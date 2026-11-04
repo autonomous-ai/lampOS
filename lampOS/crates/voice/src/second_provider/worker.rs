@@ -3390,7 +3390,7 @@ pub fn serve(
             let heeding = heeding.clone();
             crate::services::judging_voices(Arc::new(move |ask| {
                 let mut heeding = heeding.lock().ok()?;
-                let voices = heeding.voices.as_mut()?;
+                let voices = heeding.kept_voices()?;
                 match ask {
                     crate::services::VoiceAsk::Alike(a, b) => voices.alike(a, b),
                     crate::services::VoiceAsk::Conversation(request) => {
@@ -3406,15 +3406,19 @@ pub fn serve(
             .is_ok_and(|value| value == "on");
         // The same-voice check (#829): its child loads its model now. Only
         // as the lamp's only voice: a standby beside Live loads none.
-        let hears = checking_the_voice_for(
+        let printing = checking_the_voice_for(
             &heeding,
             files.same_voice.clone().filter(|_| route.only_voice),
             files.spoken_to || quiet_same_one || not_own || crate::follows_face::on(),
+            (files.same_voice_for_services, services_on),
             |model| {
                 crate::same_voice::Prints::beside_voice(model)
                     .map(|prints| Box::new(prints) as Box<dyn crate::same_voice::Printer>)
             },
         );
+        // Only prints for every rule are the voice heard; the services'
+        // alone are heard by none of them.
+        let hears = printing == Printing::ForEverything;
         // The name heard only in the room's sound opens nothing alone
         // (`LAMP_NAME_SECOND_SIGN=on`, the first builder at 21:03 on
         // #1722).
@@ -3564,6 +3568,7 @@ pub fn serve(
             &heeding,
             hears,
             files.others_answer || files.spoken_stop_ends || declines,
+            printing == Printing::ForServices,
         ) {
             engine = engine.hearing(hook);
         }
@@ -5585,7 +5590,14 @@ pub(crate) struct Heeding {
     began_just_after: Option<u64>,
     /// The same-voice check (`LAMP_SAME_VOICE_MODEL`, #829,
     /// [`Self::checking_the_voice`]), as the Live worker keeps it.
+    /// Every conversation rule reads this one: `None` is no print.
     voices: Option<crate::same_voice::Voices<Box<dyn crate::same_voice::Printer>>>,
+    /// The same-voice check kept for the linked services' judging only
+    /// (`LAMP_SAME_VOICE_FOR=services`, [`Self::checking_the_voice_for_services`]):
+    /// fed as [`Self::voices`] is ([`Self::kept_voices`]), read only by
+    /// `crate::services::judging_voices`. No conversation rule reads it, so
+    /// with it every one sees no print, as without a model.
+    for_services: Option<crate::same_voice::Voices<Box<dyn crate::same_voice::Printer>>>,
     /// #829's conversation check reads [`Self::voices`] only beside
     /// `LAMP_SPOKEN_TO` ([`Self::as_the_only_voice`]); without it the prints
     /// feed only [`Self::someone_else`] (#2428).
@@ -5796,35 +5808,79 @@ fn one_face_not_acted(seen: bool, records: bool) -> Option<&'static str> {
 /// `LAMP_GOING_ON_NOT_OWN`'s voice sign of someone else
 /// ([`Heeding::someone_else`]), which lamp-52e6 runs without
 /// `LAMP_SPOKEN_TO` (#2341). #829's own conversation check still reads them
-/// only beside `LAMP_SPOKEN_TO` ([`Heeding::voice_going_on`]). Whether the
-/// voice is heard.
+/// only beside `LAMP_SPOKEN_TO` ([`Heeding::voice_going_on`]).
+///
+/// With `for_services` (`LAMP_SAME_VOICE_FOR=services`), the child starts
+/// only while the linked services are on (`services_on`), whatever `read`
+/// says, and its prints are the services' alone
+/// ([`Heeding::checking_the_voice_for_services`]): every conversation rule
+/// reads no print. What prints are made, and for whom.
 fn checking_the_voice_for(
     heeding: &Mutex<Heeding>,
     model: Option<PathBuf>,
     read: bool,
+    (for_services, services_on): (bool, bool),
     start: impl FnOnce(PathBuf) -> std::io::Result<Box<dyn crate::same_voice::Printer>>,
-) -> bool {
+) -> Printing {
+    if for_services {
+        let Some(model) = model else {
+            return Printing::None;
+        };
+        if !services_on {
+            eprintln!(
+                "lamp-voice second: the same voice is for the linked services only (LAMP_SAME_VOICE_FOR=services), and none are on: not started"
+            );
+            return Printing::None;
+        }
+        return match start(model) {
+            Ok(printer) => {
+                eprintln!(
+                    "lamp-voice second: the same voice is judged for the linked services only (LAMP_SAME_VOICE_FOR=services): a send's voice and a read in full; no conversation rule reads a print"
+                );
+                if let Ok(mut heeding) = heeding.lock() {
+                    heeding.checking_the_voice_for_services(printer);
+                }
+                Printing::ForServices
+            }
+            Err(error) => {
+                eprintln!("lamp-voice second: the same voice is not judged: {error}");
+                Printing::None
+            }
+        };
+    }
     match (read, model) {
         (true, Some(model)) => match start(model) {
             Ok(printer) => {
                 if let Ok(mut heeding) = heeding.lock() {
                     heeding.checking_the_voice(printer);
                 }
-                true
+                Printing::ForEverything
             }
             Err(error) => {
                 eprintln!("lamp-voice second: the same voice is not judged: {error}");
-                false
+                Printing::None
             }
         },
         (false, Some(_)) => {
             eprintln!(
                 "lamp-voice second: the same voice is judged only with LAMP_SPOKEN_TO, LAMP_QUIET_GOING_ON_SAME_ONE, LAMP_GOING_ON_NOT_OWN or LAMP_MEMORY_FOLLOWS_FACE on: not judged"
             );
-            false
+            Printing::None
         }
-        (_, None) => false,
+        (_, None) => Printing::None,
     }
+}
+
+/// What the second route's same-voice check prints for
+/// ([`checking_the_voice_for`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Printing {
+    /// No print is made.
+    None,
+    /// For every rule that reads one, as `LAMP_SAME_VOICE_MODEL` alone.
+    ForEverything,
+    /// For the linked services' judging only (`LAMP_SAME_VOICE_FOR=services`).
+    ForServices,
 }
 
 /// The rule's two switches on `engine` and `heeding`, each on its own.
@@ -6343,12 +6399,25 @@ pub(super) fn see_who_speaks(
 /// it needs one: for the same-voice check (`voice_judged`), or to know which
 /// line began over the lamp's answer (`over_the_lamp`: `LAMP_OTHERS_ANSWER`,
 /// #2136, and the conversation's note, [`Heeding::conversation_note_for`]).
-/// Neither, none.
+/// With neither, but the prints made for the linked services
+/// (`for_services`), a hook that feeds only those
+/// ([`Heeding::hear_for_services`]), so no rule reads what it would not
+/// have without a model. None of the three, none.
 fn hearing_hook(
     heeding: &Arc<Mutex<Heeding>>,
     voice_judged: bool,
     over_the_lamp: bool,
+    for_services: bool,
 ) -> Option<crate::second_provider::Hearing> {
+    if !voice_judged && !over_the_lamp && for_services {
+        let heeding = heeding.clone();
+        let hook: crate::second_provider::Hearing = Arc::new(move |request, heard| {
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.hear_for_services(request, heard);
+            }
+        });
+        return Some(hook);
+    }
     (voice_judged || over_the_lamp).then(|| {
         let heeding = heeding.clone();
         let hook: crate::second_provider::Hearing = Arc::new(move |request, heard| {
@@ -6505,6 +6574,7 @@ impl Heeding {
             began_over: None,
             began_just_after: None,
             voices: None,
+            for_services: None,
             voice_ends_going_on: false,
             named_always: false,
             named_faced: None,
@@ -7451,6 +7521,50 @@ impl Heeding {
         );
     }
 
+    /// The same-voice check by `printer` for the linked services' judging
+    /// only (`LAMP_SAME_VOICE_FOR=services`): its prints are fed as
+    /// [`Self::checking_the_voice`]'s are, and no conversation rule reads
+    /// them ([`Self::for_services`]).
+    pub(crate) fn checking_the_voice_for_services(
+        &mut self,
+        printer: Box<dyn crate::same_voice::Printer>,
+    ) {
+        self.for_services = Some(
+            crate::same_voice::Voices::new(printer)
+                .callers_only(
+                    std::env::var(crate::same_voice::CALLER_ONLY_ENVIRONMENT)
+                        .is_ok_and(|value| value == "on"),
+                )
+                .for_services_only(true),
+        );
+    }
+
+    /// The same-voice check that is fed each line's sound and verdict, the
+    /// conversation rules' ([`Self::voices`]) or the services' alone
+    /// ([`Self::for_services`]). Never read for a conversation decision.
+    fn kept_voices(
+        &mut self,
+    ) -> Option<&mut crate::same_voice::Voices<Box<dyn crate::same_voice::Printer>>> {
+        self.voices.as_mut().or(self.for_services.as_mut())
+    }
+
+    /// With the prints for the services only and no other hook on the
+    /// line's sound ([`hearing_hook`]): the sound fed to their prints, and
+    /// a line begun told to a write waiting for its "send", nothing else.
+    pub(crate) fn hear_for_services(
+        &mut self,
+        request: u64,
+        heard: crate::second_provider::Heard<'_>,
+    ) {
+        if let crate::second_provider::Heard::Began {
+            over_the_lamps_voice,
+        } = heard
+        {
+            crate::services::voice_began(over_the_lamps_voice, std::time::Instant::now());
+        }
+        self.printing(request, heard);
+    }
+
     /// A spoken line's sound, for the same-voice check: judged only if it
     /// began with the lamp quiet, as on Live.
     pub(crate) fn hear(&mut self, request: u64, heard: crate::second_provider::Heard<'_>) {
@@ -7473,7 +7587,13 @@ impl Heeding {
             self.began_over = None;
             self.began_just_after = None;
         }
-        let Some(voices) = self.voices.as_mut() else {
+        self.printing(request, heard);
+    }
+
+    /// A line's sound to the kept same-voice check ([`Self::kept_voices`]).
+    fn printing(&mut self, request: u64, heard: crate::second_provider::Heard<'_>) {
+        use crate::second_provider::Heard;
+        let Some(voices) = self.kept_voices() else {
             return;
         };
         match heard {
@@ -8924,7 +9044,7 @@ impl Heeding {
         // `LAMP_SAME_SPEAKER_CARRIES`: a print come after its line's verdict
         // is another voice's only when it is sure (`Voices::sure_of_another_only`).
         if self.carries
-            && let Some(voices) = self.voices.as_mut()
+            && let Some(voices) = self.voices.as_mut().or(self.for_services.as_mut())
         {
             voices
                 .sure_of_another_only(self.sure_other_samples, crate::same_voice::DIFFERENT_BELOW);
@@ -9583,7 +9703,10 @@ impl Heeding {
         // takes below (`called`): a face turned to the lamp is a new caller,
         // and their voice is the conversation's (the Reviewer's P2 on #2650).
         // Without it, as before.
-        if let (Some(voices), Some(_)) = (self.voices.as_mut(), verdict) {
+        // Bookkeeping, fed to the services' prints too (`Self::kept_voices`).
+        if let (Some(voices), Some(_)) =
+            (self.voices.as_mut().or(self.for_services.as_mut()), verdict)
+        {
             // Seen spoken by the caller's face and no other: with
             // `LAMP_SAME_VOICE_CALLER_ONLY`, the voice of a conversation whose
             // call was too short to print.
@@ -13818,6 +13941,124 @@ mod tests {
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
     }
 
+    /// `LAMP_SAME_VOICE_FOR=services`: the prints feed the linked services'
+    /// judge (a send's `Alike`, a read's `Conversation`), and every
+    /// conversation rule sees no print, as without a model: #829's scene,
+    /// B's line going on in another voice, goes on as it does unchecked, and
+    /// each family of decisions that reads a print (the conversation's
+    /// check and the rules on `voice_going_on`, joining a cut line, the
+    /// same speaker's carry, the Policy's `like_asker`) reads none.
+    #[test]
+    fn prints_for_the_services_alone_feed_their_judge_and_no_conversation_rule() {
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::second_provider::Heard;
+        /// Prints by a line's first sample, answered at once: 1 is A's
+        /// voice, -1 B's.
+        #[derive(Default)]
+        struct Voice(std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>);
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let print = if samples[0] > 0 {
+                    vec![1.0, 0.0]
+                } else {
+                    vec![0.0, 1.0]
+                };
+                self.0.push_back((request, Ok(print)));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                self.0.pop_front()
+            }
+        }
+        let said = (10_000_000, 11_000_000);
+        let line = |heeding: &mut Heeding, request: u64, voice: i16, words: &str| {
+            heeding.hear(
+                request,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            heeding.hear(request, Heard::Samples(&[voice; 48_000]));
+            heeding.hear(request, Heard::Ended);
+            let held = heeding.heed(request, said, words, None);
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.person(words, true, Instant::now());
+            if held.is_none() {
+                thread.lamp(request, "Sure.", Instant::now());
+            }
+            held
+        };
+        let scene = |services: bool| {
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            {
+                let mut room = crate::room_told::room().lock().unwrap();
+                *room = crate::room_told::RoomTold::new();
+                room.count_only_talk(true);
+            }
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.carrying_the_same_speaker();
+            if services {
+                heeding.checking_the_voice_for_services(Box::new(Voice::default()));
+            }
+            let verdicts = [
+                line(&mut heeding, 1, 1, "Lamp, what time is it?"),
+                line(&mut heeding, 2, -1, "And what about tomorrow?"),
+                line(&mut heeding, 3, 1, "And what about tomorrow?"),
+            ];
+            (heeding, verdicts)
+        };
+        let (mut unchecked, without) = scene(false);
+        let (mut heeding, with) = scene(true);
+        // #829's scene: B's line goes on, as without the model (with the
+        // model for every rule it is held:
+        // `another_voice_going_on_is_held_and_the_conversations_own_goes_on`).
+        assert_eq!(with, without);
+        assert_eq!(with, [None, None, None]);
+        // The services' judge reads the prints: A's two lines alike, B's
+        // not; A's in the conversation's voice, B's, not kept as it, not.
+        let services = heeding.kept_voices().expect("the services' prints");
+        let near = |likeness: Option<f32>, to: f32| {
+            likeness.is_some_and(|likeness| (likeness - to).abs() < 0.01)
+        };
+        assert!(near(services.alike(1, 3), 1.0));
+        assert!(near(services.alike(1, 2), 0.0));
+        assert!(near(services.likeness_so_far(3), 1.0));
+        assert!(near(services.likeness_so_far(2), 0.0));
+        assert_eq!(services.take_late_other(), None, "ends no conversation");
+        // Every conversation decision reads no print.
+        assert!(heeding.voices.is_none());
+        for request in [2, 3] {
+            assert_eq!(
+                heeding.voice_going_on(request, true),
+                unchecked.voice_going_on(request, true),
+                "the conversation's check, {request}"
+            );
+            assert_eq!(heeding.voice_going_on(request, true).3, None);
+        }
+        assert_eq!(heeding.same_speaker(1, 2), unchecked.same_speaker(1, 2));
+        assert_eq!(heeding.same_speaker(1, 3), unchecked.same_speaker(1, 3));
+        let carried = heeding.carried_by_the_same_speaker(2, None, &Vec::new(), &Vec::new());
+        let carried_unchecked =
+            unchecked.carried_by_the_same_speaker(2, None, &Vec::new(), &Vec::new());
+        assert_eq!(
+            (carried.other, carried.goes_on, carried.voice),
+            (
+                carried_unchecked.other,
+                carried_unchecked.goes_on,
+                carried_unchecked.voice
+            ),
+            "the same speaker's carry"
+        );
+        assert_eq!(
+            crate::addressed::like_asker(heeding.voices.as_mut(), 3, true),
+            None,
+            "the Policy's like_asker"
+        );
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    }
+
     /// Ten's trace on #3126 (05:0x), pinned for the owner's question 4 (the
     /// first builder at 05:28): with `LAMP_SAME_VOICE_MODEL`,
     /// `LAMP_SPOKEN_TO` and `LAMP_NAME_OR_FOLLOW_UP`, an answered ask, then
@@ -15900,9 +16141,10 @@ mod tests {
             &heeding,
             Some(PathBuf::from("/models/campplus.onnx")),
             true,
+            (false, false),
             |_| Err(std::io::Error::other("no model")),
         );
-        assert!(!hears, "the printer did not start");
+        assert_eq!(hears, super::Printing::None, "the printer did not start");
         assert_eq!(super::one_face_not_acted(true, true), None);
         assert!(super::one_face_not_acted(false, true).is_some());
         assert!(super::one_face_not_acted(true, false).is_some());
@@ -15931,19 +16173,81 @@ mod tests {
                 &heeding,
                 Some(PathBuf::from("/models/campplus.onnx")),
                 spoken_to || quiet_same_one || not_own,
+                (false, false),
                 |_| {
                     started = true;
                     Ok(Box::new(Voice) as Box<dyn crate::same_voice::Printer>)
                 },
             );
             assert_eq!(heeding.lock().unwrap().voices.is_some(), started);
-            assert_eq!(hears, started);
+            assert!(heeding.lock().unwrap().for_services.is_none());
+            assert_eq!(hears == super::Printing::ForEverything, started);
             started
         };
         assert!(starts(false, true, false));
         assert!(starts(false, false, true));
         assert!(starts(true, false, false));
         assert!(!starts(false, false, false));
+    }
+
+    /// `LAMP_SAME_VOICE_FOR=services` (step 4 of the same voice in the
+    /// product): the child starts only while the linked services are on,
+    /// whatever rule reads a print, and its prints are the services' alone:
+    /// no conversation rule's [`Heeding::voices`] has one, and the voice is
+    /// never heard for them (`hears`).
+    #[test]
+    fn the_services_alone_start_the_same_voice_for_themselves() {
+        struct Voice;
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, _request: u64, _samples: &[i16]) -> bool {
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                None
+            }
+        }
+        let starts = |read: bool, services_on: bool| {
+            let heeding = Mutex::new(Heeding::new(true, true, None, None));
+            let mut started = false;
+            let printing = super::checking_the_voice_for(
+                &heeding,
+                Some(PathBuf::from("/models/campplus.onnx")),
+                read,
+                (true, services_on),
+                |_| {
+                    started = true;
+                    Ok(Box::new(Voice) as Box<dyn crate::same_voice::Printer>)
+                },
+            );
+            let heeding = heeding.lock().unwrap();
+            assert!(heeding.voices.is_none(), "no conversation rule's print");
+            assert_eq!(heeding.for_services.is_some(), started);
+            assert_eq!(printing == super::Printing::ForServices, started);
+            started
+        };
+        assert!(starts(true, true));
+        assert!(starts(false, true));
+        assert!(!starts(true, false), "no services, no child");
+        assert!(!starts(false, false));
+        // No model: nothing, as without the switch.
+        let heeding = Mutex::new(Heeding::new(true, true, None, None));
+        assert_eq!(
+            super::checking_the_voice_for(&heeding, None, true, (true, true), |_| {
+                unreachable!("no model, no child")
+            }),
+            super::Printing::None
+        );
+        // The hook on a line's sound feeds the services' prints only, and
+        // marks nothing a rule reads (`began_over`).
+        let heeding = Arc::new(Mutex::new(Heeding::new(true, true, None, None)));
+        let hook = super::hearing_hook(&heeding, false, false, true).expect("for the services");
+        hook(
+            9,
+            crate::second_provider::Heard::Began {
+                over_the_lamps_voice: true,
+            },
+        );
+        assert_eq!(heeding.lock().unwrap().began_over, None);
     }
 
     /// #2191 on a lamp without `LAMP_SPOKEN_TO` (lamp-52e6 and lamp-4ace):
@@ -25524,9 +25828,10 @@ mod tests {
         use crate::second_provider::Heard;
         use std::sync::{Arc, Mutex};
         let heeding = Arc::new(Mutex::new(super::Heeding::new(false, false, None, None)));
-        assert!(super::hearing_hook(&heeding, false, false).is_none());
-        assert!(super::hearing_hook(&heeding, true, false).is_some());
-        let hook = super::hearing_hook(&heeding, false, true).expect("with the switch alone");
+        assert!(super::hearing_hook(&heeding, false, false, false).is_none());
+        assert!(super::hearing_hook(&heeding, true, false, false).is_some());
+        let hook =
+            super::hearing_hook(&heeding, false, true, false).expect("with the switch alone");
         heeding.lock().unwrap().leaving_others_answers();
         hook(
             9,

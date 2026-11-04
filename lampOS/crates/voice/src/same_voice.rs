@@ -71,6 +71,15 @@ pub const ENVIRONMENT: &str = "LAMP_SAME_VOICE_MODEL";
 /// conversation's, and the two people's talk then went on as one
 /// conversation, at cosines of 0.55-0.84. Off unless set.
 pub const CALLER_ONLY_ENVIRONMENT: &str = "LAMP_SAME_VOICE_CALLER_ONLY";
+/// `services` exactly, beside [`ENVIRONMENT`]: the prints are made only for
+/// the linked services' judging (`crate::services::judging_voices`: a
+/// send's voice, a read in full), on the second route only, and only while
+/// it has services; every conversation rule reads no print, as without a
+/// model. Unset, or any other value (said once): every use, as before.
+pub const FOR_ENVIRONMENT: &str = "LAMP_SAME_VOICE_FOR";
+/// The provider worker's flag for [`FOR_ENVIRONMENT`]`=services`, right
+/// after [`FLAG`]'s path.
+pub const FOR_SERVICES_FLAG: &str = "--same-voice-for-services";
 /// The provider worker's flag for it, with the path, right after
 /// `--spoken-to`.
 pub const FLAG: &str = "--same-voice-model";
@@ -164,7 +173,13 @@ const KEPT: usize = 4;
 /// The provider worker's arguments for the model in the environment: an
 /// absolute path only.
 pub fn arguments_from_environment() -> Vec<String> {
-    arguments(std::env::var_os(ENVIRONMENT).as_deref().map(Path::new))
+    let model = std::env::var_os(ENVIRONMENT);
+    let mut arguments = arguments(model.as_deref().map(Path::new));
+    let uses = std::env::var(FOR_ENVIRONMENT).ok();
+    if !arguments.is_empty() && for_services(uses.as_deref(), &to_stderr()) {
+        arguments.push(FOR_SERVICES_FLAG.to_owned());
+    }
+    arguments
 }
 
 fn arguments(model: Option<&Path>) -> Vec<String> {
@@ -174,6 +189,34 @@ fn arguments(model: Option<&Path>) -> Vec<String> {
     {
         Some(path) => vec![FLAG.to_owned(), path.to_owned()],
         None => Vec::new(),
+    }
+}
+
+/// Whether [`FOR_ENVIRONMENT`]'s `value` keeps the prints for the services
+/// only. Any other value is as unset, and `journal` is told so once a
+/// process (the provider's arguments are made again at each restart).
+fn for_services(value: Option<&str>, journal: &Journal) -> bool {
+    static SAID: std::sync::Once = std::sync::Once::new();
+    match value {
+        None => false,
+        Some("services") => true,
+        Some(other) => {
+            SAID.call_once(|| {
+                journal(&format!(
+                    "lamp-voice: {FOR_ENVIRONMENT} is services or unset, not {other:?}: the same voice is used as without it"
+                ));
+            });
+            false
+        }
+    }
+}
+
+/// Take a leading [`FOR_SERVICES_FLAG`] off a worker's flags, right after
+/// [`take`]'s.
+pub fn take_for_services(flags: &[String]) -> (bool, &[String]) {
+    match flags {
+        [flag, rest @ ..] if flag == FOR_SERVICES_FLAG => (true, rest),
+        _ => (false, flags),
     }
 }
 
@@ -565,6 +608,10 @@ pub struct Voices<P: Printer> {
     /// is sure ([`Self::sure_of_another_only`]): from this many samples of
     /// speech or more, and under this cosine. `None`: as [`DIFFERENT_BELOW`].
     sure_of_another: Option<(usize, f32)>,
+    /// The prints are kept for the linked services' judging only
+    /// ([`FOR_ENVIRONMENT`], [`Self::for_services_only`]): a late print in
+    /// another voice ends no conversation.
+    for_services: bool,
 }
 
 impl<P: Printer> Voices<P> {
@@ -584,7 +631,18 @@ impl<P: Printer> Voices<P> {
             journal: to_stderr(),
             lengths: VecDeque::new(),
             sure_of_another: None,
+            for_services: false,
         }
+    }
+
+    /// The prints are for the linked services' judging only, with `on`
+    /// ([`FOR_ENVIRONMENT`]`=services`): the conversation's voice is kept as
+    /// ever, for their `Conversation` likeness, but a late print in another
+    /// voice is only not kept, and ends no conversation
+    /// ([`Self::take_late_other`] has nothing).
+    pub fn for_services_only(mut self, on: bool) -> Self {
+        self.for_services = on;
+        self
     }
 
     /// From now on, a print come after its line's verdict ends the
@@ -883,6 +941,11 @@ impl<P: Printer> Voices<P> {
                 (self.journal)(&format!(
                     "lamp-voice provider: request {request}: a print known after its answer at cosine {likeness:.2}, from {} ms of speech: unsure, neither another voice nor the conversation's",
                     self.usable_speech(request).unwrap_or(0) * 1_000 / RATE
+                ));
+            }
+            Some(likeness) if likeness < DIFFERENT_BELOW && self.for_services => {
+                (self.journal)(&format!(
+                    "lamp-voice provider: request {request}: another voice than the conversation's, known after its answer (cosine {likeness:.2}): not kept as its voice, for the services only"
                 ));
             }
             Some(likeness) if likeness < DIFFERENT_BELOW => {
@@ -1890,6 +1953,61 @@ exec sleep 30"#,
         assert_eq!(take(&flags[2..]).unwrap(), (None, &flags[2..]));
         assert!(take(&[FLAG.to_owned(), "m.onnx".into()]).is_err());
         assert!(take(&[FLAG.to_owned()]).is_err());
+    }
+
+    /// `LAMP_SAME_VOICE_FOR`: `services` exactly keeps the prints for the
+    /// services, its flag right after the model's path; unset is every use,
+    /// as before; any other value is as unset, said once a process.
+    #[test]
+    fn the_prints_are_for_the_services_only_with_services_exactly() {
+        let said = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let into = said.clone();
+        let journal: Journal = Arc::new(move |line: &str| into.lock().unwrap().push(line.into()));
+        assert!(for_services(Some("services"), &journal));
+        assert!(!for_services(None, &journal));
+        assert!(!for_services(Some("Services"), &journal));
+        assert!(!for_services(Some("all"), &journal));
+        let said = said.lock().unwrap();
+        assert_eq!(said.len(), 1, "said once: {said:?}");
+        assert!(said[0].contains("LAMP_SAME_VOICE_FOR is services or unset"));
+        let flags = [FLAG, "/m.onnx", FOR_SERVICES_FLAG, "--rest"].map(str::to_owned);
+        let (model, rest) = take(&flags).unwrap();
+        assert_eq!(model.as_deref(), Some(Path::new("/m.onnx")));
+        assert_eq!(take_for_services(rest), (true, &flags[3..]));
+        assert_eq!(take_for_services(&flags[3..]), (false, &flags[3..]));
+    }
+
+    /// With the prints for the services only, a late print in another
+    /// voice is not kept as the conversation's and ends no conversation,
+    /// and the journal holds its cosine only.
+    #[test]
+    fn a_late_other_voice_ends_no_conversation_for_the_services_alone() {
+        let said = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let into = said.clone();
+        let mut voices = Voices::journaled(
+            StandIn::default(),
+            Arc::new(move |line: &str| into.lock().unwrap().push(line.into())),
+        )
+        .for_services_only(true);
+        said_by(&mut voices, 1, 1);
+        voices.decided(1, true, false);
+        voices.printer.slow = true;
+        said_by(&mut voices, 2, -1);
+        voices.decided(2, true, true);
+        voices.printer.slow = false;
+        assert_eq!(voices.take_late_other(), None);
+        assert_eq!(voices.likeness_so_far(2), Some(0.0));
+        assert_eq!(voices.conversation.len(), 1, "B's print not kept");
+        assert!(
+            said.lock()
+                .unwrap()
+                .iter()
+                .any(|line| line.contains("for the services only")),
+        );
+    }
+
+    fn said_by(voices: &mut Voices<StandIn>, request: u64, voice: i16) {
+        said(voices, request, voice, 48_000);
     }
 
     #[test]

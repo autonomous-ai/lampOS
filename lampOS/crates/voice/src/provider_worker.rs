@@ -349,6 +349,11 @@ pub struct Files {
     /// another voice than the conversation's is no part of it. Only with
     /// `spoken_to`.
     pub same_voice: Option<std::path::PathBuf>,
+    /// Its prints are for the linked services' judging only
+    /// (`--same-voice-for-services`, `LAMP_SAME_VOICE_FOR=services`): the
+    /// second route makes them only with services, and no conversation rule
+    /// reads them; the Live route, which has no services' judge, none.
+    pub same_voice_for_services: bool,
     /// Whether each request is judged said to the lamp from close to it,
     /// published, and let out in a busy room (`--addressed`,
     /// `crate::addressed`).
@@ -479,6 +484,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (spoken_to, flags) = crate::attention::take_spoken_to(flags);
     let (spoken_to_by_day, flags) = crate::attention::take_by_day(flags);
     let (same_voice, flags) = crate::same_voice::take(flags)?;
+    let (same_voice_for_services, flags) = crate::same_voice::take_for_services(flags);
     let (addressed, flags) = crate::addressed::take(flags);
     let (name_signal, flags) = crate::attention::take_name(flags);
     let (name_note, name_note_busy_face, flags) = crate::called::take(flags);
@@ -539,6 +545,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         spoken_to,
         spoken_to_by_day,
         same_voice,
+        same_voice_for_services,
         addressed,
         name_signal,
         name_note,
@@ -1749,6 +1756,14 @@ pub async fn run_with_continuation(
         spoken_to: files.attention && files.spoken_to,
         // The child starts now: its model loads while the link opens.
         voices: match (files.attention && files.spoken_to, files.same_voice) {
+            // `LAMP_SAME_VOICE_FOR=services`: this route reads services with
+            // no voice judge, so no print is made here.
+            (_, Some(_)) if files.same_voice_for_services => {
+                eprintln!(
+                    "lamp-voice provider: the same voice is for the linked services only (LAMP_SAME_VOICE_FOR=services), on the second route: not judged here"
+                );
+                None
+            }
             (true, Some(model)) => match crate::same_voice::Prints::beside_voice(model) {
                 Ok(prints) => Some(Box::new(prints) as Box<dyn crate::same_voice::Printer>),
                 Err(error) => {

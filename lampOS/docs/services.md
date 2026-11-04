@@ -68,7 +68,11 @@ and the line is in the conversation's voice
 (`same_voice::Voices::likeness_so_far` at `same_voice::SAME_FROM`, 0.70, or
 over; `services::read_in_full`). The services ask the second route's
 same-voice check through `services::judging_voices`, waiting up to 800 ms
-for a print. With the owner not seen saying it, more faces, no count,
+for a print. With `LAMP_SAME_VOICE_MODEL` and
+`LAMP_SAME_VOICE_FOR=services`, the second route makes its prints for these
+judgements alone, and only while the services are on: every conversation
+rule then reads no print, as without the model
+([same-voice.md](same-voice.md), "For the services only"). With the owner not seen saying it, more faces, no count,
 another voice or no print (the camera off, a line under the print's 1.5 s, and always on the Live route,
 which has no prints), the answer keeps only each item's `id`, `from`,
 `subject`, `title`, `name`, `summary`, `date`, `start` and `end`, an item
