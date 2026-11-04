@@ -817,7 +817,7 @@ publishes, every 250 ms:
 | Not quiet hours: 22:00–07:00 local, or the skill's `[quiet]`; an unknown local time counts as quiet | `lamp_local_time::quiet_hours` | "quiet hours" |
 | One face in view, at most (`faces_at_most = 1`) | `humans/faces/tracked`, fresh within 3 s | "not alone" |
 | That face is the owner's known face | The eyes' known file (fresh within 2 s), its name the owner's, case aside | "not the owner" / "the owner not in view" |
-| No voice heard in the last minute | `voice/heard`'s latest message | "a voice heard" |
+| No voice heard in the last minute | Each line on `voice/heard`, marked as it comes by a thread of `lamp-skills`' own (the topic is an event: the bus keeps no latest of it, so before this fix the row never held a read back; lamp-9adf, 5 Nov) | "a voice heard" |
 
 All must hold steadily for 5 s. Until then the run waits, at most 60
 minutes, and then skips the day with nothing said ("skipped: <why>"). A
