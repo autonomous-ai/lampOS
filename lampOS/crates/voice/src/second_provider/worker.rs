@@ -27757,6 +27757,7 @@ mod memory_observer {
             correct: false,
             questions: false,
             sign_in: false,
+            sign_in_app: false,
         };
         let tools = crate::agent_tasks::tools(&place);
         let declare: super::super::net::Declare = Arc::new(move || tools.clone());
@@ -27943,6 +27944,7 @@ mod memory_observer {
             correct: false,
             questions: false,
             sign_in: false,
+            sign_in_app: false,
         };
         let tools = crate::agent_tasks::tools(&place);
         let declare: super::super::net::Declare = Arc::new(move || tools.clone());
