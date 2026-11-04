@@ -562,6 +562,18 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   "send" said to me right after I read the message back. Say it was not
   sent." The journal names each check that failed ("a send cancelled: …"), and
   every refusal the words it gave.
+- **A send with nothing waiting** (none prepared, or already sent or
+  cancelled) sends nothing, and the model is told `NOTHING_WAITING`, "Not
+  sent: no write waits for a send. None was prepared, or it was already sent
+  or cancelled. If they still want it, call service_write now without
+  send_id, say its read_back in full, and ask them again.", so the person
+  hears a real read-back and says "send" again. The journal says "a send with
+  no write waiting". On lamp-9adf on 4 Nov the model twice said a read-back of
+  its own, with no call, and the "send" after it found nothing; the
+  function's own rule now says never to say a read-back that no call gave in
+  the same turn.
+- **The send's voice score is journaled**: "a send's voice beside request N's:
+  cosine 0.64" (or "no print"), a score only, never a print.
 - **The read-back must have been heard in full.** The lamp's words must hold
   every word of the `read_back` in order (letters and digits, lower case, an
   address's "at" and "dot" said or written alike; more words around it, such
