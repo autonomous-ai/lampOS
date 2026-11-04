@@ -1,5 +1,7 @@
 //! The models a build carries (#1680, docs/updates.md). Off unless
-//! `LAMP_UPDATE_MODELS=on`.
+//! `LAMP_UPDATE_MODELS=on`: in lamp-update.service's environment, or, with
+//! the variable not set there at all, in the switch file a round carries
+//! (`manifest::MODELS_ENV`, [`file_on`]).
 //!
 //! A model is fetched into the store, `/opt/lampOS/models/<sha256>`, only
 //! when no file of that SHA-256 is already where it is needed, and checked
@@ -21,9 +23,63 @@ use std::{collections::BTreeSet, fs, io, path::PathBuf};
 /// The switch, in lamp-update.service's environment: `on`, or off.
 pub const SWITCH: &str = "LAMP_UPDATE_MODELS";
 
+/// The largest switch file read: the product's is a few lines.
+pub const MOST_FILE_BYTES: usize = 4096;
+
 /// Whether the switch is on, from its value.
 pub fn on(value: Option<&str>) -> bool {
     value == Some("on")
+}
+
+/// Whether the switch file's text turns the models on: every line blank, a
+/// comment (`#`) or `NAME=value`, and the last `LAMP_UPDATE_MODELS=` one
+/// exactly `on`. Anything else is off: a file not text, too long, with a
+/// line of another form or quoted, or that doesn't name the switch.
+pub fn file_on(bytes: &[u8]) -> bool {
+    if bytes.len() > MOST_FILE_BYTES {
+        return false;
+    }
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return false;
+    };
+    let mut value = None;
+    for line in text.lines().map(str::trim) {
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((name, rest)) = line.split_once('=') else {
+            return false;
+        };
+        if name.is_empty()
+            || !name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        {
+            return false;
+        }
+        if name == SWITCH {
+            value = Some(rest);
+        }
+    }
+    value == Some("on")
+}
+
+/// The switch file on the lamp, under `root`: off when it is missing, not
+/// a regular file, unreadable or garbled.
+pub fn lamp_file_on(root: &std::path::Path) -> bool {
+    use std::io::Read;
+    let path = root.join(crate::manifest::MODELS_ENV.trim_start_matches('/'));
+    if !fs::symlink_metadata(&path).is_ok_and(|metadata| metadata.is_file()) {
+        return false;
+    }
+    let mut bytes = Vec::new();
+    fs::File::open(&path)
+        .and_then(|file| {
+            file.take(MOST_FILE_BYTES as u64 + 1)
+                .read_to_end(&mut bytes)
+        })
+        .is_ok()
+        && file_on(&bytes)
 }
 
 /// A model's path as it was before a switch, to be put back.
@@ -300,5 +356,50 @@ mod tests {
         assert!(!reads(eyes, "/opt/lampOS/eyes/models/other.onnx"));
         assert!(in_a_part("/opt/lampOS/voice/current/smart-turn.onnx"));
         assert!(!in_a_part("/opt/lampOS/eyes/models/face.onnx"));
+    }
+
+    #[test]
+    fn the_switch_file_is_on_only_when_it_says_on_plainly() {
+        let product = include_bytes!("../../../deploy/product/settings/models.env");
+        assert!(file_on(product));
+        assert!(file_on(b"LAMP_UPDATE_MODELS=on\n"));
+        assert!(file_on(
+            b"# a note\n\nOTHER=1\nLAMP_UPDATE_MODELS=off\nLAMP_UPDATE_MODELS=on\n"
+        ));
+        // Missing, empty, off, garbled: off.
+        for off in [
+            &b""[..],
+            b"\n# LAMP_UPDATE_MODELS=on\n",
+            b"LAMP_UPDATE_MODELS=off\n",
+            b"LAMP_UPDATE_MODELS=on\nLAMP_UPDATE_MODELS=off\n",
+            b"LAMP_UPDATE_MODELS=\"on\"\n",
+            b"LAMP_UPDATE_MODELS=onn\n",
+            b"LAMP_UPDATE_MODELS on\n",
+            b"LAMP_UPDATE_MODELS=on\ngarbage\n",
+            b"export LAMP_UPDATE_MODELS=on\n",
+            b"LAMP_UPDATE_MODELS=on\xff\n",
+        ] {
+            assert!(!file_on(off), "{:?}", String::from_utf8_lossy(off));
+        }
+        let mut long = b"LAMP_UPDATE_MODELS=on\n".to_vec();
+        long.extend(std::iter::repeat_n(b'#', MOST_FILE_BYTES));
+        assert!(!file_on(&long));
+
+        let root = tempfile::tempdir().unwrap();
+        assert!(!lamp_file_on(root.path()));
+        let at = root
+            .path()
+            .join(crate::manifest::MODELS_ENV.trim_start_matches('/'));
+        fs::create_dir_all(at.parent().unwrap()).unwrap();
+        fs::write(&at, product).unwrap();
+        assert!(lamp_file_on(root.path()));
+        fs::write(&at, b"\x00\x01garbled").unwrap();
+        assert!(!lamp_file_on(root.path()));
+        // A link is not the round's file: off.
+        fs::remove_file(&at).unwrap();
+        let other = root.path().join("on.env");
+        fs::write(&other, product).unwrap();
+        std::os::unix::fs::symlink(&other, &at).unwrap();
+        assert!(!lamp_file_on(root.path()));
     }
 }

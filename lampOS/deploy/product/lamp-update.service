@@ -49,7 +49,8 @@ Environment=LAMP_UPDATE_APPLY=on
 # The models a build carries (deploy/product/models.json) are fetched, checked by size and SHA-256 and
 # placed with their parts (docs/updates.md, "Models in the manifest"): the same-voice check's CAM++
 # reaches a lamp so (docs/same-voice.md, step 2). No round switches this unit: a lamp in a home gets
-# this line only from an image or `lamp-update install` made from here on.
+# this line only from an image or `lamp-update install` made from here on, and the switch meanwhile from
+# /etc/lampOS/models.env, which every build carries among its settings. Set here, it wins over that file.
 Environment=LAMP_UPDATE_MODELS=on
 
 [Install]

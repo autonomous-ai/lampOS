@@ -702,9 +702,20 @@ pub const STORE_SETTINGS: &[(&str, &str)] = &[
     ),
 ];
 
+/// The models switch file a build carries (`manifest::MODELS_ENV`, from
+/// updater 11, same-voice step 2): on. Read by lamp-update itself, so a
+/// lamp in a home turns the models on with no change to its own unit, which
+/// no round rewrites. Install doesn't write it: the product unit it writes
+/// sets `LAMP_UPDATE_MODELS=on`, which wins over the file.
+pub const MODELS_SETTING: (&str, &str) = (
+    manifest::MODELS_ENV,
+    include_str!("../../../deploy/product/settings/models.env"),
+);
+
 /// The product's settings as a build carries them (#1680, crate::apply):
-/// every one of [`SETTINGS`], the tmpfiles and the Store's switch file
-/// (`manifest::STORE_ENV`), 0644. Never setup's, the
+/// every one of [`SETTINGS`], the tmpfiles, the Store's switch file
+/// (`manifest::STORE_ENV`) and the models switch file ([`MODELS_SETTING`]),
+/// 0644. Never setup's, the
 /// voice's service, the keys or the zone, which are the lamp's; nor the
 /// product skills' files, which a round places from the build's
 /// `lamp-product-skills` (crate::product_skills) and the skills guard judges.
@@ -719,6 +730,7 @@ pub fn product_settings() -> Vec<manifest::Setting> {
                 .iter()
                 .filter(|(path, _)| *path == manifest::STORE_ENV),
         )
+        .chain([&MODELS_SETTING])
         .map(|(path, text)| manifest::Setting::new(path, text))
         .collect()
 }

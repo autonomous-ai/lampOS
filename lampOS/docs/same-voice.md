@@ -35,6 +35,11 @@ until its model is put there and the voice is told where.
   since 4 November (this work's step 2), so a round fetches CAM++ where it is missing,
   checks it by size and SHA-256 and places it beside the voice in the
   voice's new folder ([updates.md](updates.md), "Models in the manifest").
+  No round rewrites the updater's own unit, so a lamp already in a home
+  gets the switch from `/etc/lampOS/models.env` instead, a signed,
+  hash-pinned setting every build carries from updater 11, read by
+  lamp-update when its environment doesn't set `LAMP_UPDATE_MODELS`; one
+  set there, `off` included, wins.
   The voice reads the model only when `LAMP_SAME_VOICE_MODEL` names it,
   which no product unit sets.
 - **The front end:** 80 Kaldi filter banks a frame, computed in Rust as
