@@ -7330,6 +7330,13 @@ async fn spoken(
             },
             shared.fixed(crate::spoken_stop::LINE)
         );
+        // The person stopped the lamp: the conversation is over, as after
+        // the button's Stop or a computer's `turn.end`. The line stays in the
+        // thread but keeps none going, so a room line said next needs a name,
+        // a turn or a tap (the local leader, 4 Nov: else it started a fresh
+        // 45 s of conversation).
+        // Its own exchange is covered however late the line is written.
+        crate::thread::close_now(Some(request));
         say_fixed(
             &shared,
             request,
