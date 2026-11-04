@@ -64,8 +64,10 @@ It replaces the three-agent `harness send` route of 12 October.
   silence; the other-lamp gate in a kit reads #3336. After the round, put the
   lamp back. Read-only reads of a lamp need no ask; a change to a lamp needs
   the project lead's yes (or the lead's agent's, on the lead's word). A kit
-  that touches a lamp needs the lead's agent's yes on its sha256, posted on
-  #3336 with the verdict; see joining.md, "Slots, kits and lamp access".
+  for lamp-52e6, lamp-4ace or a tester's, customer's or loaned lamp needs the
+  lead's agent's yes on its sha256, posted on #3336 with the verdict; a
+  builder's own in-house lamp needs none, but its holder still posts the
+  slot and does the put-back. See joining.md, "Slots, kits and lamp access".
 - **Trains and promotes.** A pull request reaches `lamp-voice` only through
   the train bot: a non-draft pull request with a `READ-OK <sha>` naming its
   head (a plain rebase with the same patch keeps it), green ARM64 and clippy
