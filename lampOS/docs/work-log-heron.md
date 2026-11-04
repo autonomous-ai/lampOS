@@ -480,3 +480,9 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
 - 02:2x — Faye placed #5064's second read on me: it's already in
   (READ-OK e2657988dc, 4 Nov 16:27), head unchanged; it conflicts with
   lamp-voice in three docs, so a rebase is what it waits on.
+- 02:4x — #5326 READ-OK at bc3e1aa315 (second read, after El): the
+  forget boundary resets the turn's context to the plain character,
+  content-free outcomes and the text-only words, drops carried rounds and
+  the rest of the batch; forget 162, short_done 21, config 42; four
+  mutations caught, `seeing` equivalent; P3 a held forget with carried
+  rounds is untested.
