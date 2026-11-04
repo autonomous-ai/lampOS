@@ -80,6 +80,18 @@ const DASHES: [char; 3] = ['\u{2014}', '\u{2013}', '-'];
 /// Told before the round asked again after a claim with no call.
 pub const NOTE: &str = "(For you to know: your last reply said something was done, but no function was called in this turn, so nothing was done, and it was not said. If they asked for a change, a timer or a reminder, call its function now; the lamp says the result itself. If you cannot do it, say plainly that you didn't. If they only asked a question, answer it in words without saying that anything was done.)";
 
+/// What the next round is told when a claim was held beside calls of
+/// another kind, which did run (Thirteen's P2 on #5253): never "no function
+/// was called", so the model doesn't call those again (a second timer, a
+/// light made brighter twice), and only the claimed kind is asked for.
+pub fn beside_calls_note(kind: Claim) -> String {
+    format!(
+        "(For you to know: your last reply said {} was done, but no function for it was called, so it was not done, and those words were not said. The other functions in that reply did run: do not call them again. If they asked for {}, call its function now; the lamp says the result itself. If not, or if you cannot, say plainly that it wasn't done.)",
+        kind.what(),
+        kind.what()
+    )
+}
+
 /// Said when the round asked again claims again with no call.
 pub const NOT_DONE_LINE: &str = "Sorry, I didn't do that. Could you ask me again?";
 
@@ -107,6 +119,16 @@ impl Claim {
                 "set_timer" | "set_reminder" | "repeat_reminder" | "snooze_reminder"
             ),
             Self::ReminderTime => Self::Schedule.made_by(name) || name == "list_reminders",
+        }
+    }
+
+    /// What it claims, in the words a note tells the model.
+    pub fn what(self) -> &'static str {
+        match self {
+            Self::LightOrVolume => "a change to the light or the volume",
+            Self::AnyCall => "an action",
+            Self::Schedule => "a timer or a reminder",
+            Self::ReminderTime => "a reminder",
         }
     }
 

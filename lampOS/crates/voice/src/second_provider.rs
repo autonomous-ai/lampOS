@@ -10604,7 +10604,7 @@ async fn answer(
         // switch) was asked again once already, and whether the next round
         // is told one went unsaid beside other calls.
         let mut action_claim_asked = false;
-        let mut action_claim_note = false;
+        let mut action_claim_note: Option<crate::action_claim::Claim> = None;
         if !rounds.is_empty() {
             eprintln!(
                 "lamp-voice second: request {request} goes on from {} messages of the cut answer's finished rounds",
@@ -10653,8 +10653,10 @@ async fn answer(
             if let Some(note) = keep_claim_note.take() {
                 messages.push(Message::system(note));
             }
-            if std::mem::take(&mut action_claim_note) {
-                messages.push(Message::system(crate::action_claim::NOTE));
+            if let Some(kind) = action_claim_note.take() {
+                messages.push(Message::system(crate::action_claim::beside_calls_note(
+                    kind,
+                )));
             }
             if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                 return Err(Stop::Gone);
@@ -11313,7 +11315,7 @@ async fn answer(
                             calls.len()
                         );
                         action_claim_asked = true;
-                        action_claim_note = true;
+                        action_claim_note = Some(kind);
                         text.clear();
                     }
                     Some(kind)
