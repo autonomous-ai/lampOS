@@ -855,10 +855,19 @@ a pause, quiet hours, the owner gone), it stops with nothing said.
 "stopped: someone came in, 2 of 5 read", "not read: <the service's plain
 error>", never a title, sender or subject.
 
-**Making one by voice.** With the switch on in `lamp-voice`,
+**Making one by voice.** With the switch on in `lamp-voice` (which
+passes the exact `on` to its two routes' workers, `provider` and `second`,
+whose `make_skill` briefs and checks the skill: their environment is
+otherwise cleared, and without it the switch was off there on lamp-9adf
+on 4 Nov),
 `made_skill::brief` lets a request through that names one linked service
 with a fixed read and no write word ("send", "reply", "add", "post", "schedule",
-...); two services, or a write, are still `NOT_A_SERVICE`. A calendar's
+...); two services, or a write, are still `NOT_A_SERVICE`. Asking for
+the skill itself is no write: words before "skill" that only ask for it
+("create me a new skill that ...", "add a skill to ...") are left out
+first, and "schedule" after "my", "the", "tomorrow's", "today's", "day"
+or "calendar" is the thing read (lamp-9adf, 4 Nov 23:51: "create a skill
+that reads my calendar" was refused so). A write after them still counts. A calendar's
 step is given whole (today, or tomorrow when it says "tomorrow"), as is
 mail's (`recent`); for any other service the brief lists its reads but the
 whole texts and free-form reads (`spoken::whats`) and the model picks
