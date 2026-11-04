@@ -632,3 +632,26 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - #5124 taken (4 Nov). It is the tie proposal: in a busy room the caller's lines lose the tie after desk talk. The first builder placed it on #5161, after Seventh's #5110 count on 9928, so both use the same played lines. It is queued behind that count.
 - #5061 went to the updater's builder (Second), not to me.
 - Reads: #5117 restated READ-OK twice on SubDarren's clean rebases (`9cf74d0c85`, then `9acb33a33c`). Each range-diff changed only context lines.
+
+## 4 Nov, afternoon and evening: reads, #5234's 3+3
+
+- Ready for lamp-voice: none of mine open. The new rules from today:
+  - a READ-OK may rest on green CI at the exact head, with a line saying no local gate ran (the PM, #4710);
+  - PRs labelled `tester:twelve` get their lamp check on c0a4 from me;
+  - each train carrying my PR gets `PASS N`/`FAIL N` from c0a4.
+- Reads:
+  - #5080: READ-OK, restated on a rebase.
+  - #5180: restated twice; it landed.
+  - #5195: READ-OK.
+  - #5072: READ-OK with one P2, then on its fix.
+  - #5240: READ-OK with one P3 (no voice guard on the pause-split tie).
+  - #5214: READ-OK on CI at `3469bb2349`, after CI re-ran on that head; it landed.
+  - #5202 (joining.md and AGENTS.md for the PM era): READ-OK at `76193425c`. One P2 for a follow-up: lamp access says every change needs the lead's yes, but in-house lamps need none.
+- #5234 (`LAMP_NAME_START_USUAL` before customers' lamps):
+  - The run from 15:25 was stopped for SubDarren before anything changed.
+  - The run from 18:0x was void: the Mac's sound was off.
+  - The 3+3 then ran 18:11–18:28: product build, the switch on by an `/etc` drop-in against off, alternating, busy_cook's shape from the Mac in synthetic voices.
+  - Result: no c11 held because the name came late, 0 of 6. c11 was answered 3/3 on and 2/3 off. The off miss was c11 spoken over the lamp's answer to a desk line let out as the conversation going on.
+  - One "on" c11 began 2.2 s into the line, on the lamp's own tail, and was answered as the conversation going on.
+  - Posted on #5234 with a close-ask. c0a4 restored, lock released.
+- #5124 waits on #5110's count and the PM's answer on whether Held carries it. Its two test edits sit uncommitted in my worktree.
