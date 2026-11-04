@@ -80,7 +80,10 @@ cho một dấu giọng. Với `LAMP_SAME_VOICE_MODEL` và
 `LAMP_SAME_VOICE_FOR=services`, tuyến thứ hai chỉ tạo dấu giọng cho các phán
 đoán này, và chỉ khi các dịch vụ đang bật: khi đó mọi quy tắc hội thoại không
 đọc dấu giọng nào, như khi không có mô hình
-([same-voice.md](../same-voice.md), "For the services only"). Chủ đèn không được thấy nói câu đó, có nhiều khuôn mặt hơn, không có số đếm, một giọng khác
+([same-voice.md](../same-voice.md), "For the services only"); khi đó, một chủ
+đèn đã có dấu giọng đăng ký thì câu nói được so với dấu giọng đó thay cho
+giọng của cuộc trò chuyện (`VoiceAsk::Owner`, same-voice.md, "The owner's
+voice print"). Chủ đèn không được thấy nói câu đó, có nhiều khuôn mặt hơn, không có số đếm, một giọng khác
 hay không có dấu giọng (camera tắt, một câu dưới 1.5 s của dấu giọng, và luôn
 luôn trên tuyến Live, vốn không có dấu giọng), câu trả lời chỉ giữ `id`, `from`,
 `subject`, `title`, `name`, `summary`, `date`, `start` và `end` của mỗi mục,
@@ -193,6 +196,10 @@ Bị xoá khi:
 - **Gỡ:** `connector.remove.<code>` của ứng dụng → `{"op":"remove"}`: file
   đó (và mọi `.new` ghi dở) bị xoá, và một lần ghi đang chờ cho dịch vụ đó bị
   quên.
+- **Dấu giọng của chủ đèn** (`/var/lib/lampos-eyes/owner-voice.json`,
+  same-voice.md, "The owner's voice print") không phải token: nó bị xoá bởi
+  kế hoạch reset và bởi "quên mọi thứ" của chủ đèn, không bao giờ bởi việc gỡ
+  một dịch vụ.
 - **Khôi phục cài đặt gốc:** `/var/lib/lampos-services` là một trong các đường
   dẫn của kế hoạch reset (`crates/setup/fixtures/reset-plan-product.json`,
   hash được thêm vào `RESET_PLAN_SHIPPED`; [setup.md](../setup.md)).
@@ -648,6 +655,20 @@ only reads …").
   theo của người đó có thể gửi, theo mọi luật ở trên với yêu cầu đó là lượt
   của đèn ngay trước. Một câu thứ hai không có dấu giọng huỷ nó như
   `OTHER_VOICE`.
+- **Dấu giọng đăng ký của chủ đèn, khi có** (chỉ với
+  `LAMP_SAME_VOICE_FOR=services`, [same-voice.md](../same-voice.md), "The
+  owner's voice print"): dấu giọng của câu gửi được so với dấu giọng của chủ
+  đèn, lấy trung bình từ nhiều câu của họ, thay cho dấu giọng của câu chuẩn
+  bị (`VoiceAsk::Owner`, `services::send_likeness`), với cùng `SAME_FROM`;
+  nhật ký chỉ ghi cosine ("owner print: the send's cosine 0.82"). Mọi kiểm
+  tra khác ở trên giữ nguyên. Không có dấu giọng thì như trên. Sau một lần
+  gửi của chủ đèn chưa có dấu giọng, đã gửi hoặc bị từ chối là
+  `OTHER_VOICE`, và khuôn mặt họ được thấy nói câu đó, mô hình được báo một
+  lần, dưới `then`: "Then ask, in the conversation's language, exactly: "May
+  I learn your voice, so I only send mail when it's you?" (in Vietnamese
+  "Cho tôi học giọng của bạn nhé, để tôi chỉ gửi thư khi đúng là bạn?"). …".
+  Không hỏi lúc chuẩn bị: phần đọc lại và câu "send" của nó là các lượt
+  ngay sau đó.
 - **Mọi lượt sau đó đều làm quên nó:** một câu thứ hai do bất kỳ ai bắt đầu,
   đèn nói trong một yêu cầu khác thứ hai, hoặc một lệnh gọi dịch vụ không có
   `send_id` trong một yêu cầu khác sẽ bỏ lần ghi đang chờ.

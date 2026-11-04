@@ -72,7 +72,10 @@ for a print. With `LAMP_SAME_VOICE_MODEL` and
 `LAMP_SAME_VOICE_FOR=services`, the second route makes its prints for these
 judgements alone, and only while the services are on: every conversation
 rule then reads no print, as without the model
-([same-voice.md](same-voice.md), "For the services only"). With the owner not seen saying it, more faces, no count,
+([same-voice.md](same-voice.md), "For the services only"); there, an owner
+with an enrolled voice print has the line held to that print instead of the
+conversation's voice (`VoiceAsk::Owner`, same-voice.md, "The owner's voice
+print"). With the owner not seen saying it, more faces, no count,
 another voice or no print (the camera off, a line under the print's 1.5 s, and always on the Live route,
 which has no prints), the answer keeps only each item's `id`, `from`,
 `subject`, `title`, `name`, `summary`, `date`, `start` and `end`, an item
@@ -181,6 +184,10 @@ Wiped:
 - **Remove:** the app's `connector.remove.<code>` → `{"op":"remove"}`: that
   file (and any half-written `.new`) is deleted, and a write waiting for that
   service is forgotten.
+- **The owner's voice print** (`/var/lib/lampos-eyes/owner-voice.json`,
+  same-voice.md, "The owner's voice print") is no token: it is wiped by the
+  reset plan and by the owner's "forget everything", never by removing a
+  service.
 - **Factory reset:** `/var/lib/lampos-services` is one of the reset plan's
   paths (`crates/setup/fixtures/reset-plan-product.json`, hash added to
   `RESET_PLAN_SHIPPED`; [setup.md](setup.md)).
@@ -615,6 +622,19 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   are no other request's, and the person's next line may send, held to
   every rule above with that request as the lamp's turn before it. A second
   line with no print cancels it as `OTHER_VOICE`.
+- **The owner's enrolled print, when there is one** (only with
+  `LAMP_SAME_VOICE_FOR=services`, [same-voice.md](same-voice.md), "The
+  owner's voice print"): the send line's print is compared with the owner's
+  print, averaged from several of their lines, instead of the prepare
+  line's (`VoiceAsk::Owner`, `services::send_likeness`), at the same
+  `SAME_FROM`; the journal says only its cosine ("owner print: the send's
+  cosine 0.82"). Every other check above is unchanged. With no print, it is
+  as above. After a send by an owner with no print, sent or refused as
+  `OTHER_VOICE`, and their face seen saying it, the model is told once, as
+  `then`: "Then ask, in the conversation's language, exactly: "May I learn
+  your voice, so I only send mail when it's you?" (in Vietnamese "Cho tôi
+  học giọng của bạn nhé, để tôi chỉ gửi thư khi đúng là bạn?"). …". Not at
+  the prepare: the read-back and its "send" are the very next turns.
 - **Any later turn forgets it:** a second line begun by anyone, the lamp
   speaking in a second other request, or a services call with no `send_id`
   in another request drops the waiting write.
