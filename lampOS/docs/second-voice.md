@@ -3991,10 +3991,12 @@ after a take-over, but now for every turn:
   start (the carried sound above). With soft starts on (`LAMP_SOFT_START`)
   a line's sound opens up to 0.3 s before its usual start, so every hearing
   reads that much later into it: on a lamp 939 to 1023 ms with them, 654 to
-  723 ms without (#4226). With `LAMP_NAME_START_USUAL=on` (off unless set)
-  the name at the line's start is dated from the usual start: the
-  coordinator's `Start` says the lead it kept (`soft_lead_us`, from the
-  line's first block to the block `PRE_ROLL_BLOCKS` back from the trigger,
+  723 ms without (#4226). With `LAMP_NAME_START_USUAL=on` (off unless set;
+  on in the product since 4 Nov: #5234's 3+3 on lamp-c0a4 held no c11 for a
+  late name in 6 rounds, c11 answered 3/3 on and 2/3 off) the name at the
+  line's start is dated from the usual start: the coordinator's `Start`
+  says the lead it kept (`soft_lead_us`, from the line's first block to
+  the block `PRE_ROLL_BLOCKS` back from the trigger,
   at most `SOFT_START_LEAD_BLOCKS` blocks, and 0 for a yield's start or one
   as the lamp's sound ends), and the rule adds it to the line's start for
   `NAME_AT_THE_START_US` alone (`Attention::start_of`), and for the
