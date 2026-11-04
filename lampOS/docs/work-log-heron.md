@@ -320,3 +320,12 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   wording: the third restart between the passes, the one-word tie
   sentence); fixed in the README only, `abbd70139d`, restated at 14:40.
   14:4x: NEXT TRAIN posted to Faye.
+- 14:5x–15:1x: Friday's FIXED on #5090 (`9e3dbabc1d`) after Thirteen's
+  13:06 HOLD, which heron's watch had missed (and whose P2, another
+  person through `sensitive()` by a possessive, a bare name or reported
+  speech, heron's own read had missed too): read the delta (`split` with
+  case kept, `names_someone`, `reported`, the "'s" strip, `object`'s
+  cuts), gate lib 130 / `main` 9 / `it` 193 / switches 2 / notes 15,
+  mutations on `names_someone` and `reported` each caught by the no-keep
+  test; READ-OK restated at 15:1x with the miss said. Thirteen lifted the
+  HOLD at 15:02, so #5090 has its two reads.
