@@ -4462,12 +4462,26 @@ after a take-over, but now for every turn:
   a forgotten name gets the same id back); a whole redo or a reset drops it
   too. A rename of the owner's own face is no forget: a `remember_my_face`
   with `replace` while an owner is kept (`known_faces::OwnerRename`) is
-  counted in flight before the eyes are asked, and once the eyes keep the
-  face under name B and no longer know the owner's name A, the owner moves
-  to B (`onboarding::owner_renamed`, a mailbox line the walk takes only
-  while the owner is still A; the rest of the file is kept), and is named
-  as B at once. The eyes' list for that is asked off the reply's path, up
-  to three times. A refresh while a rename is in flight, or one that
+  counted in flight before the eyes are asked, and the owner moves to B
+  only when the eyes answer that they kept the face under B and that the
+  one person they replaced for it was the owner A (`"replaced":["A"]`,
+  any case; [eyes.md](eyes.md)): `onboarding::owner_renamed`, a mailbox
+  line the walk takes only while the owner is still A (the rest of the
+  file is kept), and it is named as B at once. Anything else moves
+  nothing: a refusal, `replaced` empty, naming someone else or two
+  people, not a list of names, or missing, as from eyes older than this
+  build (fail closed). The move is decided on the reply itself, with no
+  list asked of the eyes, and the rename stops counting in flight once
+  answered, so a refresh drops an owner the eyes no longer know as
+  before. `replaced` is read by the voice only: it is never in what the
+  model is told, and the journal names nobody, only whether the owner
+  moved ("lamp-voice: a rename of the setup owner's face moved the
+  owner: …") or not, with how many the eyes replaced ("… moved no owner:
+  the eyes replaced N people, not the owner alone", or "… did not say
+  whom they replaced"). Before this the voice took a
+  list after the save that knew B and not A as the owner's rename, so an
+  owner removed in the app, then a visitor's own rename to B within 10 s,
+  gave B the owner's authority (Reviewer-three's P1 on #5149). A refresh while a rename is in flight, or one that
   overlapped its end, drops nothing and leaves the owner as it was, and a
   refresh's drop names the owner it drops (`onboarding::owner_gone`), so
   one that read A before the walk committed the move is let go. On a

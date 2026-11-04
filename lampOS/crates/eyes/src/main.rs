@@ -784,22 +784,22 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         }
     }
     // What a remembering answers, said in the journal with no name: the
-    // name kept, or why not.
+    // name kept and the people it replaced (`who::Remembered::answer`), or why
+    // not. The journal counts the replaced, never names them.
     fn kept_reply(
-        kept: std::result::Result<String, who::Refused>,
+        kept: std::result::Result<who::Remembered, who::Refused>,
         visits: bool,
         known: usize,
     ) -> serde_json::Value {
         match kept {
-            Ok(name) => {
-                eprintln!("lamp-eyes: remembered a face; {known} people known");
+            Ok(kept) => {
+                eprintln!(
+                    "lamp-eyes: remembered a face; {} replaced; {known} people known",
+                    kept.replaced.len()
+                );
                 // With visits counted, the voice tells them so in one line
                 // (the first builder on #1670, 12:19).
-                if visits {
-                    serde_json::json!({"remembered": name, "visits": true})
-                } else {
-                    serde_json::json!({"remembered": name})
-                }
+                kept.answer(visits)
             }
             // The face is known by another name: the voice asks the person
             // before it is replaced.
@@ -842,9 +842,13 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     .map_or(0, |since| since.as_secs());
                 // A face its person confirmed by name: no
                 // near-name question (`apart`).
-                let kept =
-                    who.people
-                        .remember_one(taken.name(), taken.prints(), now_unix_s, false, true);
+                let kept = who.people.remember_one_replacing(
+                    taken.name(),
+                    taken.prints(),
+                    now_unix_s,
+                    false,
+                    true,
+                );
                 if let Err(who::Refused::Store(_)) = &kept {
                     // Refused by the store: unconfirmed again.
                     let _ = unconfirmed.put_back(taken);
@@ -1845,8 +1849,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         None => who
                             .people
                             .remember(&taking.name, prints, now_unix_s)
+                            .map(who::Remembered::plain)
                             .map_err(|error| who::Refused::Store(error.to_string())),
-                        Some(replace) => who.people.remember_one(
+                        Some(replace) => who.people.remember_one_replacing(
                             &taking.name,
                             prints,
                             now_unix_s,
