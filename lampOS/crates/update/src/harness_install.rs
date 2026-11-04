@@ -180,8 +180,17 @@ fn failed(at_unix_ms: u64, pinned: Option<bool>, error: &str) -> HarnessInstall 
     }
 }
 
+/// Harness at [`HARNESS`], its link followed: a link whose target is gone
+/// is missing, so a round puts Harness there again (#5241's reader). An
+/// absolute target is read under `root`, as the lamp's own `/` is.
 fn present(root: &Path) -> bool {
-    fs::symlink_metadata(root.join(HARNESS.trim_start_matches('/'))).is_ok()
+    let place = root.join(HARNESS.trim_start_matches('/'));
+    match fs::read_link(&place) {
+        Ok(target) if target.is_absolute() => {
+            fs::metadata(root.join(target.strip_prefix("/").unwrap_or(&target))).is_ok()
+        }
+        _ => fs::metadata(&place).is_ok(),
+    }
 }
 
 /// When `serve` starts: with the switch off, a record of an earlier run is
