@@ -399,7 +399,11 @@ fn telling_news(test: &mut Test) {
         finished: None,
         also: vec![NEWS[1].into()],
     };
-    news_on(told, &mut test.reply);
+    news_on(
+        told,
+        crate::task_news::NotHeard(std::sync::mpsc::channel().0),
+        &mut test.reply,
+    );
     assert_eq!(test.reply.as_ref().unwrap().news, NEWS);
 }
 
