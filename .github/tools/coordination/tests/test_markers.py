@@ -5,7 +5,7 @@ sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
 from markers import read_markers, parse_marker, signer, merge_reviews
-from reads2 import two_reads
+from reads2 import two_reads, body_names_unasked
 from qholds import standing
 
 HEAD = "e2b57f1f48c0ffee00112233445566778899aabb"
@@ -349,9 +349,6 @@ class HoldsLifted(unittest.TestCase):
             os.unlink(path)
 
 
-if __name__ == "__main__":
-    unittest.main(verbosity=1)
-
 
 class BodyAsks(unittest.TestCase):
     # 4 Nov 22:1x (the PM, #5212): a PR body asks for two reads only on a line that asks it, never by quoting the rule.
@@ -374,3 +371,24 @@ class BodyAsks(unittest.TestCase):
                      "## Tests\n\n- TWO READS across a comment and a review;",
                      "Today it is left out as TWO READS short, because its body names the phrase."):
             self.assertEqual(self.ask(body), "none", body)
+
+    def test_names_without_asking_is_said(self):
+        # 4 Nov 23:4x (Thirteen's P3 on #5305): an ask in words the patterns don't take is said, once per head.
+        for body in ("This PR needs TWO READS (privacy).", "Readers: TWO READS (privacy and tests)",
+                     "Per joining.md, privacy pull requests need TWO READS."):
+            self.assertTrue(body_names_unasked(body), body)
+        for body in ("TWO READS: Reviewer-lead, Tests.", "## TWO READS\n\nSixth.", "no ask here", "two reads, lowercase"):
+            self.assertFalse(body_names_unasked(body), body)
+
+    def test_unasked_cli(self):
+        def run(body):
+            line = json.dumps({"login": "", "body": body, "pr_body": True})
+            return subprocess.run([sys.executable, "-I", os.path.join(HERE, "reads2.py"), "--unasked"], input=line + "\n",
+                                  capture_output=True, text=True, check=True).stdout.strip()
+        self.assertEqual(run("This PR needs TWO READS (privacy)."), "unasked")
+        self.assertEqual(run("TWO READS: Fourth."), "")
+        self.assertEqual(run("Nothing about reads."), "")
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=1)
