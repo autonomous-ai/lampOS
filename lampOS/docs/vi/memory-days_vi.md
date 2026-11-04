@@ -630,6 +630,37 @@ biết, được người phụ trách ký ức chấp nhận ngày 4/11: một 
 nói, khi chỉ có mặt người ấy trong khung hình, nghe được lời nhắc của họ và có
 thể huỷ hoặc hoãn chúng.
 
+**Gợi ý ký ức ở mỗi lượt** (`LAMP_SECOND_MEMORY_HITS=on`, bật trong bản sản
+phẩm, quyết định của người phụ trách ký ức ngày 4/11: «Build it that way, on by
+default … and accept the privacy leak»). Mỗi câu nói được đối chiếu với những
+điều đã lưu, tối đa ba điều được kể như ghi chú. Phạm vi theo thứ tự
+(`worker::hits_whose_by`, `worker::hits_of_lease`):
+
+1. **Thấy đang nói** (`hits_path=speaking`): người mà chính mặt họ được thấy nói
+   câu ấy (cùng cách đọc mà việc lưu, `recall` và ngữ cảnh dùng, #3437).
+2. **Mặt trong khung hình** (`hits_path=face`), phương án dự phòng đã chấp nhận:
+   không mặt nào được thấy nói câu ấy, và mặt quen của người được nhận cho câu
+   ấy là mặt duy nhất trong khung hình suốt câu, theo cách đếm một mặt của việc
+   lưu (`SpeakingFaces::one_face_in_view`: có trong ít nhất ba lần nhìn, không lần
+   nào có mặt khác; không có lần nhìn nào thì không tính là một mình)
+   (`ScopeLease::hits_by_face`). Thêm một mặt thứ hai, dù im lặng, thì gợi ý vẫn
+   là của căn phòng: người ngồi đó sẽ nghe ghi chú của người kia (first builder
+   trên #5272). Chỉ gợi ý đọc
+   phạm vi này; mọi thứ khác của câu vẫn là của căn phòng. Một lần thu hẹp sau đó
+   (giọng khác, lời người khác được nối vào) huỷ nó.
+3. **Của căn phòng** (`hits_path=room`): không ai được nêu, hoặc một mặt khác
+   (mặt lạ hay mặt quen khác) được thấy nói câu ấy: không bao giờ đọc phạm vi của
+   mặt đang im lặng.
+4. **Không gì cả**: yêu cầu đã bị thu hồi.
+
+Rủi ro đã biết, được người phụ trách ký ức chấp nhận ngày 4/11 (reviewer-two
+trên #3371): khi mặt một người quen là mặt duy nhất trong khung hình và im lặng, không mặt nào
+được thấy nói, câu trả lời cho một người gọi ngoài khung hình được kể những điều
+người ấy đã lưu. Câu đang được mang theo như cuộc trò chuyện của một người
+(`LAMP_CONVERSATION_CARRIES`) vẫn không có gợi ý. Nhật ký mỗi lượt ghi
+`hits_path=` và số lượt theo từng đường (`hits_turns_speaking=`,
+`hits_turns_face=`, `hits_turns_room=`), chỉ là số đếm, không tên, id hay lời.
+
 ## Đầu dò của bộ đo (#4748)
 
 Bộ đo bộ nhớ (`docs/memory-bench.md`) chạy một tháng qua chính client Days của

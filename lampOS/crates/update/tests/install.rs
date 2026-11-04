@@ -1646,6 +1646,33 @@ fn the_product_tells_a_person_the_rooms_lines_of_their_conversation() {
     }
 }
 
+/// Each spoken turn is told what memory holds that may fit its words
+/// (`LAMP_SECOND_MEMORY_HITS`), on by the memory owner's call of 4 Nov,
+/// who accepted reviewer-two's off-camera risk (#3371): scoped first to the
+/// face seen speaking the line, the known face in view only with no face
+/// seen speaking it. Beside the Days memory and the second route it needs,
+/// and the scoped context and sight that order its scope.
+#[test]
+fn the_product_tells_each_turn_its_memory_hits_scoped_by_the_face_seen_speaking() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_SECOND_MEMORY_HITS=on",
+        "Environment=LAMP_MEMORY_DAYS=on",
+        "Environment=LAMP_VOICE_ROUTE=second",
+        "Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock",
+        "Environment=LAMP_SECOND_SCOPED_CONTEXT=on",
+        "Environment=LAMP_SECOND_SPEAKING_FACE=on",
+        "Environment=LAMP_PERSON_SCOPE_SEEN=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// A known person's keep on a line no face was seen speaking is theirs when
 /// their own known face was the one face in view and no other voice was
 /// heard (`LAMP_PERSON_SCOPE_ONE_FACE`, the launch testers' item 1 on
