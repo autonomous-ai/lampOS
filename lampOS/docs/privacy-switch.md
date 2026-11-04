@@ -262,6 +262,26 @@ its revocation, a lease of the full 250 ms with no turn, before that expiry.
 Nothing is extended: the capture lease still ends at the last kept frame +
 100 ms, and nothing is heard after it until a fresh frame is kept.
 
+A physical mute during a held turn is revoked the same way, at the mute
+itself (`revoke_for_mute` in `coordinator.rs`, #4332): at both places the
+loop reads the slide closed (a fresh privacy event and the gate), before the
+camera is told no, before any record and before the cycle's teardown, the
+coordinator cancels the reply's turn, Denies the microphones and the camera,
+and publishes that snapshot, with no turn and a full 250 ms lease. The
+reply is then recorded as `privacy_muted`, and the cleanup's own cancel
+finds no reply and its publish is again Denied with no turn. On lamp-e82d on
+4 Nov the slide closed while a turn was held, the cleanup's revocation came
+88 ms after it, the held turn's clipped lease had lapsed by then, and the
+privacy and second workers ended on it, so the run ended as a cleanup
+failure and the restart guard muted the voice. The workers now hold a
+Denied lease with no turn through the teardown, and a lapse of it is ridden
+as above. A publish that fails at the mute does not end the run: the
+controller is Denied either way, the journal says
+`lamp-voice: the mute's Denied authority was not published (<error>); the
+microphones stay closed and the cleanup revokes again`, the trace records
+`mute_revocation_unpublished`, and the run is still the mute, whose cleanup
+publishes and stops every worker as before.
+
 A privacy worker that does not stop within the wait's 300 ms grace is killed,
 and a killed worker cannot unlink its own sockets. Once it is reaped, the
 wait's cleanup removes its `privacy.c.w` and `privacy.d.w`, each only while

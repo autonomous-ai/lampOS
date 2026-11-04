@@ -52,8 +52,11 @@ or a promise that the switch stayed open during startup.
 
 During an active serve runtime, a current valid physical mute ends the current
 owners. An unfinished reply is cancelled as `privacy_muted`; it is not reported as
-completed. Microphone/camera permissions close, all workers receive Stop before
-any final wait. That exact fresh-mute outcome with successful cleanup may
+completed. Microphone/camera permissions close, and an authority with no turn
+that grants nothing is published to every worker, at the mute itself, before
+any record or teardown step, so a held turn's short lease cannot lapse at a
+worker during the teardown (#4332, [privacy-switch.md](privacy-switch.md)). All
+workers receive Stop before any final wait. That exact fresh-mute outcome with successful cleanup may
 return to the GPIO-only wait. Optional camera/ring failures disable that capability
 during the active conversation without cancelling healthy audio. Final cleanup
 still verifies their exit and required local-revocation, teardown or black-write

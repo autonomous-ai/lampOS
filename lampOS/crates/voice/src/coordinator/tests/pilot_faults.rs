@@ -169,6 +169,10 @@ struct Script {
     /// How the privacy worker's observations begin (lamp-4ace, 19 Oct
     /// 01:19: the first read stale as the voice started).
     privacy_start: PrivacyStart,
+    /// The run's teardown, once the conversation has returned, held up
+    /// this many 2 ms scenario steps, the peers read at each (#4332,
+    /// lamp-e82d: the cleanup's revocation came 88 ms after a slide).
+    teardown_held_steps: u32,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -205,6 +209,7 @@ impl Script {
             camera: false,
             paused: false,
             privacy_start: PrivacyStart::Fresh,
+            teardown_held_steps: 0,
         }
     }
     fn then(mut self, when: When, act: Act) -> Self {
@@ -292,6 +297,8 @@ struct Seen {
     lapsed_grants: Vec<(&'static str, u64, u64, Option<u64>)>,
     /// Each step at which a peer held authority ready to listen.
     listening_held: Vec<(&'static str, u64)>,
+    /// When the first peer saw Stop.
+    first_stop_us: Option<u64>,
 }
 
 /// What a peer's held authority is at this step (#4332): a lapsed lease
@@ -330,6 +337,9 @@ struct Run {
     cleanup_fails: bool,
     /// The controller of this runtime cycle.
     boot: BootId,
+    /// When the conversation had returned and its teardown began, on the
+    /// scenario clock.
+    teardown_began_us: u64,
     /// Before the first child was spawned, and after every child was reaped,
     /// on the host clock: real process events, compared across runs.
     started_us: u64,
@@ -1326,6 +1336,7 @@ impl Peers {
         peer.close_input(deadline)?;
         let mut seen = self.seen.lock().unwrap();
         seen.stopped.push(peer.role);
+        seen.first_stop_us.get_or_insert(monotonic_us());
         if peer.role == "speaker" {
             seen.speaker_stopped_us = Some(monotonic_us());
         }
@@ -1363,7 +1374,9 @@ impl PrivacyPeer {
                 Control::Stop => {
                     self.peer.stopped = true;
                     self.peer.close_input(deadline)?;
-                    self.seen.lock().unwrap().stopped.push("privacy");
+                    let mut seen = self.seen.lock().unwrap();
+                    seen.stopped.push("privacy");
+                    seen.first_stop_us.get_or_insert(monotonic_us());
                 }
                 Control::Authority { snapshot } => self.peer.snapshot = Some(snapshot),
                 _ => {}
@@ -1443,6 +1456,7 @@ fn run_in(script: Script, trace: &mut SessionState) -> Run {
     // runs (scenario_clock.rs).
     let started_us = lamp_ipc::monotonic_us();
     let cleanup_fails = script.cleanup_fails;
+    let teardown_held_steps = script.teardown_held_steps;
     let notices = if script.notices {
         FailureNotices::synthetic()
     } else {
@@ -1616,6 +1630,12 @@ fn run_in(script: Script, trace: &mut SessionState) -> Run {
         &termination,
         &notices,
     );
+    // A slow teardown (#4332): held up before `finish_active_run`, the
+    // peers still read at each step.
+    let teardown_began_us = monotonic_us();
+    for _ in 0..teardown_held_steps {
+        crate::scenario_clock::step(crate::scenario_clock::Phase::Run).unwrap();
+    }
     let result = finish_active_run(&mut rig, &mut owner, &mut reply, trace, &mut None, result);
     let elapsed = started.elapsed();
     let mut exits = vec![
@@ -1639,6 +1659,7 @@ fn run_in(script: Script, trace: &mut SessionState) -> Run {
         result,
         trace: trace.iter().skip(first_event).cloned().collect(),
         boot,
+        teardown_began_us,
         started_us,
         finished_us,
         reaped_at,
@@ -2110,6 +2131,79 @@ fn a_held_turn_is_not_cut_by_a_slow_pass_while_frames_come_on_time() {
         .filter(|(_, at, ..)| *at < muted_at)
         .collect();
     assert!(lapsed.is_empty(), "{lapsed:?}");
+}
+
+/// lamp-e82d, 4 Nov 11:44 (#4332): the privacy slide closed just after a
+/// question, while the lamp held its turn. The turn's lease, clipped to the
+/// last kept frame + 100 ms, lapsed before the cleanup's revocation came
+/// 88 ms later; the privacy and second workers ended on it and the voice
+/// was muted by the restart guard. The mute now publishes a Denied,
+/// turnless authority at once, before any teardown: with the teardown held
+/// up 120 ms, no peer holds a lapsed lease that grants, nothing listens
+/// after the mute, and the run is a clean mute.
+#[test]
+fn a_slide_during_a_held_turn_is_a_clean_mute() {
+    let _one = one_session();
+    let run = run(Script {
+        actions: vec![(When::InputEnded(1), Act::Mute)],
+        teardown_held_steps: 60,
+        ..Script::question(Answer::Hold(40))
+    });
+    run.assert_invariants();
+    assert!(
+        is_mute(&run.result),
+        "a fault, not a mute: {:?}",
+        run.result
+    );
+    let mutes = run.events("physical_mute");
+    assert_eq!(mutes.len(), 1, "{mutes:?}");
+    let muted_at = mutes[0]["at_us"].as_u64().unwrap();
+    let turn = first(&run);
+    // The first builder's first condition: after the slide no worker
+    // grants a frame from the held turn. No lapsed lease that grants was
+    // held at any step, and nothing could listen once the mute was seen.
+    assert!(
+        run.seen.lapsed_grants.is_empty(),
+        "a worker held a lapsed lease that grants (role, at, expires, owner): {:?}",
+        run.seen.lapsed_grants
+    );
+    let listening: Vec<_> = run
+        .seen
+        .listening_held
+        .iter()
+        .filter(|(_, at)| *at > muted_at)
+        .collect();
+    assert!(
+        listening.is_empty(),
+        "listening after the mute: {listening:?}"
+    );
+    // The second: the Denied, turnless authority reached the peers before
+    // any teardown step that can fail. The speaker installed it within the
+    // teardown's first step, long before the held-up cleanup, and before
+    // any Stop.
+    let first_stop = run.seen.first_stop_us.expect("a peer saw Stop");
+    let denied_at = run
+        .seen
+        .installs
+        .iter()
+        .find(|install| {
+            install.at_us >= muted_at && install.owner.is_none() && !install.microphone_allowed
+        })
+        .expect("the speaker installed a Denied, turnless authority")
+        .at_us;
+    assert!(
+        denied_at <= run.teardown_began_us + 4_000,
+        "Denied reached the speaker at {denied_at}, teardown began at {}",
+        run.teardown_began_us
+    );
+    assert!(denied_at < first_stop, "{denied_at} >= {first_stop}");
+    assert_eq!(run.outcomes()[&turn], ["privacy_muted"]);
+    let finished = run.events("turn_finished");
+    let finished_at = finished[0]["at_us"].as_u64().unwrap();
+    assert!(
+        finished_at < first_stop,
+        "turn_finished at {finished_at}, first Stop at {first_stop}"
+    );
 }
 
 /// An XRun closes and reopens the microphone within 50 ms, inside a
