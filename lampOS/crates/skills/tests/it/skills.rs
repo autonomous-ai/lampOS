@@ -871,7 +871,7 @@ fn a_read_step_reads_only_what_its_permissions_list() {
             "speak = true\nservices = { google_drive = \"read\" }\n",
             "",
             "read = { service = \"google_drive\", what = \"text\", id = \"f\" }",
-            "gives a whole text, which a skill never reads",
+            "gives a whole text, which a made skill never reads",
         ),
         (
             "with-light",
@@ -892,7 +892,7 @@ fn a_read_step_reads_only_what_its_permissions_list() {
             "speak = true\nservices = { gmail = \"read\" }\n",
             "",
             "read = { service = \"gmail\", what = \"message\" }",
-            "gives a whole text, which a skill never reads",
+            "gives a whole text, which a made skill never reads",
         ),
     ] {
         let error = read(name, permissions, rest, step).unwrap_err();

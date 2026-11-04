@@ -56,18 +56,21 @@ sau:
    Mở rộng giới hạn này là quyết định của trưởng nhóm. Lần mở rộng duy nhất
    (nửa "đọc" của đề xuất #5288, `LAMP_SKILL_READS=on` trong `lamp-voice` và
    `lamp-skills-manage@`, tắt trừ khi được bật): `services` nêu một dịch vụ
-   liên kết có việc đọc là `"read"`, cùng `speak` để nói nó. Một yêu cầu nêu
+   liên kết có việc đọc cố định là `"read"`, cùng `speak` để nói nó. Một yêu cầu nêu
    đúng một dịch vụ như vậy và không có từ ghi nào được đưa vào brief với
    bước đọc duy nhất của dịch vụ đó (bước của lịch hay thư được cho trọn; với
    dịch vụ khác, các việc đọc của nó được liệt kê trừ những việc trả về toàn
-   văn), và câu "có" nói ra của nó nêu dịch vụ, thứ nó đọc và điều kiện, "when
+   văn và dạng tự do), thời điểm trong ngày là của yêu cầu (`during` của
+   trigger chỉ là ví dụ, 08:00 đến 08:30), và câu "có" nói ra của nó nêu dịch vụ, thứ nó đọc và điều kiện, "when
    you're alone with the lamp, it reads you tomorrow's Google Calendar: how
    many events, then each time and title." Khi tắt, mọi yêu cầu nêu một dịch
    vụ là `NOT_A_SERVICE`, như trước.
 
    Bước `read = { service, what, ... }` (`lamp-skills`, `service_read`): mọi
-   dịch vụ có việc đọc trừ `gmail-app` chỉ gửi, mọi việc đọc của nó trừ việc
-   trả về toàn văn, `events` của lịch với `day = "today"` hoặc `"tomorrow"`;
+   dịch vụ có việc đọc cố định (không phải `gmail-app` chỉ gửi, các dịch vụ
+   MCP hay Ahrefs), mọi việc đọc cố định của nó, không bao giờ việc trả về
+   toàn văn hay dạng tự do (`query` GraphQL, `get` đường dẫn bất kỳ, `call`
+   của MCP; `lamp-services` giữ lại ở cửa của nó), `events` của lịch với `day = "today"` hoặc `"tomorrow"`;
    là bước duy nhất, đứng một mình, trong kỹ năng do trigger khởi động, không
    có tool hay `each`, với `[permissions] services = { <service> = "read" }`
    và `speak = true`. `lamp-skills` tự đọc qua socket tools của

@@ -780,24 +780,34 @@ nên nó vẫn là dữ liệu trích dẫn và không gì hành động theo n�
 `AFTER_READ` đòi hỏi. Cổng gửi của giọng nói không nằm trên đường này; cổng
 của kỹ năng bên dưới thay cho nó.
 
-**Dịch vụ nào.** Mọi dịch vụ trong catalogue có việc đọc (một danh sách cho
-phép các đường dẫn, hoặc các tool đọc của một máy chủ MCP), và không dịch vụ
-nào chỉ gửi (`lamp_services::spoken::not_readable`): `gmail`,
-`google_calendar`, `google_drive`, `notion`, `figma`, `figma-api`, `github`,
-`linear`, `asana`, `ahrefs`, `facebook`, `slack`, `mondaydotcom`, `hubspot` và
-`amplitude`. `gmail-app` không đọc gì ("\"gmail-app\" only sends mail, so it
-has nothing to read"). Dịch vụ có được liên kết hay không là câu trả lời của
+**Dịch vụ nào.** Mọi dịch vụ trong catalogue có một việc đọc dạng cố định,
+và không dịch vụ nào chỉ gửi (`lamp_services::spoken::not_readable`):
+`gmail`, `google_calendar`, `google_drive`, `notion`, `figma`, `figma-api`,
+`github`, `linear`, `asana` và `facebook`. `gmail-app` không đọc gì
+("\"gmail-app\" only sends mail, so it has nothing to read"). Các dịch vụ MCP
+(`slack`, `mondaydotcom`, `hubspot`, `amplitude`) chỉ được đọc qua lệnh gọi
+tool của chúng, và `ahrefs` chỉ qua một đường dẫn bất kỳ (`get`), nên chưa
+dịch vụ nào trong số đó được kỹ năng tự tạo đọc ("... which a made skill
+can't read yet"), cho đến khi mỗi dịch vụ có một việc đọc cố định. Dịch vụ có được liên kết hay không là câu trả lời của
 chính `lamp-services` lúc chạy (`NOT_LINKED`), ghi vào journal là "not read:
 ...". Một lần đọc trả về toàn văn của một mục không bao giờ là của kỹ năng
 (`spoken::WHOLE_TEXTS`): `message` của `gmail`, `text` của `google_drive`,
-`page` của `notion`, và `comments` của `figma` và `figma-api`.
+`page` của `notion`, và `comments` của `figma` và `figma-api`. Một việc đọc
+dạng tự do cũng không, vì người hỏi viết hình dạng của nó và nó có thể đặt
+bất kỳ văn bản nào vào chỗ của tiêu đề (`spoken::FREE_FORM`, P2 của Thirteen
+trên #5303): `query` GraphQL (`github`, `linear`), `get` (đường dẫn bất kỳ) và
+`call` của MCP. Vậy `github` đọc `notifications`, `issues`, `pulls` và
+`repos`, còn `linear` đọc `my_issues`. `lamp-services` giữ cả hai quy tắc ở
+chính cửa của nó: `Services::skill_tool` từ chối một việc đọc như vậy từ
+`lamp-skills` trước khi gọi bất cứ gì (`spoken::skill_read_refused`), bất kể
+bên hỏi đã kiểm tra gì.
 
 **Bước.** Trong `skill.toml` ([skills.md](../skills.md)):
 
 ```toml
 [permissions]
 speak = true
-services = { google_calendar = "read" }   # một dịch vụ bất kỳ có việc đọc; chỉ "read"
+services = { google_calendar = "read" }   # một dịch vụ bất kỳ có việc đọc cố định; chỉ "read"
 
 [[do]]
 read = { service = "google_calendar", what = "events", day = "tomorrow" }  # hoặc "today"
@@ -810,11 +820,12 @@ read = { service = "google_calendar", what = "events", day = "tomorrow" }  # ho�
 `if_choice`), trong một kỹ năng do trigger khởi động, không có `each` và không
 có tool, và cần `[permissions] services` ghi dịch vụ của nó là `"read"` cùng
 `speak = true`. `what` là một trong các việc đọc của dịch vụ như
-`service_read` liệt kê (`reads::WHATS`; với dịch vụ MCP là `tools` hoặc
-`call`), trừ việc đọc toàn văn. Các khoá khác là của chính `service_read`:
-`count` (1 đến 10), `query`, `id`, `repo`, `calendar`, `project`,
-`workspace`, `path`, `graphql`, `variables`, `tool`, `arguments` (mỗi khoá 1
-đến 1.000 byte) và `params` (một bảng văn bản); không bao giờ `from` hay `to`.
+`service_read` liệt kê (`reads::WHATS`), trừ việc đọc toàn văn hay dạng tự
+do. Các khoá khác là của chính `service_read` cho một việc đọc cố định:
+`count` (1 đến 10), `query` (từ tìm kiếm), `id`, `repo`, `calendar`,
+`project` và `workspace` (mỗi khoá 1 đến 1.000 byte); không bao giờ `from`
+hay `to`, cũng không bao giờ `graphql`, `variables`, `path`, `params`,
+`tool` hay `arguments` của một việc đọc dạng tự do.
 `events` của lịch lấy `day = "today"` hoặc `"tomorrow"` (ngày địa phương, tối
 đa 10 sự kiện) và không có `count`; `day` không dùng cho gì khác.
 `lamp-services` giữ lần đọc trong danh sách cho phép như với giọng nói.
@@ -844,7 +855,7 @@ một lần say chính xác riêng:
 |---|---|
 | `events` của `google_calendar` (phán quyết của first builder) | "Nothing is on your calendar tomorrow." / "You have one event today." / "You have 3 events tomorrow.", rồi từng "At 9:30, Title." hoặc "All day, Title." |
 | `gmail` (phán quyết) | "You have no recent mail." / "You have one recent mail." / "You have 5 recent mails.", rồi từng "From Name: Subject." hoặc "From Name, with no subject." |
-| `notion` | "Nothing from Notion." / "One item from Notion." / "3 items from Notion.", rồi văn bản thuần của từng mục, mà với một lần tìm kiếm là tiêu đề của nó |
+| `notion` | "Nothing from Notion." / "One item from Notion." / "3 items from Notion.", rồi chỉ thuộc tính tiêu đề của từng trang, hoặc tiêu đề riêng của một database: các mục Notion của một kỹ năng do `spoken::items` tạo (P3 của Thirteen trên #5303), không bao giờ kèm văn bản của các thuộc tính khác, còn việc đọc Notion của chính giọng nói vẫn như trước |
 | Mọi dịch vụ và việc đọc khác (mặc định) | "Nothing from Google Drive." / "One item from GitHub." / "3 items from Asana.", rồi tiêu đề hoặc tên của từng mục, khoá đầu tiên nó có trong `title`, `name`, `subject` và `full_name` (dạng văn bản, hoặc `title` hay `name` của một object); mục không có khoá nào thì được đếm mà không được nói |
 
 Không bao giờ nói phần thân, nội dung tin nhắn, nội dung tệp hay bình luận.
@@ -862,11 +873,14 @@ bao giờ một tiêu đề, người gửi hay chủ đề.
 
 **Tạo bằng giọng nói.** Khi bật công tắc trong `lamp-voice`,
 `made_skill::brief` cho qua một yêu cầu nêu đúng một dịch vụ liên kết có việc
-đọc và không có từ ghi nào ("send", "reply", "add", "post", "schedule", ...);
+đọc cố định và không có từ ghi nào ("send", "reply", "add", "post", "schedule", ...);
 hai dịch vụ, hoặc một lần ghi, vẫn là `NOT_A_SERVICE`. Bước của lịch được cho
 trọn (hôm nay, hoặc ngày mai khi yêu cầu nói "tomorrow"), bước của thư cũng vậy
 (`recent`); với dịch vụ khác, brief liệt kê các việc đọc của nó trừ việc đọc
-toàn văn (`spoken::whats`) và mô hình chọn một. Kỹ năng tự tạo bị giữ ở
+toàn văn và dạng tự do (`spoken::whats`) và mô hình chọn một. Thời điểm trong
+ngày là của yêu cầu: brief chỉ đưa `during` của trigger làm ví dụ, "a time of
+day as its during = { from = \"08:00\", to = \"08:30\" }" (P3 của Thirteen
+trên #5303), như brief đèn-và-đầu. Kỹ năng tự tạo bị giữ ở
 `services = { <service> = "read" }` (`made_skill::capped`: mọi mục services
 khác bị từ chối, "it asks to use linked services other than by reading one
 that has something to read, which a made skill can't"), và câu "có" nói ra
@@ -874,8 +888,8 @@ của nó nêu dịch vụ, thứ nó đọc và điều kiện: "When the lamp 
 between 21:00 and 21:30, when you're alone with the lamp, it reads you
 tomorrow's Google Calendar: how many events, then each time and title." (với
 Drive: "it reads you Google Drive's files: how many, then each name, never
-the text."). Một bước đọc mà câu "có" không nói được (toàn văn, việc đọc dịch
-vụ không liệt kê) làm kỹ năng bị từ chối. Phần uses của nó thêm "reading your
+the text."). Một bước đọc mà câu "có" không nói được (toàn văn, việc đọc dạng tự do,
+việc đọc dịch vụ không liệt kê) làm kỹ năng bị từ chối. Phần uses của nó thêm "reading your
 <service>".
 
 ## Làm mới
@@ -976,9 +990,9 @@ chờ thì phát âm thanh đó, như một cuộc trò chuyện chậm.
 
 - **Việc đọc của kỹ năng tự tạo chưa bật, chưa chạy trên đèn nào.** Đã xây
   sau `LAMP_SKILL_READS` (tắt): chỉ thư và lịch có lời nói riêng, mọi dịch vụ
-  khác nói tiêu đề hoặc tên theo những khoá mà một mục có thể không có (một
-  câu trả lời GraphQL của Linear hay GitHub là một mục không có khoá nào, nên
-  chỉ số đếm được nói); chủ đèn chỉ là tên gõ lúc cài đặt, nên một khuôn mặt
+  khác nói tiêu đề hoặc tên theo những khoá mà một mục có thể không có (mục
+  không có khoá nào thì được đếm, không được nói); các dịch vụ MCP và Ahrefs
+  không có việc đọc cố định nên không kỹ năng tự tạo nào đọc chúng; chủ đèn chỉ là tên gõ lúc cài đặt, nên một khuôn mặt
   được `who_you_are` lưu dưới tên khác không bao giờ được tính; "một lần mỗi
   ngày" giữ trong bộ nhớ và mất khi khởi động lại; không unit sản phẩm nào đặt
   công tắc hay tệp tên chủ đèn. Việc ghi từ một kỹ năng tự tạo chưa được xây.
@@ -1071,13 +1085,19 @@ tắt, một kỹ năng tự tạo không bao giờ chạm đến dịch vụ kh
 tắt, và khi bật thì một lần đọc lịch, thư, Notion hay Drive được đưa vào brief
 (không bao giờ liệt kê toàn văn), bị giữ ở một lần đọc một dịch vụ và được nói
 cùng điều kiện của nó. `-p lamp-services` thêm: một kỹ năng được nhận ra qua
-cgroup riêng và chỉ được `service_read`; `spoken` (mọi dịch vụ có việc đọc đều
-đọc được và `gmail-app` thì không, mỗi toàn văn là một việc đọc dịch vụ có
+cgroup riêng và chỉ được `service_read`, còn `query` của GitHub hay Linear,
+`get` của Ahrefs, `call` của Slack và `message` của Gmail bị từ chối ở cửa
+trong khi việc đọc của chính giọng nói không đổi; `spoken` (mọi dịch vụ có
+việc đọc cố định đều đọc được, còn `gmail-app`, các dịch vụ MCP và Ahrefs thì
+không, query, get hay call không bao giờ là của kỹ năng, một trang Notion
+được nói chỉ bằng thuộc tính tiêu đề, mỗi toàn văn là một việc đọc dịch vụ có
 liệt kê, thư và lịch theo phán quyết, còn Drive, Notion, GitHub, một Facebook
 Page và Asana theo tiêu đề hoặc tên, không bao giờ phần thân). `-p lamp-skills`
 (`service_read`, `tests/it/skills.rs`, `tests/it/format.rs`): bước đọc chỉ
 nạp khi có quyền, đứng một mình và trong kỹ năng có trigger, cho mọi dịch vụ
-có việc đọc (Notion, Drive) và không cho `gmail-app` hay toàn văn, schema và
+có việc đọc cố định (Notion, Drive, notifications của GitHub, issues của
+Linear) và không cho `gmail-app`, toàn văn hay việc đọc dạng tự do (query,
+`get`, `call`, hay các khoá của chúng), schema và
 bộ nạp khớp nhau; một lần đọc Drive được nói theo tên; cổng chờ 5 s liên tục,
 bỏ qua sau 60 phút, dừng trước một lời, dừng với "I'll tell you the rest
 later." khi có người đến, và các dòng được nói. `-p lamp-update` (unit được

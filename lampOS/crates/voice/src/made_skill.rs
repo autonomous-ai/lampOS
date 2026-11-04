@@ -260,7 +260,7 @@ pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
         let step = match step {
             Some(step) => step.to_owned(),
             None => format!(
-                "read = {{ service = \"{service}\", what = one of {}, with its keys }}",
+                "read = {{ service = \"{service}\", what = one of {}, its keys }}",
                 lamp_services::spoken::whats(service).join("; ")
             ),
         };
@@ -270,9 +270,9 @@ pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
              kind = \"installable\", version = \"1.0.0\", no name key; [permissions] with only \
              speak = true, services = {{ {service} = \"read\" }} and topics only voice/state and \
              room/presence; one [trigger] on voice/state (field \"state\", equals \"resting\") or \
-             room/presence (field \"someone\", equals true), with for; \
-             during = {{ from = \"21:00\", to = \"21:30\" }}; [ask] policy = \"nudge\"; \
-             exactly one [[do]] step: {step}. \
+             room/presence (field \"someone\", equals true), with for; a time of day as \
+             its during = {{ from = \"08:00\", to = \"08:30\" }}; [ask] policy = \"nudge\"; \
+             one [[do]] step: {step}. \
              SKILL.md: front matter name (lowercase, hyphens) and description (one sentence: \
              what it does, when). {REQUEST_MARK}{request}"
         ));
@@ -858,12 +858,9 @@ fn read_plainly(step: &toml::Value) -> Option<String> {
     let read = step.get("read")?.as_table()?;
     let text = |key: &str| read.get(key).and_then(|value| value.as_str());
     let (service, what) = (text("service")?, text("what")?);
-    if lamp_services::spoken::not_readable(service).is_some()
-        || lamp_services::spoken::whole_text(service, what)
-        || !lamp_services::spoken::whats(service)
-            .iter()
-            .any(|listed| listed.split_whitespace().next() == Some(what))
-    {
+    // A fixed read of a service with one: never a whole text or a
+    // free-form read (Thirteen's P2 on #5303).
+    if lamp_services::spoken::skill_read_refused(service, what).is_some() {
         return None;
     }
     let events = service == "google_calendar" && what == "events";
@@ -2301,16 +2298,28 @@ light = { dim = 1 }
             "{notion}"
         );
         assert!(notion.contains(
-            "read = { service = \"notion\", what = one of search {query, count}, with its keys }"
+            "read = { service = \"notion\", what = one of search {query, count}, its keys }"
         ));
         assert!(!notion.contains("page {id}"));
         let drive = brief_with("read me my Google Drive files at nine", true).unwrap();
         assert!(drive.contains("services = { google_drive = \"read\" }"));
         assert!(
-            drive.contains("files {query, count}; file {id}, with") && !drive.contains("text {id}")
+            drive.contains("files {query, count}; file {id}, its keys")
+                && !drive.contains("text {id}")
         );
-        assert!(brief_with("glow red when Slack has a message", true).is_ok());
+        // Thirteen's P2 on #5303: fixed reads only, no query, path or call.
+        let github = brief_with("each morning read me my GitHub issues", true).unwrap();
+        assert!(github.contains("notifications; issues {repo}; pulls {repo}; repos, its keys"));
+        assert!(!github.contains("query") && !github.contains("graphql"));
+        // P3.3: the time of day is the request's, its window only shown.
+        for brief in [&github, &drive, &notion] {
+            assert!(brief.contains("a time of day as its during = {"), "{brief}");
+            assert!(!brief.contains("21:00"), "{brief}");
+        }
         for request in [
+            "glow red when Slack has a message",
+            "read me my Ahrefs numbers",
+            "read me my HubSpot deals",
             "every friday draft my weekly mail to the team",
             "when I say wrap up add tomorrow's first meeting to my calendar",
             "send my calendar to the team",
@@ -2332,7 +2341,7 @@ light = { dim = 1 }
             "GitHub",
             "Google Drive",
             "Asana",
-            "Ahrefs",
+            "Facebook",
         ] {
             let words = format!("read my {service} ");
             let longest = format!("{words}{}", "x".repeat(MOST_REQUEST_BYTES - words.len()));
@@ -2396,6 +2405,32 @@ light = { dim = 1 }
         for what in ["what = \"text\", id = \"f\"", "what = \"nothing\""] {
             let wrong = drive.replace("what = \"files\", query = \"taxes\"", what);
             assert!(plainly_with(&wrong, true).is_err(), "{what}");
+        }
+        // Nor a free-form read: a query, a path, an MCP call (#5303's P2).
+        for (service, step) in [
+            (
+                "github",
+                "service = \"github\", what = \"query\", graphql = \"{ viewer { name: bio } }\"",
+            ),
+            (
+                "ahrefs",
+                "service = \"ahrefs\", what = \"get\", path = \"/v3/x\"",
+            ),
+            (
+                "slack",
+                "service = \"slack\", what = \"call\", tool = \"read\"",
+            ),
+        ] {
+            let free = READ_TOML
+                .replace(
+                    "google_calendar = \"read\"",
+                    &format!("{service} = \"read\""),
+                )
+                .replace(
+                    "service = \"google_calendar\", what = \"events\", day = \"tomorrow\"",
+                    step,
+                );
+            assert!(plainly_with(&free, true).is_err(), "{service}");
         }
         assert_eq!(
             plainly_with(READ_TOML, true).unwrap(),

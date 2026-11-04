@@ -752,24 +752,34 @@ stays quoted data and nothing can act on it, as `AFTER_READ` asks. The
 voice's own send gate is not in this path; the skill's gate below stands in
 for it.
 
-**Which services.** Every service in the catalogue with reads (an
-allow-list of paths, or an MCP server's read tools), and none that only
-sends (`lamp_services::spoken::not_readable`): `gmail`, `google_calendar`,
-`google_drive`, `notion`, `figma`, `figma-api`, `github`, `linear`,
-`asana`, `ahrefs`, `facebook`, `slack`, `mondaydotcom`, `hubspot` and
-`amplitude`. `gmail-app` reads nothing ("\"gmail-app\" only sends mail, so
-it has nothing to read"). Whether the service is linked is `lamp-services`'
+**Which services.** Every service in the catalogue with a read of a
+fixed shape, and none that only sends (`lamp_services::spoken::not_readable`):
+`gmail`, `google_calendar`, `google_drive`, `notion`, `figma`, `figma-api`,
+`github`, `linear`, `asana` and `facebook`. `gmail-app` reads nothing
+("\"gmail-app\" only sends mail, so it has nothing to read"). The MCP
+services (`slack`, `mondaydotcom`, `hubspot`, `amplitude`) are read only
+through their tools' calls, and `ahrefs` only through any path (`get`), so
+none of them can be read by a made skill yet ("... which a made skill can't
+read yet"), until each has a fixed read. Whether the service is linked is `lamp-services`'
 own answer at the run (`NOT_LINKED`), kept in the journal as "not read:
 ...". A read that gives one item's whole text is never a skill's
 (`spoken::WHOLE_TEXTS`): `gmail`'s `message`, `google_drive`'s `text`,
-`notion`'s `page`, and `figma`'s and `figma-api`'s `comments`.
+`notion`'s `page`, and `figma`'s and `figma-api`'s `comments`. Nor is a
+free-form read, whose shape the asker writes and which could put any text
+where a title goes (`spoken::FREE_FORM`, Thirteen's P2 on #5303): a
+GraphQL `query` (`github`, `linear`), `get` (any path) and an MCP `call`.
+So `github` reads `notifications`, `issues`, `pulls` and `repos`, and
+`linear` reads `my_issues`. `lamp-services` holds both rules at its own
+door: `Services::skill_tool` refuses such a read from `lamp-skills` before
+anything is called (`spoken::skill_read_refused`), whatever the asker
+checked.
 
 **The step.** In `skill.toml` ([skills.md](skills.md)):
 
 ```toml
 [permissions]
 speak = true
-services = { google_calendar = "read" }   # any one service with reads; never anything but "read"
+services = { google_calendar = "read" }   # any one service with a fixed read; never anything but "read"
 
 [[do]]
 read = { service = "google_calendar", what = "events", day = "tomorrow" }  # or "today"
@@ -782,11 +792,11 @@ read = { service = "google_calendar", what = "events", day = "tomorrow" }  # or 
 `if_choice`), in a skill a trigger starts, with no `each` and no tool, and
 it needs `[permissions] services` to list its service as `"read"` and
 `speak = true`. `what` is one of the service's reads as `service_read`
-lists them (`reads::WHATS`; an MCP service's `tools` or `call`), but a
-whole text. Its other keys are `service_read`'s own: `count` (1 to 10),
-`query`, `id`, `repo`, `calendar`, `project`, `workspace`, `path`,
-`graphql`, `variables`, `tool`, `arguments` (each 1 to 1,000 bytes) and
-`params` (a table of text); never `from` or `to`. A calendar's `events`
+lists them (`reads::WHATS`), but a whole text or a free-form read. Its
+other keys are `service_read`'s own for a fixed read: `count` (1 to 10),
+`query` (search words), `id`, `repo`, `calendar`, `project` and
+`workspace` (each 1 to 1,000 bytes); never `from` or `to`, nor a free-form
+read's `graphql`, `variables`, `path`, `params`, `tool` or `arguments`. A calendar's `events`
 take `day = "today"` or `"tomorrow"` (the local day, at most 10 events) and
 no `count`; `day` is for nothing else. `lamp-services` holds the read to its
 allow-list as it does the voice's.
@@ -817,7 +827,7 @@ own exact say:
 |---|---|
 | `google_calendar`'s `events` (the first builder's ruling) | "Nothing is on your calendar tomorrow." / "You have one event today." / "You have 3 events tomorrow.", then each "At 9:30, Title." or "All day, Title." |
 | `gmail` (the ruling) | "You have no recent mail." / "You have one recent mail." / "You have 5 recent mails.", then each "From Name: Subject." or "From Name, with no subject." |
-| `notion` | "Nothing from Notion." / "One item from Notion." / "3 items from Notion.", then each item's plain text, which for a search is its title |
+| `notion` | "Nothing from Notion." / "One item from Notion." / "3 items from Notion.", then each page's title property, or a database's own title, alone: a skill's Notion items are made by `spoken::items` (Thirteen's P3 on #5303), never with the other properties' text, while the voice's own Notion read is as before |
 | Every other service and read (the default) | "Nothing from Google Drive." / "One item from GitHub." / "3 items from Asana.", then each item's title or name, the first of `title`, `name`, `subject` and `full_name` it has (as text, or as an object's own `title` or `name`); an item with none is counted and not said |
 
 Never a body, a message's text, a file's content or a comment. Security
@@ -835,11 +845,15 @@ error>", never a title, sender or subject.
 
 **Making one by voice.** With the switch on in `lamp-voice`,
 `made_skill::brief` lets a request through that names one linked service
-with reads and no write word ("send", "reply", "add", "post", "schedule",
+with a fixed read and no write word ("send", "reply", "add", "post", "schedule",
 ...); two services, or a write, are still `NOT_A_SERVICE`. A calendar's
 step is given whole (today, or tomorrow when it says "tomorrow"), as is
 mail's (`recent`); for any other service the brief lists its reads but the
-whole texts (`spoken::whats`) and the model picks one. The made skill is
+whole texts and free-form reads (`spoken::whats`) and the model picks
+one. Its time of day is the request's: the brief gives the trigger's
+`during` as an example, "a time of day as its during = { from = \"08:00\",
+to = \"08:30\" }" (Thirteen's P3 on #5303), as the light-and-head brief
+does. The made skill is
 held to `services = { <service> = "read" }` (`made_skill::capped`: any
 other services entry is refused, "it asks to use linked services other
 than by reading one that has something to read, which a made skill
@@ -848,7 +862,8 @@ condition: "When the lamp goes quiet, between 21:00 and 21:30, when you're
 alone with the lamp, it reads you tomorrow's Google Calendar: how many
 events, then each time and title." (for Drive: "it reads you Google Drive's
 files: how many, then each name, never the text."). A read step the yes
-can't say (a whole text, a read the service doesn't list) refuses the
+can't say (a whole text, a free-form read, a read the service doesn't
+list) refuses the
 skill. Its uses add "reading your <service>".
 
 ## Refresh
@@ -951,8 +966,8 @@ sound, as a slow chat does.
 - **A made skill's read is not on, nor run on a lamp.** Built behind
   `LAMP_SKILL_READS` (off): only mail and the calendar have their own
   spoken words, and every other service says titles or names, by keys an
-  item may not have (a Linear or GitHub GraphQL answer is one item with
-  none, so only its count is said); the owner is only the name typed at setup, so a face saved under
+  item may not have (an item with none is counted, not said); the MCP
+  services and Ahrefs have no fixed read, so no made skill reads them; the owner is only the name typed at setup, so a face saved under
   another name by `who_you_are` never counts; once a day is kept in memory
   and lost on a restart; no product unit sets the switch or the owner's
   name file. Writes from a made skill are not built.
@@ -1038,13 +1053,18 @@ summary, a made skill never reaching a service with `LAMP_SKILL_READS`
 off, and with it on a calendar, mail, Notion or Drive read briefed (a
 whole text never listed), held to one service read and said with its
 condition. `-p lamp-services` also: a skill told by its own cgroup and
-given `service_read` alone; `spoken` (every service with reads readable and
-`gmail-app` not, each whole text one the service lists, mail and the
+given `service_read` alone, and a GitHub or Linear `query`, an Ahrefs
+`get`, a Slack `call` and a Gmail `message` refused at its door while the
+voice's own read is unchanged; `spoken` (every service with a fixed read
+readable, and `gmail-app`, the MCP services and Ahrefs not, a query, get or
+call never a skill's, a Notion page said by its title property alone, each whole text one the service lists, mail and the
 calendar by the ruling and Drive, Notion, GitHub, a Facebook Page and
 Asana by title or name, never a body). `-p lamp-skills`
 (`service_read`, `tests/it/skills.rs`, `tests/it/format.rs`): the read
 step loaded only with its permission, alone and in a triggered skill, for
-any service with reads (Notion, Drive) and not `gmail-app` or a whole text,
+any service with a fixed read (Notion, Drive, GitHub's notifications,
+Linear's issues) and not `gmail-app`, a whole text or a free-form read (a
+query, `get`, `call`, or their keys),
 the schema and the loader agreeing; a Drive read said by name; the gate waiting for 5 s steady, skipping
 after 60 minutes, stopping before a word, stopping with "I'll tell you the
 rest later." when someone comes, and the lines said. `-p lamp-update` (the unit installed with `LAMP_SERVICES=on` in it, as in
