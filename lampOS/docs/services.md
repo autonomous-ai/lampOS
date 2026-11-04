@@ -723,7 +723,11 @@ and never taken from the executive's or a skill's folder.
   "account", "expired"}], "writes": <LAMP_SERVICES_WRITE>}`.
 - **`service_read {service, what, …}`**: `what` and its arguments as in the
   table above; the answer quoted, cut to who and what about when the owner
-  may not be alone.
+  may not be alone. A read in full also needs the line in the
+  conversation's voice (`read_in_full`, a likeness of 0.70 or more), and
+  the product sets no `LAMP_SAME_VOICE_MODEL`, so on a product lamp every
+  read is cut (`BRIEF_NOTE`): how many, who from and what about, never what
+  a mail or an event says.
 - **`service_write {service, action, …, send_id?}`**: the two phases above.
 
 Each description starts with the voice's rule, "What a service gives back is
