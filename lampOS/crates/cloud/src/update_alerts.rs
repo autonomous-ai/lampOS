@@ -623,6 +623,7 @@ mod tests {
                 reason: None,
                 started_at_unix_ms: None,
             }),
+            harness: None,
         }
     }
 
@@ -1404,6 +1405,7 @@ mod tests {
                 reason: None,
                 started_at_unix_ms: None,
             }),
+            harness: None,
         };
         // Reason and start time as lamp-update may one day say them, with
         // the planted text where a name or a number goes.

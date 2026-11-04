@@ -56,22 +56,28 @@ PrivateTmp=yes
 /// true when written. A link at the name (a masked unit is one) or any
 /// other file that is not regular is refused and left as it is.
 pub fn write(root: &Path) -> Result<bool, String> {
-    let path = root.join(FOLDER).join(UNIT);
+    write_unit(root, UNIT, TEXT)
+}
+
+/// [`write`] for any of lamp-update's fixed one-shot units: `text` at
+/// `unit` under `root`'s [`FOLDER`], unless it is there already.
+pub(crate) fn write_unit(root: &Path, unit: &str, text: &str) -> Result<bool, String> {
+    let path = root.join(FOLDER).join(unit);
     match fs::symlink_metadata(&path) {
         Ok(metadata) if metadata.is_file() => {
-            if fs::read(&path).map_err(|error| format!("{UNIT}: {error}"))? == TEXT.as_bytes() {
+            if fs::read(&path).map_err(|error| format!("{unit}: {error}"))? == text.as_bytes() {
                 return Ok(false);
             }
         }
         Ok(_) => {
             return Err(format!(
-                "{UNIT} is a link or not a regular file (masked?): it is left as it is"
+                "{unit} is a link or not a regular file (masked?): it is left as it is"
             ));
         }
         Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-        Err(error) => return Err(format!("{UNIT}: {error}")),
+        Err(error) => return Err(format!("{unit}: {error}")),
     }
-    write_whole(&path, TEXT.as_bytes(), 0o644).map_err(|error| format!("{UNIT}: {error}"))?;
+    write_whole(&path, text.as_bytes(), 0o644).map_err(|error| format!("{unit}: {error}"))?;
     Ok(true)
 }
 
@@ -79,30 +85,36 @@ pub fn write(root: &Path) -> Result<bool, String> {
 /// reload, is the unit [`write`] wrote: loaded, from `/etc/systemd/system`,
 /// with no drop-in, and not masked.
 pub fn loaded_as_written(show: &str) -> Result<(), String> {
+    loaded_as(show, UNIT, "the writer's unit")
+}
+
+/// [`loaded_as_written`] for any of lamp-update's fixed one-shot units,
+/// `unit`, its errors begun with `label`.
+pub(crate) fn loaded_as(show: &str, unit: &str, label: &str) -> Result<(), String> {
     let mut properties = BTreeMap::new();
     for line in show.lines().filter(|line| !line.is_empty()) {
         let (key, value) = line
             .split_once('=')
-            .ok_or("the writer's unit: a malformed systemctl property")?;
+            .ok_or_else(|| format!("{label}: a malformed systemctl property"))?;
         if !PROPERTIES.split(',').any(|name| name == key) {
             return Err(format!(
-                "the writer's unit: an unexpected systemctl property {}",
+                "{label}: an unexpected systemctl property {}",
                 clean_line(key)
             ));
         }
         if properties.insert(key, value).is_some() {
-            return Err(format!("the writer's unit: {key} twice"));
+            return Err(format!("{label}: {key} twice"));
         }
     }
     let field = |name: &str| {
         properties
             .get(name)
             .copied()
-            .ok_or_else(|| format!("the writer's unit: no {name}"))
+            .ok_or_else(|| format!("{label}: no {name}"))
     };
-    let wanted = format!("/{FOLDER}/{UNIT}");
+    let wanted = format!("/{FOLDER}/{unit}");
     let found = [
-        ("Id", UNIT),
+        ("Id", unit),
         ("LoadState", "loaded"),
         ("FragmentPath", wanted.as_str()),
         ("DropInPaths", ""),
@@ -111,7 +123,7 @@ pub fn loaded_as_written(show: &str) -> Result<(), String> {
         let value = field(name)?;
         if value != wanted {
             return Err(format!(
-                "the writer's unit: {name} is {:?}, not {wanted:?}",
+                "{label}: {name} is {:?}, not {wanted:?}",
                 clean_line(value)
             ));
         }
@@ -121,7 +133,7 @@ pub fn loaded_as_written(show: &str) -> Result<(), String> {
     let state = field("UnitFileState")?;
     if !matches!(state, "static" | "disabled") {
         return Err(format!(
-            "the writer's unit: UnitFileState is {:?}, not static",
+            "{label}: UnitFileState is {:?}, not static",
             clean_line(state)
         ));
     }

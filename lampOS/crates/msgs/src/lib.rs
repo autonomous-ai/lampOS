@@ -1231,6 +1231,105 @@ pub struct UpdateStatus {
     pub running: Option<UpdateBuild>,
     pub now: String,
     pub last: Option<UpdateResult>,
+    /// Harness put on the lamp before its sign-in (#5197): only with
+    /// `LAMP_HARNESS_AT_ONBOARDING=on`, else absent, so the app shows no
+    /// Harness step. An older reader passes over it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub harness: Option<HarnessInstall>,
+}
+
+/// Where Harness's install on the lamp is (#5197), as lamp-update's
+/// records keep it, in the app's snapshot form: `install` one of
+/// [`HarnessInstall::INSTALL`], `error` (with `failed` only) one of
+/// [`HarnessInstall::ERRORS`], `message` the plain words the app shows as
+/// they are, fixed by `install` and `error` ([`HarnessInstall::message_for`]),
+/// never free text. `revision` goes up by one at each change of this
+/// object and never on a read. `version` is `harness version`'s `a.b.c`,
+/// with `installed` only; `pinned` says whether the install went through
+/// the pinned manifest.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HarnessInstall {
+    pub install: String,
+    pub revision: u64,
+    pub at_unix_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pinned: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    pub message: String,
+}
+
+impl HarnessInstall {
+    /// Missing and not yet tried (the lamp's network not reached yet);
+    /// being put there; there; the last try failed.
+    pub const INSTALL: [&str; 4] = ["absent", "installing", "installed", "failed"];
+    /// Why the last try failed: the pin set wrongly, the pinned manifest
+    /// not fetched, its sha256 not the pinned one, past its bound,
+    /// Harness's installer failed or left no `harness`, no `lampos` user,
+    /// the one-shot unit not started.
+    pub const ERRORS: [&str; 7] = [
+        "pin_unreadable",
+        "pin_fetch",
+        "pin_mismatch",
+        "timeout",
+        "installer",
+        "no_user",
+        "not_started",
+    ];
+
+    /// The words the app shows for `install` and `error`, as they are.
+    pub fn message_for(install: &str, error: Option<&str>) -> &'static str {
+        match (install, error) {
+            ("absent", _) => "Harness will be installed once the lamp is online.",
+            ("installing", _) => "Installing Harness on the lamp.",
+            ("installed", _) => "Harness is installed. Sign in to hand tasks over.",
+            (_, Some("pin_mismatch")) => {
+                "Harness's download didn't match what this lamp expects, so it wasn't installed."
+            }
+            (_, Some("pin_fetch" | "installer")) => {
+                "Harness couldn't be downloaded. Check the lamp's internet and try again."
+            }
+            (_, Some("timeout")) => "Installing Harness took too long. Try again.",
+            _ => "Harness couldn't be installed on the lamp. Try again.",
+        }
+    }
+
+    /// A new one, its message as [`Self::message_for`] has it, at revision 0.
+    pub fn new(install: &str, error: Option<&str>, at_unix_ms: u64) -> Self {
+        Self {
+            install: install.to_owned(),
+            revision: 0,
+            at_unix_ms,
+            version: None,
+            pinned: None,
+            error: error.map(str::to_owned),
+            message: Self::message_for(install, error).to_owned(),
+        }
+    }
+
+    /// Whether every field is one lamp-update could have said: a known
+    /// `install`, an `error` only with `failed` (and always with it) and
+    /// from the list, the message for them, a version only with
+    /// `installed` and only digits and dots.
+    pub fn check(&self) -> bool {
+        Self::INSTALL.contains(&self.install.as_str())
+            && match &self.error {
+                None => self.install != "failed",
+                Some(error) => self.install == "failed" && Self::ERRORS.contains(&error.as_str()),
+            }
+            && self.message == Self::message_for(&self.install, self.error.as_deref())
+            && match &self.version {
+                None => true,
+                Some(version) => {
+                    self.install == "installed"
+                        && !version.is_empty()
+                        && version.len() <= 32
+                        && version.bytes().all(|b| b.is_ascii_digit() || b == b'.')
+                }
+            }
+    }
 }
 
 /// A build, by its sequence on the channel and its commit.
@@ -2951,6 +3050,74 @@ mod tests {
         assert_eq!(declared.period(), None);
         assert_ne!(UpdateCheck::TOPIC, UpdateStatus::TOPIC);
         assert_eq!(UpdateCheck::AGAIN_AFTER, Duration::from_secs(60));
+    }
+
+    /// #5197: `harness` is absent unless set, so a status without it reads
+    /// and writes as before; with it, only what lamp-update could say passes.
+    #[test]
+    fn an_update_status_carries_harness_only_when_set_and_checked() {
+        let without = UpdateStatus {
+            running: None,
+            now: "idle".into(),
+            last: None,
+            harness: None,
+        };
+        round_trip(&without, r#"{"running":null,"now":"idle","last":null}"#);
+        let installed = HarnessInstall {
+            revision: 3,
+            version: Some("0.4.25".into()),
+            pinned: Some(true),
+            ..HarnessInstall::new("installed", None, 7)
+        };
+        round_trip(
+            &UpdateStatus {
+                harness: Some(installed.clone()),
+                ..without
+            },
+            r#"{"running":null,"now":"idle","last":null,"harness":{"install":"installed","revision":3,"at_unix_ms":7,"version":"0.4.25","pinned":true,"message":"Harness is installed. Sign in to hand tasks over."}}"#,
+        );
+        assert!(installed.check());
+        let failed = HarnessInstall {
+            pinned: Some(false),
+            ..HarnessInstall::new("failed", Some("pin_mismatch"), 7)
+        };
+        assert!(failed.check());
+        for install in HarnessInstall::INSTALL {
+            let error = (install == "failed").then_some("installer");
+            assert!(HarnessInstall::new(install, error, 1).check(), "{install}");
+        }
+        for bad in [
+            HarnessInstall {
+                install: "gone".into(),
+                ..failed.clone()
+            },
+            HarnessInstall {
+                error: Some("/etc/x".into()),
+                ..failed.clone()
+            },
+            HarnessInstall {
+                error: None,
+                ..failed.clone()
+            },
+            HarnessInstall {
+                install: "installed".into(),
+                ..failed.clone()
+            },
+            HarnessInstall {
+                version: Some("1.2.3".into()),
+                ..failed.clone()
+            },
+            HarnessInstall {
+                message: "curl: /var/lib/x".into(),
+                ..failed.clone()
+            },
+            HarnessInstall {
+                version: Some("1.2.3 /x".into()),
+                ..installed.clone()
+            },
+        ] {
+            assert!(!bad.check(), "{bad:?}");
+        }
     }
 
     #[test]

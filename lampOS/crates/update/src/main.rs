@@ -26,6 +26,7 @@ lamp-update check|once|serve --channel-url URL [--channel NAME] [--key-file PATH
 lamp-update install --channel-url URL [--channel NAME] [--key-file PATH] [--setup on|off]
 lamp-update harness-off
 lamp-update harness-on
+lamp-update harness-install
 lamp-update back
 lamp-update apply
 lamp-update writer-probe
@@ -59,6 +60,10 @@ harness-on puts Harness on a lamp lampOS is installed on: without Harness at
         /var/lib/lampos-tasks) and linked there; then Harness at boot as install sets
         it; then lamp-tasks started again. Signing in is the person's. Run again, it
         changes nothing. As root, on the lamp itself.
+harness-install run by lamp-update-harness.service, which a `serve` round starts with
+        LAMP_HARNESS_AT_ONBOARDING=on while Harness is missing (#5197): harness-on's
+        install alone, through the manifest the round pinned if it named one (its sha256
+        checked first), recorded for update/status; no Harness at boot, no daemon.
 back    lamp-update-back (installed as /usr/local/lib/lampos/lamp-update-back, started by
         lamp-update.service's failure and its timer): when lamp-update switched to its own
         new build (LAMP_UPDATE_SELF=on) and that build has not confirmed itself, and
@@ -148,6 +153,7 @@ fn main() -> ExitCode {
         "install" => install(&options),
         "harness-off" => harness_off(&options),
         "harness-on" => harness_on(&options),
+        "harness-install" => harness_install(&options),
         "back" => back(&options),
         "apply" => apply(&options),
         "writer-probe" => writer_probe(&options),
@@ -437,6 +443,24 @@ fn harness_on(options: &BTreeMap<String, String>) -> Result<(), String> {
         );
     }
     Ok(())
+}
+
+/// `lamp-update harness-install`: Harness's one-shot (#5197). Ends with 1
+/// when the install failed or another held its lock; the record says why.
+fn harness_install(options: &BTreeMap<String, String>) -> Result<(), String> {
+    known(options, &[])?;
+    let mut say = |line: &str| eprintln!("lamp-update: {line}");
+    let said = lamp_update::harness_install::install_now(
+        Path::new("/"),
+        Path::new(lamp_update::install::RECORDS),
+        &mut install::output_of,
+        &mut lamp_update::records::unix_ms,
+        &mut say,
+    )?;
+    match said.error {
+        None => Ok(()),
+        Some(error) => Err(format!("Harness is not installed: {error}")),
+    }
 }
 
 /// `lamp-update back`: lamp-update-back, at its fixed path (#1680).
@@ -840,6 +864,23 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     // `serve` that acts, the one that says `update/status`.
     let mut app_check = (config.apply && command == "serve")
         .then(|| lamp_update::app_check::AppCheck::new(&bus_root, &mut say));
+    // Harness before the sign-in (#5197): only a `serve` that acts, with
+    // its switch on.
+    let harness = {
+        use lamp_update::harness_install as harness;
+        let on = config.apply
+            && command == "serve"
+            && harness::on(std::env::var(harness::SWITCH).ok().as_deref());
+        if config.apply && command == "serve" {
+            harness::at_start(&config.root, &records, on, lamp_update::records::unix_ms());
+        }
+        on.then(|| {
+            harness::pin_from(
+                std::env::var(harness::MANIFEST_URL).ok().as_deref(),
+                std::env::var(harness::MANIFEST_SHA256).ok().as_deref(),
+            )
+        })
+    };
     loop {
         let outcome = {
             let mut phase = |now: &'static str| {
@@ -858,6 +899,23 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             };
             round(&config, &mut world)
         };
+        // Once the channel was reached, so the lamp has its network; never
+        // before a switch of its own, whose new build does its own round.
+        if let Some(pin) = &harness
+            && !matches!(
+                outcome,
+                Outcome::Unreachable(_) | Outcome::SelfSwitched { .. } | Outcome::Climbs { .. }
+            )
+        {
+            lamp_update::harness_install::after_round(
+                &config.root,
+                &records,
+                pin,
+                &mut systemd,
+                lamp_update::records::unix_ms(),
+                &mut say,
+            );
+        }
         if let Some(telling) = &mut telling {
             let at_unix_ms = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
