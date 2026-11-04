@@ -861,6 +861,9 @@ fn serve(
         Some(root) => Bus::new(root)?,
         None => Bus::from_environment()?,
     };
+    if lamp_skills::service_read::on() {
+        hear_voices(&bus);
+    }
     let mut out =
         bus.publisher_declared(SkillEvent::TOPIC, &SkillEvent::declaration(), "skills")?;
     let audio = Arc::new(Mutex::new(Authority::new(
@@ -4413,6 +4416,48 @@ const SERVICES_TIMEOUT: Duration = Duration::from_secs(30);
 static READ_DAYS: Mutex<std::collections::BTreeMap<String, i64>> =
     Mutex::new(std::collections::BTreeMap::new());
 
+/// When the voice last heard a line (`voice/heard`), in Unix ms, 0 for
+/// never: a skill's read waits a minute after any voice (#5288). The topic
+/// is an event, so the bus keeps no latest of it; [`hear_voices`] marks
+/// each line as it comes (lamp-9adf, 5 Nov 01:19: another voice's ten
+/// words, then the calendar read 20 s later).
+static VOICE_HEARD_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// A thread of its own that marks each line the voice heard
+/// ([`VOICE_HEARD_MS`]), started with a skill's reads on. Subscribed before
+/// it returns, so a line published after is never missed.
+fn hear_voices(bus: &Bus) {
+    let mut heard = match bus.subscribe_typed(Speech::TOPICS[0], "skills_reads", Speech::TYPE) {
+        Ok(heard) => heard,
+        Err(error) => {
+            eprintln!("lamp-skills: {} not subscribed: {error}", Speech::TOPICS[0]);
+            return;
+        }
+    };
+    let spawned = std::thread::Builder::new()
+        .name("lamp-skills-heard".into())
+        .spawn(move || {
+            loop {
+                match heard.recv(Duration::from_secs(1)) {
+                    Ok(Some(_)) => {
+                        VOICE_HEARD_MS.store(unix_ms(), std::sync::atomic::Ordering::Relaxed);
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        eprintln!("lamp-skills: {} not received: {error}", Speech::TOPICS[0]);
+                        std::thread::sleep(Duration::from_secs(1));
+                    }
+                }
+            }
+        });
+    if let Err(error) = spawned {
+        eprintln!(
+            "lamp-skills: {} not listened to: {error}",
+            Speech::TOPICS[0]
+        );
+    }
+}
+
 /// A skill's read of a linked service that came due (#5288,
 /// [`lamp_skills::service_read`]): held to its permissions and once a
 /// local day, then run behind its gate. The journal's words: counts and
@@ -4496,13 +4541,11 @@ impl lamp_skills::service_read::Room for LampRoom {
             _ => false,
         };
         // Any voice heard, the owner's too: on the bus a voice is not told
-        // from another, so every one counts.
-        let heard_ago = self
-            .bus
-            .latest(Speech::TOPICS[0])
-            .ok()
-            .flatten()
-            .map(|heard| Duration::from_millis(now_ms.saturating_sub(heard.header.at_unix_ms)));
+        // from another, so every one counts ([`VOICE_HEARD_MS`]).
+        let heard_ago = match VOICE_HEARD_MS.load(std::sync::atomic::Ordering::Relaxed) {
+            0 => None,
+            at => Some(Duration::from_millis(now_ms.saturating_sub(at))),
+        };
         // The privacy switch, the microphones or the lamp put to sleep; and
         // the microphones known open lately, or it counts as private.
         let private = lamp_skills::routine::kept_asleep(&self.bus)
@@ -4797,6 +4840,38 @@ fn say_ask(call: &Call, who: bool) -> Option<serde_json::Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #5288's gate: a line on `voice/heard`, an event the bus keeps no
+    /// latest of, is marked as it comes, so a skill's read waits a minute
+    /// after it (lamp-9adf, 5 Nov 01:19: read 20 s after another voice).
+    #[test]
+    fn a_line_the_voice_heard_is_marked_for_a_reads_gate() {
+        // Short path for macOS Unix sockets; no process-wide environment change.
+        let dir = tempfile::Builder::new()
+            .prefix("hv")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        assert!(bus.latest(Speech::TOPICS[0]).unwrap().is_none());
+        hear_voices(&bus);
+        let mut voice = bus
+            .publisher_declared(Speech::TOPICS[0], &Speech::declaration(), "voice")
+            .unwrap();
+        let before = unix_ms();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while VOICE_HEARD_MS.load(std::sync::atomic::Ordering::Relaxed) < before {
+            assert!(Instant::now() < deadline, "the line was never marked");
+            voice
+                .publish_json(
+                    clock::now_us(),
+                    &json!({"request": null, "text": "is anyone home?", "finished": true}),
+                )
+                .unwrap();
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        // The bus still keeps no latest of it: the mark is the only way.
+        assert!(bus.latest(Speech::TOPICS[0]).unwrap().is_none());
+    }
 
     /// #5207 (Fourteen's played check on lamp-9adf): a note with
     /// `question` from a skill given `who` (Welcome back's day's first
