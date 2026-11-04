@@ -29,7 +29,7 @@ done and validated.
 
 ## Coverage map
 
-As of lamp-voice `acea8c2e4f` (4 Nov). `lamp` below is a connected client:
+As of lamp-voice `68f78709e1` (4 Nov). `lamp` below is a connected client:
 Python names first, JavaScript where it differs.
 
 ### Connection and state
@@ -67,8 +67,8 @@ Python names first, JavaScript where it differs.
 | Capability | lamp-control | Python / JS | lamp-mcp | Status | Owner | Validated |
 |---|---|---|---|---|---|---|
 | Colour, level, pattern, time | `light` | `light` | `lamp_light` | done: 10 colours, levels 1–5, breathe/candle/pulse, ≤ 30 s | Eighth | not yet |
-| Any colour (RGB), any brightness | — | — | — | missing | Eighth | not yet |
-| Every effect and pattern the ring draws | — | — | — | missing | Eighth | not yet |
+| Any colour (RGB), each pixel, any brightness | `light` with `rgb` or `pixels`, `brightness`, `fade_ms` | `light_rgb(rgb, …)`, `ring(pixels, for_ms=…, brightness=…)` / `lightRgb(rgb, …)`, `ring(pixels, { forMs, brightness, fadeMs })` | `lamp_ring` | done | Eighth | not yet |
+| Every effect and pattern the ring draws (`ring.play`, `ring.stream`) | — | — | — | missing | Eighth | not yet |
 
 ### Voice and sound
 
@@ -86,8 +86,8 @@ Python names first, JavaScript where it differs.
 | Its own phrases heard | `phrase.heard` | `on("phrase.heard", phrases=…)` | `lamp_events`, `lamp_wait_for` | done | Nine | not yet |
 | Its name called | `name.heard` | `on("name.heard")` | `lamp_events` | done | Nine | not yet |
 | Kinds of sound | `sound.heard` | `on("sound.heard")` | `lamp_events` | done | Nine | not yet |
-| Open a conversation turn, or end its own | `turn.start`, `turn.end` | `start_turn`, `end_turn` / `startTurn`, `endTurn` | `lamp_start_turn`, `lamp_end_turn` | PR #4944 | Nine | 75c9 3–4 Nov, combined builds: turn answered, same computer continuing, own end cutting a story (by ear) |
-| A computer's own mute | `listen.set` | `set_listening` / `setListening` | `lamp_set_listening` | PR #4944 | Nine | not yet |
+| Open a conversation turn, or end its own | `turn.start`, `turn.end` | `start_turn`, `end_turn` / `startTurn`, `endTurn` | `lamp_start_turn`, `lamp_end_turn` | done | Nine | 75c9 3–4 Nov, combined builds: turn answered, same computer continuing, own end cutting a story (by ear) |
+| A computer's own mute | `listen.set` | `set_listening` / `setListening` | `lamp_set_listening` | done | Nine | not yet |
 | The microphone's audio, local only | `microphone` grant only, not routed yet | — | — | missing | harness-reviewer | not yet |
 
 ### Eyes and camera
