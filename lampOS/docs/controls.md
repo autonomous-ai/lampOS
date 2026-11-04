@@ -1731,6 +1731,22 @@ closed, and an older reader would refuse the whole message. Tests:
 `a_computers_lift_never_opens_sleep_or_the_restart_guard`,
 `a_computers_mute_keeps_the_muted_wait_closed_until_it_is_lifted`.
 
+**The slide as the lamp's sleep and wake** (migrate-P4, #5182,
+`LAMP_SLIDE_WAKES`, off unless `on`). `crate::slide_wake` follows the states the
+muted wait reads. A slide that closes asks the sleep a hold does
+(`HandControls::slide_look`), which leaves a person's own mute, and turns the
+restart guard's mute into that sleep (`MuteRecord::sleep_over_guard`), so the
+lamp lies down whatever closed it. A slide that has
+read open for `SETTLE_US` (1 s) asks a tap's wake (`HandControls::head_wake`), so
+it clears a sleep or the restart guard's mute and leaves a person's own mute,
+and the next conversation says its "hm?". A slide closed again in that second
+wakes nothing, and a sleep about to be woken doesn't start its name capture. A
+slide first read open, or read again after it could not be read, asks nothing:
+that is no person's move, so such a lamp still wants a tap. A slide first read
+closed, at a start or after it could not be read, does ask the sleep, so after a
+fault the guard's mute under it becomes a sleep. It reads only the
+switch: it never grants a microphone. Tests: `slide_wake::tests`, `the_slide_*`.
+
 **A sleep that hears its name** (migrate-P2, `LAMP_SLEEP_HEARS_NAME`, off
 unless set; the Queue comment
 <https://github.com/autonomous-ai/lampOS/issues/3997#issuecomment-6526292114>).

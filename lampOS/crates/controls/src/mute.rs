@@ -108,6 +108,19 @@ impl MuteRecord {
         true
     }
 
+    /// A mute the owner knows its restart guard left becomes a sleep (the
+    /// privacy slide, migrate-P4): the same thing a tap may clear, so nothing
+    /// a person chose is weakened. Call only when the owner has established
+    /// that, as for a tap's clear of it.
+    pub fn sleep_over_guard(&mut self, at_us: u64) -> bool {
+        if !self.muted || at_us <= self.through_us {
+            return false;
+        }
+        self.through_us = at_us;
+        self.reason = Some(MuteReason::Sleep);
+        true
+    }
+
     /// Muted because the lamp was put to sleep.
     pub fn asleep(&self) -> bool {
         self.muted && self.reason == Some(MuteReason::Sleep)
