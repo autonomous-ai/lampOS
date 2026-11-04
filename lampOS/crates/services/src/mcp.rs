@@ -1211,6 +1211,24 @@ mod tests {
     }
 
     #[test]
+    fn a_long_tools_list_fits_the_voices_cap() {
+        let entry = slack(json!({}));
+        let endpoint = Endpoint::new(catalog::service("slack").unwrap(), &entry).unwrap();
+        let listed: Vec<Value> = (0..40)
+            .map(|i| {
+                json!({
+                    "name": if i % 2 == 0 { format!("slack_search_{i}") } else { format!("slack_create_{i}") },
+                    "description": "Finds things in the workspace. ".repeat(20),
+                    "inputSchema": {"type":"object","properties":{"query":{"type":"string"},"page_size":{"type":"integer"}}},
+                })
+            })
+            .collect();
+        let line = json!({"ok": true, "result": tools_quoted(&endpoint, &listed)}).to_string();
+        // The voice carries at most 4 KB to its model (`lamp_gemini::MAX_TOOL_JSON_BYTES`).
+        assert!(line.len() < 4_096, "{}", line.len());
+    }
+
+    #[test]
     fn a_long_answer_is_cut_under_the_cap_and_says_how_much_is_left_out() {
         let entry = slack(json!({}));
         let endpoint = Endpoint::new(catalog::service("slack").unwrap(), &entry).unwrap();
