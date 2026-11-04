@@ -436,3 +436,8 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   MCP) had El's and Thirteen's reads, so not taken; merge order with
   #5303 is Thirteen's note 2. Fourteen put #5293, #5303 and #5308's calls
   to Faye.
+- 23:2x — #5272 READ-OK restated at d55c259ef4 by range-diff: the face
+  fallback needs the person's face the only face in view
+  (`one_face_in_view`), the first builder's call; fmt, clippy,
+  person_scope 41, hits 12, remember 320, another_voice 18; putting
+  `face_seen_between` back fails the new two-silent-faces test.
