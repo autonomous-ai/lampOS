@@ -1261,7 +1261,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      (`pin_unreadable`, `pin_fetch`, `pin_mismatch`, `timeout`,
      `installer`, `no_user`, `not_started`); `message` fixed words for
      them; `revision` one more at each change. Said within 2 s of a
-     change. Switch off, `serve` removes the record, so no `harness`.
+     change, with the switch on. Switch off, `serve` removes the record, so
+     no `harness`, and the status thread wakes once a minute, as before.
    - **Tried again** after the next reached round when `failed`, or
      `installing` for over 30 min; the app's `update.check` starts that
      round at once. A failure the same steps would only repeat,

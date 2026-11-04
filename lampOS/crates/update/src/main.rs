@@ -854,12 +854,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         }
     }
     let mut last = String::new();
-    // `update/status` (#2194): where each round is, and how the last ended,
-    // only for a round that acts.
     let records = config.on(&config.records);
-    let mut telling = config
-        .apply
-        .then(|| lamp_update::status::Telling::start(&bus_root, &records, &mut say));
     // The app's Check for update (#4153): read between rounds only by a
     // `serve` that acts, the one that says `update/status`.
     let mut app_check = (config.apply && command == "serve")
@@ -890,6 +885,12 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         }
         on.then_some(wanted.pin)
     };
+    // `update/status` (#2194): where each round is, and how the last ended,
+    // only for a round that acts; Harness's record looked at often only
+    // with its switch on.
+    let mut telling = config.apply.then(|| {
+        lamp_update::status::Telling::start(&bus_root, &records, harness.is_some(), &mut say)
+    });
     loop {
         let outcome = {
             let mut phase = |now: &'static str| {
