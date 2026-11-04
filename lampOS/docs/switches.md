@@ -718,7 +718,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_TASKS_ACCOUNTS` | Questions about your calendar or email go to your computer's agent instead of the lamp's own reminders. |
 | `LAMP_TASKS_QUESTIONS` | A question about one of your computer's agents is passed to that agent to answer, not guessed by the lamp. |
 | `LAMP_TASKS_SIGN_IN` | You can sign the lamp in to your computer agents by voice: it reads out a code to type and checks your email. |
-| `LAMP_TASKS_SIGN_IN_APP` | You can sign the lamp in to your computer agents from the app: it shows the code to type, and the lamp says a code more slowly when you ask by voice. |
+| `LAMP_TASKS_SIGN_IN_APP` | You can sign the lamp in to your computers from the app, which shows the code to type. |
 | `LAMP_TASKS_MACHINE_NAMES` | The lamp calls your computers by their own names when telling you which one has your task. |
 | `LAMP_TASKS_NAMED_ASK` | Asking one of your computer's agents by name to do something hands the task straight to that agent. |
 | `LAMP_TASKS_CORRECT` | After the lamp reads back a task, you can say no, I said, and correct it before saying yes. |
