@@ -5887,10 +5887,11 @@ mod tests {
         );
         let (_, (told, _)) = run_call_scoped(&services, &write, 4_710_004, true, &send.lease());
         assert_eq!(told["error"], crate::services::NO_SEND_HERE);
-        // On the second route, a send with nothing prepared: cancelled.
+        // On the second route, a send with nothing prepared: nothing sent,
+        // and the model told to prepare it again.
         crate::services::judging_voices(std::sync::Arc::new(|_| Some(0.9)));
         let (_, (told, _)) = run_call_scoped(&services, &write, 4_710_004, true, &send.lease());
-        assert_eq!(told["error"], crate::services::CANCELLED);
+        assert_eq!(told["error"], crate::services::NOTHING_WAITING);
         assert_eq!(
             asked.lock().unwrap().len(),
             before,

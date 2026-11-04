@@ -598,6 +598,19 @@ only reads …").
   to me right after I read the message back. Say it was not sent." Journal
   ghi tên từng điều kiện không đạt ("a send cancelled: …"), và mỗi lần từ
   chối ghi kèm lời đã báo.
+- **Một câu gửi khi không có lệnh ghi nào đang chờ** (chưa chuẩn bị, hoặc
+  đã gửi hay đã huỷ) không gửi gì, và mô hình được báo `NOTHING_WAITING`,
+  "Not sent: no write waits for a send. None was prepared, or it was already
+  sent or cancelled. If they still want it, call service_write now without
+  send_id, say its read_back in full, and ask them again.", để người đó nghe
+  một phần đọc lại thật rồi nói "send" lần nữa. Journal ghi "a send with no
+  write waiting". Trên lamp-9adf ngày 4/11 mô hình hai lần tự nói một phần
+  đọc lại mà không gọi hàm, và câu "send" sau đó không thấy gì; luật riêng
+  của hàm giờ nói không bao giờ được nói một phần đọc lại mà không lệnh gọi
+  nào trong cùng lượt đưa ra.
+- **Điểm giọng của câu gửi được ghi vào journal**: "a send's voice beside
+  request N's: cosine 0.64" (hoặc "no print"), chỉ là điểm, không bao giờ là
+  dấu giọng.
 - **Phần đọc lại phải được nghe trọn.** Lời của đèn phải chứa mọi từ của
   `read_back` theo đúng thứ tự (chữ cái và chữ số, viết thường, "at" và "dot"
   của một địa chỉ nói hay viết đều như nhau; thêm lời xung quanh, như "Shall
