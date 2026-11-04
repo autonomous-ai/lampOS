@@ -2397,7 +2397,11 @@ at most 64 KiB, `{"upload": {"skill_md", "skill_toml"?}}`, taken only with
 the switch in `lamp-voice`'s unit and the say service there to ask; and
 `{"added": {"sha256"}}`, its state, `kept`, `asked`, `on`, `left_off` or
 `none`, which `lamp-cloud` asks until it is on or left off, so the backend
-hears `success` only after the spoken yes):
+hears `success` only after the spoken yes). The same upload again while it
+is in flight joins it (answered `starting`, one result for both), never
+`BUSY`; and what is in flight is kept in `lamp-cloud`'s state folder (id,
+kind, SHA-256 and state only, never the skill's name or words), so after a
+restart it is asked about again and the app is still told:
 
 1. **A name the lamp holds is refused, never replaced**: a skill on the lamp
    by that name (core, from the Store, made, `/var/lib/lampOS/skills`),

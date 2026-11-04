@@ -48,6 +48,16 @@ fn data(bytes: &[u8], format: &str) -> Value {
 /// A local backend answering `get-message` once with `data` for `kind`;
 /// the request's head handed back.
 fn backend(kind: &str, data: Value) -> (String, mpsc::Receiver<String>) {
+    backend_after(kind, data, None)
+}
+
+/// [`backend`], answering only once `gate` says so: the fetch is in flight
+/// until then.
+fn backend_after(
+    kind: &str,
+    data: Value,
+    gate: Option<mpsc::Receiver<()>>,
+) -> (String, mpsc::Receiver<String>) {
     let body = json!({"status": 1, "data": {"cmd": "data", "kind": kind, "data": data}})
         .to_string()
         .into_bytes();
@@ -66,6 +76,10 @@ fn backend(kind: &str, data: Value) -> (String, mpsc::Receiver<String>) {
             }
             head.push(byte[0]);
         }
+        let _ = tx.send(String::from_utf8_lossy(&head).into_owned());
+        if let Some(gate) = gate {
+            let _ = gate.recv();
+        }
         let mut answer = format!(
             "HTTP/1.1 200 OK\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
             body.len()
@@ -73,7 +87,6 @@ fn backend(kind: &str, data: Value) -> (String, mpsc::Receiver<String>) {
         .into_bytes();
         answer.extend_from_slice(&body);
         let _ = stream.write_all(&answer);
-        let _ = tx.send(String::from_utf8_lossy(&head).into_owned());
     });
     (base, rx)
 }
@@ -514,4 +527,184 @@ fn it_is_taken_starting_and_its_result_kept_for_the_app() {
     uploads.owe(done);
     assert_eq!(uploads.take().len(), 1);
     assert!(uploads.start("skills.upload").is_err());
+}
+
+/// The results ready within 10 s, or none.
+fn done_within(uploads: &Uploads) -> Vec<Outcome> {
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    let mut done = uploads.take();
+    while done.is_empty() && std::time::Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(20));
+        done = uploads.take();
+    }
+    done
+}
+
+/// `uploads` keeping what is in flight in `state`.
+fn uploads_kept_in(dir: &Path, base: &str, socket: &Path, state: &Path) -> Arc<Uploads> {
+    let mut made = Arc::into_inner(uploads(dir, base, socket)).unwrap();
+    made.state = Some(state.to_owned());
+    Arc::new(made)
+}
+
+/// What the state file holds: never the skill's name or its words, only
+/// the four fields, and only this process's user may read it.
+fn state_file_holds_no_words(path: &Path) -> Value {
+    use std::os::unix::fs::PermissionsExt;
+    let text = std::fs::read_to_string(path).unwrap();
+    for secret in [
+        "tea-tip",
+        "tea_tip",
+        "SECRET-WORDS",
+        "Tea tip",
+        "Only when you ask",
+        "k-secret",
+    ] {
+        assert!(!text.contains(secret), "{secret}: {text}");
+    }
+    let mode = std::fs::metadata(path).unwrap().permissions().mode();
+    assert_eq!(mode & 0o777, 0o600);
+    let read: Value = serde_json::from_str(&text).unwrap();
+    for entry in read.as_array().unwrap() {
+        let mut keys: Vec<&str> = entry
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(keys, ["kind", "sha256", "state", "upload_id"]);
+    }
+    read
+}
+
+/// The same kind again while it is in flight (fetched, then waiting for the
+/// yes, until its result is acked) is answered `starting` again and joins
+/// it, never `BUSY`, so the backend keeps the copy the first is fetching;
+/// one result settles both. Another file while one is fetched is `BUSY`
+/// (El's P3s on #5080). The state file never names the skill.
+#[test]
+fn the_same_upload_again_joins_the_one_in_flight() {
+    let dir = folder("again");
+    let state = dir.join(STATE_FILE);
+    let upload_id = id(CARD.as_bytes());
+    let kind = format!("{KIND_PREFIX}{upload_id}");
+    let (gate, held) = mpsc::channel();
+    let (base, heads) = backend_after(&kind, data(CARD.as_bytes(), "skill_md"), Some(held));
+    let (socket, seen) = voice("again", vec![kept(), json!({"state": "left_off"})]);
+    let uploads = uploads_kept_in(&dir, &base, &socket, &state);
+    uploads.start(&kind).unwrap();
+    // The backend has been asked and holds its answer: in flight.
+    heads.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert_eq!(uploads.start(&kind), Ok(()), "the same kind joins");
+    assert_eq!(
+        uploads.start(&format!("{KIND_PREFIX}0123456789abcdef")),
+        Err(BUSY.to_owned()),
+        "another file while one is fetched"
+    );
+    let pending = uploads.pending();
+    assert_eq!(pending.len(), 1);
+    assert_eq!(
+        (pending[0].state.as_str(), &pending[0].sha256),
+        (FETCHING, &None)
+    );
+    state_file_holds_no_words(&state);
+    gate.send(()).unwrap();
+    let done = done_within(&uploads);
+    assert_eq!(done.len(), 1, "one result for both");
+    assert_eq!(done[0].kind, kind);
+    assert_eq!(done[0].result, Err(LEFT_OFF.to_owned()));
+    // Handed once, asked once.
+    assert!(seen.recv().unwrap().get("upload").is_some());
+    assert!(seen.recv().unwrap().get("added").is_some());
+    // Until the broker acks it, still in flight: the same kind again joins
+    // it, with no second fetch.
+    assert_eq!(uploads.start(&kind), Ok(()));
+    let pending = uploads.pending();
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0].state, ASKING);
+    assert_eq!(pending[0].sha256, Some("a".repeat(64)));
+    assert_eq!(state_file_holds_no_words(&state)[0]["state"], ASKING);
+    assert!(uploads.take().is_empty());
+    uploads.acked(&done[0]);
+    assert!(uploads.pending().is_empty());
+    assert!(!state.exists(), "nothing in flight, no file");
+}
+
+/// A restart while it waits for the yes: the state file carries it on, it
+/// is asked about by its SHA-256, and the app still hears `success`; a
+/// record that isn't this module's is dropped.
+#[test]
+fn a_restart_while_asking_still_tells_the_app() {
+    let dir = folder("restart-ask");
+    let state = dir.join(STATE_FILE);
+    let asked = format!("{KIND_PREFIX}fedcba9876543210");
+    std::fs::write(
+        &state,
+        json!([
+            {"upload_id": "fedcba9876543210", "kind": asked, "sha256": "b".repeat(64), "state": ASKING},
+            {"upload_id": "0000000000000000", "kind": "skills.upload.1111111111111111", "sha256": null, "state": FETCHING},
+            {"upload_id": "2222222222222222", "kind": "skills.upload.2222222222222222", "sha256": "tea-tip", "state": ASKING},
+        ])
+        .to_string(),
+    )
+    .unwrap();
+    let (socket, seen) = voice(
+        "restart-ask",
+        vec![json!({"state": "asked"}), json!({"state": "on"})],
+    );
+    let uploads = uploads_kept_in(&dir, "http://127.0.0.1:9", &socket, &state);
+    uploads.resume();
+    let kinds: Vec<String> = uploads.pending().into_iter().map(|p| p.kind).collect();
+    assert_eq!(
+        kinds,
+        std::slice::from_ref(&asked),
+        "the unsound two dropped"
+    );
+    state_file_holds_no_words(&state);
+    let done = done_within(&uploads);
+    assert_eq!(done.len(), 1);
+    assert_eq!(done[0].kind, asked);
+    let told = done[0].result.clone().unwrap().unwrap();
+    assert_eq!(told["state"], "on");
+    assert_eq!(told["upload_id"], "fedcba9876543210");
+    assert_eq!(told["sha256"], "b".repeat(64));
+    assert_eq!(told.get("name"), None, "the state file never had it");
+    for _ in 0..2 {
+        assert_eq!(
+            seen.recv().unwrap(),
+            json!({"added": {"sha256": "b".repeat(64)}})
+        );
+    }
+    uploads.acked(&done[0]);
+    assert!(!state.exists());
+}
+
+/// A restart while it is fetched: fetched again (the backend still holds
+/// it, no result having been acked), handed on and settled as at first.
+#[test]
+fn a_restart_while_fetching_fetches_it_again() {
+    let dir = folder("restart-fetch");
+    let state = dir.join(STATE_FILE);
+    let upload_id = id(CARD.as_bytes());
+    let kind = format!("{KIND_PREFIX}{upload_id}");
+    std::fs::write(
+        &state,
+        json!([{"upload_id": upload_id, "kind": kind, "sha256": null, "state": FETCHING}])
+            .to_string(),
+    )
+    .unwrap();
+    let (base, heads) = backend(&kind, data(CARD.as_bytes(), "skill_md"));
+    let (socket, seen) = voice("restart-fetch", vec![kept(), json!({"state": "on"})]);
+    let uploads = uploads_kept_in(&dir, &base, &socket, &state);
+    uploads.resume();
+    let done = done_within(&uploads);
+    assert!(heads.recv().unwrap().contains(&kind));
+    assert_eq!(done.len(), 1);
+    assert_eq!(done[0].result.clone().unwrap().unwrap()["state"], "on");
+    assert_eq!(seen.recv().unwrap(), json!({"upload": {"skill_md": CARD}}));
+    assert_eq!(uploads.pending()[0].state, ASKING);
+    state_file_holds_no_words(&state);
+    uploads.acked(&done[0]);
+    assert!(!state.exists());
 }

@@ -211,10 +211,15 @@ fn main() -> ExitCode {
         .then(|| lamp_cloud::share::Store::of(&account, &key))
         .flatten();
     // A skill added from a file in the owner's app: only with
-    // LAMP_SKILL_UPLOAD=on and the skills page.
+    // LAMP_SKILL_UPLOAD=on and the skills page. What was in flight before a
+    // restart is carried on, so the app is still told.
+    let upload_state = std::env::var_os("STATE_DIRECTORY").map(PathBuf::from);
     let upload = (skills::on_from_environment() && lamp_cloud::upload::on_from_environment())
-        .then(|| lamp_cloud::upload::Uploads::product(&account, &key))
+        .then(|| lamp_cloud::upload::Uploads::product(&account, &key, upload_state.as_deref()))
         .flatten();
+    if let Some(upload) = &upload {
+        upload.resume();
+    }
     let mut lamp = Real {
         places: Places::default(),
         bus,

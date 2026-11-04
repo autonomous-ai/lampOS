@@ -28,13 +28,27 @@
 //! once a spoken yes put it on, `failure` with a plain reason on any check
 //! that fails, or when it was left off ([`Uploads::settle`]).
 //!
+//! A repeat of the same kind while that upload is still in flight (fetched,
+//! checked, or waiting for the yes, until the broker acks its result) is
+//! answered `starting` again and joins it: one result settles both, and no
+//! `BUSY` makes the backend delete the copy the first is still fetching. A
+//! different file while one is fetched is `BUSY`, and loses only its own.
+//!
+//! What is in flight is kept in [`STATE_FILE`] in `lamp-cloud`'s state
+//! folder (0600, as its other state): each upload's id, kind, SHA-256 and
+//! [`Pending::state`], never the file's words or its name. After a restart,
+//! [`Uploads::resume`] carries each on: one being fetched is fetched again,
+//! one waiting for the yes is asked about again, so the app is still told.
+//!
 //! The file's words and its name are never in the journal.
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use base64::Engine;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::settings::Outcome;
@@ -63,6 +77,46 @@ pub const SETTLE_EVERY: Duration = Duration::from_secs(5);
 /// The longest a kept skill is waited for: its ask may wait an hour for a
 /// good moment (the say service's longest), then 120 s for the yes.
 pub const SETTLE_WITHIN: Duration = Duration::from_secs(2 * 3_600);
+
+/// The file in `lamp-cloud`'s state folder (`STATE_DIRECTORY`) that keeps
+/// the uploads in flight across a restart.
+pub const STATE_FILE: &str = "uploads.json";
+/// [`Pending::state`]: being fetched, checked and handed to lamp-voice.
+pub const FETCHING: &str = "fetching";
+/// [`Pending::state`]: kept by lamp-voice, waiting for the spoken yes.
+pub const ASKING: &str = "asking";
+
+/// An upload in flight, as [`STATE_FILE`] keeps it: never the file's words
+/// or the skill's name.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Pending {
+    pub upload_id: String,
+    pub kind: String,
+    /// The kept skill's SHA-256, as lamp-voice told it, once kept: what
+    /// `{"added": {"sha256"}}` asks by.
+    pub sha256: Option<String>,
+    /// [`FETCHING`] or [`ASKING`].
+    pub state: String,
+}
+
+impl Pending {
+    /// Whether it reads as one this module wrote: the kind's id, a known
+    /// state, and once asking a SHA-256 of 64 lowercase hex (the kept
+    /// skill's, as lamp-voice told it).
+    fn sound(&self) -> bool {
+        id_of(&self.kind) == Some(self.upload_id.as_str())
+            && match (self.state.as_str(), &self.sha256) {
+                (FETCHING, None) => true,
+                (ASKING, Some(sha256)) => {
+                    sha256.len() == 64
+                        && sha256
+                            .bytes()
+                            .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+                }
+                _ => false,
+            }
+    }
+}
 
 /// The most bytes of each of the two files, lamp-voice's own bound
 /// (`lamp_voice::made_skill`'s 8 KiB).
@@ -148,8 +202,12 @@ pub struct Uploads {
     /// [`SETTLE_EVERY`] and [`SETTLE_WITHIN`], shorter in tests.
     pub settle_every: Duration,
     pub settle_within: Duration,
+    /// [`STATE_FILE`]'s path; none keeps what is in flight in memory only.
+    pub state: Option<PathBuf>,
     busy: AtomicBool,
     done: Mutex<Vec<Outcome>>,
+    /// The uploads in flight, as [`STATE_FILE`] has them.
+    pending: Mutex<Vec<Pending>>,
 }
 
 impl std::fmt::Debug for Uploads {
@@ -164,12 +222,18 @@ impl std::fmt::Debug for Uploads {
 impl Uploads {
     /// The product's, from the account's base and the lamp's key; none
     /// without either.
-    pub fn product(account: &crate::account::Account, key: &str) -> Option<Arc<Self>> {
+    /// What is in flight is kept in [`STATE_FILE`] in `state`
+    /// (`STATE_DIRECTORY`), if given.
+    pub fn product(
+        account: &crate::account::Account,
+        key: &str,
+        state: Option<&Path>,
+    ) -> Option<Arc<Self>> {
         let base = account.llm_base_url.trim().trim_end_matches('/');
         let base = base.strip_suffix("/v1").unwrap_or(base);
         let key = key.trim();
         (!base.is_empty() && !key.is_empty()).then(|| {
-            Arc::new(Self::new(
+            let mut uploads = Self::new(
                 base,
                 key,
                 &account.device_id,
@@ -177,7 +241,9 @@ impl Uploads {
                 Path::new(lamp_skills::PUSHED_DIR),
                 Path::new(lamp_skills::package::STORE_KEY),
                 Path::new(crate::make_skill::SOCKET),
-            ))
+            );
+            uploads.state = state.map(|dir| dir.join(STATE_FILE));
+            Arc::new(uploads)
         })
     }
 
@@ -201,32 +267,134 @@ impl Uploads {
             https_only: true,
             settle_every: SETTLE_EVERY,
             settle_within: SETTLE_WITHIN,
+            state: None,
             busy: AtomicBool::new(false),
             done: Mutex::new(Vec::new()),
+            pending: Mutex::new(Vec::new()),
         }
     }
 
     /// `kind` taken (`skills.upload.<upload_id>`): one fetch and check at a
     /// time, on a thread of its own, then the wait for the spoken yes on
     /// the same thread, the next upload free to start; its result kept for
-    /// [`Self::take`].
+    /// [`Self::take`]. The same kind again while it is in flight joins it
+    /// (`Ok`, answered `starting` again; one result settles both, El's P3
+    /// on #5080); another while one is fetched is [`BUSY`].
     pub fn start(self: &Arc<Self>, kind: &str) -> Result<(), String> {
         let id = id_of(kind)
             .ok_or_else(|| crate::wire::not_here(kind))?
             .to_owned();
+        let Ok(mut pending) = self.pending.lock() else {
+            return Err(VOICE_UNREACHED.into());
+        };
+        if pending.iter().any(|entry| entry.kind == kind) {
+            eprintln!(
+                "lamp-cloud: a skill from a file: the same upload again, joined to the one in flight"
+            );
+            return Ok(());
+        }
         if self.busy.swap(true, Ordering::AcqRel) {
             return Err(BUSY.into());
         }
+        pending.push(Pending {
+            upload_id: id.clone(),
+            kind: kind.to_owned(),
+            sha256: None,
+            state: FETCHING.into(),
+        });
+        self.persist(&pending);
+        drop(pending);
+        if !self.spawn(kind.to_owned(), id, None) {
+            self.busy.store(false, Ordering::Release);
+            self.forget(kind);
+            return Err(VOICE_UNREACHED.into());
+        }
+        Ok(())
+    }
+
+    /// After a restart: each upload [`STATE_FILE`] says was in flight is
+    /// carried on, so the app is still told: one being fetched is fetched
+    /// again (the backend still holds its file, as no result was acked),
+    /// one waiting for the yes is asked about again by its SHA-256. A
+    /// record that doesn't read as this module's is dropped.
+    pub fn resume(self: &Arc<Self>) {
+        let Some(path) = &self.state else {
+            return;
+        };
+        let read: Vec<Pending> = std::fs::read(path)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .unwrap_or_default();
+        let mut carried: Vec<Pending> = Vec::new();
+        let mut fetching = false;
+        for entry in read {
+            // Sound, once each, and at most one fetched, as `start` holds it.
+            if !entry.sound()
+                || carried.iter().any(|kept| kept.kind == entry.kind)
+                || (entry.state == FETCHING && std::mem::replace(&mut fetching, true))
+            {
+                continue;
+            }
+            carried.push(entry);
+        }
+        let Ok(mut pending) = self.pending.lock() else {
+            return;
+        };
+        pending.clone_from(&carried);
+        self.persist(&pending);
+        drop(pending);
+        for entry in carried {
+            eprintln!(
+                "lamp-cloud: a skill from a file: carried on after a restart ({})",
+                entry.state
+            );
+            let fetch = entry.state == FETCHING;
+            if fetch {
+                self.busy.store(true, Ordering::Release);
+            }
+            if !self.spawn(entry.kind.clone(), entry.upload_id, entry.sha256) {
+                if fetch {
+                    self.busy.store(false, Ordering::Release);
+                }
+                self.keep(Outcome {
+                    kind: entry.kind,
+                    result: Err(VOICE_UNREACHED.into()),
+                    request_id: None,
+                    code: None,
+                });
+            }
+        }
+    }
+
+    /// The upload's thread: fetched, checked and handed on (or, `asking`
+    /// with its SHA-256 after a restart, already kept), then settled and
+    /// its result kept. False if no thread could start.
+    fn spawn(self: &Arc<Self>, kind: String, id: String, asking: Option<String>) -> bool {
         let uploads = Arc::clone(self);
-        let kind = kind.to_owned();
-        let spawned = std::thread::Builder::new()
+        std::thread::Builder::new()
             .name("lamp-cloud-upload".into())
             .spawn(move || {
-                let (kept, journal) = uploads.run(&id);
-                uploads.busy.store(false, Ordering::Release);
-                for line in journal {
-                    eprintln!("lamp-cloud: {line}");
-                }
+                let kept = match asking {
+                    // Only what the state file holds: the app is told it is
+                    // on by its id and SHA-256, the rest being lamp-voice's.
+                    Some(sha256) => Ok(json!({
+                        "upload_id": id,
+                        "added": "file",
+                        "uploaded": true,
+                        "sha256": sha256,
+                    })),
+                    None => {
+                        let (kept, journal) = uploads.run(&id);
+                        if let Ok(kept) = &kept {
+                            uploads.asking(&kind, kept["sha256"].as_str().unwrap_or_default());
+                        }
+                        uploads.busy.store(false, Ordering::Release);
+                        for line in journal {
+                            eprintln!("lamp-cloud: {line}");
+                        }
+                        kept
+                    }
+                };
                 let result = match kept {
                     Ok(kept) => uploads.settle(kept),
                     Err(why) => Err(why),
@@ -244,12 +412,70 @@ impl Uploads {
                     request_id: None,
                     code: None,
                 });
-            });
-        if spawned.is_err() {
-            self.busy.store(false, Ordering::Release);
-            return Err(VOICE_UNREACHED.into());
+            })
+            .is_ok()
+    }
+
+    /// `kind` kept by lamp-voice as `sha256`: now waiting for the yes.
+    fn asking(&self, kind: &str, sha256: &str) {
+        if let Ok(mut pending) = self.pending.lock() {
+            for entry in pending.iter_mut().filter(|entry| entry.kind == kind) {
+                entry.sha256 = Some(sha256.to_owned());
+                entry.state = ASKING.into();
+            }
+            self.persist(&pending);
         }
-        Ok(())
+    }
+
+    fn forget(&self, kind: &str) {
+        if let Ok(mut pending) = self.pending.lock() {
+            pending.retain(|entry| entry.kind != kind);
+            self.persist(&pending);
+        }
+    }
+
+    /// The broker acked `outcome`: the backend has the result, so its
+    /// upload is no longer in flight, here or in [`STATE_FILE`].
+    pub fn acked(&self, outcome: &Outcome) {
+        self.forget(&outcome.kind);
+    }
+
+    /// The uploads in flight now.
+    pub fn pending(&self) -> Vec<Pending> {
+        self.pending
+            .lock()
+            .map(|pending| pending.clone())
+            .unwrap_or_default()
+    }
+
+    /// [`STATE_FILE`] written whole as `pending` (0600, beside, synced,
+    /// renamed), or removed when nothing is in flight.
+    fn persist(&self, pending: &[Pending]) {
+        let Some(path) = &self.state else {
+            return;
+        };
+        if pending.is_empty() {
+            let _ = std::fs::remove_file(path);
+            return;
+        }
+        let Ok(bytes) = serde_json::to_vec(pending) else {
+            return;
+        };
+        let beside = path.with_extension("new");
+        let _ = std::fs::remove_file(&beside);
+        let written = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&beside)
+            .and_then(|mut file| {
+                use std::io::Write;
+                file.write_all(&bytes).and_then(|()| file.sync_all())
+            })
+            .and_then(|()| std::fs::rename(&beside, path));
+        if written.is_err() {
+            let _ = std::fs::remove_file(&beside);
+        }
     }
 
     fn keep(&self, outcome: Outcome) {
