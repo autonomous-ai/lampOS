@@ -3356,6 +3356,17 @@ never have asked or taken an answer on a lamp).
   again`. Tests: `a_sign_ins_question_cut_short_is_offered_again_until_heard_whole`
   (the news thread against a stand-in tasks part) and
   `a_question_not_heard_whole_is_due_again_a_few_times_at_most`.
+- **A question talked over is asked at the next pause** (#5198): when the
+  question's turn ends not heard whole, cancelled (the person talks over
+  it: `cancel_reply`) or finished with its audio cut or unheard
+  (`heard_news`), the coordinator hands its news to `TaskNews::not_heard`.
+  A sign-in's question among it is offered again at once
+  (`AskAgain::cut`), not 30 s later, so it is told at the next pause. It
+  still counts toward `ASKED_MOST`: one talked over on its last telling is
+  let go. Other news is left as it was. Tests:
+  `a_sign_ins_question_talked_over_is_offered_again_at_once`,
+  `a_question_talked_over_is_due_at_once` and
+  `news_a_turn_did_not_get_heard_is_told_not_heard`.
 - **The question heard:** once the question's turn was heard whole
   (`TaskNews::heard`), the coordinator sends `sign_in_asked` with the
   sign-in's id and that turn's number, the same number the worker's tools
