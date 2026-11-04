@@ -649,7 +649,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_MOTION_KEEPS_ANSWER` | The sound of the lamp's own motors while it thinks no longer interrupts its answer. |
 | `LAMP_MOTION_VOICE` | The lamp tries to tell your voice from its motor noise when you speak while it moves. |
 | `LAMP_SAME_VOICE_CALLER_ONLY` | The lamp learns a conversation's voice only from the person who called it, so others' lines don't take over. |
-| `LAMP_SAME_VOICE_FOR` | With `services`, the lamp checks your voice only to let a linked service send or read in full; how it talks with people is unchanged. |
+| `LAMP_SAME_VOICE_FOR` | The lamp checks your voice only before a linked service sends or reads in full. |
 | `LAMP_SAME_VOICE_MODEL` | The lamp checks a line is in the voice of the person it's talking with; another voice ends the chat. |
 | `LAMP_VOICE_TONE` | The lamp senses how calm, excited, glad or down you sound, keeping only numbers, never your words or voice. |
 | `LAMP_NO_WORDS_AGAIN` | When you call the lamp by name and it comes up empty, it tries again or asks you to repeat, never silent. |
