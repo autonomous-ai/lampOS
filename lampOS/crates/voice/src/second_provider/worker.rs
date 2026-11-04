@@ -4161,6 +4161,16 @@ pub fn serve(
                         )
                     })
                 }));
+                // A first word said as a sentence of its own is the name by
+                // the near hearing alone (`LAMP_NAME_AS_A_SENTENCE`, #5277).
+                if std::env::var(crate::second_provider::NAME_AS_A_SENTENCE_ENVIRONMENT)
+                    .is_ok_and(|value| value == "on")
+                {
+                    eprintln!(
+                        "lamp-voice second: a line's first word said as a sentence of its own, more said after it, is the name when lamp-name heard it near within 1.3 s of the line's start, whatever it was written as; never a word said to a person (LAMP_NAME_AS_A_SENTENCE)"
+                    );
+                    engine = engine.taking_the_name_as_a_sentence(true);
+                }
             } else {
                 eprintln!(
                     "lamp-voice second: a first word like the lamp's name is never taken as it: no bus to read lamp-name's near hearings from (LAMP_NAME_NEAR)"

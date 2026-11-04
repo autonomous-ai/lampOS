@@ -1724,6 +1724,8 @@ fn second_route_worker_environment(
         crate::second_provider::NAME_CARRIES_ENVIRONMENT,
         crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT,
         lamp_msgs::NameHeard::NEAR_ENVIRONMENT,
+        // The name said as a sentence of its own, with the near hearing (#5277).
+        crate::second_provider::NAME_AS_A_SENTENCE_ENVIRONMENT,
         crate::second_provider::OWN_ECHO_ENVIRONMENT,
         crate::second_provider::FACE_NAME_ENVIRONMENT,
         crate::second_provider::STT_WARM_ENVIRONMENT,
@@ -1969,6 +1971,7 @@ mod tests {
             crate::second_provider::NAME_CARRIES_ENVIRONMENT,
             crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT,
             lamp_msgs::NameHeard::NEAR_ENVIRONMENT,
+            crate::second_provider::NAME_AS_A_SENTENCE_ENVIRONMENT,
             crate::second_provider::OWN_ECHO_ENVIRONMENT,
             crate::second_provider::FACE_NAME_ENVIRONMENT,
             crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
@@ -2691,6 +2694,7 @@ mod tests {
                     || name == crate::second_provider::NAME_CARRIES_ENVIRONMENT
                     || name == crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT
                     || name == lamp_msgs::NameHeard::NEAR_ENVIRONMENT
+                    || name == crate::second_provider::NAME_AS_A_SENTENCE_ENVIRONMENT
                     || name == crate::second_provider::OWN_ECHO_ENVIRONMENT
                     || name == crate::second_provider::FACE_NAME_ENVIRONMENT
                     || name == crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT
@@ -2841,6 +2845,7 @@ mod tests {
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_NAMED_ALWAYS=on",
                     "LAMP_NAMES_RECORD_TOLD=on",
+                    "LAMP_NAME_AS_A_SENTENCE=on",
                     "LAMP_NAME_NEAR=on",
                     "LAMP_NAME_REPEAT_NOT_A_CALL=on",
                     "LAMP_NAME_SAID_TO_A_PERSON=on",
