@@ -59,6 +59,11 @@ pub const VOICE_WITHIN: Duration = Duration::from_secs(60);
 pub const POLL: Duration = Duration::from_millis(250);
 /// What the lamp says, and only this, when someone comes mid-read.
 pub const STOP_LINE: &str = "I'll tell you the rest later.";
+/// How long a read already under way says nothing while the eyes may only
+/// have blinked: the known face's mark is renewed every 2 s and read fresh
+/// for 2 s, and a renewal a moment late reads as "not the owner" or
+/// nobody. Played on lamp-9adf: renewals 2.1 s apart, at times 4.2 s.
+pub const BLINK: Duration = Duration::from_secs(5);
 /// The most items a skill reads at once (`count`), and how many mails
 /// when it names none.
 pub const MOST_ITEMS: i64 = 10;
@@ -372,7 +377,7 @@ pub fn run(step: &ReadStep, room: &mut impl Room) -> String {
     for (at, line) in lines.iter().enumerate() {
         // Judged again before each line: the count's, then each item's.
         let read = at.saturating_sub(1);
-        if let Err(why) = judge(&room.seen()) {
+        if let Err(why) = judge_through_blinks(room) {
             if at == 0 {
                 return format!("stopped: {} before a word", why.words());
             }
@@ -392,6 +397,23 @@ pub fn run(step: &ReadStep, room: &mut impl Room) -> String {
         }
     }
     format!("read {items}")
+}
+
+/// The gate judged before a line: the owner not told, or nobody, is
+/// looked at again for up to [`BLINK`] with nothing said meanwhile, so a
+/// late mark doesn't stop the read. Anything else closes it at once.
+fn judge_through_blinks(room: &mut impl Room) -> Result<(), Closed> {
+    let began = room.now_ms();
+    loop {
+        match judge(&room.seen()) {
+            Err(Closed::NotOwner | Closed::Nobody)
+                if room.now_ms().saturating_sub(began) < BLINK.as_millis() as u64 =>
+            {
+                room.wait(POLL);
+            }
+            judged => return judged,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -443,6 +465,8 @@ mod tests {
         /// The look at which the room changes to `then`, counted from the
         /// first look after the read.
         after_read: Option<(usize, Seen)>,
+        /// How many looks after the read see the owner's mark late.
+        blinks: usize,
     }
 
     impl Lamp {
@@ -455,12 +479,19 @@ mod tests {
                 reads: Vec::new(),
                 said: Vec::new(),
                 after_read: None,
+                blinks: 0,
             }
         }
     }
 
     impl Room for Lamp {
         fn seen(&mut self) -> Seen {
+            if !self.reads.is_empty() && self.blinks > 0 {
+                self.blinks -= 1;
+                let mut late = alone();
+                late.owner_in_view = false;
+                return late;
+            }
             if !self.reads.is_empty()
                 && let Some((at, then)) = &self.after_read
             {
@@ -803,6 +834,28 @@ mod tests {
         lamp.after_read = Some((1, private));
         assert_eq!(run(&calendar(), &mut lamp), "stopped: private, 0 of 2 read");
         assert_eq!(lamp.said, ["You have 2 events tomorrow."]);
+    }
+
+    /// Played on lamp-9adf: the owner's mark a moment late just after the
+    /// read stopped it before a word. A blink under [`BLINK`] is waited out
+    /// with nothing said; a stranger who stays is still stopped.
+    #[test]
+    fn a_blink_of_the_eyes_does_not_stop_it() {
+        let drive = step(r#"service = "google_drive", what = "files""#).unwrap();
+        let answer = json!({"quoted": [{"name": "Tax 2026"}, {"name": "Plans"}]});
+        let mut lamp = Lamp::new(vec![alone()], answer.clone());
+        lamp.blinks = 8;
+        assert_eq!(run(&drive, &mut lamp), "read 2");
+        assert_eq!(lamp.said.len(), 3);
+        let mut lamp = Lamp::new(vec![alone()], answer);
+        lamp.blinks = usize::MAX;
+        let read_at = lamp.now;
+        assert_eq!(
+            run(&drive, &mut lamp),
+            "stopped: not the owner before a word"
+        );
+        assert!(lamp.said.is_empty());
+        assert!(lamp.now - read_at >= BLINK.as_millis() as u64);
     }
 
     /// A read refused by `lamp-services` says nothing.

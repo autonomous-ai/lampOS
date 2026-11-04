@@ -874,7 +874,11 @@ counted. A title, sender or subject is cut to 100 characters. The gate is
 judged again before every line. If someone comes (a second face, another
 face, a voice), the lamp stops after the line it is on and says only "I'll
 tell you the rest later."; if the gate closes for another reason (privacy,
-a pause, quiet hours, the owner gone), it stops with nothing said.
+a pause, quiet hours, the owner gone), it stops with nothing said. The
+owner not told, or nobody in view, is looked at again for up to 5 s
+(`BLINK`) with nothing said meanwhile, as the eyes renew the known face's
+mark every 2 s and it is read fresh for 2 s: on lamp-9adf a renewal 2.1 s
+apart stopped a read before a word. Anything else closes it at once.
 
 **The journal** keeps only the outcome: "read 4", "skipped: not alone",
 "stopped: someone came in, 2 of 5 read", "not read: <the service's plain
