@@ -115,7 +115,7 @@ lamp says so.
 |---|---|
 | `info` | the identity fields above |
 | `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime, zone and the owner's language (`host.language`, #4473: `en`, `vi`, `ja`, `zh` or `ko` from `/etc/lampOS/setup/language`, always said, `en` with no file or one it doesn't know, so the app tells English from a lamp too old to say). None of it asks the voice: it is answered while `lamp-voice` restarts after a new language, and `mic.get` too, from what the bus kept (`available: false` while the voice is down) |
-| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`, `skills.upload`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `system.reboot`, `system.shutdown`, `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
+| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`, `skills.upload`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `system.reboot`, `system.shutdown`, `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198, `control.code`/`control.clients`/`control.revoke` with `--control-admin-socket` while lamp-control's admin socket is there), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
 | `system.info`'s `account` | `signed_out` while this lamp's login is no longer accepted (`LAMP_SIGNED_OUT=on`, "Signed out" below). No field otherwise, read as before: an older lamp, the switch off, and a lamp signed in all say none |
 | `system.info`'s `reset` | whether the reset button's 5 s hold takes this lamp back into setup (#2937): `hold` when `/etc/lampOS/controls/controls-pins.json` names a `reset` line (a product lamp), `none` when not (a lamp moved from V1, whose pins never carry one: its way back is the hotspot, [setup.md](setup.md)). No field when the pins can't be read; the app reads a missing field as before, the hold. The app keeps the last one it heard, for a lamp it can't ask |
@@ -154,6 +154,7 @@ lamp says so.
 | `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters), `language.set` (`{"language": "en" \| "vi" \| "ja" \| "zh" \| "ko"}`, #4473) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}`, `{"name"}` or `{"language"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
 | `owner.place` (`{"lat", "lon", "name", "set_at"}`, `set_at` ISO 8601 UTC), `owner.place.clear` (`{}`) | with `LAMP_OWNER_PLACE=on` beside `LAMP_SETTINGS_CHANGE=on` (#4333, [owner-place.md](owner-place.md), "The owner's place" below): rounded here to about a kilometre and handed to root's helper as the names are; `starting` at once, then `success` with what was kept (`{"name", "lat", "lon", "set_at"}`) or `{"cleared": true}` (also when none was kept), or `failure` with why; a request that doesn't fit fails at once. `name` is an area name (sub-locality and locality from the phone's geocoder), never a street address; `lat`/`lon` is where the lamp stands, set by the person at setup or with Update now, never resent as the phone moves, rounded by the app to 2 decimals. Listed in `can` only with the switch. Without it, `owner.place` gets V1's "not on this lamp", and `owner.place.clear` is still taken, unlisted (#4356) |
 | `connector.set.<code>`, `connector.remove.<code>`, `services.list` | with `LAMP_SERVICES=on` (Queue #4710, "A person's linked services" below, [services.md](services.md)): a service of the person's linked or unlinked, by V1's codes (`gmail`, `gmail-app`, `google_calendar`, `google_drive`, `notion`, `figma-api`, `figma`, `github`, `linear`, `asana`, `ahrefs`, `facebook`, `slack`, `mondaydotcom`, `hubspot`, `amplitude`); a set's data fetched from the backend, never carried. `starting` at once, then `success` with `{"connector", "scopes"}` (a remove `{"connector"}`) or `failure` with why; `services.list` is `{"connected": [{"code", "account", "expired"}]}`. `can` says `services` for the `connector.*` kinds. Without the switch, V1's "not on this lamp" |
+| `control.code` (`{"grants": [...], "seal_to", "request_id"}`), `control.clients` (`{}`), `control.revoke` (`{"client": "c_1"}`), `control.code_cancel` (`{}`) | with `--control-admin-socket` (#5299, "The developer door" below): a pairing code for a developer computer, sealed to the app's one-time key, as `{"sealed": {"v": 1, "enc", "ct"}, "until_unix_ms", "shown", "pin_said"}`, the lamp saying the start of its pin aloud; the code dropped, `{"dropped"}`; the paired computers as `{"clients": [{"id", "name", "grants", "paired_at_unix_ms"}]}`; a computer revoked, `{"revoked", "saved"}` (with `why` when `saved` is false). `failure` with a short reason the app shows as is. Listed in `can` only while lamp-control's admin socket is there. **Who may ask:** only the lamp's own account channel, the same guard as `faces.add_photo` and `guard.on` (`online::commanded`), and that channel is plain too until broker TLS ("Limit" below). Without the option, V1's "not on this lamp" |
 | anything else (`add_channel`, the other `skills.*`, the other `face.*`, `tts.*`, the other `led.*`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
 
 ### News for the phone, unasked (`messages/out`)
@@ -2140,6 +2141,99 @@ root's `lamp-services` on `/run/lampos-services/admin.sock` (in the unit's
 
 The services, their reads and writes, the voice's functions and its send
 gate are in [services.md](services.md).
+
+## The developer door (#5299, `control.code`, `control.clients`, `control.revoke`, `control.code_cancel`)
+
+**The first time the cloud-facing part can mint pairing codes and revoke
+pairings.** lamp-cloud, which takes the app's commands from the broker, now
+reaches lamp-control's admin socket, which until now only a person at the lamp
+used (`lamp-control code`, `revoke`). It is gated by the owner's developer
+setting: with developer access off, lamp-control isn't running and the socket
+isn't there, so the four kinds are neither listed nor answered.
+
+Off unless `lamp-cloud` is started with `--control-admin-socket PATH`
+(lamp-control's admin socket, `/run/lampos-control/admin.sock`; docs/control.md,
+"Running the door"). The product `lamp-cloud.service` passes it, with
+`-/run/lampos-control` in its `ReadWritePaths=`; lamp-control itself becomes a
+product unit with #4526, and until that lands a lamp has the socket only with
+lamp-control's own runtime unit. Each
+kind is one JSON line asked of that socket, as `lamp-control code`, `clients`
+and `revoke` ask it at the lamp, waited on 3 s. `can` lists the four only
+while the socket is there (lamp-control running with `LAMP_CONTROL=on`); an
+app that asks anyway is told `developer access is off on this lamp`.
+
+- **`control.code`** (`{"grants": ["body", "light"], "seal_to": "<base64url, 32 bytes>", "request_id"}`):
+  `seal_to` is the app's one-time X25519 public key, made for this request.
+  `request_id` is the app's own, 1 to 64 printable characters. Both are
+  checked, and the grants are a list of names, before lamp-control is asked,
+  since a new code voids the one out. lamp-control's answer is sealed and
+  the app is told:
+  ```
+  {"sealed": {"v": 1, "enc": "<base64url, 32 bytes>", "ct": "<base64url>"},
+   "until_unix_ms": 1762300000000, "shown": ["can move the lamp's body", "can change the light"]}
+  ```
+  `ct` opens to `{"code": "12345678", "pin": "<64 hex>", "until_unix_ms": N}`.
+  `until_unix_ms` (outside the seal too, for the countdown) is lamp-control's
+  own: the wall clock now plus the code's 5 minutes. `shown` is the pairing
+  screen's words for each grant.
+- **The spoken pin check** (Faye on #5299, 5 Nov 08:18: before customers):
+  with each `control.code` the lamp itself says the first 8 characters of
+  its pin aloud, in its own voice and exactly as written, in two groups of
+  four ("My pairing check is 3 F 9 A, 0 B 2 C."), once nobody is talking with
+  it. `pin_said` (outside the seal) says whether the voice took the line; an
+  older lamp-control says nothing, and it is `false`. The app shows the same
+  8 characters from the opened pin. When they don't match, it sends
+  `control.code_cancel`. The pin is in no journal line.
+- **`control.code_cancel`** (`{}`): `{"dropped": true|false}`. The code out
+  is dropped at once, so nobody can pair with it ("no pairing code is out"),
+  and `dropped` says whether there was one. The app sends it on a spoken
+  check that doesn't match, and when its screen closes before the code is
+  used. The journal says `control.code_cancel from the app: the pairing code
+  dropped (true)`.
+- **The seal:** HPKE (RFC 9180), base mode, single shot, with
+  DHKEM(X25519, HKDF-SHA256), HKDF-SHA256 and ChaCha20-Poly1305 (ids 0x0020,
+  0x0001, 0x0003). `info` is `lampos/v1/control.code`; `aad` is the lamp's
+  device id (every reply's `id`), a newline, then the `request_id`, so an
+  answer moved to another lamp's or another request's context doesn't open.
+  `enc` is the lamp's ephemeral public key, new for each code. The app opens
+  it with a stock HPKE library (CryptoKit's `HPKE`, Tink's `HpkeDecrypt`) and
+  drops its key, the code and the pin at `until_unix_ms`. Built from `ring`
+  alone (`crate::seal`).
+- **`control.clients`** (`{}`): `{"clients": [{"id", "name", "grants", "paired_at_unix_ms"}]}`.
+  Nothing in it is secret, so it is not sealed.
+- **`control.revoke`** (`{"client": "c_1"}`): `{"revoked": true|false, "saved": true}`,
+  `revoked` whether it was paired. It takes effect at once either way; when
+  lamp-control's file couldn't take it yet the answer is `"saved": false`
+  with lamp-control's words as `why` (a restart before a save succeeds would
+  bring the computer back).
+- **Refusals**, as `failure` with a short `error` the app shows as is:
+  - no `seal_to`, or one that isn't 32 bytes of base64url, or a key no seal
+    can be made to: `this app must seal the code: update the app`. An app
+    that can't seal never gets a code, in the clear or otherwise, and the
+    owner's code out is untouched;
+  - no `request_id`: `this app must send a request_id with control.code`;
+  - grants not a list of names: `grants must be a list of names`; a grant
+    lamp-control doesn't know: `a grant this lamp doesn't know`;
+  - no or a bad `client`: `client must be a computer's id`;
+  - the socket not there or refusing: `developer access is off on this lamp`;
+    connected but no answer in time: `developer access did not answer on the lamp now`.
+- **Privacy:** the code, the pin, `ct` and `seal_to` are in no journal line,
+  error or telemetry. The journal says only `control.code from the app: a
+  code for 2 grants, sealed`, and for the other two the count of computers,
+  or the id revoked and whether it was saved. **The owner can see it:** each
+  `control.code` (with its grant count) and each `control.revoke` (with the
+  computer's id) is a journal line, so "who revoked my laptop?" is answered
+  from the lamp.
+- **Limit:** sealing keeps the code and pin from anyone who only reads the
+  link (plain MQTT today: the broker and its logs see `enc` and `ct`, never
+  the code or pin). It is **not end to end**: on a plain link the app's
+  request and the lamp's answer are not authenticated. The lamp saying the
+  first 8 characters of its pin aloud, matched by the owner in the app before
+  the code is shown, checks the pin outside the broker; it does not protect
+  the pairing code itself. Only the lamp's own account channel may ask
+  (`online::commanded`), and that channel is plain too. Broker TLS
+  (`LAMP_CLOUD_TLS`) closes the rest. Until it is on this is an accepted risk,
+  and the pairing is never described as end to end.
 
 ## Not yet known, for the backend (#1396)
 

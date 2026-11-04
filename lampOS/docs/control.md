@@ -253,11 +253,12 @@ lamp-control clients
   - A connection that hasn't said `hello` within 30 s of its welcome is closed, a `pair` first included, and other frames before it buy no more time. One quiet for 2 minutes after `hello` is closed too. A WebSocket ping or pong counts, so a client that only listens stays open on its keepalive.
   - Lease changes (a lapse, a conversation, a hand) go to every connection of the computer that held the lease.
 - **The owner's side:** `--admin-socket`, `/run/lampos-control/admin.sock`, 0600 in a 0700 folder, one JSON object a line:
-  - `{"code": {"grants": [...]}}` → `{"code", "pin", "shown"}`, `shown` the pairing screen's words for each grant, in the grants' order, from `Grant::shown()` (the `skills` one: "can put skills on the lamp that run on their own");
+  - `{"code": {"grants": [...]}}` → `{"code", "pin", "shown", "until_unix_ms"}`, `shown` the pairing screen's words for each grant, in the grants' order, from `Grant::shown()` (the `skills` one: "can put skills on the lamp that run on their own"). `until_unix_ms` is when the code runs out by the wall clock: the code lapses 5 min from now by the lamp's monotonic clock, so this is the wall clock now plus 5 min. With `"say_pin": true` (lamp-cloud's `control.code` asks it), the lamp also says the first 8 characters of its pin aloud, as the lamp's own exact `say` ("My pairing check is 3 F 9 A, 0 B 2 C."), and the answer adds `"pin_said"`: whether the voice took it (the spoken pin check, #5299). The pin is in no journal line;
+  - `{"cancel_code": true}` → `{"dropped": true|false}`: the code out is dropped, so a pairing with it is refused ("no pairing code is out"), and whether there was one;
   - `{"revoke": "c_…"}` → `{"revoked": true, "saved": true}`. The revoke takes effect at once either way. If the file can't take it yet, the answer is `"saved": false` with an `error`, because a restart before a save succeeds brings the key back; the next save that succeeds writes it out;
-  - `{"clients": true}` → the list.
+  - `{"clients": true}` → `{"clients": [{"id", "name", "grants", "paired_at", "paired_at_unix_ms"}]}`. `paired_at` is Unix seconds, as `clients.json` keeps it, left for older readers; `paired_at_unix_ms` is the same in milliseconds.
 
-  The app reaches it through the lamp's cloud part in a later piece.
+  **The app's path:** the app reaches it through lamp-cloud, given the socket with `--control-admin-socket` (docs/cloud.md, "The developer door"): `control.code`, `control.clients`, `control.revoke` and `control.code_cancel`. `control.code`'s code and pin go back to the app sealed to a one-time key the app sends (HPKE), never in the clear on the company link; what that does and does not stop is in docs/cloud.md, "The developer door".
 
 ## The wire
 

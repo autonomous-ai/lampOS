@@ -148,6 +148,19 @@ async fn a_computer_pairs_says_hello_and_is_answered_over_tls() {
         issued["shown"],
         json!(["can move the lamp's body", "can change the light"])
     );
+    // The code's end by the wall clock, five minutes from now.
+    let now_ms = u64::try_from(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis(),
+    )
+    .unwrap();
+    let until = issued["until_unix_ms"].as_u64().unwrap();
+    assert!(
+        until > now_ms + 290_000 && until <= now_ms + 300_000,
+        "{until} against {now_ms}"
+    );
 
     let mut socket = connect(&lamp, "/v1").await.unwrap();
     let welcome = next(&mut socket).await;
@@ -205,6 +218,13 @@ async fn a_computer_pairs_says_hello_and_is_answered_over_tls() {
     // The owner sees the computer, and a revoke closes it out.
     let listed = admin(&lamp, json!({"clients": true})).await;
     assert_eq!(listed["clients"][0]["name"], "test laptop");
+    // Seconds as the file keeps them, and the same in milliseconds.
+    let paired_at = listed["clients"][0]["paired_at"].as_u64().unwrap();
+    assert!(paired_at > 1_700_000_000, "{paired_at}");
+    assert_eq!(
+        listed["clients"][0]["paired_at_unix_ms"].as_u64(),
+        Some(paired_at * 1_000)
+    );
     assert_eq!(
         admin(&lamp, json!({"revoke": client})).await,
         json!({"revoked": true, "saved": true})
@@ -1650,4 +1670,96 @@ async fn a_computers_mute_is_held_while_it_is_here_and_let_go_when_it_goes() {
     );
     closes(held).await;
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Parts that keep each line a `say` asks the voice for.
+struct Says(Arc<std::sync::Mutex<Vec<(String, String)>>>);
+
+impl session::Parts for Says {
+    fn act(
+        &mut self,
+        client: &str,
+        _: u64,
+        op: &lamp_control::protocol::Op,
+        _: u64,
+    ) -> Result<Value, lamp_control::protocol::Error> {
+        if let lamp_control::protocol::Op::Say { text, .. } = op {
+            self.0
+                .lock()
+                .unwrap()
+                .push((client.to_owned(), text.clone()));
+        }
+        Ok(json!({"to": "voice"}))
+    }
+    fn state(&self, _: lamp_control::protocol::StateKind) -> Value {
+        Value::Null
+    }
+    fn stop(&mut self, _: &str, _: u64) {}
+}
+
+/// The spoken pin check (#5299, Faye 5 Nov 08:18): asked with `say_pin`,
+/// the lamp itself says the first 8 characters of its pin aloud, in two
+/// groups of four, and the answer says the voice took it. A code the app
+/// cancels (its check didn't match) is dropped: pairing with it then fails.
+#[tokio::test]
+async fn the_lamp_says_its_pin_check_and_a_cancelled_code_pairs_nobody() {
+    let says = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let lamp = lamp_with("pincheck", Box::new(Says(says.clone()))).await;
+    let issued = admin(
+        &lamp,
+        json!({"code": {"grants": ["light"], "say_pin": true}}),
+    )
+    .await;
+    assert_eq!(issued["pin_said"], true, "{issued}");
+    let pin = lamp.identity.pin.to_ascii_uppercase();
+    let first: Vec<String> = pin.chars().take(8).map(String::from).collect();
+    let expected = format!(
+        "My pairing check is {}, {}.",
+        first[..4].join(" "),
+        first[4..].join(" ")
+    );
+    assert_eq!(
+        *says.lock().unwrap(),
+        [("lamp".to_owned(), expected.clone())]
+    );
+    assert_eq!(server::spoken_pin(&lamp.identity.pin), expected);
+    // Without `say_pin`, nothing is said (the person's own `lamp-control
+    // code` at the lamp), and no `pin_said`.
+    let quiet = admin(&lamp, json!({"code": {"grants": ["light"]}})).await;
+    assert!(quiet.get("pin_said").is_none(), "{quiet}");
+    assert_eq!(says.lock().unwrap().len(), 1);
+
+    // The app's check didn't match: the code out is dropped.
+    let code = quiet["code"].as_str().unwrap().to_owned();
+    assert_eq!(
+        admin(&lamp, json!({"cancel_code": true})).await,
+        json!({"dropped": true})
+    );
+    assert_eq!(
+        admin(&lamp, json!({"cancel_code": true})).await,
+        json!({"dropped": false})
+    );
+    // A computer that heard the dropped code can't pair with it.
+    let keys = Ed25519KeyPair::from_seed_unchecked(&[11; 32]).unwrap();
+    let key: [u8; 32] = keys.public_key().as_ref().try_into().unwrap();
+    let mut socket = connect(&lamp, "/v1").await.unwrap();
+    let welcome = next(&mut socket).await;
+    let nonce: [u8; 32] = pairing::bytes_of(welcome["nonce"].as_str().unwrap()).unwrap();
+    let proof = pairing::pair_proof(&code, &lamp.identity.pin_bytes(), &key, &nonce);
+    let refused = send(
+        &mut socket,
+        json!({"id": 1, "op": "pair", "name": "late", "key": STANDARD.encode(key), "proof": STANDARD.encode(proof)}),
+    )
+    .await;
+    assert_eq!(refused["ok"], false, "{refused}");
+    assert_eq!(
+        refused["error"],
+        json!({"code": "unpaired", "why": "no pairing code is out: ask for one in the app"})
+    );
+    assert!(
+        admin(&lamp, json!({"clients": true})).await["clients"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
 }
