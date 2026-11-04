@@ -707,9 +707,12 @@ that names any linked service (mail and a calendar: "mail", "email", "e-mail",
 Figma, GitHub, Asana, Ahrefs, Facebook, Slack, HubSpot, Amplitude, "gdrive";
 and "google drive", "linear app", "monday com" as phrases, since "drive",
 "linear" and "monday" are plain words too) is never handed to the model:
-`made_skill::brief` answers it with `NOT_A_SERVICE`, "A skill can't use your
-mail, calendar or other services, but you can just ask me once the service is
-linked in the app: Skills, then Connectors."
+`made_skill::brief` answers it with `NOT_A_SERVICE`, "Not possible yet: a
+skill can't use your mail, calendar or other services, even ones already
+linked. Say so plainly, in a few words, and that they can ask you for it
+themselves any time." It names no place to link a service: on lamp-9adf on 4
+Nov the model told the owner to link a calendar that was already linked
+(#5288, where skills that read a service are planned).
 
 A call to a service that isn't linked fails with "<Service> isn't linked to
 this lamp yet. It can be linked in the app: Skills, then Connectors."
