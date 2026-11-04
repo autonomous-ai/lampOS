@@ -2416,6 +2416,21 @@ pub fn serve<C: Clock>(
         cli.route = switches.route;
         cli.absolute_folder = switches.absolute_folder;
         cli.new_folder = new_folder;
+        // Harness held at the version installed (#5229), off unless set.
+        if crate::hold::on(std::env::var(crate::hold::SWITCH).ok().as_deref()) {
+            match crate::hold::hold(&mut cli.environment) {
+                Ok(path) => {
+                    eprintln!(
+                        "tasks: Harness's own updates held ({}=true, {}={})",
+                        crate::hold::DISABLE,
+                        crate::hold::ENV_FILE,
+                        path.display()
+                    );
+                    cli.health_after_start = true;
+                }
+                Err(why) => eprintln!("tasks: Harness's own updates not held: {why}"),
+            }
+        }
         Cli::new(cli, session.into()).map(|cli| Production::Cli(Box::new(cli)))
     })
 }

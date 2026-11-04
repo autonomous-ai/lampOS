@@ -21,16 +21,18 @@
 //! lamp-cloud's `update.status` answers. A failed try is tried again after
 //! the next round, which the app's `update.check` starts at once.
 //!
-//! **Pinning (minimal, #3693's decision (a) still open):** with
+//! **Pinning (#3693's decision (a): a sha256 pin is enough):** with
 //! `LAMP_HARNESS_MANIFEST_URL` and `LAMP_HARNESS_MANIFEST_SHA256` both set,
 //! the manifest at that https URL is fetched and its sha256 compared first;
 //! one that differs installs nothing (`pin_mismatch`). A match runs
-//! Harness's installer with `HARNESS_METADATA_URL` at that URL, so the
-//! installer checks what it fetches against the pinned manifest's sha256s.
-//! The installer fetches the manifest again itself: a server that changes
-//! it between the two reads is not caught here. With neither set, the
+//! Harness's installer with `HARNESS_METADATA_URL` at those checked bytes,
+//! served on 127.0.0.1 while it runs ([`serve`], #5229), so the installer
+//! checks what it fetches against the pinned manifest's sha256s and never
+//! reads the manifest from its server again. With neither set, the
 //! install is as `harness-on`'s (Harness's own CDN manifest) and is said
-//! `pinned: false`.
+//! `pinned: false`, except on a lamp installed as the product, which takes
+//! the pin compiled into this build, covered by its signature, and never
+//! installs unpinned ([`product`], #5229).
 use crate::{
     install::{self, HARNESS, HARNESS_HOME, Runner, USER},
     records::write_whole,
@@ -103,10 +105,14 @@ pub fn on(value: Option<&str>) -> bool {
 }
 
 /// A pinned Harness manifest: where, and its sha256 (lower-case hex).
+/// `built_in`: the copy compiled into this build ([`product::MANIFEST`]),
+/// never fetched; `url` is then only where it was copied from.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Pin {
     pub url: String,
     pub sha256: String,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub built_in: bool,
 }
 
 /// The pin from [`MANIFEST_URL`] and [`MANIFEST_SHA256`]: none with
@@ -128,6 +134,7 @@ pub fn pin_from(url: Option<&str>, sha256: Option<&str>) -> Result<Option<Pin>, 
             Ok(Some(Pin {
                 url: url.to_owned(),
                 sha256: sha256.to_ascii_lowercase(),
+                built_in: false,
             }))
         }
         _ => Err(format!("{MANIFEST_URL} and {MANIFEST_SHA256} go together")),
@@ -324,44 +331,46 @@ pub fn install_now(
         return finish(records, failed(now_unix_ms(), None, "pin_unreadable"));
     };
     let pinned = Some(ask.pin.is_some());
-    if let Some(pin) = &ask.pin {
-        let fetched = run(&[
-            "curl".to_owned(),
-            "-fsSL".to_owned(),
-            "--proto".to_owned(),
-            "=https".to_owned(),
-            "--tlsv1.2".to_owned(),
-            "--max-filesize".to_owned(),
-            MANIFEST_MOST_BYTES.to_owned(),
-            pin.url.clone(),
-        ]);
-        let manifest = match fetched {
-            Ok(manifest) => manifest,
-            Err(why) => {
-                say(&format!(
-                    "the pinned Harness manifest was not fetched: {why}"
-                ));
-                return finish(records, failed(now_unix_ms(), pinned, "pin_fetch"));
-            }
-        };
-        let found = crate::manifest::sha256_hex(manifest.as_bytes());
-        if found != pin.sha256 {
+    let manifest = match &ask.pin {
+        Some(pin) => match pinned_bytes(pin, run, say) {
+            Ok(bytes) => Some(bytes),
+            Err(error) => return finish(records, failed(now_unix_ms(), pinned, error)),
+        },
+        None => None,
+    };
+    // The checked bytes, served on 127.0.0.1 while the installer runs
+    // (#5229): what it reads is what was checked.
+    let served = match manifest.clone().map(serve::Served::start).transpose() {
+        Ok(served) => served,
+        Err(error) => {
             say(&format!(
-                "the pinned Harness manifest's sha256 is {found}, not {}: nothing installed",
-                pin.sha256
+                "the pinned Harness manifest was not served on 127.0.0.1: {error}"
             ));
-            return finish(records, failed(now_unix_ms(), pinned, "pin_mismatch"));
+            return finish(records, failed(now_unix_ms(), pinned, "installer"));
         }
-    }
-    let url = ask.pin.as_ref().map(|pin| pin.url.as_str());
-    if let Err(why) = install::harness_on_pinned_with(run, USER, HARNESS_HOME, url) {
+    };
+    let url = served.as_ref().map(serve::Served::url);
+    let installed = install::harness_on_pinned_with(run, USER, HARNESS_HOME, url.as_deref());
+    drop(served);
+    if let Err(why) = installed {
         say(&format!("Harness is not installed: {why}"));
         return finish(records, failed(now_unix_ms(), pinned, reason_of(&why)));
+    }
+    let have = version(run);
+    if let Some(want) = manifest.as_deref().and_then(product::version_of) {
+        if have.as_deref() == Some(want.as_str()) {
+            say(&format!("Harness {want} is the pinned version"));
+        } else {
+            say(&format!(
+                "Harness says version {}, not the pinned {want}",
+                have.as_deref().unwrap_or("none")
+            ));
+        }
     }
     let said = write(
         records,
         HarnessInstall {
-            version: version(run),
+            version: have,
             pinned,
             ..state("installed", now_unix_ms())
         },
@@ -378,6 +387,54 @@ pub fn install_now(
         say(&format!("lamp-tasks.service not started again: {why}"));
     }
     Ok(said)
+}
+
+/// The pinned manifest's bytes, checked by its sha256: this build's own
+/// copy, or the one at its https URL. A fetch that fails is `pin_fetch`;
+/// other bytes are `pin_mismatch`, and nothing is installed.
+fn pinned_bytes(
+    pin: &Pin,
+    run: &mut Runner,
+    say: &mut dyn FnMut(&str),
+) -> Result<Vec<u8>, &'static str> {
+    let bytes = if pin.built_in {
+        product::MANIFEST.to_vec()
+    } else {
+        let fetched = run(&[
+            "curl".to_owned(),
+            "-fsSL".to_owned(),
+            "--proto".to_owned(),
+            "=https".to_owned(),
+            "--tlsv1.2".to_owned(),
+            "--max-filesize".to_owned(),
+            MANIFEST_MOST_BYTES.to_owned(),
+            pin.url.clone(),
+        ]);
+        match fetched {
+            Ok(manifest) => manifest.into_bytes(),
+            Err(why) => {
+                say(&format!(
+                    "the pinned Harness manifest was not fetched: {why}"
+                ));
+                return Err("pin_fetch");
+            }
+        }
+    };
+    let found = crate::manifest::sha256_hex(&bytes);
+    if found != pin.sha256 {
+        say(&format!(
+            "the pinned Harness manifest's sha256 is {found}, not {}: nothing installed",
+            pin.sha256
+        ));
+        return Err("pin_mismatch");
+    }
+    if pin.built_in {
+        say(&format!(
+            "the pinned Harness manifest is this build's own ({}, sha256 {found})",
+            product::VERSION
+        ));
+    }
+    Ok(bytes)
 }
 
 fn finish(records: &Path, said: HarnessInstall) -> Result<HarnessInstall, String> {
@@ -426,6 +483,9 @@ fn lock(records: &Path) -> Result<fs::File, String> {
     )?;
     Ok(file)
 }
+
+pub mod product;
+mod serve;
 
 #[cfg(test)]
 mod tests;

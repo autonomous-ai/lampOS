@@ -1122,6 +1122,51 @@ call counts alone do not establish that the machines timer was due or that
 the owner finished its pass. Both diagnostic waits are bounded by the test
 helper.
 
+### Harness held at its pinned version (`LAMP_HARNESS_HOLD_UPDATES`, #5229)
+
+Off unless `LAMP_HARNESS_HOLD_UPDATES=on` in `lamp-tasks.service`'s
+environment (`crates/tasks/src/hold.rs`). A home lamp installs the Harness
+its build pins (install.md, "The build's own pin"). Without a hold, Harness's
+daemon updates itself to whatever Harness publishes next. From Harness's
+source (openharness main 577954332):
+
+- The daemon holds its self-update when `ADAPTER_UPDATE_DISABLE=true` is in
+  its own environment (`config/env.ts`, `masterProcess.ts:278`). A **Team
+  account ignores the hold** on purpose, and a team setup deletes it. That
+  is for the Harness team to change; this switch can't.
+- `harness start` either spawns the daemon with the caller's environment, or,
+  when `harness service install` wrote a user unit, rewrites that unit from
+  the caller's values of a fixed list (`lib/platformDaemon.ts:42`). The list
+  includes `ADAPTER_UPDATE_DISABLE` and `HARNESS_ENV_FILE`, so a later start
+  from a shell without them drops them.
+- The one file Harness loads is `HARNESS_ENV_FILE` (dotenv, not overriding
+  the environment). Nothing under `HOME` is loaded by itself.
+
+So, with the switch on, each time lamp-tasks builds its Harness client it
+writes `harness-hold.env` in Harness's home (`/var/lib/lampos-tasks`, 0600,
+whole: `ADAPTER_UPDATE_DISABLE=true`). It then adds `ADAPTER_UPDATE_DISABLE=true`
+and `HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env` to the
+environment every Harness command gets (both are now on the client's
+environment list), `harness start` among them. Its journal says `tasks:
+Harness's own updates held (ADAPTER_UPDATE_DISABLE=true,
+HARNESS_ENV_FILE=…)`, or `not held: <why>` when the file can't be written.
+
+**Health, no credential.** With the same switch, after each `harness start`
+that succeeded (after a sign-in), a thread of its own asks `GET /api/health`
+on `127.0.0.1` at `PORT` (18473 unless set, `config/env.ts:124`). It sends
+no token or cookie, and nothing waits on it. Harness answers 200
+`{"ok":true,"version":"x.y.z"}` once its server is up, signed in or not
+(`hookServer.ts:527`). It is asked every 0.5 s, each ask bounded to 2 s,
+for at most 20 s, and one line is journaled:
+
+- `tasks: Harness health ok on 127.0.0.1:18473, version 0.5.39, <ms> ms after its start`
+- `tasks: Harness health failed on 127.0.0.1:18473: <reason>`, the reason
+  one of `not_200`, `not_json`, `not_ok`, `no_answer` or `no_answer within 20 s`.
+
+The version is the one to compare with the build's pin (install.md, "The
+build's own pin"), which `lamp-update harness-install` also compares right
+after the install.
+
 ### Signing in by a spoken code (`--sign-in-by-code`, #1676)
 
 `lamp-tasks serve --sign-in-by-code`, off unless set. A lamp has no screen
