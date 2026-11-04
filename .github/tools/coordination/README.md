@@ -134,7 +134,7 @@ For train 597: `DRY=1 LV_AT=f5f3dda325 .github/tools/coordination/merge-when-gre
 Docs-, tools- and other PRs that change no build input used to wait behind 20-minute crate trains (#5212 part 3).
 The bot now sends each eligible PR to exactly one lane, by its files (`lib.sh`, `coord_lane`; `lane.sh` shows it):
 
-- **The no-crates lane** takes a PR none of whose files is a build input: nothing under `lampOS/crates/`, no `Cargo.*`, nothing under `.github/workflows/`, and nothing else the ARM64 run or the SDK check takes (the same test as "A green train behind lamp-voice" above). Its trains are `first/train-nc-N`. They get no ARM64 or clippy run, so they merge once the checks that do start on them pass, in minutes; a train only of docs no workflow takes merges with none.
+- **The no-crates lane** takes a PR none of whose files is a build input: nothing under `lampOS/crates/`, no `Cargo.*`, nothing under `.github/workflows/`, and nothing else the ARM64 run or the SDK check takes, any path their `pull_request` paths add included (the same test as "A green train behind lamp-voice" above). Its trains are `first/train-nc-N`. They get no ARM64 or clippy run, so they merge once the checks that do start on them pass, in minutes; a train only of docs no workflow takes merges with none.
 - **The crate lane** takes every other PR, mixed ones too, as before: `first/train-N`, one ARM64 run. The SDK (`lampOS/sdk/`) and the docs `lampos-sdk.yml` takes are inputs, so their PRs go here.
 
 The lanes run side by side, one train each, in their own worktrees, and neither takes the other's PRs.
@@ -214,7 +214,7 @@ and a login whose READ-OKs on the head are all unsigned is one reader.
 - A PR stacked on another open PR sits out until that PR is on `lamp-voice`.
 - No merge commits: the bot cherry-picks with `--no-merges` and merges by rebase.
 - Each lane runs one train at a time: the no-crates lane waits while a `first/train-nc-*` PR is open, the crate lane while any other `first/train-*` PR is open. With `NOCRATES_LANE=off`, one lane waits while any `first/train-*` PR is open.
-- A train of rows PRs alone waits for a code PR, or until the oldest is 3 h old.
+- A train of rows PRs alone waits for a code PR, or until the oldest is 3 h old, in the crate lane and with `NOCRATES_LANE=off`. In the no-crates lane it goes at once: no code PR rides there, and a crate train merges with `--behind-unrelated` when lamp-voice gained only files it doesn't touch.
 
 ## Promoting a build to stable
 
