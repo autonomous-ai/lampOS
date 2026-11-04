@@ -143,7 +143,7 @@ lamp says so.
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
 | `face.remove` (`{"name", "entirely"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules (`entirely` true or left out), or the face only (`"entirely": false`, `"memory": "not asked"`). `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; for a face already gone (a remove `entirely` after a face-only one, or a retry after `kept`), `"face": "already gone"` with `"memory": "by name only"` (memory was asked by the name's id only), or `kept`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
 | `schedule.list` (`{"after_id"?: n}`), `schedule.cancel` (`{"id": n}`) | with `LAMP_APP_SCHEDULE=on` (#2195, "The lamp's timers and reminders" below): the list is a page of at most eight, `{"items": [{"id", "kind": "timer"\|"reminder", "text", "state", "local", "due_unix_ms", "repeat", "snoozed", "late"}], "next_after_id", "complete"}`, each as lamp-schedule keeps it; a cancel is `{"cancelled": true, "id": n}`, the timer or the whole reminder series. A refusal is the reminder client's fixed sentence: no longer active, changed meanwhile (list again), or not confirmed (it may have happened). A bad `after_id` or an `id` that isn't a whole number above 0 is refused before lamp-schedule is asked. Without the switch, V1's "not on this lamp" |
-| `update.status` | with `LAMP_APP_UPDATE=on` (#2194, "The lamp's software update" below): `{"running": {"sequence", "commit"} \| null, "now": "idle"\|"checking"\|"fetching"\|"switching"\|"watching"\|"restoring"\|"unknown", "last": {"outcome", "sequence", "at_unix_ms", "reason"?, "started_at_unix_ms"?} \| null, "stale"}`, from lamp-update's kept `update/status`; `unknown` and nulls before lamp-update has said anything. Without the switch, V1's "not on this lamp" |
+| `update.status` | with `LAMP_APP_UPDATE=on` (#2194, "The lamp's software update" below): `{"running": {"sequence", "commit"} \| null, "now": "idle"\|"checking"\|"fetching"\|"switching"\|"watching"\|"restoring"\|"unknown", "last": {"outcome", "sequence", "at_unix_ms", "reason"?, "started_at_unix_ms"?} \| null, "stale"}`, from lamp-update's kept `update/status`; `unknown` and nulls before lamp-update has said anything; with lamp-update's `LAMP_HARNESS_AT_ONBOARDING=on`, also `"harness"` ("Harness's install" below). Without the switch, V1's "not on this lamp" |
 | `update.check` (`{}`) | with `LAMP_APP_UPDATE=on` (#4153, "Check for update" below): asks `lamp-update serve` for its next round now. `update.status`'s object with `"check": "started"`, or `failure` with `a round is running` (`now` is not `idle` or `unknown`), `asked less than a minute ago`, or `lamp-update is not listening for a check`. Without the switch, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
@@ -527,6 +527,26 @@ true when lamp-update stopped saying it (it died mid-round), and its `now` is
 then not to be believed. Tests: `app_contract.rs`'s
 `the_software_update_is_answered_from_lamp_updates_status`, and
 `lamp-update`'s `status` tests and `a_round_with_nothing_to_change_only_checks`.
+
+### Harness's install (#5197, `harness` in `update.status`)
+
+With `LAMP_HARNESS_AT_ONBOARDING=on` in lamp-update's own unit, the status
+carries `harness` (`lamp_msgs::HarnessInstall`), Harness put on the lamp
+before its sign-in (`docs/install.md`, "Harness before the sign-in"):
+`{"install": "absent"|"installing"|"installed"|"failed", "revision",
+"at_unix_ms", "version"?, "pinned"?, "error"?, "message"}`. `error`, with
+`failed` only, is one of `pin_unreadable`, `pin_fetch`, `pin_mismatch`,
+`timeout`, `installer`, `no_user`, `not_started`; `message` is fixed
+plain English for `install` and `error` (`HarnessInstall::message_for`),
+shown by the app as it is; `revision` goes up by one at each change and
+never on a read. Without the switch, or from an older lamp-update, there
+is no `harness`, and the app shows no Harness step. lamp-cloud leaves out
+a `harness` that fails `HarnessInstall::check` and answers the rest.
+lamp-update says the value again within 2 s of a change of `harness`; the
+app reads it by asking `update.status`, as lamp-cloud pushes nothing of it.
+A failed install is tried again after the next round that reaches the
+channel, up to date or not, so `update.check` is its retry. Tests:
+`app_contract.rs`'s `the_software_update_is_answered_from_lamp_updates_status`.
 
 ### Check for update (#4153, `update.check`)
 

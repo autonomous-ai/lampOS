@@ -18,6 +18,7 @@ pub mod check_units;
 pub mod companion;
 pub mod fetch;
 pub mod fixed_copy;
+pub mod harness_install;
 mod head_touch;
 pub mod image;
 pub mod install;

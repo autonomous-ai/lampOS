@@ -17,6 +17,10 @@ use std::{
     time::Duration,
 };
 
+/// How often the status thread looks at Harness's record (#5197), so a
+/// change the one-shot writes between rounds is said within this.
+pub const HARNESS_LOOK: Duration = Duration::from_secs(2);
+
 /// The status now: the build the records say the lamp runs, the phase, and
 /// the last round's end.
 pub fn status(records: &Path, now: &'static str, last: Option<&UpdateResult>) -> UpdateStatus {
@@ -31,6 +35,7 @@ pub fn status(records: &Path, now: &'static str, last: Option<&UpdateResult>) ->
         running,
         now: now.to_owned(),
         last: last.cloned(),
+        harness: crate::harness_install::record(records),
     }
 }
 
@@ -126,17 +131,30 @@ impl Telling {
                 let _ = publisher.publish_json(0, &first);
                 let said = Arc::new(Mutex::new((publisher, first)));
                 let again = Arc::downgrade(&said);
+                let folder = records.to_owned();
                 let _ = std::thread::Builder::new()
                     .name("update-status".into())
                     .spawn(move || {
+                        let mut waited = Duration::ZERO;
                         loop {
-                            std::thread::sleep(every);
+                            let step = HARNESS_LOOK.min(every);
+                            std::thread::sleep(step);
+                            waited += step;
                             let Some(said) = again.upgrade() else {
                                 return;
                             };
                             if let Ok(mut said) = said.lock() {
                                 let (publisher, status) = &mut *said;
-                                let _ = publisher.publish_json(0, &*status);
+                                // Harness's one-shot writes its record
+                                // between rounds (#5197): said as soon as
+                                // it changes, and with the rest each `every`.
+                                let harness = crate::harness_install::record(&folder);
+                                let changed = harness != status.harness;
+                                status.harness = harness;
+                                if changed || waited >= every {
+                                    waited = Duration::ZERO;
+                                    let _ = publisher.publish_json(0, &*status);
+                                }
                             }
                         }
                     });
@@ -207,7 +225,8 @@ mod tests {
             UpdateStatus {
                 running: None,
                 now: "idle".into(),
-                last: None
+                last: None,
+                harness: None,
             }
         );
         records
@@ -399,6 +418,37 @@ mod tests {
         std::thread::sleep(Duration::from_millis(250));
         let again = bus.latest(UpdateStatus::TOPIC).unwrap().unwrap().header.seq;
         assert!(again > first, "said again: {first} then {again}");
+    }
+
+    /// #5197: Harness's record, written between rounds by its one-shot, is
+    /// said within a few looks, not at the next minute.
+    #[test]
+    fn a_harness_change_between_rounds_is_said_at_once() {
+        let records = tempfile::tempdir().unwrap();
+        let lamp = tempfile::tempdir().unwrap();
+        let bus_root = tempfile::tempdir().unwrap();
+        let bus = Bus::new(bus_root.path()).unwrap();
+        let _telling = Telling::start_every(
+            bus_root.path(),
+            records.path(),
+            Duration::from_secs(600),
+            &mut |_| {},
+        );
+        let kept = || {
+            bus.latest(UpdateStatus::TOPIC)
+                .unwrap()
+                .unwrap()
+                .parse::<UpdateStatus>()
+                .unwrap()
+        };
+        assert_eq!(kept().harness, None);
+        crate::harness_install::at_start(lamp.path(), records.path(), true, 5);
+        let until = std::time::Instant::now() + HARNESS_LOOK * 3;
+        while kept().harness.is_none() && std::time::Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let said = kept().harness.expect("said within three looks");
+        assert_eq!((said.install.as_str(), said.revision), ("absent", 1));
     }
 
     #[test]

@@ -669,6 +669,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
                 reason: None,
                 started_at_unix_ms: None,
             }),
+            harness: None,
         },
     )
     .unwrap();
@@ -709,6 +710,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         running: None,
         now: "idle".into(),
         last: None,
+        harness: None,
     };
     says.publish_json(0, &idle).unwrap();
     // Between rounds with no lamp-update reading checks: said, not counted.
@@ -738,6 +740,53 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
     );
     let again = asked(&mut real);
     assert_eq!(again["error"], lamp_cloud::update::TOO_SOON, "{again}");
+
+    // #5197: no `harness` until lamp-update says one; then the app reads it
+    // as the contract has it, and one lamp-update could not say is left out.
+    assert!(
+        replied(&mut real)["data"].get("harness").is_none(),
+        "no harness unless said"
+    );
+    let failed = lamp_msgs::HarnessInstall {
+        revision: 4,
+        pinned: Some(true),
+        ..lamp_msgs::HarnessInstall::new("failed", Some("pin_mismatch"), 1_762_230_000_000)
+    };
+    says.publish_json(
+        0,
+        &lamp_msgs::UpdateStatus {
+            harness: Some(failed),
+            ..idle.clone()
+        },
+    )
+    .unwrap();
+    let told = replied(&mut real);
+    assert_eq!(
+        told["data"]["harness"],
+        json!({
+            "install": "failed",
+            "revision": 4,
+            "at_unix_ms": 1_762_230_000_000_u64,
+            "pinned": true,
+            "error": "pin_mismatch",
+            "message": "Harness's download didn't match what this lamp expects, so it wasn't installed."
+        }),
+        "{told}"
+    );
+    says.publish_json(
+        0,
+        &lamp_msgs::UpdateStatus {
+            harness: Some(lamp_msgs::HarnessInstall {
+                message: "curl: /var/lib/x".into(),
+                ..lamp_msgs::HarnessInstall::new("failed", Some("installer"), 1)
+            }),
+            ..idle.clone()
+        },
+    )
+    .unwrap();
+    let unsaid = replied(&mut real);
+    assert_eq!(unsaid["status"], "success", "{unsaid}");
+    assert!(unsaid["data"].get("harness").is_none(), "{unsaid}");
 
     // Without the switch neither kind is here.
     real.update_page = false;

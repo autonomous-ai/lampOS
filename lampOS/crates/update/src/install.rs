@@ -1110,7 +1110,7 @@ impl Host for System {
 
 /// The Harness CLI as `user`, with `home` as its `HOME` and the user's
 /// own runtime folder (`/run/user/<uid>`), which its per-user service needs.
-fn harness_argv(user: &str, home: &str, uid: &str, args: &[&str]) -> Vec<String> {
+pub(crate) fn harness_argv(user: &str, home: &str, uid: &str, args: &[&str]) -> Vec<String> {
     let mut argv: Vec<String> = ["runuser", "-u", user, "--", "env"]
         .map(str::to_owned)
         .into();
@@ -1122,7 +1122,7 @@ fn harness_argv(user: &str, home: &str, uid: &str, args: &[&str]) -> Vec<String>
 }
 
 /// `user`'s id, from `id -u`, through `run`.
-fn uid_of(run: &mut Runner, user: &str) -> Result<String, String> {
+pub(crate) fn uid_of(run: &mut Runner, user: &str) -> Result<String, String> {
     let uid = run(&["id".to_owned(), "-u".to_owned(), user.to_owned()])?
         .trim()
         .to_owned();
@@ -1147,7 +1147,7 @@ pub const INSTALLER_WITHIN: Duration = Duration::from_secs(15 * 60);
 
 /// Every step through it gets [`RESTART_WITHIN`], but Harness's installer,
 /// which fetches, gets [`INSTALLER_WITHIN`].
-fn output_of(argv: &[String]) -> Result<String, String> {
+pub fn output_of(argv: &[String]) -> Result<String, String> {
     let fetches = argv
         .last()
         .is_some_and(|last| last.contains(HARNESS_INSTALLER));
@@ -1293,6 +1293,20 @@ pub fn harness_off_with(run: &mut Runner, user: &str, home: &str) -> Result<Vec<
 /// then [`HARNESS`] linked to it. A failing step stops it there, before the
 /// link, so a lamp is never left with a link to nothing.
 pub fn harness_on_with(run: &mut Runner, user: &str, home: &str) -> Result<(), String> {
+    harness_on_pinned_with(run, user, home, None)
+}
+
+/// [`harness_on_with`], with `metadata_url` (#5197): when given, the
+/// installer is run with `HARNESS_METADATA_URL` set to it, so it installs
+/// what that manifest names, checked by the sha256s in it, in place of
+/// Harness's own CDN manifest (#3693's plan). The manifest's own sha256 is
+/// the caller's to have checked before.
+pub fn harness_on_pinned_with(
+    run: &mut Runner,
+    user: &str,
+    home: &str,
+    metadata_url: Option<&str>,
+) -> Result<(), String> {
     let uid = uid_of(run, user)?;
     run(&["install", "-d", "-o", user, "-g", user, "-m", "0700", home].map(str::to_owned))?;
     let mut installer: Vec<String> = ["runuser", "-u", user, "--", "env"]
@@ -1303,6 +1317,11 @@ pub fn harness_on_with(run: &mut Runner, user: &str, home: &str) -> Result<(), S
         format!("XDG_RUNTIME_DIR=/run/user/{uid}"),
         "PATH=/usr/local/bin:/usr/bin:/bin".to_owned(),
         "SHELL=/bin/sh".to_owned(),
+    ]);
+    if let Some(url) = metadata_url {
+        installer.push(format!("HARNESS_METADATA_URL={url}"));
+    }
+    installer.extend([
         "sh".to_owned(),
         "-c".to_owned(),
         format!("curl -fsSL --proto =https --tlsv1.2 {HARNESS_INSTALLER} | sh"),

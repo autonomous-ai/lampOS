@@ -1504,6 +1504,7 @@ pub mod tests {
                 running: None,
                 now: "switching".into(),
                 last: None,
+                harness: None,
             },
         )
         .unwrap();

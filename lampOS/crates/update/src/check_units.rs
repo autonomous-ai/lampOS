@@ -185,6 +185,10 @@ pub struct Report {
     /// doesn't (crate::writer_unit, #3689): compared with this program's
     /// own text, none when the lamp printed none.
     pub writer: Option<Verdict>,
+    /// Harness's one-shot, which a round writes with
+    /// `LAMP_HARNESS_AT_ONBOARDING=on` (crate::harness_install, #5197):
+    /// compared with this program's own text, none when the lamp printed none.
+    pub harness: Option<Verdict>,
 }
 
 impl Report {
@@ -200,6 +204,7 @@ impl Report {
                 .values()
                 .all(|verdict| matches!(verdict, None | Some(Verdict::Same)))
             && matches!(self.writer, None | Some(Verdict::Same))
+            && matches!(self.harness, None | Some(Verdict::Same))
     }
 
     /// The report as printed, one line a finding.
@@ -252,19 +257,18 @@ impl Report {
                 }
             }
         }
-        match &self.writer {
-            None | Some(Verdict::Missing) => {}
-            Some(Verdict::Same) => out.push_str(&format!(
-                "the updater's: {}: same\n",
-                crate::writer_unit::UNIT
-            )),
-            Some(Verdict::Differs(lines)) => {
-                out.push_str(&format!(
-                    "the updater's: {}: differs\n",
-                    crate::writer_unit::UNIT
-                ));
-                for line in lines {
-                    out.push_str(&format!("  {line}\n"));
+        for (unit, verdict) in [
+            (crate::writer_unit::UNIT, &self.writer),
+            (crate::harness_install::UNIT, &self.harness),
+        ] {
+            match verdict {
+                None | Some(Verdict::Missing) => {}
+                Some(Verdict::Same) => out.push_str(&format!("the updater's: {unit}: same\n")),
+                Some(Verdict::Differs(lines)) => {
+                    out.push_str(&format!("the updater's: {unit}: differs\n"));
+                    for line in lines {
+                        out.push_str(&format!("  {line}\n"));
+                    }
                 }
             }
         }
@@ -424,16 +428,28 @@ pub fn check_with_image(
             report.image.insert(name.to_owned(), verdict);
             continue;
         }
-        if !product.contains_key(name) && name == crate::writer_unit::UNIT {
+        let updaters = [
+            (crate::writer_unit::UNIT, crate::writer_unit::TEXT),
+            (crate::harness_install::UNIT, crate::harness_install::TEXT),
+        ];
+        if let Some((unit, text)) = updaters
+            .into_iter()
+            .find(|(unit, _)| !product.contains_key(name) && name == *unit)
+        {
             if file.path != format!("{}{name}", install::UNITS) {
                 report.elsewhere.push(file.path.clone());
             }
-            let lines = differing(&trimmed(crate::writer_unit::TEXT), &file.text);
-            report.writer = Some(if lines.is_empty() {
+            let lines = differing(&trimmed(text), &file.text);
+            let verdict = Some(if lines.is_empty() {
                 Verdict::Same
             } else {
                 Verdict::Differs(lines)
             });
+            if unit == crate::writer_unit::UNIT {
+                report.writer = verdict;
+            } else {
+                report.harness = verdict;
+            }
             continue;
         }
         if !product.contains_key(name) {
@@ -816,6 +832,27 @@ ExecStart=/usr/bin/amixer -q -c device_cmedia sset Speaker 9
 [Service]
 ExecStart=
 ";
+
+    #[test]
+    fn harnesss_one_shot_is_the_updaters_not_extra_and_compared_with_its_own_text() {
+        use crate::harness_install::{TEXT, UNIT};
+        let printed = |path: &str, text: &str| format!("# {path}\n{text}\n");
+        let here = format!("/etc/systemd/system/{UNIT}");
+        let report = check(&BTreeMap::new(), &parse(&printed(&here, TEXT)));
+        assert!(report.extra.is_empty(), "{report:?}");
+        assert_eq!(report.harness, Some(Verdict::Same));
+        assert_eq!(report.writer, None);
+        assert!(report.passes(), "{}", report.said());
+        assert!(
+            report
+                .said()
+                .contains(&format!("the updater's: {UNIT}: same"))
+        );
+        let changed = TEXT.replace("ProtectSystem=full", "ProtectSystem=no");
+        let report = check(&BTreeMap::new(), &parse(&printed(&here, &changed)));
+        assert!(matches!(&report.harness, Some(Verdict::Differs(_))));
+        assert!(!report.passes());
+    }
 
     #[test]
     fn the_writers_one_shot_is_the_updaters_not_extra_and_compared_with_its_own_text() {

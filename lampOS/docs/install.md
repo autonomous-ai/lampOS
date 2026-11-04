@@ -1171,6 +1171,57 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      service running) and started `lamp-tasks` again. Installing on a lamp
      without Harness still needs a person's `sudo` on one.
 
+   **Harness before the sign-in** (#5197; off unless
+   `LAMP_HARNESS_AT_ONBOARDING=on` in `lamp-update.service`'s environment,
+   `crates/update/src/harness_install.rs`). Put there with no hand, at the
+   first onboarding or on a later update of a lamp without it:
+   - **When:** after every `lamp-update serve --apply on` round whose
+     channel was reached (not `unreachable`, nor a switch of lamp-update's
+     own), so the first one once the onboarding has the lamp on Wi-Fi,
+     and every later one, with or without a lampOS update due. Only while
+     nothing is at `/usr/local/bin/harness`; one already there is recorded
+     `installed` and nothing runs.
+   - **How:** a round's own sandbox can't write `/usr/local/bin` or
+     Harness's home, so, as with the settings writer, the round writes the
+     fixed one-shot `lamp-update-harness.service` in `/etc/systemd/system`,
+     checks what systemd loaded is that file alone, and starts it with
+     `--no-block`. Neither the round nor the onboarding waits for Harness's
+     download. The unit (`ProtectSystem=full`, `ReadWritePaths=/usr/local/bin`,
+     `TimeoutStartSec=1500`, never enabled) runs `lamp-update
+     harness-install`: `harness-on`'s install steps above, then `harness
+     version` and `systemctl restart lamp-tasks.service`. One install at a
+     time (`harness.lock` in the records).
+   - **Installed, not running:** no Harness at boot, no `harness service
+     install`, no daemon. lamp-tasks starts the daemon after the person's
+     sign-in by a spoken code, as it does today.
+   - **Pinned, minimally** (#3693's decision (a) is still open): with
+     `LAMP_HARNESS_MANIFEST_URL` (https) and `LAMP_HARNESS_MANIFEST_SHA256`
+     both set, the manifest is fetched (`curl`, 1 MB at most) and its
+     sha256 compared first; another sha256 installs nothing
+     (`pin_mismatch`). A match runs the installer with
+     `HARNESS_METADATA_URL` at that URL. The installer fetches it again
+     itself, so a server that changes it between the two reads isn't
+     caught. With neither set the install is `harness-on`'s, said
+     `pinned: false`; one alone is `pin_unreadable`.
+   - **Said to the app:** `harness-install.json` in the records,
+     `{"install", "revision", "at_unix_ms", "version"?, "pinned"?,
+     "error"?, "message"}` (`lamp_msgs::HarnessInstall`), on
+     `update/status` as `harness` and in lamp-cloud's `update.status`
+     (`docs/cloud.md`). `install` is `absent` (switch on, not tried yet),
+     `installing`, `installed` or `failed`; `error` a fixed code
+     (`pin_unreadable`, `pin_fetch`, `pin_mismatch`, `timeout`,
+     `installer`, `no_user`, `not_started`); `message` fixed words for
+     them; `revision` one more at each change. Said within 2 s of a
+     change. Switch off, `serve` removes the record, so no `harness`.
+   - **Tried again** after the next reached round when `failed`, or
+     `installing` for over 30 min; the app's `update.check` starts that
+     round at once.
+   - **Shown only in tests** (`harness_install::tests`, the status and
+     `app_contract` tests). Not run on a lamp: the one-shot's sandbox with
+     the real installer, and a first onboarding with the switch on.
+     `lamp-update.service` is never switched by a round, so the switch
+     reaches a lamp by a drop-in or a new image.
+
    **Undone by `lamp-update harness-off`** (as root, #811; the first
    builder's yes on #705, 18 Oct): with that record, as `lampos` with the
    same `HOME` and `XDG_RUNTIME_DIR`, the Harness CLI's own `harness service

@@ -955,7 +955,11 @@ manifest. Deleting the database is not an ordinary retry strategy.
 ## Before the lamp is set up for hand-overs (`--set-up-later`, #1676)
 
 A home lamp gets Harness, its sign-in and the person's computers after the
-tasks part is installed. Without the switch, the part stops at start with
+tasks part is installed. With lamp-update's `LAMP_HARNESS_AT_ONBOARDING=on`
+(#5197, off unless set), Harness itself is put there with no hand after the
+first update round that reaches the network, installed but not running, and
+lamp-tasks is started then; the app reads that install on `update.status`
+(`docs/install.md`, "Harness before the sign-in"). Without the switch, the part stops at start with
 no `targets.json` or no program at `--harness`, and systemd restarts it
 again and again, saying nothing useful. `lamp-tasks serve --set-up-later`
 (off unless set; set in the product unit, `deploy/product/lamp-tasks.service`,
