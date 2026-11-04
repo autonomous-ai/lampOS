@@ -546,7 +546,8 @@ a `harness` that fails `HarnessInstall::check` and answers the rest.
 lamp-update says the value again within 2 s of a change of `harness`; the
 app reads it by asking `update.status`, as lamp-cloud pushes nothing of it.
 A failed install is tried again after the next round that reaches the
-channel, up to date or not, so `update.check` is its retry. Tests:
+channel, up to date or not, so `update.check` is its retry; an `installer`
+or `no_user` failure only after 30 min. Tests:
 `app_contract.rs`'s `the_software_update_is_answered_from_lamp_updates_status`.
 
 ### Check for update (#4153, `update.check`)

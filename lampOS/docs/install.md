@@ -1264,7 +1264,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      change. Switch off, `serve` removes the record, so no `harness`.
    - **Tried again** after the next reached round when `failed`, or
      `installing` for over 30 min; the app's `update.check` starts that
-     round at once.
+     round at once. A failure the same steps would only repeat,
+     `installer` or `no_user`, is tried again only by a round 30 min or
+     more after it (`RETRY_AFTER`), so a broken installer isn't run after
+     every round; an `update.check` within those 30 min starts no install.
    - **Shown only in tests** (`harness_install::tests`, the status and
      `app_contract` tests). Not run on a lamp: the one-shot's sandbox with
      the real installer, and a first onboarding with the switch on.

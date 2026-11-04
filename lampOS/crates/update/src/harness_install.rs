@@ -19,7 +19,9 @@
 //! What the app reads is [`RECORD`] in lamp-update's records, said on
 //! `update/status` as `harness` ([`lamp_msgs::HarnessInstall`]), which
 //! lamp-cloud's `update.status` answers. A failed try is tried again after
-//! the next round, which the app's `update.check` starts at once.
+//! the next round, which the app's `update.check` starts at once; one that
+//! would only fail the same way (`installer`, `no_user`) waits
+//! [`RETRY_AFTER`] first.
 //!
 //! **Pinning (#3693's decision (a): a sha256 pin is enough):** with
 //! `LAMP_HARNESS_MANIFEST_URL` and `LAMP_HARNESS_MANIFEST_SHA256` both set,
@@ -65,6 +67,10 @@ pub const LOCK: &str = "harness.lock";
 /// one-shot killed past its `TimeoutStartSec`, or the lamp lost power)
 /// and tried again.
 pub const STUCK_AFTER: Duration = Duration::from_secs(30 * 60);
+/// A failure the same steps would only repeat (`installer`, `no_user`) is
+/// tried again by the first round this long after it, not after every
+/// round (#5241's reader); the rest are tried at the next round.
+pub const RETRY_AFTER: Duration = STUCK_AFTER;
 /// The largest pinned manifest fetched.
 const MANIFEST_MOST_BYTES: &str = "1048576";
 
@@ -239,6 +245,13 @@ pub fn after_round(
     if let Some(said) = &before
         && said.install == "installing"
         && now_unix_ms.saturating_sub(said.at_unix_ms) < STUCK_AFTER.as_millis() as u64
+    {
+        return None;
+    }
+    if let Some(said) = &before
+        && said.install == "failed"
+        && matches!(said.error.as_deref(), Some("installer" | "no_user"))
+        && now_unix_ms.saturating_sub(said.at_unix_ms) < RETRY_AFTER.as_millis() as u64
     {
         return None;
     }
