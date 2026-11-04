@@ -1134,7 +1134,11 @@ is Backend3's.
    joins it, and one result settles both. It is never answered `BUSY`,
    which would make the backend delete the one copy the first is still
    fetching. A different file while one is fetched is `failure`, "a skill
-   from a file is still being added", and loses only its own copy.
+   from a file is still being added", and loses only its own copy. The same
+   kind arriving after its result is sent but before the broker acks it
+   still joins (the upload is in flight until the ack), so it gets no
+   second reply of its own: the kind's one result, already sent, answers
+   both.
 2. **The message.** `GET <base>/devices/get-message?kind=skills.upload.<upload_id>`,
    `<base>` the account's `llm_base_url` with a trailing `/v1` cut off (as
    the ping's), with `authorization: Bearer` and the lamp's key and
@@ -1150,7 +1154,8 @@ is Backend3's.
    SHA-256, and its `upload_id` against both the kind and the bytes must be
    what was said, else "the file isn't the one uploaded". `format` must be
    what the bytes are.
-4. **Read.** A file that begins with `---` is a bare `SKILL.md`; anything
+4. **Read.** A file that begins with a `---` line (`\n` or Windows'
+   `\r\n`) is a bare `SKILL.md`; anything
    else must read as a package (`lamp_skills::package::read_package_bytes`).
    A package carrying the Store's signature is refused, "this skill carries
    the Skills Store's signature: add it from the Skill Store": never added
@@ -1184,7 +1189,11 @@ never the file's words or the skill's name. At start
 (`Uploads::resume`), one `fetching` is fetched again (the backend still
 holds the file, as no result was acked) and one `asking` is settled again
 by `{"added": {"sha256"}}`, so the app still hears `success` or `failure`
-after a restart. A resumed `success` carries `{"state": "on", "upload_id",
+after a restart. After a reboot `lamp-cloud` may be up before
+`lamp-voice`'s socket is: a resumed fetch whose hand-over isn't answered
+is handed over again every 5 s for the first minute (`upload::RETRY_WITHIN`),
+the file fetched once; a resumed `asking` already keeps asking for up to
+2 h. A resumed `success` carries `{"state": "on", "upload_id",
 "added": "file", "uploaded": true, "sha256"}` only, the rest being
 `lamp-voice`'s (`skills.list` has it). A record that doesn't read as one
 `lamp-cloud` wrote is dropped. The backend drops a file nobody claims within
@@ -1196,10 +1205,12 @@ yes put it on, never the file's words or its name (`upload::tests`).
 Tests: `upload::tests` (the switch and the kind's id; a bare SKILL.md taken
 from the message with the key and `success` only once on; left off or
 never asked a failure; a package's refusal; a SHA-256, size, id or format
-that doesn't match; too big; a Store-signed package; `run.py` and other
+that doesn't match; too big; a Store-signed package; a bare card with
+CRLF read as a card; `run.py` and other
 files; a taken name; its result kept for the app; the same upload again
 joining the one in flight, another file `BUSY`; a restart while asking and
-while fetching still telling the app; the state file never naming the skill
+while fetching still telling the app, and one before the voice is up
+handed over once it is; the state file never naming the skill
 or holding its words, 0600), and
 `online::tests::a_skill_from_a_file_is_acked_starting_and_its_result_follows`.
 
