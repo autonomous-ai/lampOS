@@ -216,7 +216,6 @@ pub const WHATS: &[(&str, &str)] = &[
         "events {from, to, calendar, count}, calendars",
     ),
     ("google_drive", "files {query, count}, file {id}, text {id}"),
-    ("notion", "search {query, count}, page {id}"),
     ("figma", "me, file {id}, comments {id}"),
     ("figma-api", "me, file {id}, comments {id}"),
     (
@@ -347,21 +346,6 @@ pub fn plan(code: &str, args: &Value, entry: &Entry, now: i64) -> Result<Plan, S
         ("google_drive", "text") => get(
             &["drive", "v3", "files", segment(args, "id", what)?, "export"],
             &[("mimeType", "text/plain".into())],
-        ),
-        ("notion", "search") => {
-            let mut body = json!({"page_size": count(args)});
-            if text(args, "query").is_some() {
-                body["query"] = json!(words(args, "query", what)?);
-            }
-            Ok(Plan::Http {
-                method: Method::Post,
-                url: url(base, &["v1", "search"], &[])?,
-                body: Some(body),
-            })
-        }
-        ("notion", "page") => get(
-            &["v1", "blocks", segment(args, "id", what)?, "children"],
-            &[("page_size", "50".into())],
         ),
         ("figma" | "figma-api", "me") => get(&["v1", "me"], &[]),
         ("figma" | "figma-api", "file") => get(
@@ -518,32 +502,14 @@ pub fn compact(value: &Value, most: usize, depth: usize) -> Value {
     }
 }
 
-/// Every `plain_text` in a Notion value, joined.
-fn plain_texts(value: &Value, out: &mut Vec<String>) {
-    match value {
-        Value::Object(object) => {
-            if let Some(Value::String(text)) = object.get("plain_text") {
-                out.push(text.clone());
-            }
-            for (key, value) in object {
-                if key != "plain_text" {
-                    plain_texts(value, out);
-                }
-            }
-        }
-        Value::Array(items) => items.iter().for_each(|item| plain_texts(item, out)),
-        _ => {}
-    }
-}
-
 /// The items in a service's answer body: its list, or the answer as one
 /// item; text that isn't JSON as one string.
-pub fn items(code: &str, body: &str) -> Vec<Value> {
+pub fn items(body: &str) -> Vec<Value> {
     let Ok(value) = serde_json::from_str::<Value>(body) else {
         return vec![json!(mail::tidy(body, mail::TEXT_MOST))];
     };
     let graphql_data = value.get("data").filter(|data| data.is_object());
-    let list = match &value {
+    match &value {
         Value::Array(items) => items.clone(),
         Value::Object(_) if graphql_data.is_some() => {
             vec![graphql_data.cloned().unwrap_or_default()]
@@ -553,34 +519,7 @@ pub fn items(code: &str, body: &str) -> Vec<Value> {
             .find_map(|key| object.get(*key).and_then(Value::as_array).cloned())
             .unwrap_or_else(|| vec![value.clone()]),
         other => vec![other.clone()],
-    };
-    if code != "notion" {
-        return list;
     }
-    list.into_iter()
-        .map(|item| {
-            let mut texts = Vec::new();
-            plain_texts(&item, &mut texts);
-            let mut kept = json!({
-                "id": item.get("id"),
-                "type": item.get("object").or_else(|| item.get("type")),
-                "url": item.get("url"),
-                "text": texts.join(" "),
-            });
-            // A block's page or parent block: what its neighbours share,
-            // for the security check's join ([`group_of`]).
-            if item.get("object").and_then(Value::as_str) == Some("block")
-                && let Some(parent) = item.get("parent").and_then(|parent| {
-                    ["page_id", "block_id"]
-                        .iter()
-                        .find_map(|key| parent.get(*key).and_then(Value::as_str))
-                })
-            {
-                kept["parent"] = json!(parent);
-            }
-            kept
-        })
-        .collect()
 }
 
 /// A mail as it is quoted; a security mail only as "a security mail, left
@@ -875,8 +814,6 @@ mod tests {
             ("google_calendar", json!({"what":"calendars"})),
             ("google_drive", json!({"what":"files","query":"tax 'x'"})),
             ("google_drive", json!({"what":"text","id":"abc"})),
-            ("notion", json!({"what":"search","query":"plans"})),
-            ("notion", json!({"what":"page","id":"p1"})),
             ("figma", json!({"what":"comments","id":"k"})),
             ("github", json!({"what":"issues","repo":"o/r"})),
             ("github", json!({"what":"issues"})),
@@ -913,7 +850,15 @@ mod tests {
             .unwrap(),
         );
         assert_eq!(url, "https://api.github.com/repos/o/r/issues?per_page=5");
-        assert!(plan("notion", &json!({"what":"page","id":"a/../b"}), &entry(), 0).is_err());
+        assert!(
+            plan(
+                "google_drive",
+                &json!({"what":"file","id":"a/../b"}),
+                &entry(),
+                0
+            )
+            .is_err()
+        );
         // A calendar's id is one segment, encoded.
         let (_, url, _) = http(
             plan(
@@ -1009,24 +954,13 @@ mod tests {
         let small = quoted("Notion", vec![json!({"a": 1})]);
         assert!(small.get("left_out").is_none());
         // Lists are found in each service's shape.
+        assert_eq!(items(r#"{"files":[{"id":1},{"id":2}]}"#).len(), 2);
+        assert_eq!(items(r#"[{"id":1}]"#).len(), 1);
         assert_eq!(
-            items("google_drive", r#"{"files":[{"id":1},{"id":2}]}"#).len(),
-            2
-        );
-        assert_eq!(items("github", r#"[{"id":1}]"#).len(), 1);
-        assert_eq!(
-            items("github", r#"{"data":{"viewer":{"login":"x"}}}"#),
+            items(r#"{"data":{"viewer":{"login":"x"}}}"#),
             vec![json!({"viewer":{"login":"x"}})]
         );
-        assert_eq!(
-            items("google_drive", "plain text"),
-            vec![json!("plain text")]
-        );
-        let notion = items(
-            "notion",
-            r#"{"results":[{"id":"b","object":"block","paragraph":{"rich_text":[{"plain_text":"Hi"},{"plain_text":"there"}]}}]}"#,
-        );
-        assert_eq!(notion[0]["text"], "Hi there");
+        assert_eq!(items("plain text"), vec![json!("plain text")]);
     }
 
     #[test]
@@ -1040,12 +974,8 @@ mod tests {
                 "github",
                 r#"[{"title":"Login","body":"Your verification code is 482913"},{"title":"Fix the build","body":"It fails on arm"}]"#,
             ),
-            (
-                "notion",
-                r#"{"results":[{"id":"p","object":"block","paragraph":{"rich_text":[{"plain_text":"Your verification code is 482913"}]}},{"id":"q","object":"block","paragraph":{"rich_text":[{"plain_text":"Groceries"}]}}]}"#,
-            ),
         ] {
-            let quoted = quoted("Service", items(code, body));
+            let quoted = quoted("Service", items(body));
             let text = quoted.to_string();
             assert!(!text.contains("482913"), "{code}: {text}");
             assert!(
@@ -1063,17 +993,15 @@ mod tests {
 
     #[test]
     fn a_code_split_across_two_items_is_left_out_with_both() {
-        // Notion blocks, then Slack messages, the code in the second.
-        let notion = items(
-            "notion",
-            r#"{"results":[{"id":"a","object":"block","parent":{"type":"page_id","page_id":"p1"},"paragraph":{"rich_text":[{"plain_text":"Your verification code is"}]}},{"id":"b","object":"block","parent":{"type":"page_id","page_id":"p1"},"paragraph":{"rich_text":[{"plain_text":"482913"}]}}]}"#,
+        // A page's blocks, then Slack messages, the code in the second.
+        let page = items(
+            r#"{"results":[{"id":"a","page_id":"p1","text":"Your verification code is"},{"id":"b","page_id":"p1","text":"482913"}]}"#,
         );
-        assert_eq!(notion[0]["parent"], "p1");
+        assert_eq!(page[0]["page_id"], "p1");
         let slack = items(
-            "slack",
             r#"{"items":[{"text":"Here's the code you asked for","user":"U1","channel":"C1"},{"text":"482 913","user":"U1","channel":"C1"}]}"#,
         );
-        for (name, items) in [("Notion", notion), ("Slack", slack)] {
+        for (name, items) in [("Notion", page), ("Slack", slack)] {
             let quoted = quoted(name, items);
             let text = quoted.to_string();
             assert!(

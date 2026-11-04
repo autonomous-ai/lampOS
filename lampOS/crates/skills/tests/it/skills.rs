@@ -815,14 +815,17 @@ fn a_read_step_reads_only_what_its_permissions_list() {
             serde_json::json!({"service": "google_calendar", "what": "events", "day": "tomorrow"})
         )
     );
-    // Any linked service with reads: a Notion search, a Drive list.
-    read(
-        "notion-plans",
-        "speak = true\nservices = { notion = \"read\" }\n",
-        "",
-        "read = { service = \"notion\", what = \"search\", query = \"plans\" }",
-    )
-    .unwrap();
+    // Any linked service with a fixed read: a Drive list. Notion is an MCP
+    // service since #5308, read only through its tools, so not a skill's.
+    assert!(
+        read(
+            "notion-plans",
+            "speak = true\nservices = { notion = \"read\" }\n",
+            "",
+            "read = { service = \"notion\", what = \"search\", query = \"plans\" }",
+        )
+        .is_err()
+    );
     read(
         "drive-files",
         "speak = true\nservices = { google_drive = \"read\" }\n",

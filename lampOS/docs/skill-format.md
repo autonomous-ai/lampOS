@@ -221,12 +221,13 @@ read = { service = "google_calendar", what = "events", day = "tomorrow" }
 ```
 
 - `service`: any linked service with a fixed read: `gmail`,
-  `google_calendar`, `google_drive`, `notion`, `figma`, `figma-api`,
+  `google_calendar`, `google_drive`, `figma`, `figma-api`,
   `github`, `linear`, `asana`, `facebook`; never `gmail-app`, which only
-  sends, nor the MCP services or `ahrefs`, whose reads are all free-form.
+  sends, nor the MCP services (Notion among them since #5308) or `ahrefs`,
+  whose reads are all free-form.
 - `what`: one of the service's reads as `service_read` lists them, but one
   that gives a whole text (`gmail`'s `message`, `google_drive`'s `text`,
-  `notion`'s `page`, `figma`'s and `figma-api`'s `comments`) or a
+  `figma`'s and `figma-api`'s `comments`) or a
   free-form one (`query`, `get`, `call`).
 - `day = "today"` or `"tomorrow"`: a calendar's `events` only, and needed
   there; `count` 1 to 10 for anything else (mail's `recent` 5 if left out);

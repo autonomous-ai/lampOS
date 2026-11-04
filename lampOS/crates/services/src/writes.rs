@@ -59,7 +59,6 @@ pub const ACTIONS: &[(&str, &str)] = &[
         "create_issue {repo, title, text}, comment {repo, number, text}",
     ),
     ("linear", "create_issue {team_id, title, text}"),
-    ("notion", "append_text {id, text}"),
     ("asana", "create_task {project | workspace, title, text}"),
     ("figma", "comment {id, text}"),
     ("figma-api", "comment {id, text}"),
@@ -342,24 +341,6 @@ pub fn prepare(code: &str, args: &Value, entry: &Entry) -> Result<Pending, Strin
                 ),
             )
         }
-        ("notion", "append_text") => {
-            let page = id(args, "id")?;
-            let text = body(args, "text")?;
-            http(
-                code,
-                Method::Patch,
-                &["v1", "blocks", page, "children"],
-                &[],
-                json!({"children": [{
-                    "object": "block",
-                    "type": "paragraph",
-                    "paragraph": {"rich_text": [{"type": "text", "text": {"content": text}}]},
-                }]}),
-                format!(
-                    "Add to the Notion page {page}: \"{text}\". Whoever the page is shared with sees it; anyone at all if it is published."
-                ),
-            )
-        }
         ("asana", "create_task") => {
             let (heading, text) = (title(args, "title")?, body(args, "text")?);
             let (data, place) = match args.get("project").and_then(Value::as_str) {
@@ -595,10 +576,6 @@ mod tests {
             (
                 "linear",
                 json!({"action":"create_issue","team_id":"t","title":"T","text":"B"}),
-            ),
-            (
-                "notion",
-                json!({"action":"append_text","id":"p","text":"B"}),
             ),
             (
                 "asana",
