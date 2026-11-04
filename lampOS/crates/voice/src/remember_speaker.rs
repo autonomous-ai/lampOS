@@ -164,6 +164,7 @@ mod tests {
         known_faces::FaceSwitches {
             checked: true,
             remember_speaker: true,
+            record: false,
             ..Default::default()
         }
     }

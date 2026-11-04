@@ -1008,6 +1008,27 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   journal says so, and the model is told nothing was forgotten and how to
   ask, never that the person didn't ask. Not on the Live route, whose tool
   runner has neither gate; lamps run the second route.
+  **A held face forget lasts through the spelling question**
+  (`LAMP_NAMES_RECORD_TOLD=on`, off unless set; the second route; #5141
+  row 7). On lamp-0c4e on 3 Nov a face was saved under a misheard name.
+  Forgetting it got stuck: the held `forget_my_face` was dropped as soon as
+  the lamp asked them to spell their name, since that answer asked nothing
+  about the forget. With the switch, a held `forget_my_face` whose answer
+  asks them to spell their name (`known_faces::asks_to_spell`: "spell",
+  "spelling", "spelled", "letter by letter", "đánh vần") waits for that
+  spelling. Their next spoken turn, from the same session's person, within
+  the same 60 s counted from the held turn, carries it once and runs
+  nothing. That turn's answer is then judged as the held turn's was: a
+  question naming the forget keeps it for their plain yes, and anything
+  else drops it, a second spelling question included. Another face, a turn
+  the lamp wrote, or too late drops it as before. The journal says
+  "carried a held forget … through their spelling", never words. Renaming
+  in one step was the other way proposed. It is not built, because it
+  would skip the say-back and yes that a replaced name needs
+  (`known_faces::NOT_AGREED`), and a misheard name is how lamp-0c4e's
+  record went wrong in the first place. Off, such an answer drops the hold
+  as before. Test:
+  `held_forget::with_the_record_switch_a_held_face_forget_lasts_through_the_spelling_question`.
 - **A word it doubts is asked about before it is kept** (#3504 finding
   N5; every lamp, no switch). On lamp-06c1 on 27 Oct (P5) "tulip" was
   heard as "the two", kept, and then said back as "Kept: … "the two." I
@@ -2824,6 +2845,28 @@ then use that person's scope:
   `NOT_THEIRS` and the eyes are never asked (the first builder on #2602,
   El's P2 and P3 on #3018). The eyes read a moving mouth, not a living
   face: a photo or a screen showing them is a limit of the eyes. Forgetting everything (`forget_all`) is as before.
+  **A face refusal says what is kept** (`LAMP_NAMES_RECORD_TOLD=on`, off
+  unless set; the second route; #5141 rows 9 and 10). On lamp-0c4e on 3
+  Nov the model asked to forget a face under the name the person said, but
+  the face was kept under a misheard one. It heard only `NOT_THEIRS`, and
+  nothing said what the lamp kept. With the switch, every refused
+  `remember_my_face` or `forget_my_face` also gets `kept`, the face record
+  as it stands for the one asking (`known_faces::record_now`): "Nothing
+  was changed: the face of the one asking is kept as Loren. Use that name
+  to forget or rename it." It names only their own record: the known face
+  at the lamp when the line is that person's, or, on a room's line, the
+  known face the eyes saw saying it and no other (`forget_name`'s rule).
+  Otherwise it says `RECORD_UNKNOWN`: nothing was changed, and no face the
+  lamp keeps is the one asking. Someone else only in view is never named.
+  The journal says each refusal's reason name
+  (`known_faces::refusal_reason`: `not_heard`, `not_agreed`, `near_to`,
+  `not_like_them`, `not_theirs`, `speaker_not_seen`, the eyes' own codes
+  such as `no_face` or `known_as`, else `other`) with the function:
+  "lamp-voice: forget_my_face refused: not_theirs; …". It never logs the
+  person's words, a name or an id. Off, every refusal is byte for byte as
+  before. Tests:
+  `known_faces::tests::with_the_record_switch_a_face_refusal_says_the_record_as_it_stands`
+  and `known_faces::tests::each_face_refusal_has_a_reason_name_and_the_journal_says_only_it`.
 - **With nobody known**, or without eyes, every line to the memory is
   exactly what it was: no `person` field, the same limits, the same note
   (`remember::tests::with_nobody_known_every_line_to_the_memory_is_as_before`

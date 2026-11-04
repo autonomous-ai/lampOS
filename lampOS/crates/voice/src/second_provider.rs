@@ -1621,6 +1621,14 @@ struct Shared {
         Arc<crate::speaking_faces::SpeakingFaces>,
         std::path::PathBuf,
     )>,
+    /// A held face forget lasts through one question asking them to spell
+    /// their name (`LAMP_NAMES_RECORD_TOLD`, #5141 row 7,
+    /// [`Engine::holding_forgets_through_spelling`]).
+    forget_through_spelling: bool,
+    /// A reply that says it saved their face with no `remember_my_face`
+    /// call is a keep claim with no keep (`LAMP_MEMORY_KEEP_ASKED`, #5141
+    /// row 8, [`Engine::claiming_faces`]).
+    face_claims: bool,
     remember_speaker: bool,
     enrollment_sight: Option<Arc<crate::speaking_faces::SpeakingFaces>>,
     /// A line is a known person's only when their own face was seen
@@ -3333,6 +3341,8 @@ impl Engine {
                 speaking: None,
                 held_forget: Mutex::new(HeldForgets::default()),
                 forget_sight: None,
+                forget_through_spelling: false,
+                face_claims: false,
                 remember_speaker: false,
                 enrollment_sight: None,
                 scope_seen: false,
@@ -3726,6 +3736,26 @@ impl Engine {
     ) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.forget_sight = Some((eyes, known));
+        self
+    }
+
+    /// A held `forget_my_face` whose turn's answer asked them to spell their
+    /// name is carried once through their next turn, whose answer may then
+    /// ask about it (`LAMP_NAMES_RECORD_TOLD`, #5141 row 7). Off, such an
+    /// answer drops it, as before.
+    pub fn holding_forgets_through_spelling(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.forget_through_spelling = on;
+        self
+    }
+
+    /// A reply that says it saved their face ("Hold still while I take your
+    /// face in.") with no `remember_my_face` call is a keep claim with no
+    /// keep, judged as one (`LAMP_MEMORY_KEEP_ASKED`, #5141 row 8). Off,
+    /// only the memory's keep claims are.
+    pub fn claiming_faces(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.face_claims = on;
         self
     }
 
@@ -9490,6 +9520,13 @@ struct HeldForget {
     /// forget ([`settle_held_forget`]): until then no yes runs it (Fourth's
     /// P2 on #2340: a yes to "Want me to set a reminder?" ran the forget).
     asked: bool,
+    /// A face forget whose held turn asked them to spell their name
+    /// (`LAMP_NAMES_RECORD_TOLD`, [`Shared::forget_through_spelling`]): the
+    /// next turn, theirs, carries it once, and that turn's answer is
+    /// judged as the held turn's was (#5141 row 7).
+    spelling: bool,
+    /// Carried once already: a second spelling question drops it.
+    carried: bool,
 }
 
 /// A person's spoken turn, for the turn after it: the forgets its own
@@ -9763,6 +9800,42 @@ fn take_held_forget(
     let Some(held) = hold.held.take() else {
         return Taken::Nothing;
     };
+    // A face forget whose turn asked them to spell their name
+    // (`LAMP_NAMES_RECORD_TOLD`, #5141 row 7): their next turn, the
+    // spelling, carries it once, running nothing; that turn's answer is
+    // then judged as the held turn's was ([`settle_held_forget`]).
+    if held.spelling {
+        let dropped = if !heard {
+            Some("a turn the lamp wrote")
+        } else if held.request >= request {
+            Some("not a later turn")
+        } else if asker != Some(&held.asker) {
+            Some("not the same person")
+        } else if now.saturating_duration_since(held.at) > crate::remember::HELD_FORGET_FOR {
+            Some("too late")
+        } else {
+            None
+        };
+        match dropped {
+            Some(why) => eprintln!(
+                "lamp-voice second: request {request}: dropped a held forget ({}, held in request {}): {why}",
+                held.call.name, held.request
+            ),
+            None => {
+                eprintln!(
+                    "lamp-voice second: request {request}: carried a held forget ({}, held in request {}) through their spelling (LAMP_NAMES_RECORD_TOLD)",
+                    held.call.name, held.request
+                );
+                hold.held = Some(HeldForget {
+                    request,
+                    spelling: false,
+                    carried: true,
+                    ..held
+                });
+            }
+        }
+        return Taken::Nothing;
+    }
     let dropped = if !heard {
         Some("a turn the lamp wrote")
     } else if !held.asked {
@@ -9856,6 +9929,8 @@ fn hold_forget(
         asker,
         at: now,
         asked: false,
+        spelling: false,
+        carried: false,
     });
     Holding::Held
 }
@@ -9885,6 +9960,18 @@ fn settle_held_forget(shared: &Shared, request: u64, answer: Option<&str>) {
             } =>
         {
             held.asked = true;
+            return;
+        }
+        // With `LAMP_NAMES_RECORD_TOLD` (#5141 row 7, lamp-0c4e, 3 Nov): a
+        // face forget whose answer asks them to spell their name waits for
+        // that spelling, once ([`take_held_forget`]).
+        Some(answer)
+            if shared.forget_through_spelling
+                && held.call.name == crate::known_faces::FORGET
+                && !held.carried
+                && crate::known_faces::asks_to_spell(answer) =>
+        {
+            held.spelling = true;
             return;
         }
         Some(_) => "the lamp's answer asked nothing about it",
@@ -10479,8 +10566,12 @@ async fn answer(
         let mut kept_now = false;
         let mut keep_claim_asked = false;
         // Told before the round after one whose claim went unsaid beside
-        // other calls, once those calls are answered.
-        let mut keep_claim_note = false;
+        // other calls, once those calls are answered: what the model is
+        // told of a keep claim, or of a face claim (#5141 row 8).
+        let mut keep_claim_note: Option<&'static str> = None;
+        // Whether a round of this request called `remember_my_face`, so a
+        // later round may say the face is saved (#5141 row 8).
+        let mut face_called = false;
         // A reply's offer to keep something, held to its round's end and
         // not said beside a `remember` call that keeps it (finding K2 on
         // #3504), and whether a `remember` of this request ran.
@@ -10488,8 +10579,8 @@ async fn answer(
         let mut remember_ran = false;
         let mut round = 0;
         while round < MAX_ROUNDS {
-            if std::mem::take(&mut keep_claim_note) {
-                messages.push(Message::system(crate::remember::KEEP_CLAIMED_UNKEPT));
+            if let Some(note) = keep_claim_note.take() {
+                messages.push(Message::system(note));
             }
             if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                 return Err(Stop::Gone);
@@ -10781,7 +10872,11 @@ async fn answer(
                             None => piece,
                             Some(held) => {
                                 held.push_str(&piece);
-                                match crate::remember::claims_a_keep(held, false) {
+                                match crate::remember::claims_a_keep_or_face(
+                                    held,
+                                    false,
+                                    shared.face_claims,
+                                ) {
                                     Some(false) => claim_held.take().unwrap_or_default(),
                                     // Undecided, or a claim: held.
                                     _ => continue,
@@ -10961,7 +11056,11 @@ async fn answer(
                         None => held,
                         Some(claim) => {
                             claim.push_str(&held);
-                            match crate::remember::claims_a_keep(claim, false) {
+                            match crate::remember::claims_a_keep_or_face(
+                                claim,
+                                false,
+                                shared.face_claims,
+                            ) {
                                 Some(false) => claim_held.take().unwrap_or_default(),
                                 // Undecided, or a claim: judged below.
                                 _ => String::new(),
@@ -10989,44 +11088,63 @@ async fn answer(
             // again; a second such reply, or one in the last round, is said
             // as the plain line that it was not kept.
             if let Some(held) = claim_held.take().filter(|held| !held.is_empty()) {
-                let remembers = calls
-                    .iter()
-                    .any(|call| call.name == crate::remember::REMEMBER);
+                let claim = crate::remember::keep_claim_or_face(&held, shared.face_claims);
+                // A face said saved (`LAMP_MEMORY_KEEP_ASKED`, #5141 row 8:
+                // lamp-0c4e, 3 Nov, "hold still while I take your face in"
+                // with no call) is kept by `remember_my_face`, in this round
+                // or an earlier one, and is otherwise the same miss, judged
+                // here with the same once-asked-again and journal line.
+                let face = claim == Some(crate::remember::KeepClaim::Face);
+                let (keeper, told, not_kept) = if face {
+                    (
+                        crate::known_faces::REMEMBER,
+                        crate::remember::FACE_CLAIMED_UNSAVED,
+                        crate::remember::FACE_NOT_SAVED_LINE,
+                    )
+                } else {
+                    (
+                        crate::remember::REMEMBER,
+                        crate::remember::KEEP_CLAIMED_UNKEPT,
+                        crate::remember::NOT_KEPT_LINE,
+                    )
+                };
+                let remembers =
+                    calls.iter().any(|call| call.name == keeper) || (face && face_called);
                 // A soft claim ("Noted — timer set for ten minutes.") beside
                 // any call confirms that call (Reviewer-three's and
                 // Reviewer-two's P2 on #4137): a claim only with none.
-                let claimed = match crate::remember::keep_claim(&held) {
-                    Some(crate::remember::KeepClaim::Hard) => true,
+                let claimed = match claim {
+                    Some(crate::remember::KeepClaim::Hard | crate::remember::KeepClaim::Face) => {
+                        true
+                    }
                     Some(crate::remember::KeepClaim::Soft) => calls.is_empty(),
                     None => false,
                 };
                 if claimed && !remembers {
                     if !calls.is_empty() {
                         eprintln!(
-                            "lamp-voice second: request {request} chat round {round}: its reply says it kept something, with no remember call: not said, its other calls run"
+                            "lamp-voice second: request {request} chat round {round}: its reply says it kept something, with no {keeper} call: not said, its other calls run"
                         );
                         keep_claim_asked = true;
-                        keep_claim_note = true;
+                        keep_claim_note = Some(told);
                         text.clear();
                     } else if round < MAX_ROUNDS && !std::mem::replace(&mut keep_claim_asked, true)
                     {
                         eprintln!(
-                            "lamp-voice second: request {request} chat round {round}: its reply says it kept something, with no remember call: not said, asked again"
+                            "lamp-voice second: request {request} chat round {round}: its reply says it kept something, with no {keeper} call: not said, asked again"
                         );
-                        messages.push(Message::system(crate::remember::KEEP_CLAIMED_UNKEPT));
+                        messages.push(Message::system(told));
                         continue;
                     } else {
                         eprintln!(
-                            "lamp-voice second: request {request} chat round {round}: its reply says again it kept something, with no remember call: said it was not kept"
+                            "lamp-voice second: request {request} chat round {round}: its reply says again it kept something, with no {keeper} call: said it was not kept"
                         );
                         // What an earlier round held is said first: nothing
                         // was kept (Reviewer-two's P3 on #4076).
                         for sentence in offered(&mut offer_hold, false, request, round) {
                             queue.push(sentence).await?;
                         }
-                        queue
-                            .push(crate::remember::NOT_KEPT_LINE.to_owned())
-                            .await?;
+                        queue.push(not_kept.to_owned()).await?;
                         return Ok(());
                     }
                 } else {
@@ -11086,6 +11204,9 @@ async fn answer(
             }
             let first_calls = !called_earlier;
             called_earlier |= !calls.is_empty();
+            face_called |= calls
+                .iter()
+                .any(|call| call.name == crate::known_faces::REMEMBER);
             if calls.iter().any(|call| call.name == NOT_FOR_ME) {
                 let named = heard
                     && shared

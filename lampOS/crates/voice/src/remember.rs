@@ -455,6 +455,16 @@ pub const KEEP_CLAIMED_UNKEPT: &str = "(For you to know: you were about to say y
 /// something with no `remember` call.
 pub const NOT_KEPT_LINE: &str = "I didn't keep that. Tell me again and I'll remember it.";
 
+/// What the model is told of a reply that said it saved, or was saving,
+/// their face with no `remember_my_face` call ([`KeepClaim::Face`], #5141
+/// row 8). Its words were not said.
+pub const FACE_CLAIMED_UNSAVED: &str = "(For you to know: you were about to say you were saving or renaming their face, but no face was saved or renamed: you did not call remember_my_face, and those words were not said. If they asked you to remember or rename their face, or said yes to that, call remember_my_face now with their name; otherwise answer without saying you saved or renamed it.)";
+
+/// What the lamp says when, asked again, the model still says it saved
+/// their face with no `remember_my_face` call.
+pub const FACE_NOT_SAVED_LINE: &str =
+    "I haven't saved your face yet. Ask me again and I'll take it in.";
+
 /// Whether a reply's opening says the lamp kept something, after up to
 /// three opening words such as "okay", "sure", "got it" or "done": only a
 /// keep that takes what was kept ("Kept: …", "Kept.", "kept that",
@@ -471,7 +481,14 @@ pub const NOT_KEPT_LINE: &str = "I didn't keep that. Tell me again and I'll reme
 /// (unless `whole`, the reply is all there is); decided at the first that
 /// cannot.
 pub fn claims_a_keep(reply: &str, whole: bool) -> Option<bool> {
-    keep_claim_of(reply, whole).map(|claim| claim.is_some())
+    claims_a_keep_or_face(reply, whole, false)
+}
+
+/// [`claims_a_keep`], and with `faces` (`LAMP_MEMORY_KEEP_ASKED`, #5141
+/// row 8) a reply that says it is saving or saved their face
+/// ([`KeepClaim::Face`]) too.
+pub fn claims_a_keep_or_face(reply: &str, whole: bool, faces: bool) -> Option<bool> {
+    keep_claim_of(reply, whole, faces).map(|claim| claim.is_some())
 }
 
 /// Which kind of keep claim a reply makes ([`claims_a_keep`]): a hard one
@@ -485,16 +502,113 @@ pub fn claims_a_keep(reply: &str, whole: bool) -> Option<bool> {
 pub enum KeepClaim {
     Hard,
     Soft,
+    /// A face said saved, or being saved, with what keeps it being
+    /// `remember_my_face` ([`FACE_CLAIMS`], #5141 row 8).
+    Face,
 }
 
 /// The kind of keep claim the whole of `reply` makes, if any.
 pub fn keep_claim(reply: &str) -> Option<KeepClaim> {
-    keep_claim_of(reply, true).flatten()
+    keep_claim_or_face(reply, false)
+}
+
+/// [`keep_claim`], and with `faces` a face claim ([`KeepClaim::Face`]).
+pub fn keep_claim_or_face(reply: &str, faces: bool) -> Option<KeepClaim> {
+    keep_claim_of(reply, true, faces).flatten()
+}
+
+/// What may stand before a face claim's own words ([`FACE_CLAIMS`]): "Hold
+/// still while I take your face in."
+const FACE_LEADS: &[&str] = &[
+    "hold still while ",
+    "hold still so ",
+    "hold still, ",
+    "stay still while ",
+    "stay still so ",
+    "stay still, ",
+    // lamp-9adf, 4 Nov: "I'll do it now: your face is known as Sam".
+    "i'll do it now: ",
+    "i'll do it now, ",
+    "i'll do that now: ",
+    "i'll do that now, ",
+    "",
+];
+/// The words that say the lamp is saving or saved their face, after a lead
+/// ([`FACE_LEADS`]), whatever follows: lamp-0c4e, 3 Nov, "hold still while
+/// I take your face in" with no `remember_my_face` call (#5141 row 8). Each
+/// says "your face", so no memory claim is one.
+const FACE_CLAIMS: &[&str] = &[
+    "i take your face",
+    "i learn your face",
+    "i save your face",
+    "i remember your face",
+    "i get your face",
+    "i can take your face",
+    "i can learn your face",
+    "i can save your face",
+    "i can remember your face",
+    "let me take your face",
+    "let me learn your face",
+    "let me save your face",
+    "let me remember your face",
+    "i'll take your face",
+    "i'll learn your face",
+    "i'll save your face",
+    "i'll remember your face",
+    "i will remember your face",
+    "i'm taking your face",
+    "i'm learning your face",
+    "i'm saving your face",
+    "i've saved your face",
+    "i have saved your face",
+    "i've learned your face",
+    "i've learnt your face",
+    "i've got your face",
+    "i've taken your face",
+    "taking your face",
+    "learning your face",
+    "saving your face",
+    "saved your face",
+    "got your face",
+    // A rename said done (lamp-9adf, 4 Nov, Fourteen's check on #4710:
+    // "your face is known as Sam now, and the old name is gone" after a
+    // "yes" with no call; the first builder's case on #5141 row 8).
+    "your face is known as",
+    "your face is now known as",
+    "your face is now called",
+    "your face is renamed",
+    "your face is saved",
+    "your face is now saved",
+    "i've renamed your face",
+    "i have renamed your face",
+    "renamed your face",
+];
+
+/// Whether `rest`, a reply past its opening words, says it saves their
+/// face ([`FACE_CLAIMS`]): `Some(true)` for a claim, `Some(false)` for
+/// none, `None` while it could still become one.
+fn face_claim(rest: &str) -> Option<bool> {
+    let mut maybe = false;
+    for lead in FACE_LEADS {
+        match rest.strip_prefix(lead) {
+            Some(after) => {
+                for claim in FACE_CLAIMS {
+                    if after.starts_with(claim) {
+                        return Some(true);
+                    }
+                    maybe |= claim.starts_with(after);
+                }
+            }
+            None => maybe |= lead.starts_with(rest),
+        }
+    }
+    if maybe { None } else { Some(false) }
 }
 
 /// [`claims_a_keep`] with the kind of claim: `None` while undecided,
-/// `Some(None)` for no claim.
-fn keep_claim_of(reply: &str, whole: bool) -> Option<Option<KeepClaim>> {
+/// `Some(None)` for no claim. With `faces`, a face claim counts
+/// ([`KeepClaim::Face`]).
+fn keep_claim_of(reply: &str, whole: bool, faces: bool) -> Option<Option<KeepClaim>> {
     const OPENING: &[&str] = &[
         "okay",
         "ok",
@@ -558,6 +672,13 @@ fn keep_claim_of(reply: &str, whole: bool) -> Option<Option<KeepClaim>> {
             .to_owned();
     }
     let mut maybe = rest.is_empty() || OPENING.iter().any(|opening| opening.starts_with(&rest));
+    if faces {
+        match face_claim(&rest) {
+            Some(true) => return Some(Some(KeepClaim::Face)),
+            None => maybe = true,
+            Some(false) => {}
+        }
+    }
     // K3: "Noted" claims a keep only with what was noted after a dash or
     // colon ("Noted — you work at a library now"), or with an object
     // ("Noted that."); "Noted.", "Noted, thanks." claim nothing. Only an
@@ -12102,6 +12223,42 @@ mod tests {
         );
         assert_eq!(hold.say("Shall I save it?".into(), true), None);
         assert_eq!(hold.release(true), (Vec::new(), 1));
+    }
+
+    /// #5141 row 8 (lamp-9adf, 4 Nov, Fourteen's check on #4710): after
+    /// "rename my face to Sam" and a "yes", the lamp said "your face is
+    /// known as Sam now, and the old name is gone" and "I'll do it now:
+    /// your face is known as Sam" with no call. A rename said done is a
+    /// face claim; other talk of a face or a name is not.
+    #[test]
+    fn a_rename_said_done_is_a_face_claim() {
+        for reply in [
+            "Your face is known as Sam now, and the old name is gone.",
+            "Okay, your face is known as Sam now.",
+            "Done, your face is now known as Sam.",
+            "I'll do it now: your face is known as Sam.",
+            "Got it, I've renamed your face to Sam.",
+            "Yes, your face is saved as Sam.",
+        ] {
+            assert_eq!(
+                keep_claim_or_face(reply, true),
+                Some(KeepClaim::Face),
+                "{reply}"
+            );
+            // Off, as before: no claim.
+            assert_eq!(keep_claim_or_face(reply, false), None, "{reply}");
+        }
+        for reply in [
+            "Do you want your face known as Sam from now on?",
+            "Your name is Sam.",
+            "I'll do it now: the lights are off.",
+            "Your face is in view.",
+        ] {
+            assert_eq!(keep_claim_or_face(reply, true), None, "{reply}");
+        }
+        // Undecided while it could still become the claim.
+        assert_eq!(claims_a_keep_or_face("Your face is kn", false, true), None);
+        assert_eq!(claims_a_keep_or_face("I'll do it now:", false, true), None);
     }
 
     #[test]
