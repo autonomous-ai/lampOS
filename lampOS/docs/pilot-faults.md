@@ -704,6 +704,34 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   next pass cut it as `capture_gap`); the margin check is true only
   for a held turn whose lease ends within 40 ms. Not yet tried on a lamp.
 
+- **A slide closed during a held turn ended the voice as a fault.** On
+  lamp-e82d on 4 Nov 11:44 the slide closed just after a question, while
+  the turn was held (#4332). Relative to the run's end: input admitted at
+  −1.44 s, the local endpoint at −0.774 s, `physical_mute` at −0.106 s,
+  `privacy controller lease expired` about −0.046 s, `turn_finished` at
+  −0.018 s, then `stop_delivery_error` for the privacy and second workers,
+  `worker_exit_failed` for both, and the run ended as `physical mute
+  observed…; verified cleanup failed`, which the restart guard counts. From
+  the code: the mute returned at once with nothing revoked, and the
+  cleanup's cancel and Denied publish came about 88 ms later, after the held
+  turn's lease (the last kept frame + 100 ms) had lapsed at the workers;
+  each ended on a lapsed lease that grants, as it must. The mute now
+  cancels the reply, Denies the microphones and the camera and publishes a
+  turnless snapshot first, before the camera is told no and before any
+  record or teardown (`revoke_for_mute`); a failed publish there is
+  recorded (`mute_revocation_unpublished`) and the run stays the mute.
+  Nothing is extended and the lease lengths are unchanged. Unit tests: in
+  the harness a mute right after the local endpoint of a held question,
+  with the teardown held up 120 ms, is a clean mute, no peer holds a lapsed
+  granting lease at any step, nothing listens after the mute, the speaker
+  installs the Denied turnless authority within the teardown's first steps
+  and before any Stop, and `turn_finished` `privacy_muted` comes before
+  the first Stop (before: all four peers held the held turn's lapsed
+  granting lease at every step of the held-up teardown); the mute's snapshot has no turn, grants nothing and is a
+  full 250 ms lease, published before anything is recorded; a failed
+  publish leaves the controller Denied and is recorded. Not yet tried on a
+  lamp.
+
 - **A wall clock stepped by chrony during start-up.** On lamp-06c1, in 4 of
   4 cold boots, chrony stepped the wall clock by about +20 s some 46 s in,
   and the voice then said "privacy publisher unavailable" (the step read as
