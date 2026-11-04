@@ -340,7 +340,7 @@ say để hỏi; và `{"added": {"sha256"}}`, trạng thái `kept`, `asked`, `on
 2. **Một `SKILL.md` trần** thành một kỹ năng viết (`upload_skill::written`):
    không có trigger, `tool` theo tên kỹ năng (`-` thành `_`), chỉ có quyền
    `speak`, và một bước `say` là phần chữ sau front matter trên một dòng
-   (tối đa 2.000 byte): lời dặn cho mô hình khi người ta nhờ đến nó.
+   (tối đa 900 byte, giới hạn lời của dịch vụ say, nên lời dài hơn bị từ chối ngay thay vì được bật rồi lỗi ở mọi lần gọi; file có xuống dòng kiểu Windows được đọc như mọi file khác): lời dặn cho mô hình khi người ta nhờ đến nó.
 3. **Giới hạn** (`made_skill::capped_added`): như kỹ năng tự tạo, khác hai
    điểm: không bao giờ tự chạy (trigger, `[[while]]`, `[ask]` bị từ chối),
    phải có hàm (`tool`); và được `speak`, vì lời của hàm là câu trả lời của
