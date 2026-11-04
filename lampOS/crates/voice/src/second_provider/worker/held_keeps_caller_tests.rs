@@ -290,13 +290,74 @@ fn a_sure_other_voice_gets_no_callers_tie() {
         likeness: None,
     };
     assert!(
-        heeding.callers_own_line(2, &seen(false)).is_some(),
+        heeding.callers_own_line(2, &seen(false), false).is_some(),
         "the caller's"
     );
     assert_eq!(
-        heeding.callers_own_line(2, &seen(true)),
+        heeding.callers_own_line(2, &seen(true), false),
         None,
         "another voice"
     );
     *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+}
+
+const LONDON: Line = line(
+    0,
+    1_800,
+    "Lamp, what time is it in London?",
+    "Twenty-seven past ten at night in London, still Saturday.",
+);
+
+/// Seventh's 52e6 FAIL of #5240 at 789644e0f (5 Nov 00:07, sw5008f):
+/// owner_b-2 and owner_b-3, each begun 2 s after the lamp's answer to the
+/// line before, were held under HELD as having no tie to the lamp, and
+/// let out with the switch off as the conversation going on. The lamp's
+/// name at their start was written as another word, set off (owner_b-2:
+/// "its first word, set off, doesn't sound like it: not the name",
+/// `LAMP_NAME_NEAR`). The rule reads no one's name in "Ma'am," or "Look,"
+/// (`attention::addresses_someone_else_on`), but the untied rule's
+/// `desk_talk` read a colleague called by name, which cancels "tell me …"
+/// and "Do I …?" as asks of the lamp. Under `held` a set-off word is a
+/// name only as the rule reads names; real names stay held by the rule
+/// itself, held or not.
+#[test]
+fn held_keeps_a_callers_line_whose_name_was_written_as_another_word() {
+    for name in ["Ma'am", "Look"] {
+        let b2: &'static str = Box::leak(
+            format!("{name}, I'm going out later. Do I need an umbrella?").into_boxed_str(),
+        );
+        let b3: &'static str = Box::leak(format!("{name}, tell me a joke.").into_boxed_str());
+        let owner_b = [
+            LONDON,
+            line(6_800, 4_000, b2, "A little drizzle later, so take one."),
+            line(13_800, 1_600, b3, "Why did the lamp go to school?"),
+        ];
+        assert_eq!(run(false, &owner_b), [true; 3], "off: {name}");
+        assert_eq!(run(true, &owner_b), [true; 3], "held: {name}");
+        // With no word tying it, the same opening stays held under `held`.
+        let untied = [
+            LONDON,
+            line(
+                6_800,
+                2_400,
+                Box::leak(format!("{name}, did you send the slides to Sam yet?").into_boxed_str()),
+                "I hope so.",
+            ),
+        ];
+        assert_eq!(run(true, &untied), [true, false], "held, untied: {name}");
+    }
+    // A set-off name the rule reads as someone's is still desk talk under
+    // `held`, as #5008 holds it (off lets it out as the conversation going
+    // on); other signs of desk talk stand.
+    let to_sam = [LONDON, line(6_800, 2_400, "Sam, tell me a joke.", "Okay.")];
+    assert_eq!(run(false, &to_sam), [true, true], "off: Sam");
+    assert_eq!(run(true, &to_sam), [true, false], "held: Sam");
+    for desk in [
+        "Hey Sam, play some music.",
+        "Tell Sam the meeting moved to four.",
+        "Should I bring an umbrella, you guys?",
+    ] {
+        let lines = [LONDON, line(6_800, 2_400, desk, "Okay.")];
+        assert_eq!(run(true, &lines), [true, false], "held: {desk}");
+    }
 }
