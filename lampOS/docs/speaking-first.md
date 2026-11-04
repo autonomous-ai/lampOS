@@ -594,7 +594,13 @@ nobody, refuses nothing. Otherwise it waits only for no reminder held,
 nothing being heard, listening ready, the playback mask and the model
 service answering, never a say's 15 s quiet after the last turn or the
 reminders' quiet after speech, as an exact say doesn't (lamp-75c9, 3 Nov),
-and is `expired` if they don't pass in time. The quiet hours are the door's,
+and is `expired` if they don't pass in time. While it waits, the voice's client
+thread looks at its connection every 50 ms: closed (lamp-control shuts it
+when its computer goes or is revoked), the start is dropped at the voice's
+next pass, `{"outcome":"dropped","why":"its asker went away"}`
+(`say::ASKER_GONE`), never opened, so no cue and no window. A start already
+begun is not affected: its computer's `turn.end` and the person end it.
+The quiet hours are the door's,
 not the voice's. Then:
 - **Without `text`**, it does what a tap on the head does: the listening
   face and the "hm?" (at the tap's level, and not held to the tap's one in

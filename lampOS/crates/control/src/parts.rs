@@ -25,6 +25,9 @@
 //!   `turn.end` used it; a start refused before its `begun` leaves it. A
 //!   start while one is kept names it as `after`, so the voice continues
 //!   that computer's own conversation rather than refusing it.
+//!   A start still waiting for its `begun` when the computer is gone (its
+//!   last connection, a revoke) has its connection shut, and the voice
+//!   drops it: no cue and no window for a computer gone.
 //!   `turn.end` → `turn: "end"` with that id, answered once the voice says.
 //! - `listen.set` → the voice's say socket as `listen`: `false` holds one
 //!   connection for the computer, which holds the voice's mute while it is
@@ -175,6 +178,14 @@ impl Voice {
         self.last
     }
 
+    /// `client`'s turn start numbered `seq`, while not yet answered.
+    fn turn(&mut self, client: &str, seq: u64) -> Option<&mut Turn> {
+        self.turns
+            .get_mut(client)?
+            .iter_mut()
+            .find(|turn| turn.seq == seq)
+    }
+
     /// Forgets `client`'s mute numbered `seq`: whether it was still held.
     fn forget_mute(&mut self, client: &str, seq: u64) -> bool {
         let ours = self.mutes.get(client).is_some_and(|mute| mute.seq == seq);
@@ -188,6 +199,12 @@ impl Voice {
 /// A computer's turn start not yet answered.
 struct Turn {
     seq: u64,
+    /// Its say socket connection while the voice has not begun it: shut
+    /// when the computer goes (`gone`), which drops it at the
+    /// voice, so a computer gone or revoked gets no cue and no window.
+    /// Let go once it began: a begun turn is ended by its `turn.end` or
+    /// the person, as before.
+    waiting: Option<UnixStream>,
 }
 
 /// A computer's begun turn: the voice's id for it, and the request that
@@ -599,7 +616,7 @@ impl Lamp {
                 .turns
                 .entry(client.to_owned())
                 .or_default()
-                .push(Turn { seq });
+                .push(Turn { seq, waiting: None });
             seq
         };
         let (voice, events, client) = (self.voice.clone(), self.events.clone(), client.to_owned());
@@ -608,17 +625,30 @@ impl Lamp {
             // Its id replaces the earlier turn's only now, as it begins.
             let begun = |said: &Value| {
                 if let Some(id) = said["id"].as_u64() {
-                    voice
-                        .lock()
-                        .expect("voice")
-                        .begun
-                        .insert(client.clone(), Begun { id, re });
+                    let mut voice = voice.lock().expect("voice");
+                    voice.begun.insert(client.clone(), Begun { id, re });
+                    if let Some(turn) = voice.turn(&client, seq) {
+                        turn.waiting = None;
+                    }
                 }
             };
             let (how, why) = match UnixStream::connect(&path)
                 .and_then(|mut stream| writeln!(stream, "{line}").map(|()| stream))
             {
                 Ok(stream) => {
+                    // Kept with the start while it waits; gone meanwhile, its
+                    // computer's start is let go at once.
+                    let kept = stream.try_clone().ok();
+                    let waits = match voice.lock().expect("voice").turn(&client, seq) {
+                        Some(turn) => {
+                            turn.waiting = kept;
+                            true
+                        }
+                        None => false,
+                    };
+                    if !waits {
+                        let _ = stream.shutdown(Shutdown::Both);
+                    }
                     let _ = stream.set_read_timeout(Some(SAY_ANSWER_WITHIN));
                     outcome_with(BufReader::new(stream), begun)
                 }
@@ -1111,10 +1141,20 @@ impl Parts for Lamp {
         }
     }
 
-    /// As `stop`, and its mute's connection closed, which lifts it.
+    /// As `stop`, and its mute's connection closed, which lifts it, and
+    /// the connection of each turn start still waiting for the voice
+    /// shut, which drops it there: no cue and no window for a computer
+    /// gone or revoked. A begun turn is left to its `turn.end` and the
+    /// person, as before. Shut off the lock: a shutdown never waits.
     fn gone(&mut self, client: &str, now_us: u64) {
         self.stop(client, now_us);
-        let held = self.voice.lock().expect("voice").mutes.remove(client);
+        let (held, turns) = {
+            let mut voice = self.voice.lock().expect("voice");
+            (voice.mutes.remove(client), voice.turns.remove(client))
+        };
+        for waiting in turns.into_iter().flatten().filter_map(|turn| turn.waiting) {
+            let _ = waiting.shutdown(Shutdown::Both);
+        }
         if let Some(Mute {
             held: Some(held), ..
         }) = held
@@ -2263,6 +2303,59 @@ mod tests {
             json!({"mute": "nothing_held"})
         );
         assert_eq!(told.lock().unwrap().len(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// docs/control.md, "Turns and listening": a computer gone (its last
+    /// connection, a revoke) with a `turn.start` still waiting for the
+    /// voice has that start's connection shut at once, so the voice drops
+    /// it and gives no cue; another computer's waiting start, and a begun
+    /// turn of the computer's, are left as they were.
+    #[test]
+    fn a_waiting_turn_start_is_shut_when_its_computer_goes() {
+        let dir = dir("turn-gone");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let (events, _told) = kept();
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        let start = op(r#"{"id":3,"op":"turn.start"}"#);
+        let open_for = |stream: &UnixStream, within: Duration| {
+            stream.set_read_timeout(Some(within)).unwrap();
+            let mut rest = String::new();
+            let read = BufReader::new(stream).read_line(&mut rest);
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            read.is_err()
+        };
+        lamp.act("c_1", 3, &start, 0).unwrap();
+        let (going, _) = accepted(&listener);
+        lamp.act("c_2", 3, &start, 0).unwrap();
+        let (staying, _) = accepted(&listener);
+        // Let the door's threads keep both connections.
+        std::thread::sleep(Duration::from_millis(50));
+        let asked = std::time::Instant::now();
+        lamp.gone("c_1", 0);
+        let mut rest = String::new();
+        assert_eq!(BufReader::new(&going).read_line(&mut rest).unwrap(), 0);
+        assert!(
+            asked.elapsed() < Duration::from_secs(1),
+            "{:?}",
+            asked.elapsed()
+        );
+        assert!(open_for(&staying, Duration::from_millis(200)));
+        // Begun, c_2's turn is no longer waiting: its going leaves it.
+        say(&staying, r#"{"event":"begun","at_us":5,"id":7}"#);
+        for _ in 0..300 {
+            if begun_id(&lamp, "c_2") == Some(7) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(begun_id(&lamp, "c_2"), Some(7));
+        lamp.gone("c_2", 0);
+        assert!(open_for(&staying, Duration::from_millis(200)));
+        say(&staying, r#"{"outcome":"spoken"}"#);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

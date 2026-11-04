@@ -95,7 +95,9 @@
 //!   says first; `turn: "end"` with `id` ends one it opened. Only the skill
 //!   [`TURN_SKILL`] may ask either. A start is answered `begun` with the
 //!   turn's `id` when its window opens; the coordinator decides the rest
-//!   ([`crate::control_turn`]).
+//!   ([`crate::control_turn`]). A start whose connection closes while it
+//!   still waits (its computer went or was revoked) is dropped
+//!   ([`ASKER_GONE`]); one begun is not affected.
 //! - **A computer's mute for lamp-control** (the same section):
 //!   `listen: false` holds the voice's software mute on its connection,
 //!   which stays open while it holds, answered `muted` once the voice has
@@ -128,7 +130,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         Arc,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         mpsc,
     },
     thread,
@@ -210,6 +212,11 @@ const MOST_LINE_BYTES: u64 = 4_096;
 pub const TURN_SKILL: &str = "control";
 /// How long a `turn: "end"`, which names no expiry, may wait to be taken.
 pub const TURN_END_EXPIRY_MS: u64 = 10_000;
+/// Why a turn start still waiting is dropped when its connection closed:
+/// its computer went or was revoked, and lamp-control shut it.
+pub const ASKER_GONE: &str = "its asker went away";
+/// How often a waiting turn start's client looks whether its asker went.
+const GONE_LOOK: Duration = Duration::from_millis(50);
 /// Told the model before a text, so that it says the words as they are.
 pub const AS_WRITTEN: &str = "Say exactly these words, in your own voice, and nothing else:";
 
@@ -875,6 +882,9 @@ struct Asked {
     answer: mpsc::Sender<Answer>,
     read_at_us: u64,
     guard: Option<unplug_guard::Guard>,
+    /// A turn start's asker gone: set by its client thread when its
+    /// connection closes while it waits ([`Says::expire`]).
+    gone: Option<Arc<AtomicBool>>,
     expires_at_us: u64,
 }
 
@@ -918,6 +928,7 @@ impl OwnAsks {
             answer,
             read_at_us,
             guard: None,
+            gone: None,
         });
         answered
     }
@@ -928,8 +939,19 @@ struct Waiting {
     request: Request,
     answer: mpsc::Sender<Answer>,
     guard: Option<unplug_guard::Guard>,
+    gone: Option<Arc<AtomicBool>>,
     expires_at_us: u64,
     order: u64,
+}
+
+impl Waiting {
+    /// Whether its asker went while it waited: only a turn start's client
+    /// watches for that.
+    fn asker_gone(&self) -> bool {
+        self.gone
+            .as_ref()
+            .is_some_and(|gone| gone.load(Ordering::Acquire))
+    }
 }
 
 /// A say begun: it lives on the voice's reply and is answered when the
@@ -1050,6 +1072,7 @@ impl LineForTest {
                 answer: self.answer,
                 read_at_us,
                 guard: None,
+                gone: None,
             })
             .unwrap();
     }
@@ -1354,6 +1377,7 @@ impl Says {
             answer,
             read_at_us: expires_at_us.saturating_sub(60_000_000),
             guard: None,
+            gone: None,
             expires_at_us,
         })
         .unwrap();
@@ -1382,6 +1406,7 @@ impl Says {
             answer,
             read_at_us: 0,
             guard: None,
+            gone: None,
             expires_at_us: u64::MAX,
         })
         .unwrap();
@@ -1431,6 +1456,7 @@ impl Says {
             answer,
             read_at_us: 0,
             guard: None,
+            gone: None,
             expires_at_us: u64::MAX,
         })
         .unwrap();
@@ -1479,6 +1505,7 @@ impl Says {
                 request: asked.request,
                 answer: asked.answer,
                 guard: asked.guard,
+                gone: asked.gone,
                 expires_at_us,
                 order: self.order,
             });
@@ -1486,13 +1513,24 @@ impl Says {
         self.expire(now_us);
     }
 
+    /// Answers those not begun by `now_us` `expired`, and a turn start
+    /// whose asker went while it waited `dropped` ([`ASKER_GONE`]): a
+    /// computer gone or revoked before its turn opens gets no cue and no
+    /// window. A turn already begun is out of the queue and not affected:
+    /// its computer's `turn.end` and the person still end it.
     fn expire(&mut self, now_us: u64) {
         self.waiting.retain(|waiting| {
-            let live = now_us < waiting.expires_at_us;
-            if !live {
+            if now_us >= waiting.expires_at_us {
                 let _ = waiting.answer.send(Answer::Done(Outcome::Expired));
+                return false;
             }
-            live
+            if waiting.asker_gone() {
+                let _ = waiting
+                    .answer
+                    .send(Answer::Done(Outcome::Dropped(ASKER_GONE.into())));
+                return false;
+            }
+            true
         });
     }
 
@@ -1536,6 +1574,7 @@ impl Says {
         self.waiting.iter().any(|waiting| {
             matches!(waiting.request.words, Words::TurnStart { .. })
                 && now_us < waiting.expires_at_us
+                && !waiting.asker_gone()
         })
     }
 
@@ -1549,6 +1588,7 @@ impl Says {
             .filter(|waiting| {
                 matches!(waiting.request.words, Words::TurnStart { .. })
                     && now_us < waiting.expires_at_us
+                    && !waiting.asker_gone()
             })
             .min_by_key(|waiting| waiting.order)
             .and_then(|waiting| match waiting.request.words {
@@ -1976,12 +2016,18 @@ fn serve_client(
                     let _ = stream.set_write_timeout(Some(Duration::from_millis(50)));
                 }
                 let (answer, answered) = mpsc::channel();
+                // A turn start watches its connection while it waits: closed
+                // (its computer went or was revoked, and lamp-control shut
+                // it), the voice drops it at its next pass ([`ASKER_GONE`]).
+                let mut gone = matches!(request.words, Words::TurnStart { .. })
+                    .then(|| Arc::new(AtomicBool::new(false)));
                 if ask
                     .send(Asked {
                         request,
                         answer,
                         read_at_us,
                         guard,
+                        gone: gone.clone(),
                         expires_at_us,
                     })
                     .is_err()
@@ -1997,6 +2043,8 @@ fn serve_client(
                         }
                         let answer = if monitor.is_some() {
                             answered.recv_timeout(Duration::from_millis(20))
+                        } else if gone.is_some() {
+                            answered.recv_timeout(GONE_LOOK)
                         } else {
                             answered
                                 .recv()
@@ -2005,9 +2053,18 @@ fn serve_client(
                         match answer {
                             Ok(begun @ (Answer::Begun(_) | Answer::BegunTurn { .. })) => {
                                 let _ = writeln!(stream, "{}", begun.line());
+                                // Begun, it has left the queue: no more watching.
+                                gone = None;
                             }
                             Ok(Answer::Done(outcome)) => break outcome,
-                            Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                            Err(mpsc::RecvTimeoutError::Timeout) => {
+                                if let Some(gone) = gone.as_ref()
+                                    && asker_went(&stream)
+                                {
+                                    gone.store(true, Ordering::Release);
+                                }
+                                continue;
+                            }
                             Err(mpsc::RecvTimeoutError::Disconnected) => {
                                 break Outcome::Dropped("the voice has gone".into());
                             }
@@ -2091,6 +2148,27 @@ fn read_some(stream: &UnixStream, within: Duration, kept: &mut Vec<u8>) -> Resul
             Err(_) => Err(()),
         };
     }
+}
+
+/// Whether a waiting turn start's client has closed its connection (or
+/// lamp-control shut it), looked at without waiting. Bytes after the ask
+/// line are not the protocol's on a turn start: read and let go, at most
+/// one piece a look, so they never hide the close for long.
+fn asker_went(stream: &UnixStream) -> bool {
+    if stream.set_nonblocking(true).is_err() {
+        return false;
+    }
+    let mut piece = [0u8; 512];
+    let went = loop {
+        break match (&*stream).read(&mut piece) {
+            Ok(0) => true,
+            Ok(_) => false,
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => error.kind() != io::ErrorKind::WouldBlock,
+        };
+    };
+    let _ = stream.set_nonblocking(false);
+    went
 }
 
 /// How often a held mute's connection looks for its next line and for what
@@ -3395,6 +3473,7 @@ mod tests {
                 answer,
                 read_at_us: expires_at_us.saturating_sub(60_000_000),
                 guard: None,
+                gone: None,
                 expires_at_us,
             },
             answered,
@@ -3620,6 +3699,7 @@ mod tests {
                 answer,
                 read_at_us,
                 guard: None,
+                gone: None,
             })
             .unwrap();
             says.poll(deadline - 1);
@@ -3647,6 +3727,7 @@ mod tests {
             answer,
             read_at_us,
             guard: None,
+            gone: None,
         })
         .unwrap();
         says.poll(deadline - 1);
@@ -3713,6 +3794,7 @@ mod tests {
                 answer,
                 read_at_us,
                 guard: None,
+                gone: None,
             };
             (asked, answered)
         };
@@ -4625,6 +4707,7 @@ mod tests {
                 answer,
                 read_at_us: order,
                 guard: None,
+                gone: None,
             })
             .unwrap();
         }
@@ -4650,6 +4733,90 @@ mod tests {
         ticket.answer(Outcome::Refused("the lamp is muted".into()));
     }
 
+    /// A waiting turn start whose asker went (its client saw its connection
+    /// close) is dropped at the voice's next pass, never opened; another
+    /// asker's waiting start is untouched and still taken.
+    #[test]
+    fn a_waiting_turn_start_whose_asker_went_is_dropped_and_no_other() {
+        let (mut says, ask) = Says::by_hand();
+        let asked = |text: &str, order: u64| {
+            let line = format!(
+                r#"{{"skill":"control","turn":"start","text":"{text}","expires_in_ms":5000}}"#
+            );
+            let request = parse(&line).unwrap();
+            let (answer, answered) = mpsc::channel();
+            let gone = Arc::new(AtomicBool::new(false));
+            ask.send(Asked {
+                expires_at_us: request.expires_at_us(order),
+                request,
+                answer,
+                read_at_us: order,
+                guard: None,
+                gone: Some(gone.clone()),
+            })
+            .unwrap();
+            (gone, answered)
+        };
+        let (went, went_answered) = asked("First?", 0);
+        let (_stays, stays_answered) = asked("Second?", 1);
+        says.poll(10);
+        assert!(says.turn_start_waits(10));
+        went.store(true, Ordering::Release);
+        // Before the pass only the other is counted waiting; it still is.
+        assert!(says.turn_start_waits(10));
+        says.poll(20);
+        assert_eq!(
+            went_answered.try_recv().unwrap(),
+            Answer::Done(Outcome::Dropped(ASKER_GONE.into()))
+        );
+        assert!(stays_answered.try_recv().is_err());
+        let (prompt, _, ticket) = says.take_turn_start(20).unwrap();
+        assert_eq!(prompt.as_deref(), Some("Second?"));
+        assert!(says.take_turn_start(20).is_none());
+        ticket.answer(Outcome::Spoken);
+    }
+
+    /// Through the socket: lamp-control's turn start waits (the voice never
+    /// takes it), its connection is shut, and at the next pass it is gone,
+    /// answered `dropped` with [`ASKER_GONE`] to nobody.
+    #[test]
+    fn a_turn_start_whose_connection_closes_while_waiting_is_dropped() {
+        let dir = socket_dir("turn-gone");
+        let path = dir.join("say.sock");
+        let mut says = Says::serve(&path, None, &dir, Recordings::none()).unwrap();
+        let stream = UnixStream::connect(&path).unwrap();
+        writeln!(
+            &stream,
+            r#"{{"skill":"control","turn":"start","expires_in_ms":30000}}"#
+        )
+        .unwrap();
+        let mut waits = false;
+        for _ in 0..200 {
+            says.poll(0);
+            if says.turn_start_waits(0) {
+                waits = true;
+                break;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        assert!(waits, "the turn start reached the queue");
+        stream.shutdown(std::net::Shutdown::Both).unwrap();
+        drop(stream);
+        let mut dropped = false;
+        for _ in 0..200 {
+            says.poll(0);
+            if says.waiting() == 0 {
+                dropped = true;
+                break;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        assert!(dropped, "the waiting turn start was dropped");
+        assert!(!says.turn_start_waits(0));
+        assert!(says.take_turn_start(0).is_none());
+        drop(says);
+        fs::remove_dir_all(&dir).unwrap();
+    }
     #[test]
     fn listen_is_lamp_controls_alone_with_nothing_else() {
         let words = |line: &str| parse(line).map(|request| request.words);
