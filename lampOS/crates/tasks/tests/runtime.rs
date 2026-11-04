@@ -4,11 +4,14 @@ use lamp_tasks::{
     engine::{CLOSE_RETRY_MS, CLOSE_TRIES, Clock as Sample, WATCH_EARLY_MS},
     follow::WatchLane,
     harness::{
-        AccountMachine, Closed, Ended, EngineKind, Launch, LaunchOutcome, Listed, Observation,
-        SignIn, Target, WatchEnd, WatchEvent,
+        AccountMachine, Closed, Ended, EngineKind, EngineRow, Launch, LaunchOutcome, Listed,
+        Observation, SignIn, Target, WatchEnd, WatchEvent,
     },
     progress::SETTLED_FOR_MS,
-    runtime::{Adapter, Clock, Config, SetUpLater, WaitLane, request, serve_with_adapter},
+    readiness::{Computer, engines_path, read_engines},
+    runtime::{
+        Adapter, Clock, Config, EnginesLane, SetUpLater, WaitLane, request, serve_with_adapter,
+    },
     store::Store,
 };
 use serde_json::{Value, json};
@@ -136,6 +139,10 @@ struct Counts {
     /// held on the job lane while set (the reviewer-lead's P2 on #2309).
     order: Mutex<Vec<&'static str>>,
     hold_launch: AtomicBool,
+    /// What `harness machines engines` says of each machine, by id, and
+    /// how many looks were made (#5199). A machine with none is unreachable.
+    engines: Mutex<BTreeMap<String, Result<Vec<EngineRow>, String>>>,
+    engine_looks: AtomicUsize,
 }
 type SignInRead = Result<lamp_tasks::sign_in::Event, &'static str>;
 /// A sign-in that reads the script's lines and keeps its answers.
@@ -203,6 +210,19 @@ impl WatchLane for ScriptWatch {
         end
     }
 }
+struct ScriptEngines(Arc<Counts>);
+impl EnginesLane for ScriptEngines {
+    fn engines(&self, machine: &str) -> Result<Vec<EngineRow>, String> {
+        self.0.engine_looks.fetch_add(1, Ordering::SeqCst);
+        self.0
+            .engines
+            .lock()
+            .unwrap()
+            .get(machine)
+            .cloned()
+            .unwrap_or_else(|| Err("unreachable".into()))
+    }
+}
 struct Script {
     counts: Arc<Counts>,
     stop: Arc<AtomicBool>,
@@ -250,6 +270,9 @@ impl Adapter for Script {
     }
     fn watch_lane(&self) -> Option<Arc<dyn WatchLane>> {
         Some(Arc::new(ScriptWatch(self.counts.clone())))
+    }
+    fn engines_lane(&self) -> Option<Arc<dyn EnginesLane>> {
+        Some(Arc::new(ScriptEngines(self.counts.clone())))
     }
     fn launch(&self, _: &Launch) -> LaunchOutcome {
         self.counts.launches.fetch_add(1, Ordering::SeqCst);
@@ -1729,6 +1752,7 @@ fn set_up_later_reads_the_targets_again_and_says_why_hand_overs_are_off() {
         targets: path.clone(),
         every: Duration::from_millis(50),
         from_machines: None,
+        engines: false,
     });
     s.start();
     let report = tasks_diagnostic_until(&s, |d| said(d, "handovers_off").is_some());
@@ -1844,11 +1868,13 @@ fn targets_from_machines_are_written_and_used_while_signed_in() {
         targets: path.clone(),
         every: Duration::from_millis(20),
         from_machines: Some(EngineKind::Claude),
+        engines: false,
     });
     let machine = |id: char, label: &str, current: bool| AccountMachine {
         machine_id: id.to_string().repeat(32),
         label: label.into(),
         current,
+        status: None,
     };
     *s.counts.machines.lock().unwrap() = vec![
         machine('a', "lamp", true),
@@ -1946,6 +1972,217 @@ fn targets_from_machines_are_written_and_used_while_signed_in() {
         s.ask(json!({"op":"targets"}))["targets"][1]["alias"],
         "office"
     );
+}
+
+/// A service with `--targets-from-machines claude` and, as asked,
+/// `--engines-from-machines` (#5199): the lamp and one computer, `Office
+/// iMac`, running; a look every 20 ms, the machines' every 100.
+fn engines_running(engines: bool) -> (Running, std::path::PathBuf) {
+    let mut s = Running::unstarted(false, false, false, false);
+    let path = s.root.path().join("targets.json");
+    s.config.targets = BTreeMap::new();
+    s.config.set_up_later = Some(SetUpLater {
+        targets: path.clone(),
+        every: Duration::from_millis(20),
+        from_machines: Some(EngineKind::Claude),
+        engines,
+    });
+    let machine = |id: char, label: &str, current: bool| AccountMachine {
+        machine_id: id.to_string().repeat(32),
+        label: label.into(),
+        current,
+        status: Some("running".into()),
+    };
+    *s.counts.machines.lock().unwrap() = vec![
+        machine('a', "lamp", true),
+        machine('b', "Office iMac", false),
+    ];
+    (s, path)
+}
+
+fn office_engines(s: &Running, rows: Result<Vec<EngineRow>, String>) {
+    s.counts
+        .engines
+        .lock()
+        .unwrap()
+        .insert("b".repeat(32), rows);
+}
+
+fn row(engine: &str, installed: Option<bool>, signed_in: Option<bool>) -> EngineRow {
+    EngineRow {
+        engine: engine.into(),
+        installed,
+        installable: None,
+        signed_in,
+    }
+}
+
+fn prepare_office(s: &Running) -> Value {
+    s.ask(
+        json!({"op":"prepare","guard":s.guard(),"text":"Private scripted task","target":"office"}),
+    )
+}
+
+/// Prepares to `office` until the answer's `error` is `code` (`None`: until
+/// one is prepared), within 5 s.
+fn prepared_until(s: &Running, code: Option<&str>) -> Value {
+    let start = Instant::now();
+    loop {
+        let answer = prepare_office(s);
+        let done = match code {
+            Some(code) => answer["error"] == code,
+            None => answer["ok"] == true,
+        };
+        if done {
+            return answer;
+        }
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "not {code:?}: {answer}"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+/// #5199: with `--engines-from-machines`, each computer is asked which
+/// engines it has, off the hand-overs' lane. Its target gets one it has
+/// (Codex, with Claude Code unknown there), and the engines are written
+/// beside the targets. A `prepare` is refused at once when that engine is
+/// known not signed in, or the computer known offline; a failed look keeps
+/// what was known; once it is signed in and awake, the work is prepared.
+#[test]
+fn engines_from_machines_choose_an_engine_there_and_refuse_early() {
+    let (mut s, path) = engines_running(true);
+    office_engines(
+        &s,
+        Ok(vec![
+            row("claude", None, None),
+            row("codex", Some(true), Some(false)),
+        ]),
+    );
+    s.start();
+    let start = Instant::now();
+    while s.ask(json!({"op":"targets"}))["targets"]
+        != json!([{"alias":"office","engine":"codex","name":"Office iMac"}])
+    {
+        assert!(start.elapsed() < Duration::from_secs(5), "no codex target");
+        thread::sleep(Duration::from_millis(10));
+    }
+    let refused = prepared_until(&s, Some("engine_not_signed_in"));
+    assert_eq!(refused["ok"], false, "{refused}");
+    let known = read_engines(&engines_path(&path)).unwrap();
+    assert_eq!(known.keys().collect::<Vec<_>>(), ["office"]);
+    let office: &Computer = &known["office"];
+    assert_eq!(office.status.as_ref().unwrap().value, "running");
+    assert!(!office.engines["codex"].signed_in.as_ref().unwrap().value);
+    assert_eq!(office.engines.get("claude"), None, "a null is unknown");
+    // A failed look keeps what was known: still refused after it.
+    office_engines(&s, Err("unreachable".into()));
+    let looks = s.counts.engine_looks.load(Ordering::SeqCst);
+    let start = Instant::now();
+    while s.counts.engine_looks.load(Ordering::SeqCst) < looks + 2 {
+        assert!(start.elapsed() < Duration::from_secs(5), "not looked again");
+        thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(prepare_office(&s)["error"], "engine_not_signed_in");
+    // Signed in there: prepared.
+    office_engines(&s, Ok(vec![row("codex", Some(true), Some(true))]));
+    let prepared = prepared_until(&s, None);
+    assert_eq!(prepared["ok"], true, "{prepared}");
+    // Asleep: refused, with nothing prepared; awake again: prepared.
+    s.counts.machines.lock().unwrap()[1].status = Some("offline".into());
+    prepared_until(&s, Some("computer_offline"));
+    s.counts.machines.lock().unwrap()[1].status = Some("running".into());
+    prepared_until(&s, None);
+    // Nothing known not to be there, so the targets say nothing of it.
+    assert_eq!(
+        s.ask(json!({"op":"targets"}))["targets"][0].get("installed"),
+        None
+    );
+}
+
+/// #5199: an engine not found on that computer (`installed` null with
+/// `installable` true) is refused early, and the targets say so; unknown
+/// proceeds.
+#[test]
+fn an_engine_known_not_there_is_refused_and_told_and_unknown_proceeds() {
+    let (mut s, path) = engines_running(true);
+    // A file written by hand, Codex on the office computer: never written
+    // over, and its computer still asked.
+    write_targets(
+        &path,
+        format!(
+            "{}\n",
+            json!({"version":1,"targets":{"office":{"machine_id":"b".repeat(32),"project":"~/p","engine":"codex"}}})
+        )
+        .as_bytes(),
+    );
+    let by_hand = fs::read(&path).unwrap();
+    office_engines(
+        &s,
+        Ok(vec![
+            row("claude", Some(true), Some(true)),
+            // Harness's row for an engine not on the computer.
+            EngineRow {
+                installable: Some(true),
+                ..row("codex", None, None)
+            },
+        ]),
+    );
+    s.start();
+    prepared_until(&s, Some("engine_missing"));
+    assert_eq!(
+        s.ask(json!({"op":"targets"}))["targets"],
+        json!([{"alias":"office","engine":"codex","installed":false}])
+    );
+    assert_eq!(fs::read(&path).unwrap(), by_hand);
+    // The computer can't say any more: unknown, so it goes as before.
+    office_engines(&s, Ok(vec![row("codex", None, None)]));
+    prepared_until(&s, None);
+}
+
+/// #5199: without `--engines-from-machines` nothing is asked or refused:
+/// the target is Claude Code's as before, an engines file beside the
+/// targets is never read, and the work is prepared.
+#[test]
+fn without_engines_from_machines_nothing_is_asked_or_refused() {
+    let (mut s, path) = engines_running(false);
+    office_engines(&s, Ok(vec![row("claude", Some(true), Some(false))]));
+    s.counts.machines.lock().unwrap()[1].status = Some("offline".into());
+    // An engines file saying the computer is offline, read just now: not
+    // read.
+    let engines = engines_path(&path);
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    write_targets(
+        &engines,
+        format!(
+            "{}\n",
+            json!({"version":1,"computers":{"office":{"status":{"value":"offline","read_ms":now_ms}}}})
+        )
+        .as_bytes(),
+    );
+    s.start();
+    let start = Instant::now();
+    while s.ask(json!({"op":"targets"}))["targets"]
+        != json!([{"alias":"office","engine":"claude","name":"Office iMac"}])
+    {
+        assert!(start.elapsed() < Duration::from_secs(5), "no target");
+        thread::sleep(Duration::from_millis(10));
+    }
+    let asked = s.counts.machine_reads.load(Ordering::SeqCst);
+    let start = Instant::now();
+    while s.counts.machine_reads.load(Ordering::SeqCst) < asked + 2 {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "machines not read again"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(prepare_office(&s)["ok"], true);
+    assert_eq!(s.counts.engine_looks.load(Ordering::SeqCst), 0);
 }
 
 #[test]
@@ -2175,6 +2412,7 @@ fn a_part_started_signed_in_starts_harnesss_daemon_once() {
             targets: s.root.path().join("targets.json"),
             every: Duration::from_millis(20),
             from_machines: None,
+            engines: false,
         });
         s.counts.signed_out.store(signed_out, Ordering::SeqCst);
         s.start();
@@ -2492,6 +2730,9 @@ fn targets_from_machines_needs_an_engine_and_set_up_later() {
         unknown.contains("needs claude, codex or opencode"),
         "{unknown}"
     );
+    // #5199: `--engines-from-machines` asks the computers it finds.
+    let alone = refused(&[&base[..], &["--set-up-later", "--engines-from-machines"]].concat());
+    assert!(alone.contains("it needs that too"), "{alone}");
 }
 
 /// The tasks database, opened by hand as a newer build would write it.
@@ -2890,6 +3131,7 @@ fn the_apps_state_says_harness_signed_in_across_a_restart() {
         targets: s.root.path().join("targets.json"),
         every: Duration::from_millis(20),
         from_machines: None,
+        engines: false,
     });
     let said_until = |s: &Running, want: &str| {
         let start = Instant::now();
