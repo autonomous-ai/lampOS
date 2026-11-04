@@ -796,7 +796,10 @@ A call written as words is kept nowhere, on either route
   earlier in the turn it is the answer, and said. "Done." is no step's own
   and is said; so are "Louder music helps me focus." and "Brighter.
   Better?". A second word alone after the note is not said either, and the
-  turn ends in silence.
+  turn ends in silence; with `LAMP_ACTION_CLAIM_CHECKED=on` (on in the
+  product, second-voice.md) the word alone shares the turn's one ask again
+  with the other action claims, and a second is said as "Sorry, I didn't do
+  that. Could you ask me again?" (#5215).
 
 ## Tests
 

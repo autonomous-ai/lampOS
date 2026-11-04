@@ -1504,6 +1504,25 @@ fn the_product_tells_each_turn_the_light() {
     );
 }
 
+/// A reply claiming a light, volume or timer action no call made is never
+/// said as it is (`LAMP_ACTION_CLAIM_CHECKED`, #5215): on lamp-52e6 at 9928
+/// (4 Nov) "Lamp, set a timer to one minute." got "Timer set. It rings at
+/// 9:39 am." and no call, and earlier "Louder.", "Brighter." and "Cooler."
+/// came with none.
+#[test]
+fn the_product_never_says_an_action_no_call_made() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_ACTION_CLAIM_CHECKED=on"),
+        "the voice lacks LAMP_ACTION_CLAIM_CHECKED"
+    );
+}
+
 /// A thing the person already keeps, said again, is that kept thing, not a
 /// second one (`LAMP_MEMORY_REMEMBER_ONCE`, #2176): on lamp-06c1 on 28 Oct
 /// the product unit, without it, kept "the meeting room is called orange"

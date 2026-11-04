@@ -151,6 +151,29 @@ pub fn already_say(name: &str) -> &'static str {
 /// and unmute, each already so.
 pub const SHORT_ALREADY_SAY: &str = "It already is.";
 
+/// Every line the executive itself says after a light or volume call
+/// ([`short_say`] and [`already_say`], each once). The voice reads a reply
+/// that is or opens with one of them, in a turn that made no such call, as
+/// a claim of an action never done (`LAMP_ACTION_CLAIM_CHECKED`, #5215);
+/// its own copy is held equal to this by a test of the voice's, and a test
+/// here holds this equal to what the two functions say.
+pub const SAID_LINES: [&str; 14] = [
+    "Brighter.",
+    "Dimmer.",
+    "Warmer.",
+    "Cooler.",
+    "Louder.",
+    "Quieter.",
+    SHORT_DONE_SAY,
+    "I'm already as bright as I go.",
+    "I'm already as dim as I go.",
+    "I'm already as warm as I go.",
+    "I'm already as cool as I go.",
+    "I'm already as loud as I go.",
+    "I'm already as quiet as I go.",
+    SHORT_ALREADY_SAY,
+];
+
 /// The functions that can be carried out now.
 pub fn catalog(sound: bool, light: bool) -> Vec<Function> {
     let plain = |name, description| Function {
@@ -378,6 +401,26 @@ mod tests {
             10
         );
         assert!(catalog_file(&all).len() < 65_536);
+    }
+
+    /// #5215: the said lines are exactly what [`short_say`] and
+    /// [`already_say`] say for the catalog's light and volume functions,
+    /// each once, nothing more.
+    #[test]
+    fn the_said_lines_are_every_short_and_already_line_once() {
+        let mut said: Vec<&str> = catalog(true, true)
+            .iter()
+            .filter(|function| is_short(function.name))
+            .flat_map(|function| [short_say(function.name), already_say(function.name)])
+            .collect();
+        said.sort_unstable();
+        said.dedup();
+        let mut listed = SAID_LINES.to_vec();
+        listed.sort_unstable();
+        let before = listed.len();
+        listed.dedup();
+        assert_eq!(listed.len(), before, "a said line listed twice");
+        assert_eq!(listed, said);
     }
 
     #[test]

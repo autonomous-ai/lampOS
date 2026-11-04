@@ -355,6 +355,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "미안해요, 다시 한 번 말해 줄래요?",
         ],
     ),
+    // What it says when a reply claims again an action no call made
+    // (`LAMP_ACTION_CLAIM_CHECKED`, #5215).
+    (
+        crate::action_claim::NOT_DONE_LINE,
+        [
+            "Xin lỗi, mình chưa làm việc đó. Bạn nhờ lại mình được không?",
+            "ごめんね、それはまだやっていないんだ。もう一度頼んでくれる？",
+            "抱歉，我还没有做那件事。你能再跟我说一次吗？",
+            "미안해요, 그건 아직 안 했어요. 다시 한 번 부탁해 줄래요?",
+        ],
+    ),
     // The first stand's ask and its "here I go", sent to the say service as
     // text (Fourth's finding on #4710). In another language than English it
     // asks for the touch alone, never the spoken yes.
@@ -736,7 +747,7 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 21);
+        assert_eq!(FIXED_LINES.len(), 22);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }

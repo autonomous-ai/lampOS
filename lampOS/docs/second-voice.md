@@ -229,13 +229,14 @@ each line plays exactly as before.
 | The second route's answer to a stop said over it, or within 3 s after it | `spoken_stop::LINE` ("Okay, I'll stop there.") | rendered by this route's voice as its worker starts, played at once as the lamp's words and kept in the thread (`LAMP_SPOKEN_STOP_ENDS`, on; `FixedClips`, #4710) | the owner's words, rendered ahead and kept in the thread (`language::fixed_in`); the stop itself is still heard by its English words (`spoken_stop::is_stop_request`) |
 | The second route's question after a cut-in that ended its answer with no words | `cut_in_wordless::LINE` ("Did someone say something?") | rendered ahead as the stop line, quiet room only (`LAMP_CUT_IN_WORDLESS_ASKS`, off in the product until the echo asks are near 0, #4710, #4938) | the owner's words, rendered ahead (`language::fixed_in`) |
 | The second route's line when a line by name gets no words twice | `second_provider::NO_WORDS_LINE` ("Sorry, I lost my words there. Could you ask me again?") | said as the turn's text (`LAMP_NO_WORDS_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
+| The second route's line when a reply claims again an action no call made | `action_claim::NOT_DONE_LINE` ("Sorry, I didn't do that. Could you ask me again?") | said as the turn's text (`LAMP_ACTION_CLAIM_CHECKED`, on in the product, #5215) | the owner's words (`language::fixed_in`) |
 | The second route's line when an answer to the lamp's own question gets no words | `second_provider::ANSWER_AGAIN_LINE` ("Sorry, could you say that again?") | said as the turn's text (`LAMP_ANSWER_ASK_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
 | The first stand's touch-only ask and its beat before moving | `first_stand::ASK_TOUCH_ONLY` ("I'd like to stretch for the first time. Rest your hand on my head when you're ready."), `GOING` ("Okay, here I go.") | asked of the say service as `text`, the model told to say the words | the model told the owner's words (the say service swaps a `text` that is a fixed line, `language::at_start`); in another language the first stand asks only this one, never the spoken yes (body.md, Fourth's finding on #4710) |
 
 The words are `language::FIXED_LINES`, one row per English line with its
 Vietnamese, Japanese, Chinese and Korean; "Wi-Fi" and the pinhole's
 "reset" stay as they are printed. At start the cache warms the owner's
-lines first, twenty-one today (`FIXED_LINES`), then the English two
+lines first, twenty-two today (`FIXED_LINES`), then the English two
 (`TtsCache::warm_lines`), on its
 own thread, every line tried again until all are kept, first after a
 minute, then twice as long each time, at most hourly; a line that renders
@@ -3299,6 +3300,45 @@ after a take-over, but now for every turn:
   `a rename said done after a yes with no call is the face miss`,
   `remember::tests::a_rename_said_done_is_a_face_claim` and
   `remember::tests::a_vietnamese_face_save_is_a_face_claim`.
+- **With `LAMP_ACTION_CLAIM_CHECKED=on`, a reply never says a light,
+  volume or timer action was done with no call that did it** (on in the
+  product; #5215: lamp-52e6 at 9928, 4 Nov 09:38, "Lamp, set a timer to one
+  minute." heard right got "Timer set. It rings at 9:39 am." with no call in
+  any round and no timer; in an earlier run 4 of 14 device asks got
+  "Louder." twice, "Brighter." or "Cooler." and no call). The claim test is
+  strict, no phrase list (`action_claim::claim`): the reply, case, spaces
+  and curly apostrophes aside, is or opens with one of the acting part's own
+  lines, then its end, a '.', '!', ',', ';', ':' or a dash, never a '?':
+  lamp-actions' lines after a light or volume call (`action_claim::SAID_LINES`,
+  held equal to `lamp_actions::SAID_LINES`, every `short_say` and
+  `already_say`: "Brighter.", "Louder.", "Done.", "I'm already as warm as I
+  go.", "It already is." …), its line for a colour made ("My light is blue
+  now.", `lamp_actions::light::colour_line`, for each of the ten colours),
+  and the timer's own lines (`timer_line`): "Timer set." and "I'll remind
+  you at H:MM am/pm." A light or volume line stands beside a light or
+  volume call, "Done." and "It already is." beside any call, and a timer
+  line beside `set_timer`, `set_reminder`, `repeat_reminder` or
+  `snooze_reminder`, made in any round of the turn (a cut answer's carried
+  rounds too). Each round's opening is held only while its words could
+  still begin a claim; at the first that fits none, or a claim whose call
+  an earlier round made, it goes on as before. A claim with no call yet is
+  held to the round's end: beside a call of its kind it is said; beside
+  other calls its words are not said, those run, and the next round is told
+  (`action_claim::NOTE`); alone, the model is told once and asked again,
+  and a second such reply, or one in the last round, is said as
+  `action_claim::NOT_DONE_LINE` ("Sorry, I didn't do that. Could you ask me
+  again?", a fixed line), after anything an earlier round held. A step word
+  alone (not-speech.md) takes the same one ask again, then the line. The
+  journal says the kind and the turn's call count, never the words:
+  `its reply claims a timer or reminder action no call made (0 call(s) in
+  the turn): not said, asked again (LAMP_ACTION_CLAIM_CHECKED)`, and `…
+  claims again an action no call made (…): said it wasn't done`. Answers
+  that claim nothing ("It's 9:39.", "You have one timer, for tea, at 9:39
+  am.", "Okay, louder.") and a turn that made the call are byte for byte as
+  off; so is everything with the switch off. Not on a turn offered no
+  function. Only English replies can match: in another language the
+  model's words are never the acting part's English lines. Tests:
+  `second_provider::tests::action_claim::*` and `action_claim::tests::*`.
 - **A reply never offers to keep what its `remember` call keeps** (finding
   K2 on #3504: lamp-06c1, 28 Oct, "Want me to keep that as the change?
   Kept — library now, not the bakery." in one breath). On by default, on

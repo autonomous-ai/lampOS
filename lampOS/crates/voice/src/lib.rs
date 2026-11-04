@@ -41,6 +41,7 @@ macro_rules! worker_global {
     };
 }
 
+pub mod action_claim;
 pub mod activity;
 pub mod addressed;
 pub mod admission;
