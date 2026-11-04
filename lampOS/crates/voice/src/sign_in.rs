@@ -1619,6 +1619,7 @@ mod tests {
                 correct: false,
                 questions: false,
                 now: false,
+                one_yes: false,
                 sign_in: true,
                 sign_in_app: false,
             }
@@ -2111,6 +2112,7 @@ mod tests {
             correct: false,
             questions: false,
             now: false,
+            one_yes: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -2262,6 +2264,7 @@ mod tests {
             correct: false,
             questions: false,
             now: false,
+            one_yes: false,
             sign_in: true,
             sign_in_app: false,
         };
