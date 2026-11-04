@@ -616,7 +616,10 @@ only reads …").
   chờ, bất kể nó đưa id nào hay không đưa: đối số của nó chỉ còn
   `{"service": <dịch vụ lệnh ghi được chuẩn bị cho>, "send_id": <id của nó>}`,
   nên đúng những gì đã được đọc lại được gửi, đến dịch vụ đó, theo mọi luật
-  dưới đây. `service_write` của bất kỳ câu nào khác là một lệnh ghi mới, như
+  dưới đây. Giọng của nó được xét như mọi lần gửi (`is_send`, cùng phép thử
+  cổng dùng): trên lamp-9adf ngày 4/11 một lần gửi không có id được nhận
+  nhưng không bao giờ được xét giọng, và bị từ chối như một giọng không nghe
+  được. `service_write` của bất kỳ câu nào khác là một lệnh ghi mới, như
   trước.
 - **Gửi:** một `service_write` có `send_id` được chuyển tiếp, với
   `"said":"send"` được thêm vào, chỉ khi tất cả đều đúng: đó là id được giữ;
