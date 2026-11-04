@@ -976,6 +976,15 @@ If a first HAL installation had no prior runtime or backup, recovery removes the
 failed candidate from the live path and leaves HAL stopped. It does not claim to
 restore a nonexistent prior installation.
 
+HAL and device-profile recovery also clear a HAL ownership block that nothing
+holds: the `/root/bootstrap/services/blocked/hal` marker and the
+`99-autonomous-ownership.conf` unit drop-in that make systemd skip HAL while a
+registered component replaces it. Left behind, that block stops HAL from
+starting, so recovery could never pass its health check and every later update
+would be refused. Recovery clears it only when no component owns HAL, no service
+transition is in progress, and the drop-in is exactly the one the updater writes.
+In any other case the block stays and recovery carries on as before.
+
 Core binary updates stage the executable beside its destination, require a
 successful `--version` probe within 15 seconds, save the previous binary, and
 publish with an atomic rename. Restart alone is insufficient: os-server must
@@ -1035,7 +1044,7 @@ When the HAL health check fails (on the update or on the recovery that follows),
 updater prints a short "HAL diagnostics" block to its output: the hal unit state (load and enabled state, start condition result, last start and stop times), memory
 and swap, root-disk use, structure-only lines from HAL's journal (traceback
 locations, the name of a missing module, exception type names without their message, and
-systemd's own start, stop, exit and restart messages for the unit in fixed forms; free-text lines are
+systemd's own start, stop, skip, exit and restart messages for the unit in fixed forms, the skip message naming the unmet condition; free-text lines are
 never matched, not even by prefix, because HAL logs what users say) and any
 kernel out-of-memory kills. It
 stays under about 1 KB so it survives the output tail that bootstrap reports.

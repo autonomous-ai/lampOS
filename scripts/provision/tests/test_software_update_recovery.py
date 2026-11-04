@@ -224,6 +224,72 @@ kill -KILL $$
                 self.assertEqual((self.hal / ".env").read_text(), "keep-me")
                 self.assertFalse((self.backup / "pending-update.json").exists())
 
+    HAL_BLOCK = r"""
+HAL_BLOCK_SERVICES="$TEST_ROOT/services"
+HAL_BLOCK_MARKER="$HAL_BLOCK_SERVICES/blocked/hal"
+HAL_BLOCK_DROPIN="$TEST_ROOT/units/hal.service.d/99-autonomous-ownership.conf"
+mkdir -p "${HAL_BLOCK_MARKER%/*}" "${HAL_BLOCK_DROPIN%/*}"
+echo 1 > "$HAL_BLOCK_MARKER"
+printf '[Unit]\nConditionPathExists=!%s\n[Service]\nKillMode=control-group\nTimeoutStopSec=20\n' "$HAL_BLOCK_MARKER" > "$HAL_BLOCK_DROPIN"
+"""
+
+    def block_left(self):
+        return ((self.root / "services/blocked/hal").exists(),
+                (self.root / "units/hal.service.d/99-autonomous-ownership.conf").exists())
+
+    def test_stale_hal_block_without_owner_is_cleared(self):
+        result = self.run_shell(self.HAL_BLOCK + 'clear_stale_hal_block')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.block_left(), (False, False))
+        self.assertFalse((self.root / "units/hal.service.d").exists())
+        self.assertIn("daemon-reload", (self.root / "events").read_text())
+
+    def test_stale_hal_block_cleared_when_registry_has_no_owner(self):
+        result = self.run_shell(self.HAL_BLOCK + 'echo "{}" > "$HAL_BLOCK_SERVICES/ownership.json"\n'
+                                'service_transaction() { [ "$1 $2" = "status hal" ] && echo legacy; }\nclear_stale_hal_block')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.block_left(), (False, False))
+
+    def test_owned_or_changing_hal_block_is_kept(self):
+        for case, setup in (
+            ("owned", 'echo "{}" > "$HAL_BLOCK_SERVICES/ownership.json"\nservice_transaction() { echo blocked; }'),
+            ("registry unreadable", 'echo "{}" > "$HAL_BLOCK_SERVICES/ownership.json"\nservice_transaction() { return 1; }'),
+            ("transition", 'echo "{}" > "$HAL_BLOCK_SERVICES/transition.json"'),
+            ("foreign dropin", 'echo "[Unit]" > "$HAL_BLOCK_DROPIN"'),
+        ):
+            with self.subTest(case=case):
+                result = self.run_shell(self.HAL_BLOCK + setup + '\nclear_stale_hal_block')
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(self.block_left(), (True, True))
+                for name in ("ownership.json", "transition.json"):
+                    (self.root / "services" / name).unlink(missing_ok=True)
+
+    def test_recovery_clears_stale_hal_block_and_finishes(self):
+        result = self.run_shell(self.HAL_BLOCK + """
+wait_for_url() { [ ! -e "$HAL_BLOCK_MARKER" ]; }
+mark_publish_pending "$HAL_DIR" "$ROLLBACK_DIR/hal.previous" restore_hal_service_state
+mv "$HAL_DIR" "$ROLLBACK_DIR/hal.previous"
+mkdir "$HAL_DIR"; echo broken > "$HAL_DIR/VERSION_HAL"
+recover_pending_update
+""")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("clearing a HAL ownership block", result.stdout)
+        self.assertEqual(self.block_left(), (False, False))
+        self.assertEqual((self.hal / "VERSION_HAL").read_text(), "old")
+        self.assertFalse((self.backup / "pending-update.json").exists())
+
+    def test_hal_skip_message_names_the_condition(self):
+        result = self.run_shell(self.HAL_PROBES + """
+journalctl() {
+  [ "$1" = -k ] && return 0
+  printf '%s\\n' "hal.service - HAL Hardware Runtime was skipped because of an unmet condition check (ConditionPathExists=!/root/bootstrap/services/blocked/hal)." \\
+    "hal.service - HAL Hardware Runtime was skipped because of an unmet condition check (ConditionPathExists=!/x) and the user said hi."
+}
+if check_hal; then exit 0; else exit 1; fi""", BAD_HEALTH="1")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("(ConditionPathExists=!/root/bootstrap/services/blocked/hal).", result.stderr)
+        self.assertNotIn("user said", result.stderr)
+
     def test_postpublish_error_runs_rollback_in_exit_trap(self):
         result = self.run_shell(r'''
 trap on_exit EXIT
