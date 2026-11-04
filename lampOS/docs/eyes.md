@@ -1386,6 +1386,33 @@ With the switch:
   still correcting it. And seven letters were put together from four
   spelled letters, an ordinary first name said twice between them, and
   "three letters".
+- **The first name at setup is said back for a yes** (#5140, lamp-0c4e on
+  3 Nov: the face was kept under the first name heard, misheard, and a
+  misheard name could never pass the check above). While the walk has not
+  yet ended "who you are" (`onboarding::who_you_are_open`, read only for a
+  `remember_my_face` with names checked; `FaceSwitches::at_setup`), two
+  more rules hold before anything is sent to the eyes
+  (`known_faces::run_switched`):
+  - **Said back:** a name is kept only once they said it, the lamp said
+    it back in one of the exchanges the check holds, and their next line
+    was a plain yes to it (`known_faces::plain_yes`;
+    `known_faces::said_back_and_agreed`), or once they spelled it in the
+    turn in hand. So the usual walk, "Marie, right?" "Yes.", then "May I
+    remember your face?" "Yes.", keeps the name in that one call. A
+    correction after the read-back ("No, it's Loren.") is no yes to it,
+    and a yes to the face question with no read-back before it is no yes
+    to the name. Otherwise nothing is sent and the model is told to say
+    the name back and ask if it is right (`SAY_IT_BACK`). `replace` still
+    needs the read-back in the lamp's last answer (`known_faces::agreed_to`).
+  - **Spelled:** a name not heard is asked for spelled out (`NOT_HEARD`).
+    When the turn in hand spells a name letter by letter, the letters are
+    the person's own words: the face is kept under the name as spelled
+    (each run of letters capitalised, the runs joined by a space), not the
+    model's guess, and it needs no yes. Letters that disagree with a count
+    they gave ("four letters", five spelled) are refused, as above.
+
+  Past setup, and on the speaker's own line (`LAMP_REMEMBER_SPEAKER`), the
+  check is as before.
 - **The word that called the lamp is not their name**
   (`known_faces::only_the_call`, 25 Oct).
   - **What's refused:** a name heard only as the line's opening word, past any greeting and set off by a comma or a

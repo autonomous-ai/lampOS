@@ -1067,6 +1067,7 @@ fn face_switches(settings: &Settings) -> crate::known_faces::FaceSwitches {
         checked: settings.names_checked,
         remember_speaker: settings.remember_speaker,
         visits: settings.who_visits && settings.memory.is_some(),
+        at_setup: false,
     }
 }
 
@@ -1930,10 +1931,22 @@ fn run_call_with_scope(
             // refresh never drops them meanwhile (`OwnerRename`).
             let renaming =
                 crate::known_faces::OwnerRename::begin(socket, call, onboarding.as_deref());
+            // The first save at setup, while the walk has not yet ended "who
+            // you are": the name is said back for a yes, or spelled (#5140).
+            // One read of the small local onboarding file, only for a save
+            // with names checked.
+            let switches = crate::known_faces::FaceSwitches {
+                at_setup: switches.checked
+                    && call.name == crate::known_faces::REMEMBER
+                    && onboarding
+                        .as_deref()
+                        .is_some_and(crate::onboarding::who_you_are_open),
+                ..*switches
+            };
             let told = crate::known_faces::run_scoped(
                 socket,
                 call,
-                *switches,
+                switches,
                 person,
                 line.as_ref(),
                 request,
@@ -2591,6 +2604,7 @@ mod tests {
             checked: false,
             visits: true,
             remember_speaker: false,
+            at_setup: false,
         };
         let route = Route::Faces(socket.clone(), on, None);
         let call = |name: &str| ToolCall {
