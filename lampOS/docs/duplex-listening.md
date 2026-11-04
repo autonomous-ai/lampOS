@@ -234,8 +234,9 @@ no person's stop came through yet).
 microphone's block before the canceller, and the capture worker is given
 `--raw-blocks` in its argv, only then. `LAMP_STOP_WORDS_SOURCE=linear`: they
 hear the canceller's linear output, before its residual-echo suppressor,
-and the capture worker is given `--linear-blocks`, only then
-([stop-word.md](stop-word.md#a-stop-word-heard-over-the-lamps-voice-828-16-october)).
+and the capture worker is given `--linear-blocks`, only then. With either,
+a yield's held blocks are heard as that source too, not as the canceller's
+output (#5111) ([stop-word.md](stop-word.md#a-stop-word-heard-over-the-lamps-voice-828-16-october)).
 Off by default.
 
 `LAMP_STOP_WORDS_HOLD=own-words`, with `heard-always`: a stop heard is
