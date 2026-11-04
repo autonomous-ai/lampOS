@@ -849,7 +849,7 @@ class Lamp:
         from .push import asks_beyond, pack
         from .skillcheck import check
 
-        report = check(folder)
+        report = check(folder, shape_required=False)
         if not report.ok:
             raise LampError(f"{report.folder.name}: {report.errors[0]}", code="bad_request")
         if "skills" not in self.grants:

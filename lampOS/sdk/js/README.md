@@ -44,7 +44,7 @@ LAMPOS_HOME=/tmp/lampos-try node examples/greet.js
 
 Terminal 1 then shows `asked {"op":"gesture","name":"greeting"}`. Every
 example runs this way: `tour.js` (every kind of call, one step at a time; with `lamp fake --everything` nothing is refused), `greet.js`, `follow.js`, `follow-hand.js` (with `lamp fake --hands`), `phrase.js`, `pomodoro.js`,
-`ci-light.js`, `ask-the-person.js`, and `push-skill.js ../../examples/relaxing-music` (a pairing with `skills`).
+`ci-light.js`, `ask-the-person.js`, and `push-skill.js ../examples/hello-skill` (a pairing with `skills` and `speak`).
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
 `express` as the feelings skill's move and light, `say` and `sound`
@@ -191,6 +191,18 @@ resolves with the lamp's answer (on, or held for the owner's yes);
 `lamp skill push FOLDER`, `lamp skill list` and `lamp skill remove NAME`. It refuses a
 folder without a `version`, or a `core` or add-on skill. The fuller check is
 the Python SDK's `lamp skill check`, and the lamp checks everything again.
+
+`../examples/hello-skill` is a small skill to try it with: one short hello,
+asking only `speak`. What a push needs:
+- **The grants:** `skills`, and every grant the skill's `[permissions]` asks
+  (`hello-skill` asks `speak`).
+- **The size:** a pushed skill is 1 MiB at most, packed, sent in parts of
+  36 KiB. A skill with a recording or other large files is too big; so is a
+  source template whose files must be rendered first.
+- **The lamp:** lamp-control started with `--manage-socket`, its link to the
+  root helper that installs skills ([control.md](../../docs/control.md),
+  piece 7). Without it the lamp answers that skill push isn't on this lamp. A
+  product lamp has no lamp-control unit until #4526.
 
 ## Everything you can read
 

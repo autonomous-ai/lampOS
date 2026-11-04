@@ -131,6 +131,10 @@ Ranges, from lamp-control and the body:
 These need the `skills` grant. A pushed skill runs on the lamp after the
 computer goes, never beyond the computer's other grants, and a revoke turns it
 off. `lamp skill push` checks the folder first, as `lamp skill check` does.
+A push needs `skills` plus every grant the skill's `[permissions]` asks, is
+1 MiB at most packed, and needs lamp-control started with `--manage-socket`
+(a product lamp has no lamp-control unit until #4526). To try it:
+`lampOS/sdk/examples/hello-skill`, which asks only `speak`.
 From lamp-mcp, with the same grant: `lamp_skill_push(folder)`, `lamp_skills()`
 and `lamp_skill_remove(name)`.
 

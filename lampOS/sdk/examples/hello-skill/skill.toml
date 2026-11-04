@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# An example for the lampos SDKs' skill push (lampOS/sdk/python/README.md,
+# "Push a skill to your own lamp"). Pushed as it is: no file to render first.
+kind = "installable"
+version = "1.0.0"
+tool = "say_hello_from_the_desk"
+
+[permissions]
+speak = true
+
+[[do]]
+say = "Say only one short, warm hello from the desk, then stop speaking."

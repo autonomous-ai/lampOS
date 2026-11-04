@@ -1125,6 +1125,18 @@ test('a push without the skills grant, or of a core skill, sends nothing', async
   });
 });
 
+// The pairing-without-speak refusal is the Python SDK's pre-check and the
+// lamp's; this SDK leaves it to the lamp.
+test("the README's push example is pushed with skills and speak", async () => {
+  const example = new URL('../../examples/hello-skill', import.meta.url).pathname;
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  assert.ok(readme.includes('examples/hello-skill') && !readme.includes('relaxing-music'));
+  await withLamp({ grants: ['speak', 'skills'] }, async (lamp) => {
+    const skill = await lamp.pushSkill(example);
+    assert.deepEqual([skill.name, skill.version], ['hello-skill', '1.0.0']);
+  });
+});
+
 // harness-reviewer's P3 on #4029: the tar crate's bytes, so this, the Python
 // SDK and `lamp-skills pack` give one SHA-256 for one folder (the Python test
 // pins the same digest).
