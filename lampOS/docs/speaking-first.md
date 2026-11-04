@@ -72,6 +72,14 @@ the part of the day from the lamp's own time and to say a hello and the
 name only: "(It is the afternoon here now: if you name the part of the day,
 it is the afternoon, never another. Say only a hello and their name if you
 know it: no weather, no day or date, no time, no question and no offer.)"
+A `who` note whose say also asks `question` (only with `who`; #5207,
+Welcome back's day's first hello with `LAMP_NUDGES_PRESENT=on`) is told
+`local_time::HELLO_AND_QUESTION` in place of that last sentence: "Say a
+hello and their name if you know it, then the one question the note asks,
+in one short line: no weather, no day or date, no time, no other question
+and no offer." (`person::told_hello`; tests
+`only_a_hello_that_asked_its_question_may_ask_it`,
+`question_goes_only_with_who`). Every other hello is told as before.
 The part is the one the session's time names (morning 5-11, afternoon
 12-16, evening 17-20); at night, or while the clock is not set or the zone
 cannot be read, it is told not to name one and just say hello. A hello at

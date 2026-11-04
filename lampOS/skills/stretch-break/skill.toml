@@ -72,3 +72,16 @@ body = { gesture = "stretching" }
 # (the third's arbitration and leases, #940): until then a light step would
 # change the person's own light for good.
 say = "They have been sitting a while. In one short, playful line, suggest a quick stretch, as the lamp stretches too."
+
+# With LAMP_NUDGES_PRESENT=on (#5207, off unless set): the wellbeing
+# group's two an hour, never within 30 minutes of each other, which
+# Sip of water and Comfort break name too (a group keeps its quietest).
+[present.quiet]            # never at night, as the other nudges (#5207, the P3 on #5237)
+from = "22:00"
+to = "08:00"
+
+[present.budget]
+group = "wellbeing"
+per_hour = 2
+gap = "30m"
+give_back_unsaid = true   # a nudge that said nothing (expired unheard) gives its place back

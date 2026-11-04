@@ -420,6 +420,10 @@ pub struct Request {
     /// A note to be told who is at the lamp when it is said (#2825): a
     /// skill given `who` in its permissions, Welcome back alone.
     pub who: bool,
+    /// With `who`: the hello may ask the one question its note asks, in
+    /// place of a hello and the name only (#5207, Welcome back's day's
+    /// first hello, "what's first today?").
+    pub question: bool,
 }
 
 impl Request {
@@ -502,6 +506,9 @@ struct Wire {
     /// A note to be told who is at the lamp (#2825): only with `note`.
     #[serde(default)]
     who: bool,
+    /// The hello's one question its note asks (#5207): only with `who`.
+    #[serde(default)]
+    question: bool,
 }
 
 // Missing is allowed for other sources, but an explicit null is not an ID.
@@ -603,6 +610,7 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
             || wire.invitation.is_some()
             || wire.unplug_request.is_some()
             || wire.who
+            || wire.question
         {
             return Err(
                 "quoted goes alone, with no task, invitation, unplug request or who".into(),
@@ -622,6 +630,7 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
             invitation: None,
             unplug_request: None,
             who: false,
+            question: false,
         });
     }
     let words = if let Some(clip) = wire.clip {
@@ -689,6 +698,9 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     if wire.who && !matches!(words, Words::Note(_)) {
         return Err("who goes only with a note".into());
     }
+    if wire.question && !wire.who {
+        return Err("question goes only with who".into());
+    }
     if wire.task.is_some() && words != Words::From(Source::Tasks) {
         return Err("task goes only with from tasks".into());
     }
@@ -744,6 +756,7 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
         invitation: wire.invitation,
         unplug_request: wire.unplug_request,
         who: wire.who,
+        question: wire.question,
     })
 }
 
@@ -826,6 +839,7 @@ fn parse_turn(skill: String, turn: TurnWire, wire: Wire) -> Result<Request, Stri
         invitation: None,
         unplug_request: None,
         who: false,
+        question: false,
     })
 }
 
@@ -868,6 +882,7 @@ fn parse_listen(skill: String, on: bool, wire: &Wire) -> Result<Request, String>
         invitation: None,
         unplug_request: None,
         who: false,
+        question: false,
     })
 }
 
@@ -964,6 +979,9 @@ pub struct Ticket {
     /// (`who`, #2825); never exact words, a quoted line or what the voice
     /// keeps, and never another skill's note.
     who: bool,
+    /// With `who`: its hello may ask the one question its note asks
+    /// ([`Request::question`]).
+    question: bool,
 }
 
 impl Ticket {
@@ -986,6 +1004,12 @@ impl Ticket {
         self.who
     }
 
+    /// Whether its hello may ask the one question its note asks
+    /// ([`Request::question`], #5207).
+    pub fn asks_question(&self) -> bool {
+        self.who && self.question
+    }
+
     /// A ticket the voice holds for itself: a say it makes of its own,
     /// answered to the voice, as lamp-control's turn's prompt is
     /// ([`crate::control_turn`]).
@@ -997,6 +1021,7 @@ impl Ticket {
                 answer: Some(answer),
                 guard: None,
                 who: false,
+                question: false,
             },
             answered,
         )
@@ -1373,6 +1398,7 @@ impl Says {
                 invitation: None,
                 unplug_request: None,
                 who: false,
+                question: false,
             },
             answer,
             read_at_us: expires_at_us.saturating_sub(60_000_000),
@@ -1402,6 +1428,7 @@ impl Says {
                 invitation: None,
                 unplug_request: None,
                 who: false,
+                question: false,
             },
             answer,
             read_at_us: 0,
@@ -1452,6 +1479,7 @@ impl Says {
                 invitation: None,
                 unplug_request: None,
                 who: false,
+                question: false,
             },
             answer,
             read_at_us: 0,
@@ -1638,6 +1666,7 @@ impl Says {
                 answer: Some(waiting.answer),
                 guard: waiting.guard,
                 who: false,
+                question: false,
             },
         ))
     }
@@ -1658,6 +1687,7 @@ impl Says {
                 answer: Some(waiting.answer),
                 guard: waiting.guard,
                 who: false,
+                question: false,
             },
         ))
     }
@@ -1701,6 +1731,7 @@ impl Says {
                 answer: Some(waiting.answer),
                 guard: waiting.guard,
                 who: false,
+                question: false,
             },
         ))
     }
@@ -1757,7 +1788,7 @@ impl Says {
             )));
         };
         let quoted = matches!(waiting.request.words, Words::Quoted(_));
-        let who = waiting.request.who;
+        let (who, question) = (waiting.request.who, waiting.request.question);
         let turn = match &waiting.request.words {
             Words::Text(text) if refused => crate::onboarding::said_as_is(text),
             words => words.turn(),
@@ -1770,6 +1801,7 @@ impl Says {
                 answer: Some(waiting.answer),
                 guard: waiting.guard,
                 who,
+                question,
             },
             quoted,
         ))
@@ -1802,6 +1834,7 @@ impl Says {
             answer: Some(waiting.answer),
             guard: waiting.guard,
             who: false,
+            question: false,
         })
     }
 
@@ -1823,6 +1856,7 @@ impl Says {
             answer: Some(waiting.answer),
             guard: waiting.guard,
             who: false,
+            question: false,
         })
     }
 
@@ -3469,6 +3503,7 @@ mod tests {
                     invitation: None,
                     unplug_request: None,
                     who: false,
+                    question: false,
                 },
                 answer,
                 read_at_us: expires_at_us.saturating_sub(60_000_000),
@@ -3553,6 +3588,7 @@ mod tests {
                 invitation: None,
                 unplug_request: None,
                 who: false,
+                question: false,
             }
         );
         let text =
@@ -3912,6 +3948,7 @@ mod tests {
                 invitation: None,
                 unplug_request: None,
                 who: false,
+                question: false,
             }
         );
         assert_eq!(
@@ -4457,6 +4494,32 @@ mod tests {
             r#"{"skill":"a","text":"Hello.","expires_in_ms":500,"who":true}"#,
             r#"{"skill":"a","quoted":"Hello.","expires_in_ms":500,"who":true}"#,
             r#"{"skill":"a","from":"tasks","expires_in_ms":500,"who":true}"#,
+        ] {
+            assert!(parse(line).is_err(), "{line}");
+        }
+    }
+
+    /// #5207: `question` goes only with `who` (so only with a note), and
+    /// is the request's; without it, as before, none.
+    #[test]
+    fn question_goes_only_with_who() {
+        let asked = |line: &str| parse(line).map(|request| (request.who, request.question));
+        assert_eq!(
+            asked(
+                r#"{"skill":"welcome-back","note":"Greet them, ask what's first.","expires_in_ms":500,"who":true,"question":true}"#
+            ),
+            Ok((true, true))
+        );
+        assert_eq!(
+            asked(
+                r#"{"skill":"welcome-back","note":"Greet them.","expires_in_ms":500,"who":true}"#
+            ),
+            Ok((true, false))
+        );
+        for line in [
+            r#"{"skill":"a","note":"Ask.","expires_in_ms":500,"question":true}"#,
+            r#"{"skill":"a","text":"Hello?","expires_in_ms":500,"question":true}"#,
+            r#"{"skill":"a","quoted":"Hello?","expires_in_ms":500,"question":true}"#,
         ] {
             assert!(parse(line).is_err(), "{line}");
         }

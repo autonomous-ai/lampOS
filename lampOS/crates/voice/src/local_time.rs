@@ -699,6 +699,11 @@ pub fn night_here() -> bool {
 /// What every hello is told after the part of the day ([`hello_told`]).
 pub const HELLO_ONLY: &str = "Say only a hello and their name if you know it: no weather, no day or date, no time, no question and no offer.";
 
+/// In place of [`HELLO_ONLY`] for a hello whose say asked its one question
+/// (#5207: Welcome back's day's first hello, "what's first today?"):
+/// the question its note asks, and nothing else.
+pub const HELLO_AND_QUESTION: &str = "Say a hello and their name if you know it, then the one question the note asks, in one short line: no weather, no day or date, no time, no other question and no offer.";
+
 /// What a hello's note (Welcome back's, `who = true`) is told of the time:
 /// the part of the day at `now` in the zone of this compiled zone file, as
 /// [`words`] calls it, and to say a hello and the name only. At 15:42 on

@@ -109,3 +109,12 @@ say = "They have been leaning in toward the desk for a while. In one short, kind
 [[do]]
 on = "sat_well"
 say = "They sat back after your word. Say a short, warm thanks or 'that's better' in two or three words. Nothing about their body or looks."
+
+# With LAMP_NUDGES_PRESENT=on (#5207, off unless set): the wellbeing
+# group's two an hour, never within 30 minutes of each other, which
+# Sip of water and Comfort break name too (a group keeps its quietest).
+[present.budget]
+group = "wellbeing"
+per_hour = 2
+gap = "30m"
+give_back_unsaid = true   # a nudge that said nothing (expired unheard) gives its place back

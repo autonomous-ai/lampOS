@@ -38,5 +38,11 @@ people walking past or speak into a conversation.
 - **The only hello:** the voice has none of its own (#2825), so one arrival
   gets one hello.
 
+- **The day's first hello** (#5207): only with the lamp's
+  `LAMP_NUDGES_PRESENT` switch on (off unless set). The first arrival of the
+  day before noon, once a day in the daily journal, is one hello with one
+  open clause after it, "what's first today?", in place of the plain hello
+  (`instead_of`), never beside it. Every other arrival is the plain hello.
+
 Asked about it, the lamp says it greets people when they come back to
 their desk, and that it can be switched off.

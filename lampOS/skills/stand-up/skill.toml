@@ -85,3 +85,12 @@ body = { look_at = "face" }
 [[do]]
 body = { gesture = "curious" }      # a small tilt toward them: shall we?
 say = "They have been sitting for a very long time. In one short, friendly line, suggest standing up and moving about for a minute."
+
+# With LAMP_NUDGES_PRESENT=on (#5207, off unless set): the wellbeing
+# group's two an hour, never within 30 minutes of each other, which
+# Sip of water and Comfort break name too (a group keeps its quietest).
+[present.budget]
+group = "wellbeing"
+per_hour = 2
+gap = "30m"
+give_back_unsaid = true   # a nudge that said nothing (expired unheard) gives its place back
