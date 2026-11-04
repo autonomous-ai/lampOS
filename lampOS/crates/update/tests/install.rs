@@ -2520,7 +2520,8 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     // came with its move (#2822); the four wellbeing nudges since 25 Oct;
     // Head pat and its wiggle since #4133's design owner's yes (29 Oct);
     // Comfort break, off but for LAMP_NUDGES_PRESENT=on (#5207).
-    assert_eq!(installed.len(), 29);
+    // Sit back since its played check with a person (#5208, 4 Nov).
+    assert_eq!(installed.len(), 30);
     let bedtime = installed
         .iter()
         .find(|skill| skill.name == "bedtime-morning")
@@ -2545,13 +2546,13 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     );
     assert!(root.join("bedtime-morning/SKILL.md").is_file());
     // Inventory includes the disabled core and its grants; only live skills
-    // contribute functions. The twenty live skills (with music sway and
-    // watch you leave since #2834, and Head pat and its wiggle, which declare
-    // none) offer Dance,
+    // contribute functions. The twenty-one live skills (with music sway and
+    // watch you leave since #2834, Head pat and its wiggle, which declare
+    // none, and Sit back, which shares wellbeing_nudges) offer Dance,
     // prepare_to_unplug, hidden at run time unless LAMP_UNPLUG=on, and the
     // wellbeing nudges' one wellbeing_nudges (since 25 Oct), and Pose's set_pose (#4135).
     let inventory = lamp_skills::load_each(&root);
-    assert_eq!(inventory.len(), 29);
+    assert_eq!(inventory.len(), 30);
     assert!(inventory.iter().all(|(_, skill)| skill.is_ok()));
     let listed = lamp_skills::package::list(&root).unwrap();
     let row = listed
@@ -2574,7 +2575,7 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     );
     let (live, errors) = lamp_skills::load_all(&root);
     assert!(errors.is_empty(), "{errors:?}");
-    assert_eq!(live.len(), 20);
+    assert_eq!(live.len(), 21);
     assert!(live.iter().all(|skill| skill.name != bedtime.name));
     // Each core skill installed off is disabled on the lamp and adds no
     // function, its tool or not: the 4 above are all a session is told.
