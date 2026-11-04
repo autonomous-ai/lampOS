@@ -1401,18 +1401,28 @@ With the switch:
     remember your face?" "Yes.", keeps the name in that one call. A
     correction after the read-back ("No, it's Loren.") is no yes to it,
     and a yes to the face question with no read-back before it is no yes
-    to the name. Otherwise nothing is sent and the model is told to say
-    the name back and ask if it is right (`SAY_IT_BACK`). `replace` still
-    needs the read-back in the lamp's last answer (`known_faces::agreed_to`).
+    to the name. A read-back folded into the face question ("Nice to meet
+    you, Marie! May I remember your face?" "Yes.") is no read-back, since
+    its yes may answer only the face (`known_faces::said_back`). Otherwise
+    nothing is sent and the model is told to say the name back and ask if
+    it is right (`SAY_IT_BACK`). `replace` still needs the read-back in the
+    lamp's last answer (`known_faces::agreed_to`).
   - **Spelled:** a name not heard is asked for spelled out (`NOT_HEARD`).
-    When the turn in hand spells a name letter by letter, the letters are
-    the person's own words: the face is kept under the name as spelled
-    (each run of letters capitalised, the runs joined by a space), not the
-    model's guess, and it needs no yes. Letters that disagree with a count
+    When the lamp's last answer asked them to spell
+    (`known_faces::spelling_asked`) and the turn in hand spells a name
+    letter by letter, the letters are the person's own words: the face is
+    kept under the name as spelled (each run of letters capitalised, the
+    runs joined by a space), not the model's guess, and it needs no yes.
+    There must be as many spelled runs as the model's name has words.
+    Letters said without that ask ("I work at I B M", "I'm from the U S")
+    are no name, and the name goes through the read-back above (El's HOLD
+    on #5159). Letters that disagree with a count
     they gave ("four letters", five spelled) are refused, as above.
 
   Past setup, and on the speaker's own line (`LAMP_REMEMBER_SPEAKER`), the
-  check is as before.
+  check is as before. Nobody is known yet at setup, so the line is the
+  room's: another voice's "Yes." or spelling counts the same as theirs
+  ([onboarding.md](onboarding.md), step 2).
 - **The word that called the lamp is not their name**
   (`known_faces::only_the_call`, 25 Oct).
   - **What's refused:** a name heard only as the line's opening word, past any greeting and set off by a comma or a
