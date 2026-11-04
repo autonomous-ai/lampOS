@@ -564,8 +564,10 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   (`says_send`) is taken as the waiting write's, whatever id it gives, or
   none: its arguments become only `{"service": <the service the write was
   prepared for>, "send_id": <its id>}`, so exactly what was read back goes,
-  to that service, held to every rule below. Any other line's
-  `service_write` is a new write, as before.
+  to that service, held to every rule below. Its voice is judged as any
+  send's (`is_send`, the same test the gate makes): on lamp-9adf on 4 Nov a
+  send with no id was taken but never judged, and refused as a voice not
+  heard. Any other line's `service_write` is a new write, as before.
 - **Send:** a `service_write` with a `send_id` is passed on, with
   `"said":"send"` added, only when all hold: it is the id kept; it comes in a
   later request than the one that read it back; the lamp's turn just before

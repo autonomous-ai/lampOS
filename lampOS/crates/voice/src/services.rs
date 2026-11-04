@@ -541,6 +541,42 @@ pub struct Turn<'a> {
     pub other_seen: bool,
 }
 
+/// The waiting write `call` is the "send" of. A plain "send" in a later
+/// request is the waiting write's, whatever id the model gives, or none: a
+/// later turn's history keeps a call's name, never its answer, so the model
+/// can't know the id (lamp-9adf, 4 Nov: an id made up, or the write
+/// prepared again). It sends to the service it was prepared for, exactly
+/// as read back, held to every rule of [`gate`]. [`run`] asks the same, so
+/// such a send's voice is judged too (lamp-9adf, 4 Nov: a send with no id
+/// was never judged, and refused as a voice not heard, then another).
+fn waiting_send<'a>(
+    pending: Option<&'a Pending>,
+    call: &ToolCall,
+    request: u64,
+    words: Option<&str>,
+) -> Option<&'a Pending> {
+    pending.filter(|kept| {
+        call.name == WRITE
+            && kept.request != request
+            && !kept.service.is_empty()
+            && words.is_some_and(says_send)
+    })
+}
+
+/// The non-empty `send_id` the model gave a write, if any.
+fn given_send_id(call: &ToolCall) -> Option<&str> {
+    (call.name == WRITE)
+        .then(|| call.args.get("send_id").and_then(Value::as_str))
+        .flatten()
+        .filter(|id| !id.is_empty())
+}
+
+/// Whether [`gate`] takes `call` as a send: one with the model's id, or
+/// the waiting write's plain "send" ([`waiting_send`]).
+fn is_send(pending: Option<&Pending>, call: &ToolCall, request: u64, words: Option<&str>) -> bool {
+    given_send_id(call).is_some() || waiting_send(pending, call, request, words).is_some()
+}
+
 /// The call to send on, or what the model is told instead. Only a heard
 /// line of the owner's calls a service at all. Any call in a request other
 /// than the pending write's forgets it, unless it is that write's own
@@ -552,27 +588,11 @@ pub fn gate(
     turn: &Turn,
     now: Instant,
 ) -> Result<ToolCall, Value> {
-    // A plain "send" in a later request is the waiting write's, whatever
-    // id the model gives, or none: a later turn's history keeps a call's
-    // name, never its answer, so the model can't know the id (lamp-9adf,
-    // 4 Nov: an id made up, or the write prepared again). It sends to the
-    // service it was prepared for, exactly as read back, held to every
-    // rule below.
-    let waiting = pending
-        .as_ref()
-        .filter(|kept| {
-            call.name == WRITE
-                && kept.request != request
-                && !kept.service.is_empty()
-                && turn.words.is_some_and(says_send)
-        })
+    let waiting = waiting_send(pending.as_ref(), call, request, turn.words)
         .map(|kept| (kept.send_id.clone(), kept.service.clone()));
     let send_id = match &waiting {
         Some((id, _)) => Some(id.as_str()),
-        None => (call.name == WRITE)
-            .then(|| call.args.get("send_id").and_then(Value::as_str))
-            .flatten()
-            .filter(|id| !id.is_empty()),
+        None => given_send_id(call),
     };
     if send_id.is_none() && pending.as_ref().is_some_and(|kept| kept.request != request) {
         *pending = None;
@@ -953,11 +973,13 @@ pub fn run(
         (None, None)
     };
     let judge = judge();
-    let send_id = (call.name == WRITE)
-        .then(|| call.args.get("send_id").and_then(Value::as_str))
-        .flatten()
-        .is_some_and(|id| !id.is_empty());
-    let prepared = kept::pending(|pending| pending.as_ref().map(|kept| kept.request));
+    // A send, with the model's id or the waiting write's ([`waiting_send`]).
+    let (prepared, send_id) = kept::pending(|pending| {
+        (
+            pending.as_ref().map(|kept| kept.request),
+            is_send(pending.as_ref(), call, request, words.as_deref()),
+        )
+    });
     // With the owner's enrolled print (`LAMP_SAME_VOICE_FOR=services`,
     // `crate::owner_voice`), the "send" line is held to it; without one, to
     // the line that prepared the write, as before.
@@ -1334,6 +1356,59 @@ mod tests {
             "ann",
         );
         assert_eq!(pending.unwrap().service, "gmail");
+    }
+
+    /// lamp-9adf, 4 Nov 19:37: the owner's "Go ahead and send it." came
+    /// with no id; the gate took it as the waiting write's send, but its
+    /// voice was never judged, so it was refused as not heard, then as
+    /// another voice. What [`run`] judges as a send is what the gate sends.
+    #[test]
+    fn a_send_with_no_id_is_judged_as_the_send_the_gate_takes() {
+        let now = Instant::now();
+        let mut pending = waiting(now);
+        if let Some(kept) = pending.as_mut() {
+            kept.service = "google_calendar".into();
+        }
+        let plain = "Go ahead and send it.";
+        for args in [
+            json!({"service":"google_calendar"}),
+            json!({"service":"google_calendar","send_id":""}),
+            json!({"service":"google_calendar","action":"create_event","title":"Lamp test"}),
+            json!({"service":"gmail","send_id":"call_7f3a"}),
+        ] {
+            assert!(
+                is_send(
+                    pending.as_ref(),
+                    &call(WRITE, args.clone()),
+                    11,
+                    Some(plain)
+                ),
+                "{args}"
+            );
+        }
+        let no_id = call(WRITE, json!({"service":"google_calendar"}));
+        // Not a send: a new write's words, a read, the write's own request,
+        // or nothing waiting.
+        assert!(!is_send(
+            pending.as_ref(),
+            &no_id,
+            11,
+            Some("Add one on Friday too.")
+        ));
+        assert!(!is_send(
+            pending.as_ref(),
+            &call(READ, json!({})),
+            11,
+            Some(plain)
+        ));
+        assert!(!is_send(pending.as_ref(), &no_id, 10, Some(plain)));
+        assert!(!is_send(None, &no_id, 11, Some(plain)));
+        // Judged, it goes as the waiting write's.
+        let mut turn = heard(plain, 10);
+        turn.alike = Some(0.7);
+        let passed = gate(&mut pending, &no_id, 11, &turn, at(now)).unwrap();
+        assert_eq!(passed.args["send_id"], "s1");
+        assert_eq!(passed.args["said"], "send");
     }
 
     #[test]
