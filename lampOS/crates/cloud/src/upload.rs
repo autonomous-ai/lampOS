@@ -77,6 +77,10 @@ pub const SETTLE_EVERY: Duration = Duration::from_secs(5);
 /// The longest a kept skill is waited for: its ask may wait an hour for a
 /// good moment (the say service's longest), then 120 s for the yes.
 pub const SETTLE_WITHIN: Duration = Duration::from_secs(2 * 3_600);
+/// After a restart, how long a hand-over lamp-voice didn't answer is tried
+/// again ([`SETTLE_EVERY`] apart): after a reboot lamp-cloud may be up
+/// before lamp-voice's socket is (Twelve's P3 on #5180).
+pub const RETRY_WITHIN: Duration = Duration::from_secs(60);
 
 /// The file in `lamp-cloud`'s state folder (`STATE_DIRECTORY`) that keeps
 /// the uploads in flight across a restart.
@@ -199,9 +203,11 @@ pub struct Uploads {
     pub socket: PathBuf,
     /// HTTPS only: off only in tests, against a local port.
     pub https_only: bool,
-    /// [`SETTLE_EVERY`] and [`SETTLE_WITHIN`], shorter in tests.
+    /// [`SETTLE_EVERY`], [`SETTLE_WITHIN`] and [`RETRY_WITHIN`], shorter
+    /// in tests.
     pub settle_every: Duration,
     pub settle_within: Duration,
+    pub retry_within: Duration,
     /// [`STATE_FILE`]'s path; none keeps what is in flight in memory only.
     pub state: Option<PathBuf>,
     busy: AtomicBool,
@@ -267,6 +273,7 @@ impl Uploads {
             https_only: true,
             settle_every: SETTLE_EVERY,
             settle_within: SETTLE_WITHIN,
+            retry_within: RETRY_WITHIN,
             state: None,
             busy: AtomicBool::new(false),
             done: Mutex::new(Vec::new()),
@@ -304,7 +311,7 @@ impl Uploads {
         });
         self.persist(&pending);
         drop(pending);
-        if !self.spawn(kind.to_owned(), id, None) {
+        if !self.spawn(kind.to_owned(), id, None, None) {
             self.busy.store(false, Ordering::Release);
             self.forget(kind);
             return Err(VOICE_UNREACHED.into());
@@ -343,6 +350,7 @@ impl Uploads {
         pending.clone_from(&carried);
         self.persist(&pending);
         drop(pending);
+        let retry_until = Instant::now() + self.retry_within;
         for entry in carried {
             eprintln!(
                 "lamp-cloud: a skill from a file: carried on after a restart ({})",
@@ -352,7 +360,12 @@ impl Uploads {
             if fetch {
                 self.busy.store(true, Ordering::Release);
             }
-            if !self.spawn(entry.kind.clone(), entry.upload_id, entry.sha256) {
+            if !self.spawn(
+                entry.kind.clone(),
+                entry.upload_id,
+                entry.sha256,
+                Some(retry_until),
+            ) {
                 if fetch {
                     self.busy.store(false, Ordering::Release);
                 }
@@ -368,8 +381,16 @@ impl Uploads {
 
     /// The upload's thread: fetched, checked and handed on (or, `asking`
     /// with its SHA-256 after a restart, already kept), then settled and
-    /// its result kept. False if no thread could start.
-    fn spawn(self: &Arc<Self>, kind: String, id: String, asking: Option<String>) -> bool {
+    /// its result kept; a hand-over lamp-voice didn't answer tried again
+    /// until `retry_until` (after a restart). False if no thread could
+    /// start.
+    fn spawn(
+        self: &Arc<Self>,
+        kind: String,
+        id: String,
+        asking: Option<String>,
+        retry_until: Option<Instant>,
+    ) -> bool {
         let uploads = Arc::clone(self);
         std::thread::Builder::new()
             .name("lamp-cloud-upload".into())
@@ -384,7 +405,7 @@ impl Uploads {
                         "sha256": sha256,
                     })),
                     None => {
-                        let (kept, journal) = uploads.run(&id);
+                        let (kept, journal) = uploads.run_until(&id, retry_until);
                         if let Ok(kept) = &kept {
                             uploads.asking(&kind, kept["sha256"].as_str().unwrap_or_default());
                         }
@@ -508,8 +529,18 @@ impl Uploads {
     /// kept, and the journal's lines, none of which names the file's words
     /// or name.
     pub fn run(&self, id: &str) -> (Result<Value, String>, Vec<String>) {
+        self.run_until(id, None)
+    }
+
+    /// [`Self::run`], the hand-over tried again until `retry_until` while
+    /// lamp-voice doesn't answer; the file fetched once.
+    fn run_until(
+        &self,
+        id: &str,
+        retry_until: Option<Instant>,
+    ) -> (Result<Value, String>, Vec<String>) {
         let mut journal = Vec::new();
-        let result = self.kept(id, &mut journal);
+        let result = self.kept(id, retry_until, &mut journal);
         journal.push(match &result {
             Ok(_) => "a skill from a file: kept; the lamp asks about it aloud".to_owned(),
             Err(why) => format!("a skill from a file: not added: {}", journaled(why)),
@@ -517,7 +548,12 @@ impl Uploads {
         (result, journal)
     }
 
-    fn kept(&self, id: &str, journal: &mut Vec<String>) -> Result<Value, String> {
+    fn kept(
+        &self,
+        id: &str,
+        retry_until: Option<Instant>,
+        journal: &mut Vec<String>,
+    ) -> Result<Value, String> {
         let data = fetch_message(self, id)?;
         let (bytes, format) = decoded(&data, id)?;
         journal.push(format!(
@@ -543,7 +579,18 @@ impl Uploads {
         if let Some(toml) = toml {
             upload["skill_toml"] = json!(toml);
         }
-        let reply = exchange(&self.socket, &json!({"upload": upload}))?;
+        let reply = loop {
+            match exchange(&self.socket, &json!({"upload": upload})) {
+                Err(why) if retry_until.is_some_and(|until| Instant::now() < until) => {
+                    journal.push(format!(
+                        "a skill from a file: {}; tried again",
+                        journaled(&why)
+                    ));
+                    std::thread::sleep(self.settle_every);
+                }
+                done => break done?,
+            }
+        };
         if let Some(why) = reply.get("refused").and_then(Value::as_str) {
             return Err(why.to_owned());
         }
@@ -733,7 +780,9 @@ pub fn files_of(
     skills: &Path,
     store_key: &Path,
 ) -> Result<(Option<String>, String), String> {
-    if bytes.starts_with(b"---\n") {
+    // A bare card, its line endings either way (lamp-voice reads CRLF;
+    // Twelve's P3 on #5080).
+    if bytes.starts_with(b"---\n") || bytes.starts_with(b"---\r\n") {
         let card = String::from_utf8(bytes.to_vec()).map_err(|_| NOT_A_SKILL.to_owned())?;
         return Ok((None, card));
     }
