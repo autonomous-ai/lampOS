@@ -95,7 +95,9 @@ fn time<'a>(args: &'a Value, key: &str) -> Result<Option<&'a str>, String> {
     match text(args, key) {
         None => Ok(None),
         Some(time) if calendar_time(time) => Ok(Some(time)),
-        Some(_) => Err(format!("{key} is a time like 2026-11-03T09:00:00+07:00")),
+        Some(_) => Err(format!(
+            "{key} is a time with this lamp's own UTC offset, like 2026-11-03T09:00:00+HH:MM"
+        )),
     }
 }
 
