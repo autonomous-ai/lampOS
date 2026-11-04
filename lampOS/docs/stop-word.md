@@ -1375,8 +1375,12 @@ asked.
     `asked_every_ms: 500`.
   - `LAMP_STOP_WORDS_AUDIO` then writes the raw blocks, which is what the
     stream was sent.
-  - With `heard` (yields only), a yield's first, held blocks are still the
-    canceller's output: only what follows is raw.
+  - With `heard` (yields only), a yield's first, held blocks are raw too
+    (#5111): the stop words keep the source's last 180 blocks
+    (`RECENT_BLOCKS`, the most a yield's start holds) by capture time and
+    hear each held block as the source had it. A held block they never saw
+    is heard as held, the canceller's output. Only the held blocks are
+    sent, as before; the kept ones stay in memory and are dropped.
   - Not offered: mic1. The first builder's recording there (22:55) had
     the played request only 8 dB over the floor, and no words even in the
     request. (The canceller's linear output, which could not be read out
@@ -1421,8 +1425,10 @@ asked.
     handed on, which is the microphone's block as recorded.
   - **As with `raw`:** the words are asked for every half second while the
     lamp sounds, and `LAMP_STOP_WORDS_AUDIO` writes what the stream was
-    sent. With `heard`, a yield's first, held blocks are still the
-    canceller's output.
+    sent. With `heard`, a yield's first, held blocks are linear too
+    (#5111): before, they were the canceller's output, and on lamp-52e6 on
+    4 November a played "Stop, Lamp." over the lamp, held, scored 0.1 to
+    0.4 on them and their speech-to-text heard no "stop".
   - **Which source a reply heard** is in its counts (`"source"`:
     `processed`, `raw` or `linear`) and in the journal's start line.
   - **Timing:** the linear output is one canceller block (4 ms) ahead of
