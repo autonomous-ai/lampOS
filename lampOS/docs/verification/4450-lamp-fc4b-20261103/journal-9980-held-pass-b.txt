@@ -1,0 +1,21 @@
+14:30:53 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 2 goes on from request 1: its 1380 ms of sound go first
+14:30:56 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 2 at the line's end: settled=false, speech_final=false, finals cover none of 2580 ms sent, pending=none, last final none, finalize answered in 1798 ms to 2470 ms, results 3 with words, 1 without, words from=close_stream
+14:30:56 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 2 heard 5 words, the last 1798 ms after the line ended
+14:30:56 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 2: no conversation going on: the line ran 1 s, it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+14:30:56 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 2: its name, heard in the room's sound, counts by: its words calling it, its hearing at the line's start (LAMP_NAME_SECOND_SIGN)
+14:30:56 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 2: lamp-name's hearing began 10 ms into the line (the newest 10 ms); the line's start is up to 1300 ms
+14:30:56 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 2: the room is not known yet after the start, and the ears' stream stayed within 3.3 dB of its quiet of -54.4 dBFS outside the lines, with no talk left alone, no line held and no other voice since: kept as said in a quiet room for a join (LAMP_FIRST_SECONDS_QUIET)
+14:30:56 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 2: its answer is played: its name was heard in the room's sound
+14:30:56 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 2: the model is told the lamp's name was heard
+14:30:58 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 2 chat round 1 first event in 1748 ms
+14:30:58 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 2 first answer audio 2257 ms after the words were heard
+14:31:16 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 3 at the line's end: settled=false, speech_final=false, finals cover none of 2510 ms sent, pending=interim 2000 ms after the last final, last final none, finalize answered in 343 ms to 2510 ms, results 3 with words, 0 without, words from=finalize
+14:31:16 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 3 heard 7 words, the last 344 ms after the line ended
+14:31:16 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 3: of its 7 words, 1 in the lamp's answer to request 2 so far
+14:31:16 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+14:31:18 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 3 chat round 1 first event in 1378 ms
+14:31:18 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 3 chat round 1 called not_for_me
+14:31:22 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 4 at the line's end: settled=false, speech_final=true, finals cover 3930 of 4840 ms sent, pending=none, last final 608 ms before End, finalize answered in 387 ms to 4830 ms, results 5 with words, 1 without, words from=finalize
+14:31:22 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 4 heard 8 words, the last 388 ms after the line ended
+14:31:22 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 4: of its 8 words, 0 in the lamp's answer to request 2 so far
+14:31:22 lamp-fc4b lamp-voice[6251]: lamp-voice second: request 4: its answer is held back: a conversation with the lamp is going on, but the line has no tie to the lamp: no reply to its question, no word of its last answer, no ask of the lamp
