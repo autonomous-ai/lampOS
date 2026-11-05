@@ -6199,6 +6199,7 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::LookNoCall { request, .. }
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::NewsAnswered { request, .. }
+        | ProviderOutput::StopAnswered { request }
         | ProviderOutput::SleepAsked { request }
         | ProviderOutput::ServiceCalled { request }
         | ProviderOutput::StepCallHeard { request }
@@ -7582,6 +7583,8 @@ async fn spoken(
         // 45 s of conversation).
         // Its own exchange is covered however late the line is written.
         crate::thread::close_now(Some(request));
+        // A reminder's ring this line cut is held, not rung once more.
+        let _ = shared.emit(ProviderOutput::StopAnswered { request }).await;
         say_fixed(
             &shared,
             request,

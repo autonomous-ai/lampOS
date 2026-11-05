@@ -74,6 +74,7 @@ pub(super) fn cancelled_output(event: &ProviderOutput, through: Option<u64>) -> 
         | ProviderOutput::LookNoCall { request, .. }
         | ProviderOutput::RequestedAudio { request, .. }
         | ProviderOutput::NewsAnswered { request, .. }
+        | ProviderOutput::StopAnswered { request }
         | ProviderOutput::SleepAsked { request }
         | ProviderOutput::ServiceCalled { request }
         | ProviderOutput::StepCallHeard { request }

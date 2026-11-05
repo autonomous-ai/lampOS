@@ -14,6 +14,33 @@ mod consumer;
 /// any other (#5219's once more).
 pub const RING_STOP_SWITCH: &str = "LAMP_RING_STOP_ENDS_IT";
 
+/// How long after a ring was cut by a line that line's stop still holds it:
+/// the consumer's pace before it is offered again (5 s), so a stop judged
+/// later than that finds it offered already and changes nothing.
+pub const STOP_FOR_THE_CUT_US: u64 = 5_000_000;
+
+/// The attempt a settlement says was cut by a person's line, with some of it
+/// played: a fenced `Retire` (a cut-in) or an `Abandon` with audio that
+/// isn't already marked stopped.
+fn cut_by_a_line(settlement: &ToWorker) -> Option<&PreparedToken> {
+    match settlement {
+        ToWorker::Retire { token, proof }
+            if matches!(
+                proof.basis,
+                lamp_schedule::delivery::RetirementBasis::OwnerFenced { .. }
+            ) =>
+        {
+            Some(token)
+        }
+        ToWorker::Abandon {
+            token,
+            no_audio: false,
+            stopped: false,
+        } => Some(token),
+        _ => None,
+    }
+}
+
 /// Whether [`RING_STOP_SWITCH`] is on in this process's environment.
 pub fn ring_stop_ends_it() -> bool {
     std::env::var(RING_STOP_SWITCH).ok().as_deref() == Some("on")
@@ -253,6 +280,11 @@ pub(crate) enum ToWorker {
     /// Someone said a line after a reminder was said (29e7, 2 Nov): one
     /// said late is noticed ([`lamp_schedule::protocol::Request::Noticed`]).
     Noticed {},
+    /// The person's line that cut the ring `token` was a stop (the second
+    /// route answered it "Okay, I'll stop there"): it is held, not rung once
+    /// more (the Reviewer-lead's P2 on #5351). Only with
+    /// [`RING_STOP_SWITCH`] on.
+    RingStopped { token: PreparedToken },
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -465,6 +497,12 @@ pub(crate) struct Reminders {
     said_at_us: Option<u64>,
     /// A line was heard after a reminder: Schedule is to be told.
     notice_owed: bool,
+    /// The ring last cut by a line (sent as a fenced `Retire` or an
+    /// `Abandon` with audio), and when: a stop said for it within
+    /// [`STOP_FOR_THE_CUT_US`] holds it ([`Self::stop_said`]).
+    cut_last: Option<(PreparedToken, u64)>,
+    /// A [`ToWorker::RingStopped`] still to be sent.
+    stop_owed: Option<PreparedToken>,
 }
 impl Reminders {
     pub fn from_environment() -> io::Result<Option<Self>> {
@@ -487,7 +525,22 @@ impl Reminders {
             owed_told: None,
             said_at_us: None,
             notice_owed: false,
+            cut_last: None,
+            stop_owed: None,
         }))
+    }
+
+    /// The second route answered a line as a stop over the lamp's answer
+    /// (`LAMP_SPOKEN_STOP_ENDS`): if that line cut a ring within
+    /// [`STOP_FOR_THE_CUT_US`], the ring is held, not rung once more
+    /// (the Reviewer-lead's P2 on #5351). The caller checks
+    /// [`RING_STOP_SWITCH`].
+    pub fn stop_said(&mut self, now_us: u64) {
+        if let Some((token, cut_at_us)) = self.cut_last.take()
+            && now_us.saturating_sub(cut_at_us) <= STOP_FOR_THE_CUT_US
+        {
+            self.stop_owed = Some(token);
+        }
     }
 
     /// Someone's line was last heard at `said_at_us`: one heard after a
@@ -609,10 +662,22 @@ impl Reminders {
                 if self.sent && matches!(settlement, ToWorker::Complete { .. }) {
                     self.said_at_us = Some(now_us);
                 }
+                if self.sent
+                    && let Some(token) = cut_by_a_line(settlement)
+                {
+                    self.cut_last = Some((token.clone(), now_us));
+                }
             }
         }
         if self.notice_owed && self.transport.send(&ToWorker::Noticed {})? {
             self.notice_owed = false;
+        }
+        if let Some(token) = &self.stop_owed
+            && self.transport.send(&ToWorker::RingStopped {
+                token: token.clone(),
+            })?
+        {
+            self.stop_owed = None;
         }
         if !self.sent
             && let Some(settlement) = &self.unadmitted
