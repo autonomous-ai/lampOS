@@ -75,7 +75,10 @@ pub const CALLER_ONLY_ENVIRONMENT: &str = "LAMP_SAME_VOICE_CALLER_ONLY";
 /// the linked services' judging (`crate::services::judging_voices`: a
 /// send's voice, a read in full), on the second route only, and only while
 /// it has services; every conversation rule reads no print, as without a
-/// model. Unset, or any other value (said once): every use, as before.
+/// model. Unset: every use, as before. Any other value (said once) fails
+/// closed: no print is made for anything, as without a model, so a send is
+/// refused for a voice not heard and a read is brief (the reader's P3 on
+/// #5293: it had been every use, the widest).
 pub const FOR_ENVIRONMENT: &str = "LAMP_SAME_VOICE_FOR";
 /// The provider worker's flag for [`FOR_ENVIRONMENT`]`=services`, right
 /// after [`FLAG`]'s path.
@@ -182,10 +185,25 @@ const KEPT: usize = 4;
 /// absolute path only.
 pub fn arguments_from_environment() -> Vec<String> {
     let model = std::env::var_os(ENVIRONMENT);
-    let mut arguments = arguments(model.as_deref().map(Path::new));
-    let uses = std::env::var(FOR_ENVIRONMENT).ok();
-    if !arguments.is_empty() && for_services(uses.as_deref(), &to_stderr()) {
-        arguments.push(FOR_SERVICES_FLAG.to_owned());
+    // Lossy, so a value not UTF-8 is one not known, never as unset.
+    let uses = std::env::var_os(FOR_ENVIRONMENT).map(|uses| uses.to_string_lossy().into_owned());
+    arguments_for(
+        model.as_deref().map(Path::new),
+        uses.as_deref(),
+        &to_stderr(),
+    )
+}
+
+/// The model's arguments, with what [`FOR_ENVIRONMENT`]'s `uses` makes the
+/// prints for: none at all for a value not known ([`PrintsFor::Nothing`]).
+fn arguments_for(model: Option<&Path>, uses: Option<&str>, journal: &Journal) -> Vec<String> {
+    let mut arguments = arguments(model);
+    if !arguments.is_empty() {
+        match prints_for(uses, journal) {
+            PrintsFor::Every => {}
+            PrintsFor::Services => arguments.push(FOR_SERVICES_FLAG.to_owned()),
+            PrintsFor::Nothing => arguments.clear(),
+        }
     }
     arguments
 }
@@ -200,21 +218,36 @@ fn arguments(model: Option<&Path>) -> Vec<String> {
     }
 }
 
-/// Whether [`FOR_ENVIRONMENT`]'s `value` keeps the prints for the services
-/// only. Any other value is as unset, and `journal` is told so once a
-/// process (the provider's arguments are made again at each restart).
-fn for_services(value: Option<&str>, journal: &Journal) -> bool {
+/// What [`FOR_ENVIRONMENT`] makes the prints for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PrintsFor {
+    /// Unset: every rule that reads one, as before.
+    Every,
+    /// `services` exactly: the linked services' judging alone.
+    Services,
+    /// Any other value: nothing, as without a model. With no print a send
+    /// is refused as a voice not heard and a read is brief
+    /// (`crate::services::gate`, `crate::services::read_in_full`), and
+    /// every conversation rule reads none: closed, never every use.
+    Nothing,
+}
+
+/// What [`FOR_ENVIRONMENT`]'s `value` makes the prints for. A value not
+/// known fails closed ([`PrintsFor::Nothing`]), and `journal` is told so
+/// once a process (the provider's arguments are made again at each
+/// restart).
+fn prints_for(value: Option<&str>, journal: &Journal) -> PrintsFor {
     static SAID: std::sync::Once = std::sync::Once::new();
     match value {
-        None => false,
-        Some("services") => true,
+        None => PrintsFor::Every,
+        Some("services") => PrintsFor::Services,
         Some(other) => {
             SAID.call_once(|| {
                 journal(&format!(
-                    "lamp-voice: {FOR_ENVIRONMENT} is services or unset, not {other:?}: the same voice is used as without it"
+                    "lamp-voice: {FOR_ENVIRONMENT} is services or unset, not {other:?}: no print is made for anything, as without the model; a send is refused and a read is brief"
                 ));
             });
-            false
+            PrintsFor::Nothing
         }
     }
 }
@@ -1965,19 +1998,40 @@ exec sleep 30"#,
 
     /// `LAMP_SAME_VOICE_FOR`: `services` exactly keeps the prints for the
     /// services, its flag right after the model's path; unset is every use,
-    /// as before; any other value is as unset, said once a process.
+    /// as before; any other value, empty too, makes no print for anything,
+    /// said once a process (the reader's P3 on #5293: it had been every use).
     #[test]
     fn the_prints_are_for_the_services_only_with_services_exactly() {
         let said = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
         let into = said.clone();
         let journal: Journal = Arc::new(move |line: &str| into.lock().unwrap().push(line.into()));
-        assert!(for_services(Some("services"), &journal));
-        assert!(!for_services(None, &journal));
-        assert!(!for_services(Some("Services"), &journal));
-        assert!(!for_services(Some("all"), &journal));
+        assert_eq!(prints_for(Some("services"), &journal), PrintsFor::Services);
+        assert_eq!(prints_for(None, &journal), PrintsFor::Every);
+        for unknown in ["Services", "everything", "all", "", " services"] {
+            assert_eq!(
+                prints_for(Some(unknown), &journal),
+                PrintsFor::Nothing,
+                "{unknown:?} fails closed"
+            );
+        }
         let said = said.lock().unwrap();
         assert_eq!(said.len(), 1, "said once: {said:?}");
-        assert!(said[0].contains("LAMP_SAME_VOICE_FOR is services or unset"));
+        assert!(said[0].contains("LAMP_SAME_VOICE_FOR is services or unset, not \"Services\""));
+        assert!(said[0].contains("no print is made for anything"));
+        drop(said);
+        let model = Some(Path::new("/m.onnx"));
+        assert_eq!(arguments_for(model, None, &journal), [FLAG, "/m.onnx"]);
+        assert_eq!(
+            arguments_for(model, Some("services"), &journal),
+            [FLAG, "/m.onnx", FOR_SERVICES_FLAG]
+        );
+        for unknown in ["Services", "everything", ""] {
+            assert!(
+                arguments_for(model, Some(unknown), &journal).is_empty(),
+                "{unknown:?}: no model, no child, no print"
+            );
+        }
+        assert!(arguments_for(None, Some("services"), &journal).is_empty());
         let flags = [FLAG, "/m.onnx", FOR_SERVICES_FLAG, "--rest"].map(str::to_owned);
         let (model, rest) = take(&flags).unwrap();
         assert_eq!(model.as_deref(), Some(Path::new("/m.onnx")));
