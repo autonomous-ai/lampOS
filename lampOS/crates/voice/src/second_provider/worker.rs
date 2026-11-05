@@ -12186,15 +12186,16 @@ fn keep_scoped(
                         let Some(scope) = lease.scope() else {
                             return;
                         };
-                        // A room's line their face alone was in view for
-                        // is their conversation going on, for a carry
-                        // (lamp-06c1, 5 Nov, S4).
+                        // A room's line the mouth rule named, no other
+                        // voice known, is their conversation going on, for
+                        // a carry (lamp-06c1, 5 Nov, S4; Thirteen's P1 on
+                        // #5448).
                         thread.lamp_for_named(
                             *request,
                             &text,
                             now,
                             scope.person(),
-                            lease.named_for_reply(),
+                            lease.named_for_conversation(),
                         );
                         // A held or carried line is told in the thread,
                         // never folded into a summary or talk note.

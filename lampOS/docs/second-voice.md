@@ -4877,10 +4877,14 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   such a line no face was seen speaking stays the conversation's, not the
   room's, when all of these hold: the newest exchange before it is theirs
   and began within 45 s (`Thread::going_on_with`; a room's exchange whose
-  line their face alone was in view for, its reply told their name, counts
-  as theirs here and nowhere else, `Thread::lamp_for_named`: lamp-06c1,
-  5 Nov, S4, where the owner-only name rule kept a non-owner's opening line
-  as the room's and her car line just after found no conversation of hers),
+  line the mouth rule named for their face alone in view (`named_alone`,
+  never the one-face count alone), with the one-face rule's voice tracker
+  there and no other voice known for it, counts as theirs here and nowhere
+  else, `ScopeLease::named_for_conversation`, `Thread::lamp_for_named`; any
+  later narrow, or another voice heard as the line is judged, takes it back:
+  lamp-06c1, 5 Nov, S4, where the owner-only name rule kept a non-owner's
+  opening line as the room's and her car line just after found no
+  conversation of hers; Thirteen's P1 on #5448),
   the eyes' looks fell in
   it and none tracked a face but theirs (`SpeakingFaces::no_other_face_in_view`;
   no look, a stalled eye or a covered camera, is not), their face was in
