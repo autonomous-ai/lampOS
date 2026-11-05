@@ -4004,6 +4004,15 @@ pub fn serve(
             if let Ok(mut heeding) = heeding.lock() {
                 heeding.holding_untied();
             }
+            // #5124: the caller's line begun just after the lamp's answer.
+            if crate::untied_going_on::grace() {
+                eprintln!(
+                    "lamp-voice second: a line begun within 3 s of the end of the lamp's answer to the conversation's caller keeps the conversation's tie, one line an answer, never with another face seen speaking (LAMP_UNTIED_ANSWER_GRACE)"
+                );
+                if let Ok(mut heeding) = heeding.lock() {
+                    heeding.granting_answer_grace();
+                }
+            }
         } else if crate::untied_going_on::on() {
             eprintln!(
                 "lamp-voice second: the lamp's answers to lines let out only as the conversation going on, with no tie to it, keep no conversation going, and such a line is told it may be people's talk (LAMP_UNTIED_GOING_ON)"
@@ -5882,6 +5891,12 @@ pub(crate) struct Heeding {
     untied: bool,
     /// `LAMP_UNTIED_GOING_ON=held` ([`Self::holding_untied`]).
     untied_held: bool,
+    /// `LAMP_UNTIED_ANSWER_GRACE=on` ([`Self::granting_answer_grace`]),
+    /// and the newest line if it began in the grace after the lamp's answer
+    /// to the conversation's caller ([`crate::untied_going_on::in_grace`]),
+    /// as [`Self::hear`] is told.
+    answer_grace: bool,
+    began_in_grace: Option<u64>,
     /// With it: the request judged last, if it was let out only as the
     /// conversation going on with no tie to the lamp
     /// ([`crate::untied_going_on`]): told it may be people's talk, and its
@@ -6859,6 +6874,8 @@ impl Heeding {
             said_until_free_us: None,
             untied: false,
             untied_held: false,
+            answer_grace: false,
+            began_in_grace: None,
             untied_line: None,
             chain_untied: Vec::new(),
             busy_called_strict: false,
@@ -7090,6 +7107,14 @@ impl Heeding {
         self.untied_held = true;
     }
 
+    /// `LAMP_UNTIED_ANSWER_GRACE=on` with `held` (#5124): a line begun
+    /// within [`crate::untied_going_on::ANSWER_GRACE`] of the end of the
+    /// lamp's answer to the conversation's caller is the caller's own
+    /// ([`Self::callers_own_line`]), whatever its words.
+    pub(crate) fn granting_answer_grace(&mut self) {
+        self.answer_grace = true;
+    }
+
     /// `request` joins `chain` only for having no tie to the lamp
     /// (`LAMP_UNTIED_GOING_ON`), and is kept as such for the journal.
     /// Fields only, so it is called with the rule's attention borrowed.
@@ -7152,7 +7177,17 @@ impl Heeding {
     /// voice than the conversation's (`Seen::other_voice`), or with desk
     /// talk ([`crate::untied_going_on::desk_talk_read`], with
     /// `no_name_set_off`): a colleague's "Thanks" to the caller is not the
-    /// caller's (Twelve's P3 on #5240).
+    /// caller's (Twelve's P3 on #5240). With
+    /// [`Self::granting_answer_grace`], also any line begun in the grace
+    /// after that answer ([`Self::began_in_grace`]), unless the eyes saw
+    /// another face than the caller's speaking it, it thanks someone by
+    /// name ("Thanks Sam, …", #5124), or it is a question: one that reaches
+    /// the grace is one the rules read as no ask of the lamp
+    /// ([`crate::untied_going_on::tied_read`]), asked of the one addressed
+    /// ("Did you send the slides to Sam yet?", "Ma'am, did you …" with the
+    /// set-off word read as the lamp's name by #5110), so the grace keeps
+    /// statements only ("I don't know. I'll probably just work late
+    /// tomorrow.").
     fn callers_own_line(
         &self,
         request: u64,
@@ -7187,6 +7222,18 @@ impl Heeding {
             Some("said right after the lamp's answer, it replies to it")
         } else if crate::untied_going_on::asks_for_advice(heard, no_name_set_off) {
             Some("said right after the lamp's answer, it asks the lamp's advice")
+        } else if self.answer_grace
+            && self.began_in_grace == Some(request)
+            && !another_face_speaking(&seen.speakers, &self.caller_faces)
+            && !crate::untied_going_on::names_someone_after_a_reply(heard)
+            // A question here is one the rules already read as no ask of
+            // the lamp (`tied_read` and `asks_the_lamp_read` came first):
+            // it asks the one addressed of their own doings ("Did you send
+            // the slides to Sam yet?", "Ma'am, did you …", "Are you coming
+            // to the meeting at four?"), so the grace keeps statements only.
+            && !heard.contains('?')
+        {
+            Some(crate::untied_going_on::GRACE_KEPT)
         } else {
             None
         }
@@ -7923,6 +7970,14 @@ impl Heeding {
                     crate::spoken_stop::just_after(monotonic_us(), until_us)
                 }))
             .then_some(request);
+            // From the end of the lamp's answers to lines said to it, not
+            // to lines in `chain` (`LAMP_UNTIED_ANSWER_GRACE`, #5124).
+            self.began_in_grace = (self.answer_grace
+                && !over_the_lamps_voice
+                && self.said_until_free_us.is_some_and(|until_us| {
+                    crate::untied_going_on::in_grace(monotonic_us(), until_us)
+                }))
+            .then_some(request);
             // A write waiting for its "send" is timed from when a line
             // began, not when its words came (`crate::services`).
             crate::services::voice_began(over_the_lamps_voice, std::time::Instant::now());
@@ -7930,6 +7985,7 @@ impl Heeding {
         if matches!(heard, Heard::BeganOverTheWaitSound) {
             self.began_over = None;
             self.began_just_after = None;
+            self.began_in_grace = None;
         }
         self.printing(request, heard);
     }
@@ -10471,6 +10527,17 @@ fn others_may_talk(seen: &Seen, caller_faces: &crate::speaking_faces::Speakers) 
                 .iter()
                 .any(|face| !caller_faces.contains(face));
     seen.busy || seen.other_voice || another_face
+}
+
+/// Whether the eyes saw a face speaking a line that is not the caller's: two
+/// faces, or one not among `caller_faces` once a caller's face is known. No
+/// face seen is not (#5124's grace needs no eyes).
+fn another_face_speaking(
+    speakers: &crate::speaking_faces::Speakers,
+    caller_faces: &crate::speaking_faces::Speakers,
+) -> bool {
+    speakers.len() > 1
+        || !caller_faces.is_empty() && speakers.iter().any(|face| !caller_faces.contains(face))
 }
 
 /// Whether the faces seen speaking a line are the caller's one face and no

@@ -5065,6 +5065,32 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
     same worker test (desk1 all held; the follow-ups still play; #3895's
     asks held unless tied) and
     `room_told::tests::untied_desk_lines_held_make_a_quiet_room_busy`.
+  - **A grace after the lamp's answer** (`LAMP_UNTIED_ANSWER_GRACE=on`,
+    off, with `held` only; #5124, the first builder's lever (b)). On
+    lamp-c0a4's busy_day (#4175's 3+3, 3 Nov), `held` held the caller's
+    c03, "I don't know. I'll probably just work late tomorrow.", begun 2 s
+    after the lamp's answer and sharing no word with it, and every line
+    after it, the caller's c04 to c06 among them: the product's rules read
+    no voice print, so nothing else tied them. With the grace, a line begun
+    within 3 s of the end of the lamp's answer to the conversation's caller
+    (`untied_going_on::in_grace`, from `Did::Said`'s end, never over it) is
+    the caller's own (`Heeding::callers_own_line`), whatever its words, as a
+    person who answers you right after you spoke is talking to you. One
+    line an answer; never after a notice or a timer's line; never with
+    another face than the caller's seen speaking it; the sure other voice,
+    a reply naming someone ("Thanks Sam, …") and desk talk still hold it,
+    and it keeps no question: one that reaches it is one the rules read as
+    no ask of the lamp, asked of the one addressed ("Did you send the
+    slides to Sam yet?", "Ma'am, did you …", whose set-off word #5110 reads
+    as the lamp's name), so it keeps statements only. Cost: a caller's
+    untied question right after the answer stays held. Tests
+    (`held_keeps_caller`): busy_day, off answers 8 of 8 lines, `held` 2
+    (c01, c02), the grace 3 (c03 kept; d11, begun in the grace, held as a
+    question and desk talk, and d12 and c04-c06 after it still held, as
+    the grace is one line an answer); 13 room lines held under `held`, 0
+    taken by the grace (desk lines begun 0.2 s and 2 s after the answer
+    among them). Not yet tried on a lamp. The caller's face
+    seen speaking across desk talk is lever (a), its own switch.
 - **The look by its own call.** With a full look (`LAMP_EYES_LOOK_FILE` and
   `LAMP_LOOK_FULL`), spoken turns are offered `take_a_look`
   (`second_provider::LOOK_CALL`, `worker::chat_tools` with `look`; texts

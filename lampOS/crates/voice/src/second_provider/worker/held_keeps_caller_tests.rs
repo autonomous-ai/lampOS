@@ -43,6 +43,15 @@ const ANSWER_MS: u64 = 3_000;
 /// `untied_talk_after_an_answer_keeps_no_conversation_going` plays them,
 /// in milliseconds.
 fn run(held: bool, lines: &[Line]) -> Vec<bool> {
+    play(held, false, lines)
+}
+
+/// [`run`] with `held` and `LAMP_UNTIED_ANSWER_GRACE=on` (#5124).
+fn run_grace(lines: &[Line]) -> Vec<bool> {
+    play(true, true, lines)
+}
+
+fn play(held: bool, grace: bool, lines: &[Line]) -> Vec<bool> {
     let _one = crate::provider_worker::tests::one_thread();
     let _clock =
         crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
@@ -57,6 +66,9 @@ fn run(held: bool, lines: &[Line]) -> Vec<bool> {
     heeding.as_the_only_voice(false, true, false);
     if held {
         heeding.holding_untied();
+    }
+    if grace {
+        heeding.granting_answer_grace();
     }
     let mut answered: Vec<(u64, &str, &str, u64)> = Vec::new();
     let mut was = 0;
@@ -404,4 +416,155 @@ fn held_keeps_a_callers_line_whose_name_was_written_as_another_word() {
         let lines = [LONDON, line(6_800, 2_400, desk, "Okay.")];
         assert_eq!(run(true, &lines), [true, false], "held: {desk}");
     }
+}
+
+/// #5124 (busy_day, #4175's 3+3 on lamp-c0a4, 3 Nov): the caller talks
+/// with the lamp (c01-c03), two colleagues talk at the desk (d11, d12), and
+/// the caller goes on (c04-c06). Timed as if each caller line were
+/// answered, the kindest case for the rule. Off answers them; does `held`?
+#[test]
+fn busy_day_callers_lines_after_desk_talk() {
+    let day = [
+        line(
+            0,
+            1_800,
+            "Lamp, I had a really long day today.",
+            "Long ones wear on you. Want to tell me what made it long?",
+        ),
+        line(
+            6_300,
+            2_800,
+            "Yeah. My boss moved our deadline up by a whole week.",
+            "A whole week is a lot to swallow at once.",
+        ),
+        line(
+            14_100,
+            3_000,
+            "I don't know. I'll probably just work late tomorrow.",
+            "That's one way to hold it together.",
+        ),
+        line(
+            21_100,
+            2_500,
+            "Do you want coffee? I'm going downstairs.",
+            "I can't get coffee.",
+        ),
+        line(24_100, 1_800, "Yes please, a latte, no sugar.", "Noted."),
+        line(
+            27_900,
+            1_600,
+            "Maybe. What would you do?",
+            "I'd ask which part of the week really moved.",
+        ),
+        line(
+            36_000,
+            3_000,
+            "That's a good idea. Any tips to sleep better tonight?",
+            "Keep the room cool and dark.",
+        ),
+        line(44_000, 2_200, "Thanks. You're a good listener.", "Anytime."),
+    ];
+    let off = run(false, &day);
+    let held = run(true, &day);
+    let grace = run_grace(&day);
+    eprintln!("BUSY_DAY off={off:?} held={held:?} grace={grace:?}");
+    assert_eq!(off, [true; 8], "off");
+    // `held` holds c03, begun 2 s after the lamp's answer and sharing no
+    // word with it, and every line after it (#5124's failing-first run).
+    assert_eq!(held, [true, true, false, false, false, false, false, false]);
+    // The grace keeps c03, and no room line: d11 and d12 stay held.
+    assert!(grace[2], "grace: c03 (grace {grace:?})");
+    assert_eq!(
+        &grace[3..5],
+        &[false, false],
+        "grace: d11, d12 (grace {grace:?})"
+    );
+}
+
+/// #5124's pass 2: the grace takes no room line. Every desk line these
+/// tests hold under `held` stays held with the grace too, the ones begun
+/// within its 3 s among them, and the caller's lines `held` keeps stay kept.
+#[test]
+fn the_grace_takes_no_room_line() {
+    let after_tired = [
+        TIRED,
+        line(
+            8_000,
+            2_000,
+            "Did you send the slides to Sam yet?",
+            "I hope so.",
+        ),
+    ];
+    let after_calm = [
+        CALM,
+        line(
+            7_000,
+            1_800,
+            "Can you pass me the charger? The white one.",
+            "I can't.",
+        ),
+    ];
+    let thanks_sam = [
+        CALM,
+        line(
+            7_000,
+            1_800,
+            "Thanks Sam, I'll send it after lunch.",
+            "Okay.",
+        ),
+    ];
+    let mut sets: Vec<Vec<Line>> = vec![after_tired.into(), after_calm.into(), thanks_sam.into()];
+    for (at, desk) in [
+        (6_800, "Sam, tell me a joke."),
+        (6_800, "Hey Sam, play some music."),
+        (6_800, "Tell Sam the meeting moved to four."),
+        (6_800, "Should I bring an umbrella, you guys?"),
+        (6_800, "Ma'am, did you send the slides to Sam yet?"),
+        (6_800, "Look, did you send the slides to Sam yet?"),
+        (5_000, "Did you send the slides to Sam yet?"),
+        (5_000, "Are you coming to the meeting at four?"),
+        (5_000, "Can you pass me the charger? The white one."),
+        (5_000, "Do you want coffee? I'm going downstairs."),
+    ] {
+        sets.push(vec![LONDON, line(at, 2_400, desk, "Okay.")]);
+    }
+    let mut room = (0, 0);
+    for lines in &sets {
+        let (held, grace) = (run(true, lines), run_grace(lines));
+        for (index, (held, grace)) in held.iter().zip(&grace).enumerate() {
+            if !held {
+                room.0 += 1;
+                room.1 += usize::from(*grace);
+            }
+            assert!(
+                held == grace || !grace,
+                "grace took a line held: {:?} (held {held}, grace {grace})",
+                lines[index].heard
+            );
+        }
+    }
+    eprintln!("ROOM_LINES held={} taken_by_grace={}", room.0, room.1);
+    assert_eq!(room.1, 0);
+}
+
+/// The grace keeps one line an answer: a second line before the lamp
+/// answers the first is judged as without it, and a line begun over the
+/// answer, or past 3 s after it, is not in it.
+#[test]
+fn the_grace_is_one_line_an_answer_and_three_seconds() {
+    let quiet = "I don't know. I'll probably just work late tomorrow.";
+    // 2 s after the answer: kept; 4 s after: held.
+    let in_grace = [LONDON, line(6_800, 2_400, quiet, "Okay.")];
+    assert_eq!(run(true, &in_grace), [true, false], "held");
+    assert_eq!(run_grace(&in_grace), [true, true], "grace");
+    let late = [LONDON, line(8_800, 2_400, quiet, "Okay.")];
+    assert_eq!(run_grace(&late), [true, false], "past the grace");
+    let over = [
+        LONDON,
+        Line {
+            over: true,
+            ..line(4_000, 2_400, quiet, "Okay.")
+        },
+    ];
+    assert_eq!(run_grace(&over), [true, false], "over the answer");
 }
