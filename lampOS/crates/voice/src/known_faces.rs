@@ -4775,6 +4775,63 @@ mod tests {
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
     }
 
+    /// Fifth's cause on #5415 (5 Nov): the walk's own "who you are" script
+    /// asked the face question with the name folded in and no read-back,
+    /// so every setup save was refused for the read-back. Built from the
+    /// script's own lines (`skills/onboarding/skill.toml`): it now says the
+    /// name back on its own first, and its yes, then the face question and
+    /// its yes, reach the eyes in one call. The folded line of Fifth's run
+    /// A is still refused.
+    #[test]
+    fn the_setup_scripts_own_lines_reach_the_eyes_in_one_call() {
+        const SCRIPT: &str = include_str!("../../../skills/onboarding/skill.toml");
+        let who = SCRIPT
+            .split("[onboarding.steps.who_you_are]")
+            .nth(1)
+            .and_then(|step| step.lines().find(|line| line.starts_with("first = ")))
+            .expect("who_you_are's first note");
+        let quoted: Vec<&str> = who.split("\\\"").skip(1).step_by(2).collect();
+        assert_eq!(quoted[0], "What should I call you?", "{who}");
+        let face = quoted[1];
+        assert!(face.contains("face"), "{face}");
+        let back = who
+            .find("say their name back as a question on its own")
+            .expect("the script says the name back");
+        assert!(back < who.find(face).unwrap(), "read-back before the face");
+        let call = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({ "name": "Walter" }),
+        };
+        let (socket, asked) = eyes(vec![json!({"remembered": "Walter"})]);
+        // As the script now goes: the name, its read-back and yes, then the
+        // face question and its yes, the call on that yes.
+        let walk = Said {
+            this: "Yes, please.".into(),
+            before: vec![
+                (
+                    "My name is Walter.".into(),
+                    "Walter, did I get that right?".into(),
+                ),
+                ("Yes.".into(), face.into()),
+            ],
+        };
+        let (words, _) = run_at_setup(&socket, &call, &walk);
+        assert_eq!(words, json!({"ok": true, "remembered": "Walter"}));
+        // Fifth's run A, as the old script went: refused for the read-back.
+        let folded = Said {
+            this: "Yes, please.".into(),
+            before: vec![(
+                "My name is Walter.".into(),
+                format!("Nice to meet you, Walter. {face}"),
+            )],
+        };
+        let (words, _) = run_at_setup(&socket, &call, &folded);
+        assert!(refused_for_the_read_back(&words), "{words}");
+        assert_eq!(asked.join().unwrap().len(), 1, "only the walk's call");
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
     /// lamp-52e6, 5 Nov, #5391's check: "My name is Walter." with a call
     /// refused for the read-back, "Walter. Have I got that right?", and
     /// "Yes, that's my name." with no call kept no face. The held save's

@@ -56,6 +56,13 @@ pub const FILE_ENVIRONMENT: &str = "LAMP_ONBOARDING_FILE";
 /// condition on #1711).
 const FACE_SAVE_WAIT_US: u64 = 15_000_000;
 
+/// How long "who you are" stays open for a setup face save the voice holds
+/// for the yes to its read-back ([`face_save_held`], #5415): as long as the
+/// voice holds it (`second_provider::HELD_SAVE_FOR`). The face wait above
+/// does not end the step meanwhile: on Fifth's A/B runs (5 Nov) it closed
+/// 15 s after the read-back while the yes came 13.4 s after the close.
+pub(crate) const FACE_SAVE_HELD_US: u64 = 45_000_000;
+
 pub const NUDGE_ENVIRONMENT: &str = "LAMP_ONBOARDING_NUDGE";
 /// The walk's done line also names a few things to try first, once per
 /// setup, with `on` exactly (#5316, first customers' stage 2 on #5296);
@@ -753,6 +760,10 @@ struct Answers {
     /// (the face question's, as a rule), so the step ends done at [`FACE_SAVE_WAIT_US`] if no face
     /// is saved by then.
     face_answered_us: Option<u64>,
+    /// When the voice last held a setup face save for the yes to its
+    /// read-back ([`face_save_held`]): the face wait does not end the step
+    /// within [`FACE_SAVE_HELD_US`] of it.
+    save_held_us: Option<u64>,
     quiet_hours: bool,
     hello: bool,
     /// "Preferences"' hello question has been handed out to be said: only
@@ -2881,8 +2892,17 @@ impl Onboarding {
         // lamp's latest words too, not only the person's yes: on a tester's
         // lamp-0c4e (3 Nov, #5139) it ran out while the lamp's own "Shall
         // I?" was still waiting for its answer.
+        // A save the voice holds for the yes to its read-back keeps the step
+        // open as long as the voice holds it (the Reviewer-lead's P1 on
+        // #5415): the read-back's yes comes after this wait, and once the
+        // step is done the save is no longer one at setup.
+        let save_held = led
+            .heard
+            .save_held_us
+            .is_some_and(|at| now_us.saturating_sub(at) < FACE_SAVE_HELD_US);
         if step == Step::WhoYouAre
             && quiet_us >= START_QUIET_US
+            && !save_held
             && led.heard.face_answered_us.is_some_and(|at| {
                 now_us.saturating_sub(at.max(led.lamp_said_us.unwrap_or(0))) >= FACE_SAVE_WAIT_US
             })
@@ -3495,6 +3515,19 @@ impl Onboarding {
             // P2 on #4290). One that names the owner it drops
             // ([`owner_gone`]) is let go when the owner is another by now
             // ([`owner_renamed`]): their face was renamed, not forgotten.
+            // A setup face save held for the yes to its read-back
+            // ([`face_save_held`]): "who you are" stays open for it.
+            if told.get("face_save_held").and_then(Value::as_bool) == Some(true) {
+                if let Some(led) = self.led.as_mut()
+                    && led.step == Step::WhoYouAre
+                {
+                    eprintln!(
+                        "lamp-voice: onboarding: who_you_are: a face save is held for the read-back's yes: the step stays open"
+                    );
+                    led.heard.save_held_us = Some(now_us);
+                }
+                continue;
+            }
             if told.get("face_forgotten").and_then(Value::as_bool) == Some(true) {
                 if let Some(gone) = told.get("owner").and_then(Value::as_str)
                     && !self
@@ -4549,6 +4582,16 @@ pub fn who_you_are_open(file: &Path) -> bool {
         return false;
     };
     progress["steps"].is_object() && progress["steps"].get(Step::WhoYouAre.name()).is_none()
+}
+
+/// A setup face save refused for the read-back (`known_faces::SAY_IT_BACK`),
+/// which the voice holds for the yes to it (#5415): "who you are" stays
+/// open for it up to [`FACE_SAVE_HELD_US`], so the yes still saves at
+/// setup. The runner takes it only while it leads that step.
+pub fn face_save_held(file: &Path) {
+    if let Err(error) = post(file, &json!({"face_save_held": true})) {
+        eprintln!("lamp-voice: onboarding: a face save held, not noted: {error}");
+    }
 }
 
 /// A face `forget_my_face` forgot: a face saved before "who you are" was
@@ -5698,7 +5741,7 @@ mod tests {
 
     #[test]
     fn a_name_said_alone_is_asked_back_and_kept_on_a_yes() {
-        let asked = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise ask them, in a few words: \"Did I get that right, Tovi?\" Nothing more.)";
+        let asked = "(If you said their name back or asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise ask them, in a few words: \"Did I get that right, Tovi?\" Nothing more.)";
         let mut room = at_who("yes", true);
         room.walk.lamp_said(room.at);
         room.walk.heard_line("I'm Tovi.");
@@ -6589,6 +6632,58 @@ mod tests {
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
     }
 
+    /// The Reviewer-lead's P1 on #5415, as Fifth's run A traced it (5 Nov):
+    /// "Yes, please." to the face question, the save refused for the
+    /// read-back and held, the lamp's read-back, and its yes 28 s on, past
+    /// the face wait. The step stays open while the save is held, so that
+    /// yes still saves at setup; held with no yes, it ends done with the
+    /// name only once the hold is over.
+    #[test]
+    fn a_held_face_save_keeps_who_you_are_open_for_the_read_backs_yes() {
+        let mut room = named_with_a_face("face-held");
+        room.walk.heard("Yes, please.", room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        face_save_held(&room.walk.file);
+        // "Your name is Marie. Have I got that right?"
+        room.walk.lamp_said(room.at);
+        room.wait(
+            FACE_SAVE_WAIT_US + START_QUIET_US + 2 * S,
+            Some(NEAR_MIDDLE),
+        );
+        assert_eq!(room.outcome(Step::WhoYouAre), None, "held: still open");
+        room.walk.heard("Yes.", room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        face_saved(&room.walk.file, Some("Marie"));
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert_eq!(room.walk.kept().owner.as_deref(), Some("Marie"));
+        assert!(!room.walk.kept().face_again);
+
+        // Held and never answered: the hold bounds it, the name only.
+        let mut room = named_with_a_face("face-held-unanswered");
+        room.walk.heard("Yes, please.", room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        face_save_held(&room.walk.file);
+        room.walk.lamp_said(room.at);
+        room.wait(FACE_SAVE_HELD_US - 4 * S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
+        room.wait(FACE_SAVE_WAIT_US, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert!(room.walk.kept().owner.is_none());
+
+        // Without the hold, the same wait ends it before the yes (the
+        // failure Fifth traced).
+        let mut room = named_with_a_face("face-not-held");
+        room.walk.heard("Yes, please.", room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        room.walk.lamp_said(room.at);
+        room.wait(
+            FACE_SAVE_WAIT_US + START_QUIET_US + 2 * S,
+            Some(NEAR_MIDDLE),
+        );
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+    }
+
     /// #5139 fix 3 (a tester's lamp-0c4e, 3 Nov): "who you are" done with
     /// the name only, by the wait, the give-up or the model's report, says
     /// that what the lamp remembers waits for a face; on a lamp that keeps
@@ -6803,7 +6898,7 @@ mod tests {
     /// `heard` leaves it alone.
     #[test]
     fn with_the_nudge_a_heard_name_ends_who_you_are_once_and_is_kept() {
-        let asked = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise ask them, in a few words: \"Did I get that right, Marie?\" Nothing more.)";
+        let asked = "(If you said their name back or asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise ask them, in a few words: \"Did I get that right, Marie?\" Nothing more.)";
         let mut room = at_who("one-path", true);
         room.walk.lamp_said(room.at);
         let say = |room: &mut Room, line: &str| {
