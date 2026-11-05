@@ -1438,6 +1438,18 @@ struct Shared {
     /// When [`crate::cut_in_wordless::LINE`] was said last, by the engine's
     /// clock: not again within [`crate::cut_in_wordless::AGAIN_AFTER`].
     wordless_asked_at: Mutex<Option<Instant>>,
+    /// Such a cut in a busy room, or another soon after one, picks the cut
+    /// answer up again ([`crate::cut_in_wordless::Cuts`],
+    /// `LAMP_CUT_IN_WORDLESS_RESUMES`).
+    wordless_resumes: bool,
+    /// The run of wordless cuts, by the engine's clock (`LAMP_CUT_IN_WORDLESS_RESUMES`).
+    wordless_cuts: Mutex<crate::cut_in_wordless::Cuts>,
+    /// The newest line's request and how much of the answer it cut was
+    /// played (`Start`'s `heard_of_cut`, `LAMP_SAID_AS_HEARD`).
+    heard_of_cut: Mutex<Option<(u64, crate::said_as_heard::HeardOfCut)>>,
+    /// The request whose answer was last sent whole: all its pieces are in
+    /// [`Shared::said`], so its unplayed rest can be said again.
+    said_whole: Mutex<Option<u64>>,
     /// The fixed answers' clips, rendered ahead ([`FixedClips`]).
     fixed_clips: Arc<FixedClips>,
     /// A turn after a quiet spell opens with [`ANNOUNCEMENT`]: not when
@@ -2920,7 +2932,37 @@ impl FixedClips {
 /// 15:53:43 the stop line, its voice slow, was still unplayed when a
 /// wordless line replaced its turn 5 s later, and the person heard nothing.
 async fn say_fixed(shared: &Shared, request: u64, english: &'static str, why: &str) {
-    let heard_at = Instant::now();
+    if play_fixed(shared, (request, Instant::now()), english, why, true).await {
+        complete_fixed(shared, request).await;
+    }
+}
+
+/// A fixed answer's last events: its words are over, and its turn.
+async fn complete_fixed(shared: &Shared, request: u64) {
+    if shared
+        .emit(ProviderOutput::GenerationComplete { request })
+        .await
+    {
+        shared
+            .emit(ProviderOutput::TurnComplete {
+                request,
+                idle: true,
+            })
+            .await;
+    }
+}
+
+/// [`say_fixed`]'s line, its turn not ended: told, kept and played, from its
+/// clip when rendered ahead. With `kept_words` false (a bridge before an
+/// answer said again), its sound counts in what was heard but its words are
+/// never said again after a later cut. False when the turn is gone.
+async fn play_fixed(
+    shared: &Shared,
+    (request, heard_at): (u64, Instant),
+    english: &'static str,
+    why: &str,
+    kept_words: bool,
+) -> bool {
     let line = shared.fixed(english);
     if !shared
         .emit(ProviderOutput::Transcript {
@@ -2930,9 +2972,9 @@ async fn say_fixed(shared: &Shared, request: u64, english: &'static str, why: &s
         })
         .await
     {
-        return;
+        return false;
     }
-    shared.said_piece(request, Some(line));
+    shared.said_piece(request, kept_words.then_some(line));
     let kept = shared.fixed_clips.kept(english);
     let ahead = kept.is_some();
     let mut first = true;
@@ -2958,7 +3000,7 @@ async fn say_fixed(shared: &Shared, request: u64, english: &'static str, why: &s
         for part in clip.chunks(PACKET_SAMPLES) {
             let audio = play(part.to_vec());
             if !shared.emit(audio).await {
-                return;
+                return false;
             }
             shared.said_samples(request, part.len());
             played += part.len();
@@ -2978,7 +3020,7 @@ async fn say_fixed(shared: &Shared, request: u64, english: &'static str, why: &s
                 for part in packet.chunks(PACKET_SAMPLES) {
                     let audio = play(part.to_vec());
                     if !shared.emit(audio).await {
-                        return;
+                        return false;
                     }
                     shared.said_samples(request, part.len());
                     played += part.len();
@@ -3002,17 +3044,229 @@ async fn say_fixed(shared: &Shared, request: u64, english: &'static str, why: &s
             "lamp-voice second: request {request}: its fixed line could not be said: the voice gave no sound for it twice ({why})"
         );
     }
-    if shared
-        .emit(ProviderOutput::GenerationComplete { request })
-        .await
-    {
-        shared
-            .emit(ProviderOutput::TurnComplete {
-                request,
-                idle: true,
-            })
-            .await;
+    true
+}
+
+/// What is left of the answer a wordless cut ended, to go on with
+/// (`LAMP_CUT_IN_WORDLESS_RESUMES`).
+#[derive(Debug, PartialEq, Eq)]
+enum CutRest {
+    /// None: no answer of the lamp's own was cut (one of its fixed lines
+    /// was, or nothing), or all of it was played.
+    Nothing,
+    /// Its unplayed pieces, from the sentence that was cut.
+    Rest(Vec<String>),
+    /// Not kept whole, or not told how much was played: the model goes on.
+    Model,
+}
+
+impl Shared {
+    /// What is left of the answer `request`, a wordless line, cut.
+    fn cut_rest(&self, request: u64) -> CutRest {
+        let cut = self
+            .heard_of_cut
+            .lock()
+            .ok()
+            .and_then(|kept| kept.filter(|(of, _)| *of == request).map(|(_, cut)| cut));
+        let Ok(said) = self.said.lock() else {
+            return CutRest::Nothing;
+        };
+        let words: Vec<&str> = said
+            .1
+            .iter()
+            .filter_map(|piece| piece.words.as_deref())
+            .map(str::trim)
+            .filter(|words| !words.is_empty())
+            .collect();
+        if said.0 == request || words.is_empty() {
+            return CutRest::Nothing;
+        }
+        let joined = words.join(" ");
+        if [
+            crate::cut_in_wordless::LINE,
+            crate::cut_in_wordless::PAUSE,
+            crate::spoken_stop::LINE,
+        ]
+        .into_iter()
+        .any(|line| joined == self.fixed(line))
+        {
+            return CutRest::Nothing;
+        }
+        let whole = self
+            .said_whole
+            .lock()
+            .is_ok_and(|whole| *whole == Some(said.0));
+        match cut {
+            Some(cut) if cut.request == said.0 && whole => {
+                let rest = crate::said_as_heard::unheard(&said.1, cut.samples);
+                if rest.is_empty() {
+                    CutRest::Nothing
+                } else {
+                    CutRest::Rest(rest)
+                }
+            }
+            _ => CutRest::Model,
+        }
     }
+}
+
+/// A cut-in with no words that ended the lamp's answer, with
+/// `LAMP_CUT_IN_WORDLESS_RESUMES` ([`crate::cut_in_wordless::Cuts`]): asked
+/// in a quiet room the first time (with `LAMP_CUT_IN_WORDLESS_ASKS`), else
+/// picked up again from the sentence that was cut, its rest said as it was
+/// sent, or the model asked to go on after the bridge when the rest is not
+/// kept; a third soon after pauses, and any more leave the lamp quiet. A
+/// resume with nothing left to go on with leaves it quiet too.
+async fn wordless_cut(
+    shared: &Shared,
+    request: u64,
+    scope: Option<crate::memory_scope::ScopeLease>,
+    times: Arc<Mutex<Times>>,
+) {
+    const WHY: &str = "LAMP_CUT_IN_WORDLESS_RESUMES";
+    let busy = shared.busy(request);
+    let now = (shared.clock)();
+    // Nothing of the lamp's own answer to go on with (one of its fixed lines
+    // was cut, or all was played): quiet, and not counted in the run.
+    let rest = shared.cut_rest(request);
+    let chosen = if rest == CutRest::Nothing {
+        crate::cut_in_wordless::Answer::Quiet
+    } else {
+        shared
+            .wordless_cuts
+            .lock()
+            .map_or(crate::cut_in_wordless::Answer::Quiet, |mut cuts| {
+                cuts.next(now, busy)
+            })
+    };
+    let line = match chosen.line() {
+        Some((crate::cut_in_wordless::LINE, _)) if !shared.wordless_asks => None,
+        line => line,
+    };
+    eprintln!(
+        "lamp-voice second: request {request}: a cut-in with no words ended the lamp's answer, {} room: {chosen:?}, {}, the rest {} ({WHY})",
+        if busy { "a busy" } else { "a quiet" },
+        line.map_or("left quiet".to_owned(), |(line, _)| format!(
+            "answered \"{}\"",
+            shared.fixed(line)
+        )),
+        match &rest {
+            CutRest::Nothing => "none".to_owned(),
+            CutRest::Rest(pieces) => format!("kept, {} pieces", pieces.len()),
+            CutRest::Model => "not kept: the model goes on".to_owned(),
+        }
+    );
+    match (line, rest) {
+        (None, _) => {
+            if shared.stages(request, &times).await {
+                shared
+                    .emit(ProviderOutput::TurnComplete {
+                        request,
+                        idle: true,
+                    })
+                    .await;
+            }
+        }
+        (Some((line, false)), _) => say_fixed(shared, request, line, WHY).await,
+        (Some((line, true)), CutRest::Rest(rest)) => say_resumed(shared, request, line, rest).await,
+        (Some((line, true)), _) => {
+            if !play_fixed(shared, (request, Instant::now()), line, WHY, false).await {
+                return;
+            }
+            // A note beside the thread, never anyone's words (the
+            // Reviewer-lead's P3 on #5430): no person's line is asked.
+            let ask = crate::cut_in_wordless::resume_ask(shared.fixed(line));
+            answer(
+                shared,
+                (request, scope),
+                String::new(),
+                Asker::Written {
+                    looking: false,
+                    search: false,
+                    quoted: false,
+                },
+                None,
+                None,
+                vec![ask],
+                times,
+                None,
+                None,
+            )
+            .await;
+        }
+    }
+}
+
+/// A wordless cut's line (`english`, [`crate::cut_in_wordless::BRIDGE`] or
+/// [`crate::cut_in_wordless::AGAIN`]), then `rest`, the cut answer's
+/// unplayed pieces as they were sent, the model not asked
+/// (`LAMP_CUT_IN_WORDLESS_RESUMES`). The first piece's speech begins before
+/// the line plays, from its clip rendered ahead, so the rest follows it with
+/// no wait; each next piece's begins as the one before it is sent. The
+/// journal says when the line's and the rest's first audio went.
+async fn say_resumed(shared: &Shared, request: u64, english: &'static str, rest: Vec<String>) {
+    const WHY: &str = "LAMP_CUT_IN_WORDLESS_RESUMES";
+    let heard_at = Instant::now();
+    let turn = net::Turn { request, heard_at };
+    let mut speech = JoinSet::new();
+    let mut pieces = rest.into_iter();
+    let begin = |speech: &mut JoinSet<()>, piece: Option<String>| {
+        piece.map(|piece| {
+            let packets = start_speech(shared, speech, piece.clone(), turn);
+            (piece, packets)
+        })
+    };
+    let mut next = begin(&mut speech, pieces.next());
+    if !play_fixed(shared, (request, heard_at), english, WHY, false).await {
+        return;
+    }
+    let mut first = true;
+    while let Some((piece, mut packets)) = next.take() {
+        next = begin(&mut speech, pieces.next());
+        if !shared
+            .emit(ProviderOutput::Transcript {
+                request: Some(request),
+                text: format!(" {piece}"),
+                finished: false,
+            })
+            .await
+        {
+            return;
+        }
+        shared.said_piece(request, Some(piece.as_str()));
+        while let Some(packet) = packets.recv().await {
+            let Ok(packet) = packet else {
+                eprintln!(
+                    "lamp-voice second: request {request}: a piece of the answer said again could not be said ({WHY})"
+                );
+                break;
+            };
+            for part in packet.chunks(PACKET_SAMPLES) {
+                if std::mem::replace(&mut first, false) {
+                    eprintln!(
+                        "lamp-voice second: request {request}: the cut answer's rest, its first audio {} ms after the words were heard ({WHY})",
+                        heard_at.elapsed().as_millis()
+                    );
+                }
+                let audio = ProviderOutput::Audio {
+                    request,
+                    sequence: shared.sequence.fetch_add(1, Ordering::Relaxed) + 1,
+                    provider_event_at_us: monotonic_us(),
+                    source_frames: part.len(),
+                    source_offset: 0,
+                    samples: part.to_vec(),
+                };
+                if !shared.emit(audio).await {
+                    return;
+                }
+                shared.said_samples(request, part.len());
+            }
+        }
+    }
+    if let Ok(mut whole) = shared.said_whole.lock() {
+        *whole = Some(request);
+    }
+    complete_fixed(shared, request).await;
 }
 
 /// `text` said by the route's voice into one clip, at most
@@ -3436,6 +3690,10 @@ impl Engine {
                 spoken_stop_ends: false,
                 wordless_asks: false,
                 wordless_asked_at: Mutex::new(None),
+                wordless_resumes: false,
+                wordless_cuts: Mutex::default(),
+                heard_of_cut: Mutex::new(None),
+                said_whole: Mutex::new(None),
                 fixed_clips: Arc::default(),
                 announce: true,
                 heard_last: Mutex::new(None),
@@ -4609,6 +4867,17 @@ impl Engine {
         self
     }
 
+    /// A cut-in that ended the lamp's answer with no words, in a busy room
+    /// or soon after another, picks the answer up again, and a third soon
+    /// after pauses ([`crate::cut_in_wordless::Cuts`],
+    /// `LAMP_CUT_IN_WORDLESS_RESUMES`). Before any turn only.
+    pub fn resuming_after_wordless_cut_ins(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.wordless_resumes = on;
+        }
+        self
+    }
+
     pub fn asking_again(mut self, cut_in: CutIn, ask: AskAgain) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.ask_again = Some((cut_in, ask));
@@ -5129,6 +5398,9 @@ impl Engine {
         let lines: Vec<&'static str> = [
             (shared.spoken_stop_ends, crate::spoken_stop::LINE),
             (shared.wordless_asks, crate::cut_in_wordless::LINE),
+            (shared.wordless_resumes, crate::cut_in_wordless::BRIDGE),
+            (shared.wordless_resumes, crate::cut_in_wordless::AGAIN),
+            (shared.wordless_resumes, crate::cut_in_wordless::PAUSE),
         ]
         .into_iter()
         .filter_map(|(on, line)| on.then_some(line))
@@ -5150,8 +5422,14 @@ impl Engine {
                 follows_on,
                 over_the_lamps_voice,
                 soft_lead_us,
+                heard_of_cut,
                 ..
             } => {
+                if self.shared.wordless_resumes
+                    && let Ok(mut kept) = self.shared.heard_of_cut.lock()
+                {
+                    *kept = heard_of_cut.map(|cut| (request, cut));
+                }
                 let previous = self.begun_last;
                 // Begun over nothing of the lamp's but the last request's
                 // wait sound: the person going on after a pause, not a
@@ -6668,7 +6946,8 @@ async fn spoken(
     // Also taken for a cut-in's words on the way (`interim`), with
     // `LAMP_CUT_IN_WORDLESS_ASKS` or `LAMP_SPOKEN_STOP_ENDS`.
     let mut words_said = if shared.unfinished_words
-        || (marks.over_the_lamps_voice && (shared.wordless_asks || shared.spoken_stop_ends))
+        || (marks.over_the_lamps_voice
+            && (shared.wordless_asks || shared.wordless_resumes || shared.spoken_stop_ends))
     {
         listener.said()
     } else {
@@ -8012,12 +8291,30 @@ async fn spoken(
         // sends none. Never in a busy room, where a wordless yield is the
         // room's (`LAMP_CUT_IN_OVER_BED`), and never when speech to text had
         // words for it on the way: those were words, not a cough (#4938).
-        if empty && shared.wordless_asks && marks.over_the_lamps_voice && words_were_on_the_way {
+        if empty
+            && (shared.wordless_asks || shared.wordless_resumes)
+            && marks.over_the_lamps_voice
+            && words_were_on_the_way
+        {
             eprintln!(
                 "lamp-voice second: request {request}: a cut-in whose final words came back empty had words on the way: not asked if someone spoke (LAMP_CUT_IN_WORDLESS_ASKS)"
             );
         }
+        // With `LAMP_CUT_IN_WORDLESS_RESUMES`, in any room: a busy room's
+        // first picks the answer up again, another soon after says it was
+        // cut again and goes on, a third pauses ([`wordless_cut`]).
         if empty
+            && shared.wordless_resumes
+            && marks.over_the_lamps_voice
+            && !words_were_on_the_way
+            && !echoed
+            && heeded.is_none()
+        {
+            wordless_cut(&shared, request, scope, times).await;
+            return;
+        }
+        if empty
+            && !shared.wordless_resumes
             && shared.wordless_asks
             && marks.over_the_lamps_voice
             && !words_were_on_the_way
@@ -8057,6 +8354,14 @@ async fn spoken(
                 .await;
         }
         return;
+    }
+    // The person spoke, with words, and is answered: a run of wordless cuts
+    // starts again (`LAMP_CUT_IN_WORDLESS_RESUMES`; the Reviewer-lead's P2 on
+    // #5430: "Lamp, go on" after the pause, then a cough, was left quiet).
+    if shared.wordless_resumes
+        && let Ok(mut cuts) = shared.wordless_cuts.lock()
+    {
+        cuts.spoke();
     }
     // The lamp's own words at its start or end are not sent to the model
     // (`LAMP_SECOND_OWN_ECHO`); the line was told as heard above.
@@ -11242,6 +11547,9 @@ async fn answer(
     let prepared_for = prepared
         .filter(|_| held_forget_runs.is_none() && unseen_yes.is_none() && held_save_runs.is_none())
         .map(|prepared| (prepared, said.clone()));
+    // Only a note for the model, no one's words (a wordless cut's ask to go
+    // on, `LAMP_CUT_IN_WORDLESS_RESUMES`): no message of the person's.
+    let only_notes = said.trim().is_empty() && !notes.is_empty();
     let question = match picture {
         Some(jpeg) => Message::user_seeing(said, &jpeg),
         None => Message::user(said),
@@ -11473,7 +11781,7 @@ async fn answer(
         if let Some(told) = unseen_yes {
             messages.push(Message::system(told));
         }
-        if !forgot_before_question {
+        if !forgot_before_question && !only_notes {
             messages.push(question);
         } else {
             seeing = false;
@@ -13526,6 +13834,11 @@ async fn answer(
     let gave_up = matches!(ended, Err(Stop::GaveUp));
     let last = match ended {
         Ok(_) => {
+            // Sent whole: its unplayed rest can be said again after a
+            // wordless cut (`LAMP_CUT_IN_WORDLESS_RESUMES`).
+            if let Ok(mut whole) = shared.said_whole.lock() {
+                *whole = Some(request);
+            }
             if !shared
                 .emit(ProviderOutput::GenerationComplete { request })
                 .await

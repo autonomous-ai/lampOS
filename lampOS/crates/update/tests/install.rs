@@ -1719,6 +1719,10 @@ fn the_product_answers_a_stop_and_asks_after_a_wordless_cut_in() {
         service.contains(&"Environment=LAMP_CUT_IN_WORDLESS_ASKS=on"),
         "the voice lacks LAMP_CUT_IN_WORDLESS_ASKS"
     );
+    assert!(
+        service.contains(&"Environment=LAMP_CUT_IN_WORDLESS_RESUMES=on"),
+        "the voice lacks LAMP_CUT_IN_WORDLESS_RESUMES"
+    );
 }
 
 /// The wellbeing nudges at a present spacing and Comfort break

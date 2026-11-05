@@ -334,6 +334,32 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "음, 실례지만 누가 뭐라고 했어요?",
         ],
     ),
+    // Before the rest of an answer a wordless cut ended, picked up again in a
+    // busy room (`LAMP_CUT_IN_WORDLESS_RESUMES`, on in the product).
+    (
+        crate::cut_in_wordless::BRIDGE,
+        ["Dù sao thì,", "それでね、", "总之，", "아무튼,"],
+    ),
+    // The same, when it was cut again within the minute.
+    (
+        crate::cut_in_wordless::AGAIN,
+        [
+            "Ôi, lại bị ngắt rồi. Dù sao thì,",
+            "おっと、また途切れちゃった。それでね、",
+            "哎呀，又被打断了。总之，",
+            "앗, 또 끊겼네요. 아무튼,",
+        ],
+    ),
+    // A third wordless cut within the minute: why it stops, and how to go on.
+    (
+        crate::cut_in_wordless::PAUSE,
+        [
+            "Ở đây hơi ồn, nên mình tạm dừng nhé. Khi nào muốn nghe tiếp thì cứ gọi 'Lamp' nhé.",
+            "ここは少しにぎやかだから、いったん止めるね。続きを聞きたいときは「Lamp」って呼んでね。",
+            "这里有点吵，我先停一下。想听下去的时候，叫一声“Lamp”就行。",
+            "여기가 좀 시끄러워서 잠깐 멈출게요. 계속 듣고 싶으면 'Lamp'라고 불러 주세요.",
+        ],
+    ),
     // What it says when a line by name gets no words twice
     // (`LAMP_NO_WORDS_AGAIN`, off in the product; Tests' P3 on #4723).
     (
@@ -759,7 +785,7 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 23);
+        assert_eq!(FIXED_LINES.len(), 26);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }
