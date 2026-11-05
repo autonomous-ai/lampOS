@@ -2409,7 +2409,7 @@ while a dropped one stays `kept` and is noted to the model). The app's side
 is `skills.make` and `skills.made` in `lamp-cloud` ([cloud.md](cloud.md),
 "A skill typed in the app").
 
-#### Added from a file (`LAMP_SKILL_UPLOAD=on`, off)
+#### Added from a file (`LAMP_SKILL_UPLOAD=on`, on in the product)
 
 A skill the owner adds from a file on their phone (the first builder on the
 Queue, 3 Nov 14:33, with Backend3's rules; `crate::upload_skill`): a package

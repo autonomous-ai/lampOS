@@ -1659,6 +1659,46 @@ fn the_product_lets_a_made_skill_read_a_linked_service() {
     }
 }
 
+/// A skill added from a file in the app, on a spoken yes (#5080): the
+/// switch is on in both parts that read it, `lamp-cloud` (the kind, with
+/// the skills page) and `lamp-voice` (the app-make socket, with the maker
+/// and the say service), once each.
+#[test]
+fn the_product_adds_a_skill_from_a_file_on_a_spoken_yes() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1
+    };
+    let cloud = section(unit("lamp-cloud.service"), "Service");
+    for line in [
+        "Environment=LAMP_SKILL_UPLOAD=on",
+        "Environment=LAMP_SKILLS_PAGE=on",
+        "Environment=LAMP_APP_MAKE_SKILL=on",
+    ] {
+        assert_eq!(
+            cloud.iter().filter(|set| **set == line).count(),
+            1,
+            "lamp-cloud lacks {line}"
+        );
+    }
+    let voice = section(unit("lamp-voice.service"), "Service");
+    for line in [
+        "Environment=LAMP_SKILL_UPLOAD=on",
+        "Environment=LAMP_MAKE_SKILL=on",
+        "Environment=LAMP_APP_MAKE_SKILL=on",
+        "Environment=LAMP_SAY=on",
+    ] {
+        assert_eq!(
+            voice.iter().filter(|set| **set == line).count(),
+            1,
+            "the voice lacks {line}"
+        );
+    }
+}
+
 /// A stop always gets its one line (#4710: on lamp-06c1 on 30 Oct a stop
 /// left the lamp quiet mid-story), and a cut-in with no words gets its
 /// question (the memory owner's call, 4 Nov; the lamp's own echo can still

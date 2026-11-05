@@ -426,7 +426,7 @@ giờ có tên, lời hay tệp của một kỹ năng.
   `package::tests::forget_counts_deletes_both_counts`.
 
 
-## Thêm kỹ năng từ một tệp (`LAMP_SKILL_UPLOAD=on`, tắt)
+## Thêm kỹ năng từ một tệp (`LAMP_SKILL_UPLOAD=on`, bật trong sản phẩm)
 
 Chủ đèn chọn một tệp trên điện thoại (người xây dựng đầu tiên duyệt trên
 Queue, 3/11 14:33, theo quy tắc của Backend3; `crate::upload_skill`): một
