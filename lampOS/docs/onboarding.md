@@ -295,11 +295,13 @@ goes to the model as above. Tests:
 customers' stage 2 on #5296), with `LAMP_ONBOARDING_FIRST_TRIES=on` exactly
 (off unless set; not in the product unit until #5296's run 3). The done line
 goes on, after the app's guide: "If you'd like somewhere to start, ask me for
-a timer, the weather, or anything you're curious about. You can even teach me
-something new, just by telling me." (`skill::PREFERENCES_DONE_TRIES`; the four
+a timer, the weather, or anything you're curious about. You can also add a
+skill from the Skill Store in the app, or just ask me to make one."
+(`skill::PREFERENCES_DONE_TRIES`; the four
 other languages in `in_language::LINES`). It is a few everyday things a new
 owner can say at once (a timer, the weather on `LAMP_SECOND_WEATHER`, any
-question, a skill made by voice on `LAMP_MAKE_SKILL`), said as the end of an
+question, a skill from the app's Skill Store or one made by voice on
+`LAMP_MAKE_SKILL`; the lead's ask on #5316), said as the end of an
 introduction, never a list of features (CLAUDE.md rule 8). It is the walk's
 own line, so it is said, cut or offered again as the done line is: cut while
 it is said, it is not said again. Said once per setup: `Progress::tries_said`

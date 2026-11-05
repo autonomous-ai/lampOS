@@ -1362,11 +1362,11 @@ pub(super) const LINES: &[Line] = &[
         "好的，全部完成了。你随时可以让我重新设置。想知道我的按键和触摸怎么用，可以打开 Autonomous App，选中我，再依次打开 General、About、Buttons and gestures。",
         "좋아요. 이걸로 설정이 모두 끝났어요. 다시 설정하고 싶으시면 언제든 말씀해 주세요. 제 버튼이랑 터치 사용법은 Autonomous 앱에서 저를 선택하고 General, About, Buttons and gestures 순서로 들어가면 볼 수 있어요.",
     ]),
-    ("Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can even teach me something new, just by telling me.", [
-        "Rồi, vậy là xong hết. Lúc nào bạn cũng có thể bảo mình cài đặt lại. Muốn biết các nút và cách chạm vào mình, bạn mở app Autonomous, chọn mình, rồi vào General, About, Buttons and gestures nhé. Nếu bạn muốn bắt đầu từ đâu đó, cứ nhờ mình hẹn giờ, hỏi thời tiết, hay hỏi bất cứ điều gì bạn tò mò. Bạn còn có thể dạy mình điều mới, chỉ cần nói với mình thôi.",
-        "はい、これで全部です。設定はいつでもやり直せるので、言ってくださいね。ボタンやタッチの使い方は、Autonomous アプリで私を選んで、General、About、Buttons and gestures の順に開くと見られますよ。まずは、タイマーや天気、気になることを何でも聞いてみてください。話しかけるだけで、新しいことを教えてもらうこともできますよ。",
-        "好的，全部完成了。你随时可以让我重新设置。想知道我的按键和触摸怎么用，可以打开 Autonomous App，选中我，再依次打开 General、About、Buttons and gestures。想先试试的话，可以让我定个计时器、问问天气，或者问任何你好奇的事。你甚至可以直接告诉我，教我做新的事。",
-        "좋아요. 이걸로 설정이 모두 끝났어요. 다시 설정하고 싶으시면 언제든 말씀해 주세요. 제 버튼이랑 터치 사용법은 Autonomous 앱에서 저를 선택하고 General, About, Buttons and gestures 순서로 들어가면 볼 수 있어요. 처음이라면 타이머나 날씨, 아니면 궁금한 건 뭐든 물어봐 주세요. 말로 알려 주시기만 하면 새로운 것도 배울 수 있어요.",
+    ("Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one.", [
+        "Rồi, vậy là xong hết. Lúc nào bạn cũng có thể bảo mình cài đặt lại. Muốn biết các nút và cách chạm vào mình, bạn mở app Autonomous, chọn mình, rồi vào General, About, Buttons and gestures nhé. Nếu bạn muốn bắt đầu từ đâu đó, cứ nhờ mình hẹn giờ, hỏi thời tiết, hay hỏi bất cứ điều gì bạn tò mò. Bạn cũng có thể thêm kỹ năng từ Skill Store trong app, hoặc cứ nhờ mình tạo một kỹ năng.",
+        "はい、これで全部です。設定はいつでもやり直せるので、言ってくださいね。ボタンやタッチの使い方は、Autonomous アプリで私を選んで、General、About、Buttons and gestures の順に開くと見られますよ。まずは、タイマーや天気、気になることを何でも聞いてみてください。アプリの Skill Store からスキルを追加したり、私にスキルを作ってと頼んだりもできますよ。",
+        "好的，全部完成了。你随时可以让我重新设置。想知道我的按键和触摸怎么用，可以打开 Autonomous App，选中我，再依次打开 General、About、Buttons and gestures。想先试试的话，可以让我定个计时器、问问天气，或者问任何你好奇的事。你也可以在 App 的 Skill Store 里添加技能，或者直接让我帮你做一个。",
+        "좋아요. 이걸로 설정이 모두 끝났어요. 다시 설정하고 싶으시면 언제든 말씀해 주세요. 제 버튼이랑 터치 사용법은 Autonomous 앱에서 저를 선택하고 General, About, Buttons and gestures 순서로 들어가면 볼 수 있어요. 처음이라면 타이머나 날씨, 아니면 궁금한 건 뭐든 물어봐 주세요. 앱의 Skill Store에서 스킬을 추가하거나, 저한테 하나 만들어 달라고 하셔도 돼요.",
     ]),
     ("That's fine, you can redo the setup later. Just ask me to redo the setup.", [
         "Không sao, bạn có thể cài đặt lại sau. Chỉ cần bảo mình cài đặt lại.",
