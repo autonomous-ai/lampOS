@@ -1252,6 +1252,16 @@ credential of its own.
   (`DAEMON_START_TIMEOUT`), past Harness's own 60 s wait for the daemon,
   and the part journals `Harness's daemon started after the sign-in` or why
   not. A sign-in that fails or is cancelled starts nothing.
+- **Started at the part's own start, when already signed in (#5379).**
+  Harness put on by the onboarding install (`harness-install`, install.md)
+  has no daemon at boot: no linger and no `harness service install`. So
+  after a reboot a signed-in lamp had no daemon, and no hand-over could go
+  (lamp-c0a4, 5 November: `Harness signed in: yes`, then
+  `machines_failed`). With `--sign-in-by-code` and `--set-up-later`, when
+  the part's first sign-in read says signed in (or offline), it runs the
+  same `harness start`, with the same tries below, and journals
+  `Harness signed in at this start: its daemon is started (#5379)`. A part
+  that starts signed out starts nothing until a sign-in.
 - **A failed start is tried again.** On lamp-75c9 (21 October) the start
   right after a spoken sign-in said `start_failed`, and one by hand about a
   minute later worked. So a failed start is tried again 10 s later, then
