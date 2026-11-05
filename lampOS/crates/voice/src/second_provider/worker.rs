@@ -1159,7 +1159,16 @@ pub fn services(
         );
         net = net.routing_through_the_relay(routable);
     }
+    // The stop words as key terms on the cut-in's own stream too (#5076).
+    let stop_terms = crate::stop_words::key_terms_from_environment();
+    if stop_terms {
+        eprintln!(
+            "lamp-voice second: listening asks for the stop words as key terms ({})",
+            crate::stop_words::KEYTERM_ENVIRONMENT
+        );
+    }
     Ok(net
+        .asking_for_the_stop_words(stop_terms)
         .warming_the_chat(warm)
         .warming_the_speech(warm_speech)
         .speaking_on_a_socket(speech_socket))

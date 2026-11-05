@@ -1741,6 +1741,8 @@ fn second_route_worker_environment(
         crate::second_provider::SPEECH_SOCKET_MODEL_ENVIRONMENT,
         // Read by the second worker's services (#2882).
         crate::second_provider::RELAY_ROUTES_ENVIRONMENT,
+        // Listening asks for the stop words as key terms too (#5076).
+        crate::stop_words::KEYTERM_ENVIRONMENT,
         crate::second_provider::STEADY_FIRST_ENVIRONMENT,
         crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT,
         crate::second_provider::FEW_TOOLS_ENVIRONMENT,
@@ -2664,6 +2666,7 @@ mod tests {
                     || name == crate::second_provider::SPEECH_WARM_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_SOCKET_ENVIRONMENT
                     || name == crate::second_provider::RELAY_ROUTES_ENVIRONMENT
+                    || name == crate::stop_words::KEYTERM_ENVIRONMENT
                     || name == crate::second_provider::STEADY_FIRST_ENVIRONMENT
                     || name == crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT
                     || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
@@ -2913,6 +2916,7 @@ mod tests {
                     "LAMP_SECOND_WEATHER=on",
                     "LAMP_SECOND_WRITTEN_WAIT=on",
                     "LAMP_SHORT_DONE=on",
+                    "LAMP_STOP_WORDS_KEYTERM=on",
                     "LAMP_TASKS_NAMED_ASK=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
                     "LAMP_TURNED_FACE_SPEAKS=on",

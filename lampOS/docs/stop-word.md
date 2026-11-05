@@ -1117,7 +1117,11 @@ It is to be decided again before home lamps ship.
   are left out. Before #2602's fix the
   coordinator read the file alone, so the stream asked with the lamp's
   name only: the relay counted 1-term sessions beside the worker's
-  10-term ones. The wait words' stream (`RelayEars::for_waits`) is read
+  10-term ones. With the switch the second route's own stream, which
+  hears the cut-in's words, asks with the stop words too
+  (`Net::asking_for_the_stop_words`, #5076): on lamp-52e6 on 5 Nov it
+  heard a played "Stop, Lamp." over a story as "Start plan.", "Sam
+  Lamp." and "Talent plan.", the name a key term and "Stop" not. The wait words' stream (`RelayEars::for_waits`) is read
   the same way. A `LAMP_SECOND_KEY_TERMS` the check refuses (more than 20
   terms, an empty one) is refused in the journal and the file's key terms
   are kept, so the stop and wait words are still heard (the second worker
