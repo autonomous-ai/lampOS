@@ -1,6 +1,7 @@
 //! Harness put on a lamp before its sign-in (#5197; docs/install.md,
 //! "Harness before the sign-in"), off unless `LAMP_HARNESS_AT_ONBOARDING=on`
-//! in lamp-update's own unit.
+//! in lamp-update's own unit; on a product lamp with it unset, the build's
+//! own default ([`product::PRODUCT_DEFAULT`], on).
 //!
 //! After each `serve` round that reached the channel (so the first one once
 //! the onboarding has the lamp on Wi-Fi, and every later one), a lamp with
