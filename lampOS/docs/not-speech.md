@@ -781,6 +781,19 @@ A call written as words is kept nowhere, on either route
   called the lamp by name to a face, #2191), and any other is asked once
   more, told to call the function (`CALL_ALOUD_NOTE`). Beside a call or
   other words, those go on. "Calling your sister is a good idea." is said.
+- The second route, a call written as its text with no "Calling"
+  (`not_speech::opens_with_a_call_aloud`, `opens_as_a_written_call`;
+  lamp-06c1, 5 Nov, run 1027 request 20: "remember The person's favorite
+  tea is peppermint, no longer oolong. 4" was said aloud, `remember`, its
+  text and `replaces` 4): a reply that opens with remember, recall, forget
+  or weather in lower case, then a space and a capital letter (not "I"), a
+  quote, `{`, `(` or `:`, the name alone, or a lower-case text that closes
+  with an id after a sentence's end (". 4"), is the whole reply as a call.
+  Such an opening is held to the reply's end, so none of it is said or
+  kept, and the model is asked once more to call it, as above. A reply in
+  words begins with a capital ("Remember to water the plants.", "Remember
+  when …") and goes on at its first word; "remember I said …" and a
+  lower-case reply with no closing id are said too.
 - The second route, a step's own word alone (`not_speech::step_word_alone`,
   `STEP_WORDS`: "Brighter.", "Dimmer.", "Warmer.", "Cooler.", "Louder.",
   "Quieter.", lamp-actions' own words after a step; lamp-52e6, 3 Nov, the

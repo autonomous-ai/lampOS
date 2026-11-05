@@ -1661,6 +1661,10 @@ struct Shared {
     /// call is a keep claim with no keep (`LAMP_MEMORY_KEEP_ASKED`, #5141
     /// row 8, [`Engine::claiming_faces`]).
     face_claims: bool,
+    /// A keep the round right after it doubts is taken back and held for
+    /// their yes (`LAMP_MEMORY_DOUBT_UNDOES`, C37,
+    /// [`Engine::undoing_doubted_keeps`]).
+    doubt_undoes: bool,
     remember_speaker: bool,
     enrollment_sight: Option<Arc<crate::speaking_faces::SpeakingFaces>>,
     /// A line is a known person's only when their own face was seen
@@ -3497,6 +3501,7 @@ impl Engine {
                 forget_sight: None,
                 forget_through_spelling: false,
                 face_claims: false,
+                doubt_undoes: false,
                 remember_speaker: false,
                 enrollment_sight: None,
                 scope_seen: false,
@@ -3909,6 +3914,20 @@ impl Engine {
     pub fn holding_forgets_through_spelling(mut self, on: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.forget_through_spelling = on;
+        self
+    }
+
+    /// A `remember` that kept something new, then doubted in the round
+    /// right after it ("Was that 'rhinodulus' right?",
+    /// `remember::doubted::doubts_what_was_heard`), is forgotten by its id in
+    /// the same scope and held for the same person's yes, which keeps it
+    /// again (`LAMP_MEMORY_DOUBT_UNDOES`, C37). Needs the held forget's
+    /// sight ([`Self::confirming_forgets_by_sight`]) and `forget` by id
+    /// (`LAMP_MEMORY_FORGET_ALL`); without either nothing is taken back. Off,
+    /// as before: a doubt after the keep leaves it kept.
+    pub fn undoing_doubted_keeps(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.doubt_undoes = on;
         self
     }
 
@@ -10304,6 +10323,107 @@ enum Holding {
 }
 
 /// Holds `call` for `asker`'s yes, in place of one an earlier turn held.
+/// A `remember` of this request that kept something new
+/// ([`remember::doubted::new_keep_id`]), for the round right after it
+/// (`LAMP_MEMORY_DOUBT_UNDOES`, C37).
+struct JustKept {
+    round: usize,
+    call: net::ToolCall,
+    id: u64,
+    at: Instant,
+    /// Whom it was kept for, as a held forget names them ([`forget_asker`]).
+    asker: Option<(u64, String)>,
+}
+
+/// The round right after `kept` doubts what was heard
+/// (`LAMP_MEMORY_DOUBT_UNDOES`, C37): the keep is held for the same
+/// person's yes ([`hold_forget`], asked already, since this answer is the
+/// question), then forgotten by its id in the same scope; their yes keeps
+/// it again as called. Only on a spoken turn, with the eyes' sight for a
+/// held keep's yes, for the same known person and scope it was kept in,
+/// within [`remember::doubted::UNDO_WITHIN`]. Whether it was taken back;
+/// the journal says why not, never words or ids.
+async fn undo_doubted_keep(
+    shared: &Shared,
+    request: u64,
+    round: usize,
+    heard: bool,
+    kept: &JustKept,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+) -> Result<bool, Stop> {
+    if !shared.doubt_undoes {
+        return Ok(false);
+    }
+    let asker = forget_asker(scope);
+    let now = (shared.clock)();
+    let not = if !heard {
+        Some("a turn the lamp wrote")
+    } else if shared.forget_sight.is_none() {
+        Some("the eyes don't read who speaks, so no yes could keep it again")
+    } else if asker.is_none() || asker != kept.asker {
+        Some("not the same known person")
+    } else if now.saturating_duration_since(kept.at) > crate::remember::doubted::UNDO_WITHIN {
+        Some("too late")
+    } else {
+        None
+    };
+    if let Some(why) = not {
+        eprintln!(
+            "lamp-voice second: request {request} chat round {round}: its words doubt the keep just before, not taken back: {why} ({})",
+            crate::remember::doubted::UNDOES_ENVIRONMENT
+        );
+        return Ok(false);
+    }
+    let Some(asker) = asker else {
+        return Ok(false);
+    };
+    match hold_forget(shared, request, &kept.call, asker, now) {
+        Holding::Held => {}
+        Holding::OneWaits | Holding::Stale => {
+            eprintln!(
+                "lamp-voice second: request {request} chat round {round}: its words doubt the keep just before, not taken back: another call is held ({})",
+                crate::remember::doubted::UNDOES_ENVIRONMENT
+            );
+            return Ok(false);
+        }
+    }
+    if let Ok(mut hold) = shared.held_forget.lock()
+        && let Some(held) = hold.held.as_mut().filter(|held| held.request == request)
+    {
+        held.asked = true;
+    }
+    let forget = net::ToolCall {
+        id: format!("{}-doubted", kept.call.id),
+        name: crate::remember::FORGET.to_owned(),
+        args: serde_json::json!({ "source_id": kept.id }),
+        ..kept.call.clone()
+    };
+    let told = run_tool(shared, request, heard, &forget, scope).await;
+    if scope.is_some_and(|scope| !scope.is_current()) {
+        return Err(Stop::Gone);
+    }
+    if told["forgotten"] != true {
+        if let Ok(mut hold) = shared.held_forget.lock()
+            && hold
+                .held
+                .as_ref()
+                .is_some_and(|held| held.request == request)
+        {
+            hold.held = None;
+        }
+        eprintln!(
+            "lamp-voice second: request {request} chat round {round}: its words doubt the keep just before, not taken back: the forget did not run ({})",
+            crate::remember::doubted::UNDOES_ENVIRONMENT
+        );
+        return Ok(false);
+    }
+    eprintln!(
+        "lamp-voice second: request {request} chat round {round}: its words doubt the keep just before: taken back, kept again only on their yes ({})",
+        crate::remember::doubted::UNDOES_ENVIRONMENT
+    );
+    Ok(true)
+}
+
 fn hold_forget(
     shared: &Shared,
     request: u64,
@@ -11058,6 +11178,9 @@ async fn answer(
         // spoken turn: never on a line the rule holds, and with the Policy's
         // decision.
         let mut held_forget_ran = false;
+        // Their yes kept a held keep (`LAMP_MEMORY_DOUBT_UNDOES`, or a
+        // carried line's): its round's "Kept." is no claim with no keep.
+        let mut held_keep_ran = false;
         let mut call_statuses = Vec::new();
         let mut forgot_before_question = false;
         if let Some(call) = held_forget_runs.take() {
@@ -11122,6 +11245,8 @@ async fn answer(
                     );
                     forgot_before_question = true;
                 } else {
+                    held_keep_ran =
+                        call.name == crate::remember::REMEMBER && result["remembered"] == true;
                     messages.push(Message::system(if call.name == crate::remember::REMEMBER {
                     format!(
                         "(For you to know: they said yes, so what you asked to keep for them is kept now, with this result: {result}. Say in a few words that it is kept, and do not call remember again for it.)"
@@ -11220,7 +11345,7 @@ async fn answer(
         // Whether a `remember` of this request kept something, and whether
         // a reply that said it kept something with none was asked again
         // once ([`crate::remember::claims_a_keep`], finding K on #3504).
-        let mut kept_now = false;
+        let mut kept_now = held_keep_ran;
         // A forget invalidates earlier memory-keep evidence, while completed
         // non-memory actions may still have their content-free confirmation.
         let mut confirmed_other_call = false;
@@ -11229,6 +11354,11 @@ async fn answer(
         // other calls, once those calls are answered: what the model is
         // told of a keep claim, or of a face claim (#5141 row 8).
         let mut keep_claim_note: Option<&'static str> = None;
+        // The last round's new keep, for the round right after it, and what
+        // the model is told before its next round once a doubt took it back
+        // (`LAMP_MEMORY_DOUBT_UNDOES`, C37).
+        let mut just_kept: Option<JustKept> = None;
+        let mut doubt_note: Option<&'static str> = None;
         // A reply's offer to keep something, held to its round's end and
         // not said beside a `remember` call that keeps it (finding K2 on
         // #3504), and whether a `remember` of this request ran.
@@ -11240,6 +11370,9 @@ async fn answer(
         let mut round = 0;
         while round < MAX_ROUNDS {
             if let Some(note) = keep_claim_note.take() {
+                messages.push(Message::system(note));
+            }
+            if let Some(note) = doubt_note.take() {
                 messages.push(Message::system(note));
             }
             if let Some(kind) = action_claim_note.take() {
@@ -12177,6 +12310,16 @@ async fn answer(
                     return Err(Stop::Gone);
                 }
             }
+            // The round right after a new keep doubts what was heard
+            // ("Was that 'rhinodulus' right?", C37): that keep is taken
+            // back and held for their yes (`LAMP_MEMORY_DOUBT_UNDOES`).
+            if let Some(kept) = just_kept.take().filter(|kept| kept.round + 1 == round)
+                && crate::remember::doubted::doubts_what_was_heard(&text)
+                && undo_doubted_keep(shared, request, round, heard, &kept, scope.as_ref()).await?
+                && !calls.is_empty()
+            {
+                doubt_note = Some(crate::remember::doubted::UNDONE_NOTE);
+            }
             let first_calls = !called_earlier;
             called_earlier |= !calls.is_empty();
             turn_called.extend(calls.iter().map(|call| call.name.clone()));
@@ -12691,6 +12834,7 @@ async fn answer(
                     remember_ran = false;
                     keep_claim_asked = false;
                     keep_claim_note = None;
+                    just_kept = None;
                     offer_hold = crate::remember::OfferHold::default();
                     forgot_this_round = true;
                     // Later calls were planned from the context just discarded.
@@ -12750,6 +12894,21 @@ async fn answer(
                 // is the code's own, and is said (`LAMP_KEEP_QUIETLY`).
                 if call.name == crate::remember::REMEMBER && answer.told.get("held").is_some() {
                     quiet.held_keep();
+                }
+                // A new keep, for the round right after it
+                // (`LAMP_MEMORY_DOUBT_UNDOES`): never one kept already, one
+                // that replaced another, or one held.
+                if shared.doubt_undoes
+                    && call.name == crate::remember::REMEMBER
+                    && let Some(id) = crate::remember::doubted::new_keep_id(&answer.told)
+                {
+                    just_kept = Some(JustKept {
+                        round,
+                        call: call.clone(),
+                        id,
+                        at: (shared.clock)(),
+                        asker: forget_asker(scope.as_ref()),
+                    });
                 }
                 if call.name != crate::remember::RECALL && did {
                     kept_now = true;
