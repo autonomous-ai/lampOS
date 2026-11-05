@@ -12005,6 +12005,290 @@ async fn a_wordless_cut_in_asks_at_most_once_a_minute() {
     assert!(script.asked.lock().unwrap().is_empty());
 }
 
+/// A line that cut request `cut`'s answer after `samples` of it played,
+/// begun over the lamp's voice (`LAMP_SAID_AS_HEARD`'s `heard_of_cut`).
+fn start_cutting(request: u64, cut: u64, samples: u64) -> ProviderInput {
+    ProviderInput::Start {
+        request,
+        session: 1,
+        privacy_generation: 1,
+        continues: false,
+        continues_cut_off: false,
+        over_the_lamp: true,
+        after_stop: false,
+        follows_on: false,
+        over_the_lamps_voice: true,
+        heard_of_cut: Some(crate::said_as_heard::HeardOfCut {
+            request: cut,
+            samples,
+        }),
+        soft_lead_us: 0,
+    }
+}
+
+/// Request `answer`'s story as sent, three sentences of 1,000 samples each,
+/// sent whole unless `whole` is false.
+fn story_sent(engine: &Engine, answer: u64, whole: bool) {
+    for words in [
+        "Once upon a time.",
+        " The keeper lit the lamp.",
+        " Then a ship came.",
+    ] {
+        engine.shared.said_piece(answer, Some(words));
+        engine.shared.said_samples(answer, 1_000);
+    }
+    *engine.shared.said_whole.lock().unwrap() = whole.then_some(answer);
+}
+
+/// A wordless cut-in `request`, its line over the lamp's voice, cutting
+/// `cut`'s answer after `samples`.
+async fn wordless_cut_of(engine: &mut Engine, request: u64, cut: u64, samples: u64) -> Vec<String> {
+    engine.submit(start_cutting(request, cut, samples));
+    engine.submit(audio(request, 1));
+    engine.submit(end(request));
+    turn(engine).await
+}
+
+/// The memory owner, 5 Nov (`LAMP_CUT_IN_WORDLESS_RESUMES`): a busy room's
+/// first wordless cut says "Anyway," and goes on from the sentence that
+/// was cut, the model not asked; a quiet room's still asks; another within
+/// the minute says it was cut again and goes on; a third pauses and says
+/// why; any more leave the lamp quiet; a minute later it starts afresh.
+#[tokio::test]
+async fn wordless_cuts_resume_the_answer_then_pause() {
+    use crate::cut_in_wordless::{AGAIN, AGAIN_AFTER, BRIDGE, LINE, PAUSE};
+    let script = Arc::new(Script::default());
+    let (built, _, now) = scripted(script.clone());
+    let busy = Arc::new(AtomicBool::new(true));
+    let room = busy.clone();
+    let mut engine = built
+        .asking_after_wordless_cut_ins(true)
+        .resuming_after_wordless_cut_ins(true)
+        .judging_busy(Arc::new(move |_| room.load(Ordering::Relaxed)));
+    let rest = [
+        "said: The keeper lit the lamp.".to_owned(),
+        "said: Then a ship came.".to_owned(),
+    ];
+    // Busy, first: the bridge, then the rest from the cut sentence.
+    story_sent(&engine, 1, true);
+    let out = wordless_cut_of(&mut engine, 2, 1, 1_500).await;
+    let said: Vec<&String> = out
+        .iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(
+        said,
+        [&format!("said:{BRIDGE}"), &rest[0], &rest[1]],
+        "{out:?}"
+    );
+    assert!(out.contains(&format!("audio:{}", BRIDGE.len())), "{out:?}");
+    assert!(out.ends_with(&["generated".to_owned(), "complete".to_owned()]));
+    // Within the minute, a cut of the resumed answer in its bridge: cut
+    // again, the whole rest goes on, never the bridge twice.
+    *now.lock().unwrap() += Duration::from_secs(20);
+    busy.store(false, Ordering::Relaxed);
+    let out = wordless_cut_of(&mut engine, 3, 2, 3).await;
+    let said: Vec<&String> = out
+        .iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(
+        said,
+        [&format!("said:{AGAIN}"), &rest[0], &rest[1]],
+        "{out:?}"
+    );
+    // A third within the minute: the pause, nothing more.
+    *now.lock().unwrap() += Duration::from_secs(20);
+    let out = wordless_cut_of(&mut engine, 4, 3, AGAIN.len() as u64 + 10).await;
+    let said: Vec<&String> = out
+        .iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(said, [&format!("said:{PAUSE}")], "{out:?}");
+    // A fourth: quiet, never a loop.
+    story_sent(&engine, 5, true);
+    let out = wordless_cut_of(&mut engine, 6, 5, 1_500).await;
+    assert!(
+        !out.iter().any(|label| label.starts_with("said:")),
+        "{out:?}"
+    );
+    // A minute after the last, in a quiet room: asked, as before.
+    *now.lock().unwrap() += AGAIN_AFTER;
+    story_sent(&engine, 7, true);
+    let out = wordless_cut_of(&mut engine, 8, 7, 1_500).await;
+    let said: Vec<&String> = out
+        .iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(said, [&format!("said:{LINE}")], "{out:?}");
+    // A cut of that question, soon after: nothing of the lamp's own answer
+    // to go on with, so quiet.
+    let out = wordless_cut_of(&mut engine, 9, 8, 3).await;
+    assert!(
+        !out.iter().any(|label| label.starts_with("said:")),
+        "{out:?}"
+    );
+    assert!(script.asked.lock().unwrap().is_empty());
+}
+
+/// The Reviewer-lead's P2 on #5430: after the pause, the person's "Lamp, go
+/// on." starts the run again, so a cough over that answer says "Anyway,"
+/// and goes on, never quiet. The answer is a real turn: its rest is kept
+/// because `answer()` marked it sent whole (the P3 there), not a test's set.
+#[tokio::test]
+async fn a_spoken_go_on_after_the_pause_starts_the_run_again() {
+    use crate::cut_in_wordless::{BRIDGE, PAUSE};
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok(String::new()),
+                Ok(String::new()),
+                Ok(String::new()),
+                Ok("Lamp, go on.".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [vec![
+                text("The ship came in. Its sails were red. The keeper waved."),
+                Ok(ChatEvent::Done),
+            ]]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (built, _, now) = scripted(script.clone());
+    let mut engine = built
+        .asking_after_wordless_cut_ins(true)
+        .resuming_after_wordless_cut_ins(true)
+        .judging_busy(Arc::new(|_| true));
+    story_sent(&engine, 1, true);
+    wordless_cut_of(&mut engine, 2, 1, 1_500).await;
+    wordless_cut_of(&mut engine, 3, 2, 3).await;
+    let out = wordless_cut_of(&mut engine, 4, 3, AGAIN_PLAYED).await;
+    assert!(out.contains(&format!("said:{PAUSE}")), "{out:?}");
+    *now.lock().unwrap() += Duration::from_secs(20);
+    engine.submit(start(5));
+    engine.submit(audio(5, 1));
+    engine.submit(end(5));
+    let out = turn(&mut engine).await;
+    assert!(out.contains(&"heard:Lamp, go on.".to_owned()), "{out:?}");
+    assert_eq!(*engine.shared.said_whole.lock().unwrap(), Some(5));
+    // Cut in its last sentence: the bridge, then that sentence again.
+    let (pieces, played) = {
+        let said = engine.shared.said.lock().unwrap();
+        assert_eq!(said.0, 5);
+        let all: u64 = said.1.iter().map(|piece| piece.samples).sum();
+        let last = said.1.last().unwrap();
+        (last.words.clone().unwrap(), all - last.samples / 2)
+    };
+    *now.lock().unwrap() += Duration::from_secs(30);
+    let out = wordless_cut_of(&mut engine, 6, 5, played).await;
+    let said: Vec<&String> = out
+        .iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(
+        said,
+        [
+            &format!("said:{BRIDGE}"),
+            &format!("said: {}", pieces.trim())
+        ],
+        "{out:?}"
+    );
+}
+
+/// Samples of the "cut off again" line played, less than all of it.
+const AGAIN_PLAYED: u64 = 10;
+
+/// The rest not kept (the answer was cut before it was sent whole): the
+/// bridge is said at once, then the model is asked to go on from the cut,
+/// not from the start. All played: nothing to go on with, quiet.
+#[tokio::test]
+async fn a_wordless_cut_with_no_kept_rest_asks_the_model_after_the_bridge() {
+    use crate::cut_in_wordless::BRIDGE;
+    let script = Arc::new(Script {
+        chats: Mutex::new([vec![text("And the ship was his."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (built, _, _) = scripted(script.clone());
+    let mut engine = built
+        .resuming_after_wordless_cut_ins(true)
+        .judging_busy(Arc::new(|_| true));
+    story_sent(&engine, 1, false);
+    let out = wordless_cut_of(&mut engine, 2, 1, 1_500).await;
+    let said: Vec<&String> = out
+        .iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(said.first(), Some(&&format!("said:{BRIDGE}")), "{out:?}");
+    assert!(
+        out.contains(&"said:And the ship was his.".to_owned()),
+        "{out:?}"
+    );
+    let asked = script.asked.lock().unwrap().clone();
+    assert_eq!(asked.len(), 1);
+    let ask = crate::cut_in_wordless::resume_ask(BRIDGE);
+    // Told as a note, never as anyone's words (the Reviewer-lead's P3 on
+    // #5430): no message of the person's is asked.
+    let last = asked[0].last().unwrap();
+    assert_eq!(last.role, "system", "{:?}", asked[0]);
+    assert_eq!(
+        last.content.as_ref().and_then(|c| c.as_str()),
+        Some(ask.as_str())
+    );
+    assert!(
+        asked[0]
+            .iter()
+            .any(|message| message.content.as_ref().and_then(|c| c.as_str()) == Some(ask.as_str())),
+        "{:?}",
+        asked[0]
+    );
+    // Sent whole and all of it played: nothing left, the lamp stays quiet.
+    let (built, _, now) = scripted(Arc::new(Script::default()));
+    let mut engine = built
+        .resuming_after_wordless_cut_ins(true)
+        .judging_busy(Arc::new(|_| true));
+    *now.lock().unwrap() += Duration::from_secs(1);
+    story_sent(&engine, 1, true);
+    let out = wordless_cut_of(&mut engine, 2, 1, 3_000).await;
+    assert!(
+        !out.iter().any(|label| label.starts_with("said:")),
+        "{out:?}"
+    );
+}
+
+/// The resume switch off: today's, exactly. A busy room's wordless cut
+/// stays quiet with a kept rest, and a quiet room's asks once a minute.
+#[tokio::test]
+async fn without_the_resume_switch_a_wordless_cut_is_as_before() {
+    for busy in [true, false] {
+        let script = Arc::new(Script::default());
+        let (built, _, _) = scripted(script.clone());
+        let mut engine = built
+            .asking_after_wordless_cut_ins(true)
+            .judging_busy(Arc::new(move |_| busy));
+        story_sent(&engine, 1, true);
+        let out = wordless_cut_of(&mut engine, 2, 1, 1_500).await;
+        let said: Vec<&String> = out
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        if busy {
+            assert!(said.is_empty(), "{out:?}");
+        } else {
+            assert_eq!(said, [&format!("said:{}", crate::cut_in_wordless::LINE)]);
+        }
+        story_sent(&engine, 3, true);
+        let out = wordless_cut_of(&mut engine, 4, 3, 1_500).await;
+        assert!(
+            !out.iter().any(|label| label.starts_with("said:")),
+            "{out:?}"
+        );
+        assert!(script.asked.lock().unwrap().is_empty());
+    }
+}
+
 /// #4938's replay 2 (lamp-06c1, 3 Nov 02:34): "Stop Lamp." over a story
 /// committed and its final words came back empty, so it was asked "Did
 /// someone say something?" (the line then). Words speech to text had on the way are words:
