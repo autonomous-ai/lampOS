@@ -880,7 +880,11 @@ thư cũng mới nhất trước, nên một lần đọc những tệp mới nh
 một thứ tự hay chỉ "mới nhất" ("order by modifiedTime desc", "newest") bị
 từ chối (`service_read::ordering`, sau khi một kỹ năng được tạo trên một
 đèn đọc ra 0 tệp với một thứ tự như vậy, 5/11). Bản brief của kỹ năng được
-tạo cho trọn bước của Drive và nói điều này (`made_skill::DRIVE_READ`).
+tạo cho trọn bước của Drive và nói điều này (`made_skill::DRIVE_READ`):
+bước đó, rồi "no other key" và lý do, bằng lời không gọi tên khóa nào.
+Trên 10300, ghi chú trong ngoặc ngay sau dấu ngoặc nhọn, "(newest first; …)",
+hai lần bị mô hình trả về thành thêm một khóa bên trong, bị từ chối là
+`unknown field` (lamp-9adf, 5/11 12:59).
 `events` của lịch lấy `day = "today"` hoặc `"tomorrow"` (ngày địa phương, tối
 đa 10 sự kiện) và không có `count`; `day` không dùng cho gì khác.
 `lamp-services` giữ lần đọc trong danh sách cho phép như với giọng nói.
