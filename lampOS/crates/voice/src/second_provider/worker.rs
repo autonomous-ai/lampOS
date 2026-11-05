@@ -12147,10 +12147,11 @@ fn keep_scoped(
                         let Some(scope) = lease.scope() else {
                             return;
                         };
-                        // A room's line the mouth rule named, no other
-                        // voice known, is their conversation going on, for
-                        // a carry (lamp-06c1, 5 Nov, S4; Thirteen's P1 on
-                        // #5448).
+                        // A room's line `named_alone` named (no face seen
+                        // speaking it, their face alone with a speaking
+                        // read), no other voice known, opens their
+                        // conversation for a keep only (lamp-06c1, 5 Nov,
+                        // S4; Thirteen's P1 and Heron's P2 on #5448).
                         thread.lamp_for_named(
                             *request,
                             &text,

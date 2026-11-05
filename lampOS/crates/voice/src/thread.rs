@@ -1328,6 +1328,14 @@ impl Thread {
     /// other room's exchange, a quiet, or no exchange: an exchange of anyone
     /// else's after theirs ends it.
     pub fn going_on_with(&self, request: u64, now: Instant) -> Option<String> {
+        self.going_on_how(request, now).map(|(person, _)| person)
+    }
+
+    /// [`Self::going_on_with`], and whether that conversation was only
+    /// opened by a room's exchange named for them
+    /// ([`Self::lamp_for_named`]): such a conversation carries a line's keep
+    /// only (`ScopeLease::carry_keep_only`, Heron's P2 on #5448).
+    pub fn going_on_how(&self, request: u64, now: Instant) -> Option<(String, bool)> {
         self.exchanges
             .iter()
             .rev()
@@ -1335,7 +1343,11 @@ impl Thread {
             .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric) || exchange.unheard)
             .filter(|exchange| now.saturating_duration_since(exchange.at) <= GOING_ON_FOR)
             .filter(|exchange| self.after_close(exchange))
-            .and_then(|exchange| exchange.whose.clone().or_else(|| exchange.named.clone()))
+            .and_then(|exchange| match (&exchange.whose, &exchange.named) {
+                (Some(whose), _) => Some((whose.clone(), false)),
+                (None, Some(named)) => Some((named.clone(), true)),
+                (None, None) => None,
+            })
     }
 
     /// What the person said and what the lamp answered in the newest
@@ -3898,6 +3910,11 @@ mod tests {
         thread.lamp_for_named(1, "Garden centre, noted.", now, None, Some(&a));
         assert_eq!(thread.going_on_with(2, soon), Some(a.clone()), "named");
         assert_eq!(
+            thread.going_on_how(2, soon),
+            Some((a.clone(), true)),
+            "opened by the name only: its keep only"
+        );
+        assert_eq!(
             thread.going_on_with(2, now + GOING_ON_FOR + Duration::from_secs(1)),
             None,
             "a quiet past 45 s"
@@ -3905,7 +3922,7 @@ mod tests {
         // A person's own exchange is theirs: the name never moves it.
         let b = crate::remember::person_id("B");
         thread.lamp_for_named(2, "Hi B.", now, Some(&b), Some(&a));
-        assert_eq!(thread.going_on_with(3, soon), Some(b), "B's own");
+        assert_eq!(thread.going_on_how(3, soon), Some((b, false)), "B's own");
         // A room's line named for nobody after hers ends it.
         let mut thread = Thread::new();
         thread.lamp_for_named(1, "Garden centre, noted.", now, None, Some(&a));

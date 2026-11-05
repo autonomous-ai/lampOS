@@ -1778,8 +1778,9 @@ struct Shared {
 pub(crate) type AnotherVoice = Arc<dyn Fn() -> bool + Send + Sync>;
 
 /// [`Shared::carries`]: the known person whose conversation is going on as a
-/// request is heard ([`crate::thread::Thread::going_on_with`]).
-pub(crate) type GoingOnWith = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
+/// request is heard, and whether it was only opened by a room's line named
+/// for them, which carries a keep only ([`crate::thread::Thread::going_on_how`]).
+pub(crate) type GoingOnWith = Arc<dyn Fn(u64) -> Option<(String, bool)> + Send + Sync>;
 
 /// [`Shared::keeps_calls`]: request `request`'s turn ran function `name`
 /// with the arguments it is told with ([`kept_args`],
@@ -1837,6 +1838,36 @@ fn carried_past_silent_undone(
         Some("another voice shown in the conversation")
     } else {
         None
+    }
+}
+
+/// Carries a line into `person`'s conversation going on: in full
+/// ([`ScopeLease::carry_conversation`], #4339), or, for a conversation only
+/// opened by a room's line named for them, its keep alone, held for their
+/// seen yes, with every read the room's (`ScopeLease::carry_keep_only`,
+/// Heron's P2 on #5448); that only with `LAMP_CONVERSATION_CARRIED_SAVES`,
+/// since it carries nothing else.
+///
+/// [`ScopeLease::carry_conversation`]: crate::memory_scope::ScopeLease::carry_conversation
+fn carry_into(
+    shared: &Shared,
+    lease: &crate::memory_scope::ScopeLease,
+    person: &str,
+    keep_only: bool,
+) -> bool {
+    if keep_only {
+        shared.carried_saves && lease.carry_keep_only(person)
+    } else {
+        lease.carry_conversation(person)
+    }
+}
+
+/// The journal's words for what a carried line is told ([`carry_into`]).
+fn carried_told(lease: &crate::memory_scope::ScopeLease) -> &'static str {
+    if lease.carried_for().is_some() {
+        "told from that conversation, never memory's"
+    } else {
+        "opened only by a line named for them: its keep alone carried, held for their yes, told as the room's"
     }
 }
 
@@ -4127,7 +4158,7 @@ impl Engine {
                 crate::thread::THREAD
                     .try_lock()
                     .ok()
-                    .and_then(|thread| thread.going_on_with(request, std::time::Instant::now()))
+                    .and_then(|thread| thread.going_on_how(request, std::time::Instant::now()))
             })
         }))
     }
@@ -7313,10 +7344,12 @@ async fn spoken(
     // Named by the one-face count rather than the mouth read
     // (`LAMP_SECOND_NAME_ONE_FACE`): its journal line says so.
     let mut named_by_one_face = false;
-    // Named by the mouth rule (`speaking_faces::named_alone`), whether or
-    // not the one-face count named it too: only this may open their
-    // conversation going on (Thirteen's P1 on #5448).
-    let mut named_by_mouth = false;
+    // Named by `speaking_faces::named_alone`: no face seen speaking it, their
+    // face alone in view with at least one look of it read speaking (never
+    // their mouth seen saying it), whether or not the one-face count named
+    // it too. Only this may open their conversation going on, for a keep
+    // only (Thirteen's P1 and Heron's P2 on #5448).
+    let mut named_alone_unseen = false;
     // Carried by the rule a silent face doesn't count in
     // (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`): judged again by the voice
     // once the rule has heard it.
@@ -7365,7 +7398,7 @@ async fn spoken(
                 // (`worker::known_person_for`).
                 named = shared.scope_seen
                     && crate::speaking_faces::named_alone(&speakers, &person, pair.as_ref(), alone);
-                named_by_mouth = named;
+                named_alone_unseen = named;
                 let known_face = pair.as_ref().map(|(_, face)| face.clone());
                 // No face seen speaking it, in their conversation going on,
                 // and no other face in view through it: carried as that
@@ -7388,13 +7421,15 @@ async fn spoken(
                         .carries
                         .as_ref()
                         .and_then(|going_on| going_on(request))
-                        .is_some_and(|going_on| going_on == person)
-                    && scope.carry_conversation(&person);
+                        .is_some_and(|(going_on, keep_only)| {
+                            going_on == person && carry_into(&shared, scope, &person, keep_only)
+                        });
                 if carried {
                     carried_past_silent = shared.past_silent.is_some();
                     eprintln!(
-                        "lamp-voice second: request {request}: no face was seen speaking it, in their conversation going on, {}: told from that conversation, never memory's (LAMP_CONVERSATION_CARRIES)",
-                        carried_as(&shared)
+                        "lamp-voice second: request {request}: no face was seen speaking it, in their conversation going on, {}: {} (LAMP_CONVERSATION_CARRIES)",
+                        carried_as(&shared),
+                        carried_told(scope)
                     );
                 }
                 // Their known face the one face through it, none seen
@@ -7517,10 +7552,10 @@ async fn spoken(
                 scope.name_for_reply();
             }
             // Its room's exchange opens their conversation going on for a
-            // carry only when the mouth rule named it and the voice rule is
+            // keep-only carry when `named_alone` named it and the voice rule is
             // there with no other voice known, failing closed (lamp-06c1,
             // 5 Nov, S4; Thirteen's P1 on #5448).
-            if named_by_mouth && no_other_voice_shown(&shared) {
+            if named_alone_unseen && no_other_voice_shown(&shared) {
                 scope.name_for_conversation();
             }
             // Only the one-face count tells a known face its name; the mouth
@@ -7553,7 +7588,7 @@ async fn spoken(
         && shared.scope_seen
         && lease.admitted_person().is_none()
         && lease.scope().is_some_and(|scope| scope.person().is_none())
-        && let Some(person) = going_on(request)
+        && let Some((person, keep_only)) = going_on(request)
     {
         let (speakers, pair, _) = line_sight(eyes, known, begun, finishing, true).await;
         let face = pair
@@ -7567,12 +7602,13 @@ async fn spoken(
                 begun.checked_sub(CARRY_UNSEEN_WITHIN).unwrap_or(begun),
                 finishing,
             )
-            && lease.carry_conversation(&person)
+            && carry_into(&shared, lease, &person, keep_only)
         {
             carried_past_silent = shared.past_silent.is_some();
             eprintln!(
-                "lamp-voice second: request {request}: admitted as the room's, no face seen speaking it, in a known person's conversation going on, {}: told from that conversation, never memory's (LAMP_CONVERSATION_CARRIES)",
-                carried_as(&shared)
+                "lamp-voice second: request {request}: admitted as the room's, no face seen speaking it, in a known person's conversation going on, {}: {} (LAMP_CONVERSATION_CARRIES)",
+                carried_as(&shared),
+                carried_told(lease)
             );
             if prepared.take().is_some() {
                 eprintln!(
@@ -8086,9 +8122,9 @@ async fn spoken(
     // the narrow takes the fallback back (Heron's P2 on #5272).
     // And a line named by the one-face count (`LAMP_SECOND_NAME_ONE_FACE`):
     // the narrow takes the name back too.
-    // Another voice heard as it was judged: a line named by the mouth rule
+    // Another voice heard as it was judged: a line named by `named_alone`
     // opens no conversation of theirs (Thirteen's P1 on #5448).
-    if named_by_mouth
+    if named_alone_unseen
         && !no_other_voice_shown(&shared)
         && let Some(scope) = scope.as_ref()
         && scope.named_for_conversation().is_some()

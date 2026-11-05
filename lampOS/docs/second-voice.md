@@ -4863,14 +4863,14 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   such a line no face was seen speaking stays the conversation's, not the
   room's, when all of these hold: the newest exchange before it is theirs
   and began within 45 s (`Thread::going_on_with`; a room's exchange whose
-  line the mouth rule named for their face alone in view (`named_alone`,
-  never the one-face count alone), with the one-face rule's voice tracker
-  there and no other voice known for it, counts as theirs here and nowhere
-  else, `ScopeLease::named_for_conversation`, `Thread::lamp_for_named`; any
-  later narrow, or another voice heard as the line is judged, takes it back:
-  lamp-06c1, 5 Nov, S4, where the owner-only name rule kept a non-owner's
-  opening line as the room's and her car line just after found no
-  conversation of hers; Thirteen's P1 on #5448),
+  line `named_alone` named for their face, never the one-face count alone,
+  with the one-face rule's voice tracker there and no other voice known for
+  it, opens their conversation for a **keep only**,
+  `ScopeLease::named_for_conversation`, `Thread::lamp_for_named`,
+  `Thread::going_on_how`; any later narrow, or another voice heard as the
+  line is judged, takes it back: lamp-06c1, 5 Nov, S4, where the owner-only
+  name rule kept a non-owner's opening line as the room's and her car line
+  just after found no conversation of hers; Thirteen's P1 on #5448),
   the eyes' looks fell in
   it and none tracked a face but theirs (`SpeakingFaces::no_other_face_in_view`;
   no look, a stalled eye or a covered camera, is not), their face was in
@@ -4904,6 +4904,20 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   journal: `request N: no face was seen speaking it, in their conversation
   going on, no other face in view: told from that conversation, never
   memory's (LAMP_CONVERSATION_CARRIES)`.
+  **What `named_alone` means.** It is not "their mouth was seen saying
+  it": no face was seen speaking the line (no face read speaking in at
+  least half its looks), while their known face was the only face in view
+  through it with at least one look of it read speaking and fewer than half
+  read still. A nod or a smile fits; so does a partner off camera talking
+  while they listen. So a conversation opened only by such a line
+  (`ScopeLease::carry_keep_only`, Heron's P2 on #5448) carries a later
+  unseen line's **keep alone**, held for their own seen yes and written in
+  their scope on it, with `LAMP_CONVERSATION_CARRIED_SAVES`: the line is
+  told as the room's, held, never their thread, running summary, recall,
+  note or hits, and runs no forget or yes; the journal says `opened only by
+  a line named for them: its keep alone carried, held for their yes, told
+  as the room's`. A conversation they opened in their own scope (#4339)
+  carries as before.
   **A carried line's keep waits for their yes**
   (`LAMP_CONVERSATION_CARRIED_SAVES=on`, #4339, approved 30 Oct; the first
   builder's call on #4508): after either carry, `ScopeLease::save_carried`
