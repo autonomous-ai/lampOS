@@ -486,8 +486,16 @@ The child gets `AI_AGENT=lampos` and `HARNESS_AGENT_SESSION=<persistent store
 ID>`. It receives only explicitly allowed ordinary provisioning variables:
 `HOME`, `PATH`, `LANG`, `LC_ALL`, `LC_CTYPE`, `TMPDIR`, `TMP`, `TEMP`, `USER`,
 `LOGNAME`, `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_CACHE_HOME`,
-`XDG_RUNTIME_DIR`, `ADAPTER_DATA_DIR`, `HARNESS_AUTH_DIR`, `PORT`. `HOME` is
-absolute and every PATH entry is absolute. No inherited pane, Claude or Codex
+`XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS`, `ADAPTER_DATA_DIR`,
+`HARNESS_AUTH_DIR`, `PORT`. `HOME` is absolute and every PATH entry is
+absolute. A system unit gives its process no `XDG_RUNTIME_DIR` or user bus,
+yet Harness 0.5.42's `harness start` runs `systemctl --user start
+harnessd.service`, which then fails ("Failed to connect to bus: No medium
+found"; after a sign-in from the app on lamp-c0a4, 5 Nov, #5385). So each one
+not already set is taken from the service user's own runtime folder,
+`/run/user/<uid>`, and its `bus`, only where they exist
+(`harness::with_user_bus`); the product's `lampos` user lingers, so both are
+there from boot. No inherited pane, Claude or Codex
 identity, provider key or shell startup environment is forwarded. Tasks never
 opens Harness credential/ledger files; Harness itself owns their use.
 Each forwarded value is at most 4 KiB, the environment totals at most 32 KiB,

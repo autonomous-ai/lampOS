@@ -3554,3 +3554,60 @@ fn a_close_is_given_only_what_is_left_of_its_budget() {
     // loaded host; it is never started twice.
     assert!(rig.calls().len() <= 1);
 }
+
+/// Harness 0.5.42's `harness start` reaches the service user's systemd user
+/// manager (`systemctl --user`), which a system unit's process can't find
+/// without `XDG_RUNTIME_DIR` (#5385). Each call is given the user's own
+/// runtime folder and its bus when they exist, and never overrides a set one.
+#[test]
+fn every_harness_call_is_given_the_service_users_own_bus() {
+    use lamp_tasks::harness::with_user_bus;
+    use std::path::Path;
+    let base: BTreeMap<String, OsString> = [
+        ("HOME".to_owned(), OsString::from("/var/lib/lampos-tasks")),
+        (
+            "PATH".to_owned(),
+            OsString::from("/usr/local/bin:/usr/bin:/bin"),
+        ),
+    ]
+    .into_iter()
+    .collect();
+    let lingering = |place: &Path| {
+        place == Path::new("/run/user/996") || place == Path::new("/run/user/996/bus")
+    };
+    let given = with_user_bus(base.clone(), 996, &lingering);
+    assert_eq!(given["XDG_RUNTIME_DIR"], OsString::from("/run/user/996"));
+    assert_eq!(
+        given["DBUS_SESSION_BUS_ADDRESS"],
+        OsString::from("unix:path=/run/user/996/bus")
+    );
+    assert_eq!(given["HOME"], base["HOME"]);
+
+    // No user manager (not lingering): nothing is made up.
+    let none = with_user_bus(base.clone(), 996, &|_: &Path| false);
+    assert_eq!(none, base);
+
+    // A runtime folder with no bus yet: the folder only.
+    let folder_only = with_user_bus(base.clone(), 996, &|place: &Path| {
+        place == Path::new("/run/user/996")
+    });
+    assert!(folder_only.contains_key("XDG_RUNTIME_DIR"));
+    assert!(!folder_only.contains_key("DBUS_SESSION_BUS_ADDRESS"));
+
+    // Set by the unit: kept as it is.
+    let mut set = base.clone();
+    set.insert("XDG_RUNTIME_DIR".into(), "/run/user/1000".into());
+    set.insert(
+        "DBUS_SESSION_BUS_ADDRESS".into(),
+        "unix:path=/elsewhere".into(),
+    );
+    assert_eq!(with_user_bus(set.clone(), 996, &lingering), set);
+
+    // And a checked config takes both, as every call is made with them.
+    let rig = Rig::new();
+    let mut config = rig.config.clone();
+    for name in ["XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"] {
+        config.environment.insert(name.into(), given[name].clone());
+    }
+    assert!(Cli::new(config, "stable".into()).is_ok());
+}
