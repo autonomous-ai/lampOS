@@ -263,9 +263,12 @@ fn read_of(request: &str) -> Option<(&'static str, Option<&'static str>)> {
 /// files" was made from Drive's listed reads with `query = "order by
 /// modifiedTime desc"`, which matched no file (lamp-skills now refuses an
 /// order, `service_read::QUERY_NOT_AN_ORDER`). A file by `id` is left out:
-/// a request said aloud names none.
-pub const DRIVE_READ: &str = "read = { service = \"google_drive\", what = \"files\" } \
-     (newest first; query = \"words\" only to search)";
+/// a request said aloud names none. The note after the step names no key
+/// of its own: on 10300 (lamp-9adf, 5 Nov 12:59) "(newest first; …)" right
+/// after the braces came back twice as one more key in them, refused as
+/// `unknown field` at the key after `what`.
+pub const DRIVE_READ: &str = "read = { service = \"google_drive\", what = \"files\" }, \
+     no other key: files come newest first; query is search words";
 
 /// Whether a request names a linked service (any case; "e-mail" too), so
 /// a skill to make is never asked of the model for one.
@@ -2358,12 +2361,16 @@ light = { dim = 1 }
             "{drive}"
         );
         assert!(
-            DRIVE_READ.contains("what = \"files\" }")
+            DRIVE_READ.contains("what = \"files\" }, no other key")
                 && DRIVE_READ.contains("newest first")
-                && DRIVE_READ.contains("only to search")
+                && DRIVE_READ.contains("query is search words")
                 && !drive.contains("text {id}")
                 && !drive.contains("file {id}")
         );
+        // On 10300 the note's "(newest first; …)" right after the braces
+        // came back as one more key in them, twice. The note now says a
+        // field's word nowhere a key could be read from it.
+        assert!(!DRIVE_READ.contains('(') && !DRIVE_READ.contains("newest_first"));
         let latest = brief_with("read my latest Google Drive files", true).unwrap();
         assert!(latest.contains(DRIVE_READ), "{latest}");
         // Thirteen's P2 on #5303: fixed reads only, no query, path or call.
