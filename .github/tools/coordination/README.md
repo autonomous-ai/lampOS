@@ -103,6 +103,7 @@ Stop: `kill "$(cat "$S/train-bot.pid")"` (it stops both lanes). Restart: stop, c
 
 The bot stops by itself (exit 2) when two crate trains in a row time out, or a crate run fails with no failing test named.
 It says so on the Queue (#5385, the last issue in lib.sh's `COORD_QUEUE_ISSUES`).
+If the Queue refuses the post (an issue takes at most 2,500 comments), the bot logs it instead.
 The no-crates lane stops alone (the file `train-bot.stop-nc` in the state folder) when two of its trains in a row time out or GitHub refuses its merge; delete the file, or restart the bot, to start it again.
 
 ## A green train behind lamp-voice
@@ -198,6 +199,8 @@ If any Queue issue (#4710 or #5385) can't be fetched, no PR is eligible that rou
   Post the reader's closing comment on the PR when you add the row.
 
 **Queue HOLDs.** A Queue comment of the last 3 days, on #4710 or on #5385 (lib.sh's `COORD_QUEUE_ISSUES`, the one place the Queue's issue numbers live; #4710 hit GitHub's 2,500-comment limit on 5 Nov), whose first line is `HOLD <sha>` holds the PR whose head starts with that sha.
+**When the Queue fills** (2,500 comments): open the next Queue issue and append its number to `COORD_QUEUE_ISSUES` in `lib.sh`, last.
+Keep the older ones while their last 3 days of HOLDs matter; the bot posts on the last one.
 It stands until the same login posts a later READ-OK marker on the PR whose first 400 characters say the HOLD is lifted or cleared
 (the same words as above; `**READ-OK**` counts).
 
