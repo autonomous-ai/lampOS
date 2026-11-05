@@ -1340,6 +1340,14 @@ impl Thread {
             Some((last, rest)) if self.heard.trim().is_empty() => (last.person.clone(), rest),
             _ => (self.heard.clone(), &spoken[..]),
         };
+        // An exchange with no words of theirs (a wordless cut-in the lamp
+        // answered with its fixed "did anyone say something?",
+        // `LAMP_CUT_IN_WORDLESS_ASKS`) is nobody's answer: it never pushes
+        // the lamp's read-back out of the window (Fifth's run B on #5415).
+        let earlier: Vec<&&Exchange> = earlier
+            .iter()
+            .filter(|exchange| !exchange.person.trim().is_empty())
+            .collect();
         let from = earlier.len().saturating_sub(exchanges);
         crate::known_faces::Said {
             this,
@@ -3452,6 +3460,37 @@ mod tests {
         thread.lamp(3, "Okay, A.", now);
         assert_eq!(thread.names_window(2), window(&before));
         assert_eq!(thread.names_window(1), window(&before[1..]));
+    }
+
+    /// Fifth's run B on #5415 (5 Nov): a wordless cut-in answered with the
+    /// lamp's fixed line came between the read-back and its yes. Having no
+    /// words of theirs, it is no exchange of the window: the read-back
+    /// stays in it.
+    #[test]
+    fn a_wordless_cut_in_never_pushes_the_read_back_out_of_a_names_window() {
+        let now = Instant::now();
+        let mut thread = Thread::new();
+        for (i, (said, lamp)) in [
+            ("My name is Walter.", "Walter, did I get that right?"),
+            ("", crate::cut_in_wordless::LINE),
+            ("", ""),
+        ]
+        .iter()
+        .enumerate()
+        {
+            thread.person(said, true, now);
+            thread.lamp(i as u64 + 1, lamp, now);
+        }
+        thread.person("Yes.", true, now);
+        let said = thread.names_window(crate::known_faces::SAID_EXCHANGES);
+        assert_eq!(said.this, "Yes.");
+        assert_eq!(
+            said.before,
+            [(
+                "My name is Walter.".to_owned(),
+                "Walter, did I get that right?".to_owned()
+            )]
+        );
     }
 
     /// `LAMP_LIVE_SCOPED_SESSION`: a line admitted for someone known makes
