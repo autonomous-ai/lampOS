@@ -2354,3 +2354,48 @@ fn nothing_is_dropped_on_a_clock_not_yet_trusted() {
             .is_some_and(|b| { !String::from_utf8_lossy(b).contains("dropped_late") })
     );
 }
+
+/// #5447's P3: a timer rung just before its cut-off and acknowledged just
+/// after it is kept as said, not dropped: read for its offer 9 min 59 s
+/// late, acknowledged at 10 min 1 s. One never offered is dropped at 10 min
+/// 1 s, and one offered but never acknowledged is dropped a minute after
+/// its last read before the cut-off; reads after it don't renew that.
+#[test]
+fn a_timer_offered_before_its_cut_off_and_acked_after_it_is_kept_as_said() {
+    use lamp_schedule::engine::OFFERED_HOLD_MS;
+    let disk = Disk::default();
+    let mut e = open(disk.clone(), &now(0));
+    set(&mut e, &now(0), 60);
+    set(&mut e, &now(0), 60);
+    let offered = now(60_000 + TIMER_TOO_LATE_MS - 1_000);
+    assert_eq!(get(&mut e, &offered, 1)["state"], "pending");
+    let after = now(60_000 + TIMER_TOO_LATE_MS + 1_000);
+    ack(&mut e, &after, 1, 1);
+    let kept = said(&mut e, &after, None);
+    assert_eq!(kept.len(), 1);
+    assert_eq!(kept[0]["id"], 1);
+    assert_eq!(kept[0]["late_by_ms"], TIMER_TOO_LATE_MS + 1_000);
+    let dropped = dropped_late(&disk);
+    assert_eq!(dropped.len(), 1, "{dropped:?}");
+    assert_eq!(dropped[0]["id"], 2, "the one never offered");
+
+    // Offered just before the cut-off and never acknowledged: read again
+    // after it, still held for a minute from the read before it, then
+    // dropped.
+    let at = now(HOUR);
+    set(&mut e, &at, 60);
+    let due = HOUR + 60_000;
+    let before = now(due + TIMER_TOO_LATE_MS - 1_000);
+    get(&mut e, &before, 3);
+    get(&mut e, &now(due + TIMER_TOO_LATE_MS + 30_000), 3);
+    let held = now(due + TIMER_TOO_LATE_MS - 1_000 + OFFERED_HOLD_MS);
+    e.tick(&held).unwrap();
+    assert_eq!(due_of(&e, &held), Some(3));
+    let gone = now(due + TIMER_TOO_LATE_MS + OFFERED_HOLD_MS);
+    e.tick(&gone).unwrap();
+    assert_eq!(due_of(&e, &gone), None);
+    assert_eq!(dropped_late(&disk).len(), 2);
+}
+fn due_of(engine: &Engine<Disk>, at: &ClockSample) -> Option<u64> {
+    due(engine, at).oldest.map(|oldest| oldest.id)
+}

@@ -454,7 +454,9 @@ before every request) drops a pending occurrence that is:
   my prescription") is a reminder for this rule;
 - a **reminder** more than `REMINDER_TOO_LATE_MS` (2 h) past due, or due on
   an earlier day than today in the lamp's zone (`time::earlier_day`): one
-  due at 23:50 is not said at 00:05.
+  due at 23:50 is not said at 00:05. So a reminder due just before local
+  midnight (23:58) and offered after it (00:01) is dropped, however few
+  minutes late, since it is from an earlier day.
 
 Exactly 10 min or 2 h late is still said. Lateness is `late_by_ms` as `due`
 and `get` report it (a repeat's newest missed occurrence); one whose lateness
@@ -462,8 +464,12 @@ is unknown (the wall clock not yet trusted) is never dropped. Only Schedule
 makes an occurrence due, so the rule covers the first offer after time off,
 a long mute or a sleep, and every later one: an attempt the voice holds or
 offers once more finds the item gone (`not_found`, or a stale delivery), as
-after a cancel. A ring already playing as the cut-off passes plays out, and
-its completion is resolved as a cancelled one's is. No switch: like #5219's
+after a cancel. An occurrence the voice read for its offer (`get`, or the
+pending page it joins late ones from) before the cut-off is not dropped for
+`OFFERED_HOLD_MS` (1 min) after that read, so one rung at 9:59 late and
+acknowledged at 10:01 is kept as said (#5447's P3). Reads after the cut-off
+don't renew it, so a held or muted one is dropped at most a minute later.
+The hold is in memory only; a restart forgets it. No switch: like #5219's
 fix, it changes when an existing behaviour ends, not what the lamp does.
 
 A dropped one-off leaves the items; a dropped repeat goes on to its next
@@ -483,8 +489,9 @@ Tests (`crates/schedule/tests/it/engine.rs`):
 `a_reminder_two_hours_late_still_rings_and_one_a_second_more_is_dropped`,
 `a_reminder_due_before_local_midnight_is_dropped_after_it`,
 `a_timer_waiting_out_a_sleep_mute_is_dropped_not_rung_when_the_lamp_wakes`,
-`a_repeat_too_late_drops_only_that_occurrence` and
-`nothing_is_dropped_on_a_clock_not_yet_trusted`; the line,
+`a_repeat_too_late_drops_only_that_occurrence`,
+`nothing_is_dropped_on_a_clock_not_yet_trusted` and
+`a_timer_offered_before_its_cut_off_and_acked_after_it_is_kept_as_said`; the line,
 `a_dropped_one_is_logged_by_kind_id_and_lateness_never_its_words`
 (`engine.rs`).
 
