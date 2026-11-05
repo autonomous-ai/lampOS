@@ -68,8 +68,8 @@ Take them from a real run on a lamp with the build above. No names, emails or re
 | `lamp pair CODE --pin PIN`; pin checked first; kept in `~/.config/lampos/` | `sdk/python/README.md:59-72` |
 | The code comes with the pin and a 5-minute expiry | `docs/control.md:297-300`, `docs/develop.md:259-261` |
 | The lamp says the first 8 characters of the pin aloud | `docs/cloud.md`, "The developer door" (`control.code`, the spoken pin check) |
-| The app screen is not out yet; the keeper makes the code with `lamp-control code --grants body,light,speak` | `docs/develop.md:259-262` ("that app screen is a later piece"), `docs/control.md:236`; the lamp's side is merged (commit ae813eee0, `docs/cloud.md:157`, `:2145`) |
-| lamp-control runs only with `LAMP_CONTROL=on`; no product unit passes it | `docs/control.md`, "Running the door"; no lamp-control unit in `deploy/product/`; PR #4526 is open |
+| The owner turns developer access on in the app (`control.set`), then the app asks the lamp for a code (`control.code`) with the lamp's pin; the keeper's `lamp-control code --grants body,light,speak` makes the same code | `docs/cloud.md:155`, `:1955`, `:2145`, `docs/control.md:236`, `:297-300`. The app's own screens are in `ecm-sds-mobile` and were not read; `docs/develop.md:259-262` still calls the *Add a developer computer* screen pending |
+| lamp-control is installed and enabled on every lamp and runs only with `LAMP_CONTROL=on`, which the app's developer setting writes as a drop-in | `deploy/product/lamp-control.service:1-8`, `docs/switches.md:578`, `docs/control.md`, "Running the door" (PR #4526) |
 | The owner can revoke at any time | `docs/cloud.md` (`control.revoke`), `docs/develop.md:276` |
 | The person wins | `docs/develop.md`, "What takes control back" |
 | What a program never gets | `crates/control/src/protocol.rs:118-135` (`Grant::shown`), `docs/develop.md` ("Never") |
@@ -83,5 +83,5 @@ On 5 Nov 2026, from a checkout of `origin/lamp-voice` at 39fddfe02: macOS, Pytho
 
 ### Left out because it is not proven
 
-- Any statement that the app's *Add a developer computer* screen is in a build customers get.
-- Real-lamp pairing end to end (needs lamp-control on, PR #4526 not on stable).
+- Any statement that the app's developer setting and *Add a developer computer* screen are in a build customers get: the page says what the owner does, not which app build has it.
+- Real-lamp pairing end to end: not run.

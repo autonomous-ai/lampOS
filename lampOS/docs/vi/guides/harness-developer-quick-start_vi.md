@@ -4,7 +4,7 @@ Trang này tóm tắt [harness-developer-quick-start.md](../../guides/harness-de
 
 ## Bạn nhận được gì
 
-- **Ghép đôi một máy tính với đèn.** Chủ đèn ghép một lần bằng một mã, chọn quyền cho máy đó, và có thể thu hồi bất cứ lúc nào. Màn hình *Add a developer computer* của ứng dụng sẽ tạo mã này nhưng chưa ra mắt; trong lúc đó người giữ đèn tạo mã. Người luôn thắng: tay đặt lên đầu đèn, "stop", công tắc riêng tư hay một cuộc trò chuyện đều lấy lại quyền điều khiển.
+- **Ghép đôi một máy tính với đèn.** Chủ đèn bật quyền truy cập cho nhà phát triển trong ứng dụng, rồi ghép một lần bằng một mã, chọn quyền cho máy đó, và có thể thu hồi bất cứ lúc nào. Người luôn thắng: tay đặt lên đầu đèn, "stop", công tắc riêng tư hay một cuộc trò chuyện đều lấy lại quyền điều khiển.
 - **SDK** Python và JavaScript (`lampos`): sự kiện, trạng thái và hành động, mỗi thứ cần một quyền chủ đèn đã cấp.
 - **Đèn giả** trên máy của bạn, để thử mà không cần đèn.
 - Ngoài ra: `lamp-mcp` cho tác tử và kỹ năng đẩy lên đèn.
@@ -13,7 +13,7 @@ Harness và SDK là hai cánh cửa khác nhau: SDK nói chuyện với đèn t�
 
 ## Hôm nay chạy được gì
 
-SDK và đèn giả đã merge. `lamp-control` (phía đèn) đã merge nhưng **chưa là một phần của sản phẩm**: chỉ chạy khi người giữ đèn bật `LAMP_CONTROL=on`. Màn hình *Add a developer computer* của ứng dụng **chưa ra mắt**.
+SDK và đèn giả đã merge. `lamp-control` (phía đèn) có trên mọi đèn nhưng tắt cho đến khi chủ đèn bật quyền truy cập cho nhà phát triển trong ứng dụng.
 
 ## Chạy thử (khoảng 5 phút)
 
@@ -32,7 +32,7 @@ Terminal 2 in `connected to lamp-fake with [...]` và trạng thái đèn; termi
 
 ## Dùng đèn thật
 
-Lấy mã ghép đôi 8 chữ số kèm pin của đèn (64 ký tự hex), hiệu lực 5 phút, với ba quyền `light`, `speak`, `body`. Hôm nay người giữ đèn chạy `lamp-control code --grants body,light,speak` bằng quyền root. Rồi:
+Lấy mã ghép đôi 8 chữ số kèm pin của đèn (64 ký tự hex), hiệu lực 5 phút, với ba quyền `light`, `speak`, `body`. Trong ứng dụng, bật quyền truy cập cho nhà phát triển, mở đèn và chọn *Add a developer computer*. Rồi:
 
 ```sh
 lamp pair 12345678 --pin <64 ký tự của pin>
