@@ -2466,6 +2466,7 @@ pub fn serve(
     // The worker is told the services by their folder (`--services-dir`),
     // never by `LAMP_SERVICES`, which isn't in its environment.
     let services_on = tools.services.is_some();
+    let services_folder = tools.services.clone();
     if services_on {
         if let Some(bus) = files
             .bus_root
@@ -3571,6 +3572,14 @@ pub fn serve(
         // sign-out with the services' tokens (`account/state`).
         if printing == Printing::ForServices {
             crate::owner_voice::watch_sign_outs(files.bus_root.as_deref());
+        }
+        // The services' prints only while one is linked (the reader's P3
+        // on #5293), known from `lamp-services` itself.
+        if printing == Printing::ForServices
+            && let Some(folder) = services_folder
+            && let Ok(mut heeding) = heeding.lock()
+        {
+            heeding.printing_only_while_linked(crate::services::Linked::new(folder));
         }
         // Only prints for every rule are the voice heard; the services'
         // alone are heard by none of them.
@@ -5784,6 +5793,10 @@ pub(crate) struct Heeding {
     /// `crate::services::judging_voices`. No conversation rule reads it, so
     /// with it every one sees no print, as without a model.
     for_services: Option<crate::same_voice::Voices<Box<dyn crate::same_voice::Printer>>>,
+    /// Whether a service is linked, asked again as a line begins
+    /// ([`Self::printing_only_while_linked`]): [`Self::for_services`]
+    /// prints a line only while one is.
+    services_linked: Option<Arc<crate::services::Linked>>,
     /// #829's conversation check reads [`Self::voices`] only beside
     /// `LAMP_SPOKEN_TO` ([`Self::as_the_only_voice`]); without it the prints
     /// feed only [`Self::someone_else`] (#2428).
@@ -6021,7 +6034,7 @@ fn checking_the_voice_for(
         return match start(model) {
             Ok(printer) => {
                 eprintln!(
-                    "lamp-voice second: the same voice is judged for the linked services only (LAMP_SAME_VOICE_FOR=services): a send's voice and a read in full; no conversation rule reads a print"
+                    "lamp-voice second: the same voice is judged for the linked services only (LAMP_SAME_VOICE_FOR=services): a send's voice and a read in full, a heard line printed only while a service is linked; no conversation rule reads a print"
                 );
                 if let Ok(mut heeding) = heeding.lock() {
                     heeding.checking_the_voice_for_services(printer);
@@ -6777,6 +6790,7 @@ impl Heeding {
             began_just_after: None,
             voices: None,
             for_services: None,
+            services_linked: None,
             voice_ends_going_on: false,
             named_always: false,
             named_faced: None,
@@ -7797,6 +7811,20 @@ impl Heeding {
         );
     }
 
+    /// The services' prints ([`Self::for_services`]) made only while a
+    /// service is linked, as `linked` says (the reader's P3 on #5293): a
+    /// line heard with none is asked for nothing, and `linked` is asked
+    /// again as each line begins ([`Self::printing`]), so a link made or
+    /// removed later counts from the next line, with no restart. What is
+    /// enrolled or forgotten (`crate::owner_voice`) is untouched.
+    pub(crate) fn printing_only_while_linked(&mut self, linked: Arc<crate::services::Linked>) {
+        if let Some(voices) = self.for_services.take() {
+            let open = linked.clone();
+            self.for_services = Some(voices.asking_only_while(move || open.now()));
+            self.services_linked = Some(linked);
+        }
+    }
+
     /// The same-voice check that is fed each line's sound and verdict, the
     /// conversation rules' ([`Self::voices`]) or the services' alone
     /// ([`Self::for_services`]). Never read for a conversation decision.
@@ -7851,6 +7879,11 @@ impl Heeding {
     /// A line's sound to the kept same-voice check ([`Self::kept_voices`]).
     fn printing(&mut self, request: u64, heard: crate::second_provider::Heard<'_>) {
         use crate::second_provider::Heard;
+        if matches!(heard, Heard::Began { .. })
+            && let Some(linked) = &self.services_linked
+        {
+            linked.check();
+        }
         let Some(voices) = self.kept_voices() else {
             return;
         };
@@ -16831,6 +16864,67 @@ mod tests {
             },
         );
         assert_eq!(heeding.lock().unwrap().began_over, None);
+    }
+
+    /// The reader's P3 on #5293: the services' prints are made only while a
+    /// service is linked. With none, the child is asked nothing for any
+    /// line, the owner's or a guest's; with one, each line is printed; a
+    /// link made later prints from the next line, with no restart, and its
+    /// removal stops them.
+    #[test]
+    fn the_services_print_a_line_only_while_a_service_is_linked() {
+        use crate::second_provider::Heard;
+        struct Voice(Arc<Mutex<Vec<u64>>>);
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, _samples: &[i16]) -> bool {
+                self.0.lock().unwrap().push(request);
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                None
+            }
+        }
+        let asked = Arc::new(Mutex::new(Vec::new()));
+        let heeding = Arc::new(Mutex::new(Heeding::new(true, true, None, None)));
+        let linked = crate::services::Linked::told(false);
+        {
+            let mut heeding = heeding.lock().unwrap();
+            heeding.checking_the_voice_for_services(Box::new(Voice(asked.clone())));
+            heeding.printing_only_while_linked(linked.clone());
+        }
+        let hook = super::hearing_hook(&heeding, false, false, true).expect("for the services");
+        let line = |request: u64| {
+            hook(
+                request,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            hook(request, Heard::Samples(&[1; 48_000]));
+            hook(request, Heard::Ended);
+        };
+        line(1);
+        line(2);
+        assert!(asked.lock().unwrap().is_empty(), "no link, no print asked");
+        linked.set(true);
+        line(3);
+        line(4);
+        assert_eq!(*asked.lock().unwrap(), [3, 4], "linked later: printed");
+        linked.set(false);
+        line(5);
+        assert_eq!(*asked.lock().unwrap(), [3, 4], "unlinked: no print");
+        // Without the gate, as before: every line.
+        let ungated = Arc::new(Mutex::new(Vec::new()));
+        let mut heeding = Heeding::new(true, true, None, None);
+        heeding.checking_the_voice_for_services(Box::new(Voice(ungated.clone())));
+        heeding.hear_for_services(
+            6,
+            Heard::Began {
+                over_the_lamps_voice: false,
+            },
+        );
+        heeding.hear_for_services(6, Heard::Samples(&[1; 48_000]));
+        assert_eq!(*ungated.lock().unwrap(), [6]);
     }
 
     /// #2191 on a lamp without `LAMP_SPOKEN_TO` (lamp-52e6 and lamp-4ace):

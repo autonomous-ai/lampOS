@@ -80,7 +80,9 @@ chuyện (`same_voice::Voices::likeness_so_far` từ `same_voice::SERVICES_SAME_
 giọng của tuyến thứ hai qua `services::judging_voices`, chờ tối đa 800 ms
 cho một dấu giọng. Với `LAMP_SAME_VOICE_MODEL` và
 `LAMP_SAME_VOICE_FOR=services`, tuyến thứ hai chỉ tạo dấu giọng cho các phán
-đoán này, và chỉ khi các dịch vụ đang bật: khi đó mọi quy tắc hội thoại không
+đoán này, và chỉ khi các dịch vụ đang bật và có ít nhất một dịch vụ đã liên
+kết (một câu nghe được khi chưa liên kết gì thì không bao giờ được tạo dấu
+giọng, dù của khách hay của chủ đèn): khi đó mọi quy tắc hội thoại không
 đọc dấu giọng nào, như khi không có mô hình
 ([same-voice.md](../same-voice.md), "For the services only"); khi đó, một chủ
 đèn đã có dấu giọng đăng ký thì câu nói được so với dấu giọng đó thay cho
@@ -134,7 +136,12 @@ lamp-9adf bằng chính các binary của bản 9928 ngày 4/11. Một drop-in �
 (CAM++, được ghim trong `deploy/product/models.json`) cùng
 `LAMP_SAME_VOICE_FOR=services`, nên một lệnh "send" và một lần đọc đầy đủ có
 mẫu giọng, chỉ được tạo cho các dịch vụ; mọi luật của cuộc trò chuyện không
-đọc mẫu giọng nào. Trước đó, khi không có mẫu giọng, mọi lần gửi trên lamp-9adf
+đọc mẫu giọng nào. Một câu nghe được chỉ được tạo mẫu giọng khi có một dịch
+vụ đã liên kết: giọng nói hỏi `lamp-services` những gì đã liên kết khi một câu
+bắt đầu, nhiều nhất một lần mỗi giây, nên một chiếc đèn chưa liên kết gì không
+tạo mẫu giọng của ai, và sau khi một dịch vụ được liên kết, câu kế tiếp được
+tạo mẫu giọng mà không cần khởi động lại ([same-voice.md](../same-voice.md), "For the services only"). Trước đó,
+khi không có mẫu giọng, mọi lần gửi trên lamp-9adf
 đều bị từ chối vì giọng ([switches.md](../switches.md)). Khi thư mục của giọng
 nói thiếu mô hình hoặc `lamp-same-voice`, phần kiểm tra tắt sau ba lần khởi
 động (`MOST_UNREADY`), và mọi lần gửi bị từ chối, mọi lần đọc đều ngắn gọn,
