@@ -22,6 +22,9 @@ Group=lampos
 Slice=lampos-parts.slice
 Environment=HOME=/var/lib/lampos-tasks
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
+# A home lamp keeps the Harness its build pinned: Harness's own self-update is held, and a newer
+# Harness comes only through a new pin in a build (#5229, #5379; docs/tasks.md).
+Environment=LAMP_HARNESS_HOLD_UPDATES=on
 RuntimeDirectory=lampos-tasks
 RuntimeDirectoryMode=0700
 StateDirectory=lampos-tasks
@@ -34,8 +37,10 @@ StateDirectoryMode=0700
 # failing at every start after `lamp-update harness-on` (lamp-c0a4, 3 Nov); --targets-from-machines
 # claude then writes targets.json from the person's machines once Harness is signed in (#1676).
 # --sign-in-by-code lets the person sign Harness in by its 8-digit code, by voice (LAMP_TASKS_SIGN_IN in
-# lamp-voice.service, #1676) or from the owner's app through --app-socket, which only lamp-cloud reaches
-# (LAMP_TASKS_SIGN_IN_APP in both, #5198, docs/tasks.md).
+# lamp-voice.service, #1676) or from the owner's app through --app-socket (LAMP_TASKS_SIGN_IN_APP in both,
+# #5198, docs/tasks.md). The socket is lampos's, so any unit run as lampos can connect to it; lamp-tasks
+# reads each caller from the kernel (SO_PEERCRED and its cgroup) and closes any that is not
+# lamp-cloud.service run as lampos (#5379).
 ExecStart=/opt/lampOS/tasks/current/lamp-tasks serve --enable --watch --progress --push-wait --close-told --harness-as-person --set-up-later --targets-from-machines claude --sign-in-by-code --app-socket /run/lampos-tasks/app.sock --dir /var/lib/lampos-tasks/store --socket /run/lampos-tasks/request.sock --voice-socket /run/lampos-tasks/voice.sock --targets /var/lib/lampos-tasks/targets.json --harness /usr/local/bin/harness
 Restart=on-failure
 RestartSec=5s

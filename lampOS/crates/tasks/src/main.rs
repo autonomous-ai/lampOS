@@ -190,6 +190,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }),
         sign_in_by_code,
         app_socket,
+        app_caller: lamp_tasks::runtime::app_caller_is_lamp_cloud,
         report_every: REPORT_EVERY,
         daemon_retry_after: DAEMON_RETRY_AFTER,
     };

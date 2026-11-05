@@ -3029,6 +3029,22 @@ fn the_product_signs_harness_in_from_the_app() {
     );
 }
 
+/// #5379: a home lamp keeps the Harness its build pinned. The product's
+/// lamp-tasks holds Harness's own self-update (`LAMP_HARNESS_HOLD_UPDATES`,
+/// #5229), so a newer Harness comes only through a new pin in a build.
+#[test]
+fn the_product_holds_harness_at_its_pinned_version() {
+    let tasks = install::PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-tasks.service")
+        .unwrap()
+        .1;
+    assert!(
+        section(tasks, "Service").contains(&"Environment=LAMP_HARNESS_HOLD_UPDATES=on"),
+        "the product's lamp-tasks does not hold Harness's updates"
+    );
+}
+
 /// #811, from lamp-06c1: without Harness (its own installer's to put on the
 /// lamp), the tasks part is skipped by its unit's condition rather than
 /// failing ten times; the install says Harness is missing.

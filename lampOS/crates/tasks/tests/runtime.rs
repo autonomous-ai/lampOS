@@ -371,6 +371,7 @@ impl Running {
             // waits a fraction of a second (#1128).
             sign_in_by_code: false,
             app_socket: None,
+            app_caller: lamp_tasks::runtime::app_caller_is_lamp_cloud,
             report_every: Duration::from_millis(50),
             // A failed daemon start tried again in 50, 100 and 200 ms.
             daemon_retry_after: Duration::from_millis(50),
@@ -2250,6 +2251,33 @@ fn a_stored_task_this_build_cannot_read_is_kept_and_the_part_serves() {
     assert_eq!(state["tasks"][1]["id"], next["id"]);
 }
 
+/// #5379: the app's route is lamp-cloud's unit's only. The socket is
+/// `lampos`'s, so any unit run as `lampos` could connect; the kernel's word
+/// on who connected is what lets one in. This test is no lamp-cloud, so
+/// with the part's own check it is refused: the connection closed, no
+/// answer, nothing started, while the other routes still answer it.
+#[test]
+fn the_apps_route_refuses_a_caller_that_is_not_lamp_cloud() {
+    let mut s = Running::unstarted(false, false, false, false);
+    s.config.sign_in_by_code = true;
+    s.config.app_socket = Some(s.root.path().join("run/app"));
+    s.start();
+    let socket = s.config.app_socket.clone().unwrap();
+    for op in [
+        json!({"op":"app_sign_in_state"}),
+        json!({"op":"app_sign_in_start","method":"code"}),
+    ] {
+        let answer = request(&socket, &op, Duration::from_secs(2));
+        assert!(answer.is_err(), "{op} answered {answer:?}");
+    }
+    assert_eq!(
+        s.trusted(json!({"op":"sign_in_state"}))["sign_in"],
+        "none",
+        "nothing was started"
+    );
+    s.stop();
+}
+
 /// #5198: the owner's app signs Harness in on its own route. Off without
 /// `--app-socket`; the route takes only the app's operations, and they no
 /// other route. An app-started sign-in is the app's to answer, once it was
@@ -2291,6 +2319,8 @@ fn the_apps_sign_in_is_its_own_routes_and_never_the_voices() {
     let mut s = Running::unstarted(false, false, false, false);
     s.config.sign_in_by_code = true;
     s.config.app_socket = Some(s.root.path().join("run/app"));
+    // This test stands in for lamp-cloud (#5379).
+    s.config.app_caller = |_| true;
     s.start();
     // The app's route takes nothing else, and its ops no other route.
     for op in [
@@ -2485,6 +2515,8 @@ fn a_sign_in_id_grows_across_a_restart_with_the_clock_gone_back() {
     let mut s = Running::unstarted(false, false, false, false);
     s.config.sign_in_by_code = true;
     s.config.app_socket = Some(s.root.path().join("run/app"));
+    // This test stands in for lamp-cloud (#5379).
+    s.config.app_caller = |_| true;
     s.start();
     let first = s.app(json!({"op":"app_sign_in_start"}))["id"]
         .as_u64()
