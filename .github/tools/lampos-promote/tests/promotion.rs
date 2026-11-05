@@ -549,18 +549,138 @@ fn signed_identity_must_match_source_and_fixed_url() {
         assert_eq!(fake.writes, 0);
     }
 }
-#[test]
-fn external_models_are_explicitly_unsupported() {
-    let mut fake = Fake::new(Some(9));
+const MODELS_TAG: &str = "models-2026-10-16";
+fn model_url(name: &str) -> String {
+    format!("https://github.com/{REPO}/releases/download/{MODELS_TAG}/{name}")
+}
+/// A source build of 10 pinning a plain model and two members of one
+/// archive, as `deploy/product/models.json` does, on a published release of
+/// models beside it; `change` alters the list before it is signed.
+fn with_models(fake: &mut Fake, change: impl FnOnce(&mut Value)) {
+    let (face, archive) = (b"face model".to_vec(), b"runtime archive".to_vec());
+    fake.releases.push(Release {
+        id: 3,
+        tag_name: MODELS_TAG.into(),
+        target_commitish: "c".repeat(40),
+        draft: false,
+        prerelease: false,
+        body: String::new(),
+    });
+    fake.assets.insert(3, Vec::new());
+    fake.add(3, "face.onnx", face.clone());
+    fake.add(3, "runtime.tgz", archive.clone());
+    let member = |name: &str| {
+        json!({"path":format!("/opt/lampOS/voice/lib/{name}"),"url":model_url("runtime.tgz"),
+            "bytes":4,"sha256":manifest::sha256_hex(name.as_bytes()),
+            "archive":{"bytes":archive.len(),"sha256":manifest::sha256_hex(&archive),"member":format!("lib/{name}")}})
+    };
     let mut value = payload(10);
-    value["models"] = json!([{"path":"/opt/lampOS/eyes/models/a.bin","url":"https://example.com/a.bin","bytes":1,"sha256":"a".repeat(64)}]);
+    value["models"] = json!([
+        {"path":"/opt/lampOS/eyes/models/face.onnx","url":model_url("face.onnx"),
+            "bytes":face.len(),"sha256":manifest::sha256_hex(&face)},
+        member("a.so"),
+        member("b.so"),
+    ]);
+    change(&mut value);
     fake.source_payload(value);
-    assert!(
-        promote(&mut fake, &context(10))
-            .unwrap_err()
-            .contains("external model")
-    );
-    assert_eq!(fake.writes, 0);
+}
+/// The model release's stored asset named `name`, its bytes beside it.
+fn model_asset<'a>(fake: &'a mut Fake, name: &str) -> &'a mut (Asset, Vec<u8>) {
+    fake.assets
+        .get_mut(&3)
+        .unwrap()
+        .iter_mut()
+        .find(|(a, _)| a.name == name)
+        .unwrap()
+}
+fn refuses_before_writes(mut fake: Fake, why: &str) {
+    let error = promote(&mut fake, &context(10)).unwrap_err();
+    assert!(error.contains(why), "{why}: {error}");
+    assert_eq!(fake.writes, 0, "{why}");
+}
+#[test]
+fn pinned_models_matching_their_release_assets_reach_stable_unchanged() {
+    for previous in [None, Some(9)] {
+        let mut fake = Fake::new(previous);
+        with_models(&mut fake, |_| {});
+        let source = fake.source_bytes();
+        let receipt = promote(&mut fake, &context(10)).unwrap();
+        assert_eq!(receipt.outcome, "promoted");
+        assert_eq!(fake.current().unwrap().1, source);
+        let (stable, _) = manifest::open(&fake.current().unwrap().1, &public()).unwrap();
+        assert_eq!(stable.models.len(), 3);
+        // The models' release is looked up once, by its tag.
+        assert_eq!(
+            fake.looked_up.iter().filter(|t| *t == MODELS_TAG).count(),
+            1
+        );
+    }
+}
+#[test]
+fn an_absent_or_unpublished_model_release_refuses_before_writes() {
+    let mut fake = Fake::new(Some(9));
+    with_models(&mut fake, |_| {});
+    fake.releases.retain(|r| r.tag_name != MODELS_TAG);
+    refuses_before_writes(fake, "a model's release is absent");
+    let mut fake = Fake::new(Some(9));
+    with_models(&mut fake, |_| {});
+    fake.releases.last_mut().unwrap().draft = true;
+    refuses_before_writes(fake, "a model's release is not published");
+}
+#[test]
+fn an_absent_model_asset_refuses_before_writes() {
+    for name in ["face.onnx", "runtime.tgz"] {
+        let mut fake = Fake::new(Some(9));
+        with_models(&mut fake, |_| {});
+        fake.assets
+            .get_mut(&3)
+            .unwrap()
+            .retain(|(a, _)| a.name != name);
+        refuses_before_writes(fake, "a model's release asset is absent");
+    }
+}
+#[test]
+fn a_model_asset_of_another_size_refuses_before_writes() {
+    for name in ["face.onnx", "runtime.tgz"] {
+        let mut fake = Fake::new(Some(9));
+        with_models(&mut fake, |_| {});
+        let (asset, bytes) = model_asset(&mut fake, name);
+        bytes.push(b'x');
+        asset.size += 1;
+        refuses_before_writes(fake, "a model's release asset size differs");
+    }
+}
+#[test]
+fn a_model_asset_with_a_byte_changed_refuses_before_writes() {
+    for name in ["face.onnx", "runtime.tgz"] {
+        let mut fake = Fake::new(Some(9));
+        with_models(&mut fake, |_| {});
+        model_asset(&mut fake, name).1[0] ^= 1;
+        refuses_before_writes(fake, "a model's release asset bytes differ");
+    }
+}
+#[test]
+fn a_model_url_outside_this_repositorys_releases_refuses_before_writes() {
+    for url in [
+        "https://example.com/a.bin".to_owned(),
+        format!("https://github.com/other/lampOS/releases/download/{MODELS_TAG}/face.onnx"),
+        model_url("extra/face.onnx"),
+        // A query never signs (the manifest refuses it); a lamp's own file does.
+        "file:///opt/lampOS/eyes/models/face.onnx".to_owned(),
+        format!("https://github.com/{REPO}/releases/download/face.onnx"),
+    ] {
+        let mut fake = Fake::new(Some(9));
+        with_models(&mut fake, |value| value["models"][0]["url"] = json!(url));
+        refuses_before_writes(fake, "not one of this repository's releases");
+    }
+}
+#[test]
+fn models_sharing_an_archive_must_pin_it_alike() {
+    let mut fake = Fake::new(Some(9));
+    with_models(&mut fake, |value| {
+        value["models"][2]["archive"]["sha256"] = json!("b".repeat(64));
+    });
+    refuses_before_writes(fake, "pin it differently");
 }
 #[test]
 fn uncertain_or_duplicate_inventories_refuse() {

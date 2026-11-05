@@ -156,8 +156,10 @@ It uses `lamp_update::manifest` to verify the signature with the trusted
 public key, schema and supported manifest fields, then checks the sequence,
 commit, immutable payload URL, plain manifest bytes and declared asset hashes
 and sizes. An unsupported manifest, updater level or enum value is refused.
-External model manifests are also refused: the tool does not fetch model
-URLs outside the selected release. Supported settings, image and reset-plan
+A build's pinned models reach stable in its signed list once each one's URL
+is an asset of a published release of this repository, found by its tag,
+whose size and SHA-256 match the list (its archive's, for an archive's
+member); any other URL, or an absent or changed asset, is refused. Supported settings, image and reset-plan
 contents remain signed inline and use the updater's validation. A missing or
 ambiguous source, unsuccessful run, changed asset or unknown signing key
 cannot update the feed.

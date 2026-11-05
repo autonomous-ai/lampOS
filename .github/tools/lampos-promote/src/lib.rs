@@ -251,6 +251,63 @@ fn notes(release: &Release, sequence: u64) -> Result<(u64, u64)> {
     )?;
     Ok((positive(run)?, positive(attempt)?))
 }
+/// Each pinned model's fetched file is an asset of a published release of
+/// this repository, found by its tag, with the size and SHA-256 the signed
+/// list gives it (its archive's, when it is one member of an archive). Each
+/// release is listed once and each URL hashed once; models sharing a URL
+/// must pin it alike. The list itself reaches stable unchanged, signed.
+fn models(remote: &mut impl Remote, value: &Manifest) -> Result<()> {
+    require(
+        value.models.len() <= manifest::MOST_MODELS,
+        "too many pinned models",
+    )?;
+    let prefix = format!("https://github.com/{REPO}/releases/download/");
+    let mut releases: BTreeMap<String, BTreeMap<String, Asset>> = BTreeMap::new();
+    let mut pinned: BTreeMap<&str, (u64, &str)> = BTreeMap::new();
+    let mut total = 0u64;
+    for model in &value.models {
+        let expected = model
+            .archive
+            .as_ref()
+            .map_or((model.bytes, model.sha256.as_str()), |archive| {
+                (archive.bytes, archive.sha256.as_str())
+            });
+        total = total
+            .checked_add(model.fetch_bytes())
+            .ok_or("model size overflow")?;
+        require(total <= MAX_TOTAL_BYTES, "pinned models exceed 2 GiB")?;
+        if let Some(seen) = pinned.get(model.url.as_str()) {
+            require(*seen == expected, "models sharing a URL pin it differently")?;
+            continue;
+        }
+        let (tag, name) = model
+            .url
+            .strip_prefix(&prefix)
+            .and_then(|rest| rest.split_once('/'))
+            .filter(|(tag, name)| plain(tag) && plain(name))
+            .ok_or("a model's URL is not one of this repository's releases")?;
+        if !releases.contains_key(tag) {
+            let release = lookup(remote, tag)?.ok_or("a model's release is absent")?;
+            require(!release.draft, "a model's release is not published")?;
+            releases.insert(tag.to_owned(), assets(remote, release.id)?);
+        }
+        let asset = releases[tag]
+            .get(name)
+            .ok_or("a model's release asset is absent")?;
+        let (bytes, sha256) = expected;
+        require(
+            asset.size == bytes && bytes <= manifest::MOST_FILE_BYTES,
+            "a model's release asset size differs",
+        )?;
+        let actual = remote.hash(asset, manifest::MOST_FILE_BYTES)?;
+        require(
+            actual.size == bytes && actual.sha256 == sha256,
+            "a model's release asset bytes differ",
+        )?;
+        pinned.insert(&model.url, expected);
+    }
+    Ok(())
+}
 fn candidate(remote: &mut impl Remote, context: &Context) -> Result<Candidate> {
     let tag = format!("lampos-lamp-voice-{}", context.sequence);
     let release = lookup(remote, &tag)?.ok_or("selected published build is absent")?;
@@ -310,10 +367,7 @@ fn candidate(remote: &mut impl Remote, context: &Context) -> Result<Candidate> {
         value.sequence == context.sequence && value.commit == release.target_commitish,
         "source signed identity differs",
     )?;
-    require(
-        value.models.is_empty(),
-        "external model inventories are not supported for stable promotion",
-    )?;
+    models(remote, &value)?;
     let raw = inventory
         .get("manifest.json")
         .ok_or("source plain manifest is absent")?;
