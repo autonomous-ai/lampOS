@@ -9819,7 +9819,7 @@ impl DaysClient {
         // Not an acknowledgement, though the store said ok: it may have
         // committed under an id not known, so it stays uncertain, as a lost
         // answer does (the malformed-acknowledgement contract test).
-        let Some((told, changed)) = told else {
+        let Some((mut told, changed)) = told else {
             if writes {
                 if answer["ok"] == true {
                     if call.name == crate::rules::FORGET_RULE {
@@ -9859,9 +9859,18 @@ impl DaysClient {
             Err(poisoned) => poisoned.into_inner().inhibit(Stopped::Poisoned),
         };
         say(said);
-        if changed && !replaces.is_empty() {
-            // Kept: the rules it replaces go, as a forget_rule of each would.
-            let _ = self.forget_rules(&scope, replaces, until, lease, Stopped::RuleForgotten);
+        // Kept: the rules it replaces go, as a forget_rule of each would. If
+        // that fails the older rule stays and may still win (`strictest`),
+        // so the model is told to ask again (the reviewer-lead's P3 on
+        // #5439).
+        if changed
+            && !replaces.is_empty()
+            && self
+                .forget_rules(&scope, replaces, until, lease, Stopped::RuleForgotten)
+                .is_none()
+            && let Some(told) = told.as_object_mut()
+        {
+            told.insert("note".into(), json!(REPLACED_NOT_FORGOTTEN));
         }
         if changed {
             if call.name == crate::rules::FORGET_RULE {
@@ -12059,6 +12068,10 @@ pub(crate) use tests::event_memory;
 #[cfg(test)]
 #[path = "remember_no_wait.rs"]
 mod no_wait;
+
+/// Told with a kept rule when the older rule it corrects could not be
+/// forgotten (the reviewer-lead's P3 on #5439).
+const REPLACED_NOT_FORGOTTEN: &str = "Kept, but the earlier rule it corrects could not be taken back yet, so it may still apply: ask them to say the correction once more.";
 
 #[cfg(test)]
 mod tests {

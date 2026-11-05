@@ -290,15 +290,21 @@ fn typed_mark(args: &Value) -> Result<String, Value> {
 
 /// The words before the hour a rule's `not_from` names ("quiet from ten",
 /// "after ten", "between ten and seven"), and before its `not_before`'s
-/// ("until seven", "not before nine", "ten to six").
+/// ("until seven", "not before nine"). Not "to": it is also a time's own
+/// word ("quarter to seven"), and an allowed window's end ("only from 8am
+/// to 10pm", the reviewer-lead's P1 and P2 on #5439).
 const FROM_CUES: &[&str] = &["from", "after", "past", "between"];
-const BEFORE_CUES: &[&str] = &["until", "till", "til", "before", "to"];
+const BEFORE_CUES: &[&str] = &["until", "till", "til", "before"];
 
-/// `minute`, or the hour the rule's words name after one of `cues` when
-/// the two differ: in the half of the day the words say ("pm", "at night",
-/// "in the evening"; "am", "in the morning"), else in `minute`'s, its
-/// minutes kept. A digit hour past twelve is taken as said. Words that
-/// name no hour after a cue leave `minute` as it is.
+/// `minute`, or the hour the rule's words name after one of `cues` when it
+/// sits near the model's: an hour off ("quiet from ten" given as 21:00,
+/// #4346), or twelve off with the half of the day said ("until 7am" given
+/// as 19:00). The half comes from the words ("pm", "at night", "in the
+/// evening"; "am", "in the morning"), else from `minute`; its minutes are
+/// kept. A digit hour past twelve is taken as said. Any other hour is the
+/// model reading the words another way, such as an allowed window ("only
+/// greet me from 8am to 10pm" kept as quiet before 08:00 and from 22:00),
+/// and `minute` stands, as do words that name no hour after a cue.
 fn as_said(minute: u16, words: &str, cues: &[&str]) -> u16 {
     const HOURS: [&str; 12] = [
         "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven",
@@ -345,6 +351,7 @@ fn as_said(minute: u16, words: &str, cues: &[&str]) -> u16 {
             _ => None,
         };
     }
+    let said_half = half.is_some() || hour > 12;
     let hour = match (hour, half) {
         (13.., _) | (0, _) => hour,
         (hour, Some(true)) => hour % 12 + 12,
@@ -352,10 +359,11 @@ fn as_said(minute: u16, words: &str, cues: &[&str]) -> u16 {
         (hour, None) if (minute / 60) % 12 == hour % 12 => return minute,
         (hour, None) => hour % 12 + if minute / 60 >= 12 { 12 } else { 0 },
     };
-    if hour == minute / 60 {
-        minute
-    } else {
+    let off = (24 + hour - minute / 60) % 24;
+    if matches!(off, 1 | 23) || (said_half && off == 12) {
         hour * 60 + minute % 60
+    } else {
+        minute
     }
 }
 
@@ -1196,6 +1204,26 @@ mod tests {
             ),
             "[unprompted greeting not_before=540] Do not greet them before nine."
         );
+        // The reviewer-lead's P1 and P2 on #5439: an allowed window, and a
+        // time's own "to", leave the model's hours as given.
+        assert_eq!(
+            text(
+                json!({"rule":"Only greet me from 8am to 10pm.","about":"greeting","not_before":"08:00","not_from":"22:00"})
+            ),
+            "[unprompted greeting not_before=480 not_from=1320] Only greet me from 8am to 10pm."
+        );
+        assert_eq!(
+            text(
+                json!({"rule":"Only greet me between 8am and 10pm.","about":"greeting","not_before":"08:00","not_from":"22:00"})
+            ),
+            "[unprompted greeting not_before=480 not_from=1320] Only greet me between 8am and 10pm."
+        );
+        assert_eq!(
+            text(
+                json!({"rule":"Don't greet me before quarter to seven.","about":"greeting","not_before":"06:45"})
+            ),
+            "[unprompted greeting not_before=405] Don't greet me before quarter to seven."
+        );
     }
 
     /// #4346: "no hello" said twice is one rule, and "ten, not nine"
@@ -1253,6 +1281,13 @@ mod tests {
             };
             assert!(replaces.is_empty(), "{args}");
         }
+        // The same words under another flag are another rule: a quiet one
+        // is not the plain one kept again (the reviewer-lead's P3 on #5439).
+        let quiet = [rule(8, "[quiet] Call them Minh.")];
+        assert!(matches!(
+            beside(&quiet, json!({"text": "Call them Minh."})),
+            Beside::Keep { .. }
+        ));
     }
 
     #[test]
