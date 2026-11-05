@@ -1,7 +1,7 @@
 //! Byte-preserving promotion of an already signed and published build.
 use lamp_update::manifest::{self, Manifest};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 
 pub mod github;
 pub mod notes;
@@ -257,8 +257,10 @@ fn notes(release: &Release, sequence: u64) -> Result<(u64, u64)> {
 }
 fn candidate(remote: &mut impl Remote, context: &Context) -> Result<Candidate> {
     let tag = format!("lampos-lamp-voice-{}", context.sequence);
-    let release = releases(remote)?
-        .remove(&tag)
+    let published = releases(remote)?;
+    let release = published
+        .get(&tag)
+        .cloned()
         .ok_or("selected published build is absent")?;
     require(
         !release.draft && release.prerelease && commit(&release.target_commitish),
@@ -316,10 +318,6 @@ fn candidate(remote: &mut impl Remote, context: &Context) -> Result<Candidate> {
         value.sequence == context.sequence && value.commit == release.target_commitish,
         "source signed identity differs",
     )?;
-    require(
-        value.models.is_empty(),
-        "external model inventories are not supported for stable promotion",
-    )?;
     let raw = inventory
         .get("manifest.json")
         .ok_or("source plain manifest is absent")?;
@@ -371,6 +369,7 @@ fn candidate(remote: &mut impl Remote, context: &Context) -> Result<Candidate> {
             "declared asset bytes differ",
         )?;
     }
+    models(remote, &value, &published)?;
     Ok(Candidate {
         release,
         bytes,
@@ -378,6 +377,67 @@ fn candidate(remote: &mut impl Remote, context: &Context) -> Result<Candidate> {
         run: run_id,
         attempt,
     })
+}
+/// A model's URL as a release asset of this repository: its tag and name.
+/// Any other place (another host or repository, a `file:///` URL, a query)
+/// is not one the promotion can check, so it is none.
+fn model_asset(url: &str) -> Option<(&str, &str)> {
+    let rest = url.strip_prefix(&format!("https://github.com/{REPO}/releases/download/"))?;
+    let (tag, name) = rest.split_once('/')?;
+    (plain(tag) && plain(name)).then_some((tag, name))
+}
+/// Every model the signed build lists (#5221) is an asset of a published
+/// release of this repository, the source build's or another's, with the
+/// size and SHA-256 the envelope signs for what its URL fetches: the
+/// model's own, or its archive's when the model is a member of one (the
+/// member itself is checked by the lamp once taken out). Each asset is
+/// hashed once, and the assets hashed are 2 GiB at most.
+fn models(
+    remote: &mut impl Remote,
+    value: &Manifest,
+    published: &BTreeMap<String, Release>,
+) -> Result<()> {
+    let mut inventories: BTreeMap<u64, BTreeMap<String, Asset>> = BTreeMap::new();
+    let mut hashed: BTreeMap<u64, HashSize> = BTreeMap::new();
+    let mut total = 0u64;
+    for model in &value.models {
+        let refused = |why: &str| format!("model {}: {why}", model.path);
+        let (tag, name) = model_asset(&model.url)
+            .ok_or_else(|| refused("its URL is not a release asset of this repository"))?;
+        let (size, sha256) = model
+            .archive
+            .as_ref()
+            .map_or((model.bytes, &model.sha256), |a| (a.bytes, &a.sha256));
+        let release = published
+            .get(tag)
+            .ok_or_else(|| refused("its release is absent"))?;
+        require(!release.draft, &refused("its release is not published"))?;
+        let inventory = match inventories.entry(release.id) {
+            Entry::Occupied(known) => known.into_mut(),
+            Entry::Vacant(new) => new.insert(assets(remote, release.id)?),
+        };
+        let asset = inventory
+            .get(name)
+            .ok_or_else(|| refused("its asset is absent"))?
+            .clone();
+        require(
+            asset.size == size && size <= manifest::MOST_FILE_BYTES,
+            &refused("its asset's size differs"),
+        )?;
+        let actual = match hashed.entry(asset.id) {
+            Entry::Occupied(known) => known.into_mut(),
+            Entry::Vacant(new) => {
+                total = total.checked_add(size).ok_or("model size overflow")?;
+                require(total <= MAX_TOTAL_BYTES, "declared models exceed 2 GiB")?;
+                new.insert(remote.hash(&asset, manifest::MOST_FILE_BYTES)?)
+            }
+        };
+        require(
+            actual.size == size && actual.sha256 == *sha256,
+            &refused("its asset's bytes differ"),
+        )?;
+    }
+    Ok(())
 }
 fn head(remote: &mut impl Remote, key: &[u8; 32]) -> Result<Option<Head>> {
     let Some(release) = releases(remote)?.remove(STABLE) else {
