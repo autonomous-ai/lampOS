@@ -874,7 +874,7 @@ hay `to`, cũng không bao giờ `graphql`, `variables`, `path`, `params`,
 
 | Đạt khi | Đọc từ | Nếu không |
 |---|---|---|
-| Đã đăng ký khuôn mặt chủ đèn | Tên chủ đèn gõ lúc cài đặt (`LAMP_SKILLS_OWNER_FILE`, dự định là `LoadCredential=owner:/etc/lampOS/person/name`) và tệp known của mắt | "no owner's face enrolled": bỏ qua ngay |
+| Đã đăng ký khuôn mặt chủ đèn | Tên chủ đèn gõ lúc cài đặt (`LAMP_SKILLS_OWNER_FILE`; `lamp-skills.service` của sản phẩm cho nó là `%d/owner`, `LoadCredential=owner:/etc/lampOS/person/name` với `SetCredential=owner:` làm giá trị rỗng dự phòng, nên một đèn không có tên bỏ qua việc đọc mà unit vẫn khởi động) và tệp known của mắt | "no owner's face enrolled": bỏ qua ngay (cả khi tên rỗng) |
 | Không riêng tư: micro được biết là mở, đèn không ngủ hay tắt tiếng | `routine::kept_asleep`, `voice/privacy` (`permitted`) | "private" |
 | Không tạm dừng (thay cho chế độ không làm phiền) | `lamp/pause` | "paused" |
 | Không trong giờ yên lặng: 22:00–07:00 địa phương, hoặc `[quiet]` của kỹ năng; giờ địa phương không rõ thì tính là yên lặng | `lamp_local_time::quiet_hours` | "quiet hours" |
@@ -1055,17 +1055,18 @@ kỹ năng trong cùng lượt vẫn giữ.
 
 ## Những gì chưa làm
 
-- **Việc đọc của kỹ năng tự tạo đã bật trong sản phẩm, nhưng sản phẩm chưa
-  nêu chủ đèn.** Sau `LAMP_SKILL_READS` (bật trong bốn unit sản phẩm từ
+- **Việc đọc của kỹ năng tự tạo đã bật trong sản phẩm, chưa chạy trên một
+  đèn sản phẩm.** Sau `LAMP_SKILL_READS` (bật trong bốn unit sản phẩm từ
   5/11): chỉ thư và lịch có lời nói riêng, mọi dịch vụ
   khác nói tiêu đề hoặc tên theo những khoá mà một mục có thể không có (mục
   không có khoá nào thì được đếm, không được nói); các dịch vụ MCP và Ahrefs
   không có việc đọc cố định nên không kỹ năng tự tạo nào đọc chúng; chủ đèn chỉ là tên gõ lúc cài đặt, nên một khuôn mặt
   được `who_you_are` lưu dưới tên khác không bao giờ được tính; "một lần mỗi
-  ngày" giữ trong bộ nhớ và mất khi khởi động lại; không unit sản phẩm nào đặt
-  tệp tên chủ đèn (`LAMP_SKILLS_OWNER_FILE`), nên trên đèn sản phẩm một việc
-  đọc bị bỏ qua với "no owner's face enrolled" cho đến khi có unit đặt nó.
-  Việc ghi từ một kỹ năng tự tạo chưa được xây.
+  ngày" giữ trong bộ nhớ và mất khi khởi động lại; tên chủ đèn là credential
+  được chép lúc `lamp-skills` khởi động, nên một lần đổi tên hay "quên hết"
+  sau đó để lại tên cũ cho đến lần khởi động lại, và điều đó đóng an toàn:
+  tệp known của mắt không còn hiện tên đó, nên việc đọc dừng ở "not the
+  owner". Việc ghi từ một kỹ năng tự tạo chưa được xây.
 - **Đọc dịch vụ theo lịch** (một bản tóm tắt thư buổi sáng) được bỏ ra cho
   đến khi có thiết kế riêng: một yêu cầu không được nghe trực tiếp không chạm
   đến dịch vụ nào.
