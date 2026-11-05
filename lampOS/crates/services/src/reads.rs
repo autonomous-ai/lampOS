@@ -216,10 +216,9 @@ fn graphql(base: &str, query: &str, variables: Option<&Value>) -> Result<Plan, S
 pub const WHATS: &[(&str, &str)] = &[
     ("gmail", "recent {count}, search {query}, message {id}"),
     ("gmail-app", "none, it only sends: reads use gmail"),
-    (
-        "google_calendar",
-        "events {from, to, calendar, count}, calendars",
-    ),
+    // No `calendars`: the link holds only `calendar.events`, and Google
+    // lists calendars only with a calendar or calendarlist scope (#5385).
+    ("google_calendar", "events {from, to, calendar, count}"),
     ("google_drive", "files {query, count}, file {id}, text {id}"),
     ("figma", "me, file {id}, comments {id}"),
     ("figma-api", "me, file {id}, comments {id}"),
@@ -317,9 +316,6 @@ pub fn plan(code: &str, args: &Value, entry: &Entry, now: i64) -> Result<Plan, S
                 query.push(("timeZone", zone));
             }
             get(&["calendar", "v3", "calendars", calendar, "events"], &query)
-        }
-        ("google_calendar", "calendars") => {
-            get(&["calendar", "v3", "users", "me", "calendarList"], &[])
         }
         ("google_drive", "files") => {
             let q = match text(args, "query") {
@@ -929,6 +925,31 @@ mod tests {
         );
     }
 
+    /// #5385: Calendar's link holds only `calendar.events`, which can't
+    /// list calendars, so `calendars` is no read: it gets the service's
+    /// own list of reads, and the path itself is off the allow-list.
+    #[test]
+    fn a_calendar_list_is_no_read() {
+        let refused =
+            plan("google_calendar", &json!({"what":"calendars"}), &entry(), 0).unwrap_err();
+        assert_eq!(refused, unknown("google_calendar"));
+        assert_eq!(
+            refused,
+            "google_calendar reads: events {from, to, calendar, count}; or get {path, params}"
+        );
+        let (method, url, body) = http(
+            plan(
+                "google_calendar",
+                &json!({"what":"get","path":"/calendar/v3/users/me/calendarList"}),
+                &entry(),
+                0,
+            )
+            .unwrap(),
+        );
+        let (_, path) = crate::net::split(&url).unwrap();
+        assert!(catalog::read_allowed("google_calendar", method, &path, body.as_ref()).is_err());
+    }
+
     fn http(plan: Plan) -> (Method, String, Option<Value>) {
         match plan {
             Plan::Http { method, url, body } => (method, url, body),
@@ -943,7 +964,6 @@ mod tests {
                 "google_calendar",
                 json!({"what":"events","from":"2026-11-03T00:00:00Z"}),
             ),
-            ("google_calendar", json!({"what":"calendars"})),
             ("google_drive", json!({"what":"files","query":"tax 'x'"})),
             ("google_drive", json!({"what":"text","id":"abc"})),
             ("figma", json!({"what":"comments","id":"k"})),

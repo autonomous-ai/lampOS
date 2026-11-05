@@ -254,7 +254,7 @@ refresh goes to the lamp's backend, never to Google).
 |---|---|---|---|---|
 | `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (an app password); `gmail.googleapis.com` (a Google sign-in) | `recent {count}`, `search {query}`, `message {id}` | `send_mail {to, cc, subject, text}` |
 | `gmail-app` | Gmail with Google sign-in | `gmail.googleapis.com` | none: it only sends | `send_mail {to, cc, subject, text}` |
-| `google_calendar` | Google Calendar | `www.googleapis.com` | `events {from, to, calendar, count}`, `calendars` | `create_event {title, start, end, calendar, attendees, text}` |
+| `google_calendar` | Google Calendar | `www.googleapis.com` | `events {from, to, calendar, count}` | `create_event {title, start, end, calendar, attendees, text}` |
 | `google_drive` | Google Drive | `www.googleapis.com` | `files {query, count}`, `file {id}`, `text {id}` | none |
 | `figma`, `figma-api` | Figma | `api.figma.com` | `me`, `file {id}`, `comments {id}` | `comment {id, text}` |
 | `github` | GitHub | `api.github.com` | `query {graphql, variables}`, `notifications`, `issues {repo}`, `pulls {repo}`, `repos` | `create_issue {repo, title, text}`, `comment {repo, number, text}` |
@@ -267,6 +267,10 @@ refresh goes to the lamp's backend, never to Google).
 | `hubspot` | HubSpot | `mcp.hubspot.com` | as Slack | as Slack |
 | `amplitude` | Amplitude | `mcp.amplitude.com`, `mcp.eu.amplitude.com` | as Slack | as Slack |
 | `notion` | Notion | `mcp.notion.com` | as Slack | as Slack |
+
+Calendar has no `calendars` read: its link holds only `calendar.events`
+(#5385), and Google lists calendars only with a calendar or calendarlist
+scope, so such a read gets the list of Calendar's reads.
 
 A Calendar `events` read asks for its times in the lamp's own zone
 (`timeZone`, the system zone's IANA name, `reads::zone_here`), so a

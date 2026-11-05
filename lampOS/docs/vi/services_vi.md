@@ -267,7 +267,7 @@ backend của đèn, không bao giờ đến Google).
 |---|---|---|---|---|
 | `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (mật khẩu ứng dụng); `gmail.googleapis.com` (đăng nhập Google) | `recent {count}`, `search {query}`, `message {id}` | `send_mail {to, cc, subject, text}` |
 | `gmail-app` | Gmail with Google sign-in | `gmail.googleapis.com` | không có: nó chỉ gửi | `send_mail {to, cc, subject, text}` |
-| `google_calendar` | Google Calendar | `www.googleapis.com` | `events {from, to, calendar, count}`, `calendars` | `create_event {title, start, end, calendar, attendees, text}` |
+| `google_calendar` | Google Calendar | `www.googleapis.com` | `events {from, to, calendar, count}` | `create_event {title, start, end, calendar, attendees, text}` |
 | `google_drive` | Google Drive | `www.googleapis.com` | `files {query, count}`, `file {id}`, `text {id}` | không có |
 | `figma`, `figma-api` | Figma | `api.figma.com` | `me`, `file {id}`, `comments {id}` | `comment {id, text}` |
 | `github` | GitHub | `api.github.com` | `query {graphql, variables}`, `notifications`, `issues {repo}`, `pulls {repo}`, `repos` | `create_issue {repo, title, text}`, `comment {repo, number, text}` |
@@ -280,6 +280,10 @@ backend của đèn, không bao giờ đến Google).
 | `hubspot` | HubSpot | `mcp.hubspot.com` | như Slack | như Slack |
 | `amplitude` | Amplitude | `mcp.amplitude.com`, `mcp.eu.amplitude.com` | như Slack | như Slack |
 | `notion` | Notion | `mcp.notion.com` | như Slack | như Slack |
+
+Calendar không có lần đọc `calendars`: liên kết của nó chỉ giữ
+`calendar.events` (#5385), và Google chỉ liệt kê lịch với scope calendar hoặc
+calendarlist, nên một lần đọc như vậy nhận danh sách các lần đọc của Calendar.
 
 Một lần đọc `events` của Calendar hỏi giờ theo múi giờ của chính đèn
 (`timeZone`, tên IANA của múi giờ hệ thống, `reads::zone_here`), nên một sự

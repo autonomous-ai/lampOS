@@ -646,10 +646,12 @@ mod tests {
             r#"service = "github", what = "issues", repo = "o/r""#,
             r#"service = "github", what = "notifications""#,
             r#"service = "linear", what = "my_issues""#,
-            r#"service = "google_calendar", what = "calendars""#,
         ] {
             assert!(step(good).is_ok(), "{good}: {:?}", step(good));
         }
+        // #5385: Calendar's link can't list calendars, so no step reads them.
+        let calendars = step(r#"service = "google_calendar", what = "calendars""#).unwrap_err();
+        assert!(calendars.contains(r#"not "calendars""#), "{calendars}");
         // Thirteen's P2 on #5303: never a free-form read, whose shape the
         // asker writes, and no key for one.
         for (free, why) in [
