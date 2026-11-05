@@ -530,3 +530,8 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
 - 13:4x: #5388 HOLD 23db64e13c with the Reviewer-lead's P2 (stop_failed
   sends Stop without holding; same Linux loss); renew's hold mutation
   survives on macOS. #5185 merged in train 640, no read owed.
+- 14:2x: #5388 READ-OK fac0a68ac0 (HOLD lifted: the hold sits inside
+  stop_failed, test drives it, 27/0, ARM64 green). #5404 HOLD 5fd5024105,
+  P2: naming by the one-face count reads "no other voice" as true when the
+  one-face tracker isn't attached (another_voice_heard(None) is false).
+  #5402 and #5406 were taken by Thirteen and El.
