@@ -554,7 +554,7 @@ async fn lines_known(
                     "Answered.",
                     Instant::now(),
                     scope.person(),
-                    lease.named_for_reply(),
+                    lease.named_for_conversation(),
                 );
             }
         }
@@ -1666,13 +1666,152 @@ async fn a_keep_just_after_her_face_alone_opened_as_the_rooms_is_carried_for_her
             true,
             true,
             None,
-            Voice::Off,
+            Voice::One,
             (false, &[]),
             left_then_back,
             (true, Some(1)),
         )
         .await;
         assert_eq!(got.calls, expected, "{what}");
+    }
+}
+
+/// Thirteen's P1 on #5448: a guest speaks line 1 off camera while A's
+/// face sits alone in view and is named for the reply, by the one-face
+/// count (her still face) or by the mouth rule (read speaking in one look
+/// of four), and the voice rule hears another voice. The guest's line 2,
+/// off camera within 5 s, A's face gone, carries a keep. Line 1 opens no
+/// conversation of A's, so line 2 is not carried: its keep runs as the
+/// room's (not held for A's yes), no memory hits read A's scope, and it is
+/// never told A's context or thread. With
+/// `LAMP_CONVERSATION_CARRIES_PAST_SILENT` inactive, active with its sign
+/// shown, and active with its sign missed. Also with no voice rule at all
+/// (fails closed) and with another voice heard before line 1.
+#[tokio::test]
+async fn a_guests_line_beside_her_named_lone_face_opens_no_conversation_of_hers() {
+    use lamp_msgs::SpeakingState::No;
+    const STILL: &[lamp_msgs::SpeakingState] = &[No];
+    let a = crate::remember::person_id("A");
+    fn left(request: u64, known: &std::path::Path) {
+        if request == 2 {
+            let _ = std::fs::remove_file(known);
+            let _ = std::fs::remove_file(known_face_of(known));
+        }
+    }
+    let shown = |shown: bool| -> Option<(bool, crate::second_provider::AnotherVoice)> {
+        Some((true, Arc::new(move || shown)))
+    };
+    // (what, the one-face count on, line 1's mouths, mouth-rule murmur on
+    // line 1, voice, past_silent)
+    type PastSilent = Option<(bool, crate::second_provider::AnotherVoice)>;
+    type Mouths = &'static [lamp_msgs::SpeakingState];
+    type Case = (&'static str, bool, Mouths, Option<u64>, Voice, PastSilent);
+    let cases: Vec<Case> = vec![
+        (
+            "p1-count-voice",
+            true,
+            STILL,
+            None,
+            Voice::AnotherInIt,
+            None,
+        ),
+        (
+            "p1-count-voice-ps-shown",
+            true,
+            STILL,
+            None,
+            Voice::AnotherInIt,
+            shown(true),
+        ),
+        (
+            "p1-count-voice-ps-missed",
+            true,
+            STILL,
+            None,
+            Voice::AnotherInIt,
+            shown(false),
+        ),
+        (
+            "p1-mouth-voice",
+            false,
+            &[],
+            Some(1),
+            Voice::AnotherInIt,
+            None,
+        ),
+        (
+            "p1-mouth-voice-ps-shown",
+            false,
+            &[],
+            Some(1),
+            Voice::AnotherInIt,
+            shown(true),
+        ),
+        (
+            "p1-mouth-voice-ps-missed",
+            false,
+            &[],
+            Some(1),
+            Voice::AnotherInIt,
+            shown(false),
+        ),
+        (
+            "p1-mouth-before",
+            false,
+            &[],
+            Some(1),
+            Voice::AnotherBefore,
+            None,
+        ),
+        ("p1-mouth-no-rule", false, &[], Some(1), Voice::Off, None),
+    ];
+    for (what, name_one_face, mouths, murmur, voice, past_silent) in cases {
+        let mut chats = vec![vec![text("Sure."), Ok(ChatEvent::Done)]];
+        chats.extend(keep_the_hotel_asking());
+        let got = lines_known(
+            what,
+            vec![
+                (
+                    "I'll grab a coffee first.".to_owned(),
+                    vec![("f1", false)],
+                    0,
+                ),
+                (
+                    "Can you keep that my car is in for service?".to_owned(),
+                    vec![],
+                    0,
+                ),
+            ],
+            chats,
+            (BOOT, true, true),
+            None,
+            None,
+            true,
+            true,
+            past_silent,
+            voice,
+            (name_one_face, mouths),
+            left,
+            (true, murmur),
+        )
+        .await;
+        assert_eq!(
+            got.calls,
+            [None],
+            "{what}: the room's keep, never held for A"
+        );
+        // Line 2's hits (line 1's own may fall back to her face with no
+        // voice rule: `LAMP_SECOND_MEMORY_HITS`'s accepted risk, unchanged).
+        assert!(
+            !matches!(got.hits.last(), Some(Some((Some(whose), _))) if *whose == a),
+            "{what}: line 2 reads no hits in A's scope: {:?}",
+            got.hits
+        );
+        let as_a = Message::system(format!("for {:?}", Some(a.as_str())));
+        assert!(
+            got.asked.iter().all(|told| *told != as_a),
+            "{what}: never told A's context or thread"
+        );
     }
 }
 

@@ -471,6 +471,11 @@ struct RequestContext {
     /// [`Self::named`] by the one-face count, the mouth not read
     /// (`LAMP_SECOND_NAME_ONE_FACE`, [`ScopeLease::name_for_reply_by_one_face`]).
     named_by_one_face: AtomicBool,
+    /// [`Self::named`] by the mouth rule, no other voice known for the line:
+    /// its exchange may open the person's conversation going on for a carry
+    /// ([`ScopeLease::name_for_conversation`]). Cleared by any later narrow
+    /// and by another voice heard as the line is judged.
+    named_conversation: AtomicBool,
     /// Narrowed to the room for want of a face seen speaking it, no face
     /// seen speaking it at all and the admitted person's own known face the
     /// only face in view: memory's hits alone may still read their scope
@@ -588,6 +593,7 @@ impl RequestScope {
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
                 named_by_one_face: AtomicBool::new(false),
+                named_conversation: AtomicBool::new(false),
                 hits_face: AtomicBool::new(false),
                 room: ScopeSnapshot::room(),
                 active: AtomicBool::new(true),
@@ -637,6 +643,7 @@ impl RequestScope {
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
                 named_by_one_face: AtomicBool::new(false),
+                named_conversation: AtomicBool::new(false),
                 hits_face: AtomicBool::new(false),
                 room: ScopeSnapshot::room(),
                 active: AtomicBool::new(true),
@@ -697,6 +704,11 @@ impl ScopeLease {
             .unwrap_or_else(|e| e.into_inner());
         self.context.narrowed.store(true, Ordering::Release);
         self.context.hits_face.store(false, Ordering::Release);
+        // Any narrow after the name is a sign of someone else: the line
+        // opens no conversation of theirs (Thirteen's P1 on #5448).
+        self.context
+            .named_conversation
+            .store(false, Ordering::Release);
         // A name by the one-face count is undone by any later narrow, as the
         // hits fallback is (`LAMP_SECOND_NAME_ONE_FACE`): any sign of
         // someone else wins. Taken after the narrow that names it.
@@ -832,6 +844,43 @@ impl ScopeLease {
             .named_by_one_face
             .store(true, Ordering::Release);
         self.name_for_reply();
+    }
+
+    /// A line named for its reply by the mouth rule
+    /// ([`Self::name_for_reply`], `speaking_faces::named_alone`: the person's
+    /// face alone in view and read speaking in some look), with the voice
+    /// rule there and no other voice known: its room's exchange may open
+    /// their conversation going on for a carry
+    /// ([`Self::named_for_conversation`], `Thread::lamp_for_named`;
+    /// lamp-06c1, 5 Nov, S4). Never by the one-face count alone, which
+    /// names a silent face. Taken after the narrow that names it; undone by
+    /// any later narrow and by another voice heard as the line is judged
+    /// ([`Self::drop_conversation_name`]): any sign of someone else wins.
+    pub fn name_for_conversation(&self) {
+        if self.context.named.load(Ordering::Acquire) {
+            self.context
+                .named_conversation
+                .store(true, Ordering::Release);
+        }
+    }
+
+    /// Takes back [`Self::name_for_conversation`]: another voice heard.
+    pub fn drop_conversation_name(&self) {
+        self.context
+            .named_conversation
+            .store(false, Ordering::Release);
+    }
+
+    /// The person whose conversation this narrowed line's room exchange
+    /// opens or goes on ([`Self::name_for_conversation`]), while current
+    /// and still named. Never authority to act: only
+    /// `Thread::going_on_with` reads it, for a carry.
+    pub fn named_for_conversation(&self) -> Option<&str> {
+        self.context
+            .named_conversation
+            .load(Ordering::Acquire)
+            .then(|| self.named_for_reply())
+            .flatten()
     }
 
     /// The admitted person a narrowed line's reply is told by name under
