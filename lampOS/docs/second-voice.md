@@ -5141,7 +5141,11 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
     (`spoken_by_the_caller_alone`: the faces read speaking in at least half
     the looks through the line, against `Heeding::caller_faces`, set at the
     call), is the caller's own (`Heeding::callers_own_line`), anywhere in
-    the conversation and however many lines an answer. Never a face only
+    the conversation and however many lines an answer. It trusts only a
+    face seen speaking the call itself (`Heeding::caller_faces_from_call`),
+    never the fallback's first face seen speaking a going-on line after a
+    call with none (#2341): that may be a colleague turned to the lamp
+    (the Reviewer-lead's P2 on #5440). Never a face only
     in view, or turned to the lamp but read still; never with no fresh
     look through the line (no face is read then); and the sure other
     voice, desk talk and a reply naming someone still hold it. Unlike the
@@ -5154,7 +5158,9 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
     (`held_keeps_caller`): busy_day with the eyes, all eight right with
     both levers (c01-c06 answered, d11 and d12 held); every desk line of
     busy_day and of #5110's quiet-room sets stays held with only the desk
-    face speaking, no face read, or the caller's face in view but still.
+    face speaking, no face read, or the caller's face in view but still;
+    after a call with no face, a colleague's face taken by the fallback
+    keeps none of their desk questions.
     Not yet tried on a lamp.
 - **The look by its own call.** With a full look (`LAMP_EYES_LOOK_FILE` and
   `LAMP_LOOK_FULL`), spoken turns are offered `take_a_look`

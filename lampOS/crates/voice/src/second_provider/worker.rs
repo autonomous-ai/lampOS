@@ -5842,6 +5842,12 @@ pub(crate) struct Heeding {
         Option<crate::speaking_faces::Reader>,
     )>,
     caller_faces: crate::speaking_faces::Speakers,
+    /// [`Self::caller_faces`] were seen speaking the call itself, not set
+    /// by the fallback after a call with no face (the first face seen
+    /// speaking a line going on turned to the lamp). Only such a face is
+    /// trusted by `LAMP_UNTIED_CALLER_SPEAKING` (the Reviewer-lead's P2 on
+    /// #5440).
+    caller_faces_from_call: bool,
     /// The request last ended as a cut-in over the lamp's answer.
     cut_in: Option<u64>,
     /// Leave alone a reply that answers nothing the lamp asked, said over its
@@ -6039,6 +6045,7 @@ struct BeforeLetOut {
     request: u64,
     called_at: Option<Instant>,
     caller_faces: crate::speaking_faces::Speakers,
+    caller_faces_from_call: bool,
     chain: Vec<u64>,
     said_until_us: Option<u64>,
     said_until_free_us: Option<u64>,
@@ -6896,6 +6903,7 @@ impl Heeding {
             quiet_same_one: false,
             eyes: None,
             caller_faces: Vec::new(),
+            caller_faces_from_call: false,
             cut_in: None,
             others_answer: false,
             spoken_stops: false,
@@ -7273,7 +7281,11 @@ impl Heeding {
         // desk talk ("Maybe. What would you do?", busy_day's c04) are what
         // this lever is for; a caller asking a colleague with no sign of
         // desk talk is its cost. A reply naming someone stays held.
+        // Only a face seen speaking the call itself: the fallback's first
+        // face after a call with none may be a colleague's (the
+        // Reviewer-lead's P2 on #5440).
         if self.caller_speaking
+            && self.caller_faces_from_call
             && spoken_by_the_caller_alone(&seen.speakers, &self.caller_faces)
             && !crate::untied_going_on::names_someone_after_a_reply(heard)
         {
@@ -8339,6 +8351,7 @@ impl Heeding {
     /// looks go, so no passing id outlives a privacy change.
     pub(crate) fn privacy_changed(&mut self) {
         self.caller_faces.clear();
+        self.caller_faces_from_call = false;
         // No line's words are kept past it for a repeat
         // (`LAMP_NAME_REPEAT_NOT_A_CALL`, Reviewer-two's P3 on #4645).
         self.attention.forget_said_lines();
@@ -8354,6 +8367,7 @@ impl Heeding {
         // (`LAMP_DECLINE_SILENT`).
         if let Some(before) = self.before_let_out.as_mut() {
             before.caller_faces.clear();
+            before.caller_faces_from_call = false;
             before.carry_ended();
         }
         // The lines' speaking faces too, for a join (`Self::same_speaker`),
@@ -8679,6 +8693,7 @@ impl Heeding {
                     );
                     self.called_at = before.called_at;
                     self.caller_faces = before.caller_faces;
+                    self.caller_faces_from_call = before.caller_faces_from_call;
                     self.chain = before.chain;
                     self.said_until_us = before.said_until_us;
                     self.said_until_free_us = before.said_until_free_us;
@@ -9721,8 +9736,10 @@ impl Heeding {
         // turned away) keeps the caller's face for their next line.
         if !signs.going_on && !carry_stands {
             self.caller_faces.clear();
+            self.caller_faces_from_call = false;
             if let Some(before) = self.before_let_out.as_mut() {
                 before.caller_faces.clear();
+                before.caller_faces_from_call = false;
             }
         }
         // #1522 on this route (`LAMP_GOING_ON_ASKS`): what the Policy said of
@@ -10184,6 +10201,7 @@ impl Heeding {
                 request,
                 called_at: self.called_at,
                 caller_faces: self.caller_faces.clone(),
+                caller_faces_from_call: self.caller_faces_from_call,
                 chain: self.chain.clone(),
                 said_until_us: self.said_until_us,
                 said_until_free_us: self.said_until_free_us,
@@ -10301,11 +10319,14 @@ impl Heeding {
         if called {
             self.called_at = Some(Instant::now());
             self.caller_faces = seen.speakers.clone();
+            self.caller_faces_from_call = true;
         } else if played && seen.going_on && self.caller_faces.is_empty() {
             // After a call no face was seen speaking, the first face seen
             // speaking a line going on turned to the lamp is the caller's
-            // (the first builder at 01:51 on #2341).
+            // (the first builder at 01:51 on #2341). Not seen speaking the
+            // call, so `LAMP_UNTIED_CALLER_SPEAKING` does not trust it.
             self.caller_faces = seen.turned_speakers.clone();
+            self.caller_faces_from_call = false;
         }
         // Held in a row, as Live counts its unanswered: a new session.
         self.held_run = if played {
