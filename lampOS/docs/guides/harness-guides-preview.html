@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Harness guides: preview (draft for #5413)</title>
+<title>Harness guides: preview</title>
 <!-- System fonts only: the page loads nothing from outside. A preview of harness-getting-started.md and
-     harness-developer-quick-start.md; the Markdown files are the source, and every TO CHECK there still stands. -->
+     harness-developer-quick-start.md; the Markdown files are the source. -->
 <style>
   :root { --ink:#1b1f27; --muted:#5b6472; --line:#d9dde4; --bg:#f6f7f9; --card:#fff; --accent:#d9822b; color-scheme: light; }
   * { box-sizing: border-box; }
@@ -34,7 +34,7 @@
 </head>
 <body>
 <main>
-  <p class="draft"><b>Draft for #5413.</b> Preview only. Not live until the Harness team and the SDK local leader have checked every <span class="check">TO CHECK</span>, and until a lamp build carrying PR #5379 is on stable.</p>
+  <p class="draft">A preview of the two guides. The Markdown files are the source.</p>
 
   <nav role="tablist">
     <button role="tab" id="t1" aria-selected="true" aria-controls="p1">For everyone</button>
@@ -49,17 +49,15 @@
     <div class="say"><b>Ask for a piece of work.</b><br>“Ask Claude Code to write a poem about the rain.” The lamp repeats the task, you say yes, and it tells you Claude Code has it.</div>
     <div class="say"><b>Ask for something real from your work.</b><br>“Ask Claude Code to look at why my build is slow and tell me what it finds.”</div>
     <div class="say"><b>Hear how it went, without asking.</b><br>When the helper finishes, the lamp tells you at a good moment. If it stops to ask you something, the lamp tells you that too.</div>
-    <p>Nothing starts without your spoken yes. The lamp only hands work to the helper you name, and only to computers <span class="check">TO CHECK: phones</span>.</p>
+    <p>Nothing starts without your spoken yes. The lamp only hands work to the helper you name, and only to computers.</p>
 
     <h2>Three steps</h2>
-    <div class="step"><h3><span class="num">1</span>Install the Harness app on your computer</h3>
-      <div class="shot">Picture plan: the Harness download page with the button circled, then the app's first screen. <span class="check">TO CHECK: Harness's install page</span></div></div>
+    <div class="step"><h3><span class="num">1</span>Install Harness on your computer</h3>
+      <p>Download it at harness.autonomous.ai/desktop. It runs on macOS 12 or later, Windows 10 or 11, and Ubuntu 22.04 or later.</p></div>
     <div class="step"><h3><span class="num">2</span>Sign in to Harness</h3>
-      <p>Sign in on the screen Harness shows you.</p>
-      <div class="shot">Picture plan: the sign-in screen, then the signed-in home screen. Hide names and emails. <span class="check">TO CHECK: the account</span></div></div>
+      <p>Open Harness and sign in: continue with Google, Apple or email, or scan the code with your phone.</p></div>
     <div class="step"><h3><span class="num">3</span>Connect Harness to your lamp</h3>
-      <p>In the Autonomous app, open the Harness card and start. The app shows an 8-digit code. In Harness, open <b>Machines</b>, then <b>Approve a device</b>, and type it. The app then asks “Sign in as” with your email: choose yes if it is yours.</p>
-      <div class="shot">Video plan, about 20 seconds: the code in the app (blurred), typed in Harness, the yes in the app. Then someone speaking to the lamp. <span class="check">TO CHECK: the app's screen words</span></div></div>
+      <p>In the Autonomous app, open the Harness card and start. The app shows an 8-digit code. In Harness, open <b>Machines</b>, then <b>Approve a device</b>, type it and press <b>Continue</b>. Harness asks “Sign in” with your lamp's name: press <b>Approve</b> (hold 2 seconds if you are on another network). The Autonomous app then asks “Sign in as” with your email: choose yes if it is yours.</p></div>
 
     <h2>Where people meet this</h2>
     <div class="entry">
@@ -73,9 +71,8 @@
     <p>Light it, make it speak, move it, hear its own phrases, see that someone arrived, from a program on your computer. About ten minutes.</p>
 
     <h2>What you get</h2>
-    <div class="step"><b>Pairing.</b> The owner pairs a computer once with a code and chooses what it may do. The app's <i>Add a developer computer</i> screen is meant to make the code but is still pending; until then the lamp's keeper makes it. It can be revoked at any time. The person always wins: a hand on the head, “stop”, the privacy switch or a conversation takes control back.</div>
+    <div class="step"><b>Pairing.</b> The owner pairs a computer once with a code and chooses what it may do. The app's <i>Add a developer computer</i> screen is meant to make the code but is not out yet; until then the lamp's keeper makes it. It can be revoked at any time. The person always wins: a hand on the head, “stop”, the privacy switch or a conversation takes control back.</div>
     <div class="step"><b>The SDK.</b> Python and JavaScript, the same calls: events, state and actions, each needing a grant. Plus a fake lamp for trying with no lamp.</div>
-    <p><span class="check">TO CHECK: the lamp's side, lamp-control, is not a product part until PR #4526; the app's screen</span></p>
 
     <h2>Run an example</h2>
 <pre># install (from a checkout of the repository)
