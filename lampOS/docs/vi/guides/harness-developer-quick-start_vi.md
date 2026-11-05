@@ -4,7 +4,7 @@ Trang này tóm tắt [harness-developer-quick-start.md](../../guides/harness-de
 
 ## Bạn nhận được gì
 
-- **Ghép đôi một máy tính với đèn.** Chủ đèn ghép một lần trong ứng dụng Autonomous (*Add a developer computer*), chọn quyền cho máy đó, và có thể thu hồi bất cứ lúc nào. Người luôn thắng: tay đặt lên đầu đèn, "stop", công tắc riêng tư hay một cuộc trò chuyện đều lấy lại quyền điều khiển.
+- **Ghép đôi một máy tính với đèn.** Chủ đèn ghép một lần bằng một mã, chọn quyền cho máy đó, và có thể thu hồi bất cứ lúc nào. Màn hình *Add a developer computer* của ứng dụng sẽ tạo mã này nhưng tài liệu vẫn ghi là chưa xong; trong lúc đó người giữ đèn tạo mã. Người luôn thắng: tay đặt lên đầu đèn, "stop", công tắc riêng tư hay một cuộc trò chuyện đều lấy lại quyền điều khiển.
 - **SDK** Python và JavaScript (`lampos`): sự kiện, trạng thái và hành động, mỗi thứ cần một quyền chủ đèn đã cấp.
 - **Đèn giả** trên máy của bạn, để thử mà không cần đèn.
 - Ngoài ra: `lamp-mcp` cho tác tử và kỹ năng đẩy lên đèn.
@@ -13,16 +13,18 @@ Harness và SDK là hai cánh cửa khác nhau: SDK nói chuyện với đèn t�
 
 ## Hôm nay chạy được gì
 
-SDK và đèn giả đã merge. `lamp-control` (phía đèn) đã merge nhưng **chưa là một phần của sản phẩm** (PR #4526): chỉ chạy khi `LAMP_CONTROL=on`. TO CHECK (trưởng nhóm SDK, di động): màn hình *Add a developer computer* có trong bản ứng dụng khách hàng nhận không.
+SDK và đèn giả đã merge. `lamp-control` (phía đèn) đã merge nhưng **chưa là một phần của sản phẩm** (PR #4526): chỉ chạy khi `LAMP_CONTROL=on`. Màn hình *Add a developer computer* **chưa xong** theo tài liệu (docs/develop.md:259-262). TO CHECK (trưởng nhóm SDK, di động): có trong bản TestFlight hay App Store chưa.
 
 ## Chạy thử (khoảng 5 phút)
 
 ```sh
 python3 -m venv ~/lampos-venv && . ~/lampos-venv/bin/activate
 pip install ./lampOS/sdk/python
-# terminal 1
+# terminal 1 (kích hoạt môi trường ảo trong MỖI terminal)
+. ~/lampos-venv/bin/activate
 LAMPOS_HOME=/tmp/lampos-try lamp fake
 # terminal 2: lưu docs/guides/examples/first_light.py thành first_light.py
+. ~/lampos-venv/bin/activate
 LAMPOS_HOME=/tmp/lampos-try python first_light.py
 ```
 
@@ -30,10 +32,10 @@ Terminal 2 in `connected to lamp-fake with [...]` và trạng thái đèn; termi
 
 ## Dùng đèn thật
 
-Trong ứng dụng, chọn *Add a developer computer* và chọn quyền; ứng dụng hiện mã 8 chữ số, pin của đèn (64 ký tự hex) và đếm ngược 5 phút. Rồi:
+Lấy mã ghép đôi 8 chữ số kèm pin của đèn (64 ký tự hex), hiệu lực 5 phút, với ba quyền `light`, `speak`, `body`. Dự kiến qua màn hình *Add a developer computer* của ứng dụng (chưa xong); hôm nay người giữ đèn chạy `lamp-control code --grants body,light,speak` bằng quyền root. Rồi:
 
 ```sh
-lamp pair 12345678 --pin <64 ký tự ứng dụng hiện>
+lamp pair 12345678 --pin <64 ký tự của pin>
 lamp hello
 python first_light.py
 ```

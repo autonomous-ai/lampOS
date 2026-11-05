@@ -6,7 +6,7 @@ You can read and drive your own lamp from a program on your computer: light it, 
 
 ## What you get
 
-- **Pairing a computer with your lamp.** The owner pairs a computer once, from the Autonomous app (*Add a developer computer*), choosing what it may do. The computer then connects to the lamp on your home network. The owner can revoke it at any time. The person always wins: a hand on the lamp's head, "stop", the privacy switch, or a conversation takes control back from your program ([develop.md](../develop.md), "What takes control back").
+- **Pairing a computer with your lamp.** The owner pairs a computer once with a code, choosing what it may do. The Autonomous app's *Add a developer computer* screen is meant to do this, but the repository's docs still list it as pending (see "What works today"); until it ships, the lamp's keeper makes the code. The computer then connects to the lamp on your home network. The owner can revoke it at any time. The person always wins: a hand on the lamp's head, "stop", the privacy switch, or a conversation takes control back from your program ([develop.md](../develop.md), "What takes control back").
 - **The SDK.** Python (`lampos`) and JavaScript (`lampos`), the same calls in both: events (`person.arrived`, `phrase.heard`, `touch`...), state (`get`), and actions (`light`, `say`, `gesture`, `express`, `sound`...). Each needs a grant the owner gave. See [the SDK map](../../sdk/README.md) for every call and its status.
 - **A fake lamp** on your own computer, so you can try everything with no lamp.
 - **Also there:** `lamp-mcp`, to let an agent drive the lamp ([sdk/mcp](../../sdk/mcp/README.md)), and skills you push to the lamp ([develop.md](../develop.md), part 5).
@@ -22,9 +22,9 @@ What your program never gets: camera frames or audio unless the owner grants `ca
 | The SDKs and the fake lamp | Merged. Use them now |
 | An example against the fake lamp | Runs (output below) |
 | The lamp's side, `lamp-control` | Merged, but **not a product part yet**: it runs only when `LAMP_CONTROL=on`, and no product unit passes it. PR #4526 makes it one. **TO CHECK (SDK local leader)** |
-| The app's *Add a developer computer* screen | The lamp's side is merged (`control.code`, `control.clients`, `control.revoke`). **TO CHECK (mobile, SDK local leader):** that the screen is in the app build customers get |
+| The app's *Add a developer computer* screen | **Still pending** in the repository's docs (docs/develop.md:259-262: "that app screen is a later piece"). The lamp's side is merged (`control.code`, `control.clients`, `control.revoke`, commit ae813eee0). **TO CHECK (mobile, SDK local leader):** whether the screen is in the TestFlight or App Store build |
 
-So until #4526 is on stable, a real lamp pairs only when its keeper turns lamp-control on. If that is you, ask your lamp's keeper, or use the fake lamp below.
+So today a real lamp pairs only when its keeper turns lamp-control on and makes the pairing code at the lamp. Ask your lamp's keeper, or use the fake lamp below.
 
 ## 1. Install the SDK (2 minutes)
 
@@ -41,8 +41,11 @@ pip install ./lampOS/sdk/python
 
 The fake lamp is a lamp on your computer with every grant, already paired with you. Give the trial its own `LAMPOS_HOME` so it never touches a real pairing.
 
+Open two terminals. In **each** one, activate the environment from step 1 first (`. ~/lampos-venv/bin/activate`), or the `lamp` and `python` commands won't find the SDK.
+
 ```sh
 # terminal 1
+. ~/lampos-venv/bin/activate
 LAMPOS_HOME=/tmp/lampos-try lamp fake
 ```
 
@@ -77,6 +80,7 @@ asyncio.run(main())
 
 ```sh
 # terminal 2
+. ~/lampos-venv/bin/activate
 LAMPOS_HOME=/tmp/lampos-try python first_light.py
 ```
 
@@ -87,9 +91,10 @@ connected to lamp-fake with ['body', 'light', 'speak', 'look', 'hear', 'sound', 
 lamp state: {'lamp': {'talking': False, 'paused': False, 'private': False, 'asleep': False}}
 ```
 
-Terminal 1 shows what the fake lamp was asked:
+Terminal 1 shows what the fake lamp was asked. Its own "said person.arrived" line (it announces a visitor every few seconds) is part of the fake and appears too:
 
 ```text
+said person.arrived
   asked {"op": "get", "state": ["lamp"]}
   asked {"op": "light", "colour": "warm", "level": 3, "pattern": "breathe", "for_ms": 5000}
   asked {"op": "say", "text": "Hello from my computer."}
@@ -107,18 +112,20 @@ Why it is written this way:
 
 ## 4. Point it at your real lamp
 
-1. In the Autonomous app, open your lamp and choose *Add a developer computer*. Tick what the computer may do. The app shows an 8-digit code, the lamp's pin (64 hex characters) and a 5-minute countdown. The lamp also says the first 8 characters of the pin aloud: they must match what the app shows.
-2. On your computer, with no `LAMPOS_HOME` set:
+1. **Get a pairing code.** The owner's code comes with the lamp's pin (64 hex characters) and lasts 5 minutes. For this example tick three grants: `light` (the light), `speak` (the voice) and `body` (the nod).
+   - **Meant to be:** in the Autonomous app, open your lamp and choose *Add a developer computer*. The lamp also says the first 8 characters of the pin aloud, and they must match what the app shows. **This screen is still pending** in the repository's docs (docs/develop.md:259-262).
+   - **Today:** on a lamp with lamp-control on, the lamp's keeper runs `lamp-control code --grants body,light,speak` as root. It prints the code and the pin.
+2. **On your computer**, with the environment active and no `LAMPOS_HOME` set:
 
 ```sh
-lamp pair 12345678 --pin <the 64 characters the app shows>
+lamp pair 12345678 --pin <the 64 characters of the pin>
 lamp hello                 # connects and shows the grants
 python first_light.py      # now it runs against your lamp
 ```
 
-The SDK checks the lamp's certificate against the pin before it sends anything, so the code never reaches another machine. Pairing is kept in `~/.config/lampos/`. To remove a computer, revoke it in the app.
+The SDK checks the lamp's certificate against the pin before it sends anything, so the code never reaches another machine. Pairing is kept in `~/.config/lampos/`. The owner can revoke a computer at any time, which closes its connections at once.
 
-**TO CHECK (SDK local leader and mobile):** the app screen's exact name and steps are written from the lamp's side (docs/cloud.md, "The developer door") and docs/develop.md. The writer of this draft could not read the app's code. Until #4526 is on stable, a lamp needs `LAMP_CONTROL=on` first.
+**TO CHECK (SDK local leader and mobile):** the app screen's name and steps are written from the lamp's side (docs/cloud.md, "The developer door") and docs/develop.md; the writer of this draft could not read the app's code. Until #4526 is on stable, a lamp needs `LAMP_CONTROL=on` first.
 
 ## Where next
 
@@ -139,7 +146,7 @@ Sources, in `origin/lamp-voice` at 39fddfe02 (lampOS/ paths).
 | Not on PyPI or npm; install from checkout | sdk/python/README.md:21-28, sdk/js/README.md:22-28 |
 | `lamp fake`, its `LAMPOS_HOME`, every grant | sdk/python/README.md:30-57 |
 | Pair with `lamp pair CODE --pin PIN`; pin checked first; kept in `~/.config/lampos/` | sdk/python/README.md:59-72 |
-| The app shows an 8-digit code, the pin, a 5-minute expiry | docs/control.md:297-300, docs/develop.md:259-261 |
+| The code comes with the pin and a 5-minute expiry; the app screen is pending, the keeper makes it today (`lamp-control code --grants body,light,speak`) | docs/control.md:297-300, docs/develop.md:259-261 |
 | The lamp says the first 8 pin characters aloud | docs/cloud.md, "The spoken pin check" (`control.code`) |
 | The owner can revoke at any time | docs/cloud.md `control.revoke`; docs/develop.md:276 |
 | The person wins (hand, stop, privacy, conversation) | docs/develop.md, "What takes control back" |

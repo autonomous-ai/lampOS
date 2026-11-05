@@ -47,7 +47,7 @@
 
     <h2>What you can ask your lamp to do</h2>
     <div class="say"><b>Ask for a piece of work.</b><br>“Ask Claude Code to write a poem about the rain.” The lamp repeats the task, you say yes, and it tells you Claude Code has it.</div>
-    <div class="say"><b>Ask for something from your work computer.</b><br>“Ask Claude Code on my office computer to look at why the build is slow and tell me what it finds.”</div>
+    <div class="say"><b>Ask for something real from your work.</b><br>“Ask Claude Code to look at why my build is slow and tell me what it finds.”</div>
     <div class="say"><b>Hear how it went, without asking.</b><br>When the helper finishes, the lamp tells you at a good moment. If it stops to ask you something, the lamp tells you that too.</div>
     <p>Nothing starts without your spoken yes. The lamp only hands work to the helper you name, and only to computers <span class="check">TO CHECK: phones</span>.</p>
 
@@ -55,6 +55,7 @@
     <div class="step"><h3><span class="num">1</span>Install the Harness app on your computer</h3>
       <div class="shot">Picture plan: the Harness download page with the button circled, then the app's first screen. <span class="check">TO CHECK: Harness's install page</span></div></div>
     <div class="step"><h3><span class="num">2</span>Sign in to Harness</h3>
+      <p>Sign in on the screen Harness shows you.</p>
       <div class="shot">Picture plan: the sign-in screen, then the signed-in home screen. Hide names and emails. <span class="check">TO CHECK: the account</span></div></div>
     <div class="step"><h3><span class="num">3</span>Connect Harness to your lamp</h3>
       <p>In the Autonomous app, open the Harness card and start. The app shows an 8-digit code. In Harness, open <b>Machines</b>, then <b>Approve a device</b>, and type it. The app then asks “Sign in as” with your email: choose yes if it is yours.</p>
@@ -72,7 +73,7 @@
     <p>Light it, make it speak, move it, hear its own phrases, see that someone arrived, from a program on your computer. About ten minutes.</p>
 
     <h2>What you get</h2>
-    <div class="step"><b>Pairing.</b> The owner pairs a computer once in the Autonomous app (<i>Add a developer computer</i>) and chooses what it may do. It can be revoked at any time. The person always wins: a hand on the head, “stop”, the privacy switch or a conversation takes control back.</div>
+    <div class="step"><b>Pairing.</b> The owner pairs a computer once with a code and chooses what it may do. The app's <i>Add a developer computer</i> screen is meant to make the code but is still pending; until then the lamp's keeper makes it. It can be revoked at any time. The person always wins: a hand on the head, “stop”, the privacy switch or a conversation takes control back.</div>
     <div class="step"><b>The SDK.</b> Python and JavaScript, the same calls: events, state and actions, each needing a grant. Plus a fake lamp for trying with no lamp.</div>
     <p><span class="check">TO CHECK: the lamp's side, lamp-control, is not a product part until PR #4526; the app's screen</span></p>
 
@@ -81,17 +82,19 @@
 python3 -m venv ~/lampos-venv &amp;&amp; . ~/lampos-venv/bin/activate
 pip install ./lampOS/sdk/python
 
-# terminal 1: a fake lamp
+# terminal 1: a fake lamp (activate the environment in each terminal)
+. ~/lampos-venv/bin/activate
 LAMPOS_HOME=/tmp/lampos-try lamp fake
 
 # terminal 2: examples/first_light.py
+. ~/lampos-venv/bin/activate
 LAMPOS_HOME=/tmp/lampos-try python first_light.py</pre>
 <pre>connected to lamp-fake with ['body', 'light', 'speak', 'look', 'hear', 'sound', 'skills', 'air', 'device', 'camera', 'microphone']
 lamp state: {'lamp': {'talking': False, 'paused': False, 'private': False, 'asleep': False}}</pre>
     <p>Ran against the fake lamp, not a real one.</p>
 
     <h2>Your real lamp</h2>
-<pre>lamp pair 12345678 --pin &lt;the 64 characters the app shows&gt;
+<pre>lamp pair 12345678 --pin &lt;the 64 characters of the pin&gt;
 lamp hello
 python first_light.py</pre>
     <p>The SDK checks the lamp's certificate against the pin before it sends anything.</p>
