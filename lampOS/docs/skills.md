@@ -2737,16 +2737,22 @@ not hold, for a trigger with no `wait`; a chance let go past its `wait` is
 said by the `chance dropped` line above, which #3007 gives every trigger
 with a `wait`, and not here, so it is said once), `an item came, but its
 while did not hold: ...`, `spoken to since
-HH:MM` (`unless_heard`), `its day already claimed` or `its daily journal is
-faulted`. A chance kept (quiet or active hours, the budget, a `wait`) is
+HH:MM` (`unless_heard`), `its day already claimed`, `its daily journal is
+faulted`, or, for a skill whose step is a `read` (#5288), `its read is still
+under way` (its run waits for its gate, up to 60 minutes) or `its read came
+due once today already` (until local midnight): such a chance is dropped
+before it is said triggered or asked of the Policy, so a trigger that holds
+each second says one line, not four a second (lamp-9adf, 5 Nov: 912 lines a
+minute). A chance kept (quiet or active hours, the budget, a `wait`) is
 said once when first held back. Each gate (each `[budget]` reason its
 own) is said once per hold of its
 trigger and not again for that trigger within 60 s (`DROPPED_LINE_US`), so a
 face that flickers past its `gap` says it once; a run clears that. These
 `not run` lines are only in the journal, not on `skills/events` (the
 `chance dropped` line is on both), and carry no words heard or names. A chance a `yields_to` holds says `waits: ...` as above. Tests:
-`a_dropped_chance_says_its_gate_once` and
-`resting_a_budget_queue_and_a_while_without_a_wait_say_why_not_run`
+`a_dropped_chance_says_its_gate_once`,
+`resting_a_budget_queue_and_a_while_without_a_wait_say_why_not_run` and
+`a_read_that_came_due_says_one_line_however_long_its_trigger_holds`
 (`tests/it/skills.rs`),
 `welcome_back_says_each_dropped_chance_once_with_its_gate` and
 `a_claimed_day_and_a_spoken_window_say_why_not_run` (`tests/it/daily_engine.rs`).

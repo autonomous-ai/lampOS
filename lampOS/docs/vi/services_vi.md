@@ -911,7 +911,14 @@ hai lần bị mô hình trả về thành thêm một khóa bên trong, bị t�
 Tất cả phải đạt liên tục trong 5 s. Trước đó lượt chạy chờ, tối đa 60 phút,
 rồi bỏ qua ngày đó mà không nói gì ("skipped: <why>"). Mỗi kỹ năng đọc một lần
 mỗi ngày địa phương (giữ trong bộ nhớ của `lamp-skills`, nên khởi động lại thì
-quên).
+quên). Trong lúc lượt chạy chờ cổng, và sau khi đến hạn cho tới nửa đêm địa
+phương, trigger của kỹ năng không được ghi là triggered hay hỏi Policy mỗi
+lần nó giữ: cơ hội bị bỏ với một dòng journal mỗi lần giữ, `<skill> not run:
+its read is still under way` hoặc `... its read came due once today already`
+(cổng đọc của `Engine`; lamp-9adf, 5/11: một trigger hiện diện giữ mỗi giây
+ghi bốn dòng mỗi giây cho mỗi kỹ năng, 912 dòng một phút, và journal xoay
+vòng trong khoảng 15 phút). Một kỹ năng được thay đổi qua lần nạp lại có thể
+thử lại trong cùng ngày, và quy tắc một lần mỗi ngày này vẫn quyết định.
 
 **Những gì được nói**: một quy tắc, theo dịch vụ (`lamp_services::spoken`,
 `SPOKEN`, để một phán quyết sau cho một dịch vụ chỉ đổi một bảng), mỗi dòng là
