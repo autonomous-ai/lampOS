@@ -294,6 +294,14 @@ pub struct Status {
     /// when none was given.
     #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub own_keys: std::collections::BTreeMap<&'static str, Value>,
+    /// True while setup waits for the lamp's first update, after the join
+    /// and before the marker (#5458, `crate::first_update`): only for an
+    /// app that asked for it (`update_first`). `phase` stays `connecting`
+    /// meanwhile. An older app passes over it.
+    pub updating: bool,
+    /// Where that update is: one of `update/status`'s `now` (`checking`,
+    /// `fetching`, `switching`, `watching`, `restoring`), empty otherwise.
+    pub update_phase: String,
 }
 
 /// The `generation` a V2 lamp's setup reports; V1's server has no such field.
@@ -313,6 +321,8 @@ impl Status {
             share_reports: false,
             takes_own_keys: false,
             own_keys: Default::default(),
+            updating: false,
+            update_phase: String::new(),
         }
     }
 }
@@ -368,6 +378,11 @@ pub struct SetupRequest {
     pub deepseek_base_url: String,
     #[serde(default, deserialize_with = "text")]
     pub deepgram_api_key: String,
+    /// An app that waits for the lamp's first update before the walk
+    /// (#5458): only the JSON `true`. Absent, as from every app before it
+    /// and from V1's page and this crate's, is setup as before.
+    #[serde(default, deserialize_with = "only_true")]
+    pub update_first: bool,
 }
 
 /// Whether the field is the JSON `true`, and nothing else.
@@ -496,6 +511,8 @@ pub struct Accepted {
     /// The person's own keys given (#2094), each fitted or why not; checked
     /// against its service only after the join, and kept only if it works.
     pub own_keys: Vec<Result<crate::keys::Given, (crate::keys::Service, &'static str)>>,
+    /// Whether the app asked for the first update before the marker (#5458).
+    pub update_first: bool,
 }
 
 /// Shown in place of a secret, so a debug line never logs the Wi-Fi password
@@ -599,6 +616,7 @@ pub fn check(request: &SetupRequest, config: &Config) -> Result<Accepted, String
         backend: backend_link(request).ok(),
         share_reports: request.share_reports,
         own_keys: own_keys(request),
+        update_first: request.update_first,
     })
 }
 
@@ -713,6 +731,12 @@ pub trait Save {
     /// (reviewer-two's P3 on #3024).
     fn keeps_settings(&self) -> bool {
         true
+    }
+    /// The lamp's first update before the marker (#5458,
+    /// `crate::first_update`), telling `phase` where it is. None when not
+    /// waited for: its switch off, or a [`Save`] that has none.
+    fn update_first(&mut self, _phase: &mut dyn FnMut(&str)) -> Option<crate::first_update::Ended> {
+        None
     }
 }
 
@@ -998,6 +1022,25 @@ impl Save for Files<'_> {
     fn own_keys_on(&self) -> bool {
         crate::keys::on(std::env::var(crate::keys::ENVIRONMENT).ok().as_deref())
     }
+    fn update_first(&mut self, phase: &mut dyn FnMut(&str)) -> Option<crate::first_update::Ended> {
+        use crate::first_update::{self as first, Ended};
+        if !first::on(std::env::var(first::SWITCH).ok().as_deref()) {
+            return None;
+        }
+        // There while setup waits, so the updater leaves this unit alone.
+        let waiting = self.0.marker.with_file_name(first::WAITING);
+        if let Err(error) = write_private(&waiting, b"") {
+            return Some(Ended::NotAsked(format!("{}: {error}", waiting.display())));
+        }
+        let ended = match first::OnTheBus::new() {
+            Ok(mut updates) => {
+                first::wait(&mut updates, first::MOST, std::time::Instant::now, phase)
+            }
+            Err(error) => Ended::NotAsked(error.to_string()),
+        };
+        let _ = fs::remove_file(&waiting);
+        Some(ended)
+    }
     fn own_key(&mut self, given: &crate::keys::Given) -> crate::keys::Verdict {
         use crate::keys;
         keys::check_and_keep(
@@ -1174,6 +1217,14 @@ pub fn run(
                     own_answers.insert(service.id(), json!({"code": code, "answer": words}));
                 }
             })
+            .map(|()| {
+                // The first update before the marker (#5458), only for an
+                // app that waits for it. Its end, whatever it is, never fails
+                // setup: the marker follows on the build the lamp has.
+                if accepted.update_first {
+                    update_first(status, save, &*station_ip);
+                }
+            })
             // The volume before the marker, which starts the voice, so its
             // first line is already at it (#5551).
             .map(|()| save.first_volume())
@@ -1218,6 +1269,45 @@ pub fn run(
             status.phase = Phase::Failed;
             status.error = error;
         }
+    }
+}
+
+/// The lamp's first update between the join and the marker (#5458), said on
+/// the status as `updating` and `update_phase`, its end and time in the
+/// journal: the wait the person sees, from the join to the marker.
+fn update_first(
+    status: &Arc<Mutex<Status>>,
+    save: &mut impl Save,
+    station_ip: &dyn Fn() -> Option<String>,
+) {
+    let address = station_ip();
+    {
+        let mut status = status.lock().unwrap();
+        // The app follows the lamp to its home network meanwhile.
+        if let Some(address) = address {
+            status.lan_ip = address;
+        }
+        status.updating = true;
+        status.update_phase.clear();
+    }
+    let began = std::time::Instant::now();
+    let ended = save.update_first(&mut |phase| {
+        status.lock().unwrap().update_phase = phase.to_owned();
+    });
+    {
+        let mut status = status.lock().unwrap();
+        status.updating = false;
+        status.update_phase.clear();
+    }
+    match ended {
+        Some(ended) => eprintln!(
+            "lamp-setup: the first update ended ({ended:?}) in {} s; the marker follows",
+            began.elapsed().as_secs()
+        ),
+        None => eprintln!(
+            "lamp-setup: the app asked for the first update, and {} is not on; the marker follows",
+            crate::first_update::SWITCH
+        ),
     }
 }
 

@@ -447,3 +447,66 @@ fn recovery_rechecks_effective_aliases_after_restoring_the_old_unit() {
         PathBuf::from(sha("setup 1"))
     );
 }
+
+/// Setup waiting for the lamp's first update before its marker (#5458):
+/// lamp-setup's `first_update` file, there only while it waits.
+const WAITING: &str = "var/lib/lampos-setup/first-update";
+
+fn waiting(lamp: &mut Lamp) {
+    let file = lamp.root.join(WAITING);
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(file, "").unwrap();
+}
+
+#[test]
+fn setup_waiting_for_its_first_update_is_not_restarted_mid_wait() {
+    let mut lamp = Lamp::new();
+    setup(&mut lamp, false);
+    waiting(&mut lamp);
+    let pid = lamp.systemd.units[SETUP].pid;
+    publish(&mut lamp);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(setup_restarts(&lamp), 0);
+    assert_eq!(lamp.systemd.units[SETUP].pid, pid);
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("setup waits for this update before its marker")),
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(
+        fs::read_link(lamp.root.join("opt/lampOS/setup/current")).unwrap(),
+        PathBuf::from(sha("setup 2"))
+    );
+}
+
+#[test]
+fn a_waiting_file_that_is_a_link_or_a_folder_is_no_wait() {
+    for make in [
+        |path: &Path| std::os::unix::fs::symlink("/dev/null", path).unwrap(),
+        |path: &Path| fs::create_dir(path).unwrap(),
+    ] {
+        let mut lamp = Lamp::new();
+        setup(&mut lamp, false);
+        let file = lamp.root.join(WAITING);
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        make(&file);
+        publish(&mut lamp);
+        assert_eq!(lamp.round(), Outcome::Switched(2));
+        assert_eq!(setup_restarts(&lamp), 1);
+    }
+}
+
+#[test]
+fn a_waiting_setup_with_an_unknown_dropin_keeps_the_normal_restart() {
+    let mut lamp = Lamp::new();
+    setup(&mut lamp, false);
+    waiting(&mut lamp);
+    let folder = lamp.root.join("etc/systemd/system/lamp-setup.service.d");
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("custom.conf"), "[Service]\nEnvironment=X=1\n").unwrap();
+    publish(&mut lamp);
+    assert_eq!(lamp.round(), Outcome::Switched(2));
+    assert_eq!(setup_restarts(&lamp), 1);
+}
