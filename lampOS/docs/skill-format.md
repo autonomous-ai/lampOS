@@ -208,8 +208,8 @@ caught before install.
 
 ### Reading a linked service
 
-Proposal #5288's read half, off unless `LAMP_SKILL_READS=on`
-([services.md](services.md), "A made skill's read"):
+Proposal #5288's read half, only with `LAMP_SKILL_READS=on`, which the
+product units set ([services.md](services.md), "A made skill's read"):
 
 ```toml
 [permissions]

@@ -109,7 +109,7 @@ dịch vụ.
 |---|---|---|
 | `LAMP_SERVICES=on` | `lamp-cloud` (với `LAMP_CLOUD=on`), `lamp-voice` và `lamp-services` | `lamp-cloud` trả lời `connector.*` và `services.list` của ứng dụng bằng câu của V1 "not on this lamp: <kind>" và không ghi gì vào `can`; giọng nói không khai báo hàm nào trong ba hàm và không định tuyến hàm nào; `lamp-services` không mở socket nào và thoát |
 | `LAMP_SERVICES_WRITE=on` (bật trong `lamp-services.service` của sản phẩm) | `lamp-services` | `service_write` trả lời "writing to services is off on this lamp", và không gì được chuẩn bị hay gửi; việc đọc vẫn như trước |
-| `LAMP_SKILL_READS=on` | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và một yêu cầu tạo kỹ năng nêu một dịch vụ được trả lời `NOT_A_SERVICE` ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
+| `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và một yêu cầu tạo kỹ năng nêu một dịch vụ được trả lời `NOT_A_SERVICE` ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
 được thấy đang nói câu đó, nên cần `LAMP_SECOND_SPEAKING_FACE=on` và
@@ -787,7 +787,7 @@ only reads …").
 Một lần ghi đang chờ được dùng chung cho cả hai tuyến giọng nói. Một lệnh gọi
 dịch vụ được giữ chờ quyết định của Policy như các lệnh của executive, với
 `LAMP_POLICY_HOLDS_ACTIONS=on` (`policy_holds::holds`). Khi `LAMP_SKILL_READS`
-tắt (mặc định), kỹ năng tự tạo không chạm đến dịch vụ nào cả: một bước của kỹ năng tự tạo nêu một hàm dịch vụ
+tắt (mặc định; sản phẩm bật nó), kỹ năng tự tạo không chạm đến dịch vụ nào cả: một bước của kỹ năng tự tạo nêu một hàm dịch vụ
 không bao giờ được nói thẳng ra, và một hàm riêng cùng tên của kỹ năng tự tạo
 bị từ chối (`made_skill::plainly`, `made_skill::capped`). Một yêu cầu tạo
 kỹ năng có nêu bất kỳ dịch vụ liên kết nào (thư và lịch: "mail", "email",
@@ -807,13 +807,16 @@ Một lệnh gọi đến dịch vụ chưa liên kết thất bại với "<Ser
 to this lamp yet. It can be linked in the app: Skills, then Connectors."
 (`serve::NOT_LINKED`), để đèn nói chỗ liên kết, không chỉ nói là chưa có.
 
-## Một kỹ năng tự tạo đọc dịch vụ (đề xuất #5288, `LAMP_SKILL_READS`, tắt trừ khi được bật)
+## Một kỹ năng tự tạo đọc dịch vụ (đề xuất #5288, `LAMP_SKILL_READS`, bật trong sản phẩm)
 
 Nửa "đọc" của đề xuất #5288: một kỹ năng tự tạo có thể đọc một dịch vụ liên
 kết của chủ đèn, bất kỳ dịch vụ nào có thứ để đọc, khi chủ đèn ở một mình với
 đèn. Nó không bao giờ ghi. Tất cả đều tắt trừ khi `LAMP_SKILL_READS=on` (đúng
 `on`) có trong môi trường của `lamp-services`, `lamp-skills`,
-`lamp-skills-manage@` và `lamp-voice`; không unit sản phẩm nào đặt nó.
+`lamp-skills-manage@` và `lamp-voice`; cả bốn unit sản phẩm đặt nó từ
+5/11 (bài kiểm tra cài đặt của `lamp-update`
+`the_product_lets_a_made_skill_read_a_linked_service`), và một drop-in với
+`LAMP_SKILL_READS=off` trên mỗi unit sẽ tắt nó.
 
 **Ai đọc.** Chính `lamp-skills`, như một bên gọi riêng của socket tools của
 `lamp-services` (`/run/lampos-services/tools/call.sock`, hoặc
@@ -1067,14 +1070,17 @@ kỹ năng trong cùng lượt vẫn giữ.
 
 ## Những gì chưa làm
 
-- **Việc đọc của kỹ năng tự tạo chưa bật, chưa chạy trên đèn nào.** Đã xây
-  sau `LAMP_SKILL_READS` (tắt): chỉ thư và lịch có lời nói riêng, mọi dịch vụ
+- **Việc đọc của kỹ năng tự tạo đã bật trong sản phẩm, nhưng sản phẩm chưa
+  nêu chủ đèn.** Sau `LAMP_SKILL_READS` (bật trong bốn unit sản phẩm từ
+  5/11): chỉ thư và lịch có lời nói riêng, mọi dịch vụ
   khác nói tiêu đề hoặc tên theo những khoá mà một mục có thể không có (mục
   không có khoá nào thì được đếm, không được nói); các dịch vụ MCP và Ahrefs
   không có việc đọc cố định nên không kỹ năng tự tạo nào đọc chúng; chủ đèn chỉ là tên gõ lúc cài đặt, nên một khuôn mặt
   được `who_you_are` lưu dưới tên khác không bao giờ được tính; "một lần mỗi
   ngày" giữ trong bộ nhớ và mất khi khởi động lại; không unit sản phẩm nào đặt
-  công tắc hay tệp tên chủ đèn. Việc ghi từ một kỹ năng tự tạo chưa được xây.
+  tệp tên chủ đèn (`LAMP_SKILLS_OWNER_FILE`), nên trên đèn sản phẩm một việc
+  đọc bị bỏ qua với "no owner's face enrolled" cho đến khi có unit đặt nó.
+  Việc ghi từ một kỹ năng tự tạo chưa được xây.
 - **Đọc dịch vụ theo lịch** (một bản tóm tắt thư buổi sáng) được bỏ ra cho
   đến khi có thiết kế riêng: một yêu cầu không được nghe trực tiếp không chạm
   đến dịch vụ nào.
