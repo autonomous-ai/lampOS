@@ -862,7 +862,7 @@ publishes, every 250 ms:
 
 | Holds when | Read from | Otherwise |
 |---|---|---|
-| An owner face is enrolled | The owner's typed setup name (`LAMP_SKILLS_OWNER_FILE`, meant as `LoadCredential=owner:/etc/lampOS/person/name`) and the eyes' known file | "no owner's face enrolled": skipped at once |
+| An owner face is enrolled | The owner's typed setup name (`LAMP_SKILLS_OWNER_FILE`; the product's `lamp-skills.service` gives it as `%d/owner`, `LoadCredential=owner:/etc/lampOS/person/name` with `SetCredential=owner:` as its empty fallback, so a lamp with no name skips the read and still starts the unit) and the eyes' known file | "no owner's face enrolled": skipped at once (an empty name too) |
 | Not private: the microphones known open, the lamp not asleep or muted | `routine::kept_asleep`, `voice/privacy` (`permitted`) | "private" |
 | Not paused (the lamp's stand-in for do-not-disturb) | `lamp/pause` | "paused" |
 | Not quiet hours: 22:00–07:00 local, or the skill's `[quiet]`; an unknown local time counts as quiet | `lamp_local_time::quiet_hours` | "quiet hours" |
@@ -1049,16 +1049,17 @@ the same turn stands.
 
 ## What is not done yet
 
-- **A made skill's read is on in the product, but the product names no
-  owner.** Behind `LAMP_SKILL_READS` (on in the four product units since
+- **A made skill's read is on in the product, not yet run on a product
+  lamp.** Behind `LAMP_SKILL_READS` (on in the four product units since
   5 Nov): only mail and the calendar have their own
   spoken words, and every other service says titles or names, by keys an
   item may not have (an item with none is counted, not said); the MCP
   services and Ahrefs have no fixed read, so no made skill reads them; the owner is only the name typed at setup, so a face saved under
   another name by `who_you_are` never counts; once a day is kept in memory
-  and lost on a restart; no product unit sets the owner's name file
-  (`LAMP_SKILLS_OWNER_FILE`), so on a product lamp a read is skipped with
-  "no owner's face enrolled" until one does. Writes from a made skill are not built.
+  and lost on a restart; the owner's name is the credential copied at
+  `lamp-skills`' start, so a later rename or a forget-everything leaves the
+  old name until a restart, which fails closed: the eyes' known file no
+  longer shows that name, so the read stops at "not the owner". Writes from a made skill are not built.
 - **Scheduled reads** of a service (a morning mail summary) are left out
   until they have a design of their own: a request not heard live reaches
   no service.

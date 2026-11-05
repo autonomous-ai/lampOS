@@ -1556,7 +1556,8 @@ fn the_product_sends_to_the_linked_services_held_to_the_owners_voice() {
 /// (lets `lamp-skills` onto its tools socket), `lamp-skills` (runs the
 /// read behind its gate), its manage helper (holds a made read to its cap
 /// as it is put on, `install_made`) and `lamp-voice` (briefs and checks the
-/// made skill), each once, and no other product unit names it.
+/// made skill), each once, and no other product unit names it. Only
+/// `lamp-skills` runs a read, so only it has the owner's name.
 #[test]
 fn the_product_lets_a_made_skill_read_a_linked_service() {
     let owners = [
@@ -1583,6 +1584,28 @@ fn the_product_lets_a_made_skill_read_a_linked_service() {
         assert!(
             install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
             "{owner}"
+        );
+    }
+    // The owner's setup name, for the read's gate, in lamp-skills alone:
+    // an empty fallback first, so a lamp whose name setup removed skips the
+    // read ("no owner") and still starts the unit.
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let owner = [
+            "SetCredential=owner:",
+            "LoadCredential=owner:/etc/lampOS/person/name",
+            "Environment=LAMP_SKILLS_OWNER_FILE=%d/owner",
+        ]
+        .map(|line| service.iter().filter(|set| **set == line).count());
+        let wanted = usize::from(*unit == "lamp-skills.service");
+        assert_eq!(owner, [wanted; 3], "{unit}");
+        assert_eq!(
+            service
+                .iter()
+                .filter(|line| line.contains("LAMP_SKILLS_OWNER_FILE"))
+                .count(),
+            wanted,
+            "{unit}"
         );
     }
 }
