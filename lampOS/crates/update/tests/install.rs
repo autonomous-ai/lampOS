@@ -1507,24 +1507,25 @@ fn the_product_recalls_before_a_dont_know() {
     );
 }
 
-/// A keep the round right after it doubts is taken back until their yes
-/// (`LAMP_MEMORY_DOUBT_UNDOES`, C37): the memory owner's call on 5 Nov,
-/// after lamp-06c1 kept "rhinodulus" while asking whether it was right.
+/// A keep the round right after it doubts is not taken back in the product
+/// (`LAMP_MEMORY_DOUBT_UNDOES`, C37): off again on 5 Nov at the PM's call
+/// (#5454), since ordinary keep closings ("If it changes, just say it
+/// again.") still read as doubt and would forget a right keep. It goes back
+/// on in its own PR once the matcher passes the readers' lines.
 #[test]
-fn the_product_takes_back_a_doubted_keep() {
+fn the_product_does_not_take_back_a_doubted_keep() {
     let voice = install::PRODUCT
         .iter()
         .find(|(unit, _)| *unit == "lamp-voice.service")
         .unwrap()
         .1;
     let service = section(voice, "Service");
-    for line in [
-        "Environment=LAMP_MEMORY_DOUBT_UNDOES=on",
-        "Environment=LAMP_MEMORY_FORGET_ALL=on",
-        "Environment=LAMP_EYES_SPEAKING=on",
-    ] {
-        assert!(service.contains(&line), "the voice lacks {line}");
-    }
+    assert!(
+        !service
+            .iter()
+            .any(|line| line.contains("LAMP_MEMORY_DOUBT_UNDOES")),
+        "the voice sets LAMP_MEMORY_DOUBT_UNDOES"
+    );
 }
 
 /// The memory's corrections, forget-about and recall v2 are on in the
