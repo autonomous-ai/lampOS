@@ -282,7 +282,16 @@ const MOST_BOOTS: usize = 8;
 #[derive(Default)]
 pub struct SpeakingFaces {
     looks: Mutex<Looks>,
+    /// The newest pair [`Self::known_with_boot`] read, name and `boot/f3`,
+    /// with when it was read: [`Self::known_lately`]'s, once the known file
+    /// has gone stale with the face out of view. Memory only; dropped by
+    /// [`Self::forget`].
+    named: Mutex<Option<(String, String, Instant)>>,
 }
+
+/// How long [`SpeakingFaces::known_lately`] keeps a pair read from the
+/// known file: a conversation's going on (`thread::GOING_ON_FOR`, 45 s).
+pub const NAMED_FOR: Duration = Duration::from_secs(45);
 
 impl SpeakingFaces {
     /// One read of the eyes' `humans/faces/tracked`: their frame, by its
@@ -517,6 +526,9 @@ impl SpeakingFaces {
                 ..Looks::default()
             };
         }
+        if let Ok(mut named) = self.named.lock() {
+            *named = None;
+        }
     }
 
     /// [`known_with_face`], the face's passing id with the eyes' boot it
@@ -547,13 +559,62 @@ impl SpeakingFaces {
 
     pub fn known_with_boot(&self, known: &Path) -> Option<(String, String)> {
         let (name, face, written) = known_with_face_written(known)?;
-        let looks = self.looks.lock().ok()?;
-        let (boot, _) = looks
-            .boots
-            .iter()
-            .filter(|(_, first)| *first < written)
-            .max_by_key(|(_, first)| *first)?;
-        Some((name, format!("{boot}/{face}")))
+        let pair = {
+            let looks = self.looks.lock().ok()?;
+            let (boot, _) = looks
+                .boots
+                .iter()
+                .filter(|(_, first)| *first < written)
+                .max_by_key(|(_, first)| *first)?;
+            (name, format!("{boot}/{face}"))
+        };
+        if let Ok(mut named) = self.named.lock() {
+            *named = Some((pair.0.clone(), pair.1.clone(), Instant::now()));
+        }
+        Some(pair)
+    }
+
+    /// [`Self::known_with_boot`], or, with the known file stale or naming
+    /// nobody, the pair it last read (within [`NAMED_FOR`]) when that face
+    /// left view: in some look from `since` to `to`, and not in the
+    /// newest look by `to`. The eyes stop writing the known file
+    /// once the face is gone and it is fresh only [`crate::known_faces::FRESH`]
+    /// (3 s), so a line said just after it left, or by it before it left,
+    /// read at the line's end, named no one (lamp-06c1, 5 Nov, S4: requests
+    /// 190 and 191, 3 and 8 s after Olivia's face left; neither carried).
+    /// A passing id is one face for as long as it is tracked, so the pair
+    /// still names it. A face still in view the eyes no longer name stays
+    /// unnamed: their call.
+    pub fn known_lately(
+        &self,
+        known: &Path,
+        since: Instant,
+        to: Instant,
+    ) -> Option<(String, String)> {
+        self.known_with_boot(known).or_else(|| {
+            let (name, face, read) = self.named.lock().ok()?.clone()?;
+            (to.saturating_duration_since(read) <= NAMED_FOR
+                && self.face_seen_between(Some(&face), since, to)
+                && !self.in_last_look(&face, to))
+            .then_some((name, face))
+        })
+    }
+
+    /// Whether `face` (`boot/f3`) is in the eyes' newest look at or before
+    /// `at`: still in view as of then. No look, not in view.
+    fn in_last_look(&self, face: &str, at: Instant) -> bool {
+        self.looks.lock().is_ok_and(|looks| {
+            looks
+                .kept
+                .iter()
+                .rev()
+                .find(|look| look.at <= at && !look.boot.is_empty())
+                .is_some_and(|look| {
+                    look.tracked
+                        .iter()
+                        .any(|id| format!("{}/{id}", look.boot) == face)
+                })
+        })
     }
 
     /// Whether the face `face` (`boot/f3`, as [`Self::known_with_boot`]
@@ -2225,6 +2286,55 @@ mod tests {
         assert!(!eyes.no_other_face_in_view(Some("b/f2"), from, to));
         assert!(!eyes.no_other_face_in_view(Some("b/f1"), from, to));
         assert_eq!(eyes.speakers_with_boot(from, to), ["b/f1"]);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// lamp-06c1, 5 Nov, S4: the known file goes stale once the face has
+    /// left; the pair last read still names it for a line within the
+    /// window after it left. Not once the face is out of the window, not
+    /// for a face still in view the eyes stopped naming, not past
+    /// [`NAMED_FOR`], and not after a privacy change ([`SpeakingFaces::forget`]).
+    #[test]
+    fn the_face_last_named_names_it_only_just_after_it_left() {
+        let dir =
+            std::env::temp_dir().join(format!("speaking-faces-lately-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let known = dir.join("known");
+        let eyes = SpeakingFaces::default();
+        let now = Instant::now();
+        let at = |seconds: f32| now - Duration::from_secs_f32(seconds);
+        eyes.look(at(6.0), Some((("b", 0), &faces(&[("f1", Yes)]))));
+        std::thread::sleep(Duration::from_millis(5));
+        std::fs::write(&known, "Lan\n").unwrap();
+        std::fs::write(known_face_of(&known), "f1\n").unwrap();
+        let lan = Some(("Lan".to_owned(), "b/f1".to_owned()));
+        assert_eq!(eyes.known_with_boot(&known), lan);
+        // In view until 3 s ago, then gone; the eyes stop naming it.
+        eyes.look(at(3.0), Some((("b", 1), &faces(&[("f1", No)]))));
+        eyes.look(at(2.5), Some((("b", 2), &faces(&[]))));
+        std::fs::remove_file(&known).unwrap();
+        let to = Instant::now();
+        assert_eq!(eyes.known_with_boot(&known), None);
+        assert_eq!(eyes.known_lately(&known, at(5.0), to), lan, "left 3 s ago");
+        assert_eq!(
+            eyes.known_lately(&known, at(2.0), to),
+            None,
+            "out of the window"
+        );
+        // Still in view, unnamed: the eyes' call.
+        eyes.look(at(0.1), Some((("b", 3), &faces(&[("f1", No)]))));
+        assert_eq!(eyes.known_lately(&known, at(5.0), to), None, "in view");
+        eyes.look(Instant::now(), Some((("b", 4), &faces(&[]))));
+        let later = Instant::now();
+        assert_eq!(eyes.known_lately(&known, at(5.0), later), lan, "gone again");
+        assert_eq!(
+            eyes.known_lately(&known, at(5.0), later + NAMED_FOR),
+            None,
+            "read too long ago"
+        );
+        eyes.forget();
+        assert_eq!(eyes.known_lately(&known, at(5.0), later), None, "forgotten");
         std::fs::remove_dir_all(dir).unwrap();
     }
 
