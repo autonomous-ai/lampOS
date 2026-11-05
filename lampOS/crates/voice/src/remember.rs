@@ -746,6 +746,80 @@ fn face_follows(follows: &str, said: FaceSaid, now_lead: bool, whole: bool) -> O
     }
 }
 
+/// What may follow a bare "I'll keep it" in its sentence ([`KEEP_IT`]).
+const KEEP_IT_FILLER: &[&str] = &["for", "you", "now", "safe", "then", "too"];
+
+/// The bare keeps that end their sentence: lamp-06c1, build 10226, 5 Nov,
+/// "Yes. Please keep that." answered "I'll keep it." with no `remember`
+/// call, and nothing was kept.
+const KEEP_IT: &[&str] = &[
+    "i'll keep it",
+    "i'll keep that",
+    "i will keep it",
+    "i will keep that",
+];
+
+/// Whether `rest`, a reply past its opening words, is a bare keep
+/// ([`KEEP_IT`]): a hard claim when its sentence ends (`.`, `!`, or the
+/// reply's end, with `whole`) with only filler after it
+/// ([`KEEP_IT_FILLER`]: "I'll keep it for you.", "I'll keep that safe!")
+/// and, after a comma, at most two words ("I'll keep it, Sam."), as a face
+/// save is ([`FaceSaid::Save`]). `Some(false)` for none ("I'll keep it
+/// short.", "I'll keep it brief.", "I'll keep it?"), `None` while its
+/// sentence could still be one. "I'll keep it in mind" is the soft claim's
+/// own.
+fn keep_it_claim(rest: &str, whole: bool) -> Option<bool> {
+    let mut maybe = false;
+    for claim in KEEP_IT {
+        let Some(follows) = rest.strip_prefix(claim) else {
+            maybe |= claim.starts_with(rest);
+            continue;
+        };
+        // The claim's last word ends ("I'll keep items" is not one).
+        if follows.starts_with(|c: char| c.is_alphanumeric() || c == '\'') {
+            continue;
+        }
+        let (sentence, ended) = match follows.find(['.', '!', '?']) {
+            Some(at) => (&follows[..at], Some(&follows[at..=at])),
+            None => (follows, None),
+        };
+        if ended == Some("?") {
+            continue;
+        }
+        let decided = ended.is_some() || whole;
+        let words = |text: &str| -> Vec<String> {
+            text.split(|c: char| !c.is_alphanumeric() && c != '\'')
+                .filter(|word| !word.is_empty())
+                .map(str::to_owned)
+                .collect()
+        };
+        let (before, vocative) = match sentence.split_once(',') {
+            Some((before, vocative)) => (before, Some(vocative)),
+            None => (sentence, None),
+        };
+        let filler = words(before);
+        // While streaming, the last word may be cut short ("fo", on its way
+        // to "for").
+        let cut = !decided
+            && vocative.is_none()
+            && before.ends_with(|c: char| c.is_alphanumeric() || c == '\'');
+        let fits = filler.iter().enumerate().all(|(at, word)| {
+            KEEP_IT_FILLER.contains(&word.as_str())
+                || (cut
+                    && at + 1 == filler.len()
+                    && KEEP_IT_FILLER
+                        .iter()
+                        .any(|fill| fill.starts_with(word.as_str())))
+        }) && vocative.is_none_or(|vocative| words(vocative).len() <= 2);
+        match (fits, decided) {
+            (true, true) => return Some(true),
+            (true, false) => maybe = true,
+            (false, _) => {}
+        }
+    }
+    if maybe && !whole { None } else { Some(false) }
+}
+
 /// [`claims_a_keep`] with the kind of claim: `None` while undecided,
 /// `Some(None)` for no claim. With `faces`, a face claim counts
 /// ([`KeepClaim::Face`]).
@@ -819,6 +893,12 @@ fn keep_claim_of(reply: &str, whole: bool, faces: bool) -> Option<Option<KeepCla
             None => maybe = true,
             Some(false) => {}
         }
+    }
+    // A bare "I'll keep it." ending its sentence (lamp-06c1, 5 Nov).
+    match keep_it_claim(&rest, whole) {
+        Some(true) => return Some(Some(KeepClaim::Hard)),
+        None => maybe = true,
+        Some(false) => {}
     }
     // K3: "Noted" claims a keep only with what was noted after a dash or
     // colon ("Noted — you work at a library now"), or with an object
@@ -12773,6 +12853,62 @@ mod tests {
         );
         assert_eq!(keep_claim("Đã ghi nhận."), Some(KeepClaim::Soft));
         assert_eq!(keep_claim("Got it, thanks."), None);
+    }
+
+    /// lamp-06c1, build 10226, 5 Nov: "Yes. Please keep that." answered
+    /// "I'll keep it." with no `remember` call, and nothing was kept. A bare
+    /// keep that ends its sentence, with only filler after it, is a hard
+    /// claim; one that goes on to say how it keeps ("short", "the light
+    /// on", "brief") is none, and "in mind" stays soft.
+    #[test]
+    fn a_bare_keep_that_ends_its_sentence_is_a_hard_claim() {
+        for reply in [
+            "I'll keep it.",
+            "I'll keep that.",
+            "I will keep it.",
+            "I will keep that!",
+            "Okay, I'll keep it!",
+            "Yes. I'll keep it.",
+            "Sure, I'll keep that for you.",
+            "I'll keep it safe.",
+            "Okay, I'll keep it now.",
+            "I'll keep it, Sam.",
+            "I\u{2019}ll keep it. Anything else?",
+            "I'll keep it",
+        ] {
+            assert_eq!(keep_claim(reply), Some(KeepClaim::Hard), "{reply}");
+        }
+        for reply in [
+            "I'll keep it short.",
+            "Sure, I'll keep it brief!",
+            "Okay, I'll keep the light on.",
+            "I'll keep it on for you.",
+            "I'll keep it?",
+            "I'll keep items in the box.",
+            "I'll keep it short and sweet.",
+        ] {
+            assert_eq!(keep_claim(reply), None, "{reply}");
+        }
+        assert_eq!(
+            keep_claim("All right, I'll keep it in mind."),
+            Some(KeepClaim::Soft)
+        );
+        // While streaming, decided at the sentence's end, or at the first
+        // word that is no filler.
+        assert_eq!(claims_a_keep("I'll keep", false), None);
+        assert_eq!(claims_a_keep("Okay, I'll keep it", false), None);
+        assert_eq!(claims_a_keep("I'll keep it ", false), None);
+        assert_eq!(claims_a_keep("I'll keep it fo", false), None);
+        assert_eq!(claims_a_keep("I'll keep it for you", false), None);
+        assert_eq!(claims_a_keep("I'll keep it.", false), Some(true));
+        assert_eq!(claims_a_keep("I'll keep it for you!", false), Some(true));
+        assert_eq!(claims_a_keep("I'll keep it short", false), Some(false));
+        assert_eq!(claims_a_keep("I'll keep it brief", false), Some(false));
+        assert_eq!(claims_a_keep("I'll keep it?", false), Some(false));
+        assert_eq!(claims_a_keep("I'll keep the", false), Some(false));
+        assert_eq!(claims_a_keep("I'll keep it in", false), None);
+        assert_eq!(claims_a_keep("I'll keep it in mind", false), None);
+        assert_eq!(claims_a_keep("I'll keep it in mind.", false), Some(true));
     }
 
     /// The Tiers-ideas plan, P2: a found line the memory labels a maybe or
