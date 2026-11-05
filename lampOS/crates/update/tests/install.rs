@@ -1650,6 +1650,30 @@ fn the_product_answers_a_stop_and_asks_after_a_wordless_cut_in() {
     );
 }
 
+/// The wellbeing nudges at a present spacing and Comfort break
+/// (`LAMP_NUDGES_PRESENT`, #5207): water after 50 minutes and each 50 after,
+/// Comfort break after 90, two an hour at most. Each process that loads the
+/// skills folder reads it, so all three units set it together; set only in
+/// `lamp-skills`, Comfort break would speak while the app lists it off.
+#[test]
+fn the_product_loads_the_skills_present_values_in_all_three_units() {
+    for name in [
+        "lamp-skills.service",
+        "lamp-skills-manage@.service",
+        "lamp-cloud.service",
+    ] {
+        let unit = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1;
+        assert!(
+            section(unit, "Service").contains(&"Environment=LAMP_NUDGES_PRESENT=on"),
+            "{name} lacks LAMP_NUDGES_PRESENT"
+        );
+    }
+}
+
 /// Each second-route turn is told the light as `light/state` says it now
 /// (`LAMP_LIGHT_TOLD`): on lamp-52e6 at 9928 (4 Nov), "what colour is the
 /// light?" was answered "White" three times while the light was warm at
@@ -2596,7 +2620,8 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     // the seven of PRODUCT_SKILLS_OFF come installed disabled; the startle
     // came with its move (#2822); the four wellbeing nudges since 25 Oct;
     // Head pat and its wiggle since #4133's design owner's yes (29 Oct);
-    // Comfort break, off but for LAMP_NUDGES_PRESENT=on (#5207).
+    // Comfort break, off by its own file and on by its [present] with the
+    // product units' LAMP_NUDGES_PRESENT=on (#5207).
     // Sit back since its played check with a person (#5208, 4 Nov).
     assert_eq!(installed.len(), 30);
     let bedtime = installed
