@@ -1086,6 +1086,13 @@ pub enum ProviderOutput {
         request: u64,
         key: String,
     },
+    /// The second route answered `request` as a stop said over, or just
+    /// after, the lamp's answer (`LAMP_SPOKEN_STOP_ENDS`): a reminder's ring
+    /// that line cut is held, not rung once more (`LAMP_RING_STOP_ENDS_IT`,
+    /// the Reviewer-lead's P2 on #5351).
+    StopAnswered {
+        request: u64,
+    },
     /// The model called `go_to_sleep` for `request` and was told the line
     /// to say (#3748, [`crate::sleep_asked`]): the coordinator asks the
     /// sleep once that turn has played, and never during onboarding.
@@ -1509,7 +1516,7 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
         | ProviderOutput::Unclear { request, .. }
         | ProviderOutput::LookAsked { request, .. }
         | ProviderOutput::LookNoCall { request, .. }
-        | ProviderOutput::NewsAnswered { request, .. }
+        | ProviderOutput::NewsAnswered { request, .. }        | ProviderOutput::StopAnswered { request }
         | ProviderOutput::SleepAsked { request }
         | ProviderOutput::ServiceCalled { request }
         | ProviderOutput::StepCallHeard { request }

@@ -1432,17 +1432,31 @@ said over a timer's ring, the head or the button cuts the reply as talk does
 (`hand::cancel`), so its receipt drops as an abandon with audio and, under the
 rule above, it rang once more 5 s later (Seventh's P3 on #5258). The person
 heard it; a lamp told to stop that rings again isn't listening. With the
-switch on, the coordinator marks the receipt (`Receipt::stopped_by_the_person`)
-when a spoken stop, a head stop or the button cut it with the microphones on,
-and the abandon carries `stopped`, true only once some of its audio came. The
-consumer then holds the item at once, with its own line (`held: stopped by the
-person over its ring`), and never offers it again in that voice. With nothing
+switch on, two paths hold it, each with its own line (`held: stopped by the
+person over its ring`), never offered again in that voice:
+- **The button, the head, or a stop-words route** (`hand::cancel`): the
+  coordinator marks the receipt (`Receipt::stopped_by_the_person`) with the
+  microphones on, and the abandon carries `stopped`, true only once some of
+  its audio came. The consumer holds the item at once.
+- **"Stop." said on a product lamp** (the Reviewer-lead's P2 on #5351): it is
+  a cut-in, which settles the ring as a fenced `Retire` for the 5 s retry,
+  before its words are known. When the second route then answers the line as
+  a stop (`LAMP_SPOKEN_STOP_ENDS`, "Okay, I'll stop there") it emits
+  `ProviderOutput::StopAnswered`. `Reminders::stop_said` sends
+  `ToWorker::RingStopped` for the ring last cut by a line (a fenced `Retire`
+  or an abandon with audio), if within `STOP_FOR_THE_CUT_US` (5 s), once. The
+  consumer takes that attempt, and those joined to it, off the retry and holds
+  them. One offered again already, or a stop for another attempt, changes
+  nothing. With nothing
 played a stop proves nothing heard, and the `no_audio` rule below applies. The
 field is sent only when true and read as false when absent. Like any held
 item, it stays pending in Schedule, so a later voice offers it again after a
 restart. A durable "dismissed" needs a Schedule resolution, not done here.
 Tests: `a_stop_over_the_ring_is_said_only_once_some_of_it_played`,
-`stopped_over_its_ring_it_is_held_at_once_and_never_rung_again`.
+`stopped_over_its_ring_it_is_held_at_once_and_never_rung_again`,
+`only_a_ring_cut_by_a_line_waits_for_its_stop`,
+`a_stop_said_for_the_line_that_cut_a_ring_is_sent_once_within_5_s`,
+`a_stop_for_the_ring_a_cut_in_retired_takes_it_off_the_retry`.
 
 `ToWorker::Abandon` carries `no_audio`: true when no audio of the reply ever
 came (`Receipt::audio`, called from `Reply::append_provider_audio` on the

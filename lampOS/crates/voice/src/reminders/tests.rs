@@ -39,6 +39,8 @@ impl Test {
             owed_told: None,
             said_at_us: None,
             notice_owed: false,
+            cut_last: None,
+            stop_owed: None,
         };
         Self {
             parent,
@@ -382,6 +384,97 @@ fn interrupted_receipt_with_own_retirement_stays_held_even_with_later_audio() {
         assert!(!receipt.completion_recorded());
         drop(receipt);
         assert!(matches!(probe.settlement(), Some(ToWorker::Abandon { .. })));
+    }
+}
+
+/// The Reviewer-lead's P2 on #5351, end to end in the parent: a ring cut by
+/// a line goes out as an abandon with audio, and the second route's stop for
+/// that line, within 5 s, sends the worker `RingStopped` for that attempt,
+/// once. A stop later than that, or with no ring cut, sends nothing.
+#[test]
+fn a_stop_said_for_the_line_that_cut_a_ring_is_sent_once_within_5_s() {
+    for (later_us, sent) in [(1_000_000, true), (STOP_FOR_THE_CUT_US + 1, false)] {
+        let mut test = Test::new();
+        let first = offer();
+        test.offer(first.clone(), AT);
+        let (turn, privacy) = owner(1);
+        let mut receipt = test.parent.admitted(first.clone(), turn, privacy, 7);
+        receipt.audio();
+        drop(receipt);
+        test.parent.poll(AT + 200);
+        assert!(matches!(
+            test.command(),
+            Some(ToWorker::Abandon {
+                no_audio: false,
+                stopped: false,
+                ..
+            })
+        ));
+        test.parent.stop_said(AT + 200 + later_us);
+        test.parent.poll(AT + 200 + later_us);
+        let command = test.command();
+        if sent {
+            assert!(
+                matches!(&command, Some(ToWorker::RingStopped { token }) if *token == first.token),
+                "{command:?}"
+            );
+        } else {
+            assert!(command.is_none(), "{command:?}");
+        }
+        test.parent.stop_said(AT + 300 + later_us);
+        test.parent.poll(AT + 300 + later_us);
+        assert!(test.command().is_none(), "once");
+    }
+}
+
+/// Only a ring cut by a person's line, with some of it played, is one a stop
+/// said for that line can hold: a fenced `Retire` (a cut-in) or an
+/// `Abandon` with audio not already stopped.
+#[test]
+fn only_a_ring_cut_by_a_line_waits_for_its_stop() {
+    let (turn, privacy) = owner(1);
+    let (mut receipt, probe) = receipt_for_test(turn, privacy, 7);
+    receipt.audio();
+    drop(receipt);
+    let cut = probe.settlement().unwrap();
+    assert!(super::cut_by_a_line(&cut).is_some(), "{cut:?}");
+    let ToWorker::Abandon { token, .. } = cut else {
+        unreachable!()
+    };
+    for (settlement, waits) in [
+        (
+            ToWorker::Abandon {
+                token: token.clone(),
+                no_audio: true,
+                stopped: false,
+            },
+            false,
+        ),
+        (
+            ToWorker::Abandon {
+                token: token.clone(),
+                no_audio: false,
+                stopped: true,
+            },
+            false,
+        ),
+        (
+            ToWorker::Retire {
+                token: token.clone(),
+                proof: QualifiedRetirement {
+                    correlation: token.correlation.clone(),
+                    retired_by_session: token.correlation.consumer_session.clone(),
+                    basis: RetirementBasis::NeverAdmitted {},
+                },
+            },
+            false,
+        ),
+    ] {
+        assert_eq!(
+            super::cut_by_a_line(&settlement).is_some(),
+            waits,
+            "{settlement:?}"
+        );
     }
 }
 
