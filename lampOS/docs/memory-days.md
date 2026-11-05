@@ -1237,7 +1237,8 @@ switch for them, `LAMP_MEMORY_DAYS=on`, went on later: on lamp-4ace on
 ## Nightly pass B (the memory owner's extraction plan C, step B, 3 Nov)
 
 A model pass the voice runs once a night for one known person, behind
-`LAMP_MEMORY_NIGHTLY` (voice side; [switches.md](switches.md)). It fills
+`LAMP_MEMORY_NIGHTLY` (voice side; [switches.md](switches.md); on in the
+product, with patterns and feelings, by the memory owner's call on 5 Nov). It fills
 this store with what Tiers proposed: episodes, facts, profile lines,
 patterns, what is ahead and feelings (`crates/memory/src/nightly.rs`). The
 kinds and their validation rules are Tiers' (`docs/memory-design.md`, "How

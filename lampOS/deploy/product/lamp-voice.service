@@ -590,6 +590,14 @@ Environment=LAMP_MEMORY_RECALL_V2=on
 # a played correction is either replaced or kept alone, so its earlier:true is not reachable as played.
 Environment=LAMP_MEMORY_STRENGTH=on
 Environment=LAMP_MEMORY_PROFILE=on
+# The nightly pass (extraction plan C, step B; docs/memory.md, "The nightly pass"): 03:00 to 06:00 local, after
+# 20 min quiet with the privacy slide open, each known person's day before is sent through the relay's model once
+# more and Days keeps the episodes, facts, profile lines, ahead items, patterns and feelings that pass its checks, one
+# by one. Nothing is said or shown; the journal has counts only. The memory owner's call on 5 Nov, with patterns and
+# feelings; its quotes are kept, by the owner's decision on 4 Nov. Needs lamp-memory's nightly ops (--memory-days).
+Environment=LAMP_MEMORY_NIGHTLY=on
+Environment=LAMP_MEMORY_NIGHTLY_PATTERNS=on
+Environment=LAMP_MEMORY_NIGHTLY_FEELINGS=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
