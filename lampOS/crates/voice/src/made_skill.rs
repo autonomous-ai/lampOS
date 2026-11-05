@@ -252,10 +252,20 @@ fn read_of(request: &str) -> Option<(&'static str, Option<&'static str>)> {
             Some("read = { service = \"google_calendar\", what = \"events\", day = \"today\" }")
         }
         "gmail" => Some("read = { service = \"gmail\", what = \"recent\" }"),
+        "google_drive" => Some(DRIVE_READ),
         _ => None,
     };
     Some((code, step))
 }
+
+/// Drive's step, given whole: its files come newest first, and `query` is
+/// only words to search for. A lamp, 5 Nov: "read my latest Google Drive
+/// files" was made from Drive's listed reads with `query = "order by
+/// modifiedTime desc"`, which matched no file (lamp-skills now refuses an
+/// order, `service_read::QUERY_NOT_AN_ORDER`). A file by `id` is left out:
+/// a request said aloud names none.
+pub const DRIVE_READ: &str = "read = { service = \"google_drive\", what = \"files\" } \
+     (newest first; query = \"words\" only to search)";
 
 /// Whether a request names a linked service (any case; "e-mail" too), so
 /// a skill to make is never asked of the model for one.
@@ -282,8 +292,8 @@ pub fn brief(request: &str) -> Result<String, &'static str> {
 
 /// [`brief`], with a made skill's reads on or off ([`READS_ENVIRONMENT`]).
 /// On, a request to be read one linked service with reads is briefed as a
-/// skill whose one step reads it ([`read_of`]): a calendar's or mail's step
-/// given whole, any other service's reads listed for the model to choose
+/// skill whose one step reads it ([`read_of`]): a calendar's, mail's or
+/// Drive's step given whole, any other service's reads listed for the model to choose
 /// from (`lamp_services::spoken::whats`, never a whole text). A request
 /// that would write, or names two services, is still [`NOT_A_SERVICE`].
 pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
@@ -2340,10 +2350,22 @@ light = { dim = 1 }
         );
         let drive = brief_with("read me my Google Drive files at nine", true).unwrap();
         assert!(drive.contains("services = { google_drive = \"read\" }"));
+        // A lamp, 5 Nov: "read my latest Google Drive files" was made with
+        // query = "order by modifiedTime desc", which matched no file. Drive's
+        // step is given whole: newest first, query only search words.
         assert!(
-            drive.contains("files {query, count}; file {id}, its keys")
-                && !drive.contains("text {id}")
+            drive.contains(&format!("one [[do]] step: {DRIVE_READ}. SKILL.md")),
+            "{drive}"
         );
+        assert!(
+            DRIVE_READ.contains("what = \"files\" }")
+                && DRIVE_READ.contains("newest first")
+                && DRIVE_READ.contains("only to search")
+                && !drive.contains("text {id}")
+                && !drive.contains("file {id}")
+        );
+        let latest = brief_with("read my latest Google Drive files", true).unwrap();
+        assert!(latest.contains(DRIVE_READ), "{latest}");
         // Thirteen's P2 on #5303: fixed reads only, no query, path or call.
         let github = brief_with("each morning read me my GitHub issues", true).unwrap();
         assert!(github.contains("notifications; issues {repo}; pulls {repo}; repos, its keys"));

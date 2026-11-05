@@ -871,6 +871,13 @@ do. Các khoá khác là của chính `service_read` cho một việc đọc c�
 `project` và `workspace` (mỗi khoá 1 đến 1.000 byte); không bao giờ `from`
 hay `to`, cũng không bao giờ `graphql`, `variables`, `path`, `params`,
 `tool` hay `arguments` của một việc đọc dạng tự do.
+`query` là từ để tìm (`fullText contains` của Drive), không bao giờ là một
+thứ tự: Drive liệt kê tệp mới nhất trước (`orderBy = modifiedTime desc`) và
+thư cũng mới nhất trước, nên một lần đọc những tệp mới nhất thì bỏ `query`;
+một thứ tự hay chỉ "mới nhất" ("order by modifiedTime desc", "newest") bị
+từ chối (`service_read::ordering`, sau khi một kỹ năng được tạo trên một
+đèn đọc ra 0 tệp với một thứ tự như vậy, 5/11). Bản brief của kỹ năng được
+tạo cho trọn bước của Drive và nói điều này (`made_skill::DRIVE_READ`).
 `events` của lịch lấy `day = "today"` hoặc `"tomorrow"` (ngày địa phương, tối
 đa 10 sự kiện) và không có `count`; `day` không dùng cho gì khác.
 `lamp-services` giữ lần đọc trong danh sách cho phép như với giọng nói.
@@ -931,8 +938,8 @@ that ...", "add a skill to ...") được bỏ ra trước, và "schedule" đứ
 "the", "tomorrow's", "today's", "day" hay "calendar" là thứ được đọc (lamp-9adf,
 4/11 23:51: "create a skill that reads my calendar" đã bị từ chối vì thế). Một
 lần ghi đứng sau chúng vẫn tính. Bước của lịch được cho
-trọn (hôm nay, hoặc ngày mai khi yêu cầu nói "tomorrow"), bước của thư cũng vậy
-(`recent`); với dịch vụ khác, brief liệt kê các việc đọc của nó trừ việc đọc
+trọn (hôm nay, hoặc ngày mai khi yêu cầu nói "tomorrow"), bước của thư (`recent`)
+và của Drive (`files`, mới nhất trước, `query` chỉ là từ để tìm) cũng vậy; với dịch vụ khác, brief liệt kê các việc đọc của nó trừ việc đọc
 toàn văn và dạng tự do (`spoken::whats`) và mô hình chọn một. Thời điểm trong
 ngày là của yêu cầu: brief chỉ đưa `during` của trigger làm ví dụ, "a time of
 day as its during = { from = \"08:00\", to = \"08:30\" }" (P3 của Thirteen
