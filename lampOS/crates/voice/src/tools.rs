@@ -2007,7 +2007,8 @@ fn run_call_with_scope(
             // A setup save refused for the read-back, which the voice holds
             // for its yes: "who you are" stays open for it (the
             // Reviewer-lead's P1 on #5415), so that yes still saves at setup.
-            if switches.at_setup
+            if heard
+                && switches.at_setup
                 && crate::known_faces::refused_for_the_read_back(&told.0)
                 && let Some(file) = onboarding.as_deref()
             {

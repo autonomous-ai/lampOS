@@ -1406,18 +1406,17 @@ impl Thread {
             Some((last, rest)) if self.heard.trim().is_empty() => (last.person.clone(), rest),
             _ => (self.heard.clone(), &spoken[..]),
         };
-        // A wordless cut-in (no words of theirs, and the lamp silent or
-        // answering with its fixed "did anyone say something?",
-        // `LAMP_CUT_IN_WORDLESS_ASKS`) is nobody's answer: it never pushes
-        // the lamp's read-back out of the window (Fifth's run B on #5415).
-        // A lamp line of any other words stays, so a read-back said in a
-        // turn with no words of theirs is kept (the first builder's P3).
+        // An exchange where neither they nor the lamp said a word is
+        // nothing: it never pushes the lamp's read-back out of the window
+        // (Fifth's run B on #5415). One where the lamp spoke stays, a
+        // read-back said in a turn with no words of theirs (the first
+        // builder's P3) or the wordless cut-in's own question, "did anyone
+        // say something?", whose yes answers it and never the read-back
+        // before it (the Reviewer-lead's P2).
         let earlier: Vec<&&Exchange> = earlier
             .iter()
             .filter(|exchange| {
-                let lamp = exchange.lamp.trim();
-                !(exchange.person.trim().is_empty()
-                    && (lamp.is_empty() || lamp == crate::cut_in_wordless::LINE))
+                !(exchange.person.trim().is_empty() && exchange.lamp.trim().is_empty())
             })
             .collect();
         let from = earlier.len().saturating_sub(exchanges);
@@ -3539,9 +3538,10 @@ mod tests {
     }
 
     /// Fifth's run B on #5415 (5 Nov): a wordless cut-in answered with the
-    /// lamp's fixed line came between the read-back and its yes. Having no
-    /// words of theirs, it is no exchange of the window: the read-back
-    /// stays in it.
+    /// lamp's fixed line came between the read-back and its yes. A silent
+    /// exchange is no exchange of the window, so the read-back stays in
+    /// it; the cut-in's own question stays too, and its yes is never the
+    /// read-back's.
     #[test]
     fn a_wordless_cut_in_never_pushes_the_read_back_out_of_a_names_window() {
         let now = Instant::now();
@@ -3560,12 +3560,23 @@ mod tests {
         thread.person("Yes.", true, now);
         let said = thread.names_window(crate::known_faces::SAID_EXCHANGES);
         assert_eq!(said.this, "Yes.");
+        // The silent exchange is left out; the cut-in's question stays, so
+        // the read-back is still in the window...
         assert_eq!(
             said.before,
-            [(
-                "My name is Walter.".to_owned(),
-                "Walter, did I get that right?".to_owned()
-            )]
+            [
+                (
+                    "My name is Walter.".to_owned(),
+                    "Walter, did I get that right?".to_owned()
+                ),
+                (String::new(), crate::cut_in_wordless::LINE.to_owned()),
+            ]
+        );
+        // ...but a yes to "did anyone say something?" never answers the
+        // read-back before it (the Reviewer-lead's P2 on #5415).
+        assert_ne!(
+            crate::known_faces::held_save_verdict("Walter", &said),
+            crate::known_faces::HeldSaveVerdict::Runs
         );
 
         // A lamp line of its own words in a turn with no words of theirs
