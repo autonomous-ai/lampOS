@@ -63,6 +63,7 @@ fn config(root: &Path) -> Config {
         // a fraction of a second (#1128).
         sign_in_by_code: false,
         app_socket: None,
+        app_caller: lamp_tasks::runtime::app_caller_is_lamp_cloud,
         report_every: Duration::from_millis(50),
         daemon_retry_after: Duration::from_millis(50),
     }

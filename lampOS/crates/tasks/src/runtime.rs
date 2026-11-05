@@ -14,6 +14,7 @@ use crate::{
     store::Store,
 };
 use lamp_bus::{Bus, Publisher};
+use lamp_ipc::caller::Caller;
 use lamp_msgs::{Diagnostic, Level, TaskStatus};
 use rustix::event::{PollFd, PollFlags, Timespec, poll};
 use serde::Deserialize;
@@ -164,6 +165,10 @@ pub struct Config {
     /// with `--sign-in-by-code`. lamp-cloud hands the app's
     /// `harness.sign_in.*` here. Off unless set.
     pub app_socket: Option<PathBuf>,
+    /// Who may use the app's route, as the kernel names the caller
+    /// (#5379): [`app_caller_is_lamp_cloud`] on a lamp. Any other caller is
+    /// closed unanswered. Tests that are no lamp-cloud pass their own.
+    pub app_caller: fn(Option<&Caller>) -> bool,
     /// How often the part says how it is on `diagnostics` while nothing
     /// changes: [`REPORT_EVERY`] on a lamp. A change in readiness is said
     /// at once, whatever this is. Tests pass less, so a test that reads the
@@ -603,6 +608,39 @@ fn close_line(job: &CloseJob, result: &Result<Closed, String>) -> String {
              tried again in a minute, read first"
         ),
         Ok(closed) => format!("tasks: closing task {id}'s harness: try {tries}: {closed:?}"),
+    }
+}
+
+/// The one unit that may use the app's route (#5379).
+pub const APP_CALLER_UNIT: &str = "lamp-cloud.service";
+
+/// Whether a caller the kernel named may use the app's route (#5379):
+/// only [`APP_CALLER_UNIT`] run as `own_uid`, the part's own user. The
+/// socket is that user's, so any unit run as it could connect; a caller
+/// whose unit can't be read, or none named, is refused.
+pub fn app_caller_may(caller: Option<&Caller>, own_uid: u32) -> bool {
+    caller.is_some_and(|caller| {
+        caller.uid == own_uid && caller.unit.as_deref() == Some(APP_CALLER_UNIT)
+    })
+}
+
+/// [`app_caller_may`] with this process's own uid: the part's check on a
+/// lamp ([`Config::app_caller`]).
+pub fn app_caller_is_lamp_cloud(caller: Option<&Caller>) -> bool {
+    app_caller_may(caller, rustix::process::geteuid().as_raw())
+}
+
+/// The journal's words for a caller the app's route refused: its pid,
+/// uid and unit, never anything it sent.
+fn refused_caller(caller: Option<&Caller>) -> String {
+    match caller {
+        Some(caller) => format!(
+            "pid {} (uid {}, unit {})",
+            caller.pid,
+            caller.uid,
+            caller.unit.as_deref().unwrap_or("none")
+        ),
+        None => "a caller the kernel did not name".into(),
     }
 }
 
@@ -2641,6 +2679,18 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
             for _ in 0..WORKERS + CLIENT_QUEUE {
                 match listener.accept() {
                     Ok((stream, _)) => {
+                        // The app's route is lamp-cloud's only (#5379): any
+                        // other caller is closed with no answer.
+                        if route == Route::App {
+                            let caller = lamp_ipc::caller::of_stream(&stream);
+                            if !(config.app_caller)(caller.as_ref()) {
+                                eprintln!(
+                                    "tasks: the app's route refused {}",
+                                    refused_caller(caller.as_ref())
+                                );
+                                continue;
+                            }
+                        }
                         if clients_tx
                             .try_send((stream, Instant::now(), route))
                             .is_err()
@@ -2869,6 +2919,49 @@ mod tests {
 
     use super::*;
     use std::os::unix::fs::symlink;
+
+    /// #5379: only lamp-cloud's unit, run as the part's own user, may use
+    /// the app's route; another unit, another user, a caller whose unit
+    /// can't be read and one the kernel did not name are refused, and the
+    /// journal names only the pid, uid and unit.
+    #[test]
+    fn only_lamp_clouds_unit_may_use_the_apps_route() {
+        let own = 990;
+        let may = |unit: Option<&str>, uid| {
+            app_caller_may(
+                Some(&Caller {
+                    pid: 7,
+                    uid,
+                    unit: unit.map(str::to_owned),
+                }),
+                own,
+            )
+        };
+        assert!(may(Some("lamp-cloud.service"), 990));
+        assert!(!may(Some("lamp-skills.service"), 990));
+        assert!(!may(Some("lamp-voice.service"), 990));
+        assert!(!may(Some("lamp-cloud.service"), 1000), "another user");
+        assert!(!may(Some("lamp-cloud.service"), 0), "not even root");
+        assert!(!may(None, 990), "a unit that can't be read");
+        assert!(!app_caller_may(None, own), "no caller named");
+        assert_eq!(
+            refused_caller(Some(&Caller {
+                pid: 42,
+                uid: 990,
+                unit: Some("lamp-skills.service".into()),
+            })),
+            "pid 42 (uid 990, unit lamp-skills.service)"
+        );
+        assert_eq!(
+            refused_caller(Some(&Caller {
+                pid: 42,
+                uid: 990,
+                unit: None,
+            })),
+            "pid 42 (uid 990, unit none)"
+        );
+        assert_eq!(refused_caller(None), "a caller the kernel did not name");
+    }
 
     /// An adapter for [`close_told`] alone: its read before a close says
     /// `read`, and each close it is asked for is kept with its budget.
@@ -3330,6 +3423,7 @@ mod tests {
             set_up_later: None,
             sign_in_by_code: false,
             app_socket: None,
+            app_caller: app_caller_is_lamp_cloud,
             report_every: REPORT_EVERY,
             daemon_retry_after: DAEMON_RETRY_AFTER,
         };

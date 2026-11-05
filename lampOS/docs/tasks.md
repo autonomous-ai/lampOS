@@ -1135,8 +1135,10 @@ helper.
 
 ### Harness held at its pinned version (`LAMP_HARNESS_HOLD_UPDATES`, #5229)
 
-Off unless `LAMP_HARNESS_HOLD_UPDATES=on` in `lamp-tasks.service`'s
-environment (`crates/tasks/src/hold.rs`). A home lamp installs the Harness
+On in the product since #5379: the product's `lamp-tasks.service` sets
+`LAMP_HARNESS_HOLD_UPDATES=on`, so a home lamp keeps the pinned Harness and a
+newer one comes only through a new pin in a build. Off unless set elsewhere
+(`crates/tasks/src/hold.rs`). A home lamp installs the Harness
 its build pins (install.md, "The build's own pin"). Without a hold, Harness's
 daemon updates itself to whatever Harness publishes next. From Harness's
 source (openharness main 577954332):
@@ -2224,6 +2226,16 @@ only method), `app_sign_in_state` and `app_sign_in_answer` (`{"id","answer"}`);
 any other op there is `not_on_this_route`, and those three on the public or
 voice socket are `untrusted`. Without `--sign-in-by-code` the socket isn't
 bound. The contract the app builds on is in #5198.
+
+- **Only lamp-cloud's unit** (#5379). The socket is mode 0600 in lamp-tasks'
+  own folder, so any unit run as `lampos` (skills, addons, …) could connect.
+  The part reads each caller from the kernel, as lamp-body does for its lease
+  socket (`lamp_ipc::caller::of_stream`: `SO_PEERCRED`, then the unit its
+  cgroup names), and lets in only `lamp-cloud.service` run as the part's own
+  user (`runtime::app_caller_may`). Any other caller, or one whose unit can't
+  be read (gone already, or not Linux), is closed with no answer and one
+  journal line, `tasks: the app's route refused pid N (uid U, unit …)`
+  (`unit none` when it can't be read), never anything the caller sent.
 
 - **Who started it.** Each sign-in records `by` (`voice` or `app`) and
   `method` (`code`). A start from the app while the app's own is open gives
