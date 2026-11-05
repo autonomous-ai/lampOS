@@ -809,7 +809,7 @@ fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::Unclear { request, .. }
         | ProviderOutput::LookAsked { request, .. }
         | ProviderOutput::LookNoCall { request, .. }
-        | ProviderOutput::NewsAnswered { request, .. }
+        | ProviderOutput::NewsAnswered { request, .. }        | ProviderOutput::StopAnswered { request }
         | ProviderOutput::SleepAsked { request }
         | ProviderOutput::ServiceCalled { request }
         | ProviderOutput::StepCallHeard { request }

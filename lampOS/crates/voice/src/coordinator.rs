@@ -3991,6 +3991,7 @@ fn observe_provider_output(
         | ProviderOutput::SleepAsked { .. }
         | ProviderOutput::ServiceCalled { .. }
         | ProviderOutput::StepCallHeard { .. }
+        | ProviderOutput::StopAnswered { .. }
         | ProviderOutput::OwnWordsSaid { .. }
         | ProviderOutput::RequestedAudio { .. } => {}
         // A finished task's news the person asked about, answered in this
@@ -8348,6 +8349,18 @@ fn conversation_with_gate_inner(
                 ProviderOutput::NewsAnswered { .. }
                 | ProviderOutput::OwnWordsSaid { .. }
                 | ProviderOutput::DownLineSaid { .. } => {}
+                // The person's stop for a ring their line cut: held, not
+                // rung once more (the Reviewer-lead's P2 on #5351).
+                ProviderOutput::StopAnswered { request } => {
+                    if crate::reminders::ring_stop_ends_it()
+                        && let Some(reminders) = reminders.as_mut()
+                    {
+                        reminders.stop_said(monotonic_us());
+                        eprintln!(
+                            "lamp-voice: request {request} was a stop: a ring it cut is held"
+                        );
+                    }
+                }
                 // The second route's times for the request, recorded with the
                 // end of speech decision's time, for an A/B scored on each
                 // request's first answer audio (19 Oct).

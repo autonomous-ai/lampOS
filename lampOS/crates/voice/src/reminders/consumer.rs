@@ -256,6 +256,10 @@ struct Consumer<P: Persistence> {
     /// How often each item was offered again after an attempt given up
     /// before any of its audio came ([`NO_AUDIO_RETRIES`]).
     unvoiced: BTreeMap<DeliveryKey, u8>,
+    /// The attempts the last cut put on the retry, its own first and those
+    /// joined to it: a stop the person said for that cut holds them
+    /// ([`ToWorker::RingStopped`]).
+    last_cut: Vec<PreparedToken>,
     next_offer_us: u64,
     cursor: u64,
     recovery: usize,
@@ -275,6 +279,7 @@ impl<P: Persistence> Consumer<P> {
             retry: BTreeMap::new(),
             abandoned: BTreeSet::new(),
             unvoiced: BTreeMap::new(),
+            last_cut: Vec::new(),
             next_offer_us: 0,
             cursor: 0,
             recovery: 0,
@@ -323,6 +328,10 @@ impl<P: Persistence> Consumer<P> {
                 self.notice_owed = true;
                 return Ok(());
             }
+            ToWorker::RingStopped { token } => {
+                self.ring_stopped(token.clone());
+                return Ok(());
+            }
         };
         if self
             .current
@@ -337,6 +346,9 @@ impl<P: Persistence> Consumer<P> {
             .as_ref()
             .map(|offer| offer.also.clone())
             .unwrap_or_default();
+        self.last_cut = std::iter::once(token.clone())
+            .chain(joined.iter().map(|joined| joined.token.clone()))
+            .collect();
         match command {
             ToWorker::Complete { proof, .. } => {
                 self.ledger.complete(&token, &proof).map_err(invalid)?;
@@ -397,7 +409,9 @@ impl<P: Persistence> Consumer<P> {
                 }
                 self.abandoned(token.clone(), no_audio, stopped);
             }
-            ToWorker::Noticed {} => unreachable!("answered above"),
+            ToWorker::Noticed {} | ToWorker::RingStopped { .. } => {
+                unreachable!("answered above")
+            }
         }
         self.current = None;
         self.outgoing
@@ -418,6 +432,27 @@ impl<P: Persistence> Consumer<P> {
     /// Counted in this process only: a later voice offers every attempt an
     /// earlier one left again ([`Self::retire_earlier_voices`]), held ones
     /// too.
+    /// The person's stop was said for the ring `token`'s attempt, which their
+    /// line cut and put on the retry (a cut-in, `Retire`, or a cut by talk,
+    /// `Abandon`): they heard it. That attempt and those joined to it, not
+    /// offered again yet, are taken off the retry and held. One already
+    /// offered again, or a stop for another attempt, changes nothing.
+    fn ring_stopped(&mut self, token: PreparedToken) {
+        if self.last_cut.first() != Some(&token) {
+            return;
+        }
+        for cut in std::mem::take(&mut self.last_cut) {
+            if self
+                .retry
+                .get(&cut.key)
+                .is_some_and(|(waiting, _)| waiting == &cut)
+            {
+                self.retry.remove(&cut.key);
+                self.abandoned.insert(cut.key.clone());
+                self.journal.item(&cut.key, STOPPED_HELD);
+            }
+        }
+    }
     fn abandoned(&mut self, token: PreparedToken, no_audio: bool, stopped: bool) {
         // Only items still waiting to be said are counted, so the counts
         // stay within the ledger's bound.

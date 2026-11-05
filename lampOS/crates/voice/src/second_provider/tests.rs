@@ -491,6 +491,7 @@ async fn turn_within(engine: &mut Engine, wait: Duration) -> Vec<String> {
             ProviderOutput::StepCallHeard { request } => (format!("step_call:{request}"), false),
             ProviderOutput::OwnWordsSaid { request } => (format!("own_words:{request}"), false),
             ProviderOutput::ServiceCalled { request } => (format!("service:{request}"), false),
+            ProviderOutput::StopAnswered { request } => (format!("stop:{request}"), false),
             other => panic!("the second route never sends {other:?}"),
         };
         if labels.last() != Some(&label) || !label.starts_with("audio:") {
@@ -11888,8 +11889,17 @@ async fn a_stop_over_or_just_after_the_answer_gets_the_one_line() {
             samples: vec![0; lamp_audio::CAPTURE_SAMPLES],
         });
         engine.submit(end(1));
-        turn(&mut engine).await;
-        !script.asked.lock().unwrap().is_empty()
+        let labels = turn(&mut engine).await;
+        let asked = !script.asked.lock().unwrap().is_empty();
+        // A stop answered here tells the coordinator, so a ring it cut is
+        // held (the Reviewer-lead's P2 on #5351); a line asked of the
+        // model doesn't.
+        assert_eq!(
+            labels.iter().any(|label| label == "stop:1"),
+            !asked,
+            "{words}: {labels:?}"
+        );
+        asked
     }
     let second = Some(Duration::from_secs(1));
     for stop in ["Stop.", "Stop Lamp.", "Lamp, stop.", "Lamp stop"] {

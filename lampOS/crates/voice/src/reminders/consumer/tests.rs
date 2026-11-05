@@ -855,6 +855,66 @@ fn stopped_over_its_ring_it_is_held_at_once_and_never_rung_again() {
     );
 }
 
+/// The Reviewer-lead's P2 on #5351: on a product lamp, "Stop." said over a
+/// ring is a cut-in, which retires the attempt (`OwnerFenced`) for a retry
+/// 5 s later; the second route then answers the line as a stop. That stop
+/// takes the ring off the retry and holds it. A stop for another attempt,
+/// or none, leaves the retry as it was.
+#[test]
+fn a_stop_for_the_ring_a_cut_in_retired_takes_it_off_the_retry() {
+    let fenced = |token: &PreparedToken| QualifiedRetirement {
+        correlation: token.correlation.clone(),
+        retired_by_session: SESSION.into(),
+        basis: RetirementBasis::OwnerFenced {
+            owner_boot: [7; 16],
+            turn: 1,
+            microphone_generation: 1,
+        },
+    };
+    for stop_for_it in [true, false] {
+        let (engine, socket) = served(1);
+        let mut worker = consumer(Disk::default());
+        let first = begin(&mut worker, &engine, &socket);
+        let now = lamp_ipc::monotonic_us();
+        worker
+            .command(
+                ToWorker::Retire {
+                    token: first.token.clone(),
+                    proof: fenced(&first.token),
+                },
+                now,
+            )
+            .unwrap();
+        worker.outgoing.clear();
+        let mut other = first.token.clone();
+        other.attempt += 1;
+        worker
+            .command(
+                ToWorker::RingStopped {
+                    token: if stop_for_it {
+                        first.token.clone()
+                    } else {
+                        other
+                    },
+                },
+                now,
+            )
+            .unwrap();
+        assert!(worker.outgoing.is_empty(), "nothing is settled for it");
+        if stop_for_it {
+            assert_eq!(
+                worker.journal.lines.last().unwrap(),
+                &format!("reminder id 1 delivery 1: {STOPPED_HELD}")
+            );
+            ticks_offer_nothing(&mut worker, &engine, &socket, 4);
+        } else {
+            worker.next_offer_us = 0;
+            let again = begin(&mut worker, &engine, &socket);
+            assert_eq!(again.token.key, first.token.key, "offered again as before");
+        }
+    }
+}
+
 /// lamp-9adf, build 10012 (#5219): a timer's ring is a model turn, and one
 /// whose chat had not begun in 3 s ended `GaveUp` with none of its audio,
 /// then was held for good. An attempt given up before any of its audio came

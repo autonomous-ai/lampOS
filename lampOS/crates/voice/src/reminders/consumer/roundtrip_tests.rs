@@ -252,6 +252,8 @@ impl RoundtripFixture {
             owed_told: None,
             said_at_us: None,
             notice_owed: false,
+            cut_last: None,
+            stop_owed: None,
         });
         self.worker = Some(worker);
         self.parent().poll(monotonic_us());
