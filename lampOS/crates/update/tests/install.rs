@@ -1893,6 +1893,26 @@ fn the_product_carries_a_conversation_past_a_silent_face() {
     }
 }
 
+/// A carried line keeps the person's memory conversation going
+/// (`LAMP_CARRIED_LINES_KEEP_TALK`), beside the carry it acts with: on
+/// lamp-06c1 on 5 Nov about 97 s of carried lines let the writer's
+/// conversation idle out mid-talk and its earlier piece was dropped.
+#[test]
+fn the_product_keeps_a_talk_going_through_carried_lines() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_CONVERSATION_CARRIES=on",
+        "Environment=LAMP_CARRIED_LINES_KEEP_TALK=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// The lamp's name at a line's start is dated from the line's usual start,
 /// not the soft start's lead (`LAMP_NAME_START_USUAL`, #4226), which only
 /// matters with soft starts on: #5234's 3+3 on lamp-c0a4 (4 Nov) held no

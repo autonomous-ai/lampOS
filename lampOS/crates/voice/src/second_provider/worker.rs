@@ -12100,6 +12100,17 @@ fn keep_scoped(
     {
         crate::remember::held_by_gap(lease.key().request);
     }
+    // A carried line keeps its person's memory conversation going, never
+    // journalled (`LAMP_CARRIED_LINES_KEEP_TALK`).
+    if let Some(lease) = lease
+        && let Some(person) = lease.carried_for()
+    {
+        crate::remember::carried_line(
+            lease.key().request,
+            person,
+            crate::second_provider::carried_lines_keep_talk(),
+        );
+    }
     let now = Instant::now();
     match event {
         ProviderOutput::Transcript {

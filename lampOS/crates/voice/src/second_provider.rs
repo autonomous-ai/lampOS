@@ -818,6 +818,28 @@ pub const CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT: &str = "LAMP_CONVERSATION_RO
 /// `on`, and nothing else; off, the history is the words only, as before.
 pub const HISTORY_KEEPS_CALLS_ENVIRONMENT: &str = "LAMP_HISTORY_KEEPS_CALLS";
 
+/// With [`CONVERSATION_CARRIES_ENVIRONMENT`], a carried line keeps the
+/// memory writer's conversation of the person it is carried for going
+/// (`remember::carried_line`, `DaysJob::Touch`): never journalled or stored
+/// as theirs, it counts only as their talk going on, so a run of carried
+/// lines longer than the 45 s idle gap no longer cuts the talk and drops
+/// its earlier piece (lamp-06c1, 5 Nov). `on`, and nothing else; off, a
+/// carried line touches nothing, as before.
+pub const CARRIED_LINES_KEEP_TALK_ENVIRONMENT: &str = "LAMP_CARRIED_LINES_KEEP_TALK";
+
+/// [`CARRIED_LINES_KEEP_TALK_ENVIRONMENT`] on, read once from the
+/// environment ([`carried_lines_keep_talk_from`]).
+pub(crate) fn carried_lines_keep_talk() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| carried_lines_keep_talk_from(|name| std::env::var(name).ok()))
+}
+
+/// [`CARRIED_LINES_KEEP_TALK_ENVIRONMENT`] as `var` gives it: on only for
+/// exactly `on`; unset or anything else, off.
+pub(crate) fn carried_lines_keep_talk_from(var: impl Fn(&str) -> Option<String>) -> bool {
+    var(CARRIED_LINES_KEEP_TALK_ENVIRONMENT).as_deref() == Some("on")
+}
+
 /// [`CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT`] on, with the carry and
 /// the scope by sight it acts beside.
 pub(crate) fn carries_past_silent_from_environment() -> bool {
