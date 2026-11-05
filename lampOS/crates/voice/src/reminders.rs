@@ -306,6 +306,9 @@ struct Progress {
     final_cursor: Option<(u64, u64, u64)>,
     live: bool,
     stopped: bool,
+    /// The request whose line cut this reply in (`interrupted_after_owner_fenced`):
+    /// only that line's stop may hold the ring (Thirteen's P3 on #5351).
+    cut_by: Option<u64>,
     settlement: Option<ToWorker>,
 }
 impl Progress {
@@ -420,11 +423,14 @@ impl Receipt {
     /// An invalidated receipt or any qualified own retirement stays held.
     /// A generation retirement is not a whole-provider completion, but may
     /// already be the final words; conservatively do not repeat that attempt.
-    pub fn interrupted_after_owner_fenced(&mut self) {
+    /// `cut_by` is the request of the line that cut it in, when the
+    /// coordinator knows it: only that line's stop may hold the ring.
+    pub fn interrupted_after_owner_fenced(&mut self, cut_by: Option<u64>) {
         let mut state = self.0.borrow_mut();
         if !state.live || !state.qualified || state.eligible_completion_cursor().is_some() {
             return;
         }
+        state.cut_by = cut_by;
         state.retire_owner_fenced();
     }
 }
@@ -474,6 +480,7 @@ pub(crate) fn receipt_for_test(owner: TurnOwner, privacy: u64, session: u64) -> 
         final_cursor: None,
         live: true,
         stopped: false,
+        cut_by: None,
         settlement: None,
     }));
     (Receipt(Rc::clone(&state)), Probe(state))
@@ -500,7 +507,7 @@ pub(crate) struct Reminders {
     /// The ring last cut by a line (sent as a fenced `Retire` or an
     /// `Abandon` with audio), and when: a stop said for it within
     /// [`STOP_FOR_THE_CUT_US`] holds it ([`Self::stop_said`]).
-    cut_last: Option<(PreparedToken, u64)>,
+    cut_last: Option<(PreparedToken, u64, Option<u64>)>,
     /// A [`ToWorker::RingStopped`] still to be sent.
     stop_owed: Option<PreparedToken>,
 }
@@ -535,10 +542,21 @@ impl Reminders {
     /// [`STOP_FOR_THE_CUT_US`], the ring is held, not rung once more
     /// (the Reviewer-lead's P2 on #5351). The caller checks
     /// [`RING_STOP_SWITCH`].
-    pub fn stop_said(&mut self, now_us: u64) {
-        if let Some((token, cut_at_us)) = self.cut_last.take()
-            && now_us.saturating_sub(cut_at_us) <= STOP_FOR_THE_CUT_US
-        {
+    /// `request` is the stop's own request: a ring a known line cut is held
+    /// only by that line's stop, never by a stop said for another (Thirteen's
+    /// P3 on #5351); one cut by talk, whose line isn't known, as before.
+    pub fn stop_said(&mut self, request: u64, now_us: u64) {
+        let Some((_, cut_at_us, cut_by)) = &self.cut_last else {
+            return;
+        };
+        if now_us.saturating_sub(*cut_at_us) > STOP_FOR_THE_CUT_US {
+            self.cut_last = None;
+            return;
+        }
+        if cut_by.is_some_and(|cut_by| cut_by != request) {
+            return;
+        }
+        if let Some((token, _, _)) = self.cut_last.take() {
             self.stop_owed = Some(token);
         }
     }
@@ -665,7 +683,7 @@ impl Reminders {
                 if self.sent
                     && let Some(token) = cut_by_a_line(settlement)
                 {
-                    self.cut_last = Some((token.clone(), now_us));
+                    self.cut_last = Some((token.clone(), now_us, state.cut_by));
                 }
             }
         }
@@ -749,6 +767,7 @@ impl Reminders {
             final_cursor: None,
             live: true,
             stopped: false,
+            cut_by: None,
             settlement: None,
         }));
         self.active = Some(Rc::clone(&state));
