@@ -486,6 +486,10 @@ Environment=LAMP_MEMORY_KEEP_HEARD=on
 # lamp-06c1 said "I don't remember any holiday plans" that morning without calling recall (C56). Needs
 # LAMP_MEMORY_DAYS and LAMP_VOICE_ROUTE=second, both above.
 Environment=LAMP_MEMORY_DONT_KNOW_RECALLS=on
+# A keep the round right after it doubts ("Was that 'rhinodulus' right?") is taken back and kept again only on the
+# same person's yes (C37, docs/memory.md). The memory owner's call on 5 Nov, after lamp-06c1 kept "rhinodulus" while
+# asking whether it was right. Needs LAMP_MEMORY_DAYS, LAMP_MEMORY_FORGET_ALL, LAMP_EYES_SPEAKING and the second route.
+Environment=LAMP_MEMORY_DOUBT_UNDOES=on
 # A correction replaces the kept thing (#2510): on lamp-06c1 on 4 Nov (build 10012) "my favourite colour is green
 # now" after a kept violet called remember with replaces (answer=replaced), one green kept, violet gone from recall.
 Environment=LAMP_MEMORY_REPLACES=on

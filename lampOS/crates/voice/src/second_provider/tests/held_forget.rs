@@ -45,6 +45,8 @@ struct Ran {
     /// asking for everything when it ran
     /// ([`crate::memory_scope::ScopeLease::everything_marked`], #3564).
     marked: Vec<(String, bool)>,
+    /// Every call run, by name and arguments, in order.
+    calls: Vec<(String, Value)>,
 }
 
 async fn run(turns: &[Turn]) -> Ran {
@@ -98,6 +100,19 @@ async fn run_switched(
     spelling: bool,
     result: Value,
 ) -> Ran {
+    run_full(turns, sight, first, (spelling, false), result).await
+}
+
+/// [`run_switched`], with `LAMP_MEMORY_DOUBT_UNDOES` when `switches.1`
+/// (C37): a `remember` is then answered as a new keep with id 391, and a
+/// `forget` as forgotten.
+async fn run_full(
+    turns: &[Turn],
+    sight: Option<&[Sight]>,
+    first: u64,
+    (spelling, doubt_undoes): (bool, bool),
+    result: Value,
+) -> Ran {
     use crate::speaking_faces::{SpeakingFaces, known_face_of};
     use std::sync::atomic::{AtomicBool, Ordering};
     let mut chats = VecDeque::new();
@@ -141,12 +156,17 @@ async fn run_switched(
                 .unwrap()
                 .push((name.clone(), scope.everything_marked()));
         }
+        let name_ran = name.clone();
         seen.lock().unwrap().push((name, args, heard));
         lines_seen
             .lock()
             .unwrap()
             .push((request, crate::speaking_faces::line_seen(request)));
-        let result = result.clone();
+        let result = match name_ran.as_str() {
+            crate::remember::REMEMBER if doubt_undoes => json!({"remembered": true, "id": 391}),
+            crate::remember::FORGET if doubt_undoes => json!({"forgotten": true}),
+            _ => result.clone(),
+        };
         Box::pin(async move { result })
     });
     let path = std::env::temp_dir().join(format!(
@@ -169,7 +189,8 @@ async fn run_switched(
             })),
         )
         .announcing(false)
-        .holding_forgets_through_spelling(spelling);
+        .holding_forgets_through_spelling(spelling)
+        .undoing_doubted_keeps(doubt_undoes);
     if sight.is_some() {
         engine = engine.confirming_forgets_by_sight(eyes.clone(), path.clone());
     }
@@ -257,6 +278,12 @@ async fn run_switched(
     }
     let _ = std::fs::remove_file(known_face_of(&path));
     let _ = std::fs::remove_file(path);
+    let calls = forgets
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(name, args, _)| (name.clone(), args.clone()))
+        .collect();
     let forgets = forgets
         .lock()
         .unwrap()
@@ -272,6 +299,7 @@ async fn run_switched(
         asked,
         lines,
         marked,
+        calls,
     }
 }
 
@@ -1421,4 +1449,167 @@ async fn a_held_memory_forgets_uncertain_result_cannot_copy_old_context() {
     assert!(!encoded.contains("old private context"), "{encoded}");
     assert!(encoded.contains("uncertain"));
     assert_eq!(yes.last(), Some(&Message::user("Yes.")));
+}
+
+/// C37 (lamp-06c1, 5 Nov): round 1 was a bare `remember`, and round 2 said
+/// "Was that 'rhinodulus' right? I want to be sure", the word already
+/// kept. With `LAMP_MEMORY_DOUBT_UNDOES` that keep is forgotten by its id
+/// at once and held for their yes, which keeps it again as called.
+#[tokio::test]
+async fn a_keep_the_next_round_doubts_is_taken_back_until_their_yes() {
+    const REMEMBER: &str = crate::remember::REMEMBER;
+    const FORGET: &str = crate::remember::FORGET;
+    let doubted = Lamp::Calls(
+        REMEMBER,
+        "Kept. Was that 'rhinodulus' right? I want to be sure.",
+    );
+    let a: Sight = (&["A"], true);
+    let kept_again = [
+        (REMEMBER.to_owned(), json!({"name": "A"})),
+        (FORGET.to_owned(), json!({"source_id": 391})),
+        (REMEMBER.to_owned(), json!({"name": "A"})),
+    ];
+    let undone = &kept_again[..2];
+    let kept = &kept_again[..1];
+    let flower = "My favorite flower is a ranunculus.";
+    /// The turns, their eyes, the switch, the calls run, and the case.
+    type Case<'a> = (
+        &'a [Turn],
+        &'a [Sight],
+        bool,
+        &'a [(String, Value)],
+        &'a str,
+    );
+    let cases: &[Case] = &[
+        (
+            &[
+                ("A", flower, doubted, 0),
+                ("A", "Yes.", Lamp::Says("Kept."), 5),
+            ],
+            &[a, a],
+            true,
+            &kept_again,
+            "their yes keeps it again",
+        ),
+        (
+            &[
+                ("A", flower, doubted, 0),
+                ("A", "No, ranunculus.", Lamp::Says("Ranunculus, got it."), 5),
+            ],
+            &[a, a],
+            true,
+            undone,
+            "no yes: stays taken back",
+        ),
+        (
+            &[
+                ("A", flower, doubted, 0),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            &[a, (&["B"], true)],
+            true,
+            undone,
+            "someone else's yes",
+        ),
+        (
+            &[
+                ("A", flower, doubted, 0),
+                ("A", "Yes.", Lamp::Says("Okay."), 90),
+            ],
+            &[a, a],
+            true,
+            undone,
+            "a yes too late",
+        ),
+        (
+            &[
+                ("A", flower, doubted, 0),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            &[a, a],
+            false,
+            kept,
+            "switch off: as before",
+        ),
+        (
+            &[
+                (
+                    "A",
+                    flower,
+                    Lamp::Calls(REMEMBER, "Kept: your favorite flower is the ranunculus."),
+                    0,
+                ),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            &[a, a],
+            true,
+            kept,
+            "a plain say-back",
+        ),
+        (
+            &[
+                (
+                    "A",
+                    flower,
+                    Lamp::Calls(
+                        REMEMBER,
+                        "Kept. Was that the day you went to Hanoi? Right, the trip.",
+                    ),
+                    0,
+                ),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            &[a, a],
+            true,
+            kept,
+            "a question about something else",
+        ),
+        (
+            &[
+                ("", flower, doubted, 0),
+                ("", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            &[(&[], false), (&[], false)],
+            true,
+            &[(REMEMBER.to_owned(), json!({"name": ""}))],
+            "nobody known: the room's keep stays",
+        ),
+    ];
+    for (at, (turns, sight, on, calls, case)) in cases.iter().enumerate() {
+        let ran = run_full(
+            turns,
+            Some(sight),
+            9101 + 10 * at as u64,
+            (false, *on),
+            json!({"ok": true}),
+        )
+        .await;
+        assert_eq!(ran.calls, *calls, "{case}");
+    }
+}
+
+/// Without the eyes' sight no yes could keep it again, so nothing is taken
+/// back.
+#[tokio::test]
+async fn a_doubted_keep_stays_without_the_eyes() {
+    let ran = run_full(
+        &[(
+            "A",
+            "My favorite flower is a ranunculus.",
+            Lamp::Calls(
+                crate::remember::REMEMBER,
+                "Kept. Was that 'rhinodulus' right?",
+            ),
+            0,
+        )],
+        None,
+        9301,
+        (false, true),
+        json!({"ok": true}),
+    )
+    .await;
+    assert_eq!(
+        ran.calls,
+        [(crate::remember::REMEMBER.to_owned(), json!({"name": "A"}))]
+    );
 }
