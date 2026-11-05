@@ -474,17 +474,33 @@ fn a_read_step_is_the_same_in_the_schema_and_the_loader() {
             "services = { github = \"read\" }",
             "{ service = \"github\", what = \"query\" }",
         ),
-        // A lamp, 5 Nov: an order is no query, it matched no file.
-        read(
-            drive,
-            "{ service = \"google_drive\", what = \"files\", query = \"order by modifiedTime desc\" }",
-        ),
     ] {
         assert!(
             loads(&loader_only).is_err(),
             "lamp-skills loaded {loader_only}"
         );
     }
+    // A lamp, 5 Nov: an order is no query, it matched no file. Never made
+    // so (`lamp-skills pack`), though one already on a lamp loads, its
+    // order read as none (build 10300's refused round on lamp-9adf).
+    let order = read(
+        drive,
+        "{ service = \"google_drive\", what = \"files\", query = \"order by modifiedTime desc\" }",
+    );
+    assert_eq!(loads(&order), Ok(()));
+    let root = tempfile::tempdir().unwrap();
+    let folder = root.path().join("format-case");
+    std::fs::create_dir(&folder).unwrap();
+    std::fs::write(
+        folder.join("SKILL.md"),
+        "---\nname: format-case\ndescription: A case of the format's test.\n---\n",
+    )
+    .unwrap();
+    std::fs::write(folder.join("skill.toml"), &order).unwrap();
+    assert_eq!(
+        lamp_skills::load(&folder).unwrap().made_refuses(),
+        Some(lamp_skills::service_read::QUERY_NOT_AN_ORDER)
+    );
     // The schema's services are lamp-services' readable ones, in both lists.
     let readable: Vec<String> = lamp_services::spoken::readable()
         .into_iter()

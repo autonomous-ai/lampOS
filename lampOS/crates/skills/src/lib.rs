@@ -1849,6 +1849,18 @@ impl Skill {
                 .any(|(_, step)| matches!(step, Step::Call(Call::Rest(_))))
     }
 
+    /// Why it is not made, packed or installed though it loads: a read's
+    /// `query` that is an order ([`service_read::ReadStep::made_refuses`]).
+    /// A skill already on a lamp loads with that order read as no query,
+    /// so a stricter check never strands it, nor holds the lamp's update
+    /// back (build 10300's round on lamp-9adf, 5 Nov).
+    pub fn made_refuses(&self) -> Option<&'static str> {
+        self.steps.iter().find_map(|(_, step)| match step {
+            Step::Call(Call::ServiceRead(read)) => read.made_refuses(),
+            _ => None,
+        })
+    }
+
     fn scheduled_run(&self, trigger: Option<&Trigger>) -> bool {
         self.is_routine()
             || trigger.is_some_and(|trigger| trigger.during.is_some() || trigger.once_per_day)
@@ -9336,5 +9348,64 @@ mod tests {
             assert_eq!(call.named(), ("say", json!({ "from": from })));
             assert_eq!((source.name(), source.priority()), (from, priority));
         }
+    }
+
+    /// Build 10300's round on lamp-9adf (5 Nov) refused to switch: a skill
+    /// made there by voice before #5373 read Drive with `query = "order by
+    /// modifiedTime desc"`, which the new lamp-skills refused at load. On
+    /// the lamp it loads, its read with no query, the latest; made, packed
+    /// or installed anew it is refused as before.
+    #[test]
+    fn a_skill_on_the_lamp_whose_read_asks_an_order_loads_and_a_new_one_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let skills = dir.path().join("skills");
+        let name = "read-latest-google-drive-files";
+        let folder = skills.join(name);
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(
+            folder.join("SKILL.md"),
+            format!("---\nname: {name}\ndescription: Reads my latest Drive files.\n---\n"),
+        )
+        .unwrap();
+        std::fs::write(
+            folder.join("skill.toml"),
+            "version = \"1.0.0\"\n[trigger]\ntopic = \"voice/state\"\nfield = \"state\"\n\
+             equals = \"resting\"\n[ask]\npolicy = \"nudge\"\n[permissions]\n\
+             topics = [\"voice/state\"]\nspeak = true\nservices = { google_drive = \"read\" }\n\
+             [[do]]\nread = { service = \"google_drive\", what = \"files\", \
+             query = \"order by modifiedTime desc\", count = 3 }\n",
+        )
+        .unwrap();
+        let skill = load(&folder).unwrap();
+        let [(_, Step::Call(Call::ServiceRead(read)))] = skill.steps.as_slice() else {
+            panic!("{:?}", skill.steps);
+        };
+        assert!(read.order_read_as_none);
+        assert_eq!(
+            read.args(None).unwrap(),
+            json!({ "service": "google_drive", "what": "files", "count": 3 })
+        );
+        assert_eq!(skill.made_refuses(), Some(service_read::QUERY_NOT_AN_ORDER));
+        // The lamp's folder as lamp-update's round lists it: it loads.
+        let (loaded, errors) = load_all(&skills);
+        assert!(errors.is_empty(), "{errors:?}");
+        assert_eq!(loaded.len(), 1);
+        let listed = package::list(&skills).unwrap();
+        assert!(
+            listed.contains(name) && !listed.contains("not loaded"),
+            "{listed}"
+        );
+        // Made or installed anew, refused as #5373 has it.
+        let out = dir.path().join("out");
+        let why = package::pack(&folder, &out).unwrap_err();
+        assert_eq!(
+            why,
+            format!("not packed: {}", service_read::QUERY_NOT_AN_ORDER)
+        );
+        let other = dir.path().join("other");
+        std::fs::create_dir_all(&other).unwrap();
+        let why = package::install(&other, None, &folder).unwrap_err();
+        assert!(why.contains(service_read::QUERY_NOT_AN_ORDER), "{why}");
+        assert!(!other.join(name).exists());
     }
 }

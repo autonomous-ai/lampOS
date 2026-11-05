@@ -1226,6 +1226,15 @@ fn serve(
                 for error in errors {
                     eprintln!("lamp-skills: not loaded: {error}");
                 }
+                // Loaded, though never made so now: its read's order is
+                // read as no query, the latest (build 10300's refused round
+                // on lamp-9adf, 5 Nov). Its name alone, never the query.
+                for skill in skills.iter().filter(|skill| skill.made_refuses().is_some()) {
+                    eprintln!(
+                        "lamp-skills: {}: its read's query is an order, read as no query: the latest",
+                        skill.name
+                    );
+                }
                 // Keep the previous accepted generation intact if its
                 // cap declarations cannot be installed as one bounded set.
                 // The earlier asset scan still revokes changed media;
