@@ -8973,6 +8973,17 @@ async fn a_reply_never_says_it_kept_something_with_no_remember_call() {
             1,
             "said:Kept: it's Orange.",
         ),
+        // lamp-06c1, build 10226, 5 Nov: a bare "I'll keep it." with no
+        // call is the same claim, asked again, and the call then runs.
+        (
+            vec![
+                vec![text("I'll keep it."), Ok(ChatEvent::Done)],
+                vec![remember(), Ok(ChatEvent::Done)],
+                vec![text("Kept: it's Orange."), Ok(ChatEvent::Done)],
+            ],
+            1,
+            "said:Kept: it's Orange.",
+        ),
         // Claimed twice with no call: the plain line.
         (
             vec![
