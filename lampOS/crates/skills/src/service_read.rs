@@ -79,7 +79,11 @@ const DAY_MS: i64 = 86_400_000;
 /// voice on a lamp (5 Nov, "read my latest Google Drive files") read with
 /// `query = "order by modifiedTime desc"`, which Drive searched for in its
 /// files' text and found in none (`read 0`). Drive's files and mail come
-/// newest first already.
+/// newest first already. Refused only where a skill is made, packed or
+/// installed ([`ReadStep::made_refuses`]): one already on a lamp loads with
+/// its order read as no query, so reads the latest, as it meant. Build
+/// 10300's round on lamp-9adf (5 Nov) refused to switch for such a skill,
+/// made by voice there before this check, and would have every round.
 pub const QUERY_NOT_AN_ORDER: &str = "read: query is only words to search for, never an order or \
      \"latest\": files and mail come newest first, so leave query out to read the latest";
 
@@ -151,10 +155,14 @@ pub struct ReadStep {
     /// The skill's own `[quiet]`, local minutes, held beside the lamp's
     /// quiet hours.
     pub quiet: Option<(u16, u16)>,
+    /// Whether the folder's `query` was an order or the latest alone
+    /// ([`ordering`]), left out so the read gives the latest.
+    pub order_read_as_none: bool,
 }
 
 impl ReadFile {
-    /// The step, or why the folder's words are not one.
+    /// The step, or why the folder's words are not one. A `query` that is
+    /// an order is left out and marked ([`ReadStep::made_refuses`]).
     pub fn step(self, quiet: Option<(u16, u16)>) -> Result<ReadStep, String> {
         let (service, what) = (self.service, self.what);
         // A fixed list of a service with one, never a whole text or a
@@ -174,6 +182,7 @@ impl ReadFile {
             (false, None) => None,
         };
         let mut args = Map::new();
+        let mut order_read_as_none = false;
         let count = match (events, self.count) {
             (true, Some(_)) => return Err("read: a calendar's events take day, not count".into()),
             (true, None) => None,
@@ -199,7 +208,8 @@ impl ReadFile {
                     return Err(format!("read: {key} is 1 to {MOST_ARG_BYTES} bytes"));
                 }
                 if key == "query" && ordering(&value) {
-                    return Err(QUERY_NOT_AN_ORDER.into());
+                    order_read_as_none = true;
+                    continue;
                 }
                 args.insert(key.into(), json!(value));
             }
@@ -210,11 +220,19 @@ impl ReadFile {
             day,
             args,
             quiet,
+            order_read_as_none,
         })
     }
 }
 
 impl ReadStep {
+    /// Why a skill with this step is not made, packed or installed
+    /// ([`QUERY_NOT_AN_ORDER`]); `None` if it may be. A skill already on
+    /// the lamp is never held to it: it loads, its order read as none.
+    pub fn made_refuses(&self) -> Option<&'static str> {
+        self.order_read_as_none.then_some(QUERY_NOT_AN_ORDER)
+    }
+
     /// The step as its skill names it: service, what, day and its keys.
     pub fn named(&self) -> Value {
         let mut named = self.args.clone();
@@ -717,10 +735,18 @@ mod tests {
             "my most recent files",
             "the latest mail",
         ] {
-            let read = format!(r#"service = "google_drive", what = "files", query = "{order}""#);
-            assert_eq!(step(&read).unwrap_err(), QUERY_NOT_AN_ORDER, "{order}");
-            let mail = format!(r#"service = "gmail", what = "search", query = "{order}""#);
-            assert_eq!(step(&mail).unwrap_err(), QUERY_NOT_AN_ORDER, "{order}");
+            // Never made so, and read as no query by a skill already on a
+            // lamp (build 10300's refused round on lamp-9adf, 5 Nov).
+            for read in [
+                format!(r#"service = "google_drive", what = "files", query = "{order}""#),
+                format!(r#"service = "gmail", what = "search", query = "{order}""#),
+            ] {
+                let read = step(&read).unwrap();
+                assert_eq!(read.made_refuses(), Some(QUERY_NOT_AN_ORDER), "{order}");
+                assert!(read.order_read_as_none, "{order}");
+                assert!(!read.args.contains_key("query"), "{order}");
+                assert!(read.args(None).unwrap().get("query").is_none(), "{order}");
+            }
         }
         assert!(QUERY_NOT_AN_ORDER.contains("leave query out"));
         for words in [
@@ -733,7 +759,9 @@ mod tests {
             "descartes",
         ] {
             let read = format!(r#"service = "google_drive", what = "files", query = "{words}""#);
-            assert!(step(&read).is_ok(), "{words}: {:?}", step(&read));
+            let read = step(&read).unwrap();
+            assert_eq!(read.made_refuses(), None, "{words}");
+            assert_eq!(read.args["query"], json!(words), "{words}");
         }
     }
 

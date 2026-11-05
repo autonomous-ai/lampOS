@@ -526,6 +526,11 @@ pub fn pack_signed_by(
     author: bool,
 ) -> Result<PathBuf, String> {
     let skill = load(dir).map_err(|why| format!("not packed: {why}"))?;
+    // A skill made by voice is packed here first: held to what a new
+    // skill is, though one already on a lamp loads ([`Skill::made_refuses`]).
+    if let Some(why) = skill.made_refuses() {
+        return Err(format!("not packed: {why}"));
+    }
     if skill.kind == SkillKind::Core {
         return Err(format!(
             "not packed: {} is a core skill: it comes with the lamp (lamp-update install), never as a package",
@@ -1516,6 +1521,10 @@ pub fn install_pushed_at(
             .find(|(path, _)| path == &folder)
             .map(|(_, loaded)| loaded)
             .unwrap_or_else(|| Err("it was not found where it was put".into()))
+            .and_then(|skill| match skill.made_refuses() {
+                Some(why) => Err(why.to_owned()),
+                None => Ok(skill),
+            })
             .map_err(|why| format!("not installed: {why}"))
     })();
     let _ = fs::remove_dir_all(&checking);
@@ -2247,6 +2256,11 @@ fn moved_in(
 ) -> Result<String, String> {
     let skill =
         load(folder).map_err(|why| format!("not installed: {name} does not load: {why}"))?;
+    // A package, from the Store, the app or a folder, is a new skill to
+    // the lamp ([`Skill::made_refuses`]).
+    if let Some(why) = skill.made_refuses() {
+        return Err(format!("not installed: {name}: {why}"));
+    }
     if skill.kind == SkillKind::Core {
         return Err(format!(
             "not installed: {name} says kind = \"core\": a core skill comes with the lamp (lamp-update install), \

@@ -812,6 +812,7 @@ fn a_read_step_reads_only_what_its_permissions_list() {
         day: Some("tomorrow".into()),
         args: serde_json::Map::new(),
         quiet: None,
+        order_read_as_none: false,
     };
     let call = Call::ServiceRead(Box::new(step));
     assert_eq!(skill.permissions.refuses(&call), None);

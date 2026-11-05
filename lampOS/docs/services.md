@@ -858,7 +858,14 @@ Drive lists files newest first (`orderBy = modifiedTime desc`) and mail
 comes newest first, so a read of the latest leaves it out; an order or the
 latest alone ("order by modifiedTime desc", "newest") is refused
 (`service_read::ordering`, after a lamp's made skill read 0 files with
-one, 5 Nov). A made skill's brief gives Drive's step whole and says so
+one, 5 Nov) where a skill is made or comes new to the lamp: `lamp-skills
+pack` (the make check), and an install from the Store, the app or a
+computer (`Skill::made_refuses`, `QUERY_NOT_AN_ORDER`). A skill already on
+the lamp still loads, its order read as no query, so it reads the latest
+as it meant, and lamp-skills says so in the journal at load, by the
+skill's name. Refused at load, it stranded the lamp: build 10300's round
+on lamp-9adf (5 Nov) would not switch, as its lamp-skills would not load
+a skill made there before the check. A made skill's brief gives Drive's step whole and says so
 (`made_skill::DRIVE_READ`): the step, then "no other key" and why, in
 words that name no key. On 10300 its note in brackets right after the
 braces, "(newest first; …)", came back twice as one more key in them,

@@ -886,7 +886,15 @@ thứ tự: Drive liệt kê tệp mới nhất trước (`orderBy = modifiedTim
 thư cũng mới nhất trước, nên một lần đọc những tệp mới nhất thì bỏ `query`;
 một thứ tự hay chỉ "mới nhất" ("order by modifiedTime desc", "newest") bị
 từ chối (`service_read::ordering`, sau khi một kỹ năng được tạo trên một
-đèn đọc ra 0 tệp với một thứ tự như vậy, 5/11). Bản brief của kỹ năng được
+đèn đọc ra 0 tệp với một thứ tự như vậy, 5/11) ở nơi một kỹ năng được tạo
+hay mới đến đèn: `lamp-skills pack` (bước kiểm khi tạo), và việc cài từ
+Store, ứng dụng hay một máy tính (`Skill::made_refuses`,
+`QUERY_NOT_AN_ORDER`). Một kỹ năng đã có trên đèn vẫn nạp, thứ tự của nó
+được đọc như không có `query`, nên nó đọc những tệp mới nhất đúng như ý
+định, và lamp-skills ghi điều đó vào journal lúc nạp, theo tên kỹ năng. Nếu
+bị từ chối lúc nạp, đèn bị kẹt: vòng cập nhật của bản build 10300 trên
+lamp-9adf (5/11) không chuyển, vì lamp-skills của nó không nạp một kỹ năng
+được tạo ở đó trước khi có bước kiểm này. Bản brief của kỹ năng được
 tạo cho trọn bước của Drive và nói điều này (`made_skill::DRIVE_READ`):
 bước đó, rồi "no other key" và lý do, bằng lời không gọi tên khóa nào.
 Trên 10300, ghi chú trong ngoặc ngay sau dấu ngoặc nhọn, "(newest first; …)",
