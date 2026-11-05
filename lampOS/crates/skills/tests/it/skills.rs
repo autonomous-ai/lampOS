@@ -910,6 +910,104 @@ fn a_read_step_reads_only_what_its_permissions_list() {
     }
 }
 
+/// A made skill's read (#5288) on `room/presence someone = true for 1s`,
+/// no cooldown, held each second (lamp-9adf, 5 Nov: four lines a second
+/// for each such skill, 912 a minute): once made, its chance is dropped
+/// with one journal line while its read is under way and till its local
+/// midnight, never said triggered nor asked of the Policy; the next day it
+/// comes due again.
+#[test]
+fn a_read_that_came_due_says_one_line_however_long_its_trigger_holds() {
+    let dir = tempfile::tempdir().unwrap();
+    let toml = "[trigger]\ntopic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+                for = \"1s\"\n[ask]\npolicy = \"nudge\"\n[permissions]\n\
+                topics = [\"room/presence\"]\nspeak = true\n\
+                services = { google_calendar = \"read\" }\n[[do]]\n\
+                read = { service = \"google_calendar\", what = \"events\", day = \"tomorrow\" }\n";
+    let skill = || load(&skill_with(dir.path(), "evening-calendar", toml)).unwrap();
+    // 10:00 UTC on a day, the local time UTC.
+    const MORNING_MS: u64 = 1_762_336_800_000;
+    const SECOND: u64 = 1_000_000;
+    const DAY: u64 = 86_400 * SECOND;
+    let at = |engine: &mut Engine, at_us: u64, someone: bool| {
+        let payload = format!("{{\"someone\":{someone}}}");
+        let runs = engine.observe("room/presence", at_us, payload.as_bytes(), None);
+        let mut lines: Vec<String> = runs
+            .iter()
+            .flat_map(|run| &run.events)
+            .map(|event| format!("{} {:?}: {}", event.skill, event.stage, event.why))
+            .collect();
+        lines.extend(engine.take_dropped());
+        (runs, lines)
+    };
+    let held = |engine: &mut Engine, from_s: u64, ticks: u64| {
+        let mut lines = Vec::new();
+        for second in from_s..from_s + ticks {
+            let (runs, said) = at(engine, second * SECOND, true);
+            assert!(
+                runs.iter()
+                    .all(|run| run.calls.is_empty() && run.ask.is_none()),
+                "at {second} s: {runs:?}"
+            );
+            lines.extend(said);
+        }
+        lines
+    };
+    // The ask skipped: made at its first second held.
+    let mut engine = Engine::new(vec![skill()], true);
+    engine.clock(0, 0, MORNING_MS);
+    at(&mut engine, 0, true);
+    let (runs, lines) = at(&mut engine, SECOND, true);
+    assert!(
+        matches!(runs[0].calls.as_slice(), [Call::ServiceRead(_)]),
+        "{runs:?}"
+    );
+    assert_eq!(lines.len(), 3, "{lines:?}");
+    // Its gate waits: 600 ticks, one line.
+    assert_eq!(
+        held(&mut engine, 2, 600),
+        ["evening-calendar not run: its read is still under way"]
+    );
+    // Done (read, skipped or stopped): the same hold says nothing more.
+    engine.done("evening-calendar");
+    assert!(held(&mut engine, 602, 600).is_empty());
+    // Gone and back the same day: one line for the new hold.
+    at(&mut engine, 1_202 * SECOND, false);
+    assert_eq!(
+        held(&mut engine, 1_203, 600),
+        ["evening-calendar not run: its read came due once today already"]
+    );
+    // The next local day it comes due again.
+    let (runs, _) = at(&mut engine, DAY, true);
+    assert!(
+        matches!(runs[0].calls.as_slice(), [Call::ServiceRead(_)]),
+        "{runs:?}"
+    );
+    // Asked of the Policy: asked until its yes is made, then never while
+    // its read could not run.
+    let mut engine = Engine::new(vec![skill()], false).asking_the_policy();
+    engine.clock(0, 0, MORNING_MS);
+    at(&mut engine, 0, true);
+    let (runs, _) = at(&mut engine, SECOND, true);
+    assert!(runs[0].ask.is_some(), "{runs:?}");
+    // A no, or no answer, leaves the read to come due again.
+    let (runs, _) = at(&mut engine, 2 * SECOND, true);
+    assert!(runs[0].ask.is_some(), "{runs:?}");
+    engine.made("evening-calendar", 2 * SECOND);
+    assert_eq!(
+        held(&mut engine, 3, 600),
+        ["evening-calendar not run: its read is still under way"]
+    );
+    // A skill mended may try again today; the program's own once a day
+    // still says whether it reads.
+    engine.done("evening-calendar");
+    let mut mended = skill();
+    mended.description = "Mended.".into();
+    engine.replace(vec![mended]);
+    let (runs, _) = at(&mut engine, 604 * SECOND, true);
+    assert!(runs[0].ask.is_some(), "{runs:?}");
+}
+
 /// The camera's picture is its own grant, `camera` (#3822's gap 1, the
 /// helper's decision on #3504, 27 Oct): `look` is presence and face
 /// position only, as the protocol's. A format 1 skill that said `look = true`

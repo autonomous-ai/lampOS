@@ -883,7 +883,14 @@ publishes, every 250 ms:
 All must hold steadily for 5 s. Until then the run waits, at most 60
 minutes, and then skips the day with nothing said ("skipped: <why>"). A
 read runs once a local day per skill (kept in `lamp-skills`' memory, so a
-restart forgets it).
+restart forgets it). While its run waits for the gate, and after it came
+due until local midnight, the skill's trigger is not said triggered or asked
+of the Policy each time it holds: the chance is dropped with one journal
+line a hold, `<skill> not run: its read is still under way` or `... its read
+came due once today already` (`Engine`'s read gate; lamp-9adf, 5 Nov: a
+presence trigger held each second wrote four lines a second per skill, 912
+a minute, and the journal rotated in about 15 minutes). A skill changed by a
+reload may try again the same day, and this once a day still decides.
 
 **What is said**: one rule, keyed by service (`lamp_services::spoken`,
 `SPOKEN`, so a later ruling for a service changes one table), each line its
