@@ -540,3 +540,22 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   14:27; passed on the main.rs `engine.done` wiring point.
 - 15:0x: #5404 READ-OK 655318e753 (HOLD lifted: fails closed with no
   one-face tracker); P3, its test is helper-only (reasoned, not run).
+- 15:1x: lamp-fc4b read-only check over ssh (the person's yes, key only, no
+  sound, no change): build 10226 up to date, every lamp-* unit that should
+  run is active, no lampOS error or warning in the hour, 57 °C, disk 7%.
+  Kernel only: an I2C NACK on twi 2510000 every 10 min, and 49 sdmmc "dma
+  hold bit" lines a day; neither seen in lamp-body's reads (0 bad reads).
+  #5221's model fetch worked (fetched to /opt/lampOS/models at 10:00).
+- 16:2x: #5414 READ-OK 6434d65a4a (gate green, wiring, `asked`, sight and
+  `kept_now` mutations caught; P3s: UNDO_WITHIN unpinned, `kept_now` stays
+  true after an undo, hold_forget's doc moved onto JustKept).
+- 17:2x: #5419 HOLD 00d948b184, P2: the carried-line forget is
+  helper-only (both `memory_refused` bypasses, the tools.rs arm and the
+  scope-is-theirs check can be dropped with every test green). The
+  Reviewer-lead added two P2s.
+- 17:3x: #5433 HOLD d9c8b24c50, concurring with Thirteen's P1 (Fix 1
+  retries as an unlinked append, which memory-days.md calls a privacy
+  guard). 18:2x: #5064 READ-OK restated at d7022c0e73 (range-diff same,
+  process:: 45/0 after one loaded-Mac flake). 18:4x: #5436 HOLD
+  97c51ef952, concurring with Twelve and the Reviewer-lead (a yes or no
+  to the lamp's forget question can be swallowed and told done).
