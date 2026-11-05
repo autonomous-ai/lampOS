@@ -1017,7 +1017,10 @@ its only way back once its package carries the unit.
   on the Wi-Fi (online), `wpa_state` (joined to a known network's radio,
   waiting for an address: only slow), `lamp-setup.service` and a Wi-Fi
   change from the app (busy), and while the hotspot is open the phones on it
-  (`iw dev wlan0 station dump`; one that can't be counted counts as some).
+  (`iw dev wlan0 station dump`, or the resolved neighbours on `wlan0` in
+  `/proc/net/arp` when there are more: lamp-0c89's radio listed no station
+  while hostapd had a phone associated, #5417; an `iw` that can't be read
+  counts as some).
   This count and the station address (`ip -4 -o addr show`, also read every
   second while joining) use the reset queries' five-second bound below: a
   stalled or pipe-holding read is stopped and reads as none.
