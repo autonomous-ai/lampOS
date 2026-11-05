@@ -791,6 +791,13 @@ impl SecondConfig {
                 self.tts_voice = Some(language.voice().to_owned());
             }
         }
+        // The owner's chosen voice (#5394, `LAMP_CHOSEN_VOICE=on`), over the
+        // language's; none kept, or one this build lacks, changes nothing.
+        if self.tts_provider == TtsProvider::ElevenLabs
+            && let Some(voice) = crate::chosen_voice::voice(&var)
+        {
+            self.tts_voice = Some(voice);
+        }
         self = self.with_key_terms_from(&var)?;
         self.stt_flux = var(FLUX_ENV).is_some_and(|value| value == "on");
         Ok(self)
