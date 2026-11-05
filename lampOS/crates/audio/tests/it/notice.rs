@@ -440,3 +440,121 @@ fn the_wifi_recovering_line_is_a_kind_of_its_own() {
         lost
     );
 }
+
+/// A lamp's notices as lamp-update places them (#5362): under a root,
+/// `opt/lampOS/voice/notices/<name>` is a link `../../models/<sha256>` (the
+/// form of lamp-update's `models::target`) into `opt/lampOS/models/`.
+struct Placed {
+    root: Directory,
+}
+impl Placed {
+    fn new() -> Self {
+        let root = Directory::new();
+        fs::create_dir_all(root.path().join("opt/lampOS/voice/notices")).unwrap();
+        fs::create_dir_all(root.path().join("opt/lampOS/models")).unwrap();
+        Self { root }
+    }
+    fn notices(&self) -> PathBuf {
+        self.root.path().join("opt/lampOS/voice/notices")
+    }
+    fn store(&self) -> PathBuf {
+        self.root.path().join("opt/lampOS/models")
+    }
+    /// `bytes` into the store, and `name` linked to it with `target`'s text
+    /// (`None`: lamp-update's own).
+    fn place(&self, name: &str, bytes: &[u8], target: Option<&str>) {
+        let sha = sha(bytes);
+        fs::write(self.store().join(&sha), bytes).unwrap();
+        let target = target.map_or_else(|| format!("../../models/{sha}"), str::to_owned);
+        let at = self.notices().join(name);
+        let _ = fs::remove_file(&at);
+        std::os::unix::fs::symlink(target, at).unwrap();
+    }
+    /// One notice, manifest and recording both placed as store links.
+    fn provision(&self) -> Vec<u8> {
+        let bytes = wav(RATE, 1, &tone(RATE));
+        self.place("outage.wav", &bytes, None);
+        let manifest = json!({"schema_version": 1, "notices": [
+            entry("provider_unavailable", "outage.wav", &bytes, RATE)
+        ]});
+        self.place(MANIFEST, manifest.to_string().as_bytes(), None);
+        manifest.to_string().into_bytes()
+    }
+    fn get(&self) -> Result<Vec<i16>, Missing> {
+        Notices::load(&self.notices(), Approval::Production)
+            .get(NoticeKind::ProviderUnavailable, "en-US")
+            .map(|notice| notice.samples().to_vec())
+    }
+}
+
+#[test]
+fn notices_placed_as_store_links_by_lamp_update_are_loaded() {
+    let placed = Placed::new();
+    placed.provision();
+    assert!(
+        fs::symlink_metadata(placed.notices().join(MANIFEST))
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert_eq!(placed.get(), Ok(tone(RATE)));
+}
+
+#[test]
+fn a_link_other_than_a_store_link_is_still_refused() {
+    let placed = Placed::new();
+    let manifest = placed.provision();
+    let id = sha(&manifest);
+    let elsewhere = placed.root.path().join("opt/lampOS/elsewhere");
+    fs::create_dir(&elsewhere).unwrap();
+    fs::write(elsewhere.join(&id), &manifest).unwrap();
+    let absolute = placed.store().join(&id);
+    for target in [
+        // Absolute, even into the store.
+        absolute.to_str().unwrap().to_owned(),
+        // Out of the store, or into it by another spelling.
+        format!("../elsewhere/{id}"),
+        format!("../../elsewhere/{id}"),
+        format!("../models/{id}"),
+        format!("../../../lampOS/models/{id}"),
+        format!("../../models/./{id}"),
+        format!("../../models//{id}"),
+        // Not a SHA-256 name.
+        format!("../../models/{}", id.to_uppercase()),
+        format!("../../models/{}", &id[1..]),
+        "../../models/manifest.json".into(),
+    ] {
+        placed.place(MANIFEST, &manifest, Some(&target));
+        assert_eq!(placed.get(), Err(Missing::InvalidManifest), "{target}");
+    }
+    // A recording linked out of the store is refused as before.
+    placed.place(MANIFEST, &manifest, None);
+    assert!(placed.get().is_ok());
+    let bytes = wav(RATE, 1, &tone(RATE));
+    fs::write(elsewhere.join(sha(&bytes)), &bytes).unwrap();
+    placed.place(
+        "outage.wav",
+        &bytes,
+        Some(&format!("../elsewhere/{}", sha(&bytes))),
+    );
+    assert_eq!(placed.get(), Err(Missing::AssetUnreadable));
+}
+
+#[test]
+fn a_store_entry_or_store_that_is_a_link_is_refused() {
+    let placed = Placed::new();
+    let manifest = placed.provision();
+    let id = sha(&manifest);
+    // The store entry is itself a link to the real file.
+    fs::rename(placed.store().join(&id), placed.store().join("real")).unwrap();
+    std::os::unix::fs::symlink("real", placed.store().join(&id)).unwrap();
+    assert_eq!(placed.get(), Err(Missing::InvalidManifest));
+    fs::remove_file(placed.store().join(&id)).unwrap();
+    fs::rename(placed.store().join("real"), placed.store().join(&id)).unwrap();
+    assert!(placed.get().is_ok());
+    // The store directory is a link to a copy of it elsewhere.
+    let moved = placed.root.path().join("opt/lampOS/models-real");
+    fs::rename(placed.store(), &moved).unwrap();
+    std::os::unix::fs::symlink("models-real", placed.store()).unwrap();
+    assert_eq!(placed.get(), Err(Missing::InvalidManifest));
+}
