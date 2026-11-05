@@ -438,6 +438,19 @@ it happens (`duplex_fruitless_forgiven`, with `forgiven_so_far`), and
 `fallen_back_at_end` says only whether the last reply had fallen back when
 the session ended (Eighth on #2048).
 
+**With `LAMP_ONSET_FADE=on` (#5076, off unless set), the reply is lowered
+from the first block heard over it.** A yield takes 7 blocks over the lamp
+(10 early in a reply), and until then the reply plays at full level, so
+the start of a word said over it is under the lamp's voice on every stage
+of the canceller: on lamp-52e6 on 5 Nov a played "Stop, Lamp." gave no
+words on `processed` and the lamp's story on `linear` and `raw`. With the
+switch, every reply chunk handed to the speaker while the onset run counts
+(`Interruption::onset_run`) is ramped down to -12 dB (`ONSET_FADE_FLOOR`);
+a yield or a commit then stops the speaker as before, and a run that comes
+to nothing ramps the reply back up over five chunks, 50 ms
+(`ONSET_FADE_RISE_CHUNKS`). The fade is applied before the speaker worker
+writes, so the canceller's reference is what was played.
+
 **With `LAMP_CUT_IN_KEEPS_LISTENING=on` (#2602, off unless set), a person
 who keeps trying is still heard within those 20 s.** On the Mac's replay
 of the coordinator's real path (22 Oct), a third line 3 to 19 s after two
