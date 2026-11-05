@@ -157,6 +157,19 @@ impl Channel {
         self.drop_stale_first = true;
         self
     }
+
+    /// For a test rig's own reader only, never the product's: a rig that
+    /// reads a worker's frames between its other work can lag a loaded CI
+    /// runner past the product's 100 ms (#5388's ARM64 run: a capture
+    /// frame read 156 ms after it was sent ended
+    /// `mic1_with_a_recording_keeps_the_held_steps_before_the_first_block`).
+    /// Its messages may then be up to `max_age_us` old, at most
+    /// [`FIRST_CONTROL_MAX_AGE_US`] as [`Self::bind`] allows. Order, boot and
+    /// sender are judged as before.
+    #[doc(hidden)]
+    pub fn widen_for_a_test_reader(&mut self, max_age_us: u64) {
+        self.max_age_us = max_age_us.clamp(1, FIRST_CONTROL_MAX_AGE_US);
+    }
     pub fn connect(&mut self, path: &Path) -> io::Result<()> {
         self.endpoint.connect(path)
     }
@@ -754,6 +767,32 @@ mod tests {
         sender.connect(&dir.join("r")).unwrap();
         receiver.connect(&dir.join("s")).unwrap();
         (sender, receiver)
+    }
+
+    /// A test rig's reader widened (`widen_for_a_test_reader`) takes a
+    /// message read 300 ms after it was sent, which the product's 100 ms
+    /// bound refuses; it still refuses one older than its widened bound.
+    #[test]
+    fn a_widened_test_reader_takes_a_late_message_and_the_product_bound_does_not() {
+        for (widen, late_us, taken) in [
+            (None, 300_000, false),
+            (Some(1_000_000), 300_000, true),
+            (Some(1_000_000), 1_200_000, false),
+        ] {
+            let dir = SessionDirectory::create().unwrap();
+            let (mut sender, mut receiver) = pair(&dir.path);
+            if let Some(us) = widen {
+                receiver.widen_for_a_test_reader(us);
+            }
+            let sent_at = monotonic_us();
+            sender.send_with(7u32, || sent_at).unwrap();
+            let got = receiver.receive_with::<u32>(|| sent_at + late_us);
+            assert_eq!(
+                got.as_ref().is_ok_and(|got| *got == Some(7)),
+                taken,
+                "{widen:?} {late_us}: {got:?}"
+            );
+        }
     }
 
     fn reference_pair(dir: &Path) -> (ReferenceChannels, ReferenceChannels) {
