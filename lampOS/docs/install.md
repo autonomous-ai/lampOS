@@ -1207,7 +1207,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      (`pin_mismatch`). A match runs the installer with
      `HARNESS_METADATA_URL` at the checked bytes, served on 127.0.0.1
      (next), so a server that changes the manifest after that read isn't
-     read again. With neither set the install is `harness-on`'s, said
+     read again. The installer and its four other manifests are the
+     build's own copies (next), with this pin too. With neither set the
+     install is `harness-on`'s, said
      `pinned: false`, except on a product lamp (next); one alone is
      `pin_unreadable`.
    - **The build's own pin** (#5229, `harness_install/product.rs`): a round
@@ -1228,10 +1230,43 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      each file the manifest names (`cli.js`, `notify.mjs`, at per-version
      CDN paths that are never republished) against its sha256. A fetched pin
      (`LAMP_HARNESS_MANIFEST_*`) is served the same way, so the installer
-     never reads it again from its server. After the install, `harness
+     never reads it again from its server.
+     After the install, `harness
      version` is compared with the manifest's `cli.version` and journaled:
      `Harness 0.5.39 is the pinned version`, or `Harness says version …, not
-     the pinned …`.
+     the pinned …`. Another version, or none, is recorded `failed` with
+     `version`, not `installed`, so the app can tell it apart. Harness is
+     still there and lamp-tasks is still started again. While Harness is
+     there, later rounds keep that record and install nothing.
+     - **The installer and its other manifests are pinned too.** Harness's
+       installer reads four more manifests from its CDN, each with its own
+       variable: the Node runtime (`HARNESS_RUNTIME_METADATA_URL`), tmux
+       (`HARNESS_TMUX_METADATA_URL`), grid (`HARNESS_GRID_METADATA_URL`) and
+       hn (`HARNESS_TUI_MANIFEST_URL`). Byte-for-byte copies of them and of
+       the installer itself (`https://cdn.autonomous.ai/harness/cli/install.sh`)
+       are under `deploy/harness/`, copied on 5 Nov 2026, and compiled in
+       (`product::INSTALLER`, `product::MANIFESTS`), each with its
+       SHA-256. Every pinned install, the build's own pin or the env pair,
+       checks all five against their SHA-256s before anything runs
+       (`pin_mismatch` otherwise). The four manifests are served from the
+       same `127.0.0.1` listener, each at its own path, and each variable
+       is set to its loopback URL. The installer is written as
+       `harness-install.sh` in a new folder under the one-shot's private
+       `/tmp`, owned by root (folder 0755, file 0644, so `lampos` can read it
+       but not change it), checked by its SHA-256 again, run as `lampos` with
+       `sh <file>`, and removed after. No pinned install fetches a script or
+       a manifest from a server, apart from an env pin's own manifest. The
+       installer's 15-min bound (`INSTALLER_WITHIN`) holds for this run too.
+     - **OpenCode is never fetched unattended.** The installer downloads
+       OpenCode (`curl https://opencode.ai/install | bash`, not pinned) only
+       when its output is a terminal or `HARNESS_INSTALL_ATTENDED=1`. The
+       one-shot captures the output, and a pinned run starts the installer
+       with `env -u HARNESS_INSTALL_ATTENDED`, so that step never runs.
+     - **A listener or file not made** (no listener on `127.0.0.1`, or the
+       installer's file not written) is `serve`, not `installer`. It is
+       tried again at the next round, with no 30-min wait.
+     - **Without a pin** (a builder's lamp, `harness-on`), the installer is
+       still the CDN's, piped to `sh`, as before.
      - **Which lamp:** a product lamp is one whose `lamp-update.service` is a
        regular file starting `/opt/lampOS/update/current/lamp-update`, that
        link naming a build. That is the same test a round makes before
@@ -1246,9 +1281,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        this build's default on a product lamp`. That default is off until a
        later build turns it on after its lamp check. The environment, a
        drop-in included, always wins.
-     - **A new Harness version** is a one-file PR: the new copy under
-       `deploy/harness/`, and `product.rs`'s `include_bytes!` path,
-       `MANIFEST_SHA256` and `VERSION` (a test holds the three to the file).
+     - **A new Harness version** is a PR that copies the CLI manifest, the
+       installer and the four other manifests again under
+       `deploy/harness/`, and updates `product.rs`'s `include_bytes!` paths
+       and constants: `MANIFEST_SHA256`, `VERSION`, `INSTALLER_SHA256` and
+       each `MANIFESTS` entry's `sha256`. Tests hold every constant to its
+       file.
      - **Held there:** Harness's own self-update is held by lamp-tasks'
        `LAMP_HARNESS_HOLD_UPDATES` (tasks.md, "Harness held at its pinned
        version"). A Team account ignores it.
@@ -1259,7 +1297,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      (`docs/cloud.md`). `install` is `absent` (switch on, not tried yet),
      `installing`, `installed` or `failed`; `error` a fixed code
      (`pin_unreadable`, `pin_fetch`, `pin_mismatch`, `timeout`,
-     `installer`, `no_user`, `not_started`); `message` fixed words for
+     `installer`, `no_user`, `not_started`, `serve`, `version`); `message`
+     fixed words for
      them; `revision` one more at each change. Said within 2 s of a
      change, with the switch on. Switch off, `serve` removes the record, so
      no `harness`, and the status thread wakes once a minute, as before.
@@ -1269,6 +1308,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `installer` or `no_user`, is tried again only by a round 30 min or
      more after it (`RETRY_AFTER`), so a broken installer isn't run after
      every round; an `update.check` within those 30 min starts no install.
+     `serve` and the rest are tried at the next round. `version` is not
+     held either, but nothing is tried while Harness is there.
    - **Shown only in tests** (`harness_install::tests`, the status and
      `app_contract` tests). Not run on a lamp: the one-shot's sandbox with
      the real installer, and a first onboarding with the switch on.

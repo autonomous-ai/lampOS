@@ -1,11 +1,12 @@
-//! The pinned manifest handed to Harness's installer from 127.0.0.1
+//! The pinned manifests handed to Harness's installer from 127.0.0.1
 //! (#5229): the bytes lamp-update has already checked by their sha256,
 //! served while the installer runs and at no other time.
 //!
-//! Harness's installer reads its manifest with Node's `fetch`, so it takes
-//! an http URL but no `file://` one (openharness `install.sh`). Served here,
-//! the manifest the installer reads is exactly the one checked: no server
-//! can change it between lamp-update's read and the installer's.
+//! Harness's installer reads its CLI manifest with Node's `fetch` and the
+//! others with `curl`, so it takes an http URL but no `file://` one
+//! (openharness `install.sh`). Served here, each manifest the installer
+//! reads is exactly the one checked: no server can change it between
+//! lamp-update's read and the installer's.
 use std::{
     io::{self, Read, Write},
     net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream},
@@ -17,7 +18,8 @@ use std::{
     time::Duration,
 };
 
-/// The path the manifest is served at; any other is answered 404.
+/// The path the CLI's manifest is served at. A path not served is
+/// answered 404.
 pub const PATH: &str = "/metadata.json";
 /// How long one connection may take to ask.
 const ASK_WITHIN: Duration = Duration::from_secs(5);
@@ -26,7 +28,7 @@ const MOST_REQUEST: usize = 8 * 1024;
 /// How often the listener looks whether it is to stop.
 const POLL: Duration = Duration::from_millis(20);
 
-/// The manifest served on 127.0.0.1 until dropped.
+/// The manifests served on 127.0.0.1 until dropped.
 pub struct Served {
     address: SocketAddr,
     stop: Arc<AtomicBool>,
@@ -34,9 +36,9 @@ pub struct Served {
 }
 
 impl Served {
-    /// `bytes` served at [`PATH`] on 127.0.0.1, a port the system picks.
-    pub fn start(bytes: Vec<u8>) -> io::Result<Self> {
-        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
+    /// Each `(path, bytes)` in `files` served on `listener`
+    /// ([`loopback`]).
+    pub fn start(listener: TcpListener, files: Vec<(String, Vec<u8>)>) -> io::Result<Self> {
         listener.set_nonblocking(true)?;
         let address = listener.local_addr()?;
         let stop = Arc::new(AtomicBool::new(false));
@@ -47,7 +49,7 @@ impl Served {
                 while !stopping.load(Ordering::Acquire) {
                     match listener.accept() {
                         Ok((stream, _)) => {
-                            let _ = answer(stream, &bytes);
+                            let _ = answer(stream, &files);
                         }
                         Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
                             thread::sleep(POLL);
@@ -63,9 +65,9 @@ impl Served {
         })
     }
 
-    /// The URL the installer is given: `http://127.0.0.1:<port>/metadata.json`.
-    pub fn url(&self) -> String {
-        format!("http://{}{PATH}", self.address)
+    /// The URL `path` is served at: `http://127.0.0.1:<port><path>`.
+    pub fn url(&self, path: &str) -> String {
+        format!("http://{}{path}", self.address)
     }
 }
 
@@ -78,8 +80,14 @@ impl Drop for Served {
     }
 }
 
-/// One connection: a `GET` of [`PATH`] gets the bytes, anything else 404.
-fn answer(mut stream: TcpStream, bytes: &[u8]) -> io::Result<()> {
+/// A listener on 127.0.0.1, a port the system picks.
+pub fn loopback() -> io::Result<TcpListener> {
+    TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
+}
+
+/// One connection: a `GET` of a path in `files` gets its bytes, anything
+/// else 404.
+fn answer(mut stream: TcpStream, files: &[(String, Vec<u8>)]) -> io::Result<()> {
     stream.set_nonblocking(false)?;
     stream.set_read_timeout(Some(ASK_WITHIN))?;
     stream.set_write_timeout(Some(ASK_WITHIN))?;
@@ -93,9 +101,11 @@ fn answer(mut stream: TcpStream, bytes: &[u8]) -> io::Result<()> {
         asked.extend_from_slice(&chunk[..read]);
     }
     let line = asked.split(|&b| b == b'\r').next().unwrap_or_default();
-    let wanted = line.starts_with(format!("GET {PATH} ").as_bytes())
-        || line.starts_with(format!("GET {PATH}?").as_bytes());
-    if wanted {
+    let wanted = files.iter().find(|(path, _)| {
+        line.starts_with(format!("GET {path} ").as_bytes())
+            || line.starts_with(format!("GET {path}?").as_bytes())
+    });
+    if let Some((_, bytes)) = wanted {
         write!(
             stream,
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -128,8 +138,15 @@ mod tests {
 
     #[test]
     fn the_checked_bytes_are_served_on_loopback_until_dropped() {
-        let served = Served::start(b"{\"cli\":{}}".to_vec()).unwrap();
-        let url = served.url();
+        let served = Served::start(
+            loopback().unwrap(),
+            vec![
+                (PATH.to_owned(), b"{\"cli\":{}}".to_vec()),
+                ("/tui/metadata.json".to_owned(), b"{}".to_vec()),
+            ],
+        )
+        .unwrap();
+        let url = served.url(PATH);
         assert!(url.starts_with("http://127.0.0.1:"), "{url}");
         assert!(url.ends_with(PATH), "{url}");
         for _ in 0..2 {
@@ -138,7 +155,10 @@ mod tests {
             assert!(said.contains("Content-Length: 10\r\n"), "{said}");
             assert!(said.ends_with("\r\n\r\n{\"cli\":{}}"), "{said}");
         }
+        let tui = get(&url, "/tui/metadata.json");
+        assert!(tui.ends_with("\r\n\r\n{}"), "{tui}");
         assert!(get(&url, "/other.json").starts_with("HTTP/1.1 404"));
+        assert!(get(&url, "/tui/metadata.json.bak").starts_with("HTTP/1.1 404"));
         let address = url
             .strip_prefix("http://")
             .and_then(|rest| rest.split('/').next())
