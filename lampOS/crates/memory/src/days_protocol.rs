@@ -441,7 +441,37 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             )?,
         }),
         // #2510: a correction, checked here, of a kept thing the session
-        // was shown; refused, nothing is written.
+        // was shown; refused, nothing is written. With `once`, a
+        // "correction" in the very words of the kept thing it names
+        // ([`Days::restates`]) is that kept thing said again, as `once`
+        // answers it below: no new version (C81 on lamp-06c1, 5 Nov: "gym
+        // locker code 441" said twice came back as `replaces` of itself and
+        // was kept as a new id, never marked said again).
+        Request::Remember {
+            person,
+            at_unix_ms,
+            text,
+            source_ids,
+            replaces: Some(old),
+            shown,
+            on,
+            speaker,
+            once,
+            ..
+        } if once && store.restates(&one(person.clone())?, at_unix_ms, &text, old, &shown)? => {
+            match store.remember_on_by(
+                &one(person)?,
+                at_unix_ms,
+                &text,
+                &source_ids,
+                true,
+                on.as_deref(),
+                speaker.as_deref(),
+            )? {
+                (id, true) => json!({"ok":true,"id":id,"existing":true}),
+                (id, false) => value(Response::Added { id }),
+            }
+        }
         Request::Remember {
             person,
             at_unix_ms,
@@ -1665,8 +1695,10 @@ mod tests {
     }
 
     /// #2510 (reviewer-lead P3): `replaces` with `once` is a correction,
-    /// never deduplicated, even with the very words it replaces; and a
-    /// `replaces` that is no store id is refused with nothing written.
+    /// never deduplicated against another kept thing in the same words; and
+    /// a `replaces` that is no store id is refused with nothing written. In
+    /// the very words of the kept thing it names, it is that kept thing said
+    /// again (C81, 5 Nov), never a new version.
     #[test]
     fn a_correction_with_once_is_never_deduplicated_and_an_id_out_of_range_is_refused() {
         const MAI: &str = "p-0123456789abcdef";
@@ -1699,20 +1731,38 @@ mod tests {
                 "{replaces}"
             );
         }
-        // The same words, once: the replaces arm comes first, so it is a new
-        // version, not the existing one.
-        let (line, wrote) = ask(json!({"op":"remember","person":MAI,"at_unix_ms":NOW+1,
-            "text":violet,"once":true,"replaces":1,"shown":[1]}));
-        assert_eq!(line, json!({"ok":true,"id":2,"replaced":1}));
-        assert!(wrote);
+        // The very words of the kept thing it names, once: that kept thing
+        // said again (C81), no new version. Not shown, it is refused as any
+        // correction is.
+        let (line, _) = ask(json!({"op":"remember","person":MAI,"at_unix_ms":NOW+1,
+            "text":"her favourite colour is  VIOLET","once":true,"replaces":1,"shown":[]}));
+        assert_eq!(line["error"], "refused", "{line}");
+        let (line, _) = ask(json!({"op":"remember","person":MAI,"at_unix_ms":NOW+1,
+            "text":"her favourite colour is  VIOLET","once":true,"replaces":1,"shown":[1]}));
+        assert_eq!(line, json!({"ok":true,"id":1,"existing":true}));
         let kept = ask(json!({"op":"kept","person":MAI})).0;
         assert_eq!(kept["entries"].as_array().unwrap().len(), 1, "{kept}");
-        assert_eq!(kept["entries"][0]["id"], 2);
-        // Without replaces, once finds the new version.
+        assert_eq!(kept["entries"][0]["id"], 1);
+        // Without `once`, as before: a new version.
+        let (line, wrote) = ask(json!({"op":"remember","person":MAI,"at_unix_ms":NOW+1,
+            "text":violet,"replaces":1,"shown":[1]}));
+        assert_eq!(line, json!({"ok":true,"id":2,"replaced":1}));
+        assert!(wrote);
+        // In the words of another kept thing, once: still a correction of
+        // the one it names, never that other one.
+        let teal = "Her favourite colour is teal.";
         assert_eq!(
-            ask(json!({"op":"remember","person":MAI,"at_unix_ms":NOW+2,"text":violet,"once":true}))
-                .0,
-            json!({"ok":true,"id":2,"existing":true})
+            ask(json!({"op":"remember","person":MAI,"at_unix_ms":NOW+2,"text":teal})).0,
+            json!({"ok":true,"id":3})
+        );
+        let (line, wrote) = ask(json!({"op":"remember","person":MAI,"at_unix_ms":NOW+3,
+            "text":teal,"once":true,"replaces":2,"shown":[2,3]}));
+        assert_eq!(line, json!({"ok":true,"id":4,"replaced":2}));
+        assert!(wrote);
+        // Without replaces, once finds the newest version.
+        assert_eq!(
+            ask(json!({"op":"remember","person":MAI,"at_unix_ms":NOW+4,"text":teal,"once":true})).0,
+            json!({"ok":true,"id":3,"existing":true})
         );
     }
 

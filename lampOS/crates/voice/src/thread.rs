@@ -128,6 +128,12 @@ struct Exchange {
     /// file (#1505): a thread read back tells its exchanges in words only,
     /// as before.
     calls: Vec<Called>,
+    /// A room's exchange whose line kept or corrected a thing in this
+    /// known person's memory by the one-face rule ([`Thread::kept_for`]):
+    /// told in their later turns beside the room's lines of their own
+    /// conversation ([`Thread::recent_with_room_lines`]). Not kept in the
+    /// file.
+    kept_for: Option<String>,
 }
 
 /// One function a turn ran ([`Thread::called`]): its name, and the
@@ -189,6 +195,9 @@ pub struct Thread {
     /// ([`Self::called`]), the newest [`LINES`] requests': each goes to its
     /// exchange when it opens.
     calling: VecDeque<(u64, Vec<Called>)>,
+    /// The newest [`LINES`] requests a one-face keep wrote for a known
+    /// person before their exchange opened ([`Self::kept_for`]).
+    kept_for: VecDeque<(u64, String)>,
     /// The newest [`LINES`] requests a connected service's read answered
     /// in ([`Self::private_for`]): their lamp's words are never kept.
     private: VecDeque<u64>,
@@ -367,6 +376,7 @@ impl Thread {
             quoted: None,
             lines: VecDeque::new(),
             calling: VecDeque::new(),
+            kept_for: VecDeque::new(),
             private: VecDeque::new(),
             closed_at: None,
             closed_request: None,
@@ -663,6 +673,7 @@ impl Thread {
                     add(&mut written, &text, PERSON_BYTES);
                     written
                 }),
+                kept_for: None,
                 calls: Vec::new(),
             });
         }
@@ -891,6 +902,14 @@ impl Thread {
                 .and_then(|at| self.calling.remove(at))
                 .map(|(_, calls)| calls)
                 .unwrap_or_default();
+            // A room's line only: a person's own exchange is theirs already.
+            let kept_for = self
+                .kept_for
+                .iter()
+                .position(|(held, _)| *held == request)
+                .and_then(|at| self.kept_for.remove(at))
+                .map(|(_, person)| person)
+                .filter(|_| whose.is_none());
             self.exchanges.push_back(Exchange {
                 request,
                 at: now,
@@ -905,6 +924,7 @@ impl Thread {
                 whose,
                 written,
                 calls,
+                kept_for,
             });
         }
         let private = self.private.contains(&request);
@@ -967,6 +987,51 @@ impl Thread {
                 self.calling.push_back((request, calls));
             }
         }
+    }
+
+    /// Request `request`'s line, the room's, kept or corrected a thing in
+    /// `person`'s memory by the one-face rule (`LAMP_PERSON_SCOPE_ONE_FACE`,
+    /// [`crate::memory_scope::ScopeLease::take_by_one_face`]): its exchange
+    /// is told in their later turns too, as said in the room
+    /// ([`Self::recent_with_room_lines`]), so what their memory now holds
+    /// is never older than what their history says (lamp-06c1, 5 Nov, the
+    /// bike lock: the correction to 315 was filed only as the room's, and
+    /// Olivia's next turn, told her own thread's 486, said 486). A
+    /// request whose exchange is not open yet is held for it; one opened as
+    /// a person's own is theirs already, and nothing changes.
+    pub fn kept_for(&mut self, request: u64, person: &str) {
+        if let Some(exchange) = self
+            .exchanges
+            .iter_mut()
+            .rev()
+            .find(|exchange| exchange.request == request)
+        {
+            if exchange.whose.is_none() {
+                exchange.kept_for = Some(person.to_owned());
+            }
+            return;
+        }
+        self.kept_for.retain(|(held, _)| *held != request);
+        if self.kept_for.len() == LINES {
+            self.kept_for.pop_front();
+        }
+        self.kept_for.push_back((request, person.to_owned()));
+    }
+
+    /// Whose keep request `request`'s room's line was marked as
+    /// ([`Self::kept_for`]), held or on its exchange: for tests.
+    #[cfg(test)]
+    pub(crate) fn kept_for_of(&self, request: u64) -> Option<&str> {
+        self.kept_for
+            .iter()
+            .find(|(held, _)| *held == request)
+            .map(|(_, person)| person.as_str())
+            .or_else(|| {
+                self.exchanges
+                    .iter()
+                    .find(|exchange| exchange.request == request)
+                    .and_then(|exchange| exchange.kept_for.as_deref())
+            })
     }
 
     /// The exchanges that are over and were not given out before, for the
@@ -1072,6 +1137,7 @@ impl Thread {
         self.exchanges.clear();
         self.lines.clear();
         self.calling.clear();
+        self.kept_for.clear();
         self.note = None;
         self.heard.clear();
         self.heard_at = None;
@@ -1585,7 +1651,11 @@ impl Thread {
                 let theirs = exchange.whose.as_deref() == Some(person);
                 let rooms =
                     exchange.whose.is_none() && first_theirs.is_some_and(|first| *index >= first);
-                (theirs || rooms)
+                // A room's line that kept for them by the one-face rule
+                // ([`Self::kept_for`]), in this conversation or an earlier one.
+                let kept_theirs =
+                    exchange.whose.is_none() && exchange.kept_for.as_deref() == Some(person);
+                (theirs || rooms || kept_theirs)
                     && now.saturating_duration_since(exchange.at) <= within
                     && (exchange.lamp.chars().any(char::is_alphanumeric) || exchange.unheard)
             })
@@ -3551,6 +3621,71 @@ mod tests {
         assert!(!given.is_empty());
         assert!(given.iter().all(|request| request % 3 != 0), "{given:?}");
         assert_eq!(given.len(), EXCHANGES - EXCHANGES / 3, "{given:?}");
+    }
+
+    /// The bike lock (lamp-06c1, 5 Nov): a room's line that corrected A's
+    /// kept thing by the one-face rule ([`Thread::kept_for`]) is told in
+    /// A's later turn, after A's own older exchanges and marked as the
+    /// room's, though another conversation; held when marked before its
+    /// exchange opens. Never B's, never the room's own turn's change, and a
+    /// person's own exchange is never marked.
+    #[test]
+    fn a_one_face_keep_on_a_rooms_line_is_told_in_their_later_turns() {
+        let a = crate::remember::person_id("A");
+        let b = crate::remember::person_id("B");
+        let t0 = Instant::now();
+        let at = |seconds: u64| t0 + Duration::from_secs(seconds);
+        let lamps = |recent: &[Recent]| -> Vec<(String, bool)> {
+            recent
+                .iter()
+                .map(|said| (said.lamp.clone(), said.room))
+                .collect()
+        };
+        let mut thread = Thread::new();
+        thread.lamp_for(1, "Kept: 486.", at(0), Some(&a));
+        // Two minutes on, no conversation going on: the correction is the
+        // room's line, its keep A's. Marked before any words (the keep runs
+        // first), and once more after, changing nothing.
+        thread.lamp_for(2, "Room talk.", at(60), None);
+        thread.kept_for(3, &a);
+        thread.lamp_for(3, "Changed to 315.", at(120), None);
+        thread.kept_for(3, &a);
+        // A's own line, marked: theirs already.
+        thread.lamp_for(4, "A again.", at(125), Some(&a));
+        thread.kept_for(4, &a);
+        let told = thread.recent_with_room_lines(&a, at(250), REMEMBERED_FOR, EXCHANGES);
+        assert_eq!(
+            lamps(&told),
+            [
+                ("Kept: 486.".to_owned(), false),
+                ("Changed to 315.".to_owned(), true),
+                ("A again.".to_owned(), false),
+            ]
+        );
+        assert!(
+            thread
+                .recent_with_room_lines(&b, at(250), REMEMBERED_FOR, EXCHANGES)
+                .is_empty(),
+            "never B's"
+        );
+        let room = thread.recent_for(None, at(250), REMEMBERED_FOR, EXCHANGES);
+        assert_eq!(
+            lamps(&room),
+            [
+                ("Room talk.".to_owned(), false),
+                ("Changed to 315.".to_owned(), false)
+            ],
+            "the room's turn as before"
+        );
+        // A forget drops it, and what was held for a line not yet open.
+        thread.kept_for(9, &a);
+        thread.forget();
+        thread.lamp_for(9, "After the forget.", at(260), None);
+        assert!(
+            thread
+                .recent_with_room_lines(&a, at(270), REMEMBERED_FOR, EXCHANGES)
+                .is_empty()
+        );
     }
 
     /// #4339: A is in a conversation going on only while the newest
