@@ -10,7 +10,9 @@ needs = ["eyes", "body", "voice"]
 # Installable: its owner chooses it (`lamp-skills install`), and it is not in
 # the product's install (`install::NOT_PRODUCT_SKILLS`) until tried on a lamp.
 kind = "installable"
-version = "1.0.0"
+# 1.0.1: the `[present.budget]` below (#5207, first in build 10147), so the
+# Store's package lets an installed lamp see it; 1.0.0 had none.
+version = "1.0.1"
 # Once at lunch and once at dinner, counted from the local midnight.
 most_a_day = 2
 

@@ -543,8 +543,15 @@ fn every_skill_folder_says_its_kind_and_version() {
             "who-was-here"
         ]
     );
+    // Meal check is 1.0.1 for its `[present.budget]` (#5207), so the Store's
+    // package reaches a lamp that has 1.0.0.
     for skill in &skills {
-        assert_eq!(skill.version.as_deref(), Some("1.0.0"), "{}", skill.name);
+        let version = if skill.name == "meal-check" {
+            "1.0.1"
+        } else {
+            "1.0.0"
+        };
+        assert_eq!(skill.version.as_deref(), Some(version), "{}", skill.name);
     }
     assert_eq!(
         skills
