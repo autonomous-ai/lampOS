@@ -188,6 +188,11 @@ it starts, so a change takes effect at the voice's next start. Writing it
 from the app (`lamp-cloud`, root's change helper) is not built yet: its
 contract is agreed on #4473 and #4474 first.
 
+**The owner's chosen voice wins over the language's** (#5394,
+`LAMP_CHOSEN_VOICE=on`, [chosen-voice.md](chosen-voice.md)): with a voice
+kept from the app, ElevenLabs speaks in it, with the language's model; the
+owner's character words are told after the character and the language's rule.
+
 **English is unchanged.** No variable, no file, an empty file, `en` or a
 value this build doesn't know (said in the journal) is English: the
 speech-to-text query, the character, the voice and its model are

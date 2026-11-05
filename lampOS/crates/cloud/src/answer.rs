@@ -266,7 +266,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 58] = [
+pub const KINDS: [(&str, Switch); 60] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -301,6 +301,8 @@ pub const KINDS: [(&str, Switch); 58] = [
     (crate::settings::KINDS[3], SETTINGS),
     (crate::settings::PLACE_KINDS[0], PLACE),
     (crate::settings::PLACE_KINDS[1], PLACE),
+    (crate::settings::VOICE_KINDS[0], VOICE),
+    (crate::settings::VOICE_KINDS[1], VOICE),
     ("faces.add_photo", |lamp| lamp.photos().is_some()),
     ("face.list", |lamp| lamp.faces().is_some()),
     ("face.remove", |lamp| lamp.faces().is_some()),
@@ -354,6 +356,7 @@ const SHARE: Switch = |lamp| lamp.skills().is_some() && lamp.share().is_some();
 const KEYS: Switch = |lamp| lamp.changes().is_some_and(|c| c.keys_on());
 const SETTINGS: Switch = |lamp| lamp.changes().is_some();
 const PLACE: Switch = |lamp| lamp.changes().is_some_and(|c| c.place_on());
+const VOICE: Switch = |lamp| lamp.changes().is_some_and(|c| c.voice_on());
 /// The switch, and lamp-services there to ask.
 const SERVICES: Switch = |lamp| lamp.services().is_some_and(|s| s.here());
 /// The socket given, and lamp-control there to ask.
@@ -529,6 +532,15 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             let line = crate::settings::place_line(kind, data)?;
+            changes.start(kind, line);
+            Ok(None)
+        }
+        // The owner's chosen voice and character words (#5394), with
+        // LAMP_CHOSEN_VOICE=on too: checked here, then to root's helper as
+        // the names go, which checks them again and keeps them.
+        kind if crate::settings::VOICE_KINDS.contains(&kind) && on(lamp, kind) => {
+            let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
+            let line = crate::settings::voice_line(kind, data)?;
             changes.start(kind, line);
             Ok(None)
         }
@@ -1343,6 +1355,21 @@ pub mod tests {
                     "language.set",
                     "owner.place",
                     "owner.place.clear",
+                ],
+            ),
+            (
+                "chosen voice",
+                |f| {
+                    f.changes =
+                        changes_of(false, false).map(|changes| changes.taking_the_voice(true))
+                },
+                &[
+                    "timezone.set",
+                    "person.name.set",
+                    "device.rename",
+                    "language.set",
+                    "voice.set",
+                    "character.set",
                 ],
             ),
             (
