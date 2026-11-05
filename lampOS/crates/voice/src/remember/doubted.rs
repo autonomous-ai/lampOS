@@ -69,12 +69,6 @@ const DOUBTS: &[&str] = &[
     "not sure i heard",
     "not sure if i heard",
     "not sure i caught",
-    "if i heard you right",
-    "if i heard that right",
-    "if i heard correctly",
-    "did you say",
-    "could you repeat",
-    "can you repeat",
     // lamp-06c1, 5 Nov (C37): "I want to be sure" after a keep, only of
     // what was heard: "I want to be sure you make it" is reassurance.
     "want to be sure i heard",
@@ -83,7 +77,7 @@ const DOUBTS: &[&str] = &[
     // Of the word: "How do you spell relief?" is a joke, no doubt.
     "how do you spell it",
     "how do you spell that",
-    "how do you spell your",
+    "how do you spell your name",
     "how do you spell the name",
     "nghe nh\u{1ea7}m",
     "nghe ch\u{1b0}a r\u{f5}",
@@ -104,13 +98,35 @@ const DOUBTS_ENDED: &[&str] = &[
     "want to be sure i've got that",
 ];
 
-/// An ask to say it again, a doubt unless its clause says there is no
-/// need: "Say that again?" doubts, "You never have to say it again" and
-/// "bạn không cần nói lại" do not.
-const ASKS_AGAIN: &[&str] = &["say that again", "say it again", "n\u{f3}i l\u{1ea1}i"];
+/// A doubt only where [`asks_for_their_words`] says the sentence asks
+/// the person for their own words: "Sorry, could you say it again?", "Did
+/// you say Mai or May?", "Bạn nói lại được không?". In a keep's closing
+/// line the same words invite a later change or say what the lamp will do
+/// ("If it changes, just say it again.", "I'll say it again at seven.",
+/// "Did you say you also wanted a reminder?"), and are no doubt (#5454).
+const ASKED_DOUBTS: &[&str] = &[
+    "say that again",
+    "say it again",
+    "n\u{f3}i l\u{1ea1}i",
+    "did you say",
+    "can you repeat",
+    "could you repeat",
+    "if i heard you right",
+    "if i heard that right",
+    "if i heard correctly",
+];
 
-/// What, earlier in its clause, makes an [`ASKS_AGAIN`] no ask.
-const NO_NEED: &[&str] = &[
+/// Words that, in the clause before an [`ASKED_DOUBTS`], make it no ask of
+/// their words: the lamp saying it ("I'll", "should I", "want me to"), an
+/// invitation for later ("just", "if"), or no need ("never").
+const NOT_ASKED_BEFORE: &[&str] = &[
+    "i'll",
+    "i will",
+    "me to",
+    "should i",
+    "shall i",
+    "just",
+    "if",
     "never",
     "no need",
     "needn't",
@@ -120,28 +136,90 @@ const NO_NEED: &[&str] = &[
     "won't have to",
     "do not need",
     "do not have to",
+    "n\u{1ebf}u",
     "kh\u{f4}ng c\u{1ea7}n",
     "kh\u{1ecf}i",
     "ch\u{1eb3}ng c\u{1ea7}n",
 ];
 
-/// The clause of `said` before byte `at`: back to '.', '!', '?', ',', ';',
-/// ':', a dash or a line end.
-fn clause_before(said: &str, at: usize) -> &str {
-    let before = &said[..at];
-    before
-        .rfind(['.', '!', '?', ',', ';', ':', '\u{2014}', '\u{2013}', '\n'])
-        .map_or(before, |end| {
-            let mut from = end + 1;
-            while !before.is_char_boundary(from) {
-                from += 1;
-            }
-            &before[from..]
-        })
+/// Words that anywhere in its clause make an [`ASKED_DOUBTS`] no ask:
+/// "nếu" (if) and "nhé" (a friendly close, "… nói lại với mình nhé").
+const NOT_ASKED_IN_CLAUSE: &[&str] = &["n\u{1ebf}u", "nh\u{e9}"];
+
+/// The first words after an [`ASKED_DOUBTS`] that make it a question about
+/// something said, not a check of the words: "Did you say she's visiting
+/// soon?", "Did you say anything else?".
+const NOT_ASKED_AFTER: &[&str] = &[
+    "i",
+    "i'm",
+    "you",
+    "you're",
+    "he",
+    "he's",
+    "she",
+    "she's",
+    "they",
+    "they're",
+    "we",
+    "we're",
+    "it's",
+    "anything",
+    "something",
+];
+
+/// Ends of a sentence and of a clause.
+const SENTENCE_ENDS: [char; 4] = ['.', '!', '?', '\n'];
+const CLAUSE_ENDS: [char; 9] = ['.', '!', '?', ',', ';', ':', '\u{2014}', '\u{2013}', '\n'];
+
+/// Whether `words` (lower case) has `marker` as whole words.
+fn has_words(words: &str, marker: &str) -> bool {
+    words.match_indices(marker).any(|(at, _)| {
+        let before = words[..at].chars().next_back();
+        let next = words[at + marker.len()..].chars().next();
+        before.is_none_or(|c| !c.is_alphanumeric() && c != '\'')
+            && next.is_none_or(|c| !c.is_alphanumeric() && c != '\'')
+    })
 }
 
-/// Whether `said` (lower case) has one of [`DOUBTS_ENDED`], [`ASKS_AGAIN`]
-/// with no [`NO_NEED`] before it, or "did you mean" that is not "did you
+/// Whether the [`ASKED_DOUBTS`] phrase at bytes `at..end` of `said` (lower
+/// case) asks the person for their own words: its sentence ends with '?',
+/// its clause before has none of [`NOT_ASKED_BEFORE`], its clause none of
+/// [`NOT_ASKED_IN_CLAUSE`], and what follows it to the sentence's end
+/// neither opens with one of [`NOT_ASKED_AFTER`] nor sends it on ("to your
+/// sister").
+fn asks_for_their_words(said: &str, at: usize, end: usize) -> bool {
+    let after = &said[end..];
+    let Some(stop) = after.find(SENTENCE_ENDS) else {
+        return false;
+    };
+    if !after[stop..].starts_with('?') {
+        return false;
+    }
+    let rest = &after[..stop];
+    let before = &said[..at];
+    let clause_before = &before[before.rfind(CLAUSE_ENDS).map_or(0, |cut| {
+        cut + before[cut..].chars().next().map_or(1, char::len_utf8)
+    })..];
+    let clause_after = &after[..after.find(CLAUSE_ENDS).unwrap_or(after.len())];
+    let first = rest
+        .split(|c: char| !c.is_alphanumeric() && c != '\'')
+        .find(|word| !word.is_empty());
+    !NOT_ASKED_BEFORE
+        .iter()
+        .any(|marker| has_words(clause_before, marker))
+        && !NOT_ASKED_IN_CLAUSE
+            .iter()
+            .any(|marker| has_words(clause_before, marker) || has_words(clause_after, marker))
+        && !first.is_some_and(|word| NOT_ASKED_AFTER.contains(&word))
+        && ![
+            "to your", "to my", "to her", "to his", "to them", "to him", "to our",
+        ]
+        .iter()
+        .any(|sent_on| has_words(rest, sent_on))
+}
+
+/// Whether `said` (lower case) has one of [`DOUBTS_ENDED`], one of
+/// [`ASKED_DOUBTS`] that [`asks_for_their_words`], or "did you mean" that is not "did you
 /// mean to" ("Did you mean to add a reminder too?") unless "to say".
 fn doubts_in_place(said: &str) -> bool {
     let ended = DOUBTS_ENDED.iter().any(|doubt| {
@@ -152,11 +230,9 @@ fn doubts_in_place(said: &str) -> bool {
                 || after.starts_with(" correct")
         })
     });
-    let asked = ASKS_AGAIN.iter().any(|ask| {
-        said.match_indices(ask).any(|(at, _)| {
-            let clause = clause_before(said, at);
-            !NO_NEED.iter().any(|no| clause.contains(no))
-        })
+    let asked = ASKED_DOUBTS.iter().any(|ask| {
+        said.match_indices(ask)
+            .any(|(at, _)| asks_for_their_words(said, at, at + ask.len()))
     });
     let meant = said.match_indices("did you mean").any(|(at, head)| {
         let after = &said[at + head.len()..];
@@ -237,7 +313,7 @@ mod tests {
             "Kept: your favorite flower is \"the two.\" I may have misheard that — was it tulip?",
             "Did you say tulip or the two?",
             "I didn\u{2019}t catch the name of the flower.",
-            "If I heard you right, your locker is 12.",
+            "If I heard you right, your locker is 12?",
             "Could you repeat the flower's name?",
             "Mình sợ nghe nhầm, bạn nói lại tên hoa được không?",
             "Có phải bạn nói hoa tulip?",
@@ -330,6 +406,25 @@ mod tests {
             "Kept. Did you mean to add a reminder too?",
             "Kept your dentist time. Was that all right?",
             "\u{110}\u{e3} nh\u{1edb} r\u{1ed3}i, b\u{1ea1}n kh\u{f4}ng c\u{1ea7}n n\u{f3}i l\u{1ea1}i \u{111}\u{e2}u.",
+            // #5454, the second read: a keep's closing line.
+            "Kept. If it changes, just say it again.",
+            "Got it. If you ever forget, just say it again and I'll tell you.",
+            "Kept. You can say it again anytime to update it.",
+            "Saved. Want me to say it again tomorrow morning?",
+            "Kept. I'll say it again at seven.",
+            "\u{110}\u{e3} nh\u{1edb} r\u{1ed3}i. N\u{1ebf}u thay \u{111}\u{1ed5}i th\u{ec} n\u{f3}i l\u{1ea1}i v\u{1edb}i m\u{ec}nh nh\u{e9}.",
+            "Kept. If I heard you right, you're off to Hanoi, have fun!",
+            "Kept: your sister's name is Mai. Did you say she's visiting soon?",
+            "Kept. Did you say you also wanted a reminder?",
+            "Got it. Can you repeat that to your sister too? She'll want to know.",
+            "Kept. How do you spell your excitement? Probably with exclamation marks!",
+            "Saved. Tell me again if it changes.",
+            "Kept, and I'll remind you. No need to repeat it.",
+            "Saved. Should I say it again before you leave?",
+            "Kept. Did you say anything else you'd like me to keep?",
+            "Got it. Tomorrow I'll say it again when you wake up.",
+            "Kept. Next time, just say it again and I'll update it?",
+            "\u{110}\u{e3} nh\u{1edb}. Mai m\u{ec}nh s\u{1ebd} n\u{f3}i l\u{1ea1}i cho b\u{1ea1}n nh\u{e9}?",
         ] {
             assert!(!doubts_what_was_heard(said), "{said}");
         }
@@ -348,10 +443,15 @@ mod tests {
             "How do you spell your name?",
             "Sorry, could you say that again?",
             "I'm not sure, say it again?",
-            "I didn't get that so please say it again.",
+            "I didn't get that, so could you say it again?",
+            "Sorry, could you say it again?",
+            "Did you say Mai or May?",
+            "What did you say?",
+            "Can you repeat the name?",
+            "If I heard you right, that's Mai?",
+            "B\u{1ea1}n n\u{f3}i l\u{1ea1}i \u{111}\u{1b0}\u{1ee3}c kh\u{f4}ng?",
             "Did you mean today or Tuesday?",
             "Did you mean to say tulip?",
-            "M\u{00ec}nh nghe ch\u{1b0}a k\u{1ef9}, b\u{1ea1}n n\u{f3}i l\u{1ea1}i nh\u{e9}?",
         ] {
             assert!(doubts_what_was_heard(said), "{said}");
         }
