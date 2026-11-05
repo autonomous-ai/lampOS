@@ -180,9 +180,9 @@ Environment=LAMP_SAID_AS_HEARD=on
 # Known gap, accepted: the lamp's own echo can commit as a cut-in with 0 words and be asked (7 of 15 stories on
 # lamp-06c1, 3 Nov, #4938); a later echo fix from duplex makes those asks fewer.
 Environment=LAMP_CUT_IN_WORDLESS_ASKS=on
-# Such a cut in a busy room says "Anyway," and goes on from the sentence it cut; another within a minute says
-# "Oops, cut off again. Anyway," and goes on; a third says why and pauses (the memory owner's call, 5 Nov).
-Environment=LAMP_CUT_IN_WORDLESS_RESUMES=on
+# LAMP_CUT_IN_WORDLESS_RESUMES (a busy room's cut goes on from the sentence it cut) is off for the candidate
+# (the PM, 6 Nov): its lamp check on lamp-06c1 came back FAIL, partial, with the busy room and the second and third
+# cuts never reached (#5430). It comes back on once that path passes on a lamp.
 Environment=LAMP_SECOND_SAID_ONCE=on
 # A light, volume or timer turn answered at once with the acting part's own result, a single ask ending there, in
 # English only (#2135, #4700): on lamp-4ace on 31 Oct (d06603109f) off and on alternating, timers and reminders 2.06-2.20 s
@@ -528,13 +528,9 @@ Environment=LAMP_MEMORY_FORGET_ABOUT=on
 # Recall's second version (#2176), with lamp-memory from the same build: on lamp-06c1 on 4 Nov (build 10012) "my"
 # alone found nothing (5 before), the drink order was found, and "last week" got a span answer (span=true).
 Environment=LAMP_MEMORY_RECALL_V2=on
-# Tiers' ideas in Days (the memory owner's 3 Nov plan, P1 to P4; docs/memory-days.md): a correction said in plain
-# talk comes back ahead of the line it corrects (NEWER_FIRST), a maybe or a plan comes back marked as one (STRENGTH),
-# and the session note keeps the person's tastes and kept facts first (PROFILE). The memory owner's call on 5 Nov.
-# Each needs a lamp-memory from the same build, which a product install ships.
-Environment=LAMP_MEMORY_NEWER_FIRST=on
-Environment=LAMP_MEMORY_STRENGTH=on
-Environment=LAMP_MEMORY_PROFILE=on
+# Tiers' ideas in Days (LAMP_MEMORY_NEWER_FIRST, LAMP_MEMORY_STRENGTH, LAMP_MEMORY_PROFILE; docs/memory-days.md) are
+# off for the candidate (the PM, 6 Nov): they merged in train 664 with their played check written but never posted
+# (#5331). They come back on once a played check passes.
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
