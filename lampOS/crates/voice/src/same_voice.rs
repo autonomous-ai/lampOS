@@ -653,6 +653,9 @@ pub struct Voices<P: Printer> {
     /// ([`FOR_ENVIRONMENT`], [`Self::for_services_only`]): a late print in
     /// another voice ends no conversation.
     for_services: bool,
+    /// A line is asked for only while this says yes
+    /// ([`Self::asking_only_while`]): with none, always.
+    asks_while: Option<Box<dyn Fn() -> bool + Send>>,
 }
 
 impl<P: Printer> Voices<P> {
@@ -673,7 +676,23 @@ impl<P: Printer> Voices<P> {
             lengths: VecDeque::new(),
             sure_of_another: None,
             for_services: false,
+            asks_while: None,
         }
+    }
+
+    /// A line is asked for its print only while `open` says yes, as its
+    /// first samples are all heard or it ends: one heard while it says no
+    /// is dropped, unprinted, and the child is asked nothing
+    /// (`LAMP_SAME_VOICE_FOR=services`: only while a service is linked,
+    /// `crate::services::Linked`, the reader's P3 on #5293).
+    pub fn asking_only_while(mut self, open: impl Fn() -> bool + Send + 'static) -> Self {
+        self.asks_while = Some(Box::new(open));
+        self
+    }
+
+    /// Whether a line may be asked for now ([`Self::asking_only_while`]).
+    fn asking(&self) -> bool {
+        self.asks_while.as_ref().is_none_or(|open| open())
     }
 
     /// The prints are for the linked services' judging only, with `on`
@@ -780,6 +799,10 @@ impl<P: Printer> Voices<P> {
         let Some(clip) = self.clip.take() else {
             return;
         };
+        if !self.asking() {
+            self.unprinted(clip.request);
+            return;
+        }
         if self.printer.ask(clip.request, &clip.samples) {
             if self.asked.len() == KEPT {
                 self.asked.pop_front();
@@ -859,7 +882,7 @@ impl<P: Printer> Voices<P> {
             || self
                 .clip
                 .as_ref()
-                .is_some_and(|clip| clip.request == request)
+                .is_some_and(|clip| clip.request == request && self.asking())
     }
 
     /// How like the conversation's voice the line `request` is, when both
@@ -2076,6 +2099,49 @@ exec sleep 30"#,
                 .iter()
                 .any(|line| line.contains("for the services only")),
         );
+    }
+
+    /// A line heard while the gate says no is asked for nothing, and none
+    /// is coming; one heard once it says yes is printed, the gate read as
+    /// the line is asked for, not as it begins (the reader's P3 on #5293).
+    #[test]
+    fn a_line_is_asked_for_only_while_the_gate_is_open() {
+        let open = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let gate = open.clone();
+        let mut voices = Voices::new(StandIn::default())
+            .for_services_only(true)
+            .asking_only_while(move || gate.load(std::sync::atomic::Ordering::SeqCst));
+        voices.began(1, true);
+        voices.heard(1, &[1; 320]);
+        assert!(!voices.print_coming(1), "none coming while closed");
+        voices.ended(1);
+        said_by(&mut voices, 1, 1);
+        assert!(voices.printer.asked.is_empty(), "no print asked");
+        assert_eq!(voices.print_of(1), None);
+        // Opened after the line began, before its samples are all heard.
+        voices.began(2, true);
+        voices.heard(2, &[1; 320]);
+        open.store(true, std::sync::atomic::Ordering::SeqCst);
+        for _ in 0..150 {
+            voices.heard(2, &[1; 320]);
+        }
+        voices.ended(2);
+        let asked = |voices: &Voices<StandIn>| -> Vec<u64> {
+            voices
+                .printer
+                .asked
+                .iter()
+                .map(|(request, _)| *request)
+                .collect()
+        };
+        assert_eq!(asked(&voices), [2], "printed once open");
+        assert!(voices.print_of(2).is_some());
+        said_by(&mut voices, 3, 1);
+        assert_eq!(asked(&voices), [2, 3]);
+        // Closed again: nothing asked.
+        open.store(false, std::sync::atomic::Ordering::SeqCst);
+        said_by(&mut voices, 4, 1);
+        assert_eq!(asked(&voices), [2, 3]);
     }
 
     fn said_by(voices: &mut Voices<StandIn>, request: u64, voice: i16) {

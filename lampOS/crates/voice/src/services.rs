@@ -1104,6 +1104,137 @@ fn ask(folder: &Path, call: &ToolCall, deadline: Duration) -> (Value, bool) {
     }
 }
 
+/// How long [`Linked`]'s answer is taken as it was: a line begun later
+/// asks again.
+pub const LINKED_FRESH: Duration = Duration::from_secs(1);
+/// The longest [`Linked`] waits for `lamp-services` to say what is linked.
+const LINKED_DEADLINE: Duration = Duration::from_millis(500);
+
+/// Whether any service is linked, for the same-voice child's prints
+/// (`LAMP_SAME_VOICE_FOR=services`): a heard line is printed only while one
+/// is (the reader's P3 on #5293), so a lamp nobody linked anything on makes
+/// no voice print of anyone in the room.
+///
+/// Known by asking `lamp-services` [`CONNECTED`] on the folder's socket, as
+/// the voice already may: no new file or right. Asked off the line's path,
+/// on a thread of its own, when the worker starts and as a line begins
+/// ([`Self::check`]), at most once in [`LINKED_FRESH`]; the line's print is
+/// asked for 1.2 s or more later, by when the answer is in, so the first
+/// line after a link, the one a write is prepared in, is printed, and the
+/// first after the last unlink is not. Until `lamp-services` first answers,
+/// nothing is linked; an answer with no list (busy, refused, no socket)
+/// changes nothing.
+pub struct Linked {
+    folder: PathBuf,
+    linked: std::sync::atomic::AtomicBool,
+    /// When it was last asked, and whether that ask is still going.
+    asked: std::sync::Mutex<(Option<Instant>, bool)>,
+}
+
+impl Linked {
+    /// For the services' tools folder, asked at once.
+    pub fn new(folder: PathBuf) -> std::sync::Arc<Self> {
+        let linked = std::sync::Arc::new(Self {
+            folder,
+            linked: std::sync::atomic::AtomicBool::new(false),
+            asked: std::sync::Mutex::new((None, false)),
+        });
+        linked.check();
+        linked
+    }
+
+    /// Whether a service was linked when `lamp-services` last said.
+    pub fn now(&self) -> bool {
+        self.linked.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Ask again, unless asked within [`LINKED_FRESH`] or still asking;
+    /// never waits.
+    pub fn check(self: &std::sync::Arc<Self>) {
+        let now = Instant::now();
+        {
+            let Ok(mut asked) = self.asked.lock() else {
+                return;
+            };
+            let (at, asking) = *asked;
+            if asking || at.is_some_and(|at| now.duration_since(at) < LINKED_FRESH) {
+                return;
+            }
+            *asked = (Some(now), true);
+        }
+        let linked = self.clone();
+        let started = std::thread::Builder::new()
+            .name("services-linked".into())
+            .spawn(move || {
+                let told = crate::tools::exchange(
+                    &linked.folder.join(crate::tools::CALL_SOCKET),
+                    &json!({"op":"call","name":CONNECTED}),
+                    LINKED_DEADLINE,
+                );
+                if let Some(any) = told.as_ref().and_then(any_linked) {
+                    linked.kept(any);
+                }
+                if let Ok(mut asked) = linked.asked.lock() {
+                    asked.1 = false;
+                }
+            });
+        if started.is_err()
+            && let Ok(mut asked) = self.asked.lock()
+        {
+            asked.1 = false;
+        }
+    }
+
+    /// `linked` kept, said once as it changes.
+    fn kept(&self, linked: bool) {
+        if self
+            .linked
+            .swap(linked, std::sync::atomic::Ordering::SeqCst)
+            != linked
+        {
+            eprintln!(
+                "lamp-voice: {}",
+                if linked {
+                    "a service is linked: each heard line's voice is printed, for a send's and a full read's voice check"
+                } else {
+                    "no service is linked: no heard line's voice is printed"
+                }
+            );
+        }
+    }
+
+    /// One for a test, `linked` as told, never asking.
+    #[cfg(test)]
+    pub(crate) fn told(linked: bool) -> std::sync::Arc<Self> {
+        std::sync::Arc::new(Self {
+            folder: PathBuf::new(),
+            linked: std::sync::atomic::AtomicBool::new(linked),
+            asked: std::sync::Mutex::new((Some(Instant::now() + LINKED_FRESH * 3_600), false)),
+        })
+    }
+
+    /// A test's link made or removed.
+    #[cfg(test)]
+    pub(crate) fn set(&self, linked: bool) {
+        self.linked
+            .store(linked, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+/// From [`CONNECTED`]'s answer, `{"ok":true,"result":{"connected":[...]}}`:
+/// whether one link in it is usable (not `expired`); `None` without a list.
+fn any_linked(told: &Value) -> Option<bool> {
+    if told.get("ok").and_then(Value::as_bool) != Some(true) {
+        return None;
+    }
+    let connected = told.get("result")?.get("connected")?.as_array()?;
+    Some(
+        connected
+            .iter()
+            .any(|link| link.get("expired").and_then(Value::as_bool) != Some(true)),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1986,5 +2117,101 @@ mod tests {
         assert_eq!(told["quoted"][1]["title"], "Fix the build");
         assert_eq!(told["quoted"][2], "an item");
         assert_eq!(told["others_here"], BRIEF_NOTE);
+    }
+
+    /// A tools folder whose socket answers each [`CONNECTED`] call with
+    /// what `links` holds then, and counts the calls.
+    fn services_answering(
+        name: &str,
+        links: std::sync::Arc<std::sync::Mutex<Value>>,
+    ) -> (PathBuf, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+        use std::io::{BufRead, BufReader, Write};
+        let folder = std::env::temp_dir().join(format!("linked-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let listener =
+            std::os::unix::net::UnixListener::bind(folder.join(crate::tools::CALL_SOCKET)).unwrap();
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = calls.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let mut line = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                let asked: Value = serde_json::from_str(&line).unwrap();
+                assert_eq!(asked, json!({"op":"call","name":CONNECTED}));
+                counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let connected = links.lock().unwrap().clone();
+                let answer = json!({"ok":true,"result":{"connected":connected,"writes":true}});
+                writeln!(stream, "{answer}").unwrap();
+            }
+        });
+        (folder, calls)
+    }
+
+    fn until(what: impl Fn() -> bool) -> bool {
+        let by = Instant::now() + Duration::from_secs(5);
+        while Instant::now() < by {
+            if what() {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        what()
+    }
+
+    /// Nothing linked, no print (the reader's P3 on #5293); a link made
+    /// later is known at the next line begun once [`LINKED_FRESH`] is past,
+    /// with no restart, and its removal too. Asked once at start, then at
+    /// most once a [`LINKED_FRESH`].
+    #[test]
+    fn a_link_is_known_from_lamp_services_at_start_and_as_a_line_begins() {
+        let links = std::sync::Arc::new(std::sync::Mutex::new(json!([])));
+        let (folder, calls) = services_answering("later", links.clone());
+        let linked = Linked::new(folder.clone());
+        assert!(until(
+            || calls.load(std::sync::atomic::Ordering::SeqCst) == 1
+        ));
+        assert!(until(|| !linked.asked.lock().unwrap().1));
+        assert!(!linked.now(), "nothing linked");
+        // Within LINKED_FRESH of the last ask: not asked again.
+        linked.check();
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+        *links.lock().unwrap() =
+            json!([{"service":"gmail","name":"Gmail","account":"a@b.c","expired":false}]);
+        std::thread::sleep(LINKED_FRESH);
+        linked.check();
+        assert!(until(|| linked.now()), "the link made later is known");
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+        // Only an expired one left: as unlinked.
+        *links.lock().unwrap() =
+            json!([{"service":"gmail","name":"Gmail","account":"a@b.c","expired":true}]);
+        std::thread::sleep(LINKED_FRESH);
+        linked.check();
+        assert!(until(|| !linked.now()), "the unlink is known");
+        std::fs::remove_dir_all(folder).unwrap();
+    }
+
+    /// An answer that lists nothing (refused, busy) or no socket at all
+    /// changes nothing.
+    #[test]
+    fn only_a_list_of_links_says_whether_one_is_linked() {
+        assert_eq!(
+            any_linked(&json!({"ok":true,"result":{"connected":[]}})),
+            Some(false)
+        );
+        assert_eq!(
+            any_linked(
+                &json!({"ok":true,"result":{"connected":[{"service":"notion","expired":false}]}})
+            ),
+            Some(true)
+        );
+        assert_eq!(any_linked(&json!({"ok":false,"error":"busy"})), None);
+        assert_eq!(any_linked(&json!({"ok":true,"result":{}})), None);
+        let nowhere = Linked::new(std::env::temp_dir().join("linked-none-at-all"));
+        assert!(until(|| !nowhere.asked.lock().unwrap().1));
+        assert!(!nowhere.now());
     }
 }

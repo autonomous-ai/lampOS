@@ -72,7 +72,9 @@ and the line is in the conversation's voice
 same-voice check through `services::judging_voices`, waiting up to 800 ms
 for a print. With `LAMP_SAME_VOICE_MODEL` and
 `LAMP_SAME_VOICE_FOR=services`, the second route makes its prints for these
-judgements alone, and only while the services are on: every conversation
+judgements alone, and only while the services are on and at least one is
+linked (a line heard with nothing linked is never printed, a guest's or the
+owner's): every conversation
 rule then reads no print, as without the model
 ([same-voice.md](same-voice.md), "For the services only"); there, an owner
 with an enrolled voice print has the line held to that print instead of the
@@ -126,6 +128,11 @@ turns them off. Since 4 November `lamp-services.service` also sets
 `LAMP_SAME_VOICE_MODEL` (CAM++, pinned in `deploy/product/models.json`) with
 `LAMP_SAME_VOICE_FOR=services`, so a "send" and a read in full have a voice
 print, made for the services alone; every conversation rule reads none.
+A heard line is printed only while a service is linked: the voice asks
+`lamp-services` what is linked as a line begins, at most once a second, so
+a lamp with nothing linked prints no one's voice, and a link made later
+prints from the next line ([same-voice.md](same-voice.md), "For the
+services only").
 Before it, with no print, every send on lamp-9adf was refused for its voice
 ([switches.md](switches.md)). Without the model or `lamp-same-voice` in the
 voice's folder the check is off after three starts (`MOST_UNREADY`), and
