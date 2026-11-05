@@ -266,6 +266,12 @@ thread_local! {
     /// on its own thread (a `tokio::test` runs on the thread it starts on);
     /// off for every other.
     static FORGET_JUST_KEPT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// Whether [`lines_past_silent`]'s lines go on from a bare call of the
+    /// lamp's name, request 1, said with A's known face the one face in
+    /// view (`LAMP_SECOND_NAME_CARRIES`); the lines are then requests 2, 3,
+    /// … Set by the test that asks for it on its own thread; off for every
+    /// other.
+    static BARE_CALL_FIRST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// One line said: its words, the faces in the eyes' looks while it is said
@@ -394,8 +400,15 @@ async fn lines_known(
 ) -> Outcome {
     let eyes = Arc::new(SpeakingFaces::default());
     let path = known_file(what, &eyes);
+    let bare_call = BARE_CALL_FIRST.with(std::cell::Cell::get);
     let script = Arc::new(Script {
-        heard: Mutex::new(lines.iter().map(|(words, ..)| Ok(words.clone())).collect()),
+        heard: Mutex::new(
+            bare_call
+                .then(|| Ok("Lamp".to_owned()))
+                .into_iter()
+                .chain(lines.iter().map(|(words, ..)| Ok(words.clone())))
+                .collect(),
+        ),
         chats: Mutex::new(chats.into()),
         early: Mutex::new(
             early
@@ -524,10 +537,35 @@ async fn lines_known(
         );
     }
     let mut labels = Vec::new();
+    let first = if bare_call {
+        // "Lamp", alone and short, with A's face the one face in view: its
+        // answer waits for the line after it, which is said by it.
+        engine = engine.checking_sounds(true).carrying_the_name(true);
+        let done = Arc::new(AtomicBool::new(false));
+        let feeder = feed_faces(eyes.clone(), vec![("f1", false)], boot, done.clone());
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        tokio::time::sleep(Duration::from_millis(40)).await;
+        engine.submit(ProviderInput::Called {
+            request: 1,
+            privacy_generation: 1,
+        });
+        engine.submit(ProviderInput::End {
+            request: 1,
+            privacy_generation: 1,
+            sound: true,
+            cut_in: false,
+        });
+        done.store(true, Ordering::Release);
+        feeder.join().unwrap();
+        2
+    } else {
+        1
+    };
     for (at, (_, in_view, after)) in lines.into_iter().enumerate() {
-        let request = at as u64 + 1;
+        let request = at as u64 + first;
         // The line before is over; the last stays current, for its lease.
-        if request > 1 {
+        if request > first {
             engine.retire_through(request - 1);
         }
         *now.lock().unwrap() += Duration::from_secs(after);
@@ -1086,6 +1124,42 @@ async fn a_carried_lines_forget_reaches_the_memory_only_with_the_switch() {
         FORGET_JUST_KEPT.with(|switch| switch.set(false));
         assert!(got.held, "{what}: carried");
         assert_eq!(got.calls, expected, "{what}");
+    }
+}
+
+/// The Reviewer-lead's P3 on #5419 (second_provider.rs:6938): "Lamp."
+/// with A's known face the one face in view, then "Forget that." with no
+/// face in view, said by that call. With `LAMP_MEMORY_FORGET_JUST_KEPT`
+/// the one-face rule counts the call's looks too, so the forget reaches
+/// A's scope, where the memory takes only their just kept thing. Off, it
+/// counts the line's own looks, as before: none of A's, so the forget is
+/// the room's and never takes A's just kept thing.
+#[tokio::test]
+async fn a_forget_after_a_bare_call_reaches_their_scope_by_the_calls_looks_only_with_the_switch() {
+    let a = crate::remember::person_id("A");
+    for (what, on, expected) in [
+        ("bare-call-forget-on", true, Some(a.clone())),
+        ("bare-call-forget-off", false, None),
+    ] {
+        FORGET_JUST_KEPT.with(|switch| switch.set(on));
+        BARE_CALL_FIRST.with(|bare| bare.set(true));
+        let got = lines_saving(
+            what,
+            vec![("Forget that.".to_owned(), vec![], 0)],
+            forget_that(),
+            BOOT,
+            true,
+            true,
+            None,
+            None,
+            true,
+            false,
+            Voice::One,
+        )
+        .await;
+        BARE_CALL_FIRST.with(|bare| bare.set(false));
+        FORGET_JUST_KEPT.with(|switch| switch.set(false));
+        assert_eq!(got.calls, [expected], "{what}: {:?}", got.labels);
     }
 }
 
