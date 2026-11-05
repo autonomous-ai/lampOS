@@ -575,3 +575,6 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   carries the keep only.
 - 23:2x: #5454 READ-OK fb1a5d2e6b. LAMP_MEMORY_DOUBT_UNDOES is off, and
   putting it back fails the install test. install 148/0, doubt 13/0.
+- 00:2x (6 Nov): #5448 privacy READ-OK 1ecc6b4960. A conversation opened
+  only by the name now carries just the keep, and the line is told as the
+  room's. A mutation back to the full carry fails S4 (49/1).
