@@ -221,7 +221,7 @@ fn active_lease_is_exact_and_does_not_revoke_an_unrelated_person_turn() {
     drop(receipt);
     test.parent.poll(AT + 200);
     assert!(
-        matches!(test.command(), Some(ToWorker::Abandon { token, no_audio: true }) if token == first.token)
+        matches!(test.command(), Some(ToWorker::Abandon { token, no_audio: true, .. }) if token == first.token)
     );
 }
 
@@ -383,6 +383,44 @@ fn interrupted_receipt_with_own_retirement_stays_held_even_with_later_audio() {
         drop(receipt);
         assert!(matches!(probe.settlement(), Some(ToWorker::Abandon { .. })));
     }
+}
+
+/// Seventh's P3 on #5258: a receipt the person stopped over its ring says
+/// so on its drop, only once some of its audio came; the field is sent only
+/// when true, and a packet without it reads as a cut by talk.
+#[test]
+fn a_stop_over_the_ring_is_said_only_once_some_of_it_played() {
+    for had_audio in [false, true] {
+        let (turn, privacy) = owner(1);
+        let (mut receipt, probe) = receipt_for_test(turn, privacy, 7);
+        if had_audio {
+            receipt.audio();
+        }
+        receipt.stopped_by_the_person();
+        drop(receipt);
+        let settlement = probe.settlement().unwrap();
+        assert!(
+            matches!(settlement, ToWorker::Abandon { stopped, .. } if stopped == had_audio),
+            "{settlement:?}"
+        );
+        let wire = serde_json::to_value(&settlement).unwrap();
+        assert_eq!(wire.get("stopped").is_some(), had_audio, "{wire}");
+    }
+    let (turn, privacy) = owner(1);
+    let (mut receipt, probe) = receipt_for_test(turn, privacy, 7);
+    receipt.audio();
+    drop(receipt);
+    let settlement = probe.settlement().unwrap();
+    assert!(matches!(
+        settlement,
+        ToWorker::Abandon { stopped: false, .. }
+    ));
+    let mut older = serde_json::to_value(&settlement).unwrap();
+    older.as_object_mut().unwrap().remove("stopped");
+    assert!(matches!(
+        serde_json::from_value::<ToWorker>(older).unwrap(),
+        ToWorker::Abandon { stopped: false, .. }
+    ));
 }
 
 /// #5219: a receipt dropped unsettled says whether any of its audio came,
@@ -579,6 +617,7 @@ fn parent_poll_cost() {
             let packet = ToWorker::Abandon {
                 token: offered.token,
                 no_audio: false,
+                stopped: false,
             };
             let mut full = false;
             for _ in 0..1024 {
