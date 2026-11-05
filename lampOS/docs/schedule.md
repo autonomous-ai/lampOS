@@ -1427,6 +1427,23 @@ item holds it, with the `held` line, so an attempt heard without proof is said
 twice at most; one said once more and never again is better than one never
 said.
 
+**A ring the person stopped is held (`LAMP_RING_STOP_ENDS_IT`, off).** "Stop"
+said over a timer's ring, the head or the button cuts the reply as talk does
+(`hand::cancel`), so its receipt drops as an abandon with audio and, under the
+rule above, it rang once more 5 s later (Seventh's P3 on #5258). The person
+heard it; a lamp told to stop that rings again isn't listening. With the
+switch on, the coordinator marks the receipt (`Receipt::stopped_by_the_person`)
+when a spoken stop, a head stop or the button cut it with the microphones on,
+and the abandon carries `stopped`, true only once some of its audio came. The
+consumer then holds the item at once, with its own line (`held: stopped by the
+person over its ring`), and never offers it again in that voice. With nothing
+played a stop proves nothing heard, and the `no_audio` rule below applies. The
+field is sent only when true and read as false when absent. Like any held
+item, it stays pending in Schedule, so a later voice offers it again after a
+restart. A durable "dismissed" needs a Schedule resolution, not done here.
+Tests: `a_stop_over_the_ring_is_said_only_once_some_of_it_played`,
+`stopped_over_its_ring_it_is_held_at_once_and_never_rung_again`.
+
 `ToWorker::Abandon` carries `no_audio`: true when no audio of the reply ever
 came (`Receipt::audio`, called from `Reply::append_provider_audio` on the
 first non-empty provider PCM, was never called). Such an attempt was certainly
