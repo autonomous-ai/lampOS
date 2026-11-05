@@ -33,7 +33,10 @@ StateDirectoryMode=0700
 # --set-up-later starts the part with no targets.json yet (hand-overs off, said why), rather than
 # failing at every start after `lamp-update harness-on` (lamp-c0a4, 3 Nov); --targets-from-machines
 # claude then writes targets.json from the person's machines once Harness is signed in (#1676).
-ExecStart=/opt/lampOS/tasks/current/lamp-tasks serve --enable --watch --progress --push-wait --close-told --harness-as-person --set-up-later --targets-from-machines claude --dir /var/lib/lampos-tasks/store --socket /run/lampos-tasks/request.sock --voice-socket /run/lampos-tasks/voice.sock --targets /var/lib/lampos-tasks/targets.json --harness /usr/local/bin/harness
+# --sign-in-by-code lets the person sign Harness in by its 8-digit code, by voice (LAMP_TASKS_SIGN_IN in
+# lamp-voice.service, #1676) or from the owner's app through --app-socket, which only lamp-cloud reaches
+# (LAMP_TASKS_SIGN_IN_APP in both, #5198, docs/tasks.md).
+ExecStart=/opt/lampOS/tasks/current/lamp-tasks serve --enable --watch --progress --push-wait --close-told --harness-as-person --set-up-later --targets-from-machines claude --sign-in-by-code --app-socket /run/lampos-tasks/app.sock --dir /var/lib/lampos-tasks/store --socket /run/lampos-tasks/request.sock --voice-socket /run/lampos-tasks/voice.sock --targets /var/lib/lampos-tasks/targets.json --harness /usr/local/bin/harness
 Restart=on-failure
 RestartSec=5s
 StandardInput=null
