@@ -1180,7 +1180,8 @@ after the install.
 
 ### Signing in by a spoken code (`--sign-in-by-code`, #1676)
 
-`lamp-tasks serve --sign-in-by-code`, off unless set. A lamp has no screen
+`lamp-tasks serve --sign-in-by-code`, off unless set; the product's
+`lamp-tasks.service` sets it (with `--app-socket`) since 5 Nov (#5198). A lamp has no screen
 to show Harness's QR code. Harness 0.4.23 signs a device in by a code it
 says aloud instead (openharness#1410, the Harness team on 20 October):
 `harness login --code --json`, as the part's own user and `HOME`. The part
@@ -2208,6 +2209,13 @@ Tests: `agent_tasks::tests::with_questions_a_question_for_the_staff_is_handed_ov
 
 ### Signing the lamp in from the app (#5198, `--app-socket`, off unless `LAMP_TASKS_SIGN_IN_APP=on`)
 
+On in the product since 5 Nov (#5198): `lamp-voice.service` and `lamp-cloud.service`
+set `LAMP_TASKS_SIGN_IN_APP=on` (the voice `LAMP_TASKS_SIGN_IN=on` too), and
+`lamp-tasks.service` runs `--sign-in-by-code --app-socket
+/run/lampos-tasks/app.sock`, the folder in `lamp-cloud`'s `ReadWritePaths`
+(`-/run/lampos-tasks`). A round carries the three units to a
+product-installed lamp (updates.md), so lamps already in homes get it too.
+
 `lamp-tasks serve --sign-in-by-code --app-socket PATH` binds a third socket,
 the owner's app's route (`/run/lampos-tasks/app.sock`, reached by
 `lamp-cloud` for the app's `harness.sign_in.*`, `docs/cloud.md`, which keeps the code and the email off the broker and hands them to the backend over HTTPS). It takes
@@ -2271,6 +2279,9 @@ switch both are as before. Test:
 `sign_in::tests::with_the_app_switch_the_code_is_said_slowly_and_again_and_an_app_sign_in_never`.
 
 ### Signing the lamp in by voice (#1676, off unless `LAMP_TASKS_SIGN_IN=on`)
+
+On in the product's voice since 5 Nov (#5198), which the app's sign-in needs
+(above).
 
 A lamp has no screen for Harness's QR code. Harness 0.4.23 signs a device in
 by a code it says aloud (openharness#1410). The tasks part runs Harness's
