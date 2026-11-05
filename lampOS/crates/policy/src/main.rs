@@ -770,6 +770,32 @@ mod tests {
             " hello=true hello_by_rule=true gate=true act=hello"
         );
         assert!(!gating.hello_by_rule);
+        // Both product units obey the rules people kept about speaking
+        // first: without --rules a setup "no hello" held nothing and the
+        // hello still came (#813's keep_rule, hello.rs).
+        for unit in [
+            include_str!("../../../deploy/product/lamp-policy.service"),
+            include_str!("../../../deploy/units/lamp-policy.service"),
+        ] {
+            let exec = unit
+                .lines()
+                .find_map(|line| line.strip_prefix("ExecStart="))
+                .expect("an ExecStart line");
+            let line = exec
+                .split_whitespace()
+                .skip(1)
+                .map(|word| match word {
+                    "%d/jev.key" | "${CREDENTIALS_DIRECTORY}/jev.key" => "/k",
+                    word => word,
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            let product = of(&line).unwrap().unwrap();
+            assert!(
+                product.rules && product.hello && product.hello_by_rule && product.gate,
+                "{line}"
+            );
+        }
         let only = of("--log-dir /d --key-file /k --progress")
             .unwrap()
             .unwrap();

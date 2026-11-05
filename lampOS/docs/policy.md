@@ -742,7 +742,7 @@ the service its own copy (`LoadCredential`); the log is in
 
 **The hello on a home lamp** (the first builder, 30 Oct, on the launch
 testers' findings and on #4625): the product unit passes `--zone system
---hello --act hello --gate --hello-by-rule`, so Welcome back's hello, which
+--hello --act hello --gate --hello-by-rule --rules`, so Welcome back's hello, which
 lamp-skills asks on `skills/ask` even with `LAMP_SKILLS_ASK=skip`
 ([skills.md](skills.md)), is decided here by the hard rules alone (talking,
 twenty minutes since the last hello, one an hour to each person, kept
@@ -750,7 +750,14 @@ rules): a pass is `say_now` at once, with no wait for the model. The judge
 is still asked for each pass, in shadow, off the answer's path, and its
 answer is only written down ([below](#by-the-hard-rules-alone-4625)). Every
 other question stays off; `--gate` also makes the moment question, which
-the product's skills do not ask under `skip`.
+the product's skills do not ask under `skip`. `--rules` (5 Nov, the lead's call): the hello
+obeys what the people at the lamp kept about speaking first
+(`memory/rules`, #813: a setup "no hello", "quiet after ten" by the
+`--zone` time); before it, a kept rule held nothing in the product and the
+hello still came (`hello.rs`). With no rule kept nothing changes; with
+`--gate` it also holds the moment question's news and unprompted asks, never
+a reminder the person set (`moment::REMINDER`). The option test in
+`main.rs` reads both product units' `ExecStart` and wants `--rules`.
 
 **On a home lamp** (#811) the product unit asks Jev through V1's route, the
 campaign-api proxy (`--endpoint
