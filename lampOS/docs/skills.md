@@ -523,7 +523,7 @@ skills".)
     from the eyes' known file as it asks (`--known-file`, the id on the
     file's second line, else the id of the name; never the name), and none
     for a face not known. The product's `lamp-policy` runs with `--hello
-    --act hello --gate --hello-by-rule` to answer it: the hard rules alone
+    --act hello --gate --hello-by-rule --rules` to answer it: the hard rules alone
     decide, a pass is `say_now` at once with no wait for the model, and the
     judge is asked only in shadow, never acting (the first builder on
     #4625; [policy.md](policy.md#by-the-hard-rules-alone-4625)). Every other skill acts at once, as
