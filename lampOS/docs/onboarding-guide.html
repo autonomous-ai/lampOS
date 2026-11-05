@@ -4,10 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Lamp Awakens</title>
-<!-- Two comic faces from Google Fonts; without them the page falls back to Impact and the system sans. -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
+<!-- System fonts only: the page loads nothing from outside. -->
 <style>
   /* A comic book, issue #1: inked panels on halftone paper, read as a two-page spread you turn. */
   :root {
@@ -18,8 +15,8 @@
     --blue: #2f80ed;
     --sky: #8fd3ff;
     --night: #15183a;
-    --display: "Bangers", Impact, "Arial Black", sans-serif;
-    --body: "Comic Neue", "Chalkboard SE", "Trebuchet MS", system-ui, sans-serif;
+    --display: Impact, Haettenschweiler, "Arial Narrow Bold", "Arial Black", sans-serif;
+    --body: "Chalkboard SE", "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
     --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     color-scheme: light;
   }
@@ -167,7 +164,7 @@
   <div class="page" data-chapter="Cover" style="grid-template-rows: 1fr 1.1fr;">
     <div class="panel nightfill text-panel" style="color:#fff">
       <h3 style="color:var(--yellow)">PREVIOUSLY…</h3>
-      <p>You opened a box. Inside was a lamp that listens, learns who you are, and lights your desk.</p>
+      <p>You opened a box. Inside was a lamp that listens, learns who you are, if you say so, and lights your desk.</p>
       <p>You can teach it new tricks. Developers can even program it.</p>
     </div>
     <div class="panel halftone-s">
@@ -312,6 +309,7 @@
     <div class="panel halftone-r text-panel" style="color:#fff">
       <h2 class="title chap">CHAPTER 4: UPGRADES</h2>
       <p style="font-weight:700">In the app: Skills, then Store. Tap Add, and I have a new skill.</p>
+      <p>No Add button yet? I'm finishing my first update; look again in about 15 minutes.</p>
     </div>
     <div class="panel halftone-y">
       <div class="tiles">
@@ -329,7 +327,7 @@
     </div>
     <div class="panel text-panel">
       <h3>TRY LOOK FOR THINGS.</h3>
-      <p>I look around your desk, a few places either side, and tell you what I find. No Add button yet? I'm finishing my first update; look again in about 15 minutes.</p>
+      <p>I look around your desk, a few places either side, and tell you what I find.</p>
     </div>
   </div>
 
