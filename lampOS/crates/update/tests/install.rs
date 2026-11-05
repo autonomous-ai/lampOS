@@ -1551,6 +1551,42 @@ fn the_product_sends_to_the_linked_services_held_to_the_owners_voice() {
     }
 }
 
+/// A made skill reads a linked service to its owner alone (#5288, #5303):
+/// `LAMP_SKILL_READS=on` in the four units that read it, `lamp-services`
+/// (lets `lamp-skills` onto its tools socket), `lamp-skills` (runs the
+/// read behind its gate), its manage helper (holds a made read to its cap
+/// as it is put on, `install_made`) and `lamp-voice` (briefs and checks the
+/// made skill), each once, and no other product unit names it.
+#[test]
+fn the_product_lets_a_made_skill_read_a_linked_service() {
+    let owners = [
+        "lamp-services.service",
+        "lamp-skills.service",
+        "lamp-skills-manage@.service",
+        "lamp-voice.service",
+    ];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service
+            .iter()
+            .filter(|line| **line == "Environment=LAMP_SKILL_READS=on")
+            .count();
+        let mentioned = service
+            .iter()
+            .filter(|line| line.contains("LAMP_SKILL_READS"))
+            .count();
+        let owner = owners.contains(unit);
+        assert_eq!(on, usize::from(owner), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+    }
+    for owner in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner}"
+        );
+    }
+}
+
 /// A stop always gets its one line (#4710: on lamp-06c1 on 30 Oct a stop
 /// left the lamp quiet mid-story), and a cut-in with no words gets its
 /// question (the memory owner's call, 4 Nov; the lamp's own echo can still
