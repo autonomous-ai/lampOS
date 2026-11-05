@@ -1406,13 +1406,19 @@ impl Thread {
             Some((last, rest)) if self.heard.trim().is_empty() => (last.person.clone(), rest),
             _ => (self.heard.clone(), &spoken[..]),
         };
-        // An exchange with no words of theirs (a wordless cut-in the lamp
-        // answered with its fixed "did anyone say something?",
+        // A wordless cut-in (no words of theirs, and the lamp silent or
+        // answering with its fixed "did anyone say something?",
         // `LAMP_CUT_IN_WORDLESS_ASKS`) is nobody's answer: it never pushes
         // the lamp's read-back out of the window (Fifth's run B on #5415).
+        // A lamp line of any other words stays, so a read-back said in a
+        // turn with no words of theirs is kept (the first builder's P3).
         let earlier: Vec<&&Exchange> = earlier
             .iter()
-            .filter(|exchange| !exchange.person.trim().is_empty())
+            .filter(|exchange| {
+                let lamp = exchange.lamp.trim();
+                !(exchange.person.trim().is_empty()
+                    && (lamp.is_empty() || lamp == crate::cut_in_wordless::LINE))
+            })
             .collect();
         let from = earlier.len().saturating_sub(exchanges);
         crate::known_faces::Said {
@@ -3561,6 +3567,18 @@ mod tests {
                 "Walter, did I get that right?".to_owned()
             )]
         );
+
+        // A lamp line of its own words in a turn with no words of theirs
+        // stays in the window (the first builder's P3 on #5415).
+        let mut thread = Thread::new();
+        thread.person("My name is Walter.", true, now);
+        thread.lamp(1, "Nice to meet you.", now);
+        thread.person("", true, now);
+        thread.lamp(2, "Walter, did I get that right?", now);
+        thread.person("Yes.", true, now);
+        let said = thread.names_window(crate::known_faces::SAID_EXCHANGES);
+        assert_eq!(said.before.len(), 2, "{:?}", said.before);
+        assert_eq!(said.before[1].1, "Walter, did I get that right?");
     }
 
     /// `LAMP_LIVE_SCOPED_SESSION`: a line admitted for someone known makes

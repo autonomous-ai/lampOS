@@ -1424,7 +1424,8 @@ With the switch:
     itself on the person's next turn when that turn is a plain yes to the
     read-back (`known_faces::held_save_verdict`), through the same runner
     and check as a model call, so it counts as the walk's face save; the
-    model is told the face is kept, and a model call after it gets
+    model is told the face is kept, or, when the eyes keep nothing, that it
+    was not kept and why, and a model call after it gets
     `ALREADY_KEPT`, never a second save. A correction, a spelling, another
     name, a no, a new save call, a second face seen speaking the yes (or,
     where the eyes read speaking, the speaker not seen saying it), a line
@@ -1439,9 +1440,17 @@ With the switch:
     a question on its own and waits for its yes before it asks the face
     question, so the usual walk reaches the eyes in one call; it asked the
     face question with the name folded in before, which was refused every
-    time (Fifth on #5415). The name's window leaves out an exchange with
-    no words of theirs, such as a wordless cut-in answered with the
-    lamp's fixed line, so it never pushes the read-back out.
+    time (Fifth on #5415). The name's window leaves out a wordless cut-in
+    (no words of theirs, and the lamp silent or answering with its fixed
+    line), so it never pushes the read-back out; a lamp line of other
+    words in a turn with no words of theirs stays in it.
+    The speaker check holds only where the eyes read speaking
+    (`LAMP_EYES_SPEAKING=on`). There, the yes must be seen spoken: a
+    still face, such as a photo or a paused clip on a screen, never is,
+    so a test kit needs a talking face (the Reviewer-lead's P2 on #5415).
+    With it off, a yes said off camera by someone else while the person
+    who asked is alone in view keeps the asker's face, as a model's own
+    second save call would (#5391's path has the same gap).
     `replace` still needs the read-back in the
     lamp's last answer (`known_faces::agreed_to`).
   - **Spelled:** a name not heard is asked for spelled out (`NOT_HEARD`).
