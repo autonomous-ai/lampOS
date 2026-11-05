@@ -1098,6 +1098,10 @@ fn serve(
     let mut subscribers: Vec<Subscriber> = Vec::new();
     let mut seen = None;
     let mut looked: Option<Instant> = None;
+    // The skills whose read's order was said read as no query: said once
+    // a skill for this run of the program, not at every reload (Thirteen's
+    // P3 on #5402).
+    let mut order_said: HashSet<String> = HashSet::new();
     // Night sleep's live claim (#940), with routines on: said at each
     // reload, every minute and when its rest path goes down or comes back,
     // so Expression knows the night is a skill's. Its third part is why the
@@ -1229,7 +1233,9 @@ fn serve(
                 // Loaded, though never made so now: its read's order is
                 // read as no query, the latest (build 10300's refused round
                 // on lamp-9adf, 5 Nov). Its name alone, never the query.
-                for skill in skills.iter().filter(|skill| skill.made_refuses().is_some()) {
+                for skill in skills.iter().filter(|skill| {
+                    skill.made_refuses().is_some() && order_said.insert(skill.name.clone())
+                }) {
                     eprintln!(
                         "lamp-skills: {}: its read's query is an order, read as no query: the latest",
                         skill.name
