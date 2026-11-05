@@ -566,8 +566,8 @@ one is chosen) and kept in the thread as the lamp's:
   lamp-06c1 on 3 Nov, 7 of 15 stories had one over the lamp's answer), so
   the question can answer the lamp's own voice; a later echo fix from
   duplex makes those asks fewer.
-  With `LAMP_CUT_IN_WORDLESS_RESUMES=on` too (on in the product, the
-  memory owner, 5 Nov), a busy room's first such cut says "Anyway," and
+  With `LAMP_CUT_IN_WORDLESS_RESUMES=on` too (off in the product for the
+  candidate since 6 Nov, after #5430's lamp check came back FAIL, partial), a busy room's first such cut says "Anyway," and
   goes on from the sentence it cut, another within a minute says "Oops,
   cut off again. Anyway," and goes on, and a third says "It's a bit noisy
   here, so I'll pause. Just say 'Lamp' when you want me to go on."
