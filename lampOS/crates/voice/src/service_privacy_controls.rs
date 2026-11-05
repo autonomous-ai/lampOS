@@ -340,7 +340,7 @@ fn run(
                         eprintln!("lamp-voice: muted indication unavailable: {error}");
                         indicator_failure = Some(error);
                         indicator_failed_at = Some(monotonic_us());
-                        indicator_stopped_at = stop_failed(&mut child);
+                        indicator_stopped_at = stop_failed(&mut waiting.ring_held, &mut child);
                         indicator = Some(child);
                     }
                 }
@@ -353,7 +353,7 @@ fn run(
                     // failed by that Fault, not by its exit, which a loaded
                     // board can see first (ARM64 CI on #5244).
                     for _ in 0..16 {
-                        match child.channels.control.receive::<WorkerEvent>() {
+                        match next_ring(&mut waiting.ring_held, child) {
                             Ok(Some(WorkerEvent::Ring {
                                 report: report @ RingFeedback::Blanked { .. },
                             })) => {
@@ -384,7 +384,7 @@ fn run(
                     if let Some(error) = &indicator_failure {
                         indicator_failed_at = Some(monotonic_us());
                         eprintln!("lamp-voice: muted indication failed: {error}");
-                        indicator_stopped_at = stop_failed(child);
+                        indicator_stopped_at = stop_failed(&mut waiting.ring_held, child);
                     }
                 }
                 if indicator_failure.is_some() {
@@ -393,12 +393,22 @@ fn run(
                     // black write is verified and its process gone may another
                     // writer start; without that black write the failure
                     // stays, and ends the wait as it always has.
-                    drain_failed(child, indicator_stopped_at, &mut indicator_blanked);
+                    drain_failed(
+                        &mut waiting.ring_held,
+                        child,
+                        indicator_stopped_at,
+                        &mut indicator_blanked,
+                    );
                     match child.try_exit() {
                         Ok(Some(_)) => {
                             // A receipt can arrive between the drain and the
                             // exit: read once more, with the sender gone.
-                            drain_failed(child, indicator_stopped_at, &mut indicator_blanked);
+                            drain_failed(
+                                &mut waiting.ring_held,
+                                child,
+                                indicator_stopped_at,
+                                &mut indicator_blanked,
+                            );
                             reaped = indicator_blanked && child.cleanup_ring_paths().is_ok();
                         }
                         Ok(None) => {
@@ -424,6 +434,7 @@ fn run(
                 // once more. If that one fails too, the wait goes on muted
                 // without its light, and only the switch opening leaves it.
                 indicator = None;
+                waiting.ring_held.clear();
                 indicator_failure = None;
                 indicator_failed_at = None;
                 indicator_kill_requested = false;
@@ -482,8 +493,13 @@ fn run(
 }
 
 /// Sends a failed writer its Stop, and says when: its shutdown receipt must
-/// be for a write after it.
-fn stop_failed(child: &mut Worker) -> u64 {
+/// be for a write after it. What it has queued is held first
+/// ([`hold_events`]): a writer that said its black write and its Fault and
+/// exited refuses this send, and on Linux the refusal would empty the wait's
+/// queue, so [`drain_failed`] would never see the black write (the
+/// Reviewer-lead's P2 on #5388).
+fn stop_failed(held: &mut VecDeque<io::Result<WorkerEvent>>, child: &mut Worker) -> u64 {
+    hold_events(held, child);
     let stopped_at = monotonic_us();
     let _ = child.channels.control.send(Control::Stop);
     stopped_at
@@ -503,9 +519,14 @@ fn control_lost_black(report: RingFeedback) -> bool {
 /// Reads a failed writer's events, without blocking, for its black write:
 /// the shutdown receipt for a write after its Stop, or its own control-lost
 /// one. Nothing else it says changes the failure.
-fn drain_failed(child: &mut Worker, stopped_at: u64, blanked: &mut bool) {
+fn drain_failed(
+    held: &mut VecDeque<io::Result<WorkerEvent>>,
+    child: &mut Worker,
+    stopped_at: u64,
+    blanked: &mut bool,
+) {
     for _ in 0..16 {
-        match child.channels.control.receive::<WorkerEvent>() {
+        match next_ring(held, child) {
             Ok(Some(WorkerEvent::Ring {
                 report: report @ RingFeedback::Blanked { .. },
             })) => {
@@ -537,6 +558,11 @@ struct Waiting {
     /// The worker's events read just before a renewal is sent, in order,
     /// for the next look to take first ([`Self::hold_queued`]).
     held: VecDeque<io::Result<WorkerEvent>>,
+    /// The ring writer's events read just before a renewal is sent to it,
+    /// in order, for the wait's own read of the writer to take first: the
+    /// same Linux loss as [`Self::hold_queued`]'s, on the indicator's socket
+    /// (ARM64 CI, #5224).
+    ring_held: VecDeque<io::Result<WorkerEvent>>,
 }
 
 impl Waiting {
@@ -555,6 +581,7 @@ impl Waiting {
             last_publish: None,
             started: Instant::now(),
             held: VecDeque::new(),
+            ring_held: VecDeque::new(),
         })
     }
 
@@ -694,6 +721,7 @@ impl Waiting {
                 ))
             })?;
         if let Some(indicator) = indicator {
+            hold_events(&mut self.ring_held, indicator);
             let _ = indicator
                 .channels
                 .control
@@ -712,28 +740,44 @@ impl Waiting {
     /// held; reading stops at an error or a Fault, which the look then
     /// handles as it always did.
     fn hold_queued(&mut self, worker: &mut Worker) {
-        if matches!(
-            self.held.back(),
-            Some(Err(_) | Ok(WorkerEvent::Fault { .. }))
-        ) {
-            return;
-        }
-        while self.held.len() < 16 {
-            match worker.channels.control.receive::<WorkerEvent>() {
-                Ok(None) => break,
-                Ok(Some(event)) => {
-                    let fault = matches!(event, WorkerEvent::Fault { .. });
-                    self.held.push_back(Ok(event));
-                    if fault {
-                        break;
-                    }
-                }
-                Err(error) => {
-                    self.held.push_back(Err(error));
+        hold_events(&mut self.held, worker);
+    }
+}
+
+/// Reads what `worker` has queued into `held`, without blocking, before a
+/// send to it ([`Waiting::hold_queued`]): at most 16, stopping at an error or
+/// a Fault, and nothing more once one is held.
+fn hold_events(held: &mut VecDeque<io::Result<WorkerEvent>>, worker: &mut Worker) {
+    if matches!(held.back(), Some(Err(_) | Ok(WorkerEvent::Fault { .. }))) {
+        return;
+    }
+    while held.len() < 16 {
+        match worker.channels.control.receive::<WorkerEvent>() {
+            Ok(None) => break,
+            Ok(Some(event)) => {
+                let fault = matches!(event, WorkerEvent::Fault { .. });
+                held.push_back(Ok(event));
+                if fault {
                     break;
                 }
             }
+            Err(error) => {
+                held.push_back(Err(error));
+                break;
+            }
         }
+    }
+}
+
+/// The ring writer's next event: one held before a renewal first
+/// ([`Waiting::ring_held`]), then its socket's.
+fn next_ring(
+    held: &mut VecDeque<io::Result<WorkerEvent>>,
+    child: &mut Worker,
+) -> io::Result<Option<WorkerEvent>> {
+    match held.pop_front() {
+        Some(event) => event.map(Some),
+        None => child.channels.control.receive::<WorkerEvent>(),
     }
 }
 
@@ -1744,6 +1788,67 @@ pub(crate) mod tests {
             );
             assert_eq!(starts, 1, "no writer started after the stop");
         }
+    }
+
+    /// A writer that said its black write and its Fault, then exited, is
+    /// read by both even when a renewal's send to its gone socket comes
+    /// first: on Linux that refused send empties the wait's own queue, so the
+    /// events are held before it (ARM64 CI, #5224; [`hold_events`]).
+    #[test]
+    fn a_writers_last_words_outlive_a_send_to_its_gone_socket() {
+        let rings = SessionDirectory::create().unwrap();
+        let (mut ring, mut ring_peer, input) = Worker::cooperative_fixture(&rings.path, "ring");
+        ring_peer.control.send(control_lost()).unwrap();
+        ring_peer
+            .control
+            .send(WorkerEvent::Fault {
+                code: "privacy ring: synthetic SPI fault".into(),
+            })
+            .unwrap();
+        let mut held = VecDeque::new();
+        hold_events(&mut held, &mut ring);
+        drop(ring_peer);
+        drop(input);
+        let _ = ring.channels.control.send(Control::Stop);
+        let mut blanked = false;
+        assert!(matches!(
+            next_ring(&mut held, &mut ring),
+            Ok(Some(WorkerEvent::Ring { report })) if control_lost_black(report)
+        ));
+        match next_ring(&mut held, &mut ring) {
+            Ok(Some(WorkerEvent::Fault { code })) => assert!(code.contains("synthetic SPI fault")),
+            other => panic!("the Fault was lost: {other:?}"),
+        }
+        hold_events(&mut held, &mut ring);
+        drain_failed(&mut held, &mut ring, monotonic_us(), &mut blanked);
+        assert!(!blanked, "nothing more after the Fault");
+    }
+
+    /// A failed writer's Stop goes to a socket it may have just left: its
+    /// black write and Fault, said before it exited, are held before the
+    /// send, so the drain still finds the black write verified (the
+    /// Reviewer-lead's P2 on #5388; [`stop_failed`]).
+    #[test]
+    fn a_failed_writers_black_write_outlives_its_stop_to_a_gone_socket() {
+        let rings = SessionDirectory::create().unwrap();
+        let (mut ring, mut ring_peer, input) = Worker::cooperative_fixture(&rings.path, "ring");
+        ring_peer.control.send(control_lost()).unwrap();
+        ring_peer
+            .control
+            .send(WorkerEvent::Fault {
+                code: "privacy ring: synthetic SPI fault".into(),
+            })
+            .unwrap();
+        drop(ring_peer);
+        drop(input);
+        let mut held = VecDeque::new();
+        let stopped_at = stop_failed(&mut held, &mut ring);
+        let mut blanked = false;
+        drain_failed(&mut held, &mut ring, stopped_at, &mut blanked);
+        assert!(
+            blanked,
+            "the black write said before the exit is still read"
+        );
     }
 
     /// A light that failed long before the stop is no stop's: past the

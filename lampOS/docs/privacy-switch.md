@@ -515,7 +515,11 @@ resume. In the muted wait an indicator failure with its black write verified
 and its writer reaped keeps the wait muted and starts the writer once more,
 then goes on with no light; one that comes with the service's stop, or at most
 1 s before it, is the stop's, and the voice ends with 0 (#4332,
-[pilot faults](pilot-faults.md)). These bounds can exceed the normal indication target. Kernel I/O and
+[pilot faults](pilot-faults.md)). The writer's last words, its black write and its Fault, are read
+before each renewal is sent to it, and before a failed writer's Stop: on Linux
+a send refused by its gone socket
+empties the wait's own queue, so they are held first and the wait reads them
+in order (`hold_events`, #5224). These bounds can exceed the normal indication target. Kernel I/O and
 kill/wait are not hard realtime deadlines.
 
 ## First's lamp handoff
