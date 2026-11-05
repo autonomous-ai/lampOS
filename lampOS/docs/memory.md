@@ -478,7 +478,8 @@ on** (`LAMP_CONVERSATION_CARRIES=on`, #4339): with `LAMP_PERSON_SCOPE_SEEN`
 such a line was the room's, so one turn of a known person's talk lost it
 (lamp-3e83, 29 Oct: the chat saw 16, then 4, then 16 messages, and the lamp
 asked its question again). It now stays that conversation's when the newest
-exchange before it is theirs and began within 45 s, and the eyes saw through
+exchange before it is theirs and began within 45 s (or is the room's, their
+face alone in view for it and its reply told their name), and the eyes saw through
 it with no face but theirs in view, and their face was in view through it
 or within 5 s before it began (`CARRY_UNSEEN_WITHIN`; an empty view from the
 start, or their face gone longer, and it is the room's, as before #4339: the
