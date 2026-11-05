@@ -493,6 +493,20 @@ class CoordQueue(Repo):
         r = run(["zsh", "-c", 'TOOLS_DIR=%s; source %s; print -r -- $COORD_QUEUE_POST ${(j:,:)COORD_QUEUE_ISSUES}' % (HERE, LIB)], self.work, env=self.env)
         self.assertEqual(r.stdout.split(), ["5385", "4710,5385"])
 
+    def test_a_refused_queue_post_is_logged_not_dropped(self):
+        # The Reviewer-lead's P3 on #5390: when the Queue issue is full, the bot's post fails; it is said, not lost.
+        fn = 'say() { print -r -- "said: $*"; }; source %s; eval "$(sed -n \'/^queue_post()/,/^}/p\' %s)"; queue_post "train 9 merged"' % (LIB, BOT)
+        ok = run(["zsh", "-c", fn], self.work, env=self.env)
+        self.assertEqual(ok.stdout + ok.stderr, "")
+        gh_fails = os.path.join(self.tmp, "failgh")
+        os.makedirs(gh_fails)
+        with open(os.path.join(gh_fails, "gh"), "w") as f:
+            f.write("#!/bin/sh\nexit 1\n")
+        os.chmod(os.path.join(gh_fails, "gh"), 0o755)
+        r = run(["zsh", "-c", fn], self.work, env=dict(self.env, PATH=gh_fails + os.pathsep + self.env["PATH"]))
+        self.assertIn("said: the Queue (#5385) refused the bot's post", r.stdout + r.stderr)
+        self.assertIn("train 9 merged", r.stdout + r.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

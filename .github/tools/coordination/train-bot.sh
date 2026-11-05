@@ -47,6 +47,12 @@ source $TOOLS_DIR/lib.sh
 # Kept in a file: eligible() runs in a subshell, so a variable wouldn't outlive the round.
 said=$SP/train-bot.said; touch $said
 once() { grep -qx -- "$1" $said || { say "$2" >&2; print -r -- "$1" >> $said; }; }
+# queue_post TEXT: the bot's post on the Queue (lib.sh's COORD_QUEUE_POST). 5 Nov (the Reviewer-lead's P3 on #5390):
+# a refused post is logged, not dropped; when the Queue issue is full, add the next one to COORD_QUEUE_ISSUES.
+queue_post() {
+  gh issue comment $COORD_QUEUE_POST -R $REPO --body "$1" >/dev/null \
+    || say "the Queue (#$COORD_QUEUE_POST) refused the bot's post (full? add the next Queue issue to lib.sh's COORD_QUEUE_ISSUES): $1" >&2
+}
 fine() { grep -qx -- "$1" $said && { grep -vx -- "$1" $said > $said.new; mv $said.new $said; }; return 0; }
 eligible() {
   local p head ok sha held two own wf qf=$SP/queue.jsonl cf=$SP/pr-comments.jsonl bf=$SP/pr-body.jsonl
@@ -253,7 +259,7 @@ run_train() {
     # background.
     slow=$(( $(cat $slowf 2>/dev/null || echo 0) + 1 )); echo $slow > $slowf
     gh pr close $tp -R $REPO -c "Train bot: closed, its checks hadn't finished in 45 min; the same PRs go again." >/dev/null
-    if [[ $slow -ge 2 ]]; then say "train $tn (#$tp): checks unfinished twice in a row: stopping for the first builder"; gh issue comment $COORD_QUEUE_POST -R $REPO --body "Train bot, $(date +%H:%M): two trains in a row had checks unfinished after 45 min (CI is slow or stuck); stopped for the first builder$([[ $lane == nc ]] && print ' (the no-crates lane only)')." >/dev/null; echo 0 > $slowf; halt $lane; return; fi
+    if [[ $slow -ge 2 ]]; then say "train $tn (#$tp): checks unfinished twice in a row: stopping for the first builder"; queue_post "Train bot, $(date +%H:%M): two trains in a row had checks unfinished after 45 min (CI is slow or stuck); stopped for the first builder$([[ $lane == nc ]] && print ' (the no-crates lane only)')."; echo 0 > $slowf; halt $lane; return; fi
     say "train $tn (#$tp) checks unfinished in 45 min: rebuilding"; return
   fi
   echo 0 > $slowf
@@ -286,7 +292,7 @@ run_train() {
       # 28 Oct 16:4x: closed with no comment; the Queue's merge line names it (post less).
       [[ $left == 0 ]] && gh pr close $p -R $REPO >/dev/null && say "  closed #$p"
     done
-    gh issue comment $COORD_QUEUE_POST -R $REPO --body "Train bot, $(date +%H:%M): **train $tn (#$tp) merged** as lamp-voice \`$NV\`: $refs." >/dev/null
+    queue_post "Train bot, $(date +%H:%M): **train $tn (#$tp) merged** as lamp-voice \`$NV\`: $refs."
     return
   fi
   if [[ $lane == nc ]]; then
@@ -301,7 +307,7 @@ run_train() {
     elif [[ $rc == 2 ]]; then
       touch $SP/train-bot.nc-one; say "train $tn (#$tp) failed with ${#carried} PRs: the no-crates lane carries one PR a train until one merges"
     else
-      say "train $tn (#$tp) failed (rc $rc)"; gh issue comment $COORD_QUEUE_POST -R $REPO --body "Train bot, $(date +%H:%M): no-crates train $tn (#$tp) failed (rc $rc, not its checks); the no-crates lane stopped for the first builder." >/dev/null; halt nc
+      say "train $tn (#$tp) failed (rc $rc)"; queue_post "Train bot, $(date +%H:%M): no-crates train $tn (#$tp) failed (rc $rc, not its checks); the no-crates lane stopped for the first builder."; halt nc
     fi
     return
   fi
@@ -343,7 +349,7 @@ run_train() {
       fi
     done
   fi
-  [[ -z $fails ]] && { say "no failing test named: stopping for the first builder"; gh issue comment $COORD_QUEUE_POST -R $REPO --body "Train bot, $(date +%H:%M): train $n (#$tp) failed with no failing test named; stopped for the first builder." >/dev/null; halt crates; }
+  [[ -z $fails ]] && { say "no failing test named: stopping for the first builder"; queue_post "Train bot, $(date +%H:%M): train $n (#$tp) failed with no failing test named; stopped for the first builder."; halt crates; }
   return 0
 }
 # lane_round LANE BUSY PR...: what one lane does this round with its PRs: nothing (busy, stopped, rows alone, none),
