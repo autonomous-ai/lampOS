@@ -277,8 +277,10 @@ fn a_reminder_this_build_cannot_read_is_kept_as_it_is_and_the_part_serves() {
             zone: None,
         });
         let mut engine = Engine::open(disk.clone(), "Etc/UTC", &now(0), FRESH).unwrap();
+        // Due a minute before it is looked at, a week on: not too late to
+        // be said (#5258).
         let other = engine
-            .answer(set(&engine, When::After { seconds: 60 }), &now(0))
+            .answer(set(&engine, When::After { seconds: 691_140 }), &now(0))
             .unwrap()["id"]
             .clone();
         drop(engine);

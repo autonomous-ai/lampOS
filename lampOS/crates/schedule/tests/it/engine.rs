@@ -585,7 +585,18 @@ fn after_time_off_the_oldest_notice_is_chosen_by_the_occurrence_shown() {
     // A one-off at 08:00 three days on: an hour before the newest 09:00.
     let mut later = now(1_000);
     later.unix_ms = first + 3 * DAY - 3_600_000 - 60_000;
-    let set = create(&mut e, &later, When::After { seconds: 60 });
+    // At a clock time: a one-minute timer an hour and a half late is too
+    // late to ring (#5258); a reminder is not.
+    let set = create(
+        &mut e,
+        &later,
+        When::At {
+            time: "08:00".into(),
+            day: None,
+            zone: None,
+            fold: None,
+        },
+    );
     assert_eq!(set["id"], 2);
     drop(e);
     let mut at = now(0);
@@ -1829,23 +1840,24 @@ fn texts_of(said: &[Value]) -> Vec<&str> {
 }
 
 /// The 29e7 sequence: four one-time reminders due while the microphones
-/// were closed, said 13 to 38 hours late, then "what reminders did I set
-/// earlier?": the list has none set, and all four as said, waiting for an
-/// answer.
+/// were closed, said late, then "what reminders did I set earlier?": the
+/// list has none set, and all four as said, waiting for an answer. On
+/// 29e7 they were 13 to 38 hours late, too late to be said now (#5258):
+/// here they are 15 minutes to two hours late.
 #[test]
 fn four_late_reminders_said_are_kept_as_said_and_wait_for_an_answer() {
     let at = now(0);
     let disk = Disk::default();
     let mut e = open(disk.clone(), &at);
     for (text, seconds) in [
-        ("Send the report", 3_600),
-        ("Buy the gift", 6 * 3_600),
-        ("Drink water", 60),
-        ("Water timer", 120),
+        ("Send the report", 3 * 3_600),
+        ("Buy the gift", 4 * 3_600),
+        ("Drink water", 4 * 3_600 + 60),
+        ("Water timer", 4 * 3_600 + 120),
     ] {
         set_when(&mut e, &at, text, Some(ANN), When::After { seconds });
     }
-    let opened = now(39 * HOUR);
+    let opened = now(5 * HOUR);
     assert_eq!(ack_all(&mut e, &opened), 4);
     let list = e
         .answer(
@@ -1873,7 +1885,7 @@ fn four_late_reminders_said_are_kept_as_said_and_wait_for_an_answer() {
     for one in said {
         assert_eq!(one["waiting_for_answer"], true, "{one}");
         assert_eq!(one["on_time"], false);
-        assert!(one["late_by_ms"].as_u64().unwrap() > 30 * HOUR);
+        assert!(one["late_by_ms"].as_u64().unwrap() > lamp_schedule::engine::SAID_LATE_MS);
         assert!(one["said_local"].as_str().is_some() && one["said_day"].as_str().is_some());
     }
     // They survive a restart.
@@ -1889,14 +1901,16 @@ fn said_of(engine: &mut Engine<Disk>, at: &ClockSample, person: &str) -> Vec<Val
 fn a_line_after_a_late_one_notices_it_and_the_grace_ends_the_wait() {
     let at = now(0);
     let mut e = open(Disk::default(), &at);
+    // Set for three hours, a reminder, not a kitchen timer: said an hour
+    // late, not too late (#5258).
     set_when(
         &mut e,
         &at,
         "Stretch",
         Some(ANN),
-        When::After { seconds: 60 },
+        When::After { seconds: 3 * 3_600 },
     );
-    let late = now(HOUR);
+    let late = now(4 * HOUR);
     assert_eq!(ack_all(&mut e, &late), 1);
     assert_eq!(said_of(&mut e, &late, ANN)[0]["waiting_for_answer"], true);
     let revision = e.revision();
@@ -1916,12 +1930,12 @@ fn a_line_after_a_late_one_notices_it_and_the_grace_ends_the_wait() {
         &late,
         "Pills",
         Some(ANN),
-        When::After { seconds: 60 },
+        When::After { seconds: 3 * 3_600 },
     );
-    let later = now(2 * HOUR);
+    let later = now(8 * HOUR);
     ack_all(&mut e, &later);
     assert_eq!(said_of(&mut e, &later, ANN)[0]["waiting_for_answer"], true);
-    let after_grace = now(4 * HOUR + 1);
+    let after_grace = now(10 * HOUR + 1);
     assert_eq!(
         said_of(&mut e, &after_grace, ANN)[0]["waiting_for_answer"],
         false
@@ -1979,6 +1993,9 @@ fn a_line_hears_its_own_and_the_rooms_said_ones_and_a_forget_takes_theirs() {
     set_by(&mut e, &at, "Water the plant", None);
     // The room's reminder and timer: every line hears them.
     timer_by(&mut e, &at, "Pasta", None);
+    // Each said when it is due: hours late, the room's two would be too
+    // late to be said at all (#5258).
+    ack_all(&mut e, &now(600_000));
     ack_all(&mut e, &now(4 * HOUR));
     let at = now(4 * HOUR);
     let mut ann = texts_of(&said_of(&mut e, &at, ANN))
@@ -2128,4 +2145,212 @@ fn list_set_says_when_each_was_set_to_the_millisecond() {
         .map(|i| i["set_unix_ms"].as_i64().unwrap())
         .collect();
     assert_eq!(set, [WALL, WALL + 29_000]);
+}
+
+// #5258, #5219: a reminder or timer too late to mean anything is dropped,
+// never said, and the store keeps it as dropped late.
+
+use lamp_schedule::engine::{REMINDER_TOO_LATE_MS, TIMER_TOO_LATE_MS};
+
+/// The store's record of those dropped too late, as written.
+fn dropped_late(disk: &Disk) -> Vec<Value> {
+    let bytes = disk.0.lock().unwrap().bytes.clone().unwrap();
+    let stored: Value = serde_json::from_slice(&bytes).unwrap();
+    stored["dropped_late"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+}
+
+#[test]
+fn a_timer_ten_minutes_late_still_rings_and_one_a_second_more_is_dropped() {
+    let disk = Disk::default();
+    let mut e = open(disk.clone(), &now(0));
+    set(&mut e, &now(0), 60);
+    let ten = now(60_000 + TIMER_TOO_LATE_MS);
+    e.tick(&ten).unwrap();
+    let oldest = due(&e, &ten).oldest.unwrap();
+    assert_eq!(oldest.id, 1);
+    assert_eq!(oldest.late_by_ms, Some(TIMER_TOO_LATE_MS));
+    assert!(dropped_late(&disk).is_empty());
+
+    let over = now(60_000 + TIMER_TOO_LATE_MS + 1_000);
+    e.tick(&over).unwrap();
+    assert!(due(&e, &over).oldest.is_none());
+    assert_eq!(e.counts(&over), (0, 0, 0));
+    let dropped = dropped_late(&disk);
+    assert_eq!(dropped.len(), 1);
+    assert_eq!(dropped[0]["id"], 1);
+    assert_eq!(dropped[0]["timer"], true);
+    assert_eq!(dropped[0]["late_by_ms"], TIMER_TOO_LATE_MS + 1_000);
+    assert_eq!(dropped[0]["waiting"], false);
+    // Never told as said.
+    assert!(said(&mut e, &over, None).is_empty());
+}
+
+#[test]
+fn a_reminder_two_hours_late_still_rings_and_one_a_second_more_is_dropped() {
+    let disk = Disk::default();
+    let mut e = open(disk.clone(), &now(0));
+    // 08:10 in the lamp's zone (now(0) is 08:00 UTC).
+    let id = set_by(&mut e, &now(0), "Water the plant", None);
+    // Set for three hours from now: a reminder, kept as one, not a timer.
+    let long = set_when(
+        &mut e,
+        &now(0),
+        "Renew the prescription",
+        None,
+        When::After { seconds: 3 * 3_600 },
+    );
+    let due_ms = 600_000;
+    let two = now(due_ms + REMINDER_TOO_LATE_MS);
+    e.tick(&two).unwrap();
+    let oldest = due(&e, &two).oldest.unwrap();
+    assert_eq!(oldest.id, id);
+    assert_eq!(oldest.late_by_ms, Some(REMINDER_TOO_LATE_MS));
+
+    let over = now(due_ms + REMINDER_TOO_LATE_MS + 1_000);
+    e.tick(&over).unwrap();
+    assert_eq!(e.counts(&over).0, 1, "only the three-hour one is left");
+    let dropped = dropped_late(&disk);
+    assert_eq!(dropped.len(), 1);
+    assert_eq!(dropped[0]["id"], id);
+    assert_eq!(dropped[0]["timer"], false);
+    assert_eq!(dropped[0]["late_by_ms"], REMINDER_TOO_LATE_MS + 1_000);
+
+    // The three-hour one half an hour late: a timer's ten minutes would
+    // have dropped it; a reminder's two hours keep it.
+    let half = now(3 * HOUR + 30 * 60_000);
+    e.tick(&half).unwrap();
+    let oldest = due(&e, &half).oldest.unwrap();
+    assert_eq!(oldest.id, long);
+    assert_eq!(oldest.late_by_ms, Some(30 * 60_000));
+}
+
+/// Due before midnight in the lamp's zone and offered after it: from an
+/// earlier day, it is dropped, however few minutes late. The same lateness
+/// before midnight is said. The lamp's zone, not UTC, draws the line.
+#[test]
+fn a_reminder_due_before_local_midnight_is_dropped_after_it() {
+    let disk = Disk::default();
+    // 15:00 in Ho Chi Minh City (now(0) is 08:00 UTC); midnight there is
+    // 17:00 UTC.
+    let mut e = Engine::open(disk.clone(), "Asia/Ho_Chi_Minh", &now(0), STORE).unwrap();
+    let at = |time: &str| When::At {
+        time: time.into(),
+        day: None,
+        zone: None,
+        fold: None,
+    };
+    let earlier = set_when(&mut e, &now(0), "Lock the door", None, at("23:40"));
+    let later = set_when(&mut e, &now(0), "Take the pills", None, at("23:50"));
+    // 23:55: both late, on their own day, so both are said.
+    let before = now(8 * HOUR + 55 * 60_000);
+    e.tick(&before).unwrap();
+    assert_eq!(due(&e, &before).pending, 2);
+    assert_eq!(due(&e, &before).oldest.unwrap().id, earlier);
+
+    // 00:05 the next day: 25 and 15 minutes late, from yesterday.
+    let after = now(9 * HOUR + 5 * 60_000);
+    e.tick(&after).unwrap();
+    assert!(due(&e, &after).oldest.is_none());
+    let dropped: Vec<_> = dropped_late(&disk)
+        .iter()
+        .map(|d| (d["id"].as_u64().unwrap(), d["late_by_ms"].as_u64().unwrap()))
+        .collect();
+    assert_eq!(dropped, [(earlier, 25 * 60_000), (later, 15 * 60_000)]);
+}
+
+/// lamp-e82d (#5258): a one-minute timer due 21:49:37 rang into a sleep
+/// mute, was never proven said, and came back 18.4 hours later as the lamp
+/// woke. Waiting out the mute, still unacknowledged, it is dropped once it
+/// is ten minutes late, so the waking lamp finds nothing to ring. One that
+/// comes due while Schedule itself was down is dropped on its first look.
+#[test]
+fn a_timer_waiting_out_a_sleep_mute_is_dropped_not_rung_when_the_lamp_wakes() {
+    let disk = Disk::default();
+    let mut e = open(disk.clone(), &now(0));
+    set(&mut e, &now(0), 60);
+    // Due, offered and never acknowledged: the voice is muted.
+    let muted = now(60_000 + 5 * 60_000);
+    e.tick(&muted).unwrap();
+    assert_eq!(due(&e, &muted).pending, 1);
+    // The lamp wakes 18.4 hours on.
+    let woke = now(60_000 + 66_240_000);
+    e.tick(&woke).unwrap();
+    assert_eq!(due(&e, &woke).pending, 0);
+    assert!(due(&e, &woke).oldest.is_none());
+    assert_eq!(dropped_late(&disk).len(), 1);
+    // It stays dropped across a restart.
+    drop(e);
+    let mut e = open(disk.clone(), &woke);
+    e.tick(&woke).unwrap();
+    assert_eq!(e.counts(&woke), (0, 0, 0));
+
+    // Set, then Schedule is down past its time: its first look drops it.
+    let set_at = now(70_000_000);
+    set(&mut e, &set_at, 60);
+    drop(e);
+    let mut back = now(70_000_000 + 60_000 + HOUR);
+    back.boot_id = "boot-b".into();
+    back.boot_ms = 5_000;
+    let mut e = open(disk.clone(), &back);
+    e.tick(&back).unwrap();
+    assert!(due(&e, &back).oldest.is_none());
+    let dropped = dropped_late(&disk);
+    assert_eq!(dropped.len(), 2);
+    assert_eq!(dropped[1]["late_by_ms"], HOUR);
+}
+
+/// A daily reminder missed by more than two hours: that day's is dropped,
+/// and the next goes on, as an acknowledged one does.
+#[test]
+fn a_repeat_too_late_drops_only_that_occurrence() {
+    let disk = Disk::default();
+    let mut e = open(disk.clone(), &now(0));
+    create(
+        &mut e,
+        &now(0),
+        When::Daily {
+            time: "09:00".into(),
+            zone: None,
+        },
+    );
+    let first = get(&mut e, &now(0), 1)["due_unix_ms"].as_i64().unwrap();
+    drop(e);
+    let mut at = now(0);
+    at.boot_id = "boot-b".into();
+    at.boot_ms = 1_000;
+    at.unix_ms = first + 3 * HOUR as i64;
+    let mut e = open(disk.clone(), &at);
+    e.tick(&at).unwrap();
+    assert!(due(&e, &at).oldest.is_none());
+    let item = get(&mut e, &at, 1);
+    assert_eq!(item["delivery"], 2);
+    assert_eq!(item["due_unix_ms"].as_i64(), Some(first + 86_400_000));
+    assert_eq!(dropped_late(&disk)[0]["late_by_ms"], 3 * HOUR);
+}
+
+/// A clock not yet trusted tells no lateness: nothing is dropped on it.
+#[test]
+fn nothing_is_dropped_on_a_clock_not_yet_trusted() {
+    let disk = Disk::default();
+    let mut e = open(disk.clone(), &now(0));
+    set_by(&mut e, &now(0), "Water the plant", None);
+    drop(e);
+    let mut at = now(10 * HOUR);
+    at.boot_id = "boot-b".into();
+    at.boot_ms = 1_000;
+    at.wall_trusted = false;
+    let mut e = open(disk.clone(), &at);
+    e.tick(&at).unwrap();
+    assert_eq!(e.counts(&at).0, 1);
+    assert!(
+        disk.0
+            .lock()
+            .unwrap()
+            .bytes
+            .as_ref()
+            .is_some_and(|b| { !String::from_utf8_lossy(b).contains("dropped_late") })
+    );
 }

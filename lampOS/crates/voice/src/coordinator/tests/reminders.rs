@@ -1144,7 +1144,11 @@ fn reset_or_playback_gap_cannot_be_relabeled_whole_reminder_completion() {
             })
             .unwrap();
         } else {
-            test.reply.as_mut().unwrap().playback_gaps = 1;
+            // A gap whose zeros leave its words under 80% of what was
+            // written: 240 of 304 frames (#5258).
+            let current = test.reply.as_mut().unwrap();
+            current.playback_gaps = 1;
+            current.gap_zeros = GapZeros { total: 64, open: 0 };
         }
         assert!(answered.try_recv().is_err());
         test.provider_complete();
@@ -1164,6 +1168,116 @@ fn reset_or_playback_gap_cannot_be_relabeled_whole_reminder_completion() {
         );
         assert!(answered.try_recv().is_err());
     }
+}
+
+/// #5258, #5219 (lamp-e82d): a reminder that played through gaps in its
+/// playback counts as said when its words were at least 80% of what the
+/// speaker wrote for it, the rest the zeros of the gaps, and is answered
+/// spoken. At 79% it is not, and is offered once more as before.
+#[test]
+fn a_reminder_played_through_gaps_counts_as_said_from_80_percent_of_its_words() {
+    let clock = crate::scenario_clock::Scope::enter(Duration::from_secs(24)).unwrap();
+    clock.set_pump(|_| Ok(())).unwrap();
+    // Five blocks of words, 1_200 frames: 300 zeros make 80%, 320 make 79%.
+    for (zeros, said) in [(300, true), (320, false)] {
+        let mut test = Test::new();
+        let answered = test.ask_skill();
+        let chunk = test.generation(17);
+        test.accept(&chunk, 240);
+        test.retire(&chunk);
+        let current = test.reply.as_mut().unwrap();
+        // The words of four more blocks, played through the same gaps.
+        current.handed += 4 * 240;
+        // A gap's start carries its first block of zeros; its end, all.
+        let mut gap = crate::wire::PlaybackGap {
+            owner: current.owner,
+            first_sample: PlaybackCursor {
+                epoch: 1,
+                frame: 240,
+            },
+            end_sample: PlaybackCursor {
+                epoch: 1,
+                frame: 480,
+            },
+            started_at_us: 1,
+            last_zero_accepted_at_us: 1,
+            zero_frames: 240,
+        };
+        handle_playback_gap(
+            &mut test.reply,
+            None,
+            &mut test.trace,
+            WorkerEvent::PlaybackGap {
+                phase: PlaybackGapPhase::Started,
+                gap,
+                observed_at_us: 1,
+            },
+            false,
+            None,
+        )
+        .unwrap();
+        gap.end_sample.frame = 240 + zeros;
+        gap.zero_frames = zeros;
+        gap.last_zero_accepted_at_us = 2;
+        handle_playback_gap(
+            &mut test.reply,
+            None,
+            &mut test.trace,
+            WorkerEvent::PlaybackGap {
+                phase: PlaybackGapPhase::Resumed,
+                gap,
+                observed_at_us: 2,
+            },
+            false,
+            None,
+        )
+        .unwrap();
+        let current = test.reply.as_ref().unwrap();
+        assert_eq!(current.playback_gaps, 1);
+        assert_eq!(current.gap_zeros.total, zeros);
+        test.provider_complete();
+        assert!(test.finish_if_settled());
+        if said {
+            assert!(matches!(
+                test.probe.settlement(),
+                Some(ToWorker::Complete { .. })
+            ));
+            assert_eq!(answered.try_recv(), Ok(Answer::Done(Outcome::Spoken)));
+        } else {
+            assert!(matches!(
+                test.probe.settlement(),
+                Some(ToWorker::Abandon {
+                    no_audio: false,
+                    ..
+                })
+            ));
+            assert_eq!(
+                answered.try_recv(),
+                Ok(Answer::Done(Outcome::Dropped(
+                    "audio_written_with_playback_gaps_unscored".into()
+                )))
+            );
+        }
+    }
+}
+
+/// A listening gap's zeros held at a sentence's end (#828) are no delivery
+/// gap's and never count against the words; once they ran on past the
+/// hold, all of them do.
+#[test]
+fn a_listening_gaps_zeros_count_against_the_words_only_once_it_overran() {
+    let mut zeros = GapZeros::default();
+    zeros.receipt(PlaybackGapPhase::Started, 240, true, false);
+    zeros.receipt(PlaybackGapPhase::Resumed, 6_000, true, false);
+    assert_eq!(zeros.total, 0);
+    zeros.receipt(PlaybackGapPhase::Started, 240, true, false);
+    zeros.receipt(PlaybackGapPhase::Resumed, 6_000, true, true);
+    assert_eq!(zeros.total, 6_000);
+    // A delivery gap: its start's block, then the rest at its end.
+    zeros.receipt(PlaybackGapPhase::Started, 240, false, false);
+    assert_eq!(zeros.total, 6_240);
+    zeros.receipt(PlaybackGapPhase::Cancelled, 500, false, false);
+    assert_eq!(zeros.total, 6_500);
 }
 
 #[test]
@@ -1738,7 +1852,8 @@ fn a_reminder_cancelled_while_muted_is_never_said() {
 /// lateness with its words.
 #[test]
 fn a_mute_past_an_hour_leaves_the_reminder_to_the_one_hour_rule() {
-    let mut fixture = RoundtripFixture::new();
+    // A reminder: a timer an hour late is too late to ring at all (#5258).
+    let mut fixture = RoundtripFixture::of_reminders();
     let on_time = fixture.offer();
     assert!(
         on_time
@@ -2124,7 +2239,7 @@ fn user_interruption_cannot_retry_a_failed_provider_with_unretired_audio() {
 }
 
 /// 29e7, 2 Nov, replayed: four one-time reminders due while the
-/// microphones were closed, 13 hours late when they open, and the person
+/// microphones were closed, half an hour late when they open, and the person
 /// already talking. They are one offer, the oldest with the other three
 /// joined; it waits while the person talks and begins at a pause; the
 /// provider is given all four in one note, to be said once, together.
@@ -2134,9 +2249,12 @@ fn four_overdue_reminders_as_the_microphones_open_mid_talk_are_one_line_at_a_pau
     // The real Stores sync each prepare: on the stepped scenario clock a
     // busy host's disk cannot spend the 250 ms socket budget (lampOS#935).
     let _clock = crate::scenario_clock::Scope::enter(std::time::Duration::from_secs(24)).unwrap();
-    let mut fixture = RoundtripFixture::new();
+    // Reminders half an hour late: 29e7's were 13 to 38 hours late, too
+    // late to be said now, and a timer more than ten minutes late is
+    // dropped (#5258).
+    let mut fixture = RoundtripFixture::of_reminders();
     fixture.set_more(&["Send the report", "Buy the gift", "Water timer"]);
-    fixture.advance_wall(13 * 3_600_000);
+    fixture.advance_wall(30 * 60_000);
     let offer = fixture.offer();
     assert!(offer.late && offer.late_line(), "{offer:?}");
     assert_eq!(

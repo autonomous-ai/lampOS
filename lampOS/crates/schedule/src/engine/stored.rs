@@ -77,6 +77,7 @@ pub(super) fn read(bytes: &[u8]) -> Result<Read, Error> {
     // A said record this build can't use is dropped, never the store.
     let next_id = state.next_id;
     state.said.retain(|said| said.valid(next_id));
+    state.dropped_late.retain(|said| said.valid(next_id));
     // A future request or reply cannot be used as this build's retry cache.
     // Keep the committed revision: an old guard cannot run the mutation again.
     if state.check().is_err() && state.last_receipt.is_some() {
