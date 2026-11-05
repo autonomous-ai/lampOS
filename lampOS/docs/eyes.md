@@ -1419,7 +1419,19 @@ With the switch:
     you, Marie! May I remember your face?" "Yes.") is no read-back, since
     its yes may answer only the face (`known_faces::said_back`). Otherwise
     nothing is sent and the model is told to say the name back and ask if
-    it is right (`SAY_IT_BACK`). `replace` still needs the read-back in the
+    it is right (`SAY_IT_BACK`). The voice keeps that refused save
+    (`second_provider::HeldSave`, as a held forget is kept) and runs it
+    itself on the person's next turn when that turn is a plain yes to the
+    read-back (`known_faces::held_save_verdict`), through the same runner
+    and check as a model call, so it counts as the walk's face save; the
+    model is told the face is kept, and a model call after it gets
+    `ALREADY_KEPT`, never a second save. A correction, a spelling, another
+    name, a no, a new save call, a second face seen speaking the yes (or,
+    where the eyes read speaking, the speaker not seen saying it), a line
+    held by a face's gap, another session or 45 s (`HELD_SAVE_FOR`) drops
+    it (lamp-52e6, 5 Nov, #5391's check: "Walter. Have I got that
+    right?" "Yes, that's my name." made no call and kept no face).
+    `replace` still needs the read-back in the
     lamp's last answer (`known_faces::agreed_to`).
   - **Spelled:** a name not heard is asked for spelled out (`NOT_HEARD`).
     When the lamp's last answer asked them to spell
