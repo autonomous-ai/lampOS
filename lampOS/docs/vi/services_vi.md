@@ -900,7 +900,7 @@ hai lần bị mô hình trả về thành thêm một khóa bên trong, bị t�
 
 | Đạt khi | Đọc từ | Nếu không |
 |---|---|---|
-| Đã đăng ký khuôn mặt chủ đèn | Tên chủ đèn gõ lúc cài đặt (`LAMP_SKILLS_OWNER_FILE`; `lamp-skills.service` của sản phẩm cho nó là `%d/owner`, `LoadCredential=owner:/etc/lampOS/person/name` với `SetCredential=owner:` làm giá trị rỗng dự phòng, nên một đèn không có tên bỏ qua việc đọc mà unit vẫn khởi động) và tệp known của mắt | "no owner's face enrolled": bỏ qua ngay (cả khi tên rỗng) |
+| Đã đăng ký khuôn mặt chủ đèn | Tên chủ đèn gõ lúc cài đặt (`LAMP_SKILLS_OWNER_FILE`; `lamp-skills.service` của sản phẩm cho nó là `%d/owner`, `LoadCredential=owner:/etc/lampOS/person/name` với `SetCredential=owner:\n` làm giá trị trống dự phòng, nên một đèn không có tên bỏ qua việc đọc mà unit vẫn khởi động; một dấu xuống dòng, không bao giờ rỗng, vì systemd 252 làm hỏng bước CREDENTIALS khi `SetCredential=` rỗng mà thiếu tệp hoặc thư mục của nó, lamp-75c9, 5 Nov) và tệp known của mắt | "no owner's face enrolled": bỏ qua ngay (cả khi tên rỗng) |
 | Không riêng tư: micro được biết là mở, đèn không ngủ hay tắt tiếng | `routine::kept_asleep`, `voice/privacy` (`permitted`) | "private" |
 | Không tạm dừng (thay cho chế độ không làm phiền) | `lamp/pause` | "paused" |
 | Không trong giờ yên lặng: 22:00–07:00 địa phương, hoặc `[quiet]` của kỹ năng; giờ địa phương không rõ thì tính là yên lặng | `lamp_local_time::quiet_hours` | "quiet hours" |
