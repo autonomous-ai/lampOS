@@ -301,7 +301,8 @@ pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf
 /// `tests/install.rs` holds the two lists equal). Twenty-one keep their
 /// folders' own default: twenty enabled, Bedtime and Morning disabled by its
 /// own `enabled = false` until its lamp comparison (#1672), and Comfort break
-/// by its own until `LAMP_NUDGES_PRESENT=on` (#5207); those of
+/// by its own but on by its `[present]` with `LAMP_NUDGES_PRESENT=on`, which
+/// the product's skills units set (#5207); those of
 /// [`PRODUCT_SKILLS_OFF`] are installed disabled until their lamp checks,
 /// so none of their functions reach a session.
 /// Every behaviour that has a skill runs as the skill (the owner, 19 Oct):
@@ -343,9 +344,10 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     "stand-up",
     "wind-down",
     // A short break after a long sitting (#3504, #5207): V1's bathroom-break
-    // reminder, shipped off by its own `enabled = false` and on only with
-    // `LAMP_NUDGES_PRESENT=on` (its `[present]`), until its played check.
-    // Its function is the nudges' one `wellbeing_nudges`, no new one.
+    // reminder, shipped off by its own `enabled = false` and on by its
+    // `[present]` with `LAMP_NUDGES_PRESENT=on`, which `lamp-skills.service`,
+    // `lamp-skills-manage@.service` and `lamp-cloud.service` set: after 90
+    // minutes. Its function is the nudges' one `wellbeing_nudges`, no new one.
     "comfort-break",
     // Sit back (#3694, #5208): V1's posture reminder brought back, a core
     // skill since its played check with a person on lamp-9adf (4 Nov). It
