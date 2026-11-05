@@ -3,392 +3,509 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Meet your Lamp</title>
+<title>The Lamp Awakens</title>
+<!-- Two comic faces from Google Fonts; without them the page falls back to Impact and the system sans. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  /* A story you flip through, one idea a page. Each chapter has one flat colour; the lamp's warm light runs through all of them. */
+  /* A comic book, issue #1: inked panels on halftone paper, read as a two-page spread you turn. */
   :root {
-    --ink: #10141f;
-    --cream: #fff7ea;
-    --amber: #ffb547;
-    --sky: #7cc0ff;
-    --mint: #8fe3b4;
-    --coral: #ff8f73;
-    --display: "Avenir Next", "Futura", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
-    --body: -apple-system, "Segoe UI", system-ui, Roboto, "Helvetica Neue", sans-serif;
+    --ink: #111216;
+    --paper: #fff8e7;
+    --yellow: #ffd23f;
+    --red: #ff4b3e;
+    --blue: #2f80ed;
+    --sky: #8fd3ff;
+    --night: #15183a;
+    --display: "Bangers", Impact, "Arial Black", sans-serif;
+    --body: "Comic Neue", "Chalkboard SE", "Trebuchet MS", system-ui, sans-serif;
     --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    color-scheme: dark;
+    color-scheme: light;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
-  body { background: var(--ink); color: var(--cream); font: 18px/1.5 var(--body); overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: #121320 radial-gradient(circle at 50% 0%, #2c2f4a 0%, #121320 70%);
+    color: var(--ink); font: 17px/1.35 var(--body); overflow: hidden;
+    display: grid; place-items: center; -webkit-tap-highlight-color: transparent;
+  }
 
-  .story { position: relative; height: 100%; width: 100%; max-width: 520px; margin: 0 auto; overflow: hidden; }
-  @media (min-width: 700px) { .story { height: min(100%, 920px); top: 50%; transform: translateY(-50%); border-radius: 28px; box-shadow: 0 40px 120px rgba(0,0,0,.55); } }
+  /* the book */
+  .stage { width: min(1200px, 96vw); display: grid; gap: 14px; justify-items: center; }
+  .book { position: relative; width: 100%; aspect-ratio: 2 / 1.38; max-height: 84vh; perspective: 2600px; }
+  .book.single { aspect-ratio: 1 / 1.45; max-height: 82vh; width: min(560px, 96vw); }
+  .leaf { position: absolute; top: 0; left: 50%; width: 50%; height: 100%; transform-style: preserve-3d;
+          transform-origin: left center; transition: transform .95s cubic-bezier(.3,.1,.2,1); cursor: pointer; }
+  .book.single .leaf { left: 0; width: 100%; transition: transform .75s cubic-bezier(.3,.1,.2,1), opacity .2s .55s; }
+  .leaf.flipped { transform: rotateY(-180deg); }
+  .book.single .leaf.flipped { opacity: 0; pointer-events: none; }
+  .face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; overflow: hidden; }
+  .face.back { transform: rotateY(180deg); box-shadow: inset -14px 0 18px -14px rgba(0,0,0,.45); }
+  .face.front { box-shadow: inset 14px 0 18px -14px rgba(0,0,0,.45); }
+  .book.single .face.front { box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+  @media (prefers-reduced-motion: reduce) { .leaf { transition: none !important; } }
 
-  /* progress bars */
-  .bars { position: absolute; z-index: 5; top: 0; left: 0; right: 0; display: flex; gap: 4px; padding: calc(12px + env(safe-area-inset-top)) 14px 0; }
-  .bars i { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.28); overflow: hidden; }
-  .bars i b { display: block; height: 100%; width: 0; background: currentColor; transition: width .25s ease; }
-  .bars i.done b { width: 100%; }
-  .top { position: absolute; z-index: 5; top: calc(26px + env(safe-area-inset-top)); left: 14px; right: 14px; display: flex; justify-content: space-between; align-items: center; }
-  .chapter-name { font: 500 14px var(--display); letter-spacing: .08em; text-transform: uppercase; opacity: .8; }
-  .menu-btn { font: 700 14px var(--display); color: inherit; background: rgba(255,255,255,.16); border: 0; border-radius: 999px; padding: 7px 13px; cursor: pointer; }
-  .on-light .menu-btn { background: rgba(16,20,31,.10); }
-  .on-light .bars i { background: rgba(16,20,31,.18); }
+  /* a comic page */
+  .page {
+    position: absolute; inset: 0; padding: 4.2% 4.4% 6%; display: grid; gap: 3.2%;
+    background-color: var(--paper);
+    background-image: radial-gradient(rgba(17,18,22,.10) 1px, transparent 1.4px);
+    background-size: 9px 9px;
+  }
+  .folio { position: absolute; bottom: 1.8%; font: 15px var(--display); letter-spacing: .06em; color: rgba(17,18,22,.55); }
+  .face.front .folio { right: 5%; } .face.back .folio { left: 5%; }
+  .book.single .folio { right: 5%; left: auto; }
 
-  /* pages */
-  .page { position: absolute; inset: 0; padding: calc(86px + env(safe-area-inset-top)) 28px calc(92px + env(safe-area-inset-bottom));
-          display: none; flex-direction: column; justify-content: space-between; }
-  .page.on { display: flex; animation: in .35s ease-out both; }
-  .page.back.on { animation-name: inback; }
-  @keyframes in { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
-  @keyframes inback { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
-  @media (prefers-reduced-motion: reduce) { .page.on { animation: none; } .glow { animation: none !important; } }
+  .panel { position: relative; border: 4px solid var(--ink); border-radius: 4px; box-shadow: 5px 5px 0 var(--ink);
+           overflow: hidden; background: #fff; min-height: 0; }
+  .panel > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 
-  .art { flex: 1; display: grid; place-items: center; min-height: 0; }
-  .art svg { width: min(100%, 360px); height: auto; max-height: 100%; }
-  h1, h2 { font-family: var(--display); font-weight: 800; letter-spacing: -.02em; text-wrap: balance; margin: 0; }
-  h1 { font-size: clamp(46px, 13vw, 68px); line-height: .95; }
-  h2 { font-size: clamp(34px, 9.4vw, 48px); line-height: 1.0; }
-  .copy p { margin: 14px 0 0; font-size: 19px; opacity: .86; max-width: 30ch; }
-  .kicker { font: 500 15px var(--display); letter-spacing: .12em; text-transform: uppercase; margin: 0 0 12px; opacity: .8; }
+  .halftone-y { background: var(--yellow) radial-gradient(rgba(255,120,0,.38) 2px, transparent 2.6px) 0 0/12px 12px; }
+  .halftone-r { background: var(--red) radial-gradient(rgba(120,0,0,.32) 2px, transparent 2.6px) 0 0/12px 12px; }
+  .halftone-b { background: var(--blue) radial-gradient(rgba(0,20,80,.35) 2px, transparent 2.6px) 0 0/12px 12px; }
+  .halftone-s { background: var(--sky) radial-gradient(rgba(0,70,140,.25) 2px, transparent 2.6px) 0 0/12px 12px; }
+  .nightfill { background: var(--night) radial-gradient(rgba(255,255,255,.08) 1.5px, transparent 2px) 0 0/10px 10px; }
+  .burst { background: repeating-conic-gradient(from 0deg at 50% 55%, var(--yellow) 0 6deg, #ffe680 6deg 12deg); }
+  .burst-r { background: repeating-conic-gradient(from 0deg at 50% 50%, var(--red) 0 6deg, #ff7b6e 6deg 12deg); }
 
-  /* speech: what you say, what the lamp says */
-  .you, .lamp { display: inline-block; font: 600 22px/1.25 var(--display); padding: 12px 16px; border-radius: 22px; max-width: 100%; }
-  .you { background: var(--cream); color: var(--ink); border-bottom-right-radius: 6px; }
-  .lamp { background: var(--ink); color: var(--amber); border-bottom-left-radius: 6px; box-shadow: 0 0 0 2px rgba(255,181,71,.35); }
-  .who { display: block; font: 700 12px var(--body); letter-spacing: .1em; text-transform: uppercase; opacity: .6; margin-bottom: 4px; }
-  .bubbles { display: grid; gap: 10px; justify-items: start; }
-  .bubbles .right { justify-self: end; }
+  /* lettering */
+  .caption { position: absolute; z-index: 2; background: #ffe680; border: 3px solid var(--ink); padding: 6px 10px;
+             font: 700 15px/1.25 var(--body); text-transform: uppercase; letter-spacing: .02em; max-width: 80%; box-shadow: 3px 3px 0 var(--ink); }
+  .caption.tl { top: 8px; left: 8px; } .caption.br { bottom: 8px; right: 8px; } .caption.bl { bottom: 8px; left: 8px; }
+  .balloon { position: absolute; z-index: 2; background: #fff; border: 3px solid var(--ink); border-radius: 22px; padding: 9px 13px;
+             font: 700 16px/1.25 var(--body); max-width: 72%; box-shadow: 2px 2px 0 var(--ink); }
+  .balloon::after { content: ""; position: absolute; width: 18px; height: 18px; background: inherit; border-right: 3px solid var(--ink); border-bottom: 3px solid var(--ink); }
+  .balloon.down::after { bottom: -11px; left: 26px; transform: rotate(45deg) skew(10deg, 10deg); }
+  .balloon.down-r::after { bottom: -11px; right: 26px; transform: rotate(45deg) skew(10deg, 10deg); }
+  .balloon.lamp { background: #fff3d1; }
+  .balloon .who { display: block; font: 13px var(--display); letter-spacing: .08em; color: #a05a00; }
+  .balloon.you .who { color: #1d5fb8; }
+  .sfx { position: absolute; z-index: 3; font: clamp(28px, 4.6vw, 60px)/1 var(--display); letter-spacing: .03em; color: var(--yellow);
+         -webkit-text-stroke: 2.5px var(--ink); paint-order: stroke fill; text-shadow: 4px 4px 0 var(--red); transform: rotate(-9deg); }
+  .sfx.blue { color: var(--sky); text-shadow: 4px 4px 0 var(--blue); }
+  .title { font: clamp(30px, 4.4vw, 62px)/.92 var(--display); letter-spacing: .03em; -webkit-text-stroke: 1.5px var(--ink); paint-order: stroke fill; margin: 0; }
+  .text-panel { padding: 16px 18px; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+  .text-panel h3 { margin: 0; font: clamp(22px, 2.5vw, 34px)/1 var(--display); letter-spacing: .04em; }
+  .text-panel p { margin: 0; font-size: 16px; }
+  .chap { font-size: clamp(28px, 3.3vw, 46px); color: var(--yellow); }
 
-  /* chapter colours */
-  .c-cover { background: radial-gradient(120% 70% at 70% 30%, #3a2a10 0%, var(--ink) 62%); color: var(--cream); }
-  .c-amber { background: var(--amber); color: var(--ink); }
-  .c-night { background: #141b2c; color: var(--cream); }
-  .c-sky   { background: var(--sky); color: var(--ink); }
-  .c-mint  { background: var(--mint); color: var(--ink); }
-  .c-coral { background: var(--coral); color: var(--ink); }
-  .c-code  { background: #07090f; color: var(--cream); }
-  .chapter-card h1 { font-size: clamp(56px, 16vw, 86px); }
-  .num { font: 800 clamp(120px, 40vw, 200px)/.8 var(--display); opacity: .16; margin: 0 0 -10px -6px; }
-
-  .term { width: 100%; border-radius: 18px; background: #0f131d; border: 1px solid #263048; overflow: hidden; text-align: left; }
-  .term .tbar { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid #263048; }
-  .term .tbar i { width: 10px; height: 10px; border-radius: 50%; background: #2f3a55; }
-  .term pre { margin: 0; padding: 14px 16px; font: 13px/1.75 var(--mono); color: #dbe3f2; white-space: pre-wrap; word-break: break-word; }
-  .term .p { color: var(--amber); } .term .c { color: #6f7c99; }
-
-  .phone { width: 210px; aspect-ratio: 9/18; border-radius: 34px; padding: 10px; background: var(--ink); box-shadow: 0 24px 50px rgba(0,0,0,.28); }
-  .screen { height: 100%; border-radius: 26px; background: #f6f7fb; color: var(--ink); padding: 18px 14px; display: flex; flex-direction: column; gap: 9px; }
-  .screen .bar { width: 64px; height: 5px; border-radius: 3px; background: #d7dbe6; margin: 0 auto 4px; }
-  .screen .t { font: 800 19px var(--display); }
-  .screen .row { padding: 10px 12px; border-radius: 12px; background: #fff; border: 1px solid #e3e6ef; font-size: 14px; display: flex; justify-content: space-between; }
-  .screen .row small { color: #6b7488; }
-  .screen .cta { margin-top: auto; text-align: center; padding: 11px; border-radius: 12px; background: var(--ink); color: #fff; font: 700 15px var(--display); }
-  .screen .cta.amber { background: var(--amber); color: var(--ink); }
-
-  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
-  .tiles div { border-radius: 18px; padding: 16px; background: rgba(16,20,31,.08); font: 800 19px/1.15 var(--display); }
-  .tiles div small { display: block; margin-top: 10px; font: 700 13px var(--body); opacity: .65; }
+  .phone { position: absolute; z-index: 2; left: 50%; top: 50%; width: 44%; aspect-ratio: 9/17; transform: translate(-50%, -50%) rotate(-4deg);
+           border: 4px solid var(--ink); border-radius: 26px; background: var(--ink); padding: 7px; box-shadow: 5px 5px 0 rgba(0,0,0,.35); }
+  .screen { height: 100%; border-radius: 18px; background: #fff; padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; font: 700 13px var(--body); }
+  .screen .t { font: 20px var(--display); letter-spacing: .04em; }
+  .screen .r { border: 2px solid var(--ink); border-radius: 8px; padding: 6px 8px; display: flex; justify-content: space-between; }
+  .screen .b { margin-top: auto; text-align: center; padding: 8px; border-radius: 8px; background: var(--red); color: #fff; font: 18px var(--display); letter-spacing: .06em; border: 2px solid var(--ink); }
+  .term { position: absolute; inset: 12% 7% 10%; z-index: 2; background: #0c0d14; border: 4px solid var(--ink); border-radius: 8px; box-shadow: 5px 5px 0 rgba(0,0,0,.4); overflow: hidden; }
+  .term pre { margin: 0; padding: 12px 14px; color: #e8ecf6; font: 12.5px/1.65 var(--mono); white-space: pre-wrap; word-break: break-word; }
+  .term .p { color: var(--yellow); } .term .c { color: #7d89a6; }
+  .tiles { position: absolute; inset: 18% 8% 8%; z-index: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .tiles div { background: #fff; border: 3px solid var(--ink); border-radius: 6px; box-shadow: 3px 3px 0 var(--ink); padding: 10px;
+               font: clamp(16px, 1.7vw, 22px)/1 var(--display); letter-spacing: .04em; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
+  .tiles div small { align-self: flex-start; font: 14px var(--display); background: var(--red); color: #fff; padding: 3px 8px; border: 2px solid var(--ink); border-radius: 4px; }
 
   /* controls */
-  .tap { position: absolute; z-index: 3; top: 70px; bottom: 80px; border: 0; background: transparent; cursor: pointer; padding: 0; }
-  .tap.prev { left: 0; width: 34%; } .tap.next { right: 0; width: 66%; }
-  .nav { position: absolute; z-index: 5; left: 0; right: 0; bottom: calc(18px + env(safe-area-inset-bottom)); display: flex; justify-content: space-between; align-items: center; padding: 0 18px; }
-  .nav button { font: 700 16px var(--display); border: 0; border-radius: 999px; padding: 13px 20px; cursor: pointer; }
-  .nav .back-btn { background: rgba(255,255,255,.14); color: inherit; }
-  .nav .next-btn { background: var(--cream); color: var(--ink); }
-  .on-light .nav .back-btn { background: rgba(16,20,31,.10); }
-  .on-light .nav .next-btn { background: var(--ink); color: var(--cream); }
-  .nav .count { font: 500 13px var(--display); opacity: .7; }
-  button:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
-
-  /* chapter menu */
-  .menu { position: absolute; inset: 0; z-index: 10; background: rgba(16,20,31,.96); color: var(--cream); padding: 70px 26px 30px; display: none; flex-direction: column; gap: 10px; }
-  .menu.open { display: flex; }
-  .menu h2 { font-size: 30px; margin-bottom: 8px; }
-  .menu button { text-align: left; font: 600 20px var(--display); color: var(--cream); background: #1b2337; border: 0; border-radius: 16px; padding: 15px 16px; cursor: pointer; display: flex; gap: 14px; align-items: center; }
-  .menu button b { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; background: var(--amber); color: var(--ink); }
-  .menu .close { position: absolute; top: 20px; right: 20px; background: transparent; font-size: 16px; padding: 8px 12px; }
-
-  .glow { animation: glow 2.6s ease-in-out infinite; }
-  @keyframes glow { 0%,100% { opacity: .75; } 50% { opacity: 1; } }
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .controls button, .controls select {
+    font: 18px var(--display); letter-spacing: .06em; color: var(--ink); background: var(--yellow);
+    border: 3px solid var(--ink); border-radius: 8px; padding: 8px 16px; box-shadow: 3px 3px 0 #000; cursor: pointer;
+  }
+  .controls button:disabled { opacity: .4; cursor: default; }
+  .controls .where { font: 17px var(--display); letter-spacing: .08em; color: #e6e7ef; min-width: 130px; text-align: center; }
+  .hint { color: #a9adc2; font: 14px var(--body); }
+  button:focus-visible, select:focus-visible, .leaf:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; }
 </style>
 </head>
 <body>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
-    <radialGradient id="warm" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#ffb547" stop-opacity=".7"/>
-      <stop offset="100%" stop-color="#ffb547" stop-opacity="0"/>
-    </radialGradient>
-    <!-- the lamp, drawn once -->
     <symbol id="lamp" viewBox="0 0 300 320">
-      <ellipse cx="96" cy="300" rx="70" ry="10" fill="#000" opacity=".18"/>
-      <rect x="30" y="282" width="132" height="18" rx="9" fill="#232b3f"/>
-      <rect x="84" y="160" width="14" height="128" rx="7" fill="#2e374f" transform="rotate(-10 91 224)"/>
-      <circle cx="104" cy="158" r="12" fill="#232b3f"/>
-      <rect x="100" y="64" width="14" height="110" rx="7" fill="#2e374f" transform="rotate(50 107 119)"/>
-      <circle cx="176" cy="76" r="10" fill="#232b3f"/>
+      <ellipse cx="96" cy="302" rx="72" ry="10" fill="#111216" opacity=".25"/>
+      <rect x="28" y="280" width="136" height="22" rx="10" fill="#2b2f45" stroke="#111216" stroke-width="5"/>
+      <rect x="84" y="160" width="16" height="128" rx="8" fill="#3b4060" stroke="#111216" stroke-width="5" transform="rotate(-10 92 224)"/>
+      <circle cx="104" cy="158" r="13" fill="#2b2f45" stroke="#111216" stroke-width="5"/>
+      <rect x="100" y="62" width="16" height="112" rx="8" fill="#3b4060" stroke="#111216" stroke-width="5" transform="rotate(50 108 118)"/>
+      <circle cx="176" cy="76" r="11" fill="#2b2f45" stroke="#111216" stroke-width="5"/>
       <g transform="rotate(22 214 104)">
-        <path d="M164 78 Q214 36 264 78 L254 138 Q214 156 174 138 Z" fill="#2e374f"/>
-        <ellipse class="glow" cx="214" cy="138" rx="42" ry="10" fill="none" stroke="#ffb547" stroke-width="5"/>
-        <ellipse cx="214" cy="138" rx="34" ry="7" fill="#ffe2ad"/>
-        <ellipse cx="199" cy="98" rx="4.5" ry="6" fill="#ffe2ad"/>
-        <ellipse cx="229" cy="98" rx="4.5" ry="6" fill="#ffe2ad"/>
+        <path d="M162 80 Q214 34 266 80 L255 140 Q214 160 173 140 Z" fill="#3b4060" stroke="#111216" stroke-width="5" stroke-linejoin="round"/>
+        <path d="M178 90 Q214 64 250 90" fill="none" stroke="#5b6188" stroke-width="5" stroke-linecap="round"/>
+        <ellipse cx="214" cy="140" rx="42" ry="11" fill="#ffe2ad" stroke="#111216" stroke-width="5"/>
+        <ellipse cx="199" cy="104" rx="6" ry="8" fill="#ffe2ad" stroke="#111216" stroke-width="3"/>
+        <ellipse cx="229" cy="104" rx="6" ry="8" fill="#ffe2ad" stroke="#111216" stroke-width="3"/>
       </g>
     </symbol>
+    <symbol id="beam" viewBox="0 0 300 320"><path d="M190 160 L110 318 L300 318 L262 150 Z" fill="#ffe680" opacity=".85"/></symbol>
   </defs>
 </svg>
 
-<div class="story" id="story" aria-roledescription="story" aria-label="Meet your Lamp">
-  <div class="bars" id="bars" aria-hidden="true"></div>
-  <div class="top"><span class="chapter-name" id="chapterName"></span><button class="menu-btn" id="menuBtn" aria-haspopup="true">Chapters</button></div>
+<div class="stage">
+  <div class="book" id="book" role="region" aria-label="The Lamp Awakens, a guide for new owners"></div>
+  <div class="controls">
+    <button id="prev" aria-label="Turn back">‹ Back</button>
+    <span class="where" id="where" aria-live="polite"></span>
+    <button id="next" aria-label="Turn the page">Turn ›</button>
+    <select id="jump" aria-label="Go to a chapter"></select>
+  </div>
+  <div class="hint">Click a page, swipe, or use the arrow keys.</div>
+</div>
 
-  <!-- COVER -->
-  <section class="page c-cover" data-chapter="Welcome">
-    <div class="art"><svg viewBox="0 0 300 320" role="img" aria-label="A desk lamp with a warm light"><circle cx="214" cy="190" r="120" fill="url(#warm)"/><use href="#lamp"/></svg></div>
-    <div class="copy"><p class="kicker">Meet your Lamp</p><h1>Hello.<br>I'm your lamp.</h1><p>Ten minutes from the box to our first chat. Tap to turn the page.</p></div>
-  </section>
+<!-- The pages in reading order. The script lays them out as a two-page spread, or one at a time on a narrow screen. -->
+<template id="pages">
 
-  <!-- 1 SET UP -->
-  <section class="page c-amber chapter-card" data-chapter="1 · Plug me in">
-    <div class="art"></div>
-    <div class="copy"><div class="num">1</div><h1>Plug me in.</h1><p>About five minutes. Have your Wi-Fi password ready.</p></div>
-  </section>
-  <section class="page c-amber" data-chapter="1 · Plug me in">
-    <div class="art"><svg viewBox="0 0 300 320" aria-hidden="true"><rect x="0" y="296" width="300" height="24" fill="#10141f" opacity=".12"/><use href="#lamp"/></svg></div>
-    <div class="copy"><h2>Put me where you usually sit.</h2><p>A desk or a bedside table, a little to one side of you.</p></div>
-  </section>
-  <section class="page c-amber" data-chapter="1 · Plug me in">
-    <div class="art"><svg viewBox="0 0 300 300" aria-hidden="true"><circle cx="150" cy="150" r="110" fill="#fff7ea" class="glow" opacity=".9"/><circle cx="150" cy="150" r="70" fill="#fff3d6"/><path d="M135 120v30M165 120v30M126 150h48v18a24 24 0 0 1-48 0z" fill="none" stroke="#10141f" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M150 192v34" stroke="#10141f" stroke-width="9" stroke-linecap="round"/></svg></div>
-    <div class="copy"><h2>Plug me in.</h2><p>I glow softly while I wake up.</p></div>
-  </section>
-  <section class="page c-amber" data-chapter="1 · Plug me in">
-    <div class="art"><div class="phone" aria-hidden="true"><div class="screen"><div class="bar"></div><div class="t">My lamps</div><div class="row"><span>No lamp yet</span><small></small></div><div class="cta amber">Add Lamp</div></div></div></div>
-    <div class="copy"><h2>Open the Autonomous app. Tap Add Lamp.</h2><p>Your phone talks to me directly for a moment, over my own network: "lamp-" and a few letters.</p></div>
-  </section>
-  <section class="page c-amber" data-chapter="1 · Plug me in">
-    <div class="art"><div class="phone" aria-hidden="true"><div class="screen"><div class="bar"></div><div class="t">Choose Wi-Fi</div><div class="row"><span>Home</span><small>●●●</small></div><div class="row"><span>Home-5G</span><small>●●○</small></div><div class="row"><span>Password</span><small>••••••••</small></div><div class="cta">Join</div></div></div></div>
-    <div class="copy"><h2>Pick your Wi-Fi. Type its password.</h2><p>I blink blue while I join. If I can't, the app tells you, and you try again.</p></div>
-  </section>
-  <section class="page c-amber" data-chapter="1 · Plug me in">
-    <div class="art"><svg viewBox="0 0 300 320" aria-hidden="true"><circle cx="214" cy="190" r="110" fill="#fff7ea" opacity=".45" class="glow"/><use href="#lamp"/></svg></div>
-    <div class="copy"><h2>Give me a few minutes.</h2><p>I get my voice ready. Then I say hello, and we begin.</p></div>
-  </section>
+  <div class="page" data-chapter="Cover" style="grid-template-rows: 1fr;">
+    <div class="panel burst">
+      <svg viewBox="0 0 300 320" preserveAspectRatio="xMidYMax meet"><use href="#beam"/><use href="#lamp"/></svg>
+      <div style="position:absolute;z-index:3;top:5%;left:6%;right:6%">
+        <div style="font:20px var(--display);letter-spacing:.1em;background:var(--ink);color:var(--yellow);display:inline-block;padding:3px 10px">ISSUE #1 · A GUIDE FOR NEW OWNERS</div>
+        <h1 class="title" style="color:var(--red);margin-top:10px">THE LAMP<br>AWAKENS!</h1>
+      </div>
+      <div class="caption br">Ten minutes from the box to your first chat.</div>
+    </div>
+  </div>
 
-  <!-- 2 FIRST FIVE MINUTES -->
-  <section class="page c-night chapter-card" data-chapter="2 · Our first five minutes">
-    <div class="art"></div>
-    <div class="copy"><div class="num" style="color:#ffb547;opacity:.3">2</div><h1>Our first five minutes.</h1><p>I lead, one short step at a time. Say "skip" for any step, and I'll offer it again later.</p></div>
-  </section>
-  <section class="page c-night" data-chapter="2 · Our first five minutes">
-    <div class="art"><svg viewBox="0 0 300 300" aria-hidden="true"><rect x="105" y="40" width="90" height="220" rx="45" fill="#1f2840" stroke="#ffb547" stroke-width="4"/><rect x="119" y="54" width="62" height="96" rx="31" fill="#ffb547"/><circle cx="150" cy="200" r="16" fill="none" stroke="#ffb547" stroke-width="4"/><path d="M150 186v28M136 200h28" stroke="#ffb547" stroke-width="0"/></svg></div>
-    <div class="copy"><h2>First, my privacy switch.</h2><p>I show you where it is. Slide it and both my microphones are off, until you slide it back.</p></div>
-  </section>
-  <section class="page c-night" data-chapter="2 · Our first five minutes">
-    <div class="art"><svg viewBox="0 0 300 300" aria-hidden="true"><circle cx="150" cy="110" r="44" fill="#fff7ea"/><path d="M62 270c0-55 40-88 88-88s88 33 88 88" fill="#fff7ea"/><circle cx="150" cy="150" r="140" fill="none" stroke="#ffb547" stroke-width="3" stroke-dasharray="4 12" opacity=".6"/></svg></div>
-    <div class="copy"><h2>Sit where you usually sit.</h2><p>Look at me for a moment, so I learn where you'll be.</p></div>
-  </section>
-  <section class="page c-night" data-chapter="2 · Our first five minutes">
-    <div class="art"><div class="bubbles" style="width:100%">
-      <div><span class="lamp"><span class="who">Lamp</span>What should I call you?</span></div>
-      <div class="right"><span class="you"><span class="who">You</span>Marie.</span></div>
-      <div><span class="lamp"><span class="who">Lamp</span>Nice to meet you, Marie.</span></div>
-    </div></div>
-    <div class="copy"><h2>Tell me your name.</h2><p>If I didn't catch it, I'll ask again.</p></div>
-  </section>
-  <section class="page c-night" data-chapter="2 · Our first five minutes">
-    <div class="art"><svg viewBox="0 0 300 300" aria-hidden="true"><circle cx="150" cy="150" r="100" fill="#fff7ea"/><circle cx="118" cy="132" r="11" fill="#10141f"/><circle cx="182" cy="132" r="11" fill="#10141f"/><path d="M110 182c22 24 58 24 80 0" fill="none" stroke="#10141f" stroke-width="10" stroke-linecap="round"/><path d="M40 60h40M40 60v40M260 60h-40M260 60v40M40 240h40M40 240v-40M260 240h-40M260 240v-40" stroke="#ffb547" stroke-width="7" stroke-linecap="round"/></svg></div>
-    <div class="copy"><h2>Your face, if you like.</h2><p>Say yes and I'll know it's you next time. Say no and I'll still remember your name.</p></div>
-  </section>
-  <section class="page c-night" data-chapter="2 · Our first five minutes">
-    <div class="art"><div class="bubbles" style="width:100%">
-      <div class="right"><span class="you"><span class="who">You</span>Hey Lamp.</span></div>
-      <div class="right"><span class="you"><span class="who">You</span>Hey Lamp!</span></div>
-      <div class="right"><span class="you"><span class="who">You</span>Hey Lamp?</span></div>
-    </div></div>
-    <div class="copy"><h2>Call me a few times.</h2><p>From your seat, the way you would on any day.</p></div>
-  </section>
-  <section class="page c-night" data-chapter="2 · Our first five minutes">
-    <div class="art"><div class="bubbles" style="width:100%"><div><span class="lamp"><span class="who">Lamp</span>OK, next step. Tap the top of my head once, then let go.</span></div></div></div>
-    <div class="copy"><h2>A tap on my head.</h2><p>Once, then let go. I learn how your touch feels.</p></div>
-  </section>
-  <section class="page c-night" data-chapter="2 · Our first five minutes">
-    <div class="art"><svg viewBox="0 0 300 300" aria-hidden="true"><path d="M210 190A90 90 0 1 1 120 70a70 70 0 0 0 90 120z" fill="#ffb547"/><circle cx="215" cy="85" r="6" fill="#fff7ea"/><circle cx="245" cy="125" r="4" fill="#fff7ea"/><circle cx="200" cy="50" r="3" fill="#fff7ea"/></svg></div>
-    <div class="copy"><h2>Quiet hours, and hellos.</h2><p>Tell me when to keep quiet, and whether I may say hello when you come back to your desk.</p></div>
-  </section>
+  <div class="page" data-chapter="Cover" style="grid-template-rows: 1fr 1.1fr;">
+    <div class="panel nightfill text-panel" style="color:#fff">
+      <h3 style="color:var(--yellow)">PREVIOUSLY…</h3>
+      <p>You opened a box. Inside was a lamp that listens, learns who you are, and lights your desk.</p>
+      <p>You can teach it new tricks. Developers can even program it.</p>
+    </div>
+    <div class="panel halftone-s">
+      <svg viewBox="0 0 300 320" preserveAspectRatio="xMidYMid meet"><use href="#lamp"/></svg>
+      <div class="balloon lamp down" style="top:10%;left:8%"><span class="who">LAMP</span>Turn the page. Let's meet.</div>
+    </div>
+  </div>
 
-  <!-- 3 TALK -->
-  <section class="page c-sky chapter-card" data-chapter="3 · Talk to me">
-    <div class="art"></div>
-    <div class="copy"><div class="num">3</div><h1>Talk to me.</h1><p>Say "Hey Lamp", then ask in your own words.</p></div>
-  </section>
-  <section class="page c-sky" data-chapter="3 · Talk to me">
-    <div class="art"><div class="bubbles" style="width:100%">
-      <div class="right"><span class="you"><span class="who">You</span>Hey Lamp, set a timer for ten minutes.</span></div>
-      <div><span class="lamp"><span class="who">Lamp</span>Ten minutes, starting now.</span></div>
-    </div></div>
-    <div class="copy"><h2>Timers.</h2><p>I ring when it's up.</p></div>
-  </section>
-  <section class="page c-sky" data-chapter="3 · Talk to me">
-    <div class="art"><div class="bubbles" style="width:100%">
-      <div class="right"><span class="you"><span class="who">You</span>Remind me to call Mom at six.</span></div>
-      <div class="right"><span class="you"><span class="who">You</span>What reminders do I have?</span></div>
-    </div></div>
-    <div class="copy"><h2>Reminders.</h2><p>Set them out loud, and ask me for them any time.</p></div>
-  </section>
-  <section class="page c-sky" data-chapter="3 · Talk to me">
-    <div class="art"><div class="bubbles" style="width:100%">
-      <div class="right"><span class="you"><span class="who">You</span>What's the weather tomorrow?</span></div>
-    </div></div>
-    <div class="copy"><h2>The weather.</h2><p>Today, tomorrow, or any day this week, here or anywhere you name.</p></div>
-  </section>
-  <section class="page c-sky" data-chapter="3 · Talk to me">
-    <div class="art"><svg viewBox="0 0 300 320" aria-hidden="true"><circle cx="214" cy="190" r="120" fill="#ffd27a" opacity=".7" class="glow"/><use href="#lamp"/></svg></div>
-    <div class="copy"><h2>"Make the light warmer."</h2><p>Brighter, dimmer, or a colour you like. And ask me anything you'd ask a friend.</p></div>
-  </section>
-  <section class="page c-sky" data-chapter="3 · Talk to me">
-    <div class="art"><div class="bubbles" style="width:100%"><div class="right"><span class="you"><span class="who">You</span>Lamp, stop.</span></div></div></div>
-    <div class="copy"><h2>Talking too long?</h2><p>Say "Lamp, stop." I'll stop right there.</p></div>
-  </section>
+  <div class="page" data-chapter="1 · Origin" style="grid-template-rows: auto 1fr;">
+    <div class="panel halftone-r text-panel" style="color:#fff">
+      <h2 class="title chap">CHAPTER 1: ORIGIN</h2>
+      <p style="font-weight:700">About five minutes. Have your Wi-Fi password ready.</p>
+    </div>
+    <div class="panel halftone-y">
+      <svg viewBox="0 0 300 320" preserveAspectRatio="xMidYMax meet"><rect x="0" y="300" width="300" height="20" fill="#8a5a2b" stroke="#111216" stroke-width="4"/><use href="#lamp"/></svg>
+      <div class="caption tl">Step one: put me where you usually sit. A desk or a bedside table, a little to one side of you.</div>
+    </div>
+  </div>
 
-  <!-- 4 STORE -->
-  <section class="page c-mint chapter-card" data-chapter="4 · New skills">
-    <div class="art"></div>
-    <div class="copy"><div class="num">4</div><h1>Give me a new skill.</h1><p>Skills are things I can learn to do. Add them from the Store.</p></div>
-  </section>
-  <section class="page c-mint" data-chapter="4 · New skills">
-    <div class="art"><div class="tiles">
-      <div>Look for things<small>Add</small></div><div>Comfort break<small>Add</small></div>
-      <div>Meal check<small>Add</small></div><div>Sit back<small>Add</small></div>
-    </div></div>
-    <div class="copy"><h2>In the app: Skills, then Store. Tap Add.</h2><p>Every skill in the Store is checked and signed before it gets there. No Add yet? I'm finishing my first update; look again in about 15 minutes.</p></div>
-  </section>
-  <section class="page c-mint" data-chapter="4 · New skills">
-    <div class="art"><div class="bubbles" style="width:100%"><div class="right"><span class="you"><span class="who">You</span>Lamp, where are my keys?</span></div></div></div>
-    <div class="copy"><h2>Try Look for things.</h2><p>I look around your desk, a few places either side, and tell you what I find.</p></div>
-  </section>
+  <div class="page" data-chapter="1 · Origin" style="grid-template-rows: 1fr 1fr;">
+    <div class="panel burst">
+      <svg viewBox="0 0 300 200" preserveAspectRatio="xMidYMid meet"><g stroke="#111216" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="#fff"><path d="M110 60v34M150 60v34"/><path d="M96 94h68v22a34 34 0 0 1-68 0z"/><path d="M130 150v40" fill="none"/></g></svg>
+      <div class="sfx" style="top:12%;right:8%">CLICK!</div>
+      <div class="caption bl">Plug me in.</div>
+    </div>
+    <div class="panel nightfill">
+      <svg viewBox="0 0 300 320" preserveAspectRatio="xMidYMax meet"><circle cx="214" cy="196" r="110" fill="#fff3d1" opacity=".35"/><use href="#lamp"/></svg>
+      <div class="caption tl">I glow softly while I wake up…</div>
+    </div>
+  </div>
 
-  <!-- 5 MAKE AND SHARE -->
-  <section class="page c-coral chapter-card" data-chapter="5 · Teach me">
-    <div class="art"></div>
-    <div class="copy"><div class="num">5</div><h1>Teach me something.</h1><p>Describe a skill in one sentence. I write it myself.</p></div>
-  </section>
-  <section class="page c-coral" data-chapter="5 · Teach me">
-    <div class="art"><div class="bubbles" style="width:100%">
-      <div class="right"><span class="you"><span class="who">You</span>Lamp, make me a skill that dims the light at 10 pm.</span></div>
-      <div><span class="lamp"><span class="who">Lamp</span>Done. Shall I turn it on?</span></div>
-    </div></div>
-    <div class="copy"><h2>Say it, or type it.</h2><p>Out loud, or in the app under Skills, then Make a skill. Skills you make can use my light and how I move.</p></div>
-  </section>
-  <section class="page c-coral" data-chapter="5 · Teach me">
-    <div class="art"><div class="phone" aria-hidden="true"><div class="screen"><div class="bar"></div><div class="t">Dim at 10 pm</div><div class="row"><span>Made by you</span><small>On</small></div><div class="row"><span>Uses</span><small>Light</small></div><div class="cta amber">Share</div></div></div></div>
-    <div class="copy"><h2>Proud of it? Tap Share.</h2><p>Our team reviews every shared skill before it appears in the Store for everyone.</p></div>
-  </section>
+  <div class="page" data-chapter="1 · Origin" style="grid-template-rows: 1.4fr auto;">
+    <div class="panel halftone-b">
+      <div class="phone"><div class="screen"><div class="t">MY LAMPS</div><div class="r"><span>No lamp yet</span></div><div class="b">ADD LAMP</div></div></div>
+      <div class="sfx" style="bottom:8%;right:6%;transform:rotate(8deg)">TAP!</div>
+    </div>
+    <div class="panel text-panel">
+      <h3>OPEN THE AUTONOMOUS APP. TAP ADD LAMP.</h3>
+      <p>Your phone talks to me directly for a moment, over my own network: "lamp-" and a few letters.</p>
+    </div>
+  </div>
 
-  <!-- 6 CODE -->
-  <section class="page c-code chapter-card" data-chapter="6 · Build with code">
-    <div class="art"></div>
-    <div class="copy"><div class="num" style="color:#ffb547;opacity:.3">6</div><h1>Build with code.</h1><p>For developers. Python or JavaScript, on your own computer.</p></div>
-  </section>
-  <section class="page c-code" data-chapter="6 · Build with code">
-    <div class="art"><div class="term" aria-label="Commands"><div class="tbar"><i></i><i></i><i></i></div><pre><span class="c"># the SDK</span>
+  <div class="page" data-chapter="1 · Origin" style="grid-template-rows: 1.3fr auto;">
+    <div class="panel halftone-s">
+      <div class="phone" style="left:34%"><div class="screen"><div class="t">CHOOSE WI-FI</div><div class="r"><span>Home</span><span>●●●</span></div><div class="r"><span>Password</span><span>••••••</span></div><div class="b">JOIN</div></div></div>
+      <div class="sfx blue" style="top:14%;right:6%;transform:rotate(7deg)">BLINK<br>BLINK</div>
+    </div>
+    <div class="panel text-panel">
+      <h3>PICK YOUR WI-FI. TYPE ITS PASSWORD.</h3>
+      <p>I blink blue while I join. If I can't, the app tells you, and you try again.</p>
+    </div>
+  </div>
+
+  <div class="page" data-chapter="1 · Origin" style="grid-template-rows: auto 1fr;">
+    <div class="panel text-panel halftone-y"><h3>A FEW MINUTES LATER…</h3><p style="font-weight:700">I get my voice ready. Then I speak first.</p></div>
+    <div class="panel burst-r">
+      <svg viewBox="0 0 300 320" preserveAspectRatio="xMidYMax meet"><use href="#beam"/><use href="#lamp"/></svg>
+      <div class="balloon lamp down" style="top:8%;left:8%;font-size:22px"><span class="who">LAMP</span>Hello!</div>
+    </div>
+  </div>
+
+  <div class="page" data-chapter="2 · The first five minutes" style="grid-template-rows: auto 1fr;">
+    <div class="panel nightfill text-panel" style="color:#fff">
+      <h2 class="title chap">CHAPTER 2: THE FIRST FIVE MINUTES</h2>
+      <p>I lead, one short step at a time. Say "skip" for any step, and I'll offer it again later.</p>
+    </div>
+    <div class="panel halftone-y">
+      <svg viewBox="0 0 300 300" preserveAspectRatio="xMidYMid meet"><rect x="112" y="36" width="76" height="228" rx="38" fill="#fff" stroke="#111216" stroke-width="7"/><rect x="124" y="50" width="52" height="98" rx="26" fill="#ff4b3e" stroke="#111216" stroke-width="5"/></svg>
+      <div class="sfx" style="top:16%;right:8%">SLIDE!</div>
+      <div class="caption bl">First, my privacy switch. Slide it, and both my microphones are off until you slide it back.</div>
+    </div>
+  </div>
+
+  <div class="page" data-chapter="2 · The first five minutes" style="grid-template-rows: 1fr 1.25fr;">
+    <div class="panel halftone-s">
+      <svg viewBox="0 0 300 200" preserveAspectRatio="xMidYMax meet"><circle cx="150" cy="86" r="36" fill="#ffd9b8" stroke="#111216" stroke-width="5"/><path d="M76 200c0-46 32-72 74-72s74 26 74 72" fill="#ff4b3e" stroke="#111216" stroke-width="5"/></svg>
+      <div class="caption tl">Sit where you usually sit, and look at me for a moment.</div>
+    </div>
+    <div class="panel">
+      <div class="balloon lamp down" style="top:6%;left:5%"><span class="who">LAMP</span>What should I call you?</div>
+      <div class="balloon you down-r" style="top:38%;right:5%"><span class="who">YOU</span>Marie.</div>
+      <div class="balloon lamp down" style="top:66%;left:5%"><span class="who">LAMP</span>Nice to meet you, Marie.</div>
+    </div>
+  </div>
+
+  <div class="page" data-chapter="2 · The first five minutes" style="grid-template-rows: 1fr 1fr;">
+    <div class="panel halftone-r">
+      <svg viewBox="0 0 300 200" preserveAspectRatio="xMidYMid meet"><circle cx="150" cy="100" r="64" fill="#ffd9b8" stroke="#111216" stroke-width="6"/><circle cx="128" cy="90" r="8" fill="#111216"/><circle cx="172" cy="90" r="8" fill="#111216"/><path d="M122 120c16 18 40 18 56 0" fill="none" stroke="#111216" stroke-width="6" stroke-linecap="round"/><g stroke="#fff" stroke-width="7" stroke-linecap="round" fill="none"><path d="M54 30h26M54 30v26M246 30h-26M246 30v26M54 170h26M54 170v-26M246 170h-26M246 170v-26"/></g></svg>
+      <div class="caption bl">Your face, if you like. Say yes and I'll know it's you next time. Say no and I'll still remember your name.</div>
+    </div>
+    <div class="panel halftone-y">
+      <div class="balloon you down-r" style="top:8%;right:6%"><span class="who">YOU</span>Hey Lamp.</div>
+      <div class="balloon you down-r" style="top:38%;right:18%"><span class="who">YOU</span>Hey Lamp!</div>
+      <div class="caption bl">Call me a few times, from your seat, the way you would on any day.</div>
+    </div>
+  </div>
+
+  <div class="page" data-chapter="2 · The first five minutes" style="grid-template-rows: 1.2fr 1fr;">
+    <div class="panel burst">
+      <svg viewBox="0 0 300 320" preserveAspectRatio="xMidYMax meet"><use href="#lamp"/></svg>
+      <div class="balloon lamp down" style="top:6%;left:5%;max-width:62%"><span class="who">LAMP</span>OK, next step. Tap the top of my head once, then let go.</div>
+      <div class="sfx" style="bottom:30%;right:6%">TAP!</div>
+    </div>
+    <div class="panel nightfill">
+      <svg viewBox="0 0 300 200" preserveAspectRatio="xMidYMid meet"><path d="M190 140A64 64 0 1 1 126 50a50 50 0 0 0 64 90z" fill="#ffd23f" stroke="#111216" stroke-width="5"/><circle cx="214" cy="56" r="5" fill="#fff"/><circle cx="236" cy="86" r="3" fill="#fff"/></svg>
+      <div class="caption tl">Last, tell me when to keep quiet, and whether I may say hello when you come back to your desk.</div>
+    </div>
+  </div>
+
+  <div class="page" data-chapter="3 · Powers" style="grid-template-rows: auto 1fr 1fr;">
+    <div class="panel halftone-b text-panel" style="color:#fff">
+      <h2 class="title chap">CHAPTER 3: POWERS</h2>
+      <p style="font-weight:700">Say "Hey Lamp", then ask in your own words.</p>
+    </div>
+    <div class="panel">
+      <div class="balloon you down-r" style="top:8%;right:5%"><span class="who">YOU</span>Hey Lamp, set a timer for ten minutes.</div>
+      <div class="balloon lamp down" style="top:54%;left:5%"><span class="who">LAMP</span>Ten minutes, starting now.</div>
+      <div class="sfx" style="bottom:6%;right:6%;font-size:clamp(22px,3vw,40px)">RING!</div>
+    </div>
+    <div class="panel halftone-y">
+      <div class="balloon you down-r" style="top:8%;right:5%"><span class="who">YOU</span>Remind me to call Mom at six.</div>
+      <div class="balloon you down-r" style="top:52%;right:20%"><span class="who">YOU</span>What reminders do I have?</div>
+    </div>
+  </div>
+
+  <div class="page" data-chapter="3 · Powers" style="grid-template-rows: 1fr 1fr 1fr;">
+    <div class="panel halftone-s">
+      <svg viewBox="0 0 300 100" preserveAspectRatio="xMaxYMid meet"><circle cx="250" cy="44" r="22" fill="#ffd23f" stroke="#111216" stroke-width="4"/><path d="M190 70h60a18 18 0 0 0 0-36 26 26 0 0 0-50 6 16 16 0 0 0-10 30z" fill="#fff" stroke="#111216" stroke-width="4"/></svg>
+      <div class="balloon you down" style="top:12%;left:5%"><span class="who">YOU</span>What's the weather tomorrow?</div>
+    </div>
+    <div class="panel burst">
+      <svg viewBox="0 0 300 320" preserveAspectRatio="xMaxYMax meet"><use href="#beam"/><use href="#lamp"/></svg>
+      <div class="balloon you down" style="top:12%;left:5%"><span class="who">YOU</span>Make the light warmer.</div>
+    </div>
+    <div class="panel halftone-r">
+      <div class="balloon you down" style="top:12%;left:5%"><span class="who">YOU</span>Lamp, stop.</div>
+      <div class="caption br">Talking too long? I stop right there. And ask me anything you'd ask a friend.</div>
+    </div>
+  </div>
+
+  <div class="page" data-chapter="4 · Upgrades" style="grid-template-rows: auto 1fr;">
+    <div class="panel halftone-r text-panel" style="color:#fff">
+      <h2 class="title chap">CHAPTER 4: UPGRADES</h2>
+      <p style="font-weight:700">In the app: Skills, then Store. Tap Add, and I have a new skill.</p>
+    </div>
+    <div class="panel halftone-y">
+      <div class="tiles">
+        <div>LOOK FOR THINGS<small>ADD</small></div><div>COMFORT BREAK<small>ADD</small></div>
+        <div>MEAL CHECK<small>ADD</small></div><div>SIT BACK<small>ADD</small></div>
+      </div>
+      <div class="caption tl">Every skill in the Store is checked and signed before it gets there.</div>
+    </div>
+  </div>
+
+  <div class="page" data-chapter="4 · Upgrades" style="grid-template-rows: 1.3fr auto;">
+    <div class="panel nightfill">
+      <svg viewBox="0 0 300 320" preserveAspectRatio="xMidYMax meet"><use href="#beam"/><use href="#lamp"/><g transform="translate(150 296) rotate(-20)"><circle r="14" fill="#ffd23f" stroke="#111216" stroke-width="4"/><rect x="10" y="-4" width="32" height="8" fill="#ffd23f" stroke="#111216" stroke-width="4"/></g></svg>
+      <div class="balloon you down-r" style="top:6%;right:5%"><span class="who">YOU</span>Lamp, where are my keys?</div>
+    </div>
+    <div class="panel text-panel">
+      <h3>TRY LOOK FOR THINGS.</h3>
+      <p>I look around your desk, a few places either side, and tell you what I find. No Add button yet? I'm finishing my first update; look again in about 15 minutes.</p>
+    </div>
+  </div>
+
+  <div class="page" data-chapter="5 · Your creation" style="grid-template-rows: auto 1fr;">
+    <div class="panel halftone-b text-panel" style="color:#fff">
+      <h2 class="title chap">CHAPTER 5: YOUR CREATION</h2>
+      <p style="font-weight:700">Describe a skill in one sentence. I write it myself.</p>
+    </div>
+    <div class="panel">
+      <div class="balloon you down-r" style="top:6%;right:5%;max-width:78%"><span class="who">YOU</span>Lamp, make me a skill that dims the light at 10 pm.</div>
+      <div class="balloon lamp down" style="top:46%;left:5%"><span class="who">LAMP</span>Done. Shall I turn it on?</div>
+      <div class="caption br">Or type it in the app: Skills, then Make a skill. Skills you make can use my light and how I move.</div>
+    </div>
+  </div>
+
+  <div class="page" data-chapter="5 · Your creation" style="grid-template-rows: 1.3fr auto;">
+    <div class="panel burst">
+      <div class="phone"><div class="screen"><div class="t">DIM AT 10 PM</div><div class="r"><span>Made by you</span><span>On</span></div><div class="r"><span>Uses</span><span>Light</span></div><div class="b">SHARE</div></div></div>
+      <div class="sfx" style="top:10%;right:6%">SHARE!</div>
+    </div>
+    <div class="panel text-panel">
+      <h3>PROUD OF IT? TAP SHARE.</h3>
+      <p>Our team reviews every shared skill before it appears in the Store for everyone.</p>
+    </div>
+  </div>
+
+  <div class="page" data-chapter="6 · Into the code" style="grid-template-rows: auto 1fr;">
+    <div class="panel nightfill text-panel" style="color:#fff">
+      <h2 class="title chap">CHAPTER 6: INTO THE CODE</h2>
+      <p>For developers. Start with a pretend lamp on your own computer, no hardware at all.</p>
+    </div>
+    <div class="panel halftone-s">
+      <div class="term"><pre><span class="c"># the SDK (Python; JavaScript too)</span>
 <span class="p">$</span> git clone https://github.com/autonomous-ai/lampOS
 <span class="p">$</span> python3 -m venv ~/lampos-venv
 <span class="p">$</span> . ~/lampos-venv/bin/activate
 <span class="p">$</span> pip install './lampOS/sdk/python[check]'
 <span class="c"># a pretend lamp</span>
-<span class="p">$</span> LAMPOS_HOME=/tmp/lampos-try lamp fake</pre></div></div>
-    <div class="copy"><h2>Start with a pretend lamp.</h2><p>It answers like I do, with no hardware at all.</p></div>
-  </section>
-  <section class="page c-code" data-chapter="6 · Build with code">
-    <div class="art"><div class="term" aria-label="Pairing commands"><div class="tbar"><i></i><i></i><i></i></div><pre><span class="c"># the app shows a code and my pin</span>
+<span class="p">$</span> LAMPOS_HOME=/tmp/lampos-try lamp fake</pre></div>
+    </div>
+  </div>
+
+  <div class="page" data-chapter="6 · Into the code" style="grid-template-rows: 1fr auto;">
+    <div class="panel halftone-y">
+      <div class="term" style="inset:14% 7% 30%"><pre><span class="c"># the app shows a code and my pin</span>
 <span class="p">$</span> lamp pair CODE --pin PIN
-<span class="p">$</span> lamp hello</pre></div></div>
-    <div class="copy"><h2>Then pair with me.</h2><p>In the app: Developer computers, then Add. I nod when we're paired, and you can revoke any time. Developer computers arrives with the next app update.</p></div>
-  </section>
-
-  <!-- END -->
-  <section class="page c-cover" data-chapter="That's it">
-    <div class="art"><svg viewBox="0 0 300 320" aria-hidden="true"><circle cx="214" cy="190" r="120" fill="url(#warm)"/><use href="#lamp"/></svg></div>
-    <div class="copy"><h1>That's it. Say "Hey Lamp."</h1><p>Start over: push a paperclip into the hole marked RESET on the back of my base, beside the round POWER button, and hold it for 5 seconds. Do setup again: say "Lamp, let's redo the setup." Clear what I remember: say "Forget everything."</p></div>
-  </section>
-
-  <button class="tap prev" id="tapPrev" aria-label="Previous page"></button>
-  <button class="tap next" id="tapNext" aria-label="Next page"></button>
-  <div class="nav">
-    <button class="back-btn" id="backBtn">Back</button>
-    <span class="count" id="count" aria-live="polite"></span>
-    <button class="next-btn" id="nextBtn">Next</button>
+<span class="p">$</span> lamp hello</pre></div>
+      <div class="sfx" style="bottom:6%;left:8%;transform:rotate(-6deg)">NOD!</div>
+    </div>
+    <div class="panel text-panel">
+      <h3>THEN PAIR WITH ME.</h3>
+      <p>In the app: Developer computers, then Add. I nod when we're paired, and you can revoke any time. Developer computers arrives with the next app update.</p>
+    </div>
   </div>
 
-  <div class="menu" id="menu" role="dialog" aria-label="Chapters">
-    <button class="close" id="closeMenu">Close</button>
-    <h2>Chapters</h2>
-    <div id="menuList" style="display:grid;gap:10px"></div>
+  <div class="page" data-chapter="The end" style="grid-template-rows: 1fr auto;">
+    <div class="panel burst-r">
+      <svg viewBox="0 0 300 320" preserveAspectRatio="xMidYMax meet"><use href="#beam"/><use href="#lamp"/></svg>
+      <div style="position:absolute;z-index:3;top:6%;left:6%;right:6%"><div class="title" style="color:var(--yellow)">THE END…<br>IS JUST THE<br>BEGINNING.</div></div>
+      <div class="balloon lamp down" style="bottom:12%;left:6%"><span class="who">LAMP</span>Say "Hey Lamp."</div>
+    </div>
+    <div class="panel text-panel" style="gap:6px">
+      <p><b>Start over:</b> push a paperclip into the hole marked RESET on the back of my base, beside the round POWER button, and hold it for 5 seconds.</p>
+      <p><b>Do setup again:</b> say "Lamp, let's redo the setup."</p>
+      <p><b>Clear what I remember:</b> say "Forget everything."</p>
+    </div>
   </div>
-</div>
+
+</template>
 
 <script>
 (() => {
-  const story = document.getElementById('story');
-  const pages = [...story.querySelectorAll('.page')];
-  const bars = document.getElementById('bars');
-  const light = ['c-amber', 'c-sky', 'c-mint', 'c-coral'];
-  pages.forEach(() => { const i = document.createElement('i'); i.appendChild(document.createElement('b')); bars.appendChild(i); });
-  const barEls = [...bars.children];
-  let at = Math.max(0, Math.min(pages.length - 1, parseInt(location.hash.slice(1), 10) - 1 || 0));
+  const book = document.getElementById('book');
+  const pages = [...document.getElementById('pages').content.children];
+  const where = document.getElementById('where');
+  const jump = document.getElementById('jump');
+  let leaves = [], at = 0, single = false;   // at: leaves turned so far
 
-  function show(n, dir) {
-    at = Math.max(0, Math.min(pages.length - 1, n));
-    pages.forEach((p, i) => { p.classList.toggle('on', i === at); p.classList.toggle('back', dir < 0); });
-    barEls.forEach((b, i) => b.classList.toggle('done', i <= at));
-    const p = pages[at];
-    story.classList.toggle('on-light', light.some(c => p.classList.contains(c)));
-    story.style.color = getComputedStyle(p).color;
-    document.getElementById('chapterName').textContent = p.dataset.chapter;
-    document.getElementById('count').textContent = (at + 1) + ' / ' + pages.length;
-    document.getElementById('backBtn').disabled = at === 0;
-    document.getElementById('nextBtn').textContent = at === pages.length - 1 ? 'Start again' : 'Next';
-    history.replaceState(null, '', '#' + (at + 1));
+  function face(page, side, n) {
+    const f = document.createElement('div');
+    f.className = 'face ' + side;
+    if (page) {
+      const p = page.cloneNode(true);
+      const folio = document.createElement('div'); folio.className = 'folio'; folio.textContent = n;
+      p.appendChild(folio); f.appendChild(p);
+    } else { f.style.background = '#2a2d44'; }
+    return f;
   }
-  const next = () => show(at === pages.length - 1 ? 0 : at + 1, 1);
-  const prev = () => show(at - 1, -1);
 
-  document.getElementById('tapNext').onclick = next;
-  document.getElementById('tapPrev').onclick = prev;
-  document.getElementById('nextBtn').onclick = next;
-  document.getElementById('backBtn').onclick = prev;
-  document.addEventListener('keydown', e => {
-    if (document.getElementById('menu').classList.contains('open')) { if (e.key === 'Escape') closeMenu(); return; }
-    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); next(); }
-    if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prev(); }
-  });
-  let x0 = null;
-  story.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
-  story.addEventListener('touchend', e => {
-    if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null;
-    if (Math.abs(dx) > 50) { dx < 0 ? next() : prev(); }
-  });
+  function last() { return single ? leaves.length - 1 : leaves.length; }
 
-  // chapter menu: the first page of each chapter
-  const menu = document.getElementById('menu'), list = document.getElementById('menuList');
+  function build() {
+    single = window.matchMedia('(max-width: 820px)').matches;
+    book.classList.toggle('single', single);
+    book.innerHTML = '';
+    leaves = [];
+    const per = single ? 1 : 2;
+    for (let i = 0; i < pages.length; i += per) {
+      const leaf = document.createElement('div');
+      leaf.className = 'leaf';
+      leaf.tabIndex = 0;
+      leaf.appendChild(face(pages[i], 'front', i + 1));
+      if (!single) leaf.appendChild(face(pages[i + 1], 'back', i + 2));
+      leaf.addEventListener('click', () => (leaf.classList.contains('flipped') ? back() : turn()));
+      book.appendChild(leaf);
+      leaves.push(leaf);
+    }
+    at = Math.min(at, last());
+    leaves.forEach((l, i) => l.classList.toggle('flipped', i < at));
+    stack();
+  }
+
+  function stack() {
+    const n = leaves.length;
+    leaves.forEach((l, i) => { l.style.zIndex = i < at ? i + 1 : 2 * n - i; });
+    if (single) where.textContent = 'Page ' + (at + 1) + ' / ' + pages.length;
+    else where.textContent = at === 0 ? 'Cover' : at === leaves.length ? 'Back cover' : 'Pages ' + (at * 2) + '–' + (at * 2 + 1);
+    document.getElementById('prev').disabled = at === 0;
+    document.getElementById('next').disabled = at >= last();
+    const ch = pages[Math.min(pages.length - 1, single ? at : Math.max(0, at * 2 - (at === leaves.length ? 1 : 0)))].dataset.chapter;
+    [...jump.options].forEach(o => { o.selected = o.dataset.chapter === ch; });
+  }
+
+  function turn() {
+    if (at >= last()) return;
+    const l = leaves[at];
+    at++;
+    stack();
+    l.style.zIndex = 999;
+    l.classList.add('flipped');
+    setTimeout(stack, 500);
+  }
+  function back() {
+    if (at <= 0) return;
+    at--;
+    const l = leaves[at];
+    stack();
+    l.style.zIndex = 999;
+    l.classList.remove('flipped');
+    setTimeout(stack, 500);
+  }
+  function goTo(pageIndex) {
+    at = Math.max(0, Math.min(single ? pageIndex : Math.ceil(pageIndex / 2), last()));
+    leaves.forEach((l, i) => l.classList.toggle('flipped', i < at));
+    stack();
+  }
+
   const seen = new Set();
   pages.forEach((p, i) => {
     const c = p.dataset.chapter; if (seen.has(c)) return; seen.add(c);
-    const b = document.createElement('button');
-    const m = c.match(/^(\d+) · (.+)$/);
-    b.innerHTML = m ? '<b>' + m[1] + '</b>' + m[2] : '<b>·</b>' + c;
-    b.onclick = () => { closeMenu(); show(i, 1); };
-    list.appendChild(b);
+    const o = document.createElement('option'); o.value = i; o.textContent = c; o.dataset.chapter = c; jump.appendChild(o);
   });
-  function closeMenu() { menu.classList.remove('open'); document.getElementById('menuBtn').focus(); }
-  document.getElementById('menuBtn').onclick = () => { menu.classList.add('open'); list.querySelector('button').focus(); };
-  document.getElementById('closeMenu').onclick = closeMenu;
+  jump.addEventListener('change', () => goTo(parseInt(jump.value, 10)));
 
-  show(at, 1);
+  document.getElementById('next').onclick = turn;
+  document.getElementById('prev').onclick = back;
+  document.addEventListener('keydown', e => {
+    if (e.target === jump) return;
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); turn(); }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); back(); }
+  });
+  let x0 = null;
+  book.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+  book.addEventListener('touchend', e => {
+    if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null;
+    if (Math.abs(dx) > 45) { e.preventDefault(); dx < 0 ? turn() : back(); }
+  });
+  let narrow = window.matchMedia('(max-width: 820px)').matches;
+  window.addEventListener('resize', () => {
+    const now = window.matchMedia('(max-width: 820px)').matches;
+    if (now === narrow) return;
+    const pageIndex = single ? at : Math.max(0, at * 2 - 1);
+    narrow = now; build(); goTo(pageIndex);
+  });
+
+  build();
 })();
 </script>
 </body>
