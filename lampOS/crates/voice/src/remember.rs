@@ -2957,10 +2957,12 @@ pub const HEARD_BARE: &str = "heard_bare";
 
 /// The argument the lamp adds, never the model, to a bare `forget` whose
 /// own `about` it dropped as not heard where the line asks to forget
-/// ([`named_forget_with`], C35): the memory forgets their just kept thing
-/// when that is plainly "that" ([`just_kept`]), and otherwise asks which,
-/// never their last kept thing on a guess (the Reviewer-lead's P2 on
-/// #5419).
+/// ([`named_forget_with`], C35), carrying that `about`: the memory forgets
+/// their just kept thing only when that is plainly "that" ([`just_kept`])
+/// and its words have every word of the dropped `about`
+/// ([`kept_has_about`]), and otherwise asks which, never their last kept
+/// thing on a guess (the Reviewer-lead's P2s on #5419: "I sold my bicycle.
+/// Lamp, forget it." just after the tea keep is not the tea).
 pub const ABOUT_DROPPED: &str = "about_dropped";
 
 /// What the model is told of a bare forget's guessed `source_id`
@@ -3870,11 +3872,11 @@ pub fn named_forget_with(
                 .as_object_mut()
                 .and_then(|args| args.remove("about"))
                 .and_then(|about| about.as_str().map(str::to_owned))
-                .is_some_and(|about| {
-                    subject_of(words_of(&search_text(&about)).iter().map(String::as_str)).is_some()
+                .filter(|about| {
+                    subject_of(words_of(&search_text(about)).iter().map(String::as_str)).is_some()
                 });
-            if dropped {
-                args[ABOUT_DROPPED] = json!(true);
+            if let Some(about) = dropped {
+                args[ABOUT_DROPPED] = json!(about);
             }
             args[HEARD_BARE] = json!(true);
             return Some(ToolCall {
@@ -6655,6 +6657,10 @@ struct DaysContext {
     /// again (Bug C, lamp-06c1, 5 Nov). Emptied as each memory call is sent
     /// and as a session opens under another name or closes.
     last_done: Option<(MemoryDone, Option<String>, Instant)>,
+    /// The words [`Self::last_given`]'s `remember` kept, when it came from
+    /// one: a forget whose `about` was dropped as unheard takes that keep
+    /// only when it has the dropped words ([`kept_has_about`]).
+    given_text: Option<String>,
     /// Whether [`Self::last_given`] came from a `remember` filed to its
     /// person by the one-face rule (`LAMP_PERSON_SCOPE_ONE_FACE`,
     /// [`run_one_face_keep`]): only then does a bare forget on a one-face
@@ -6717,6 +6723,22 @@ fn just_kept(context: &DaysContext, person: Option<&str>, one_face: bool) -> Jus
         }
         _ => JustKept::No,
     }
+}
+
+/// Whether the session's last kept thing ([`DaysContext::given_text`]) has
+/// every key word of `about`, a forget's `about` dropped as unheard
+/// ([`ABOUT_DROPPED`]), each the same word or its plural, as `forget
+/// {about}` matches ([`about_words`], [`about_same`]). An `about` with no
+/// key word, or no kept words known, is not plainly that keep.
+fn kept_has_about(context: &DaysContext, about: &str) -> bool {
+    let words = about_words(about);
+    let Some(kept) = context.given_text.as_deref().map(kept_words) else {
+        return false;
+    };
+    !words.is_empty()
+        && words
+            .iter()
+            .all(|word| kept.iter().any(|has| about_same(word, has)))
 }
 
 /// Whether the session's last memory call was a recall that gave
@@ -8985,14 +9007,20 @@ impl DaysClient {
             // A one-face line reached their scope only for it, so it never
             // falls to their `forget_last`: anything else asks which.
             let one_face = call.args.get(JUST_KEPT_ONE_FACE) == Some(&json!(true));
+            // An unheard `about` the model gave: the just kept thing is
+            // "that" only when it has its words (the Reviewer-lead's P2 on
+            // #5419, 5f320eb104).
+            let dropped = call.args.get(ABOUT_DROPPED).and_then(Value::as_str);
             let reached = one_face
                 || call.args.get(JUST_KEPT_CARRIED) == Some(&json!(true))
-                || call.args.get(ABOUT_DROPPED) == Some(&json!(true));
+                || dropped.is_some();
             match (
                 self.forget_just_kept.load(Ordering::Acquire),
                 just_kept(&context, person, one_face),
             ) {
-                (true, JustKept::Id(id)) => {
+                (true, JustKept::Id(id))
+                    if dropped.is_none_or(|about| kept_has_about(&context, about)) =>
+                {
                     eprintln!(
                         "lamp-voice provider: a bare forget right after their keep forgets that keep, entry {id} (LAMP_MEMORY_FORGET_JUST_KEPT)"
                     );
@@ -9631,6 +9659,7 @@ impl DaysClient {
         if matches!(call.name.as_str(), REMEMBER | RECALL) {
             context.last_given = Some((ids.clone(), Instant::now()));
             context.given_by_recall = call.name == RECALL;
+            context.given_text = request_text.clone().filter(|_| call.name == REMEMBER);
             // Set by [`run_one_face_keep`] once this returns, for its keep.
             context.given_one_face = false;
         }
@@ -14956,7 +14985,7 @@ mod tests {
             .expect("a bare forget is marked");
         assert_eq!(
             routed.args,
-            json!({ HEARD_BARE: true, ABOUT_DROPPED: true })
+            json!({ HEARD_BARE: true, ABOUT_DROPPED: "bicycle" })
         );
         let that = named_forget_with(
             &call(FORGET, json!({"about": "that"})),
@@ -14989,6 +15018,63 @@ mod tests {
             let read = served.join().unwrap();
             assert!(
                 read.iter().all(|line| line["op"] == "remember"),
+                "{index}: {read:?}"
+            );
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+        }
+    }
+
+    /// The Reviewer-lead's P2 on #5419 at `5f320eb104`: with
+    /// `LAMP_MEMORY_FORGET_JUST_KEPT` on, "Remember my favourite tea is
+    /// jasmine." then, within 60 s, "I sold my bicycle. Lamp, forget it."
+    /// (called with `about:"bicycle"`, dropped as unheard) asks which and
+    /// never forgets the tea by its id. When the dropped words are in the
+    /// just kept thing ("my bicycle is blue"), that keep is "that", and it
+    /// is forgotten by its id as a bare forget is.
+    #[test]
+    fn an_unheard_about_takes_the_just_kept_thing_only_when_it_has_those_words() {
+        const OLIVIA: &str = "p-b247000000000001";
+        let routed = named_forget_with(
+            &call(FORGET, json!({"about": "bicycle"})),
+            Some("I sold my bicycle. Lamp, forget it."),
+            Some(OLIVIA),
+            &Carry::default(),
+        )
+        .expect("a bare forget is marked");
+        let carried = {
+            let mut carried = routed.clone();
+            carried.args[JUST_KEPT_CARRIED] = json!(true);
+            carried
+        };
+        for (index, forget) in [&routed, &carried].into_iter().enumerate() {
+            let (socket, served) =
+                memory(&format!("unheard-about-kept-{index}"), 3, just_kept_memory);
+            let client = DaysClient::new(socket.clone()).unwrap();
+            client.forget_about.store(true, Ordering::Release);
+            client.forget_just_kept.store(true, Ordering::Release);
+            let run = |call: &ToolCall| {
+                client.run_at(call, Duration::from_secs(3), NOW, Some(&EAST), Some(OLIVIA))
+            };
+            // The tea just kept: the bicycle is not it, so asked which.
+            assert!(
+                run(&call(
+                    REMEMBER,
+                    json!({"text": "my favourite tea is jasmine"})
+                ))
+                .1
+            );
+            assert_eq!(run(forget), (forget_which(true), true), "{index}");
+            // The bicycle just kept: that keep goes, by its id.
+            assert!(run(&call(REMEMBER, json!({"text": "my bicycle is blue"}))).1);
+            let (told, answered) = run(forget);
+            assert!(answered && told["forgotten"] == true, "{index}: {told}");
+            let read = served.join().unwrap();
+            let ops: Vec<&str> = read.iter().filter_map(|line| line["op"].as_str()).collect();
+            assert_eq!(ops, ["remember", "remember", "forget"], "{index}: {read:?}");
+            assert_eq!(
+                read[2],
+                json!({"op":"forget","id":5,"person":OLIVIA,"selective":true}),
                 "{index}: {read:?}"
             );
             drop(client);

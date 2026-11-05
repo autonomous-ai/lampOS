@@ -1427,9 +1427,12 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     ran as called, found nothing, and the lamp said "Nothing was forgotten"
     without asking which. A dropped `about` that names something ("I sold
     my bicycle. Lamp, forget it." called with `about:"bicycle"`) is marked
-    `about_dropped`: the memory asks which, or takes their just kept thing
-    with `LAMP_MEMORY_FORGET_JUST_KEPT`, never their last kept thing on a
-    guess (the Reviewer-lead's P2 on #5419). The guard (`remember::named_forget`, run in
+    `about_dropped` with those words: the memory asks which, never their
+    last kept thing on a guess (the Reviewer-lead's P2 on #5419). With
+    `LAMP_MEMORY_FORGET_JUST_KEPT` it takes their just kept thing only when
+    that has every word of the dropped `about` (`remember::kept_has_about`),
+    so the bicycle line just after the jasmine tea keep asks which and never
+    forgets the tea. The guard (`remember::named_forget`, run in
     `tools::run_call_with_scope` for spoken turns and in `messages` for
     texts) sends a `Named` pick as `forget {about, heard_named}`.
   - **What names a thing** (`remember::named_subject`): the last sentence
