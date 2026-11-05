@@ -374,6 +374,18 @@ Ghi chú cuộc trò chuyện vẫn chỉ đến qua `recall`: không ghi chú n
 khi một phiên bắt đầu. `probe-tools ... --recall` đo quy tắc này so với lời
 trước nó trên mô hình thật ([second-voice.md](../second-voice.md)).
 
+## Lời «không biết» tìm trước (`LAMP_MEMORY_DONT_KNOW_RECALLS`)
+
+`LAMP_MEMORY_DONT_KNOW_RECALLS=on` (nhiệm vụ C57; tắt nếu không đặt, đường
+voice thứ hai với Days) bật trong bản sản phẩm từ 5/11, theo quyết định của
+người phụ trách trí nhớ, sau khi sáng hôm đó lamp-06c1 nói «tôi không nhớ kế
+hoạch kỳ nghỉ nào» mà không gọi `recall` (C56). Khi câu trả lời mở đầu bằng
+một lời không biết về điều của chính người hỏi, những điều đã giữ của người đó
+được tìm ngay (tối đa 60 ms); có tìm thấy thì lời không biết không được nói và
+mô hình được hỏi lại một lần với chúng. Chỉ người của chính yêu cầu, không bao
+giờ của căn phòng hay của người khác. Chi tiết: [memory.md](../memory.md),
+"A don't-know recalls first".
+
 ## Người hỏi chưa nhận ra được, hỏi về chính mình
 
 Khi đèn không nhận ra người hỏi (không thấy mặt quen, không biết tên),

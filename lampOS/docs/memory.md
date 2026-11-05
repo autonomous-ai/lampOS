@@ -2635,7 +2635,7 @@ On lamp-06c1 on 30 Oct the lamp answered only 1 to 2 of 15 questions about thing
 - **Latency:** a reply that isn't a don't-know waits only for its first word or two. A don't-know with nothing found waits for the search (60 ms at most; 3 to 4 ms on a 200-thing kept list, `hits_note_latency_on_a_200_entry_kept_list`). A don't-know with a find adds the search and one chat round, as a `recall` the model called would.
 - **Journal:** `its reply opens with a don't-know; the person's kept things were found: not said, asked again with them in N ms (LAMP_MEMORY_DONT_KNOW_RECALLS)`, or `… had nothing for its words: said …`, and a `memory searched for a don't-know` line with the counts (kept out of the hits' per-path counts). Counts only, never words.
 
-Off, every reply is byte for byte as before. Tested in `second_provider::tests::dont_know` and `worker::tests::a_dont_know_recalls_only_the_requests_own_persons_kept_things`.
+Off unless set, every reply is byte for byte as before; on in the product (`deploy/product/lamp-voice.service`) by the memory owner's call on 5 Nov, after lamp-06c1 said "I don't remember any holiday plans" that morning without calling `recall` (C56). Tested in `second_provider::tests::dont_know` and `worker::tests::a_dont_know_recalls_only_the_requests_own_persons_kept_things`.
 
 ### The nightly pass (`LAMP_MEMORY_NIGHTLY=on`, extraction plan C, step B)
 
