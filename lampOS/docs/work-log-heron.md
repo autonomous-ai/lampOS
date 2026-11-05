@@ -559,3 +559,13 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   process:: 45/0 after one loaded-Mac flake). 18:4x: #5436 HOLD
   97c51ef952, concurring with Twelve and the Reviewer-lead (a yes or no
   to the lamp's forget question can be swallowed and told done).
+- 19:xx–20:xx: #5404, #5433 and #5436 READ-OK on their fixed heads. #5454
+  HOLD 902949d75e (closings such as "If it changes, just say it again."
+  count as doubt and undo a right keep). #5419 HOLD 5f320eb104.
+- 21:5x–22:2x: #5454 HOLD bccc65127e and 98132434aa. Eleven ordinary
+  closings still count as doubt, and LAMP_MEMORY_DOUBT_UNDOES=on is still
+  in the unit, against Faye's 21:16 call to turn it off. #5379 and #5447
+  handed to El and Thirteen, as Faye placed them.
+- 22:3x: #5419 READ-OK 0a2cbe7fb0. The unheard-about guard and the
+  engine test are pinned by mutations. P3: "ba" matches "bà" after
+  accent folding.
