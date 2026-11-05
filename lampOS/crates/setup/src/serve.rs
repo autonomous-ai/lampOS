@@ -1230,13 +1230,41 @@ fn station_ip_within(
         .map(String::from)
 }
 
-/// Phones on the hotspot, from `iw dev IF station dump`: None when it can't
-/// be read in five seconds, which the policy counts as some.
+/// Phones on the hotspot: the stations `iw dev IF station dump` lists, or
+/// the kernel's resolved neighbours on IF (`/proc/net/arp`) when there are
+/// more of those (#5417). lamp-0c89's radio listed no station in `iw` while
+/// hostapd logged a phone associated, so `iw` alone read a joined phone as
+/// none and the hotspot closed under it; a phone that took an address and
+/// spoke to the lamp is in the neighbour table whatever the driver. One that
+/// left may stay there a while, which holds a retry at most
+/// [`crate::recover::PHONE_HOLDS_MS`]. None when `iw` can't be read in five
+/// seconds, which the policy counts as some.
 pub fn phones(interface: &str) -> Option<u16> {
-    phones_within(
+    let stations = phones_within(
         std::process::Command::new("iw").args(["dev", interface, "station", "dump"]),
         crate::reset::query::QUERY_WITHIN,
-    )
+    )?;
+    let table = std::fs::read_to_string("/proc/net/arp").unwrap_or_default();
+    Some(stations.max(neighbours(&table, interface)))
+}
+
+/// Resolved entries (`ATF_COM`) on `interface` in `/proc/net/arp`'s table,
+/// whose columns are address, type, flags, hardware address, mask, device.
+fn neighbours(table: &str, interface: &str) -> u16 {
+    table
+        .lines()
+        .skip(1)
+        .filter(|line| {
+            let fields: Vec<&str> = line.split_whitespace().collect();
+            fields.len() >= 6
+                && fields[5] == interface
+                && fields[3] != "00:00:00:00:00:00"
+                && u32::from_str_radix(fields[2].trim_start_matches("0x"), 16)
+                    .is_ok_and(|flags| flags & 0x2 != 0)
+        })
+        .count()
+        .try_into()
+        .unwrap_or(u16::MAX)
 }
 
 fn phones_within(command: &mut std::process::Command, within: Duration) -> Option<u16> {
@@ -1328,6 +1356,21 @@ mod tests {
         assert_eq!(timed(read, STATIONS).0, Some(2));
         assert_eq!(timed(read, "exit 1").0, None);
         bounded(read, STATIONS, None);
+    }
+
+    /// #5417: a phone on lamp-0c89's hotspot that `iw` never listed is in
+    /// the neighbour table; incomplete entries, other interfaces and the
+    /// header are not phones.
+    #[test]
+    fn a_phone_iw_does_not_list_is_counted_from_the_neighbour_table() {
+        let table = "\
+IP address       HW type     Flags       HW address            Mask     Device
+192.168.100.77   0x1         0x2         aa:bb:cc:dd:ee:01     *        wlan0
+192.168.100.78   0x1         0x0         00:00:00:00:00:00     *        wlan0
+192.168.1.1      0x1         0x2         aa:bb:cc:dd:ee:02     *        eth0
+";
+        assert_eq!(neighbours(table, "wlan0"), 1, "the joined phone is counted");
+        assert_eq!(neighbours("", "wlan0"), 0);
     }
 
     #[test]
