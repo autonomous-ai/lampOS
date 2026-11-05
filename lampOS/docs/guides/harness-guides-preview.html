@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harness guides: preview (draft for #5413)</title>
+<!-- System fonts only: the page loads nothing from outside. A preview of harness-getting-started.md and
+     harness-developer-quick-start.md; the Markdown files are the source, and every TO CHECK there still stands. -->
+<style>
+  :root { --ink:#1b1f27; --muted:#5b6472; --line:#d9dde4; --bg:#f6f7f9; --card:#fff; --accent:#d9822b; color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:17px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:20px 16px 60px; }
+  .draft { background:#fff4e0; border:1px solid #f0c987; border-radius:10px; padding:10px 14px; font-size:15px; }
+  nav { display:flex; gap:8px; margin:18px 0; }
+  nav button { flex:1; padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--card); font:inherit; font-weight:600; cursor:pointer; }
+  nav button[aria-selected="true"] { background:var(--ink); color:#fff; border-color:var(--ink); }
+  section[hidden] { display:none; }
+  h1 { font-size:26px; line-height:1.2; margin:8px 0 10px; }
+  h2 { font-size:20px; margin:26px 0 8px; }
+  .step { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin:12px 0; }
+  .step h3 { margin:0 0 6px; font-size:18px; }
+  .num { display:inline-block; width:28px; height:28px; line-height:28px; text-align:center; border-radius:50%; background:var(--accent); color:#fff; font-weight:700; margin-right:8px; }
+  .shot { margin-top:10px; border:2px dashed var(--line); border-radius:10px; padding:10px 12px; color:var(--muted); font-size:14px; }
+  .say { background:var(--card); border-left:4px solid var(--accent); padding:8px 12px; margin:8px 0; border-radius:0 8px 8px 0; }
+  .check { background:#eef3ff; border-radius:6px; padding:0 5px; font-size:13px; font-weight:600; color:#2c4a9a; white-space:nowrap; }
+  pre { background:#12151b; color:#e7eaf0; padding:12px; border-radius:10px; overflow-x:auto; font:13px/1.45 ui-monospace,Menlo,Consolas,monospace; }
+  code { font:14px ui-monospace,Menlo,Consolas,monospace; }
+  .entry { display:grid; gap:10px; grid-template-columns:1fr 1fr; }
+  @media (max-width:600px) { .entry { grid-template-columns:1fr; } }
+  .entry div { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font-size:15px; }
+  .btn { display:inline-block; margin-top:8px; padding:8px 14px; background:var(--ink); color:#fff; border-radius:8px; font-size:15px; }
+</style>
+</head>
+<body>
+<main>
+  <p class="draft"><b>Draft for #5413.</b> Preview only. Not live until the Harness team and the SDK local leader have checked every <span class="check">TO CHECK</span>, and until a lamp build carrying PR #5379 is on stable.</p>
+
+  <nav role="tablist">
+    <button role="tab" id="t1" aria-selected="true" aria-controls="p1">For everyone</button>
+    <button role="tab" id="t2" aria-selected="false" aria-controls="p2">For developers</button>
+  </nav>
+
+  <section id="p1" role="tabpanel" aria-labelledby="t1">
+    <h1>Get your lamp working with your computer</h1>
+    <p>Your lamp can hand work to the AI helpers on your computer, such as Claude Code. You ask out loud. The lamp tells you when it is done. A program called <b>Harness</b> carries the work from the lamp to your computer. Setup takes about ten minutes.</p>
+
+    <h2>What you can ask your lamp to do</h2>
+    <div class="say"><b>Ask for a piece of work.</b><br>“Ask Claude Code to write a poem about the rain.” The lamp repeats the task, you say yes, and it tells you Claude Code has it.</div>
+    <div class="say"><b>Ask for something from your work computer.</b><br>“Ask Claude Code on my office computer to look at why the build is slow and tell me what it finds.”</div>
+    <div class="say"><b>Hear how it went, without asking.</b><br>When the helper finishes, the lamp tells you at a good moment. If it stops to ask you something, the lamp tells you that too.</div>
+    <p>Nothing starts without your spoken yes. The lamp only hands work to the helper you name, and only to computers <span class="check">TO CHECK: phones</span>.</p>
+
+    <h2>Three steps</h2>
+    <div class="step"><h3><span class="num">1</span>Install the Harness app on your computer</h3>
+      <div class="shot">Picture plan: the Harness download page with the button circled, then the app's first screen. <span class="check">TO CHECK: Harness's install page</span></div></div>
+    <div class="step"><h3><span class="num">2</span>Sign in to Harness</h3>
+      <div class="shot">Picture plan: the sign-in screen, then the signed-in home screen. Hide names and emails. <span class="check">TO CHECK: the account</span></div></div>
+    <div class="step"><h3><span class="num">3</span>Connect Harness to your lamp</h3>
+      <p>In the Autonomous app, open the Harness card and start. The app shows an 8-digit code. In Harness, open <b>Machines</b>, then <b>Approve a device</b>, and type it. The app then asks “Sign in as” with your email: choose yes if it is yours.</p>
+      <div class="shot">Video plan, about 20 seconds: the code in the app (blurred), typed in Harness, the yes in the app. Then someone speaking to the lamp. <span class="check">TO CHECK: the app's screen words</span></div></div>
+
+    <h2>Where people meet this</h2>
+    <div class="entry">
+      <div><b>Right after the lamp's setup</b><br>“Your lamp can hand work to the AI helpers on your computer. Set it up in three steps.”<br><span class="btn">Show me</span></div>
+      <div><b>On the Harness card, when the lamp has no Harness</b><br>“Connect your computer so the lamp can hand it work.” May also link to the App Store.<br><span class="btn">Open the guide</span></div>
+    </div>
+  </section>
+
+  <section id="p2" role="tabpanel" aria-labelledby="t2" hidden>
+    <h1>Program your lamp from your computer</h1>
+    <p>Light it, make it speak, move it, hear its own phrases, see that someone arrived, from a program on your computer. About ten minutes.</p>
+
+    <h2>What you get</h2>
+    <div class="step"><b>Pairing.</b> The owner pairs a computer once in the Autonomous app (<i>Add a developer computer</i>) and chooses what it may do. It can be revoked at any time. The person always wins: a hand on the head, “stop”, the privacy switch or a conversation takes control back.</div>
+    <div class="step"><b>The SDK.</b> Python and JavaScript, the same calls: events, state and actions, each needing a grant. Plus a fake lamp for trying with no lamp.</div>
+    <p><span class="check">TO CHECK: the lamp's side, lamp-control, is not a product part until PR #4526; the app's screen</span></p>
+
+    <h2>Run an example</h2>
+<pre># install (from a checkout of the repository)
+python3 -m venv ~/lampos-venv &amp;&amp; . ~/lampos-venv/bin/activate
+pip install ./lampOS/sdk/python
+
+# terminal 1: a fake lamp
+LAMPOS_HOME=/tmp/lampos-try lamp fake
+
+# terminal 2: examples/first_light.py
+LAMPOS_HOME=/tmp/lampos-try python first_light.py</pre>
+<pre>connected to lamp-fake with ['body', 'light', 'speak', 'look', 'hear', 'sound', 'skills', 'air', 'device', 'camera', 'microphone']
+lamp state: {'lamp': {'talking': False, 'paused': False, 'private': False, 'asleep': False}}</pre>
+    <p>Ran against the fake lamp, not a real one.</p>
+
+    <h2>Your real lamp</h2>
+<pre>lamp pair 12345678 --pin &lt;the 64 characters the app shows&gt;
+lamp hello
+python first_light.py</pre>
+    <p>The SDK checks the lamp's certificate against the pin before it sends anything.</p>
+  </section>
+</main>
+<script>
+  var tabs = [document.getElementById("t1"), document.getElementById("t2")];
+  var panels = [document.getElementById("p1"), document.getElementById("p2")];
+  tabs.forEach(function (tab, i) {
+    tab.addEventListener("click", function () {
+      tabs.forEach(function (t, j) { t.setAttribute("aria-selected", i === j ? "true" : "false"); panels[j].hidden = i !== j; });
+    });
+  });
+</script>
+</body>
+</html>
