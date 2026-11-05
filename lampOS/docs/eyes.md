@@ -1431,7 +1431,11 @@ With the switch:
     where the eyes read speaking, the speaker not seen saying it), a line
     held by a face's gap, another session or 45 s (`HELD_SAVE_FOR`) drops
     it (lamp-52e6, 5 Nov, #5391's check: "Walter. Have I got that
-    right?" "Yes, that's my name." made no call and kept no face). While
+    right?" "Yes, that's my name." made no call and kept no face). A
+    plain yes dropped for the second face or the speaker not seen saying
+    it is told to the model as a face not kept, and why, so it makes up no
+    reason of its own (lamp-52e6, 5 Nov, Fifth's run B on #5415: "I need
+    to know who you are first"). While
     it is held, the onboarding walk keeps "who you are" open for it, up to
     45 s (`onboarding::face_save_held`, `FACE_SAVE_HELD_US`), instead of
     ending it done with the name only 15 s after the lamp's read-back

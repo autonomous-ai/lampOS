@@ -219,3 +219,27 @@ async fn a_held_save_that_keeps_nothing_is_told_to_the_model() {
         "{notes:?}"
     );
 }
+
+/// A plain yes whose held save is dropped all the same (here a second
+/// face seen at the yes; the speaking gate's drop takes the same path):
+/// the model is told why, so it makes up no reason of its own (Fifth's
+/// run B on #5415, lamp-52e6, 5 Nov).
+#[tokio::test]
+async fn a_dropped_held_save_after_a_plain_yes_is_told_to_the_model() {
+    let (sent, asked) = run_with(
+        &[NAME_LINE, ("Yes, that's my name.", Lamp::Says("Got it."))],
+        Some(1),
+        None,
+    )
+    .await;
+    assert_eq!(sent, Vec::<Value>::new());
+    let last = asked.last().expect("the yes was asked of the model");
+    assert!(
+        last.iter()
+            .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
+            .any(|note| note.starts_with("(For you to know")
+                && note.contains("could not be kept")
+                && note.contains("a second face seen at the yes")),
+        "{last:?}"
+    );
+}

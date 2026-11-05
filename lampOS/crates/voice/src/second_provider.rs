@@ -10843,14 +10843,18 @@ fn let_the_walk_go() {
 /// The held setup save request `request` runs, if any: only on the next
 /// spoken turn of the same session, within [`HELD_SAVE_FOR`], when that
 /// turn is a plain yes to the lamp's read-back. A turn the lamp wrote
-/// leaves it as it is; any other turn drops it.
+/// leaves it as it is; any other turn drops it. A plain yes whose save is
+/// dropped all the same (a second face, or the speaker not seen saying it)
+/// comes back as `Err` with why, for the model to be told: left untold, it
+/// made up its own reason on lamp-52e6 (Fifth's run B on #5415, 5 Nov:
+/// "I need to know who you are first").
 fn take_held_save(
     shared: &Shared,
     request: u64,
     heard: bool,
     scope: Option<&crate::memory_scope::ScopeLease>,
     now: Instant,
-) -> Option<net::ToolCall> {
+) -> Option<Result<net::ToolCall, &'static str>> {
     let mut hold = shared.held_save.lock().ok()?;
     let held = hold.take()?;
     if !heard || held.request >= request {
@@ -10866,6 +10870,10 @@ fn take_held_save(
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_owned();
+    let verdict = crate::known_faces::held_save_verdict(&name, &said_window(shared));
+    let plain_yes = verdict == crate::known_faces::HeldSaveVerdict::Runs;
+    // Only these two drop a plain yes the model should hear about.
+    let mut told = false;
     let why = if now.saturating_duration_since(held.at) > HELD_SAVE_FOR {
         "too late"
     } else if held_by_gap(scope) {
@@ -10878,21 +10886,23 @@ fn take_held_save(
     {
         // The save stays the speaker's own: a second face seen speaking
         // the yes may be someone else's.
+        told = plain_yes;
         "a second face seen at the yes"
     } else if shared.forget_sight.is_some()
         && seen_speaking
             .as_ref()
             .is_none_or(|line| line.speakers.len() != 1)
     {
+        told = plain_yes;
         "the speaker was not seen saying the yes"
     } else {
-        match crate::known_faces::held_save_verdict(&name, &said_window(shared)) {
+        match verdict {
             crate::known_faces::HeldSaveVerdict::Runs => {
                 eprintln!(
                     "lamp-voice second: request {request}: their yes to the read-back runs the setup face save held in request {}",
                     held.request
                 );
-                return Some(held.call);
+                return Some(Ok(held.call));
             }
             crate::known_faces::HeldSaveVerdict::Waits => "the lamp did not say the name back",
             crate::known_faces::HeldSaveVerdict::Drops => "not a plain yes to the read-back",
@@ -10903,7 +10913,7 @@ fn take_held_save(
         held.request
     );
     let_the_walk_go();
-    None
+    told.then_some(Err(why))
 }
 
 /// The answer of a save a held one already ran for `name` in `request`,
@@ -11610,8 +11620,12 @@ async fn answer(
         Taken::Runs(call) => (Some(call), None),
         Taken::Unseen(name) => (None, Some(crate::remember::unseen_yes_told(&name))),
     };
-    let mut held_save_runs =
-        take_held_save(shared, request, heard, scope.as_ref(), (shared.clock)());
+    let (mut held_save_runs, held_save_dropped) =
+        match take_held_save(shared, request, heard, scope.as_ref(), (shared.clock)()) {
+            Some(Ok(call)) => (Some(call), None),
+            Some(Err(why)) => (None, Some(why)),
+            None => (None, None),
+        };
     // Whom the line's own words ask by name (`LAMP_TASKS_NAMED_ASK`): told
     // once, after round 1 answers.
     let mut named_ask = shared
@@ -11683,7 +11697,12 @@ async fn answer(
     // result, or that its yes did not count, so it does not stand for
     // round 1.
     let prepared_for = prepared
-        .filter(|_| held_forget_runs.is_none() && unseen_yes.is_none() && held_save_runs.is_none())
+        .filter(|_| {
+            held_forget_runs.is_none()
+                && unseen_yes.is_none()
+                && held_save_runs.is_none()
+                && held_save_dropped.is_none()
+        })
         .map(|prepared| (prepared, said.clone()));
     // Only a note for the model, no one's words (a wordless cut's ask to go
     // on, `LAMP_CUT_IN_WORDLESS_RESUMES`): no message of the person's.
@@ -11918,6 +11937,14 @@ async fn answer(
                     )));
                 }
             }
+        }
+        // Their plain yes to the read-back, its held face save dropped all
+        // the same: told why, so the model neither says it will know them
+        // nor makes up a reason.
+        if let Some(why) = held_save_dropped {
+            messages.push(Message::system(format!(
+                "(For you to know: they said yes to the name you said back, but their face could not be kept: {why}. Do not say you will know their face; you may ask them to look at you and try again.)"
+            )));
         }
         // Their yes did not count (#2377): told once, beside the request.
         if let Some(told) = unseen_yes {
