@@ -1639,6 +1639,9 @@ pub const FORGET_ASKS_DESCRIBED: &str = " If nothing was forgotten and their wor
 /// Only the exact value `on`, with the Days client: `forget` also takes what
 /// it is `about`, and forgets the kept things of whoever is at the lamp that
 /// have every one of those words (#2176). Off, the functions are as before.
+/// The least time a `forget {about}`'s nightly mark ([`DaysClient`]'s
+/// `forget_mark` request) is given when the forget used its deadline.
+const FORGET_MARK_WITHIN: Duration = Duration::from_millis(250);
 pub const FORGET_ABOUT_ENVIRONMENT: &str = "LAMP_MEMORY_FORGET_ABOUT";
 static FORGET_ABOUT: OnceLock<bool> = OnceLock::new();
 
@@ -8177,6 +8180,23 @@ impl DaysClient {
                 let until = started + deadline;
                 let (told, answered) =
                     self.forget_about(&call.args["about"], person, until, lease, heard_named(call));
+                // Found or not, the night passes over what they said today
+                // before it (El's option 2 on #5333): a line said and never
+                // kept has nothing here to match. After the forget, so its
+                // own requests go first; an older memory refuses the op and
+                // nothing changes.
+                if let Some(person) = person {
+                    let budget = until
+                        .checked_duration_since(Instant::now())
+                        .unwrap_or_default()
+                        .max(FORGET_MARK_WITHIN);
+                    let mark = for_person(json!({"op":"forget_mark"}), Some(person));
+                    if bounded_exchange_scoped(&self.socket, &mark, budget, lease)
+                        .is_none_or(|answer| answer["ok"] != true)
+                    {
+                        eprintln!("lamp-voice provider: a forget's nightly mark was not confirmed");
+                    }
+                }
                 return (room_forget_told(told, person, needs_face::on()), answered);
             }
             // "Forget that" right after a follow-up: the entry it was about
@@ -14987,6 +15007,7 @@ mod tests {
                     {"id":50,"at_unix_ms":NOW,"text":"The coffee is in the cupboard"}
                 ]}),
                 (Some("forget"), _) => json!({"ok":true,"removed":1}),
+                (Some("forget_mark"), _) => json!({"ok":true}),
                 _ => json!({"ok":false}),
             }
         }
@@ -15001,7 +15022,7 @@ mod tests {
             (0, json!({"about":"coffee"})),
             (1, json!({"about":"coffee", HEARD_NAMED: true})),
         ] {
-            let (socket, served) = memory(&format!("one-face-nine-{at}"), 1, nine_of_theirs);
+            let (socket, served) = memory(&format!("one-face-nine-{at}"), 2, nine_of_theirs);
             let client = DaysClient::new(socket.clone()).unwrap();
             client.forget_about.store(true, Ordering::Release);
             let _ = client.context.lock().unwrap().include(None, &[50]);
@@ -15012,9 +15033,13 @@ mod tests {
                 told["note"].as_str().unwrap().contains("Ask which one"),
                 "{told}"
             );
+            // Their day is marked for the night (El's option 2 on #5333).
             assert_eq!(
                 served.join().unwrap(),
-                [json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true,"person":MINH})],
+                [
+                    json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true,"person":MINH}),
+                    json!({"op":"forget_mark","person":MINH}),
+                ],
                 "nothing of the room's is listed or forgotten"
             );
             drop(client);
@@ -15022,21 +15047,26 @@ mod tests {
         }
         // Named, none of theirs: the room's is searched and its shown one
         // forgotten, in the room's scope.
-        let (socket, served) = memory("one-face-named-none", 3, none_of_theirs);
+        let (socket, served) = memory("one-face-named-none", 4, none_of_theirs);
         let client = DaysClient::new(socket.clone()).unwrap();
         client.forget_about.store(true, Ordering::Release);
         let _ = client.context.lock().unwrap().include(None, &[50]);
         let (told, _) = forget(&client, json!({"about":"coffee", HEARD_NAMED: true}));
         assert_eq!(told["forgotten"], true, "{told}");
+        // Their own look marks their day; the room's forget marks none.
         assert_eq!(
-            served.join().unwrap()[2],
-            json!({"op":"forget","id":50,"selective":true})
+            served.join().unwrap()[1..],
+            [
+                json!({"op":"forget_mark","person":MINH}),
+                json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true}),
+                json!({"op":"forget","id":50,"selective":true}),
+            ]
         );
         drop(client);
         std::fs::remove_file(&socket).unwrap();
         // Unnamed, none of theirs: forget_about's own look in the room's
         // forgets it; the room's is not run again (a fourth request).
-        let (socket, served) = memory("one-face-unnamed-none", 3, none_of_theirs);
+        let (socket, served) = memory("one-face-unnamed-none", 4, none_of_theirs);
         let client = DaysClient::new(socket.clone()).unwrap();
         client.forget_about.store(true, Ordering::Release);
         let _ = client.context.lock().unwrap().include(None, &[50]);
@@ -15049,6 +15079,7 @@ mod tests {
                 json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true,"person":MINH}),
                 json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true}),
                 json!({"op":"forget","id":50,"selective":true}),
+                json!({"op":"forget_mark","person":MINH}),
             ]
         );
         drop(client);
@@ -24650,7 +24681,7 @@ mod tests {
     /// never sent, and the model is told plainly that it couldn't forget it.
     #[test]
     fn a_named_forget_with_an_older_days_memory_removes_nothing_and_says_so() {
-        let (socket, served) = memory("forget-named-older", 2, |request| {
+        let (socket, served) = memory("forget-named-older", 3, |request| {
             let known: &[&str] = match request["op"].as_str() {
                 Some("kept") => &["op", "person", "max_bytes"],
                 Some("forget_last") => &["op", "person", "kind"],
@@ -24666,6 +24697,10 @@ mod tests {
                     {"id":4,"at_unix_ms":NOW-DAY,"text":"Sister's wedding is on Saturday."}
                 ]}),
                 Some("forget_last") | Some("forget") => json!({"ok":true,"removed":1}),
+                // Unknown to an older memory, as the night's mark is.
+                Some("forget_mark") => {
+                    json!({"ok":false,"error":"unknown_op","message":"the memory operation is unknown"})
+                }
                 _ => json!({"ok":true,"end":true}),
             }
         });
@@ -24693,9 +24728,10 @@ mod tests {
             read,
             [
                 json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true,"person":MAI}),
+                json!({"op":"forget_mark","person":MAI}),
                 json!({"op":"end"}),
             ],
-            "nothing removed, no forget_last"
+            "nothing removed, no forget_last; the mark refused changes nothing"
         );
         let context = client.context.lock().unwrap();
         assert!(!context.journal_inhibited);
