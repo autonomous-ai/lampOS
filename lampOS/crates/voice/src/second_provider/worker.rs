@@ -3565,6 +3565,11 @@ pub fn serve(
                     .map(|prints| Box::new(prints) as Box<dyn crate::same_voice::Printer>)
             },
         );
+        // The owner's print, kept for the services' send gate, goes on a
+        // sign-out with the services' tokens (`account/state`).
+        if printing == Printing::ForServices {
+            crate::owner_voice::watch_sign_outs(files.bus_root.as_deref());
+        }
         // Only prints for every rule are the voice heard; the services'
         // alone are heard by none of them.
         let hears = printing == Printing::ForEverything;

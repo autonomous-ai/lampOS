@@ -789,7 +789,9 @@ prints).
   beside the owner's place and name (`tools.rs` →
   `owner_voice::forget_with_everything`, its answer `voice_print:
   "forgotten too"`), whether or not the switch is on. Another person's or
-  the room's forget leaves it.
+  the room's forget leaves it. A sign-out wipes it too, with the services'
+  tokens: the voice reads `account/state` every 5 s and removes it once a
+  spell (`owner_voice::watch_sign_outs`).
 - **Used:** a send is held to it (`VoiceAsk::Owner`, at
   `SERVICES_SAME_FROM`, 0.55) in place of the preparing line's print, and a read in full is too in place
   of the conversation's voice ([services.md](services.md)); with none,

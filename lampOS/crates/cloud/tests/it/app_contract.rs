@@ -1110,8 +1110,9 @@ fn mic_get_says_who_muted_the_lamp_only_while_muted() {
 }
 
 /// `LAMP_SIGNED_OUT`: `system.info` and `lamp.health` read the state from
-/// `account/state`. No state at all (the switch off, an older lamp-cloud) and
-/// a state of signed in say no field.
+/// `account/state`. No state at all (an older lamp-cloud), a state of signed
+/// in, and the switch off (the state said for the voice alone, with
+/// `LAMP_SERVICES=on`) say no field.
 #[test]
 fn system_info_and_health_say_signed_out_only_while_the_bus_says_so() {
     use lamp_msgs::{AccountState, Health};
@@ -1173,6 +1174,11 @@ fn system_info_and_health_say_signed_out_only_while_the_bus_says_so() {
             },
         )
         .unwrap();
+    // The switch off: said on the bus for the voice, not to the app.
+    lamp_cloud::signed_out::tell_the_app(false);
+    assert!(said(&mut real, "system.info").get("account").is_none());
+    assert!(said(&mut real, "lamp.health").get("account").is_none());
+    lamp_cloud::signed_out::tell_the_app(true);
     assert_eq!(said(&mut real, "system.info")["account"], "signed_out");
     assert_eq!(said(&mut real, "lamp.health")["account"], "signed_out");
 }

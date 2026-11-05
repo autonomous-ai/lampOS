@@ -209,19 +209,24 @@ Wiped:
   service is forgotten.
 - **The owner's voice print** (`/var/lib/lampos-eyes/owner-voice.json`,
   same-voice.md, "The owner's voice print") is no token: it is wiped by the
-  reset plan and by the owner's "forget everything", never by removing a
-  service.
+  reset plan, by the owner's "forget everything" and by a sign-out, never by
+  removing a service.
 - **Factory reset:** `/var/lib/lampos-services` is one of the reset plan's
   paths (`crates/setup/fixtures/reset-plan-product.json`, hash added to
   `RESET_PLAN_SHIPPED`; [setup.md](setup.md)).
 - **Sign-out:** whenever `LAMP_SERVICES=on`, whatever `LAMP_SIGNED_OUT` says,
-  `lamp-cloud` counts the ping's answers for a sign-out (`watches_login`;
-  it tells the bus and the app of it only with `LAMP_SIGNED_OUT=on`). Once it
+  `lamp-cloud` counts the ping's answers for a sign-out (`watches_login`)
+  and says it on `account/state` (it tells the app of it, and the voice holds
+  turns, only with `LAMP_SIGNED_OUT=on`). Once it
   finds the lamp signed out ([cloud.md](cloud.md), "Signed out"), it asks
   `{"op":"wipe"}`: every file in the folder deleted, the folder kept, any
   waiting write forgotten. Once a spell; tried again every 30 s while it
   fails and the lamp stays signed out, and once more at the next spell. The
   journal says "signed out: the services' tokens are wiped", or why not.
+  The voice, which owns the owner's voice print, reads `account/state` every
+  5 s and removes the print with the tokens once a spell
+  (`owner_voice::watch_sign_outs`, "owner print: signed out: wiped with the
+  services' tokens").
 
 `list` and `services_connected` give a service's code, its account and
 `expired` (expired with no refresh token, so it needs linking again), never

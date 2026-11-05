@@ -672,6 +672,9 @@ impl Lamp for Real {
     }
 
     fn account(&mut self) -> Option<&'static str> {
+        if !crate::signed_out::told_to_the_app() {
+            return None;
+        }
         self.latest(lamp_msgs::AccountState::TOPIC)
             .filter(|message| !message.expired)
             .and_then(|message| message.parse::<lamp_msgs::AccountState>().ok())
