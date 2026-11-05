@@ -396,9 +396,11 @@ const (
 	// AgentRuntimeRemote uses a brain on another machine; the URL/token are saved but no switch happens yet.
 	AgentRuntimeRemote = "remote"
 
-	KindSystemInfo     = "system.info"
-	KindSystemVersion  = "system.version"
-	KindSystemNetwork  = "system.network"
+	KindSystemInfo    = "system.info"
+	KindSystemVersion = "system.version"
+	KindSystemNetwork = "system.network"
+	// KindSystemStats reports CPU, memory, disk and temperature plus the state of the HAL service.
+	KindSystemStats    = "system.stats"
 	KindSystemReboot   = "system.reboot"   // via HAL
 	KindSystemShutdown = "system.shutdown" // via HAL (servo-aware)
 
@@ -765,6 +767,57 @@ type MQTTHostData struct {
 	DeviceName    string `json:"device_name"` // friendly "<device_type>-xxxx"
 	UptimeSeconds int64  `json:"uptime_seconds"`
 	Timezone      string `json:"timezone,omitempty"` // active IANA zone
+}
+
+// MQTTStatsData answers kind:"system.stats": host load plus the state of the HAL service.
+// Fields that cannot be read are left at their zero value or empty.
+type MQTTStatsData struct {
+	CPU  MQTTCPUStats  `json:"cpu"`
+	Mem  MQTTMemStats  `json:"mem"`
+	Disk MQTTDiskStats `json:"disk"`
+	// TempC is the SoC temperature in degrees Celsius; 0 when unreadable.
+	TempC float64      `json:"temp_c"`
+	HAL   MQTTHALStats `json:"hal"`
+	// KernelOOM holds the last few kernel out-of-memory kill lines.
+	KernelOOM []string `json:"kernel_oom,omitempty"`
+}
+
+// MQTTCPUStats carries the load averages and the core count.
+type MQTTCPUStats struct {
+	Load1  float64 `json:"load1"`
+	Load5  float64 `json:"load5"`
+	Load15 float64 `json:"load15"`
+	Cores  int     `json:"cores"`
+}
+
+// MQTTMemStats carries RAM and swap use in MB.
+type MQTTMemStats struct {
+	TotalMB     int64   `json:"total_mb"`
+	AvailableMB int64   `json:"available_mb"`
+	UsedPercent float64 `json:"used_percent"`
+	SwapTotalMB int64   `json:"swap_total_mb"`
+	SwapUsedMB  int64   `json:"swap_used_mb"`
+}
+
+// MQTTDiskStats carries the root filesystem use.
+type MQTTDiskStats struct {
+	TotalMB     int64   `json:"total_mb"`
+	UsedMB      int64   `json:"used_mb"`
+	UsedPercent float64 `json:"used_percent"`
+}
+
+// MQTTHALStats says why HAL is or is not serving: the systemd unit state, whether
+// /health answers, and the recent error lines of its journal.
+type MQTTHALStats struct {
+	ActiveState    string `json:"active_state"`
+	SubState       string `json:"sub_state"`
+	Result         string `json:"result"`
+	ExecMainStatus string `json:"exec_main_status"`
+	Restarts       int    `json:"restarts"`
+	// Health is "ok", or the error from probing HAL's /health.
+	Health string `json:"health"`
+	// RecentErrors are the newest structural error lines of the journal (no message text), oldest first.
+	RecentErrors []string `json:"recent_errors,omitempty"`
 }
 
 // MQTTOAuthSetData is the Data payload for kind:"oauth.set"; Provider keys access_tokens.json.

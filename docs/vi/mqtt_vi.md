@@ -417,6 +417,7 @@ nhận HAL nhận yêu cầu phát, không đảm bảo audio đã phát xong.
 | `system.info` | Snapshot tổng hợp: versions + network + host | _(không)_ |
 | `system.version` | Chỉ versions các thành phần (rẻ hơn `system.info`) | _(không)_ |
 | `system.network` | Chỉ thông tin mạng của interface đang giữ default route | _(không)_ |
+| `system.stats` | CPU load, bộ nhớ, ổ đĩa, nhiệt độ và trạng thái service HAL | _(không)_ |
 | `system.reboot` | Xếp lịch reboot OS qua HAL có cue | _(không)_ |
 | `system.shutdown` | Xếp lịch shutdown OS qua HAL có cue và release servo | _(không)_ |
 | `system.ota_versions` | Version OTA từng component + những gì bootstrap đang cài (dữ liệu của card Versions trên web) | _(không)_ |
@@ -533,6 +534,16 @@ về block `network`. Cách probe version: `os-server` từ biến ldflags lúc 
 qua `bootstrap-server --version`, `hal` qua HTTP từ endpoint `/version` của HAL
 local, `openclaw` từ probe cache của agent monitor (`openclaw_detected` phân biệt
 "chưa cài" với "đã cài nhưng không parse được").
+
+`system.stats` dùng để chẩn đoán device có HAL đang chết, khi `system.info` chỉ cho biết thiếu
+version HAL. `data` gồm `cpu` (`load1/5/15`, `cores`), `mem` (`total_mb`, `available_mb`,
+`used_percent`, swap), `disk` (root filesystem), `temp_c`, và `hal`: `active_state`/`sub_state`/
+`result`/`exec_main_status`/`restarts` của systemd, `health` (`ok`, hoặc lỗi khi probe `/health`
+của HAL) và `recent_errors`. `recent_errors` là các dòng lỗi có cấu trúc của journal HAL, tối đa
+15 dòng, mỗi dòng 300 byte: thông báo thoát/khởi động lại `hal.service:` của systemd (chỉ các dạng cố định), vị trí traceback
+(file, dòng, hàm), tên module bị thiếu, và tên loại exception đã bỏ phần thông điệp. Không bao giờ lọc theo từ
+khóa vì HAL ghi lại lời người dùng nói và một cảnh báo có thể trích dẫn nó. `kernel_oom` liệt kê 3 dòng kernel kill
+do hết bộ nhớ gần nhất. Mỗi probe giới hạn 3 giây, probe lỗi thì field giữ giá trị zero.
 
 #### `system.ota_versions` / `system.software_update`
 
@@ -1831,6 +1842,7 @@ Router MQTT của os-server không có case `ota`: message bị log là `unknown
 | `system/server/device/delivery/mqtt/mcp_connector_writer.go` | Writer MCP stdio đặc biệt (`figma-api`): token file + entry MCP wrapper cục bộ trong `openclaw.json` |
 | `system/server/device/delivery/mqtt/connector_refresh.go` | Loop refresh token connector (`/connector/refresh-token`) |
 | `system/server/device/delivery/mqtt/system_info_handler.go` | Handle `data` kinds `system.info`/`system.version`/`system.network` |
+| `system/server/device/delivery/mqtt/system_stats_handler.go` | Handle `data` kind `system.stats` (host load + trạng thái service HAL) |
 | `system/server/device/delivery/mqtt/system_ota_handler.go` | Xử lý `data` kind `system.ota_versions`/`system.software_update` (+ watcher báo hoàn tất) |
 | `system/ota/ota.go` | Client OTA bootstrap dùng chung (versions, updating, force-update, rate limit theo target) cho cả MQTT kind và `/api/system/ota-*` + `software-update` |
 | `system/server/device/delivery/mqtt/channel_refresh_handler.go` | Handle `data` kind `channel.refresh_config` (re-apply block config của channel, bất đồng bộ) |
