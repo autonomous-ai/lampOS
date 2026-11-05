@@ -728,11 +728,16 @@ pub fn plainly(text: &str) -> Result<String, Refused> {
 /// you're alone with the lamp, it reads you tomorrow's Google Calendar: …"
 /// (the first builder's ruling on #5288). Off, such a step is unsaid.
 pub fn plainly_with(text: &str, reads: bool) -> Result<String, Refused> {
-    // Its lines go back to the model once, as the check's do.
+    // Its lines go back to the model once, as the check's do; with reads
+    // on, they keep the brief's read step ([`PLAIN_OR_READ`]).
     let unsaid = || {
         Refused(
             "it does something the lamp can't say plainly".into(),
-            Some(PLAIN_ONLY.into()),
+            Some(if reads {
+                format!("{PLAIN_ONLY}{PLAIN_OR_READ}")
+            } else {
+                PLAIN_ONLY.into()
+            }),
         )
     };
     let table: toml::Table = toml::from_str(text).map_err(unreadable)?;
@@ -876,6 +881,14 @@ const PLAIN_ONLY: &str = "only kind, version, needs, permissions, one [trigger],
                           [[do]]; the trigger may have only topic, field, equals, for, cooldown, \
                           rearm and during, and at most a few [[do]] steps, each one light or \
                           one body gesture, as the request names them";
+
+/// What [`PLAIN_ONLY`] goes on to say with reads on: a skill that reads a
+/// linked service keeps its one read step. On lamp-9adf, 5 Nov 13:26, an
+/// app make of "Read me my latest email when I sit down at my desk." was
+/// refused twice: the repair, told only lights and gestures, took the
+/// mail read away.
+const PLAIN_OR_READ: &str = "; or, for a read of a linked service, only one [[do]] step: the \
+                             brief's read step exactly as the brief gives it, and nothing else";
 
 /// The model's [`LEFT_OUT`] words in a fixed frame, as its own note: no
 /// quotes, and one clause, so they can't read as another sentence of what
@@ -2751,7 +2764,7 @@ body = { gesture = "nod" }
     /// repair: the person is never asked about something they weren't told.
     #[test]
     fn what_it_cant_say_is_refused_with_lines_for_a_repair() {
-        let refused = |toml: &str| match plainly(toml) {
+        let refused = |toml: &str| match plainly_with(toml, false) {
             Err(Refused(why, Some(lines))) => {
                 assert!(why.contains("can't say plainly"), "{why}");
                 assert_eq!(lines, PLAIN_ONLY);
@@ -2786,6 +2799,36 @@ body = { gesture = "nod" }
         refused(&format!(
             "{TOML}{many}\n[[do]]\nbody = {{ gesture = \"nod\" }}\n"
         ));
+    }
+
+    /// With reads on, a read refused as unsaid goes back with lines that
+    /// keep the brief's read step, so the repair doesn't take the read away
+    /// (lamp-9adf, 5 Nov 13:26: an app make of a mail read, refused twice).
+    #[test]
+    fn with_reads_on_the_repair_lines_keep_the_read_step() {
+        let mail = READ_TOML
+            .replace("google_calendar = \"read\"", "gmail = \"read\"")
+            .replace(
+                "service = \"google_calendar\", what = \"events\", day = \"tomorrow\"",
+                "service = \"gmail\", what = \"recent\", day = \"today\"",
+            );
+        let Err(Refused(why, Some(lines))) = plainly_with(&mail, true) else {
+            panic!("a mail read with a day is unsaid");
+        };
+        assert!(why.contains("can't say plainly"), "{why}");
+        assert_eq!(lines, format!("{PLAIN_ONLY}{PLAIN_OR_READ}"));
+        assert!(
+            lines.contains("the brief's read step exactly as the brief gives it"),
+            "{lines}"
+        );
+        assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
+        let repair = repair_brief(&"x".repeat(MOST_REQUEST_BYTES), &lines).unwrap();
+        assert!(repair.contains(&lines), "{repair}");
+        assert!(repair.len() <= crate::agent_tasks::MOST_TASK_BYTES);
+        let Err(Refused(_, Some(off))) = plainly_with(&mail, false) else {
+            panic!("a read is unsaid with reads off");
+        };
+        assert_eq!(off, PLAIN_ONLY);
     }
 
     /// A made skill never reaches a connected service ([`crate::services`]):
