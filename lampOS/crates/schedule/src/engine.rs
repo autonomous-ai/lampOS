@@ -9,7 +9,10 @@ use lamp_local_time::LocalTime;
 use lamp_msgs::{ClockStamp, ScheduleDue, ScheduleNotice};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{collections::BTreeSet, fmt, io};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt, io,
+};
 
 mod stored;
 
@@ -61,6 +64,12 @@ pub const TIMER_TOO_LATE_MS: u64 = 10 * 60_000;
 /// lamp's zone, is too late to mean anything: dropped, never said
 /// (#5258, #5219). One missed in a short nap is still said late.
 pub const REMINDER_TOO_LATE_MS: u64 = 2 * 3_600_000;
+/// An occurrence read for an offer before it was too late is not dropped
+/// for this long after that read, so one rung just before the cut-off and
+/// acknowledged just after it is kept as said (#5447's P3: a timer rung 9:59
+/// late and acknowledged at 10:01). Reads past the cut-off don't renew it,
+/// so a held or muted one is dropped at most this long after it.
+pub const OFFERED_HOLD_MS: u64 = 60_000;
 /// The said record holds at most this many reminders and timers...
 pub const SAID_KEPT: usize = 20;
 /// ...and none said longer ago than this.
@@ -576,6 +585,10 @@ pub struct Engine<P: Persistence> {
     every: bool,
     last_clock: ClockSample,
     recovered: BTreeSet<u64>,
+    /// Pending occurrences read for an offer while not yet too late, by id:
+    /// their delivery and when, on the boot clock ([`OFFERED_HOLD_MS`]).
+    /// In memory only: a restart forgets them.
+    offered: BTreeMap<u64, (u64, u64)>,
     failed: bool,
 }
 
@@ -816,6 +829,7 @@ impl<P: Persistence> Engine<P> {
             system,
             last_clock: now.clone(),
             recovered,
+            offered: BTreeMap::new(),
             failed: false,
         })
     }
@@ -914,7 +928,11 @@ impl<P: Persistence> Engine<P> {
         // covers a first offer and every later one.
         let mut index = 0;
         while index < next.items.len() {
-            let Some(late_by_ms) = self.too_late(&next.items[index], now) else {
+            let item = &next.items[index];
+            let Some(late_by_ms) = self
+                .too_late(item, now)
+                .filter(|_| !self.in_flight(item, now))
+            else {
                 index += 1;
                 continue;
             };
@@ -940,6 +958,12 @@ impl<P: Persistence> Engine<P> {
                 next.last_receipt = None;
             }
         }
+        // Only occurrences still pending as they were read stay offered.
+        self.offered.retain(|id, (delivery, _)| {
+            next.items
+                .iter()
+                .any(|item| item.id == *id && item.delivery == *delivery && item.pending.is_some())
+        });
         if changed {
             next.revision = next
                 .revision
@@ -1010,6 +1034,28 @@ impl<P: Persistence> Engine<P> {
                     .unwrap_or(false)
         };
         too_late.then_some(late_by_ms)
+    }
+
+    /// Read for an offer, before it was too late, within the last
+    /// [`OFFERED_HOLD_MS`]: it may be ringing now, its acknowledgement to
+    /// come (#5447's P3).
+    fn in_flight(&self, item: &Item, now: &ClockSample) -> bool {
+        self.offered.get(&item.id).is_some_and(|(delivery, at)| {
+            *delivery == item.delivery && now.boot_ms.saturating_sub(*at) <= OFFERED_HOLD_MS
+        })
+    }
+
+    /// The pending occurrences `ids` are read for an offer at `now`: each
+    /// not yet too late is held from being dropped ([`Self::in_flight`]).
+    fn read_for_offer(&mut self, ids: &[u64], now: &ClockSample) {
+        for id in ids {
+            let Some(item) = self.state.items.iter().find(|i| i.id == *id) else {
+                continue;
+            };
+            if item.pending.is_some() && self.too_late(item, now).is_none() {
+                self.offered.insert(item.id, (item.delivery, now.boot_ms));
+            }
+        }
     }
 
     /// The pending occurrence at `index` in `next` is done with, acknowledged
@@ -1220,6 +1266,7 @@ impl<P: Persistence> Engine<P> {
                 }
                 let next_after_id =
                     (views.len() < available.len()).then(|| available[views.len() - 1].id);
+                let listed: Vec<u64> = available.iter().take(views.len()).map(|i| i.id).collect();
                 let mut body = json!({"items":views,"next_after_id":next_after_id});
                 if let Some(asker) = &asker {
                     // What this line may see that is set and not yet due,
@@ -1255,6 +1302,11 @@ impl<P: Persistence> Engine<P> {
                 if with_set && *after_id == 0 && !pending_only {
                     body["said"] = self.said_views(asker.as_ref(), &body, now)?;
                 }
+                // The pending page the voice joins late ones from, in one
+                // line with the one it offers (29e7).
+                if *pending_only && !with_set && asker.is_none() {
+                    self.read_for_offer(&listed, now);
+                }
                 return Ok(self.reply(body));
             }
             Request::Noticed {} => return self.noticed(now),
@@ -1267,7 +1319,10 @@ impl<P: Persistence> Engine<P> {
                     .ok_or_else(|| {
                         err("not_found", "That reminder or timer is no longer active.")
                     })?;
-                return Ok(self.reply(json!({"item":self.item_view(item,now)})));
+                let reply = self.reply(json!({"item":self.item_view(item,now)}));
+                // The voice reads each occurrence it offers.
+                self.read_for_offer(&[*id], now);
+                return Ok(reply);
             }
             _ => {}
         }
