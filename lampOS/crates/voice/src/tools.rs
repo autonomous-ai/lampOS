@@ -5604,6 +5604,70 @@ mod tests {
         }
     }
 
+    /// The bike lock (lamp-06c1, 5 Nov): a one-face keep written in her
+    /// scope marks its room's line as kept for her in the thread, so her
+    /// later turns are told it ([`crate::thread::Thread::kept_for`]); one
+    /// the memory did not keep marks nothing.
+    #[test]
+    fn a_one_face_keep_marks_its_rooms_line_as_kept_for_her() {
+        let ann = crate::remember::person_id("Ann");
+        for (at, reply, marked) in [
+            (0u64, "{\"ok\":true,\"id\":7}\n", true),
+            (1, "{\"ok\":false,\"error\":\"full\"}\n", false),
+        ] {
+            let request = 5_105_000 + at;
+            let socket = std::env::temp_dir().join(format!(
+                "one-face-kept-for-{at}-{}.sock",
+                std::process::id()
+            ));
+            let _ = std::fs::remove_file(&socket);
+            let listener = UnixListener::bind(&socket).unwrap();
+            let served = std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                stream.write_all(reply.as_bytes()).unwrap();
+                serde_json::from_str::<Value>(&line).unwrap()
+            });
+            let owner = crate::memory_scope::RequestScope::new(
+                crate::memory_scope::RequestKey {
+                    worker: lamp_turn_owner::BootId::new([0x51; 16]).unwrap(),
+                    session: 1,
+                    request,
+                },
+                crate::memory_scope::ScopeSnapshot::of("Ann"),
+            );
+            let lease = owner.lease();
+            assert!(lease.take_by_one_face());
+            let call = ToolCall {
+                id: "k1".into(),
+                name: crate::remember::REMEMBER.into(),
+                args: json!({"text": "my bike lock code is 315"}),
+            };
+            let (told, _) = crate::remember::run_one_face_keep(
+                &socket,
+                &call,
+                std::time::Duration::from_secs(2),
+                &lease,
+                &ann,
+            );
+            let asked = served.join().unwrap();
+            std::fs::remove_file(socket).unwrap();
+            assert_eq!(asked["person"], json!(ann), "{asked}");
+            let kept_for = crate::thread::THREAD
+                .lock()
+                .unwrap()
+                .kept_for_of(request)
+                .map(str::to_owned);
+            assert_eq!(kept_for.is_some(), marked, "{told}");
+            if marked {
+                assert_eq!(kept_for.as_deref(), Some(ann.as_str()));
+            }
+        }
+    }
+
     /// A genuinely unknown speaker's keep (nobody known by the end of the
     /// wait) keeps the documented room rule: "said in this room; speaker
     /// unknown", with no person, as before.

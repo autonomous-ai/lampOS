@@ -543,7 +543,15 @@ or after their own first exchange in it; within the chat's window
 turn of the room's, or an unplaced voice's (#4196/#4207), is never given a
 person's lines, and a person's turn is never given another person's. The
 thread text, the running summary and talk notes stay each scope's own: the
-room's lines are never folded into the person's. Any forget drops them with
+room's lines are never folded into the person's. A room's line whose keep
+was written in their memory by the one-face rule
+(`LAMP_PERSON_SCOPE_ONE_FACE`, `remember::run_one_face_keep`,
+`Thread::kept_for`) is told in their later turns too, marked the same,
+whatever conversation it was in: their history is never older than their
+memory (lamp-06c1, 5 Nov, the bike lock: the correction to 315 was the
+room's line, and her next turn, told her own thread's 486, said 486;
+`thread::tests::a_one_face_keep_on_a_rooms_line_is_told_in_their_later_turns`,
+`tools::tests::a_one_face_keep_marks_its_rooms_line_as_kept_for_her`). Any forget drops them with
 the rest (`Thread::forget`). Built in memory under the thread's one lock, in
 the same read as before: no new I/O on the reply's path. Part of the "said
 aloud" risk, accepted: a line narrowed to the room's because another voice
@@ -1983,7 +1991,15 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `remember::noted::tests::a_correction_kept_as_heard_is_journalled_not_replaced` and
     `remember::tests::a_fact_shown_only_in_the_note_is_corrected_with_replaces`.
   - **With `LAMP_MEMORY_REMEMBER_ONCE`:** a correction is never `once`; it
-    always writes its new version.
+    always writes its new version, even in the words of another kept thing.
+    One in the very words of the kept thing it names (the same text as
+    `once` compares it, that thing shown, kept, active and not newer) is that
+    kept thing said again, answered `existing` as `once` answers it, with no
+    new version (`Days::restates`; C81 on lamp-06c1, 5 Nov: "gym locker code
+    441" said twice came back as `replaces` of itself and was kept as a new
+    id, never marked said again;
+    `days_protocol::tests::a_correction_with_once_is_never_deduplicated_and_an_id_out_of_range_is_refused`,
+    `it::days::a_correction_in_the_very_words_it_replaces_is_said_again`).
   - **The journal**, counts and yes/no only, never a word of the call,
     of what was heard or of what was kept:
     - One line per `remember` call, both routes:
