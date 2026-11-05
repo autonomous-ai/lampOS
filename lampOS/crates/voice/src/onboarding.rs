@@ -2920,7 +2920,12 @@ impl Onboarding {
             return None;
         }
         if step != Step::WhereYouSit {
-            if now_us.saturating_sub(asked_us) >= STEP_GIVE_UP_US && quiet_us >= TIMED_OUT_QUIET_US
+            // Nor does the give-up end it while a face save is held (the
+            // Reviewer-lead's P3 on #5415): a hold that began late in the
+            // step still gets its yes.
+            if now_us.saturating_sub(asked_us) >= STEP_GIVE_UP_US
+                && quiet_us >= TIMED_OUT_QUIET_US
+                && !save_held
             {
                 // A name heard and never taken back is known, call or not.
                 // The name's words are not kept: the record says so.
@@ -3517,14 +3522,21 @@ impl Onboarding {
             // ([`owner_renamed`]): their face was renamed, not forgotten.
             // A setup face save held for the yes to its read-back
             // ([`face_save_held`]): "who you are" stays open for it.
-            if told.get("face_save_held").and_then(Value::as_bool) == Some(true) {
+            // One let go before its yes ([`face_save_let_go`]) no longer
+            // keeps it open (the Reviewer-lead's P3 on #5415).
+            if let Some(held) = told.get("face_save_held").and_then(Value::as_bool) {
                 if let Some(led) = self.led.as_mut()
                     && led.step == Step::WhoYouAre
                 {
                     eprintln!(
-                        "lamp-voice: onboarding: who_you_are: a face save is held for the read-back's yes: the step stays open"
+                        "lamp-voice: onboarding: who_you_are: {}",
+                        if held {
+                            "a face save is held for the read-back's yes: the step stays open"
+                        } else {
+                            "the held face save was let go"
+                        }
                     );
-                    led.heard.save_held_us = Some(now_us);
+                    led.heard.save_held_us = held.then_some(now_us);
                 }
                 continue;
             }
@@ -4592,6 +4604,24 @@ pub fn face_save_held(file: &Path) {
     if let Err(error) = post(file, &json!({"face_save_held": true})) {
         eprintln!("lamp-voice: onboarding: a face save held, not noted: {error}");
     }
+}
+
+/// The setup face save held for the read-back's yes ([`face_save_held`])
+/// let go before its yes (a correction, another name, the hold run out):
+/// "who you are" is no longer kept open for it.
+pub fn face_save_let_go(file: &Path) {
+    if let Err(error) = post(file, &json!({"face_save_held": false})) {
+        eprintln!("lamp-voice: onboarding: a held face save let go, not noted: {error}");
+    }
+}
+
+/// The onboarding file the voice's own settings name, when the walk is
+/// switched on (as `tools` passes it to its runner).
+pub(crate) fn file_from_environment() -> Option<PathBuf> {
+    switched_on(
+        std::env::var(ENVIRONMENT).ok().as_deref(),
+        std::env::var(FILE_ENVIRONMENT).ok().as_deref(),
+    )
 }
 
 /// A face `forget_my_face` forgot: a face saved before "who you are" was
@@ -6670,6 +6700,21 @@ mod tests {
         room.wait(FACE_SAVE_WAIT_US, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
         assert!(room.walk.kept().owner.is_none());
+
+        // Let go before its yes (a correction, the hold run out in the
+        // voice): the face wait ends it again (the Reviewer-lead's P3).
+        let mut room = named_with_a_face("face-held-let-go");
+        room.walk.heard("Yes, please.", room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        face_save_held(&room.walk.file);
+        room.walk.lamp_said(room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        face_save_let_go(&room.walk.file);
+        room.wait(
+            FACE_SAVE_WAIT_US + START_QUIET_US + 2 * S,
+            Some(NEAR_MIDDLE),
+        );
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
 
         // Without the hold, the same wait ends it before the yes (the
         // failure Fifth traced).
