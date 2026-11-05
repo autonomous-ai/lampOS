@@ -357,6 +357,9 @@ Environment=LAMP_SERVICES=on
 # (MOST_UNREADY), and every send stays refused as before.
 Environment=LAMP_SAME_VOICE_MODEL=/opt/lampOS/voice/current/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx
 Environment=LAMP_SAME_VOICE_FOR=services
+# A made skill reads a linked service to its owner alone (#5288, #5303): the made-skill brief lets one read
+# through, passed to the provider and second routes. Played on lamp-9adf 5 Nov.
+Environment=LAMP_SKILL_READS=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
 Environment=LAMP_SCHEDULE_SPEAK=skill

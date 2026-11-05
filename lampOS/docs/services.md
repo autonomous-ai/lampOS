@@ -101,7 +101,7 @@ connected apps.
 |---|---|---|
 | `LAMP_SERVICES=on` | `lamp-cloud` (with `LAMP_CLOUD=on`), `lamp-voice` and `lamp-services` | `lamp-cloud` answers the app's `connector.*` and `services.list` with V1's "not on this lamp: <kind>" and puts nothing in `can`; the voice declares none of the three functions and routes none; `lamp-services` opens no socket and exits |
 | `LAMP_SERVICES_WRITE=on` (on in the product's `lamp-services.service`) | `lamp-services` | `service_write` answers "writing to services is off on this lamp", and nothing is prepared or sent; reads are as before |
-| `LAMP_SKILL_READS=on` | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and a request to make a skill naming a service is answered `NOT_A_SERVICE` ("A made skill's read", below) |
+| `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and a request to make a skill naming a service is answered `NOT_A_SERVICE` ("A made skill's read", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
 the line, so `LAMP_SECOND_SPEAKING_FACE=on` and `LAMP_EYES_SPEAKING=on` in
@@ -748,7 +748,7 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
 One waiting write is shared by both voice routes. A services call is held
 for the Policy's decision as the executive's are, with
 `LAMP_POLICY_HOLDS_ACTIONS=on` (`policy_holds::holds`). With
-`LAMP_SKILL_READS` off (the default), made skills reach no
+`LAMP_SKILL_READS` off (the default; the product sets it on), made skills reach no
 service at all: a made skill's step that names a services function is never
 said plainly, and a made skill's own function of that name is refused
 (`made_skill::plainly`, `made_skill::capped`). A request to make a skill
@@ -770,14 +770,16 @@ this lamp yet. It can be linked in the app: Skills, then Connectors."
 (`serve::NOT_LINKED`), so the lamp says where to link it, not only that it
 isn't.
 
-## A made skill's read (proposal #5288, `LAMP_SKILL_READS`, off unless set)
+## A made skill's read (proposal #5288, `LAMP_SKILL_READS`, on in the product)
 
 The read half of proposal #5288: a made skill may read one of the owner's
 linked services, any that has something to read, when the owner is alone
 with the lamp. It never writes. All of it is off unless
 `LAMP_SKILL_READS=on` (exactly `on`) is in the environment of
-`lamp-services`, `lamp-skills`, `lamp-skills-manage@` and `lamp-voice`; no
-product unit sets it.
+`lamp-services`, `lamp-skills`, `lamp-skills-manage@` and `lamp-voice`; all
+four product units set it since 5 Nov (`lamp-update`'s install test
+`the_product_lets_a_made_skill_read_a_linked_service`), and a drop-in with
+`LAMP_SKILL_READS=off` on each turns it off.
 
 **Who reads.** `lamp-skills` itself, as its own caller of `lamp-services`'
 tools socket (`/run/lampos-services/tools/call.sock`, or
@@ -1030,14 +1032,16 @@ the same turn stands.
 
 ## What is not done yet
 
-- **A made skill's read is not on, nor run on a lamp.** Built behind
-  `LAMP_SKILL_READS` (off): only mail and the calendar have their own
+- **A made skill's read is on in the product, but the product names no
+  owner.** Behind `LAMP_SKILL_READS` (on in the four product units since
+  5 Nov): only mail and the calendar have their own
   spoken words, and every other service says titles or names, by keys an
   item may not have (an item with none is counted, not said); the MCP
   services and Ahrefs have no fixed read, so no made skill reads them; the owner is only the name typed at setup, so a face saved under
   another name by `who_you_are` never counts; once a day is kept in memory
-  and lost on a restart; no product unit sets the switch or the owner's
-  name file. Writes from a made skill are not built.
+  and lost on a restart; no product unit sets the owner's name file
+  (`LAMP_SKILLS_OWNER_FILE`), so on a product lamp a read is skipped with
+  "no owner's face enrolled" until one does. Writes from a made skill are not built.
 - **Scheduled reads** of a service (a morning mail summary) are left out
   until they have a design of their own: a request not heard live reaches
   no service.
