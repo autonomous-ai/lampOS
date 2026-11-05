@@ -17256,3 +17256,15 @@ async fn a_joined_piece_not_started_either_goes_on_into_the_next() {
         ]
     );
 }
+
+/// Heron's P2 on #5404: a lone face is named by the one-face count only
+/// where the one-face rule's tracker is there and heard no other voice; no
+/// tracker (the rule off or not acted on) names nobody.
+#[test]
+fn a_lone_face_is_named_only_with_the_one_face_tracker_hearing_no_other_voice() {
+    assert!(!no_other_voice_known(None), "no tracker: not known, not named");
+    let quiet = AtomicBool::new(false);
+    assert!(no_other_voice_known(Some(&quiet)), "tracker, no other voice");
+    let heard = AtomicBool::new(true);
+    assert!(!no_other_voice_known(Some(&heard)), "another voice heard");
+}

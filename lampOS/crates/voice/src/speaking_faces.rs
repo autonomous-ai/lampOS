@@ -1045,6 +1045,27 @@ pub fn named_alone(
         && known.is_some_and(|(name, _)| crate::known_faces::memory_person(name) == person)
 }
 
+/// [`named_alone`] without the mouth read (`LAMP_SECOND_NAME_ONE_FACE`, the
+/// memory owner's call of 5 Nov: "the 'talking' detection is not
+/// trustable"): no face was seen speaking it, the known face, theirs, was
+/// the `one_face` in view through it ([`SpeakingFaces::one_face_in_view`],
+/// the same count the one-face keep and memory's hits fallback use), and the
+/// one-face rule heard no `another_voice` in the conversation. On lamp-06c1
+/// (5 Nov 11:12, request 6) the test face alone in 11 of 11 looks was read
+/// still in 6 and speaking in 5, so [`SpeakingFaces::alone_in_view`] failed
+/// and the lamp had no name for her. Only the reply is told their name; any
+/// face seen speaking it, a second face in any look, or another voice names
+/// nobody.
+pub fn named_one_face(
+    speakers: &[String],
+    person: &str,
+    known: Option<&(String, String)>,
+    one_face: bool,
+    another_voice: bool,
+) -> bool {
+    !another_voice && named_alone(speakers, person, known, one_face)
+}
+
 /// The journal's words for who was seen speaking a line admitted as a known
 /// person's, given whether it stayed `theirs` ([`not_theirs`]): the passing
 /// face ids only, never a name or the line's words. `None` when no face was
@@ -1772,6 +1793,62 @@ mod tests {
         // Nobody in view at all.
         let (eyes, from, to) = seen(&[&[][..]; 4]);
         assert!(!eyes.alone_in_view("b/f1", from, to));
+    }
+
+    /// lamp-06c1 (5 Nov 11:12, request 6, `LAMP_SECOND_NAME_ONE_FACE`): the
+    /// test face alone in 11 of 11 looks, read speaking in 5 and still in 6,
+    /// so [`SpeakingFaces::alone_in_view`] failed and the lamp had no name for
+    /// her. [`named_one_face`] reads only the one-face count: their face the
+    /// one in view, mouth never read speaking, no other voice: named. A
+    /// second face in a look, another voice, someone else known, or a face
+    /// seen speaking it that isn't theirs: not named.
+    #[test]
+    fn a_lone_known_face_is_named_by_the_one_face_count_whatever_its_mouth() {
+        let lan = crate::known_faces::memory_person("A");
+        let known = Some(("A".to_owned(), "b/f1".to_owned()));
+        // As on lamp-06c1: read still in 6 of 11, speaking in 5, no speaker.
+        let mut looks: Vec<&[(&str, SpeakingState)]> = vec![&[("f1", No)]; 6];
+        looks.extend(vec![&[("f1", Yes)][..]; 5]);
+        let (eyes, from, to) = seen(&looks);
+        assert!(
+            !eyes.alone_in_view("b/f1", from, to),
+            "the mouth rule fails"
+        );
+        assert!(eyes.speakers_with_boot(from, to).is_empty());
+        let one = eyes.one_face_in_view("b/f1", from, to);
+        assert!(one);
+        let speakers: Vec<String> = Vec::new();
+        assert!(named_one_face(&speakers, &lan, known.as_ref(), one, false));
+        // Never read speaking at all, only still: still named.
+        let (eyes, from, to) = seen(&[&[("f1", No)][..]; 4]);
+        assert!(eyes.speakers_with_boot(from, to).is_empty());
+        let one = eyes.one_face_in_view("b/f1", from, to);
+        assert!(one);
+        assert!(named_one_face(&speakers, &lan, known.as_ref(), one, false));
+        // Another voice heard in the conversation: not named.
+        assert!(!named_one_face(&speakers, &lan, known.as_ref(), one, true));
+        // Someone else known now, or nobody: not named.
+        let other = Some(("B".to_owned(), "b/f1".to_owned()));
+        assert!(!named_one_face(&speakers, &lan, other.as_ref(), one, false));
+        assert!(!named_one_face(&speakers, &lan, None, one, false));
+        // A face seen speaking it that isn't theirs: not named.
+        assert!(!named_one_face(
+            &["b/f2".to_owned()],
+            &lan,
+            known.as_ref(),
+            one,
+            false
+        ));
+        // A second face in one look: not the one face, not named.
+        let (eyes, from, to) = seen(&[
+            &[("f1", No)],
+            &[("f1", No), ("f2", No)],
+            &[("f1", No)],
+            &[("f1", No)],
+        ]);
+        let one = eyes.one_face_in_view("b/f1", from, to);
+        assert!(!one);
+        assert!(!named_one_face(&speakers, &lan, known.as_ref(), one, false));
     }
 
     /// lamp-29e7 (28 Oct 18:48): 18 of 20 lines read with no face
