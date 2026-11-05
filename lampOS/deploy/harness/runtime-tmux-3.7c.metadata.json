@@ -1,0 +1,18 @@
+{
+  "tmux": {
+    "darwin-arm64": {
+      "version": "3.7c",
+      "url": "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/tmux/v3.7c/tmux-3.7c-darwin-arm64.tar.gz",
+      "sha256": "8f26712b2b239eab1ebab02a42a67a5b4e5de3c0c8aca1ce8738a7aaadbe25cc",
+      "size": 553988,
+      "archiveRoot": "tmux-3.7c-darwin-arm64"
+    },
+    "darwin-x64": {
+      "version": "3.7c",
+      "url": "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/tmux/v3.7c/tmux-3.7c-darwin-x64.tar.gz",
+      "sha256": "b590b66124e3dd6db0c6813c525fa9fb0e6930ee589cd9f8ee5a49db951265a0",
+      "size": 598677,
+      "archiveRoot": "tmux-3.7c-darwin-x64"
+    }
+  }
+}

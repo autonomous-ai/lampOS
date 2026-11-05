@@ -13,8 +13,12 @@
 //! PM's decision (a) on #3693 asks. Nothing is fetched for it and nothing
 //! is hosted: the one-shot hands it to Harness's installer from a listener
 //! of its own on 127.0.0.1 ([`super::install_now`]). The installer checks
-//! each file it names by its sha256. A new Harness version is one file
-//! here and its three constants.
+//! each file it names by its sha256. Harness's installer is compiled in
+//! too ([`INSTALLER`]), and the four more manifests it reads ([`MANIFESTS`]:
+//! the Node runtime, tmux, grid and hn), served from the same listener: a
+//! pinned install fetches no script and no manifest from a server. A new
+//! Harness version is a PR that copies these files again and updates
+//! their constants.
 //!
 //! Which lamp is the product's: one whose lamp-update unit is a regular
 //! file starting `/opt/lampOS/update/current/lamp-update`, the link naming
@@ -48,6 +52,65 @@ pub const VERSION: &str = "0.5.39";
 /// Where [`MANIFEST`] was copied from: said, never fetched.
 pub const ORIGIN: &str =
     "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/cli/metadata.json";
+
+/// Harness's installer, a byte-for-byte copy of [`INSTALLER_ORIGIN`] as it
+/// was when [`MANIFEST`] was copied. Every pinned install runs this copy,
+/// from a file, never the one at its URL (#5229).
+pub const INSTALLER: &[u8] = include_bytes!("../../../../deploy/harness/cli-install-98f9d886.sh");
+/// [`INSTALLER`]'s SHA-256, checked by a test and again before each run.
+pub const INSTALLER_SHA256: &str =
+    "98f9d886b386c3f2f0a452b37c6fdafa3dd27538b4894935080599b221943a76";
+/// Where [`INSTALLER`] was copied from: said, never fetched.
+pub const INSTALLER_ORIGIN: &str = crate::install::HARNESS_INSTALLER;
+
+/// One more manifest [`INSTALLER`] reads besides the CLI's: copied, served on
+/// 127.0.0.1 at `path` and handed to the installer in `env`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Manifest {
+    /// The installer's variable for its URL.
+    pub env: &'static str,
+    /// Where lamp-update's listener serves it.
+    pub path: &'static str,
+    pub bytes: &'static [u8],
+    /// Its SHA-256, checked by a test and again before each install.
+    pub sha256: &'static str,
+    /// Where it was copied from: said, never fetched.
+    pub origin: &'static str,
+}
+
+/// The Node runtime's, tmux's, grid's and hn's manifests, as Harness's CDN
+/// had them when [`INSTALLER`] was copied. Each names its files by their
+/// sha256, which the installer checks.
+pub const MANIFESTS: [Manifest; 4] = [
+    Manifest {
+        env: "HARNESS_RUNTIME_METADATA_URL",
+        path: "/runtime/metadata.json",
+        bytes: include_bytes!("../../../../deploy/harness/runtime-node-v22.23.2.metadata.json"),
+        sha256: "7e229eb66d8af4001672336373e66909e1d2428f560facb0359d6a203b293ffc",
+        origin: "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/metadata.json",
+    },
+    Manifest {
+        env: "HARNESS_TMUX_METADATA_URL",
+        path: "/runtime/tmux/metadata.json",
+        bytes: include_bytes!("../../../../deploy/harness/runtime-tmux-3.7c.metadata.json"),
+        sha256: "f618bb8b9faac7e906b5223c1900797208d99885c1faa7de62c108b005c1f470",
+        origin: "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/tmux/metadata.json",
+    },
+    Manifest {
+        env: "HARNESS_GRID_METADATA_URL",
+        path: "/runtime/grid/metadata.json",
+        bytes: include_bytes!("../../../../deploy/harness/runtime-grid-0.3.63.metadata.json"),
+        sha256: "5dacba2bde0f19c34bcd2a174b830d80905eef50f94059adf5091b8f01e1ae5e",
+        origin: "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/grid/metadata.json",
+    },
+    Manifest {
+        env: "HARNESS_TUI_MANIFEST_URL",
+        path: "/tui/metadata.json",
+        bytes: include_bytes!("../../../../deploy/harness/tui-0.1.46.metadata.json"),
+        sha256: "0b1ace516bf03198c9fca238946c918ff1bd9cd297cc6c7315304d39e6e3ecd5",
+        origin: "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/tui/metadata.json",
+    },
+];
 
 /// This build's own pin: [`MANIFEST`], compiled in.
 pub fn built_in() -> Pin {
@@ -163,6 +226,39 @@ mod tests {
             )),
             "{text}"
         );
+    }
+
+    /// The installer and the four manifests it reads are held to their
+    /// constants too, and the installer reads each from the variable it is
+    /// handed in, with the URL it was copied from as its default.
+    #[test]
+    fn the_built_in_installer_and_manifests_are_the_ones_their_constants_name() {
+        assert_eq!(crate::manifest::sha256_hex(INSTALLER), INSTALLER_SHA256);
+        let installer = std::str::from_utf8(INSTALLER).unwrap();
+        assert!(installer.starts_with("#!"), "a shell script");
+        assert!(
+            installer.contains(&format!("${{HARNESS_METADATA_URL:-{ORIGIN}}}")),
+            "the CLI manifest's variable"
+        );
+        for manifest in MANIFESTS {
+            assert_eq!(
+                crate::manifest::sha256_hex(manifest.bytes),
+                manifest.sha256,
+                "{}",
+                manifest.origin
+            );
+            let value: serde_json::Value = serde_json::from_slice(manifest.bytes).unwrap();
+            assert!(value.is_object(), "{}", manifest.origin);
+            assert!(
+                installer.contains(&format!("${{{}:-{}}}", manifest.env, manifest.origin)),
+                "{} is read from {}",
+                manifest.origin,
+                manifest.env
+            );
+            assert!(manifest.path.starts_with('/') && manifest.path != super::super::serve::PATH);
+        }
+        // The OpenCode step runs only with a person there.
+        assert!(installer.contains("[ \"${HARNESS_INSTALL_ATTENDED:-}\" = 1 ]"));
     }
 
     #[test]

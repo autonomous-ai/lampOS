@@ -1274,8 +1274,10 @@ impl HarnessInstall {
     /// Why the last try failed: the pin set wrongly, the pinned manifest
     /// not fetched, its sha256 not the pinned one, past its bound,
     /// Harness's installer failed or left no `harness`, no `lampos` user,
-    /// the one-shot unit not started.
-    pub const ERRORS: [&str; 7] = [
+    /// the one-shot unit not started, the pinned files not handed to the
+    /// installer (no listener on 127.0.0.1, or no file for its script),
+    /// a pinned install's `harness version` not the pinned one.
+    pub const ERRORS: [&str; 9] = [
         "pin_unreadable",
         "pin_fetch",
         "pin_mismatch",
@@ -1283,6 +1285,8 @@ impl HarnessInstall {
         "installer",
         "no_user",
         "not_started",
+        "serve",
+        "version",
     ];
 
     /// The words the app shows for `install` and `error`, as they are.
@@ -1298,6 +1302,9 @@ impl HarnessInstall {
                 "Harness couldn't be downloaded. Check the lamp's internet and try again."
             }
             (_, Some("timeout")) => "Installing Harness took too long. Try again.",
+            (_, Some("version")) => {
+                "Harness was installed, but not at the version this lamp expects."
+            }
             _ => "Harness couldn't be installed on the lamp. Try again.",
         }
     }

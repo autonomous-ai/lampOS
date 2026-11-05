@@ -1144,24 +1144,32 @@ pub type Runner<'a> = dyn FnMut(&[String]) -> Result<String, String> + 'a;
 /// a busy lamp. One past it is not known, and the Harness there is kept.
 pub const VERSION_WITHIN: Duration = Duration::from_secs(30);
 
-/// The longest Harness's installer (`curl … | sh`) may take: it fetches over
-/// the lamp's own network, which can be slow.
+/// The longest Harness's installer (`curl … | sh`, or a pinned install's
+/// `sh <file>`) may take: it fetches over the lamp's own network, which can
+/// be slow.
 pub const INSTALLER_WITHIN: Duration = Duration::from_secs(15 * 60);
 
 /// Every step through it gets [`RESTART_WITHIN`], but Harness's installer,
 /// which fetches, gets [`INSTALLER_WITHIN`].
 pub fn output_of(argv: &[String]) -> Result<String, String> {
-    let fetches = argv
-        .last()
-        .is_some_and(|last| last.contains(HARNESS_INSTALLER));
     output_of_within(
         argv,
-        if fetches {
+        if runs_installer(argv) {
             INSTALLER_WITHIN
         } else {
             RESTART_WITHIN
         },
     )
+}
+
+/// Whether `argv` runs Harness's installer: the CDN's piped to `sh`, or a
+/// pinned install's checked copy, `sh <dir>/`[`PINNED_INSTALLER`].
+pub fn runs_installer(argv: &[String]) -> bool {
+    match argv {
+        [.., sh, file] if sh == "sh" && file.ends_with(&format!("/{PINNED_INSTALLER}")) => true,
+        [.., last] => last.contains(HARNESS_INSTALLER),
+        [] => false,
+    }
 }
 
 fn output_of_within(argv: &[String], within: Duration) -> Result<String, String> {
@@ -1299,36 +1307,65 @@ pub fn harness_on_with(run: &mut Runner, user: &str, home: &str) -> Result<(), S
     harness_on_pinned_with(run, user, home, None)
 }
 
-/// [`harness_on_with`], with `metadata_url` (#5197): when given, the
-/// installer is run with `HARNESS_METADATA_URL` set to it, so it installs
-/// what that manifest names, checked by the sha256s in it, in place of
-/// Harness's own CDN manifest (#3693's plan). The manifest's own sha256 is
-/// the caller's to have checked before.
+/// The file name a pinned install's checked copy of Harness's installer is
+/// written as, in a folder of its own ([`Pinned::installer`]).
+pub const PINNED_INSTALLER: &str = "harness-install.sh";
+
+/// A pinned install's installer run (#5229): Harness's installer, a copy
+/// already checked by its sha256, run from a file, with each manifest it
+/// reads at a URL whose bytes were checked too.
+pub struct Pinned<'a> {
+    /// The checked installer, a file `user` can read but not change, named
+    /// [`PINNED_INSTALLER`].
+    pub installer: &'a str,
+    /// The installer's variables for its manifests and their URLs:
+    /// `HARNESS_METADATA_URL` and the rest.
+    pub urls: &'a [(&'a str, String)],
+}
+
+/// [`harness_on_with`], with `pinned` (#5197, #5229): when given, the
+/// installer run is that checked copy (`sh <file>`, never fetched), with
+/// each manifest variable set to its URL, so it installs what those
+/// manifests name, checked by the sha256s in them, in place of Harness's
+/// own CDN manifests (#3693's plan), and with `HARNESS_INSTALL_ATTENDED`
+/// taken out, so its OpenCode step, which fetches an unpinned script, never
+/// runs. The bytes' sha256s are the caller's to have checked before.
 pub fn harness_on_pinned_with(
     run: &mut Runner,
     user: &str,
     home: &str,
-    metadata_url: Option<&str>,
+    pinned: Option<&Pinned>,
 ) -> Result<(), String> {
     let uid = uid_of(run, user)?;
     run(&["install", "-d", "-o", user, "-g", user, "-m", "0700", home].map(str::to_owned))?;
     let mut installer: Vec<String> = ["runuser", "-u", user, "--", "env"]
         .map(str::to_owned)
         .into();
+    if pinned.is_some() {
+        installer.extend(["-u", "HARNESS_INSTALL_ATTENDED"].map(str::to_owned));
+    }
     installer.extend([
         format!("HOME={home}"),
         format!("XDG_RUNTIME_DIR=/run/user/{uid}"),
         "PATH=/usr/local/bin:/usr/bin:/bin".to_owned(),
         "SHELL=/bin/sh".to_owned(),
     ]);
-    if let Some(url) = metadata_url {
-        installer.push(format!("HARNESS_METADATA_URL={url}"));
+    match pinned {
+        Some(pinned) => {
+            installer.extend(
+                pinned
+                    .urls
+                    .iter()
+                    .map(|(name, url)| format!("{name}={url}")),
+            );
+            installer.extend(["sh".to_owned(), pinned.installer.to_owned()]);
+        }
+        None => installer.extend([
+            "sh".to_owned(),
+            "-c".to_owned(),
+            format!("curl -fsSL --proto =https --tlsv1.2 {HARNESS_INSTALLER} | sh"),
+        ]),
     }
-    installer.extend([
-        "sh".to_owned(),
-        "-c".to_owned(),
-        format!("curl -fsSL --proto =https --tlsv1.2 {HARNESS_INSTALLER} | sh"),
-    ]);
     run(&installer)?;
     let launcher = format!("{home}/.local/bin/harness");
     run(&["test".to_owned(), "-x".to_owned(), launcher.clone()])?;

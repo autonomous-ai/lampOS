@@ -30,7 +30,13 @@
 //! Harness's installer with `HARNESS_METADATA_URL` at those checked bytes,
 //! served on 127.0.0.1 while it runs ([`serve`], #5229), so the installer
 //! checks what it fetches against the pinned manifest's sha256s and never
-//! reads the manifest from its server again. With neither set, the
+//! reads the manifest from its server again. The installer itself and the
+//! four more manifests it reads are this build's copies
+//! ([`product::INSTALLER`], [`product::MANIFESTS`]), each checked by its
+//! sha256 too (`pin_mismatch`); the manifests are served from the same
+//! listener and the installer is run from a file, never fetched. A
+//! listener or file lamp-update cannot make is `serve`, tried again at
+//! the next round. With neither set, the
 //! install is as `harness-on`'s (Harness's own CDN manifest) and is said
 //! `pinned: false`, except on a lamp installed as the product, which takes
 //! the pin compiled into this build, covered by its signature, and never
@@ -44,10 +50,11 @@ use lamp_msgs::HarnessInstall;
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
-    io::{self, ErrorKind},
-    os::unix::fs::OpenOptionsExt,
-    path::Path,
-    time::Duration,
+    io::{self, ErrorKind, Write},
+    net::TcpListener,
+    os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt},
+    path::{Path, PathBuf},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 /// The switch, in lamp-update's own unit: `on` exactly.
@@ -69,7 +76,8 @@ pub const LOCK: &str = "harness.lock";
 pub const STUCK_AFTER: Duration = Duration::from_secs(30 * 60);
 /// A failure the same steps would only repeat (`installer`, `no_user`) is
 /// tried again by the first round this long after it, not after every
-/// round (#5241's reader); the rest are tried at the next round.
+/// round (#5241's reader); the rest, `serve` among them, are tried at the
+/// next round.
 pub const RETRY_AFTER: Duration = STUCK_AFTER;
 /// The largest pinned manifest fetched.
 const MANIFEST_MOST_BYTES: &str = "1048576";
@@ -217,7 +225,7 @@ pub fn at_start(root: &Path, records: &Path, switch: bool, now_unix_ms: u64) {
 
 /// After a round that reached the channel, with the switch on: Harness
 /// already there is recorded `installed` (put there before, or by hand),
-/// and nothing runs; missing, with no try under way, `installing` is
+/// unless a pinned install recorded it `version`, and nothing runs; missing, with no try under way, `installing` is
 /// recorded, the pin handed over in [`ASK`], and [`UNIT`] written and
 /// started without waiting. A pin set wrongly, or a unit that cannot be
 /// started, is recorded `failed`. What was recorded is returned, none when
@@ -232,10 +240,11 @@ pub fn after_round(
 ) -> Option<HarnessInstall> {
     let before = record(records);
     if present(root) {
-        if before
-            .as_ref()
-            .is_some_and(|said| said.install == "installed")
-        {
+        // A pinned install that left another version stays `version`
+        // while Harness is there: it is not the pinned one.
+        if before.as_ref().is_some_and(|said| {
+            said.install == "installed" || said.error.as_deref() == Some("version")
+        }) {
             return None;
         }
         let said = write(records, state("installed", now_unix_ms));
@@ -319,7 +328,11 @@ fn start(root: &Path, systemd: &mut dyn Systemd) -> Result<(), String> {
 /// missing, the pinned manifest (if [`ASK`] names one) fetched and its
 /// sha256 checked, then Harness's own installer as `harness-on` runs it
 /// ([`install::harness_on_pinned_with`]), `harness version` read, and
-/// lamp-tasks started again so it runs with Harness. Harness already there
+/// lamp-tasks started again so it runs with Harness. Pinned, a `harness
+/// version` other than the manifest's `cli.version` (or none) is recorded
+/// `failed` with `version`, not `installed`. Pinned, the installer
+/// is this build's checked copy, run from a file, with every manifest it
+/// reads served checked from 127.0.0.1 ([`Kit`]). Harness already there
 /// is recorded `installed` and nothing runs. Each step goes through `run`.
 /// The record written is returned; an error only when another install
 /// holds [`LOCK`], with nothing written.
@@ -329,6 +342,165 @@ pub fn install_now(
     run: &mut Runner,
     now_unix_ms: &mut dyn FnMut() -> u64,
     say: &mut dyn FnMut(&str),
+) -> Result<HarnessInstall, String> {
+    install_with(root, records, run, now_unix_ms, say, &Kit::BUILT)
+}
+
+/// What a pinned install runs and serves besides the CLI's manifest: this
+/// build's own ([`Kit::BUILT`]); a test's may hold other bytes, or a
+/// listener that cannot be made.
+struct Kit {
+    installer: &'static [u8],
+    installer_sha256: &'static str,
+    manifests: [product::Manifest; 4],
+    bind: fn() -> io::Result<TcpListener>,
+}
+
+impl Kit {
+    const BUILT: Kit = Kit {
+        installer: product::INSTALLER,
+        installer_sha256: product::INSTALLER_SHA256,
+        manifests: product::MANIFESTS,
+        bind: serve::loopback,
+    };
+
+    /// Each file's bytes against its sha256, before anything runs: other
+    /// bytes are `pin_mismatch`.
+    fn check(&self, say: &mut dyn FnMut(&str)) -> Result<(), &'static str> {
+        let installer =
+            std::iter::once(("Harness's installer", self.installer, self.installer_sha256));
+        let manifests = self
+            .manifests
+            .iter()
+            .map(|manifest| (manifest.path, manifest.bytes, manifest.sha256));
+        for (name, bytes, sha256) in installer.chain(manifests) {
+            let found = crate::manifest::sha256_hex(bytes);
+            if found != sha256 {
+                say(&format!(
+                    "the pinned {name}'s sha256 is {found}, not {sha256}: nothing installed"
+                ));
+                return Err("pin_mismatch");
+            }
+        }
+        Ok(())
+    }
+}
+
+/// The checked installer written as a file for `sh` to run: in a folder of
+/// its own under the one-shot's private `/tmp` (`PrivateTmp=yes`), both
+/// root's, the folder 0755 and the file 0644, so `lampos` reads it but
+/// cannot change it. Taken away when dropped.
+struct InstallerFile {
+    folder: PathBuf,
+}
+
+impl InstallerFile {
+    /// `bytes` written, then read back and checked against `sha256` just
+    /// before the run: a write that cannot be made is `serve`, other bytes
+    /// read back `pin_mismatch`.
+    fn write(bytes: &[u8], sha256: &str, say: &mut dyn FnMut(&str)) -> Result<Self, &'static str> {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |since| since.as_nanos());
+        let folder = std::env::temp_dir().join(format!(
+            "lamp-update-harness-{}-{stamp}",
+            std::process::id()
+        ));
+        let written = Self {
+            folder: folder.clone(),
+        };
+        let made = fs::DirBuilder::new()
+            .mode(0o755)
+            .create(&folder)
+            .and_then(|()| fs::set_permissions(&folder, fs::Permissions::from_mode(0o755)))
+            .and_then(|()| {
+                let mut file = fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .mode(0o644)
+                    .open(written.path())?;
+                file.write_all(bytes)?;
+                file.sync_all()?;
+                fs::set_permissions(written.path(), fs::Permissions::from_mode(0o644))
+            });
+        if let Err(error) = made {
+            say(&format!(
+                "the pinned Harness installer was not written at {}: {error}",
+                folder.display()
+            ));
+            return Err("serve");
+        }
+        let found = fs::read(written.path()).map(|read| crate::manifest::sha256_hex(&read));
+        if found.as_deref().ok() != Some(sha256) {
+            say(&format!(
+                "the pinned Harness installer written at {} is not sha256 {sha256}: nothing installed",
+                folder.display()
+            ));
+            return Err("pin_mismatch");
+        }
+        Ok(written)
+    }
+
+    fn path(&self) -> PathBuf {
+        self.folder.join(install::PINNED_INSTALLER)
+    }
+}
+
+impl Drop for InstallerFile {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.folder);
+    }
+}
+
+/// A pinned install's pieces, held while its installer runs: the listener
+/// serving the checked manifests, and the checked installer's file.
+struct Handed {
+    served: serve::Served,
+    installer: InstallerFile,
+    urls: Vec<(&'static str, String)>,
+}
+
+/// Every piece of a pinned install, checked and handed out: `manifest` (the
+/// CLI's, checked already) and `kit`'s, each against its sha256
+/// (`pin_mismatch`), served on 127.0.0.1, and the installer written as a
+/// file (`serve` when either cannot be).
+fn hand(manifest: Vec<u8>, kit: &Kit, say: &mut dyn FnMut(&str)) -> Result<Handed, &'static str> {
+    kit.check(say)?;
+    let mut files = vec![(serve::PATH.to_owned(), manifest)];
+    files.extend(
+        kit.manifests
+            .iter()
+            .map(|manifest| (manifest.path.to_owned(), manifest.bytes.to_vec())),
+    );
+    let served = (kit.bind)()
+        .and_then(|listener| serve::Served::start(listener, files))
+        .map_err(|error| {
+            say(&format!(
+                "the pinned Harness manifests were not served on 127.0.0.1: {error}"
+            ));
+            "serve"
+        })?;
+    let installer = InstallerFile::write(kit.installer, kit.installer_sha256, say)?;
+    let mut urls = vec![("HARNESS_METADATA_URL", served.url(serve::PATH))];
+    urls.extend(
+        kit.manifests
+            .iter()
+            .map(|manifest| (manifest.env, served.url(manifest.path))),
+    );
+    Ok(Handed {
+        served,
+        installer,
+        urls,
+    })
+}
+
+fn install_with(
+    root: &Path,
+    records: &Path,
+    run: &mut Runner,
+    now_unix_ms: &mut dyn FnMut() -> u64,
+    say: &mut dyn FnMut(&str),
+    kit: &Kit,
 ) -> Result<HarnessInstall, String> {
     let _lock = lock(records)?;
     let before = record(records);
@@ -360,25 +532,39 @@ pub fn install_now(
         },
         None => None,
     };
-    // The checked bytes, served on 127.0.0.1 while the installer runs
-    // (#5229): what it reads is what was checked.
-    let served = match manifest.clone().map(serve::Served::start).transpose() {
-        Ok(served) => served,
-        Err(error) => {
-            say(&format!(
-                "the pinned Harness manifest was not served on 127.0.0.1: {error}"
-            ));
-            return finish(records, failed(now_unix_ms(), pinned, "installer"));
-        }
+    // The checked bytes, served on 127.0.0.1 while the installer runs, and
+    // the checked installer run from a file (#5229): what runs and what it
+    // reads is what was checked.
+    let handed = match manifest
+        .clone()
+        .map(|bytes| hand(bytes, kit, say))
+        .transpose()
+    {
+        Ok(handed) => handed,
+        Err(error) => return finish(records, failed(now_unix_ms(), pinned, error)),
     };
-    let url = served.as_ref().map(serve::Served::url);
-    let installed = install::harness_on_pinned_with(run, USER, HARNESS_HOME, url.as_deref());
-    drop(served);
+    let installer = handed
+        .as_ref()
+        .map(|handed| handed.installer.path().to_string_lossy().into_owned());
+    let pinned_run = handed
+        .as_ref()
+        .zip(installer.as_deref())
+        .map(|(handed, installer)| install::Pinned {
+            installer,
+            urls: &handed.urls,
+        });
+    let installed = install::harness_on_pinned_with(run, USER, HARNESS_HOME, pinned_run.as_ref());
+    // The listener stopped and the installer's file taken away once it ran.
+    if let Some(handed) = handed {
+        drop(handed.served);
+        drop(handed.installer);
+    }
     if let Err(why) = installed {
         say(&format!("Harness is not installed: {why}"));
         return finish(records, failed(now_unix_ms(), pinned, reason_of(&why)));
     }
     let have = version(run);
+    let mut other_version = false;
     if let Some(want) = manifest.as_deref().and_then(product::version_of) {
         if have.as_deref() == Some(want.as_str()) {
             say(&format!("Harness {want} is the pinned version"));
@@ -387,22 +573,31 @@ pub fn install_now(
                 "Harness says version {}, not the pinned {want}",
                 have.as_deref().unwrap_or("none")
             ));
+            other_version = true;
         }
     }
-    let said = write(
-        records,
-        HarnessInstall {
-            version: have,
-            pinned,
-            ..state("installed", now_unix_ms())
-        },
-    );
-    say(&format!(
-        "Harness {} installed for {USER} at {HARNESS}; not signed in, and its daemon not started",
-        said.version
-            .as_deref()
-            .unwrap_or("of a version it doesn't say")
-    ));
+    let said = if other_version {
+        // Installed, but not as pinned: `failed` with `version`, so the
+        // app tells it from a pinned install. Kept while Harness is there
+        // (`after_round`); installing again would only run the same steps.
+        write(records, failed(now_unix_ms(), pinned, "version"))
+    } else {
+        let said = write(
+            records,
+            HarnessInstall {
+                version: have,
+                pinned,
+                ..state("installed", now_unix_ms())
+            },
+        );
+        say(&format!(
+            "Harness {} installed for {USER} at {HARNESS}; not signed in, and its daemon not started",
+            said.version
+                .as_deref()
+                .unwrap_or("of a version it doesn't say")
+        ));
+        said
+    };
     // lamp-tasks waits for Harness (its `ConditionPathExists`): started now,
     // so it says why hand-overs are off and takes a sign-in.
     if let Err(why) = run(&["systemctl", "restart", "lamp-tasks.service"].map(str::to_owned)) {

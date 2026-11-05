@@ -1,0 +1,21 @@
+{
+  "version": "0.1.46",
+  "builds": {
+    "darwin-arm64": {
+      "url": "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/tui/0.1.46/harness-tui-darwin-arm64",
+      "sha256": "3e3b5dd836ec58e32007c870bed5b47251c5670a4aa2ccd253c5e0ed3d3e2d5f"
+    },
+    "darwin-x64": {
+      "url": "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/tui/0.1.46/harness-tui-darwin-x64",
+      "sha256": "647f20ae20db0faee1bf036d9c29a8ef3caaf59c0a8c0eabf7a08fa42e834b9c"
+    },
+    "linux-arm64": {
+      "url": "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/tui/0.1.46/harness-tui-linux-arm64",
+      "sha256": "1b6c5998c86add155eaf25c0573421356308353213d59f81a42e7fcbdce15f12"
+    },
+    "linux-x64": {
+      "url": "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/tui/0.1.46/harness-tui-linux-x64",
+      "sha256": "c498241dadf910314ad563e18a667e08c75b6e573d7044ad366ea0617df482fd"
+    }
+  }
+}

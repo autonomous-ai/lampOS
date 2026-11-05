@@ -1,0 +1,35 @@
+{
+  "grid": {
+    "darwin-arm64": {
+      "version": "0.3.63",
+      "url": "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/grid/v0.3.63/grid-0.3.63-darwin-arm64.tar.gz",
+      "sha256": "d3b135ec113699e2f62e929742438c76d99ce1b9f1e4731ccd20d913dbf9f413",
+      "size": 19515922,
+      "archiveRoot": "grid-0.3.63-darwin-arm64"
+    },
+    "darwin-x64": {
+      "version": "0.3.63",
+      "url": "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/grid/v0.3.63/grid-0.3.63-darwin-x64.tar.gz",
+      "sha256": "5d74669c6d924b7ade32e4b96d76b1ed27edf1cf786172b43c5955709cbfbd33",
+      "size": 22016791,
+      "archiveRoot": "grid-0.3.63-darwin-x64"
+    },
+    "linux-x64": {
+      "version": "0.3.63",
+      "url": "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/grid/v0.3.63/grid-0.3.63-linux-x64.tar.gz",
+      "sha256": "f26a09c47d7f1b518acdc5f95c6c1a1cab4c724bf698c60618fa609c81366c0a",
+      "size": 36906822,
+      "archiveRoot": "grid-0.3.63-linux-x64"
+    },
+    "linux-arm64": {
+      "version": "0.3.63",
+      "url": "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/grid/v0.3.63/grid-0.3.63-linux-arm64.tar.gz",
+      "sha256": "6813a23131be91e879661225143be69328b26accebb40e741ad2eb60ad18ddfd",
+      "size": 34655532,
+      "archiveRoot": "grid-0.3.63-linux-arm64"
+    },
+    "win32-x64": {
+      "version": "0.3.63"
+    }
+  }
+}
