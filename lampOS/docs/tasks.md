@@ -966,7 +966,8 @@ manifest. Deleting the database is not an ordinary retry strategy.
 
 A home lamp gets Harness, its sign-in and the person's computers after the
 tasks part is installed. With lamp-update's `LAMP_HARNESS_AT_ONBOARDING=on`
-(#5197, off unless set), Harness itself is put there with no hand after the
+(#5197, off unless set; on a product lamp with it unset, on by the build's
+default), Harness itself is put there with no hand after the
 first update round that reaches the network, installed but not running, and
 lamp-tasks is started then; the app reads that install on `update.status`
 (`docs/install.md`, "Harness before the sign-in"). Without the switch, the part stops at start with

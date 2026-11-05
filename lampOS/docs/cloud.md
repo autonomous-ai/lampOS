@@ -535,7 +535,8 @@ then not to be believed. Tests: `app_contract.rs`'s
 
 ### Harness's install (#5197, `harness` in `update.status`)
 
-With `LAMP_HARNESS_AT_ONBOARDING=on` in lamp-update's own unit, the status
+With `LAMP_HARNESS_AT_ONBOARDING=on` in lamp-update's own unit (or unset on
+a product lamp, on by the build's default, #5229), the status
 carries `harness` (`lamp_msgs::HarnessInstall`), Harness put on the lamp
 before its sign-in (`docs/install.md`, "Harness before the sign-in"):
 `{"install": "absent"|"installing"|"installed"|"failed", "revision",

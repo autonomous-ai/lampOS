@@ -3192,11 +3192,12 @@ refreshed", below). The unit has been checked by its tests' reading of the
 text and a fake systemd, not by a real systemd: neither `systemd-analyze
 verify` nor a start on Bookworm has run.
 
-### Harness's one-shot unit (#5197, `LAMP_HARNESS_AT_ONBOARDING`, off)
+### Harness's one-shot unit (#5197, `LAMP_HARNESS_AT_ONBOARDING`, on by default on a product lamp)
 
 The same pattern puts Harness on a lamp before its sign-in
 (`docs/install.md`, "Harness before the sign-in"). After each `serve` round
-that reached the channel, with the switch on and nothing at
+that reached the channel, with the switch on (on a product lamp, with it
+unset too: the build's `PRODUCT_DEFAULT`, on, #5229) and nothing at
 `/usr/local/bin/harness`, the round writes `lamp-update-harness.service`
 (`harness_install::TEXT`) beside the writer's, checks systemd's view of it
 the same way (`writer_unit::loaded_as`), and starts it with `--no-block`:

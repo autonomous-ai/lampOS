@@ -29,17 +29,19 @@
 //! What the environment of lamp-update's unit sets always wins, so a lamp's
 //! drop-in can turn the install off, or name another pin to fetch
 //! ([`super::MANIFEST_URL`], [`super::MANIFEST_SHA256`]). With the switch
-//! unset, a product lamp takes [`PRODUCT_DEFAULT`]: off in this build, so
-//! nothing changes on a home lamp until a later build turns it on after its
-//! lamp check. A product lamp never installs an unpinned Harness.
+//! unset, a product lamp takes [`PRODUCT_DEFAULT`]: on since #5197's
+//! switch-on, so a home lamp gets the pinned Harness by itself once this
+//! build's lamp-update runs there, and the app signs it in. A product lamp
+//! never installs an unpinned Harness.
 use super::{Pin, pin_from};
 use crate::{own, unit};
 use std::{fs, path::Path};
 
 /// Whether a lamp installed as the product installs Harness with
-/// `LAMP_HARNESS_AT_ONBOARDING` unset. Off: turned on by a later build,
-/// after its lamp check and the PM's yes (#5229).
-pub const PRODUCT_DEFAULT: bool = false;
+/// `LAMP_HARNESS_AT_ONBOARDING` unset. On (#5197): the PM's call on 5 Nov,
+/// once the app's sign-in screen is in a TestFlight build; off only by the
+/// environment (`LAMP_HARNESS_AT_ONBOARDING=off` in a drop-in).
+pub const PRODUCT_DEFAULT: bool = true;
 
 /// The Harness manifest this build pins for a product lamp: a byte-for-byte
 /// copy of Harness's CDN manifest ([`ORIGIN`]) when it named [`VERSION`].
@@ -218,7 +220,7 @@ mod tests {
         assert_eq!(crate::manifest::sha256_hex(MANIFEST), MANIFEST_SHA256);
         assert_eq!(version_of(MANIFEST).as_deref(), Some(VERSION));
         const { assert!(MANIFEST.len() < 4096) };
-        const { assert!(!PRODUCT_DEFAULT) };
+        const { assert!(PRODUCT_DEFAULT) };
         let text = std::str::from_utf8(MANIFEST).unwrap();
         assert!(
             text.contains(&format!(
@@ -279,6 +281,27 @@ mod tests {
         assert_eq!(on.pin, Ok(Some(built_in())));
         // Anything but `on` exactly is off.
         assert!(!wanted(Some("ON"), None, None, true, true).on);
+    }
+
+    /// This build's own default (#5197's switch-on): a product lamp with
+    /// the switch unset installs the built-in pin, and a drop-in's
+    /// `LAMP_HARNESS_AT_ONBOARDING=off` (or any value but `on`) still turns
+    /// it off; a builder's lamp is untouched by it.
+    #[test]
+    fn this_builds_default_is_on_for_a_product_lamp_and_the_environment_still_turns_it_off() {
+        let unset = wanted(None, None, None, true, PRODUCT_DEFAULT);
+        assert_eq!((unset.on, unset.source), (true, Source::Build));
+        assert_eq!(unset.pin, Ok(Some(built_in())));
+        for value in ["off", "", "OFF", "no"] {
+            let set = wanted(Some(value), None, None, true, PRODUCT_DEFAULT);
+            assert_eq!(
+                (set.on, set.source),
+                (false, Source::Environment),
+                "{value:?}"
+            );
+        }
+        let builder = wanted(None, None, None, false, PRODUCT_DEFAULT);
+        assert_eq!((builder.on, builder.source), (false, Source::Unset));
     }
 
     #[test]
