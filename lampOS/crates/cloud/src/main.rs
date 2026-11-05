@@ -175,11 +175,13 @@ fn main() -> ExitCode {
         .map(|shared| (shared, reports::Lamp::new(bus.clone())));
     let report_build = reports::Build::of(&build);
     let shared_for_alerts = shared.clone();
-    // A rejected login said on the bus and to the app: only with
-    // LAMP_SIGNED_OUT=on, and only with a login to reject. Counted also
-    // with LAMP_SERVICES=on alone, so a lamp removed from the app wipes the
-    // person's service tokens whatever LAMP_SIGNED_OUT says.
+    // A rejected login said to the app: only with LAMP_SIGNED_OUT=on, and
+    // only with a login to reject. Counted and said on the bus also with
+    // LAMP_SERVICES=on alone, so a lamp removed from the app wipes the
+    // person's service tokens, and the voice the owner's kept voice print,
+    // whatever LAMP_SIGNED_OUT says.
     let telling_on = signed_out::on_from_environment();
+    signed_out::tell_the_app(telling_on);
     let mut login = watches_login(
         telling_on,
         lamp_cloud::services::on_from_environment(),
@@ -193,10 +195,7 @@ fn main() -> ExitCode {
             &mut say,
         )
     });
-    let telling = login
-        .as_ref()
-        .filter(|_| telling_on)
-        .map(|login| (login.watch(), bus.clone()));
+    let telling = login.as_ref().map(|login| (login.watch(), bus.clone()));
     // The person's own services from the app (Queue #4710): only with
     // LAMP_SERVICES=on; every token wiped once the lamp is signed out.
     let services = lamp_cloud::services::Services::product(&account, &key);

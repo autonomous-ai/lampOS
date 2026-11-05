@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::sync::watch;
 
@@ -35,6 +36,23 @@ const REJECTED_STATUS: u16 = 401;
 
 pub fn on_from_environment() -> bool {
     std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// Whether the app is told of a sign-out (`system.info`'s and
+/// `lamp.health`'s `account`): with [`ENVIRONMENT`] on alone. With
+/// `LAMP_SERVICES=on` and the switch off, `account/state` is still said, so
+/// the voice removes the owner's kept voice print with the services' tokens,
+/// and the app is told nothing new.
+static TOLD_TO_THE_APP: AtomicBool = AtomicBool::new(false);
+
+/// Set once at start, from [`on_from_environment`].
+pub fn tell_the_app(on: bool) {
+    TOLD_TO_THE_APP.store(on, Ordering::Relaxed);
+}
+
+/// [`tell_the_app`]'s setting.
+pub fn told_to_the_app() -> bool {
+    TOLD_TO_THE_APP.load(Ordering::Relaxed)
 }
 
 /// What one ping's answer says of the login.
@@ -199,14 +217,17 @@ pub fn now_s() -> u64 {
         .map_or(0, |since| since.as_secs())
 }
 
-/// Says the state on `account/state` when it changes and every few seconds.
-/// Without a bus, or a topic it can publish, it only waits.
+/// Says the state on `account/state` when it changes and every few seconds,
+/// as `lamp-cloud`'s other topics, by [`crate::lamp::SOURCE`] (a publisher's
+/// name is `[a-z][a-z0-9_]*`: "lamp-cloud", its name before, was refused,
+/// so the state was never said). Without a bus, or a topic it can publish,
+/// it only waits.
 pub async fn tell(mut since: watch::Receiver<Option<u64>>, bus: Option<lamp_bus::Bus>) {
     let publisher = bus.and_then(|bus| {
         bus.publisher_declared(
             AccountState::TOPIC,
             &AccountState::declaration(),
-            "lamp-cloud",
+            crate::lamp::SOURCE,
         )
         .ok()
     });
@@ -349,5 +370,25 @@ mod tests {
         );
         // A clock set back is a young spell, never a wrapped one.
         assert_eq!(state(Some(60), 50).for_s, 0);
+    }
+
+    /// The state is said on the bus, and read back there as it was said.
+    #[tokio::test(flavor = "current_thread")]
+    async fn the_state_is_said_on_the_bus() {
+        let folder = tempfile::tempdir().unwrap();
+        let bus = lamp_bus::Bus::new(folder.path().join("bus")).unwrap();
+        let (_since, watching) = watch::channel(Some(now_s()));
+        let told = tokio::spawn(tell(watching, Some(bus.clone())));
+        let mut read = None;
+        for _ in 0..100 {
+            read = bus.latest(AccountState::TOPIC).unwrap();
+            if read.is_some() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        told.abort();
+        let state: AccountState = read.expect("said").parse().unwrap();
+        assert!(state.signed_out);
     }
 }
