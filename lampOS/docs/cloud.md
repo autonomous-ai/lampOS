@@ -1189,7 +1189,8 @@ Off unless `LAMP_SKILL_UPLOAD=on` in `lamp-cloud`'s unit, with the skills
 page (`LAMP_SKILLS_PAGE=on`) and `LAMP_CLOUD`, and the backend's base and
 the lamp's key at start (`crate::upload::Uploads`); `lamp-voice`'s unit
 needs the same switch, with `LAMP_MAKE_SKILL=on`, `LAMP_APP_MAKE_SKILL=on`
-(the upload rides its socket) and the say service. No product unit sets it.
+(the upload rides its socket) and the say service. Both product units set
+it, `lamp-cloud.service` and `lamp-voice.service` (#5080).
 `system.info`'s `can` names `skills.upload` only then. The first builder
 approved it on the Queue (3 Nov 14:33) with Backend3's rules; the contract
 is Backend3's.
