@@ -696,7 +696,8 @@ bị bỏ và đếm theo lý do, mục tốt được ghi.
 
 - `nightly_prepare {person, day, after_id?}`: các bản ghi đủ điều kiện của
   người đó trong ngày địa phương `day` (lượt trao đổi có `heard` không rỗng,
-  và điều đã giữ trong ngày), theo id sau `after_id`, tối đa 128 bản ghi và
+  trừ lượt nói trước một lần quên của người đó trong ngày hoặc trong một
+  phút sau nó, và điều đã giữ trong ngày), theo id sau `after_id`, tối đa 128 bản ghi và
   64 KiB; kèm `existing` (mọi dòng hồ sơ hiện tại, rồi 32 fact, episode,
   ahead mới nhất). Chỉ người đã biết (`p-` và 16 chữ số hex); phòng hay phạm
   vi quy tắc là `bad_person`. Công việc chỉ giữ id, không giữ chữ.
@@ -726,7 +727,37 @@ Mỗi người giữ tối đa 512 mục còn hiệu lực (`full`); mục đã 
 hết hạn là lịch sử và không được tính.
 Một lệnh quên xoá mọi mục dẫn tới thứ bị quên, lan tiếp (dòng hồ sơ dẫn một
 fact bị quên); quên trong lúc lượt đang chạy thì khi áp dụng, các mục dẫn tới
-thứ đã mất bị bỏ `forgotten`, phần còn lại vẫn ghi. Dòng hồ sơ vào dải sở
+thứ đã mất bị bỏ `forgotten`, phần còn lại vẫn ghi.
+
+Dấu quên (phương án 2 của El trên #5333): quên theo chủ đề (`forget
+{about}`) chỉ khớp điều đã giữ và quan sát, nên một lượt nói chưa từng được
+giữ không có gì để khớp và vẫn còn 30 ngày; lượt đêm sẽ đọc và giữ nó kèm lời
+trích. Vì vậy mọi lần quên của một người đã biết đánh dấu ngày đó: `forget`,
+`forget_last` (thấy hay không), và `forget_mark {person}` voice gửi sau một
+`forget {about}`, thấy hay không (`{ok:true}`; phòng hay phạm vi quy tắc
+không đánh dấu; bộ nhớ cũ trả `unknown_op` và voice đi tiếp). Mỗi người, mỗi
+ngày địa phương một hàng `nightly_forgets(person, day, at_unix_ms)`, giờ của
+lần quên mới nhất, tạo `IF NOT EXISTS`, `user_version` vẫn là 1. Mỗi lần
+quên đánh dấu hôm nay và `DAYS_BACK` (3) ngày trước đó, cùng một thời điểm:
+voice chỉ chạy lượt cho một ngày vào đêm sau và giữ ngày đó chờ tối đa 3
+ngày, nên lần quên lúc 00:10 vẫn tới được câu nói lúc 23:40, và lần quên
+trước một lượt chạy muộn vẫn tới ngày của nó (P2 của Thirteen trên #5345).
+`nightly::DAYS_BACK` của bộ nhớ sao lại hằng số cùng tên của voice;
+`tests/nightly_days_back.rs` hỏng khi hai số khác nhau. Ngày xa hơn không
+được đánh dấu: lượt của nó đã chạy hoặc sẽ không chạy.
+`nightly_prepare` bỏ qua các lượt trao đổi của người đó trong ngày đã đánh dấu nói trước
+dấu cộng `FORGET_TURN_MS` (60 giây): chính câu yêu cầu quên cũng là lượt
+trao đổi của ngày ("quên điều tôi nói về chị tôi" nhắc lại chủ đề), nên
+cũng bị bỏ qua (ý của Heron trên #5333). Lượt nói sau đó vẫn được đọc. Điều
+đã giữ không bị bỏ qua. Quên trong lúc lượt đang chạy cũng vậy: khi áp
+dụng, lượt trao đổi đó bị bỏ `forgotten` cùng mọi mục dẫn tới nó. Lượt nói
+của người khác, và của ngày ngoài khoảng đó, giữ nguyên. Độ trễ: voice gửi
+`forget_mark` sau `forget {about}` trong 1,5 giây của lệnh, nhưng ít nhất
+250 ms (`FORGET_MARK_WITHIN`) khi lệnh quên đã dùng hết, nên trường hợp xấu
+nhất của lượt khoảng 1,75 giây trên socket cục bộ. `forget_all` và `forget_person`
+xoá dấu của người đó; một dấu mất khi ngày của nó quá `keep_days`.
+
+Dòng hồ sơ vào dải sở
 thích của ghi chú phiên (P3, #5043); các loại khác không bao giờ vào ghi chú
 phiên. Không có gì được nói ra hay hiển thị.
 

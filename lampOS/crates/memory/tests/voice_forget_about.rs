@@ -303,3 +303,59 @@ fn a_one_face_forget_about_takes_the_room_line_that_says_their_keep() {
     assert_eq!(rows(HENRY), 0, "his kept thing is gone");
     assert_eq!(rows("everyone"), 1, "only the guest's room line stays");
 }
+
+/// One request straight to the store, its answer.
+fn ask(socket: &PathBuf, request: Value) -> Value {
+    use std::io::{BufRead, BufReader, Write};
+    let mut stream = std::os::unix::net::UnixStream::connect(socket).unwrap();
+    stream.write_all(format!("{request}\n").as_bytes()).unwrap();
+    let mut line = String::new();
+    BufReader::new(stream).read_line(&mut line).unwrap();
+    serde_json::from_str(&line).unwrap()
+}
+
+/// El's scene on #5333: a line said and never kept, then "forget what I
+/// said about my sister", which matches nothing kept. The night passes
+/// over the line all the same; another person's line of the day is read.
+#[test]
+fn a_topic_forget_that_matched_nothing_keeps_the_night_off_that_days_lines() {
+    assert!(switch_forget_about(true));
+    let mut day = String::new();
+    let fixture = Fixture::new_with("about-night", |store, now| {
+        let ana = Person::new(ANA).unwrap();
+        let binh = Person::new(BINH).unwrap();
+        store
+            .append(
+                &ana,
+                now - 1,
+                "synthetic: my sister Lan just moved to Da Nang",
+                "How exciting",
+                &[],
+            )
+            .unwrap();
+        store
+            .append(
+                &binh,
+                now - 1,
+                "synthetic: my brother lives in Hanoi",
+                "Nice",
+                &[],
+            )
+            .unwrap();
+        day = lamp_memory::store::Day::at(now, &lamp_memory::store::LocalTime::Offset(0))
+            .unwrap()
+            .to_string();
+    });
+    let client = DaysClient::new(fixture.socket.clone()).unwrap();
+    let prepare = |person: &str| {
+        ask(
+            &fixture.socket,
+            json!({"op":"nightly_prepare","person":person,"day":day}),
+        )
+    };
+    let records = |answer: Value| answer["input"]["records"].as_array().map_or(0, Vec::len);
+    let (told, ok) = client.run_for(&call(FORGET, json!({"about":"sister"})), BUDGET, Some(ANA));
+    assert!(ok && told["forgotten"] == false, "{told}");
+    assert_eq!(prepare(ANA), json!({"ok":true,"reason":"nothing"}));
+    assert_eq!(records(prepare(BINH)), 1);
+}

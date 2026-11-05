@@ -838,9 +838,13 @@ item checked alone, a bad one dropped and counted: Tiers' kinds and rules
 No health, money or other person's private matter is kept unless the
 person asked the lamp to remember it. Profile lines join the session
 note's preferences; the rest are found by `search` and `recall` with
-`nightly:true`. Nothing is spoken or shown. The legacy store answers
+`nightly:true`. Nothing is spoken or shown. Any forget a person asks
+(`forget`, `forget_last`, `forget {about}` found or not) marks the day, and
+the night passes over their exchanges of that day said before it and the
+forget's own turn, so a line said, never kept and asked to be forgotten is
+not kept overnight (El's option 2 on #5333). The legacy store answers
 `unknown_op`. Rules and limits: [memory-days.md](memory-days.md), "Nightly
-pass B".
+pass B" and "Forget marks".
 
 ## Limits, and what happens at each
 

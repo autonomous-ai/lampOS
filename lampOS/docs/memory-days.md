@@ -1190,7 +1190,7 @@ operation; the model's `proposal` inside `nightly_apply` is lenient.
 
 | Request | Successful response and rules |
 |---|---|
-| `nightly_prepare {person, day, after_id?}` | `{ok:true,input:{job,person,day,generation,records,existing,profile_lines,profile_changes_left,profile_adds_left,more}}`, or `{ok:true,reason:"nothing"}` when the day has no eligible record after `after_id` (no job kept). Only a known person (`p-` and 16 hex digits): the room, a rules scope or anyone else is `bad_person`. `day` is a local `YYYY-MM-DD` not after today (`bad_day`). Records: the person's own active exchanges of that day with nonblank `heard`, and kept things kept that day, by id after `after_id`, at most 128 and 64 KiB of the encoded input (`more:true` when some are left: ask again with the last id). `existing`: every current profile line, then the newest 32 facts, episodes and ahead items, each `{id,kind,day,text,…}` without quotes. The job keeps ids only, never text. A batch (`day`, `after_id`) prepared again while pending is the same job; applied, it is `done`. At most 8 pending per person (`busy`); a job lasts a day. |
+| `nightly_prepare {person, day, after_id?}` | `{ok:true,input:{job,person,day,generation,records,existing,profile_lines,profile_changes_left,profile_adds_left,more}}`, or `{ok:true,reason:"nothing"}` when the day has no eligible record after `after_id` (no job kept). Only a known person (`p-` and 16 hex digits): the room, a rules scope or anyone else is `bad_person`. `day` is a local `YYYY-MM-DD` not after today (`bad_day`). Records: the person's own active exchanges of that day with nonblank `heard`, but for those said before a forget of theirs that day or within a minute after it (below, **Forget marks**), and kept things kept that day, by id after `after_id`, at most 128 and 64 KiB of the encoded input (`more:true` when some are left: ask again with the last id). `existing`: every current profile line, then the newest 32 facts, episodes and ahead items, each `{id,kind,day,text,…}` without quotes. The job keeps ids only, never text. A batch (`day`, `after_id`) prepared again while pending is the same job; applied, it is `done`. At most 8 pending per person (`busy`); a job lasts a day. |
 | `nightly_apply {person, job, proposal, patterns?, feelings?}` | `{ok:true,accepted:{episode,fact,profile,pattern,ahead,feeling},dropped:{…},reasons:{…},ids:[…]}`. Each item of `proposal` (`episodes`, `facts`, `profile`, `patterns`, `ahead`, `feelings`; at most 32 of each; unknown fields and arrays ignored; not an object, nothing) is checked alone, in that order; the good ones are written in one transaction and the job is `done`, so a repeat returns the same answer. `patterns` and `feelings` default false: their items are dropped `off`, and an episode's `feeling` is not kept. Another person's job, or one gone, is `stale`. The log line has counts only. |
 | `search {…, nightly?}`, `recall {…, nightly?}` | With `nightly:true` the answer adds `nightly:[{id,kind,day,text,…}]`: the person's current items matching the query (the same FTS rules), or the newest with no query, within the request's day or span by the item's day, at most 8 and 4,096 bytes. A plain `search` also lists items among its observations, each with `nightly:{kind,day}`. Without `nightly`, or `false`, the answer is byte for byte as before. |
 
@@ -1207,8 +1207,41 @@ day or more than 60 days after it), `supersede` (nothing current of that
 kind and person, newer than the evidence, or already superseded),
 `profile_cap`, `off`, `too_many`, `full` (2,048 observations or 512 live
 nightly items; superseded or expired items are history and not counted).
-Days keeps no forget fingerprints, so none is checked; a fingerprint store,
-when there is one, adds a check here.
+An exchange said before a forget mark of its day (below) is dropped
+`forgotten` too. Days keeps no other forget fingerprints.
+
+**Forget marks** (El's option 2 on #5333). A topic forget (`forget
+{about}`) matches kept things and observations only, so an exchange said
+and never kept has nothing to match and stays active for its 30 days; the
+night would read it and keep it with a quote. So every forget a known
+person asks marks the day: `forget`, `forget_last` (found or not), and the
+voice's `forget_mark {person}` after a `forget {about}`, found or not
+(`{ok:true}`; the room or a rules scope marks nothing; an older memory
+answers `unknown_op` and the voice goes on). The mark is one
+`nightly_forgets(person, day, at_unix_ms)` row per person and local day,
+the latest forget's time, created `IF NOT EXISTS`, `user_version` still 1.
+Each forget marks today and the `DAYS_BACK` (3) days before it, all at the
+same time: the voice passes a day only on a later night and keeps it
+pending up to 3 days back, so a forget at 00:10 reaches a line said at
+23:40, and a forget before a late pass reaches its day (Thirteen's P2 on
+#5345). The memory's `nightly::DAYS_BACK` mirrors the voice's
+`nightly::DAYS_BACK` (lamp-voice never links lamp-memory);
+`tests/nightly_days_back.rs` fails when they differ. A day further back is
+not marked: its pass has run or never will.
+`nightly_prepare` passes over that person's exchanges of a marked day said at
+or before the mark plus `FORGET_TURN_MS` (60 s): the forget request is that
+day's exchange too ("forget what I said about my sister" names the topic
+again), stamped at its turn, so it is passed over as well (Heron's point
+on #5333). A line said later is read. Kept things are not passed over: the
+person asked for them, and their forget is by id. A forget during a pass
+is respected the same way: apply leaves such an exchange out as
+`forgotten`, with every item citing it. Another person's lines, and a day
+outside the window, are untouched. Latency: the voice sends `forget_mark`
+after the `forget {about}` it follows, within the call's 1.5 s, but given at
+least 250 ms (`FORGET_MARK_WITHIN`) when the forget used it all, so the
+turn's worst case is about 1.75 s on the local socket. `forget_all` and `forget_person` take the person's
+marks (their exchanges are gone); a mark goes once its day is past the
+`keep_days` its exchanges last.
 
 **Privacy (`private_kind`).** The product rule (the voice's `OBSERVE_PROMPT`,
 memory.md): never keep health, medicine, money or another person's private
@@ -1265,15 +1298,23 @@ again what cites those (a profile line citing a forgotten fact), with
 their versions; after the exchanges expired, an item sharing a source
 exchange (`origins`) with a kept thing or observation forgotten goes too.
 A forget during a pass: the job holds ids, so apply finds what is gone
-and drops those items `forgotten`; the rest apply. `forget_all` and
-`forget_person` take every item, job and allowance.
+and drops those items `forgotten`, and those citing an exchange said
+before a forget mark made since; the rest apply. `forget_all` and
+`forget_person` take every item, job, allowance and forget mark.
 
 Tests: `nightly::tests` (each kind accepted, every drop reason, the
 privacy rule in English and Vietnamese, a known person's own records only,
 forget cascades, a forget during a pass, the quarter cap, plan and event
 expiry, supersession history and search/recall, patterns needing two days
-and the off switches, the input bounds, and answers without `nightly`
-unchanged).
+and the off switches, the input bounds, answers without `nightly`
+unchanged, and forget marks: El's scene, a line after the forget, another
+person and a day past the window, a mark during a pass, every forget's
+mark, a forget after midnight reaching the day before, a forget four days
+later leaving the day alone, `forget_last` with nothing kept);
+`tests/nightly_days_back.rs` (the two `DAYS_BACK` equal);
+`tests/voice_forget_about.rs`
+(`a_topic_forget_that_matched_nothing_keeps_the_night_off_that_days_lines`,
+through the voice's client and the real store).
 
 ## The benchmark's probe (#4748)
 

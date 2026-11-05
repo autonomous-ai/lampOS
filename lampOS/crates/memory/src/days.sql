@@ -162,6 +162,18 @@ CREATE TABLE IF NOT EXISTS nightly_jobs (
     result TEXT NOT NULL DEFAULT '',
     UNIQUE(person,day,after_id)
 );
+-- A forget by a known person (El's option 2 on #5333): the latest time of
+-- one local day they asked any forget. The night passes over their
+-- exchanges of that day said before it, so a line a topic forget had
+-- nothing to match isn't kept that night. Goes with `forget_all`,
+-- `forget_person` and with the day's exchanges. Older builds pass this
+-- table over; `user_version` stays 1.
+CREATE TABLE IF NOT EXISTS nightly_forgets (
+    person TEXT NOT NULL,
+    day TEXT NOT NULL,
+    at_unix_ms INTEGER NOT NULL,
+    PRIMARY KEY(person,day)
+);
 -- One night's profile allowance: the lines it began with, and how many
 -- it changed and added.
 CREATE TABLE IF NOT EXISTS nightly_nights (
