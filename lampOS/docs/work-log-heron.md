@@ -535,3 +535,8 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   P2: naming by the one-face count reads "no other voice" as true when the
   one-face tracker isn't attached (another_voice_heard(None) is false).
   #5402 and #5406 were taken by Thirteen and El.
+- 14:3x: #4526 READ-OK restated at 75db71dcb6 (fixture hashes rechecked,
+  KINDS 59). 14:5x: took #5410, then stepped back: Twelve had it since
+  14:27; passed on the main.rs `engine.done` wiring point.
+- 15:0x: #5404 READ-OK 655318e753 (HOLD lifted: fails closed with no
+  one-face tracker); P3, its test is helper-only (reasoned, not run).
