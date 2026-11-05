@@ -6827,6 +6827,9 @@ fn conversation_with_gate_inner(
     // A person who tries again over a reply fallen back is still heard
     // (#2602, `LAMP_CUT_IN_KEEPS_LISTENING=on`). Off unless set.
     let keeps_listening = duplex && crate::turn_taking::cut_in_keeps_listening();
+    // The reply lowered from the first block heard over it until the yield
+    // is decided (#5076, `LAMP_ONSET_FADE=on`). Off unless set.
+    let onset_fade = duplex && crate::turn_taking::onset_fade();
     // A resume counts as fruitless only when its yield's evidence window
     // points at the lamp's own voice (#2602, `LAMP_CUT_IN_COUNTS_REAL=on`).
     // Off unless set.
@@ -7050,6 +7053,7 @@ fn conversation_with_gate_inner(
             "commit_on_stillness_after_plain_blocks":Confirmation::EVALUATED.plain_blocks,
             "fruitless_yields_before_fallback":FRUITLESS_YIELDS,
             "fruitless_yield_forgiven_after_ms":crate::turn_taking::FORGIVE_FRUITLESS_US / 1_000,
+            "onset_fade":onset_fade.then_some(json!({"floor_db":-12,"rise_ms":u64::from(crate::turn_taking::ONSET_FADE_RISE_CHUNKS) * 10})),
             "keeps_listening":keeps_listening.then_some(json!({"over_blocks":crate::turn_taking::KEEPS_TRYING_BLOCKS,"more_fruitless_yields":crate::turn_taking::KEEPS_TRYING_YIELDS})),
             "fruitless_counts_own_voice_only":counts_real.then_some(json!({"window":"onset run through the settling block","own":"own, or over not plain","person":"plain over, or clear"})),
             "decision_budget_us":hold.decision_budget_us,
@@ -7075,6 +7079,9 @@ fn conversation_with_gate_inner(
         }
         if keeps_listening {
             mask.keep_listening();
+        }
+        if onset_fade {
+            mask.fade_at_onset();
         }
         if counts_real {
             mask.count_real_cut_ins();
@@ -15970,7 +15977,7 @@ fn dispatch_speaker_chunk(
         SPEAKER_PERMIT_LEASE_US
     };
     let permit = owner.issue_output(permit_at, current.plan, lease)?;
-    let (samples, final_chunk, first_notice) = if origin.local() {
+    let (mut samples, final_chunk, first_notice) = if origin.local() {
         let reserved = current.notice.reserve_chunk(monotonic_us())?;
         // A computer's exact line is shown speaking, by its own level.
         if origin == SpeechOrigin::ExactLine {
@@ -15988,6 +15995,10 @@ fn dispatch_speaker_chunk(
         .checked_add(1)
         .ok_or_else(|| io::Error::other("speaker counter exhausted"))?;
     let dispatch_at = monotonic_us();
+    // Lowered while someone is heard over the reply (#5076, off unless set).
+    if origin == SpeechOrigin::Provider {
+        playback_mask.fade(&mut samples);
+    }
     if origin == SpeechOrigin::Provider
         && let Some(gaps) = playback_mask.listen_gaps()
     {
