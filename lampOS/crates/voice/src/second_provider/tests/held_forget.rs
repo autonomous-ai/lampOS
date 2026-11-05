@@ -610,7 +610,9 @@ async fn a_spoken_forget_everything_always_asks_first() {
         (&[misheard, ("A", "Vâng.", Lamp::Says("Xong."), 5)], 1),
         // A no, anything else, another person's yes, or nobody's.
         (
-            &[ask, ("A", "No.", Lamp::Says("Okay, I'll keep it."), 5)],
+            // Not "Okay, I'll keep it.": a bare keep is a keep claim now
+            // (lamp-06c1, build 10226, 5 Nov), asked again with no call.
+            &[ask, ("A", "No.", Lamp::Says("Okay, I won't forget it."), 5)],
             0,
         ),
         (&[ask, ("A", "What time is it?", Lamp::Says("Noon."), 5)], 0),

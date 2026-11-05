@@ -3251,7 +3251,13 @@ after a take-over, but now for every turn:
   "got it", "done"…, a keep that takes what was kept: "Kept:", "Kept.",
   "kept that/it", "I've kept that", "I'll remember that/this/it", "I've
   saved it", "saved that", and "đã ghi nhớ", "mình sẽ nhớ", "đã lưu"
-  with anything after them). The softer claims count too (K3: lamp-06c1,
+  with anything after them). A bare keep that ends its sentence is a
+  hard claim too (lamp-06c1, build 10226, 5 Nov: "Yes. Please keep that."
+  answered "I'll keep it." with no call, and nothing was kept): "I'll
+  keep it.", "I'll keep that!", "I will keep it", with only filler after
+  it ("for you", "now", "safe", "then", "too", or after a comma at most
+  two words), decided at `.`, `!` or the reply's end; "I'll keep it
+  short.", "I'll keep it brief." and "I'll keep it?" claim nothing. The softer claims count too (K3: lamp-06c1,
   28 Oct night, "Noted — you work at a library now, not the bakery." and
   "All right, I'll keep it in mind." with no call): "Noted" with what was
   noted after a dash or colon, or "noted that"; "I'll keep it/that in
