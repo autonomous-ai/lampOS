@@ -294,21 +294,19 @@ async fn lines_past_silent(
     past_silent: Option<(bool, crate::second_provider::AnotherVoice)>,
     voice: Voice,
 ) -> Outcome {
-    lines_named(
+    lines_known(
         what,
         lines,
         chats,
-        boot,
-        seen,
-        eyes_up,
+        (boot, seen, eyes_up),
         early,
         going_on,
         named,
         saves,
         past_silent,
         voice,
-        false,
-        &[],
+        (false, &[]),
+        |_, _| {},
     )
     .await
 }
@@ -332,6 +330,41 @@ async fn lines_named(
     voice: Voice,
     name_one_face: bool,
     mouths: &'static [lamp_msgs::SpeakingState],
+) -> Outcome {
+    lines_known(
+        what,
+        lines,
+        chats,
+        (boot, seen, eyes_up),
+        early,
+        going_on,
+        named,
+        saves,
+        past_silent,
+        voice,
+        (name_one_face, mouths),
+        |_, _| {},
+    )
+    .await
+}
+
+/// [`lines_named`], with `known_at` called before each line with its
+/// request and the eyes' known file, as the eyes rewrite or stop writing
+/// it between lines.
+#[allow(clippy::too_many_arguments)]
+async fn lines_known(
+    what: &str,
+    lines: Vec<Line>,
+    chats: Vec<Vec<net::Result<ChatEvent>>>,
+    (boot, seen, eyes_up): (&'static str, bool, bool),
+    early: Option<&str>,
+    going_on: Option<bool>,
+    named: bool,
+    saves: bool,
+    past_silent: Option<(bool, crate::second_provider::AnotherVoice)>,
+    voice: Voice,
+    (name_one_face, mouths): (bool, &'static [lamp_msgs::SpeakingState]),
+    known_at: fn(u64, &std::path::Path),
 ) -> Outcome {
     let eyes = Arc::new(SpeakingFaces::default());
     let path = known_file(what, &eyes);
@@ -463,6 +496,7 @@ async fn lines_named(
             engine.retire_through(request - 1);
         }
         *now.lock().unwrap() += Duration::from_secs(after);
+        known_at(request, &path);
         let done = Arc::new(AtomicBool::new(false));
         let feeder = feed_faces(eyes.clone(), in_view, mouths, boot, done.clone());
         engine.submit(start(request));
@@ -1419,6 +1453,141 @@ async fn a_held_carried_keep_is_written_only_on_their_seen_yes() {
         let got = lines_saving(
             what,
             lines,
+            chats,
+            BOOT,
+            true,
+            true,
+            None,
+            Some(true),
+            true,
+            true,
+            Voice::Off,
+        )
+        .await;
+        assert_eq!(got.calls, expected, "{what}");
+    }
+}
+
+/// lamp-06c1, 5 Nov, build 10343, S4 (C54, C55): A opens the conversation,
+/// seen saying it; her face leaves view and the eyes stop writing their
+/// known file (fresh 3 s), and she says "remember that my car is silver"
+/// at once, off camera. The known face read at the line's end named no one,
+/// so the line was the room's and its keep refused ("I don't know who's
+/// speaking yet"). Her face as last named, gone within
+/// `CARRY_UNSEEN_WITHIN` before the line, carries it: the keep is held and
+/// written in her scope on her plain yes, seen on her face's new track. Her face
+/// still in view while the eyes no longer name it is not hers: the room's.
+#[tokio::test]
+async fn an_off_camera_keep_just_after_her_face_left_is_carried_and_held_for_her_yes() {
+    let a = crate::remember::person_id("A");
+    fn left_then_back(request: u64, known: &std::path::Path) {
+        match request {
+            // Her face gone: the eyes write their known file no more.
+            2 => {
+                let _ = std::fs::remove_file(known);
+                let _ = std::fs::remove_file(known_face_of(known));
+            }
+            // Back, on a new track.
+            3 => {
+                std::fs::write(known, "A").unwrap();
+                std::fs::write(known_face_of(known), "f2\n").unwrap();
+            }
+            _ => {}
+        }
+    }
+    let opening = || {
+        (
+            "I'm going to the garden centre on Saturday.".to_owned(),
+            vec![("f1", true)],
+            0,
+        )
+    };
+    // A plain yes: S4's own "Yes, please keep that." is not one
+    // (`known_faces::plain_agreement`: "keep" stands beside no yes).
+    let yes = || ("Yes, please.".to_owned(), vec![("f2", true)], 5);
+    for (what, car_in_view, expected) in [
+        ("s4-left", vec![], vec![Some(a.clone())]),
+        ("s4-unnamed-in-view", vec![("f1", false)], vec![None]),
+    ] {
+        let mut chats = vec![vec![
+            text("Garden centre on Saturday, noted."),
+            Ok(ChatEvent::Done),
+        ]];
+        chats.extend(keep_the_hotel_asking());
+        chats.push(vec![text("Okay."), Ok(ChatEvent::Done)]);
+        let got = lines_known(
+            what,
+            vec![
+                opening(),
+                ("Remember that my car is silver.".to_owned(), car_in_view, 0),
+                yes(),
+            ],
+            chats,
+            (BOOT, true, true),
+            None,
+            Some(true),
+            true,
+            true,
+            None,
+            Voice::Off,
+            (false, &[]),
+            left_then_back,
+        )
+        .await;
+        assert_eq!(got.calls, expected, "{what}");
+    }
+}
+
+/// lamp-06c1, 5 Nov, S4: "Yes, please keep that.", A's face seen saying
+/// it, writes a carried keep held for A's yes. The same words to a forget
+/// A asked for and the lamp held for a yes are no yes: the forget is
+/// dropped, as before; a plain "Yes." still runs it.
+#[tokio::test]
+async fn yes_please_keep_that_writes_a_held_keep_and_runs_no_held_forget() {
+    let a = crate::remember::person_id("A");
+    const KEEP_THAT: &str = "Yes, please keep that.";
+    let okay = || vec![text("Okay."), Ok(ChatEvent::Done)];
+    let forget_asking = || {
+        let mut chats = forget_everything();
+        chats[1] = vec![
+            text("Want me to forget everything about you?"),
+            Ok(ChatEvent::Done),
+        ];
+        chats.push(okay());
+        chats
+    };
+    let mut keep_chats = keep_the_hotel_asking();
+    keep_chats.push(okay());
+    let cases = [
+        (
+            "keep-that-held-keep",
+            (THE_HOTEL, vec![("f1", false)]),
+            keep_chats,
+            KEEP_THAT,
+            vec![Some(a.clone())],
+        ),
+        (
+            "keep-that-held-forget",
+            (FORGET_ME, vec![("f1", true)]),
+            forget_asking(),
+            KEEP_THAT,
+            vec![],
+        ),
+        (
+            "plain-yes-held-forget",
+            (FORGET_ME, vec![("f1", true)]),
+            forget_asking(),
+            "Yes.",
+            vec![Some(a.clone())],
+        ),
+    ];
+    for (what, (first, in_view), chats, yes, expected) in cases {
+        let got = lines_saving(
+            what,
+            vec![
+                (first.to_owned(), in_view, 0),
+                (yes.to_owned(), vec![("f1", true)], 5),
+            ],
             chats,
             BOOT,
             true,
