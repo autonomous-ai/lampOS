@@ -325,6 +325,47 @@ fn said_back_and_agreed(name: &str, said: &Said) -> bool {
     })
 }
 
+/// What becomes of the first setup save refused only for the read-back's
+/// yes ([`SAY_IT_BACK`]), held by the voice for the person's next turn
+/// (`second_provider::HeldSave`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum HeldSaveVerdict {
+    /// The lamp said the name back and this turn is a plain yes to it
+    /// ([`said_back_and_agreed`]): the voice runs the save itself.
+    Runs,
+    /// The lamp's last answer did not say it back: nothing to answer yet.
+    Waits,
+    /// The person answered the read-back with anything but a yes (a
+    /// correction, a spelling, another name, a no): dropped.
+    Drops,
+}
+
+/// [`HeldSaveVerdict`] for the save held under `name`, on the turn `said`
+/// holds (lamp-52e6, 5 Nov, #5391's check: after "Walter. Have I got that
+/// right?" and "Yes, that's my name." the model made no call, and no face
+/// was kept).
+pub(crate) fn held_save_verdict(name: &str, said: &Said) -> HeldSaveVerdict {
+    if said_back_and_agreed(name, said) {
+        return HeldSaveVerdict::Runs;
+    }
+    match said.before.last() {
+        Some((_, lamp)) if said_back(name, lamp) => HeldSaveVerdict::Drops,
+        // The face question with the name folded in is no read-back (El's
+        // #5159 rule): its yes answers the face, so the hold goes.
+        Some((_, lamp)) if said_by_them(name, lamp) => HeldSaveVerdict::Drops,
+        _ if gives_a_name(&said.this) || spelled_name(&said.this).is_some() => {
+            HeldSaveVerdict::Drops
+        }
+        _ => HeldSaveVerdict::Waits,
+    }
+}
+
+/// Whether a tool answer is the first setup save's refusal for want of the
+/// read-back's yes ([`SAY_IT_BACK`]): the voice holds that save.
+pub(crate) fn refused_for_the_read_back(told: &Value) -> bool {
+    told["error"] == SAY_IT_BACK
+}
+
 /// Whether the lamp's line `lamp` says `name` back as a question of its
 /// own: a line that also asks about their face ("Nice to meet you, Marie!
 /// May I remember your face?") is not one, since its yes may answer only
@@ -1157,7 +1198,7 @@ pub const NAME_TOLD_NOTE: &str = "If they have just told you their own name, cal
 const NOT_HEARD: &str = "You did not hear that name in what they said. Say the name back to them and ask them to spell it, then call this again with the name as they said or spelled it.";
 /// What the model is told at setup, before the first save, when the name
 /// was not said back and agreed to (#5140 row 5).
-const SAY_IT_BACK: &str = "I have not kept their face yet. First say the name back to them and ask if you have it right. Only if they say yes, call this again with that name; if they correct it, say the new one back the same way.";
+pub(crate) const SAY_IT_BACK: &str = "I have not kept their face yet. First say the name back to them and ask if you have it right. Only if they say yes, call this again with that name; if they correct it, say the new one back the same way.";
 /// What the model is told when the name was only the word that called the
 /// lamp ([`only_the_call`]).
 const ONLY_THE_CALL: &str = "That word was them calling you, not their name, so I have not remembered anyone. Ask them what their name is, then call this again with the name they give.";
@@ -4731,6 +4772,79 @@ mod tests {
             "Henry",
             &after(READ_BACK, "Yes. That's right. Please remember my face.")
         ));
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// lamp-52e6, 5 Nov, #5391's check: "My name is Walter." with a call
+    /// refused for the read-back, "Walter. Have I got that right?", and
+    /// "Yes, that's my name." with no call kept no face. The held save's
+    /// verdict on the yes runs it, through the same check as a call; a
+    /// correction or a read-back folded into the face question drops it.
+    #[test]
+    fn at_setup_a_held_save_runs_on_the_yes_to_the_read_back() {
+        use HeldSaveVerdict::{Drops, Runs, Waits};
+        let call = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({ "name": "Walter" }),
+        };
+        const HEARD: &str = "My name is Walter.";
+        const READ_BACK: &str = "Walter. Have I got that right?";
+        let after = |lamp: &str, this: &str| Said {
+            this: this.into(),
+            before: vec![(HEARD.into(), lamp.into())],
+        };
+        let (socket, asked) = eyes(vec![
+            json!({"remembered": "Walter"}),
+            json!({"remembered": "Walter"}),
+        ]);
+        // (a) The call on the name line is refused for the read-back.
+        let (words, _) = run_at_setup(&socket, &call, &Said::now(HEARD));
+        assert!(refused_for_the_read_back(&words), "{words}");
+        // The hold is judged only on the turn after the refused call, so
+        // the name line itself is never judged.
+        for (lamp, this, verdict) in [
+            // (a) and (b): a yes, plain or with the save's ask.
+            (READ_BACK, "Yes, that's my name.", Runs),
+            (
+                READ_BACK,
+                "Yes. That's right. Please remember my face.",
+                Runs,
+            ),
+            // (c) A correction, a spelling, a no.
+            (READ_BACK, "No, it's Walt.", Drops),
+            (READ_BACK, "W A L T.", Drops),
+            (READ_BACK, "No.", Drops),
+            // (e) The read-back folded into the face question (El's #5159).
+            (
+                "Nice to meet you, Walter! May I remember your face?",
+                "Yes.",
+                Drops,
+            ),
+            // Something else asked: it waits.
+            ("What would you like me to call the room?", "Hmm.", Waits),
+        ] {
+            assert_eq!(
+                held_save_verdict("Walter", &after(lamp, this)),
+                verdict,
+                "{lamp} / {this}"
+            );
+        }
+        // The held save run on the yes is the call's own eyes request.
+        for this in [
+            "Yes, that's my name.",
+            "Yes. That's right. Please remember my face.",
+        ] {
+            let (words, _) = run_at_setup(&socket, &call, &after(READ_BACK, this));
+            assert_eq!(words, json!({"ok": true, "remembered": "Walter"}));
+        }
+        assert_eq!(
+            asked.join().unwrap(),
+            [
+                json!({"remember": "Walter", "one_face": true, "replace": false}),
+                json!({"remember": "Walter", "one_face": true, "replace": false}),
+            ]
+        );
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
     }
 
