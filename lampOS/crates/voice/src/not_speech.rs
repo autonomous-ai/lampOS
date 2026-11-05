@@ -363,8 +363,90 @@ pub fn bare_call(piece: &str) -> bool {
 }
 
 /// The lamp's functions whose names have no underscore, so
-/// [`names_a_function`] alone can't tell them from a word.
-const PLAIN_NAMES: [&str; 3] = ["remember", "recall", "forget"];
+/// [`names_a_function`] alone can't tell them from a word: the memory's
+/// three (`remember::REMEMBER`, `RECALL`, `FORGET`) and the second route's
+/// `weather` (`second_provider::net::weather::NAME`); a test holds them the
+/// same. The actions part's and the skills' one-word names (`dance`,
+/// `glow` …) come from their own lists and are not here.
+const PLAIN_NAMES: [&str; 4] = ["remember", "recall", "forget", "weather"];
+
+/// Whether a reply so far opens with a call written as its text, with no
+/// "Calling": one of [`PLAIN_NAMES`], lower case, at the reply's very start,
+/// then its arguments. On lamp-06c1 on 5 Nov (run 1027, request 20) the
+/// lamp said aloud "remember The person's favorite tea is peppermint, no
+/// longer oolong. 4": `remember`, its text and `replaces` 4. A reply in
+/// words begins with a capital ("Remember to water the plants.", "Recall
+/// that…"), so the lower-case name is the sign, and after it one of: a
+/// space and a capital letter (but "I", "I'm" …: "remember I said…"), a
+/// quote, `{`, `(` or `:`; nothing more (the name alone); or, once the
+/// reply ends, a closing id after a sentence's end (". 4"). `Some(Some(name))`
+/// only once `ended`: the whole reply is the call, and none of it is said;
+/// `Some(None)`: no such opening; `None`: not yet known, or one whose end
+/// has not come.
+fn opens_as_a_written_call(rest: &str, ended: bool) -> Option<Option<String>> {
+    let word_len = rest
+        .find(|c: char| !c.is_ascii_lowercase())
+        .unwrap_or(rest.len());
+    let word = &rest[..word_len];
+    let after = &rest[word_len..];
+    if after.is_empty() {
+        return match (ended, PLAIN_NAMES.contains(&word)) {
+            (true, true) => Some(Some(word.to_owned())),
+            (true, false) => Some(None),
+            (false, _) if PLAIN_NAMES.iter().any(|name| name.starts_with(word)) => None,
+            (false, _) => Some(None),
+        };
+    }
+    if !PLAIN_NAMES.contains(&word) {
+        return Some(None);
+    }
+    let call = || {
+        if ended {
+            Some(Some(word.to_owned()))
+        } else {
+            None
+        }
+    };
+    let next = after.chars().next().unwrap_or_default();
+    match next {
+        '{' | '(' | ':' => return call(),
+        '.' | '!' if after[1..].trim().is_empty() => return call(),
+        ' ' => {}
+        _ => return Some(None),
+    }
+    let args = after.trim_start();
+    let Some(first) = args.chars().next() else {
+        // "remember " and nothing yet.
+        return call();
+    };
+    match first {
+        '{' | '(' | '"' | '\u{201c}' => return call(),
+        _ if first.is_uppercase() => {
+            // "remember I said…": "I" as a word is speech, not a fact.
+            let second = args[first.len_utf8()..].chars().next();
+            return match (first, second) {
+                ('I', None) if !ended => None,
+                ('I', None) => Some(None),
+                ('I', Some(c)) if !c.is_alphanumeric() => Some(None),
+                _ => call(),
+            };
+        }
+        _ => {}
+    }
+    // A lower-case fact: a call only if it closes with an id after a
+    // sentence's end ("… oolong. 4"), known once the reply ends.
+    if !ended {
+        return None;
+    }
+    let trimmed = args.trim_end();
+    let digits = trimmed.len() - trimmed.trim_end_matches(|c: char| c.is_ascii_digit()).len();
+    let before = trimmed[..trimmed.len() - digits].trim_end();
+    if digits > 0 && before.len() < trimmed.len() - digits && before.ends_with(['.', '!', '?', ','])
+    {
+        return Some(Some(word.to_owned()));
+    }
+    Some(None)
+}
 
 /// The actions part's own words after a light or volume step, each with
 /// its function (`lamp_actions::short_say`; a test holds the two the
@@ -421,6 +503,11 @@ pub fn step_word_alone(text: &str, ended: bool) -> Option<Option<&'static str>> 
 /// "Louder.") is one too, its function's name with the whole text's
 /// length: on lamp-52e6 on 3 November, 4 of 14 light and volume asks got
 /// "Louder.", "Brighter." or "Cooler." and no call, so nothing changed.
+///
+/// So is a whole reply that is a call written as its text, with no
+/// "Calling" ([`opens_as_a_written_call`]: "remember The person's favorite
+/// tea is peppermint. 4", lamp-06c1, 5 Nov), its name with the whole text's
+/// length, known once the reply ends.
 pub fn opens_with_a_call_aloud(text: &str, ended: bool) -> Option<Option<(usize, String)>> {
     if let Some(name) = step_word_alone(text, ended)? {
         return Some(Some((text.len(), name.to_owned())));
@@ -428,6 +515,9 @@ pub fn opens_with_a_call_aloud(text: &str, ended: bool) -> Option<Option<(usize,
     const CALLING: &str = "calling ";
     let start = text.len() - text.trim_start().len();
     let rest = &text[start..];
+    if let Some(name) = opens_as_a_written_call(rest, ended)? {
+        return Some(Some((text.len(), name)));
+    }
     let head: String = rest.chars().take(CALLING.len()).collect();
     if !CALLING.starts_with(&head.to_lowercase()) {
         return Some(None);
@@ -1670,6 +1760,151 @@ mod tests {
             assert_eq!(said(text), Some(None), "{text:?}");
         }
         assert_eq!(opens_with_a_call_aloud("Calli", true), Some(None));
+    }
+
+    /// lamp-06c1, 5 Nov (run 1027, request 20): "remember The person's
+    /// favorite tea is peppermint, no longer oolong. 4" was said aloud. A
+    /// reply that opens with a plain function's name in lower case and then
+    /// its arguments is a call written as text: the whole reply, known once
+    /// it ends, and held (never said) until then.
+    #[test]
+    fn a_call_written_as_its_text_is_never_said() {
+        for (text, name) in [
+            (
+                "remember The person's favorite tea is peppermint, no longer oolong. 4",
+                "remember",
+            ),
+            (
+                "remember Their favorite flower is a ranunculus.",
+                "remember",
+            ),
+            (" remember The locker code is 12.", "remember"),
+            ("remember {\"text\": \"tea is mint\"}", "remember"),
+            ("remember{\"text\":\"tea is mint\"}", "remember"),
+            ("remember(text=\"tea is mint\")", "remember"),
+            ("remember: The tea is mint.", "remember"),
+            ("remember \"The tea is mint.\"", "remember"),
+            ("remember \u{201c}The tea is mint.\u{201d}", "remember"),
+            ("recall Favorite tea", "recall"),
+            ("recall {\"about\": \"tea\"}", "recall"),
+            ("forget The favorite tea.", "forget"),
+            ("forget {}", "forget"),
+            ("forget()", "forget"),
+            ("weather Hanoi", "weather"),
+            ("weather {\"place\": \"Hanoi\"}", "weather"),
+            ("remember their favorite tea is peppermint. 4", "remember"),
+            ("remember their tea is mint, 12", "remember"),
+            ("remember", "remember"),
+            ("remember.", "remember"),
+            ("forget ", "forget"),
+            ("remember Lily's birthday is in May.", "remember"),
+        ] {
+            assert_eq!(
+                opens_with_a_call_aloud(text, true),
+                Some(Some((text.len(), name.to_owned()))),
+                "{text:?}"
+            );
+            // Held whole while more may come: none of it is said.
+            assert_eq!(opens_with_a_call_aloud(text, false), None, "{text:?}");
+        }
+        // Not yet known while its start or its arguments are still coming.
+        for text in [
+            "r",
+            "re",
+            "rememb",
+            "remember",
+            "remember ",
+            "rec",
+            "f",
+            "w",
+            "remember I",
+        ] {
+            assert_eq!(opens_with_a_call_aloud(text, false), None, "{text:?}");
+        }
+    }
+
+    /// Ordinary words are said: a capital first word ("Remember to …",
+    /// "Remember when …"), "I" after the name, a lower-case reply with no
+    /// closing id, another word, or a name inside a longer word.
+    #[test]
+    fn words_that_begin_with_a_functions_name_are_said() {
+        for text in [
+            "Remember to water the plants.",
+            "Remember when we talked about tea?",
+            "Remember The Beatles? Great band.",
+            "Recall that you asked me about Monday.",
+            "Forget it, that's fine.",
+            "Forget The rest, peppermint is your favorite.",
+            "Weather Hanoi looks sunny.",
+            "Weather today is sunny.",
+            "REMEMBER The tea.",
+            "remember I said I'd water the plants.",
+            "remember I'm here.",
+            "remember I",
+            "remember to water the plants.",
+            "remember when we talked about tea?",
+            "remember the 4 of us?",
+            "remembered The tea.",
+            "remembering The tea.",
+            "recalled Nothing.",
+            "forgetful The tea.",
+            "rememberThe tea.",
+            "remember-me The tea.",
+            "remember's The tea.",
+            "remember. The tea is mint.",
+            "reminder The tea.",
+            "rest The tea.",
+            "weathers The storm.",
+            "whether The tea is mint.",
+            "4 The tea.",
+            "Your favorite tea is peppermint now, not oolong.",
+            "Kept: your favorite tea is peppermint.",
+            "Peppermint now, got it. 4",
+            "",
+            "  ",
+        ] {
+            assert_eq!(opens_with_a_call_aloud(text, true), Some(None), "{text:?}");
+        }
+        // Known at once, before the reply ends.
+        for text in [
+            "Remember to",
+            "Rem",
+            "Recall",
+            "Weather",
+            "remembered",
+            "rest",
+            "4",
+            "remember-",
+            "remember to water",
+            "remember I'm",
+            "remember I said",
+        ] {
+            if text.starts_with("remember to") {
+                // Lower-case: its end decides (a closing id), so held.
+                assert_eq!(opens_with_a_call_aloud(text, false), None, "{text:?}");
+            } else {
+                assert_eq!(opens_with_a_call_aloud(text, false), Some(None), "{text:?}");
+            }
+        }
+        // The "Calling" narration is unchanged by the written call.
+        assert_eq!(
+            opens_with_a_call_aloud("Calling weather for Hanoi. Sunny.", true),
+            Some(Some((26, "weather".to_owned())))
+        );
+    }
+
+    /// The plain names are the functions' own.
+    #[test]
+    fn the_plain_names_are_the_functions_own() {
+        assert_eq!(
+            PLAIN_NAMES,
+            [
+                crate::remember::REMEMBER,
+                crate::remember::RECALL,
+                crate::remember::FORGET,
+                crate::second_provider::net::weather::NAME,
+            ]
+        );
     }
 
     /// lamp-52e6, 3 Nov: "Louder.", "Brighter." and "Cooler." came back

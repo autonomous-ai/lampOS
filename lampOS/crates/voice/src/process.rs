@@ -1762,6 +1762,8 @@ fn second_route_worker_environment(
         crate::remember::HITS_ENVIRONMENT,
         // A don't-know about the person recalls their kept things first (C57).
         crate::dont_know::ENVIRONMENT,
+        // A keep the round after it doubts is taken back for their yes (C37).
+        crate::remember::doubted::UNDOES_ENVIRONMENT,
         crate::second_provider::SKILL_LOOK_ENVIRONMENT,
         crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
         // Untied talk keeps no conversation going (#3882).
@@ -1955,6 +1957,7 @@ mod tests {
             crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT,
             crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
             crate::dont_know::ENVIRONMENT,
+            crate::remember::doubted::UNDOES_ENVIRONMENT,
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
             crate::untied_going_on::ENVIRONMENT,
@@ -2679,6 +2682,7 @@ mod tests {
                     || name == crate::second_provider::NAMED_ALWAYS_ENVIRONMENT
                     || name == crate::remember::HITS_ENVIRONMENT
                     || name == crate::dont_know::ENVIRONMENT
+                    || name == crate::remember::doubted::UNDOES_ENVIRONMENT
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
                     || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
                     || name == crate::untied_going_on::ENVIRONMENT
@@ -2824,6 +2828,7 @@ mod tests {
                     "LAMP_MAKE_SKILL=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_DONT_KNOW_RECALLS=on",
+                    "LAMP_MEMORY_DOUBT_UNDOES=on",
                     "LAMP_MEMORY_EVENTS=on",
                     "LAMP_MEMORY_FOLLOWS_FACE=on",
                     "LAMP_MEMORY_FORGET_ABOUT=on",

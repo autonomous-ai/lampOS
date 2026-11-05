@@ -1507,6 +1507,26 @@ fn the_product_recalls_before_a_dont_know() {
     );
 }
 
+/// A keep the round right after it doubts is taken back until their yes
+/// (`LAMP_MEMORY_DOUBT_UNDOES`, C37): the memory owner's call on 5 Nov,
+/// after lamp-06c1 kept "rhinodulus" while asking whether it was right.
+#[test]
+fn the_product_takes_back_a_doubted_keep() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_MEMORY_DOUBT_UNDOES=on",
+        "Environment=LAMP_MEMORY_FORGET_ALL=on",
+        "Environment=LAMP_EYES_SPEAKING=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// The memory's corrections, forget-about and recall v2 are on in the
 /// product (#2510, #2176): each passed its check on lamp-06c1 on 4 Nov
 /// (build 10012): "green now, not violet" with `replaces`, both bicycle

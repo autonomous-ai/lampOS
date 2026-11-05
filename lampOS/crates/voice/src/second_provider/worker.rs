@@ -3312,6 +3312,29 @@ pub fn serve(
     if crate::remember::asked::on() {
         engine = engine.claiming_faces(true);
     }
+    // A keep the round right after it doubts is taken back and held for
+    // their yes (`LAMP_MEMORY_DOUBT_UNDOES`, C37). It forgets by id, so it
+    // needs `LAMP_MEMORY_FORGET_ALL` and the Days memory.
+    if crate::remember::doubted::undoes_on() {
+        let by_id = crate::remember::days_from_environment()
+            && std::env::var(crate::remember::FORGET_ALL_ENVIRONMENT)
+                .ok()
+                .as_deref()
+                == Some("on");
+        if by_id {
+            eprintln!(
+                "lamp-voice second: a keep the round after it doubts is taken back, kept again on their yes ({})",
+                crate::remember::doubted::UNDOES_ENVIRONMENT
+            );
+        } else {
+            eprintln!(
+                "lamp-voice second: a doubted keep is not taken back: {} needs the Days memory and {}",
+                crate::remember::doubted::UNDOES_ENVIRONMENT,
+                crate::remember::FORGET_ALL_ENVIRONMENT
+            );
+        }
+        engine = engine.undoing_doubted_keeps(by_id);
+    }
     if let Some(place) = named_ask {
         engine = engine.asking_by_name(Arc::new(move |words: &str| {
             crate::agent_tasks::named_ask(&place, words)

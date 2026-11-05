@@ -1082,7 +1082,9 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   name, a number, the thing itself), don't call it yet; ask, and call it
   once they say it again. On the second route, a `remember` called in a
   chat round whose own words doubt what was heard ("misheard", "didn't
-  catch", "did you say", "say that again", "nghe nhầm", "nói lại" …;
+  catch", "did you say", "say that again", "was that … right", "did I
+  hear … right", "want to be sure", "is that spelled", "nghe nhầm", "nói
+  lại" …;
   `remember::doubted::doubts_what_was_heard`) is not run that round. The
   model is told `{"remembered": false, "note": "Not kept: in this same
   reply you doubted what you heard. …"}` and the journal says "a remember
@@ -1092,6 +1094,24 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   round's words, so a normal turn's time is unchanged. Tests:
   `remember::doubted::tests`,
   `second_provider::tests::a_keep_its_own_round_doubts_is_not_run`.
+- **A doubt right after the keep takes it back** (C37,
+  `LAMP_MEMORY_DOUBT_UNDOES=on`, the second route; off unless set, on in
+  the product by the memory owner's call on 5 Nov). On lamp-06c1 on 5 Nov
+  round 1 was a bare `remember` and round 2 said "Was that 'rhinodulus'
+  right — I want to be sure", with "rhinodulus" already kept (id 391).
+  With the switch, the Days memory, `LAMP_MEMORY_FORGET_ALL` and the eyes'
+  speaking check, when the round right after a `remember` that kept
+  something new (`doubted::new_keep_id`: an id, not kept already, not a
+  replacement) doubts what was heard, the keep is forgotten by its id in
+  the same scope and the call is held, as a held forget is, for the same
+  known person's plain yes seen said within 60 s; their yes keeps it again
+  as called (`second_provider::undo_doubted_keep`). Within 30 s of the
+  keep (`doubted::UNDO_WITHIN`), for a known person only: nobody known,
+  the room's keep stays. If that round called more, the model is told
+  `doubted::UNDONE_NOTE` first. The journal says "taken back" or why not.
+  Tests:
+  `held_forget::a_keep_the_next_round_doubts_is_taken_back_until_their_yes`,
+  `held_forget::a_doubted_keep_stays_without_the_eyes`.
 - **Plain facts are kept quietly, with few offers to keep**
   (`LAMP_KEEP_QUIETLY=on`, the second route; off unless set, on in the
   product unit since #5053). In lamp-06c1's long run of 30 Oct, 8 of the
