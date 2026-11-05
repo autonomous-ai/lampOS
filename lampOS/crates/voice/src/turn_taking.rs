@@ -75,6 +75,29 @@ pub fn cut_in_keeps_listening() -> bool {
         .as_deref()
         == Some("on")
 }
+
+/// The voice's environment switch for [`PlaybackMask::fade_at_onset`], with
+/// `on`; off unless set (#5076). On lamp-52e6 on 5 Nov a played "Stop,
+/// Lamp." over a story was lost in the input itself: the reply played at
+/// full level for the 70 ms a yield takes, and the speaker's queue after it,
+/// so its "St-" was under the lamp's voice on every stage of the canceller
+/// (processed gave no words at all, linear and raw the story).
+pub const ONSET_FADE_ENVIRONMENT: &str = "LAMP_ONSET_FADE";
+
+/// Whether the voice's environment says `on` for [`ONSET_FADE_ENVIRONMENT`].
+pub fn onset_fade() -> bool {
+    std::env::var(ONSET_FADE_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// With [`ONSET_FADE_ENVIRONMENT`], the reply's level while someone is heard
+/// over it and the yield is not yet decided: -12 dB. Lower than a person's
+/// raised voice over it, still heard if they stop at once.
+pub const ONSET_FADE_FLOOR: f32 = 0.25;
+
+/// With [`ONSET_FADE_ENVIRONMENT`], the speaker chunks (10 ms each) the reply
+/// takes to come back to full level once the run over it is over without a
+/// yield: 50 ms, so a cough or a door lowers it for a moment, not a word.
+pub const ONSET_FADE_RISE_CHUNKS: u8 = 5;
 /// With `LAMP_CUT_IN_COUNTS_REAL=on`, resumes whose window did not point at
 /// the lamp's own voice ([`YieldEvidence`]) before the mask stops yielding
 /// for the rest of the reply, as [`FRUITLESS_YIELDS`] does, until
@@ -400,6 +423,9 @@ pub(crate) struct PlaybackMask {
     /// Listening gaps (#828, [`crate::listen_gaps`]): with the duplex mask
     /// only, off unless set.
     listen_gaps: Option<crate::listen_gaps::ListenGaps>,
+    /// With [`ONSET_FADE_ENVIRONMENT`] (#5076), the gain the last reply
+    /// chunk ended at; with the duplex mask only, off unless set.
+    onset_fade: Option<f32>,
 }
 impl PlaybackMask {
     pub fn new(policy: TurnTaking) -> Self {
@@ -417,6 +443,7 @@ impl PlaybackMask {
             last_now: 0,
             suppressed_blocks: 0,
             listen_gaps: None,
+            onset_fade: None,
         }
     }
     /// The conservative mask with ears. See the module documentation.
@@ -467,6 +494,40 @@ impl PlaybackMask {
     /// The listening gaps, when on.
     pub fn listen_gaps(&mut self) -> Option<&mut crate::listen_gaps::ListenGaps> {
         self.listen_gaps.as_mut()
+    }
+    /// The reply is lowered to [`ONSET_FADE_FLOOR`] from the first block
+    /// heard over it that could make a yield, until the yield is decided
+    /// ([`ONSET_FADE_ENVIRONMENT`], #5076). A yield or a commit then stops the
+    /// speaker as before; a run that comes to nothing brings the reply back
+    /// over [`ONSET_FADE_RISE_CHUNKS`]. Only with ears.
+    pub fn fade_at_onset(&mut self) {
+        if self.duplex.is_some() {
+            self.onset_fade = Some(1.0);
+        }
+    }
+    /// `samples`, the reply's next chunk for the speaker, at the fade's
+    /// level ([`Self::fade_at_onset`]): ramped across the chunk from where
+    /// the last one ended, so the speaker never steps. As they are with the
+    /// switch off, or at full level.
+    pub fn fade(&mut self, samples: &mut [i16]) {
+        let (Some(gain), Some(duplex)) = (self.onset_fade.as_mut(), self.duplex.as_ref()) else {
+            return;
+        };
+        let from = *gain;
+        let to = if duplex.interruption.onset_run() > 0 {
+            ONSET_FADE_FLOOR
+        } else {
+            (from + (1.0 - ONSET_FADE_FLOOR) / f32::from(ONSET_FADE_RISE_CHUNKS)).min(1.0)
+        };
+        *gain = to;
+        if from == 1.0 && to == 1.0 {
+            return;
+        }
+        let n = samples.len() as f32;
+        for (i, sample) in samples.iter_mut().enumerate() {
+            let g = from + (to - from) * (i + 1) as f32 / n;
+            *sample = (f32::from(*sample) * g).round() as i16;
+        }
     }
     /// Whether the speaker's zeros for `owner` from `started_us` are a
     /// listening gap's, not a delivery gap.
