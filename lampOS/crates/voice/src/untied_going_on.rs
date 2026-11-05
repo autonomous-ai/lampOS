@@ -53,6 +53,25 @@
 /// Where the worker reads the switch. `on` or `held`.
 pub const ENVIRONMENT: &str = "LAMP_UNTIED_GOING_ON";
 
+/// With `held`, a grace after the lamp's own answer (#5124,
+/// `LAMP_UNTIED_ANSWER_GRACE=on`, off unless set): a line begun within
+/// [`ANSWER_GRACE`] of the end of the lamp's answer to the conversation's
+/// caller keeps the conversation's tie whatever its words, as a person who
+/// answers you right after you spoke is talking to you. One line an answer,
+/// never after a notice or a timer's line, never with another face seen
+/// speaking, and needs no voice print. On lamp-c0a4's busy_day (#4175's
+/// 3+3, 3 Nov), `held` held the caller's c03, "I don't know. I'll probably
+/// just work late tomorrow.", begun 2 s after the lamp's answer, and every
+/// line after it.
+pub const GRACE_ENVIRONMENT: &str = "LAMP_UNTIED_ANSWER_GRACE";
+
+/// How long after the lamp's answer ends a line keeps the tie with
+/// [`GRACE_ENVIRONMENT`].
+pub const ANSWER_GRACE: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// What a line kept by the grace is let out as, for the journal.
+pub const GRACE_KEPT: &str = "begun within 3 s of the end of the lamp's answer to the conversation's caller, it keeps the conversation's tie by LAMP_UNTIED_ANSWER_GRACE";
+
 /// What an untied line is held as, with `LAMP_UNTIED_GOING_ON=held`.
 pub const HELD: &str = "a conversation with the lamp is going on, but the line has no tie to the lamp: no reply to its question, no word of its last answer, no ask of the lamp";
 
@@ -64,6 +83,27 @@ pub fn on() -> bool {
 /// Whether an untied line is held, not told (`held`, #5008).
 pub fn held() -> bool {
     held_for(std::env::var(ENVIRONMENT).ok().as_deref())
+}
+
+/// Whether the grace after the lamp's answer is on in this process's
+/// environment (`on` only, [`GRACE_ENVIRONMENT`]).
+pub fn grace() -> bool {
+    grace_for(std::env::var(GRACE_ENVIRONMENT).ok().as_deref())
+}
+
+fn grace_for(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// Whether a line begun at `began_us` began within [`ANSWER_GRACE`] of the
+/// end of the lamp's answer, played by `until_us` (both on the monotonic
+/// clock), and not before it: a line begun over the answer is not in it.
+/// Never with no answer played yet (`until_us` 0) or no start known.
+pub fn in_grace(began_us: u64, until_us: u64) -> bool {
+    began_us != 0
+        && until_us != 0
+        && began_us >= until_us
+        && began_us <= until_us.saturating_add(ANSWER_GRACE.as_micros() as u64)
 }
 
 fn on_for(value: Option<&str>) -> bool {
@@ -555,6 +595,20 @@ const ASKS_FOR_ADVICE: &[&str] = &[
 /// after a held desk line, a thanks may be a person's to another. With
 /// `no_name_set_off`, desk talk as [`desk_talk_read`] reads it.
 pub fn replies_to_the_lamp(heard: &str, no_name_set_off: bool) -> bool {
+    reply_names_someone(heard) == Some(false) && !desk_talk_read(heard, no_name_set_off)
+}
+
+/// Whether `heard` opens with a reply ([`REPLIES`], after any of
+/// [`REPLY_LEADS`]) that names someone right after it ("Thanks Sam, I'll
+/// send it after lunch."): a reply to them, not to the lamp, whenever it
+/// was said (#5124's grace).
+pub fn names_someone_after_a_reply(heard: &str) -> bool {
+    reply_names_someone(heard) == Some(true)
+}
+
+/// With `heard` opening with a reply, whether a name follows it; `None`
+/// when it opens with none.
+fn reply_names_someone(heard: &str) -> Option<bool> {
     let words = words_of(heard);
     let mut rest = words.as_str();
     while let Some(lead) = REPLY_LEADS
@@ -563,13 +617,10 @@ pub fn replies_to_the_lamp(heard: &str, no_name_set_off: bool) -> bool {
     {
         rest = &rest[lead.len() + 1..];
     }
-    let Some(reply) = REPLIES
+    let reply = REPLIES
         .iter()
         .filter(|reply| rest.starts_with(&format!(" {reply} ")))
-        .max_by_key(|reply| reply.len())
-    else {
-        return false;
-    };
+        .max_by_key(|reply| reply.len())?;
     // The words heard up to the reply's end, and the one after it: a word
     // in capitals there, in the same sentence, is someone's name ("Thanks
     // Sam", "Thanks, Linh"), unless it is the speaker or the lamp.
@@ -589,7 +640,7 @@ pub fn replies_to_the_lamp(heard: &str, no_name_set_off: bool) -> bool {
             && next.chars().next().is_some_and(char::is_uppercase)
             && !["i", "i'm", "i'll", "i've", "i'd", "lamp"].contains(&word.trim())
     });
-    !names_someone && !desk_talk_read(heard, no_name_set_off)
+    Some(names_someone)
 }
 
 /// Whether `heard` asks for advice ([`ASKS_FOR_ADVICE`] opening any part
@@ -672,6 +723,24 @@ mod tests {
         for value in [None, Some("on"), Some("off"), Some("HELD"), Some("hold")] {
             assert!(!held_for(value), "{value:?}");
         }
+    }
+
+    /// #5124's grace: `on` only, and a line begun from the answer's end to
+    /// 3 s after it, never over the answer or with none played.
+    #[test]
+    fn the_grace_is_on_only_and_three_seconds_after_the_answer() {
+        assert!(grace_for(Some("on")));
+        for value in [None, Some(""), Some("off"), Some("ON"), Some("held")] {
+            assert!(!grace_for(value), "{value:?}");
+        }
+        let end = 20_000_000;
+        assert!(in_grace(end, end));
+        assert!(in_grace(end + 2_000_000, end), "c03, 2 s after");
+        assert!(in_grace(end + 3_000_000, end));
+        assert!(!in_grace(end + 3_000_001, end));
+        assert!(!in_grace(end - 1, end), "over the answer");
+        assert!(!in_grace(end, 0), "no answer played");
+        assert!(!in_grace(0, end), "no start known");
     }
 
     /// #3882's desk1 lines, after the lamp's Saigon answer, show no tie.

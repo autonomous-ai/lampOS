@@ -1763,6 +1763,8 @@ fn second_route_worker_environment(
         crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
         // Untied talk keeps no conversation going (#3882).
         crate::untied_going_on::ENVIRONMENT,
+        // With `held`, a grace after the lamp's answer (#5124).
+        crate::untied_going_on::GRACE_ENVIRONMENT,
         // A skill made by this worker's own chat (Fourteen's proposal on #4710),
         // the only maker since 3 Nov.
         crate::made_skill::ENVIRONMENT,
@@ -1955,6 +1957,7 @@ mod tests {
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
             crate::untied_going_on::ENVIRONMENT,
+            crate::untied_going_on::GRACE_ENVIRONMENT,
             crate::made_skill::ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::remark_about_it::ENVIRONMENT,
@@ -2677,6 +2680,7 @@ mod tests {
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
                     || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
                     || name == crate::untied_going_on::ENVIRONMENT
+                    || name == crate::untied_going_on::GRACE_ENVIRONMENT
                     || name == crate::made_skill::ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::remark_about_it::ENVIRONMENT
@@ -2910,6 +2914,7 @@ mod tests {
                     "LAMP_TURNED_FACE_SPEAKS=on",
                     "LAMP_TURNED_SPEAKING=on",
                     "LAMP_TWO_FACES_HELD=on",
+                    "LAMP_UNTIED_ANSWER_GRACE=on",
                     "LAMP_UNTIED_GOING_ON=on",
                     "LAMP_WINDOW_FROM_START=on",
                 ],
