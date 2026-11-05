@@ -119,6 +119,10 @@ pub mod known;
 /// (#4333, `docs/owner-place.md`).
 pub mod owner_place;
 
+/// The voice and character the owner chose in the app (#5394,
+/// `docs/chosen-voice.md`).
+pub mod chosen_voice;
+
 /// The safe shutdown's line (#3697, `docs/shutdown.md`): said by
 /// `lamp-setup shutdown-now` and rendered ahead into the voice's speech
 /// cache, which is keyed by these exact words, so both take them from here.

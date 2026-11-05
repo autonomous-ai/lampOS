@@ -420,9 +420,13 @@ impl ProviderConfig {
     /// The configured character and language without the injected setup name.
     /// Used after a forget, when prior personal context must not be copied.
     pub(crate) fn instruction_without_person(&self, camera: bool) -> io::Result<String> {
-        Ok(crate::language::instruction(
-            self.character(camera)?,
-            crate::language::from_environment(),
+        // The owner's own words for the character (#5394), after it.
+        Ok(crate::chosen_voice::with_character(
+            crate::language::instruction(
+                self.character(camera)?,
+                crate::language::from_environment(),
+            ),
+            |name| std::env::var_os(name),
         ))
     }
 

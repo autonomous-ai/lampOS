@@ -1860,6 +1860,8 @@ fn second_route_worker_environment(
         // The owner's place for a question that needs one, and cleared
         // with the owner's forget everything (#4333).
         crate::owner_place::ENVIRONMENT,
+        // The owner's chosen voice and character words (#5394).
+        lamp_msgs::chosen_voice::ENVIRONMENT,
         crate::second_provider::net::key_terms::ENVIRONMENT,
         // Each turn told the light as `light/state` says it now (lamp-52e6,
         // 4 Nov: "what colour is the light?" guessed "White").
@@ -2789,6 +2791,7 @@ mod tests {
                     || name == crate::known_faces::RECORD_TOLD_ENVIRONMENT
                     || name == crate::second_config::OWN_KEYS_ENV
                     || name == crate::owner_place::ENVIRONMENT
+                    || name == lamp_msgs::chosen_voice::ENVIRONMENT
                 {
                     "on"
                 } else if name == crate::remember::FORGET_ASKED_ENVIRONMENT {
@@ -2870,6 +2873,7 @@ mod tests {
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_BUSY_CALLED_STRICT=on",
                     "LAMP_BUSY_ENDS_SOONER=on",
+                    "LAMP_CHOSEN_VOICE=on",
                     "LAMP_CONVERSATION_CARRIED_SAVES=on",
                     "LAMP_CONVERSATION_CARRIES=on",
                     "LAMP_CONVERSATION_CARRIES_PAST_SILENT=on",
