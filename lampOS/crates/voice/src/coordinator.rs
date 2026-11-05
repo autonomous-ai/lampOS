@@ -16445,7 +16445,7 @@ struct MuteRevocation {
 fn revoke_for_mute(
     owner: &mut Controller,
     reply: &mut Option<Reply>,
-    mut publish: impl FnMut(Snapshot) -> io::Result<()>,
+    publish: impl FnMut(Snapshot) -> io::Result<()>,
 ) -> MuteRevocation {
     // Taken, so the cleanup's `cancel_reply` after it finds none.
     let cancelled = reply.take().map(|current| {
@@ -16454,16 +16454,44 @@ fn revoke_for_mute(
         let _ = owner.cancel_turn(now(), current.owner);
         (current, monotonic_us())
     });
-    let _ = owner.set_camera_permission(now(), Permission::Denied);
-    let _ = owner.set_microphone_permission(now(), Permission::Denied);
+    let camera = owner.set_camera_permission(now(), Permission::Denied);
+    let microphones = owner.set_microphone_permission(now(), Permission::Denied);
     let unpublished = match owner.snapshot(now()) {
-        Ok(snapshot) => publish(snapshot).err().map(|error| error.to_string()),
+        Ok(snapshot) => publish_denied_only(snapshot, &camera, &microphones, publish),
         Err(error) => Some(error.to_string()),
     };
     MuteRevocation {
         cancelled,
         unpublished,
     }
+}
+
+/// Publishes the mute's snapshot only if it grants nothing
+/// ([`crate::privacy_bus::denied_only`]): were a setter ever to refuse, a
+/// snapshot still granting a microphone, the camera or a turn is never
+/// sent as the mute's, and why is returned to be recorded, as a failed
+/// publish is (the first builder's P3 on #5269).
+fn publish_denied_only(
+    snapshot: Snapshot,
+    camera: &std::result::Result<(), lamp_turn_owner::Error>,
+    microphones: &std::result::Result<(), lamp_turn_owner::Error>,
+    publish: impl FnOnce(Snapshot) -> io::Result<()>,
+) -> Option<String> {
+    if crate::privacy_bus::denied_only(snapshot) {
+        return publish(snapshot).err().map(|error| error.to_string());
+    }
+    let refused = |what: &str, result: &std::result::Result<(), lamp_turn_owner::Error>| {
+        result
+            .as_ref()
+            .err()
+            .map(|error| format!("; {what} refused Denied: {error}"))
+            .unwrap_or_default()
+    };
+    Some(format!(
+        "the snapshot after the mute still grants, so it was not published{}{}",
+        refused("the camera", camera),
+        refused("the microphones", microphones)
+    ))
 }
 
 /// Records what [`revoke_for_mute`] did: the reply it cancelled, finished as
@@ -16815,6 +16843,46 @@ mod tests {
         assert!(crate::privacy_bus::denied_only(
             owner.snapshot(super::now()).unwrap()
         ));
+    }
+
+    /// A snapshot that still grants (a setter refused) is never published as
+    /// the mute's: why is returned, to be recorded as a failed publish is
+    /// (the first builder's P3 on #5269). A Denied-only one is published.
+    #[test]
+    fn a_mute_publishes_only_a_snapshot_that_grants_nothing() {
+        let (mut owner, _current, _) = active_reply();
+        let held = owner.snapshot(super::now()).unwrap();
+        assert!(!crate::privacy_bus::denied_only(held), "a turn is held");
+        let refused: std::result::Result<(), lamp_turn_owner::Error> =
+            Err(lamp_turn_owner::Error::StaleOwner);
+        let mut published = Vec::new();
+        let why = super::publish_denied_only(held, &Ok(()), &refused, |snapshot| {
+            published.push(snapshot);
+            Ok(())
+        });
+        assert!(published.is_empty(), "a granting snapshot is not sent");
+        let why = why.unwrap();
+        assert!(
+            why.starts_with("the snapshot after the mute still grants"),
+            "{why}"
+        );
+        assert!(why.contains("the microphones refused Denied"), "{why}");
+        assert!(!why.contains("the camera refused"), "{why}");
+        let turn = held.owner().unwrap();
+        let _ = owner.cancel_turn(super::now(), turn);
+        owner
+            .set_camera_permission(super::now(), Permission::Denied)
+            .unwrap();
+        owner
+            .set_microphone_permission(super::now(), Permission::Denied)
+            .unwrap();
+        let denied = owner.snapshot(super::now()).unwrap();
+        let why = super::publish_denied_only(denied, &Ok(()), &Ok(()), |snapshot| {
+            published.push(snapshot);
+            Ok(())
+        });
+        assert_eq!(why, None);
+        assert_eq!(published, [denied]);
     }
 
     /// The same mute when its publish fails: the controller is Denied with
