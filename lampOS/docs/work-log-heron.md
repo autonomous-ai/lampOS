@@ -517,3 +517,16 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   (`holder_may` mutation caught). #4579 869bd94832 (lease-cap and
   900-byte mutations caught; body clamps any finite look). #4526 90c52a59ba
   (stop and drop-in mutations caught; P3 unit hardening, retry-off).
+- 13:0x: #5336 READ-OK d4dfa360d7 (HPKE pinned to RFC 9180 A.2.1; AAD,
+  cancel and say_pin mutations caught; small-order equivalent via ring);
+  the broker-rewrite race written out as the accepted risk. Corrected my
+  #4526 note: the answer.rs lists are switch groups, not owner-only; the
+  owner is the account channel.
+- 13:3x: #4526 READ-OK restated at ca14a39262 (two fixture hashes checked,
+  KINDS 55; the red notes test fixed by #4568's base; I hadn't run
+  lampos-promote notes). #5396 READ-OK 4ca3fad661, P3 confirmed by run: a
+  declined forget-everything's "Okay, I'll keep it." is asked again and
+  can end in NOT_KEPT_LINE.
+- 13:4x: #5388 HOLD 23db64e13c with the Reviewer-lead's P2 (stop_failed
+  sends Stop without holding; same Linux loss); renew's hold mutation
+  survives on macOS. #5185 merged in train 640, no read owed.
