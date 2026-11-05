@@ -44,7 +44,10 @@
 //! right after the lamp's own answer, with nothing held between and in no
 //! sure other voice, that replies to it ([`replies_to_the_lamp`]:
 //! "Thanks.", "That's a good idea.") or an ask of its advice
-//! ([`asks_for_advice`]: "Any tips to sleep better tonight?"). With `on`,
+//! ([`asks_for_advice`]: "Any tips to sleep better tonight?"), and,
+//! anywhere in the conversation, a question of what or who the speaker's
+//! own is or was ([`asks_of_their_own`]: "Nice. And what was my sister's
+//! name again?", held as untied on lamp-52e6 on 5 Nov 08:07). With `on`,
 //! as before.
 
 /// Where the worker reads the switch. `on` or `held`.
@@ -201,6 +204,24 @@ const ASKS_OF_A_KNOWER: &[&str] = &[
     "was that",
     "are there",
     "will there",
+];
+
+/// Words that, opening a question after any of [`ASK_LEADS`], ask what or
+/// who the speaker's own is or was, of the one who knows them: "And what
+/// was my sister's name again?" (#5110, `talk_sis-3`), "What's my wifi
+/// password?". Not of where a thing is ("Where's my charger?", asked of
+/// the room), and not of the one asked ("What was your sister's name?").
+/// Read with "what's" whole, as [`words_of`] keeps it. Only `held` reads
+/// them ([`asks_of_their_own`]).
+const ASKS_OF_THEIR_OWN: &[&str] = &[
+    "what was my",
+    "what were my",
+    "what is my",
+    "what's my",
+    "what are my",
+    "who was my",
+    "who is my",
+    "who's my",
 ];
 
 /// Words that ask for the lamp's own work at a line's start, its light,
@@ -593,6 +614,30 @@ pub fn asks_for_advice(heard: &str, no_name_set_off: bool) -> bool {
         && !desk_talk_read(heard, no_name_set_off)
 }
 
+/// Whether `heard` asks what or who the speaker's own is or was
+/// ([`ASKS_OF_THEIR_OWN`] opening any part of a question, after any of
+/// [`ASK_LEADS`]) with no sign of desk talk ([`desk_talk`]): "Nice. And
+/// what was my sister's name again?". With `held`, the worker ties such a
+/// line wherever it comes in the conversation, as the lamp is the one who
+/// keeps what the person told it. With `no_name_set_off`, desk talk as
+/// [`desk_talk_read`] reads it.
+pub fn asks_of_their_own(heard: &str, no_name_set_off: bool) -> bool {
+    let asks = |part: &str| {
+        let words = words_of(part);
+        let rest = ASK_LEADS
+            .iter()
+            .filter(|lead| words.starts_with(&format!(" {lead} ")))
+            .max_by_key(|lead| lead.len())
+            .map_or(words.as_str(), |lead| &words[lead.len() + 1..]);
+        ASKS_OF_THEIR_OWN
+            .iter()
+            .any(|phrase| rest.starts_with(&format!(" {phrase} ")))
+    };
+    heard.contains('?')
+        && heard.split([',', '.', ';', '!', '?']).any(asks)
+        && !desk_talk_read(heard, no_name_set_off)
+}
+
 /// Whether a line let out only as the conversation going on is tied to the
 /// lamp by its words: it refers back, shares a content word with what the
 /// lamp last said or the line that was to (`said`), or asks the lamp a
@@ -921,5 +966,49 @@ mod tests {
         ] {
             assert!(!opens_with_a_set_off_name(line), "{line}");
         }
+    }
+
+    /// #5110 (Seventh, lamp-52e6, 5 Nov 08:07, sw5008f): `talk_sis-3`,
+    /// "Nice. And what was my sister's name again?", asks the lamp what it
+    /// knows of the person's own, after an answer sharing no word with it,
+    /// and was held as untied. A question of what or who the speaker's own
+    /// is or was asks the one who knows them; one about the one asked
+    /// ("your"), of where a thing is, a statement, or one with desk talk
+    /// does not. Only `held` reads it: `tied`, as `on` reads it, is
+    /// unchanged.
+    #[test]
+    fn a_question_of_the_speakers_own_asks_the_lamp() {
+        let said = [
+            "What should I cook tonight?",
+            "Try a warm noodle soup with ginger.",
+        ];
+        for line in [
+            "Nice. And what was my sister's name again?",
+            "What was my sister's name again?",
+            "What's my sister's name?",
+            "What is my wifi password?",
+            "Who was my doctor again?",
+            "Okay, what were my plans for Saturday?",
+            "Can you please... what's my sister's name?",
+        ] {
+            assert!(asks_of_their_own(line, false), "{line}");
+        }
+        assert!(!tied("Nice. And what was my sister's name again?", &said));
+        for line in [
+            "What was your sister's name again?",
+            "Where's my charger?",
+            "Sam, what was my sister's name again?",
+            "What was my sister's name again, you guys?",
+            "Hey Sam, what's my sister's name?",
+            "My sister's name was hard to spell.",
+            "What was my sister's name, I forget.",
+            "Did you send the slides to Sam yet?",
+            "What time is my meeting?",
+        ] {
+            assert!(!asks_of_their_own(line, false), "{line}");
+        }
+        // A set-off word the rule reads as no one's name is the lamp's.
+        let line = "Ma'am, what was my sister's name again?";
+        assert!(!asks_of_their_own(line, false) && asks_of_their_own(line, true));
     }
 }

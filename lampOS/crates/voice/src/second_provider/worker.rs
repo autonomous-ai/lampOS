@@ -7044,9 +7044,11 @@ impl Heeding {
     }
 
     /// With `LAMP_UNTIED_GOING_ON=held` (#5110), why a line with no tie by
-    /// [`Self::tied_to_the_lamp`] is still the caller's own, if it is: said
-    /// right after the lamp's own answer, with no held line between, it
-    /// replies to it ("Thanks.", "That's a good idea.",
+    /// [`Self::tied_to_the_lamp`] is still the caller's own, if it is: it
+    /// asks what the lamp knows of the person's own ("And what was my
+    /// sister's name again?", [`crate::untied_going_on::asks_of_their_own`]);
+    /// or, said right after the lamp's own answer, with no held line
+    /// between, it replies to it ("Thanks.", "That's a good idea.",
     /// [`crate::untied_going_on::replies_to_the_lamp`]) or asks its advice
     /// ("Any tips to sleep better tonight?",
     /// [`crate::untied_going_on::asks_for_advice`]). Never in a sure other
@@ -7063,6 +7065,11 @@ impl Heeding {
         let heard = seen.heard.as_str();
         if seen.other_voice || crate::untied_going_on::desk_talk_read(heard, no_name_set_off) {
             return None;
+        }
+        // Asking what the lamp knows of the person's own ties it anywhere in
+        // the conversation (#5110, `talk_sis-3`).
+        if crate::untied_going_on::asks_of_their_own(heard, no_name_set_off) {
+            return Some("it asks what the lamp knows of their own");
         }
         // The line judged before this one is the one the lamp answered
         // last: nothing was held between its answer and this line.
