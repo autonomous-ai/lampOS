@@ -1852,7 +1852,9 @@ makes is rejected, and the ping sends that same login as its bearer, so it can't
 get a new one by itself: a person has to set it up again. With
 `LAMP_SIGNED_OUT=on`, `lamp-cloud` works this out from the ping's answers
 (`crate::signed_out`) and tells the voice and the app. Off unless set; without
-it no count is kept, no topic is said and no field is added.
+it no field is added and the voice holds no turn, and the count is kept and
+`account/state` said only with `LAMP_SERVICES=on`, so the services' tokens and
+the owner's kept voice print are wiped ([services.md](services.md)).
 
 - **What counts.** Only the ping's answer that refuses the login. A timeout, a
   failed connection, a failing backend, any other refusal, a redirect or a reply
@@ -2126,8 +2128,9 @@ root's `lamp-services` on `/run/lampos-services/admin.sock` (in the unit's
   (`gmail-app`, a Lamp 2's send-only Google sign-in for Gmail, is one).
 - `can` lists `services` and `services.list` only while the switch is on and
   the admin socket is there.
-- **Signed out** (`LAMP_SIGNED_OUT=on` too): every token wiped once a spell
-  with `{"op":"wipe"}`.
+- **Signed out** (whatever `LAMP_SIGNED_OUT` says): every token wiped once a
+  spell with `{"op":"wipe"}`, and the voice removes the owner's kept voice
+  print with them.
 
 The services, their reads and writes, the voice's functions and its send
 gate are in [services.md](services.md).

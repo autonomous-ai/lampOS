@@ -18,8 +18,9 @@
 //!   folder of the eyes' [`FACES`]), its own file, written whole through
 //!   [`Store::write`]; one that is not a root-owned 0600 regular file is
 //!   never read, and is removed ([`Store::read`]).
-//! - **Wiped by the reset plan** (`crates/setup/fixtures/reset-plan-product.json`)
-//!   and by the owner's "forget everything" ([`forget_with_everything`]).
+//! - **Wiped by the reset plan** (`crates/setup/fixtures/reset-plan-product.json`),
+//!   by the owner's "forget everything" ([`forget_with_everything`]), and
+//!   by a sign-out, with the services' tokens ([`watch_sign_outs`]).
 //! - **Never sent anywhere or backed up:** nothing names it but this module
 //!   and the reset plans, and no part but the voice's own callers names this
 //!   module (`nothing_but_the_reset_names_the_print`).
@@ -76,6 +77,9 @@ pub const LEAST_LINES: usize = 2;
 pub const LEAST_SPEECH: usize = same_voice::RATE * 3;
 /// The most a kept file may be.
 const MOST_BYTES: u64 = 1 << 20;
+/// How often `account/state` is read for a sign-out ([`watch_sign_out`]):
+/// under its 15 s lifespan, so no spell is missed.
+const READ_ACCOUNT_EVERY: Duration = Duration::from_secs(5);
 /// Lines whose print is still to come, waited for.
 const WAITING_LINES: usize = 8;
 /// The most of the lamp's words kept to find the ask in.
@@ -718,6 +722,89 @@ pub fn enable() {
     enable_with(Store::product(), same_voice::to_stderr());
 }
 
+/// With [`enable`], on the worker's bus at `bus_root`: the owner's print is
+/// removed on a sign-out, in a thread of its own ([`watch_sign_out`]).
+/// Without a bus, it is not, and the journal says so.
+pub fn watch_sign_outs(bus_root: Option<&Path>) {
+    let Some(bus) = bus_root.and_then(|root| lamp_bus::Bus::new(root).ok()) else {
+        eprintln!("lamp-voice: owner print: a sign-out is not watched: no bus");
+        return;
+    };
+    let journal = same_voice::to_stderr();
+    let started = std::thread::Builder::new()
+        .name("owner-print-sign-out".into())
+        .spawn(move || watch_sign_out(&bus, &Store::product(), &journal));
+    if let Err(error) = started {
+        eprintln!(
+            "lamp-voice: owner print: a sign-out is not watched: {}",
+            error.kind()
+        );
+    }
+}
+
+/// A sign-out's spells as `account/state` says them (`lamp-cloud`, with
+/// `LAMP_SERVICES=on` whatever `LAMP_SIGNED_OUT` says): one begins once.
+#[derive(Default)]
+struct SignOut {
+    out: bool,
+}
+
+impl SignOut {
+    /// Takes what was read: whether a spell begins. A state past its
+    /// lifespan, or none, is signed in, as the voice reads it
+    /// (`coordinator::signed_out`): a stopped `lamp-cloud` wipes nothing.
+    fn began(&mut self, state: Option<lamp_msgs::AccountState>) -> bool {
+        let out = state.is_some_and(|state| state.signed_out);
+        let began = out && !self.out;
+        self.out = out;
+        began
+    }
+}
+
+/// `account/state` on `bus`, when it is said and not past its lifespan.
+fn account(bus: &lamp_bus::Bus) -> Option<lamp_msgs::AccountState> {
+    bus.latest(lamp_msgs::AccountState::TOPIC)
+        .ok()
+        .flatten()
+        .filter(|message| !message.expired)
+        .and_then(|message| message.parse().ok())
+}
+
+/// Reads `account/state` every [`READ_ACCOUNT_EVERY`], for good: each
+/// sign-out spell that begins, or is under way at start, removes the
+/// owner's print ([`wipe_signed_out`]), as `lamp-cloud` wipes the
+/// services' tokens for it.
+pub fn watch_sign_out(bus: &lamp_bus::Bus, store: &Store, journal: &Journal) -> ! {
+    let mut spell = SignOut::default();
+    loop {
+        if spell.began(account(bus)) {
+            wipe_signed_out(store, journal);
+        }
+        std::thread::sleep(READ_ACCOUNT_EVERY);
+    }
+}
+
+/// The lamp is signed out: the owner's print goes with the services'
+/// tokens, through the same removal as "forget everything" ([`wipe`]).
+fn wipe_signed_out(store: &Store, journal: &Journal) {
+    let said = match wipe(store) {
+        Ok(true) => "signed out: wiped with the services' tokens".to_owned(),
+        Ok(false) => "signed out: none was kept".to_owned(),
+        Err(error) => format!(
+            "signed out: could not be wiped with the services' tokens: {}",
+            error.kind()
+        ),
+    };
+    journal(&format!("lamp-voice: owner print: {said}"));
+}
+
+/// Remove the print, and drop the ask and learning under way: whether there
+/// was one.
+fn wipe(store: &Store) -> io::Result<bool> {
+    with(State::forget);
+    store.wipe()
+}
+
 /// [`enable`] with its store and journal.
 pub fn enable_with(store: Store, journal: Journal) {
     kept::state(|state| *state = Some(State::new(store, journal)));
@@ -807,8 +894,7 @@ pub(crate) fn forget_if(
     if !emptied || !theirs {
         return told;
     }
-    with(State::forget);
-    match store.wipe() {
+    match wipe(store) {
         Ok(true) => {
             eprintln!("lamp-voice: owner print: wiped with everything about them");
             told.0["voice_print"] = json!("forgotten too");
@@ -1231,6 +1317,75 @@ mod tests {
         let told = forget_if(&store, emptied, Some(OWNER), &owners);
         assert_eq!(told.0["voice_print"], "forgotten too");
         assert!(!store.path.exists() && !store.new_path().exists());
+    }
+
+    /// A sign-out spell removes the print and its half-written copy once,
+    /// learning under way dropped, and says so; one with none kept is fine;
+    /// a state past its lifespan, none, or signed in removes nothing.
+    #[test]
+    fn a_sign_out_wipes_the_owners_print() {
+        use lamp_msgs::AccountState;
+        let dir = folder("sign-out");
+        let store = store(&dir);
+        let kept = Kept {
+            owner: OWNER.into(),
+            print: vec![1.0],
+            lines: 4,
+            speech_ms: 6_000,
+            declined: false,
+            at_unix_ms: 1,
+        };
+        let said = Arc::new(Mutex::new(Vec::<String>::new()));
+        let into = said.clone();
+        let journal: Journal = Arc::new(move |line: &str| into.lock().unwrap().push(line.into()));
+        // Learning under way in this thread's state.
+        enable_with(store.clone(), journal.clone());
+        with(|state| {
+            state.stage = Stage::Learning {
+                owner: OWNER.into(),
+                from: 1,
+                at: Instant::now(),
+                lines: Vec::new(),
+            }
+        });
+        // The state as `lamp-cloud` says it, on a bus of the test's own.
+        let bus = lamp_bus::Bus::new(dir.join("bus")).unwrap();
+        let mut spell = SignOut::default();
+        assert!(!spell.began(account(&bus)), "none said: signed in");
+        let mut publisher = bus
+            .publisher_declared(AccountState::TOPIC, &AccountState::declaration(), "cloud")
+            .unwrap();
+        publisher
+            .publish_json(lamp_ipc::monotonic_us(), &AccountState::default())
+            .unwrap();
+        assert!(!spell.began(account(&bus)), "signed in");
+        store.write(&kept).unwrap();
+        std::fs::write(store.new_path(), b"half").unwrap();
+        let out = AccountState {
+            signed_out: true,
+            for_s: 0,
+        };
+        publisher
+            .publish_json(lamp_ipc::monotonic_us(), &out)
+            .unwrap();
+        assert!(spell.began(account(&bus)));
+        wipe_signed_out(&store, &journal);
+        assert!(!store.path.exists() && !store.new_path().exists());
+        assert!(with(|state| matches!(state.stage, Stage::Idle)).unwrap());
+        // The same spell read again begins nothing; with none kept, a new
+        // spell is fine.
+        assert!(!spell.began(Some(out)));
+        assert!(!spell.began(None));
+        assert!(spell.began(Some(out)));
+        wipe_signed_out(&store, &journal);
+        assert_eq!(
+            *said.lock().unwrap(),
+            [
+                "lamp-voice: owner print: signed out: wiped with the services' tokens",
+                "lamp-voice: owner print: signed out: none was kept",
+            ]
+        );
+        kept::state(|state| *state = None);
     }
 
     /// The product's reset plan wipes the print and its half-written copy.

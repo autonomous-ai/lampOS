@@ -221,20 +221,24 @@ Bị xoá khi:
   quên.
 - **Dấu giọng của chủ đèn** (`/var/lib/lampos-eyes/owner-voice.json`,
   same-voice.md, "The owner's voice print") không phải token: nó bị xoá bởi
-  kế hoạch reset và bởi "quên mọi thứ" của chủ đèn, không bao giờ bởi việc gỡ
-  một dịch vụ.
+  kế hoạch reset, bởi "quên mọi thứ" của chủ đèn và bởi việc đăng xuất, không
+  bao giờ bởi việc gỡ một dịch vụ.
 - **Khôi phục cài đặt gốc:** `/var/lib/lampos-services` là một trong các đường
   dẫn của kế hoạch reset (`crates/setup/fixtures/reset-plan-product.json`,
   hash được thêm vào `RESET_PLAN_SHIPPED`; [setup.md](../setup.md)).
 - **Đăng xuất:** mỗi khi `LAMP_SERVICES=on`, bất kể `LAMP_SIGNED_OUT` nói gì,
   `lamp-cloud` đếm các câu trả lời của ping để phát hiện đăng xuất
-  (`watches_login`; nó chỉ báo việc đó cho bus và ứng dụng khi có
-  `LAMP_SIGNED_OUT=on`). Một khi nó thấy đèn đã đăng xuất
+  (`watches_login`) và báo việc đó trên `account/state` (nó chỉ báo cho ứng
+  dụng, và voice chỉ giữ lượt, khi có `LAMP_SIGNED_OUT=on`). Một khi nó thấy
+  đèn đã đăng xuất
   ([cloud.md](../cloud.md), "Signed out"), nó yêu cầu `{"op":"wipe"}`: mọi
   file trong thư mục bị xoá, thư mục được giữ, mọi lần ghi đang chờ bị quên.
   Một lần mỗi đợt; thử lại mỗi 30 s khi nó thất bại và đèn vẫn đăng xuất, và
   thêm một lần ở đợt kế tiếp. Journal ghi "signed out: the services' tokens
-  are wiped", hoặc lý do vì sao không.
+  are wiped", hoặc lý do vì sao không. Voice, tiến trình sở hữu dấu giọng của
+  chủ đèn, đọc `account/state` mỗi 5 s và xoá dấu giọng cùng các token một lần
+  mỗi đợt (`owner_voice::watch_sign_outs`, "owner print: signed out: wiped with
+  the services' tokens").
 
 `list` và `services_connected` cho biết code của một dịch vụ, tài khoản của
 nó và `expired` (hết hạn mà không có refresh token, nên cần liên kết lại),
