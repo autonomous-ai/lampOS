@@ -81,6 +81,7 @@ impl Running {
             set_up_later: None,
             sign_in_by_code: false,
             app_socket: None,
+            app_caller: lamp_tasks::runtime::app_caller_is_lamp_cloud,
             report_every: REPORT_EVERY,
             daemon_retry_after: lamp_tasks::runtime::DAEMON_RETRY_AFTER,
         };
