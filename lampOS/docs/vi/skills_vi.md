@@ -123,7 +123,12 @@ sau:
      `cooldown`, `rearm` và `during`, trigger khác "đèn nghỉ" hoặc "có/không
      có người", hay bước khác một lệnh đèn (`colour`, `level`, `for`, hoặc
      chỉ `dim`) hoặc một cử chỉ (`nod`, `curious`) đều bị từ chối, và được
-     sửa một lần như lỗi của bước kiểm tra. Trên lamp-0c89, mô hình của đèn
+     sửa một lần như lỗi của bước kiểm tra (dòng của `PLAIN_ONLY`; khi bật
+     đọc, thêm `PLAIN_OR_READ`: với kỹ năng đọc một dịch vụ đã liên kết,
+     chỉ một bước `[[do]]`, đúng bước đọc như bản tóm tắt đưa ra. Trên
+     lamp-9adf, 13:26 ngày 5/11, một lần tạo từ ứng dụng "Read me my latest
+     email when I sit down at my desk." bị từ chối hai lần vì lần sửa chỉ
+     được dặn đèn và cử chỉ). Trên lamp-0c89, mô hình của đèn
      đã giữ "when someone says good night, dim the light slowly over a
      minute" thành bất kỳ phút yên lặng nào từ 22:00 đến 22:30, dưới mô tả
      của chính nó về điều được yêu cầu.

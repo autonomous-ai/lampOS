@@ -2164,7 +2164,11 @@ gone ([switches.md](switches.md)). What happens:
      continuation lines too), in `made.json`, in the app and in what the
      lamp says; the model is told to say it leaving nothing out, not to
      sum it up. Refused, and repaired once as a check's refusal is
-     (`PLAIN_ONLY`'s line):
+     (`PLAIN_ONLY`'s line; with reads on it goes on with `PLAIN_OR_READ`:
+     for a read of a linked service, only one `[[do]]` step, the brief's
+     read step exactly as the brief gives it. On lamp-9adf, 5 Nov 13:26,
+     an app make of "Read me my latest email when I sit down at my desk."
+     was refused twice, the repair told only lights and gestures):
      - any top-level part but `kind`, `version`, `needs`, `format`,
        `permissions`, one `[trigger]` table, `[ask]` and `[[do]]`, so a
        `[quiet]`, `[[while]]`, `most_a_day`, `[budget]` or `[rest]` that
@@ -2198,6 +2202,7 @@ gone ([switches.md](switches.md)). What happens:
      package's description as well. Both markers are read in any case.
    - Tests: `made_skill::tests::what_it_does_is_said_from_its_toml`,
      `what_it_cant_say_is_refused_with_lines_for_a_repair`,
+     `with_reads_on_the_repair_lines_keep_the_read_step`,
      `a_cannot_answer_is_said_and_makes_nothing`,
      `a_repairs_brief_carries_the_checks_lines_and_still_fits`,
      `a_failed_check_gives_its_lines_with_the_folder_replaced`, and
