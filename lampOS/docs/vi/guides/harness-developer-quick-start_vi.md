@@ -1,10 +1,10 @@
 # Lập trình đèn từ máy tính: bắt đầu nhanh cho nhà phát triển
 
-Trang này tóm tắt [harness-developer-quick-start.md](../../guides/harness-developer-quick-start.md), bằng tiếng Anh; nếu hai trang khác nhau, bản tiếng Anh đúng. **Bản nháp cho #5413**: chưa đăng cho đến khi trưởng nhóm SDK kiểm tra các dòng ghi TO CHECK.
+Trang này tóm tắt [harness-developer-quick-start.md](../../guides/harness-developer-quick-start.md), bằng tiếng Anh; nếu hai trang khác nhau, bản tiếng Anh đúng.
 
 ## Bạn nhận được gì
 
-- **Ghép đôi một máy tính với đèn.** Chủ đèn ghép một lần bằng một mã, chọn quyền cho máy đó, và có thể thu hồi bất cứ lúc nào. Màn hình *Add a developer computer* của ứng dụng sẽ tạo mã này nhưng tài liệu vẫn ghi là chưa xong; trong lúc đó người giữ đèn tạo mã. Người luôn thắng: tay đặt lên đầu đèn, "stop", công tắc riêng tư hay một cuộc trò chuyện đều lấy lại quyền điều khiển.
+- **Ghép đôi một máy tính với đèn.** Chủ đèn ghép một lần bằng một mã, chọn quyền cho máy đó, và có thể thu hồi bất cứ lúc nào. Màn hình *Add a developer computer* của ứng dụng sẽ tạo mã này nhưng chưa ra mắt; trong lúc đó người giữ đèn tạo mã. Người luôn thắng: tay đặt lên đầu đèn, "stop", công tắc riêng tư hay một cuộc trò chuyện đều lấy lại quyền điều khiển.
 - **SDK** Python và JavaScript (`lampos`): sự kiện, trạng thái và hành động, mỗi thứ cần một quyền chủ đèn đã cấp.
 - **Đèn giả** trên máy của bạn, để thử mà không cần đèn.
 - Ngoài ra: `lamp-mcp` cho tác tử và kỹ năng đẩy lên đèn.
@@ -13,7 +13,7 @@ Harness và SDK là hai cánh cửa khác nhau: SDK nói chuyện với đèn t�
 
 ## Hôm nay chạy được gì
 
-SDK và đèn giả đã merge. `lamp-control` (phía đèn) đã merge nhưng **chưa là một phần của sản phẩm** (PR #4526): chỉ chạy khi `LAMP_CONTROL=on`. Màn hình *Add a developer computer* **chưa xong** theo tài liệu (docs/develop.md:259-262). TO CHECK (trưởng nhóm SDK, di động): có trong bản TestFlight hay App Store chưa.
+SDK và đèn giả đã merge. `lamp-control` (phía đèn) đã merge nhưng **chưa là một phần của sản phẩm**: chỉ chạy khi người giữ đèn bật `LAMP_CONTROL=on`. Màn hình *Add a developer computer* của ứng dụng **chưa ra mắt**.
 
 ## Chạy thử (khoảng 5 phút)
 
@@ -28,11 +28,11 @@ LAMPOS_HOME=/tmp/lampos-try lamp fake
 LAMPOS_HOME=/tmp/lampos-try python first_light.py
 ```
 
-Terminal 2 in `connected to lamp-fake with [...]` và trạng thái đèn; terminal 1 in bốn yêu cầu: `get`, `light`, `say`, `gesture`. Đã chạy với đèn giả (bản dựng 39fddfe02); **chưa chạy trên đèn thật**.
+Terminal 2 in `connected to lamp-fake with [...]` và trạng thái đèn; terminal 1 in bốn yêu cầu: `get`, `light`, `say`, `gesture` (cùng dòng `said person.arrived` của đèn giả). Đã chạy với đèn giả; **chưa chạy trên đèn thật**.
 
 ## Dùng đèn thật
 
-Lấy mã ghép đôi 8 chữ số kèm pin của đèn (64 ký tự hex), hiệu lực 5 phút, với ba quyền `light`, `speak`, `body`. Dự kiến qua màn hình *Add a developer computer* của ứng dụng (chưa xong); hôm nay người giữ đèn chạy `lamp-control code --grants body,light,speak` bằng quyền root. Rồi:
+Lấy mã ghép đôi 8 chữ số kèm pin của đèn (64 ký tự hex), hiệu lực 5 phút, với ba quyền `light`, `speak`, `body`. Hôm nay người giữ đèn chạy `lamp-control code --grants body,light,speak` bằng quyền root. Rồi:
 
 ```sh
 lamp pair 12345678 --pin <64 ký tự của pin>
