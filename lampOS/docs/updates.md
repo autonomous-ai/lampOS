@@ -156,8 +156,19 @@ It uses `lamp_update::manifest` to verify the signature with the trusted
 public key, schema and supported manifest fields, then checks the sequence,
 commit, immutable payload URL, plain manifest bytes and declared asset hashes
 and sizes. An unsupported manifest, updater level or enum value is refused.
-External model manifests are also refused: the tool does not fetch model
-URLs outside the selected release. Supported settings, image and reset-plan
+A build's signed `models` (every published build carries the product's
+pinned models since #5221) are checked, not refused (#3008): each model's
+URL must be an asset of a published (not draft) release of this repository,
+`https://github.com/autonomous-ai/lampOS/releases/download/<tag>/<name>`,
+the selected build's own release or another such as `models-2026-10-16`,
+and that asset must be there with the size and SHA-256 the envelope signs
+for what the URL fetches: the model's own, or its archive's when the model
+is a member of a pinned `.tgz` (the member is checked by the lamp once
+taken out). Each asset is hashed once, 2 GiB of models at most. A model
+anywhere else (another host or repository, a `file:///` URL), a missing
+release or asset, or a different size or hash refuses the promotion before
+any write, naming the model's path. The inventory reaches stable exactly as
+signed, inside the copied envelope. Supported settings, image and reset-plan
 contents remain signed inline and use the updater's validation. A missing or
 ambiguous source, unsuccessful run, changed asset or unknown signing key
 cannot update the feed.
@@ -246,7 +257,10 @@ the retained asset IDs and job receipt support repair. Other writers must
 not update this alias outside the serialized job.
 
 Offline Rust tests exercise verification, monotonic selection and failed
-promotion/recovery with a disposable key and simulated GitHub responses.
+promotion/recovery with a disposable key and simulated GitHub responses,
+and a model inventory: matching (promoted byte for byte), a missing asset
+or release, different bytes or size, and a URL outside this repository's
+releases.
 The ARM64 workflow runs them; Linux Clippy also checks the standalone tool.
 These tests do not establish a real stable promotion or lamp acceptance.
 

@@ -535,18 +535,132 @@ fn signed_identity_must_match_source_and_fixed_url() {
         assert_eq!(fake.writes, 0);
     }
 }
-#[test]
-fn external_models_are_explicitly_unsupported() {
-    let mut fake = Fake::new(Some(9));
+/// A source build whose signed envelope lists three models (#5221): a plain
+/// one and one inside a pinned archive, both in a models release (id 3),
+/// and one carried in the source build's own release.
+fn with_models(fake: &mut Fake) -> Value {
+    fake.releases.push(Release {
+        id: 3,
+        tag_name: "models-2026-10-16".into(),
+        target_commitish: "c".repeat(40),
+        draft: false,
+        prerelease: false,
+        body: String::new(),
+    });
+    fake.add(3, "face.onnx", b"face model".to_vec());
+    fake.add(3, "runtime.tgz", b"runtime archive".to_vec());
+    let url =
+        |tag: &str, name: &str| format!("https://github.com/{REPO}/releases/download/{tag}/{name}");
     let mut value = payload(10);
-    value["models"] = json!([{"path":"/opt/lampOS/eyes/models/a.bin","url":"https://example.com/a.bin","bytes":1,"sha256":"a".repeat(64)}]);
-    fake.source_payload(value);
-    assert!(
-        promote(&mut fake, &context(10))
-            .unwrap_err()
-            .contains("external model")
-    );
-    assert_eq!(fake.writes, 0);
+    value["models"] = json!([
+        {"path":"/opt/lampOS/eyes/models/face.onnx","url":url("models-2026-10-16","face.onnx"),
+         "bytes":10,"sha256":manifest::sha256_hex(b"face model")},
+        {"path":"/opt/lampOS/voice/current/libruntime.so","url":url("models-2026-10-16","runtime.tgz"),
+         "bytes":4096,"sha256":"d".repeat(64),
+         "archive":{"bytes":15,"sha256":manifest::sha256_hex(b"runtime archive"),"member":"lib/libruntime.so"}},
+        {"path":"/opt/lampOS/name/models/name.onnx","url":url("lampos-lamp-voice-10","name.onnx"),
+         "bytes":10,"sha256":manifest::sha256_hex(b"name model")},
+    ]);
+    fake.source_payload(value.clone());
+    fake.add(1, "name.onnx", b"name model".to_vec());
+    value
+}
+fn model_asset<'a>(fake: &'a mut Fake, name: &str) -> &'a mut (Asset, Vec<u8>) {
+    fake.assets
+        .values_mut()
+        .flatten()
+        .find(|(a, _)| a.name == name)
+        .unwrap()
+}
+#[test]
+fn a_matching_model_inventory_is_promoted_exactly_as_signed() {
+    for previous in [Some(9), None] {
+        let mut fake = Fake::new(previous);
+        let value = with_models(&mut fake);
+        let source = fake.source_bytes();
+        let receipt = promote(&mut fake, &context(10)).unwrap();
+        assert_eq!(receipt.outcome, "promoted");
+        let stable = fake.current().unwrap().1;
+        assert_eq!(stable, source);
+        let (signed, _) = manifest::open(&stable, &public()).unwrap();
+        let listed: Vec<manifest::Model> = serde_json::from_value(value["models"].clone()).unwrap();
+        assert_eq!(signed.models, listed);
+    }
+}
+#[test]
+fn a_missing_model_asset_or_release_refuses_before_writes() {
+    for change in 0..4 {
+        let mut fake = Fake::new(Some(9));
+        with_models(&mut fake);
+        let why = match change {
+            0 => {
+                model_asset(&mut fake, "face.onnx").0.name = "other.onnx".into();
+                "face.onnx: its asset is absent"
+            }
+            1 => {
+                model_asset(&mut fake, "name.onnx").0.name = "other.onnx".into();
+                "name.onnx: its asset is absent"
+            }
+            2 => {
+                fake.releases.retain(|r| r.id != 3);
+                "its release is absent"
+            }
+            3 => {
+                fake.releases.iter_mut().find(|r| r.id == 3).unwrap().draft = true;
+                "its release is not published"
+            }
+            _ => unreachable!(),
+        };
+        let error = promote(&mut fake, &context(10)).unwrap_err();
+        assert!(error.contains(why), "case {change}: {error}");
+        assert_eq!(fake.writes, 0);
+    }
+}
+#[test]
+fn a_model_asset_whose_bytes_or_size_differ_refuses_before_writes() {
+    for (name, grow) in [
+        ("face.onnx", false),
+        ("runtime.tgz", false),
+        ("name.onnx", false),
+        ("face.onnx", true),
+        ("runtime.tgz", true),
+    ] {
+        let mut fake = Fake::new(Some(9));
+        with_models(&mut fake);
+        let item = model_asset(&mut fake, name);
+        if grow {
+            item.1.push(b'!');
+            item.0.size += 1;
+        } else {
+            item.1[0] ^= 1;
+        }
+        let error = promote(&mut fake, &context(10)).unwrap_err();
+        let why = if grow { "size differs" } else { "bytes differ" };
+        assert!(error.contains(why), "{name}: {error}");
+        assert_eq!(fake.writes, 0);
+    }
+}
+#[test]
+fn a_model_outside_this_repository_s_releases_refuses_before_writes() {
+    for url in [
+        "https://example.com/a.bin".to_owned(),
+        "file:///opt/models/a.bin".to_owned(),
+        "https://github.com/someone/lampOS/releases/download/models-2026-10-16/face.onnx"
+            .to_owned(),
+        format!("https://github.com/{REPO}/releases/download/models-2026-10-16/x/face.onnx"),
+        format!("https://github.com/{REPO}/archive/refs/tags/face.onnx"),
+    ] {
+        let mut fake = Fake::new(Some(9));
+        let mut value = with_models(&mut fake);
+        value["models"][0]["url"] = json!(url);
+        fake.source_payload(value);
+        let error = promote(&mut fake, &context(10)).unwrap_err();
+        assert!(
+            error.contains("not a release asset of this repository"),
+            "{url}: {error}"
+        );
+        assert_eq!(fake.writes, 0);
+    }
 }
 #[test]
 fn uncertain_or_duplicate_inventories_refuse() {
