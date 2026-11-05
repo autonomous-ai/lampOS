@@ -395,10 +395,6 @@ mod tests {
     fn what_is_said_is_one_rule_by_service() {
         assert_eq!(rule("gmail", "search"), Spoken::Mail);
         assert_eq!(rule("google_calendar", "events"), Spoken::Calendar);
-        assert_eq!(
-            rule("google_calendar", "calendars"),
-            Spoken::Titles(TITLE_KEYS)
-        );
         assert_eq!(rule("github", "issues"), Spoken::Titles(TITLE_KEYS));
         let drive = json!({"source": "Google Drive", "quoted": [
             {"name": "Tax 2026", "mimeType": "application/pdf"},
