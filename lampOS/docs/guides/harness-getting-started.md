@@ -9,7 +9,7 @@ Your lamp can hand work to the AI helpers on your computer, such as Claude Code.
 You talk to the lamp as you always do. The lamp says back what it understood, and nothing starts until you say yes.
 
 1. **Ask for a piece of work.** "Ask Claude Code to write a poem about the rain." The lamp repeats the task. You say yes. The lamp says Claude Code has it, and that it will tell you when it is done.
-2. **Ask for something real from your work computer.** "Ask Claude Code on my office computer to look at why the build is slow and tell me what it finds." If you have more than one computer, the lamp knows each by its name, so you can say which one.
+2. **Ask for something real from your work.** "Ask Claude Code to look at why my build is slow and tell me what it finds." The lamp gives the work to your computer.
 3. **Hear how it went, without asking.** When the helper finishes, the lamp tells you at a good moment, in its own words, along with what the helper found. If the helper stops to ask you something, the lamp tells you that too. You answer it at your computer.
 
 Good to know:
@@ -28,14 +28,14 @@ You need your Autonomous app on your phone, a computer you want the lamp to work
 Get the Harness app on the computer you want the lamp to use and open it.
 
 - **Picture or video plan:** one screenshot of the Harness download page with the download button circled, then one of the Harness app open on its first screen. Caption: "Install Harness on your computer."
-- **TO CHECK (Harness team):** the address of Harness's own install page, and which computers it supports. The only Harness address this repository names for people is harness.autonomous.ai (the lamp tells you to use it in step 3). No install page was found, so none is linked here.
+- **TO CHECK (Harness team):** the address of Harness's own install page, and which computers it supports. The only Harness address the lamp itself gives people is harness.autonomous.ai (for typing the code in step 3). No install page was found, so none is linked here.
 
 ### Step 2. Sign in to Harness
 
-Sign in with your Autonomous account.
+Sign in to Harness on the screen it shows you. Harness is made by the Harness team, so follow what its own sign-in asks for.
 
 - **Picture or video plan:** one screenshot of Harness's sign-in screen, then one of the signed-in home screen. Hide your name and email in anything you publish.
-- **TO CHECK (Harness team):** which account Harness asks for and how it signs in. This guide does not describe it: Harness owns it.
+- **TO CHECK (Harness team):** which account Harness asks for and how it signs in. This guide does not describe it: Harness owns it, and nothing here invents another way to sign in.
 
 ### Step 3. Connect Harness to your lamp
 
@@ -49,7 +49,7 @@ That's it. Within a minute or two the lamp knows your computer, and you can ask 
 - If you answer no, or the app says it didn't work, nothing is connected. Start again from the app.
 - Anyone who hears the code gets nothing from it: the lamp only connects after **you** answer yes to your own email.
 - **Picture or video plan:** a 20-second screen recording of the three actions in order (the app showing the code, the code typed in Harness, the yes in the app), with the code blurred. Then one photo or clip of someone speaking to the lamp and the lamp answering, for the first real ask.
-- **TO CHECK (mobile):** the exact names on the app's Harness card and sign-in screen (the code reaches the app from the lamp: docs/cloud.md:123, `harness.sign_in.*`). The app's screens are in `ecm-sds-mobile`, which the writer of this draft could not read.
+- **TO CHECK (mobile):** the exact names on the app's Harness card and sign-in screen. The app's screens are in a repository the writer of this draft could not read.
 
 ## Try it
 
@@ -57,7 +57,7 @@ Say: "Ask Claude Code to write a short poem about the rain." Say yes when the la
 
 ## If something doesn't work
 
-- **The lamp says it isn't set up to hand work over yet.** Harness isn't on the lamp yet, or isn't connected. Do step 3 again. (The lamp says this in plain words when it has no Harness: docs/tasks.md, "Before the lamp is set up for hand-overs".)
+- **The lamp says it isn't set up to hand work over yet.** Harness isn't on the lamp yet, or isn't connected. Do step 3 again.
 - **The lamp says it can't find a computer.** The lamp learns your computers from Harness. Check Harness is open and signed in on the computer, and wait a minute.
 - **You named a helper the lamp says isn't set up.** Set that helper up on your computer, or ask for one that is.
 
@@ -81,8 +81,9 @@ Every claim in this guide, with where it comes from in `origin/lamp-voice` at 39
 | Lamp tells you at a good moment, unasked, how it went | docs/tasks.md:1735-1745; `LAMP_TASK_NEWS=skill` at deploy/product/lamp-voice.service:338 |
 | A question from the helper is told, and you answer at your computer | docs/tasks.md:1750 and :1777 (`needs-input`, the 21 Oct case) |
 | Only the named helper gets the work | deploy/product/lamp-voice.service:310 (`LAMP_TASKS_NAMED_ONLY=on`), docs/switches.md:409 |
-| Computers are called by their names | `LAMP_TASKS_MACHINE_NAMES` is **off** in the product (docs/switches.md:407). **TO CHECK (voice owner):** the line in example 2 says "my office computer"; the first computer is named `office` (docs/switches.md:534), so that works for a first computer. Other names depend on that switch |
+| Computers are called by their names | `LAMP_TASKS_MACHINE_NAMES` is **off** in the product (docs/switches.md:407). Example 2 therefore does not name a computer: only the first computer is called `office` (docs/switches.md:534), and other names need that switch. **TO CHECK (voice owner):** when the names switch goes on, a line like "on my office computer" can come back |
 | Completion is "unverified" | docs/tasks.md:30-34 |
+| Sign-in is Harness's own, not described here | docs/tasks.md:9-15 (Tasks implements no pairing, login or credential); `HARNESS_LEAST`, crates/update/src/install.rs:854 (the lamp's code sign-in only passes the answer on). **TO CHECK (Harness team)** |
 | Work goes to computers | docs/tasks.md:1030 (targets from `harness machines`), docs/switches.md:534 |
 | The lamp gets Harness by itself after it is online | docs/switches.md:454 (`LAMP_HARNESS_AT_ONBOARDING`). **Off in the product today:** crates/update/src/harness_install/product.rs:42 (`PRODUCT_DEFAULT = false`). PR #5379 turns it on |
 | The app signs Harness in by an 8-digit code | docs/switches.md:406 (`LAMP_TASKS_SIGN_IN_APP`), docs/cloud.md:123. **Off in the product today:** deploy/product/lamp-tasks.service:36 has no `--sign-in-by-code`. PR #5379 adds it |
