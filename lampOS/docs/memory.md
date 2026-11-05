@@ -492,7 +492,11 @@ before. A line admitted as the room's, nobody named for it (lamp-06c1, 29
 Oct: 5 of 68 turns with the person in view throughout), is carried into the
 known person's conversation going on by the same rule. A carried line's
 exchange is told in the thread but never given to the running summary or a
-talk note (below). Risk, accepted: someone off camera, with no other sign,
+talk note (below). With `LAMP_CARRIED_LINES_KEEP_TALK=on` (in the product) it
+still keeps that person's memory conversation going: the writer's 45 s idle
+gap counts from it, so a run of carried lines no longer ends their talk
+mid-way and drops its earlier piece (lamp-06c1, 5 Nov); nothing of it is
+stored. Risk, accepted: someone off camera, with no other sign,
 within those 5 s, is answered inside the conversation going on and hears
 what was said in it and its running summary.
 

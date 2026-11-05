@@ -1834,6 +1834,7 @@ fn second_route_worker_environment(
         crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
         crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT,
         crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT,
+        crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT,
         // An earlier turn's calls told with its words (lamp build 9699).
         crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
         crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
@@ -2039,6 +2040,7 @@ mod tests {
             crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT,
             crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT,
+            crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT,
             crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
             crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
@@ -2787,6 +2789,7 @@ mod tests {
                     || name == crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT
+                    || name == crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT
                     || name == crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT
                     || name == crate::second_provider::NAME_ONE_FACE_ENVIRONMENT
@@ -2885,6 +2888,7 @@ mod tests {
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_BUSY_CALLED_STRICT=on",
                     "LAMP_BUSY_ENDS_SOONER=on",
+                    "LAMP_CARRIED_LINES_KEEP_TALK=on",
                     "LAMP_CHOSEN_VOICE=on",
                     "LAMP_CONVERSATION_CARRIED_SAVES=on",
                     "LAMP_CONVERSATION_CARRIES=on",

@@ -440,6 +440,25 @@ người ngoài khung hình, không có dấu hiệu nào khác, được trả 
 chuyện đang diễn ra và nghe được những gì đã nói trong đó; họ không chạm được
 ký ức đã lưu của người kia.
 
+Với `LAMP_CARRIED_LINES_KEEP_TALK=on` (bật trong bản sản phẩm), một câu được
+giữ trong cuộc trò chuyện như vậy, dù không bao giờ được ghi vào nhật ký hay lưu
+là của họ, vẫn giữ cuộc trò chuyện trong bộ nhớ của người đó tiếp diễn: khoảng
+im lặng 45 giây của bộ ghi được tính từ câu ấy (`DaysJob::Touch`). Trước đây,
+khoảng 97 giây các câu như vậy làm cuộc trò chuyện của người đó hết hạn giữa
+chừng và phần trước bị bỏ (lamp-06c1, 5/11). Câu của người khác, hoặc sau
+khoảng im lặng, không thay đổi gì.
+
+Một nguồn bị thiếu hoặc đã xóa làm dòng bị từ chối, và dòng đó không bao giờ
+được gửi lại dưới dạng không liên kết. Khi một điều bị quên từ bên ngoài voice
+(ứng dụng, `forget_person` của mắt, việc dọn dẹp theo thời hạn, bước dọn của bài
+thử), ngữ cảnh vẫn giữ id đã mất, nên trước đây mọi dòng sau dẫn tới nó đều bị từ
+chối (lamp-06c1, 5/11). Nay lời từ chối đúng nguyên văn «a source ID does not
+exist for this person», cho một nguồn hay một quy tắc (`remember::source_gone`),
+được xử lý như một lần quên đã xác nhận: dừng ghi nhật ký
+(`why=source_gone`), cuộc trò chuyện đến lúc đó kết thúc trọn vẹn và vẫn được
+quan sát, các dòng tạo trước lúc dừng không được ghi sau đó, và dòng bị từ chối
+không được giữ.
+
 **Một khuôn mặt im lặng không tính** (`LAMP_CONVERSATION_CARRIES_PAST_SILENT=on`,
 #4339, quyết định của người phụ trách trí nhớ ngày 30/10): trên lamp-3e83 ngày
 30/10 (bản 8899), khuôn mặt quen ở trong khung hình ở các câu bị rơi nhưng hầu
