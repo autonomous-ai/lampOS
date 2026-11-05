@@ -120,8 +120,8 @@ fn registered_month_runs_answering_judging_and_restore_without_any_scores() {
     })
     .unwrap();
     assert_eq!(result["events"], 2220);
-    assert_eq!(result["questions"], 200);
-    assert_eq!(result["answer_turns"], 224);
+    assert_eq!(result["questions"], 206);
+    assert_eq!(result["answer_turns"], 230);
     assert_eq!(result["nights"], 30);
     assert_eq!(result["weekly_passes"], 4);
     assert_eq!(result["label"], "plumbing check");
@@ -130,7 +130,7 @@ fn registered_month_runs_answering_judging_and_restore_without_any_scores() {
         assert_eq!(kind["scored"], 0);
     }
     assert_eq!(judged, 76);
-    assert_eq!(*counts.lock().unwrap(), (224, 76));
+    assert_eq!(*counts.lock().unwrap(), (230, 76));
     runner
         .execute(Request::new("close", Op::Close, json!({})), &mut worker)
         .unwrap();
@@ -141,6 +141,6 @@ fn registered_month_runs_answering_judging_and_restore_without_any_scores() {
             .unwrap()
             .receipts
             .len(),
-        300
+        306
     );
 }
