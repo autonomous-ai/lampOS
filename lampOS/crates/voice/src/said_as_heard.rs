@@ -156,9 +156,59 @@ pub fn words_in(pieces: &[Piece]) -> usize {
         .sum()
 }
 
+/// What of `pieces` was not played in their first `samples`, piece by
+/// piece, to be said again after a wordless cut
+/// (`LAMP_CUT_IN_WORDLESS_RESUMES`): from the start of the piece playing at
+/// the cut, a sentence, and every piece with words after it. A piece with
+/// no sound is no place in the time and is skipped before the cut; one
+/// with no words (a wait sound, a bridge) is never said again. Empty when
+/// all was played.
+pub fn unheard(pieces: &[Piece], samples: u64) -> Vec<String> {
+    let mut left = samples;
+    let mut from = pieces.len();
+    for (at, piece) in pieces.iter().enumerate() {
+        if piece.samples == 0 {
+            continue;
+        }
+        if left >= piece.samples {
+            left -= piece.samples;
+            continue;
+        }
+        from = at;
+        break;
+    }
+    pieces[from..]
+        .iter()
+        .filter_map(|piece| piece.words.as_deref())
+        .map(str::trim)
+        .filter(|words| !words.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The rest goes again from the start of the sentence that was cut;
+    /// a wait sound or a bridge is never said again; all played, none.
+    #[test]
+    fn the_unheard_rest_begins_at_the_cut_sentence() {
+        let pieces = [
+            piece(None, 500),
+            piece(Some("Once upon a time."), 1_000),
+            piece(Some(" The keeper lit the lamp."), 1_000),
+            piece(Some(" Then a ship came."), 1_000),
+        ];
+        assert_eq!(
+            unheard(&pieces, 2_000),
+            ["The keeper lit the lamp.", "Then a ship came."]
+        );
+        assert_eq!(unheard(&pieces, 1_500), unheard(&pieces, 2_499));
+        assert_eq!(unheard(&pieces, 300).len(), 3, "cut in the wait sound");
+        assert_eq!(unheard(&pieces, 3_000), ["Then a ship came."]);
+        assert!(unheard(&pieces, 3_500).is_empty());
+    }
 
     fn piece(words: Option<&str>, samples: u64) -> Piece {
         Piece {

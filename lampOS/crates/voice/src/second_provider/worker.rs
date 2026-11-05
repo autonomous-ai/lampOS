@@ -3468,6 +3468,16 @@ pub fn serve(
         );
     }
     engine = engine.asking_after_wordless_cut_ins(wordless_asks);
+    // Such a cut in a busy room, or another soon after one, picks the
+    // answer up again; a third soon after pauses
+    // (`LAMP_CUT_IN_WORDLESS_RESUMES=on`).
+    let wordless_resumes = crate::cut_in_wordless::resumes();
+    if wordless_resumes {
+        eprintln!(
+            "lamp-voice second: a cut-in that ended the lamp's answer with no words, in a busy room or soon after another, picks the answer up from the sentence it cut; a third within a minute pauses (LAMP_CUT_IN_WORDLESS_RESUMES)"
+        );
+    }
+    engine = engine.resuming_after_wordless_cut_ins(wordless_resumes);
     // An answer to the lamp's own question is never left in silence by an
     // empty reply: the lamp asks to hear it again, once
     // (`LAMP_ANSWER_ASK_AGAIN=on`, Queue #4710 item 3). It reads the

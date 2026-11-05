@@ -228,6 +228,7 @@ each line plays exactly as before.
 | The second route's down lines, and a look that never began | `second_provider::DOWN_LINE` ("Sorry, my thoughts are slow just now. Ask me again in a moment."), `DOWN_LINE_AGAIN`, `DOWN_LINE_CANNOT`; `COULD_NOT_LOOK` ("I couldn't get a good look.") | the down lines rendered by this route's voice after a turn and kept in memory (`LAMP_SECOND_DOWN_LINE`, on in the product); the look's said as the turn's text (`LAMP_SECOND_LOOK`, on) | rendered and said in the owner's words (`DownLine`'s language, read at start; `language::fixed_in`) |
 | The second route's answer to a stop said over it, or within 3 s after it | `spoken_stop::LINE` ("Okay, I'll stop there.") | rendered by this route's voice as its worker starts, played at once as the lamp's words and kept in the thread (`LAMP_SPOKEN_STOP_ENDS`, on; `FixedClips`, #4710); `ProviderOutput::StopAnswered` tells the coordinator first, so a reminder's ring the line cut is held, not rung once more (`LAMP_RING_STOP_ENDS_IT`, schedule.md) | the owner's words, rendered ahead and kept in the thread (`language::fixed_in`); the stop itself is still heard by its English words (`spoken_stop::is_stop_request`) |
 | The second route's question after a cut-in that ended its answer with no words | `cut_in_wordless::LINE` ("Um, excuse me, did anyone say something?") | rendered ahead as the stop line, quiet room only (`LAMP_CUT_IN_WORDLESS_ASKS`, on in the product by the memory owner's call, 4 Nov; the lamp's own echo can still be asked, #4710, #4938) | the owner's words, rendered ahead (`language::fixed_in`) |
+| The second route's lines when a wordless cut-in is picked up again | `cut_in_wordless::BRIDGE` ("Anyway,"), `AGAIN` ("Oops, cut off again. Anyway,"), `PAUSE` ("It's a bit noisy here, so I'll pause. Just say 'Lamp' when you want me to go on.") | rendered ahead as the stop line; the first two then the cut answer's rest (`LAMP_CUT_IN_WORDLESS_RESUMES`, on in the product by the memory owner's call, 5 Nov) | the owner's words, rendered ahead (`language::fixed_in`); the rest in the answer's own words |
 | The second route's line when a line by name gets no words twice | `second_provider::NO_WORDS_LINE` ("Sorry, I lost my words there. Could you ask me again?") | said as the turn's text (`LAMP_NO_WORDS_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
 | The second route's line when a reply claims again an action no call made | `action_claim::NOT_DONE_LINE` ("Sorry, I didn't do that. Could you ask me again?") | said as the turn's text (`LAMP_ACTION_CLAIM_CHECKED`, on in the product, #5215) | the owner's words (`language::fixed_in`) |
 | The second route's line when an answer to the lamp's own question gets no words | `second_provider::ANSWER_AGAIN_LINE` ("Sorry, could you say that again?") | said as the turn's text (`LAMP_ANSWER_ASK_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
@@ -2036,6 +2037,33 @@ order is kept. A written turn is the same from the chat on.
     the lamp's answer: answered …" or "a cut-in with no words ended the
     lamp's answer: answered …", then "first answer audio … its fixed
     line".
+  - **A wordless cut-in picked up again** (`LAMP_CUT_IN_WORDLESS_RESUMES`,
+    on in the product; the memory owner, 5 Nov): the same cut-in, counted
+    in a run, each within `cut_in_wordless::AGAIN_AFTER` (60 s) of the last
+    (`cut_in_wordless::Cuts`). The first in a quiet room still asks
+    `cut_in_wordless::LINE`; the first in a busy room says `BRIDGE`
+    ("Anyway,") and goes on; the second says `AGAIN` ("Oops, cut off
+    again. Anyway,") and goes on, in any room; the third says `PAUSE`
+    ("It's a bit noisy here, so I'll pause. Just say 'Lamp' when you want
+    me to go on."); any more stay quiet, so it never loops. A line of the
+    person's words that is answered starts the run again
+    (`Cuts::spoke`), so a cut after "Lamp, go on" picks the answer up; a
+    cut with nothing left to go on with is quiet and not counted. It goes on
+    with the cut answer's unplayed pieces as they were sent, from the start
+    of the sentence playing at the cut (`said_as_heard::unheard`, with the
+    line's `heard_of_cut`), the model not asked, when that answer was sent
+    whole; the first piece's speech begins before the line plays, so the
+    rest follows the line's clip with no wait. Otherwise (cut before it was
+    sent whole, or `LAMP_SAID_AS_HEARD` off) the line is played and the
+    model asked, as a written turn whose only message is that note (no
+    person's words), to go on from the cut, not from the start, with no
+    apology (`cut_in_wordless::resume_ask`). A cut of one
+    of its own fixed lines (the question, the pause, the stop line), or of
+    an answer played whole, has nothing to go on with and stays quiet. The
+    journal says "a cut-in with no words ended the lamp's answer, a busy
+    (quiet) room: Resume, answered …, the rest kept, N pieces", then the
+    line's "first answer audio … its fixed line" and "the cut answer's
+    rest, its first audio … ms after the words were heard".
   - The journal says each: "it began over the lamp's answer, and the
     model is told so", "the model is told it may follow on from what the
     lamp said" (or "… in a busy room; the model is not told …"), "only
