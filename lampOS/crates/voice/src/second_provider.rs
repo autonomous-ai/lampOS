@@ -11466,6 +11466,10 @@ async fn answer(
                     eprintln!(
                         "lamp-voice second: request {request}: the held setup face save kept nothing"
                     );
+                    let why = result["error"].as_str().unwrap_or("the eyes kept nothing");
+                    messages.push(Message::system(format!(
+                        "(For you to know: they said yes to the name you said back, but their face could not be kept: {why}. Do not say you will know their face; you may ask them to look at you and try again.)"
+                    )));
                 }
             }
         }

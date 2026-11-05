@@ -360,6 +360,17 @@ pub(crate) fn held_save_verdict(name: &str, said: &Said) -> HeldSaveVerdict {
     }
 }
 
+/// Whether a tool answer is one the name checks gave here, before the eyes
+/// were asked (`run_switched`): no name, a name not heard, the lamp's own
+/// name, no read-back's yes, or no yes to a new name. The voice's log says
+/// "refused here" for those, not that the eyes answered (the
+/// Reviewer-lead's P3 on #5415).
+pub(crate) fn refused_here(told: &Value) -> bool {
+    told["error"].as_str().is_some_and(|error| {
+        [NO_NAME, NOT_HEARD, ONLY_THE_CALL, SAY_IT_BACK, NOT_AGREED].contains(&error)
+    })
+}
+
 /// Whether a tool answer is the first setup save's refusal for want of the
 /// read-back's yes ([`SAY_IT_BACK`]): the voice holds that save.
 pub(crate) fn refused_for_the_read_back(told: &Value) -> bool {
@@ -4858,6 +4869,15 @@ mod tests {
         // (a) The call on the name line is refused for the read-back.
         let (words, _) = run_at_setup(&socket, &call, &Said::now(HEARD));
         assert!(refused_for_the_read_back(&words), "{words}");
+        // Refused here, so never logged as the eyes' answer (the
+        // Reviewer-lead's P3); what the eyes answer is theirs.
+        assert!(refused_here(&words), "{words}");
+        for theirs in [
+            json!({"ok": true, "remembered": "Walter"}),
+            json!({"error": "no one face in view"}),
+        ] {
+            assert!(!refused_here(&theirs), "{theirs}");
+        }
         // The hold is judged only on the turn after the refused call, so
         // the name line itself is never judged.
         for (lamp, this, verdict) in [
