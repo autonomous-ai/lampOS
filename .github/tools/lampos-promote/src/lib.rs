@@ -99,7 +99,8 @@ pub struct Job {
 /// Operations are injected so every remote mutation and uncertain response can be tested.
 pub trait Remote {
     fn repository(&mut self) -> Result<Repository>;
-    fn releases(&mut self) -> Result<Vec<Release>>;
+    /// The release named by `tag`; None when GitHub has none (404).
+    fn release(&mut self, tag: &str) -> Result<Option<Release>>;
     fn tag(&mut self, name: &str) -> Result<Option<String>>;
     fn assets(&mut self, release: u64) -> Result<Vec<Asset>>;
     fn read(&mut self, asset: &Asset, most: u64) -> Result<Vec<u8>>;
@@ -180,20 +181,15 @@ struct Head {
     sequence: u64,
 }
 
-fn releases(remote: &mut impl Remote) -> Result<BTreeMap<String, Release>> {
-    let mut found = BTreeMap::new();
-    let mut ids = BTreeSet::new();
-    for release in remote.releases()? {
-        require(
-            release.id > 0 && ids.insert(release.id),
-            "invalid or duplicate release ID",
-        )?;
-        require(
-            found.insert(release.tag_name.clone(), release).is_none(),
-            "duplicate release tag",
-        )?;
-    }
-    Ok(found)
+/// One release looked up by its tag, never the whole list: that grew past
+/// 64 MiB on 5 Nov and stopped the promote.
+fn lookup(remote: &mut impl Remote, tag: &str) -> Result<Option<Release>> {
+    let Some(release) = remote.release(tag)? else {
+        return Ok(None);
+    };
+    require(release.id > 0, "invalid release ID")?;
+    require(release.tag_name == tag, "release answered for another tag")?;
+    Ok(Some(release))
 }
 fn assets(remote: &mut impl Remote, release: u64) -> Result<BTreeMap<String, Asset>> {
     let entries = remote.assets(release)?;
@@ -257,11 +253,7 @@ fn notes(release: &Release, sequence: u64) -> Result<(u64, u64)> {
 }
 fn candidate(remote: &mut impl Remote, context: &Context) -> Result<Candidate> {
     let tag = format!("lampos-lamp-voice-{}", context.sequence);
-    let published = releases(remote)?;
-    let release = published
-        .get(&tag)
-        .cloned()
-        .ok_or("selected published build is absent")?;
+    let release = lookup(remote, &tag)?.ok_or("selected published build is absent")?;
     require(
         !release.draft && release.prerelease && commit(&release.target_commitish),
         "source is not a published immutable build",
@@ -369,7 +361,7 @@ fn candidate(remote: &mut impl Remote, context: &Context) -> Result<Candidate> {
             "declared asset bytes differ",
         )?;
     }
-    models(remote, &value, &published)?;
+    models(remote, &value, &release)?;
     Ok(Candidate {
         release,
         bytes,
@@ -390,13 +382,11 @@ fn model_asset(url: &str) -> Option<(&str, &str)> {
 /// release of this repository, the source build's or another's, with the
 /// size and SHA-256 the envelope signs for what its URL fetches: the
 /// model's own, or its archive's when the model is a member of one (the
-/// member itself is checked by the lamp once taken out). Each asset is
-/// hashed once, and the assets hashed are 2 GiB at most.
-fn models(
-    remote: &mut impl Remote,
-    value: &Manifest,
-    published: &BTreeMap<String, Release>,
-) -> Result<()> {
+/// member itself is checked by the lamp once taken out). Each release is
+/// looked up by its tag and each asset hashed once, the assets hashed 2 GiB
+/// at most.
+fn models(remote: &mut impl Remote, value: &Manifest, source: &Release) -> Result<()> {
+    let mut published = BTreeMap::from([(source.tag_name.clone(), Some(source.clone()))]);
     let mut inventories: BTreeMap<u64, BTreeMap<String, Asset>> = BTreeMap::new();
     let mut hashed: BTreeMap<u64, HashSize> = BTreeMap::new();
     let mut total = 0u64;
@@ -408,9 +398,12 @@ fn models(
             .archive
             .as_ref()
             .map_or((model.bytes, &model.sha256), |a| (a.bytes, &a.sha256));
-        let release = published
-            .get(tag)
-            .ok_or_else(|| refused("its release is absent"))?;
+        let release = match published.entry(tag.to_owned()) {
+            Entry::Occupied(known) => known.into_mut(),
+            Entry::Vacant(new) => new.insert(lookup(remote, tag)?),
+        }
+        .as_ref()
+        .ok_or_else(|| refused("its release is absent"))?;
         require(!release.draft, &refused("its release is not published"))?;
         let inventory = match inventories.entry(release.id) {
             Entry::Occupied(known) => known.into_mut(),
@@ -440,7 +433,7 @@ fn models(
     Ok(())
 }
 fn head(remote: &mut impl Remote, key: &[u8; 32]) -> Result<Option<Head>> {
-    let Some(release) = releases(remote)?.remove(STABLE) else {
+    let Some(release) = lookup(remote, STABLE)? else {
         require(
             remote.tag(STABLE)?.is_none(),
             "stable tag exists without a release; repair required",
@@ -638,9 +631,7 @@ pub fn promote(remote: &mut impl Remote, context: &Context) -> Result<Receipt> {
             &staged_name,
             &candidate.bytes,
         )?;
-        let made = releases(remote)?
-            .remove(STABLE)
-            .ok_or("stable bootstrap was not confirmed")?;
+        let made = lookup(remote, STABLE)?.ok_or("stable bootstrap was not confirmed")?;
         require(
             !made.draft && made.prerelease && made.target_commitish == candidate.manifest.commit,
             "stable bootstrap identity differs",

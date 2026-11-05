@@ -16,7 +16,7 @@ use std::{
 
 /// The largest JSON answer read. The paginated release list grew past
 /// 64 MiB on 5 Nov (every train publishes a pre-release with notes), which
-/// blocked the promote of 10226; looking releases up by tag follows.
+/// blocked the promote of 10226; releases are now looked up by tag.
 const MAX_JSON: u64 = 512 * 1024 * 1024;
 const COMMAND_LIMIT: Duration = Duration::from_secs(600);
 /// The most of the CLI's error text read, only to tell GitHub's 5xx: it is
@@ -31,17 +31,38 @@ const RETRY_PAUSES: [Duration; 3] = [
     Duration::from_secs(30),
 ];
 const SERVER_FAILED: &str = "GitHub answered 5xx; remote state may need inspection";
-/// Whether the CLI's error text says GitHub answered 500, 502, 503 or 504.
-fn server_error(stderr: &[u8]) -> bool {
+/// A read of something GitHub does not have; never asked again.
+const NOT_FOUND: &str = "GitHub answered 404";
+/// Whether the CLI's error text says GitHub answered one of `statuses`.
+fn answered(stderr: &[u8], statuses: &[&[u8; 8]]) -> bool {
     stderr.windows(8).enumerate().any(|(at, window)| {
         let digit_after = stderr.get(at + 8).is_some_and(u8::is_ascii_digit);
         let word_before = at > 0 && stderr[at - 1].is_ascii_alphanumeric();
-        matches!(
-            window,
-            b"HTTP 500" | b"HTTP 502" | b"HTTP 503" | b"HTTP 504"
-        ) && !digit_after
-            && !word_before
+        statuses.iter().any(|status| window == &status[..]) && !digit_after && !word_before
     })
+}
+/// Whether the CLI's error text says GitHub answered 500, 502, 503 or 504.
+fn server_error(stderr: &[u8]) -> bool {
+    answered(
+        stderr,
+        &[b"HTTP 500", b"HTTP 502", b"HTTP 503", b"HTTP 504"],
+    )
+}
+/// Whether the CLI's error text says GitHub answered 404.
+fn not_found(stderr: &[u8]) -> bool {
+    answered(stderr, &[b"HTTP 404"])
+}
+/// A 404 as None; any other failure stays one.
+fn found<T>(answer: Result<T>) -> Result<Option<T>> {
+    match answer {
+        Ok(value) => Ok(Some(value)),
+        Err(why) if why == NOT_FOUND => Ok(None),
+        Err(why) => Err(why),
+    }
+}
+/// The one release named by `tag`; the whole list is never read.
+fn release_endpoint(tag: &str) -> String {
+    format!("releases/tags/{tag}")
 }
 /// `attempt` again after each of `pauses` while it fails with GitHub's 5xx.
 fn retried<T>(
@@ -172,6 +193,9 @@ fn command_once(arguments: &[String], output: Output) -> Result<Answer> {
                     if server_error(&said) {
                         break Err(SERVER_FAILED.to_owned());
                     }
+                    if not_found(&said) {
+                        break Err(NOT_FOUND.to_owned());
+                    }
                     break Err("GitHub CLI failed; remote state may need inspection".to_owned());
                 }
                 break answer.take().unwrap_or_else(|| {
@@ -206,12 +230,15 @@ fn words(items: &[&str]) -> Vec<String> {
 pub struct Github;
 impl Github {
     fn api<T: DeserializeOwned>(&mut self, endpoint: &str, pages: bool) -> Result<T> {
+        self.json(&Self::api_arguments(endpoint, pages))
+    }
+    fn api_arguments(endpoint: &str, pages: bool) -> Vec<String> {
         let mut args = words(&["api", "--method", "GET"]);
         if pages {
             args.extend(words(&["--paginate", "--slurp"]));
         }
         args.push(format!("repos/{REPO}/{endpoint}"));
-        self.json(&args)
+        args
     }
     fn json<T: DeserializeOwned>(&mut self, args: &[String]) -> Result<T> {
         let Answer::Bytes(bytes) = command(args, Output::Bytes(MAX_JSON))? else {
@@ -272,9 +299,9 @@ impl Remote for Github {
             &format!("repos/{REPO}"),
         ]))
     }
-    fn releases(&mut self) -> Result<Vec<Release>> {
-        let pages: Vec<Vec<Release>> = self.api("releases?per_page=100", true)?;
-        Ok(pages.into_iter().flatten().collect())
+    fn release(&mut self, tag: &str) -> Result<Option<Release>> {
+        require(super::plain(tag), "unsafe release tag")?;
+        found(self.api(&release_endpoint(tag), false))
     }
     fn tag(&mut self, name: &str) -> Result<Option<String>> {
         let refs: Vec<Value> = self.api(&format!("git/matching-refs/tags/{name}"), false)?;
@@ -410,6 +437,48 @@ mod tests {
         ] {
             assert!(!server_error(said), "{}", String::from_utf8_lossy(said));
         }
+    }
+    #[test]
+    fn a_404_is_told_and_read_as_absent() {
+        assert!(not_found(b"gh: Not Found (HTTP 404)"));
+        for said in [&b"HTTP 403"[..], b"HTTP 4040", b"XHTTP 404", b"HTTP 504"] {
+            assert!(!not_found(said), "{}", String::from_utf8_lossy(said));
+        }
+        assert_eq!(found::<u8>(Err(NOT_FOUND.to_owned())), Ok(None));
+        assert_eq!(found(Ok(7)), Ok(Some(7)));
+        assert_eq!(
+            found::<u8>(Err(SERVER_FAILED.to_owned())),
+            Err(SERVER_FAILED.to_owned())
+        );
+        // A 404 is never asked again.
+        let mut asked = 0;
+        let answer: Result<u8> = retried(
+            &[Duration::from_secs(1)],
+            |_| {},
+            || {
+                asked += 1;
+                Err(NOT_FOUND.to_owned())
+            },
+        );
+        assert_eq!((answer, asked), (Err(NOT_FOUND.to_owned()), 1));
+    }
+    #[test]
+    fn a_release_is_one_get_by_tag_and_never_the_list() {
+        let args = Github::api_arguments(&release_endpoint(crate::STABLE), false);
+        assert_eq!(
+            args,
+            words(&[
+                "api",
+                "--method",
+                "GET",
+                &format!("repos/{REPO}/releases/tags/lampos-stable"),
+            ])
+        );
+        // The GET keeps the 5xx retry; no page of the release list is asked.
+        assert!(args.windows(2).any(|p| p[0] == "--method" && p[1] == "GET"));
+        assert!(!args.iter().any(|a| a == "--paginate"));
+        // Nor does any endpoint here ask for it.
+        assert!(!include_str!("github.rs").contains(concat!("releases", "?per_page")));
     }
     #[test]
     fn a_5xx_read_is_asked_again_after_each_pause_and_nothing_else_is() {
