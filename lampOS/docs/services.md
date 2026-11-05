@@ -862,7 +862,7 @@ publishes, every 250 ms:
 
 | Holds when | Read from | Otherwise |
 |---|---|---|
-| An owner face is enrolled | The owner's typed setup name (`LAMP_SKILLS_OWNER_FILE`; the product's `lamp-skills.service` gives it as `%d/owner`, `LoadCredential=owner:/etc/lampOS/person/name` with `SetCredential=owner:` as its empty fallback, so a lamp with no name skips the read and still starts the unit) and the eyes' known file | "no owner's face enrolled": skipped at once (an empty name too) |
+| An owner face is enrolled | The owner's typed setup name (`LAMP_SKILLS_OWNER_FILE`; the product's `lamp-skills.service` gives it as `%d/owner`, `LoadCredential=owner:/etc/lampOS/person/name` with `SetCredential=owner:\n` as its blank fallback, so a lamp with no name skips the read and still starts the unit; one newline, never empty, since systemd 252 fails an empty `SetCredential=` at CREDENTIALS with the file or its folder missing, lamp-75c9, 5 Nov) and the eyes' known file | "no owner's face enrolled": skipped at once (an empty name too) |
 | Not private: the microphones known open, the lamp not asleep or muted | `routine::kept_asleep`, `voice/privacy` (`permitted`) | "private" |
 | Not paused (the lamp's stand-in for do-not-disturb) | `lamp/pause` | "paused" |
 | Not quiet hours: 22:00–07:00 local, or the skill's `[quiet]`; an unknown local time counts as quiet | `lamp_local_time::quiet_hours` | "quiet hours" |

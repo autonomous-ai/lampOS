@@ -1605,12 +1605,23 @@ fn the_product_lets_a_made_skill_read_a_linked_service() {
         );
     }
     // The owner's setup name, for the read's gate, in lamp-skills alone:
-    // an empty fallback first, so a lamp whose name setup removed skips the
-    // read ("no owner") and still starts the unit.
+    // a blank fallback first, so a lamp whose name setup removed skips the
+    // read ("no owner") and still starts the unit. One newline, never empty:
+    // systemd 252 fails an empty SetCredential= at CREDENTIALS with the file
+    // missing (lamp-75c9, 5 Nov), so no product unit has one.
     for (unit, text) in install::PRODUCT {
         let service = section(text, "Service");
+        let empty = service
+            .iter()
+            .filter(|line| {
+                line.strip_prefix("SetCredential=")
+                    .and_then(|set| set.split_once(':'))
+                    .is_some_and(|(_, value)| value.trim().is_empty())
+            })
+            .count();
+        assert_eq!(empty, 0, "{unit}");
         let owner = [
-            "SetCredential=owner:",
+            "SetCredential=owner:\\n",
             "LoadCredential=owner:/etc/lampOS/person/name",
             "Environment=LAMP_SKILLS_OWNER_FILE=%d/owner",
         ]
