@@ -186,11 +186,11 @@ pub struct Wider {
 
 /// No service thread, network client or model belongs to this store.
 pub struct Days {
-    db: Connection,
+    pub(crate) db: Connection,
     dir: PathBuf,
     keep_days: u32,
-    local: LocalTime,
-    now: u64,
+    pub(crate) local: LocalTime,
+    pub(crate) now: u64,
     set_aside: Option<String>,
     /// When a kept thing was said again (#4753), by its rid, until the
     /// exchange that said it is written: the voice's `remember` comes
@@ -443,10 +443,15 @@ impl Days {
         let event = Day::at(self.now, &self.local)
             .and_then(|today| today.before(FOLLOW_UP_WITHIN_DAYS))
             .map_or_else(|| "1970-01-01".into(), |d| d.to_string());
+        let today =
+            Day::at(self.now, &self.local).map_or_else(|| "1970-01-01".into(), |d| d.to_string());
         let tx = self.db.transaction()?;
         keep_origins(&tx)?;
         tx.execute("DELETE FROM doomed", [])?;
-        tx.execute("INSERT INTO doomed SELECT rid FROM entries WHERE (kind='exchange' AND day<?1) OR (kind='observation' AND coalesce(category,'')!='talk' AND used_unix_ms<?2 AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=entries.rid AND d.day>=?3))",params![day,unused,event])?;
+        tx.execute("INSERT INTO doomed SELECT rid FROM entries WHERE (kind='exchange' AND day<?1) OR (kind='observation' AND coalesce(category,'') NOT IN ('talk','episode','fact','profile','pattern','ahead','feeling') AND used_unix_ms<?2 AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=entries.rid AND d.day>=?3))",params![day,unused,event])?;
+        // Nightly pass B's items close on their own end days, never by
+        // disuse or with their source exchanges (`nightly::expire`).
+        crate::nightly::expire(&tx, &today, self.now)?;
         descendants(&tx, Some(&event))?;
         let count = erase(&tx)?;
         tx.execute(
@@ -1327,6 +1332,8 @@ impl Days {
             tx.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid])?;
         }
         talk_with_doomed(&tx)?;
+        // Nightly pass B: what rests on anything going goes too.
+        crate::nightly::with_doomed(&tx)?;
         said_again_with_doomed(&tx)?;
         let count = erase(&tx)?;
         tx.commit()?;
@@ -1546,7 +1553,7 @@ impl Days {
         if text.len() > cap {
             text.clear();
         }
-        let candidates:Vec<u64>=self.db.prepare("SELECT id FROM entries WHERE person=? AND active=1 AND kind IN ('kept','observation') ORDER BY CASE category WHEN 'promise' THEN 0 WHEN 'thread' THEN 1 ELSE 2 END,at_unix_ms DESC,id DESC LIMIT 256")?.query_map([person.as_str()],|r|r.get(0))?.collect::<rusqlite::Result<_>>()?;
+        let candidates:Vec<u64>=self.db.prepare("SELECT id FROM entries WHERE person=? AND active=1 AND kind IN ('kept','observation') AND coalesce(category,'') NOT IN ('episode','fact','pattern','ahead','feeling') ORDER BY CASE category WHEN 'promise' THEN 0 WHEN 'thread' THEN 1 ELSE 2 END,at_unix_ms DESC,id DESC LIMIT 256")?.query_map([person.as_str()],|r|r.get(0))?.collect::<rusqlite::Result<_>>()?;
         // The day a fact is about, apart from when it was said (#3987): a
         // session opened after a restart told only "dentist on Friday" took
         // it against the new day. Older voices ignore the field.
@@ -2860,7 +2867,7 @@ fn legacy_files(dir: &Path) -> Result<Vec<PathBuf>> {
     files.sort();
     Ok(files)
 }
-fn ensure_person(db: &Connection, person: &Person) -> Result<()> {
+pub(crate) fn ensure_person(db: &Connection, person: &Person) -> Result<()> {
     db.execute(
         "INSERT OR IGNORE INTO people(person) VALUES(?)",
         [person.as_str()],
@@ -2890,7 +2897,7 @@ pub(crate) fn next_id(db: &Connection, person: &Person) -> Result<u64> {
     )?;
     Ok(id)
 }
-fn generation(db: &Connection, person: &Person) -> Result<u64> {
+pub(crate) fn generation(db: &Connection, person: &Person) -> Result<u64> {
     Ok(db.query_row(
         "SELECT generation FROM people WHERE person=?",
         [person.as_str()],
@@ -3273,7 +3280,7 @@ fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
         // expired exchange goes by the foreign key (#2176). So does an
         // observation whose event day is on or after `event`: it is kept to
         // its follow-up window. A forget, below, still follows those links.
-        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept' AND coalesce(e.category,'')!='talk' AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=s.child AND d.day>=?1)) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[event])?;
+        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept' AND coalesce(e.category,'') NOT IN ('talk','episode','fact','profile','pattern','ahead','feeling') AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=s.child AND d.day>=?1)) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[event])?;
     } else {
         // A forget: a kept thing goes only when it is named (the doomed rows
         // this walk starts from, with their versions), never because it
@@ -3317,6 +3324,7 @@ fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
         "DELETE FROM jobs WHERE ?1 IS NULL OR person=?1",
         [person.map(Person::as_str)],
     )?;
+    crate::nightly::empty(tx, person)?;
     tx.execute(
         "UPDATE people SET skipped=0 WHERE ?1 IS NULL OR person=?1",
         [person.map(Person::as_str)],

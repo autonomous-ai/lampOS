@@ -130,3 +130,45 @@ CREATE TABLE IF NOT EXISTS said_again (
     origin INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY(rid,at_unix_ms,origin)
 );
+-- Nightly pass B (the memory owner's extraction plan C, step B, 3 Nov;
+-- `nightly.rs`): an item's own fields beside its `entries` row (an
+-- observation of category episode, fact, profile, pattern, ahead or
+-- feeling): its kind, the night that made it, the local day after which it
+-- closes (`expires`, none for no age expiry) and its fields as JSON. Its
+-- row goes with the entry. Older builds pass these tables over;
+-- `user_version` stays 1.
+CREATE TABLE IF NOT EXISTS nightly_items (
+    rid INTEGER PRIMARY KEY REFERENCES entries(rid) ON DELETE CASCADE,
+    person TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    night TEXT NOT NULL,
+    expires TEXT,
+    detail TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS nightly_items_by ON nightly_items(person,kind);
+-- A nightly job: the ids it gave, never their text, so a forget never
+-- needs to erase one and a forget during a pass drops only what rests on
+-- what it forgot. Kept a day.
+CREATE TABLE IF NOT EXISTS nightly_jobs (
+    job INTEGER PRIMARY KEY AUTOINCREMENT,
+    person TEXT NOT NULL,
+    day TEXT NOT NULL,
+    after_id INTEGER NOT NULL,
+    generation INTEGER NOT NULL,
+    at_unix_ms INTEGER NOT NULL,
+    ids TEXT NOT NULL,
+    existing TEXT NOT NULL,
+    state TEXT NOT NULL CHECK(state IN ('pending','done')),
+    result TEXT NOT NULL DEFAULT '',
+    UNIQUE(person,day,after_id)
+);
+-- One night's profile allowance: the lines it began with, and how many
+-- it changed and added.
+CREATE TABLE IF NOT EXISTS nightly_nights (
+    person TEXT NOT NULL,
+    day TEXT NOT NULL,
+    base INTEGER NOT NULL,
+    changed INTEGER NOT NULL DEFAULT 0,
+    added INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(person,day)
+);

@@ -678,6 +678,58 @@ người ấy đã lưu. Câu đang được mang theo như cuộc trò chuyện
 `hits_path=` và số lượt theo từng đường (`hits_turns_speaking=`,
 `hits_turns_face=`, `hits_turns_room=`), chỉ là số đếm, không tên, id hay lời.
 
+## Lượt ban đêm B (kế hoạch trích xuất C, bước B, của người phụ trách trí nhớ, 3/11)
+
+Một lượt mô hình mà voice chạy mỗi đêm cho một người đã biết, sau công tắc
+`LAMP_MEMORY_NIGHTLY` (phía voice). Nó ghi vào kho này những gì Tiers đề
+xuất: các đoạn (episode), sự thật (fact), dòng hồ sơ (profile), thói quen
+lặp lại (pattern), việc sắp tới (ahead) và cảm xúc (feeling)
+(`crates/memory/src/nightly.rs`). Các loại và quy tắc kiểm tra là của Tiers
+(`docs/memory-design.md` và `docs/memory-tiers.md` trên `tiers/recall-adapter`):
+mô hình chỉ trỏ tới id bản ghi, mã chép lời trích; chỉ bản ghi của chính
+người đó; một pattern cần bản ghi trên hai ngày; thay thế giữ lịch sử; một
+kế hoạch hết hạn 14 ngày sau nguồn mới nhất; một cuộc hẹn đóng sau ngày của
+nó; hồ sơ tối đa 60 dòng và 2 KiB, và một đêm đổi tối đa một phần tư. Khác
+biệt là đơn vị ghi: Tiers ghi cả đêm hoặc không gì, nên một mục hỏng làm mất
+cả đêm (34 lần; Tiers đạt 0,35). Ở đây từng mục được kiểm tra riêng: mục hỏng
+bị bỏ và đếm theo lý do, mục tốt được ghi.
+
+- `nightly_prepare {person, day, after_id?}`: các bản ghi đủ điều kiện của
+  người đó trong ngày địa phương `day` (lượt trao đổi có `heard` không rỗng,
+  và điều đã giữ trong ngày), theo id sau `after_id`, tối đa 128 bản ghi và
+  64 KiB; kèm `existing` (mọi dòng hồ sơ hiện tại, rồi 32 fact, episode,
+  ahead mới nhất). Chỉ người đã biết (`p-` và 16 chữ số hex); phòng hay phạm
+  vi quy tắc là `bad_person`. Công việc chỉ giữ id, không giữ chữ.
+- `nightly_apply {person, job, proposal, patterns?, feelings?}`: từng mục
+  được kiểm tra riêng; câu trả lời đếm `accepted`, `dropped` theo loại và
+  `reasons` theo lý do, không bao giờ kèm chữ. `patterns` và `feelings` mặc
+  định tắt: mục của chúng bị bỏ `off`.
+- `search`/`recall` với `nightly:true` thêm `nightly:[…]`, các mục hiện tại
+  khớp truy vấn, trong ngày hay khoảng ngày theo ngày của mục, tối đa 8 và
+  4.096 byte. Không có trường này, câu trả lời giữ nguyên từng byte.
+
+Quyền riêng tư (`private_kind`): không giữ sức khoẻ, thuốc men, tiền bạc hay
+chuyện riêng của người khác, trừ khi mọi nguồn mục đó dẫn đều là điều người
+đó đã nhờ đèn ghi nhớ (hoặc mục dựa trên điều đó); một điều đã giữ lẫn giữa các
+trao đổi là chưa đủ. Kiểm tra bằng danh sách từ tiếng Anh và tiếng Việt
+(`nightly::private`), là lớp chặn dự phòng sau lời nhắc; một cách diễn đạt
+khác có thể lọt. Dòng `relationship` chỉ gồm tên và quan hệ, tối đa 8 từ;
+không có loại `worry`.
+
+Lưu trữ: mỗi mục là một hàng `entries` (`kind='observation'`, `category` là
+loại của nó), nên tìm kiếm, nguồn, thay thế, quên và xoá an toàn như các
+quan sát; trường riêng nằm trong `nightly_items`, công việc trong
+`nightly_jobs`, hạn mức của đêm trong `nightly_nights`, tạo `IF NOT EXISTS`,
+`user_version` vẫn là 1. Mục không hết hạn vì không dùng hay theo 30 ngày của
+lượt trao đổi; chỉ theo ngày kết thúc của nó (ahead, plan, `valid_until`).
+Mỗi người giữ tối đa 512 mục còn hiệu lực (`full`); mục đã bị thay thế hay đã
+hết hạn là lịch sử và không được tính.
+Một lệnh quên xoá mọi mục dẫn tới thứ bị quên, lan tiếp (dòng hồ sơ dẫn một
+fact bị quên); quên trong lúc lượt đang chạy thì khi áp dụng, các mục dẫn tới
+thứ đã mất bị bỏ `forgotten`, phần còn lại vẫn ghi. Dòng hồ sơ vào dải sở
+thích của ghi chú phiên (P3, #5043); các loại khác không bao giờ vào ghi chú
+phiên. Không có gì được nói ra hay hiển thị.
+
 ## Đầu dò của bộ đo (#4748)
 
 Bộ đo bộ nhớ (`docs/memory-bench.md`) chạy một tháng qua chính client Days của
