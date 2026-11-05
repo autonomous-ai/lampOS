@@ -4876,7 +4876,12 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   **Within their conversation** (`LAMP_CONVERSATION_CARRIES=on`, #4339):
   such a line no face was seen speaking stays the conversation's, not the
   room's, when all of these hold: the newest exchange before it is theirs
-  and began within 45 s (`Thread::going_on_with`), the eyes' looks fell in
+  and began within 45 s (`Thread::going_on_with`; a room's exchange whose
+  line their face alone was in view for, its reply told their name, counts
+  as theirs here and nowhere else, `Thread::lamp_for_named`: lamp-06c1,
+  5 Nov, S4, where the owner-only name rule kept a non-owner's opening line
+  as the room's and her car line just after found no conversation of hers),
+  the eyes' looks fell in
   it and none tracked a face but theirs (`SpeakingFaces::no_other_face_in_view`;
   no look, a stalled eye or a covered camera, is not), their face was in
   view through it or within 5 s before it began
