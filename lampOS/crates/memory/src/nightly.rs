@@ -78,6 +78,17 @@ const LINE_BYTES: usize = 200;
 const LABEL_BYTES: usize = 32;
 const DAY_MS: u64 = 86_400_000;
 const JOB_MS: u64 = DAY_MS;
+/// How many days back a day's pass may still run: the voice's
+/// `lamp_voice::nightly::DAYS_BACK`, mirrored (lamp-voice never links this
+/// crate) and pinned equal by `tests/nightly_days_back.rs`. A forget marks
+/// today and these days before it ([`Days::forget_mark`]).
+pub const DAYS_BACK: u32 = 3;
+/// After a forget mark, how long the person's lines are still passed over:
+/// the forget request is that day's exchange too ("forget what I said
+/// about my sister" names the topic again), stamped by the voice at its
+/// turn, so a minute takes it whichever end of the turn it was stamped at
+/// (Heron's point on #5333). A line said later is read.
+pub const FORGET_TURN_MS: u64 = 60_000;
 
 fn bad(message: &'static str) -> Error {
     Error::new("bad_request", message)
@@ -842,6 +853,41 @@ fn job_number(job: &str) -> Result<u64> {
 }
 
 impl Days {
+    /// A forget asked by `person` now (`forget`, `forget_last`, the voice's
+    /// `forget_mark` for a `forget {about}`; El's option 2 on #5333): the
+    /// latest such time of today and of the [`DAYS_BACK`] days before it,
+    /// kept so the night passes over their
+    /// exchanges of those days said before it, and the forget's own turn
+    /// ([`FORGET_TURN_MS`]), as `nightly_prepare` and
+    /// `nightly_apply` read it. A topic forget matches kept things and
+    /// observations only, so a line said and never kept had nothing to
+    /// match and stayed; this keeps the night from keeping it. Only a known
+    /// person's own scope has a night: any other scope marks nothing.
+    pub fn forget_mark(&mut self, person: &Person) -> Result<()> {
+        if !lamp_msgs::known::is_person_id(person.as_str()) {
+            return Ok(());
+        }
+        let Some(today) = Day::at(self.now, &self.local) else {
+            return Ok(());
+        };
+        // Today and each earlier day whose pass may still be pending
+        // ([`DAYS_BACK`]), all at the same time: a forget after midnight,
+        // or before a late pass, reaches the day the words were said on
+        // (Thirteen's P2 on #5345).
+        let tx = self.db.transaction()?;
+        for back in 0..=DAYS_BACK {
+            let Some(day) = today.before(back) else {
+                continue;
+            };
+            tx.execute(
+                "INSERT INTO nightly_forgets(person,day,at_unix_ms) VALUES(?1,?2,?3) ON CONFLICT(person,day) DO UPDATE SET at_unix_ms=max(at_unix_ms,?3)",
+                params![person.as_str(), day.to_string(), self.now],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     /// A bounded input of `person`'s eligible records of the local `day`
     /// after `after_id` (`nightly_prepare`), or `None` when there is none.
     pub fn nightly_prepare(
@@ -882,8 +928,8 @@ impl Days {
         let (lines, changes, adds) = allowance(&tx, person, &day)?;
         let generation = generation(&tx, person)?;
         let rows = tx
-            .prepare("SELECT id,at_unix_ms,kind,heard,said,text FROM entries WHERE person=?1 AND day=?2 AND id>?3 AND active=1 AND ((kind='exchange' AND trim(heard)!='') OR kind='kept') ORDER BY id")?
-            .query_map(params![person.as_str(), day, after_id], |r| {
+            .prepare("SELECT id,at_unix_ms,kind,heard,said,text FROM entries WHERE person=?1 AND day=?2 AND id>?3 AND active=1 AND ((kind='exchange' AND trim(heard)!='' AND at_unix_ms>coalesce((SELECT f.at_unix_ms+?4 FROM nightly_forgets f WHERE f.person=?1 AND f.day=?2),-1)) OR kind='kept') ORDER BY id")?
+            .query_map(params![person.as_str(), day, after_id, FORGET_TURN_MS], |r| {
                 Ok(json!({"id":r.get::<_,u64>(0)?,"at_unix_ms":r.get::<_,u64>(1)?,"kind":r.get::<_,String>(2)?,"heard":r.get::<_,String>(3)?,"said":r.get::<_,String>(4)?,"text":r.get::<_,String>(5)?}))
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -995,10 +1041,17 @@ impl Days {
                 )
                 .optional()?;
             // A record given as a record must still be one of the person's
-            // own eligible kinds; an existing item, still a nightly item.
+            // own eligible kinds; an existing item, still a nightly item. An
+            // exchange said before a forget of its day, one asked during
+            // the pass too, is left out as a forgotten one is.
             if let Some(source) = found {
                 let fits = if batch_ids.contains(id) {
-                    source.item.is_none() && matches!(source.kind.as_str(), "exchange" | "kept")
+                    source.item.is_none()
+                        && match source.kind.as_str() {
+                            "kept" => true,
+                            "exchange" => !marked(&tx, person, &source.day, source.at)?,
+                            _ => false,
+                        }
                 } else {
                     source.item.is_some()
                 };
@@ -1298,10 +1351,22 @@ pub(crate) fn with_doomed(tx: &Transaction<'_>) -> Result<()> {
     }
 }
 
+/// Whether a line `person` said at `at` on `day` is passed over: a forget
+/// of theirs that day after it, or the forget's own turn
+/// ([`Days::forget_mark`], [`FORGET_TURN_MS`]).
+fn marked(tx: &rusqlite::Connection, person: &Person, day: &str, at: u64) -> Result<bool> {
+    Ok(tx.query_row(
+        "SELECT EXISTS (SELECT 1 FROM nightly_forgets WHERE person=?1 AND day=?2 AND at_unix_ms+?4>=?3)",
+        params![person.as_str(), day, at, FORGET_TURN_MS],
+        |r| r.get(0),
+    )?)
+}
+
 /// Expiry (`maintain`): an item whose end day is before `today` joins the
 /// doomed rows, with the items citing it; nightly jobs older than a day, and night allowances of
-/// days long gone, go.
-pub(crate) fn expire(tx: &Transaction<'_>, today: &str, now: u64) -> Result<()> {
+/// days long gone, go; and forget marks of days before `oldest`, the first
+/// day whose exchanges are still kept.
+pub(crate) fn expire(tx: &Transaction<'_>, today: &str, oldest: &str, now: u64) -> Result<()> {
     tx.execute(
         "INSERT OR IGNORE INTO doomed SELECT rid FROM nightly_items WHERE expires IS NOT NULL AND expires<?",
         [today],
@@ -1324,11 +1389,13 @@ pub(crate) fn expire(tx: &Transaction<'_>, today: &str, now: u64) -> Result<()> 
     if let Some(old) = old {
         tx.execute("DELETE FROM nightly_nights WHERE day<?", [old])?;
     }
+    tx.execute("DELETE FROM nightly_forgets WHERE day<?", [oldest])?;
     Ok(())
 }
 
-/// A person's pending nightly jobs and allowances, on `forget_all` and
-/// `forget_person` (every person for `None`).
+/// A person's pending nightly jobs, allowances and forget marks, on
+/// `forget_all` and `forget_person` (every person for `None`): their
+/// exchanges are all gone, so no mark is needed.
 pub(crate) fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<()> {
     tx.execute(
         "DELETE FROM nightly_jobs WHERE ?1 IS NULL OR person=?1",
@@ -1336,6 +1403,10 @@ pub(crate) fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<()>
     )?;
     tx.execute(
         "DELETE FROM nightly_nights WHERE ?1 IS NULL OR person=?1",
+        [person.map(Person::as_str)],
+    )?;
+    tx.execute(
+        "DELETE FROM nightly_forgets WHERE ?1 IS NULL OR person=?1",
         [person.map(Person::as_str)],
     )?;
     Ok(())
@@ -1846,19 +1917,27 @@ mod tests {
             NOW + 40,
         );
         assert_eq!(s.active(cello), None);
-        // forget_all leaves no item and no job.
-        s.say(NOW + 50, "I work at the city library now.", "Nice.");
+        // forget_all leaves no item and no job. Said past the last
+        // forget's turn, so the night reads it ([`FORGET_TURN_MS`]).
+        s.say(
+            NOW + 40 + FORGET_TURN_MS + 10,
+            "I work at the city library now.",
+            "Nice.",
+        );
         let day = Day::at(NOW, &crate::store::LocalTime::Offset(0))
             .unwrap()
             .to_string();
         // That night's first batch is done; what came after it is a new one.
         let input = s.ask(
             json!({"op":"nightly_prepare","person":MAI,"day":day,"after_id":later}),
-            NOW + 60,
+            NOW + FORGET_TURN_MS + 60,
         );
         assert_eq!(input["ok"], true, "{input}");
         assert!(input["input"]["job"].is_string(), "{input}");
-        s.ask(json!({"op":"forget_all","person":MAI}), NOW + 70);
+        s.ask(
+            json!({"op":"forget_all","person":MAI}),
+            NOW + FORGET_TURN_MS + 70,
+        );
         let left: u64 = s
             .1
             .db
@@ -1872,7 +1951,7 @@ mod tests {
     }
 
     #[test]
-    fn a_forget_during_a_pass_drops_only_what_rests_on_it() {
+    fn a_forget_during_a_pass_drops_what_rests_on_it_and_the_days_earlier_lines() {
         let mut s = Scratch::new("mid-pass");
         let ids = day(&mut s, NOW);
         let input = s.prepare(NOW, NOW + 10);
@@ -1895,8 +1974,10 @@ mod tests {
             false,
             NOW + 20,
         );
-        assert_eq!(got["accepted"]["fact"], 1, "{got}");
-        assert_eq!(got["reasons"], json!({"forgotten":2}), "{got}");
+        // The forgotten line's episode and fact; and the sister's fact too,
+        // its line said that day before the forget (El's option 2 on #5333).
+        assert_eq!(got["accepted"]["fact"], 0, "{got}");
+        assert_eq!(got["reasons"], json!({"forgotten":3}), "{got}");
     }
 
     #[test]
@@ -2231,5 +2312,273 @@ mod tests {
         assert!(records < 60, "{records}");
         assert_eq!(input["input"]["more"], true);
         assert!(input["input"].to_string().len() <= MAX_INPUT_BYTES);
+    }
+
+    /// Hour `h` of the day of `NOW` (noon UTC), at `Offset(0)`.
+    fn hour(h: u64) -> u64 {
+        NOW - DAY_MS / 2 + h * 3_600_000
+    }
+
+    fn heard(input: &Value) -> Vec<String> {
+        input["input"]["records"]
+            .as_array()
+            .map(|records| {
+                records
+                    .iter()
+                    .map(|r| r["heard"].as_str().unwrap().to_owned())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// El's scene on #5333: said at 15:00 and not kept, a topic forget at
+    /// 16:00 that matched nothing, and the night passes over the 15:00 line
+    /// and the forget's own turn, but reads a line said after it, another
+    /// person's and another day's.
+    #[test]
+    fn a_forget_mark_keeps_the_night_off_that_days_earlier_lines() {
+        let mut s = Scratch::new("mark");
+        const BINH: &str = "p-fedcba9876543210";
+        let binh = Person::new(BINH).unwrap();
+        // Yesterday, the same words: a day whose pass may still be pending,
+        // so it is marked too. Four days back, past the voice's pass: not.
+        s.say(
+            hour(15) - DAY_MS,
+            "My sister Lan lives in Hue.",
+            "Lovely city.",
+        );
+        let four_back = hour(15) - (u64::from(DAYS_BACK) + 1) * DAY_MS;
+        s.say(four_back, "My sister Lan lived in Hanoi.", "I see.");
+        s.say(
+            hour(15),
+            "My sister Lan just moved to Da Nang.",
+            "How exciting.",
+        );
+        // A kept thing is the person's own ask, and a forget of it is by
+        // its id: a mark leaves it to the night.
+        s.1.remember(
+            &Person::new(MAI).unwrap(),
+            hour(15) + 1,
+            "I play the cello on Sundays.",
+        )
+        .unwrap();
+        s.1.append(&binh, hour(15), "My brother lives in Hanoi.", "Nice.", &[])
+            .unwrap();
+        // The voice's mark for a `forget {about}` that matched nothing.
+        assert_eq!(
+            s.ask(json!({"op":"forget_mark","person":MAI}), hour(16)),
+            json!({"ok":true})
+        );
+        // The forget request itself, stamped in its turn.
+        s.say(
+            hour(16) + 5_000,
+            "Forget what I said about my sister.",
+            "I couldn't find anything about your sister.",
+        );
+        // Said well after it: read.
+        s.say(
+            hour(16) + 5 * 60_000,
+            "I have a dentist visit on Friday.",
+            "Noted.",
+        );
+        let tonight = NOW + DAY_MS / 2 + 3 * 3_600_000;
+        let input = s.prepare(hour(16), tonight);
+        assert_eq!(heard(&input), ["", "I have a dentist visit on Friday."]);
+        assert_eq!(input["input"]["records"][0]["kind"], "kept");
+        // Yesterday's earlier line is passed over too; a day past the
+        // voice's pass is untouched.
+        assert_eq!(
+            s.prepare(hour(15) - DAY_MS, tonight),
+            json!({"ok":true,"reason":"nothing"})
+        );
+        assert_eq!(
+            heard(&s.prepare(four_back, tonight)),
+            ["My sister Lan lived in Hanoi."]
+        );
+        // Another person's lines are untouched.
+        let day = Day::at(hour(15), &crate::store::LocalTime::Offset(0))
+            .unwrap()
+            .to_string();
+        let theirs = s.ask(
+            json!({"op":"nightly_prepare","person":BINH,"day":day}),
+            tonight,
+        );
+        assert_eq!(heard(&theirs), ["My brother lives in Hanoi."]);
+        // The room and a rules scope mark nothing: Mai's today and the
+        // days back are all.
+        s.ask(json!({"op":"forget_mark"}), hour(17));
+        let marks: u64 =
+            s.1.db
+                .query_row("SELECT count(*) FROM nightly_forgets", [], |r| r.get(0))
+                .unwrap();
+        assert_eq!(marks, u64::from(DAYS_BACK) + 1);
+    }
+
+    /// A forget asked while a pass runs: the lines said before it are left
+    /// out of the apply as a forgotten one is.
+    #[test]
+    fn a_forget_mark_during_a_pass_drops_what_rests_on_earlier_lines() {
+        let mut s = Scratch::new("mark-mid-pass");
+        let sister = s.say(
+            hour(15),
+            "My sister Lan just moved to Da Nang.",
+            "How exciting.",
+        );
+        let input = s.prepare(hour(15), hour(20));
+        assert_eq!(heard(&input).len(), 1);
+        s.ask(json!({"op":"forget_mark","person":MAI}), hour(21));
+        let got = s.apply(
+            &input["input"]["job"],
+            json!({"facts":[{"kind":"person","claim":"Sister Lan lives in Da Nang.","cites":[sister]}]}),
+            false,
+            hour(22),
+        );
+        assert_eq!(got["accepted"]["fact"], 0, "{got}");
+        assert_eq!(got["reasons"], json!({"forgotten":1}), "{got}");
+    }
+
+    /// `forget` and `forget_last` mark the day, found or not; `forget_all`
+    /// and `forget_person` take the person's marks with everything else.
+    #[test]
+    fn every_forget_marks_and_forgetting_everything_takes_the_marks() {
+        let mut s = Scratch::new("mark-ops");
+        let marks = |s: &Scratch| -> u64 {
+            s.1.db
+                .query_row(
+                    "SELECT count(*) FROM nightly_forgets WHERE person=?",
+                    [MAI],
+                    |r| r.get(0),
+                )
+                .unwrap()
+        };
+        let at = |s: &Scratch| -> u64 {
+            s.1.db
+                .query_row(
+                    "SELECT min(at_unix_ms) FROM nightly_forgets WHERE person=?",
+                    [MAI],
+                    |r| r.get(0),
+                )
+                .unwrap()
+        };
+        s.say(
+            hour(13),
+            "My sister Lan just moved to Da Nang.",
+            "How exciting.",
+        );
+        s.ask(json!({"op":"forget","person":MAI,"id":999}), hour(14));
+        let window = u64::from(DAYS_BACK) + 1;
+        assert_eq!((marks(&s), at(&s)), (window, hour(14)));
+        s.ask(
+            json!({"op":"forget_last","person":MAI,"kind":"kept"}),
+            hour(15),
+        );
+        assert_eq!((marks(&s), at(&s)), (window, hour(15)));
+        // The next day adds its own mark, and moves the rest on.
+        s.ask(json!({"op":"forget_mark","person":MAI}), hour(15) + DAY_MS);
+        assert_eq!((marks(&s), at(&s)), (window + 1, hour(15)));
+        s.ask(json!({"op":"forget_all","person":MAI}), hour(16) + DAY_MS);
+        assert_eq!(marks(&s), 0);
+        s.ask(json!({"op":"forget_mark","person":MAI}), hour(17) + DAY_MS);
+        s.ask(
+            json!({"op":"forget_person","person":MAI}),
+            hour(18) + DAY_MS,
+        );
+        assert_eq!(marks(&s), 0);
+    }
+
+    /// Thirteen's P2 on #5345: said at 23:40, forgotten at 00:10 the next
+    /// day, and that night's 03:00 pass of the first day passes over it. A
+    /// line said on the new day after the forget minute is read.
+    #[test]
+    fn a_forget_after_midnight_reaches_the_day_before() {
+        let mut s = Scratch::new("mark-midnight");
+        let minute = 60_000;
+        s.say(
+            hour(23) + 40 * minute,
+            "My sister Lan just moved to Da Nang.",
+            "How exciting.",
+        );
+        s.ask(
+            json!({"op":"forget","person":MAI,"id":999}),
+            hour(24) + 10 * minute,
+        );
+        s.say(
+            hour(24) + 20 * minute,
+            "I have a dentist visit on Friday.",
+            "Noted.",
+        );
+        let night = hour(27);
+        assert_eq!(
+            s.prepare(hour(23), night),
+            json!({"ok":true,"reason":"nothing"})
+        );
+        assert_eq!(
+            heard(&s.prepare(hour(24) + 20 * minute, night)),
+            ["I have a dentist visit on Friday."]
+        );
+    }
+
+    /// El's second scene on #5345: a night put off, so a day two days back
+    /// is still pending, and a forget today passes over its lines.
+    #[test]
+    fn a_forget_today_reaches_a_day_still_pending_two_days_back() {
+        let mut s = Scratch::new("mark-pending");
+        let two_back = hour(15) - 2 * DAY_MS;
+        s.say(
+            two_back,
+            "My sister Lan just moved to Da Nang.",
+            "How exciting.",
+        );
+        s.ask(json!({"op":"forget_mark","person":MAI}), hour(13));
+        s.say(hour(14), "I have a dentist visit on Friday.", "Noted.");
+        assert_eq!(
+            s.prepare(two_back, hour(27)),
+            json!({"ok":true,"reason":"nothing"})
+        );
+        assert_eq!(
+            heard(&s.prepare(hour(14), hour(27))),
+            ["I have a dentist visit on Friday."]
+        );
+    }
+
+    /// A forget four days later marks no day past the voice's pass: that
+    /// day's lines are as they were (its pass ran, or never will).
+    #[test]
+    fn a_forget_four_days_later_leaves_the_day_alone() {
+        let mut s = Scratch::new("mark-four-days");
+        s.say(
+            hour(15),
+            "My sister Lan just moved to Da Nang.",
+            "How exciting.",
+        );
+        let later = hour(15) + (u64::from(DAYS_BACK) + 1) * DAY_MS;
+        s.ask(
+            json!({"op":"forget_last","person":MAI,"kind":"kept"}),
+            later,
+        );
+        assert_eq!(
+            heard(&s.prepare(hour(15), later + 60_000)),
+            ["My sister Lan just moved to Da Nang."]
+        );
+    }
+
+    /// `forget_last` marks the days even when nothing is kept to forget
+    /// (the mutation that drops its mark fails here).
+    #[test]
+    fn a_forget_last_with_nothing_kept_still_marks() {
+        let mut s = Scratch::new("mark-forget-last");
+        s.say(
+            hour(15),
+            "My sister Lan just moved to Da Nang.",
+            "How exciting.",
+        );
+        s.ask(
+            json!({"op":"forget_last","person":MAI,"kind":"kept"}),
+            hour(16),
+        );
+        assert_eq!(
+            s.prepare(hour(15), hour(27)),
+            json!({"ok":true,"reason":"nothing"})
+        );
     }
 }

@@ -236,6 +236,14 @@ enum Extra {
         #[serde(default)]
         feelings: bool,
     },
+    /// A forget a known person asked that may reach nothing kept (the
+    /// voice's `forget {about}`): their exchanges of today said before it
+    /// are not read by the night (`Days::forget_mark`, El's option 2 on
+    /// #5333). Any other scope marks nothing.
+    ForgetMark {
+        #[serde(default)]
+        person: Who,
+    },
     /// #2176 (5a): the room's entries become someone known's (`Days::adopt`).
     Adopt {
         #[serde(default)]
@@ -922,6 +930,10 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             patterns,
             feelings,
         } => store.nightly_apply(&one(person)?, &job, &proposal, patterns, feelings)?,
+        Extra::ForgetMark { person } => {
+            store.forget_mark(&one(person)?)?;
+            json!({"ok":true})
+        }
         Extra::Adopt { person, to, ids } => {
             let to = one(Who::Id(to))?;
             let moved = store.adopt(&one(person)?, &to, &ids)?;
@@ -961,6 +973,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "talk_notes",
             "nightly_prepare",
             "nightly_apply",
+            "forget_mark",
         ];
         const OLD: &[&str] = &[
             "append",

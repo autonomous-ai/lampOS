@@ -94,6 +94,9 @@ pub const MOST_REPLY_BYTES: usize = 60 * 1024;
 pub const MOST_LINE_BYTES: usize = 64 * 1024;
 /// People and days waiting for a pass at most, and how many days back.
 pub const MOST_PENDING: usize = 32;
+/// Mirrored by `lamp_memory::nightly::DAYS_BACK`, the days a forget marks
+/// for the night, and pinned equal by lamp-memory's
+/// `tests/nightly_days_back.rs`.
 pub const DAYS_BACK: i64 = 3;
 /// How often a call in flight looks whether it must stop.
 const STOP_CHECK: Duration = Duration::from_millis(20);

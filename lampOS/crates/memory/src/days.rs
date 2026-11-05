@@ -451,7 +451,7 @@ impl Days {
         tx.execute("INSERT INTO doomed SELECT rid FROM entries WHERE (kind='exchange' AND day<?1) OR (kind='observation' AND coalesce(category,'') NOT IN ('talk','episode','fact','profile','pattern','ahead','feeling') AND used_unix_ms<?2 AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=entries.rid AND d.day>=?3))",params![day,unused,event])?;
         // Nightly pass B's items close on their own end days, never by
         // disuse or with their source exchanges (`nightly::expire`).
-        crate::nightly::expire(&tx, &today, self.now)?;
+        crate::nightly::expire(&tx, &today, &day, self.now)?;
         descendants(&tx, Some(&event))?;
         let count = erase(&tx)?;
         tx.execute(
@@ -1278,6 +1278,9 @@ impl Days {
     /// a request without `selective` gets, so an older voice, and one whose
     /// links say what was used (`LAMP_MEMORY_LINK_USED`), forget as before.
     pub fn forget_linked(&mut self, person: &Person, id: u64, selective: bool) -> Result<u64> {
+        // Marked first, found or not: what they asked to forget may be a
+        // line nothing else names (`Days::forget_mark`).
+        self.forget_mark(person)?;
         let count = self.forget_here(person, id, selective)?;
         self.forget_set_aside()?;
         Ok(count)
@@ -1388,6 +1391,7 @@ impl Days {
         Ok(count)
     }
     pub fn forget_last(&mut self, person: &Person, only: Option<Kind>) -> Result<Option<Removed>> {
+        self.forget_mark(person)?;
         let kind = only.map(|k| match k {
             Kind::Kept => "kept",
             Kind::Exchange => "exchange",
