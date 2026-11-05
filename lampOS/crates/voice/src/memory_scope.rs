@@ -471,7 +471,9 @@ struct RequestContext {
     /// [`Self::named`] by the one-face count, the mouth not read
     /// (`LAMP_SECOND_NAME_ONE_FACE`, [`ScopeLease::name_for_reply_by_one_face`]).
     named_by_one_face: AtomicBool,
-    /// [`Self::named`] by the mouth rule, no other voice known for the line:
+    /// [`Self::named`] by `speaking_faces::named_alone` (no face seen
+    /// speaking it, their face alone in view with at least one look of it
+    /// read speaking), no other voice known for the line:
     /// its exchange may open the person's conversation going on for a carry
     /// ([`ScopeLease::name_for_conversation`]). Cleared by any later narrow
     /// and by another voice heard as the line is judged.
@@ -486,6 +488,10 @@ struct RequestContext {
     /// it (#4339, [`ScopeLease::carry_conversation`]): that person's scope
     /// held ([`ScopeSnapshot::held`]) from then on, unless narrowed.
     carried: OnceLock<ScopeSnapshot>,
+    /// Carried for this person's keep only ([`ScopeLease::carry_keep_only`]):
+    /// [`Self::carried`] is then the room's, held, and only the keep is
+    /// theirs, held for their seen yes.
+    keep_for: OnceLock<Arc<str>>,
     /// Carried, its keep waits for that conversation's person's yes
     /// (`LAMP_CONVERSATION_CARRIED_SAVES`, [`ScopeLease::save_carried`]).
     carried_saves: AtomicBool,
@@ -587,6 +593,7 @@ impl RequestScope {
                 key,
                 scope,
                 carried: OnceLock::new(),
+                keep_for: OnceLock::new(),
                 carried_saves: AtomicBool::new(false),
                 one_face: Mutex::new(None),
                 narrowed: AtomicBool::new(false),
@@ -637,6 +644,7 @@ impl RequestScope {
                 key,
                 scope,
                 carried: OnceLock::new(),
+                keep_for: OnceLock::new(),
                 carried_saves: AtomicBool::new(false),
                 one_face: Mutex::new(None),
                 narrowed: AtomicBool::new(false),
@@ -787,6 +795,37 @@ impl ScopeLease {
         carried.person() == Some(person)
     }
 
+    /// [`Self::carry_conversation`] for a conversation `person` only opened
+    /// by a room's line named for them ([`Self::named_for_conversation`]):
+    /// its keep alone is carried. Its scope is the room's, held
+    /// ([`ScopeSnapshot::held`]): told the room's thread, never their
+    /// thread, running summary, recall, note or hits, and no forget or yes;
+    /// with [`Self::save_carried`], its `remember` is held for `person`'s
+    /// own seen yes and written in their scope on it ([`Self::saves_carried`]).
+    /// A name with no face seen speaking the line, their face alone in view
+    /// with at least one look of it read speaking, fits a partner off
+    /// camera while they nod (Heron's P2 on #5448), so nothing of theirs is
+    /// told on it. `false`, and nothing changed, as for
+    /// [`Self::carry_conversation`].
+    pub fn carry_keep_only(&self, person: &str) -> bool {
+        if !self.is_current()
+            || self.context.narrowed.load(Ordering::Acquire)
+            || self.context.scope.person().is_some_and(|own| own != person)
+        {
+            return false;
+        }
+        let keep_for = self.context.keep_for.get_or_init(|| Arc::from(person));
+        if &**keep_for != person {
+            return false;
+        }
+        let held = ScopeSnapshot {
+            person: None,
+            held: true,
+        };
+        let carried = self.context.carried.get_or_init(|| held);
+        carried.person().is_none()
+    }
+
     /// A carried line ([`Self::carry_conversation`]) may save: its
     /// `remember` is held, in memory only, for the carried person's yes,
     /// their own face seen saying it, and then written in their scope, the
@@ -815,7 +854,10 @@ impl ScopeLease {
         (self.is_current()
             && !self.context.narrowed.load(Ordering::Acquire)
             && self.context.carried_saves.load(Ordering::Acquire))
-        .then(|| self.context.carried.get().and_then(ScopeSnapshot::person))
+        .then(|| match self.context.keep_for.get() {
+            Some(person) => Some(&**person),
+            None => self.context.carried.get().and_then(ScopeSnapshot::person),
+        })
         .flatten()
     }
 
@@ -846,9 +888,10 @@ impl ScopeLease {
         self.name_for_reply();
     }
 
-    /// A line named for its reply by the mouth rule
-    /// ([`Self::name_for_reply`], `speaking_faces::named_alone`: the person's
-    /// face alone in view and read speaking in some look), with the voice
+    /// A line named for its reply by `speaking_faces::named_alone`
+    /// ([`Self::name_for_reply`]: no face seen speaking it, the person's
+    /// face alone in view with at least one look of it read speaking; never
+    /// their mouth seen saying it), with the voice
     /// rule there and no other voice known: its room's exchange may open
     /// their conversation going on for a carry
     /// ([`Self::named_for_conversation`], `Thread::lamp_for_named`;

@@ -114,7 +114,7 @@ fn feed_faces(
 
 /// A face's mouth read speaking in one look of four and unread in the
 /// rest: never seen speaking it (no majority), but a face alone in view is
-/// then named for the reply by the mouth rule
+/// then named for the reply by `named_alone`
 /// ([`SpeakingFaces::alone_in_view`]; lamp-06c1, 5 Nov, S4's opening line:
 /// read speaking in 1 of 9 looks).
 const S4_OPENING_MOUTHS: &[lamp_msgs::SpeakingState] = &[
@@ -474,11 +474,11 @@ async fn lines_known(
         Some(kept) => {
             let kept = kept.clone();
             Some(Arc::new(move |request: u64| {
-                kept.lock().unwrap().going_on_with(request, Instant::now())
+                kept.lock().unwrap().going_on_how(request, Instant::now())
             }))
         }
         None => going_on.map(|going_on| -> crate::second_provider::GoingOnWith {
-            Arc::new(move |_| going_on.then(|| a.clone()))
+            Arc::new(move |_| going_on.then(|| (a.clone(), false)))
         }),
     });
     let mut engine = engine.saving_carried(saves);
@@ -1598,8 +1598,9 @@ async fn an_off_camera_keep_just_after_her_face_left_is_carried_and_held_for_her
 /// camera just after, then found no conversation of hers going on: no
 /// carry line, `speaker unknown (skipped=1)`, and her "Yes, please keep
 /// that." had nothing held. That room's exchange, named for her face
-/// alone, is her conversation going on: the car line is carried, its keep
-/// held, and written in her scope on her seen yes. A second face in view
+/// alone, opens her conversation for a keep only: the car line's keep is
+/// carried, held, and written in her scope on her seen yes, while the line
+/// itself is told as the room's, never her context or thread. A second face in view
 /// at the opening (not named for her) or at the car line: no carry, the
 /// room's keep.
 #[tokio::test]
@@ -1673,12 +1674,23 @@ async fn a_keep_just_after_her_face_alone_opened_as_the_rooms_is_carried_for_her
         )
         .await;
         assert_eq!(got.calls, expected, "{what}");
+        // Line 2's rounds (the keep and its ask) are never told A's context
+        // or thread: a conversation opened only by a line named for her
+        // carries the keep alone (Heron's P2 on #5448: her partner off
+        // camera, the conversation's only voice, looks the same).
+        let as_a = Message::system(format!("for {:?}", Some(a.as_str())));
+        assert_eq!(got.asked.len(), 4, "{what}: rounds");
+        assert!(
+            got.asked[1..3].iter().all(|told| *told != as_a),
+            "{what}: line 2 told A's context: {:?}",
+            &got.asked[1..3]
+        );
     }
 }
 
 /// Thirteen's P1 on #5448: a guest speaks line 1 off camera while A's
 /// face sits alone in view and is named for the reply, by the one-face
-/// count (her still face) or by the mouth rule (read speaking in one look
+/// count (her still face) or by `named_alone` (read speaking in one look
 /// of four), and the voice rule hears another voice. The guest's line 2,
 /// off camera within 5 s, A's face gone, carries a keep. Line 1 opens no
 /// conversation of A's, so line 2 is not carried: its keep runs as the
@@ -1701,7 +1713,7 @@ async fn a_guests_line_beside_her_named_lone_face_opens_no_conversation_of_hers(
     let shown = |shown: bool| -> Option<(bool, crate::second_provider::AnotherVoice)> {
         Some((true, Arc::new(move || shown)))
     };
-    // (what, the one-face count on, line 1's mouths, mouth-rule murmur on
+    // (what, the one-face count on, line 1's mouths, `named_alone` murmur on
     // line 1, voice, past_silent)
     type PastSilent = Option<(bool, crate::second_provider::AnotherVoice)>;
     type Mouths = &'static [lamp_msgs::SpeakingState];
