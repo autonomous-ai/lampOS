@@ -1866,6 +1866,39 @@ fn the_sign_in_by_code_is_the_trusted_routes_from_its_code_to_its_end() {
     assert_eq!(s.counts.sign_in_starts.load(Ordering::SeqCst), 2);
 }
 
+/// #5379, lamp-c0a4 on 5 Nov: Harness put on by the onboarding install has
+/// no daemon at boot, so after a reboot a signed-in lamp had none, and no
+/// hand-over could go. With `--sign-in-by-code` and `--set-up-later`, a
+/// part that first reads Harness as signed in starts its daemon once; one
+/// that reads it signed out starts nothing, and nor does a part without
+/// `--sign-in-by-code`.
+#[test]
+fn a_part_started_signed_in_starts_harnesss_daemon_once() {
+    let started = |by_code: bool, signed_out: bool| {
+        let mut s = Running::unstarted(false, false, false, false);
+        s.config.sign_in_by_code = by_code;
+        s.config.set_up_later = Some(SetUpLater {
+            targets: s.root.path().join("targets.json"),
+            every: Duration::from_millis(20),
+            from_machines: None,
+        });
+        s.counts.signed_out.store(signed_out, Ordering::SeqCst);
+        s.start();
+        // Many sign-in reads, every 20 ms: the start is made once, not at
+        // each read.
+        let start = Instant::now();
+        while s.counts.sign_in_reads.load(Ordering::SeqCst) < 5 {
+            assert!(start.elapsed() < Duration::from_secs(5), "no sign-in read");
+            thread::sleep(Duration::from_millis(10));
+        }
+        thread::sleep(Duration::from_millis(200));
+        s.counts.daemon_starts.load(Ordering::SeqCst)
+    };
+    assert_eq!(started(true, false), 1, "signed in at the start");
+    assert_eq!(started(true, true), 0, "signed out at the start");
+    assert_eq!(started(false, false), 0, "no sign-in by code");
+}
+
 /// openharness#1463, the reviewer-lead's P2 on #2309: a hand-over waiting
 /// when a sign-in by code succeeds goes to Harness only after its daemon
 /// was started again, and a sign-in that fails starts nothing (the
