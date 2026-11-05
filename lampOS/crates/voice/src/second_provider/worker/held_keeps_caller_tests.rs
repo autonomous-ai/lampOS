@@ -944,6 +944,7 @@ fn the_callers_face_speaking_yields_to_the_guards() {
     let mut heeding = Heeding::new(true, true, None, None);
     heeding.holding_untied();
     heeding.caller_faces = vec!["b/f1".to_owned()];
+    heeding.caller_faces_from_call = true;
     let seen = |heard: &str, speakers: &[&str], other_voice| Seen {
         room: crate::room_told::Room::Quiet,
         going_on: true,
@@ -995,4 +996,56 @@ fn the_callers_face_speaking_yields_to_the_guards() {
             "{why}"
         );
     }
+}
+
+/// The Reviewer-lead's P2 on #5440: the lever trusts only a face seen
+/// speaking the call itself. A call with no face seen speaking it; a
+/// colleague, f2, turns to the lamp and says "I'll be back after lunch."
+/// 2 s after the answer (the grace may keep it, and the fallback then takes
+/// f2 for the caller's); f2's next questions to the desk stay held. The
+/// control: with the call seen spoken by f1, f1's line after desk talk is
+/// still kept.
+#[test]
+fn the_callers_face_speaking_trusts_only_a_face_seen_speaking_the_call() {
+    let colleague = |at, heard, answer| Line {
+        faces: B_SPEAKS,
+        ..line(at, 2_000, heard, answer)
+    };
+    let probe = [
+        LONDON,
+        colleague(6_800, "I'll be back after lunch.", "See you then."),
+        colleague(
+            12_000,
+            "Did you finish the report for the client?",
+            "Not yet.",
+        ),
+        colleague(16_000, "Can you send it to me before four?", "Sure."),
+    ];
+    let out = play_seen(BOTH, &probe);
+    eprintln!("FALLBACK_FACE_PROBE both={out:?}");
+    assert!(out[0], "the call is answered");
+    assert_eq!(
+        out[2..],
+        [false, false],
+        "the colleague's desk questions stay held"
+    );
+    let control = [
+        Line {
+            faces: CALLER_SPEAKS,
+            ..LONDON
+        },
+        colleague(7_000, "Are you coming to the meeting at four?", "No."),
+        Line {
+            faces: CALLER_SPEAKS,
+            ..line(12_000, 1_800, "Maybe. What would you do?", "I'd go.")
+        },
+    ];
+    let (grace, both) = (play_seen(GRACE, &control), play_seen(BOTH, &control));
+    eprintln!("FALLBACK_FACE_CONTROL grace={grace:?} both={both:?}");
+    assert_eq!(grace, [true, false, false], "without the lever");
+    assert_eq!(
+        both,
+        [true, false, true],
+        "the caller seen speaking the call"
+    );
 }
