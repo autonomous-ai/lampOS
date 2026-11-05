@@ -75,6 +75,10 @@ enum Extra {
         /// so in `strength` ([`Strength`]). Absent, as before.
         #[serde(default)]
         strength: bool,
+        /// Nightly pass B: the answer also has the person's matching
+        /// nightly items (`Days::nightly_find`). Absent, as before.
+        #[serde(default)]
+        nightly: bool,
     },
     /// The legacy `recall` with any of #2176's fields: a span of days
     /// (`day_from`, `day_to`) or `recall_v2`. Without them a recall is the
@@ -106,6 +110,9 @@ enum Extra {
         /// so in `strength` ([`Strength`]). Absent, as before.
         #[serde(default)]
         strength: bool,
+        /// Nightly pass B, as `search`'s.
+        #[serde(default)]
+        nightly: bool,
     },
     Forget {
         #[serde(default)]
@@ -207,6 +214,28 @@ enum Extra {
         #[serde(default)]
         max_bytes: Option<usize>,
     },
+    /// Nightly pass B: one known person's eligible records of a local day
+    /// (`Days::nightly_prepare`).
+    NightlyPrepare {
+        #[serde(default)]
+        person: Who,
+        day: String,
+        #[serde(default)]
+        after_id: u64,
+    },
+    /// Nightly pass B: the model's proposal, each item checked alone
+    /// (`Days::nightly_apply`). `patterns` and `feelings` are off unless sent.
+    NightlyApply {
+        #[serde(default)]
+        person: Who,
+        job: String,
+        #[serde(default)]
+        proposal: Value,
+        #[serde(default)]
+        patterns: bool,
+        #[serde(default)]
+        feelings: bool,
+    },
     /// #2176 (5a): the room's entries become someone known's (`Days::adopt`).
     Adopt {
         #[serde(default)]
@@ -256,6 +285,20 @@ fn ask<'a>(
 /// The most days a span names, both ends counted (#2176): "last week" is
 /// seven.
 const SPAN_DAYS: u32 = 14;
+
+/// Nightly items a `search` or `recall` with `nightly:true` gives at most.
+const NIGHTLY_MOST: usize = 8;
+const NIGHTLY_BYTES: usize = 4096;
+
+/// A request's day or span, as `Days::nightly_find` takes it.
+fn nightly_days(day: &Option<String>, last: Option<Day>) -> Option<(String, String)> {
+    day.as_ref().map(|first| {
+        (
+            first.clone(),
+            last.map_or_else(|| first.clone(), |last| last.to_string()),
+        )
+    })
+}
 
 /// The days a request names: one `day`, or a span from `day_from` to
 /// `day_to`, both ends counted, oldest first and at most [`SPAN_DAYS`].
@@ -575,6 +618,7 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             recall_v2,
             newer_first,
             strength,
+            nightly,
         } => {
             // `more` is said only for a span of days (#3627); dated kept
             // entries can still carry `on` without a span (#3987).
@@ -584,6 +628,7 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             // A known person's own lines only: in the room's, one speaker's
             // line could mark another's `earlier` (the HOLD on #5049).
             let newer_first = newer_first && person.as_str() != Person::EVERYONE;
+            let days = nightly_days(&day, last_day);
             let wider = Wider {
                 last_day,
                 second: recall_v2,
@@ -617,6 +662,13 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
                         };
                         label_entry(entry, words);
                     }
+                    // Nightly pass B: an item listed among the observations
+                    // says its kind and day. None exists with it off.
+                    if record.kind == "observation"
+                        && let Some((kind, day)) = store.nightly_kind(&person, record.id)?
+                    {
+                        entry["nightly"] = json!({"kind":kind,"day":day});
+                    }
                 }
             }
             // #2510: with history, a replaced version says until when it
@@ -644,6 +696,16 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             if spanned {
                 found["more"] = json!(more);
             }
+            if nightly {
+                found["nightly"] = json!(store.nightly_find(
+                    &person,
+                    Some(&query),
+                    recall_v2,
+                    days,
+                    NIGHTLY_MOST,
+                    NIGHTLY_BYTES
+                )?);
+            }
             found
         }
         Extra::Recall {
@@ -657,6 +719,7 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             recall_v2,
             newer_first,
             strength,
+            nightly,
         } => {
             // `more` is said only for a span of days (#3627); dated kept
             // entries can still carry `on` without a span (#3987).
@@ -666,6 +729,7 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             // A known person's own lines only: in the room's, one speaker's
             // line could mark another's `earlier` (the HOLD on #5049).
             let newer_first = newer_first && person.as_str() != Person::EVERYONE;
+            let days = nightly_days(&day, last_day);
             let wider = Wider {
                 last_day,
                 second: recall_v2,
@@ -688,6 +752,16 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             }
             if spanned {
                 recalled["more"] = json!(more);
+            }
+            if nightly {
+                recalled["nightly"] = json!(store.nightly_find(
+                    &person,
+                    query.as_deref(),
+                    recall_v2,
+                    days,
+                    NIGHTLY_MOST,
+                    NIGHTLY_BYTES
+                )?);
             }
             recalled
         }
@@ -833,6 +907,21 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
                 .collect();
             json!({"ok":true,"talk_notes":notes,"more":more})
         }
+        Extra::NightlyPrepare {
+            person,
+            day,
+            after_id,
+        } => match store.nightly_prepare(&one(person)?, &day, after_id)? {
+            Some(input) => json!({"ok":true,"input":input}),
+            None => json!({"ok":true,"reason":"nothing"}),
+        },
+        Extra::NightlyApply {
+            person,
+            job,
+            proposal,
+            patterns,
+            feelings,
+        } => store.nightly_apply(&one(person)?, &job, &proposal, patterns, feelings)?,
         Extra::Adopt { person, to, ids } => {
             let to = one(Who::Id(to))?;
             let moved = store.adopt(&one(person)?, &to, &ids)?;
@@ -870,6 +959,8 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "forget_said",
             "talk_note",
             "talk_notes",
+            "nightly_prepare",
+            "nightly_apply",
         ];
         const OLD: &[&str] = &[
             "append",
@@ -896,9 +987,16 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
         // so is one with `newer_first`, or with `strength` (the Tiers-ideas
         // plan, P2).
         let wider = name == "recall"
-            && ["day_from", "day_to", "recall_v2", "newer_first", "strength"]
-                .iter()
-                .any(|field| parsed.get(field).is_some());
+            && [
+                "day_from",
+                "day_to",
+                "recall_v2",
+                "newer_first",
+                "strength",
+                "nightly",
+            ]
+            .iter()
+            .any(|field| parsed.get(field).is_some());
         if NEW.contains(&name) || wider {
             extra(
                 store,
