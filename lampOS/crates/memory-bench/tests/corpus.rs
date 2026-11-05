@@ -16,7 +16,7 @@ fn fictional_month_is_repeatable_and_questions_never_cite_future_records() {
     let b = corpus::generate(persona()).unwrap();
     files::validate(&a).unwrap();
     assert_eq!(a.events.len(), 2220);
-    assert_eq!(a.questions.len(), 200);
+    assert_eq!(a.questions.len(), 206);
     assert_eq!(
         serde_json::to_vec(&a).unwrap(),
         serde_json::to_vec(&b).unwrap()
