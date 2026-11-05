@@ -45,6 +45,10 @@ struct Fake {
     final_read_failed: bool,
     corrupt_stage: bool,
     uncertain_releases: bool,
+    /// Every tag a release was looked up by, in order.
+    looked_up: Vec<String>,
+    /// The source lookup answers a release of another tag.
+    wrong_tag: bool,
     upload_fail: Option<bool>,
     changed_head_during_upload: bool,
     foreign_canonical_on_failure: bool,
@@ -106,6 +110,8 @@ impl Fake {
             final_read_failed: false,
             corrupt_stage: false,
             uncertain_releases: false,
+            looked_up: Vec::new(),
+            wrong_tag: false,
             upload_fail: None,
             changed_head_during_upload: false,
             foreign_canonical_on_failure: false,
@@ -181,12 +187,20 @@ impl Remote for Fake {
             private: false,
         })
     }
-    fn releases(&mut self) -> Result<Vec<Release>> {
+    fn release(&mut self, tag: &str) -> Result<Option<Release>> {
+        self.looked_up.push(tag.into());
         if self.uncertain_releases {
-            Err("unavailable".into())
-        } else {
-            Ok(self.releases.clone())
+            return Err("unavailable".into());
         }
+        // GitHub answers one release per tag, or 404.
+        let mut found = self.releases.iter().find(|r| r.tag_name == tag).cloned();
+        if self.wrong_tag
+            && tag != STABLE
+            && let Some(release) = &mut found
+        {
+            release.tag_name = "lampos-lamp-voice-11".into();
+        }
+        Ok(found)
     }
     fn tag(&mut self, name: &str) -> Result<Option<String>> {
         Ok(self.tags.get(name).cloned())
@@ -669,7 +683,15 @@ fn uncertain_or_duplicate_inventories_refuse() {
     assert!(promote(&mut fake, &context(10)).is_err());
     assert_eq!(fake.writes, 0);
     let mut fake = Fake::new(Some(9));
-    fake.releases.push(fake.releases[0].clone());
+    fake.wrong_tag = true;
+    assert!(
+        promote(&mut fake, &context(10))
+            .unwrap_err()
+            .contains("another tag")
+    );
+    assert_eq!(fake.writes, 0);
+    let mut fake = Fake::new(Some(9));
+    fake.releases[0].id = 0;
     assert!(promote(&mut fake, &context(10)).is_err());
     assert_eq!(fake.writes, 0);
     let mut fake = Fake::new(Some(9));
@@ -865,4 +887,55 @@ fn a_failed_promotion_deletes_nothing() {
     fake.fail = Some((2, false));
     assert!(promote(&mut fake, &context(10)).is_err());
     assert!(fake.deleted.is_empty());
+}
+#[test]
+fn releases_are_found_by_their_tag() {
+    let mut fake = Fake::new(Some(9));
+    assert_eq!(
+        promote(&mut fake, &context(10)).unwrap().outcome,
+        "promoted"
+    );
+    // The source once, then stable for the head and its checks: each by tag.
+    assert_eq!(fake.looked_up[0], "lampos-lamp-voice-10");
+    assert!(fake.looked_up[1..].iter().all(|tag| tag == STABLE));
+    assert!(fake.looked_up.len() > 1);
+}
+#[test]
+fn an_absent_release_is_none_at_each_lookup() {
+    // An absent source build refuses before any write.
+    let mut fake = Fake::new(Some(9));
+    fake.releases
+        .retain(|r| r.tag_name != "lampos-lamp-voice-10");
+    assert!(
+        promote(&mut fake, &context(10))
+            .unwrap_err()
+            .contains("selected published build is absent")
+    );
+    assert_eq!(fake.writes, 0);
+    // An absent stable without its tag bootstraps, confirmed by tag.
+    let mut fake = Fake::new(None);
+    assert_eq!(
+        promote(&mut fake, &context(10)).unwrap().outcome,
+        "promoted"
+    );
+    assert_eq!(
+        fake.looked_up,
+        ["lampos-lamp-voice-10", STABLE, STABLE, STABLE, STABLE]
+    );
+}
+#[test]
+fn no_call_lists_every_release() {
+    // Only lookups by the two known tags reach the remote, whatever the outcome.
+    for previous in [None, Some(9), Some(10), Some(11)] {
+        let mut fake = Fake::new(previous);
+        let _ = promote(&mut fake, &context(10));
+        assert!(!fake.looked_up.is_empty());
+        assert!(
+            fake.looked_up
+                .iter()
+                .all(|tag| tag == "lampos-lamp-voice-10" || tag == STABLE),
+            "{:?}",
+            fake.looked_up
+        );
+    }
 }
