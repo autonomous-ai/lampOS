@@ -1318,6 +1318,7 @@ hal_failure_diagnostics() {
       /^hal\.service: (Main process exited, code=[a-z]+, status=[0-9]+\/[A-Za-z0-9]+|Failed with result .[a-z-]+.\.?|Scheduled restart job, restart counter is at [0-9]+\.?|Deactivated successfully\.|Succeeded\.|Start request repeated too quickly\.)$/ { print substr($0, 1, 130); next }
       /^(Started|Stopping|Stopped) HAL Hardware Runtime\.\.?\.?$/ { print substr($0, 1, 130); next }
       /^Condition check resulted in HAL Hardware Runtime being skipped\.$/ { print substr($0, 1, 130); next }
+      /^hal\.service - HAL Hardware Runtime was skipped because of an unmet condition check \(Condition[A-Za-z]+=!?\/[A-Za-z0-9_.\/-]+\)\.$/ { print substr($0, 1, 200); next }
       /^ +File "[^"]+", line [0-9]+, in [A-Za-z0-9_<>]+$/        { print substr($0, 1, 130); next }
       /^(ModuleNotFoundError|ImportError): No module named .[A-Za-z0-9_.]+.$/ { print substr($0, 1, 130); next }
       /^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception)(:|$)/            { sub(/:.*/, ":"); print substr($0, 1, 130); next }
@@ -1421,6 +1422,33 @@ recovery_owner_allowed() {
   fi
 }
 
+# A HAL ownership block (marker + unit dropin) is written only while a registered
+# component replaces HAL. If one is left behind with no owner, systemd skips HAL on
+# every start, so recovery can never pass its health check and every later update is
+# refused. Clear it only when no component owns HAL, no service transition is in
+# progress, and the dropin is exactly the one the updater writes.
+HAL_BLOCK_SERVICES=/root/bootstrap/services
+HAL_BLOCK_MARKER=$HAL_BLOCK_SERVICES/blocked/hal
+HAL_BLOCK_DROPIN=/etc/systemd/system/hal.service.d/99-autonomous-ownership.conf
+clear_stale_hal_block() {
+  local services=$HAL_BLOCK_SERVICES expected
+  [ -e "$HAL_BLOCK_MARKER" ] || [ -L "$HAL_BLOCK_MARKER" ] \
+    || [ -e "$HAL_BLOCK_DROPIN" ] || [ -L "$HAL_BLOCK_DROPIN" ] || return 0
+  if [ -e "$services/transition.json" ] || [ -L "$services/transition.json" ]; then return 0; fi
+  if [ -e "$services/ownership.json" ] || [ -L "$services/ownership.json" ]; then
+    [ "$(service_transaction status hal 2>/dev/null)" = legacy ] || return 0
+  fi
+  expected=$(printf '[Unit]\nConditionPathExists=!%s\n[Service]\nKillMode=control-group\nTimeoutStopSec=20\n' "$HAL_BLOCK_MARKER")
+  if [ -L "$HAL_BLOCK_DROPIN" ] || [ -L "$HAL_BLOCK_MARKER" ] \
+      || { [ -e "$HAL_BLOCK_DROPIN" ] && [ "$(cat "$HAL_BLOCK_DROPIN")" != "$expected" ]; }; then
+    return 0
+  fi
+  echo "[software-update] clearing a HAL ownership block that no component holds"
+  rm -f "$HAL_BLOCK_MARKER" "$HAL_BLOCK_DROPIN" || return 1
+  rmdir "${HAL_BLOCK_DROPIN%/*}" 2>/dev/null || true
+  systemctl daemon-reload
+}
+
 recover_pending_update() {
   local journal="$ROLLBACK_DIR/pending-update.json" live backup restore staged failed check had_live rootfs
   if [ ! -f "$journal" ]; then
@@ -1442,6 +1470,7 @@ recover_pending_update() {
   case "$restore" in
     restore_hal_service_state)
       recovery_owner_allowed hal || return 1
+      clear_stale_hal_block || return 1
       [ "$live" = "$HAL_DIR" ] && [ "$backup" = "$ROLLBACK_DIR/hal.previous" ] || return 1
       systemctl stop hal || return 1; check=check_hal ;;
     restore_web_service_state)
@@ -1449,6 +1478,7 @@ recover_pending_update() {
       systemctl stop nginx || return 1; check=check_web ;;
     restore_device_service_state)
       recovery_owner_allowed hal && recovery_owner_allowed os-server || return 1
+      clear_stale_hal_block || return 1
       [ "$backup" = "$ROLLBACK_DIR/device.previous" ] && [[ "$live" = /* ]] && [ "$live" != / ] || return 1
       DEVICE_DEST="$live"
       systemctl stop os-server || return 1
