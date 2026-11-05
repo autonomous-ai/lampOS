@@ -331,6 +331,12 @@ impl Rig {
             WorkerChannels::bind(&directory.path, "capture", parent_boot, worker_boot, true)
                 .unwrap();
         parent.connect(&directory.path, "capture", false).unwrap();
+        // The rig reads the worker's frames between its other work, so a
+        // loaded runner can read one later than the product's 100 ms: what
+        // is checked here is the worker, not this reader (#5388's ARM64 run).
+        parent
+            .data
+            .widen_for_a_test_reader(lamp_voice::transport::FIRST_CONTROL_MAX_AGE_US);
         channels.connect(&directory.path, "capture", true).unwrap();
         let speaker =
             ReferenceChannels::bind(&directory.path, "speaker", speaker_boot, worker_boot).unwrap();
