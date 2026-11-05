@@ -124,6 +124,10 @@ test('the debug log redacts what would pair or hello as this computer', async ()
     { ev: 'hand', seen: true, x: 0.4, y: 0.5, size: 0.12, open: true, confidence: 0.9 },
     { re: 4, ok: true, to: 'body', follow: 'hand' },
     { re: 5, ok: true, limits: { say: { most: 6, within_ms: 60000 }, hold_max_ms: 30000, lease_max_ms: 600000, take_max_ms: 600000, say_max_chars: 300, quiet_hours: { from: '22:00', to: '07:00' } } },
+    { re: 6, ok: true, state: { volume: { level: 40, muted: false }, body: {
+      known: true, stands: true, speed_deg_s: 4.4, acceleration_deg_s2: 35.2, load_limit: null, heat_stop_c: 62, counts_per_turn: 4096,
+      joints: { yaw: { counts: 2026, deg: 1.0, min_deg: -3.5, max_deg: 3.5, min_counts: 1975, max_counts: 2055, home_counts: 2015, folded_counts: null, stand_counts: null } } } } },
+    { re: 7, ok: true, state: { body: { known: false, why: 'the body has not said its limits in the last 15 s' } } },
   ]) assert.ok(!JSON.stringify(debug.redact(frame)).includes('<not shown>'), JSON.stringify(frame));
   assert.ok(shown.text.startsWith('<13 chars, tag ') && !shown.text.includes('Build'));
   // Keyed for this run: the same text tags the same, and the unkeyed SHA-256's start isn't it.

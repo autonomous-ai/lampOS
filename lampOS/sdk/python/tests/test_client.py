@@ -145,7 +145,13 @@ def test_the_debug_log_redacts_what_would_pair_or_hello_as_this_computer():
                   {"re": 4, "ok": True, "to": "body", "follow": "hand"},
                   {"re": 5, "ok": True, "limits": {"say": {"most": 6, "within_ms": 60_000}, "hold_max_ms": 30_000, "lease_max_ms": 600_000,
                                                    "take_max_ms": 600_000, "say_max_chars": 300,
-                                                   "quiet_hours": {"from": "22:00", "to": "07:00"}}}):
+                                                   "quiet_hours": {"from": "22:00", "to": "07:00"}}},
+                  {"re": 6, "ok": True, "state": {"volume": {"level": 40, "muted": False}, "body": {
+                      "known": True, "stands": True, "speed_deg_s": 4.4, "acceleration_deg_s2": 35.2, "load_limit": None,
+                      "heat_stop_c": 62, "counts_per_turn": 4096,
+                      "joints": {"yaw": {"counts": 2026, "deg": 1.0, "min_deg": -3.5, "max_deg": 3.5, "min_counts": 1975,
+                                         "max_counts": 2055, "home_counts": 2015, "folded_counts": None, "stand_counts": None}}}}},
+                  {"re": 7, "ok": True, "state": {"body": {"known": False, "why": "the body has not said its limits in the last 15 s"}}}):
         assert "<not shown>" not in json.dumps(debug.redact(sample)), sample
     assert shown["text"].startswith("<13 chars, tag ") and "Build" not in shown["text"]
     # Keyed for this run: the same text tags the same, and the unkeyed SHA-256's start isn't it.
@@ -579,6 +585,19 @@ def test_get_replies_with_light_and_shows_are_the_schemas():
     for light in ({}, None, own, {"shows": own}, {**own, "shows": {"on": True, "colour": "green", "level": 2}}):
         assert not list(validator.iter_errors({"re": 1, "ok": True, "state": {"light": light}})), light
     assert list(validator.iter_errors({"re": 1, "ok": True, "state": {"light": {"shows": {"on": True}}}}))
+
+def test_get_replies_with_body_and_volume_are_the_schemas():
+    jsonschema = pytest.importorskip("jsonschema")
+    validator = jsonschema.Draft202012Validator({**schema.schema(), "$ref": "#/$defs/reply"})
+    yaw = {"counts": None, "deg": None, "min_deg": -3.5, "max_deg": 3.5, "min_counts": 1975, "max_counts": 2055,
+           "home_counts": 2015, "folded_counts": None, "stand_counts": None}
+    body = {"known": True, "joints": {"yaw": yaw}, "stands": True, "speed_deg_s": 4.4, "acceleration_deg_s2": 35.2,
+            "load_limit": 0.6, "heat_stop_c": 62, "counts_per_turn": 4096.0}
+    for state in ({"body": {"known": False, "why": "the body has not said its limits in the last 15 s"}},
+                  {"body": body}, {"volume": None}, {"volume": {"level": 40, "muted": False}}):
+        assert not list(validator.iter_errors({"re": 1, "ok": True, "state": state})), state
+    assert list(validator.iter_errors({"re": 1, "ok": True, "state": {"body": {**body, "joints": {"knee": yaw}}}}))
+
 
 def test_the_examples_compile_and_call_only_what_the_client_has():
     import ast
