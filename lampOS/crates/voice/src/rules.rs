@@ -703,6 +703,25 @@ fn wait_handled(seen: u64) {
 mod tests {
     use super::*;
 
+    /// Both voice routes say the rules' fact on the bus (#5409): the second
+    /// route, the product's, started the memory but never `bus_on`, so
+    /// `memory/rules` stayed empty and lamp-policy's `--rules` held nothing.
+    #[test]
+    fn both_routes_say_the_rules_on_the_bus() {
+        for (route, source) in [
+            ("provider_worker", include_str!("provider_worker.rs")),
+            (
+                "second_provider/worker",
+                include_str!("second_provider/worker.rs"),
+            ),
+        ] {
+            assert!(
+                source.contains("crate::rules::bus_on(root, socket)"),
+                "{route}"
+            );
+        }
+    }
+
     fn call(name: &str, args: Value) -> ToolCall {
         ToolCall {
             id: "c1".into(),

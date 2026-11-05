@@ -2033,6 +2033,13 @@ pub fn serve(
             socket.clone(),
             tools.who.as_deref().map(crate::known_faces::known_file_of),
         );
+        // The rules' typed fact for the policy, as the Live route says it
+        // (`provider_worker`): without it `memory/rules` was never said on
+        // this route, so lamp-policy's `--rules` had nothing to obey and a
+        // kept "no hello" held nothing (#5409, lamp-52e6, 5 Nov).
+        if let Some(root) = files.bus_root.as_deref().filter(|_| crate::rules::on()) {
+            crate::rules::bus_on(root, socket);
+        }
     }
     // The voice unit's credentials (`LoadCredential=`), passed to this
     // worker alone (`process.rs`).
