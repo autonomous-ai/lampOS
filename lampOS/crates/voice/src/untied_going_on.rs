@@ -556,7 +556,9 @@ pub fn shares_a_word(heard: &str, said: &[&str]) -> bool {
 
 /// Words a line opens with in reply to what was just said to it: a thanks,
 /// or taking up the idea (#5110: `talk_day-5`'s "That's a good idea." and
-/// `talk_day-6`'s "Thanks. You're a good listener.", held on lamp-52e6).
+/// `talk_day-6`'s "Thanks. You're a good listener.", held on lamp-52e6;
+/// `talk_cook-6`'s "Perfect. I'll try that on Saturday.", held on
+/// lamp-52e6 on 5 Nov 12:21, answered with it off).
 const REPLIES: &[&str] = &[
     "thanks",
     "thank you",
@@ -582,6 +584,10 @@ const REPLIES: &[&str] = &[
     "that's good to know",
     "you're right",
     "got it",
+    "perfect",
+    "that's perfect",
+    "i'll try that",
+    "i will try that",
     "cảm ơn",
     "cám ơn",
     "ý hay",
@@ -596,7 +602,9 @@ const REPLY_LEADS: &[&str] = &[
 ];
 
 /// Words that open a question asking for advice of the one who knows: "Any
-/// tips to sleep better tonight?", "How can I stop waking up at night?".
+/// tips to sleep better tonight?", "How can I stop waking up at night?",
+/// "And what do I need to buy for it?" (#5110: `talk_cook-4`, held on
+/// lamp-52e6 on 5 Nov 12:21, answered with it off).
 const ASKS_FOR_ADVICE: &[&str] = &[
     "any tips",
     "any tip",
@@ -608,6 +616,9 @@ const ASKS_FOR_ADVICE: &[&str] = &[
     "how should i",
     "how can i",
     "how do i",
+    "what do i need",
+    "what else do i need",
+    "what else should i",
     "what do you suggest",
     "what would you suggest",
     "what do you recommend",
@@ -689,6 +700,79 @@ pub fn asks_for_advice(heard: &str, no_name_set_off: bool) -> bool {
     heard.contains('?')
         && heard.split([',', '.', ';', '!', '?']).any(asks)
         && !desk_talk_read(heard, no_name_set_off)
+}
+
+/// Words in a question that ask the one addressed for their own view:
+/// "what do you think", "your take", "how about you", "and you".
+const ASKS_ITS_VIEW: &[&str] = &[
+    "you think",
+    "you reckon",
+    "you suggest",
+    "you recommend",
+    "you prefer",
+    "you say",
+    "your take",
+    "your view",
+    "your opinion",
+    "your advice",
+    "your guess",
+    "your pick",
+    "your favorite",
+    "your favourite",
+    "about you",
+    "and you",
+    "if you were",
+];
+
+/// The words that open a question asking how the one addressed would
+/// choose or act: "What would you do?", "Which one would you pick?".
+const ASKS_HOW_IT_WOULD: &[&str] = &["what", "which", "how", "where", "when", "who"];
+
+/// Calls to more than one person: a question to them is no one's view of
+/// the lamp ("What do you think, you all?").
+const TO_MANY: &[&str] = &[
+    "you guys",
+    "you all",
+    "y'all",
+    "you two",
+    "both of you",
+    "everyone",
+];
+
+/// Whether `heard` asks the one addressed for their own view in a
+/// question ([`ASKS_ITS_VIEW`] in any part, or a part opening with one of
+/// [`ASKS_HOW_IT_WOULD`] then "would you", after any of [`ASK_LEADS`]),
+/// called to no more than one ([`TO_MANY`]) and with no sign of desk talk
+/// ([`desk_talk_read`] with `no_name_set_off`). The worker reads it only
+/// right after the lamp's own answer, so "you" is the lamp: lamp-52e6, 5
+/// Nov 21:10, `talk_day-4` ("Maybe. What would you do?") was held as
+/// untied, tied before only when it shared a word with the answer. A
+/// question of the addressee's own doings ("Did you send …?", "Are you
+/// coming …?", "Can you pass me …?") asks no view and stays untied.
+pub fn asks_its_view(heard: &str, no_name_set_off: bool) -> bool {
+    let all = words_of(heard);
+    if !heard.contains('?')
+        || TO_MANY
+            .iter()
+            .any(|call| all.contains(&format!(" {call} ")))
+        || desk_talk_read(heard, no_name_set_off)
+    {
+        return false;
+    }
+    heard.split([',', '.', ';', '!', '?']).any(|part| {
+        let words = words_of(part);
+        let rest = ASK_LEADS
+            .iter()
+            .filter(|lead| words.starts_with(&format!(" {lead} ")))
+            .max_by_key(|lead| lead.len())
+            .map_or(words.as_str(), |lead| &words[lead.len() + 1..]);
+        ASKS_ITS_VIEW
+            .iter()
+            .any(|cue| words.contains(&format!(" {cue} ")))
+            || ASKS_HOW_IT_WOULD
+                .iter()
+                .any(|wh| rest.starts_with(&format!(" {wh} ")) && rest.contains(" would you "))
+    })
 }
 
 /// Whether `heard` asks what or who the speaker's own is or was
@@ -996,6 +1080,8 @@ mod tests {
             "Thanks, I'll try that.",
             "Thanks Lamp.",
             "Cảm ơn nhé.",
+            "Perfect. I'll try that on Saturday.",
+            "Okay, I'll try that tonight.",
         ] {
             assert!(replies_to_the_lamp(line, false), "{line}");
         }
@@ -1008,6 +1094,8 @@ mod tests {
             "I'm thankful it's Friday.",
             "Did you send the slides to Sam yet?",
             "Not yet, I'll do it after lunch.",
+            "Perfect, Sam.",
+            "I'll try the new place on Saturday.",
         ] {
             assert!(!replies_to_the_lamp(line, false), "{line}");
         }
@@ -1023,6 +1111,8 @@ mod tests {
             "How can I stop waking up at night?",
             "So what should I eat before a run?",
             "What would you recommend?",
+            "And what do I need to buy for it?",
+            "What else do I need?",
         ] {
             assert!(asks_for_advice(line, false), "{line}");
         }
@@ -1032,8 +1122,45 @@ mod tests {
             "How do I look, you guys?",
             "Are you coming to the meeting at four?",
             "Can you pass me the charger? The white one.",
+            "Sam, what do I need to bring to the meeting?",
+            "I know what I need to buy.",
         ] {
             assert!(!asks_for_advice(line, false), "{line}");
+        }
+    }
+
+    /// lamp-52e6, 5 Nov 21:10 (`talk_day-4`): a question asking the one
+    /// addressed for their view, in phrasings the kit never plays; a
+    /// question of their own doings, to many, or to a name asks none.
+    #[test]
+    fn a_question_asking_its_view() {
+        for line in [
+            "Maybe. What would you do?",
+            "How about you?",
+            "And you?",
+            "What's your take?",
+            "Which one would you pick?",
+            "Do you think that's enough?",
+            "What do you reckon?",
+            "If you were me, would you go?",
+            "Hmm, so what would you suggest instead?",
+            "Is that your favorite?",
+        ] {
+            assert!(asks_its_view(line, false), "{line}");
+        }
+        for line in [
+            "Did you send the slides to Sam yet?",
+            "Are you coming to the meeting at four?",
+            "Can you pass me the charger? The white one.",
+            "Do you want coffee? I'm going downstairs.",
+            "Would you grab me a coffee?",
+            "Sam, what do you think?",
+            "What do you think, you guys?",
+            "And you all?",
+            "What would you do.",
+            "I think you're right.",
+        ] {
+            assert!(!asks_its_view(line, false), "{line}");
         }
     }
 

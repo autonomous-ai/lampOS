@@ -1049,3 +1049,87 @@ fn the_callers_face_speaking_trusts_only_a_face_seen_speaking_the_call() {
         "the caller seen speaking the call"
     );
 }
+
+/// Seventh's 52e6 run of #5363's build (5 Nov 12:20, sw5008f):
+/// `talk_day-5` was answered under HELD, but journaled with no tie: tied
+/// by its words (a word of the lamp's last answer), it never reached the
+/// caller's-own reading, the only one that had a why. Every tie under
+/// `held` has its why, so each tied line is journaled as not held as
+/// untied.
+#[test]
+fn held_gives_every_tie_its_why() {
+    let _one = crate::provider_worker::tests::one_thread();
+    let _clock =
+        crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
+    let mut heeding = Heeding::new(true, true, None, None);
+    heeding.holding_untied();
+    heeding
+        .said_lately
+        .push_back((1, (10_000_000, 11_800_000), true, 10_000_000));
+    let seen = |heard: &str, lamp_asked| Seen {
+        room: crate::room_told::Room::Quiet,
+        going_on: true,
+        turned: None,
+        busy: false,
+        lamp_asked,
+        speakers: Vec::new(),
+        turned_speakers: Vec::new(),
+        heard: heard.to_owned(),
+        named_faced: false,
+        other_voice: false,
+        same_voice: false,
+        likeness: None,
+    };
+    let follow_up = "That's a good idea. Any tips to sleep better tonight?";
+    for (answer, why) in [
+        (
+            "Try going to sleep at the same time every night.",
+            TIED_BY_ITS_WORDS,
+        ),
+        (
+            TIRED.answer,
+            "said right after the lamp's answer, it replies to it",
+        ),
+    ] {
+        let mut thread = crate::thread::Thread::new();
+        let then = Instant::now() - Duration::from_secs(3);
+        thread.person(TIRED.heard, true, then);
+        thread.lamp(1, answer, then);
+        *crate::thread::THREAD.lock().unwrap() = thread;
+        assert_eq!(
+            heeding.held_tie(2, &seen(follow_up, false)),
+            Some(why),
+            "{answer}"
+        );
+    }
+    assert_eq!(
+        heeding.held_tie(2, &seen("Yes, please.", true)),
+        Some(REPLIES_TO_ITS_QUESTION)
+    );
+    assert_eq!(
+        heeding.held_tie(2, &seen("Did you send the slides to Sam yet?", false)),
+        None
+    );
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+}
+
+/// lamp-52e6, 5 Nov 21:10 (`talk_day-4`): a question asking the lamp's
+/// view, right after its answer and sharing no word with it, is the
+/// caller's own under `held`, in phrasings the kit never plays; a question
+/// of a colleague's doings stays held.
+#[test]
+fn held_keeps_a_question_asking_the_lamps_view() {
+    for asked in [
+        "Maybe. What would you do?",
+        "How about you?",
+        "What's your take?",
+    ] {
+        let lines = [LONDON, line(6_800, 2_400, asked, "Okay.")];
+        assert_eq!(run(true, &lines), [true, true], "held: {asked}");
+    }
+    let desk = [
+        LONDON,
+        line(6_800, 2_400, "Did you send the slides to Sam yet?", "Okay."),
+    ];
+    assert_eq!(run(true, &desk), [true, false], "held: desk");
+}
