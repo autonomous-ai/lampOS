@@ -112,6 +112,18 @@ fn feed_faces(
     })
 }
 
+/// A face's mouth read speaking in one look of four and unread in the
+/// rest: never seen speaking it (no majority), but a face alone in view is
+/// then named for the reply by the mouth rule
+/// ([`SpeakingFaces::alone_in_view`]; lamp-06c1, 5 Nov, S4's opening line:
+/// read speaking in 1 of 9 looks).
+const S4_OPENING_MOUTHS: &[lamp_msgs::SpeakingState] = &[
+    lamp_msgs::SpeakingState::Yes,
+    lamp_msgs::SpeakingState::Unknown,
+    lamp_msgs::SpeakingState::Unknown,
+    lamp_msgs::SpeakingState::Unknown,
+];
+
 /// What one line admitted as the owner A's came to: the scope each memory
 /// call ran in, the scope the line's lease ends in, and what its first
 /// round was told.
@@ -307,6 +319,7 @@ async fn lines_past_silent(
         voice,
         (false, &[]),
         |_, _| {},
+        (false, None),
     )
     .await
 }
@@ -344,13 +357,17 @@ async fn lines_named(
         voice,
         (name_one_face, mouths),
         |_, _| {},
+        (false, None),
     )
     .await
 }
 
 /// [`lines_named`], with `known_at` called before each line with its
 /// request and the eyes' known file, as the eyes rewrite or stop writing
-/// it between lines.
+/// it between lines. With `thread`, whose conversation is going on is
+/// read from a thread of the test's own, kept after each line as the worker
+/// keeps it (`Thread::lamp_for_named`, with the line's told lease), in place
+/// of `going_on`'s fixed answer.
 #[allow(clippy::too_many_arguments)]
 async fn lines_known(
     what: &str,
@@ -365,6 +382,7 @@ async fn lines_known(
     voice: Voice,
     (name_one_face, mouths): (bool, &'static [lamp_msgs::SpeakingState]),
     known_at: fn(u64, &std::path::Path),
+    (thread, murmur): (bool, Option<u64>),
 ) -> Outcome {
     let eyes = Arc::new(SpeakingFaces::default());
     let path = known_file(what, &eyes);
@@ -451,11 +469,18 @@ async fn lines_known(
         }
     };
     let a = crate::remember::person_id("A");
-    let engine = engine.carrying_conversations_by(going_on.map(
-        |going_on| -> crate::second_provider::GoingOnWith {
+    let kept_thread = thread.then(|| Arc::new(Mutex::new(crate::thread::Thread::new())));
+    let engine = engine.carrying_conversations_by(match &kept_thread {
+        Some(kept) => {
+            let kept = kept.clone();
+            Some(Arc::new(move |request: u64| {
+                kept.lock().unwrap().going_on_with(request, Instant::now())
+            }))
+        }
+        None => going_on.map(|going_on| -> crate::second_provider::GoingOnWith {
             Arc::new(move |_| going_on.then(|| a.clone()))
-        },
-    ));
+        }),
+    });
     let mut engine = engine.saving_carried(saves);
     if let Some((hears, another)) = past_silent {
         engine = engine.carrying_past_silent_where_heard(true, hears, another);
@@ -498,6 +523,13 @@ async fn lines_known(
         *now.lock().unwrap() += Duration::from_secs(after);
         known_at(request, &path);
         let done = Arc::new(AtomicBool::new(false));
+        // S4's opening line: her mouth read speaking in one look of four,
+        // unread in the rest (lamp-06c1, 5 Nov: read speaking in 1 of 9).
+        let mouths = if murmur == Some(request) {
+            S4_OPENING_MOUTHS
+        } else {
+            mouths
+        };
         let feeder = feed_faces(eyes.clone(), in_view, mouths, boot, done.clone());
         engine.submit(start(request));
         engine.submit(audio(request, 1));
@@ -506,6 +538,26 @@ async fn lines_known(
         labels.extend(turn(&mut engine).await);
         done.store(true, Ordering::Release);
         feeder.join().unwrap();
+        // The line's answer kept in the thread as the worker keeps it.
+        if let Some(kept) = &kept_thread {
+            let told = told_leases
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|lease| lease.key().request == request)
+                .cloned();
+            if let Some(lease) = told
+                && let Some(scope) = lease.scope()
+            {
+                kept.lock().unwrap().lamp_for_named(
+                    request,
+                    "Answered.",
+                    Instant::now(),
+                    scope.person(),
+                    lease.named_for_reply(),
+                );
+            }
+        }
     }
     clean(&path);
     // The line's lease: as its context was told, else as memory was asked.
@@ -1532,9 +1584,170 @@ async fn an_off_camera_keep_just_after_her_face_left_is_carried_and_held_for_her
             Voice::Off,
             (false, &[]),
             left_then_back,
+            (false, None),
         )
         .await;
         assert_eq!(got.calls, expected, "{what}");
+    }
+}
+
+/// lamp-06c1, 5 Nov, S4 rerun on #5448's head: Olivia's opening line, her
+/// face alone in view and none seen speaking it, was kept as the room's
+/// with its reply told her name (`the known person's face alone in view:
+/// kept as the room's, its reply told their name`). Her car line, off
+/// camera just after, then found no conversation of hers going on: no
+/// carry line, `speaker unknown (skipped=1)`, and her "Yes, please keep
+/// that." had nothing held. That room's exchange, named for her face
+/// alone, is her conversation going on: the car line is carried, its keep
+/// held, and written in her scope on her seen yes. A second face in view
+/// at the opening (not named for her) or at the car line: no carry, the
+/// room's keep.
+#[tokio::test]
+async fn a_keep_just_after_her_face_alone_opened_as_the_rooms_is_carried_for_her_yes() {
+    let a = crate::remember::person_id("A");
+    fn left_then_back(request: u64, known: &std::path::Path) {
+        match request {
+            2 => {
+                let _ = std::fs::remove_file(known);
+                let _ = std::fs::remove_file(known_face_of(known));
+            }
+            3 => {
+                std::fs::write(known, "A").unwrap();
+                std::fs::write(known_face_of(known), "f2\n").unwrap();
+            }
+            _ => {}
+        }
+    }
+    for (what, opening_in_view, car_in_view, expected) in [
+        (
+            "s4-room-named",
+            vec![("f1", false)],
+            vec![],
+            vec![Some(a.clone())],
+        ),
+        (
+            "s4-room-two-faces",
+            vec![("f1", false), ("f3", false)],
+            vec![],
+            vec![None],
+        ),
+        (
+            "s4-room-named-other-face",
+            vec![("f1", false)],
+            vec![("f3", false)],
+            vec![None],
+        ),
+    ] {
+        let mut chats = vec![vec![
+            text("Off to the garden center on Saturday, Olivia?"),
+            Ok(ChatEvent::Done),
+        ]];
+        chats.extend(keep_the_hotel_asking());
+        chats.push(vec![text("Okay."), Ok(ChatEvent::Done)]);
+        let got = lines_known(
+            what,
+            vec![
+                (
+                    "I'm going to the garden centre on Saturday.".to_owned(),
+                    opening_in_view,
+                    0,
+                ),
+                (
+                    "Can you keep that my car is in for service?".to_owned(),
+                    car_in_view,
+                    0,
+                ),
+                ("Yes, please keep that.".to_owned(), vec![("f2", true)], 5),
+            ],
+            chats,
+            (BOOT, true, true),
+            None,
+            None,
+            true,
+            true,
+            None,
+            Voice::Off,
+            (false, &[]),
+            left_then_back,
+            (true, Some(1)),
+        )
+        .await;
+        assert_eq!(got.calls, expected, "{what}");
+    }
+}
+
+/// lamp-06c1, 5 Nov, S4 rerun: the eyes' last look with Olivia's face was
+/// 1.7 s before the car line began, and the line ended 5.5 s after it.
+/// The window counts from the line's start (`CARRY_UNSEEN_WITHIN`), so her
+/// face as last named is the line's, and seen within it. The locker line,
+/// her face gone 12 s before it began: neither.
+#[tokio::test]
+async fn the_carry_window_counts_from_the_lines_start_not_its_end() {
+    for (what, gone_before_start, line_for, carries) in [
+        ("s4-car-timing", 1.7_f32, 3.8_f32, true),
+        ("s4-locker-timing", 12.0, 3.0, false),
+    ] {
+        let eyes = Arc::new(SpeakingFaces::default());
+        let now = Instant::now();
+        let span = Duration::from_secs_f32(gone_before_start + line_for + 0.5);
+        let t0 = now - span;
+        let face = |id: &str| lamp_msgs::Faces {
+            faces: vec![lamp_msgs::Face {
+                id: id.to_owned(),
+                xmin: 0.1,
+                ymin: 0.1,
+                xmax: 0.3,
+                ymax: 0.4,
+                confidence: 1.0,
+                yaw: None,
+                facing: None,
+                speaking: Some(lamp_msgs::Speaking {
+                    state: lamp_msgs::SpeakingState::No,
+                    score: 0.9,
+                    from: None,
+                }),
+                follows: None,
+            }],
+        };
+        let empty = lamp_msgs::Faces { faces: vec![] };
+        eyes.look(t0 - Duration::from_millis(200), Some(((BOOT, 0), &empty)));
+        eyes.look(t0, Some(((BOOT, 1), &face("f1"))));
+        std::thread::sleep(Duration::from_millis(5));
+        let known = std::env::temp_dir().join(format!(
+            "scope-seen-{what}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::write(&known, "A").unwrap();
+        std::fs::write(known_face_of(&known), "f1\n").unwrap();
+        // Read while her face was named: the pair the line may find.
+        assert!(eyes.known_with_boot(&known).is_some(), "{what}");
+        clean(&known);
+        // The eyes look every 100 ms and see nobody from then on.
+        let mut seq = 2;
+        let mut at = t0 + crate::speaking_faces::EVERY;
+        while at <= now {
+            eyes.look(at, Some(((BOOT, seq), &empty)));
+            seq += 1;
+            at += crate::speaking_faces::EVERY;
+        }
+        let begun = t0 + Duration::from_secs_f32(gone_before_start);
+        let finishing = begun + Duration::from_secs_f32(line_for);
+        let (speakers, pair, _) =
+            crate::second_provider::line_sight(&eyes, &known, begun, finishing, true).await;
+        assert!(speakers.is_empty(), "{what}");
+        let her_face = format!("{BOOT}/f1");
+        let expected = carries.then(|| ("A".to_owned(), her_face.clone()));
+        assert_eq!(pair, expected, "{what}");
+        let since = begun
+            .checked_sub(crate::second_provider::CARRY_UNSEEN_WITHIN)
+            .unwrap();
+        assert_eq!(
+            eyes.face_seen_between(Some(&her_face), since, finishing),
+            carries,
+            "{what}: seen within the window from the line's start"
+        );
+        clean(&known);
     }
 }
 

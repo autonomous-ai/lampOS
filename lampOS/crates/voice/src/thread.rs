@@ -134,6 +134,13 @@ struct Exchange {
     /// conversation ([`Thread::recent_with_room_lines`]). Not kept in the
     /// file.
     kept_for: Option<String>,
+    /// A room's exchange whose line was narrowed with the admitted known
+    /// person's face alone in view and none seen speaking it, its reply told
+    /// their name ([`Thread::lamp_for_named`],
+    /// `ScopeLease::named_for_reply`): their conversation going on for a
+    /// carry ([`Thread::going_on_with`]), and nothing else. Not kept in the
+    /// file.
+    named: Option<String>,
 }
 
 /// One function a turn ran ([`Thread::called`]): its name, and the
@@ -674,6 +681,7 @@ impl Thread {
                     written
                 }),
                 kept_for: None,
+                named: None,
                 calls: Vec::new(),
             });
         }
@@ -831,6 +839,36 @@ impl Thread {
         self.lamp_for(request, text, now, scope.as_deref());
     }
 
+    /// [`Self::lamp_for`], and a room's answer whose line was narrowed with
+    /// the admitted known person's face alone in view (`named`,
+    /// `ScopeLease::named_for_reply`) marks its exchange as said in their
+    /// conversation ([`Self::going_on_with`]). lamp-06c1, 5 Nov, S4: the
+    /// owner-only name rule kept Olivia's opening line as the room's, her
+    /// face alone in view, so her car line just after, off camera, found no
+    /// conversation of hers going on and was not carried.
+    pub fn lamp_for_named(
+        &mut self,
+        request: u64,
+        text: &str,
+        now: Instant,
+        scope: Option<&str>,
+        named: Option<&str>,
+    ) {
+        self.lamp_for(request, text, now, scope);
+        let Some(person) = named.filter(|_| scope.is_none()) else {
+            return;
+        };
+        if let Some(exchange) = self
+            .exchanges
+            .iter_mut()
+            .rev()
+            .find(|exchange| exchange.request == request)
+            .filter(|exchange| exchange.whose.is_none())
+        {
+            exchange.named = Some(person.to_owned());
+        }
+    }
+
     /// Attribute an answer to its admitted scope rather than a later face observation.
     pub fn lamp_for(&mut self, request: u64, text: &str, now: Instant, scope: Option<&str>) {
         let words = text;
@@ -925,6 +963,7 @@ impl Thread {
                 written,
                 calls,
                 kept_for,
+                named: None,
             });
         }
         let private = self.private.contains(&request);
@@ -1284,8 +1323,10 @@ impl Thread {
     /// The known person (a memory id) whose conversation is going on as
     /// `request` is heard: the newest exchange before it, one with words from
     /// the lamp or cut unheard, began within [`GOING_ON_FOR`] of `now` and is
-    /// theirs (#4339). `None` for the room's, a quiet, or no exchange: an
-    /// exchange of anyone else's after theirs ends it.
+    /// theirs (#4339), or the room's with their face alone in view, its
+    /// reply told their name ([`Self::lamp_for_named`]). `None` for any
+    /// other room's exchange, a quiet, or no exchange: an exchange of anyone
+    /// else's after theirs ends it.
     pub fn going_on_with(&self, request: u64, now: Instant) -> Option<String> {
         self.exchanges
             .iter()
@@ -1294,7 +1335,7 @@ impl Thread {
             .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric) || exchange.unheard)
             .filter(|exchange| now.saturating_duration_since(exchange.at) <= GOING_ON_FOR)
             .filter(|exchange| self.after_close(exchange))
-            .and_then(|exchange| exchange.whose.clone())
+            .and_then(|exchange| exchange.whose.clone().or_else(|| exchange.named.clone()))
     }
 
     /// What the person said and what the lamp answered in the newest
@@ -3841,6 +3882,35 @@ mod tests {
         // The room's exchange came after A's: someone else's in between.
         thread.lamp_for(2, "Hello there.", now + Duration::from_secs(5), None);
         assert_eq!(thread.going_on_with(3, soon), None);
+    }
+
+    /// lamp-06c1, 5 Nov, S4: Olivia's opening line, her face alone in view
+    /// and none seen speaking it, was kept as the room's with its reply told
+    /// her name. Her conversation is going on for the car line after it.
+    /// A room's exchange named for nobody is not, a room's exchange after
+    /// hers ends it, and a quiet past the conversation's 45 s too.
+    #[test]
+    fn a_room_exchange_named_for_their_face_alone_is_their_conversation_going_on() {
+        let now = Instant::now();
+        let a = crate::remember::person_id("A");
+        let soon = now + Duration::from_secs(10);
+        let mut thread = Thread::new();
+        thread.lamp_for_named(1, "Garden centre, noted.", now, None, Some(&a));
+        assert_eq!(thread.going_on_with(2, soon), Some(a.clone()), "named");
+        assert_eq!(
+            thread.going_on_with(2, now + GOING_ON_FOR + Duration::from_secs(1)),
+            None,
+            "a quiet past 45 s"
+        );
+        // A person's own exchange is theirs: the name never moves it.
+        let b = crate::remember::person_id("B");
+        thread.lamp_for_named(2, "Hi B.", now, Some(&b), Some(&a));
+        assert_eq!(thread.going_on_with(3, soon), Some(b), "B's own");
+        // A room's line named for nobody after hers ends it.
+        let mut thread = Thread::new();
+        thread.lamp_for_named(1, "Garden centre, noted.", now, None, Some(&a));
+        thread.lamp_for_named(2, "Hello there.", now, None, None);
+        assert_eq!(thread.going_on_with(3, soon), None, "the room's after");
     }
 
     #[test]
