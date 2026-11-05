@@ -1764,6 +1764,31 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
     script: nothing kept unless `stopping`, 5 MB a boot newest first, 2
     boots and 10 MB at most, a boot with nothing closed keeps the kept, a
     failed move keeps them and says so, and the links.
+  - **How long they are kept (privacy, the PM's ruling on #5358, the first
+    builder's P2 on #5342):** their lines can hold what a person said, so
+    they follow the setup journal's rules (below). No file is kept past 72
+    hours from when it was closed: the shutdown's `keep` copies none older,
+    and `link` at boot and every `lamp-journal-setup` run (every 3 minutes)
+    delete any older, with their links, each with a `lamp-journal-keep: a
+    kept boot's file is deleted after 72 hours` line; nothing is deleted on
+    a clock not yet set. A reset wipes them: both reset plans wipe
+    `/var/lib/lamp-journal` whole, and `lamp-setup`'s reset then leaves
+    `.forgotten-boot` with this boot's id there, so a reset that ends in a
+    reboot keeps nothing of the old owner's boot at that shutdown (Twelve's
+    P2 on #5365; a reset started in place empties the journal itself). The
+    owner's own "forget everything about
+    me" removes them with the setup's (`lamp-voice`'s
+    `setup_journal::forget_with_everything`), with their links, and leaves
+    `.forgotten-boot` holding this boot's id
+    (`/proc/sys/kernel/random/boot_id`), so this boot's shutdown keeps
+    nothing of it, even with nothing kept yet; at the next boot's shutdown the mark is spent and the
+    keep goes on as before. Tests: `image_ramlog.rs`'s
+    `a_boot_the_owner_forgot_is_not_kept_at_its_shutdown` and
+    `the_kept_boots_are_kept_72_hours_at_most`; `lamp-voice`'s
+    `setup_journal` tests; `lamp-setup`'s reset tests list both folders,
+    and `a_reset_marks_this_boot_so_its_shutdown_keeps_no_journal`. The
+    script tests run with a `journalctl`, `systemctl` and `pkill` that fail
+    them if called, and with a `date` before 2026 that deletes nothing.
   - **Existing lamps:** a build carries both with the image's files
     (`LAMP_UPDATE_IMAGE=on`), then `systemctl daemon-reload`: the next
     shutdown keeps, and the boot after it links. By hand: copy both, then
@@ -1799,19 +1824,18 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   - **How long it is kept (privacy, the PM's call on #5342):** its lines can
     hold what the person said at setup, so it is deleted, links and all,
     72 hours after the walk was first seen, at a reset (both reset plans
-    wipe `/var/lib/lamp-journal/setup`), or when a walk begins again (a
+    wipe `/var/lib/lamp-journal`, #5358), or when a walk begins again (a
     redo of the walk or of a step), which replaces it, whichever comes
     first; the keep's run says "deleted after 72 hours". A walk first seen
     before the lamp's clock was set (before 2026) is dated anew once it is.
     The owner's own "forget everything about me", once their memory is
     emptied (the same mark and rule as their place and voice print),
     deletes it at once: `lamp-voice`'s `setup_journal::forget_with_everything`
-    removes the copies and their links, the answer says
-    `setup_log: "forgotten too"` (or `everything: false` with the reason
-    when one can't be removed), and it leaves `.forgotten`, so nothing more
-    of that walk is copied, even a file being copied then; a redo after
-    that walk ends starts anew. The last two boots' copies (#2602, above)
-    are not part of this.
+    removes the copies and their links, with the last two boots' (#5358,
+    above), the answer says `kept_logs: "forgotten too"` (or `everything:
+    false` with the reason when one can't be removed), and it leaves
+    `.forgotten`, so nothing more of that walk is copied, even a file being
+    copied then; a redo after that walk ends starts anew.
   - **Its bound:** 24 MB on the eMMC, each file written once, stopping at
     the first that doesn't fit, so what is kept is the setup's start
     without a gap, with a `lamp-journal-setup:` line saying it is full.
