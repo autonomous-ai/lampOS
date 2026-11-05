@@ -301,6 +301,50 @@ fn a_sure_other_voice_gets_no_callers_tie() {
     *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
 }
 
+const SISTER: Line = line(
+    0,
+    2_000,
+    "Lamp, remember my sister's name is Lan.",
+    "Got it, your sister is Lan.",
+);
+
+const COOK: Line = line(
+    7_000,
+    1_800,
+    "What should I cook tonight?",
+    "Try a warm noodle soup with ginger.",
+);
+
+/// Seventh's 52e6 rerun of #5324 (5 Nov 08:07, sw5008f): `talk_sis-3`,
+/// "Nice. And what was my sister's name again?", said right after the
+/// lamp's answer to a line sharing no word with it, was held under HELD as
+/// untied, and answered with the switch off: the one line the switch cost
+/// (HELD 32/37, OFF 34/37). It asks the lamp what it knows of the
+/// person's own. The same words asked of a colleague about theirs, or with
+/// a colleague's name, stay held.
+#[test]
+fn held_keeps_a_question_of_the_callers_own() {
+    let sis = [
+        SISTER,
+        COOK,
+        line(
+            12_000,
+            2_400,
+            "Nice. And what was my sister's name again?",
+            "Your sister is Lan.",
+        ),
+    ];
+    assert_eq!(run(false, &sis), [true; 3], "off: talk_sis-3");
+    assert_eq!(run(true, &sis), [true; 3], "held: talk_sis-3");
+    for desk in [
+        "Nice. And what was your sister's name again?",
+        "Sam, what was my sister's name again?",
+    ] {
+        let lines = [SISTER, COOK, line(12_000, 2_400, desk, "Lan.")];
+        assert_eq!(run(true, &lines), [true, true, false], "held: {desk}");
+    }
+}
+
 const LONDON: Line = line(
     0,
     1_800,
