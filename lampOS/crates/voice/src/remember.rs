@@ -122,6 +122,29 @@ pub const HELD_FORGET_RAN: &str =
 pub const ONE_FORGET_HELD: &str =
     "Not done: one forget waits for their yes at a time. Ask about that one only.";
 
+/// The argument the lamp adds, never the model, to a bare `forget` it runs
+/// in a person's scope only because a one-face line's keep was theirs
+/// ([`run_one_face_just_kept`], C88): it forgets that keep by its id or
+/// nothing, never their `forget_last`.
+pub const JUST_KEPT_ONE_FACE: &str = "just_kept_one_face";
+
+/// The argument the lamp adds, never the model, to a bare `forget` on a
+/// line carried as the person's conversation going on
+/// ([`run_carried_just_kept`], C88): like [`JUST_KEPT_ONE_FACE`], it forgets
+/// their keep by its id or nothing, never their `forget_last`; any keep of
+/// theirs counts, as the carried line already saw no face but theirs.
+pub const JUST_KEPT_CARRIED: &str = "just_kept_carried";
+
+/// What a person's `remember` answer tells the model with
+/// [`FORGET_JUST_KEPT_ENVIRONMENT`] (C88): a bare "forget that" now is
+/// this keep, and is a call.
+fn just_kept_told(text: &str) -> String {
+    format!(
+        "If they now say \"forget that\", that is what you just kept: \"{}\". Call forget with nothing else; do not answer it in words.",
+        cut_at_a_word(text, WHAT_WENT_BYTES)
+    )
+}
+
 /// What the model is told of a forget held for the person's yes: ask once,
 /// plainly, and the engine runs it on their yes. Never that they did not
 /// ask (rule 8: the lamp asks once and does not nag).
@@ -2013,6 +2036,33 @@ pub fn switch_forget_about(on: bool) -> bool {
     *FORGET_ABOUT.get_or_init(|| on)
 }
 
+/// Only the exact value `on`, with the Days client (C88, #5022): a bare
+/// "forget that" right after the same person's own `remember` forgets that
+/// kept thing by its id, in their scope, within [`HELD_FORGET_FOR`] of the
+/// keep. On lamp-06c1 (5 Nov) "Lamp, forget that." 56 s after Olivia's
+/// umbrella was kept on a one-face line was answered in words, nothing
+/// called; and a call would have run as the room's `forget_last`, which
+/// cannot reach her umbrella. With it the remember's answer tells the model
+/// what "that" now is, a one-face line whose keep was filed to them by
+/// that rule reaches their scope for it alone ([`run_one_face_just_kept`]),
+/// and a bare forget past the window, or one on a one-face line that is no
+/// longer plainly that keep, asks which. Another person's or the room's
+/// keep is never forgotten this way. Off, every forget is as before.
+pub const FORGET_JUST_KEPT_ENVIRONMENT: &str = "LAMP_MEMORY_FORGET_JUST_KEPT";
+static FORGET_JUST_KEPT: OnceLock<bool> = OnceLock::new();
+
+/// Whether a bare forget takes the person's just kept thing
+/// ([`FORGET_JUST_KEPT_ENVIRONMENT`]).
+pub fn forget_just_kept_on() -> bool {
+    FORGET_JUST_KEPT.get() == Some(&true)
+}
+
+/// Set it once for this process, as [`start`] does from the environment;
+/// the first setting stands.
+pub fn switch_forget_just_kept(on: bool) -> bool {
+    *FORGET_JUST_KEPT.get_or_init(|| on)
+}
+
 /// The most kept things one `forget {about}` removes. More matching than
 /// this is too broad a forgetting to do on a few words: nothing is removed
 /// and the model is told to ask which.
@@ -2905,6 +2955,14 @@ pub const HEARD_NAMED: &str = "heard_named";
 /// when more than one thing could be meant ([`FORGET_WHICH`]).
 pub const HEARD_BARE: &str = "heard_bare";
 
+/// The argument the lamp adds, never the model, to a bare `forget` whose
+/// own `about` it dropped as not heard where the line asks to forget
+/// ([`named_forget_with`], C35): the memory forgets their just kept thing
+/// when that is plainly "that" ([`just_kept`]), and otherwise asks which,
+/// never their last kept thing on a guess (the Reviewer-lead's P2 on
+/// #5419).
+pub const ABOUT_DROPPED: &str = "about_dropped";
+
 /// What the model is told of a bare forget's guessed `source_id`
 /// ([`HEARD_BARE`]) while more than one thing this session was shown could
 /// be "that": nothing is forgotten, and it asks once which one. On
@@ -3377,7 +3435,20 @@ pub struct Recent {
 /// after a named forget is that subject again (Twelve's "Yes, please forget
 /// it."); a bare one just after a follow-up was asked is that follow-up
 /// ([`ForgetPick::Asked`], #2808); any other bare one is [`ForgetPick::Last`].
+/// With [`FORGET_ABOUT_ENVIRONMENT`], the model's own `about` runs as called
+/// only when nothing was heard or its words were heard in the part of the
+/// line that asks to forget ([`pick_forget_on`], C35).
 pub fn pick_forget(call: &ToolCall, said: Option<&str>, recent: &Recent) -> ForgetPick {
+    pick_forget_on(call, said, recent, forget_about_on())
+}
+
+/// [`pick_forget`] with [`FORGET_ABOUT_ENVIRONMENT`] as `about_on`.
+fn pick_forget_on(
+    call: &ToolCall,
+    said: Option<&str>,
+    recent: &Recent,
+    about_on: bool,
+) -> ForgetPick {
     if call.name != FORGET {
         return ForgetPick::AsCalled;
     }
@@ -3409,8 +3480,21 @@ pub fn pick_forget(call: &ToolCall, said: Option<&str>, recent: &Recent) -> Forg
     {
         return ForgetPick::Kept;
     }
+    // The model's own `about` runs as called only when nothing was heard,
+    // or when its words were heard where the line asks to forget. A made-up
+    // `about` ("that" for a bare "Lamp. Forget that.") is the model's guess:
+    // run as called it found nothing and the lamp said "Nothing was
+    // forgotten" without asking which (lamp-06c1, 5 Nov, C35). It falls to
+    // the bare handling below instead (#3737, #3860).
+    let about_heard = || match (&parts, model()) {
+        (None, _) => true,
+        (Some((forgets, _)), Some(subject)) => in_part(forgets, &subject),
+        (Some(_), None) => false,
+    };
     if (forget_all_on() && call.args.get("source_id").is_some_and(|id| !id.is_null()))
-        || (forget_about_on() && call.args.get("about").is_some_and(|about| !about.is_null()))
+        || (about_on
+            && call.args.get("about").is_some_and(|about| !about.is_null())
+            && about_heard())
     {
         return ForgetPick::AsCalled;
     }
@@ -3775,6 +3859,23 @@ pub fn named_forget_with(
                     .is_some_and(|said| asks_to_forget(said) && named_subject(said).is_none()) =>
         {
             let mut args = call.args.clone();
+            // The model's `about`, never heard in the part that asks, is
+            // dropped: never run by words that were not said (C35). One that
+            // names something ("that" or "it" alone names nothing) is
+            // marked, so the memory asks which rather than taking their last
+            // kept thing: "I sold my bicycle. Lamp, forget it." may mean the
+            // bicycle, which the line's forget part never names (the
+            // Reviewer-lead's P2 on #5419).
+            let dropped = args
+                .as_object_mut()
+                .and_then(|args| args.remove("about"))
+                .and_then(|about| about.as_str().map(str::to_owned))
+                .is_some_and(|about| {
+                    subject_of(words_of(&search_text(&about)).iter().map(String::as_str)).is_some()
+                });
+            if dropped {
+                args[ABOUT_DROPPED] = json!(true);
+            }
             args[HEARD_BARE] = json!(true);
             return Some(ToolCall {
                 id: call.id.clone(),
@@ -4136,7 +4237,138 @@ pub fn run_one_face_keep(
     {
         thread.kept_for(lease.key().request, person);
     }
+    // Their keep by this rule, for a bare forget on a one-face line right
+    // after it ([`just_kept`], C88). Waited for, as the run's own context
+    // write was: only when the last thing given is still this keep of theirs.
+    if result.0["remembered"] == true
+        && let Some(client) = days_client_for(socket)
+        && let Ok(mut context) = client.context.lock()
+        && context.last_given.as_ref().is_some_and(
+            |(given, _)| matches!(given.as_slice(), [(Some(whose), _)] if whose == person),
+        )
+        && !context.given_by_recall
+    {
+        context.given_one_face = true;
+    }
     result
+}
+
+/// The Days client on `socket`, when it is the one started.
+fn days_client_for(socket: &Path) -> Option<&'static DaysClient> {
+    DAYS.get()
+        .and_then(Option::as_ref)
+        .filter(|client| client.socket == socket)
+}
+
+/// Whether a bare `forget` (marked [`HEARD_BARE`], no id and no `about`) on
+/// a line `person`'s only by the one-face rule is for their keep by that
+/// rule, the session's last memory call ([`just_kept`], C88): then it is
+/// run in their scope ([`run_one_face_just_kept`]), forgetting that keep
+/// or asking which. Otherwise it stays the room's (Thirteen's P2 on #5022).
+/// Only with [`FORGET_JUST_KEPT_ENVIRONMENT`].
+pub fn one_face_just_kept(socket: &Path, call: &ToolCall, person: &str) -> bool {
+    let given = |key: &str| call.args.get(key).is_some_and(|value| !value.is_null());
+    call.name == FORGET
+        && call.args.get(HEARD_BARE) == Some(&json!(true))
+        && !given("source_id")
+        && !given("about")
+        && days_client_for(socket).is_some_and(|client| {
+            client.forget_just_kept.load(Ordering::Acquire)
+                && client
+                    .context
+                    .lock()
+                    .is_ok_and(|context| just_kept(&context, Some(person), true) != JustKept::No)
+        })
+}
+
+/// What a carried line's forget other than a bare "forget that" is told:
+/// the second route's words for any memory call on a held line.
+pub const CARRIED_FORGET_REFUSED: &str = "I can't see who is talking just now, so I can't look up, keep or forget anything, or take a yes, for anyone. Say so, and ask them to come back where I can see them.";
+
+/// The person a line carried as their conversation going on is for, when
+/// `name` is a `forget` ([`ScopeLease::carried_for`]: current, not narrowed,
+/// no face but theirs seen through it), C88 / #5022. Its scope is then theirs:
+/// a lease's scope is its carried one until narrowed, and a line admitted as
+/// someone else's is never carried (`ScopeLease::carry_conversation`). The
+/// second route lets that one call through its refusal of memory calls on
+/// held lines (`second_provider::carried_forget_runs`, with the switch), and
+/// [`run_carried_just_kept`] runs it only for their just kept thing; a line
+/// held only by a gap is not carried, and stays refused.
+///
+/// [`ScopeLease::carried_for`]: crate::memory_scope::ScopeLease::carried_for
+pub fn carried_forget_lease(
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    name: &str,
+) -> Option<String> {
+    (name == FORGET)
+        .then(|| lease?.carried_for().map(str::to_owned))
+        .flatten()
+}
+
+/// A `forget` on a carried line ([`carried_forget_lease`]): run in
+/// `person`'s scope marked [`JUST_KEPT_CARRIED`] only when it is bare
+/// ("forget that": [`HEARD_BARE`], no `about`, no `source_id`) and their
+/// last memory call was their own keep within [`HELD_FORGET_FOR`], with the
+/// Days client on this socket and [`FORGET_JUST_KEPT_ENVIRONMENT`] on
+/// ([`just_kept`]), so it forgets that keep by its id or nothing. Any other
+/// forget is refused as a held line's memory call is
+/// ([`CARRIED_FORGET_REFUSED`]), and nothing is sent.
+pub fn run_carried_just_kept(
+    socket: &Path,
+    call: &ToolCall,
+    deadline: Duration,
+    lease: &crate::memory_scope::ScopeLease,
+    person: &str,
+) -> (Value, bool) {
+    let given = |key: &str| call.args.get(key).is_some_and(|value| !value.is_null());
+    if call.name != FORGET
+        || call.args.get(HEARD_BARE) != Some(&json!(true))
+        || given("about")
+        || given("source_id")
+    {
+        eprintln!(
+            "lamp-voice: a carried forget that is not a bare \"forget that\" runs for no one (LAMP_MEMORY_FORGET_JUST_KEPT)"
+        );
+        return (json!({ "error": CARRIED_FORGET_REFUSED }), true);
+    }
+    let kept_just_now = days_client_for(socket).is_some_and(|client| {
+        client.forget_just_kept.load(Ordering::Acquire)
+            && client.context.lock().is_ok_and(|context| {
+                matches!(just_kept(&context, Some(person), false), JustKept::Id(_))
+            })
+    });
+    if !kept_just_now {
+        eprintln!(
+            "lamp-voice: a carried bare forget with no keep of theirs just before runs for no one (LAMP_MEMORY_FORGET_JUST_KEPT)"
+        );
+        return (json!({ "error": CARRIED_FORGET_REFUSED }), true);
+    }
+    let mut marked = call.clone();
+    marked.args[JUST_KEPT_CARRIED] = json!(true);
+    run_scoped_for(socket, &marked, deadline, lease, person)
+}
+
+/// A bare forget on a line `person`'s only by the one-face rule, right
+/// after their keep by that rule ([`one_face_just_kept`]): run in their
+/// scope marked [`JUST_KEPT_ONE_FACE`], so it forgets that keep by its id
+/// or nothing and asks which, never their last kept thing. Re-checked
+/// right before the run: narrowed since, it is the room's.
+pub fn run_one_face_just_kept(
+    socket: &Path,
+    call: &ToolCall,
+    deadline: Duration,
+    lease: &crate::memory_scope::ScopeLease,
+    person: &str,
+) -> (Value, bool) {
+    if !still_one_face(lease, person) {
+        eprintln!(
+            "lamp-voice: a one-face forget whose line was narrowed since is the room's (LAMP_PERSON_SCOPE_ONE_FACE)"
+        );
+        return run_scoped(socket, call, deadline, lease);
+    }
+    let mut marked = call.clone();
+    marked.args[JUST_KEPT_ONE_FACE] = json!(true);
+    run_scoped_for(socket, &marked, deadline, lease, person)
 }
 
 /// A single-item `forget` on a line `person`'s only by the one-face rule:
@@ -4735,6 +4967,9 @@ pub fn start(socket: PathBuf, known: Option<PathBuf>) {
         days && std::env::var(FORGET_ABOUT_ENVIRONMENT).ok().as_deref() == Some("on"),
     );
     switch_replaces(days && std::env::var(REPLACES_ENVIRONMENT).ok().as_deref() == Some("on"));
+    switch_forget_just_kept(
+        days && std::env::var(FORGET_JUST_KEPT_ENVIRONMENT).ok().as_deref() == Some("on"),
+    );
     switch_forget_asks(
         days && std::env::var(FORGET_ASKS_ENVIRONMENT).ok().as_deref() == Some("on"),
     );
@@ -6194,6 +6429,8 @@ pub struct DaysClient {
     remember_once: AtomicBool,
     /// [`forget_about_on`], read when the client is made (#2176).
     forget_about: AtomicBool,
+    /// [`forget_just_kept_on`], read when the client is made (C88).
+    forget_just_kept: AtomicBool,
     /// [`replaces_on`], read when the client is made (#2510).
     replaces: AtomicBool,
     /// [`ROOM_NOT_ASKER_ENVIRONMENT`], read when the client is made (#2176).
@@ -6418,6 +6655,11 @@ struct DaysContext {
     /// again (Bug C, lamp-06c1, 5 Nov). Emptied as each memory call is sent
     /// and as a session opens under another name or closes.
     last_done: Option<(MemoryDone, Option<String>, Instant)>,
+    /// Whether [`Self::last_given`] came from a `remember` filed to its
+    /// person by the one-face rule (`LAMP_PERSON_SCOPE_ONE_FACE`,
+    /// [`run_one_face_keep`]): only then does a bare forget on a one-face
+    /// line reach their scope for it ([`just_kept`], C88).
+    given_one_face: bool,
 }
 
 /// A memory write that was done ([`DaysContext::last_done`]).
@@ -6429,6 +6671,52 @@ pub(crate) enum MemoryDone {
     Changed,
     /// A `forget` forgot something.
     Forgotten,
+}
+
+/// What a bare forget of `person`'s may take as "that" with
+/// [`FORGET_JUST_KEPT_ENVIRONMENT`] ([`just_kept`], C88).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum JustKept {
+    /// Their last memory call was not a keep of theirs alone.
+    No,
+    /// The one thing their keep gave, within [`HELD_FORGET_FOR`].
+    Id(u64),
+    /// Their keep was the last memory call, but longer ago: "that" may be
+    /// anything said since, so the lamp asks which.
+    Stale,
+}
+
+/// Whether the session's last memory call was `person`'s own `remember`,
+/// which gave one thing of their scope, with no follow-up asked of them
+/// since ([`bare_forget_target`] wins then, as it is newer). On a
+/// `one_face` line, only a keep filed to them by that same rule: a keep
+/// of their own seen line is not reached from a line only one face made
+/// theirs. Nobody known is never this: the room's keep may be anyone's.
+fn just_kept(context: &DaysContext, person: Option<&str>, one_face: bool) -> JustKept {
+    let Some(person) = person else {
+        return JustKept::No;
+    };
+    let Some((given, at)) = context.last_given.as_ref() else {
+        return JustKept::No;
+    };
+    let theirs = match given.as_slice() {
+        [(Some(whose), id)] if whose == person => Some(*id),
+        _ => None,
+    };
+    match theirs {
+        Some(id)
+            if !context.given_by_recall
+                && (!one_face || context.given_one_face)
+                && bare_forget_target(context, Some(person)).is_none() =>
+        {
+            if at.elapsed() <= HELD_FORGET_FOR {
+                JustKept::Id(id)
+            } else {
+                JustKept::Stale
+            }
+        }
+        _ => JustKept::No,
+    }
 }
 
 /// Whether the session's last memory call was a recall that gave
@@ -8067,6 +8355,7 @@ impl DaysClient {
                 std::env::var(REMEMBER_ONCE_ENVIRONMENT).ok().as_deref() == Some("on"),
             ),
             forget_about: AtomicBool::new(forget_about_on()),
+            forget_just_kept: AtomicBool::new(forget_just_kept_on()),
             replaces: AtomicBool::new(replaces_on()),
             room_not_asker: AtomicBool::new(
                 std::env::var(ROOM_NOT_ASKER_ENVIRONMENT).ok().as_deref() == Some("on"),
@@ -8677,6 +8966,7 @@ impl DaysClient {
         // may be either, so nothing runs and the model asks which (lamp-06c1,
         // 27 Oct 20:55: a sunflower kept, hibiscus tea recalled, "forget
         // that" removed the sunflower while the lamp said the tea).
+        let mut just_kept_id = None;
         if call.name == FORGET
             && call.args.get(HEARD_BARE) == Some(&json!(true))
             && call.args.get("source_id").is_none_or(Value::is_null)
@@ -8690,8 +8980,43 @@ impl DaysClient {
                 );
                 return (forget_which(person.is_some()), true);
             }
+            // C88 (#5022): "that" right after their own keep is that keep,
+            // by its id in their scope ([`FORGET_JUST_KEPT_ENVIRONMENT`]).
+            // A one-face line reached their scope only for it, so it never
+            // falls to their `forget_last`: anything else asks which.
+            let one_face = call.args.get(JUST_KEPT_ONE_FACE) == Some(&json!(true));
+            let reached = one_face
+                || call.args.get(JUST_KEPT_CARRIED) == Some(&json!(true))
+                || call.args.get(ABOUT_DROPPED) == Some(&json!(true));
+            match (
+                self.forget_just_kept.load(Ordering::Acquire),
+                just_kept(&context, person, one_face),
+            ) {
+                (true, JustKept::Id(id)) => {
+                    eprintln!(
+                        "lamp-voice provider: a bare forget right after their keep forgets that keep, entry {id} (LAMP_MEMORY_FORGET_JUST_KEPT)"
+                    );
+                    just_kept_id = Some(id);
+                }
+                (true, JustKept::Stale) => {
+                    eprintln!(
+                        "lamp-voice provider: a bare forget long after their keep is not run, asked which (LAMP_MEMORY_FORGET_JUST_KEPT)"
+                    );
+                    return (forget_which(true), true);
+                }
+                _ if reached => {
+                    eprintln!(
+                        "lamp-voice provider: a one-face, carried or unheard-about bare forget is not plainly their keep, asked which"
+                    );
+                    return (forget_which(person.is_some()), true);
+                }
+                _ => {}
+            }
         }
         let days_request = match call.name.as_str() {
+            FORGET if just_kept_id.is_some() => {
+                just_kept_id.map(|id| json!({"op":"forget","id":id}))
+            }
             FORGET
                 if self.forget_all.load(Ordering::Acquire)
                     && call.args.get("source_id").is_some() =>
@@ -9095,9 +9420,12 @@ impl DaysClient {
             // names that, or nothing, never its own guess (#3504, Friday's
             // N1, lamp follow-up).
             if call.name == FORGET && told["forgotten"] == true {
+                // A forget by the just kept id is answered with a count:
+                // that id is what went (C88).
+                let by_id = just_kept_id.map(|id| json!({"removed": {"id": id}}));
                 told_what_went(
                     &mut told,
-                    &answer,
+                    by_id.as_ref().unwrap_or(&answer),
                     self.context.try_lock().ok().as_deref(),
                     person,
                 );
@@ -9193,10 +9521,16 @@ impl DaysClient {
                 };
                 replaced = answer["replaced"].as_u64();
                 let replaces = self.replaces.load(Ordering::Acquire);
-                (
-                    told_kept(told, id, replaces),
-                    vec![(person.map(str::to_owned), id)],
-                )
+                let mut told = told_kept(told, id, replaces);
+                // What "that" now is for them (C88): on lamp-06c1 the model
+                // answered a bare "forget that" in words, calling nothing.
+                if self.forget_just_kept.load(Ordering::Acquire)
+                    && person.is_some()
+                    && let Some(text) = request_text.as_deref()
+                {
+                    told["that"] = json!(just_kept_told(text));
+                }
+                (told, vec![(person.map(str::to_owned), id)])
             } else {
                 (told, vec![])
             };
@@ -9237,6 +9571,11 @@ impl DaysClient {
         let mut said = None;
         if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING) && told["forgotten"] == true {
             said = self.forgotten(&mut context);
+            // The keep that was "that" is gone: a second "forget that" is
+            // not it again (C88).
+            if just_kept_id.is_some() {
+                context.last_given = None;
+            }
         }
         // A write done, for a yes alone soon after it (Bug C, 5 Nov).
         let done = match call.name.as_str() {
@@ -9292,6 +9631,8 @@ impl DaysClient {
         if matches!(call.name.as_str(), REMEMBER | RECALL) {
             context.last_given = Some((ids.clone(), Instant::now()));
             context.given_by_recall = call.name == RECALL;
+            // Set by [`run_one_face_keep`] once this returns, for its keep.
+            context.given_one_face = false;
         }
         for (at, (whose, id)) in ids.into_iter().enumerate() {
             said = said.or(context.include(whose.as_deref(), &[id]));
@@ -13133,6 +13474,228 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    const JUST_KEPT_TOOLS_CHILD: &str = "LAMP_MEMORY_FORGET_JUST_KEPT_TOOLS_TEST_CHILD";
+
+    /// C88 through the tools route (`tools::run_call_scoped`), with the Days
+    /// client and `LAMP_MEMORY_FORGET_JUST_KEPT` on (Heron's P2 and the
+    /// Reviewer-lead's P3 on #5419): lamp-06c1's request 202, a bare "Lamp,
+    /// forget that." on a line carried as Ann's conversation going on right
+    /// after her keep, forgets that keep by its id in her scope; a carried
+    /// `forget {about}` and a carried bare forget with no keep of hers just
+    /// before are refused and send nothing. A one-face line's bare forget
+    /// reaches her scope for her one-face keep only
+    /// (`one_face_just_kept`). The Days client is the process's, so it runs
+    /// in a child.
+    #[test]
+    fn a_carried_or_one_face_forget_that_takes_only_their_just_kept_thing_through_the_tools() {
+        const NAME: &str = "remember::tests::a_carried_or_one_face_forget_that_takes_only_their_just_kept_thing_through_the_tools";
+        if std::env::var(JUST_KEPT_TOOLS_CHILD).ok().as_deref() != Some("1") {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", NAME, "--nocapture"])
+                .env(JUST_KEPT_TOOLS_CHILD, "1")
+                .output()
+                .unwrap();
+            let said = format!(
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(output.status.success(), "{said}");
+            assert!(said.contains("1 passed"), "the child ran no test: {said}");
+            return;
+        }
+        let dir = PathBuf::from(format!("/tmp/fjk-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let memory = dir.join("m.sock");
+        let listener = UnixListener::bind(&memory).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let done = Arc::new(AtomicBool::new(false));
+        let served = {
+            let done = done.clone();
+            std::thread::spawn(move || {
+                let until = Instant::now() + Duration::from_secs(20);
+                let mut read = Vec::new();
+                while !done.load(Ordering::Acquire) && Instant::now() < until {
+                    let stream = match listener.accept() {
+                        Ok((stream, _)) => stream,
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            std::thread::sleep(Duration::from_millis(5));
+                            continue;
+                        }
+                        Err(error) => panic!("{error}"),
+                    };
+                    stream.set_nonblocking(false).unwrap();
+                    stream
+                        .set_read_timeout(Some(Duration::from_secs(2)))
+                        .unwrap();
+                    let mut line = String::new();
+                    if BufReader::new(&stream).read_line(&mut line).is_err() {
+                        continue;
+                    }
+                    let Ok(request) = serde_json::from_str::<Value>(&line) else {
+                        continue;
+                    };
+                    let answer = match request["op"].as_str() {
+                        Some("forget") => json!({"ok": true, "removed": 1}),
+                        _ => json!({"ok": true, "entries": []}),
+                    };
+                    let _ = (&stream).write_all(format!("{answer}\n").as_bytes());
+                    read.push(request);
+                }
+                read
+            })
+        };
+        DAYS_MODE.set(true).unwrap();
+        let client = DaysClient::new(memory.clone()).unwrap();
+        client.forget_just_kept.store(true, Ordering::Release);
+        assert!(DAYS.set(Some(client)).is_ok());
+        let client = days_client_for(&memory).unwrap();
+        let route = crate::tools::Route::Memory(memory.clone(), None, None);
+        let ann = person_id("Ann");
+        let kept = |one_face: bool| {
+            let mut context = client.context.lock().unwrap();
+            context.last_given = Some((vec![(Some(ann.clone()), 5)], Instant::now()));
+            context.given_by_recall = false;
+            context.given_one_face = one_face;
+        };
+        // Each request's line as heard, for the tools' own reading of it.
+        let heard = |request: u64, words: &str| {
+            let now = Instant::now();
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.person(words, true, now);
+            thread.hold_line(request, now);
+        };
+        let carried = |request: u64| {
+            let scope = scoped_request(None, request);
+            assert!(scope.lease().carry_conversation(&ann));
+            assert_eq!(
+                carried_forget_lease(Some(&scope.lease()), FORGET).as_deref(),
+                Some(ann.as_str())
+            );
+            scope
+        };
+        // 1. Carried, right after her keep: that keep, by its id, hers.
+        kept(false);
+        heard(5_419_001, "Lamp, forget that.");
+        let scope = carried(5_419_001);
+        let (_, (told, answered)) = crate::tools::run_call_scoped(
+            &route,
+            &call(FORGET, json!({})),
+            5_419_001,
+            true,
+            &scope.lease(),
+        );
+        assert!(answered && told["forgotten"] == true, "{told}");
+        // 2. Carried, with no keep of hers just before: refused.
+        client.context.lock().unwrap().last_given = None;
+        heard(5_419_003, "Lamp, forget that.");
+        let scope = carried(5_419_003);
+        let (_, (told, _)) = crate::tools::run_call_scoped(
+            &route,
+            &call(FORGET, json!({})),
+            5_419_003,
+            true,
+            &scope.lease(),
+        );
+        assert_eq!(told["error"], CARRIED_FORGET_REFUSED, "{told}");
+        // 3. Carried, a forget naming what: refused, nothing sent.
+        kept(false);
+        heard(5_419_002, "Lamp, forget the umbrella.");
+        let scope = carried(5_419_002);
+        let (_, (told, _)) = crate::tools::run_call_scoped(
+            &route,
+            &call(FORGET, json!({"about": "umbrella"})),
+            5_419_002,
+            true,
+            &scope.lease(),
+        );
+        assert_eq!(told["error"], CARRIED_FORGET_REFUSED, "{told}");
+        // 4. A one-face line after her one-face keep: that keep; after a
+        // keep of her seen line, not reached from it.
+        let one_face = |request: u64| {
+            let scope = scoped_request(Some("Ann"), request);
+            assert!(scope.lease().take_by_one_face());
+            scope
+        };
+        let bare = ToolCall {
+            id: String::new(),
+            name: FORGET.to_owned(),
+            args: json!({ HEARD_BARE: true }),
+        };
+        let person = one_face(5_419_004)
+            .lease()
+            .reached_by_one_face(FORGET)
+            .unwrap();
+        kept(false);
+        assert!(!one_face_just_kept(&memory, &bare, &person));
+        kept(true);
+        assert!(one_face_just_kept(&memory, &bare, &person));
+        assert!(!one_face_just_kept(
+            &memory,
+            &call(FORGET, json!({"about": "umbrella", HEARD_BARE: true})),
+            &person
+        ));
+        heard(5_419_005, "Lamp, forget that.");
+        let scope = one_face(5_419_005);
+        let (_, (told, answered)) = crate::tools::run_call_scoped(
+            &route,
+            &call(FORGET, json!({})),
+            5_419_005,
+            true,
+            &scope.lease(),
+        );
+        assert!(answered && told["forgotten"] == true, "{told}");
+        done.store(true, Ordering::Release);
+        let read = served.join().unwrap();
+        assert!(read.iter().all(|r| r["op"] != "forget_last"), "{read:?}");
+        let sent: Vec<&Value> = read.iter().filter(|r| r["op"] == "forget").collect();
+        assert_eq!(sent.len(), 2, "{read:?}");
+        for forget in sent {
+            assert_eq!(
+                *forget,
+                json!({"op":"forget","id":5,"person":person,"selective":true}),
+                "{read:?}"
+            );
+        }
+        assert_eq!(person, ann);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A line carried for a person is the one held line whose forget may
+    /// reach them ([`carried_forget_lease`]), and its scope is theirs: the
+    /// lease reads its carried scope until narrowed, a line admitted as
+    /// someone else is never carried for another, and a narrowed one is
+    /// carried for nobody (the Reviewer-lead's P3 on #5419: the check that
+    /// the scope is the carried person's was a restatement of these, so it
+    /// is pinned here instead). Only a `forget`.
+    #[test]
+    fn a_carried_line_reaches_only_its_carried_persons_scope_and_only_to_forget() {
+        let ann = person_id("Ann");
+        let room = scoped_request(None, 5_419_101);
+        assert!(carried_forget_lease(Some(&room.lease()), FORGET).is_none());
+        assert!(room.lease().carry_conversation(&ann));
+        assert_eq!(
+            carried_forget_lease(Some(&room.lease()), FORGET).as_deref(),
+            Some(ann.as_str())
+        );
+        let scope = room.lease().scope().cloned().unwrap();
+        assert_eq!(scope.person(), Some(ann.as_str()));
+        assert!(scope.held());
+        for name in [REMEMBER, RECALL, FORGET_EVERYTHING] {
+            assert!(
+                carried_forget_lease(Some(&room.lease()), name).is_none(),
+                "{name}"
+            );
+        }
+        room.lease().narrow_to_room();
+        assert!(carried_forget_lease(Some(&room.lease()), FORGET).is_none());
+        // Admitted as Bo: never carried for Ann.
+        let bo = scoped_request(Some("Bo"), 5_419_102);
+        assert!(!bo.lease().carry_conversation(&ann));
+        assert!(carried_forget_lease(Some(&bo.lease()), FORGET).is_none());
+    }
+
     /// The reviewer-lead's P3 on #3564: with a name typed at setup, the
     /// answer says it stays.
     #[test]
@@ -14305,6 +14868,340 @@ mod tests {
         );
         drop(client);
         std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// C35 (lamp-06c1, 5 Nov): with `LAMP_MEMORY_FORGET_ABOUT` on, "Lamp.
+    /// Forget that." was called as `forget {about:"that"}`, run as called,
+    /// and answered "Nothing was forgotten" without asking which. An
+    /// `about` whose words were not heard in the forget line is now bare:
+    /// its `about` dropped, and after a recall the lamp asks which (#3737,
+    /// #3860). An `about` that was heard, or one with nothing heard, still
+    /// runs as called.
+    #[test]
+    fn a_made_up_about_is_bare_and_asks_which_and_a_heard_one_runs() {
+        const OLIVIA: &str = "p-b247000000000001";
+        let none = Recent::default();
+        let that = call(FORGET, json!({"about": "that"}));
+        let umbrella = call(FORGET, json!({"about": "umbrella"}));
+        assert_eq!(
+            pick_forget_on(&that, Some("Lamp. Forget that."), &none, true),
+            ForgetPick::Last
+        );
+        assert_eq!(
+            pick_forget_on(&umbrella, Some("Lamp, forget the umbrella."), &none, true),
+            ForgetPick::AsCalled
+        );
+        assert_eq!(
+            pick_forget_on(&umbrella, None, &none, true),
+            ForgetPick::AsCalled
+        );
+        // Not heard anywhere in the line: never run by words not said.
+        assert_ne!(
+            pick_forget_on(&umbrella, Some("Lamp. Forget that."), &none, true),
+            ForgetPick::AsCalled
+        );
+        let routed = named_forget_with(
+            &that,
+            Some("Lamp. Forget that."),
+            Some(OLIVIA),
+            &Carry::default(),
+        )
+        .expect("a bare forget is marked");
+        assert_eq!(routed.args, json!({ HEARD_BARE: true }));
+        // Run with the switch on, after a recall: asked which, nothing sent.
+        let (socket, served) = memory("made-up-about", 3, |request| match request["op"].as_str() {
+            Some("remember") => json!({"ok":true,"id":5}),
+            Some("search") => json!({"ok":true,"entries":[
+                {"kind":"kept","id":3,"at_unix_ms":NOW-DAY,"text":"favorite drink is hibiscus tea"}
+            ]}),
+            _ => json!({"ok":false,"error":"unexpected","message":"m"}),
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_about.store(true, Ordering::Release);
+        let run = |call: &ToolCall| {
+            client.run_at(call, Duration::from_secs(3), NOW, Some(&EAST), Some(OLIVIA))
+        };
+        assert!(
+            run(&call(
+                REMEMBER,
+                json!({"text": "my umbrella is in the car"})
+            ))
+            .1
+        );
+        assert!(run(&call(RECALL, json!({"about": "drink"}))).1);
+        let (told, answered) = run(&routed);
+        assert!(answered);
+        assert_eq!(told, forget_which(true), "{told}");
+        let read = served.join().unwrap();
+        assert!(
+            read.iter()
+                .all(|line| line["op"] != "forget" && line["op"] != "kept")
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// The Reviewer-lead's P2 on #5419: "I sold my bicycle. Lamp, forget
+    /// it." is called as `forget {about:"bicycle"}`, whose word is not in the
+    /// part that asks to forget. Its `about` is dropped and marked
+    /// ([`ABOUT_DROPPED`]): with no keep of theirs just before, the lamp
+    /// asks which and never runs `forget_last` on their newest, unrelated
+    /// keep. A made-up "that" names nothing and is not marked.
+    #[test]
+    fn an_unheard_about_that_names_something_asks_which_never_the_last_kept_thing() {
+        const OLIVIA: &str = "p-b247000000000001";
+        let bicycle = call(FORGET, json!({"about": "bicycle"}));
+        let said = "I sold my bicycle. Lamp, forget it.";
+        let routed = named_forget_with(&bicycle, Some(said), Some(OLIVIA), &Carry::default())
+            .expect("a bare forget is marked");
+        assert_eq!(
+            routed.args,
+            json!({ HEARD_BARE: true, ABOUT_DROPPED: true })
+        );
+        let that = named_forget_with(
+            &call(FORGET, json!({"about": "that"})),
+            Some("Lamp. Forget that."),
+            Some(OLIVIA),
+            &Carry::default(),
+        )
+        .unwrap();
+        assert_eq!(that.args, json!({ HEARD_BARE: true }));
+        for (index, just_kept_on) in [false, true].into_iter().enumerate() {
+            // A keep long ago, then the line: nothing just kept.
+            let (socket, served) = memory(&format!("unheard-about-{index}"), 1, just_kept_memory);
+            let client = DaysClient::new(socket.clone()).unwrap();
+            client.forget_about.store(true, Ordering::Release);
+            client
+                .forget_just_kept
+                .store(just_kept_on, Ordering::Release);
+            let run = |call: &ToolCall| {
+                client.run_at(call, Duration::from_secs(3), NOW, Some(&EAST), Some(OLIVIA))
+            };
+            assert!(
+                run(&call(
+                    REMEMBER,
+                    json!({"text": "my favourite tea is jasmine"})
+                ))
+                .1
+            );
+            client.context.lock().unwrap().last_given = None;
+            assert_eq!(run(&routed), (forget_which(true), true), "{index}");
+            let read = served.join().unwrap();
+            assert!(
+                read.iter().all(|line| line["op"] == "remember"),
+                "{index}: {read:?}"
+            );
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+        }
+    }
+
+    /// The store's answers for the C88 cases: a keep is id 5, a forget by
+    /// id removes one, and `forget_last` removes another kept thing, 9.
+    fn just_kept_memory(request: &Value) -> Value {
+        match request["op"].as_str() {
+            Some("remember") => json!({"ok":true,"id":5}),
+            Some("forget") => json!({"ok":true,"removed":1}),
+            Some("forget_last") => {
+                json!({"ok":true,"removed":{"kind":"kept","id":9,"at_unix_ms":NOW}})
+            }
+            _ => json!({"ok":false,"error":"unexpected","message":"m"}),
+        }
+    }
+
+    /// C88 (lamp-06c1, 5 Nov, #5022): with `LAMP_MEMORY_FORGET_JUST_KEPT`, a
+    /// bare "forget that" right after the same person's keep forgets that
+    /// keep by its id in their scope, and the keep's answer tells the model
+    /// what "that" is. Past [`HELD_FORGET_FOR`] it asks which; a second one
+    /// is not that keep again.
+    #[test]
+    fn forget_that_right_after_their_keep_forgets_that_id_and_later_asks() {
+        const OLIVIA: &str = "p-b247000000000001";
+        let (socket, served) = memory("forget-just-kept", 4, just_kept_memory);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.replaces.store(true, Ordering::Release);
+        client.forget_just_kept.store(true, Ordering::Release);
+        let run = |call: &ToolCall| {
+            client.run_at(call, Duration::from_secs(3), NOW, Some(&EAST), Some(OLIVIA))
+        };
+        let keep = call(REMEMBER, json!({"text": "my umbrella is in the car"}));
+        let bare = named_forget_with(
+            &call(FORGET, json!({})),
+            Some("Lamp, forget that."),
+            Some(OLIVIA),
+            &Carry::default(),
+        )
+        .expect("a bare forget is marked");
+        let (kept, answered) = run(&keep);
+        assert!(answered && kept["remembered"] == true, "{kept}");
+        assert!(
+            kept["that"]
+                .as_str()
+                .is_some_and(|that| that.contains("my umbrella is in the car")),
+            "{kept}"
+        );
+        let (told, answered) = run(&bare);
+        assert!(answered && told["forgotten"] == true, "{told}");
+        assert_eq!(told["what_went"], "my umbrella is in the car", "{told}");
+        // Gone: "that" is not that keep again.
+        assert!(client.context.lock().unwrap().last_given.is_none());
+        // Kept again, then "forget that" past the window: asked which.
+        assert!(run(&keep).1);
+        client
+            .context
+            .lock()
+            .unwrap()
+            .last_given
+            .as_mut()
+            .unwrap()
+            .1 = Instant::now()
+            .checked_sub(HELD_FORGET_FOR + Duration::from_secs(1))
+            .unwrap();
+        assert_eq!(run(&bare), (forget_which(true), true));
+        // No keep last at all: as before, their last kept thing.
+        client.context.lock().unwrap().last_given = None;
+        assert_eq!(run(&bare).0["forgotten"], true);
+        let read = served.join().unwrap();
+        assert_eq!(
+            read[1],
+            json!({"op":"forget","id":5,"person":OLIVIA,"selective":true}),
+            "{read:?}"
+        );
+        let ops: Vec<&str> = read.iter().filter_map(|line| line["op"].as_str()).collect();
+        assert_eq!(ops, ["remember", "forget", "remember", "forget_last"]);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// C88: another person's keep, or the room's, is never "that" for a
+    /// bare forget: theirs runs as before, by their own last kept thing,
+    /// and never by the id another's keep gave. Switch off, a keep then
+    /// "forget that" is `forget_last` as before, the keep told no "that".
+    #[test]
+    fn forget_that_never_takes_another_persons_or_the_rooms_keep() {
+        const OLIVIA: &str = "p-b247000000000001";
+        const MINH: &str = "p-be9688998f085098";
+        let bare = named_forget_with(
+            &call(FORGET, json!({})),
+            Some("Forget that."),
+            Some(OLIVIA),
+            &Carry::default(),
+        )
+        .expect("a bare forget is marked");
+        let keep = call(REMEMBER, json!({"text": "my umbrella is in the car"}));
+        for (index, keeper, on) in [
+            (0, Some(MINH), true),
+            (1, None, true),
+            (2, Some(OLIVIA), false),
+        ] {
+            let (socket, served) =
+                memory(&format!("forget-not-theirs-{index}"), 2, just_kept_memory);
+            let client = DaysClient::new(socket.clone()).unwrap();
+            client.forget_just_kept.store(on, Ordering::Release);
+            let (kept, answered) =
+                client.run_at(&keep, Duration::from_secs(3), NOW, Some(&EAST), keeper);
+            assert!(answered && kept["remembered"] == true, "{index}: {kept}");
+            assert_eq!(
+                kept.get("that").is_some(),
+                on && keeper.is_some(),
+                "{index}"
+            );
+            let (told, answered) = client.run_at(
+                &bare,
+                Duration::from_secs(3),
+                NOW,
+                Some(&EAST),
+                Some(OLIVIA),
+            );
+            assert!(answered && told["forgotten"] == true, "{index}: {told}");
+            let read = served.join().unwrap();
+            assert_eq!(
+                read[1],
+                json!({"op":"forget_last","kind":"kept","person":OLIVIA}),
+                "{index}: {read:?}"
+            );
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+        }
+    }
+
+    /// C88 on a one-face line (`LAMP_PERSON_SCOPE_ONE_FACE`): a bare forget
+    /// reaches their scope only for a keep filed to them by that same rule
+    /// (marked [`JUST_KEPT_ONE_FACE`]), by its id; after a keep of their
+    /// own seen line, or with nothing kept, it asks which and never runs
+    /// their `forget_last` (Thirteen's P2 on #5022).
+    #[test]
+    fn a_one_face_bare_forget_takes_only_their_one_face_keep() {
+        const OLIVIA: &str = "p-b247000000000001";
+        let (socket, served) = memory("forget-just-kept-one-face", 3, just_kept_memory);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_just_kept.store(true, Ordering::Release);
+        let run = |call: &ToolCall| {
+            client.run_at(call, Duration::from_secs(3), NOW, Some(&EAST), Some(OLIVIA))
+        };
+        let keep = call(REMEMBER, json!({"text": "my umbrella is in the car"}));
+        let one_face = call(
+            FORGET,
+            json!({ HEARD_BARE: true, JUST_KEPT_ONE_FACE: true }),
+        );
+        // Their keep on a seen line: not reached from a one-face line.
+        assert!(run(&keep).1);
+        assert_eq!(run(&one_face), (forget_which(true), true));
+        {
+            let context = client.context.lock().unwrap();
+            assert_eq!(just_kept(&context, Some(OLIVIA), true), JustKept::No);
+            assert_eq!(just_kept(&context, Some(OLIVIA), false), JustKept::Id(5));
+            assert_eq!(just_kept(&context, None, false), JustKept::No);
+        }
+        // Their keep by the one-face rule: forgotten by its id.
+        assert!(run(&keep).1);
+        client.context.lock().unwrap().given_one_face = true;
+        assert_eq!(run(&one_face).0["forgotten"], true);
+        // Nothing kept just before: asked which, never `forget_last`.
+        assert_eq!(run(&one_face), (forget_which(true), true));
+        let read = served.join().unwrap();
+        let ops: Vec<&str> = read.iter().filter_map(|line| line["op"].as_str()).collect();
+        assert_eq!(ops, ["remember", "remember", "forget"], "{read:?}");
+        assert_eq!(read[2]["id"], 5);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// C88 on a line carried as their conversation going on (lamp-06c1, 5
+    /// Nov, request 202: told "I can't tell who's speaking"): a bare forget
+    /// marked [`JUST_KEPT_CARRIED`] takes their keep, seen or one-face, by
+    /// its id; with nothing kept just before it asks which, never their
+    /// `forget_last`.
+    #[test]
+    fn a_carried_bare_forget_takes_only_their_just_kept_thing() {
+        const OLIVIA: &str = "p-b247000000000001";
+        let (socket, served) = memory("forget-just-kept-carried", 2, just_kept_memory);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_just_kept.store(true, Ordering::Release);
+        let run = |call: &ToolCall| {
+            client.run_at(call, Duration::from_secs(3), NOW, Some(&EAST), Some(OLIVIA))
+        };
+        let carried = call(FORGET, json!({ HEARD_BARE: true, JUST_KEPT_CARRIED: true }));
+        // Their keep on a seen line: a carried "forget that" takes it.
+        assert!(
+            run(&call(
+                REMEMBER,
+                json!({"text": "my umbrella is in the car"})
+            ))
+            .1
+        );
+        assert_eq!(run(&carried).0["forgotten"], true);
+        // Nothing kept just before: asked which.
+        assert_eq!(run(&carried), (forget_which(true), true));
+        let read = served.join().unwrap();
+        assert_eq!(
+            read[1],
+            json!({"op":"forget","id":5,"person":OLIVIA,"selective":true})
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+        // No carried line, no exception to the held line's refusal.
+        assert!(carried_forget_lease(None, FORGET).is_none());
     }
 
     /// Reviewer-two's P2 on #3860: the longest keep, forgotten, is still a
@@ -17725,6 +18622,7 @@ mod tests {
             remember_once: AtomicBool::new(false),
             replaces: AtomicBool::new(false),
             forget_about: AtomicBool::new(false),
+            forget_just_kept: AtomicBool::new(false),
             room_sounds: PathBuf::from("/unused-no-io"),
             resumes: AtomicBool::new(false),
             fresh_tried: Arc::new(Mutex::new(None)),
@@ -22624,6 +23522,7 @@ mod tests {
             remember_once: AtomicBool::new(false),
             replaces: AtomicBool::new(false),
             forget_about: AtomicBool::new(false),
+            forget_just_kept: AtomicBool::new(false),
             room_sounds: PathBuf::from("/unused-no-io"),
             resumes: AtomicBool::new(false),
             fresh_tried: Arc::new(Mutex::new(None)),
@@ -22857,6 +23756,7 @@ mod tests {
             remember_once: AtomicBool::new(false),
             replaces: AtomicBool::new(false),
             forget_about: AtomicBool::new(false),
+            forget_just_kept: AtomicBool::new(false),
             resumes: AtomicBool::new(false),
             fresh_tried: Arc::new(Mutex::new(None)),
             kept_since_note: Arc::new(AtomicBool::new(false)),
@@ -23338,6 +24238,7 @@ mod tests {
             remember_once: AtomicBool::new(false),
             replaces: AtomicBool::new(false),
             forget_about: AtomicBool::new(false),
+            forget_just_kept: AtomicBool::new(false),
             resumes: AtomicBool::new(resumes),
             fresh_tried: Arc::new(Mutex::new(None)),
             kept_since_note: Arc::new(AtomicBool::new(false)),

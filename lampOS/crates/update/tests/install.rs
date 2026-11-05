@@ -1528,6 +1528,23 @@ fn the_product_does_not_take_back_a_doubted_keep() {
     );
 }
 
+/// "Forget that" right after a keep forgets that keep in the product
+/// (C88, #5022): the memory owner's call on 5 Nov, after lamp-06c1 answered
+/// a bare "forget that" after the umbrella keep in words two days running.
+#[test]
+fn the_product_forgets_what_was_just_kept() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_MEMORY_FORGET_JUST_KEPT=on"),
+        "the voice lacks LAMP_MEMORY_FORGET_JUST_KEPT"
+    );
+}
+
 /// The memory's corrections, forget-about and recall v2 are on in the
 /// product (#2510, #2176): each passed its check on lamp-06c1 on 4 Nov
 /// (build 10012): "green now, not violet" with `replaces`, both bicycle
