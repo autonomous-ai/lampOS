@@ -51,6 +51,16 @@ pub const SAID_LATE_MS: u64 = 10 * 60_000;
 /// One said late waits this long for someone to answer a line after it
 /// ([`Request::Noticed`]); after it, it counts as noticed.
 pub const NOTICE_GRACE_MS: i64 = 2 * 3_600_000;
+/// A timer more than this past due is too late to mean anything: it is
+/// dropped, never rung (#5258, #5219: on lamp-e82d a one-minute timer due
+/// 21:49:37 came back 18.4 hours later, as the lamp woke from its sleep
+/// mute). A timer set for longer than [`ROOM_TIMER_MS`] is kept as a
+/// reminder is, with [`REMINDER_TOO_LATE_MS`].
+pub const TIMER_TOO_LATE_MS: u64 = 10 * 60_000;
+/// A reminder more than this past due, or due on an earlier day in the
+/// lamp's zone, is too late to mean anything: dropped, never said
+/// (#5258, #5219). One missed in a short nap is still said late.
+pub const REMINDER_TOO_LATE_MS: u64 = 2 * 3_600_000;
 /// The said record holds at most this many reminders and timers...
 pub const SAID_KEPT: usize = 20;
 /// ...and none said longer ago than this.
@@ -159,9 +169,13 @@ impl Item {
     /// A timer the room hears ([`visible`]): set with nobody sure, for at
     /// most [`ROOM_TIMER_MS`] from when it was set.
     fn rooms(&self) -> bool {
-        self.person.is_none()
-            && self.timer()
-            && self.deadline.unix_ms.saturating_sub(self.created_unix_ms) <= ROOM_TIMER_MS
+        self.person.is_none() && self.short_timer()
+    }
+
+    /// A timer set for at most [`ROOM_TIMER_MS`]: a kitchen timer's, not a
+    /// relative reminder's ("in three weeks, renew my prescription").
+    fn short_timer(&self) -> bool {
+        self.timer() && self.deadline.unix_ms.saturating_sub(self.created_unix_ms) <= ROOM_TIMER_MS
     }
 }
 
@@ -248,6 +262,16 @@ fn remember_said(record: &mut Vec<Said>, said: Said, now: &ClockSample) {
     }
 }
 
+/// The journal's line for an occurrence dropped too late (#5258, #5219):
+/// which, and how late, never its words.
+fn dropped_late_line(timer: bool, id: u64, delivery: u64, late_by_ms: u64) -> String {
+    format!(
+        "schedule: {} id {id} delivery {delivery} dropped, too late to mean anything \
+         (late_by_ms {late_by_ms}); it is not said",
+        if timer { "timer" } else { "reminder" }
+    )
+}
+
 /// A setter's person id as memory makes them: `p-` and 16 hex digits.
 fn valid_person(person: &str) -> bool {
     lamp_msgs::known::is_person_id(person) && person.len() <= 64
@@ -289,6 +313,17 @@ struct State {
         deserialize_with = "stored::readable_said"
     )]
     said: Vec<Said>,
+    /// Occurrences dropped as too late to mean anything, never said
+    /// ([`Engine::too_late`], #5258, #5219), oldest first, kept as the said
+    /// record keeps its own (`said_unix_ms` is when it was dropped) and as
+    /// bounded, apart from it, so none is ever told as said. Optional stored
+    /// metadata, so no `schema` bump: a build from before leaves it out.
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "stored::readable_said"
+    )]
+    dropped_late: Vec<Said>,
 }
 
 /// A stored reminder or timer this build can't read: its JSON text as
@@ -423,8 +458,10 @@ impl State {
             }
             last_id = item.id;
         }
-        if self.said.len() > SAID_KEPT || self.said.iter().any(|said| !said.valid(self.next_id)) {
-            return Err(invalid());
+        for record in [&self.said, &self.dropped_late] {
+            if record.len() > SAID_KEPT || record.iter().any(|said| !said.valid(self.next_id)) {
+                return Err(invalid());
+            }
         }
         if let Some(receipt) = &self.last_receipt {
             let guard = receipt.request.guard().ok_or_else(invalid)?;
@@ -474,6 +511,7 @@ impl State {
                         || self
                             .said
                             .iter()
+                            .chain(&self.dropped_late)
                             .any(|s| s.person.as_deref() == Some(person.as_str()))
                     {
                         return Err(invalid());
@@ -740,6 +778,7 @@ impl<P: Persistence> Engine<P> {
                     unread: Vec::new(),
                     last_receipt: None,
                     said: Vec::new(),
+                    dropped_late: Vec::new(),
                 },
                 None => State {
                     schema: SCHEMA,
@@ -750,6 +789,7 @@ impl<P: Persistence> Engine<P> {
                     unread: Vec::new(),
                     last_receipt: None,
                     said: Vec::new(),
+                    dropped_late: Vec::new(),
                 },
             },
         };
@@ -846,8 +886,9 @@ impl<P: Persistence> Engine<P> {
     }
 
     /// One bounded scan. Pending occurrences never become future again after a
-    /// clock correction. A repeat advances only when its exact delivery is acked,
-    /// then to its next occurrence still ahead: after time off it is said once.
+    /// clock correction. A repeat advances only when its exact delivery is acked
+    /// or dropped too late, then to its next occurrence still ahead: after time
+    /// off it is said once.
     pub fn tick(&mut self, now: &ClockSample) -> Result<bool, Error> {
         self.observe(now)?;
         let mut next = self.state.clone();
@@ -865,6 +906,38 @@ impl<P: Persistence> Engine<P> {
                     });
                     changed = true;
                 }
+            }
+        }
+        // Too late to mean anything: dropped with a line, never offered, as
+        // it comes due after time off or a long mute, or waits to be offered
+        // again (#5258, #5219). Only Schedule offers what is due, so this
+        // covers a first offer and every later one.
+        let mut index = 0;
+        while index < next.items.len() {
+            let Some(late_by_ms) = self.too_late(&next.items[index], now) else {
+                index += 1;
+                continue;
+            };
+            let item = &next.items[index];
+            let line = dropped_late_line(item.short_timer(), item.id, item.delivery, late_by_ms);
+            // A repeat whose next occurrence can't be found is left as it
+            // is, to be acknowledged or cancelled: a scan never fails on it.
+            let Ok((mut dropped, removed)) = self.settle(&mut next, index, now) else {
+                index += 1;
+                continue;
+            };
+            eprintln!("{line}");
+            dropped.waiting = false;
+            remember_said(&mut next.dropped_late, dropped, now);
+            if !removed {
+                index += 1;
+            }
+            changed = true;
+            // The last mutation's receipt may name the item as it was. A
+            // retry of it then meets the revision this drop moves on, a
+            // conflict, never a second item, as `stored::read` drops one.
+            if next.check().is_err() {
+                next.last_receipt = None;
             }
         }
         if changed {
@@ -916,6 +989,71 @@ impl<P: Persistence> Engine<P> {
                 || late_by.unwrap_or(pending.overdue_at_detection_ms) > LATE_AFTER_MS,
             late_by,
         )
+    }
+
+    /// How late `item` is when it is too late to mean anything (#5258,
+    /// #5219): a timer of a kitchen's length ([`Item::short_timer`]) more
+    /// than [`TIMER_TOO_LATE_MS`] past due; any other reminder more than
+    /// [`REMINDER_TOO_LATE_MS`] past due, or due on an earlier day in the
+    /// lamp's zone. Only a pending one, and only when its lateness is known:
+    /// none is dropped on a clock not yet trusted.
+    fn too_late(&self, item: &Item, now: &ClockSample) -> Option<u64> {
+        let (_, late_by_ms) = self.late(item, now);
+        let late_by_ms = late_by_ms?;
+        let too_late = if item.short_timer() {
+            late_by_ms > TIMER_TOO_LATE_MS
+        } else {
+            late_by_ms > REMINDER_TOO_LATE_MS
+                || time::earlier_day(Self::shown(item, now).unix_ms, now, &self.zone)
+                    .ok()
+                    .flatten()
+                    .unwrap_or(false)
+        };
+        too_late.then_some(late_by_ms)
+    }
+
+    /// The pending occurrence at `index` in `next` is done with, acknowledged
+    /// as said or dropped too late: a repeat goes on to its next occurrence
+    /// still ahead, and a one-time one leaves the items (the `bool`). Either
+    /// way, the occurrence as the said record keeps it, at `now`.
+    fn settle(
+        &self,
+        next: &mut State,
+        index: usize,
+        now: &ClockSample,
+    ) -> Result<(Said, bool), Error> {
+        let (_, late_by_ms) = self.late(&next.items[index], now);
+        let shown = Self::shown(&next.items[index], now);
+        let item = &next.items[index];
+        let said = Said {
+            id: item.id,
+            room: item.rooms(),
+            timer: item.timer(),
+            text: item.text.clone(),
+            due_unix_ms: shown.unix_ms,
+            due_local: shown.local,
+            said_unix_ms: now.unix_ms,
+            late_by_ms,
+            person: item.person.clone(),
+            waiting: late_by_ms.is_none_or(|ms| ms > SAID_LATE_MS),
+        };
+        match time::next_ahead(&item.deadline, now).map_err(bad_time)? {
+            Some(deadline) => {
+                let item = &mut next.items[index];
+                item.delivery = item
+                    .delivery
+                    .checked_add(1)
+                    .ok_or_else(|| err("full", "Delivery identifiers are exhausted."))?;
+                item.deadline = deadline;
+                item.pending = None;
+                item.snooze = None;
+                Ok((said, false))
+            }
+            None => {
+                next.items.remove(index);
+                Ok((said, true))
+            }
+        }
     }
 
     fn item_view(&self, item: &Item, now: &ClockSample) -> Value {
@@ -1241,41 +1379,16 @@ impl<P: Persistence> Engine<P> {
                 // What was said to them goes with what was set (29e7).
                 next.said
                     .retain(|s| s.person.as_deref() != Some(person.as_str()));
+                next.dropped_late
+                    .retain(|s| s.person.as_deref() != Some(person.as_str()));
                 json!({"forgotten":before - next.items.len()})
             }
             Request::Ack { id, delivery, .. } => {
                 let index = find_pending(&next, *id, *delivery)?;
-                match time::next_ahead(&next.items[index].deadline, now).map_err(bad_time)? {
-                    Some(deadline) => {
-                        let item = &mut next.items[index];
-                        item.delivery = item
-                            .delivery
-                            .checked_add(1)
-                            .ok_or_else(|| err("full", "Delivery identifiers are exhausted."))?;
-                        item.deadline = deadline;
-                        item.pending = None;
-                        item.snooze = None;
-                    }
-                    None => {
-                        // Said, and kept in the said record: one said late
-                        // waits there for an answer (29e7, 2 Nov).
-                        let (_, late_by_ms) = self.late(&next.items[index], now);
-                        let shown = Self::shown(&next.items[index], now);
-                        let item = next.items.remove(index);
-                        let said = Said {
-                            id: item.id,
-                            room: item.rooms(),
-                            timer: item.timer(),
-                            text: item.text,
-                            due_unix_ms: shown.unix_ms,
-                            due_local: shown.local,
-                            said_unix_ms: now.unix_ms,
-                            late_by_ms,
-                            person: item.person,
-                            waiting: late_by_ms.is_none_or(|ms| ms > SAID_LATE_MS),
-                        };
-                        remember_said(&mut next.said, said, now);
-                    }
+                // Said, and a one-time one kept in the said record: one said
+                // late waits there for an answer (29e7, 2 Nov).
+                if let (said, true) = self.settle(&mut next, index, now)? {
+                    remember_said(&mut next.said, said, now);
                 }
                 json!({"acknowledged":true,"id":id,"delivery":delivery})
             }
@@ -1447,4 +1560,20 @@ fn find_pending(state: &State, id: u64, delivery: u64) -> Result<usize, Error> {
         ));
     }
     Ok(index)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_dropped_one_is_logged_by_kind_id_and_lateness_never_its_words() {
+        assert_eq!(
+            super::dropped_late_line(true, 7, 1, 66_240_000),
+            "schedule: timer id 7 delivery 1 dropped, too late to mean anything \
+             (late_by_ms 66240000); it is not said"
+        );
+        assert!(
+            super::dropped_late_line(false, 3, 2, 7_200_001)
+                .starts_with("schedule: reminder id 3 delivery 2")
+        );
+    }
 }

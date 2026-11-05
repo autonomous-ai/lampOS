@@ -1179,6 +1179,51 @@ impl SleepOwed {
     }
 }
 
+/// A reminder's play whose playback had gaps counts as said when its words
+/// are at least this share, in percent, of what the speaker wrote for it,
+/// the rest being the zeros of those gaps (#5258, #5219: on lamp-e82d a
+/// reminder that played through with gaps was given up as never proven
+/// said and said again, three times in three hours).
+const MOSTLY_PLAYED_PERCENT: u64 = 80;
+
+/// The zeros the speaker wrote into a reply's delivery gaps, the gaps
+/// `Reply::playback_gaps` counts (#5258).
+#[derive(Clone, Copy, Debug, Default)]
+struct GapZeros {
+    /// Every delivery gap's zero frames so far.
+    total: u64,
+    /// The open gap's, counted from its start's receipt.
+    open: u64,
+}
+impl GapZeros {
+    /// A gap receipt's zeros: a start's first block, then the rest of them
+    /// in its end's receipt, which carries them all. A listening gap's
+    /// zeros (#828) count only once they ran on past its hold, as the gap
+    /// itself does, all of them, the cautious side.
+    fn receipt(
+        &mut self,
+        phase: PlaybackGapPhase,
+        zero_frames: u64,
+        listening: bool,
+        overran: bool,
+    ) {
+        match phase {
+            PlaybackGapPhase::Started if !listening => {
+                self.total = self.total.saturating_add(zero_frames);
+                self.open = zero_frames;
+            }
+            PlaybackGapPhase::Resumed | PlaybackGapPhase::Cancelled if !listening => {
+                let rest = zero_frames.saturating_sub(std::mem::take(&mut self.open));
+                self.total = self.total.saturating_add(rest);
+            }
+            PlaybackGapPhase::Resumed if overran => {
+                self.total = self.total.saturating_add(zero_frames);
+            }
+            _ => {}
+        }
+    }
+}
+
 struct Reply {
     owner: TurnOwner,
     cloud: CloudRequest,
@@ -1198,6 +1243,8 @@ struct Reply {
     had_audio: bool,
     final_chunk: Option<u64>,
     playback_gaps: u64,
+    /// The zeros the speaker wrote in those gaps ([`Self::mostly_played`]).
+    gap_zeros: GapZeros,
     last_provider_audio_at_us: Option<u64>,
     start: StartGate,
     need: StartNeed,
@@ -1289,10 +1336,47 @@ impl Reply {
         }
     }
 
+    /// Its words were at least [`MOSTLY_PLAYED_PERCENT`] of what the
+    /// speaker wrote for it: the samples handed to the speaker, against
+    /// those and the zeros of its delivery gaps. A reply heard through
+    /// ([`Self::heard_through`]) had every sample of its audio written, so
+    /// only the gaps' zeros can make it less.
+    fn mostly_played(&self) -> bool {
+        let words = self.handed;
+        words > 0
+            && words.saturating_mul(100)
+                >= words
+                    .saturating_add(self.gap_zeros.total)
+                    .saturating_mul(MOSTLY_PLAYED_PERCENT)
+    }
+
+    /// Heard through with gaps in its playback, and mostly played
+    /// ([`Self::mostly_played`]): a reminder's play that counts as said
+    /// (#5258, #5219).
+    fn said_through_gaps(
+        &self,
+        speaker_pending: &Option<PendingSpeaker>,
+        snapshot: Snapshot,
+    ) -> bool {
+        self.playback_gaps > 0
+            && self.reminder.is_some()
+            && self.heard_through(speaker_pending, snapshot)
+            && self.mostly_played()
+    }
+
     fn complete_reminder(&mut self, speaker_pending: &Option<PendingSpeaker>, snapshot: Snapshot) {
-        if self.heard_whole(speaker_pending, snapshot)
+        let through_gaps = self.said_through_gaps(speaker_pending, snapshot);
+        if (through_gaps || self.heard_whole(speaker_pending, snapshot))
             && let Some(reminder) = &mut self.reminder
         {
+            if through_gaps {
+                eprintln!(
+                    "lamp-voice: the reminder played through {} gap(s), its words {} of {} frames written: counted as said (#5258)",
+                    self.playback_gaps,
+                    self.handed,
+                    self.handed.saturating_add(self.gap_zeros.total)
+                );
+            }
             reminder.completed();
         }
     }
@@ -1338,7 +1422,11 @@ impl Reply {
         ) && self.settled(speaker_pending)
             && self.notice.retired()
             && self.playback_gaps == 0;
-        let played_whole = sound || self.heard_whole(speaker_pending, snapshot);
+        // A reminder that played through gaps and counts as said
+        // (#5258) is spoken on the same proof.
+        let played_whole = sound
+            || self.heard_whole(speaker_pending, snapshot)
+            || self.said_through_gaps(speaker_pending, snapshot);
         // complete_reminder runs first. Read its resulting settlement, not the
         // pre-completion eligibility that successful completion consumes.
         let reminder_complete = self
@@ -15089,6 +15177,7 @@ fn commit_written_turn(
         told_stop: None,
         final_chunk: None,
         playback_gaps: 0,
+        gap_zeros: GapZeros::default(),
         notice: NoticeDelivery::default(),
         media: Default::default(),
         local_only: None,
@@ -15332,6 +15421,7 @@ fn commit_admitted_input(
         told_stop: after_stop,
         final_chunk: None,
         playback_gaps: 0,
+        gap_zeros: GapZeros::default(),
         notice: NoticeDelivery::default(),
         media: RequestedMedia::spoken(),
         local_only: None,
@@ -15443,6 +15533,7 @@ fn commit_offline_input(
         told_stop: None,
         final_chunk: None,
         playback_gaps: 0,
+        gap_zeros: GapZeros::default(),
         notice: NoticeDelivery::default(),
         media: Default::default(),
         local_only: Some(local),
@@ -15614,6 +15705,7 @@ fn commit_own_line(
         told_stop: None,
         final_chunk: None,
         playback_gaps: 0,
+        gap_zeros: GapZeros::default(),
         notice: NoticeDelivery::default(),
         media: Default::default(),
         local_only: Some(notices::LocalOnly {
@@ -15731,6 +15823,7 @@ fn continue_after_early_end(
         told_stop: None,
         final_chunk: None,
         playback_gaps: 0,
+        gap_zeros: GapZeros::default(),
         notice: NoticeDelivery::default(),
         media: RequestedMedia::spoken(),
         local_only: None,
@@ -16747,6 +16840,11 @@ fn handle_playback_gap(
                 .playback_gaps
                 .checked_add(1)
                 .ok_or_else(|| io::Error::other("reply playback gap counter exhausted"))?;
+        }
+        if !origin.is_some_and(SpeechOrigin::local) {
+            current
+                .gap_zeros
+                .receipt(phase, gap.zero_frames, listening, overran_us.is_some());
         }
         (
             Some(current.pcm.len()),
@@ -17962,6 +18060,7 @@ mod tests {
                 told_stop: None,
                 final_chunk: None,
                 playback_gaps: 0,
+                gap_zeros: GapZeros::default(),
                 notice: NoticeDelivery::default(),
                 media: Default::default(),
                 local_only: None,
@@ -19108,6 +19207,7 @@ mod tests {
             told_stop: None,
             final_chunk: None,
             playback_gaps: 0,
+            gap_zeros: GapZeros::default(),
             notice: NoticeDelivery::default(),
             media: Default::default(),
             local_only: None,
@@ -19432,6 +19532,7 @@ mod tests {
             told_stop: None,
             final_chunk: None,
             playback_gaps: 0,
+            gap_zeros: GapZeros::default(),
             notice: NoticeDelivery::default(),
             media: Default::default(),
             local_only: None,
