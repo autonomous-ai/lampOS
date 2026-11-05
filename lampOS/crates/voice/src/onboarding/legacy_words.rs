@@ -8,8 +8,8 @@ pub const SIT_TURN: &str = "(Say only this, nothing before or after it: \"I can 
 pub const SIT_DONE: &str =
     "(Say only this, nothing before or after it: \"Got it, I can see you well there.\")";
 pub const SIT_FAILED: &str = "(Say only this, nothing before or after it: \"I still can't see you well there. That's fine, you can turn me toward your seat later.\")";
-pub const WHO_NOTE: &str = "(Nobody has spoken. Ask exactly this: \"What should I call you?\" When they have told you, and only if you have remember_my_face, ask exactly this: \"May I remember your face, so I know you next time?\", and only after a clear yes call remember_my_face with their name. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done. If it was skipped or failed, say only: \"That's fine. You can tell me your name any time.\")";
-pub const WHO_NUDGE: &str = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise call setup_step with step \"who_you_are\" now, before you say anything else: done once you know their name, skipped if they would rather not.)";
+pub const WHO_NOTE: &str = "(Nobody has spoken. Ask exactly this: \"What should I call you?\" When they have told you, say their name back as a question on its own, with nothing else in that line, and wait for their answer. Only after a clear yes to their name, and only if you have remember_my_face, ask exactly this: \"May I remember your face, so I know you next time?\", and only after a clear yes call remember_my_face with their name. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done. If it was skipped or failed, say only: \"That's fine. You can tell me your name any time.\")";
+pub const WHO_NUDGE: &str = "(If you said their name back or asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise call setup_step with step \"who_you_are\" now, before you say anything else: done once you know their name, skipped if they would rather not.)";
 pub const PREFERENCES_NUDGE: &str = "(They have answered. Call setup_step with step \"preferences\" now, before you say anything else.)";
 pub const WHO_AGAIN: &str =
     "(That was not their name. Ask exactly this: \"Sorry, what should I call you?\")";
@@ -52,7 +52,7 @@ pub const GIVE_DONE: &str =
     "(Say only this, nothing before or after it: \"Got it, my head moved with your hand.\")";
 pub const GIVE_FAILED: &str = "(Say only this, nothing before or after it: \"I didn't feel my head move this time. That's fine, you can redo the setup later. Just ask me to redo the setup.\")";
 pub const PRIVACY_INVITATION: &str = "(Say only this, nothing before or after it: \"Find my privacy switch {location}. Close it, then open it again.\" Do not explain it, claim success or ask a tool to mark privacy done.)";
-pub const WHO_CONFIRM: &str = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise ask them, in a few words: \"Did I get that right, {name}?\" Nothing more.)";
+pub const WHO_CONFIRM: &str = "(If you said their name back or asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise ask them, in a few words: \"Did I get that right, {name}?\" Nothing more.)";
 pub const WHERE_YOU_SIT_SKIPPED: &str =
     "(Say only this, nothing before or after it: \"Okay, we'll skip where you sit for now.\")";
 pub const HOW_YOU_SOUND_SKIPPED: &str =

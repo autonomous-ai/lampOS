@@ -1997,6 +1997,15 @@ fn run_call_with_scope(
             if let Some(name) = name_kept_with_face(call, &told.0, onboarding.as_deref()) {
                 crate::remember::keep_name_with_face(name);
             }
+            // A setup save refused for the read-back, which the voice holds
+            // for its yes: "who you are" stays open for it (the
+            // Reviewer-lead's P1 on #5415), so that yes still saves at setup.
+            if switches.at_setup
+                && crate::known_faces::refused_for_the_read_back(&told.0)
+                && let Some(file) = onboarding.as_deref()
+            {
+                crate::onboarding::face_save_held(file);
+            }
             // A face saved while the walk leads "who you are" ends that step
             // (#3740), through the mailbox `setup_step` writes; one saved
             // before it is asked ends it when it comes up, unless a face is

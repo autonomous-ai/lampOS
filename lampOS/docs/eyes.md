@@ -1430,7 +1430,18 @@ With the switch:
     where the eyes read speaking, the speaker not seen saying it), a line
     held by a face's gap, another session or 45 s (`HELD_SAVE_FOR`) drops
     it (lamp-52e6, 5 Nov, #5391's check: "Walter. Have I got that
-    right?" "Yes, that's my name." made no call and kept no face).
+    right?" "Yes, that's my name." made no call and kept no face). While
+    it is held, the onboarding walk keeps "who you are" open for it, up to
+    45 s (`onboarding::face_save_held`, `FACE_SAVE_HELD_US`), instead of
+    ending it done with the name only 15 s after the lamp's read-back
+    (the Reviewer-lead's P1 on #5415). The walk's own script
+    (`skills/onboarding/skill.toml`, `who_you_are`) says the name back as
+    a question on its own and waits for its yes before it asks the face
+    question, so the usual walk reaches the eyes in one call; it asked the
+    face question with the name folded in before, which was refused every
+    time (Fifth on #5415). The name's window leaves out an exchange with
+    no words of theirs, such as a wordless cut-in answered with the
+    lamp's fixed line, so it never pushes the read-back out.
     `replace` still needs the read-back in the
     lamp's last answer (`known_faces::agreed_to`).
   - **Spelled:** a name not heard is asked for spelled out (`NOT_HEARD`).
