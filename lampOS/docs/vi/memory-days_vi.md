@@ -976,6 +976,14 @@ Dòng hồ sơ vào dải sở
 thích của ghi chú phiên (P3, #5043); các loại khác không bao giờ vào ghi chú
 phiên. Không có gì được nói ra hay hiển thị.
 
+`LAMP_MEMORY_NIGHTLY`, cùng `LAMP_MEMORY_NIGHTLY_PATTERNS` và
+`LAMP_MEMORY_NIGHTLY_FEELINGS`, bật trong unit voice của bản sản phẩm từ 5/11,
+theo quyết định của người phụ trách trí nhớ: từ 03:00 đến 06:00 giờ địa
+phương, sau 20 phút yên lặng và khi công tắc riêng tư mở, ngày hôm trước của
+mỗi người đã biết được gửi qua relay tới mô hình một lần nữa, và Days giữ
+những gì qua được kiểm tra, từng mục một. Không nói hay hiện gì; nhật ký chỉ
+có số đếm.
+
 ## Đầu dò của bộ đo (#4748)
 
 Bộ đo bộ nhớ (`docs/memory-bench.md`) chạy một tháng qua chính client Days của

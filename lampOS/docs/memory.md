@@ -996,8 +996,9 @@ for fields, errors, retries, invalidation and caller responsibilities.
 With `--memory-days`, `nightly_prepare` and `nightly_apply` run a nightly
 model pass for one known person (the memory owner's extraction plan C, step
 B, 3 Nov; the voice's `LAMP_MEMORY_NIGHTLY`, with patterns and feelings
-behind `LAMP_MEMORY_NIGHTLY_PATTERNS` and `LAMP_MEMORY_NIGHTLY_FEELINGS`, off
-even when it is on). It keeps episodes, facts, profile lines, patterns,
+behind `LAMP_MEMORY_NIGHTLY_PATTERNS` and `LAMP_MEMORY_NIGHTLY_FEELINGS`, each off
+unless set, even with it on; all three on in the product by the memory
+owner's call on 5 Nov). It keeps episodes, facts, profile lines, patterns,
 what is ahead and feelings from that person's own records of a day, each
 item checked alone, a bad one dropped and counted: Tiers' kinds and rules
 (memory-tiers, `tiers/recall-adapter`) without its all-or-nothing night.
@@ -3033,7 +3034,8 @@ that fills Days with episodes, facts, profile lines and what is ahead (and,
 each behind its own switch, patterns and feelings), from what a known
 person said in a day. lamp-memory has no network, so the voice runs the
 night (`nightly.rs`), its night runner adapted from the Tiers night (#5000,
-credited) and ported to Days. Days checks each item alone: a bad item is
+credited) and ported to Days. On in the product, with patterns and feelings, by
+the memory owner's call on 5 Nov. Days checks each item alone: a bad item is
 dropped and counted, the good ones are kept (where Tiers threw the whole
 night away).
 

@@ -1580,6 +1580,39 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {
     }
 }
 
+/// The nightly pass is on in the product, with patterns and feelings (the
+/// memory owner's call on 5 Nov): it needs the memory's socket, Days and
+/// the second route's relay, which the unit sets too, and lamp-memory's
+/// nightly ops, which `--memory-days` brings.
+#[test]
+fn the_product_sorts_a_day_into_memory_overnight() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1
+    };
+    let service = section(unit("lamp-voice.service"), "Service");
+    for line in [
+        "Environment=LAMP_MEMORY_NIGHTLY=on",
+        "Environment=LAMP_MEMORY_NIGHTLY_PATTERNS=on",
+        "Environment=LAMP_MEMORY_NIGHTLY_FEELINGS=on",
+        "Environment=LAMP_MEMORY_DAYS=on",
+        "Environment=LAMP_VOICE_ROUTE=second",
+        "Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+    let memory = section(unit("lamp-memory.service"), "Service");
+    assert!(
+        memory
+            .iter()
+            .any(|line| line.starts_with("ExecStart=") && line.contains(" --memory-days")),
+        "the memory runs without --memory-days"
+    );
+}
+
 /// What a caller said before their face was known becomes theirs once it is
 /// (`LAMP_MEMORY_FOLLOWS_FACE`, #2176): the memory owner's call on 4 Nov. It
 /// moves nothing without the Days memory, the second route and the eyes'
