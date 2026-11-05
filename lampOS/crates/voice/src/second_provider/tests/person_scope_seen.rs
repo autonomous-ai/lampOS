@@ -63,20 +63,23 @@ fn feed(
     boot: &'static str,
     done: Arc<AtomicBool>,
 ) -> std::thread::JoinHandle<()> {
-    feed_faces(eyes, vec![("f1", f1_speaks)], boot, done)
+    feed_faces(eyes, vec![("f1", f1_speaks)], &[], boot, done)
 }
 
 /// [`feed`] with `in_view` the faces in each look, by passing id, each
-/// speaking it or silent; none, looks with no face in them.
+/// speaking it or silent; none, looks with no face in them. With `mouths`,
+/// each look reads every face's mouth by the next of them in turn instead.
 fn feed_faces(
     eyes: Arc<SpeakingFaces>,
     in_view: Vec<(&'static str, bool)>,
+    mouths: &'static [lamp_msgs::SpeakingState],
     boot: &'static str,
     done: Arc<AtomicBool>,
 ) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let mut frame = 0u64;
         while !done.load(Ordering::Acquire) {
+            let mouth = (!mouths.is_empty()).then(|| mouths[frame as usize % mouths.len()]);
             let faces = lamp_msgs::Faces {
                 faces: in_view
                     .iter()
@@ -90,11 +93,11 @@ fn feed_faces(
                         yaw: None,
                         facing: None,
                         speaking: Some(lamp_msgs::Speaking {
-                            state: if speaks {
+                            state: mouth.unwrap_or(if speaks {
                                 lamp_msgs::SpeakingState::Yes
                             } else {
                                 lamp_msgs::SpeakingState::No
-                            },
+                            }),
                             score: 0.9,
                             from: None,
                         }),
@@ -135,6 +138,9 @@ struct Outcome {
     /// Whose scope, and by which rule, each memory hits ask read
     /// (`worker::hits_of_lease`, as the product's callback reads it).
     hits: Vec<HitsRead>,
+    /// Whose name the line's reply is told by the face name, as the worker
+    /// picks it (`worker::known_person_for`, by lease).
+    named_for_reply: Option<String>,
 }
 
 async fn one_line(
@@ -288,6 +294,45 @@ async fn lines_past_silent(
     past_silent: Option<(bool, crate::second_provider::AnotherVoice)>,
     voice: Voice,
 ) -> Outcome {
+    lines_named(
+        what,
+        lines,
+        chats,
+        boot,
+        seen,
+        eyes_up,
+        early,
+        going_on,
+        named,
+        saves,
+        past_silent,
+        voice,
+        false,
+        &[],
+    )
+    .await
+}
+
+/// [`lines_past_silent`] with `name_one_face` as `LAMP_SECOND_NAME_ONE_FACE`
+/// ([`Engine::naming_by_one_face`]), and `mouths`, when any, each look's
+/// mouth read for every face in turn ([`feed_faces`]).
+#[allow(clippy::too_many_arguments)]
+async fn lines_named(
+    what: &str,
+    lines: Vec<Line>,
+    chats: Vec<Vec<net::Result<ChatEvent>>>,
+    boot: &'static str,
+    seen: bool,
+    eyes_up: bool,
+    early: Option<&str>,
+    going_on: Option<bool>,
+    named: bool,
+    saves: bool,
+    past_silent: Option<(bool, crate::second_provider::AnotherVoice)>,
+    voice: Voice,
+    name_one_face: bool,
+    mouths: &'static [lamp_msgs::SpeakingState],
+) -> Outcome {
     let eyes = Arc::new(SpeakingFaces::default());
     let path = known_file(what, &eyes);
     let script = Arc::new(Script {
@@ -352,6 +397,7 @@ async fn lines_past_silent(
     } else {
         failed_reader(engine, &path, seen)
     };
+    let engine = engine.naming_by_one_face(name_one_face);
     let engine = if voice == Voice::Off {
         engine
     } else {
@@ -418,7 +464,7 @@ async fn lines_past_silent(
         }
         *now.lock().unwrap() += Duration::from_secs(after);
         let done = Arc::new(AtomicBool::new(false));
-        let feeder = feed_faces(eyes.clone(), in_view, boot, done.clone());
+        let feeder = feed_faces(eyes.clone(), in_view, mouths, boot, done.clone());
         engine.submit(start(request));
         engine.submit(audio(request, 1));
         tokio::time::sleep(Duration::from_millis(40)).await;
@@ -444,6 +490,10 @@ async fn lines_past_silent(
         .as_ref()
         .and_then(ScopeLease::scope)
         .is_some_and(crate::memory_scope::ScopeSnapshot::held);
+    // Whose name the reply's face name is told, as the worker picks it.
+    let named_for_reply = first.as_ref().and_then(|lease| {
+        super::super::worker::known_person_for(Some(lease), super::super::worker::Chosen::ByLease)
+    });
     let rounds = script.asked.lock().unwrap().clone();
     let asked: Vec<Message> = rounds.iter().map(|chat| chat[0].clone()).collect();
     Outcome {
@@ -456,6 +506,7 @@ async fn lines_past_silent(
         held,
         rounds,
         hits: hits.lock().unwrap().clone(),
+        named_for_reply,
     }
 }
 
@@ -1710,6 +1761,145 @@ async fn a_second_face_an_unknown_face_no_face_or_another_voice_is_as_before() {
     .await;
     assert_eq!(got.lease, Some(a));
     assert!(got.held, "carried, never memory's");
+}
+
+/// One line, "What's my name?", A's known face in every look per
+/// `in_view`, with `LAMP_SECOND_NAME_ONE_FACE` as `name_one_face`.
+async fn whats_my_name(
+    what: &str,
+    in_view: Vec<(&'static str, bool)>,
+    voice: Voice,
+    name_one_face: bool,
+) -> Outcome {
+    whats_my_name_read(what, in_view, &[], voice, name_one_face).await
+}
+
+/// [`whats_my_name`] with each look's mouth read as the next of `mouths`.
+async fn whats_my_name_read(
+    what: &str,
+    in_view: Vec<(&'static str, bool)>,
+    mouths: &'static [lamp_msgs::SpeakingState],
+    voice: Voice,
+    name_one_face: bool,
+) -> Outcome {
+    lines_named(
+        what,
+        vec![("Lamp, what's my name?".to_owned(), in_view, 0)],
+        vec![vec![text("You're A."), Ok(ChatEvent::Done)]],
+        BOOT,
+        true,
+        true,
+        None,
+        None,
+        true,
+        false,
+        None,
+        voice,
+        name_one_face,
+        mouths,
+    )
+    .await
+}
+
+/// lamp-06c1 (build 10343, request 42, `LAMP_SECOND_NAME_ONE_FACE`): the test
+/// face, known and not the owner, alone in 12 of 12 looks, read speaking in
+/// 2, still in 4 and unread in 6, no other voice. The mouth rule
+/// (`speaking_faces::named_alone`) held too, and once it had named the line
+/// the one-face count was never checked: that rule reaches the reply only as
+/// the owner's typed name, so she was told no name and said "I don't
+/// remember your name". The one-face count names her for the reply whether
+/// or not the mouth rule held; the line stays the room's.
+#[tokio::test]
+async fn a_lone_known_face_the_mouth_rule_named_is_named_by_the_one_face_count_too() {
+    use lamp_msgs::SpeakingState::{No, Unknown, Yes};
+    const MOUTHS: &[lamp_msgs::SpeakingState] = &[
+        Yes, Yes, No, No, No, No, Unknown, Unknown, Unknown, Unknown, Unknown, Unknown,
+    ];
+    let a = crate::remember::person_id("A");
+    let got = whats_my_name_read(
+        "name-one-face-mouth-rule",
+        vec![("f1", false)],
+        MOUTHS,
+        Voice::One,
+        true,
+    )
+    .await;
+    assert_eq!(got.named_for_reply, Some(a), "the reply told A's name");
+    assert_eq!(got.lease, None, "told and read as the room's");
+    assert!(!got.held);
+    assert_eq!(got.told, Message::system("for None"), "no A context");
+    // The switch off: named by the mouth rule alone, no face name.
+    let got = whats_my_name_read(
+        "name-one-face-mouth-rule-off",
+        vec![("f1", false)],
+        MOUTHS,
+        Voice::One,
+        false,
+    )
+    .await;
+    assert_eq!(got.named_for_reply, None);
+    assert_eq!(got.lease, None, "the room's");
+}
+
+/// lamp-06c1 (5 Nov 11:12, request 6, `LAMP_SECOND_NAME_ONE_FACE`): the test
+/// face alone in 11 of 11 looks, its mouth read still in 6, so the mouth
+/// rule (`speaking_faces::named_alone`) failed and "what's my name?" got "I
+/// don't have a name for you". With the switch on, A's known face the one
+/// face in every look, read still throughout and never speaking, and no
+/// other voice: the reply is told A's name, and only that: the line is told
+/// and read as the room's. The memory owner's call of 5 Nov.
+#[tokio::test]
+async fn a_lone_known_face_never_read_speaking_is_named_for_the_reply_with_the_switch_on() {
+    let a = crate::remember::person_id("A");
+    let got = whats_my_name("name-one-face", vec![("f1", false)], Voice::One, true).await;
+    assert_eq!(got.named_for_reply, Some(a), "the reply told A's name");
+    assert_eq!(got.lease, None, "told and read as the room's");
+    assert!(!got.held);
+    assert_eq!(got.told, Message::system("for None"), "no A context");
+    assert!(
+        got.noted.iter().all(|(person, _)| person.is_none()),
+        "no A note: {:?}",
+        got.noted
+    );
+}
+
+/// The switch off: the same line, as before, names nobody (the mouth was
+/// never read speaking, so `named_alone` fails).
+#[tokio::test]
+async fn a_lone_known_face_never_read_speaking_is_not_named_with_the_switch_off() {
+    let got = whats_my_name("name-one-face-off", vec![("f1", false)], Voice::One, false).await;
+    assert_eq!(got.named_for_reply, None);
+    assert_eq!(got.lease, None, "the room's");
+}
+
+/// Any sign of someone else wins (`LAMP_SECOND_NAME_ONE_FACE`): a second
+/// face in the looks, another voice heard before the line or in it, or a
+/// face other than A's seen speaking it names nobody, and the line stays
+/// the room's.
+#[tokio::test]
+async fn another_face_another_voice_or_another_speaker_names_nobody() {
+    for (what, in_view, voice) in [
+        (
+            "name-second-face",
+            vec![("f1", false), ("f2", false)],
+            Voice::One,
+        ),
+        (
+            "name-voice-before",
+            vec![("f1", false)],
+            Voice::AnotherBefore,
+        ),
+        ("name-voice-in-it", vec![("f1", false)], Voice::AnotherInIt),
+        (
+            "name-other-speaks",
+            vec![("f1", false), ("f2", true)],
+            Voice::One,
+        ),
+    ] {
+        let got = whats_my_name(what, in_view, voice, true).await;
+        assert_eq!(got.named_for_reply, None, "{what}: named nobody");
+        assert_eq!(got.lease, None, "{what}: the room's");
+    }
 }
 
 fn list_reminders() -> Vec<Vec<net::Result<ChatEvent>>> {

@@ -5105,6 +5105,16 @@ pub(crate) fn lamp_just_asked(thread: &crate::thread::Thread, request: u64, now:
 /// conversation (`LAMP_CONVERSATION_CARRIES`, #4339: no face was seen
 /// speaking it, the readers' HOLDs on #4158), one held by a face's gap, or
 /// a revoked one.
+///
+/// But with `LAMP_SECOND_NAME_ONE_FACE`, a line narrowed to the room for want
+/// of a face seen speaking it is named for its admitted person when it was
+/// named by the one-face count, the mouth not read
+/// (`ScopeLease::named_by_one_face_for_reply`: no face seen speaking it, not
+/// carried, their own known face the one face in view, no other voice
+/// heard; any later narrow takes it back). The memory owner's call of 5 Nov:
+/// "the 'talking' detection is not trustable" (lamp-06c1, request 6: the
+/// test face alone in 11 of 11 looks, read still in 6, had no name). A line
+/// named only by the mouth rule (`speaking_faces::named_alone`) still is not.
 pub(crate) fn known_person_for(
     lease: Option<&crate::memory_scope::ScopeLease>,
     chosen: Chosen,
@@ -5112,6 +5122,9 @@ pub(crate) fn known_person_for(
     let lease = lease.filter(|_| chosen == Chosen::ByLease)?;
     if lease.carried_for().is_some() {
         return None;
+    }
+    if let Some(person) = lease.named_by_one_face_for_reply() {
+        return Some(person.to_owned());
     }
     let scope = lease.scope().filter(|scope| !scope.held())?;
     scope.person().map(str::to_owned)
@@ -6682,6 +6695,18 @@ pub(super) fn see_who_speaks(
         );
     }
     engine = engine.scoping_by_sight(seen);
+    // A line narrowed for want of a face seen speaking it is still named for
+    // its reply when their own face was the one face in view, the mouth not
+    // read (`LAMP_SECOND_NAME_ONE_FACE=on`, the memory owner's call of 5 Nov).
+    let name_one_face = seen
+        && std::env::var(crate::second_provider::NAME_ONE_FACE_ENVIRONMENT)
+            .is_ok_and(|value| value == "on");
+    if name_one_face {
+        eprintln!(
+            "lamp-voice second: a known person's line no face was seen speaking is told their name for its reply when their face was the one face in view and no other voice was heard, its scope the room's (LAMP_SECOND_NAME_ONE_FACE)"
+        );
+    }
+    engine = engine.naming_by_one_face(name_one_face);
     match (known, root) {
         (Some(known), Some(root)) if speaking && engine.scopes_context() => {
             let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
@@ -21394,6 +21419,20 @@ mod tests {
         lease.narrow_to_room();
         lease.name_for_reply();
         assert_eq!(lease.named_for_reply(), Some(pippa.as_str()));
+        assert_eq!(known_person_for(Some(&lease), Chosen::ByLease), None);
+        // Narrowed, then named by the one-face count, the mouth not read
+        // (`LAMP_SECOND_NAME_ONE_FACE`, 5 Nov): named, by lease only; a
+        // later narrow (another voice heard as it was judged) takes it back.
+        let one_face = scope(4);
+        let lease = one_face.lease();
+        lease.narrow_to_room();
+        lease.name_for_reply_by_one_face();
+        assert_eq!(
+            known_person_for(Some(&lease), Chosen::ByLease),
+            Some(pippa.clone())
+        );
+        assert_eq!(known_person_for(Some(&lease), Chosen::ByPresence), None);
+        lease.narrow_to_room();
         assert_eq!(known_person_for(Some(&lease), Chosen::ByLease), None);
         // Carried in their conversation, no face seen speaking it.
         let carried = scope(3);

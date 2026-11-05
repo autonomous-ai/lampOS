@@ -468,6 +468,9 @@ struct RequestContext {
     /// Narrowed to the room, its reply still told the admitted person's
     /// name ([`ScopeLease::name_for_reply`]).
     named: AtomicBool,
+    /// [`Self::named`] by the one-face count, the mouth not read
+    /// (`LAMP_SECOND_NAME_ONE_FACE`, [`ScopeLease::name_for_reply_by_one_face`]).
+    named_by_one_face: AtomicBool,
     /// Narrowed to the room for want of a face seen speaking it, no face
     /// seen speaking it at all and the admitted person's own known face the
     /// only face in view: memory's hits alone may still read their scope
@@ -584,6 +587,7 @@ impl RequestScope {
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
+                named_by_one_face: AtomicBool::new(false),
                 hits_face: AtomicBool::new(false),
                 room: ScopeSnapshot::room(),
                 active: AtomicBool::new(true),
@@ -632,6 +636,7 @@ impl RequestScope {
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
+                named_by_one_face: AtomicBool::new(false),
                 hits_face: AtomicBool::new(false),
                 room: ScopeSnapshot::room(),
                 active: AtomicBool::new(true),
@@ -692,6 +697,12 @@ impl ScopeLease {
             .unwrap_or_else(|e| e.into_inner());
         self.context.narrowed.store(true, Ordering::Release);
         self.context.hits_face.store(false, Ordering::Release);
+        // A name by the one-face count is undone by any later narrow, as the
+        // hits fallback is (`LAMP_SECOND_NAME_ONE_FACE`): any sign of
+        // someone else wins. Taken after the narrow that names it.
+        if self.context.named_by_one_face.swap(false, Ordering::AcqRel) {
+            self.context.named.store(false, Ordering::Release);
+        }
         if one_face.take().is_some() {
             mark_one_face_line(self.context.key.request, None);
         }
@@ -804,6 +815,34 @@ impl ScopeLease {
     /// (reviewer-three's P2 on #4090).
     pub fn name_for_reply(&self) {
         self.context.named.store(true, Ordering::Release);
+    }
+
+    /// [`Self::name_for_reply`], named by the one-face count rather than the
+    /// mouth read; taken after the narrow, and undone by any later one
+    /// ([`Self::narrow_to_room`]): any sign of someone else wins. Named by the
+    /// one-face count rather than the
+    /// mouth read (`LAMP_SECOND_NAME_ONE_FACE`, the memory owner's call of 5
+    /// Nov, `speaking_faces::named_one_face`): no face seen speaking it, not
+    /// carried, their own known face the one face in view, no other voice
+    /// heard. Only [`Self::named_by_one_face_for_reply`] reads it, for the
+    /// reply's name (`worker::known_person_for`); every memory boundary
+    /// still reads [`Self::scope`], the room's.
+    pub fn name_for_reply_by_one_face(&self) {
+        self.context
+            .named_by_one_face
+            .store(true, Ordering::Release);
+        self.name_for_reply();
+    }
+
+    /// The admitted person a narrowed line's reply is told by name under
+    /// `LAMP_SECOND_NAME_ONE_FACE` ([`Self::name_for_reply_by_one_face`]),
+    /// while the lease is current. Never authority to act.
+    pub fn named_by_one_face_for_reply(&self) -> Option<&str> {
+        self.context
+            .named_by_one_face
+            .load(Ordering::Acquire)
+            .then(|| self.named_for_reply())
+            .flatten()
     }
 
     /// A line admitted as a known person's, theirs only by the one-face rule
@@ -1412,6 +1451,49 @@ mod tests {
         drop(owner);
         assert_eq!(lease.named_for_reply(), None, "revoked");
         assert!(lease.scope().is_none());
+    }
+
+    /// `LAMP_SECOND_NAME_ONE_FACE` (5 Nov): a narrowed line named by the
+    /// one-face count is named through `named_by_one_face_for_reply` as well
+    /// as `named_for_reply`; one named only by the mouth rule
+    /// (`name_for_reply`) is not. Its scope stays the room's, a later narrow
+    /// takes it back, and a revoked lease names no one.
+    #[test]
+    fn a_line_named_by_the_one_face_count_is_told_apart_from_the_mouth_rule() {
+        let person = ScopeSnapshot {
+            person: Some(Arc::from("p-0123456789abcdef")),
+            held: false,
+        };
+        let owner = RequestScope::new(key(1), person.clone());
+        let lease = owner.lease();
+        lease.narrow_to_room();
+        lease.name_for_reply();
+        assert_eq!(
+            lease.named_by_one_face_for_reply(),
+            None,
+            "the mouth rule only"
+        );
+        let other = RequestScope::new(key(2), person.clone());
+        let by_count = other.lease();
+        by_count.name_for_reply_by_one_face();
+        assert_eq!(by_count.named_by_one_face_for_reply(), None, "not narrowed");
+        // Taken after the narrow, as the judgement takes it.
+        by_count.narrow_to_room();
+        by_count.name_for_reply_by_one_face();
+        assert_eq!(
+            by_count.named_by_one_face_for_reply(),
+            Some("p-0123456789abcdef")
+        );
+        assert_eq!(by_count.named_for_reply(), Some("p-0123456789abcdef"));
+        assert_eq!(by_count.scope(), Some(&ScopeSnapshot::room()));
+        // Any later narrow (another voice heard as it was judged) takes the
+        // name back, as it does the hits fallback.
+        by_count.narrow_to_room();
+        assert_eq!(by_count.named_by_one_face_for_reply(), None, "undone");
+        assert_eq!(by_count.named_for_reply(), None, "undone");
+        by_count.name_for_reply_by_one_face();
+        drop(other);
+        assert_eq!(by_count.named_by_one_face_for_reply(), None, "revoked");
     }
 
     #[test]
