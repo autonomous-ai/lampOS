@@ -401,6 +401,9 @@ impl Launch {
 
 #[derive(Clone, Debug)]
 pub struct CliConfig {
+    /// Where the service user's runtime folder is looked for, at each call
+    /// ([`with_user_bus`]): `/run/user`, swapped only in tests.
+    pub user_runtime_root: PathBuf,
     pub executable: PathBuf,
     pub launch_timeout: Duration,
     pub read_timeout: Duration,
@@ -461,6 +464,9 @@ pub struct CliConfig {
     pub health_after_start: bool,
 }
 
+/// Where systemd's logind makes each user's runtime folder.
+pub const USER_RUNTIME_ROOT: &str = "/run/user";
+
 /// The service user's systemd user manager, for every Harness call: Harness
 /// 0.5.42's `harness start` runs `systemctl --user start harnessd.service`,
 /// which fails with "Failed to connect to bus: No medium found" when the
@@ -469,14 +475,17 @@ pub struct CliConfig {
 /// its process neither variable, even with the user lingering, so each one
 /// not already set is taken from the user's own runtime folder,
 /// `/run/user/<uid>`, and its `bus`, only where they exist; one already set
-/// is kept as it is.
+/// is kept as it is. It is looked at for each call ([`Cli::child_environment`]),
+/// not once at start: after a reboot lamp-tasks may start before logind has
+/// made the lingering user's folder (#5393's reads).
 pub fn with_user_bus(
     mut environment: BTreeMap<String, OsString>,
+    root: &Path,
     uid: u32,
     exists: &dyn Fn(&Path) -> bool,
 ) -> BTreeMap<String, OsString> {
     if !environment.contains_key("XDG_RUNTIME_DIR") {
-        let runtime = PathBuf::from(format!("/run/user/{uid}"));
+        let runtime = root.join(uid.to_string());
         if exists(&runtime) {
             environment.insert("XDG_RUNTIME_DIR".into(), runtime.into_os_string());
         }
@@ -500,14 +509,11 @@ impl CliConfig {
             executable,
             launch_timeout: Duration::from_secs(60),
             read_timeout: Duration::from_secs(10),
-            environment: with_user_bus(
-                ENVIRONMENT
-                    .iter()
-                    .filter_map(|name| std::env::var_os(name).map(|value| ((*name).into(), value)))
-                    .collect(),
-                rustix::process::geteuid().as_raw(),
-                &|place: &Path| place.exists(),
-            ),
+            environment: ENVIRONMENT
+                .iter()
+                .filter_map(|name| std::env::var_os(name).map(|value| ((*name).into(), value)))
+                .collect(),
+            user_runtime_root: PathBuf::from(USER_RUNTIME_ROOT),
             cancel: None,
             as_person: false,
             folder_missing: false,
@@ -577,6 +583,17 @@ fn executable_identity(path: &Path) -> io::Result<ExecutableIdentity> {
 }
 
 impl Cli {
+    /// The environment each Harness child gets: the checked one, with the
+    /// service user's runtime folder and bus looked up now ([`with_user_bus`]).
+    pub fn child_environment(&self) -> BTreeMap<String, OsString> {
+        with_user_bus(
+            self.config.environment.clone(),
+            &self.config.user_runtime_root,
+            rustix::process::geteuid().as_raw(),
+            &|place: &Path| place.exists(),
+        )
+    }
+
     pub fn new(mut config: CliConfig, caller_session: String) -> io::Result<Self> {
         if !token(&caller_session, 80) {
             return Err(invalid("invalid_caller_session"));
@@ -1365,7 +1382,7 @@ impl Cli {
                 "--json",
             ])
             .env_clear()
-            .envs(&self.config.environment);
+            .envs(self.child_environment());
         if !self.config.as_person {
             command
                 .env("AI_AGENT", "lampos")
@@ -1496,7 +1513,7 @@ impl Cli {
         command
             .args(args)
             .env_clear()
-            .envs(&self.config.environment);
+            .envs(self.child_environment());
         if !self.config.as_person {
             command
                 .env("AI_AGENT", "lampos")
