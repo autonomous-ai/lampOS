@@ -862,8 +862,12 @@ one, 5 Nov) where a skill is made or comes new to the lamp: `lamp-skills
 pack` (the make check), and an install from the Store, the app or a
 computer (`Skill::made_refuses`, `QUERY_NOT_AN_ORDER`). A skill already on
 the lamp still loads, its order read as no query, so it reads the latest
-as it meant, and lamp-skills says so in the journal at load, by the
-skill's name. Refused at load, it stranded the lamp: build 10300's round
+as it meant: Drive's files with no query, and a mail `search`, which needs
+one, as `recent` (the only skill read that needs a query; any other takes
+none). A query of search words with an order in it ("budget sorted by
+date") is left out whole, so such a skill reads wider, any latest file or
+mail, under the same permission. lamp-skills says so in the journal once a
+skill when it first loads it, by the skill's name. Refused at load, it stranded the lamp: build 10300's round
 on lamp-9adf (5 Nov) would not switch, as its lamp-skills would not load
 a skill made there before the check. A made skill's brief gives Drive's step whole and says so
 (`made_skill::DRIVE_READ`): the step, then "no other key" and why, in

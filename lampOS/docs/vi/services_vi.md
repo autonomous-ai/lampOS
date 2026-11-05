@@ -890,9 +890,14 @@ từ chối (`service_read::ordering`, sau khi một kỹ năng được tạo t
 hay mới đến đèn: `lamp-skills pack` (bước kiểm khi tạo), và việc cài từ
 Store, ứng dụng hay một máy tính (`Skill::made_refuses`,
 `QUERY_NOT_AN_ORDER`). Một kỹ năng đã có trên đèn vẫn nạp, thứ tự của nó
-được đọc như không có `query`, nên nó đọc những tệp mới nhất đúng như ý
-định, và lamp-skills ghi điều đó vào journal lúc nạp, theo tên kỹ năng. Nếu
-bị từ chối lúc nạp, đèn bị kẹt: vòng cập nhật của bản build 10300 trên
+được đọc như không có `query`, nên nó đọc những gì mới nhất đúng như ý
+định: các tệp của Drive không có `query`, và một `search` thư, vốn cần
+`query`, thành `recent` (việc đọc duy nhất của kỹ năng cần `query`; mọi việc
+đọc khác không dùng nó). Một `query` gồm từ tìm kiếm có lẫn một thứ tự
+("budget sorted by date") bị bỏ cả, nên kỹ năng đó đọc rộng hơn, bất kỳ tệp
+hay thư mới nhất nào, dưới cùng quyền. lamp-skills ghi điều đó vào journal
+một lần cho mỗi kỹ năng, khi nạp nó lần đầu, theo tên kỹ năng. Nếu bị từ
+chối lúc nạp, đèn bị kẹt: vòng cập nhật của bản build 10300 trên
 lamp-9adf (5/11) không chuyển, vì lamp-skills của nó không nạp một kỹ năng
 được tạo ở đó trước khi có bước kiểm này. Bản brief của kỹ năng được
 tạo cho trọn bước của Drive và nói điều này (`made_skill::DRIVE_READ`):
