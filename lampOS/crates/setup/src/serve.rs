@@ -770,7 +770,7 @@ fn stage_private(path: &Path, bytes: &[u8]) -> io::Result<PathBuf> {
 }
 
 /// `bytes` in a new temporary file beside `path` with `mode`, synced.
-fn stage(path: &Path, bytes: &[u8], mode: u32) -> io::Result<PathBuf> {
+pub(crate) fn stage(path: &Path, bytes: &[u8], mode: u32) -> io::Result<PathBuf> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -789,7 +789,7 @@ fn stage(path: &Path, bytes: &[u8], mode: u32) -> io::Result<PathBuf> {
 }
 
 /// The second half: the temporary file renamed over `path`, its folder synced.
-fn put_in_place(temporary: &Path, path: &Path) -> io::Result<()> {
+pub(crate) fn put_in_place(temporary: &Path, path: &Path) -> io::Result<()> {
     if let Err(why) = fs::rename(temporary, path) {
         let _ = fs::remove_file(temporary);
         return Err(why);

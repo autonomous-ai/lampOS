@@ -27,7 +27,13 @@
 //! - the owner's language (`/etc/lampOS/setup/language`, #4473): one code,
 //!   root's, 0644, as setup writes it. The voice reads it at start, so once
 //!   it changed the voice is restarted when it rests between turns (5 s, at
-//!   most [`REST_MOST`]), as the app's restart waits ([`when_rested`]).
+//!   most [`REST_MOST`]), as the app's restart waits ([`when_rested`]);
+//! - the owner's chosen voice and character words (`voice` and `character`
+//!   beside the language, #5394, `docs/chosen-voice.md`): one line each,
+//!   root's, 0644, checked by [`lamp_msgs::chosen_voice`]'s rules; an empty
+//!   one removes the file. The voice reads them at start, so it restarts as
+//!   for a new language. The reset's plan wipes both. `lamp-cloud` sends
+//!   them only with `LAMP_CHOSEN_VOICE=on`.
 use crate::serve::{Config, Files, Save, write_private};
 use lamp_update::quiet::{Heard, QUIET, Quiet};
 use serde_json::{Value, json};
@@ -60,6 +66,16 @@ pub enum Change {
     OwnerPlace(Option<lamp_msgs::owner_place::Place>),
     /// The owner's language: one of [`crate::serve::LANGUAGES`].
     Language(&'static str),
+    /// The owner's chosen voice's name; `None` goes back to the default.
+    Voice(Option<String>),
+    /// The owner's words for the character; `None` clears them.
+    Character(Option<String>),
+}
+
+/// Where the chosen voice and the character words are kept: beside the
+/// language, in the folder updates keep and the reset's plan names.
+pub fn beside_language(config: &Config, name: &str) -> std::path::PathBuf {
+    config.language.with_file_name(name)
 }
 
 /// A control character, a line or paragraph separator, or a mark that turns
@@ -83,7 +99,8 @@ pub fn fit_name(name: &str) -> Result<String, &'static str> {
 
 /// The one line `lamp-cloud` sends, checked against `config`: exactly
 /// `{"person_name": s}`, `{"display_name": s}`, `{"timezone": s}`,
-/// `{"language": s}`, or `{"owner_place": {"name", "lat", "lon", "set_at"}}`
+/// `{"language": s}`, `{"voice": s}`, `{"character": s}` (`""` clears
+/// either), or `{"owner_place": {"name", "lat", "lon", "set_at"}}`
 /// (`null` clears it).
 pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
     if line.len() > LINE_MOST {
@@ -122,6 +139,15 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
         "language" => crate::serve::language(text.ok_or(crate::serve::LANGUAGE_REFUSED)?)
             .map(Change::Language)
             .ok_or_else(|| crate::serve::LANGUAGE_REFUSED.into()),
+        // Checked again here, whatever lamp-cloud sent (#5394).
+        "voice" => lamp_msgs::chosen_voice::fit_voice(text.ok_or("voice must be text")?)
+            .map(Change::Voice)
+            .map_err(Into::into),
+        "character" => {
+            lamp_msgs::chosen_voice::fit_character(text.ok_or("character must be text")?)
+                .map(Change::Character)
+                .map_err(Into::into)
+        }
         // Rounded again here, whatever lamp-cloud sent: root's copy of the
         // rule is the one that writes.
         "owner_place" if given.is_null() => Ok(Change::OwnerPlace(None)),
@@ -231,6 +257,37 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 said: format!("the language is now {code}"),
             })
         }
+        Change::Voice(voice) => {
+            let path = beside_language(config, "voice");
+            let changed = keep_line(&path, voice.as_deref())?;
+            Ok(Done {
+                data: json!({"provider": "elevenlabs", "voice": voice.as_deref().unwrap_or(""), "speed": 1.0}),
+                restart_schedule: false,
+                restart_voice: changed,
+                // A voice's name is no one's: said, as the language is.
+                said: format!(
+                    "the chosen voice is now {}",
+                    voice.as_deref().unwrap_or("the default")
+                ),
+            })
+        }
+        // The journal says only how long the words are, never them.
+        Change::Character(text) => {
+            let path = beside_language(config, "character");
+            let changed = keep_line(&path, text.as_deref())?;
+            Ok(Done {
+                data: json!({"text": text.as_deref().unwrap_or("")}),
+                restart_schedule: false,
+                restart_voice: changed,
+                said: match text {
+                    Some(text) => format!(
+                        "the character's words were set ({} characters)",
+                        text.chars().count()
+                    ),
+                    None => "the character's words were cleared".into(),
+                },
+            })
+        }
         Change::OwnerPlace(None) => {
             remove(&lamp_msgs::owner_place::beside_name(&config.name))?;
             Ok(Done {
@@ -241,6 +298,23 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             })
         }
     }
+}
+
+/// `line` kept at `path` as one line, root's, 0644 (the voice reads it as
+/// `lampos`), or the file removed for `None`; whether its bytes changed.
+fn keep_line(path: &Path, line: Option<&str>) -> io::Result<bool> {
+    let before = fs::read(path).ok();
+    match line {
+        Some(line) => {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            let temporary = crate::serve::stage(path, format!("{line}\n").as_bytes(), 0o644)?;
+            crate::serve::put_in_place(&temporary, path)?;
+        }
+        None => remove(path)?,
+    }
+    Ok(before != fs::read(path).ok())
 }
 
 /// The refusal of every request without `--enable`.
@@ -278,10 +352,11 @@ pub fn answer_holding(
     enabled: bool,
     records: &lamp_update::records::Records,
 ) -> (Value, Option<Done>, Option<lamp_update::records::Lock>) {
+    // The chosen voice and character restart the voice too (#5394).
     let language = enabled
         && matches!(
             parse(line.trim_end_matches(['\n', '\r']), config),
-            Ok(Change::Language(_))
+            Ok(Change::Language(_) | Change::Voice(_) | Change::Character(_))
         );
     if !language {
         let (reply, done) = answer(line, config, enabled);
