@@ -291,6 +291,18 @@ pub(crate) fn plain_agreement(turn: &str) -> bool {
     plain_yes("", turn)
 }
 
+/// Beside a yes to a held keep only ([`plain_agreement_to_keep`]).
+const BESIDE_A_KEEP: &[&str] = &["keep"];
+
+/// [`plain_agreement`], or a plain yes that also says to keep it: "Yes,
+/// please keep that.", "Yes, keep it." (lamp-06c1, 5 Nov, S4: the held
+/// keep was dropped as not a plain yes). Only for a keep held for the
+/// person's yes; a held forget, and every other ask, takes
+/// [`plain_agreement`].
+pub(crate) fn plain_agreement_to_keep(turn: &str) -> bool {
+    plain_yes_beside("", turn, BESIDE_A_KEEP)
+}
+
 /// Whether the lamp said `name` back in the exchange just before the turn
 /// in hand, and the person said a plain yes to it now ([`plain_yes`]):
 /// what `replace` needs, and a name kept from an earlier exchange.
@@ -3139,6 +3151,34 @@ pub fn note(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// lamp-06c1, 5 Nov, S4: "Yes, please keep that." is a yes to a held
+    /// keep, never a plain yes to anything else; the rest still fails both.
+    #[test]
+    fn keep_stands_beside_a_yes_only_to_a_held_keep() {
+        for yes in [
+            "Yes, please keep that.",
+            "Yes, keep it.",
+            "Yes. Please keep that.",
+        ] {
+            assert!(plain_agreement_to_keep(yes), "{yes}");
+            assert!(!plain_agreement(yes), "{yes}");
+        }
+        for yes in ["Yes.", "Yes, please."] {
+            assert!(
+                plain_agreement_to_keep(yes) && plain_agreement(yes),
+                "{yes}"
+            );
+        }
+        for not in [
+            "Keep that?",
+            "No, keep it.",
+            "Yes, keep it, and forget my coffee.",
+            "Yes, keep my face.",
+        ] {
+            assert!(!plain_agreement_to_keep(not), "{not}");
+        }
+    }
 
     #[test]
     fn observations_expire_from_source_age_without_renewal_on_reread() {

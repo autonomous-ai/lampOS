@@ -1876,10 +1876,15 @@ async fn line_sight(
     if seen_only {
         let speakers = eyes.speakers_with_boot(begun, finishing);
         let eyes_now = eyes.clone();
-        let pair = tokio::task::spawn_blocking(move || eyes_now.known_with_boot(&known))
-            .await
-            .ok()
-            .flatten();
+        // The known face as last named, if it left view within
+        // `CARRY_UNSEEN_WITHIN` before the line or during it: the eyes'
+        // file is stale by the line's end (lamp-06c1, 5 Nov, S4).
+        let since = begun.checked_sub(CARRY_UNSEEN_WITHIN).unwrap_or(begun);
+        let pair =
+            tokio::task::spawn_blocking(move || eyes_now.known_lately(&known, since, finishing))
+                .await
+                .ok()
+                .flatten();
         // A follow of the known face still pending at the line's end: the
         // eyes' print decides, never the link (#4966).
         let pair = crate::speaking_faces::known_once_decided(
@@ -10720,7 +10725,10 @@ fn take_held_forget(
         Some("the lamp did not ask about it")
     } else if held.request >= request {
         Some("not a later turn")
-    } else if !crate::known_faces::plain_agreement(said) {
+    } else if !(crate::known_faces::plain_agreement(said)
+        || (held.call.name == crate::remember::REMEMBER
+            && crate::known_faces::plain_agreement_to_keep(said)))
+    {
         Some("not a plain yes")
     } else if asker != Some(&held.asker) {
         Some("not the same person")
