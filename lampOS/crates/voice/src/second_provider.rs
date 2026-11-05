@@ -10769,7 +10769,9 @@ fn take_held_forget(
 pub(crate) type SaidWindow = Arc<dyn Fn() -> crate::known_faces::Said + Send + Sync>;
 
 /// How long a held setup save waits for the yes.
-const HELD_SAVE_FOR: Duration = Duration::from_secs(45);
+// One bound with the walk's: "who you are" stays open as long as a save is
+// held (the Reviewer-lead's P3 on #5415).
+const HELD_SAVE_FOR: Duration = Duration::from_micros(crate::onboarding::FACE_SAVE_HELD_US);
 
 /// The first save at setup the eyes' check refused only for want of the
 /// read-back's yes (`known_faces::refused_for_the_read_back`), held for the
@@ -10826,6 +10828,15 @@ fn drop_held_save(shared: &Shared, request: u64, why: &str) {
             "lamp-voice second: request {request}: dropped the held setup face save (held in request {}): {why}",
             was.request
         );
+        let_the_walk_go();
+    }
+}
+
+/// Tells the walk a held setup save was let go, so "who you are" is no
+/// longer kept open for it.
+fn let_the_walk_go() {
+    if let Some(file) = crate::onboarding::file_from_environment() {
+        crate::onboarding::face_save_let_go(&file);
     }
 }
 
@@ -10891,6 +10902,7 @@ fn take_held_save(
         "lamp-voice second: request {request}: dropped the held setup face save (held in request {}): {why}",
         held.request
     );
+    let_the_walk_go();
     None
 }
 
