@@ -319,7 +319,13 @@ needs that read-back, #5140; a read-back folded into the face question was
 refused every time, #5415), then asks "May I remember your face, so I know you
 next time?". A face save refused for the read-back is held by the voice, and
 the step stays open for it up to 45 s (`FACE_SAVE_HELD_US`) instead of ending
-15 s after the lamp's last words (`FACE_SAVE_WAIT_US`). On a skip or a
+15 s after the lamp's last words (`FACE_SAVE_WAIT_US`). Neither the step's give-up nor
+the model's own `setup_step` done ends it while the save is held: the model's
+done waits, and ends it done with the name only once the hold is over unless
+the face is saved first. A hold the voice lets go before its yes (a
+correction, another name, its 45 s) is posted too (`face_save_let_go`), and
+the step is no longer kept open for it; both sides read one bound
+(`HELD_SAVE_FOR` is `FACE_SAVE_HELD_US`). On a skip or a
 failure says only "That's fine. You can tell me your name any time."
 (`who_again`: "Sorry, what should I call you?"). `preferences`' model asks "Are there
 hours when I should keep quiet? For example, 'after ten at night', or 'no'." and
