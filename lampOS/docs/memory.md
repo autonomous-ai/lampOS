@@ -1091,8 +1091,11 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   once they say it again. On the second route, a `remember` called in a
   chat round whose own words doubt what was heard ("misheard", "didn't
   catch", "did you say", "say that again", "was that … right", "did I
-  hear … right", "want to be sure", "is that spelled", "nghe nhầm", "nói
-  lại" …;
+  hear … right", "want to be sure I heard", "is that spelled", "how do
+  you spell it", "nghe nhầm", "nói lại" …; reassurance is none: "I want to
+  be sure you make it", "How do you spell relief?", "You never have to say
+  it again", "Did you mean to add a reminder?", "Was that all right?"
+  (#5414 P2);
   `remember::doubted::doubts_what_was_heard`) is not run that round. The
   model is told `{"remembered": false, "note": "Not kept: in this same
   reply you doubted what you heard. …"}` and the journal says "a remember
