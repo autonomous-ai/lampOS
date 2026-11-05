@@ -3356,7 +3356,20 @@ after a take-over, but now for every turn:
   keep it.", "I'll keep that!", "I will keep it", with only filler after
   it ("for you", "now", "safe", "then", "too", or after a comma at most
   two words), decided at `.`, `!` or the reply's end; "I'll keep it
-  short.", "I'll keep it brief." and "I'll keep it?" claim nothing. The softer claims count too (K3: lamp-06c1,
+  short.", "I'll keep it brief." and "I'll keep it?" claim nothing. A keep
+  that names a time is a soft claim (lamp-06c1, 5 Nov: "I'll keep the
+  dentist tomorrow at ten." with no call, and nothing was kept): "I'll
+  keep the …", "I will keep the …", "I'll keep your …", whose sentence
+  names a time (today, tonight, tomorrow, a weekday, the weekend, a month,
+  "next week", am/pm, o'clock, noon, a digit, or "at" an hour) and has no
+  state word (on, off, going, running, short, brief, quiet, low, warm,
+  safe, light, lamp, volume, timer, alarm, music, the lamp's own settings
+  such as brightness, screen, colour, percent or `%`, kelvin, level… or
+  "in mind"), decided
+  at its `.` or `!` (never a `?`), or at its first state word. "I'll keep
+  the light on until ten.", "I'll keep the music going till six." and
+  "I'll keep the timer at ten minutes." and "I'll keep the brightness at
+  40 percent." claim nothing. The softer claims count too (K3: lamp-06c1,
   28 Oct night, "Noted — you work at a library now, not the bakery." and
   "All right, I'll keep it in mind." with no call): "Noted" with what was
   noted after a dash or colon, or "noted that"; "I'll keep it/that in

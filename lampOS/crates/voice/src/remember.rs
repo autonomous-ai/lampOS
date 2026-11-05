@@ -820,6 +820,173 @@ fn keep_it_claim(rest: &str, whole: bool) -> Option<bool> {
     if maybe && !whole { None } else { Some(false) }
 }
 
+/// The keeps that name what they keep ([`named_keep_claim`]): lamp-06c1,
+/// 5 Nov, "I'll keep the dentist tomorrow at ten." with no `remember`
+/// call, and nothing was kept.
+const NAMED_KEEP: &[&str] = &[
+    "i'll keep the ",
+    "i will keep the ",
+    "i'll keep your ",
+    "i will keep your ",
+];
+
+/// What makes a named keep a time's ([`named_keep_claim`]): a day, a part
+/// of one, or a month ("may" is left out: "the ones you may want").
+const NAMED_KEEP_TIMES: &[&str] = &[
+    "today",
+    "tonight",
+    "tomorrow",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+    "mondays",
+    "tuesdays",
+    "wednesdays",
+    "thursdays",
+    "fridays",
+    "saturdays",
+    "sundays",
+    "weekend",
+    "weekends",
+    "o'clock",
+    "am",
+    "pm",
+    "noon",
+    "midnight",
+    "morning",
+    "afternoon",
+    "evening",
+    "january",
+    "february",
+    "march",
+    "april",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
+];
+
+/// The hours "at" may name ("at ten").
+const NAMED_KEEP_HOURS: &[&str] = &[
+    "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven",
+    "twelve",
+];
+
+/// A word that makes a named keep a state kept, not a thing remembered
+/// ("I'll keep the light on until ten", "I'll keep the music going till
+/// six", "I'll keep the timer at ten minutes").
+const NAMED_KEEP_STATES: &[&str] = &[
+    "on",
+    "off",
+    "open",
+    "closed",
+    "going",
+    "running",
+    "short",
+    "brief",
+    "simple",
+    "quiet",
+    "low",
+    "down",
+    "up",
+    "warm",
+    "cool",
+    "dim",
+    "bright",
+    "safe",
+    "away",
+    "out",
+    "light",
+    "lights",
+    "lamp",
+    "volume",
+    "timer",
+    "timers",
+    "alarm",
+    "alarms",
+    "music",
+    // The lamp's own settings ("I'll keep the brightness at 40 percent.",
+    // the reviewer-lead's P2 on #5436): a setting kept, never a memory.
+    "brightness",
+    "screen",
+    "colour",
+    "color",
+    "percent",
+    "kelvin",
+    "level",
+    "temperature",
+    "warmth",
+    "setting",
+    "settings",
+];
+
+/// Whether `rest`, a reply past its opening words, is a keep that names
+/// what it keeps ([`NAMED_KEEP`], Bug B of 5 Nov): a soft claim
+/// ([`KeepClaim::Soft`], so beside any call it is that call's) when its
+/// sentence (up to `.` or `!`, or the reply's end with `whole`) names a
+/// time ([`NAMED_KEEP_TIMES`], a digit, "next week" or "at" an hour) and
+/// has no state word ([`NAMED_KEEP_STATES`]) nor "in mind" ("I'll keep
+/// that in mind" is the soft claim's own). `Some(false)` for none ("I'll
+/// keep the light on.", "I'll keep the dentist?"), decided at the first
+/// state word; `None` while its sentence could still be one.
+fn named_keep_claim(rest: &str, whole: bool) -> Option<bool> {
+    let Some(follows) = NAMED_KEEP.iter().find_map(|claim| rest.strip_prefix(claim)) else {
+        let maybe = NAMED_KEEP.iter().any(|claim| claim.starts_with(rest));
+        return if maybe && !whole { None } else { Some(false) };
+    };
+    // A sentence ends at `.`, `!` or `?`, though not at a point between
+    // digits ("at 10.30").
+    let bytes = follows.as_bytes();
+    let end = follows.char_indices().find(|&(at, c)| {
+        matches!(c, '!' | '?')
+            || (c == '.'
+                && !(at > 0
+                    && bytes[at - 1].is_ascii_digit()
+                    && bytes.get(at + 1).is_some_and(u8::is_ascii_digit)))
+    });
+    let (sentence, ended) = match end {
+        Some((at, c)) => (&follows[..at], Some(c)),
+        None => (follows, None),
+    };
+    if ended == Some('?') {
+        return Some(false);
+    }
+    let decided = ended.is_some() || whole;
+    let mut words: Vec<&str> = sentence
+        .split(|c: char| !c.is_alphanumeric() && c != '\'')
+        .filter(|word| !word.is_empty())
+        .collect();
+    // While streaming, the last word may be cut short ("on", on its way to
+    // "onions").
+    if !decided && sentence.ends_with(|c: char| c.is_alphanumeric() || c == '\'') {
+        words.pop();
+    }
+    let in_mind = words.windows(2).any(|pair| pair == ["in", "mind"]);
+    if in_mind
+        || sentence.contains('%')
+        || words.iter().any(|word| NAMED_KEEP_STATES.contains(word))
+    {
+        return Some(false);
+    }
+    if !decided {
+        return None;
+    }
+    let timed = words
+        .iter()
+        .any(|word| NAMED_KEEP_TIMES.contains(word) || word.contains(|c: char| c.is_ascii_digit()))
+        || words.windows(2).any(|pair| {
+            pair == ["next", "week"] || (pair[0] == "at" && NAMED_KEEP_HOURS.contains(&pair[1]))
+        });
+    Some(timed)
+}
+
 /// [`claims_a_keep`] with the kind of claim: `None` while undecided,
 /// `Some(None)` for no claim. With `faces`, a face claim counts
 /// ([`KeepClaim::Face`]).
@@ -897,6 +1064,13 @@ fn keep_claim_of(reply: &str, whole: bool, faces: bool) -> Option<Option<KeepCla
     // A bare "I'll keep it." ending its sentence (lamp-06c1, 5 Nov).
     match keep_it_claim(&rest, whole) {
         Some(true) => return Some(Some(KeepClaim::Hard)),
+        None => maybe = true,
+        Some(false) => {}
+    }
+    // A keep that names a time ("I'll keep the dentist tomorrow at ten."):
+    // soft, so beside any call it is that call's (lamp-06c1, 5 Nov).
+    match named_keep_claim(&rest, whole) {
+        Some(true) => return Some(Some(KeepClaim::Soft)),
         None => maybe = true,
         Some(false) => {}
     }
@@ -5429,6 +5603,7 @@ fn replace_session(
     // "that" (#3504, Friday's N1).
     if context.session.as_deref() != Some(name) {
         context.last_given = None;
+        context.last_done = None;
     }
     if context.session.as_deref() == Some(name) {
         (
@@ -6165,6 +6340,22 @@ struct DaysContext {
     /// not what that recall gave (lamp-06c1, 27 Oct 20:55:
     /// [`recall_was_last`]).
     given_by_recall: bool,
+    /// The session's last memory write that was done, whose, and when
+    /// ([`done_last`]): a yes alone soon after it confirms it, never asks
+    /// again (Bug C, lamp-06c1, 5 Nov). Emptied as each memory call is sent
+    /// and as a session opens under another name or closes.
+    last_done: Option<(MemoryDone, Option<String>, Instant)>,
+}
+
+/// A memory write that was done ([`DaysContext::last_done`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum MemoryDone {
+    /// A `remember` kept something new.
+    Kept,
+    /// A `remember` replaced something kept.
+    Changed,
+    /// A `forget` forgot something.
+    Forgotten,
 }
 
 /// Whether the session's last memory call was a recall that gave
@@ -6178,6 +6369,38 @@ fn recall_was_last(context: &DaysContext, person: Option<&str>) -> bool {
             at.elapsed() <= HELD_FORGET_FOR
                 && given.iter().any(|(whose, _)| whose.as_deref() == person)
         })
+}
+
+/// What the session's last memory call did for `person`'s scope, when it
+/// was a write that was done (a keep, a replace or a forget) within
+/// [`HELD_FORGET_FOR`]: a yes alone just after it confirms it
+/// ([`heard::yes_alone`], Bug C of 5 Nov). A call that fails, or any later
+/// memory call, leaves none.
+fn done_last(context: &DaysContext, person: Option<&str>) -> Option<MemoryDone> {
+    context
+        .last_done
+        .as_ref()
+        .filter(|(_, whose, at)| whose.as_deref() == person && at.elapsed() <= HELD_FORGET_FOR)
+        .map(|(done, ..)| *done)
+}
+
+/// [`done_last`] in the scope a call with `lease` runs in (as
+/// [`shown_text`]). Never asks the store.
+pub(crate) fn done_last_in(lease: Option<&crate::memory_scope::ScopeLease>) -> Option<MemoryDone> {
+    let person = match lease {
+        Some(lease) => lease.scope()?.person().map(str::to_owned),
+        None => person_now(),
+    };
+    DAYS.get()
+        .and_then(Option::as_ref)?
+        .done_last_for(person.as_deref())
+}
+
+impl DaysClient {
+    /// [`done_last`] on this client's context.
+    fn done_last_for(&self, person: Option<&str>) -> Option<MemoryDone> {
+        done_last(&*self.context.lock().ok()?, person)
+    }
 }
 
 /// A confirmed forget's answer told with what went, by the id the store
@@ -7822,6 +8045,7 @@ impl DaysClient {
         let unoffered = context.let_event_go();
         context.just_asked = None;
         context.last_given = None;
+        context.last_done = None;
         drop(context);
         self.take_back(unoffered);
         for (name, person) in open {
@@ -8457,8 +8681,21 @@ impl DaysClient {
                     && call.args.get("about").is_some_and(|about| !about.is_null()) =>
             {
                 let until = started + deadline;
+                if let Ok(mut context) = self.context.lock() {
+                    context.last_done = None;
+                }
                 let (told, answered) =
                     self.forget_about(&call.args["about"], person, until, lease, heard_named(call));
+                // A forget done, for a yes alone soon after it (Bug C).
+                if told["forgotten"] == true
+                    && let Ok(mut context) = self.context.lock()
+                {
+                    context.last_done = Some((
+                        MemoryDone::Forgotten,
+                        person.map(str::to_owned),
+                        Instant::now(),
+                    ));
+                }
                 // Found or not, the night passes over what they said today
                 // before it (El's option 2 on #5333): a line said and never
                 // kept has nothing here to match. After the forget, so its
@@ -8666,10 +8903,16 @@ impl DaysClient {
         let request_text = request["text"].as_str().map(str::to_owned);
         // A remember or recall sent gives "that" only when it is answered
         // (#3504, Friday's N1): one that fails or is lost leaves none.
-        if matches!(call.name.as_str(), REMEMBER | RECALL)
-            && let Ok(mut context) = self.context.lock()
+        if matches!(
+            call.name.as_str(),
+            REMEMBER | RECALL | FORGET | FORGET_EVERYTHING
+        ) && let Ok(mut context) = self.context.lock()
         {
-            context.last_given = None;
+            if matches!(call.name.as_str(), REMEMBER | RECALL) {
+                context.last_given = None;
+            }
+            // Nor is an earlier write the last one done (Bug C).
+            context.last_done = None;
         }
         let writes = matches!(call.name.as_str(), REMEMBER | FORGET | FORGET_EVERYTHING);
         if writes {
@@ -8909,6 +9152,16 @@ impl DaysClient {
         let mut said = None;
         if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING) && told["forgotten"] == true {
             said = self.forgotten(&mut context);
+        }
+        // A write done, for a yes alone soon after it (Bug C, 5 Nov).
+        let done = match call.name.as_str() {
+            FORGET if told["forgotten"] == true => Some(MemoryDone::Forgotten),
+            REMEMBER if !ids.is_empty() && told["replaced"].is_u64() => Some(MemoryDone::Changed),
+            REMEMBER if !ids.is_empty() => Some(MemoryDone::Kept),
+            _ => None,
+        };
+        if let Some(done) = done {
+            context.last_done = Some((done, person.map(str::to_owned), Instant::now()));
         }
         // A thing kept in the room's scope may follow the person its
         // conversation becomes (#2176, 5a): the writer is told its id.
@@ -13062,6 +13315,116 @@ mod tests {
         assert_eq!(keep_claim("Got it, thanks."), None);
     }
 
+    /// The reviewer-lead's P3 on #5436: each memory write that is done
+    /// records what it did ([`DaysContext::last_done`]): a keep, a replace,
+    /// a forget; a write that fails, or a recall sent after, lets it go. And
+    /// [`heard::yes_alone_in`] reads it: a lone yes after each is told it is
+    /// done already, a lone no never.
+    #[test]
+    fn a_done_keep_replace_and_forget_are_recorded_and_a_recall_lets_them_go() {
+        let (socket, served) = memory("done-last", 6, |request| match request["op"].as_str() {
+            Some("remember")
+                if request["text"]
+                    .as_str()
+                    .is_some_and(|t| t.contains("green")) =>
+            {
+                json!({"ok":true,"id":9,"replaced":8})
+            }
+            Some("remember") if request["text"].as_str().is_some_and(|t| t.contains("red")) => {
+                json!({"ok":false,"error":"refused","reason":"full","message":"m"})
+            }
+            Some("remember") => json!({"ok":true,"id":8}),
+            Some("forget") => json!({"ok":true,"removed":1}),
+            Some("search") => json!({"ok":true,"entries":[]}),
+            _ => json!({"ok":false}),
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        // A forget by its id, as the product runs it.
+        client.forget_all.store(true, Ordering::Release);
+        let run = |name, args| client.run_at(&call(name, args), FIRST_READ, NOW, Some(&EAST), None);
+        let done = || client.done_last_for(None);
+        // The lamp's thread: their correction, the lamp's answer with no
+        // offer, then a lone yes or no (S6 reqs 269-270, S13).
+        let now = Instant::now();
+        let thread = |person: &str| {
+            let mut thread = crate::thread::Thread::new();
+            thread.person("Her favourite colour is green now.", true, now);
+            thread.lamp(1, "Green now, not violet.", now);
+            thread.person(person, true, now);
+            thread
+        };
+        let lone = |person: &str, forget: bool| {
+            heard::yes_alone_in(&thread(person), (2, None, now), forget, done())
+        };
+        let note = |told: Option<Value>| told.unwrap()["note"].clone();
+        assert_eq!(done(), None);
+        let (told, _) = run(REMEMBER, json!({"text":"Her favourite colour is violet."}));
+        assert_eq!(told["remembered"], true, "{told}");
+        assert_eq!(done(), Some(MemoryDone::Kept));
+        assert_eq!(
+            note(lone("Yes. Please keep that.", false)),
+            heard::DONE_ALREADY_KEPT
+        );
+        let (told, _) = run(REMEMBER, json!({"text":"Her favourite colour is green."}));
+        assert_eq!(told["replaced"], 8, "{told}");
+        assert_eq!(done(), Some(MemoryDone::Changed));
+        assert_eq!(
+            note(lone("Yes. Please keep that.", false)),
+            heard::DONE_ALREADY_CHANGED
+        );
+        // A lone no never takes it: a remember is told nothing was kept, a
+        // forget runs.
+        assert_eq!(note(lone("No.", false)), heard::YES_ALONE);
+        assert_eq!(lone("No.", true), None);
+        // A write the memory refuses leaves none.
+        let (told, _) = run(REMEMBER, json!({"text":"Her favourite colour is red."}));
+        assert_ne!(told["remembered"], true, "{told}");
+        assert_eq!(done(), None);
+        assert_eq!(
+            note(lone("Yes. Please keep that.", false)),
+            heard::YES_ALONE
+        );
+        let _ = run(REMEMBER, json!({"text":"Her favourite colour is green."}));
+        assert_eq!(done(), Some(MemoryDone::Changed));
+        assert_eq!(client.context.lock().unwrap().include(None, &[9]), None);
+        let (told, _) = run(FORGET, json!({"source_id": 9}));
+        assert_eq!(told["forgotten"], true, "{told}");
+        assert_eq!(done(), Some(MemoryDone::Forgotten));
+        assert_eq!(note(lone("Yes.", true)), heard::DONE_ALREADY_FORGOTTEN);
+        let _ = run(RECALL, json!({"about":"colour"}));
+        assert_eq!(done(), None);
+        served.join().unwrap();
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// Bug C, lamp-06c1, 5 Nov: a yes alone confirms the last write only
+    /// when it was done for the same scope within [`HELD_FORGET_FOR`]: a
+    /// keep, a replace or a forget; never another's, past the bound, or
+    /// with none.
+    #[test]
+    fn a_done_write_is_last_only_for_the_scope_soon() {
+        const MINH: &str = "p-be9688998f085098";
+        let mut context = DaysContext::default();
+        assert_eq!(done_last(&context, None), None);
+        for done in [MemoryDone::Kept, MemoryDone::Changed, MemoryDone::Forgotten] {
+            context.last_done = Some((done, None, Instant::now()));
+            assert_eq!(done_last(&context, None), Some(done));
+            assert_eq!(done_last(&context, Some(MINH)), None);
+            context.last_done = Some((done, Some(MINH.to_owned()), Instant::now()));
+            assert_eq!(done_last(&context, Some(MINH)), Some(done));
+            assert_eq!(done_last(&context, None), None);
+        }
+        context.last_done = Some((
+            MemoryDone::Kept,
+            Some(MINH.to_owned()),
+            Instant::now()
+                .checked_sub(HELD_FORGET_FOR + Duration::from_secs(1))
+                .unwrap(),
+        ));
+        assert_eq!(done_last(&context, Some(MINH)), None);
+    }
+
     /// lamp-06c1, build 10226, 5 Nov: "Yes. Please keep that." answered
     /// "I'll keep it." with no `remember` call, and nothing was kept. A bare
     /// keep that ends its sentence, with only filler after it, is a hard
@@ -13112,10 +13475,66 @@ mod tests {
         assert_eq!(claims_a_keep("I'll keep it short", false), Some(false));
         assert_eq!(claims_a_keep("I'll keep it brief", false), Some(false));
         assert_eq!(claims_a_keep("I'll keep it?", false), Some(false));
-        assert_eq!(claims_a_keep("I'll keep the", false), Some(false));
+        assert_eq!(claims_a_keep("I'll keep the", false), None);
+        assert_eq!(claims_a_keep("I'll keep the light ", false), Some(false));
+        assert_eq!(claims_a_keep("I'll keep their", false), Some(false));
         assert_eq!(claims_a_keep("I'll keep it in", false), None);
         assert_eq!(claims_a_keep("I'll keep it in mind", false), None);
         assert_eq!(claims_a_keep("I'll keep it in mind.", false), Some(true));
+    }
+
+    /// Bug B, lamp-06c1, 5 Nov: "I'll keep the dentist tomorrow at ten."
+    /// with no `remember` call kept nothing. A keep that names a time, with
+    /// no state word, is a soft claim (it counts only in a round with no
+    /// calls); a state kept is none.
+    #[test]
+    fn a_keep_that_names_a_time_is_a_soft_claim() {
+        for reply in [
+            "I'll keep the dentist tomorrow at ten.",
+            "I'll keep the dentist tomorrow at ten. Did you mean the one on Elm?",
+            "Okay, I'll keep the pottery class for Saturdays",
+            "Sure, I'll keep your dentist appointment for 10:30!",
+            "I will keep the plant watering for Mondays.",
+            "I'll keep your flight next week.",
+            "I'll keep the call at 10.30 tomorrow.",
+            "I\u{2019}ll keep the meeting at three.",
+        ] {
+            assert_eq!(keep_claim(reply), Some(KeepClaim::Soft), "{reply}");
+        }
+        for reply in [
+            "Okay, I'll keep the light on.",
+            "I'll keep the light on until ten.",
+            "I'll keep the music going till six.",
+            "I'll keep the timer at ten minutes.",
+            "I'll keep the volume low tonight.",
+            "I'll keep it short.",
+            "I'll keep the dentist tomorrow?",
+            "Should I keep the kitchen plan on its own?",
+            "I'll keep your birthday in mind for March.",
+            "I'll keep the notes.",
+            "I'll keep their dentist tomorrow.",
+            // The lamp's own settings (the reviewer-lead's P2 on #5436).
+            "I'll keep the brightness at 40 percent.",
+            "I'll keep the colour at 3000 kelvin.",
+            "I'll keep the color warm tonight.",
+            "I'll keep the screen dim until 7.",
+            "I'll keep the light level at 30% tonight.",
+            "Okay, I'll keep the volume at 5 tomorrow.",
+        ] {
+            assert_eq!(keep_claim(reply), None, "{reply}");
+        }
+        assert_eq!(keep_claim("I'll keep that in mind."), Some(KeepClaim::Soft));
+        // While streaming, decided at the sentence's end, or at the first
+        // state word.
+        assert_eq!(claims_a_keep("I'll keep the dentist tomorrow", false), None);
+        assert_eq!(
+            claims_a_keep("I'll keep the dentist tomorrow.", false),
+            Some(true)
+        );
+        assert_eq!(claims_a_keep("I'll keep the light on", false), Some(false));
+        assert_eq!(claims_a_keep("I'll keep the music", false), None);
+        assert_eq!(claims_a_keep("I'll keep the music ", false), Some(false));
+        assert_eq!(claims_a_keep("I'll keep the notes.", false), Some(false));
     }
 
     /// The Tiers-ideas plan, P2: a found line the memory labels a maybe or

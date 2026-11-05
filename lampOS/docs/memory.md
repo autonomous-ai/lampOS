@@ -1319,7 +1319,20 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `replaces`, since it is the line the offer was about. With no such
     offer, a `remember` in a line that is only a yes keeps nothing: the
     model is told to ask what to keep, and the journal says so with no
-    words. The `on` check and the REPLACES journal line use the same words.
+    words. When the line is a yes (never a no) and the same scope's last
+    memory write, within the held window (`HELD_FORGET_FOR`, 60 s), was
+    done (a keep, a replace or a forget: `remember::done_last_in`), the
+    model is told instead that it is done already, by what was done, to
+    confirm briefly and not ask again (`heard::DONE_ALREADY_KEPT`,
+    `_CHANGED`, `_FORGOTTEN`). A `forget` in a line that is only a yes is
+    held so only when that done write was itself a forget and the lamp's
+    answer before it asked nothing about forgetting (forget, delete, erase,
+    remove, clear, drop, discard, scrap, wipe, get rid of, quên, xóa, bỏ):
+    a yes to "Should I clear the locker number too?" is consent, and runs.
+    After a lone no, or with nothing done, a `forget` runs as before.
+    Nothing is written either way (lamp-06c1, 5 Nov: a lone yes after
+    "Mondays now, not Fridays.", after a done keep and after a done forget
+    was told to ask, and the lamp asked again). The `on` check and the REPLACES journal line use the same words.
     A line that says more than yes ("Yes, my dog is called Moe") is its own,
     as ever. No extra round: one thread lookup in the call.
   - **A yes after a second offer.** On lamp-06c1 on 4 Nov (build 10012),
