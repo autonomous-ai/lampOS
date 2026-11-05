@@ -55,55 +55,9 @@ const ELEVENLABS_HOSTS: &[&str] = &[
     "api.us.elevenlabs.io",
     "api.eu.elevenlabs.io",
 ];
-/// V1's curated ElevenLabs voices by name (`VOICE_IDS_BY_LANG`), so a
-/// V1 `tts_voice` works here; any other value is taken as a voice id. The
-/// first is the default, as `DefaultElevenLabsVoiceForLang` gives in English.
-const ELEVENLABS_VOICES: &[(&str, &str)] = &[
-    ("Rachel", "21m00Tcm4TlvDq8ikWAM"),
-    ("Sarah", "EXAVITQu4vr4xnSDxMaL"),
-    ("Nicole", "piTKgcLEGmPE4e6mEKli"),
-    ("Terra", "aFueGIISJUmscc05ZNfD"),
-    ("Maria", "vZzlAds9NzvLsFSWp0qk"),
-    ("Sophie", "AEW6JTgnyoPaoB9zlK3S"),
-    ("Piper", "rzgrf9VyEb0LLa824k8Q"),
-    ("Mia", "052jzHJceQiZr7ltnY0C"),
-    ("Kimmy", "TmK7x2BFDD7TOVlR69J2"),
-    ("Brianna", "2NzqTfQARqdn4tcBKTSh"),
-    ("Ally", "qmm0vRXCIew16ilYAeiI"),
-    ("Tori", "lAxf5ma5HGtzxC434SWT"),
-    ("Brian", "nPczCjzI2devNBz1zQrb"),
-    ("Adam", "pNInz6obpgDQGcFmaJgB"),
-    ("Daniel", "onwK4e9ZLuTAKqWW03F9"),
-    ("George", "JBFqnCBsd6RMkjVDRZzb"),
-    ("James", "ZQe5CZNOzWyzPSCn5a3c"),
-    ("Liam", "TX3LPaxmHKxFdv7VOQHJ"),
-    ("Charlie", "IKne3meq5aSn9XLyUdCD"),
-    ("Sam", "yoZ06aMxZJJ28mfd3POQ"),
-    ("Sean", "FgARTjeugpFkVodK0Ovq"),
-    ("Kael", "RxsTyZQJnPygpas5IyzL"),
-    ("Brooks", "sUzXYdokj3o9QQ91yPRF"),
-    ("Erion", "BSgaLWMIhbNhOCIH1apf"),
-    ("Ngan", "a3AkyqGG4v8Pg7SWQ0Y3"),
-    ("Linh", "L5c6tGA8OiORYKxez5Zu"),
-    ("Huyen", "foH7s9fX31wFFH2yqrFa"),
-    ("Freya", "rXOGzMiqbmjugMpzKMEx"),
-    ("Nathan", "u8EWWYyBDfXFxHak7WM3"),
-    ("Quan", "puBBfOSRT9Dbk3FUJQGd"),
-    ("Shizuka", "WQz3clzUdMqvBf0jswZQ"),
-    ("Konoha", "T7yYq3WpB94yAuOXraRi"),
-    ("Rin", "NxfO5zydfqwpYnWQJ7jJ"),
-    ("Asahi", "GKDaBI8TKSBJVhsCLD6n"),
-    ("Hinata", "j210dv0vWm7fCknyQpbA"),
-    ("Hiroki", "vzIXwvf41vKosKu00hYj"),
-    ("Amy", "bhJUNIXWQQ94l8eI2VUf"),
-    ("Sage", "APSIkVZudNbPAwyPoeVO"),
-    ("Xiaoxi", "9DMBSOAnMDPiFAsz1ZGK"),
-    ("Yun", "YxbjaPemDJV2xlfvkiIG"),
-    ("Evan Zhao", "MI36FIkp9wRP7cpWKPTl"),
-    ("Jin", "vZZLclMx4wouUtKBRfZn"),
-    // Not V1's: Korean's voice (`language::Language::voice`, #4473).
-    ("Kanna", "5I7B1di44aCL15NkP0jn"),
-];
+/// V1's curated ElevenLabs voices by name, so a V1 `tts_voice` works here;
+/// any other value is taken as a voice id. The first is the default.
+use lamp_msgs::chosen_voice::ELEVENLABS_VOICES;
 
 /// One request's URL, key header and body.
 #[derive(Debug, PartialEq)]

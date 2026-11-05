@@ -644,3 +644,13 @@ rounded to 2 decimals by the app. `fit` checks the app's `data` and rounds it
 (`rounded`: latitude to 0.01°, longitude to a step at least 1 km wide at the
 cell's edge nearest the pole); `read` reads `/etc/lampOS/person/place` and
 rounds again; `utc_time` keeps `set_at` as ISO 8601 UTC to the second.
+
+## The chosen voice and character (not a topic)
+
+`lamp_msgs::chosen_voice` (#5394, [chosen-voice.md](chosen-voice.md)) is no
+message on the bus either: the one copy of the rules for the owner's chosen
+voice and character words, read by `lamp-cloud`, by `lamp-setup change` and
+by the voice. `ELEVENLABS_VOICES` is the lamp's voice table (moved here from
+the voice's `net::tts`), `fit_voice` takes a name of it or `""`,
+`fit_character` takes plain text on one line of at most 200 characters or
+`""`, and `told` is the sentence the model is given for the words.
