@@ -1179,7 +1179,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
 
    **Harness before the sign-in** (#5197; off unless
    `LAMP_HARNESS_AT_ONBOARDING=on` in `lamp-update.service`'s environment,
-   `crates/update/src/harness_install.rs`). Put there with no hand, at the
+   `crates/update/src/harness_install.rs`; on a product lamp with it unset,
+   on by the build's own default since 5 Nov, below). Put there with no hand, at the
    first onboarding or on a later update of a lamp without it:
    - **When:** after every `lamp-update serve --apply on` round whose
      channel was reached (not `unreachable`, nor a switch of lamp-update's
@@ -1278,10 +1279,16 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        uses the build's pin, so a home lamp never installs an unpinned
        Harness. The env pair still overrides it, for a builder's test. With
        `LAMP_HARNESS_AT_ONBOARDING` unset, it takes the build's
-       `PRODUCT_DEFAULT`, journaled as `Harness before the sign-in: off by
-       this build's default on a product lamp`. That default is off until a
-       later build turns it on after its lamp check. The environment, a
-       drop-in included, always wins.
+       `PRODUCT_DEFAULT`, journaled as `Harness before the sign-in: on by
+       this build's default on a product lamp`. That default is on since 5
+       Nov (#5197: the PM's call, once the app's sign-in screen is in a
+       TestFlight build); the build that carried #5229 had it off. It
+       reaches a lamp already in a home with this build's own lamp-update
+       (`LAMP_UPDATE_SELF=on`), not with a unit. The environment, a drop-in
+       included, always wins: `LAMP_HARNESS_AT_ONBOARDING=off` (or any value
+       but `on`) turns it off, journaled `off` with no "by this build's
+       default" line
+       (`this_builds_default_is_on_for_a_product_lamp_and_the_environment_still_turns_it_off`).
      - **A new Harness version** is a PR that copies the CLI manifest, the
        installer and the four other manifests again under
        `deploy/harness/`, and updates `product.rs`'s `include_bytes!` paths

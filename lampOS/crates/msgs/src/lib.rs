@@ -1238,7 +1238,8 @@ pub struct UpdateStatus {
     pub now: String,
     pub last: Option<UpdateResult>,
     /// Harness put on the lamp before its sign-in (#5197): only with
-    /// `LAMP_HARNESS_AT_ONBOARDING=on`, else absent, so the app shows no
+    /// `LAMP_HARNESS_AT_ONBOARDING=on` (on a product lamp, also with it
+    /// unset: the build's default), else absent, so the app shows no
     /// Harness step. An older reader passes over it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub harness: Option<HarnessInstall>,
