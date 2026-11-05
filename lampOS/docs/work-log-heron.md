@@ -507,3 +507,13 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
 - 05:2x: #5064 READ-OK restated at 71dafb08c2 after Friday's docs-only
   rebase: code byte-identical, gate green (remember 333, process 61), and
   dropping the newer-first or profile `.envs` still fails 2 of 61.
+- 05:3x–11:5x: the watcher was down, and I missed Faye's 11:12 order and
+  the local leader's 11:45 post (said on Queue #5385). Meanwhile El held
+  #5345 for the cross-midnight gap (my probe found the same) and it merged
+  fixed; El took #5293 in full in my place.
+- 12:0x: #5333 READ-OK restated at 848dd93ef6 (HOLD lifted; my
+  cross-midnight probe passes on lamp-voice). Asked Faye to close #4450.
+- 12:0x–12:4x: SDK second reads, READ-OK on all three. #4568 a8318bbd1b
+  (`holder_may` mutation caught). #4579 869bd94832 (lease-cap and
+  900-byte mutations caught; body clamps any finite look). #4526 90c52a59ba
+  (stop and drop-in mutations caught; P3 unit hardening, retry-off).
