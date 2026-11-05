@@ -786,6 +786,34 @@ impl Days {
         )
     }
 
+    /// Whether a correction of `old` in `text` would only say it again: `old`
+    /// is a kept thing of this person's, active, not newer than `at`, that
+    /// `shown` holds (each as [`Self::remember_replacing_on_by`] checks), and
+    /// its words are `text`'s (the same as `once` compares them,
+    /// [`same_text`]). Anything else is `false`, and the correction goes on
+    /// to be checked, and refused or kept, as before.
+    pub fn restates(
+        &self,
+        person: &Person,
+        at: u64,
+        text: &str,
+        old: u64,
+        shown: &[u64],
+    ) -> Result<bool> {
+        if !shown.contains(&old) {
+            return Ok(false);
+        }
+        let Some(record) = self.record(person, old)? else {
+            return Ok(false);
+        };
+        let text = store::tidy(text, store::TEXT_BYTES);
+        Ok(record.kind == "kept"
+            && record.active
+            && record.at_unix_ms <= at
+            && !text.is_empty()
+            && same_text(&record.text) == same_text(&text))
+    }
+
     /// A remember's `from`, the person's own exchanges, and its text tidied.
     fn kept_text(&self, person: &Person, text: &str, from: &[u64]) -> Result<String> {
         for id in from {

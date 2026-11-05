@@ -215,6 +215,12 @@ quiet ends it, and only the room's from the person's first exchange in it
 count. Within the chat's 12 exchanges and 600 s
 (`thread::Thread::recent_with_room_lines`,
 `thread::tests::room_lines_told_to_a_person_are_their_conversations_only`).
+A room's exchange whose line kept or corrected a thing in their memory by
+the one-face rule (`LAMP_PERSON_SCOPE_ONE_FACE`, `Thread::kept_for`) is
+given to their later turns too, marked the same, whatever conversation it
+was in, so their history is never older than their memory (lamp-06c1, 5 Nov,
+the bike lock;
+`thread::tests::a_one_face_keep_on_a_rooms_line_is_told_in_their_later_turns`).
 Never the reverse and never another person's; the thread text and the
 running note stay the scope's own ([memory.md](memory.md)). Part of the
 "said aloud" risk, accepted: a room's line narrowed because another voice

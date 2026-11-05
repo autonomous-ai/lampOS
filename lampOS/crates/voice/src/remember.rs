@@ -3850,7 +3850,16 @@ pub fn run_one_face_keep(
         );
         return run_scoped(socket, call, deadline, lease);
     }
-    run_scoped_for(socket, call, deadline, lease, person)
+    let result = run_scoped_for(socket, call, deadline, lease, person);
+    // Kept or corrected in their memory from a line told as the room's:
+    // its exchange is told in their later turns too, so their history is
+    // never older than their memory (the bike lock on lamp-06c1, 5 Nov).
+    if result.0["remembered"] == true
+        && let Ok(mut thread) = crate::thread::THREAD.lock()
+    {
+        thread.kept_for(lease.key().request, person);
+    }
+    result
 }
 
 /// A single-item `forget` on a line `person`'s only by the one-face rule:

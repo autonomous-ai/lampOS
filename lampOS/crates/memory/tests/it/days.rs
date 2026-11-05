@@ -3881,6 +3881,44 @@ fn a_kept_thing_said_again_tells_when_it_was_last_said() {
     assert_eq!(said_again_rows(&scratch, "p-minh", id), 0);
 }
 
+/// C81 (lamp-06c1, 5 Nov): a kept thing said again whose `remember` came as
+/// a correction of itself (`replaces` its own id, in its very words, with
+/// `once`) is that kept thing said again, as a plain `once` is: no new id,
+/// and its time told once its line is written.
+#[test]
+fn a_correction_in_the_very_words_it_replaces_is_said_again() {
+    let scratch = Scratch::new("last-said-replaces-itself");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    const COFFEE: &str = "Takes coffee black.";
+    let (id, _) = said_in_a_turn(
+        &mut store,
+        &minh,
+        NOW,
+        COFFEE,
+        &[],
+        "Remember I take my coffee black.",
+        &[],
+    );
+    let again = NOW + DAY;
+    store.maintain(again).unwrap();
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"remember","person":"p-minh","at_unix_ms":again,"text":COFFEE,
+            "once":true,"replaces":id,"shown":[id]}),
+        again,
+    );
+    assert_eq!(answer, json!({"ok":true,"id":id,"existing":true}));
+    store
+        .append(&minh, again, "Coffee black, remember.", "Sure.", &[id])
+        .unwrap();
+    assert_eq!(said_again_rows(&scratch, "p-minh", id), 1);
+    assert_eq!(
+        last_said_told(&mut store, "p-minh", id, again),
+        [Some(again); 3]
+    );
+}
+
 /// #4753, the forget guards, in the voice's order (Reviewer-lead's P2): a
 /// forget of the line a kept thing was said again in (by id, "forget what I
 /// just said" as `forget_last`, a forget-all) leaves no time of it; a
