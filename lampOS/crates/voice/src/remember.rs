@@ -10540,10 +10540,12 @@ impl DaysClient {
             person
         };
         let scope = crate::rules::scope(owner);
-        let line = match crate::rules::request(call, now, &scope) {
+        let mut line = match crate::rules::request(call, now, &scope) {
             Ok(line) => line,
             Err(told) => return (told, true),
         };
+        // The older rules a kept one replaces (#4346), forgotten once it is.
+        let mut replaces = vec![];
         // Counting and keeping are one step: up to eight calls run at once,
         // and each of them must see the others' rules.
         let _keeping = if call.name == crate::rules::KEEP_RULE {
@@ -10568,10 +10570,31 @@ impl DaysClient {
                     )
                 })
                 .and_then(|answer| crate::rules::rules(&answer));
-            match kept.map(|kept| crate::rules::admit(&kept)) {
-                None => return (gone(), false),
-                Some(Err(told)) => return (told, true),
-                Some(Ok(())) => {}
+            let Some(kept) = kept else {
+                return (gone(), false);
+            };
+            // The same rule kept again is the one kept (#4346: "no hello"
+            // was kept twice).
+            match crate::rules::beside(&kept, line) {
+                crate::rules::Beside::Already(_) => {
+                    return (
+                        json!({"kept_rule": true, "note": "Already kept: follow it from now on, with them, without being reminded."}),
+                        true,
+                    );
+                }
+                crate::rules::Beside::Keep {
+                    line: merged,
+                    replaces: older,
+                } => {
+                    (line, replaces) = (merged, older);
+                }
+            }
+            let left: Vec<_> = kept
+                .into_iter()
+                .filter(|rule| !replaces.contains(&rule.id))
+                .collect();
+            if let Err(told) = crate::rules::admit(&left) {
+                return (told, true);
             }
             Some(keeping)
         } else {
@@ -10659,6 +10682,10 @@ impl DaysClient {
             Err(poisoned) => poisoned.into_inner().inhibit(Stopped::Poisoned),
         };
         say(said);
+        if changed && !replaces.is_empty() {
+            // Kept: the rules it replaces go, as a forget_rule of each would.
+            let _ = self.forget_rules(&scope, replaces, until, lease, Stopped::RuleForgotten);
+        }
         if changed {
             if call.name == crate::rules::FORGET_RULE {
                 // The store removed what was said under the rule. As for
@@ -10706,12 +10733,36 @@ impl DaysClient {
                 true,
             );
         }
+        let Some(removed) =
+            self.forget_rules(&scope, ids, until, None, Stopped::LightRuleForgotten)
+        else {
+            return (gone(), false);
+        };
+        self.tell_policy(person, until);
+        (
+            json!({"forgotten": removed > 0, "note": "The light may go out again when nobody is there."}),
+            true,
+        )
+    }
+
+    /// Forget the rules `ids` of `scope` before `until`: how many records
+    /// went, or `None` when it could not be done. The store removes what was
+    /// said under them, so journalling stops (`why`), as for `forget_rule`.
+    fn forget_rules(
+        &self,
+        scope: &str,
+        ids: Vec<u64>,
+        until: Instant,
+        lease: Option<&crate::memory_scope::ScopeLease>,
+        why: Stopped,
+    ) -> Option<u64> {
+        let left = || until.checked_duration_since(Instant::now());
         // As for any write: journalling waits until it is acknowledged.
         match self.context.try_lock() {
             Ok(mut context) => {
                 context.uncertain_writes = context.uncertain_writes.saturating_add(1);
             }
-            Err(_) => return (gone(), false),
+            Err(_) => return None,
         }
         let mut removed = 0;
         // As for any write (#2176 row 1c): known outcomes settle, a lost
@@ -10719,7 +10770,7 @@ impl DaysClient {
         // journalling.
         let partly = |forgot: usize| {
             if forgot > 0 {
-                self.stop(Stopped::LightRuleForgotten);
+                self.stop(why);
             }
         };
         for (forgot, id) in ids.into_iter().enumerate() {
@@ -10727,17 +10778,17 @@ impl DaysClient {
             let Some(left) = left() else {
                 partly(forgot);
                 self.settle_write();
-                return (gone(), false);
+                return None;
             };
-            let Some(answer) = bounded_exchange(&self.socket, &forget, left) else {
+            let Some(answer) = bounded_exchange_scoped(&self.socket, &forget, left, lease) else {
                 partly(forgot);
                 self.lose_write();
-                return (gone(), false);
+                return None;
             };
             if answer["ok"] != true {
                 partly(forgot);
                 self.settle_write();
-                return (gone(), false);
+                return None;
             }
             removed += answer.get("removed").and_then(Value::as_u64).unwrap_or(0);
         }
@@ -10747,18 +10798,14 @@ impl DaysClient {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         context.uncertain_writes = context.uncertain_writes.saturating_sub(1);
-        let said = context.inhibit(Stopped::LightRuleForgotten);
+        let said = context.inhibit(why);
         drop(context);
         say(said);
         FORGET_THREAD.store(true, Ordering::Release);
         if let Ok(mut thread) = crate::thread::THREAD.try_lock() {
             clear_forgotten_thread(&mut thread);
         }
-        self.tell_policy(person, until);
-        (
-            json!({"forgotten": removed > 0, "note": "The light may go out again when nobody is there."}),
-            true,
-        )
+        Some(removed)
     }
 
     /// Every rule of the room's, and of this person's, read before `until`,
@@ -21815,8 +21862,18 @@ mod tests {
             name: name.into(),
             args,
         };
+        // The first read, the keep's, has no light rule yet: one kept
+        // already is not kept again (#4346).
+        static ROOM_READS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let (socket, served) = memory_lines("light-rule", 8, |request| {
             match (request["op"].as_str(), request["person"].as_str()) {
+                (Some("kept"), Some("r-everyone"))
+                    if ROOM_READS.fetch_add(1, Ordering::Relaxed) == 0 =>
+                {
+                    json!({"ok":true,"entries":[
+                        {"id":3,"at_unix_ms":1,"text":"[unprompted greeting never] Don't greet me."}
+                    ]})
+                }
                 (Some("kept"), Some("r-everyone")) => json!({"ok":true,"entries":[
                     {"id":3,"at_unix_ms":1,"text":"[unprompted greeting never] Don't greet me."},
                     {"id":9,"at_unix_ms":2,"text":"[unprompted light never] Keep the light on."}
@@ -21857,6 +21914,65 @@ mod tests {
         assert_eq!(forgets.len(), 1);
         assert_eq!(forgets[0]["id"], 9);
         assert_eq!(forgets[0]["person"], "r-everyone");
+        drop(client);
+        std::fs::remove_file(socket).unwrap();
+    }
+
+    /// #4346, the setup walk on lamp-c0a4 on 5 Nov: "no hello" said again
+    /// is the rule already kept, and nothing is written; "ten at night
+    /// until seven" kept with not_from 21:00 is kept as said, at 22:00, and
+    /// replaces the rule that kept nine, its "until seven" carried.
+    #[test]
+    fn setup_keeps_the_hello_once_and_quiet_hours_as_said() {
+        use crate::rules::KEEP_RULE;
+        let _one = crate::provider_worker::tests::one_thread();
+        let call = |args: Value| ToolCall {
+            id: "c1".into(),
+            name: KEEP_RULE.into(),
+            args,
+        };
+        let (socket, served) = memory_lines("setup-rules", 6, |request| {
+            match (request["op"].as_str(), request["person"].as_str()) {
+                (Some("kept"), Some("r-be9688998f085098")) => json!({"ok":true,"entries":[
+                    {"id":4,"at_unix_ms":1,"text":"[unprompted greeting never] No hello when they sit down."},
+                    {"id":5,"at_unix_ms":2,"text":"[unprompted both not_before=420 not_from=1260] Quiet from nine at night until seven."}
+                ]}),
+                (Some("kept"), _) => json!({"ok":true,"entries":[]}),
+                (Some("remember"), _) => json!({"ok":true,"id":6}),
+                (Some("forget"), _) => json!({"ok":true,"removed":1}),
+                _ => json!({"ok":false,"error":"unexpected"}),
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let (deadline, person) = (Duration::from_secs(1), Some("p-be9688998f085098"));
+        let hello = call(
+            json!({"rule":"Don't say hello when I sit down.","about":"greeting","never":true}),
+        );
+        let (told, _) = client.rule_for(&hello, deadline, person);
+        assert_eq!(told["kept_rule"], true, "{told}");
+        let quiet = call(
+            json!({"rule":"Quiet from ten at night until seven.","about":"both","not_from":"21:00"}),
+        );
+        let (told, _) = client.rule_for(&quiet, deadline, person);
+        assert_eq!(told["kept_rule"], true, "{told}");
+        let read: Vec<Value> = served
+            .join()
+            .unwrap()
+            .iter()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        let ops: Vec<&str> = read
+            .iter()
+            .map(|line| line["op"].as_str().unwrap())
+            .collect();
+        // The hello: one read, no write. The quiet hours: read, kept, the
+        // nine forgotten, then both scopes read for the policy.
+        assert_eq!(ops, ["kept", "kept", "remember", "forget", "kept", "kept"]);
+        assert_eq!(
+            read[2]["text"],
+            "[unprompted both not_before=420 not_from=1320] Quiet from ten at night until seven."
+        );
+        assert_eq!(read[3]["id"], 5);
         drop(client);
         std::fs::remove_file(socket).unwrap();
     }
