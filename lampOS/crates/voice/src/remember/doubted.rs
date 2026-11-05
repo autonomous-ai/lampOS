@@ -73,22 +73,97 @@ const DOUBTS: &[&str] = &[
     "if i heard that right",
     "if i heard correctly",
     "did you say",
-    "did you mean",
-    "say that again",
-    "say it again",
     "could you repeat",
     "can you repeat",
-    // lamp-06c1, 5 Nov (C37): "I want to be sure" after a keep.
-    "want to be sure",
+    // lamp-06c1, 5 Nov (C37): "I want to be sure" after a keep, only of
+    // what was heard: "I want to be sure you make it" is reassurance.
+    "want to be sure i heard",
+    "want to be sure i caught",
     "is that spelled",
-    "how do you spell",
+    // Of the word: "How do you spell relief?" is a joke, no doubt.
+    "how do you spell it",
+    "how do you spell that",
+    "how do you spell your",
+    "how do you spell the name",
     "nghe nh\u{1ea7}m",
     "nghe ch\u{1b0}a r\u{f5}",
     "nghe kh\u{f4}ng r\u{f5}",
     "ch\u{1b0}a nghe r\u{f5}",
     "c\u{f3} ph\u{1ea3}i b\u{1ea1}n n\u{f3}i",
-    "n\u{f3}i l\u{1ea1}i",
 ];
+
+/// A doubt only where its sentence or clause ends right after it, or
+/// "right"/"correct" follows: "I want to be sure I have it." doubts, "I
+/// want to be sure I have it saved for Monday" does not.
+const DOUBTS_ENDED: &[&str] = &[
+    "want to be sure i have it",
+    "want to be sure i have that",
+    "want to be sure i got it",
+    "want to be sure i got that",
+    "want to be sure i've got it",
+    "want to be sure i've got that",
+];
+
+/// An ask to say it again, a doubt unless its clause says there is no
+/// need: "Say that again?" doubts, "You never have to say it again" and
+/// "bạn không cần nói lại" do not.
+const ASKS_AGAIN: &[&str] = &["say that again", "say it again", "n\u{f3}i l\u{1ea1}i"];
+
+/// What, earlier in its clause, makes an [`ASKS_AGAIN`] no ask.
+const NO_NEED: &[&str] = &[
+    "never",
+    "no need",
+    "needn't",
+    "don't need",
+    "don't have to",
+    "won't need",
+    "won't have to",
+    "do not need",
+    "do not have to",
+    "kh\u{f4}ng c\u{1ea7}n",
+    "kh\u{1ecf}i",
+    "ch\u{1eb3}ng c\u{1ea7}n",
+];
+
+/// The clause of `said` before byte `at`: back to '.', '!', '?', ',', ';',
+/// ':', a dash or a line end.
+fn clause_before(said: &str, at: usize) -> &str {
+    let before = &said[..at];
+    before
+        .rfind(['.', '!', '?', ',', ';', ':', '\u{2014}', '\u{2013}', '\n'])
+        .map_or(before, |end| {
+            let mut from = end + 1;
+            while !before.is_char_boundary(from) {
+                from += 1;
+            }
+            &before[from..]
+        })
+}
+
+/// Whether `said` (lower case) has one of [`DOUBTS_ENDED`], [`ASKS_AGAIN`]
+/// with no [`NO_NEED`] before it, or "did you mean" that is not "did you
+/// mean to" ("Did you mean to add a reminder too?") unless "to say".
+fn doubts_in_place(said: &str) -> bool {
+    let ended = DOUBTS_ENDED.iter().any(|doubt| {
+        said.match_indices(doubt).any(|(at, _)| {
+            let after = &said[at + doubt.len()..];
+            after.chars().next().is_none_or(|c| ".!?,;:\n".contains(c))
+                || after.starts_with(" right")
+                || after.starts_with(" correct")
+        })
+    });
+    let asked = ASKS_AGAIN.iter().any(|ask| {
+        said.match_indices(ask).any(|(at, _)| {
+            let clause = clause_before(said, at);
+            !NO_NEED.iter().any(|no| clause.contains(no))
+        })
+    });
+    let meant = said.match_indices("did you mean").any(|(at, head)| {
+        let after = &said[at + head.len()..];
+        !after.starts_with(" to ") || after.starts_with(" to say")
+    });
+    ended || asked || meant
+}
 
 /// A doubt in two parts with the doubted word between them, lower case:
 /// "Was that 'rhinodulus' right?" (lamp-06c1, 5 Nov, C37), "Did I hear
@@ -131,20 +206,24 @@ fn doubts_around(said: &str) -> bool {
                 let next = window[found + tail.len()..].chars().next();
                 before.is_some_and(|c| !c.is_alphanumeric())
                     && next.is_none_or(|c| !c.is_alphanumeric())
+                    // "Was that all right?" asks if keeping it was fine.
+                    && !window[..found].ends_with("all ")
             })
         })
     })
 }
 
-/// Whether a round's own words doubt what was heard ([`DOUBTS`], or
-/// [`DOUBTS_AROUND`] with the word between).
+/// Whether a round's own words doubt what was heard ([`DOUBTS`], the ones
+/// [`doubts_in_place`] reads, or [`DOUBTS_AROUND`] with the word between).
 pub fn doubts_what_was_heard(said: &str) -> bool {
     let said: String = said
         .nfc()
         .flat_map(char::to_lowercase)
         .map(|c| if c == '\u{2019}' { '\'' } else { c })
         .collect();
-    DOUBTS.iter().any(|doubt| said.contains(doubt)) || doubts_around(&said)
+    DOUBTS.iter().any(|doubt| said.contains(doubt))
+        || doubts_in_place(&said)
+        || doubts_around(&said)
 }
 
 #[cfg(test)]
@@ -231,6 +310,50 @@ mod tests {
             "Was thatch right for the roof?",
         ] {
             assert!(!doubts_what_was_heard(said), "{said}");
+        }
+    }
+
+    /// #5414 P2: reassurance after a keep, and other plain keep replies
+    /// that hold a doubt's words, are no doubt: read as one, the keep
+    /// would be forgotten and held for a yes that never comes.
+    #[test]
+    fn reassurance_after_a_keep_is_no_doubt() {
+        for said in [
+            "Kept your flight time. I want to be sure you make it.",
+            "Got it. I want to be sure you don't miss it.",
+            "How do you spell relief? A nap.",
+            "Kept your locker number. I want to be sure it's there when you need it.",
+            "Kept. If you want to be sure, ask me tomorrow.",
+            "Saved. I want to be sure I have it ready for Monday.",
+            "Kept. You never have to say it again.",
+            "No need to say that again \u{2014} I've got it.",
+            "Kept. Did you mean to add a reminder too?",
+            "Kept your dentist time. Was that all right?",
+            "\u{110}\u{e3} nh\u{1edb} r\u{1ed3}i, b\u{1ea1}n kh\u{f4}ng c\u{1ea7}n n\u{f3}i l\u{1ea1}i \u{111}\u{e2}u.",
+        ] {
+            assert!(!doubts_what_was_heard(said), "{said}");
+        }
+    }
+
+    /// The narrower doubts that stay: of what was heard, the word, or an
+    /// ask to say it again.
+    #[test]
+    fn the_narrower_doubts_are_still_seen() {
+        for said in [
+            "I want to be sure I heard the name.",
+            "I want to be sure I caught that.",
+            "I want to be sure I got that right.",
+            "I want to be sure I have it?",
+            "How do you spell that?",
+            "How do you spell your name?",
+            "Sorry, could you say that again?",
+            "I'm not sure, say it again?",
+            "I didn't get that so please say it again.",
+            "Did you mean today or Tuesday?",
+            "Did you mean to say tulip?",
+            "M\u{00ec}nh nghe ch\u{1b0}a k\u{1ef9}, b\u{1ea1}n n\u{f3}i l\u{1ea1}i nh\u{e9}?",
+        ] {
+            assert!(doubts_what_was_heard(said), "{said}");
         }
     }
 
