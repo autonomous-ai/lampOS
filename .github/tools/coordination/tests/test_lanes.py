@@ -45,7 +45,7 @@ echo "$*" >> "$FAKE_DIR/calls.log"
 case "$*" in
   "pr diff"*) cat "$FAKE_DIR/files.txt" ;;
   *collaborators*) echo w1 ;;
-  *issues/4710/comments*) ;;
+  *issues/4710/comments*|*issues/5385/comments*) a="$*"; n=${a#*issues/}; n=${n%%/*}; [ -f "$FAKE_DIR/queue-fail-$n" ] && exit 1; cat "$FAKE_DIR/queue-$n.json" 2>/dev/null; exit 0 ;;
   *issues/*/comments*) a="$*"; n=${a#*issues/}; n=${n%%/*}; cat "$FAKE_DIR/comments-$n.json" ;;
   *"--state all"*) echo 23 ;;
   *"--json headRefName --jq"*) cat "$FAKE_DIR/open.txt" 2>/dev/null ;;
@@ -357,13 +357,15 @@ class MergeNoArm64(Repo):
 
 
 class BotDryRound(Repo):
-    def bot(self, **extra):
+    def bot(self, before=None, **extra):
         self.pr(7, [TOOL])
         self.pr(8, ["lampOS/crates/x/src/lib.rs"])
         self.pr(9, ["lampOS/docs/controls.md"])
         self.fakefile("prs.txt", "7\n8\n9\n")
         self.fakefile("heads.txt", "".join("%d %s\n" % (n, open(os.path.join(self.fake, "head-%d.txt" % n)).read().strip())
                                            for n in (7, 8, 9)))
+        if before:
+            before()
         env = dict(self.env, DRY="1", WORKTREE=os.path.join(self.tmp, "wt"), WORKTREE_NC=os.path.join(self.tmp, "wtnc"), **extra)
         os.makedirs(self.state, exist_ok=True)
         r = run(["zsh", BOT], self.work, env=env, check=False)
@@ -427,6 +429,69 @@ class BotDryRound(Repo):
         r, lines = self.bot(NOCRATES_LANE="off")
         self.assertEqual(lines[0], "dry: another train is open; a real run would wait for it")
         self.assertNothingChanged()
+
+    # 5 Nov: #4710 hit GitHub's 2,500-comment limit and the Queue goes on in #5385; lib.sh's coord_queue reads both.
+    def queue_hold(self, issue, n):
+        h = open(os.path.join(self.fake, "head-%d.txt" % n)).read().strip()
+        self.fakefile("queue-%d.json" % issue, json.dumps({"login": "w1", "body": "HOLD %s\n\nEngineer, 12:30: lamp check pending" % h[:10],
+                                                           "created_at": "2026-11-05T05:30:00Z"}) + "\n")
+
+    def test_a_hold_on_the_new_queue_holds_its_pr(self):
+        r, lines = self.bot(before=lambda: self.queue_hold(5385, 8))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("#8 left out: a HOLD on the Queue (2026-11-05T05:30:00Z) names head", r.stderr)
+        self.assertIn("dry: crate lane: would carry 9 onto " + self.base[:9], lines)
+        self.assertIn("dry: no-crates lane: would carry 7 onto " + self.base[:9], lines)
+        self.assertIn("issues/4710/comments", self.calls())
+        self.assertIn("issues/5385/comments", self.calls())
+        self.assertNothingChanged()
+
+    def test_a_hold_on_the_old_queue_still_holds_its_pr(self):
+        r, lines = self.bot(before=lambda: self.queue_hold(4710, 7))
+        self.assertIn("#7 left out: a HOLD on the Queue (2026-11-05T05:30:00Z) names head", r.stderr)
+        self.assertIn("dry: crate lane: would carry 8 9 onto " + self.base[:9], lines)
+        self.assertIn("dry: no-crates lane: nothing eligible", lines)
+        self.assertNothingChanged()
+
+    def test_either_queue_unread_makes_nothing_eligible(self):
+        for issue in (4710, 5385):
+            for f in os.listdir(self.fake):
+                if f.startswith("queue-fail-"):
+                    os.unlink(os.path.join(self.fake, f))
+            self.fakefile("queue-fail-%d" % issue, "")
+            shutil.rmtree(self.state, ignore_errors=True)
+            r, lines = self.bot()
+            self.assertIn("the Queue's (#4710, #5385) comments can't be fetched: no PR is eligible", r.stderr)
+            self.assertNotIn("would carry", " ".join(lines))
+            self.assertNothingChanged()
+
+
+class CoordQueue(Repo):
+    """lib.sh's coord_queue: every Queue issue in one file, or a failure with no file (fail closed)."""
+
+    def queue(self):
+        out = os.path.join(self.tmp, "q.jsonl")
+        r = run(["zsh", "-c", 'TOOLS_DIR=%s; source %s; coord_queue %s' % (HERE, LIB, out)], self.work, env=self.env, check=False)
+        return r.returncode, (open(out).read().splitlines() if os.path.exists(out) else None)
+
+    def test_both_issues_in_one_list(self):
+        self.fakefile("queue-4710.json", '{"login":"w1","body":"old","created_at":"2026-11-04T01:00:00Z"}\n')
+        self.fakefile("queue-5385.json", '{"login":"w1","body":"new","created_at":"2026-11-05T01:00:00Z"}\n')
+        rc, lines = self.queue()
+        self.assertEqual(rc, 0)
+        self.assertEqual([json.loads(l)["body"] for l in lines], ["old", "new"])
+
+    def test_either_issue_failing_fails_with_no_file(self):
+        for issue in (4710, 5385):
+            self.fakefile("queue-fail-%d" % issue, "")
+            rc, lines = self.queue()
+            self.assertNotEqual(rc, 0)
+            self.assertIsNone(lines)
+            os.unlink(os.path.join(self.fake, "queue-fail-%d" % issue))
+
+    def test_the_bot_posts_on_the_last_issue(self):
+        r = run(["zsh", "-c", 'TOOLS_DIR=%s; source %s; print -r -- $COORD_QUEUE_POST ${(j:,:)COORD_QUEUE_ISSUES}' % (HERE, LIB)], self.work, env=self.env)
+        self.assertEqual(r.stdout.split(), ["5385", "4710,5385"])
 
 
 if __name__ == "__main__":

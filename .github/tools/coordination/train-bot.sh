@@ -51,11 +51,11 @@ fine() { grep -qx -- "$1" $said && { grep -vx -- "$1" $said > $said.new; mv $sai
 eligible() {
   local p head ok sha held two own wf qf=$SP/queue.jsonl cf=$SP/pr-comments.jsonl bf=$SP/pr-body.jsonl
   # 3 Nov 15:4x (the Reviewer-lead's HOLD on #5068): the repo is public, so markers count only from accounts with write
-  # access (lib.sh, coord_writers). Every fetch fails closed: without the writers list, or without the Queue (#4710) and
-  # so its HOLDs, no PR is eligible this round; without a PR's head, comments or body, that PR is not.
+  # access (lib.sh, coord_writers). Every fetch fails closed: without the writers list, or without the Queue (every
+  # issue in lib.sh's COORD_QUEUE_ISSUES) and so its HOLDs, no PR is eligible this round; without a PR's head, comments or body, that PR is not.
   wf=$(coord_writers) || { once writers "the writers list can't be fetched and its cache is an hour old: no PR is eligible"; return; }
   fine writers
-  coord_queue $qf || { once queue "the Queue's (#4710) comments can't be fetched: no PR is eligible"; return; }
+  coord_queue $qf || { once queue "the Queue's (#${(j:, #:)COORD_QUEUE_ISSUES}) comments can't be fetched: no PR is eligible"; return; }
   fine queue
   # A PR whose head is in another repository is never carried (coord_head checks it again).
   for p in $(gh pr list -R $REPO --base lamp-voice --state open --limit 200 --json number,isDraft,headRefName,isCrossRepository --jq '.[]|select(.isDraft|not)|select(.isCrossRepository|not)|select(.headRefName|startswith("first/train-")|not)|.number'); do
@@ -63,10 +63,10 @@ eligible() {
     # 4 Nov: with its reviews' bodies (#5212 part 1).
     coord_pr_comments $p $cf || { once comments$p "#$p left out: its comments can't be fetched"; continue; }
     fine head$p; fine comments$p
-    # 3 Nov 09:4x: a HOLD posted on the Queue (#4710) whose first line is `HOLD <sha>` holds the PR whose head starts with
-    # that sha, until the same account posts a READ-OK on the PR, after it, saying the HOLD is lifted or cleared
-    # (qholds.py, with markers.py's marker and lifting words). Train 546 took #5013 on Fourteen's READ-OK while
-    # Seventh's "HOLD a13408fb8d…: lamp check pending" stood only on the Queue.
+    # 3 Nov 09:4x: a HOLD posted on the Queue (#4710, and from 5 Nov #5385: lib.sh's COORD_QUEUE_ISSUES) whose first
+    # line is `HOLD <sha>` holds the PR whose head starts with that sha, until the same account posts a READ-OK on the
+    # PR, after it, saying the HOLD is lifted or cleared (qholds.py, with markers.py's marker and lifting words). Train
+    # 546 took #5013 on Fourteen's READ-OK while Seventh's "HOLD a13408fb8d…: lamp check pending" stood only on the Queue.
     if ! held=$($PYTHON -I $TOOLS_DIR/qholds.py --writers $wf $head $qf < $cf); then
       once qholds$p "#$p left out: qholds.py failed"; continue
     fi
@@ -203,8 +203,8 @@ build_train() {
     git worktree prune; git worktree add -q -B $br $wt origin/lamp-voice || { say "worktree failed"; return 1; }
   fi
   carried=()
-  if [[ $lane == nc ]]; then body="No-crates train $tn, onto lamp-voice \`$LV\`, built by the train bot (#4710, the Queue). Its PRs change no build input, so no ARM64 run: it merges by rebase once the checks that start on it pass.\n"
-  else body="Merge train $n, onto lamp-voice \`$LV\`, built by the train bot (#4710, the Queue). One ARM64 run, merged by rebase.\n"; fi
+  if [[ $lane == nc ]]; then body="No-crates train $tn, onto lamp-voice \`$LV\`, built by the train bot (#$COORD_QUEUE_POST, the Queue). Its PRs change no build input, so no ARM64 run: it merges by rebase once the checks that start on it pass.\n"
+  else body="Merge train $n, onto lamp-voice \`$LV\`, built by the train bot (#$COORD_QUEUE_POST, the Queue). One ARM64 run, merged by rebase.\n"; fi
   for p in "$@"; do
     own=(${(f)"$(git -C $wt rev-list --reverse --cherry-pick --right-only --no-merges HEAD...refs/remotes/pr/$p)"})
     [[ -n ${own[1]} ]] || continue
@@ -225,7 +225,7 @@ build_train() {
   git -C $wt push -q origin "${h}:refs/heads/$br" 2>&1 | grep -v '^remote:'
   # A push refused (the branch already there) leaves the old head under the PR: never open one on it (27 Oct 14:0x).
   [[ $(git ls-remote origin "refs/heads/$br" | cut -c1-40) == $h ]] || { say "train $tn: push didn't land, next number"; return 1; }
-  print -r -- "$body\n\nPart of #4710." > $SP/pr-train$tn.md
+  print -r -- "$body\n\nPart of #$COORD_QUEUE_POST." > $SP/pr-train$tn.md
   # The crate lane's title keeps "merge train N", which the train number search reads; "no-crates train nc-N" never
   # matches it.
   if [[ $lane == nc ]]; then title="lampOS: no-crates train $tn: $refs"; else title="lampOS: merge train $n: $refs"; fi
@@ -253,7 +253,7 @@ run_train() {
     # background.
     slow=$(( $(cat $slowf 2>/dev/null || echo 0) + 1 )); echo $slow > $slowf
     gh pr close $tp -R $REPO -c "Train bot: closed, its checks hadn't finished in 45 min; the same PRs go again." >/dev/null
-    if [[ $slow -ge 2 ]]; then say "train $tn (#$tp): checks unfinished twice in a row: stopping for the first builder"; gh issue comment 4710 -R $REPO --body "Train bot, $(date +%H:%M): two trains in a row had checks unfinished after 45 min (CI is slow or stuck); stopped for the first builder$([[ $lane == nc ]] && print ' (the no-crates lane only)')." >/dev/null; echo 0 > $slowf; halt $lane; return; fi
+    if [[ $slow -ge 2 ]]; then say "train $tn (#$tp): checks unfinished twice in a row: stopping for the first builder"; gh issue comment $COORD_QUEUE_POST -R $REPO --body "Train bot, $(date +%H:%M): two trains in a row had checks unfinished after 45 min (CI is slow or stuck); stopped for the first builder$([[ $lane == nc ]] && print ' (the no-crates lane only)')." >/dev/null; echo 0 > $slowf; halt $lane; return; fi
     say "train $tn (#$tp) checks unfinished in 45 min: rebuilding"; return
   fi
   echo 0 > $slowf
@@ -286,7 +286,7 @@ run_train() {
       # 28 Oct 16:4x: closed with no comment; the Queue's merge line names it (post less).
       [[ $left == 0 ]] && gh pr close $p -R $REPO >/dev/null && say "  closed #$p"
     done
-    gh issue comment 4710 -R $REPO --body "Train bot, $(date +%H:%M): **train $tn (#$tp) merged** as lamp-voice \`$NV\`: $refs." >/dev/null
+    gh issue comment $COORD_QUEUE_POST -R $REPO --body "Train bot, $(date +%H:%M): **train $tn (#$tp) merged** as lamp-voice \`$NV\`: $refs." >/dev/null
     return
   fi
   if [[ $lane == nc ]]; then
@@ -301,7 +301,7 @@ run_train() {
     elif [[ $rc == 2 ]]; then
       touch $SP/train-bot.nc-one; say "train $tn (#$tp) failed with ${#carried} PRs: the no-crates lane carries one PR a train until one merges"
     else
-      say "train $tn (#$tp) failed (rc $rc)"; gh issue comment 4710 -R $REPO --body "Train bot, $(date +%H:%M): no-crates train $tn (#$tp) failed (rc $rc, not its checks); the no-crates lane stopped for the first builder." >/dev/null; halt nc
+      say "train $tn (#$tp) failed (rc $rc)"; gh issue comment $COORD_QUEUE_POST -R $REPO --body "Train bot, $(date +%H:%M): no-crates train $tn (#$tp) failed (rc $rc, not its checks); the no-crates lane stopped for the first builder." >/dev/null; halt nc
     fi
     return
   fi
@@ -343,7 +343,7 @@ run_train() {
       fi
     done
   fi
-  [[ -z $fails ]] && { say "no failing test named: stopping for the first builder"; gh issue comment 4710 -R $REPO --body "Train bot, $(date +%H:%M): train $n (#$tp) failed with no failing test named; stopped for the first builder." >/dev/null; halt crates; }
+  [[ -z $fails ]] && { say "no failing test named: stopping for the first builder"; gh issue comment $COORD_QUEUE_POST -R $REPO --body "Train bot, $(date +%H:%M): train $n (#$tp) failed with no failing test named; stopped for the first builder." >/dev/null; halt crates; }
   return 0
 }
 # lane_round LANE BUSY PR...: what one lane does this round with its PRs: nothing (busy, stopped, rows alone, none),
