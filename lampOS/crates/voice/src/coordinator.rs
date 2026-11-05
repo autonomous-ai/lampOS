@@ -8372,7 +8372,7 @@ fn conversation_with_gate_inner(
                     if crate::reminders::ring_stop_ends_it()
                         && let Some(reminders) = reminders.as_mut()
                     {
-                        reminders.stop_said(monotonic_us());
+                        reminders.stop_said(request, monotonic_us());
                         eprintln!(
                             "lamp-voice: request {request} was a stop: a ring it cut is held"
                         );
@@ -10363,7 +10363,9 @@ fn conversation_with_gate_inner(
                         snapshot = state;
                         rig.publish(snapshot)?;
                         if let Some(receipt) = &mut interrupted {
-                            receipt.interrupted_after_owner_fenced();
+                            receipt.interrupted_after_owner_fenced(
+                                reply.as_ref().map(|current| current.owner.turn()),
+                            );
                         }
                         last_publish = monotonic_us();
                         continue;
@@ -10738,7 +10740,9 @@ fn conversation_with_gate_inner(
                                 snapshot = owner.snapshot(now())?;
                                 rig.publish(snapshot)?;
                                 if let Some(receipt) = &mut interrupted {
-                                    receipt.interrupted_after_owner_fenced();
+                                    receipt.interrupted_after_owner_fenced(
+                                        reply.as_ref().map(|current| current.owner.turn()),
+                                    );
                                 }
                             }
                         }
@@ -15365,7 +15369,7 @@ fn commit_admitted_input(
     // The old owner is revoked, its queues cleared, and the replacement
     // authority successfully published. Only this known interruption retries.
     if let Some(receipt) = &mut interrupted {
-        receipt.interrupted_after_owner_fenced();
+        receipt.interrupted_after_owner_fenced(reply.as_ref().map(|current| current.owner.turn()));
     }
     Ok(snapshot)
 }
@@ -15456,7 +15460,7 @@ fn commit_offline_input(
     // The old owner is revoked, its queues cleared, and the replacement
     // authority successfully published. Only this known interruption retries.
     if let Some(receipt) = &mut interrupted {
-        receipt.interrupted_after_owner_fenced();
+        receipt.interrupted_after_owner_fenced(reply.as_ref().map(|current| current.owner.turn()));
     }
     Ok(snapshot)
 }
@@ -15748,7 +15752,7 @@ fn continue_after_early_end(
     // The old owner is revoked, its queues cleared, and the replacement
     // authority successfully published. Only this known interruption retries.
     if let Some(receipt) = &mut interrupted {
-        receipt.interrupted_after_owner_fenced();
+        receipt.interrupted_after_owner_fenced(reply.as_ref().map(|current| current.owner.turn()));
     }
     Ok(snapshot)
 }
