@@ -4,9 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Meet your Lamp</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 <style>
   /* A story you flip through, one idea a page. Each chapter has one flat colour; the lamp's warm light runs through all of them. */
   :root {
@@ -16,8 +13,8 @@
     --sky: #7cc0ff;
     --mint: #8fe3b4;
     --coral: #ff8f73;
-    --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
-    --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --display: "Avenir Next", "Futura", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+    --body: -apple-system, "Segoe UI", system-ui, Roboto, "Helvetica Neue", sans-serif;
     --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     color-scheme: dark;
   }
@@ -198,9 +195,9 @@
     <div class="art"><div class="bubbles" style="width:100%">
       <div><span class="lamp"><span class="who">Lamp</span>What should I call you?</span></div>
       <div class="right"><span class="you"><span class="who">You</span>Marie.</span></div>
-      <div><span class="lamp"><span class="who">Lamp</span>Marie, did I get that right?</span></div>
+      <div><span class="lamp"><span class="who">Lamp</span>Nice to meet you, Marie.</span></div>
     </div></div>
-    <div class="copy"><h2>Tell me your name.</h2><p>I say it back so you can check. If I got it wrong, spell it for me.</p></div>
+    <div class="copy"><h2>Tell me your name.</h2><p>If I didn't catch it, I'll ask again.</p></div>
   </section>
   <section class="page c-night" data-chapter="2 · Our first five minutes">
     <div class="art"><svg viewBox="0 0 300 300" aria-hidden="true"><circle cx="150" cy="150" r="100" fill="#fff7ea"/><circle cx="118" cy="132" r="11" fill="#10141f"/><circle cx="182" cy="132" r="11" fill="#10141f"/><path d="M110 182c22 24 58 24 80 0" fill="none" stroke="#10141f" stroke-width="10" stroke-linecap="round"/><path d="M40 60h40M40 60v40M260 60h-40M260 60v40M40 240h40M40 240v-40M260 240h-40M260 240v-40" stroke="#ffb547" stroke-width="7" stroke-linecap="round"/></svg></div>
@@ -219,10 +216,6 @@
     <div class="copy"><h2>A tap on my head.</h2><p>Once, then let go. I learn how your touch feels.</p></div>
   </section>
   <section class="page c-night" data-chapter="2 · Our first five minutes">
-    <div class="art"><div class="bubbles" style="width:100%"><div><span class="lamp"><span class="who">Lamp</span>Hold my base with one hand. With the other, tilt my head gently to one side. Let go when I say so.</span></div></div></div>
-    <div class="copy"><h2>A gentle tilt.</h2><p>So I learn how your hand feels, and give way when you move me.</p></div>
-  </section>
-  <section class="page c-night" data-chapter="2 · Our first five minutes">
     <div class="art"><svg viewBox="0 0 300 300" aria-hidden="true"><path d="M210 190A90 90 0 1 1 120 70a70 70 0 0 0 90 120z" fill="#ffb547"/><circle cx="215" cy="85" r="6" fill="#fff7ea"/><circle cx="245" cy="125" r="4" fill="#fff7ea"/><circle cx="200" cy="50" r="3" fill="#fff7ea"/></svg></div>
     <div class="copy"><h2>Quiet hours, and hellos.</h2><p>Tell me when to keep quiet, and whether I may say hello when you come back to your desk.</p></div>
   </section>
@@ -237,7 +230,7 @@
       <div class="right"><span class="you"><span class="who">You</span>Hey Lamp, set a timer for ten minutes.</span></div>
       <div><span class="lamp"><span class="who">Lamp</span>Ten minutes, starting now.</span></div>
     </div></div>
-    <div class="copy"><h2>Timers.</h2><p>I ring when it's up, even if we're in the middle of a chat.</p></div>
+    <div class="copy"><h2>Timers.</h2><p>I ring when it's up.</p></div>
   </section>
   <section class="page c-sky" data-chapter="3 · Talk to me">
     <div class="art"><div class="bubbles" style="width:100%">
@@ -245,6 +238,12 @@
       <div class="right"><span class="you"><span class="who">You</span>What reminders do I have?</span></div>
     </div></div>
     <div class="copy"><h2>Reminders.</h2><p>Set them out loud, and ask me for them any time.</p></div>
+  </section>
+  <section class="page c-sky" data-chapter="3 · Talk to me">
+    <div class="art"><div class="bubbles" style="width:100%">
+      <div class="right"><span class="you"><span class="who">You</span>What's the weather tomorrow?</span></div>
+    </div></div>
+    <div class="copy"><h2>The weather.</h2><p>Today, tomorrow, or any day this week, here or anywhere you name.</p></div>
   </section>
   <section class="page c-sky" data-chapter="3 · Talk to me">
     <div class="art"><svg viewBox="0 0 300 320" aria-hidden="true"><circle cx="214" cy="190" r="120" fill="#ffd27a" opacity=".7" class="glow"/><use href="#lamp"/></svg></div>
@@ -314,7 +313,7 @@
   <!-- END -->
   <section class="page c-cover" data-chapter="That's it">
     <div class="art"><svg viewBox="0 0 300 320" aria-hidden="true"><circle cx="214" cy="190" r="120" fill="url(#warm)"/><use href="#lamp"/></svg></div>
-    <div class="copy"><h1>That's it. Say "Hey Lamp."</h1><p>Start over: hold the small reset hole for 5 seconds. Do setup again: say "Lamp, let's redo the setup." Clear what I remember: say "Forget everything."</p></div>
+    <div class="copy"><h1>That's it. Say "Hey Lamp."</h1><p>Start over: push a paperclip into the hole marked RESET on the back of my base, beside the round POWER button, and hold it for 5 seconds. Do setup again: say "Lamp, let's redo the setup." Clear what I remember: say "Forget everything."</p></div>
   </section>
 
   <button class="tap prev" id="tapPrev" aria-label="Previous page"></button>
