@@ -2523,7 +2523,7 @@ exec sleep 30"#,
     /// The known person's own voice: their kept prints against the bar, one
     /// person at a time, each line once, at most `OWNER_PRINTS`.
     #[test]
-    fn the_owner_voice_judges_against_their_own_prints_only() {
+    fn the_owners_voice_judges_against_their_own_prints_only() {
         let owner = OwnerVoice::new(0.5);
         assert_eq!(owner.judge("a", &[1.0, 0.0]), Confirmed::Unknown);
         // Against the mean of their prints, each of unit length: prints at
