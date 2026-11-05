@@ -5,6 +5,7 @@ use crate::catalog::{self, FACEBOOK_VERSION, Method};
 use crate::mail::{self, MailAsk, MailItem};
 use crate::store::Entry;
 use serde_json::{Map, Value, json};
+use std::ops::RangeInclusive;
 
 /// The most a tool's whole answer line may be: the voice carries a result
 /// to its model only under `lamp_gemini::MAX_TOOL_JSON_BYTES` (4 KB), and
@@ -551,8 +552,132 @@ pub fn about(name: &str) -> String {
 /// Keys whose values are ids, never read for security text.
 const ID_KEYS: &[&str] = &["id", "parent"];
 
-/// Every text in `value`, its keys and ids aside, one per line: what a
-/// security check reads of an item.
+/// Keys naming a time, besides those ending in `Time`, `_time` or `_at`
+/// (Drive's `modifiedTime`, a calendar event's `start.dateTime`).
+const TIME_KEYS: &[&str] = &["date", "dateTime", "created", "updated", "start", "end"];
+
+/// Whether `key` names a time ([`TIME_KEYS`]).
+fn time_key(key: &str) -> bool {
+    TIME_KEYS.contains(&key)
+        || key.ends_with("Time")
+        || key.ends_with("_time")
+        || key.ends_with("_at")
+}
+
+/// Whether `text` is wholly a time, each part in its range: an RFC 3339
+/// date (`2026-11-05`) or date-time (`2026-11-04T10:15:30.123Z`,
+/// `2026-11-05T09:00:00+07:00`), or a mail's RFC 5322 date (`Tue, 03 Nov
+/// 2026 10:15:30 +0700`). Such a time is never a code.
+fn is_time(text: &str) -> bool {
+    is_rfc3339(text) || is_rfc5322(text)
+}
+
+/// A mail's date as its `Date` field writes it: `[Day,] D Mon YYYY
+/// HH:MM[:SS] ±HHMM [(Zone)]`, or `GMT`/`UT`/`UTC` for the offset.
+fn is_rfc5322(text: &str) -> bool {
+    const DAYS: &[&str] = &["Mon,", "Tue,", "Wed,", "Thu,", "Fri,", "Sat,", "Sun,"];
+    const MONTHS: &[&str] = &[
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let digits = |part: Option<&str>, lens: RangeInclusive<usize>, most: RangeInclusive<u32>| {
+        part.is_some_and(|part| {
+            lens.contains(&part.len())
+                && part.bytes().all(|c| c.is_ascii_digit())
+                && part.parse::<u32>().is_ok_and(|n| most.contains(&n))
+        })
+    };
+    let mut parts: Vec<&str> = text.split_whitespace().collect();
+    if parts.first().is_some_and(|day| DAYS.contains(day)) {
+        parts.remove(0);
+    }
+    if let Some(zone) = parts.get(5) {
+        let name = zone
+            .strip_prefix('(')
+            .and_then(|zone| zone.strip_suffix(')'));
+        if parts.len() != 6
+            || !name.is_some_and(|name| {
+                (2..=5).contains(&name.len()) && name.bytes().all(|c| c.is_ascii_uppercase())
+            })
+        {
+            return false;
+        }
+    }
+    let [day, month, year, clock, zone, ..] = parts[..] else {
+        return false;
+    };
+    let clock: Vec<&str> = clock.split(':').collect();
+    let offset = zone.strip_prefix(['+', '-']).is_some_and(|hhmm| {
+        hhmm.len() == 4
+            && digits(hhmm.get(..2), 2..=2, 0..=23)
+            && digits(hhmm.get(2..), 2..=2, 0..=59)
+    });
+    digits(Some(day), 1..=2, 1..=31)
+        && MONTHS.contains(&month)
+        && digits(Some(year), 4..=4, 0..=9999)
+        && (2..=3).contains(&clock.len())
+        && digits(Some(clock[0]), 2..=2, 0..=23)
+        && clock[1..]
+            .iter()
+            .all(|part| digits(Some(part), 2..=2, 0..=59))
+        && (offset || ["GMT", "UT", "UTC"].contains(&zone))
+}
+
+/// An RFC 3339 date or date-time ([`is_time`]).
+fn is_rfc3339(text: &str) -> bool {
+    let b = text.as_bytes();
+    let num = |from: usize, len: usize| -> Option<u32> {
+        let part = b.get(from..from + len)?;
+        part.iter()
+            .all(u8::is_ascii_digit)
+            .then(|| part.iter().fold(0, |n, d| n * 10 + u32::from(d - b'0')))
+    };
+    let date = num(0, 4).is_some()
+        && b.get(4) == Some(&b'-')
+        && num(5, 2).is_some_and(|month| (1..=12).contains(&month))
+        && b.get(7) == Some(&b'-')
+        && num(8, 2).is_some_and(|day| (1..=31).contains(&day));
+    if !date {
+        return false;
+    }
+    if b.len() == 10 {
+        return true;
+    }
+    let clock = b.get(10) == Some(&b'T')
+        && num(11, 2).is_some_and(|hour| hour <= 23)
+        && b.get(13) == Some(&b':')
+        && num(14, 2).is_some_and(|minute| minute <= 59)
+        && b.get(16) == Some(&b':')
+        && num(17, 2).is_some_and(|second| second <= 60);
+    if !clock {
+        return false;
+    }
+    let mut at = 19;
+    if b.get(at) == Some(&b'.') {
+        let digits = b[at + 1..]
+            .iter()
+            .take_while(|c| c.is_ascii_digit())
+            .count();
+        if !(1..=9).contains(&digits) {
+            return false;
+        }
+        at += 1 + digits;
+    }
+    match &b[at..] {
+        [b'Z'] => true,
+        [b'+' | b'-', ..] => {
+            b.len() == at + 6
+                && num(at + 1, 2).is_some_and(|hour| hour <= 23)
+                && b[at + 3] == b':'
+                && num(at + 4, 2).is_some_and(|minute| minute <= 59)
+        }
+        _ => false,
+    }
+}
+
+/// Every text in `value`, its keys, ids and times aside, one per line: what
+/// a security check reads of an item. A time field ([`time_key`]) holding
+/// only a time ([`is_time`]) is passed over, so a file's `modifiedTime`
+/// ("04T10", letters and digits) is never read as a code.
 fn texts_of(value: &Value, out: &mut String) {
     match value {
         Value::String(text) => {
@@ -563,6 +688,7 @@ fn texts_of(value: &Value, out: &mut String) {
         Value::Object(object) => object
             .iter()
             .filter(|(key, _)| !ID_KEYS.contains(&key.as_str()))
+            .filter(|(key, item)| !(time_key(key) && item.as_str().is_some_and(is_time)))
             .for_each(|(_, item)| texts_of(item, out)),
         _ => {}
     }
@@ -603,7 +729,7 @@ pub fn group_of(item: &Value) -> Option<String> {
 /// ("Your verification code is") an item with a code or a link goes, so a
 /// code split across blocks, messages or pieces is never quoted either.
 /// Only the items that make it are left out ("Lunch at noon?" beside "Code:
-/// 482913" stays). Separate mails or events, with no group, are never
+/// 482913" stays). Separate mails, events or Drive files, with no group, are never
 /// joined.
 fn without_security(items: Vec<(Option<String>, Value)>, left_out: &str) -> Vec<Value> {
     let texts: Vec<String> = items
@@ -697,9 +823,11 @@ pub fn quoted(name: &str, items: Vec<Value>) -> Value {
 pub const ANSWER: &str = "answer";
 
 /// Whether the service `name`'s items are each their own, never read
-/// joined however they come: Gmail's mails and Google Calendar's events.
+/// joined however they come: Gmail's mails, Google Calendar's events and
+/// Google Drive's files (one file left out never takes the others listed
+/// with it).
 fn kept_apart(name: &str) -> bool {
-    ["gmail", "google_calendar"]
+    ["gmail", "google_calendar", "google_drive"]
         .iter()
         .filter_map(|code| catalog::service(code))
         .any(|service| service.name == name)
@@ -1153,5 +1281,196 @@ mod tests {
         };
         assert_eq!(mail_item(&plain)["subject"], "Dinner");
         assert_eq!(rfc3339(1_793_664_000), "2026-11-03T00:00:00Z");
+    }
+
+    /// The names of `quoted`'s items, "-" for one left out.
+    fn names(quoted: &Value, key: &str) -> Vec<String> {
+        quoted["quoted"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| {
+                item.get(key)
+                    .and_then(Value::as_str)
+                    .unwrap_or("-")
+                    .to_owned()
+            })
+            .collect()
+    }
+
+    /// lamp-9adf, 5 Nov: a made skill reading the owner's latest Drive
+    /// files, no query, got none: each `modifiedTime` was read as a code
+    /// ("04T10" letters and digits), and a file left out took the others
+    /// listed with it.
+    #[test]
+    fn a_drive_listings_times_are_no_code_and_each_file_is_its_own() {
+        let file = |name: &str, time: Option<&str>| {
+            let mut file = json!({
+                "id": format!("id-{name}"),
+                "name": name,
+                "mimeType": "application/vnd.google-apps.document",
+                "owners": [{"displayName": "Owner"}],
+            });
+            if let Some(time) = time {
+                file["modifiedTime"] = json!(time);
+            }
+            file
+        };
+        let listing = |files: Vec<Value>| {
+            quoted(
+                "Google Drive",
+                items(&json!({ "files": files }).to_string()),
+            )
+        };
+        let plain = ["Q4 plan", "Trip notes", "Budget 2026"];
+        let times = [
+            "2026-11-04T10:15:30.123Z",
+            "2026-11-03T08:00:00Z",
+            "2026-11-01T23:59:59+07:00",
+        ];
+        let three: Vec<Value> = plain
+            .iter()
+            .zip(times)
+            .map(|(name, time)| file(name, Some(time)))
+            .collect();
+        assert_eq!(names(&listing(three.clone()), "name"), plain);
+        // Code words in names, with times: only the file's own words judge it.
+        let worded: Vec<Value> = ["Code review notes", "Token design", "Barcode labels"]
+            .iter()
+            .zip(times)
+            .map(|(name, time)| file(name, Some(time)))
+            .collect();
+        assert_eq!(
+            names(&listing(worded), "name"),
+            ["Code review notes", "Token design", "Barcode labels"]
+        );
+        // A file the filter leaves out by its own name never takes the
+        // others, with its time or without.
+        for time in [Some("2026-11-02T09:00:00Z"), None] {
+            let mut files = three.clone();
+            files.insert(1, file("Verification code backup", time));
+            assert_eq!(
+                names(&listing(files), "name"),
+                ["Q4 plan", "-", "Trip notes", "Budget 2026"],
+                "{time:?}"
+            );
+        }
+        // A file missing its time drops nothing.
+        let mut files = three.clone();
+        files.insert(1, file("Old draft", None));
+        assert_eq!(
+            names(&listing(files), "name"),
+            ["Q4 plan", "Old draft", "Trip notes", "Budget 2026"]
+        );
+        // A real code in a file's name still goes.
+        let mut files = three;
+        files.push(file("Your verification code is 482913", Some(times[0])));
+        let result = listing(files);
+        assert!(!result.to_string().contains("482913"), "{result}");
+        assert_eq!(names(&result, "name")[3], "-");
+    }
+
+    #[test]
+    fn a_calendar_events_times_are_no_code() {
+        let event = |summary: &str, start: &str, end: &str| {
+            json!({
+                "id": "e",
+                "summary": summary,
+                "created": "2026-10-30T04:12:09.000Z",
+                "updated": "2026-10-31T05:01:44.123Z",
+                "start": {"dateTime": start, "timeZone": "Asia/Ho_Chi_Minh"},
+                "end": {"dateTime": end, "timeZone": "Asia/Ho_Chi_Minh"},
+            })
+        };
+        let events = quoted(
+            "Google Calendar",
+            vec![
+                event(
+                    "Code review",
+                    "2026-11-05T09:00:00+07:00",
+                    "2026-11-05T10:00:00+07:00",
+                ),
+                event(
+                    "Pick up the PIN pad",
+                    "2026-11-05T11:00:00+07:00",
+                    "2026-11-05T11:30:00+07:00",
+                ),
+                event(
+                    "Token sale call",
+                    "2026-11-05T14:00:00+07:00",
+                    "2026-11-05T15:00:00+07:00",
+                ),
+            ],
+        );
+        // "PIN" alone is the filter's own word; the others stay.
+        assert_eq!(
+            names(&events, "summary"),
+            ["Code review", "-", "Token sale call"]
+        );
+        // A code in an event still goes.
+        let code = quoted(
+            "Google Calendar",
+            vec![event(
+                "Your verification code is 482913",
+                "2026-11-05T09:00:00+07:00",
+                "2026-11-05T10:00:00+07:00",
+            )],
+        );
+        assert_eq!(code["quoted"][0], mail::SECURITY_MESSAGE_LEFT_OUT);
+    }
+
+    /// A text that only looks like a time, in a field that is no time, is
+    /// still read: a code is never hidden from the filter in one.
+    #[test]
+    fn only_a_time_field_is_passed_over() {
+        let slack = quoted(
+            "Slack",
+            vec![
+                json!({"text":"Your verification code is","channel":"C1"}),
+                json!({"text":"2026-11-04T10:15:30Z","channel":"C1"}),
+            ],
+        );
+        assert_eq!(names(&slack, "text"), ["-", "-"], "{slack}");
+        // A value out of a time's ranges is no time, in any field.
+        let drive = quoted(
+            "Google Drive",
+            vec![json!({"name":"Code","modifiedTime":"2026-11-04T48:29:13Z"})],
+        );
+        assert_eq!(names(&drive, "name"), ["-"], "{drive}");
+        assert!(!is_time("482913T0Z"));
+        assert!(!is_time("2026-11-04T48:29:13Z"));
+        assert!(is_time("2026-11-04T10:15:30.123Z"));
+        assert!(is_time("2026-11-05T09:00:00+07:00"));
+        assert!(is_time("2026-11-05"));
+        assert!(is_time("Tue, 03 Nov 2026 10:15:30 +0700"));
+        assert!(is_time("3 Nov 2026 10:15 -0500 (EST)"));
+        assert!(is_time("Tue, 03 Nov 2026 10:15:30 GMT"));
+        assert!(!is_time("Tue, 03 Nov 2026 48:29:13 +0700"));
+        assert!(!is_time("Tue, 03 Nov 2026 10:15:30 +0700 (code 482913)"));
+        assert!(!is_time("Your code is 482913"));
+    }
+
+    /// A mail's `Date` field ("2026 10" read as six digits) is no code
+    /// beside "Code review"; a code in its body still goes.
+    #[test]
+    fn a_mails_date_is_no_code() {
+        let mail = |subject: &str, text: &str| {
+            mail_item(&MailItem {
+                id: "1".into(),
+                from: "Ana <ana@example.com>".into(),
+                subject: subject.into(),
+                date: "Tue, 03 Nov 2026 10:15:30 +0700".into(),
+                text: text.into(),
+            })
+        };
+        let mails = quoted(
+            "Gmail",
+            vec![
+                mail("Code review", "See you at the review"),
+                mail("Hi", "Your verification code is 482913"),
+            ],
+        );
+        assert_eq!(mails["quoted"][0]["subject"], "Code review", "{mails}");
+        assert_eq!(mails["quoted"][1], mail::SECURITY_LEFT_OUT);
     }
 }

@@ -577,14 +577,18 @@ Mọi mục của mỗi lần đọc đều được kiểm tra (`reads::quoted`
 người gửi, tiêu đề và nội dung, mọi mục khác (một tin nhắn Slack, một trang
 Notion, một file Drive, một sự kiện lịch, một mục GitHub hay Linear, từng mảnh
 câu trả lời của một tool MCP) theo mọi đoạn văn bản trong nó trừ `id` và
-`parent`. Các mục cùng một nhóm còn được đọc cùng hai mục kế tiếp
+`parent`. Một trường thời gian chỉ chứa một thời điểm (`modifiedTime`,
+`createdTime` hay `start.dateTime` của sự kiện theo RFC 3339, hoặc `date`
+của thư theo RFC 5322) không bao giờ bị đọc thành mã (`reads::is_time`).
+Các mục cùng một nhóm còn được đọc cùng hai mục kế tiếp
 (`reads::without_security`): một nhóm là thứ mà lần đọc cho biết chúng cùng
 thuộc về (`reads::group_of`: `channel`, `channel_id`, `thread_ts`,
 `threadId`, `thread_id`, `parent`, `page_id`); các mục mà lần đọc không nêu nhóm thì cùng một nhóm với phần
 còn lại của câu trả lời (lịch sử một kênh chỉ nêu kênh một lần ở đầu, không
 nêu ở từng tin nhắn: `reads::ANSWER`), cũng như toàn bộ văn bản thuần của
-một câu trả lời MCP; chỉ các thư Gmail và các sự kiện Google Calendar là
-riêng từng cái và không bao giờ được nối (`kept_apart`). Hai mục
+một câu trả lời MCP; chỉ các thư Gmail, các sự kiện Google Calendar và các
+file Google Drive là riêng từng cái và không bao giờ được nối (`kept_apart`),
+nên một file bị bỏ ra không bao giờ kéo theo các file khác trong danh sách. Hai mục
 riêng thì ổn nhưng nối lại là nội dung bảo mật thì cả hai bị bỏ ra, hai đầu
 của ba mục cũng vậy khi chúng là như thế ("Your code", "is", "482913" giữ
 "is"); bên cạnh một nội dung bảo mật không có mã hay đường dẫn của riêng nó
