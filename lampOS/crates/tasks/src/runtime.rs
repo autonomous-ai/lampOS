@@ -994,6 +994,23 @@ fn owner<C: Clock>(
                                 if found.sign_in != Some(sign_in) {
                                     eprintln!("tasks: Harness signed in: {}", sign_in.name());
                                 }
+                                // The first read of this run says signed in:
+                                // Harness's daemon is started, as after a
+                                // sign-in, with the same tries. The onboarding
+                                // install puts Harness on with no daemon at
+                                // boot, so a signed-in lamp had none after a
+                                // reboot (lamp-c0a4, 5 Nov, #5379).
+                                if found.sign_in.is_none()
+                                    && sign_in_starter.is_some()
+                                    && start_daemon_due.is_none()
+                                    && matches!(sign_in, SignIn::In | SignIn::Offline)
+                                {
+                                    eprintln!(
+                                        "tasks: Harness signed in at this start: its daemon is started (#5379)"
+                                    );
+                                    start_daemon_due = Some(Instant::now());
+                                    daemon_tries = 0;
+                                }
                                 found.sign_in = Some(sign_in);
                             }
                             // Kept as it was: one failed read says nothing
