@@ -15,14 +15,17 @@
 use super::*;
 
 /// One line: when it began after the first (ms), how long it was (ms),
-/// what was heard, the lamp's answer if let out, and whether it began over
-/// the lamp's answer.
+/// what was heard, the lamp's answer if let out, whether it began over
+/// the lamp's answer, and the faces the eyes saw through it, each with
+/// whether it read speaking (none: no look at all, as with the eyes off).
+#[derive(Clone, Copy)]
 struct Line {
     at: u64,
     long: u64,
     heard: &'static str,
     answer: &'static str,
     over: bool,
+    faces: &'static [(&'static str, bool)],
 }
 
 const fn line(at: u64, long: u64, heard: &'static str, answer: &'static str) -> Line {
@@ -32,6 +35,7 @@ const fn line(at: u64, long: u64, heard: &'static str, answer: &'static str) -> 
         heard,
         answer,
         over: false,
+        faces: &[],
     }
 }
 
@@ -52,6 +56,88 @@ fn run_grace(lines: &[Line]) -> Vec<bool> {
 }
 
 fn play(held: bool, grace: bool, lines: &[Line]) -> Vec<bool> {
+    play_seen(
+        Switches {
+            held,
+            grace,
+            ..Switches::default()
+        },
+        lines,
+    )
+}
+
+/// The switches a run plays with, and whether the eyes' speaking faces are
+/// read (each line's [`Line::faces`]).
+#[derive(Clone, Copy, Default)]
+struct Switches {
+    held: bool,
+    grace: bool,
+    /// `LAMP_UNTIED_CALLER_SPEAKING=on` (#5124's lever (a)).
+    speaking: bool,
+    eyes: bool,
+}
+
+/// Off, `held`, `held` with the grace, with the caller seen speaking, and
+/// with both, all with the eyes read.
+const OFF: Switches = Switches {
+    held: false,
+    grace: false,
+    speaking: false,
+    eyes: true,
+};
+const HELD: Switches = Switches { held: true, ..OFF };
+const GRACE: Switches = Switches {
+    grace: true,
+    ..HELD
+};
+const SPEAKING: Switches = Switches {
+    speaking: true,
+    ..HELD
+};
+const BOTH: Switches = Switches {
+    grace: true,
+    ..SPEAKING
+};
+
+/// One frame of the eyes: each face, speaking (`Yes`) or still (`No`),
+/// turned to the lamp.
+fn frame(faces: &[(&str, bool)]) -> lamp_msgs::Faces {
+    use lamp_msgs::{Face, Speaking, SpeakingState};
+    lamp_msgs::Faces {
+        faces: faces
+            .iter()
+            .enumerate()
+            .map(|(index, (id, speaking))| Face {
+                id: (*id).to_owned(),
+                xmin: 0.1 + 0.4 * index as f32,
+                ymin: 0.2,
+                xmax: 0.3 + 0.4 * index as f32,
+                ymax: 0.5,
+                confidence: 1.0,
+                yaw: None,
+                facing: Some(true),
+                speaking: Some(Speaking {
+                    state: if *speaking {
+                        SpeakingState::Yes
+                    } else {
+                        SpeakingState::No
+                    },
+                    score: 0.9,
+                    from: None,
+                }),
+                follows: None,
+            })
+            .collect(),
+    }
+}
+
+fn play_seen(switches: Switches, lines: &[Line]) -> Vec<bool> {
+    let Switches {
+        held,
+        grace,
+        speaking,
+        eyes: read_eyes,
+    } = switches;
     let _one = crate::provider_worker::tests::one_thread();
     let _clock =
         crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
@@ -70,6 +156,14 @@ fn play(held: bool, grace: bool, lines: &[Line]) -> Vec<bool> {
     if grace {
         heeding.granting_answer_grace();
     }
+    if speaking {
+        heeding.keeping_the_callers_speaking_face();
+    }
+    let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+    if read_eyes {
+        heeding.seeing_speaking_faces(eyes.clone(), None);
+    }
+    let mut seq = 0;
     let mut answered: Vec<(u64, &str, &str, u64)> = Vec::new();
     let mut was = 0;
     let mut out = Vec::new();
@@ -93,6 +187,20 @@ fn play(held: bool, grace: bool, lines: &[Line]) -> Vec<bool> {
         }
         *crate::thread::THREAD.lock().unwrap() = thread;
         heeding.called_at = heeding.called_at.map(|at| at - passed);
+        // Four looks through the line, by the clock the rule reads them
+        // with (`speakers_between`); none for a line with no faces.
+        if !line.faces.is_empty() {
+            let (now, now_us) = (Instant::now(), monotonic_us());
+            let seen = frame(line.faces);
+            for look in 0..4u64 {
+                seq += 1;
+                let at_us = said.0 + (said.1 - said.0) * (2 * look + 1) / 8;
+                eyes.look(
+                    now - Duration::from_micros(now_us - at_us),
+                    Some((("b", seq), &seen)),
+                );
+            }
+        }
         heeding.hear(
             request,
             crate::second_provider::Heard::Began {
@@ -418,52 +526,55 @@ fn held_keeps_a_callers_line_whose_name_was_written_as_another_word() {
     }
 }
 
+/// #4175's busy_day on lamp-c0a4 (3 Nov): c01-c03, d11, d12, c04-c06.
+const BUSY_DAY: [Line; 8] = [
+    line(
+        0,
+        1_800,
+        "Lamp, I had a really long day today.",
+        "Long ones wear on you. Want to tell me what made it long?",
+    ),
+    line(
+        6_300,
+        2_800,
+        "Yeah. My boss moved our deadline up by a whole week.",
+        "A whole week is a lot to swallow at once.",
+    ),
+    line(
+        14_100,
+        3_000,
+        "I don't know. I'll probably just work late tomorrow.",
+        "That's one way to hold it together.",
+    ),
+    line(
+        21_100,
+        2_500,
+        "Do you want coffee? I'm going downstairs.",
+        "I can't get coffee.",
+    ),
+    line(24_100, 1_800, "Yes please, a latte, no sugar.", "Noted."),
+    line(
+        27_900,
+        1_600,
+        "Maybe. What would you do?",
+        "I'd ask which part of the week really moved.",
+    ),
+    line(
+        36_000,
+        3_000,
+        "That's a good idea. Any tips to sleep better tonight?",
+        "Keep the room cool and dark.",
+    ),
+    line(44_000, 2_200, "Thanks. You're a good listener.", "Anytime."),
+];
+
 /// #5124 (busy_day, #4175's 3+3 on lamp-c0a4, 3 Nov): the caller talks
 /// with the lamp (c01-c03), two colleagues talk at the desk (d11, d12), and
 /// the caller goes on (c04-c06). Timed as if each caller line were
 /// answered, the kindest case for the rule. Off answers them; does `held`?
 #[test]
 fn busy_day_callers_lines_after_desk_talk() {
-    let day = [
-        line(
-            0,
-            1_800,
-            "Lamp, I had a really long day today.",
-            "Long ones wear on you. Want to tell me what made it long?",
-        ),
-        line(
-            6_300,
-            2_800,
-            "Yeah. My boss moved our deadline up by a whole week.",
-            "A whole week is a lot to swallow at once.",
-        ),
-        line(
-            14_100,
-            3_000,
-            "I don't know. I'll probably just work late tomorrow.",
-            "That's one way to hold it together.",
-        ),
-        line(
-            21_100,
-            2_500,
-            "Do you want coffee? I'm going downstairs.",
-            "I can't get coffee.",
-        ),
-        line(24_100, 1_800, "Yes please, a latte, no sugar.", "Noted."),
-        line(
-            27_900,
-            1_600,
-            "Maybe. What would you do?",
-            "I'd ask which part of the week really moved.",
-        ),
-        line(
-            36_000,
-            3_000,
-            "That's a good idea. Any tips to sleep better tonight?",
-            "Keep the room cool and dark.",
-        ),
-        line(44_000, 2_200, "Thanks. You're a good listener.", "Anytime."),
-    ];
+    let day = BUSY_DAY;
     let off = run(false, &day);
     let held = run(true, &day);
     let grace = run_grace(&day);
@@ -481,11 +592,9 @@ fn busy_day_callers_lines_after_desk_talk() {
     );
 }
 
-/// #5124's pass 2: the grace takes no room line. Every desk line these
-/// tests hold under `held` stays held with the grace too, the ones begun
-/// within its 3 s among them, and the caller's lines `held` keeps stay kept.
-#[test]
-fn the_grace_takes_no_room_line() {
+/// The room lines `the_grace_takes_no_room_line` plays, each set's last
+/// line a desk line after the caller's.
+fn grace_room_sets() -> Vec<Vec<Line>> {
     let after_tired = [
         TIRED,
         line(
@@ -528,6 +637,15 @@ fn the_grace_takes_no_room_line() {
     ] {
         sets.push(vec![LONDON, line(at, 2_400, desk, "Okay.")]);
     }
+    sets
+}
+
+/// #5124's pass 2: the grace takes no room line. Every desk line these
+/// tests hold under `held` stays held with the grace too, the ones begun
+/// within its 3 s among them, and the caller's lines `held` keeps stay kept.
+#[test]
+fn the_grace_takes_no_room_line() {
+    let sets = grace_room_sets();
     let mut room = (0, 0);
     for lines in &sets {
         let (held, grace) = (run(true, lines), run_grace(lines));
@@ -567,4 +685,314 @@ fn the_grace_is_one_line_an_answer_and_three_seconds() {
         },
     ];
     assert_eq!(run_grace(&over), [true, false], "over the answer");
+}
+
+/// The grace keeps no line the eyes saw another face than the caller's
+/// speaking, and no question, a full-width '？' too (the reviewer-lead's P2
+/// and P3 on #5423). The call is seen spoken by the caller's face, f1; a
+/// statement begun 2 s after the answer is kept with no face seen, and held
+/// with a colleague's face, or the caller's still and a colleague's
+/// speaking.
+#[test]
+fn the_grace_keeps_no_line_another_face_speaks_and_no_question() {
+    let quiet = "I don't know. I'll probably just work late tomorrow.";
+    let call = Line {
+        faces: CALLER_SPEAKS,
+        ..LONDON
+    };
+    let after = |heard, faces| {
+        [
+            call,
+            Line {
+                faces,
+                ..line(6_800, 2_400, heard, "Okay.")
+            },
+        ]
+    };
+    let grace = |lines: &[Line]| play_seen(GRACE, lines);
+    assert_eq!(grace(&after(quiet, NO_FACE)), [true, true], "no face seen");
+    assert_eq!(
+        grace(&after(quiet, B_SPEAKS)),
+        [true, false],
+        "another face"
+    );
+    assert_eq!(
+        grace(&after(quiet, CALLER_STILL_B_SPEAKS)),
+        [true, false],
+        "the caller's face still, another speaking"
+    );
+    for question in [
+        "Will you finish the report tonight?",
+        "Will you finish the report tonight？",
+    ] {
+        assert_eq!(
+            grace(&after(question, NO_FACE)),
+            [true, false],
+            "a question: {question}"
+        );
+    }
+}
+
+/// No look through a line: no reading, or only stale ones from before it.
+const NO_FACE: &[(&str, bool)] = &[];
+/// The caller's face, f1, read speaking through a line.
+const CALLER_SPEAKS: &[(&str, bool)] = &[("f1", true)];
+/// A colleague's face read speaking, and no other face in view.
+const B_SPEAKS: &[(&str, bool)] = &[("f2", true)];
+const C_SPEAKS: &[(&str, bool)] = &[("f3", true)];
+/// The caller's face in view and turned to the lamp, read still, while a
+/// colleague's face speaks.
+const CALLER_STILL_B_SPEAKS: &[(&str, bool)] = &[("f1", false), ("f2", true)];
+/// The caller's face in view and turned to the lamp, read still, and no
+/// face speaking: a voice from off the picture.
+const CALLER_STILL: &[(&str, bool)] = &[("f1", false)];
+
+/// `lines` with the eyes' faces: the caller's seen speaking each line
+/// but those at `desk`, which show `desk_faces` (none: no look through
+/// them, as with no reading or only stale ones from earlier lines).
+fn seen(lines: &[Line], desk: &[usize], desk_faces: &'static [(&'static str, bool)]) -> Vec<Line> {
+    lines
+        .iter()
+        .enumerate()
+        .map(|(index, line)| Line {
+            faces: if desk.contains(&index) {
+                desk_faces
+            } else {
+                CALLER_SPEAKS
+            },
+            ..*line
+        })
+        .collect()
+}
+
+/// #5124's lever (a), failing first: busy_day with the eyes, the caller's
+/// face seen speaking c01-c06 and the colleagues' faces d11 and d12. With
+/// `held` and the grace, c04-c06 after the desk talk are still held; with
+/// `LAMP_UNTIED_CALLER_SPEAKING` too, all eight are as they should be:
+/// every caller line answered, both desk lines held.
+#[test]
+fn busy_day_the_callers_face_seen_speaking_keeps_the_tie() {
+    let mut day = seen(&BUSY_DAY, &[3], B_SPEAKS);
+    day[4].faces = C_SPEAKS;
+    let [off, held, grace, speaking, both] =
+        [OFF, HELD, GRACE, SPEAKING, BOTH].map(|switches| play_seen(switches, &day));
+    let right = [true, true, true, false, false, true, true, true];
+    let count = |out: &[bool]| out.iter().zip(&right).filter(|(a, b)| a == b).count();
+    eprintln!(
+        "BUSY_DAY_SEEN off={off:?} held={held:?} grace={grace:?} speaking={speaking:?} both={both:?} right: off {} held {} grace {} speaking {} both {} of 8",
+        count(&off),
+        count(&held),
+        count(&grace),
+        count(&speaking),
+        count(&both)
+    );
+    assert_eq!(off, [true; 8], "off answers every line");
+    assert_eq!(both, right, "held, the grace and the caller seen speaking");
+}
+
+/// #5124's pass 2 for lever (a): no room line is taken. Every desk line of
+/// busy_day and of #5110's quiet-room sets (the grace's, `held_still_holds_
+/// desk_talk`'s desk1, desk talk before a reply or a thank-you, a question
+/// of a colleague's own, a set-off word before desk talk), with the eyes
+/// showing only the desk speaker's face speaking, no face read, the
+/// caller's face in view but still while another face speaks, or the
+/// caller's face still and no face speaking: each held under `held` stays
+/// held with both levers, and the caller's lines `held` keeps stay kept.
+#[test]
+fn the_callers_face_speaking_takes_no_room_line() {
+    let busy_day: Vec<(Vec<Line>, Vec<usize>)> = vec![(BUSY_DAY.into(), vec![3, 4])];
+    let mut quiet: Vec<(Vec<Line>, Vec<usize>)> = grace_room_sets()
+        .into_iter()
+        .map(|lines| {
+            let desk = (1..lines.len()).collect();
+            (lines, desk)
+        })
+        .collect();
+    let desk1 = [
+        line(
+            0,
+            1_800,
+            "Lamp, what's the weather in Saigon?",
+            "It's sunny in Saigon, about thirty-three degrees.",
+        ),
+        Line {
+            over: true,
+            ..line(
+                6_000,
+                2_000,
+                "Did you send the slides to Sam yet?",
+                "I hope so.",
+            )
+        },
+        line(
+            9_000,
+            1_800,
+            "Not yet, I'll do it after lunch.",
+            "Enjoy lunch.",
+        ),
+        line(
+            12_000,
+            2_000,
+            "Are you coming to the meeting at four?",
+            "No meeting for me.",
+        ),
+        line(
+            15_000,
+            2_000,
+            "I think so, but I might be a bit late.",
+            "No rush.",
+        ),
+        line(
+            18_000,
+            2_000,
+            "Can you pass me the charger? The white one.",
+            "I can't.",
+        ),
+    ];
+    quiet.push((desk1.into(), (1..6).collect()));
+    quiet.push((
+        vec![
+            TIRED,
+            line(
+                8_000,
+                2_000,
+                "Did you send the slides to Sam yet?",
+                "I hope the slides went well.",
+            ),
+            line(
+                11_000,
+                1_200,
+                "That's a good idea, I'll try it tonight.",
+                "Glad you think so.",
+            ),
+        ],
+        vec![1, 2],
+    ));
+    quiet.push((
+        vec![
+            CALM,
+            line(
+                7_000,
+                1_800,
+                "Can you pass me the charger? The white one.",
+                "I can't pass things.",
+            ),
+            line(9_500, 1_500, "Thanks, you're a star.", "Any time."),
+        ],
+        vec![1, 2],
+    ));
+    for desk in [
+        "Nice. And what was your sister's name again?",
+        "Sam, what was my sister's name again?",
+    ] {
+        quiet.push((
+            vec![SISTER, COOK, line(12_000, 2_400, desk, "Lan.")],
+            vec![2],
+        ));
+    }
+    for desk in [
+        "Ma'am, did you send the slides to Sam yet?",
+        "Look, did you send the slides to Sam yet?",
+    ] {
+        quiet.push((
+            vec![LONDON, line(6_800, 2_400, desk, "I hope so.")],
+            vec![1],
+        ));
+    }
+    for (name, sets) in [("busy_day", &busy_day), ("quiet_room", &quiet)] {
+        for (reading, desk_faces) in [
+            ("desk_face", B_SPEAKS),
+            ("no_face", NO_FACE),
+            ("caller_still_desk_face", CALLER_STILL_B_SPEAKS),
+            ("caller_still", CALLER_STILL),
+        ] {
+            let (mut room, mut taken) = (0, 0);
+            for (lines, desk) in sets {
+                let lines = seen(lines, desk, desk_faces);
+                let (held, both) = (play_seen(HELD, &lines), play_seen(BOTH, &lines));
+                for (index, (held, both)) in held.iter().zip(&both).enumerate() {
+                    if desk.contains(&index) {
+                        assert!(!held, "held let out a desk line: {:?}", lines[index].heard);
+                        room += 1;
+                        taken += usize::from(*both);
+                    } else if *held {
+                        assert!(*both, "a caller's line lost: {:?}", lines[index].heard);
+                    }
+                }
+                assert!(
+                    desk.iter().all(|index| !both[*index]),
+                    "{name} {reading}: a room line taken in {:?}",
+                    lines.iter().map(|line| line.heard).collect::<Vec<_>>()
+                );
+            }
+            eprintln!("ROOM_LINES_SEEN {name} {reading}: held={room} taken={taken}");
+            assert_eq!(taken, 0);
+        }
+    }
+}
+
+/// The guards `callers_own_line` reads before the caller's face: a sure
+/// other voice, desk talk and a reply naming someone are not the caller's
+/// with their face seen speaking; nor a face in view but still, two faces
+/// speaking, or the switch off. A question seen spoken by the caller's
+/// face is theirs.
+#[test]
+fn the_callers_face_speaking_yields_to_the_guards() {
+    let _one = crate::provider_worker::tests::one_thread();
+    // No answer in the thread, so nothing but the face can keep a line.
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    let mut heeding = Heeding::new(true, true, None, None);
+    heeding.holding_untied();
+    heeding.caller_faces = vec!["b/f1".to_owned()];
+    let seen = |heard: &str, speakers: &[&str], other_voice| Seen {
+        room: crate::room_told::Room::Quiet,
+        going_on: true,
+        turned: None,
+        busy: false,
+        lamp_asked: false,
+        speakers: speakers.iter().map(|face| (*face).to_owned()).collect(),
+        turned_speakers: Vec::new(),
+        heard: heard.to_owned(),
+        named_faced: false,
+        other_voice,
+        same_voice: false,
+        likeness: None,
+    };
+    let kept = Some(crate::untied_going_on::CALLER_SPEAKING_KEPT);
+    let question = "Maybe. What would you do?";
+    assert_eq!(
+        heeding.callers_own_line(9, &seen(question, &["b/f1"], false), false),
+        None,
+        "the switch off"
+    );
+    heeding.keeping_the_callers_speaking_face();
+    assert_eq!(
+        heeding.callers_own_line(9, &seen(question, &["b/f1"], false), false),
+        kept,
+        "a question seen spoken by the caller's face"
+    );
+    for (heard, speakers, other_voice, why) in [
+        (question, &["b/f1"][..], true, "a sure other voice"),
+        (
+            "Should I bring an umbrella, you guys?",
+            &["b/f1"][..],
+            false,
+            "desk talk",
+        ),
+        (
+            "Thanks Sam, I'll send it after lunch.",
+            &["b/f1"][..],
+            false,
+            "a reply naming someone",
+        ),
+        (question, &[][..], false, "no face seen speaking"),
+        (question, &["b/f2"][..], false, "another face"),
+        (question, &["b/f1", "b/f2"][..], false, "two faces"),
+    ] {
+        assert_eq!(
+            heeding.callers_own_line(9, &seen(heard, speakers, other_voice), false),
+            None,
+            "{why}"
+        );
+    }
 }

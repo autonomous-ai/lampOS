@@ -72,6 +72,22 @@ pub const ANSWER_GRACE: std::time::Duration = std::time::Duration::from_secs(3);
 /// What a line kept by the grace is let out as, for the journal.
 pub const GRACE_KEPT: &str = "begun within 3 s of the end of the lamp's answer to the conversation's caller, it keeps the conversation's tie by LAMP_UNTIED_ANSWER_GRACE";
 
+/// With `held`, the caller's face seen speaking (#5124, the first builder's
+/// lever (a), `LAMP_UNTIED_CALLER_SPEAKING=on`, off unless set): a line the
+/// eyes saw spoken by the conversation's caller's face, and by no other
+/// face, keeps the conversation's tie whatever its words and however long
+/// after the lamp's answer, so the caller's lines after desk talk are the
+/// caller's again. Never a face only in view, or turned to the lamp but
+/// silent: only the faces the eyes read speaking in at least half the looks
+/// through the line (`speaking_faces::SpeakingFaces::speakers`), none with
+/// no fresh look. On lamp-c0a4's busy_day (#4175's 3+3, 3 Nov), `held`
+/// held the caller's c04 to c06 after the colleagues' d11 and d12.
+pub const CALLER_SPEAKING_ENVIRONMENT: &str = "LAMP_UNTIED_CALLER_SPEAKING";
+
+/// What a line kept by the caller's face seen speaking is let out as, for
+/// the journal.
+pub const CALLER_SPEAKING_KEPT: &str = "the eyes saw the conversation's caller's face speaking it, and no other face: it keeps the conversation's tie by LAMP_UNTIED_CALLER_SPEAKING";
+
 /// What an untied line is held as, with `LAMP_UNTIED_GOING_ON=held`.
 pub const HELD: &str = "a conversation with the lamp is going on, but the line has no tie to the lamp: no reply to its question, no word of its last answer, no ask of the lamp";
 
@@ -92,6 +108,16 @@ pub fn grace() -> bool {
 }
 
 fn grace_for(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// Whether the caller's face seen speaking keeps the tie in this process's
+/// environment (`on` only, [`CALLER_SPEAKING_ENVIRONMENT`]).
+pub fn caller_speaking() -> bool {
+    caller_speaking_for(std::env::var(CALLER_SPEAKING_ENVIRONMENT).ok().as_deref())
+}
+
+fn caller_speaking_for(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
@@ -741,6 +767,15 @@ mod tests {
         assert!(!in_grace(end - 1, end), "over the answer");
         assert!(!in_grace(end, 0), "no answer played");
         assert!(!in_grace(0, end), "no start known");
+    }
+
+    /// #5124's caller seen speaking: `on` only.
+    #[test]
+    fn the_callers_face_speaking_is_on_only() {
+        assert!(caller_speaking_for(Some("on")));
+        for value in [None, Some(""), Some("off"), Some("ON"), Some("held")] {
+            assert!(!caller_speaking_for(value), "{value:?}");
+        }
     }
 
     /// #3882's desk1 lines, after the lamp's Saigon answer, show no tie.
