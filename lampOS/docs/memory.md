@@ -3659,7 +3659,20 @@ facts stay `remember`.
   that is not `HH:MM`, or `not_before` equal to `not_from` is refused with
   words the model can say, so nothing is kept half-typed. A rule without
   a limit stays text only: told to sessions, enforced by nothing. A word in
-  a mark this voice does not know is left out, not misread.
+  a mark this voice does not know is left out, not misread. A time whose
+  hour the rule's own words name after a cue ("from", "after", "past",
+  "between" for `not_from`; "until", "till", "before", "to" for
+  `not_before`) is kept at that hour, in the half of the day the words say
+  ("pm", "at night") or else the model's: on lamp-c0a4 on 5 Nov "ten at
+  night until seven" was kept with `not_from` 21:00 (#4346).
+- **Kept once, corrected in place (#4346).** A keep is read beside its
+  scope's rules first. The same rule again (the same marks, and for a rule
+  with no typed mark the same words) is answered kept and nothing is
+  written, so "no hello" said twice is one rule. A typed rule with the same
+  marks and `about` as an older one and a limit in common replaces it: the
+  new one is kept with the older one's other limits carried, then the older
+  one is forgotten as `forget_rule` would, so "ten, not nine" replaces the
+  nine and keeps its "until seven".
 - **Bounded when kept, never cut when told.** A scope keeps at most six
   rules (`rules::MOST_RULES`, so at most 1,200 bytes of rule text). A
   seventh is refused, with words for the model to say: ask which rule to

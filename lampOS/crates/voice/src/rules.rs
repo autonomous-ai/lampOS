@@ -244,7 +244,12 @@ fn typed_mark(args: &Value) -> Result<String, Value> {
         }
     };
     let (never, talking) = (flag("never")?, flag("not_while_talking")?);
-    let (before, from) = (time("not_before")?, time("not_from")?);
+    // The time the rule's own words name wins over a different hour given
+    // beside them (#4346: "Quiet from ten at night until seven." was kept
+    // with not_from 21:00, and the lamp went quiet an hour early).
+    let words = args.get("rule").and_then(Value::as_str).unwrap_or_default();
+    let before = time("not_before")?.map(|minute| as_said(minute, words, BEFORE_CUES));
+    let from = time("not_from")?.map(|minute| as_said(minute, words, FROM_CUES));
     if !never && !talking && before.is_none() && from.is_none() {
         return Ok(String::new());
     }
@@ -281,6 +286,77 @@ fn typed_mark(args: &Value) -> Result<String, Value> {
     }
     mark.push_str("] ");
     Ok(mark)
+}
+
+/// The words before the hour a rule's `not_from` names ("quiet from ten",
+/// "after ten", "between ten and seven"), and before its `not_before`'s
+/// ("until seven", "not before nine", "ten to six").
+const FROM_CUES: &[&str] = &["from", "after", "past", "between"];
+const BEFORE_CUES: &[&str] = &["until", "till", "til", "before", "to"];
+
+/// `minute`, or the hour the rule's words name after one of `cues` when
+/// the two differ: in the half of the day the words say ("pm", "at night",
+/// "in the evening"; "am", "in the morning"), else in `minute`'s, its
+/// minutes kept. A digit hour past twelve is taken as said. Words that
+/// name no hour after a cue leave `minute` as it is.
+fn as_said(minute: u16, words: &str, cues: &[&str]) -> u16 {
+    const HOURS: [&str; 12] = [
+        "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven",
+        "twelve",
+    ];
+    let lower = words.to_lowercase();
+    let words: Vec<&str> = lower
+        .split(|c: char| !(c.is_ascii_alphanumeric() || c == ':'))
+        .filter(|word| !word.is_empty())
+        .collect();
+    let hour_of = |word: &str| -> Option<(u16, Option<bool>)> {
+        if let Some(index) = HOURS.iter().position(|hour| *hour == word) {
+            return Some((index as u16 + 1, None));
+        }
+        let (number, half) = match word.strip_suffix("pm") {
+            Some(number) => (number, Some(true)),
+            None => match word.strip_suffix("am") {
+                Some(number) => (number, Some(false)),
+                None => (word, None),
+            },
+        };
+        let hours = number.split(':').next()?;
+        let hour =
+            (!hours.is_empty() && hours.len() <= 2 && hours.bytes().all(|b| b.is_ascii_digit()))
+                .then(|| hours.parse::<u16>().ok())
+                .flatten()
+                .filter(|hour| *hour < 24)?;
+        Some((hour, half))
+    };
+    let said = (1..words.len()).find_map(|at| {
+        cues.contains(&words[at - 1])
+            .then(|| hour_of(words[at]).map(|(hour, half)| (at, hour, half)))
+            .flatten()
+    });
+    let Some((at, hour, mut half)) = said else {
+        return minute;
+    };
+    if half.is_none() {
+        half = match &words[at + 1..] {
+            ["pm" | "tonight", ..] | ["at", "night", ..] | ["in", "the", "evening", ..] => {
+                Some(true)
+            }
+            ["am", ..] | ["in", "the", "morning", ..] => Some(false),
+            _ => None,
+        };
+    }
+    let hour = match (hour, half) {
+        (13.., _) | (0, _) => hour,
+        (hour, Some(true)) => hour % 12 + 12,
+        (hour, Some(false)) => hour % 12,
+        (hour, None) if (minute / 60) % 12 == hour % 12 => return minute,
+        (hour, None) => hour % 12 + if minute / 60 >= 12 { 12 } else { 0 },
+    };
+    if hour == minute / 60 {
+        minute
+    } else {
+        hour * 60 + minute % 60
+    }
 }
 
 /// `HH:MM`, 24 hours, as the minute of the day.
@@ -348,6 +424,9 @@ pub struct Rule {
     pub text: String,
     pub quiet: bool,
     pub quiet_mornings: bool,
+    /// Its typed mark's words, `about` first, such as `greeting never`:
+    /// empty for a rule with none.
+    pub mark: String,
     /// Its limits on the greeting, and on news, said unprompted.
     pub hello: lamp_msgs::Unprompted,
     pub news: lamp_msgs::Unprompted,
@@ -371,38 +450,135 @@ pub fn rules(answer: &Value) -> Option<Vec<Rule>> {
         .as_array()?
         .iter()
         .map(|entry| {
-            let text = entry.get("text")?.as_str()?;
-            let (quiet, quiet_mornings, text) = if let Some(text) = text.strip_prefix(QUIET) {
-                (true, false, text)
-            } else if let Some(text) = text.strip_prefix(QUIET_MORNINGS) {
-                (false, true, text)
-            } else {
-                (false, false, text)
-            };
-            let none = lamp_msgs::Unprompted::default();
-            let (text, hello, news, keep_light_on) = match text
-                .strip_prefix(TYPED)
-                .and_then(|text| text.split_once("] "))
-            {
-                Some((mark, text)) => {
-                    let (limits, hello, news, light) = limits(mark);
-                    let only = |about| if about { limits } else { none };
-                    (text, only(hello), only(news), light)
-                }
-                None => (text, none, none, false),
-            };
-            Some(Rule {
-                id: entry.get("id").and_then(valid_id)?,
-                at_unix_ms: entry.get("at_unix_ms")?.as_u64()?,
-                text: text.to_owned(),
-                quiet,
-                quiet_mornings,
-                hello,
-                news,
-                keep_light_on,
-            })
+            parse(
+                entry.get("id").and_then(valid_id)?,
+                entry.get("at_unix_ms")?.as_u64()?,
+                entry.get("text")?.as_str()?,
+            )
         })
         .collect()
+}
+
+/// One kept rule from its stored text, its marks read off.
+fn parse(id: u64, at_unix_ms: u64, text: &str) -> Option<Rule> {
+    let (quiet, quiet_mornings, text) = if let Some(text) = text.strip_prefix(QUIET) {
+        (true, false, text)
+    } else if let Some(text) = text.strip_prefix(QUIET_MORNINGS) {
+        (false, true, text)
+    } else {
+        (false, false, text)
+    };
+    let none = lamp_msgs::Unprompted::default();
+    let (text, mark, hello, news, keep_light_on) = match text
+        .strip_prefix(TYPED)
+        .and_then(|text| text.split_once("] "))
+    {
+        Some((mark, text)) => {
+            let (limits, hello, news, light) = limits(mark);
+            let only = |about| if about { limits } else { none };
+            (text, mark, only(hello), only(news), light)
+        }
+        None => (text, "", none, none, false),
+    };
+    Some(Rule {
+        id,
+        at_unix_ms,
+        text: text.to_owned(),
+        quiet,
+        quiet_mornings,
+        mark: mark.to_owned(),
+        hello,
+        news,
+        keep_light_on,
+    })
+}
+
+/// What keeping a rule does beside the rules its scope already keeps
+/// (#4346, the setup walk on lamp-c0a4 on 5 Nov).
+#[derive(Debug, PartialEq)]
+pub enum Beside {
+    /// The same rule is kept already, as this one: nothing is written, so
+    /// "no hello" said twice is one rule.
+    Already(u64),
+    /// Keep `line`; then forget `replaces`, the older rules about the same
+    /// thing with the same limit, so "ten, not nine" replaces the nine. A
+    /// limit of theirs the new rule does not give is carried into `line`:
+    /// "ten, not nine" keeps the "until seven".
+    Keep { line: Value, replaces: Vec<u64> },
+}
+
+/// What keeping `line`, a [`request`] for [`KEEP_RULE`], does beside the
+/// rules `kept` in its scope. Only a typed rule (a mark) replaces another:
+/// the words of an untyped one are kept again only when they differ.
+pub fn beside(kept: &[Rule], mut line: Value) -> Beside {
+    let Some(new) = line["text"].as_str().and_then(|text| parse(0, 0, text)) else {
+        return Beside::Keep {
+            line,
+            replaces: vec![],
+        };
+    };
+    let flags = |rule: &Rule| (rule.quiet, rule.quiet_mornings);
+    if let Some(old) = kept.iter().find(|old| {
+        flags(old) == flags(&new)
+            && old.mark == new.mark
+            && (!new.mark.is_empty() || old.text.trim().eq_ignore_ascii_case(new.text.trim()))
+    }) {
+        return Beside::Already(old.id);
+    }
+    if new.mark.is_empty() {
+        return Beside::Keep {
+            line,
+            replaces: vec![],
+        };
+    }
+    let words =
+        |mark: &str| -> Vec<String> { mark.split(' ').skip(1).map(str::to_owned).collect() };
+    let key = |word: &str| word.split('=').next().unwrap_or_default().to_owned();
+    let about = |mark: &str| mark.split(' ').next().unwrap_or_default().to_owned();
+    let mut merged = words(&new.mark);
+    let mut replaces = vec![];
+    for old in kept {
+        let shares = |merged: &[String]| {
+            words(&old.mark)
+                .iter()
+                .any(|word| merged.iter().any(|ours| key(ours) == key(word)))
+        };
+        if old.mark.is_empty()
+            || flags(old) != flags(&new)
+            || about(&old.mark) != about(&new.mark)
+            || !shares(&words(&new.mark))
+        {
+            continue;
+        }
+        for word in words(&old.mark) {
+            if !merged.iter().any(|ours| key(ours) == key(&word)) {
+                merged.push(word);
+            }
+        }
+        replaces.push(old.id);
+    }
+    if replaces.is_empty() {
+        return Beside::Keep { line, replaces };
+    }
+    // The order `typed_mark` writes them in; a newer voice's word last.
+    let rank = |word: &String| {
+        ["never", "not_before", "not_from", "not_while_talking"]
+            .iter()
+            .position(|known| key(word) == *known)
+            .unwrap_or(4)
+    };
+    merged.sort_by_key(rank);
+    let prefix = match flags(&new) {
+        (true, _) => QUIET,
+        (_, true) => QUIET_MORNINGS,
+        _ => "",
+    };
+    let mark = std::iter::once(about(&new.mark))
+        .chain(merged)
+        .collect::<Vec<_>>()
+        .join(" ");
+    line["text"] = json!(format!("{prefix}{TYPED}{mark}] {}", new.text));
+    Beside::Keep { line, replaces }
 }
 
 /// What to tell the model for the memory's answer, and whether the rules
@@ -969,6 +1145,113 @@ mod tests {
             json!({"rule":"r","about":"news","not_before":"09:00","not_from":"09:00"}),
         ] {
             assert!(keep(bad.clone()).unwrap_err()["error"].is_string(), "{bad}");
+        }
+    }
+
+    /// #4346, the setup walk on lamp-c0a4 on 5 Nov: "ten at night until
+    /// seven" was kept as quiet from nine (not_from=1260). The hour the
+    /// rule's own words name is kept, in the half of the day they say.
+    #[test]
+    fn quiet_hours_are_kept_at_the_hour_the_rule_says() {
+        let text = |args: Value| {
+            request(&call(KEEP_RULE, args), 7, "r-x").unwrap()["text"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        };
+        assert_eq!(
+            text(
+                json!({"rule":"Quiet from ten at night until seven.","about":"both","not_from":"21:00","not_before":"07:00"})
+            ),
+            "[unprompted both not_before=420 not_from=1320] Quiet from ten at night until seven."
+        );
+        // "Ten, not nine": the hour after "from", in the model's half of the day.
+        assert_eq!(
+            text(json!({"rule":"Quiet from ten, not nine.","about":"both","not_from":"21:00"})),
+            "[unprompted both not_from=1320] Quiet from ten, not nine."
+        );
+        for (rule, from, minute) in [
+            ("No news after 10pm.", "21:00", "1320"),
+            ("No news after 10:30 PM.", "21:30", "1350"),
+            ("No news after ten thirty.", "22:30", "1350"),
+            ("Nothing after 22:00.", "21:00", "1320"),
+            ("No news after ten at night.", "10:00", "1320"),
+            ("No news in the evening.", "21:00", "1260"),
+        ] {
+            let kept = text(json!({"rule":rule,"about":"news","not_from":from}));
+            assert!(
+                kept.contains(&format!("not_from={minute}]")),
+                "{rule}: {kept}"
+            );
+        }
+        assert_eq!(
+            text(
+                json!({"rule":"Do not greet me until 7am.","about":"greeting","not_before":"19:00"})
+            ),
+            "[unprompted greeting not_before=420] Do not greet me until 7am."
+        );
+        assert_eq!(
+            text(
+                json!({"rule":"Do not greet them before nine.","about":"greeting","not_before":"09:00"})
+            ),
+            "[unprompted greeting not_before=540] Do not greet them before nine."
+        );
+    }
+
+    /// #4346: "no hello" said twice is one rule, and "ten, not nine"
+    /// replaces the nine, keeping its "until seven".
+    #[test]
+    fn a_rule_kept_again_is_one_rule_and_a_correction_replaces_it() {
+        let kept = [
+            rule(
+                4,
+                "[unprompted greeting never] No hello when they sit down.",
+            ),
+            rule(
+                5,
+                "[unprompted both not_before=420 not_from=1260] Quiet from nine at night until seven.",
+            ),
+            rule(6, "Call them Minh."),
+        ];
+        let line = |args: Value| request(&call(KEEP_RULE, args), 7, "r-x").unwrap();
+        assert_eq!(
+            beside(
+                &kept,
+                line(json!({"rule":"Don't say hello.","about":"greeting","never":true}))
+            ),
+            Beside::Already(4)
+        );
+        assert_eq!(
+            beside(&kept, line(json!({"rule":"call them minh. "}))),
+            Beside::Already(6)
+        );
+        let Beside::Keep {
+            line: kept_line,
+            replaces,
+        } = beside(
+            &kept,
+            line(
+                json!({"rule":"Quiet from ten at night, not nine.","about":"both","not_from":"21:00"}),
+            ),
+        )
+        else {
+            panic!("a correction is kept");
+        };
+        assert_eq!(replaces, [5]);
+        assert_eq!(
+            kept_line["text"],
+            "[unprompted both not_before=420 not_from=1320] Quiet from ten at night, not nine."
+        );
+        // Another kind, or no shared limit, replaces nothing.
+        for args in [
+            json!({"rule":"No news while I'm on a call.","about":"news","not_while_talking":true}),
+            json!({"rule":"Never say anything unasked.","about":"both","never":true}),
+            json!({"rule":"Answer in short sentences."}),
+        ] {
+            let Beside::Keep { replaces, .. } = beside(&kept, line(args.clone())) else {
+                panic!("{args}");
+            };
+            assert!(replaces.is_empty(), "{args}");
         }
     }
 
