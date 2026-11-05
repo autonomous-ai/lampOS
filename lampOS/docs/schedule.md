@@ -1444,7 +1444,11 @@ person over its ring`), never offered again in that voice:
   a stop (`LAMP_SPOKEN_STOP_ENDS`, "Okay, I'll stop there") it emits
   `ProviderOutput::StopAnswered`. `Reminders::stop_said` sends
   `ToWorker::RingStopped` for the ring last cut by a line (a fenced `Retire`
-  or an abandon with audio), if within `STOP_FOR_THE_CUT_US` (5 s), once. The
+  or an abandon with audio), if within `STOP_FOR_THE_CUT_US` (5 s), once. A
+  cut-in keeps the request of the line that cut it
+  (`Receipt::interrupted_after_owner_fenced`), and only that request's stop
+  holds the ring; a stop answered for another line holds nothing (Thirteen's
+  P3 on #5351, `only_the_cutting_lines_stop_holds_the_ring`). The
   consumer takes that attempt, and those joined to it, off the retry and holds
   them. One offered again already, or a stop for another attempt, changes
   nothing. With nothing

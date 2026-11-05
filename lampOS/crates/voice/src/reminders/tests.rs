@@ -340,7 +340,7 @@ fn interrupted_receipt_retires_before_or_after_audio_without_claiming_completion
         }
         // This is the receipt boundary, not a claim that a speaker was
         // fenced here. The coordinator tests exercise that publication.
-        receipt.interrupted_after_owner_fenced();
+        receipt.interrupted_after_owner_fenced(None);
         let Some(ToWorker::Retire { token, proof }) = probe.settlement() else {
             panic!("known interruption did not retire (audio={audio})");
         };
@@ -358,7 +358,7 @@ fn interrupted_receipt_retires_before_or_after_audio_without_claiming_completion
         receipt.audio();
         receipt.retired(2, 2, 480);
         receipt.completed();
-        receipt.interrupted_after_owner_fenced();
+        receipt.interrupted_after_owner_fenced(None);
         assert!(!receipt.completion_recorded());
         drop(receipt);
         assert!(
@@ -379,7 +379,7 @@ fn interrupted_receipt_with_own_retirement_stays_held_even_with_later_audio() {
             receipt.audio();
         }
         assert!(receipt.eligible_for_completion());
-        receipt.interrupted_after_owner_fenced();
+        receipt.interrupted_after_owner_fenced(None);
         assert!(probe.settlement().is_none());
         assert!(!receipt.completion_recorded());
         drop(receipt);
@@ -410,7 +410,7 @@ fn a_stop_said_for_the_line_that_cut_a_ring_is_sent_once_within_5_s() {
                 ..
             })
         ));
-        test.parent.stop_said(AT + 200 + later_us);
+        test.parent.stop_said(1, AT + 200 + later_us);
         test.parent.poll(AT + 200 + later_us);
         let command = test.command();
         if sent {
@@ -421,10 +421,38 @@ fn a_stop_said_for_the_line_that_cut_a_ring_is_sent_once_within_5_s() {
         } else {
             assert!(command.is_none(), "{command:?}");
         }
-        test.parent.stop_said(AT + 300 + later_us);
+        test.parent.stop_said(1, AT + 300 + later_us);
         test.parent.poll(AT + 300 + later_us);
         assert!(test.command().is_none(), "once");
     }
+}
+
+/// Thirteen's P3 on #5351: a ring a known line cut in (a fenced `Retire`,
+/// its cutting request kept) is held only by that line's own stop; a stop
+/// the second route answered for another line, within the 5 s, holds
+/// nothing, and the cut ring is still that line's to hold.
+#[test]
+fn only_the_cutting_lines_stop_holds_the_ring() {
+    let mut test = Test::new();
+    let first = offer();
+    test.offer(first.clone(), AT);
+    let (turn, privacy) = owner(1);
+    let mut receipt = test.parent.admitted(first.clone(), turn, privacy, 7);
+    receipt.audio();
+    receipt.interrupted_after_owner_fenced(Some(5));
+    drop(receipt);
+    test.parent.poll(AT + 200);
+    assert!(matches!(test.command(), Some(ToWorker::Retire { .. })));
+    test.parent.stop_said(6, AT + 1_000);
+    test.parent.poll(AT + 1_000);
+    assert!(test.command().is_none(), "another line's stop");
+    test.parent.stop_said(5, AT + 2_000);
+    test.parent.poll(AT + 2_000);
+    let command = test.command();
+    assert!(
+        matches!(&command, Some(ToWorker::RingStopped { token }) if *token == first.token),
+        "{command:?}"
+    );
 }
 
 /// Only a ring cut by a person's line, with some of it played, is one a stop
@@ -560,7 +588,7 @@ fn interrupted_receipt_preserves_completed_and_invalidated_outcomes() {
     let Some(ToWorker::Complete { token, proof }) = probe.settlement() else {
         panic!("completion missing");
     };
-    receipt.interrupted_after_owner_fenced();
+    receipt.interrupted_after_owner_fenced(None);
     drop(receipt);
     assert!(
         matches!(probe.settlement(), Some(ToWorker::Complete { token: kept, proof: kept_proof })
@@ -573,7 +601,7 @@ fn interrupted_receipt_preserves_completed_and_invalidated_outcomes() {
         receipt.retired(1, 2, 240);
         if invalidated {
             receipt.invalidate();
-            receipt.interrupted_after_owner_fenced();
+            receipt.interrupted_after_owner_fenced(None);
             assert!(probe.settlement().is_none());
         }
         // An unexplained drop and a reset-invalidated interruption both
@@ -591,7 +619,7 @@ fn interrupted_receipt_waits_for_drop_and_exact_consumer_settlement() {
     let (turn, privacy) = owner(1);
     let mut receipt = test.parent.admitted(offered.clone(), turn, privacy, 7);
     receipt.audio();
-    receipt.interrupted_after_owner_fenced();
+    receipt.interrupted_after_owner_fenced(None);
     test.parent.poll(AT);
     assert!(test.command().is_none(), "a live receipt cannot be settled");
     drop(receipt);
