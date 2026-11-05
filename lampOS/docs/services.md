@@ -852,7 +852,10 @@ comes newest first, so a read of the latest leaves it out; an order or the
 latest alone ("order by modifiedTime desc", "newest") is refused
 (`service_read::ordering`, after a lamp's made skill read 0 files with
 one, 5 Nov). A made skill's brief gives Drive's step whole and says so
-(`made_skill::DRIVE_READ`). A calendar's `events`
+(`made_skill::DRIVE_READ`): the step, then "no other key" and why, in
+words that name no key. On 10300 its note in brackets right after the
+braces, "(newest first; …)", came back twice as one more key in them,
+refused as `unknown field` (lamp-9adf, 5 Nov 12:59). A calendar's `events`
 take `day = "today"` or `"tomorrow"` (the local day, at most 10 events) and
 no `count`; `day` is for nothing else. `lamp-services` holds the read to its
 allow-list as it does the voice's.
