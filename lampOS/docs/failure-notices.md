@@ -83,7 +83,14 @@ the model, can't be spoken without a network. So a notices release with a
 recording over 10 s goes onto a lamp only with, or after, the build that
 allows 15 s.
 
-Each recording must be a regular file opened without following a link, a
+Each recording, and `manifest.json`, must be a regular file opened without
+following a link, with one exception (#5362): lamp-update places each as a
+link into the models store, `../../models/<sha256>` (`models::target`), so
+the loader follows a link whose text is exactly that, `../../models/` and 64
+lowercase hex digits, opening the store directory and then its entry from the
+notices directory, each without following a further link. Any other link is
+refused: absolute, another relative form, out of the store, a store entry or
+store that is itself a link. Each recording is a
 complete RIFF/WAVE container of mono 24 kHz 16-bit integer PCM with exactly
 the stated number of frames, matching its hash, unchanged in size while read,
 and not all silence. Worst case held in memory: 8 notices of 15 s, 5.76 MB.
@@ -110,7 +117,7 @@ notices.capability();   // what can and cannot be said, for a status report
 | `not_approved` | Provisioned only as a test asset |
 | `invalid_entry` | Name, transcript, voice, hash or length malformed |
 | `asset_missing` | The named file is not there |
-| `asset_unreadable` | Not a bounded regular file, reached through a link, or changed while read |
+| `asset_unreadable` | Not a bounded regular file, reached through a link other than lamp-update's store link, or changed while read |
 | `asset_hash_mismatch` | The file is not the one the manifest describes |
 | `asset_format` | Not complete mono 24 kHz PCM16 of the stated length, or silent |
 
@@ -369,7 +376,8 @@ nothing is heard.
 They and `manifest.json` are in the release `notices-2026-11-03`, pinned by
 size and SHA-256 in `deploy/product/models.json`. `lamp-update install`
 places them in `/opt/lampOS/voice/notices`, the folder the product unit's
-`--failure-notice-dir` names. A lamp moved from V1 gets no install, and its
+`--failure-notice-dir` names, each as a link into `/opt/lampOS/models/`,
+which the loader follows (#5362). A lamp moved from V1 gets no install, and its
 package carries no notices, so `lamp-keeper prepare` places the same six
 files, by install's own fetch and check, in `/var/lib/lampOS/voice/notices`
 (#2943, [keeper.md](keeper.md)): only a missing one, and a failed fetch is

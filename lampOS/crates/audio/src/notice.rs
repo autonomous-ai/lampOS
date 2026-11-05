@@ -250,29 +250,86 @@ impl Notices {
     }
 }
 
-/// A regular file opened without following a link, read whole, unchanged in
-/// size while it was read.
-fn read_regular(
-    path: &Path,
-    limit: u64,
+/// The store a notices directory's links may point into, as lamp-update
+/// writes the link for `<root>/voice/notices/<name>`: `models::target` in
+/// lamp-update gives `../../models/<sha256>` (#5362).
+const STORE_LINK: &str = "../../models/";
+
+/// The open flags for a file read here: never through a link.
+fn file_flags() -> rustix::fs::OFlags {
+    rustix::fs::OFlags::RDONLY
+        | rustix::fs::OFlags::CLOEXEC
+        | rustix::fs::OFlags::NOFOLLOW
+        | rustix::fs::OFlags::NONBLOCK
+}
+
+/// `name` in `directory`, opened without following a link, or, when `name`
+/// is a link lamp-update placed into the models store, the store entry it
+/// names (#5362). Such a link's text must be exactly `../../models/` and 64
+/// lowercase hex digits; the store directory and its entry are each opened
+/// without following a link, from the notices directory itself, so `..` is
+/// what the link would resolve to. Any other link is refused.
+fn open_regular(
+    directory: &Path,
+    name: &str,
     absent: Missing,
     unreadable: Missing,
-) -> Result<Vec<u8>, Missing> {
-    let fd = rustix::fs::open(
-        path,
-        rustix::fs::OFlags::RDONLY
-            | rustix::fs::OFlags::CLOEXEC
-            | rustix::fs::OFlags::NOFOLLOW
-            | rustix::fs::OFlags::NONBLOCK,
-        rustix::fs::Mode::empty(),
-    )
-    .map_err(|error| {
+) -> Result<rustix::fd::OwnedFd, Missing> {
+    let error = |error: rustix::io::Errno| {
         if error == rustix::io::Errno::NOENT {
             absent
         } else {
             unreadable
         }
-    })?;
+    };
+    let dir = rustix::fs::open(
+        directory,
+        rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::DIRECTORY | rustix::fs::OFlags::CLOEXEC,
+        rustix::fs::Mode::empty(),
+    )
+    .map_err(error)?;
+    match rustix::fs::openat(&dir, name, file_flags(), rustix::fs::Mode::empty()) {
+        Ok(fd) => return Ok(fd),
+        Err(rustix::io::Errno::NOENT) => return Err(absent),
+        // Not a plain file: a link, or something unreadable. Only a store
+        // link is read further.
+        Err(_) => {}
+    }
+    let target = rustix::fs::readlinkat(&dir, name, Vec::new()).map_err(|_| unreadable)?;
+    let sha = target
+        .to_str()
+        .ok()
+        .and_then(|target| target.strip_prefix(STORE_LINK))
+        .filter(|sha| {
+            sha.len() == 64
+                && sha
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        })
+        .ok_or(unreadable)?;
+    let store = rustix::fs::openat(
+        &dir,
+        STORE_LINK.trim_end_matches('/'),
+        rustix::fs::OFlags::RDONLY
+            | rustix::fs::OFlags::DIRECTORY
+            | rustix::fs::OFlags::NOFOLLOW
+            | rustix::fs::OFlags::CLOEXEC,
+        rustix::fs::Mode::empty(),
+    )
+    .map_err(error)?;
+    rustix::fs::openat(&store, sha, file_flags(), rustix::fs::Mode::empty()).map_err(error)
+}
+
+/// A regular file opened by [`open_regular`], read whole, unchanged in size
+/// while it was read.
+fn read_regular(
+    directory: &Path,
+    name: &str,
+    limit: u64,
+    absent: Missing,
+    unreadable: Missing,
+) -> Result<Vec<u8>, Missing> {
+    let fd = open_regular(directory, name, absent, unreadable)?;
     let mut file = File::from(fd);
     let read = |file: &mut File| -> io::Result<Option<Vec<u8>>> {
         let before = file.metadata()?;
@@ -296,7 +353,8 @@ fn read_manifest(directory: &Path) -> Result<Manifest, Missing> {
         return Err(Missing::NoDirectory);
     }
     let bytes = read_regular(
-        &directory.join(MANIFEST),
+        directory,
+        MANIFEST,
         MAX_MANIFEST_BYTES,
         Missing::NoManifest,
         Missing::InvalidManifest,
@@ -356,7 +414,8 @@ fn load_entry(directory: &Path, entry: Entry, accept: Approval) -> Result<Notice
         return Err(Missing::NotApproved);
     }
     let bytes = read_regular(
-        &directory.join(&entry.file),
+        directory,
+        &entry.file,
         MAX_WAV_BYTES,
         Missing::AssetMissing,
         Missing::AssetUnreadable,
