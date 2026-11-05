@@ -403,6 +403,22 @@ impl Net {
         self
     }
 
+    /// With `on` (`LAMP_STOP_WORDS_KEYTERM=on`), listening asks with the stop
+    /// words as key terms after the lamp's name, as the stop stream does
+    /// ([`crate::stop_words::with_key_terms`]), at its near address too. On
+    /// lamp-52e6 on 5 Nov (#5076) a played "Stop, Lamp." over a story came
+    /// back from this stream as "Start plan.", "Sam Lamp." and "Talent
+    /// plan.": the lamp's name, a key term, was heard, and "Stop" never.
+    pub fn asking_for_the_stop_words(mut self, on: bool) -> Self {
+        if on {
+            self.config = Arc::new(crate::stop_words::with_key_terms(
+                (*self.config).clone(),
+                true,
+            ));
+        }
+        self
+    }
+
     /// The chat's requests must call the function `force` names for their
     /// messages ([`net::Chat::forcing`]). Called after the chat is chosen.
     pub fn forcing(mut self, force: net::Force) -> Self {
@@ -2035,6 +2051,39 @@ pub(crate) mod tests {
         });
         assert!(net.listen().await.is_err());
         assert_eq!(near.seen().len(), 2);
+    }
+
+    /// #5076 (5 Nov): with `LAMP_STOP_WORDS_KEYTERM=on` the cut-in's own
+    /// stream asks for "Stop" too, not only the stop stream, and with it off
+    /// for the lamp's name and the unit's words only.
+    #[tokio::test]
+    async fn listening_asks_for_the_stop_words_with_the_switch() {
+        for on in [false, true] {
+            let own = stub("k-stop-terms", vec![]).await;
+            let net = Net::new(
+                config_at("stop-terms", "k-stop-terms", &own.url, &own.url),
+                Arc::new(Vec::new),
+            )
+            .unwrap()
+            .asking_for_the_stop_words(on);
+            assert!(net.listen().await.is_err(), "the stand-in is no socket");
+            let seen = own.seen();
+            let asked =
+                reqwest::Url::parse(&format!("ws://x{}", seen[0].split(' ').nth(1).unwrap()))
+                    .unwrap();
+            let terms: Vec<String> = asked
+                .query_pairs()
+                .filter(|(key, _)| key == "keyterm")
+                .map(|(_, value)| value.into_owned())
+                .collect();
+            let stop: &[&str] = if on {
+                crate::stop_words::KEY_TERMS
+            } else {
+                &[]
+            };
+            let expected: Vec<&str> = ["Lamp"].into_iter().chain(stop.iter().copied()).collect();
+            assert_eq!(terms, expected, "switch {on}: {seen:?}");
+        }
     }
 
     /// #2882 (f): a relay that never answers its routes delays no turn: the
