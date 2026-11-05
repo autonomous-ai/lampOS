@@ -2990,6 +2990,45 @@ fn the_tasks_part_starts_with_no_targets_and_learns_them_from_the_machines() {
     );
 }
 
+/// #5198: the owner's app signs the lamp's Harness in by its code
+/// (`LAMP_TASKS_SIGN_IN_APP`), which needs the voice's own sign-in
+/// (`LAMP_TASKS_SIGN_IN`) and lamp-tasks' code sign-in with the app's route
+/// (`--sign-in-by-code --app-socket`); lamp-cloud, the only one that reaches
+/// that route, has the same switch and the socket's folder in its sandbox.
+#[test]
+fn the_product_signs_harness_in_from_the_app() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap_or_else(|| panic!("no {name}"))
+            .1
+    };
+    let voice = section(unit("lamp-voice.service"), "Service");
+    for line in [
+        "Environment=LAMP_TASKS_SIGN_IN=on",
+        "Environment=LAMP_TASKS_SIGN_IN_APP=on",
+    ] {
+        assert!(voice.contains(&line), "the voice lacks {line}");
+    }
+    let cloud = section(unit("lamp-cloud.service"), "Service");
+    assert!(cloud.contains(&"Environment=LAMP_TASKS_SIGN_IN_APP=on"));
+    let written: Vec<&str> = cloud
+        .iter()
+        .filter_map(|line| line.strip_prefix("ReadWritePaths="))
+        .flat_map(str::split_whitespace)
+        .collect();
+    assert!(written.contains(&"-/run/lampos-tasks"), "{written:?}");
+    let exec = section(unit("lamp-tasks.service"), "Service")
+        .into_iter()
+        .find(|line| line.starts_with("ExecStart="))
+        .unwrap();
+    assert!(
+        exec.contains(" --sign-in-by-code --app-socket /run/lampos-tasks/app.sock "),
+        "{exec}"
+    );
+}
+
 /// #811, from lamp-06c1: without Harness (its own installer's to put on the
 /// lamp), the tasks part is skipped by its unit's condition rather than
 /// failing ten times; the install says Harness is missing.

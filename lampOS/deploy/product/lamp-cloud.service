@@ -72,6 +72,10 @@ Environment=LAMP_SERVICES=on
 # On after the checks: the button and the app on lamp-52e6 (#3697, 2 Nov), the app's power-off on lamp-0c89 (#3698, 30 Oct).
 Environment=LAMP_SHUTDOWN=on
 Environment=LAMP_APP_RESTART=on
+# Harness signed in from the owner's app (#5198, harness.sign_in.*): handed to lamp-tasks' app route
+# (/run/lampos-tasks/app.sock, its --app-socket); the code and the email go to the backend over HTTPS only,
+# never on the broker. The same switch as lamp-voice.service's, with LAMP_TASKS_SIGN_IN there.
+Environment=LAMP_TASKS_SIGN_IN_APP=on
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos
@@ -104,8 +108,9 @@ ProtectSystem=strict
 # app's photos, for the eyes, with LAMP_PHOTO_FACES=on (docs/cloud.md; made by lampos.conf at boot);
 # lamp-skills' call socket, for guard mode from the app with LAMP_GUARD_FROM_APP=on (#2562); and
 # lamp-voice's app-make socket, for a skill typed in the app with LAMP_APP_MAKE_SKILL=on (#2813);
+# lamp-tasks' app route, for Harness signed in from the app with LAMP_TASKS_SIGN_IN_APP=on (#5198);
 # and lamp-control's admin socket, while developer access is on.
-ReadWritePaths=/run/lampos-bus /run/lampos-actions -/run/lampos-photos -/run/lampos-skills -/run/lampos-app-make -/run/lampos-services -/run/lampos-control
+ReadWritePaths=/run/lampos-bus /run/lampos-actions -/run/lampos-photos -/run/lampos-skills -/run/lampos-app-make -/run/lampos-services -/run/lampos-tasks -/run/lampos-control
 ProtectHome=yes
 PrivateTmp=yes
 # No capability is needed (Fourth on #1404): the broker, the ping and the bus. Netlink is for `iw`,

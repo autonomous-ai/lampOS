@@ -1163,7 +1163,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      (`No such file or directory`) until systemd stopped restarting it.
    - **Signing in is the person's,** not done here: by a spoken code since
      Harness 0.4.23 (openharness#1410), with `lamp-tasks serve
-     --sign-in-by-code` and the voice's `LAMP_TASKS_SIGN_IN`.
+     --sign-in-by-code` and the voice's `LAMP_TASKS_SIGN_IN`, or from the
+     owner's app (`--app-socket`, `LAMP_TASKS_SIGN_IN_APP` in the voice and
+     `lamp-cloud`, #5198): all on in the product's units since 5 Nov.
    - **Shown only in tests** (`crates/update/tests/install.rs`): the steps
      in their order through stand-ins; a Harness already there kept; each
      failing step leaving no link and no record; run again, nothing; its
