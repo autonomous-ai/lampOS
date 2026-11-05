@@ -537,7 +537,11 @@ before its sign-in (`docs/install.md`, "Harness before the sign-in"):
 `{"install": "absent"|"installing"|"installed"|"failed", "revision",
 "at_unix_ms", "version"?, "pinned"?, "error"?, "message"}`. `error`, with
 `failed` only, is one of `pin_unreadable`, `pin_fetch`, `pin_mismatch`,
-`timeout`, `installer`, `no_user`, `not_started`; `message` is fixed
+`timeout`, `installer`, `no_user`, `not_started`, `serve` (a pinned
+install's files not handed to the installer: no listener on 127.0.0.1, or
+no file for its script), `version` (a pinned install whose `harness
+version` is not the pinned one, or says none; Harness is there, but not as
+pinned); `message` is fixed
 plain English for `install` and `error` (`HarnessInstall::message_for`),
 shown by the app as it is; `revision` goes up by one at each change and
 never on a read. Without the switch, or from an older lamp-update, there
@@ -547,7 +551,8 @@ lamp-update says the value again within 2 s of a change of `harness`; the
 app reads it by asking `update.status`, as lamp-cloud pushes nothing of it.
 A failed install is tried again after the next round that reaches the
 channel, up to date or not, so `update.check` is its retry; an `installer`
-or `no_user` failure only after 30 min. Tests:
+or `no_user` failure only after 30 min; a `serve` failure at the next
+round; a `version` failure stays while Harness is there. Tests:
 `app_contract.rs`'s `the_software_update_is_answered_from_lamp_updates_status`.
 
 ### Check for update (#4153, `update.check`)
