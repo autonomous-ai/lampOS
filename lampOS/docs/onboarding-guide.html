@@ -3,118 +3,161 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Welcome to your Lamp</title>
+<title>Meet your Lamp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 <style>
+  /* A desk at night: one pool of warm lamplight on deep ink. Single theme by choice. */
   :root {
-    --ink: #1f2430;
-    --soft: #5b6270;
-    --line: #e7e1d6;
-    --paper: #fbf8f2;
-    --card: #ffffff;
-    --glow: #f4b74a;
-    --glow-soft: #fde9c2;
-    --sky: #4f8fd6;
-    --leaf: #4fa37a;
-    --radius: 18px;
+    --night: #0f1420;      /* the room after dark */
+    --desk: #161d2c;       /* surfaces the light falls on */
+    --edge: #253048;       /* quiet lines */
+    --paper: #eef1f7;      /* text in lamplight */
+    --dim: #9aa6bf;        /* text in the shade */
+    --glow: #ffb547;       /* the lamp's warm light, the one accent */
+    --glow-soft: rgba(255, 181, 71, .14);
+    --wifi: #6fb2ff;       /* the blue blink while it joins Wi-Fi */
+    --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color-scheme: dark;
   }
   * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
-  body {
-    margin: 0;
-    font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    color: var(--ink);
-    background: var(--paper);
-  }
-  .wrap { max-width: 880px; margin: 0 auto; padding: 0 22px; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { margin: 0; background: var(--night); color: var(--paper); font: 18px/1.6 var(--body); }
+  a { color: var(--glow); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--glow); outline-offset: 3px; border-radius: 6px; }
+  h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+  .wrap { width: min(1080px, 100% - 40px); margin-inline: auto; }
+  .measure { max-width: 62ch; }
 
-  /* Hero */
-  header.hero {
-    background: radial-gradient(120% 90% at 70% 10%, #fff6e2 0%, var(--paper) 60%);
-    padding: 56px 0 28px;
-    border-bottom: 1px solid var(--line);
+  /* Hero: the lamp wakes */
+  .hero { position: relative; overflow: hidden; padding: 64px 0 40px; }
+  .hero::before {
+    content: ""; position: absolute; inset: -20% -10% auto auto; width: 760px; height: 760px; border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(255,181,71,.30), rgba(255,181,71,.08) 55%, transparent 72%);
+    pointer-events: none;
   }
-  .hero-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 28px; align-items: center; }
-  .eyebrow { font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: var(--soft); margin: 0 0 8px; }
-  h1 { font-size: 44px; line-height: 1.1; margin: 0 0 14px; letter-spacing: -.01em; }
-  .lede { font-size: 19px; color: var(--soft); margin: 0 0 22px; }
-  .journey { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0; list-style: none; }
-  .journey a {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 7px 13px; border-radius: 999px; background: var(--card);
-    border: 1px solid var(--line); color: var(--ink); text-decoration: none; font-size: 15px;
+  .hero-grid { position: relative; display: grid; grid-template-columns: 1.1fr .9fr; gap: 32px; align-items: center; }
+  .kicker { font: 600 15px/1 var(--display); letter-spacing: .14em; text-transform: uppercase; color: var(--glow); margin: 0 0 18px; }
+  .hero h1 { font-size: clamp(44px, 7vw, 84px); line-height: .98; font-weight: 800; letter-spacing: -.02em; }
+  .hero h1 em { font-style: normal; color: var(--glow); }
+  .hero p.lede { font-size: 21px; color: var(--dim); margin: 22px 0 28px; max-width: 34ch; }
+  .chapters { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0; list-style: none; }
+  .chapters a {
+    display: inline-flex; align-items: center; gap: 10px; padding: 9px 14px 9px 10px; border-radius: 999px;
+    background: var(--desk); border: 1px solid var(--edge); color: var(--paper); text-decoration: none; font-size: 16px;
   }
-  .journey a:hover { border-color: var(--glow); }
-  .journey b { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
-               background: var(--glow-soft); font-size: 13px; }
-  .hero-art svg { width: 100%; height: auto; max-height: 340px; }
+  .chapters a:hover { border-color: var(--glow); }
+  .chapters b { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 700 13px var(--display);
+                background: var(--glow-soft); color: var(--glow); }
+  .lamp-art svg { width: 100%; height: auto; max-height: 460px; display: block; }
+  .ring { transform-origin: center; animation: wake 2.4s ease-out 1 both; }
+  .halo { animation: halo 2.4s ease-out 1 both; }
+  @keyframes wake { 0% { opacity: .25; } 35% { opacity: 1; } 55% { opacity: .55; } 100% { opacity: 1; } }
+  @keyframes halo { 0% { opacity: .2; transform: scale(.92); } 100% { opacity: 1; transform: scale(1); } }
+  @media (prefers-reduced-motion: reduce) { .ring, .halo { animation: none; } html { scroll-behavior: auto; } }
 
-  /* Sections */
-  section.stage { padding: 44px 0 8px; }
-  .stage-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
-  .badge { flex: 0 0 auto; width: 58px; height: 58px; border-radius: 16px; display: grid; place-items: center;
-           background: var(--card); border: 1px solid var(--line); }
-  .badge svg { width: 34px; height: 34px; }
-  .stage-num { font-size: 14px; color: var(--soft); letter-spacing: .06em; text-transform: uppercase; margin: 0; }
-  h2 { font-size: 28px; line-height: 1.2; margin: 2px 0 0; }
-  .time { font-size: 14px; color: var(--soft); }
-
-  .steps { display: grid; gap: 12px; padding: 0; margin: 0; list-style: none; counter-reset: s; }
-  .steps li {
-    counter-increment: s; position: relative; background: var(--card); border: 1px solid var(--line);
-    border-radius: var(--radius); padding: 16px 18px 16px 62px;
+  /* Chapters */
+  section.chapter { padding: 72px 0 8px; border-top: 1px solid var(--edge); }
+  .ch-head { display: grid; grid-template-columns: auto 1fr; gap: 22px; align-items: center; margin-bottom: 28px; }
+  .numeral {
+    width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center;
+    font: 800 30px var(--display); color: var(--glow);
+    background: radial-gradient(circle, rgba(255,181,71,.16), transparent 70%); border: 2px solid rgba(255,181,71,.55);
+    box-shadow: 0 0 28px rgba(255,181,71,.18);
   }
+  .ch-head h2 { font-size: clamp(30px, 4.2vw, 46px); line-height: 1.05; font-weight: 800; letter-spacing: -.01em; }
+  .ch-head p { margin: 6px 0 0; color: var(--dim); font-size: 17px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; align-items: start; }
+
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; counter-reset: s; }
+  .steps li { counter-increment: s; display: grid; grid-template-columns: 34px 1fr; gap: 14px; }
   .steps li::before {
-    content: counter(s); position: absolute; left: 18px; top: 15px; width: 30px; height: 30px; border-radius: 50%;
-    display: grid; place-items: center; font-weight: 600; font-size: 15px; background: var(--glow-soft); color: #7a4b00;
+    content: counter(s); width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    font: 700 15px var(--display); color: var(--night); background: var(--glow);
   }
-  .steps strong { display: block; font-size: 18px; margin-bottom: 2px; }
-  .steps p { margin: 0; color: var(--soft); }
+  .steps strong { display: block; font: 600 20px/1.3 var(--display); margin-bottom: 2px; }
+  .steps p { margin: 0; color: var(--dim); }
 
-  .walk { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin-top: 14px; }
-  .walk div { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
-  .walk svg { width: 30px; height: 30px; display: block; margin-bottom: 6px; }
-  .walk strong { display: block; }
-  .walk span { color: var(--soft); font-size: 15px; }
+  /* The lamp's own words, and yours */
+  .say, .lampsays { display: inline-block; border-radius: 16px; padding: 3px 12px; margin: 2px 0; }
+  .say { background: #22304a; color: var(--paper); border-bottom-right-radius: 4px; }
+  .say::before { content: "You: "; color: var(--dim); font-size: .85em; }
+  .lampsays { background: var(--glow-soft); color: #ffd79a; border-bottom-left-radius: 4px; }
+  .lampsays::before { content: "Lamp: "; color: rgba(255,215,154,.7); font-size: .85em; }
 
-  .say {
-    display: inline-block; background: #fff8ea; border: 1px solid #f3dcaa; border-radius: 12px;
-    padding: 2px 10px; margin: 2px 0; font-style: italic;
+  /* Phone frame for app steps */
+  .phone {
+    width: min(300px, 100%); margin-inline: auto; aspect-ratio: 9 / 18.5; border-radius: 38px; padding: 12px;
+    background: #0a0d15; border: 1px solid var(--edge); box-shadow: 0 30px 60px rgba(0,0,0,.45), 0 0 80px rgba(255,181,71,.08);
   }
-  .phrases { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; margin: 14px 0 0; padding: 0; list-style: none; }
-  .phrases li { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
-  .phrases li em { display: block; font-style: normal; color: var(--soft); font-size: 14px; }
+  .screen { height: 100%; border-radius: 28px; background: #f6f7fb; color: #1b2233; padding: 22px 18px; display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+  .screen .bar { width: 90px; height: 6px; border-radius: 3px; background: #d7dbe6; margin: 0 auto 6px; }
+  .screen h4 { margin: 0; font: 800 22px var(--display); }
+  .screen .row { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-radius: 14px; background: #fff; border: 1px solid #e3e6ef; font-size: 15px; }
+  .screen .row small { color: #6b7488; }
+  .screen .lock { width: 14px; height: 14px; }
+  .screen .btn { margin-top: auto; text-align: center; padding: 13px; border-radius: 14px; background: #1b2233; color: #fff; font: 700 16px var(--display); }
+  .screen .hint { font-size: 13px; color: #6b7488; text-align: center; }
 
-  .note {
-    display: flex; gap: 12px; align-items: flex-start; margin: 16px 0 0; padding: 14px 16px; border-radius: 14px;
-    background: #eef5fd; border: 1px solid #d3e4f7; color: #26476b; font-size: 16px;
+  /* Light legend */
+  .lights { display: grid; gap: 10px; margin-top: 22px; padding: 0; list-style: none; }
+  .lights li { display: flex; gap: 12px; align-items: center; color: var(--dim); font-size: 16px; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 14px; }
+  .dot.warm { background: #fff3dc; box-shadow: 0 0 12px #fff3dc; }
+  .dot.blue { background: var(--wifi); box-shadow: 0 0 12px var(--wifi); }
+
+  /* The first five minutes: a script */
+  .script { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+  .script li { display: grid; grid-template-columns: 52px 1fr; gap: 16px; align-items: start; padding: 16px 18px; border-radius: 18px; background: var(--desk); border: 1px solid var(--edge); }
+  .script svg { width: 52px; height: 52px; }
+  .script h3 { font-size: 19px; font-weight: 600; margin-bottom: 4px; }
+  .script p { margin: 0; color: var(--dim); font-size: 16px; }
+  .script .lampsays, .script .say { font-size: 16px; }
+  .aside { margin-top: 18px; color: var(--dim); font-size: 16px; }
+  .aside b { color: var(--paper); }
+
+  /* Things to say */
+  .phrases { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 0; padding: 0; list-style: none; }
+  .phrases li { padding: 18px; border-radius: 18px; background: var(--desk); border: 1px solid var(--edge); }
+  .phrases .say { font-size: 17px; }
+  .phrases small { display: block; margin-top: 8px; color: var(--dim); font-size: 15px; }
+
+  /* Store tiles */
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0 0; padding: 0; list-style: none; }
+  .tiles li { padding: 16px 14px; border-radius: 16px; background: var(--desk); border: 1px solid var(--edge); font: 600 17px/1.25 var(--display); }
+  .tiles li span { display: block; width: 30px; height: 30px; border-radius: 10px; margin-bottom: 10px; background: var(--glow-soft); border: 1px solid rgba(255,181,71,.35); }
+  .note { display: flex; gap: 12px; margin-top: 20px; padding: 14px 16px; border-radius: 14px; border: 1px dashed var(--edge); color: var(--dim); font-size: 16px; }
+  .note b { color: var(--paper); }
+
+  /* Terminal */
+  .term { border-radius: 16px; background: #090c13; border: 1px solid var(--edge); overflow: hidden; }
+  .term .tbar { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--edge); }
+  .term .tbar i { width: 10px; height: 10px; border-radius: 50%; background: #2c3650; }
+  .term pre { margin: 0; padding: 16px 18px; overflow-x: auto; font: 14px/1.7 var(--mono); color: #d6deee; }
+  .term pre .c { color: #6c7a96; }
+  .term pre .p { color: var(--glow); }
+
+  footer { margin-top: 80px; padding: 40px 0 56px; border-top: 1px solid var(--edge); }
+  .help { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .help div { padding: 18px; border-radius: 18px; background: var(--desk); border: 1px solid var(--edge); }
+  .help h3 { font-size: 19px; margin-bottom: 6px; }
+  .help p { margin: 0; color: var(--dim); font-size: 16px; }
+  .signoff { margin: 28px 0 0; color: var(--dim); font-size: 15px; }
+
+  @media (max-width: 860px) {
+    .hero-grid, .two { grid-template-columns: 1fr; }
+    .lamp-art { max-width: 380px; margin: 0 auto; order: -1; }
+    .tiles { grid-template-columns: repeat(2, 1fr); }
+    .help { grid-template-columns: 1fr; }
   }
-  .note svg { flex: 0 0 22px; width: 22px; height: 22px; margin-top: 2px; }
-
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
-  .chips li { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 15px; }
-
-  pre {
-    background: #1f2430; color: #f3efe7; padding: 14px 16px; border-radius: 14px; overflow-x: auto;
-    font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin: 10px 0 0;
-  }
-  code { font: 15px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-
-  footer { margin: 52px 0 0; padding: 26px 0 40px; border-top: 1px solid var(--line); color: var(--soft); font-size: 15px; }
-  footer .tips { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-bottom: 18px; }
-  footer .tips div { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
-  footer strong { color: var(--ink); }
-
-  @media (max-width: 720px) {
-    h1 { font-size: 34px; }
-    .hero-grid { grid-template-columns: 1fr; }
-    .hero-art { order: -1; max-width: 260px; margin: 0 auto; }
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --ink: #f2efe8; --soft: #b4b8c2; --line: #343a46; --paper: #171a21; --card: #1f2430; --glow-soft: #4a3a18; }
-    header.hero { background: radial-gradient(120% 90% at 70% 10%, #2a2416 0%, var(--paper) 60%); }
-    .steps li::before { color: #ffd88a; }
-    .say { background: #2c2617; border-color: #54451f; }
-    .note { background: #18283b; border-color: #284565; color: #cfe2f7; }
+  @media (max-width: 520px) {
+    body { font-size: 17px; }
+    .phrases { grid-template-columns: 1fr; }
+    .ch-head { grid-template-columns: 1fr; gap: 12px; }
+    .numeral { width: 60px; height: 60px; font-size: 24px; }
   }
 </style>
 </head>
@@ -123,54 +166,61 @@
 <header class="hero">
   <div class="wrap hero-grid">
     <div>
-      <p class="eyebrow">Getting started</p>
-      <h1>Welcome to your Lamp</h1>
-      <p class="lede">A lamp you can talk to. It learns who you are, helps with your day, and you can teach it new things. Here is how to go from the box to your first skill.</p>
-      <ul class="journey">
-        <li><a href="#setup"><b>1</b>Set up</a></li>
-        <li><a href="#talk"><b>2</b>Talk</a></li>
-        <li><a href="#store"><b>3</b>Add a skill</a></li>
-        <li><a href="#make"><b>4</b>Make a skill</a></li>
-        <li><a href="#share"><b>5</b>Share it</a></li>
-        <li><a href="#sdk"><b>6</b>Build with the SDK</a></li>
+      <p class="kicker">Getting started</p>
+      <h1>Hello. I'm your <em>lamp.</em></h1>
+      <p class="lede">Ten minutes from the box to our first chat. After that, teach me anything you like.</p>
+      <ul class="chapters" aria-label="Chapters">
+        <li><a href="#setup"><b>1</b>Plug in</a></li>
+        <li><a href="#walk"><b>2</b>Our first five minutes</a></li>
+        <li><a href="#talk"><b>3</b>Talk to me</a></li>
+        <li><a href="#store"><b>4</b>Add a skill</a></li>
+        <li><a href="#make"><b>5</b>Make and share one</a></li>
+        <li><a href="#sdk"><b>6</b>Build with code</a></li>
       </ul>
     </div>
-    <div class="hero-art" aria-hidden="true">
-      <!-- A desk lamp with a warm glow -->
-      <svg viewBox="0 0 320 320">
+    <div class="lamp-art" aria-hidden="true">
+      <svg viewBox="0 0 420 460">
         <defs>
-          <radialGradient id="g" cx="50%" cy="40%" r="60%">
-            <stop offset="0%" stop-color="#ffd27a" stop-opacity=".95"/>
-            <stop offset="100%" stop-color="#ffd27a" stop-opacity="0"/>
+          <radialGradient id="pool" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#ffb547" stop-opacity=".55"/>
+            <stop offset="60%" stop-color="#ffb547" stop-opacity=".10"/>
+            <stop offset="100%" stop-color="#ffb547" stop-opacity="0"/>
           </radialGradient>
-          <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#ffd98f" stop-opacity=".75"/>
-            <stop offset="100%" stop-color="#ffd98f" stop-opacity="0"/>
+          <linearGradient id="cone" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ffd08a" stop-opacity=".50"/>
+            <stop offset="100%" stop-color="#ffd08a" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#3a4560"/>
+            <stop offset="100%" stop-color="#232b3e"/>
           </linearGradient>
         </defs>
-        <ellipse cx="200" cy="292" rx="110" ry="10" fill="#000" opacity=".06"/>
-        <circle cx="205" cy="118" r="110" fill="url(#g)"/>
-        <path d="M188 150 L120 286 L290 286 L238 150 Z" fill="url(#beam)"/>
+        <!-- desk and the pool of light on it -->
+        <rect x="0" y="392" width="420" height="68" fill="#141b29"/>
+        <ellipse class="halo" cx="262" cy="398" rx="150" ry="22" fill="url(#pool)"/>
+        <path d="M232 214 L150 396 L372 396 L298 214 Z" fill="url(#cone)"/>
         <!-- base -->
-        <rect x="70" y="270" width="110" height="18" rx="9" fill="#2f3441"/>
-        <!-- lower arm -->
-        <rect x="114" y="170" width="12" height="104" rx="6" fill="#3a4050" transform="rotate(-12 120 222)"/>
-        <!-- joint -->
-        <circle cx="132" cy="168" r="10" fill="#2f3441"/>
-        <!-- upper arm -->
-        <rect x="128" y="96" width="12" height="86" rx="6" fill="#3a4050" transform="rotate(48 134 139)"/>
-        <!-- head -->
-        <g transform="rotate(18 214 122)">
-          <path d="M176 100 Q214 70 252 100 L244 146 Q214 160 184 146 Z" fill="#2f3441"/>
-          <ellipse cx="214" cy="146" rx="31" ry="9" fill="#ffe3a3"/>
-          <!-- friendly eyes on the shade -->
-          <circle cx="203" cy="116" r="4" fill="#ffe3a3"/>
-          <circle cx="225" cy="116" r="4" fill="#ffe3a3"/>
+        <ellipse cx="128" cy="390" rx="78" ry="12" fill="#0b0f18"/>
+        <rect x="56" y="370" width="144" height="20" rx="10" fill="url(#metal)"/>
+        <!-- arms -->
+        <rect x="117" y="238" width="16" height="140" rx="8" fill="url(#metal)" transform="rotate(-10 125 308)"/>
+        <circle cx="140" cy="236" r="13" fill="#2b3449" stroke="#3d4862" stroke-width="2"/>
+        <rect x="136" y="128" width="16" height="122" rx="8" fill="url(#metal)" transform="rotate(50 144 189)"/>
+        <circle cx="218" cy="140" r="11" fill="#2b3449" stroke="#3d4862" stroke-width="2"/>
+        <!-- head, tilted toward the desk, with a face -->
+        <g transform="rotate(22 262 168)">
+          <path d="M206 140 Q262 92 318 140 L306 206 Q262 226 218 206 Z" fill="url(#metal)" stroke="#45506c" stroke-width="2"/>
+          <!-- the ring of light under the shade -->
+          <ellipse class="ring" cx="262" cy="206" rx="46" ry="12" fill="none" stroke="#ffb547" stroke-width="5"/>
+          <ellipse cx="262" cy="206" rx="38" ry="8" fill="#ffe2ad" opacity=".85"/>
+          <!-- eyes -->
+          <ellipse cx="246" cy="160" rx="5" ry="6.5" fill="#ffe2ad"/>
+          <ellipse cx="278" cy="160" rx="5" ry="6.5" fill="#ffe2ad"/>
         </g>
-        <!-- little sparkles -->
-        <g fill="#f4b74a">
-          <circle cx="282" cy="64" r="3"/><circle cx="296" cy="92" r="2"/><circle cx="268" cy="38" r="2"/>
-        </g>
+        <!-- a mug and a notebook on the desk, for scale -->
+        <rect x="330" y="356" width="34" height="38" rx="6" fill="#26304a"/>
+        <path d="M364 366 q14 2 0 18" fill="none" stroke="#26304a" stroke-width="6"/>
+        <rect x="214" y="384" width="96" height="10" rx="3" fill="#2a3552"/>
       </svg>
     </div>
   </div>
@@ -178,195 +228,185 @@
 
 <main class="wrap">
 
-  <!-- 1. Set up -->
-  <section class="stage" id="setup">
-    <div class="stage-head">
-      <div class="badge" aria-hidden="true">
-        <svg viewBox="0 0 34 34" fill="none" stroke="#c98a12" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5 13a17 17 0 0 1 24 0"/><path d="M9.5 17.5a10.5 10.5 0 0 1 15 0"/><path d="M14 22a4 4 0 0 1 6 0"/><circle cx="17" cy="26.5" r="1.4" fill="#c98a12"/>
-        </svg>
-      </div>
-      <div>
-        <p class="stage-num">Step 1 · about 10 minutes</p>
-        <h2>Set up your lamp</h2>
-      </div>
+  <!-- 1 -->
+  <section class="chapter" id="setup">
+    <div class="ch-head">
+      <div class="numeral">1</div>
+      <div><h2>Plug me in, then open the app</h2><p>About five minutes. Have your Wi-Fi password ready.</p></div>
     </div>
-
-    <ol class="steps">
-      <li><strong>Plug it in</strong><p>Put the lamp where you usually sit, then plug it in. A soft light shows it is waking up.</p></li>
-      <li><strong>Open the Autonomous app and tap Add Lamp</strong><p>Your phone connects to the lamp for a moment. Its network is called <code>lamp-</code> and a few letters.</p></li>
-      <li><strong>Choose your home Wi-Fi</strong><p>Pick your network and type its password. The lamp blinks blue while it joins. If it can't join, the app tells you, and you can try again.</p></li>
-      <li><strong>Give it a few minutes</strong><p>The lamp gets its voice ready. Then it says hello, and the two of you start your first five minutes together.</p></li>
-    </ol>
-
-    <h3 style="margin:28px 0 4px;font-size:21px">Your first five minutes together</h3>
-    <p style="margin:0;color:var(--soft)">The lamp leads, one short step at a time. Say <span class="say">skip</span> for any step, and it offers it again later.</p>
-
-    <div class="walk">
+    <div class="two">
       <div>
-        <svg viewBox="0 0 30 30" fill="none" stroke="#4fa37a" stroke-width="2" stroke-linecap="round"><rect x="9" y="4" width="12" height="22" rx="6"/><path d="M15 10v6"/></svg>
-        <strong>The privacy switch</strong><span>It shows you its privacy switch. Slide it to turn the microphones off, any time.</span>
+        <ol class="steps">
+          <li><div><strong>Put me where you usually sit</strong><p>A desk or a bedside table works best, a little to one side of you. Then plug me in.</p></div></li>
+          <li><div><strong>Open the Autonomous app and tap Add Lamp</strong><p>Your phone talks to me directly for a moment, over my own little network called <b>lamp-</b> and a few letters.</p></div></li>
+          <li><div><strong>Pick your home Wi-Fi</strong><p>Type its password. If I can't join, the app tells you, and you can try again.</p></div></li>
+          <li><div><strong>Wait for my hello</strong><p>I take a few minutes to get my voice ready. Then I'll say hello, and we start.</p></div></li>
+        </ol>
+        <ul class="lights" aria-label="What my light means">
+          <li><span class="dot warm"></span>A soft glow: I'm waking up.</li>
+          <li><span class="dot blue"></span>Blinking blue: I'm joining your Wi-Fi.</li>
+        </ul>
       </div>
-      <div>
-        <svg viewBox="0 0 30 30" fill="none" stroke="#4f8fd6" stroke-width="2" stroke-linecap="round"><circle cx="15" cy="9" r="4"/><path d="M7 26c0-5 3.6-8 8-8s8 3 8 8"/></svg>
-        <strong>Sit where you usually sit</strong><span>Look at the lamp, so it learns where you will be.</span>
-      </div>
-      <div>
-        <svg viewBox="0 0 30 30" fill="none" stroke="#c98a12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h20v12H13l-5 4v-4H5z"/></svg>
-        <strong>Tell it your name</strong><span>It says your name back, so you can check it heard you right.</span>
-      </div>
-      <div>
-        <svg viewBox="0 0 30 30" fill="none" stroke="#4f8fd6" stroke-width="2" stroke-linecap="round"><circle cx="15" cy="15" r="10"/><circle cx="11.5" cy="13" r="1.2" fill="#4f8fd6"/><circle cx="18.5" cy="13" r="1.2" fill="#4f8fd6"/><path d="M11 18.5c2 2 6 2 8 0"/></svg>
-        <strong>Your face, if you like</strong><span>Say yes and it remembers your face, so it knows it's you next time.</span>
-      </div>
-      <div>
-        <svg viewBox="0 0 30 30" fill="none" stroke="#c98a12" stroke-width="2" stroke-linecap="round"><path d="M8 12v6M12 9v12M16 6v18M20 10v10M24 13v4"/></svg>
-        <strong>Say "Hey Lamp"</strong><span>A few times, the way you'd call it from your seat.</span>
-      </div>
-      <div>
-        <svg viewBox="0 0 30 30" fill="none" stroke="#4fa37a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 14V6.5a2 2 0 0 1 4 0V13l5 1.3a2.5 2.5 0 0 1 1.8 3l-1.4 5.7a3 3 0 0 1-2.9 2.3H14a3 3 0 0 1-2.4-1.2L7.5 18.5a2 2 0 0 1 3-2.6L13 18"/></svg>
-        <strong>Tap the top of its head</strong><span>Once, then let go.</span>
-      </div>
-      <div>
-        <svg viewBox="0 0 30 30" fill="none" stroke="#4f8fd6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 24h18"/><path d="M15 24V14"/><path d="M10 9l5-4 5 4-5 5z"/><path d="M22 7c2 2 2 5 0 7"/></svg>
-        <strong>Tilt its head gently</strong><span>Hold its base with one hand, tilt the head to one side with the other, and let go when it says so.</span>
-      </div>
-      <div>
-        <svg viewBox="0 0 30 30" fill="none" stroke="#c98a12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 18.5A9 9 0 1 1 11.5 6a7 7 0 0 0 9.5 12.5z"/></svg>
-        <strong>Quiet hours and hellos</strong><span>Tell it when to stay quiet, and whether it may say hello when you arrive.</span>
+      <div class="phone" aria-hidden="true">
+        <div class="screen">
+          <div class="bar"></div>
+          <h4>Add Lamp</h4>
+          <div class="row"><span>Choose your Wi-Fi</span><small>Step 2 of 3</small></div>
+          <div class="row"><span>Home</span>
+            <svg class="lock" viewBox="0 0 14 14" fill="none" stroke="#6b7488" stroke-width="1.6"><rect x="2.5" y="6" width="9" height="6.5" rx="1.5"/><path d="M4.5 6V4.5a2.5 2.5 0 0 1 5 0V6"/></svg>
+          </div>
+          <div class="row"><span>Home-5G</span>
+            <svg class="lock" viewBox="0 0 14 14" fill="none" stroke="#6b7488" stroke-width="1.6"><rect x="2.5" y="6" width="9" height="6.5" rx="1.5"/><path d="M4.5 6V4.5a2.5 2.5 0 0 1 5 0V6"/></svg>
+          </div>
+          <div class="row"><span>Password</span><small>••••••••</small></div>
+          <div class="btn">Join</div>
+          <div class="hint">Your lamp blinks blue while it joins.</div>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- 2. Talk -->
-  <section class="stage" id="talk">
-    <div class="stage-head">
-      <div class="badge" aria-hidden="true">
-        <svg viewBox="0 0 34 34" fill="none" stroke="#4f8fd6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5 8h24v14H14l-6 5v-5H5z"/><path d="M11 15h.01M17 15h.01M23 15h.01" stroke-width="3"/>
-        </svg>
-      </div>
-      <div>
-        <p class="stage-num">Step 2</p>
-        <h2>Talk to it</h2>
-      </div>
+  <!-- 2 -->
+  <section class="chapter" id="walk">
+    <div class="ch-head">
+      <div class="numeral">2</div>
+      <div><h2>Our first five minutes</h2><p>I lead, one short step at a time. Say "skip" for any step, and I'll offer it again later.</p></div>
     </div>
-    <p style="margin:0">Say <span class="say">Hey Lamp</span>, then ask in your own words. Some first things to try:</p>
+    <ol class="script">
+      <li>
+        <svg viewBox="0 0 52 52" fill="none" stroke="#ffb547" stroke-width="2.4" stroke-linecap="round"><rect x="17" y="8" width="18" height="34" rx="9"/><path d="M26 17v9"/></svg>
+        <div><h3>The privacy switch</h3><p>I show you where it is. Slide it and both my microphones are off, until you slide it back.</p></div>
+      </li>
+      <li>
+        <svg viewBox="0 0 52 52" fill="none" stroke="#ffb547" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="26" cy="15" r="7"/><path d="M12 44c0-9 6-14 14-14s14 5 14 14"/></svg>
+        <div><h3>Sit where you usually sit</h3><p>Look at me for a moment, so I learn where you'll be.</p></div>
+      </li>
+      <li>
+        <svg viewBox="0 0 52 52" fill="none" stroke="#ffb547" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12h36v20H22l-9 7v-7H8z"/></svg>
+        <div><h3>Tell me your name</h3><p>I say it back, so you can check I heard it right. If I didn't, spell it for me.</p></div>
+      </li>
+      <li>
+        <svg viewBox="0 0 52 52" fill="none" stroke="#ffb547" stroke-width="2.4" stroke-linecap="round"><circle cx="26" cy="26" r="17"/><circle cx="20" cy="22" r="1.8" fill="#ffb547"/><circle cx="32" cy="22" r="1.8" fill="#ffb547"/><path d="M19 31c4 4 10 4 14 0"/></svg>
+        <div><h3>Your face, if you like</h3><p>Say yes and I'll remember your face, so I know it's you next time. Say no and I'll still remember your name.</p></div>
+      </li>
+      <li>
+        <svg viewBox="0 0 52 52" fill="none" stroke="#ffb547" stroke-width="2.4" stroke-linecap="round"><path d="M13 22v8M19 17v18M26 12v28M33 18v16M39 23v6"/></svg>
+        <div><h3>Call me a few times</h3><p>Say <span class="say">Hey Lamp</span> from your seat, the way you would on any day.</p></div>
+      </li>
+      <li>
+        <svg viewBox="0 0 52 52" fill="none" stroke="#ffb547" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 24V11a3.5 3.5 0 0 1 7 0v11l8 2.2a4 4 0 0 1 2.9 4.8l-2.3 9a5 5 0 0 1-4.8 3.8h-9a5 5 0 0 1-4-2l-6.6-8.6a3.4 3.4 0 0 1 5.2-4.4L22 30"/></svg>
+        <div><h3>A tap on my head</h3><p><span class="lampsays">OK, next step. Tap the top of my head once, then let go.</span></p></div>
+      </li>
+      <li>
+        <svg viewBox="0 0 52 52" fill="none" stroke="#ffb547" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 42h32"/><path d="M26 42V26"/><path d="M18 17l8-7 8 7-8 8z"/><path d="M38 13c3 3 3 8 0 11"/></svg>
+        <div><h3>A gentle tilt</h3><p><span class="lampsays">Hold my base with one hand. With the other, tilt my head gently to one side. Let go when I say so.</span></p></div>
+      </li>
+      <li>
+        <svg viewBox="0 0 52 52" fill="none" stroke="#ffb547" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M36 31A15 15 0 1 1 20 11a12 12 0 0 0 16 20z"/></svg>
+        <div><h3>Quiet hours, and hellos</h3><p>Tell me when to keep quiet, and whether I may say hello when you come back to your desk.</p></div>
+      </li>
+    </ol>
+    <p class="aside"><b>Changed your mind later?</b> Say <span class="say">Lamp, let's redo the setup.</span></p>
+  </section>
+
+  <!-- 3 -->
+  <section class="chapter" id="talk">
+    <div class="ch-head">
+      <div class="numeral">3</div>
+      <div><h2>Talk to me like a friend at your desk</h2><p>Start with "Hey Lamp", then ask in your own words.</p></div>
+    </div>
     <ul class="phrases">
-      <li><span class="say">Set a timer for ten minutes.</span><em>It rings when time's up.</em></li>
-      <li><span class="say">Remind me to call Mom at six.</span><em>Ask "What reminders do I have?" any time.</em></li>
-      <li><span class="say">Make the light warmer.</span><em>Or brighter, dimmer, a colour you like.</em></li>
-      <li><span class="say">Why is the sky blue?</span><em>Ask anything you'd ask a friend.</em></li>
+      <li><span class="say">Set a timer for ten minutes.</span><small>I ring when it's up, even if we're mid-chat.</small></li>
+      <li><span class="say">Remind me to call Mom at six.</span><small>Ask "What reminders do I have?" any time.</small></li>
+      <li><span class="say">Make the light warmer.</span><small>Brighter, dimmer, or a colour you like.</small></li>
+      <li><span class="say">Why is the sky blue?</span><small>Ask me anything you'd ask a friend.</small></li>
     </ul>
-    <div class="note">
-      <svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="9"/><path d="M11 10v5M11 7h.01"/></svg>
-      <div>To stop it mid-sentence, say <span class="say">Lamp, stop.</span></div>
+    <p class="aside"><b>Talking too long?</b> Say <span class="say">Lamp, stop.</span></p>
+  </section>
+
+  <!-- 4 -->
+  <section class="chapter" id="store">
+    <div class="ch-head">
+      <div class="numeral">4</div>
+      <div><h2>Give me a new skill</h2><p>In the app: your lamp, then Skills, then Store. Tap Add, and I have it.</p></div>
+    </div>
+    <div class="two">
+      <div class="measure">
+        <p style="margin:0">Every skill in the Store is checked and signed before it gets there. Try <b>Look for things</b> first:</p>
+        <p style="margin:14px 0 0"><span class="say">Lamp, where are my keys?</span></p>
+        <p style="margin:8px 0 0;color:var(--dim)">I look around your desk, a few places either side, and tell you what I find.</p>
+        <div class="note"><span>Right after setup, I quietly download my first update. <b>If you don't see Add yet,</b> give me about 15 minutes, then look again.</span></div>
+      </div>
+      <ul class="tiles" aria-label="In the Store today">
+        <li><span></span>Look for things</li>
+        <li><span></span>Comfort break</li>
+        <li><span></span>Meal check</li>
+        <li><span></span>Sit back</li>
+      </ul>
     </div>
   </section>
 
-  <!-- 3. Store -->
-  <section class="stage" id="store">
-    <div class="stage-head">
-      <div class="badge" aria-hidden="true">
-        <svg viewBox="0 0 34 34" fill="none" stroke="#4fa37a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M7 12h20l-2 16H9z"/><path d="M12 12V9a5 5 0 0 1 10 0v3"/><path d="M17 17v6M14 20h6"/>
-        </svg>
+  <!-- 5 -->
+  <section class="chapter" id="make">
+    <div class="ch-head">
+      <div class="numeral">5</div>
+      <div><h2>Teach me something, then share it</h2><p>Describe it in one sentence. I write the skill myself, then ask whether to turn it on.</p></div>
+    </div>
+    <div class="two">
+      <div>
+        <h3 style="font-size:21px;margin-bottom:10px">Make one</h3>
+        <p style="margin:0 0 8px"><span class="say">Lamp, make me a skill that dims the light at 10 pm.</span></p>
+        <p style="margin:0;color:var(--dim)">Or type the same sentence in the app: Skills, then Make a skill. Skills you make can use my light and how I move.</p>
       </div>
       <div>
-        <p class="stage-num">Step 3</p>
-        <h2>Add a skill from the Store</h2>
+        <h3 style="font-size:21px;margin-bottom:10px">Share it</h3>
+        <ol class="steps">
+          <li><div><strong>Open it in the app</strong><p>Skills, then the skill you made.</p></div></li>
+          <li><div><strong>Tap Share</strong><p>Our team reviews every shared skill before it appears in the Store for everyone.</p></div></li>
+        </ol>
       </div>
-    </div>
-    <ol class="steps">
-      <li><strong>Open Skills in the app</strong><p>Choose your lamp, then Skills, then Store.</p></li>
-      <li><strong>Tap Add</strong><p>The lamp installs the skill in a moment. Every skill in the Store is checked and signed before it gets there.</p></li>
-      <li><strong>Use it</strong><p>Try <b>Look for things</b>: say <span class="say">Lamp, where are my keys?</span> and it looks around your desk for them.</p></li>
-    </ol>
-    <p style="margin:14px 0 0;color:var(--soft)">In the Store today:</p>
-    <ul class="chips">
-      <li>Look for things</li><li>Comfort break</li><li>Meal check</li><li>Sit back</li>
-    </ul>
-    <div class="note">
-      <svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="9"/><path d="M11 10v5M11 7h.01"/></svg>
-      <div>Right after setup, your lamp quietly downloads its first update. If you don't see Add yet, give it about 15 minutes, then look again.</div>
     </div>
   </section>
 
-  <!-- 4. Make -->
-  <section class="stage" id="make">
-    <div class="stage-head">
-      <div class="badge" aria-hidden="true">
-        <svg viewBox="0 0 34 34" fill="none" stroke="#c98a12" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M7 27L21 13"/><path d="M19 7l1.4 3.6L24 12l-3.6 1.4L19 17l-1.4-3.6L14 12l3.6-1.4z"/><path d="M27 19l.7 1.8 1.8.7-1.8.7L27 24l-.7-1.8-1.8-.7 1.8-.7z"/>
-        </svg>
-      </div>
-      <div>
-        <p class="stage-num">Step 4</p>
-        <h2>Make your own skill</h2>
-      </div>
+  <!-- 6 -->
+  <section class="chapter" id="sdk">
+    <div class="ch-head">
+      <div class="numeral">6</div>
+      <div><h2>Build with code</h2><p>For developers: Python or JavaScript. Start with a pretend lamp on your own computer.</p></div>
     </div>
-    <p style="margin:0">Tell the lamp what you want in one sentence. It writes the skill itself, then asks if it should turn it on.</p>
-    <ul class="phrases">
-      <li><b>By voice</b><span class="say">Lamp, make me a skill that dims the light at 10 pm.</span></li>
-      <li><b>In the app</b><em>Skills, then Make a skill. Type what you want, the same way you'd say it.</em></li>
-    </ul>
-    <p style="margin:12px 0 0;color:var(--soft)">Skills you make can use the lamp's light and its movement. Keep the idea short and specific.</p>
-  </section>
+    <div class="two">
+      <div class="term" aria-label="Try the SDK with a pretend lamp">
+        <div class="tbar"><i></i><i></i><i></i></div>
+<pre><span class="c"># get the SDK</span>
+<span class="p">$</span> git clone https://github.com/autonomous-ai/lampOS
+<span class="p">$</span> python3 -m venv ~/lampos-venv &amp;&amp; . ~/lampos-venv/bin/activate
+<span class="p">$</span> pip install './lampOS/sdk/python[check]'
 
-  <!-- 5. Share -->
-  <section class="stage" id="share">
-    <div class="stage-head">
-      <div class="badge" aria-hidden="true">
-        <svg viewBox="0 0 34 34" fill="none" stroke="#4f8fd6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M17 22V6"/><path d="M11 12l6-6 6 6"/><path d="M7 20v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6"/>
-        </svg>
-      </div>
-      <div>
-        <p class="stage-num">Step 5</p>
-        <h2>Share it with everyone</h2>
-      </div>
-    </div>
-    <ol class="steps">
-      <li><strong>Open the skill you made</strong><p>In the app: Skills, then the skill.</p></li>
-      <li><strong>Tap Share</strong><p>It goes to the Store team. We review every shared skill before it appears in the Store for others.</p></li>
-    </ol>
-  </section>
+<span class="c"># a pretend lamp, no hardware needed</span>
+<span class="p">$</span> LAMPOS_HOME=/tmp/lampos-try lamp fake
 
-  <!-- 6. SDK -->
-  <section class="stage" id="sdk">
-    <div class="stage-head">
-      <div class="badge" aria-hidden="true">
-        <svg viewBox="0 0 34 34" fill="none" stroke="#4fa37a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 10l-6 7 6 7"/><path d="M22 10l6 7-6 7"/><path d="M19 7l-4 20"/>
-        </svg>
+<span class="c"># later, your real lamp</span>
+<span class="p">$</span> lamp pair CODE --pin PIN
+<span class="p">$</span> lamp hello</pre>
       </div>
       <div>
-        <p class="stage-num">Step 6 · for developers</p>
-        <h2>Build with the SDK</h2>
+        <ol class="steps">
+          <li><div><strong>Add your computer in the app</strong><p>Developer computers, then Add. Choose what your programs may do. The app shows a code and my pin.</p></div></li>
+          <li><div><strong>Pair from your computer</strong><p>Run <code>lamp pair</code> with that code and pin. I give a small nod when we're paired.</p></div></li>
+          <li><div><strong>Remove it any time</strong><p>Revoke your computer in the app, and its connection closes at once.</p></div></li>
+        </ol>
+        <p class="aside">Developer computers arrives in the app with its next update; the pretend lamp works today. Full guide: <a href="https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/develop.md">Program your lamp in 10 minutes</a>.</p>
       </div>
     </div>
-    <p style="margin:0">Program your lamp from your computer, in Python or JavaScript. Start with a pretend lamp on your own machine:</p>
-<pre>git clone https://github.com/autonomous-ai/lampOS
-python3 -m venv ~/lampos-venv &amp;&amp; . ~/lampos-venv/bin/activate
-pip install './lampOS/sdk/python[check]'
-LAMPOS_HOME=/tmp/lampos-try lamp fake</pre>
-    <p style="margin:16px 0 0">Then connect your real lamp:</p>
-    <ol class="steps" style="margin-top:10px">
-      <li><strong>Add your computer in the app</strong><p>Developer computers, then Add. Choose what your programs may do. The app shows a code and your lamp's pin.</p></li>
-      <li><strong>Pair from your computer</strong><p><code>lamp pair CODE --pin PIN</code>, then <code>lamp hello</code>. The lamp gives a small nod when your computer pairs.</p></li>
-      <li><strong>Remove it any time</strong><p>Revoke your computer in the app and its connection closes at once.</p></li>
-    </ol>
-    <p style="margin:14px 0 0;color:var(--soft)">If Developer computers isn't in your app yet, it arrives with the next app update. The pretend lamp works today.</p>
-    <p style="margin:8px 0 0;color:var(--soft)">The full ten-minute guide, with your first program: <a href="https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/develop.md">Program your lamp in 10 minutes</a>.</p>
   </section>
 
   <footer>
-    <div class="tips">
-      <div><strong>Start over</strong><br>Hold the small reset hole for 5 seconds. The lamp forgets its setup and starts fresh.</div>
-      <div><strong>Do setup again</strong><br>Say <span class="say">Lamp, let's redo the setup.</span></div>
-      <div><strong>Privacy</strong><br>Slide the privacy switch to turn the microphones off. Say <span class="say">Forget everything</span> to clear what it remembers.</div>
+    <div class="help">
+      <div><h3>Start over</h3><p>Hold the small reset hole for 5 seconds. I forget my setup and start fresh.</p></div>
+      <div><h3>Privacy, your way</h3><p>Slide the privacy switch to turn my microphones off. Say <span class="say">Forget everything</span> to clear what I remember.</p></div>
+      <div><h3>Do setup again</h3><p>Say <span class="say">Lamp, let's redo the setup.</span> We'll walk through it together.</p></div>
     </div>
-    Made with care by the Autonomous team.
+    <p class="signoff">Made with care by the Autonomous team.</p>
   </footer>
 </main>
 </body>
