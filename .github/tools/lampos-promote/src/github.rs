@@ -14,7 +14,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-const MAX_JSON: u64 = 64 * 1024 * 1024;
+/// The largest JSON answer read. The paginated release list grew past
+/// 64 MiB on 5 Nov (every train publishes a pre-release with notes), which
+/// blocked the promote of 10226; looking releases up by tag follows.
+const MAX_JSON: u64 = 512 * 1024 * 1024;
 const COMMAND_LIMIT: Duration = Duration::from_secs(600);
 /// The most of the CLI's error text read, only to tell GitHub's 5xx: it is
 /// never printed or kept.
