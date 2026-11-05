@@ -53,7 +53,7 @@ pub(crate) const FACE_AGAIN: &str = "(Nobody has spoken. Ask exactly this: \"One
 /// once per setup with `LAMP_ONBOARDING_FIRST_TRIES` on (#5316, the first
 /// customers' stage 2 on #5296): the introduction ends on what to do next,
 /// a few everyday things, never a list of features.
-pub(crate) const PREFERENCES_DONE_TRIES: &str = "(Say only this, nothing before or after it: \"Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can even teach me something new, just by telling me.\")";
+pub(crate) const PREFERENCES_DONE_TRIES: &str = "(Say only this, nothing before or after it: \"Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one.\")";
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
