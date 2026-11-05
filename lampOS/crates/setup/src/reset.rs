@@ -47,6 +47,15 @@ const WIFI_COPIES: [&str; 3] = [
 
 /// The extension setup's staging copy of a file takes (`serve::stage`).
 const STAGED: &str = "lamp-setup-tmp";
+/// The journal the image keeps on the eMMC (`lamp-journal-keep`, #5358):
+/// once a reset has wiped the folder of this name, it leaves a mark there
+/// with this boot's id, so this boot's shutdown keeps nothing of it. A reset
+/// that ends in a reboot, not a start in place (which empties the journal),
+/// would otherwise copy the old owner's lines back (Twelve's P2 on #5365).
+const KEPT_JOURNAL: &str = "lamp-journal";
+/// The keep's mark, and where this boot's id is read.
+const FORGOTTEN_BOOT: &str = ".forgotten-boot";
+const BOOT_ID: &str = "/proc/sys/kernel/random/boot_id";
 
 /// Whether Wi-Fi may put an old network back (`lamp-setup wifi-restore`, at
 /// boot and after a change helper's stop): never while a reset is
@@ -846,6 +855,22 @@ fn parts_of(stop: &[String], effects: &mut impl Effects) -> io::Result<Vec<Strin
     Ok(parts)
 }
 
+/// After the kept journal at `folder` is wiped: this boot's shutdown keeps
+/// nothing of it ([`KEPT_JOURNAL`]). Best effort: with no boot id there is
+/// nothing to mark, and a mark that can't be written is said.
+fn forget_this_boot(folder: &Path) {
+    let Ok(id) = fs::read_to_string(BOOT_ID) else {
+        return;
+    };
+    let marked =
+        fs::create_dir_all(folder).and_then(|()| fs::write(folder.join(FORGOTTEN_BOOT), id.trim()));
+    if let Err(error) = marked {
+        eprintln!(
+            "lamp-setup: reset: the kept journal's boot mark could not be written ({error}); this boot's shutdown may keep it"
+        );
+    }
+}
+
 /// Begin a reset: journal, remove the marker, stop the lamp, wipe, then start
 /// setup in place ([`stop_and_wait_keeping`]), or reboot where it can't.
 /// If the stop fails, reboot at once without wiping: setup finishes the wipe
@@ -992,6 +1017,9 @@ fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io:
         wipe(&path.with_extension(STAGED))?;
         wipe(path)?;
         steps.push(Step::Wiped(path.clone()));
+        if path.file_name() == Some(KEPT_JOURNAL.as_ref()) {
+            forget_this_boot(path);
+        }
     }
     let removed = effects.remove_installed_skills()?;
     if removed > 0 {

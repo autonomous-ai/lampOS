@@ -309,6 +309,27 @@ fn a_reset_stops_wipes_removes_the_marker_and_reboots_in_that_order() {
     );
 }
 
+/// #5358, Twelve's P2 on #5365: a reset that ends in a reboot wipes the kept
+/// journal and leaves the keep its mark with this boot's id, so the reboot's
+/// shutdown keeps nothing of the old owner's boot (`lamp-journal-keep`).
+#[test]
+fn a_reset_marks_this_boot_so_its_shutdown_keeps_no_journal() {
+    let root = Root::new();
+    let mut plan = lamp(&root);
+    let kept = root.path("lamp-journal");
+    fs::create_dir_all(kept.join("last")).unwrap();
+    fs::write(kept.join("last/system@a.journal"), b"j").unwrap();
+    plan.wipe.push(kept.clone());
+    let steps = reset::reset(&plan, &mut Fake::default()).unwrap();
+    assert_eq!(steps.last(), Some(&Step::Rebooting));
+    assert!(!kept.join("last").exists());
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id").unwrap();
+    assert_eq!(
+        fs::read_to_string(kept.join(".forgotten-boot")).unwrap(),
+        boot.trim()
+    );
+}
+
 /// lamp-29e7 on 26 Oct: `systemctl stop lampos.target` returned before the
 /// target's parts had stopped, and Voice's onboarding commit, written as it
 /// stopped, outlived the wipe, so the customer got no first five minutes.
@@ -748,7 +769,7 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 43] = [
+const PERSON_STORES: [&str; 45] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
@@ -818,9 +839,12 @@ const PERSON_STORES: [&str; 43] = [
     // The person's light the ring keeps with `LAMP_LIGHT_KEEP=on` (#1468):
     // the folder, so a `person.json.new` a power cut left goes too.
     "/var/lib/lampOS/light",
-    // A first-time setup's journal the image keeps on the eMMC (#5144,
-    // `lamp-journal-keep setup`): its lines can hold what the person said.
+    // The journal the image keeps on the eMMC (`lamp-journal-keep`): a
+    // first-time setup's (#5144) and the last two boots' (#2602, #5358).
+    // Their lines can hold what the person said.
     "/var/lib/lamp-journal/setup",
+    "/var/lib/lamp-journal/last",
+    "/var/lib/lamp-journal/previous",
     // What setup saves, and its marker: the user's key, to the voice and to
     // the Policy (the owner, #806, 16:13), and the name.
     "/etc/lampOS/voice/credential",

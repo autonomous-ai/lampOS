@@ -455,3 +455,189 @@ fn a_failed_move_keeps_the_kept_boots_and_says_so() {
     names.sort();
     assert_eq!(names, ["last", "previous"]);
 }
+
+/// Runs the keep script's `step` as the lamp would, on this boot (`boot`).
+fn boots_keep(
+    step: &str,
+    boot: &std::path::Path,
+    from: &std::path::Path,
+    keep: &std::path::Path,
+    run: &std::path::Path,
+) -> String {
+    boots_keep_at(step, boot, from, keep, run, None)
+}
+
+/// [`boots_keep`], with `date` saying `now` (Unix seconds) when given, and
+/// a `journalctl`, `systemctl`, `pkill` and `killall` in `PATH` that fail
+/// the run if called: the keep never asks journald for anything here
+/// (Twelve's P3s on #5365).
+fn boots_keep_at(
+    step: &str,
+    boot: &std::path::Path,
+    from: &std::path::Path,
+    keep: &std::path::Path,
+    run: &std::path::Path,
+    now: Option<u64>,
+) -> String {
+    use std::os::unix::fs::PermissionsExt;
+    let bin = tempfile::tempdir().unwrap();
+    let called = bin.path().join("called");
+    let mut tools: Vec<(&str, String)> = ["journalctl", "systemctl", "pkill", "killall"]
+        .iter()
+        .map(|tool| {
+            (
+                *tool,
+                format!(
+                    "#!/bin/sh\necho \"{tool} $*\" >>'{}'\nexit 1\n",
+                    called.display()
+                ),
+            )
+        })
+        .collect();
+    if let Some(now) = now {
+        tools.push((
+            "date",
+            format!(
+                "#!/bin/sh\n[ \"$1\" = +%s ] && {{ echo {now}; exit 0; }}\nexec /bin/date \"$@\"\n"
+            ),
+        ));
+    }
+    for (tool, text) in tools {
+        let path = bin.path().join(tool);
+        fs::write(&path, text).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let out = Command::new("bash")
+        .arg(rootfs().join("usr/local/libexec/lamp-journal-keep"))
+        .arg(step)
+        .env(
+            "PATH",
+            format!(
+                "{}:{}",
+                bin.path().display(),
+                std::env::var("PATH").unwrap()
+            ),
+        )
+        .env("LAMP_JOURNAL_STATE", "stopping")
+        .env("LAMP_JOURNAL_FROM", from)
+        .env("LAMP_JOURNAL_KEEP", keep)
+        .env("LAMP_JOURNAL_RUN", run)
+        .env("LAMP_JOURNAL_BOOT_ID", boot)
+        .env("LAMP_JOURNAL_SETUP_DONE", keep.join("no-setup-done"))
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        !called.exists(),
+        "{}",
+        fs::read_to_string(&called).unwrap_or_default()
+    );
+    String::from_utf8_lossy(&out.stderr).into_owned()
+}
+
+/// Sets each file in `folder` closed `ago_s` seconds back.
+fn closed_ago(folder: &std::path::Path, ago_s: u64) {
+    for entry in fs::read_dir(folder).unwrap() {
+        fs::File::options()
+            .write(true)
+            .open(entry.unwrap().path())
+            .unwrap()
+            .set_modified(std::time::SystemTime::now() - std::time::Duration::from_secs(ago_s))
+            .unwrap();
+    }
+}
+
+/// #5358, the PM's privacy ruling: the owner's forget everything leaves
+/// `.forgotten-boot` with this boot's id (lamp-voice's `setup_journal`), and
+/// that boot's shutdown keeps nothing of it; a mark from an earlier boot is
+/// spent and the next shutdown keeps as before.
+#[test]
+fn a_boot_the_owner_forgot_is_not_kept_at_its_shutdown() {
+    let root = tempfile::tempdir().unwrap();
+    let (from, keep, run, boot) = (
+        root.path().join("var/log/journal/0123456789abcdef"),
+        root.path().join("var/lib/lamp-journal"),
+        root.path().join("run/log/journal"),
+        root.path().join("boot_id"),
+    );
+    fs::write(&boot, "boot-1\n").unwrap();
+    fs::create_dir_all(&keep).unwrap();
+    // What the forget leaves: this boot's id, the copies gone.
+    fs::write(keep.join(".forgotten-boot"), "boot-1").unwrap();
+    a_boot(&from, "a", &[1000, 1000]);
+    boots_keep("keep", &boot, &from, &keep, &run);
+    assert!(!keep.join("last").exists());
+    // The next boot: the mark is spent, and its shutdown keeps it.
+    fs::write(&boot, "boot-2\n").unwrap();
+    a_boot(&from, "b", &[1000]);
+    boots_keep("keep", &boot, &from, &keep, &run);
+    assert!(kept(&keep, "last")[0].starts_with("system@b-"));
+    assert!(!keep.join(".forgotten-boot").exists());
+}
+
+/// #5358: no boot's copy is kept past 72 hours from when its file closed.
+/// The shutdown copies none older, and the boot's `link` and every `setup`
+/// run (every 3 minutes) delete any older, with their links, and say so.
+#[test]
+fn the_kept_boots_are_kept_72_hours_at_most() {
+    let root = tempfile::tempdir().unwrap();
+    let (from, keep, run, boot) = (
+        root.path().join("var/log/journal/0123456789abcdef"),
+        root.path().join("var/lib/lamp-journal"),
+        root.path().join("run/log/journal"),
+        root.path().join("boot_id"),
+    );
+    fs::write(&boot, "boot-1\n").unwrap();
+    // A shutdown of a boot whose files closed 73 hours ago keeps none.
+    a_boot(&from, "a", &[1000, 1000]);
+    for entry in fs::read_dir(&from).unwrap() {
+        let path = entry.unwrap().path();
+        if path.to_string_lossy().contains('@') {
+            fs::File::options()
+                .write(true)
+                .open(&path)
+                .unwrap()
+                .set_modified(
+                    std::time::SystemTime::now() - std::time::Duration::from_secs(73 * 3600),
+                )
+                .unwrap();
+        }
+    }
+    boots_keep("keep", &boot, &from, &keep, &run);
+    assert!(!keep.join("last").exists());
+    // Two boots kept, then linked at boot.
+    a_boot(&from, "b", &[1000]);
+    boots_keep("keep", &boot, &from, &keep, &run);
+    a_boot(&from, "c", &[1000]);
+    boots_keep("keep", &boot, &from, &keep, &run);
+    boots_keep("link", &boot, &from, &keep, &run);
+    let links = |run: &std::path::Path| fs::read_dir(run).map_or(0, |entries| entries.count());
+    assert_eq!(links(&run), 2);
+    // 71 hours on: both kept.
+    closed_ago(&keep.join("previous"), 71 * 3600);
+    closed_ago(&keep.join("last"), 71 * 3600);
+    boots_keep("setup", &boot, &from, &keep, &run);
+    assert_eq!(links(&run), 2);
+    // A clock not set yet (2001) deletes nothing, whatever the files' age.
+    closed_ago(&keep.join("previous"), 72 * 3600);
+    for step in ["setup", "link"] {
+        boots_keep_at(step, &boot, &from, &keep, &run, Some(1_000_000_000));
+    }
+    assert!(keep.join("previous").exists());
+    assert_eq!(links(&run), 2);
+    // The boot before 72 hours on: a `setup` run deletes it and its link.
+    closed_ago(&keep.join("previous"), 72 * 3600);
+    let said = boots_keep("setup", &boot, &from, &keep, &run);
+    assert!(said.contains("deleted after 72 hours"), "{said}");
+    assert!(!keep.join("previous").exists());
+    assert_eq!(links(&run), 1);
+    // The last one too, this time at boot.
+    closed_ago(&keep.join("last"), 80 * 3600);
+    boots_keep("link", &boot, &from, &keep, &run);
+    assert!(!keep.join("last").exists());
+    assert_eq!(links(&run), 0);
+}

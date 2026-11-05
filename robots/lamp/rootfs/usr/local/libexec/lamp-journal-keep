@@ -46,8 +46,17 @@
 #   most, each file written once. A lamp whose walk ended before this ran
 #   keeps nothing. Journald is never rotated, restarted nor signalled here.
 #
-# The paths, and the state, may be given for tests only; with them given,
-# journald isn't asked to rotate.
+# The last two boots' copies hold the same kind of lines as the setup's, so
+# they follow its rules too (#5358, the PM's privacy ruling): a reset wipes
+# them (both reset plans wipe /var/lib/lamp-journal), the owner's "forget
+# everything" removes them and leaves .forgotten-boot with this boot's id,
+# so the shutdown of that boot keeps nothing of it, and no file is kept
+# past 72 hours from when it was closed: `keep` copies none older, and
+# `link` at boot and every `setup` run (every 3 minutes) delete any older,
+# with their links. Nothing is deleted on a clock not set yet.
+#
+# The paths, the state and the boot's id may be given for tests only; with
+# them given, journald isn't asked to rotate.
 keep=${LAMP_JOURNAL_KEEP:-/var/lib/lamp-journal}
 run=${LAMP_JOURNAL_RUN:-/run/log/journal}
 budget=5000000
@@ -76,6 +85,30 @@ walking() {
     return 1
 }
 
+# This boot's id, as the voice's forget reads it (setup_journal.rs).
+boot_id() {
+    cat "${LAMP_JOURNAL_BOOT_ID:-/proc/sys/kernel/random/boot_id}" 2>/dev/null
+}
+
+# The last two boots' files closed more than 72 hours ago are deleted, with
+# their links; a slot left empty goes too. Only on a clock that is set.
+expire_boots() {
+    local now file name slot
+    now=$(date +%s)
+    [ "$now" -ge "$clock_set" ] || return 0
+    for slot in previous last; do
+        for file in "$keep/$slot"/*.journal; do
+            [ -f "$file" ] || continue
+            [ $((now - $(stat -c %Y "$file"))) -ge "$setup_life" ] || continue
+            name=${file##*/}
+            rm -f "$file" "$run/lamp-kept-$slot-${name//@/.}"
+            echo "lamp-journal-keep: a kept boot's file is deleted after 72 hours" >&2
+        done
+        rmdir "$keep/$slot" 2>/dev/null
+    done
+    return 0
+}
+
 # Links each setup copy whose original is gone from `$1` (all of them with
 # no `$1`) into $run, as lamp-kept-setup-….journal.
 setup_links() {
@@ -92,6 +125,14 @@ case "$1" in
 keep)
     state=${LAMP_JOURNAL_STATE:-$(systemctl is-system-running 2>/dev/null)}
     [ "$state" = stopping ] || exit 0
+    # The owner forgot everything during this boot: none of it is kept. A
+    # mark from an earlier boot is spent.
+    if [ -f "$keep/.forgotten-boot" ]; then
+        if [ "$(cat "$keep/.forgotten-boot")" = "$(boot_id)" ]; then
+            exit 0
+        fi
+        rm -f "$keep/.forgotten-boot"
+    fi
     if [ -n "${LAMP_JOURNAL_FROM:-}" ]; then
         from=$LAMP_JOURNAL_FROM
     else
@@ -106,7 +147,13 @@ keep)
     total=0
     # Closed files only: an archived name has "@"; the open ones journald
     # starts after the rotation hold the shutdown's last lines only.
+    now=$(date +%s)
     for file in $(ls -1t "$from"/*@*.journal 2>/dev/null); do
+        # None closed more than 72 hours ago: newest first, so none after.
+        if [ "$now" -ge "$clock_set" ] &&
+            [ $((now - $(stat -c %Y "$file"))) -ge "$setup_life" ]; then
+            break
+        fi
         size=$(wc -c <"$file")
         [ $((total + size)) -le $budget ] || break
         cp -p "$file" "$new/" || break
@@ -141,6 +188,7 @@ keep)
 link)
     mkdir -p "$run" || exit 0
     rm -f "$run"/lamp-kept-*.journal
+    expire_boots
     for slot in previous last; do
         for file in "$keep/$slot"/*.journal; do
             [ -f "$file" ] || continue
@@ -151,6 +199,7 @@ link)
     setup_links ""
     ;;
 setup)
+    expire_boots
     done_marker=${LAMP_JOURNAL_SETUP_DONE:-/var/lib/lampos-setup/done}
     progress=${LAMP_JOURNAL_PROGRESS:-/var/lib/lampOS/voice/onboarding/progress.json}
     from=${LAMP_JOURNAL_FROM:-/var/log/journal/$(cat /etc/machine-id 2>/dev/null)}
