@@ -1372,8 +1372,10 @@ fn a_reminder_said_late_is_listed_as_said_to_its_own_line_only() {
         );
         assert_eq!(told["result"]["status"], "committed", "{told}");
     }
-    // Thirteen hours on, the microphones open and both are said.
-    *schedule.clock.0.lock().unwrap() = sample(13 * 3_600_000);
+    // An hour on, the microphones open and both are said, 50 minutes
+    // late. Thirteen hours late, as on 29e7, they are too late to be said
+    // now (#5258).
+    *schedule.clock.0.lock().unwrap() = sample(3_600_000);
     thread::sleep(Duration::from_millis(1_200));
     ack_pending(&schedule);
     let list = actions.call_as("list_reminders", json!({}), ann.clone());
@@ -1382,7 +1384,7 @@ fn a_reminder_said_late_is_listed_as_said_to_its_own_line_only() {
     let said_texts: Vec<_> = said.iter().map(|s| s["text"].as_str().unwrap()).collect();
     assert_eq!(said_texts, ["Buy the gift", "Send the report"], "{list}");
     assert_eq!(said[0]["waiting_for_answer"], true);
-    assert_eq!(said[0]["said_clock"], "21:00");
+    assert_eq!(said[0]["said_clock"], "09:00");
     assert_eq!(said[0]["said_day"], "today");
     assert_eq!(said[0]["due_clock"], "08:10");
     assert_eq!(list["result"]["said_complete"], true);

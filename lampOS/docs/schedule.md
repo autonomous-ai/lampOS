@@ -442,6 +442,52 @@ ahead, so the ones missed in between are stepped over, not delivered. The
 stored deadline is not rewritten by a scan (its receipt names it); only an
 acknowledgement moves it. With an untrusted wall clock nothing is stepped.
 
+**Too late to mean anything is dropped, never said** (#5258, #5219, the PM's
+yes on #5385, 5 Nov 18:29). On lamp-e82d a one-minute timer due 21:49:37
+rang into a sleep mute, was never proven said, and was offered again 18.4
+hours later as the lamp woke. Every scan (`Engine::tick`, which also runs
+before every request) drops a pending occurrence that is:
+
+- a **timer** more than `TIMER_TOO_LATE_MS` (10 min) past due. A timer here
+  is one set for at most `ROOM_TIMER_MS` (2 h), a kitchen's or a roast's
+  (`Item::short_timer`); a longer one set from now ("in three weeks, renew
+  my prescription") is a reminder for this rule;
+- a **reminder** more than `REMINDER_TOO_LATE_MS` (2 h) past due, or due on
+  an earlier day than today in the lamp's zone (`time::earlier_day`): one
+  due at 23:50 is not said at 00:05.
+
+Exactly 10 min or 2 h late is still said. Lateness is `late_by_ms` as `due`
+and `get` report it (a repeat's newest missed occurrence); one whose lateness
+is unknown (the wall clock not yet trusted) is never dropped. Only Schedule
+makes an occurrence due, so the rule covers the first offer after time off,
+a long mute or a sleep, and every later one: an attempt the voice holds or
+offers once more finds the item gone (`not_found`, or a stale delivery), as
+after a cancel. A ring already playing as the cut-off passes plays out, and
+its completion is resolved as a cancelled one's is. No switch: like #5219's
+fix, it changes when an existing behaviour ends, not what the lamp does.
+
+A dropped one-off leaves the items; a dropped repeat goes on to its next
+occurrence still ahead, as an acknowledged one does. Schedule writes one line
+for each, never its words: `schedule: timer id 7 delivery 1 dropped, too late
+to mean anything (late_by_ms 66240000); it is not said`. The store keeps it in
+its own record, `dropped_late`, shaped and bounded as the said record (below;
+`said_unix_ms` is when it was dropped, `waiting` is false), so it is never
+told as said. It is optional stored metadata, so no `schema` bump: an older
+build ignores it and drops it on its next save. A person's `forget` drops
+theirs too. The drop clears the last mutation's exact-retry receipt when it
+names the dropped item as it was; a retry then meets the newer revision, a
+`conflict`, never a second item.
+
+Tests (`crates/schedule/tests/it/engine.rs`):
+`a_timer_ten_minutes_late_still_rings_and_one_a_second_more_is_dropped`,
+`a_reminder_two_hours_late_still_rings_and_one_a_second_more_is_dropped`,
+`a_reminder_due_before_local_midnight_is_dropped_after_it`,
+`a_timer_waiting_out_a_sleep_mute_is_dropped_not_rung_when_the_lamp_wakes`,
+`a_repeat_too_late_drops_only_that_occurrence` and
+`nothing_is_dropped_on_a_clock_not_yet_trusted`; the line,
+`a_dropped_one_is_logged_by_kind_id_and_lateness_never_its_words`
+(`engine.rs`).
+
 Acknowledging a one-off removes it from the items and keeps it in the said
 record (below). Acknowledging a repeat advances to its
 next occurrence still ahead and increments its delivery token. Cancellation removes
@@ -454,7 +500,8 @@ On lamp-29e7 on 1 Nov four one-time reminders, 13 to 38 hours late after
 the microphones had been closed, were said back to back in 34 s as they
 opened, in the middle of a conversation; each acknowledgement removed its
 item, and six minutes later "what reminders did I set earlier?" listed
-nothing and the lamp said "I don't see either still set". So:
+nothing and the lamp said "I don't see either still set". (That late, they
+are now dropped, never said, above.) So:
 
 - **The said record.** The store keeps the one-time reminders and timers
   already said (`State::said`): the text, kind, due instant and its local
@@ -1295,7 +1342,9 @@ once it has read open, and a reminder pending then is no mute's, so it gives
 no line that would later hold back the real one (the reviewer on #1551).
 When they open, it is the first turn the voice's loop may take, said as any
 late reminder is, and resolved `said`; one that waited an hour or more
-follows the one-hour rule above. With `LAMP_REMINDER_PULSE=on` (and
+follows the one-hour rule above. A timer that waited more than 10 minutes, or
+a reminder more than 2 hours or past midnight, is no longer due when they
+open: Schedule dropped it (#5258, "Too late to mean anything" above). With `LAMP_REMINDER_PULSE=on` (and
 `LAMP_RING_ASLEEP=on`), the asleep face shows one soft pulse a minute while
 it is owed and the switch or a mute holds the microphones (not asleep), the
 first at its due time, for half an hour from then at most ([ring-choreography.md](ring-choreography.md), "The asleep face"). One cancelled meanwhile is withdrawn and
@@ -1355,7 +1404,31 @@ existing look policy.
 Only a successful provider terminal joined with ended input, empty PCM, no
 speaker work, no playback occurrence, no gaps/reset, and actual final
 provider-origin retirement produces a completion record. Multiple generations
-must all retire. Zero audio, local failure notices, partial acceptance, first
+must all retire.
+
+**A play with gaps that mostly sounded counts as said** (#5258, #5219, the
+PM's yes on #5385). On lamp-e82d (stable 10226) a reminder played through
+with gaps in its playback (`audio_written_with_playback_gaps_unscored`) was
+given up as never proven said and said again, three times in three hours.
+Now a reply heard through (`Reply::heard_through`: settled, the provider's
+answer complete, every sample of its audio written, nobody else's turn, the
+microphones allowed) whose playback had gaps completes its reminder when its
+words were at least `MOSTLY_PLAYED_PERCENT` (80%) of what the speaker wrote
+for it: the samples handed to the speaker (`Reply::handed`) against those and
+the zeros the speaker filled into its delivery gaps (`Reply::gap_zeros`, from
+the gaps' accepted-zero receipts: a start's first block, then the rest at its
+end; a listening gap's zeros held at a sentence's end, #828, count only once
+they ran past its hold, as the gap itself does). Since a reply heard through
+wrote all its audio, only the gaps' silence can bring it under 80%. Under it
+the play is given up as before and offered once more. The voice says
+`lamp-voice: the reminder played through N gap(s), its words W of T frames
+written: counted as said (#5258)`, and a skill's say on it is `spoken`. A cut,
+failed or reset play is unchanged. Tests
+(`coordinator/tests/reminders.rs`):
+`a_reminder_played_through_gaps_counts_as_said_from_80_percent_of_its_words`
+(1,200 frames of words: 300 zeros is 80%, said; 320 is 79%, offered once
+more), `reset_or_playback_gap_cannot_be_relabeled_whole_reminder_completion`
+and `a_listening_gaps_zeros_count_against_the_words_only_once_it_overran`. Zero audio, local failure notices, partial acceptance, first
 audio, cancelled tails and late callbacks cannot acknowledge. The receipt is
 the speaker's ALSA cursor evidence, not proof of acoustic fidelity or that a
 person heard it. A failed reminder does not play a local failure recording.
@@ -1380,7 +1453,8 @@ Voice tries the whole-reply join. It reports `spoken` only when the record is
 reset can invalidate the receipt without adding a playback gap; that case
 reports `dropped` with `reminder_completion_unconfirmed`, never `spoken` beside
 an abandoned reminder. Provider failures and playback gaps keep their existing
-failure reasons. Ordinary says and skill sounds keep their existing checks.
+failure reasons, except a play with gaps that counts as said (above), which
+is `spoken`. Ordinary says and skill sounds keep their existing checks.
 This read adds no I/O or wait to the audio loop, and does not claim the worker
 has already durably stored completion or acknowledged Schedule. The coordinator
 fixtures pair the actual say ticket with clean, partially accepted, reset, gap,
@@ -1425,7 +1499,11 @@ and waits for a pause in the talk). Each reminder joined to that line is
 treated the same way, each under its own attempt. A second abandon of the same
 item holds it, with the `held` line, so an attempt heard without proof is said
 twice at most; one said once more and never again is better than one never
-said.
+said. A play heard through gaps that wrote 80% or more of its words is no
+abandon: it counts as said (above). Neither a re-offer nor a held item
+outlives the cut-off for one too late to mean anything: Schedule drops it
+(10 min for a timer, 2 h or an earlier day for a reminder), and the attempt
+then finds the item gone.
 
 **A ring the person stopped is held (`LAMP_RING_STOP_ENDS_IT`, off).** "Stop"
 said over a timer's ring, the head or the button cuts the reply as talk does

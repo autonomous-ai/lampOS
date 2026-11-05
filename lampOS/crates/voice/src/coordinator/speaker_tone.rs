@@ -221,6 +221,7 @@ pub(super) fn commit_sound_turn(
         told_stop: None,
         final_chunk: None,
         playback_gaps: 0,
+        gap_zeros: GapZeros::default(),
         notice: sound,
         media: Default::default(),
         local_only: None,

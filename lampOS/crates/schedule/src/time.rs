@@ -689,6 +689,20 @@ pub fn set_at(unix_ms: i64, now: &ClockSample, zone: &str) -> Result<(String, St
     Ok((set.to_string(), day))
 }
 
+/// Whether `unix_ms` falls on a day before `now`'s in the lamp's zone
+/// `zone` (#5258, #5219: a reminder due before midnight is not said after
+/// it). None while `now`'s wall clock is not trusted: no day is told on a
+/// guess.
+pub fn earlier_day(unix_ms: i64, now: &ClockSample, zone: &str) -> Result<Option<bool>, TimeError> {
+    if !now.wall_trusted {
+        return Ok(None);
+    }
+    let zone = named_zone(zone)?;
+    let then = timestamp(unix_ms)?.to_zoned(zone.clone()).date();
+    let today = timestamp(now.unix_ms)?.to_zoned(zone).date();
+    Ok(Some(then < today))
+}
+
 fn first_repeat(
     raw_time: &str,
     zone_name: &str,

@@ -79,13 +79,34 @@ struct Schedule {
     lose_acks: Arc<AtomicBool>,
     /// How far Schedule's clock has been moved on, in ms.
     advanced: Arc<AtomicU64>,
+    /// Its items are reminders at 08:00, not one-second timers ([`due_when`]).
+    reminders: bool,
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
 }
+/// When the fixture's items fall due: a second after they are set, a timer,
+/// or for [`RoundtripFixture::of_reminders`], at 08:00, a reminder, which
+/// stays said late for up to two hours (#5258): a timer is dropped once it
+/// is ten minutes late.
+fn due_when(reminders: bool) -> When {
+    if reminders {
+        When::At {
+            time: "08:00".into(),
+            day: None,
+            zone: None,
+            fold: None,
+        }
+    } else {
+        When::After { seconds: 1 }
+    }
+}
+
 impl Schedule {
-    fn new(root: &Directory) -> Self {
+    fn new(root: &Directory, reminders: bool) -> Self {
         let mut created = clock();
-        created.unix_ms -= 1000;
+        // A second before 08:00:01, its due time; a reminder's set at 07:59:59
+        // for 08:00.
+        created.unix_ms -= if reminders { 2000 } else { 1000 };
         created.boot_ms = 0;
         let mut engine = Engine::open(
             Store::open(&root.child("schedule")).unwrap(),
@@ -104,7 +125,7 @@ impl Schedule {
                         request_id: "roundtrip-create".into(),
                     },
                     text: TEXT.into(),
-                    when: When::After { seconds: 1 },
+                    when: due_when(reminders),
                 },
                 &created,
             )
@@ -172,6 +193,7 @@ impl Schedule {
             advanced,
             stop,
             thread: Some(thread),
+            reminders,
         }
     }
 }
@@ -202,9 +224,17 @@ pub(crate) struct RoundtripFixture {
 }
 impl RoundtripFixture {
     pub(crate) fn new() -> Self {
+        Self::with_items(false)
+    }
+    /// The same with reminders due at 08:00, not one-second timers, for a
+    /// test of one said more than ten minutes late (#5258).
+    pub(crate) fn of_reminders() -> Self {
+        Self::with_items(true)
+    }
+    fn with_items(reminders: bool) -> Self {
         let directory = Directory::new();
         let ledger_directory = directory.child("ledger");
-        let schedule = Schedule::new(&directory);
+        let schedule = Schedule::new(&directory, reminders);
         let bus = Bus::new(directory.0.join("bus")).unwrap();
         let publisher = bus
             .publisher_declared(ScheduleDue::TOPIC, &ScheduleDue::declaration(), "schedule")
@@ -339,7 +369,12 @@ impl RoundtripFixture {
     /// as the person set them before the microphones closed (29e7).
     pub(crate) fn set_more(&self, texts: &[&str]) {
         let schedule = self.schedule.as_ref().unwrap();
-        let at = clock_after(schedule.advanced.load(Ordering::Acquire));
+        let mut at = clock_after(schedule.advanced.load(Ordering::Acquire));
+        if schedule.reminders {
+            // Reminders for 08:00, set at 07:59:59 on the wall clock; only
+            // the boot clock must not go back.
+            at.unix_ms = WALL - 1000;
+        }
         let mut engine = schedule.engine.lock().unwrap();
         for (index, text) in texts.iter().enumerate() {
             let guard = Guard {
@@ -353,7 +388,7 @@ impl RoundtripFixture {
                         person: None,
                         guard,
                         text: (*text).into(),
-                        when: When::After { seconds: 1 },
+                        when: due_when(schedule.reminders),
                     },
                     &at,
                 )

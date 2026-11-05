@@ -1005,20 +1005,26 @@ fn never_voiced_attempts_are_offered_again_five_times_then_held() {
     ticks_offer_nothing(&mut worker, &engine, &socket, 4);
 }
 
-/// Four reminders 39 hours late, served as one late line, and the sample
-/// time they are served at.
+/// Four reminders set for three to four hours, so kept as reminders, not
+/// timers, and when each is due, in seconds: oldest first, Drink water,
+/// Water timer, Send the report, Buy the gift. 29e7's were 13 to 38 hours
+/// late, too late to be said now (#5258).
+const LATE_FOUR: [(&str, u64); 4] = [
+    ("Send the report", 3 * 3_600 + 600),
+    ("Buy the gift", 4 * 3_600),
+    ("Drink water", 3 * 3_600),
+    ("Water timer", 3 * 3_600 + 60),
+];
+/// When they are served: half an hour to an hour and a half late, said late
+/// and not too late (#5258).
+const LATE_FOUR_MS: u64 = 4 * 3_600_000 + 1_800_000;
+
+/// Four reminders late, served as one late line, and the sample time they
+/// are served at.
 fn late_four() -> (Arc<Mutex<Engine<Disk>>>, Socket, u64) {
-    const LATE: u64 = 39 * 3_600_000;
+    const LATE: u64 = LATE_FOUR_MS;
     let mut engine = Engine::open(Disk::default(), "Etc/UTC", &sample(0), STORE_ID).unwrap();
-    for (index, (text, seconds)) in [
-        ("Send the report", 3_600),
-        ("Buy the gift", 6 * 3_600),
-        ("Drink water", 60),
-        ("Water timer", 120),
-    ]
-    .into_iter()
-    .enumerate()
-    {
+    for (index, (text, seconds)) in LATE_FOUR.into_iter().enumerate() {
         engine
             .answer(
                 Request::Set {
@@ -1888,17 +1894,9 @@ fn the_journal_says_what_became_of_each_due_item_once_per_change() {
 /// them once every one is acknowledged.
 #[test]
 fn late_ones_are_offered_as_one_line_and_noticed_after_their_acks() {
-    const LATE: u64 = 39 * 3_600_000;
+    const LATE: u64 = LATE_FOUR_MS;
     let mut engine = Engine::open(Disk::default(), "Etc/UTC", &sample(0), STORE_ID).unwrap();
-    for (index, (text, seconds)) in [
-        ("Send the report", 3_600),
-        ("Buy the gift", 6 * 3_600),
-        ("Drink water", 60),
-        ("Water timer", 120),
-    ]
-    .into_iter()
-    .enumerate()
-    {
+    for (index, (text, seconds)) in LATE_FOUR.into_iter().enumerate() {
         engine
             .answer(
                 Request::Set {
