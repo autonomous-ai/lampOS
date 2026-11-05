@@ -402,6 +402,9 @@ impl<S: Save> Save for ReleasingSave<'_, S> {
     fn first_volume(&mut self) {
         self.save.first_volume()
     }
+    fn update_first(&mut self, phase: &mut dyn FnMut(&str)) -> Option<crate::first_update::Ended> {
+        self.save.update_first(phase)
+    }
     fn marker(&mut self) -> io::Result<()> {
         if let Some(light) = self.light {
             light.release();

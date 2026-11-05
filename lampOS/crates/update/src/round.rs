@@ -720,7 +720,7 @@ impl Run<'_, '_> {
             .as_deref().is_some_and(crate::setup_lifecycle::manager_matches)
             // The bounded manager query can take time; reset may have removed
             // completion meanwhile. This last observation is not a reset lock.
-            && crate::setup_lifecycle::done(&self.config.root)
+            && crate::setup_lifecycle::settled(&self.config.root)
     }
 
     fn say(&mut self, line: &str) {
@@ -2604,7 +2604,11 @@ impl Run<'_, '_> {
                 .find(|change| change.unit == back.unit)
                 .is_some_and(|change| self.leave_completed_setup(back, &change.after))
             {
-                self.say("setup is complete; its phone grace period is not restarted");
+                self.say(if crate::setup_lifecycle::waiting(&self.config.root) {
+                    "setup waits for this update before its marker; it is not restarted"
+                } else {
+                    "setup is complete; its phone grace period is not restarted"
+                });
                 continue;
             }
             if backs[at].unit == VOICE_UNIT && !voice_stopped {

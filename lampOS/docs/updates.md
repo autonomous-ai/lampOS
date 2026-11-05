@@ -873,6 +873,14 @@ each under the quiet rule. A round
    inspecting overrides and querying the manager, at selection time; this does not lock out a
    simultaneous reset. The earlier activity snapshot remains unchanged.
 
+   **Setup waiting for the first update (#5458):** before its marker, setup
+   may be waiting for the lamp's first round (`setup.md`, "The first update
+   before the walk"), with `/var/lib/lampos-setup/first-update` there. A
+   restart would end that wait mid-round and bring the hotspot back, so the
+   same exception holds, with the same unit, drop-in and manager checks, for
+   that regular file in place of the marker. The old process runs to its
+   marker; the unit then never starts again until a reset.
+
    **The voice stopped first (#3689, the first builder's yes on 30 Oct):**
    when the voice is running and a running part before it in startup order
    restarts too (lamp-controls, Memory, Ears, ...), the round reads queued
@@ -1348,6 +1356,7 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `switching to build N` | the parts' switch begins |
 | `the voice is stopped before the parts it reads restart` | see "The voice stopped first" |
 | `setup is complete; its phone grace period is not restarted` | a completed setup's unit changed, and isn't restarted |
+| `setup waits for this update before its marker; it is not restarted` | a setup waiting for the lamp's first update (#5458, `/var/lib/lampos-setup/first-update`): its unit changed, and isn't restarted |
 | `started lamp-setup-recover.service, its switch on` | the switch's watch passed and the build is kept; recovery is enabled and `LAMP_WIFI_RECOVERY` reads `on` (#4863, "A part added over the air") |
 | `lamp-setup-recover.service could not be started (…); it starts at the next boot` | that start failed: said only, the round stays switched |
 | **Putting a build back** | |

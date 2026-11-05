@@ -465,9 +465,9 @@ on it. The routes:
 
 | Route | What it does |
 |---|---|
-| `GET /api/device/setup/status` | V1's `phase` (`idle`/`connecting`/`connected`/`failed`), `lan_ip`, `error`, `mac` (the kernel's host name, `lamp-xxxx`, which avahi announces), `run`, `set_up_completed`, `runtime_phase`; V2's own `generation`, `share_reports`, `takes_own_keys` and, when keys were given, `own_keys`. |
+| `GET /api/device/setup/status` | V1's `phase` (`idle`/`connecting`/`connected`/`failed`), `lan_ip`, `error`, `mac` (the kernel's host name, `lamp-xxxx`, which avahi announces), `run`, `set_up_completed`, `runtime_phase`; V2's own `generation`, `share_reports`, `takes_own_keys`, `updating` and `update_phase` (#5458, "The first update before the walk") and, when keys were given, `own_keys`. |
 | `GET /api/network` | `iw dev wlan0 scan`, parsed as V1 does, in V1's `domain.Network` fields. |
-| `POST /api/device/setup` | V1's `SetupRequest`; its other fields are accepted and ignored. Checked before anything is touched: the network's name and password as for the join; `llm_api_key`, the user's voice key (at most 512 printable characters; none keeps the key already there, as on a lamp that ran V1, but a lamp missing either key file is refused with "the lamp needs its voice key", since it would have Wi-Fi and no voice); V2's own `name` (up to 64 characters) and `timezone` (an IANA name whose file, links followed, is a `TZif` zone file inside the zone data; one the lamp lacks is skipped, not a reason to refuse setup); the optional `language` (#4473: exactly `en`, `vi`, `ja`, `zh` or `ko`, trimmed, as `language.set` checks it; absent writes nothing, which is English, and any other value is skipped with a journal line, not a reason to refuse setup, as an unknown zone). Replies at once, then, 2 s later as in V1, joins; one run at a time; refused once the lamp is set up. |
+| `POST /api/device/setup` | V1's `SetupRequest`; its other fields are accepted and ignored. Checked before anything is touched: the network's name and password as for the join; `llm_api_key`, the user's voice key (at most 512 printable characters; none keeps the key already there, as on a lamp that ran V1, but a lamp missing either key file is refused with "the lamp needs its voice key", since it would have Wi-Fi and no voice); V2's own `name` (up to 64 characters) and `timezone` (an IANA name whose file, links followed, is a `TZif` zone file inside the zone data; one the lamp lacks is skipped, not a reason to refuse setup); the optional `language` (#4473: exactly `en`, `vi`, `ja`, `zh` or `ko`, trimmed, as `language.set` checks it; absent writes nothing, which is English, and any other value is skipped with a journal line, not a reason to refuse setup, as an unknown zone); the optional `update_first` (#5458: only the JSON `true`, the first update before the marker, "The first update before the walk"). Replies at once, then, 2 s later as in V1, joins; one run at a time; refused once the lamp is set up. |
 
 While joining it reads the station address every second and publishes it as
 `lan_ip`, V1's fix for the page that lost the lamp, and once more when the join
@@ -546,6 +546,48 @@ not answer them (404); V1's page has a fallback for each failure (read in its
 source: not online, no current network, no capabilities so no voice or face
 step, an empty form), so its one Wi-Fi step still works. A lamp run must
 confirm it.
+
+## The first update before the walk (#5458, on for the product, for an app that asks)
+
+A lamp flashed with an older image would walk its person through
+onboarding on the image's build: the updater holds while the walk is under
+way (`docs/updates.md`), so the first walk on lamp-c0a4 (5 Nov) ran none of
+the onboarding fixes since 30 Oct. With `LAMP_SETUP_UPDATE_FIRST=on` (in the
+product's `lamp-setup.service`) and a setup request carrying
+`update_first: true`, setup takes the first update between the join and the
+marker (`crate::first_update`):
+
+1. After the join and the saves (the key and own keys included), the status
+   says `updating: true` with the station's `lan_ip`; `phase` stays
+   `connecting`, so the light goes on joining and a second request is
+   refused.
+2. Setup says `update/check` on the bus, as the app's Check for update does
+   (#4153), and follows the round on `update/status`, each phase as
+   `update_phase` (`checking`, `fetching`, `switching`, `watching`,
+   `restoring`). Nothing of the product runs yet (every part needs the
+   marker), so the switch restarts no voice and no body, and the walk isn't
+   under way, so the updater doesn't hold for it.
+3. A round that only switched the updater (`self-switched`, the climb of an
+   updater below the build's `min_updater`) is followed by the new updater's
+   own round. An unreachable round may have begun before the join, so it is
+   asked once more after the least time between checks (60 s). Any other end,
+   an updater not heard in 20 s, or 10 minutes from the ask ends the wait.
+4. `updating` goes back to false, the journal says
+   `the first update ended (…) in N s; the marker follows`, and the marker is
+   written as before: on stable's build after a switch, on the image's
+   otherwise. No end of the wait fails setup.
+
+While it waits, `/var/lib/lampos-setup/first-update` is there, and the
+updater leaves `lamp-setup.service` alone as it leaves a completed setup's
+grace period (`setup_lifecycle`, the same unit and drop-in checks): a
+restart would cut the wait off and bring the hotspot back. The old process
+runs to its marker, and the next start removes a file a crash left.
+
+An app that doesn't send `update_first` (every app before it, V1's page and
+this crate's own) gets setup as before: it gives up on a setup that takes
+as long as an update, and it starts enrolment as soon as setup is done. The
+wait from the join to the marker, on first use and on a slow network, is not
+yet measured on a lamp.
 
 ## The setup light (on for the product)
 

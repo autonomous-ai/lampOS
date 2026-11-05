@@ -1265,6 +1265,13 @@ fn serve(
     for path in lamp_setup::serve::leftover_temporaries(&config) {
         let _ = std::fs::remove_file(path);
     }
+    // A wait for the first update a crash or a stop ended (#5458): the
+    // updater would leave this unit alone for good.
+    let _ = std::fs::remove_file(
+        config
+            .marker
+            .with_file_name(lamp_setup::first_update::WAITING),
+    );
     // The runtime the server answers on, and the stop (`systemctl stop`, a
     // shutdown), asked for before the light starts: from here on a stop
     // ends serving as its end does, so the light is put out with black.
