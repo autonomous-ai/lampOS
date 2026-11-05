@@ -1407,7 +1407,12 @@ With the switch:
     was a plain yes to it (`known_faces::plain_yes`;
     `known_faces::said_back_and_agreed`), or once they spelled it in the
     turn in hand. So the usual walk, "Marie, right?" "Yes.", then "May I
-    remember your face?" "Yes.", keeps the name in that one call. A
+    remember your face?" "Yes.", keeps the name in that one call. The yes
+    may carry the save's own ask, as people say it: "Yes. That's right.
+    Please remember my face." (`known_faces::BESIDE_THE_SAVE`: remember,
+    face, save, keep, and, now, go ahead, can you; stable 10226 on
+    lamp-52e6, 5 Nov, kept no face on it and ended the walk with the name
+    only). Only here: a rename's yes keeps the plain words. A
     correction after the read-back ("No, it's Loren.") is no yes to it,
     and a yes to the face question with no read-back before it is no yes
     to the name. A read-back folded into the face question ("Nice to meet

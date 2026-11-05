@@ -241,6 +241,21 @@ const BESIDE_A_YES: &[&str] = &[
 /// name put in place costs the right one. So is a yes said as a question:
 /// "Yes?", "Right?", and "Dạ?", which in Vietnamese is "sorry, what?".
 fn plain_yes(name: &str, turn: &str) -> bool {
+    plain_yes_beside(name, turn, &[])
+}
+
+/// The save's own ask, said with the yes to the read-back at setup: "Yes.
+/// That's right. Please remember my face." (lamp-52e6 on stable 10226, 5
+/// Nov, R1 and the walk's face step: the yes went past [`BESIDE_A_YES`],
+/// so the face was never kept and the walk ended with the name only).
+/// Only for the first save at setup ([`said_back_and_agreed`]); a rename's
+/// yes and a held forget's keep [`plain_yes`].
+const BESIDE_THE_SAVE: &[&str] = &[
+    "remember", "face", "save", "keep", "and", "now", "go", "ahead", "can", "you",
+];
+
+/// [`plain_yes`], with `beside` also standing beside the yes.
+fn plain_yes_beside(name: &str, turn: &str, beside: &[&str]) -> bool {
     if turn.trim_end().ends_with('?') {
         return false;
     }
@@ -264,6 +279,7 @@ fn plain_yes(name: &str, turn: &str) -> bool {
         && words.iter().zip(&covered).all(|(word, covered)| {
             *covered
                 || BESIDE_A_YES.contains(&word.as_str())
+                || beside.contains(&word.as_str())
                 || name.contains(&folded_words(word).concat())
         })
 }
@@ -293,7 +309,8 @@ pub(crate) fn agreed_to(name: &str, said: &Said) -> bool {
 /// (#5140), so the usual walk, "Marie, right?" "Yes." and then the face's
 /// question and its yes, keeps the name in one call. A correction after
 /// the read-back ("No, it's Loren.") is no yes to it. `replace` keeps
-/// [`agreed_to`], the read-back in the lamp's last answer only.
+/// [`agreed_to`], the read-back in the lamp's last answer only. The yes may
+/// carry the save's own ask ([`BESIDE_THE_SAVE`]), as people say it.
 fn said_back_and_agreed(name: &str, said: &Said) -> bool {
     said.before.iter().enumerate().any(|(at, (_, lamp))| {
         let next = said
@@ -304,7 +321,7 @@ fn said_back_and_agreed(name: &str, said: &Said) -> bool {
             .iter()
             .any(|(person, _)| said_by_them(name, person))
             && said_back(name, lamp)
-            && plain_yes(name, next)
+            && plain_yes_beside(name, next, BESIDE_THE_SAVE)
     })
 }
 
@@ -4654,6 +4671,66 @@ mod tests {
             asked.join().unwrap(),
             [json!({"remember": "Loren", "one_face": true, "replace": false})]
         );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// Stable 10226, lamp-52e6, 5 Nov 11:28 (the core-verifier's R1, and the
+    /// walk's face step the same way): the name said back alone and
+    /// "Yes. That's right. Please remember my face." kept no face, the yes
+    /// going past a plain yes's words, so the walk ended with the name only.
+    /// A yes that carries the save's own ask is a yes to the read-back; a
+    /// correction, a spelling, or a read-back folded into the face question
+    /// (El's #5159 rule) still keeps nothing.
+    #[test]
+    fn at_setup_a_yes_that_asks_for_the_save_keeps_the_face() {
+        let call = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({ "name": "Henry" }),
+        };
+        const HEARD: &str = "Hey, Lamp. My name is Henry. Please remember my face.";
+        const READ_BACK: &str =
+            "I'll take a look at you, Henry, so I know you next time. Henry, did I get that right?";
+        let after = |lamp: &str, this: &str| Said {
+            this: this.into(),
+            before: vec![(HEARD.into(), lamp.into())],
+        };
+        let (socket, asked) = eyes(vec![json!({"remembered": "Henry"})]);
+        // The first call, the name and the ask in one line: said back first.
+        let (words, _) = run_at_setup(&socket, &call, &Said::now(HEARD));
+        assert!(
+            words["error"]
+                .as_str()
+                .is_some_and(|told| told.contains("say the name back")),
+            "{words}"
+        );
+        for (lamp, this) in [
+            (READ_BACK, "No, it's Harry. Please remember my face."),
+            (READ_BACK, "Yes, but it's spelled H E N R Y E."),
+            (READ_BACK, "Remember my face."),
+            (
+                "Nice to meet you, Henry! May I remember your face?",
+                "Yes. That's right. Please remember my face.",
+            ),
+        ] {
+            let (words, _) = run_at_setup(&socket, &call, &after(lamp, this));
+            assert!(words["error"].is_string(), "{this}: {words}");
+        }
+        let (words, _) = run_at_setup(
+            &socket,
+            &call,
+            &after(READ_BACK, "Yes. That's right. Please remember my face."),
+        );
+        assert_eq!(words, json!({"ok": true, "remembered": "Henry"}));
+        assert_eq!(
+            asked.join().unwrap(),
+            [json!({"remember": "Henry", "one_face": true, "replace": false})]
+        );
+        // A rename's yes keeps the strict words: the save's ask isn't one.
+        assert!(!agreed_to(
+            "Henry",
+            &after(READ_BACK, "Yes. That's right. Please remember my face.")
+        ));
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
     }
 
