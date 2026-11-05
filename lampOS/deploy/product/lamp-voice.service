@@ -393,6 +393,15 @@ Environment=LAMP_PERSON_SCOPE_ONE_FACE=on
 # 0, and their own reminder left out of the list). Memory's reads stay the room's. Known risk, accepted by the
 # memory owner on 4 Nov: a voice not seen saying it, with the person's face alone in view, hears their reminders.
 Environment=LAMP_ONE_FACE_REMINDERS=on
+# And such a line's reply is told the person's name, only their name, when no face was seen speaking it, their own
+# known face was the one face in view through it (the mouth not read), it was not carried and no other voice was heard
+# (lamp-06c1 on 5 Nov, request 6: the test face alone in 11 of 11 looks, read still in 6, and "what's my name?" got
+# "I don't have a name for you"). The memory owner's call on 5 Nov: "this is too strict rule, can we change it to
+# improve UX, since I think that the 'talking' detection is not trustable". Its scope, memory, keeps, forgets and yes
+# stay the room's. Known risk, the one accepted for LAMP_SECOND_MEMORY_HITS on 4 Nov and smaller: a voice off camera,
+# with the person's face silent and alone in view, hears their name. The name reaches the reply only with
+# LAMP_SECOND_FACE_NAME on.
+Environment=LAMP_SECOND_NAME_ONE_FACE=on
 # But within a conversation going on, a line of theirs no face was seen speaking (or one with nobody named), with no
 # other face in view and no 45 s quiet since their last exchange, stays in that conversation (#4339, lamp-3e83: one such line dropped to the
 # room's, the chat lost the talk and asked its question again), when their face was in view through it or within
@@ -421,8 +430,9 @@ Environment=LAMP_CONVERSATION_ROOM_LINES_TOLD=on
 # remember_my_face was recognised and never said back). Only with LAMP_PERSON_SCOPE_SEEN above: a turn is theirs
 # only when their own face alone was seen speaking it, so a silent face in view names no off-camera caller
 # (reviewer-two on #3371). A face only alone in view, not seen speaking, is never named this way: the owner alone is
-# named through the typed name (#4090, #4132), nobody else (the readers' HOLDs on #4158). Nor is a line carried in
-# their conversation (LAMP_CONVERSATION_CARRIES above): no face was seen speaking it. Nor a turn with no lease of
+# named through the typed name (#4090, #4132), nobody else (the readers' HOLDs on #4158), except the one face in view
+# with no other voice heard, by LAMP_SECOND_NAME_ONE_FACE above (the memory owner's call, 5 Nov). Nor is a line carried
+# in their conversation (LAMP_CONVERSATION_CARRIES above): no face was seen speaking it. Nor a turn with no lease of
 # its own (an add-on's say): only a turn told by its own lease is named (worker::known_person_for).
 Environment=LAMP_SECOND_FACE_NAME=on
 # The memory a friend has (#1693): at each conversation's end the second route's model proposes the few things

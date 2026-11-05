@@ -1952,6 +1952,30 @@ fn the_product_lets_a_one_face_line_hear_its_persons_reminders() {
     }
 }
 
+/// A line narrowed to the room for want of a face seen speaking it is still
+/// told the person's name, only that, when their own known face was the one
+/// face in view and no other voice was heard (`LAMP_SECOND_NAME_ONE_FACE`):
+/// on lamp-06c1 on 5 Nov the test face alone in 11 of 11 looks, read still
+/// in 6, had no name. The memory owner's call, 5 Nov ("the 'talking'
+/// detection is not trustable"), the risk accepted for the memory hits.
+/// Beside the sight scoping and the one-face rule it acts with.
+#[test]
+fn the_product_names_a_lone_known_face_by_the_one_face_count() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_SECOND_NAME_ONE_FACE=on",
+        "Environment=LAMP_PERSON_SCOPE_SEEN=on",
+        "Environment=LAMP_PERSON_SCOPE_ONE_FACE=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// Only faces of people at the desk count as people at the lamp
 /// (`LAMP_FACES_AT_DESK_ONLY`): on lamp-a0ae on 2 Nov tiny, unsure faces
 /// beside the owner held their name back on 51 of 79 turns as "more than one
