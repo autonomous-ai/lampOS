@@ -681,6 +681,20 @@ prints for the services alone:
   The Live route, which has no services' judge, starts none. The
   coordinator passes it as `--same-voice-for-services`, right after the
   model's path.
+- **Only while a service is linked** (the reader's P3 on #5293). The
+  services being on is only their folder being there, which every product
+  lamp has. So a heard line is printed only while the owner has at least
+  one service linked; with none, the child is asked nothing for any line,
+  the owner's or a guest's, and uses no CPU on them. The voice asks
+  `lamp-services` `services_connected` on the folder's socket, which it
+  already may (`services::Linked`): once at start, then as a line begins,
+  at most once a second, on a thread of its own. A link whose token is
+  expired with no refresh counts as none. The answer decides when the
+  line's print would be asked for, 1.2 s or more after it began
+  (`Voices::asking_only_while`), so the line said right after a link, the
+  one a write is prepared in, is printed, with no restart; after the last
+  unlink, the next line is not. The journal says each change once. The
+  owner's enrolled print and its forgetting are as before.
 - **What is fed.** The prints are kept apart from the rules'
   (`Heeding::for_services`, beside `Heeding::voices`, which stays empty).
   Each line's sound and each verdict feed them as before
@@ -712,6 +726,9 @@ prints for the services alone:
   widest). The journal holds counts and cosines only, never a print.
 
 Shown in tests only (`the_services_alone_start_the_same_voice_for_themselves`,
+`the_services_print_a_line_only_while_a_service_is_linked`,
+`a_line_is_asked_for_only_while_the_gate_is_open`,
+`a_link_is_known_from_lamp_services_at_start_and_as_a_line_begins`,
 `prints_for_the_services_alone_feed_their_judge_and_no_conversation_rule`,
 `a_late_other_voice_ends_no_conversation_for_the_services_alone`,
 `the_prints_are_for_the_services_only_with_services_exactly`). The
