@@ -1837,6 +1837,8 @@ fn second_route_worker_environment(
         // An earlier turn's calls told with its words (lamp build 9699).
         crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
         crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
+        // A narrowed line named for its reply by the one-face count (5 Nov).
+        crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
         // A one-face line's reminder reads are its person's (lamp-29e7).
         crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT,
         // Read by the second worker for the reply's owner-by-default (#3884).
@@ -2039,6 +2041,7 @@ mod tests {
             crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT,
             crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
+            crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
             crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT,
             crate::person::BY_DEFAULT_ENVIRONMENT,
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
@@ -2786,6 +2789,7 @@ mod tests {
                     || name == crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT
                     || name == crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT
+                    || name == crate::second_provider::NAME_ONE_FACE_ENVIRONMENT
                     || name == crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT
                     || name == crate::person::BY_DEFAULT_ENVIRONMENT
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
@@ -2977,6 +2981,7 @@ mod tests {
                     "LAMP_SECOND_LOOK_WALK=on",
                     "LAMP_SECOND_MEMORY_HITS=on",
                     "LAMP_SECOND_NAME_CARRIES=on",
+                    "LAMP_SECOND_NAME_ONE_FACE=on",
                     "LAMP_SECOND_OPEN_NAME=on",
                     "LAMP_SECOND_OWN_ECHO=on",
                     "LAMP_SECOND_PREPARED=on",

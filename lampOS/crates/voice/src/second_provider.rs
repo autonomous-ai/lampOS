@@ -770,6 +770,28 @@ pub const CONVERSATION_CARRIED_SAVES_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARR
 /// another voice ([`Engine::scoping_by_one_face`]).
 pub const PERSON_SCOPE_ONE_FACE_ENVIRONMENT: &str = "LAMP_PERSON_SCOPE_ONE_FACE";
 
+/// A known person's line narrowed to the room for want of a face seen
+/// speaking it is still *named* for its reply when no face at all was seen
+/// speaking it, their own known face was the one face in view through it by
+/// the one-face count (`SpeakingFaces::one_face_in_view`, the mouth not
+/// read), the line was not carried, and the one-face rule heard no other
+/// voice in the conversation ([`Engine::naming_by_one_face`],
+/// `speaking_faces::named_one_face`). Only the reply's name: its scope,
+/// memory, keeps, forgets and yes stay the room's, as with
+/// `speaking_faces::named_alone`. That rule also wants the mouth read
+/// speaking and seldom still, and the mouth read is not to be trusted: on
+/// lamp-220c the owner's face was in 17 looks and read speaking in none, and
+/// on lamp-06c1 (5 Nov 11:12, request 6) the test face alone in 11 of 11
+/// looks was read still in 6, so "what's my name?" was answered "I don't
+/// have a name for you". The memory owner's call (5 Nov): "this is too strict
+/// rule, can we change it to improve UX, since I think that the 'talking'
+/// detection is not trustable". The risk is the one they accepted for
+/// `LAMP_SECOND_MEMORY_HITS` on 4 Nov (a voice off camera while their face
+/// sits silent alone in view), here a smaller leak: their name only. Any
+/// sign of someone else wins. `on`, and nothing else; acts only with
+/// [`PERSON_SCOPE_SEEN_ENVIRONMENT`].
+pub const NAME_ONE_FACE_ENVIRONMENT: &str = "LAMP_SECOND_NAME_ONE_FACE";
+
 /// With [`CONVERSATION_CARRIES_ENVIRONMENT`], a silent face doesn't count
 /// (#4339, lamp-3e83, 30 Oct: the known face in all 30 looks of a line and
 /// none with it alone, so 4 lines carried of a conversation split in two):
@@ -1716,6 +1738,11 @@ struct Shared {
     /// face seen speaking it, keeps for them while this reads `false`, its
     /// reads the room's. None, off.
     one_face: Option<Arc<AtomicBool>>,
+    /// With [`Self::scope_seen`], a line narrowed to the room whose known
+    /// person's own face was the one face in view through it, none seen
+    /// speaking it, is told their name for its reply
+    /// (`LAMP_SECOND_NAME_ONE_FACE`, [`Engine::naming_by_one_face`]).
+    name_one_face: bool,
     /// Each function a turn ran and nothing refused, handed on by request
     /// (`LAMP_HISTORY_KEEPS_CALLS`, [`Engine::keeping_calls`]); none, off.
     keeps_calls: Option<CallsKept>,
@@ -1867,6 +1894,16 @@ async fn line_sight(
 /// another voice in the conversation. `false` with the rule off.
 fn another_voice_heard(another_voice: Option<&AtomicBool>) -> bool {
     another_voice.is_some_and(|another| another.load(Ordering::Acquire))
+}
+
+/// Whether the one-face rule's tracker is there and has recorded no other
+/// voice in the conversation: fails closed, `false` with no tracker (the
+/// rule off, dropped by a drop-in, or not acted on), so a lone face is
+/// named for its reply (`LAMP_SECOND_NAME_ONE_FACE`) only where another
+/// voice would have been seen (Heron's P2 on #5404: with no tracker, an
+/// off-camera guest's "what's my name?" was told the silent owner's name).
+fn no_other_voice_known(another_voice: Option<&AtomicBool>) -> bool {
+    another_voice.is_some_and(|another| !another.load(Ordering::Acquire))
 }
 
 fn one_face_theirs(
@@ -3780,6 +3817,7 @@ impl Engine {
                 services_sight: false,
                 past_silent: None,
                 one_face: None,
+                name_one_face: false,
                 keeps_calls: None,
             }),
             output,
@@ -4018,6 +4056,21 @@ impl Engine {
     pub fn scoping_by_sight(mut self, on: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.scope_seen = on;
+        self
+    }
+
+    /// With [`Self::scoping_by_sight`], a known person's line narrowed to the
+    /// room is also named for its reply when no face was seen speaking it,
+    /// not carried, their own known face the one face in view through it
+    /// (`SpeakingFaces::one_face_in_view`, the mouth not read) and no other
+    /// voice heard by the one-face rule (`LAMP_SECOND_NAME_ONE_FACE=on`,
+    /// the memory owner's call of 5 Nov, `speaking_faces::named_one_face`).
+    /// Only `ScopeLease::named_for_reply` reads it: scope, memory, keeps,
+    /// forgets and yes stay the room's. Off, only
+    /// `speaking_faces::named_alone` names such a line, as before.
+    pub fn naming_by_one_face(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.name_one_face = on;
         self
     }
 
@@ -7221,6 +7274,9 @@ async fn spoken(
     // With `LAMP_PERSON_SCOPE_SEEN`, no eyes to read is no face seen
     // speaking it: the room's (reviewer-two's P2 on #3437).
     let mut named = false;
+    // Named by the one-face count rather than the mouth read
+    // (`LAMP_SECOND_NAME_ONE_FACE`): its journal line says so.
+    let mut named_by_one_face = false;
     // Carried by the rule a silent face doesn't count in
     // (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`): judged again by the voice
     // once the rule has heard it.
@@ -7263,8 +7319,10 @@ async fn spoken(
                     crate::keep_quietly::saw(request, &person, &speakers, pair.clone());
                 }
                 // Their face alone in view, none seen speaking it: the
-                // room's scope, but its reply told their name (lamp-3e83;
-                // reviewer-three's P2 on #4090).
+                // room's scope, but its reply may be told the owner's typed
+                // name (lamp-3e83; reviewer-three's P2 on #4090). A known
+                // face not the owner's is told nothing by this rule alone
+                // (`worker::known_person_for`).
                 named = shared.scope_seen
                     && crate::speaking_faces::named_alone(&speakers, &person, pair.as_ref(), alone);
                 let known_face = pair.as_ref().map(|(_, face)| face.clone());
@@ -7322,6 +7380,36 @@ async fn spoken(
                     && speakers.is_empty()
                     && !another_voice_heard(shared.one_face.as_deref())
                     && own_face.is_some_and(|face| eyes.one_face_in_view(face, begun, finishing));
+                // Their own known face the one face in view through it by the
+                // one-face count, the mouth not read, none seen speaking it,
+                // not carried and no other voice heard: still named for the
+                // reply (`LAMP_SECOND_NAME_ONE_FACE`, the memory owner's call
+                // of 5 Nov: "the 'talking' detection is not trustable";
+                // lamp-06c1 request 6, the test face alone in 11 of 11 looks
+                // and read still in 6, lost its name). Only the reply's name:
+                // any face seen speaking it, theirs or not, or a second face
+                // or voice, names nobody (the risk accepted for
+                // `LAMP_SECOND_MEMORY_HITS` on 4 Nov, a smaller leak).
+                // Checked whether or not the mouth rule named it: that rule
+                // names only the owner, by the typed name, so a known face
+                // not the owner's that passed both was told nothing
+                // (lamp-06c1, build 10343, request 42: the test face alone in
+                // 12 of 12 looks, read speaking in 2, still in 4, unread in
+                // 6, said "I don't remember your name").
+                if shared.name_one_face
+                    && shared.scope_seen
+                    && !carried
+                    && crate::speaking_faces::named_one_face(
+                        &speakers,
+                        &person,
+                        pair.as_ref(),
+                        own_face.is_some_and(|face| eyes.one_face_in_view(face, begun, finishing)),
+                        !no_other_voice_known(shared.one_face.as_deref()),
+                    )
+                {
+                    named = true;
+                    named_by_one_face = true;
+                }
                 one_face = !carried
                     && shared.scope_seen
                     && speakers.is_empty()
@@ -7382,9 +7470,21 @@ async fn spoken(
             );
         }
         if named {
-            scope.name_for_reply();
+            if named_by_one_face {
+                scope.name_for_reply_by_one_face();
+            } else {
+                scope.name_for_reply();
+            }
+            // Only the one-face count tells a known face its name; the mouth
+            // rule alone reaches the reply only as the owner's typed name
+            // (`worker::known_person_for`).
+            let told = if named_by_one_face {
+                "its reply told their name (LAMP_SECOND_NAME_ONE_FACE)"
+            } else {
+                "its reply may be told only the owner's typed name"
+            };
             eprintln!(
-                "lamp-voice second: request {request}: {why}, the known person's face alone in view: kept as the room's, its reply told their name"
+                "lamp-voice second: request {request}: {why}, the known person's face alone in view: kept as the room's, {told}"
             );
         } else {
             eprintln!("lamp-voice second: request {request}: {why}: told and kept as the room's");
@@ -7936,14 +8036,18 @@ async fn spoken(
     // all, before the model is asked: the room's, keeps and all. So too a
     // line whose hits fell back to the face in view (`LAMP_SECOND_MEMORY_HITS`):
     // the narrow takes the fallback back (Heron's P2 on #5272).
-    if (one_face || hits_face)
+    // And a line named by the one-face count (`LAMP_SECOND_NAME_ONE_FACE`):
+    // the narrow takes the name back too.
+    if (one_face || hits_face || named_by_one_face)
         && another_voice_heard(shared.one_face.as_deref())
         && let Some(scope) = scope.as_ref()
-        && (scope.by_one_face() || scope.hits_by_face().is_some())
+        && (scope.by_one_face()
+            || scope.hits_by_face().is_some()
+            || scope.named_by_one_face_for_reply().is_some())
     {
         scope.narrow_to_room();
         eprintln!(
-            "lamp-voice second: request {request}: another voice in the conversation, heard as it was judged: its keep and hits are the room's too (LAMP_PERSON_SCOPE_ONE_FACE)"
+            "lamp-voice second: request {request}: another voice in the conversation, heard as it was judged: its keep, hits and name are the room's too (LAMP_PERSON_SCOPE_ONE_FACE)"
         );
     }
     // A stop said over the lamp's own answer (#3985: on lamp-29e7 "Stop"
