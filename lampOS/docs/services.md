@@ -843,7 +843,14 @@ lists them (`reads::WHATS`), but a whole text or a free-form read. Its
 other keys are `service_read`'s own for a fixed read: `count` (1 to 10),
 `query` (search words), `id`, `repo`, `calendar`, `project` and
 `workspace` (each 1 to 1,000 bytes); never `from` or `to`, nor a free-form
-read's `graphql`, `variables`, `path`, `params`, `tool` or `arguments`. A calendar's `events`
+read's `graphql`, `variables`, `path`, `params`, `tool` or `arguments`.
+`query` is searched for (Drive's `fullText contains`), never an order:
+Drive lists files newest first (`orderBy = modifiedTime desc`) and mail
+comes newest first, so a read of the latest leaves it out; an order or the
+latest alone ("order by modifiedTime desc", "newest") is refused
+(`service_read::ordering`, after a lamp's made skill read 0 files with
+one, 5 Nov). A made skill's brief gives Drive's step whole and says so
+(`made_skill::DRIVE_READ`). A calendar's `events`
 take `day = "today"` or `"tomorrow"` (the local day, at most 10 events) and
 no `count`; `day` is for nothing else. `lamp-services` holds the read to its
 allow-list as it does the voice's.
@@ -906,8 +913,9 @@ the skill itself is no write: words before "skill" that only ask for it
 first, and "schedule" after "my", "the", "tomorrow's", "today's", "day"
 or "calendar" is the thing read (lamp-9adf, 4 Nov 23:51: "create a skill
 that reads my calendar" was refused so). A write after them still counts. A calendar's
-step is given whole (today, or tomorrow when it says "tomorrow"), as is
-mail's (`recent`); for any other service the brief lists its reads but the
+step is given whole (today, or tomorrow when it says "tomorrow"), as are
+mail's (`recent`) and Drive's (`files`, newest first, `query` only words
+to search); for any other service the brief lists its reads but the
 whole texts and free-form reads (`spoken::whats`) and the model picks
 one. Its time of day is the request's: the brief gives the trigger's
 `during` as an example, "a time of day as its during = { from = \"08:00\",

@@ -75,6 +75,49 @@ pub const MOST_ARG_BYTES: usize = 1_000;
 
 const DAY_MS: i64 = 86_400_000;
 
+/// Why a read's `query` that asks for an order is refused: a skill made by
+/// voice on a lamp (5 Nov, "read my latest Google Drive files") read with
+/// `query = "order by modifiedTime desc"`, which Drive searched for in its
+/// files' text and found in none (`read 0`). Drive's files and mail come
+/// newest first already.
+pub const QUERY_NOT_AN_ORDER: &str = "read: query is only words to search for, never an order or \
+     \"latest\": files and mail come newest first, so leave query out to read the latest";
+
+/// Words of an order, never of a search: Drive's sort fields among them.
+const ORDER_WORDS: &[&str] = &[
+    "orderby",
+    "asc",
+    "desc",
+    "ascending",
+    "descending",
+    "modifiedtime",
+    "createdtime",
+    "viewedbymetime",
+];
+
+/// Words that only ask for the latest: a query of these alone searches for
+/// nothing that was meant.
+const LATEST_WORDS: &[&str] = &[
+    "latest", "newest", "recent", "recently", "most", "last", "new", "first", "my", "the", "file",
+    "files", "mail", "mails",
+];
+
+/// Whether a read's `query` asks for an order or for the latest ("order by
+/// modifiedTime desc", "sorted by date", "newest", "my latest files")
+/// rather than words to search for.
+pub fn ordering(query: &str) -> bool {
+    let query = query.to_lowercase();
+    let words: Vec<&str> = query
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    words
+        .windows(2)
+        .any(|pair| matches!(pair[0], "order" | "ordered" | "sort" | "sorted") && pair[1] == "by")
+        || words.iter().any(|word| ORDER_WORDS.contains(word))
+        || (!words.is_empty() && words.iter().all(|word| LATEST_WORDS.contains(word)))
+}
+
 /// `read = { … }`, as the folder writes it: `service` and `what`, and the
 /// keys `lamp-services`' `service_read` takes for a fixed read, but `from`
 /// and `to` (a calendar's day is `day`); never a free-form read's
@@ -154,6 +197,9 @@ impl ReadFile {
             if let Some(value) = value {
                 if value.trim().is_empty() || value.len() > MOST_ARG_BYTES {
                     return Err(format!("read: {key} is 1 to {MOST_ARG_BYTES} bytes"));
+                }
+                if key == "query" && ordering(&value) {
+                    return Err(QUERY_NOT_AN_ORDER.into());
                 }
                 args.insert(key.into(), json!(value));
             }
@@ -650,6 +696,44 @@ mod tests {
             r#"service = "dropbox", what = "files""#,
         ] {
             assert!(step(refused).is_err(), "{refused}");
+        }
+    }
+
+    /// A lamp, 5 Nov: "read my latest Google Drive files" was made with
+    /// `query = "order by modifiedTime desc"`, searched for in the files'
+    /// text and found in none. An order, or the latest alone, is no query;
+    /// search words are, whatever they say.
+    #[test]
+    fn a_query_is_search_words_never_an_order() {
+        for order in [
+            "order by modifiedTime desc",
+            "ORDER BY modified",
+            "orderBy=modifiedTime",
+            "sorted by date",
+            "modifiedTime desc",
+            "createdTime",
+            "latest",
+            "newest first",
+            "my most recent files",
+            "the latest mail",
+        ] {
+            let read = format!(r#"service = "google_drive", what = "files", query = "{order}""#);
+            assert_eq!(step(&read).unwrap_err(), QUERY_NOT_AN_ORDER, "{order}");
+            let mail = format!(r#"service = "gmail", what = "search", query = "{order}""#);
+            assert_eq!(step(&mail).unwrap_err(), QUERY_NOT_AN_ORDER, "{order}");
+        }
+        assert!(QUERY_NOT_AN_ORDER.contains("leave query out"));
+        for words in [
+            "taxes",
+            "purchase order",
+            "sort the boxes",
+            "latest taxes",
+            "new house plans",
+            "from:mom is:unread",
+            "descartes",
+        ] {
+            let read = format!(r#"service = "google_drive", what = "files", query = "{words}""#);
+            assert!(step(&read).is_ok(), "{words}: {:?}", step(&read));
         }
     }
 
