@@ -19,7 +19,8 @@
 //! once in [`AGAIN_AFTER`]. The second route only.
 //!
 //! With `LAMP_CUT_IN_WORDLESS_RESUMES=on` too (the memory owner, 5 Nov:
-//! "the once a minute is kinda strict"), the lamp picks its answer up again,
+//! "the once a minute is kinda strict"; off in the product since 6 Nov until
+//! its busy-room path passes on a lamp, #5430), the lamp picks its answer up again,
 //! as a person cut off by a cough does ([`Cuts::next`]):
 //! - the first such cut in a quiet room still asks [`LINE`];
 //! - the first in a busy room says [`BRIDGE`] and goes on from the sentence
