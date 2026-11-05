@@ -232,13 +232,18 @@ read = { service = "google_calendar", what = "events", day = "tomorrow" }
 - `day = "today"` or `"tomorrow"`: a calendar's `events` only, and needed
   there; `count` 1 to 10 for anything else (mail's `recent` 5 if left out);
   `query`, `id`, `repo`, `calendar`, `project` and `workspace` (1 to 1,000
-  bytes each), as `service_read` takes them.
+  bytes each), as `service_read` takes them. `query` is only words to
+  search for (Drive looks for them in its files' text), never an order:
+  Drive's files and mail come newest first, so a read of the latest leaves
+  `query` out. An order ("order by modifiedTime desc", "sorted by", `desc`)
+  or the latest alone ("newest", "my recent files") is refused
+  (`service_read::ordering`), so a skill made by voice is asked again.
 - `[permissions] services` lists its service as `"read"`, and only
   `"read"`: a skill never writes.
 
-The schema says every key but two rules, which `lamp-skills` alone holds:
-a whole text or a free-form `what`, and a calendar's `events` with no
-`day`. What is said is the
+The schema says every key but three rules, which `lamp-skills` alone holds:
+a whole text or a free-form `what`, a calendar's `events` with no
+`day`, and a `query` that is an order. What is said is the
 count, then each event's time and title, each mail's sender and subject,
 or any other item's title or name; never a body.
 

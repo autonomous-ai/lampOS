@@ -474,6 +474,11 @@ fn a_read_step_is_the_same_in_the_schema_and_the_loader() {
             "services = { github = \"read\" }",
             "{ service = \"github\", what = \"query\" }",
         ),
+        // A lamp, 5 Nov: an order is no query, it matched no file.
+        read(
+            drive,
+            "{ service = \"google_drive\", what = \"files\", query = \"order by modifiedTime desc\" }",
+        ),
     ] {
         assert!(
             loads(&loader_only).is_err(),
