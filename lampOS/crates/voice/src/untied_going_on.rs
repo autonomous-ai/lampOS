@@ -490,7 +490,9 @@ pub fn shares_a_word(heard: &str, said: &[&str]) -> bool {
 
 /// Words a line opens with in reply to what was just said to it: a thanks,
 /// or taking up the idea (#5110: `talk_day-5`'s "That's a good idea." and
-/// `talk_day-6`'s "Thanks. You're a good listener.", held on lamp-52e6).
+/// `talk_day-6`'s "Thanks. You're a good listener.", held on lamp-52e6;
+/// `talk_cook-6`'s "Perfect. I'll try that on Saturday.", held on
+/// lamp-52e6 on 5 Nov 12:21, answered with it off).
 const REPLIES: &[&str] = &[
     "thanks",
     "thank you",
@@ -516,6 +518,10 @@ const REPLIES: &[&str] = &[
     "that's good to know",
     "you're right",
     "got it",
+    "perfect",
+    "that's perfect",
+    "i'll try that",
+    "i will try that",
     "cảm ơn",
     "cám ơn",
     "ý hay",
@@ -530,7 +536,9 @@ const REPLY_LEADS: &[&str] = &[
 ];
 
 /// Words that open a question asking for advice of the one who knows: "Any
-/// tips to sleep better tonight?", "How can I stop waking up at night?".
+/// tips to sleep better tonight?", "How can I stop waking up at night?",
+/// "And what do I need to buy for it?" (#5110: `talk_cook-4`, held on
+/// lamp-52e6 on 5 Nov 12:21, answered with it off).
 const ASKS_FOR_ADVICE: &[&str] = &[
     "any tips",
     "any tip",
@@ -542,6 +550,9 @@ const ASKS_FOR_ADVICE: &[&str] = &[
     "how should i",
     "how can i",
     "how do i",
+    "what do i need",
+    "what else do i need",
+    "what else should i",
     "what do you suggest",
     "what would you suggest",
     "what do you recommend",
@@ -892,6 +903,8 @@ mod tests {
             "Thanks, I'll try that.",
             "Thanks Lamp.",
             "Cảm ơn nhé.",
+            "Perfect. I'll try that on Saturday.",
+            "Okay, I'll try that tonight.",
         ] {
             assert!(replies_to_the_lamp(line, false), "{line}");
         }
@@ -904,6 +917,8 @@ mod tests {
             "I'm thankful it's Friday.",
             "Did you send the slides to Sam yet?",
             "Not yet, I'll do it after lunch.",
+            "Perfect, Sam.",
+            "I'll try the new place on Saturday.",
         ] {
             assert!(!replies_to_the_lamp(line, false), "{line}");
         }
@@ -919,6 +934,8 @@ mod tests {
             "How can I stop waking up at night?",
             "So what should I eat before a run?",
             "What would you recommend?",
+            "And what do I need to buy for it?",
+            "What else do I need?",
         ] {
             assert!(asks_for_advice(line, false), "{line}");
         }
@@ -928,6 +945,8 @@ mod tests {
             "How do I look, you guys?",
             "Are you coming to the meeting at four?",
             "Can you pass me the charger? The white one.",
+            "Sam, what do I need to bring to the meeting?",
+            "I know what I need to buy.",
         ] {
             assert!(!asks_for_advice(line, false), "{line}");
         }
