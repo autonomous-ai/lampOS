@@ -280,7 +280,11 @@ controller is Denied either way, the journal says
 `lamp-voice: the mute's Denied authority was not published (<error>); the
 microphones stay closed and the cleanup revokes again`, the trace records
 `mute_revocation_unpublished`, and the run is still the mute, whose cleanup
-publishes and stops every worker as before.
+publishes and stops every worker as before. The mute's snapshot is published
+only if it grants nothing (`privacy_bus::denied_only`: both Denied, no turn).
+Were a permission setter ever to refuse, the snapshot that still grants is
+not sent, and why is recorded the same way, naming the setter that refused
+(`publish_denied_only`).
 
 A privacy worker that does not stop within the wait's 300 ms grace is killed,
 and a killed worker cannot unlink its own sockets. Once it is reaped, the
