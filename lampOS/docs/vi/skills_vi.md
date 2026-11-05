@@ -55,7 +55,7 @@ sau:
    - nói, tin nhắn, cái nhìn và mọi chủ đề khác đều bị từ chối.
    Mở rộng giới hạn này là quyết định của trưởng nhóm. Lần mở rộng duy nhất
    (nửa "đọc" của đề xuất #5288, `LAMP_SKILL_READS=on` trong `lamp-voice` và
-   `lamp-skills-manage@`, tắt trừ khi được bật): `services` nêu một dịch vụ
+   `lamp-skills-manage@`, bật trong các unit sản phẩm): `services` nêu một dịch vụ
    liên kết có việc đọc cố định là `"read"`, cùng `speak` để nói nó. Một yêu cầu nêu
    đúng một dịch vụ như vậy và không có từ ghi nào được đưa vào brief với
    bước đọc duy nhất của dịch vụ đó (bước của lịch hay thư được cho trọn; với

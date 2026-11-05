@@ -32,6 +32,9 @@ Environment=LAMP_SKILL_ROUTINES=on
 Environment=LAMP_LIGHT_REQUESTS=on
 # A stand asked by voice (#4135): the Pose skill's stand step, read by lamp-body's LAMP_BODY_POSE_ASK.
 Environment=LAMP_BODY_POSE_ASK=on
+# A made skill reads a linked service to its owner alone (#5288, #5303): a skill's read step, said behind its
+# gate (the owner's face alone, no voice, not private), through lamp-services' tools socket. Played on lamp-9adf 5 Nov.
+Environment=LAMP_SKILL_READS=on
 # --zone system: the lamp's zone from /etc/localtime, which setup points at the person's (#820), for a skill's
 # [quiet] hours, which without it never start themselves (docs/skills.md); across summer time (#1384).
 # --state-dir: the skills a person turned off with a skill's [stop], one name a line in off, kept
