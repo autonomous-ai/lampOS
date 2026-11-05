@@ -2051,6 +2051,14 @@ impl Skill {
             .iter()
             .any(|(_, step)| matches!(step, Step::Call(call) if call.held_until_ends()))
     }
+
+    /// Whether its run is a read of a linked service, its only step (#5288).
+    fn reads_a_service(&self) -> bool {
+        matches!(
+            self.steps.as_slice(),
+            [(_, Step::Call(Call::ServiceRead(_)))]
+        )
+    }
 }
 
 /// The line a trigger's field must stay past for a while before the trigger
@@ -5459,6 +5467,51 @@ fn dropped(
     }
 }
 
+/// A read's run the engine made ([`Engine::reads`]): the local day it was
+/// made, if the local time was known, and whether it is still under way
+/// (until [`Engine::done`]).
+#[derive(Clone, Copy, Debug, Default)]
+struct ReadMade {
+    day: Option<i64>,
+    under_way: bool,
+}
+
+/// `skill`'s read made at `now_us`: under way, on its local day.
+fn read_made(
+    reads: &mut HashMap<String, ReadMade>,
+    clock: Option<(i32, u64, u64)>,
+    skill: &str,
+    now_us: u64,
+) {
+    reads.insert(
+        skill.to_owned(),
+        ReadMade {
+            day: clock.map(|_| day_of(clock, now_us)),
+            under_way: true,
+        },
+    );
+}
+
+/// Why a read's chance at `now_us` is dropped, if it is: its last run is
+/// still under way, or was made on this local day. The program's own once a
+/// day ([`service_read`]) stays the read's rule; this only keeps a trigger
+/// that holds from saying each second what the program would refuse.
+fn read_spent(
+    reads: &HashMap<String, ReadMade>,
+    clock: Option<(i32, u64, u64)>,
+    skill: &str,
+    now_us: u64,
+) -> Option<&'static str> {
+    let read = reads.get(skill)?;
+    if read.under_way {
+        Some("its read is still under way")
+    } else if clock.is_some() && read.day == Some(day_of(clock, now_us)) {
+        Some("its read came due once today already")
+    } else {
+        None
+    }
+}
+
 /// How long is left of `us`, for the journal: `7 min`, or `40 s` under one.
 fn left(us: u64) -> String {
     if us >= 60_000_000 {
@@ -5579,6 +5632,13 @@ pub struct Engine {
     judged: HashMap<(String, String), (i64, Option<u64>)>,
     /// The journal's lines of due chances dropped ([`dropped`]), not yet taken.
     dropped: Vec<String>,
+    /// By skill whose run is a read of a linked service (#5288): its last
+    /// run made ([`ReadMade`]). Its next chance is dropped while that run
+    /// is under way and for the rest of its local day, so a trigger that
+    /// holds says nothing each second the read could not run (lamp-9adf,
+    /// 5 Nov: 912 journal lines a minute). In memory, as the program's own
+    /// once a day is.
+    reads: HashMap<String, ReadMade>,
     /// With [`REST_THROUGH_SOUNDS_ENVIRONMENT`] on: a `[[while]]`'s
     /// `through` and `broken_by` are kept (#1672).
     rest_through_sounds: bool,
@@ -5781,6 +5841,7 @@ impl Engine {
             rested_day: None,
             judged: HashMap::new(),
             dropped: Vec::new(),
+            reads: HashMap::new(),
             rest_through_sounds: false,
             sooner: false,
             picked: std::sync::Mutex::default(),
@@ -6176,6 +6237,17 @@ impl Engine {
     pub fn made(&mut self, skill: &str, now_us: u64) {
         if let Some(skill) = self.skills.iter().find(|known| known.name == skill) {
             nudged(&mut self.nudges, &self.latest, skill, now_us);
+            if skill.reads_a_service() {
+                read_made(&mut self.reads, self.clock, &skill.name, now_us);
+            }
+        }
+    }
+
+    /// `skill`'s run is done (the program's `done`): a read's next chance
+    /// waits only for its local day ([`Engine::reads`]).
+    pub fn done(&mut self, skill: &str) {
+        if let Some(read) = self.reads.get_mut(skill) {
+            read.under_way = false;
         }
     }
 
@@ -6388,6 +6460,15 @@ impl Engine {
             &mut self.skills,
             skills.into_iter().filter(|skill| skill.enabled).collect(),
         );
+        // A read's skill changed (its permissions mended, say) may try
+        // again today: the program's once a day still says whether it
+        // reads. A run under way stays so until it is done.
+        for (name, read) in &mut self.reads {
+            let before = old.iter().find(|skill| &skill.name == name);
+            if before != self.skills.iter().find(|skill| &skill.name == name) {
+                read.day = None;
+            }
+        }
         let mut ends = Vec::new();
         for ((name, index), watch) in &mut self.watches {
             if !watch.open {
@@ -7285,6 +7366,21 @@ impl Engine {
                     );
                     continue;
                 }
+                // A read of a linked service (#5288) comes due once a local
+                // day and waits up to an hour for its gate: until then, and
+                // till midnight after, a chance is dropped as a cooldown's
+                // is, before it is said triggered or asked of the Policy.
+                if let Some(why) = read_spent(&self.reads, self.clock, &skill.name, now_us) {
+                    dropped(
+                        &mut self.dropped,
+                        watch,
+                        &skill.name,
+                        "read",
+                        now_us,
+                        || why.into(),
+                    );
+                    continue;
+                }
                 if skill
                     .quiet
                     .is_some_and(|quiet| minute.is_none_or(|minute| within(minute, quiet)))
@@ -7854,6 +7950,11 @@ impl Engine {
                         )
                     },
                 );
+                // Made now, its ask skipped: a read is under way from here.
+                // Asked of the Policy, from its yes ([`Engine::made`]).
+                if run.ask.is_none() && !run.calls.is_empty() && skill.reads_a_service() {
+                    read_made(&mut self.reads, self.clock, &skill.name, now_us);
+                }
                 runs.push(Run {
                     from: Some((index, None)),
                     ..run

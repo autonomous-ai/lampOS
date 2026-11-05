@@ -1147,6 +1147,8 @@ fn serve(
                     "lamp-skills: {skill} said nothing: its place in the {group} group's hour is given back"
                 );
             }
+            // A read done waits only for its local day (#5288).
+            engine.done(&skill);
             runs.done(&skill, &engine, &mut out, &runner);
         }
         take_skips(
