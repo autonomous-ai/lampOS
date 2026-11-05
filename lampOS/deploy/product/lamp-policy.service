@@ -30,7 +30,11 @@ LoadCredential=jev.key:/etc/lampOS/policy/jev.key
 # once with no wait for the model; the judge is asked only in shadow, logged, never acting (the first
 # builder, 30 Oct, on #4625, as #4305 took Jev out of what the lamp does). Every other question stays
 # off or in shadow.
-ExecStart=/opt/lampOS/policy/current/lamp-policy --zone system --hello --act hello --gate --hello-by-rule --key-file %d/jev.key --endpoint https://campaign-api.autonomous.ai/api/v1/ai/v1/jev/decisions --log-dir /var/lib/lampos-policy --bus-root /run/lampos-bus
+# --rules: the hello, and with --gate a skill's unprompted ask or news, obey what the people at the lamp
+# asked at setup or later about speaking first (memory/rules, #813: "no hello", "quiet after ten" by
+# the --zone time); without it a kept rule held nothing and the hello still came (hello.rs). No rule
+# kept: nothing changes. A reminder the person set is never held by a rule (moment::REMINDER).
+ExecStart=/opt/lampOS/policy/current/lamp-policy --zone system --hello --act hello --gate --hello-by-rule --rules --key-file %d/jev.key --endpoint https://campaign-api.autonomous.ai/api/v1/ai/v1/jev/decisions --log-dir /var/lib/lampos-policy --bus-root /run/lampos-bus
 Restart=on-failure
 RestartSec=5s
 StandardInput=null

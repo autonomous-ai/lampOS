@@ -836,7 +836,7 @@ Gaps between the docs, the units and the code, for whoever owns each:
   so they live in drop-ins on the lamp that the repo doesn't have. Before
   switching groups on, the lamp's own drop-ins should be read and copied here.
 - **No repo policy unit passes `--act attention` or `--act progress`; the
-  product units pass `--hello --act hello --gate --hello-by-rule`** (the
+  product units pass `--hello --act hello --gate --hello-by-rule --rules`** (the
   first builder, 30 Oct, on the launch testers' findings and on #4625), so
   Welcome back's hello, asked of the gate even with `LAMP_SKILLS_ASK=skip`,
   is decided by the hard rules alone, one hello an hour to each person
