@@ -544,14 +544,18 @@ hiding: a discount code or a postal code near a number is left out too.
 Every read's items are checked (`reads::quoted`): a mail by its sender,
 subject and text, any other item (a Slack message, a Notion page, a Drive
 file, a calendar event, a GitHub or Linear item, each piece of an MCP tool's
-answer) by every text in it but its `id` and `parent`. Items of one group
+answer) by every text in it but its `id` and `parent`. A time field holding
+only a time (an RFC 3339 `modifiedTime`, `createdTime` or event
+`start.dateTime`, or a mail's RFC 5322 `date`) is never read as a code
+(`reads::is_time`). Items of one group
 are also read with the next two (`reads::without_security`): a group is
 what the read says they share (`reads::group_of`: `channel`, `channel_id`,
 `thread_ts`, `threadId`, `thread_id`, `parent`, `page_id`); items whose read names none are one group with the rest of
 their answer (a channel's history names its channel once, at the top, not
 on each message: `reads::ANSWER`), as is all the plain text of one MCP
-answer; only Gmail's mails and Google Calendar's events are each their own
-and never joined (`kept_apart`). Two items fine
+answer; only Gmail's mails, Google Calendar's events and Google Drive's
+files are each their own and never joined (`kept_apart`), so one file left
+out never takes the others listed with it. Two items fine
 alone that are a security text joined are both left out, and so are the
 two ends of three when they are ("Your code", "is", "482913" keeps "is");
 beside a security text with no code or link of its own ("Your verification
