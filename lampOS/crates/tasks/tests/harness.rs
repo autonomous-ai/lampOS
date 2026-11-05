@@ -109,6 +109,7 @@ impl Rig {
             journal: None,
             calls: None,
             health_after_start: false,
+            user_runtime_root: root.path().join("run-user"),
         };
         let rig = Self {
             root,
@@ -3563,6 +3564,7 @@ fn a_close_is_given_only_what_is_left_of_its_budget() {
 fn every_harness_call_is_given_the_service_users_own_bus() {
     use lamp_tasks::harness::with_user_bus;
     use std::path::Path;
+    let root = Path::new("/run/user");
     let base: BTreeMap<String, OsString> = [
         ("HOME".to_owned(), OsString::from("/var/lib/lampos-tasks")),
         (
@@ -3575,7 +3577,7 @@ fn every_harness_call_is_given_the_service_users_own_bus() {
     let lingering = |place: &Path| {
         place == Path::new("/run/user/996") || place == Path::new("/run/user/996/bus")
     };
-    let given = with_user_bus(base.clone(), 996, &lingering);
+    let given = with_user_bus(base.clone(), root, 996, &lingering);
     assert_eq!(given["XDG_RUNTIME_DIR"], OsString::from("/run/user/996"));
     assert_eq!(
         given["DBUS_SESSION_BUS_ADDRESS"],
@@ -3584,11 +3586,13 @@ fn every_harness_call_is_given_the_service_users_own_bus() {
     assert_eq!(given["HOME"], base["HOME"]);
 
     // No user manager (not lingering): nothing is made up.
-    let none = with_user_bus(base.clone(), 996, &|_: &Path| false);
-    assert_eq!(none, base);
+    assert_eq!(
+        with_user_bus(base.clone(), root, 996, &|_: &Path| false),
+        base
+    );
 
     // A runtime folder with no bus yet: the folder only.
-    let folder_only = with_user_bus(base.clone(), 996, &|place: &Path| {
+    let folder_only = with_user_bus(base.clone(), root, 996, &|place: &Path| {
         place == Path::new("/run/user/996")
     });
     assert!(folder_only.contains_key("XDG_RUNTIME_DIR"));
@@ -3601,13 +3605,30 @@ fn every_harness_call_is_given_the_service_users_own_bus() {
         "DBUS_SESSION_BUS_ADDRESS".into(),
         "unix:path=/elsewhere".into(),
     );
-    assert_eq!(with_user_bus(set.clone(), 996, &lingering), set);
+    assert_eq!(with_user_bus(set.clone(), root, 996, &lingering), set);
+}
 
-    // And a checked config takes both, as every call is made with them.
+/// The reboot race (#5393's reads): lamp-tasks may start before logind has
+/// made the lingering user's runtime folder. Each call looks again, so a
+/// folder that appears after the start is given to the next call, with no
+/// restart of lamp-tasks.
+#[test]
+fn a_runtime_folder_made_after_the_start_reaches_the_next_harness_call() {
+    use std::os::unix::fs::MetadataExt;
     let rig = Rig::new();
-    let mut config = rig.config.clone();
-    for name in ["XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"] {
-        config.environment.insert(name.into(), given[name].clone());
-    }
-    assert!(Cli::new(config, "stable".into()).is_ok());
+    let uid = fs::metadata(rig.root.path()).unwrap().uid();
+    let cli = Cli::new(rig.config.clone(), "stable".into()).unwrap();
+    let before = cli.child_environment();
+    assert!(!before.contains_key("XDG_RUNTIME_DIR"), "{before:?}");
+    assert!(!before.contains_key("DBUS_SESSION_BUS_ADDRESS"));
+
+    let folder = rig.config.user_runtime_root.join(uid.to_string());
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("bus"), b"").unwrap();
+    let after = cli.child_environment();
+    assert_eq!(after["XDG_RUNTIME_DIR"], folder.as_os_str());
+    let mut address = OsString::from("unix:path=");
+    address.push(folder.join("bus").as_os_str());
+    assert_eq!(after["DBUS_SESSION_BUS_ADDRESS"], address);
+    assert_eq!(after["HOME"], before["HOME"]);
 }

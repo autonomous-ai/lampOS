@@ -494,8 +494,10 @@ harnessd.service`, which then fails ("Failed to connect to bus: No medium
 found"; after a sign-in from the app on lamp-c0a4, 5 Nov, #5385). So each one
 not already set is taken from the service user's own runtime folder,
 `/run/user/<uid>`, and its `bus`, only where they exist
-(`harness::with_user_bus`); the product's `lampos` user lingers, so both are
-there from boot. No inherited pane, Claude or Codex
+(`harness::with_user_bus`), looked at again for each call
+(`Cli::child_environment`): after a reboot lamp-tasks can start before
+logind has made the lingering `lampos` user's folder, and the next call
+then finds it with no restart (#5393's reads). No inherited pane, Claude or Codex
 identity, provider key or shell startup environment is forwarded. Tasks never
 opens Harness credential/ledger files; Harness itself owns their use.
 Each forwarded value is at most 4 KiB, the environment totals at most 32 KiB,
