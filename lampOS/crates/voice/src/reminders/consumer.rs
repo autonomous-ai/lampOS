@@ -147,6 +147,11 @@ fn late_line(late: bool, late_by_ms: Option<u64>) -> bool {
 /// heard twice.
 const HELD: &str = "held: an attempt may have been heard and was never proven said, \
                     so it is not offered again";
+/// A due item the person stopped over its ring, a spoken stop, the head or
+/// the button, after some of it played: they heard it (Seventh's P3 on
+/// #5258, with `LAMP_RING_STOP_ENDS_IT`).
+const STOPPED_HELD: &str = "held: stopped by the person over its ring, so it is not \
+                            offered again";
 /// A due item given up with nothing proven the first time (#5219).
 const ONCE_MORE: &str = "not completed: given up before it was proven said, \
                          to be offered once more";
@@ -384,11 +389,13 @@ impl<P: Persistence> Consumer<P> {
                     "not completed: this attempt can no longer speak, to be offered again",
                 );
             }
-            ToWorker::Abandon { no_audio, .. } => {
+            ToWorker::Abandon {
+                no_audio, stopped, ..
+            } => {
                 for joined in joined {
-                    self.abandoned(joined.token, no_audio);
+                    self.abandoned(joined.token, no_audio, stopped);
                 }
-                self.abandoned(token.clone(), no_audio);
+                self.abandoned(token.clone(), no_audio, stopped);
             }
             ToWorker::Noticed {} => unreachable!("answered above"),
         }
@@ -411,7 +418,7 @@ impl<P: Persistence> Consumer<P> {
     /// Counted in this process only: a later voice offers every attempt an
     /// earlier one left again ([`Self::retire_earlier_voices`]), held ones
     /// too.
-    fn abandoned(&mut self, token: PreparedToken, no_audio: bool) {
+    fn abandoned(&mut self, token: PreparedToken, no_audio: bool, stopped: bool) {
         // Only items still waiting to be said are counted, so the counts
         // stay within the ledger's bound.
         let ledger = &self.ledger;
@@ -422,6 +429,12 @@ impl<P: Persistence> Consumer<P> {
         };
         self.abandoned.retain(|key| waiting(key));
         self.unvoiced.retain(|key, _| waiting(key));
+        // Stopped by the person over its ring: heard, and not rung again.
+        if stopped && !no_audio {
+            self.abandoned.insert(token.key.clone());
+            self.journal.item(&token.key, STOPPED_HELD);
+            return;
+        }
         let line = if no_audio {
             let tries = self.unvoiced.entry(token.key.clone()).or_default();
             if *tries >= NO_AUDIO_RETRIES {

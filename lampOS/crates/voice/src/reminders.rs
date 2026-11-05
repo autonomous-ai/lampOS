@@ -7,6 +7,17 @@ use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, io, path::PathBuf, rc::Rc, time::Instant};
 
 mod consumer;
+
+/// `on` only: a reminder the person stopped over its ring (a spoken stop,
+/// the head or the button), once some of it played, is held, not rung once
+/// more 5 s later (Seventh's P3 on #5258). Off, such a stop is a cut like
+/// any other (#5219's once more).
+pub const RING_STOP_SWITCH: &str = "LAMP_RING_STOP_ENDS_IT";
+
+/// Whether [`RING_STOP_SWITCH`] is on in this process's environment.
+pub fn ring_stop_ends_it() -> bool {
+    std::env::var(RING_STOP_SWITCH).ok().as_deref() == Some("on")
+}
 mod scheduling;
 #[cfg(test)]
 mod tests;
@@ -230,6 +241,14 @@ pub(crate) enum ToWorker {
         /// true, so the common packet is the same as before.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         no_audio: bool,
+        /// The person stopped it over its ring, by a spoken stop, the head
+        /// or the button, after some of it had played: they heard it, and a
+        /// ring again 5 s later would be the lamp not listening (Seventh's P3
+        /// on #5258). Only with [`RING_STOP_SWITCH`] on; sent only when true,
+        /// so the common packet is the same as before, and a packet without
+        /// it is taken as cut by talk.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        stopped: bool,
     },
     /// Someone said a line after a reminder was said (29e7, 2 Nov): one
     /// said late is noticed ([`lamp_schedule::protocol::Request::Noticed`]).
@@ -254,6 +273,7 @@ struct Progress {
     retired: u64,
     final_cursor: Option<(u64, u64, u64)>,
     live: bool,
+    stopped: bool,
     settlement: Option<ToWorker>,
 }
 impl Progress {
@@ -297,6 +317,14 @@ impl Receipt {
     }
     pub fn audio(&mut self) {
         self.0.borrow_mut().had_audio = true;
+    }
+    /// The person stopped this reply over its ring (a spoken stop, the head
+    /// or the button). Counts only once some of its audio came; the drop
+    /// then says so. The coordinator calls it only with
+    /// [`RING_STOP_SWITCH`] on.
+    pub fn stopped_by_the_person(&mut self) {
+        let mut state = self.0.borrow_mut();
+        state.stopped = state.had_audio;
     }
     pub fn retired(&mut self, sequence: u64, epoch: u64, frame: u64) {
         let mut state = self.0.borrow_mut();
@@ -376,6 +404,7 @@ impl Drop for Receipt {
             state.settlement = Some(ToWorker::Abandon {
                 token: state.token.clone(),
                 no_audio: !state.had_audio,
+                stopped: state.stopped,
             });
         }
     }
@@ -412,6 +441,7 @@ pub(crate) fn receipt_for_test(owner: TurnOwner, privacy: u64, session: u64) -> 
         retired: 0,
         final_cursor: None,
         live: true,
+        stopped: false,
         settlement: None,
     }));
     (Receipt(Rc::clone(&state)), Probe(state))
@@ -653,6 +683,7 @@ impl Reminders {
             retired: 0,
             final_cursor: None,
             live: true,
+            stopped: false,
             settlement: None,
         }));
         self.active = Some(Rc::clone(&state));

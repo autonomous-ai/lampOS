@@ -7842,7 +7842,17 @@ fn conversation_with_gate_inner(
                     "observation_to_speaker_dispatch_us":cancellation.speaker_told_at_us.saturating_sub(observed_at_us),
                     "boundary":"coordinator observation to local speaker control send; excludes bus delivery and acoustic stop"}),
                 )?;
-                if let Some(current) = cancellation.reply {
+                if let Some(mut current) = cancellation.reply {
+                    // The person stopped a reminder's ring (a spoken stop,
+                    // the head or the button): they heard it, so it is held,
+                    // not rung once more 5 s later (Seventh's P3 on #5258).
+                    if (stop || head_stop || spoken_stop)
+                        && !muted
+                        && crate::reminders::ring_stop_ends_it()
+                        && let Some(reminder) = &mut current.reminder
+                    {
+                        reminder.stopped_by_the_person();
+                    }
                     record_cancelled_reply(
                         current,
                         trace,

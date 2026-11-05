@@ -725,12 +725,22 @@ fn abandon(worker: &mut Consumer<Disk>, token: &PreparedToken) -> u64 {
 }
 /// As [`abandon`], saying whether any of its audio came.
 fn abandon_as(worker: &mut Consumer<Disk>, token: &PreparedToken, no_audio: bool) -> u64 {
+    abandon_with(worker, token, no_audio, false)
+}
+/// As [`abandon_as`], saying too whether the person stopped it over its ring.
+fn abandon_with(
+    worker: &mut Consumer<Disk>,
+    token: &PreparedToken,
+    no_audio: bool,
+    stopped: bool,
+) -> u64 {
     let now = lamp_ipc::monotonic_us();
     worker
         .command(
             ToWorker::Abandon {
                 token: token.clone(),
                 no_audio,
+                stopped,
             },
             now,
         )
@@ -809,6 +819,39 @@ fn abandoned_once_is_offered_again_after_the_pace_and_twice_is_held() {
             .requests()
             .iter()
             .any(|r| matches!(r, Request::Ack { .. }))
+    );
+}
+
+/// Seventh's P3 on #5258: "stop" said over a timer's ring, or the head or
+/// the button, after some of it played, is the person saying they heard it.
+/// It is held at once, never rung again 5 s later; with nothing played, a
+/// stop is no proof it was heard, and it is offered again as before.
+#[test]
+fn stopped_over_its_ring_it_is_held_at_once_and_never_rung_again() {
+    let (engine, socket) = served(1);
+    let mut worker = consumer(Disk::default());
+    let first = begin(&mut worker, &engine, &socket);
+    abandon_with(&mut worker, &first.token, false, true);
+    assert_eq!(
+        worker.journal.lines.last().unwrap(),
+        &format!("reminder id 1 delivery 1: {STOPPED_HELD}")
+    );
+    ticks_offer_nothing(&mut worker, &engine, &socket, 4);
+    assert!(
+        !socket
+            .requests()
+            .iter()
+            .any(|r| matches!(r, Request::Ack { .. }))
+    );
+
+    let (engine, socket) = served(1);
+    let mut worker = consumer(Disk::default());
+    let first = begin(&mut worker, &engine, &socket);
+    let now = abandon_with(&mut worker, &first.token, true, true);
+    assert_eq!(worker.next_offer_us, now + PACE_US);
+    assert_eq!(
+        worker.journal.lines.last().unwrap(),
+        &format!("reminder id 1 delivery 1: {}", no_audio_again(1))
     );
 }
 
@@ -1146,6 +1189,7 @@ fn only_exact_qualified_completion_can_change_the_durable_prepared_record() {
                 ToWorker::Abandon {
                     token: wrong,
                     no_audio: false,
+                    stopped: false,
                 },
                 lamp_ipc::monotonic_us()
             )
