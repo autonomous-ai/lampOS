@@ -705,8 +705,11 @@ prints for the services alone:
   `LAMP_CONVERSATION_CARRIES_PAST_SILENT`'s voice heard.
   `LAMP_SAME_VOICE_CALLER_ONLY` shapes only which prints are the
   conversation's voice.
-- **Any other value** is as unset (every use, as before), said once in the
-  journal. The journal holds counts and cosines only, never a print.
+- **Any other value** (`Services`, `everything`, empty) fails closed, said
+  once in the journal: the coordinator passes no model, so no print is made
+  for anything, as without one; a send is refused for a voice not heard and
+  a read is brief (the reader's P3 on #5293: it had been every use, the
+  widest). The journal holds counts and cosines only, never a print.
 
 Shown in tests only (`the_services_alone_start_the_same_voice_for_themselves`,
 `prints_for_the_services_alone_feed_their_judge_and_no_conversation_rule`,
