@@ -356,7 +356,15 @@ canceller removes what it can fit to the render, so a person well over
 the echo leaves the cancelled signal within 1 dB of the microphone (9 dB
 over it, 0.6 dB under) and stays `Over`; the lamp's own ringing is what
 the canceller takes, a median 52 dB of its voice on lamp-4ace and
-lamp-a0ae. Neither a score nor a level decides
+lamp-a0ae. Nor is an `Over` block plain while the render's
+last sound is still arriving: from the render's first quiet block until
+the echo's delay (`echo_delay_blocks`) and 20 ms more
+(`ECHO_DELAY_MARGIN_BLOCKS`, the delay's spread within a session in the
+table above) have passed. On lamp-06c1 at 10:41 the eleven blocks after a
+yield were that, the render under them never 3 dB down and nothing
+explained, and three of them made ten plain blocks and a commit with
+nothing said (#5032). They stay `Over`, so a person over the lamp's own
+pauses between words still counts towards a yield. Neither a score nor a level decides
 anything alone: a score of 0.99 with the render explaining the block is
 the lamp. The 300 ms is the longest the microphone took to fall back to
 its floor after a reply stopped, 270 ms over sixteen recorded stops, and
@@ -384,7 +392,11 @@ A run of blocks becomes at most three moments (`Interruption`):
    hearing decision, not addressee evidence or completed input admission.
    Or, since 2026-10-13, forty consecutive `Still` blocks after a yield
    in which at least ten `Over` blocks were **plain**: the render explained
-   no more than 20% of the microphone. A short word that the lamp's own
+   no more than 20% of the microphone. Blocks after the yield are plain
+   only once the render's echo has stopped arriving (see the decision
+   above); past that the render at the alignment has fallen or is
+   silent, so in practice the ten come from the yield's own run, or the
+   word goes on into the clear. A short word that the lamp's own
    voice cannot account for is a person telling it something, "stop" as
    likely as anything, and the lamp does not talk over that. See "A short
    word, heard plainly" below.
@@ -530,9 +542,12 @@ alignment is silent, so the lamp's own tail, still arriving for up to about
 `Own`, #5032), and on lamp-4ace that tail and 40 still
 blocks ended an answer with nobody speaking. In a quiet room both rules
 commit exactly as with the switch off: talk in the clear (rule a) and
-stillness after ten plain blocks, the yield's run and after it (rule b), so
-a short "Wait" late in an answer, seven blocks to yield and a few more,
-then silence, still ends it, and so can the lamp's own tail there. A known
+stillness after ten plain blocks, the yield's run and after it (rule b).
+Since #5032 the blocks after a late yield are not plain while the
+render's echo is still arriving, so a short "Wait" late in an answer,
+seven blocks to yield and a few more, then silence, resumes the answer
+unless its words end it (a stop word with `LAMP_STOP_WORDS=heard`); one
+that goes on into the clear, six blocks past 300 ms, still ends it. A known
 limit: "busy" is unanswered turns (three, then 180 s; `Attention::busy` in
 `body_link.rs`), not sound, so a television that forms no turns is never
 busy, and a quiet room within 180 s of three ignored remarks is.
@@ -1424,7 +1439,9 @@ functions:
 | `a_person_over_the_lamps_dips_yields_within_the_onset` (`evidence.rs`) | #5037's P1: a 150 ms "Stop." 9 dB over the echo, across a dip between the lamp's syllables (3 or more blocks with `render_drop` 60 and up), the canceller taking 20 dB of the echo: every block `Over`, a yield at the seventh |
 | `a_person_half_a_second_after_the_render_stops_still_commits` | #5032's guard: after the tail, a person 500 ms after the render went quiet commits at the sixth block in the clear |
 | `lamp_06c1s_tails_under_a_fallen_render_commit_nothing` | Four of lamp-06c1's five zero-word commits, their ten plain blocks' `render_drop`: none commits |
-| `lamp_06c1s_tail_under_a_level_render_commits_nothing` (ignored) | The fifth, a render that never fell 3 dB: still commits; open until the echo's delay reaches `EchoEvidence` (#5032) |
+| `lamp_06c1s_tail_under_a_level_render_commits_nothing` | The fifth, a render that never fell 3 dB, its echo 12 blocks behind: the three blocks after the yield are not plain while it arrives, and stillness resumes (before: commit) |
+| `a_wait_that_goes_on_after_the_yield_still_commits` | #5032's guard: a "Wait" seven blocks over the lamp and 38 after the yield commits at its sixth block in the clear |
+| `a_short_wait_right_after_the_yield_is_kept_by_its_words` | #5032's guard and cost: a "Wait" 23 blocks after the yield, then stillness, resumes (before: commit); with its words awaited, as a stop word it commits at the next block |
 | `over_a_busy_room_the_lamps_own_tail_after_a_yield_commits_nothing` | With the switch, a busy room: plain blocks after a seven-block yield, then stillness, resume; off, they commit |
 | `with_the_over_bed_switch_a_quiet_room_commits_a_short_word_then_stillness` | With the switch, a quiet room: a seven-block yield, five plain blocks after it, then stillness commit by rule (b), as off |
 | `over_a_bed_of_talk_a_stop_word_still_ends_the_reply` | With the switch, the room busy: a stop word commits the yield at its next block |

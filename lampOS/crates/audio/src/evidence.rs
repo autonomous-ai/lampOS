@@ -169,6 +169,13 @@ pub struct EchoEvidence {
     /// not for want of an alignment (#828). None otherwise.
     #[serde(default)]
     pub silent_at_echo: Option<u16>,
+    /// With an alignment held, how long after the newest render its echo
+    /// arrives, in capture blocks (10 ms), rounded up
+    /// ([`EchoObserver::echo_delay`]): the render's last sound is still
+    /// reaching the microphone for this many blocks after it went quiet
+    /// (#5032). None while nothing is matched.
+    #[serde(default)]
+    pub echo_delay_blocks: Option<u8>,
 }
 
 /// What the skip of [`EchoObserver::skip_while_render_silent`] did: capture
@@ -458,6 +465,11 @@ impl EchoObserver {
             residual_level: Level::of(clean_energy),
             echo,
             silent_at_echo: self.silent_at,
+            echo_delay_blocks: self.echo_delay().map(|(samples, _)| {
+                (samples.max(0) as u64)
+                    .div_ceil(BLOCK as u64)
+                    .min(u64::from(u8::MAX)) as u8
+            }),
         };
         self.latest = Some(evidence);
         evidence

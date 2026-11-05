@@ -31,6 +31,7 @@ just processed:
 | `capture_level` | Microphone level before cancellation |
 | `residual_level` | Level after cancellation: what the speech detector and the provider receive |
 | `echo` | Present only while non-silent render is matched to the capture |
+| `echo_delay_blocks` | With an alignment held, how many 10 ms blocks after the newest render its echo arrives, rounded up. Until the render has been quiet that long and 20 ms more, `Hearing::plain` holds no block plain: the render's last sound is still arriving (#5032) |
 
 and inside `echo`:
 
