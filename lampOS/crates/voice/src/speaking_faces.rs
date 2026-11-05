@@ -2338,6 +2338,56 @@ mod tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
 
+    /// Thirteen's P3 on #5448: the pair [`SpeakingFaces::known_lately`]
+    /// keeps once the known file is stale also feeds [`not_theirs`] and
+    /// [`named_alone`]. Her face gone, nobody seen speaking: the line is not
+    /// hers and not named (not alone in view). Her own passing id seen
+    /// speaking it before she left: hers, one tracked id being one face.
+    /// Another face seen speaking it: not hers.
+    #[test]
+    fn the_face_last_named_feeds_not_theirs_and_named_alone_as_a_fresh_pair() {
+        let dir =
+            std::env::temp_dir().join(format!("speaking-faces-stale-pair-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let known = dir.join("known");
+        let eyes = SpeakingFaces::default();
+        let now = Instant::now();
+        let at = |seconds: f32| now - Duration::from_secs_f32(seconds);
+        eyes.look(at(6.0), Some((("b", 0), &faces(&[("f1", No)]))));
+        std::thread::sleep(Duration::from_millis(5));
+        std::fs::write(&known, "Lan\n").unwrap();
+        std::fs::write(known_face_of(&known), "f1\n").unwrap();
+        assert!(eyes.known_with_boot(&known).is_some());
+        let lan = crate::known_faces::memory_person("Lan");
+        // Seen speaking, then gone; the eyes stop naming her.
+        for (seq, ago) in [(1, 3.0), (2, 2.9), (3, 2.8)] {
+            eyes.look(at(ago), Some((("b", seq), &faces(&[("f1", Yes)]))));
+        }
+        for (seq, ago) in [(4, 2.0), (5, 1.0), (6, 0.5), (7, 0.1)] {
+            eyes.look(at(ago), Some((("b", seq), &faces(&[]))));
+        }
+        std::fs::remove_file(&known).unwrap();
+        let to = Instant::now();
+        // A line begun after she left: nobody seen speaking it.
+        let (from, since) = (at(1.5), at(6.5));
+        let pair = eyes.known_lately(&known, since, to);
+        assert_eq!(pair, Some(("Lan".to_owned(), "b/f1".to_owned())));
+        let speakers = eyes.speakers_with_boot(from, to);
+        assert!(speakers.is_empty());
+        assert!(not_theirs(&speakers, &lan, pair.clone(), true), "not hers");
+        let alone = eyes.alone_in_view("b/f1", from, to);
+        assert!(!alone, "not in view");
+        assert!(!named_alone(&speakers, &lan, pair.as_ref(), alone));
+        // A line she began before she left, her id seen speaking it: hers.
+        let speakers = eyes.speakers_with_boot(at(3.05), at(2.75));
+        assert_eq!(speakers, vec!["b/f1".to_owned()]);
+        assert!(!not_theirs(&speakers, &lan, pair.clone(), true), "hers");
+        // Another face seen speaking it: not hers.
+        assert!(not_theirs(&["b/f2".to_owned()], &lan, pair, true));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     /// #3037: the known face's id is compared with its boot. The eyes'
     /// `-face` file holds the bare id, so it takes the boot whose first frame
     /// was read before it was written: a file still fresh from before the
