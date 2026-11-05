@@ -1489,6 +1489,24 @@ fn the_product_keeps_what_was_heard() {
     );
 }
 
+/// A don't-know about the person's own kept thing recalls first
+/// (`LAMP_MEMORY_DONT_KNOW_RECALLS`, task C57): the memory owner's call on
+/// 5 Nov, after lamp-06c1 said "I don't remember any holiday plans" without
+/// calling recall (C56).
+#[test]
+fn the_product_recalls_before_a_dont_know() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_MEMORY_DONT_KNOW_RECALLS=on"),
+        "the voice lacks LAMP_MEMORY_DONT_KNOW_RECALLS"
+    );
+}
+
 /// The memory's corrections, forget-about and recall v2 are on in the
 /// product (#2510, #2176): each passed its check on lamp-06c1 on 4 Nov
 /// (build 10012): "green now, not violet" with `replaces`, both bicycle
