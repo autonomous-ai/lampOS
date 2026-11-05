@@ -569,3 +569,9 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
 - 22:3x: #5419 READ-OK 0a2cbe7fb0. The unheard-about guard and the
   engine test are pinned by mutations. P3: "ba" matches "bà" after
   accent folding.
+- 23:1x: #5448 privacy HOLD 827aab2c20, P2. A mouth-rule mark set while
+  the partner off camera is the only voice opens her conversation, and the
+  partner's next line is told her thread (#4090's case). Fix: the mark
+  carries the keep only.
+- 23:2x: #5454 READ-OK fb1a5d2e6b. LAMP_MEMORY_DOUBT_UNDOES is off, and
+  putting it back fails the install test. install 148/0, doubt 13/0.
