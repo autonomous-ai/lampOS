@@ -4013,6 +4013,18 @@ pub fn serve(
                     heeding.granting_answer_grace();
                 }
             }
+            // #5124 (a): the caller's face seen speaking, across desk talk.
+            if crate::untied_going_on::caller_speaking() {
+                eprintln!(
+                    "lamp-voice second: a line the eyes saw spoken by the conversation's caller's face, and no other face, keeps the conversation's tie, never a face only in view or silent (LAMP_UNTIED_CALLER_SPEAKING)"
+                );
+                if let Ok(mut heeding) = heeding.lock() {
+                    heeding.keeping_the_callers_speaking_face();
+                    // The faces seen speaking each line, and the caller's
+                    // at the call; the same reader as above.
+                    heeding.opening_the_eyes(files.bus_root.as_deref());
+                }
+            }
         } else if crate::untied_going_on::on() {
             eprintln!(
                 "lamp-voice second: the lamp's answers to lines let out only as the conversation going on, with no tie to it, keep no conversation going, and such a line is told it may be people's talk (LAMP_UNTIED_GOING_ON)"
@@ -5897,6 +5909,9 @@ pub(crate) struct Heeding {
     /// as [`Self::hear`] is told.
     answer_grace: bool,
     began_in_grace: Option<u64>,
+    /// `LAMP_UNTIED_CALLER_SPEAKING=on`
+    /// ([`Self::keeping_the_callers_speaking_face`]).
+    caller_speaking: bool,
     /// With it: the request judged last, if it was let out only as the
     /// conversation going on with no tie to the lamp
     /// ([`crate::untied_going_on`]): told it may be people's talk, and its
@@ -6876,6 +6891,7 @@ impl Heeding {
             untied_held: false,
             answer_grace: false,
             began_in_grace: None,
+            caller_speaking: false,
             untied_line: None,
             chain_untied: Vec::new(),
             busy_called_strict: false,
@@ -7115,6 +7131,13 @@ impl Heeding {
         self.answer_grace = true;
     }
 
+    /// `LAMP_UNTIED_CALLER_SPEAKING=on` with `held` (#5124, lever (a)): a
+    /// line the eyes saw spoken by the conversation's caller's face, and no
+    /// other, is the caller's own ([`Self::callers_own_line`]).
+    pub(crate) fn keeping_the_callers_speaking_face(&mut self) {
+        self.caller_speaking = true;
+    }
+
     /// `request` joins `chain` only for having no tie to the lamp
     /// (`LAMP_UNTIED_GOING_ON`), and is kept as such for the journal.
     /// Fields only, so it is called with the rule's attention borrowed.
@@ -7187,7 +7210,10 @@ impl Heeding {
     /// ("Did you send the slides to Sam yet?", "Ma'am, did you …" with the
     /// set-off word read as the lamp's name by #5110), so the grace keeps
     /// statements only ("I don't know. I'll probably just work late
-    /// tomorrow.").
+    /// tomorrow."). With [`Self::keeping_the_callers_speaking_face`], also
+    /// any line the eyes saw spoken by the caller's face and no other
+    /// (`spoken_by_the_caller_alone`), anywhere in the conversation, a
+    /// question too, unless it thanks someone by name (#5124 (a)).
     fn callers_own_line(
         &self,
         request: u64,
@@ -7202,6 +7228,21 @@ impl Heeding {
         // the conversation (#5110, `talk_sis-3`).
         if crate::untied_going_on::asks_of_their_own(heard, no_name_set_off) {
             return Some("it asks what the lamp knows of their own");
+        }
+        // #5124 (a): the eyes saw the caller's face speaking it and no other
+        // face, the faces read speaking in at least half the looks through
+        // the line (`speakers_between`; no fresh look, no face). Anywhere in
+        // the conversation, desk talk between, any number of lines an
+        // answer. A question too: unlike the grace's timing, the face is
+        // direct evidence of who said it, and the caller's questions after
+        // desk talk ("Maybe. What would you do?", busy_day's c04) are what
+        // this lever is for; a caller asking a colleague with no sign of
+        // desk talk is its cost. A reply naming someone stays held.
+        if self.caller_speaking
+            && spoken_by_the_caller_alone(&seen.speakers, &self.caller_faces)
+            && !crate::untied_going_on::names_someone_after_a_reply(heard)
+        {
+            return Some(crate::untied_going_on::CALLER_SPEAKING_KEPT);
         }
         // The line judged before this one is the one the lamp answered
         // last: nothing was held between its answer and this line.
@@ -7231,7 +7272,9 @@ impl Heeding {
             // it asks the one addressed of their own doings ("Did you send
             // the slides to Sam yet?", "Ma'am, did you …", "Are you coming
             // to the meeting at four?"), so the grace keeps statements only.
-            && !heard.contains('?')
+            // A full-width '？' is a question mark too; a question STT left
+            // with no mark is the grace's cost (docs/second-voice.md).
+            && !heard.contains(['?', '？'])
         {
             Some(crate::untied_going_on::GRACE_KEPT)
         } else {

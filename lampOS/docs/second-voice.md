@@ -5087,15 +5087,47 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
     and it keeps no question: one that reaches it is one the rules read as
     no ask of the lamp, asked of the one addressed ("Did you send the
     slides to Sam yet?", "Ma'am, did you …", whose set-off word #5110 reads
-    as the lamp's name), so it keeps statements only. Cost: a caller's
-    untied question right after the answer stays held. Tests
+    as the lamp's name), so it keeps statements only ('?' or a
+    full-width '？'). Costs: a caller's untied question right after the
+    answer stays held. With no face seen, any statement begun within 3 s
+    of the answer is kept, whoever it is said to: "I'll be back after
+    lunch." said to a colleague in that gap is answered. A question STT
+    wrote with no '?' ("Did you send the slides to Sam yet") reads as a
+    statement, so in the gap it is kept and answered too. Tests
     (`held_keeps_caller`): busy_day, off answers 8 of 8 lines, `held` 2
     (c01, c02), the grace 3 (c03 kept; d11, begun in the grace, held as a
     question and desk talk, and d12 and c04-c06 after it still held, as
     the grace is one line an answer); 13 room lines held under `held`, 0
     taken by the grace (desk lines begun 0.2 s and 2 s after the answer
-    among them). Not yet tried on a lamp. The caller's face
+    among them); a statement in the gap is held with another face seen
+    speaking it and kept with none, and a question ending in '?' or '？'
+    is held (`the_grace_keeps_no_line_another_face_speaks_and_no_question`).
+    Not yet tried on a lamp. The caller's face
     seen speaking across desk talk is lever (a), its own switch.
+  - **The caller's face seen speaking** (`LAMP_UNTIED_CALLER_SPEAKING=on`,
+    off, with `held` only; #5124, the first builder's lever (a)). On
+    busy_day, after the colleagues' d11 and d12 were held, the caller's
+    c04 to c06 were held too: the grace is one line an answer and nothing
+    else tied them. With the switch, a line the eyes saw spoken by the
+    conversation's caller's face, and by no other face
+    (`spoken_by_the_caller_alone`: the faces read speaking in at least half
+    the looks through the line, against `Heeding::caller_faces`, set at the
+    call), is the caller's own (`Heeding::callers_own_line`), anywhere in
+    the conversation and however many lines an answer. Never a face only
+    in view, or turned to the lamp but read still; never with no fresh
+    look through the line (no face is read then); and the sure other
+    voice, desk talk and a reply naming someone still hold it. Unlike the
+    grace it keeps questions: the face is direct evidence of who spoke,
+    and the caller's questions after desk talk ("Maybe. What would you
+    do?") are what it is for. Cost: the caller's own untied question to a
+    colleague, with no sign of desk talk, is let out. The worker opens the
+    eyes' reader for it (`Heeding::opening_the_eyes`); with no speaking
+    read (`LAMP_EYES_SPEAKING` off on lamp-eyes) it changes nothing. Tests
+    (`held_keeps_caller`): busy_day with the eyes, all eight right with
+    both levers (c01-c06 answered, d11 and d12 held); every desk line of
+    busy_day and of #5110's quiet-room sets stays held with only the desk
+    face speaking, no face read, or the caller's face in view but still.
+    Not yet tried on a lamp.
 - **The look by its own call.** With a full look (`LAMP_EYES_LOOK_FILE` and
   `LAMP_LOOK_FULL`), spoken turns are offered `take_a_look`
   (`second_provider::LOOK_CALL`, `worker::chat_tools` with `look`; texts
