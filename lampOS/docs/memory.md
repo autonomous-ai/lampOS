@@ -1092,15 +1092,19 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   chat round whose own words doubt what was heard ("misheard", "didn't
   catch", "was that … right", "did I hear … right", "want to be sure I
   heard", "is that spelled", "how do you spell it", "nghe nhầm" …;
-  "say that again", "did you say", "can you repeat", "if I heard you
-  right" and "nói lại" only in a question that asks for their words:
-  "Sorry, could you say it again?", "Did you say Mai or May?", "Bạn nói
-  lại được không?"; not after "I'll", "me to", "just", "if", nor with
-  "nếu"/"nhé" in the clause, nor before "you"/"she's"/"anything" or "to
-  your …"). Reassurance and a keep's closing line are none: "I want to be
-  sure you make it", "How do you spell relief?", "If it changes, just say
-  it again.", "I'll say it again at seven.", "Did you say you also wanted
-  a reminder?", "Was that all right?" (#5414 P2, #5454);
+  "say that again", "did you say", "can you repeat" and "nói lại" unless
+  their sentence invites a later change ("anytime", "whenever", "if it
+  changes", "if you ever", "feel free", "you can", "next time", "never",
+  "no need", "cứ", "nếu thay đổi"), has the lamp say it ("I'll", "me to",
+  "should I", "mình sẽ" before it, "at"/"tomorrow" after "again"), or
+  goes on to a new topic ("you …", "she's …", "anything …", "to your …");
+  "if I heard you right" unless its sentence ends with "!". So "Please say
+  it again.", "Bạn nói lại tên hoa nhé?" and "If I heard you right, your
+  locker is 12." doubt, and reassurance and a keep's closing line do not:
+  "I want to be sure you make it", "How do you spell relief?", "If it
+  changes, just say it again.", "I'll say it again at seven.", "Did you
+  say you also wanted a reminder?", "Was that all right?" (#5414 P2,
+  #5454);
   `remember::doubted::doubts_what_was_heard`) is not run that round. The
   model is told `{"remembered": false, "note": "Not kept: in this same
   reply you doubted what you heard. …"}` and the journal says "a remember
