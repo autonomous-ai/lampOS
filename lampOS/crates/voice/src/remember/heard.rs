@@ -245,6 +245,20 @@ pub const YES_ALONE: &str = "Nothing was kept: they only said yes or no, and no 
 /// The journal's line for it: no words of it.
 pub const YES_ALONE_LINE: &str = "lamp-voice provider: a remember in a line that was only a yes, with no offer before it, was not kept (skipped=1)";
 
+/// What the model is told for a `remember` or `forget` whose line was only
+/// a yes, with no offer waiting, just after the scope's last memory write
+/// was done (Bug C, lamp-06c1, 5 Nov: after "Mondays now, not Fridays.",
+/// a done keep and a done forget, a lone yes was told to ask, and the lamp
+/// asked again what to keep or forget): by what was done.
+pub const DONE_ALREADY_KEPT: &str = "It is done already (kept): your last turn kept it. Just confirm briefly that it is kept; do not ask again or offer to keep it again.";
+/// [`DONE_ALREADY_KEPT`] after a replace.
+pub const DONE_ALREADY_CHANGED: &str = "It is done already (changed): your last turn changed it. Just confirm briefly that it is changed; do not ask again or offer to change it again.";
+/// [`DONE_ALREADY_KEPT`] after a forget.
+pub const DONE_ALREADY_FORGOTTEN: &str = "It is done already (forgotten): your last turn forgot it. Just confirm briefly that it is forgotten; do not ask again what to forget.";
+
+/// The journal's line for it: no words of it.
+pub const DONE_ALREADY_LINE: &str = "lamp-voice provider: a memory call in a line that was only a yes, after a done write: told it is done already (skipped=1)";
+
 /// What the model is told instead of running a `remember` in heard line
 /// `request` that was only a yes with no offer before it, with the switch
 /// on ([`YES_ALONE`]): a line that is only a yes is never kept. `None`:
@@ -255,13 +269,105 @@ pub fn yes_alone(
     heard: bool,
     lease: Option<&crate::memory_scope::ScopeLease>,
 ) -> Option<Value> {
-    if !heard || call.name != super::REMEMBER || !on() {
+    let forget = call.name == super::FORGET;
+    if !heard || !(call.name == super::REMEMBER || forget) || !on() {
         return None;
     }
-    (held_now(request, lease)? == Held::YesAlone).then(|| {
-        eprintln!("{YES_ALONE_LINE}");
-        json!({"remembered": false, "note": YES_ALONE})
+    // Read before the thread is locked: the two locks are never held
+    // together.
+    let done = super::done_last_in(lease);
+    let thread = crate::thread::THREAD.lock().ok()?;
+    yes_alone_in(
+        &thread,
+        (request, writes_for(lease), Instant::now()),
+        forget,
+        done,
+    )
+}
+
+/// [`yes_alone`] for heard line `request` on `thread`, in scope `whose`, at
+/// `now`, with `done` the scope's last memory write done
+/// ([`super::done_last_in`]): `None` unless the line is only a yes or a no
+/// with no offer of the lamp's waiting ([`Held::YesAlone`]), then as
+/// [`yes_alone_decided`].
+pub(super) fn yes_alone_in(
+    thread: &crate::thread::Thread,
+    (request, whose, now): (u64, Option<&str>, Instant),
+    forget: bool,
+    done: Option<super::MemoryDone>,
+) -> Option<Value> {
+    let said = thread.heard_for(request, now);
+    let yes = said.as_deref().is_some_and(only_a_yes);
+    let held = held(said, || {
+        thread.offered_line(request, whose, now, offers_to_keep, only_a_yes)
+    });
+    if held != Held::YesAlone {
+        return None;
+    }
+    yes_alone_decided(forget, yes, done, || {
+        thread
+            .offered_line(request, whose, now, asks_to_forget, |_| false)
+            .is_some()
     })
+}
+
+/// [`yes_alone`] past its line being only a yes or a no with no offer
+/// waiting: `forget`, the call is a `forget`; `yes`, the line was a yes
+/// (not a no); `done`, the scope's last memory write done
+/// ([`super::done_last_in`]); `asked`, whether the lamp's answer before it
+/// asked whether to forget. Only a yes after a done write is told it is
+/// done already: a no never is (the reviewer-lead's P2 on #5436: "Kept it,
+/// right?" "No." runs its forget). A `forget` is held only when the done
+/// write was itself a forget and the lamp asked nothing about forgetting
+/// (Heron's and Twelve's P2 on #5436: a yes to "Should I clear the locker
+/// number too?" is consent, and runs); else it runs as before (`None`).
+fn yes_alone_decided(
+    forget: bool,
+    yes: bool,
+    done: Option<super::MemoryDone>,
+    asked: impl FnOnce() -> bool,
+) -> Option<Value> {
+    let done = done.filter(|_| yes);
+    if forget && (done != Some(super::MemoryDone::Forgotten) || asked()) {
+        return None;
+    }
+    Some(yes_alone_told(done, forget))
+}
+
+/// What asks whether to forget, without accents: English and Vietnamese
+/// ("Should I drop the old Friday note?", "Mình bỏ ghi chú cũ nhé?").
+const FORGET_ASKS: &[&str] = &[
+    "forget", "delete", "erase", "remove", "clear", "drop", "discard", "scrap", "wipe", "rid",
+    "quen", "xoa", "bo",
+];
+
+/// Whether the lamp's words `said` ask whether to forget something: one of
+/// [`FORGET_ASKS`] in them.
+fn asks_to_forget(said: &str) -> bool {
+    words(said).any(|word| FORGET_ASKS.contains(&bare(&word).as_str()))
+}
+
+/// What [`yes_alone`] tells the model, and journals: when the scope's last
+/// memory write was done within the held window (`done`), that it is done
+/// already, by what was done; else [`YES_ALONE`]. Nothing is written
+/// either way. `forget`: the call is a `forget`'s, told as one.
+fn yes_alone_told(done: Option<super::MemoryDone>, forget: bool) -> Value {
+    use super::MemoryDone;
+    let Some(done) = done else {
+        eprintln!("{YES_ALONE_LINE}");
+        return json!({"remembered": false, "note": YES_ALONE});
+    };
+    eprintln!("{DONE_ALREADY_LINE}");
+    let note = match done {
+        MemoryDone::Kept => DONE_ALREADY_KEPT,
+        MemoryDone::Changed => DONE_ALREADY_CHANGED,
+        MemoryDone::Forgotten => DONE_ALREADY_FORGOTTEN,
+    };
+    if forget {
+        json!({"forgotten": done == MemoryDone::Forgotten, "already": true, "note": note})
+    } else {
+        json!({"remembered": done != MemoryDone::Forgotten, "already": true, "note": note})
+    }
 }
 
 /// NFC, lower case, đ as d: `lamp_memory::search::text`.
@@ -993,5 +1099,167 @@ mod tests {
             answered(kept.clone(), &dark, fallback.as_ref(), false),
             super::told(kept, "They said: it's green now")
         );
+    }
+
+    /// Bug C, lamp-06c1, 5 Nov: a yes alone just after a done keep, replace
+    /// or forget is told it is done already, by what was done, never "Nothing
+    /// was kept … ask"; with nothing done last it is told [`YES_ALONE`].
+    #[test]
+    fn a_yes_alone_after_a_done_keep_is_told_it_is_kept_already() {
+        let told = yes_alone_told(Some(super::super::MemoryDone::Kept), false);
+        assert_eq!(told["remembered"], true);
+        assert_eq!(told["already"], true);
+        assert_eq!(told["note"], DONE_ALREADY_KEPT);
+        assert!(DONE_ALREADY_KEPT.starts_with("It is done already (kept)"));
+    }
+
+    #[test]
+    fn a_yes_alone_after_a_done_replace_is_told_it_is_changed_already() {
+        let told = yes_alone_told(Some(super::super::MemoryDone::Changed), false);
+        assert_eq!(told["remembered"], true);
+        assert_eq!(told["already"], true);
+        assert_eq!(told["note"], DONE_ALREADY_CHANGED);
+        assert!(DONE_ALREADY_CHANGED.starts_with("It is done already (changed)"));
+    }
+
+    #[test]
+    fn a_yes_alone_after_a_done_forget_is_told_it_is_forgotten_already() {
+        use super::super::MemoryDone;
+        let told = yes_alone_told(Some(MemoryDone::Forgotten), true);
+        assert_eq!(told["forgotten"], true);
+        assert_eq!(told["already"], true);
+        assert_eq!(told["note"], DONE_ALREADY_FORGOTTEN);
+        assert!(DONE_ALREADY_FORGOTTEN.starts_with("It is done already (forgotten)"));
+        // A remember after a forget is told the forget is done, and keeps
+        // nothing.
+        let told = yes_alone_told(Some(MemoryDone::Forgotten), false);
+        assert_eq!(told["remembered"], false);
+        assert_eq!(told["note"], DONE_ALREADY_FORGOTTEN);
+    }
+
+    #[test]
+    fn a_yes_alone_with_nothing_done_is_told_nothing_was_kept() {
+        assert_eq!(
+            yes_alone_told(None, false),
+            json!({"remembered": false, "note": YES_ALONE})
+        );
+        for note in [
+            DONE_ALREADY_KEPT,
+            DONE_ALREADY_CHANGED,
+            DONE_ALREADY_FORGOTTEN,
+        ] {
+            assert!(!note.contains("Nothing was kept"), "{note}");
+        }
+    }
+
+    /// The reviewer-lead's P2 on #5436: a lone no never takes the
+    /// done-already path. "Kept it, right?" then "No.": the forget runs, and
+    /// a remember is told nothing was kept.
+    #[test]
+    fn a_lone_no_after_a_done_keep_runs_its_forget() {
+        use super::super::MemoryDone;
+        assert!(only_a_no("No.") && !only_a_yes("No."));
+        let no = only_a_yes("No.");
+        assert_eq!(
+            yes_alone_decided(true, no, Some(MemoryDone::Kept), || false),
+            None
+        );
+        assert_eq!(
+            yes_alone_decided(false, no, Some(MemoryDone::Kept), || false),
+            Some(json!({"remembered": false, "note": YES_ALONE}))
+        );
+    }
+
+    /// The reviewer-lead's P3 on #5436: [`yes_alone`]'s decision reads the
+    /// done write. A yes after one is told it is done already; with none, a
+    /// remember is told nothing was kept. A forget is held only after a done
+    /// forget with no forget question asked (Heron's and Twelve's P2).
+    #[test]
+    fn a_yes_alone_is_decided_by_the_done_write() {
+        use super::super::MemoryDone;
+        for (done, note) in [
+            (MemoryDone::Kept, DONE_ALREADY_KEPT),
+            (MemoryDone::Changed, DONE_ALREADY_CHANGED),
+            (MemoryDone::Forgotten, DONE_ALREADY_FORGOTTEN),
+        ] {
+            let told = yes_alone_decided(false, true, Some(done), || false).unwrap();
+            assert_eq!(told["note"], note);
+            assert_eq!(told["already"], true);
+            assert_eq!(yes_alone_decided(true, true, Some(done), || true), None);
+        }
+        // A forget after a done keep or change runs.
+        assert_eq!(
+            yes_alone_decided(true, true, Some(MemoryDone::Kept), || false),
+            None
+        );
+        assert_eq!(
+            yes_alone_decided(true, true, Some(MemoryDone::Changed), || false),
+            None
+        );
+        let told = yes_alone_decided(true, true, Some(MemoryDone::Forgotten), || false).unwrap();
+        assert_eq!(told["note"], DONE_ALREADY_FORGOTTEN);
+        assert_eq!(told["forgotten"], true);
+        assert_eq!(
+            yes_alone_decided(false, true, None, || false),
+            Some(json!({"remembered": false, "note": YES_ALONE}))
+        );
+        assert_eq!(yes_alone_decided(true, true, None, || false), None);
+    }
+
+    /// Twelve's P2 on #5436, through [`yes_alone_in`] on a thread: after a
+    /// done forget, a lone "Yes." to the lamp's "Should I clear the locker
+    /// number too?" runs its forget; to "Anything else?" it is held and told
+    /// it is forgotten already; a lone "No." runs it either way.
+    #[test]
+    fn a_yes_to_the_lamps_forget_question_runs_its_forget() {
+        use super::super::MemoryDone;
+        use crate::thread::Thread;
+        let now = Instant::now();
+        let after = |lamp: &str, person: &str| {
+            let mut thread = Thread::new();
+            thread.person("Forget my gym code.", true, now);
+            thread.lamp(1, lamp, now);
+            thread.person(person, true, now);
+            thread
+        };
+        let forget = |thread: &Thread| {
+            yes_alone_in(thread, (2, None, now), true, Some(MemoryDone::Forgotten))
+        };
+        for lamp in [
+            "Done. Should I clear the locker number too?",
+            "Done. Want me to wipe the locker number too?",
+            "Done. Should I get rid of the locker number too?",
+            "Xong. Mình bỏ số tủ luôn nhé?",
+        ] {
+            assert_eq!(forget(&after(lamp, "Yes.")), None, "{lamp}");
+        }
+        let held = forget(&after("Done. Anything else?", "Yes.")).unwrap();
+        assert_eq!(held["note"], DONE_ALREADY_FORGOTTEN);
+        assert_eq!(forget(&after("Done. Anything else?", "No.")), None);
+    }
+
+    /// The reviewer-lead's P2 on #5436: "drop", "clear" and Vietnamese "bỏ"
+    /// ask whether to forget, so a yes to them runs the forget.
+    #[test]
+    fn the_lamp_asking_to_drop_clear_or_bo_asks_to_forget() {
+        for said in [
+            "Kept. Should I drop the old Friday note?",
+            "Want me to clear the old one?",
+            "Should I forget the dentist too?",
+            "Shall I delete it?",
+            "Mình bỏ ghi chú cũ nhé?",
+            "Should I get rid of the old one?",
+            "Want me to wipe that?",
+            "Mình xóa cái cũ nhé?",
+        ] {
+            assert!(asks_to_forget(said), "{said}");
+        }
+        for said in [
+            "Kept it, right?",
+            "Want me to keep that?",
+            "Mondays now, not Fridays.",
+        ] {
+            assert!(!asks_to_forget(said), "{said}");
+        }
     }
 }
