@@ -778,7 +778,8 @@ fn questions(persona: &Persona, events: &[Event], key: &[Evidence]) -> Result<Ve
                 .collect(),
         )?);
     }
-    if out.len() != 200 {
+    late_month_when(persona, key, &mut out)?;
+    if out.len() != 206 {
         return Err(invalid("question count changed from registration"));
     }
     for q in &mut out {
@@ -790,6 +791,119 @@ fn questions(persona: &Persona, events: &[Event], key: &[Evidence]) -> Result<Ve
         q.validate()?;
     }
     Ok(out)
+}
+/// Six "when" probes asked on the month's last two days, appended after the
+/// registered 200 so earlier question ids keep their bytes. The day-7 "when"
+/// probes only reach back a week; these ask from the end of the month about
+/// "earlier this month", "last week" and a date more than a week back.
+/// Forgotten facts are skipped: their answer is an abstention, not a date.
+fn late_month_when(persona: &Persona, key: &[Evidence], out: &mut Vec<Question>) -> Result<()> {
+    let days = |f: &Fact| -> Vec<u32> {
+        let mut d: Vec<u32> = key
+            .iter()
+            .filter(|k| k.fact_id.as_ref() == Some(&f.id))
+            .filter_map(|k| k.record_id.get(1..3)?.parse().ok())
+            .collect();
+        d.sort_unstable();
+        d
+    };
+    let last_by = |f: &Fact, day: u32| days(f).into_iter().rfind(|d| *d <= day);
+    let kept: Vec<&Fact> = persona
+        .facts
+        .iter()
+        .filter(|f| f.forget_day.is_none())
+        .collect();
+    let mut used = BTreeSet::new();
+    let ask = |out: &mut Vec<Question>,
+               used: &mut BTreeSet<String>,
+               day: u32,
+               heard: String,
+               on: u32,
+               f: &Fact| {
+        used.insert(f.id.clone());
+        let q = question(
+            persona,
+            out.len() + 1,
+            day,
+            "when",
+            heard,
+            Rule::Date {
+                expected: persona.local_date(on)?.to_string(),
+                tolerance_days: 1,
+            },
+            sources(key, &f.id),
+        )?;
+        out.push(q);
+        Ok::<_, crate::Error>(())
+    };
+    // Day 30, the month's last day: the first mention, four weeks back.
+    for f in kept.iter().skip(20).take(2) {
+        let first = *days(f)
+            .first()
+            .ok_or_else(|| invalid("fact has no source"))?;
+        ask(
+            out,
+            &mut used,
+            30,
+            format!(
+                "Earlier this month, on which date did I first mention my {}? Give YYYY-MM-DD.",
+                f.label
+            ),
+            first,
+            f,
+        )?;
+    }
+    // Day 30: the last mention fell in the previous Monday-to-Sunday week.
+    let monday = 30
+        - u32::try_from(persona.local_date(30)?.weekday().to_monday_zero_offset())
+            .map_err(|_| invalid("invalid weekday"))?;
+    let week = (monday - 7)..monday;
+    let mut n = 0;
+    for f in &kept {
+        if n == 2 || used.contains(&f.id) {
+            continue;
+        }
+        if let Some(d) = last_by(f, 30).filter(|d| week.contains(d)) {
+            ask(
+                out,
+                &mut used,
+                30,
+                format!(
+                    "Last week, on which date did I last discuss my {}? Give YYYY-MM-DD.",
+                    f.label
+                ),
+                d,
+                f,
+            )?;
+            n += 1;
+        }
+    }
+    // Day 29: the last mention is more than a week back, so "a few days
+    // ago" is wrong. The rule does not depend on the weekday.
+    let mut n = 0;
+    for f in &kept {
+        if n == 2 || used.contains(&f.id) {
+            continue;
+        }
+        if let Some(d) = last_by(f, 29).filter(|d| *d + 8 <= 29) {
+            ask(
+                out,
+                &mut used,
+                29,
+                format!(
+                    "On which date did I last discuss my {}? Give YYYY-MM-DD.",
+                    f.label
+                ),
+                d,
+                f,
+            )?;
+            n += 1;
+        }
+    }
+    if used.len() != 6 {
+        return Err(invalid("late-month when probes need six distinct facts"));
+    }
+    Ok(())
 }
 pub fn counts(corpus: &Corpus) -> BTreeMap<String, usize> {
     let mut counts = BTreeMap::new();

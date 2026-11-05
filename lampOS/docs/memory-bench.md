@@ -695,7 +695,7 @@ The first benchmark chunk provides the versioned wire types, recorded model
 client and budget accounting, exact/date/abstention scorers, a rubric gate,
 private append-only run ledger, and deterministic corpus generation and
 validation. The development fixture contains 2,220 events (50 utterances, eight
-conversation starts/ends and four arrivals/departures per day) and 200 questions. Its registration records
+conversation starts/ends and four arrivals/departures per day) and 206 questions. Its registration records
 hashes and the fixed twelve-arm candidate order; human review is still pending.
 
 From `lampOS/`, `cargo run -p lamp-memory-bench -- generate PERSONA NEW_DIRECTORY`

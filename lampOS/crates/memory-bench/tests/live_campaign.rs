@@ -453,11 +453,11 @@ fn fake_services_drive_shared_speech_then_complete_month_with_null_scores() {
         .unwrap()
         .remaining_microusd();
     let result = live_run::execute(&p, approval(&p), &root, &run("none", 1), true).unwrap();
-    assert_eq!(result["questions"], 200);
-    assert_eq!(result["answer_turns"], 224);
-    assert_eq!(result["model_calls"], 300);
+    assert_eq!(result["questions"], 206);
+    assert_eq!(result["answer_turns"], 230);
+    assert_eq!(result["model_calls"], 306);
     assert_eq!(result["label"], "plumbing check");
-    assert_eq!(chat.counts.load(Ordering::Relaxed), 300);
+    assert_eq!(chat.counts.load(Ordering::Relaxed), 306);
     for kind in result["by_kind"].as_object().unwrap().values() {
         assert!(kind["mean"].is_null());
     }
