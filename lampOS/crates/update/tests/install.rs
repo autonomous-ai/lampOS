@@ -1720,9 +1720,13 @@ fn the_product_answers_a_stop_and_asks_after_a_wordless_cut_in() {
         service.contains(&"Environment=LAMP_CUT_IN_WORDLESS_ASKS=on"),
         "the voice lacks LAMP_CUT_IN_WORDLESS_ASKS"
     );
+    // Off for the candidate (the PM, 6 Nov): its lamp check came back FAIL,
+    // partial (#5430), so a busy room's cut is asked, as on stable.
     assert!(
-        service.contains(&"Environment=LAMP_CUT_IN_WORDLESS_RESUMES=on"),
-        "the voice lacks LAMP_CUT_IN_WORDLESS_RESUMES"
+        !service
+            .iter()
+            .any(|line| line.contains("LAMP_CUT_IN_WORDLESS_RESUMES")),
+        "the voice sets LAMP_CUT_IN_WORDLESS_RESUMES"
     );
 }
 
@@ -2112,25 +2116,32 @@ fn the_product_summarises_a_long_conversation() {
     );
 }
 
-/// Tiers' ideas in Days are on in the product (the memory owner's call on
-/// 5 Nov): a newer correction first (`LAMP_MEMORY_NEWER_FIRST`), a maybe or
-/// a plan marked (`LAMP_MEMORY_STRENGTH`), and tastes first in the session
-/// note (`LAMP_MEMORY_PROFILE`). Each sends its field only with Days on.
+/// Tiers' ideas in Days, a newer correction first (`LAMP_MEMORY_NEWER_FIRST`),
+/// a maybe or a plan marked (`LAMP_MEMORY_STRENGTH`) and tastes first in the
+/// session note (`LAMP_MEMORY_PROFILE`), are off for the candidate (the PM,
+/// 6 Nov): they merged with their played check never posted (#5331). Days
+/// itself stays on.
 #[test]
-fn the_product_ranks_corrections_marks_maybes_and_keeps_tastes_first() {
+fn the_product_leaves_tiers_ideas_off_until_their_played_check() {
     let voice = install::PRODUCT
         .iter()
         .find(|(unit, _)| *unit == "lamp-voice.service")
         .unwrap()
         .1;
     let service = section(voice, "Service");
-    for line in [
-        "Environment=LAMP_MEMORY_NEWER_FIRST=on",
-        "Environment=LAMP_MEMORY_STRENGTH=on",
-        "Environment=LAMP_MEMORY_PROFILE=on",
-        "Environment=LAMP_MEMORY_DAYS=on",
+    assert!(
+        service.contains(&"Environment=LAMP_MEMORY_DAYS=on"),
+        "the voice lacks LAMP_MEMORY_DAYS=on"
+    );
+    for switch in [
+        "LAMP_MEMORY_NEWER_FIRST",
+        "LAMP_MEMORY_STRENGTH",
+        "LAMP_MEMORY_PROFILE",
     ] {
-        assert!(service.contains(&line), "the voice lacks {line}");
+        assert!(
+            !service.iter().any(|line| line.contains(switch)),
+            "the voice sets {switch}"
+        );
     }
 }
 
