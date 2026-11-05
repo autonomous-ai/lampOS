@@ -20,6 +20,16 @@ const NAME_LINE: (&str, Lamp) = ("My name is Walter.", Lamp::Saves(READ_BACK));
 
 /// The eyes requests the voice sent: each save that ran, by its name.
 async fn run(turns: &[(&'static str, Lamp)], two_faces_at: Option<usize>) -> Vec<Value> {
+    run_with(turns, two_faces_at, None).await.0
+}
+
+/// As [`run`], with the eyes refusing the save on the yes with `refused`,
+/// and what each chat was asked.
+async fn run_with(
+    turns: &[(&'static str, Lamp)],
+    two_faces_at: Option<usize>,
+    refused: Option<&'static str>,
+) -> (Vec<Value>, Vec<Vec<Message>>) {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     // Request numbers of their own: lines seen are the process's.
     let first = 9_000 + 100 * NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -68,6 +78,9 @@ async fn run(turns: &[(&'static str, Lamp)], two_faces_at: Option<usize>) -> Vec
             &said,
         ) == crate::known_faces::HeldSaveVerdict::Runs
         {
+            if let Some(why) = refused {
+                return Box::pin(async move { json!({"error": why}) });
+            }
             eyes.lock()
                 .unwrap()
                 .push(json!({"remember": args["name"], "one_face": true, "replace": false}));
@@ -114,7 +127,8 @@ async fn run(turns: &[(&'static str, Lamp)], two_faces_at: Option<usize>) -> Vec
         };
         before.push(((*said).to_owned(), (*lamp_said).to_owned()));
     }
-    sent.lock().unwrap().clone()
+    let asked = script.asked.lock().unwrap().clone();
+    (sent.lock().unwrap().clone(), asked)
 }
 
 fn kept() -> Vec<Value> {
@@ -178,4 +192,30 @@ async fn a_model_call_after_the_held_save_keeps_it_once() {
     )
     .await;
     assert_eq!(sent, kept());
+}
+
+/// The eyes keep nothing on the yes (no one face in view): the model is
+/// told the face was not kept, and why, so it does not say it will know
+/// them.
+#[tokio::test]
+async fn a_held_save_that_keeps_nothing_is_told_to_the_model() {
+    let (sent, asked) = run_with(
+        &[NAME_LINE, ("Yes, that's my name.", Lamp::Says("Got it."))],
+        None,
+        Some("no one face in view"),
+    )
+    .await;
+    assert_eq!(sent, Vec::<Value>::new());
+    let last = asked.last().expect("the yes was asked of the model");
+    let notes: Vec<&str> = last
+        .iter()
+        .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
+        .filter(|content| content.starts_with("(For you to know"))
+        .collect();
+    assert!(
+        notes
+            .iter()
+            .any(|note| note.contains("could not be kept") && note.contains("no one face in view")),
+        "{notes:?}"
+    );
 }

@@ -1325,7 +1325,14 @@ fn answer_inner(
             if !keep_news && matches!(route, Route::Tasks(_)) {
                 let _ = crate::agent_tasks::take_news_key(&mut answer.told);
             }
-            // Worded as the Live route's line, which is read on the lamp.
+            // Worded as the Live route's line, which is read on the lamp. A
+            // refusal the name checks gave here never reached the eyes, so
+            // it is not said to be theirs (the Reviewer-lead's P3 on #5415).
+            let whom = if crate::known_faces::refused_here(&answer.told) {
+                "the name checks here (the eyes not asked)"
+            } else {
+                whom
+            };
             eprintln!(
                 "lamp-voice second: request {request} asked for {}; {whom} {} in {} ms; the answer was sent",
                 call.name,
