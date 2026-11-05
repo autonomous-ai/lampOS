@@ -266,7 +266,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 61] = [
+pub const KINDS: [(&str, Switch); 62] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -304,6 +304,7 @@ pub const KINDS: [(&str, Switch); 61] = [
     (crate::settings::PLACE_KINDS[1], PLACE),
     (crate::settings::VOICE_KINDS[0], VOICE),
     (crate::settings::VOICE_KINDS[1], VOICE),
+    (crate::settings::VOICE_GET_KIND, VOICE),
     ("faces.add_photo", |lamp| lamp.photos().is_some()),
     ("face.list", |lamp| lamp.faces().is_some()),
     ("face.remove", |lamp| lamp.faces().is_some()),
@@ -544,6 +545,13 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let line = crate::settings::voice_line(kind, data)?;
             changes.start(kind, line);
             Ok(None)
+        }
+        // What the lamp keeps now (#5394's follow-up), read where the
+        // helper writes it, as the language is: nothing is asked of it.
+        crate::settings::VOICE_GET_KIND if on(lamp, kind) => {
+            let file = std::path::Path::new(lamp_msgs::chosen_voice::VOICE_FILE);
+            let dir = file.parent().ok_or_else(|| not_here(kind))?;
+            Ok(Some(crate::settings::chosen_now(dir)))
         }
         // A face from a photo the app sends (#1968): handed to the eyes,
         // which keep it unconfirmed until its person says yes at the lamp.
@@ -1376,6 +1384,7 @@ pub mod tests {
                     "control.set",
                     "voice.set",
                     "character.set",
+                    "voice.get",
                 ],
             ),
             (
