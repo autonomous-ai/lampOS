@@ -1,0 +1,181 @@
+//! The first face save at setup, refused only for want of the read-back's
+//! yes, is held by the voice and run on that yes with no model call
+//! (lamp-52e6, 5 Nov, #5391's check: "My name is Walter.", "Walter. Have I
+//! got that right?", "Yes, that's my name." made no call, and the walk
+//! ended with the name only).
+use super::*;
+use crate::known_faces::{REMEMBER, Said};
+use crate::memory_scope::FaceCache;
+
+/// What the model does on a turn: says a line, or calls the face save
+/// under "Walter" and then says a line.
+#[derive(Clone, Copy)]
+enum Lamp {
+    Says(&'static str),
+    Saves(&'static str),
+}
+
+const READ_BACK: &str = "Walter. Have I got that right?";
+const NAME_LINE: (&str, Lamp) = ("My name is Walter.", Lamp::Saves(READ_BACK));
+
+/// The eyes requests the voice sent: each save that ran, by its name.
+async fn run(turns: &[(&'static str, Lamp)], two_faces_at: Option<usize>) -> Vec<Value> {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    // Request numbers of their own: lines seen are the process's.
+    let first = 9_000 + 100 * NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let mut chats = VecDeque::new();
+    for (_, lamp) in turns {
+        match lamp {
+            Lamp::Says(line) => chats.push_back(vec![text(line), Ok(ChatEvent::Done)]),
+            Lamp::Saves(line) => {
+                chats.push_back(vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        REMEMBER,
+                        json!({"name": "Walter"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ]);
+                chats.push_back(vec![text(line), Ok(ChatEvent::Done)]);
+            }
+        }
+    }
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            turns
+                .iter()
+                .map(|(said, _)| Ok((*said).to_owned()))
+                .collect(),
+        ),
+        chats: Mutex::new(chats),
+        ..Script::default()
+    });
+    // What was said, as the thread's window gives it: the turn in hand and
+    // the exchanges before it.
+    let window = Arc::new(Mutex::new(Said::default()));
+    let reading = window.clone();
+    let sent: Arc<Mutex<Vec<Value>>> = Arc::default();
+    let eyes = sent.clone();
+    let judged = window.clone();
+    // The eyes' check as a setup save makes it: kept only on a plain yes
+    // to the read-back, else refused for it.
+    let runner: ScopedToolRunner = Arc::new(move |_, _, name, args, _| {
+        let said = judged.lock().unwrap().clone();
+        let told = if name != REMEMBER {
+            json!({"ok": true})
+        } else if crate::known_faces::held_save_verdict(
+            args["name"].as_str().unwrap_or_default(),
+            &said,
+        ) == crate::known_faces::HeldSaveVerdict::Runs
+        {
+            eyes.lock()
+                .unwrap()
+                .push(json!({"remember": args["name"], "one_face": true, "replace": false}));
+            json!({"ok": true, "remembered": args["name"]})
+        } else {
+            json!({"error": crate::known_faces::SAY_IT_BACK})
+        };
+        Box::pin(async move { told })
+    });
+    let cache = Arc::new(FaceCache::default());
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine
+        .with_memory_scope(
+            lamp_turn_owner::BootId::new([12; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            None,
+        )
+        .announcing(false)
+        .reading_said_from(Arc::new(move || reading.lock().unwrap().clone()));
+    engine.memory_camera(true, 1);
+    let mut before: Vec<(String, String)> = Vec::new();
+    for (at, (said, lamp)) in turns.iter().enumerate() {
+        let request = first + at as u64;
+        *window.lock().unwrap() = Said {
+            this: (*said).to_owned(),
+            before: before[before.len().saturating_sub(2)..].to_vec(),
+        };
+        if two_faces_at == Some(at) {
+            crate::speaking_faces::saw_line(crate::speaking_faces::LineSeen {
+                request,
+                speakers: vec!["f1".into(), "f2".into()],
+                ..Default::default()
+            });
+        }
+        cache.replace(cache.begin_refresh(), None);
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        turn(&mut engine).await;
+        engine.retire_through(request);
+        let lamp_said = match lamp {
+            Lamp::Says(line) | Lamp::Saves(line) => line,
+        };
+        before.push(((*said).to_owned(), (*lamp_said).to_owned()));
+    }
+    sent.lock().unwrap().clone()
+}
+
+fn kept() -> Vec<Value> {
+    vec![json!({"remember": "Walter", "one_face": true, "replace": false})]
+}
+
+/// (a) and (b): the trace's order, the yes with no model call keeps the
+/// face once, the eyes asked as a model call would ask them.
+#[tokio::test]
+async fn the_yes_to_the_read_back_keeps_the_held_face_with_no_call() {
+    for yes in [
+        "Yes, that's my name.",
+        "Yes. That's right. Please remember my face.",
+    ] {
+        let sent = run(&[NAME_LINE, (yes, Lamp::Says("Got it."))], None).await;
+        assert_eq!(sent, kept(), "{yes}");
+    }
+}
+
+/// (c), (e) and a second face: a correction, a read-back folded into the
+/// face question, or a second face seen speaking the yes keeps nothing,
+/// and the hold is gone after it.
+#[tokio::test]
+async fn a_correction_a_face_question_or_a_second_face_keeps_nothing() {
+    let sent = run(
+        &[
+            NAME_LINE,
+            ("No, it's Walt.", Lamp::Says("Walt, right?")),
+            ("Yes, that's my name.", Lamp::Says("Got it.")),
+        ],
+        None,
+    )
+    .await;
+    assert_eq!(sent, Vec::<Value>::new());
+    let sent = run(
+        &[
+            (
+                "My name is Walter.",
+                Lamp::Saves("Nice to meet you, Walter! May I remember your face?"),
+            ),
+            ("Yes.", Lamp::Says("Got it.")),
+        ],
+        None,
+    )
+    .await;
+    assert_eq!(sent, Vec::<Value>::new());
+    let sent = run(
+        &[NAME_LINE, ("Yes, that's my name.", Lamp::Says("Got it."))],
+        Some(1),
+    )
+    .await;
+    assert_eq!(sent, Vec::<Value>::new());
+}
+
+/// (d): the model also calls the save after the yes: kept exactly once.
+#[tokio::test]
+async fn a_model_call_after_the_held_save_keeps_it_once() {
+    let sent = run(
+        &[NAME_LINE, ("Yes, that's my name.", Lamp::Saves("Got it."))],
+        None,
+    )
+    .await;
+    assert_eq!(sent, kept());
+}
