@@ -3,7 +3,7 @@
 Everything here is fictional. The development persona has 40 facts, twelve
 traits, ten changed facts, two explicit forget requests, six appointments,
 visitors and decoys. The generator emits thirty days with fifty utterances
-in eight conversations across four desk visits per day (2,220 events total). Its 200 questions include twelve
+in eight conversations across four desk visits per day (2,220 events total). Its 206 questions include twelve
 three-turn appointment probes. No arm has been scored against this material.
 
 Registration version 2 adds three day-9 wrong-person probes, replacing three
@@ -25,6 +25,15 @@ The prior nine-minute spacing falsely split every utterance into a product
 conversation. Consolidation remains 30 nightly and four weekly passes.
 The facts and ahead removal names now match the adapter manifest, with no
 change in component meaning or order. Prior plumbing attempts remain retained.
+
+Registration version 6 appends six late-month "when" probes, q201–q206,
+before any score. The twenty registered "when" probes are all asked on day 7
+about the first week. The new ones are asked from the end of the month: two on
+day 30 about a first mention earlier this month, two on day 30 about a last
+mention in the previous Monday-to-Sunday week, and two on day 29 about a last
+mention more than a week back. Forgotten facts are skipped. The persona, events,
+answer key and the bytes of q001–q200 are unchanged. The month runs from 1 to
+30 April, so no question crosses a calendar-month edge.
 
 Files are deliberately separated:
 

@@ -79,8 +79,9 @@ pub fn write_corpus(path: &Path, corpus: &Corpus) -> Result<()> {
     .into_iter()
     .map(|name| Ok((name, hash(&fs::read(path.join(name))?))))
     .collect::<Result<BTreeMap<_, _>>>()?;
-    let mut registration = json!({"version":5,"protocol_version":2,"protocol_minor":1,"status":"draft_pending_human_review","fictional":true,
-        "question_count":200,"days":30,"utterances_per_day":50,"timezone":corpus.persona.timezone,
+    let mut registration = json!({"version":6,"protocol_version":2,"protocol_minor":1,"status":"draft_pending_human_review","fictional":true,
+        "question_count":206,
+        "late_month_revision":{"date":"2026-11-05","before_any_score":true,"reason":"Every registered when probe is asked on day 7 about the first week; none asks from the end of the month.","added":"q201-q206, category when, appended so q001-q200 keep their bytes: two on day 30 for a first mention earlier this month, two on day 30 for a last mention in the previous Monday-to-Sunday week, two on day 29 for a last mention more than a week back; forgotten facts skipped","unchanged":"persona, events, answer key and the bytes of q001-q200","gaps":["the month runs 1-30 April, so no question crosses a calendar-month edge"]},"days":30,"utterances_per_day":50,"timezone":corpus.persona.timezone,
         "seed":corpus.persona.seed,"files":hashes,"scorers":"src/score.rs and tests/guards.rs committed before scored runs",
         "coverage_revision":{"date":"2026-10-31","before_any_score":true,"reason":"Give memory only product-observable activity and a realistic prompt budget; prevent empty or unused tier removals from being treated as evidence of no value.","activity":"Scripted at_desk, head_down and away from visit stage directions; probe posture rotates independently of question content.","topic":null,"objects":[],"memory_text_bytes":4096,"no_memory":"no memory text","full_history":"ceiling; no memory-selection cap, complete prompt must fit pinned model context; transport overflow is unsupported, never truncation","diagnostics":"optional metadata-only tier-usage-v1 on inspection; unknown when absent; never scored","gaps":["fading not exercised by this month","no second identified person","no delivered-recall acknowledgement","no supplied-topic episode split","no supplied object labels"]},
         "topic_segmentation_revision":{"date":"2026-10-31","before_any_score":true,"reason":"The prior engine cut only on sessions and departures; measure sleep-time topic segmentation rather than assuming its benefit.","full_engine":"nightly model proposes record-id ranges within each session; code requires contiguous ranges covering every eligible record exactly once; no added live-reply work","all_ten_removals":"segmentation remains enabled; each removal differs from the full engine only in its named component","no_nightly_sleep_label":"no consolidation of facts, lines and episode summaries; nightly topic-boundary pass still runs","no_nightly_sleep_weekly":"weekly reflection remains enabled","session_cutting_only":"same engine with topic segmentation disabled; session and departure boundaries remain","readiness":"If segmentation is not ready, only the three reference setups may run; hold every Tiers setup for one agreed segmented build.","unchanged":"all persona, event, question and answer-key bytes from registration v4","cost":"six additional two-persona runs; new segmentation overhead unmeasured"},
@@ -159,7 +160,7 @@ pub fn read_corpus(path: &Path) -> Result<Corpus> {
 pub fn validate(corpus: &Corpus) -> Result<()> {
     corpus.persona.validate()?;
     let (event_count, question_count, day_count) = match corpus.profile {
-        Profile::Month => (2220, 200, 30),
+        Profile::Month => (2220, 206, 30),
         Profile::Aging { .. } => (2856, 42, 120),
     };
     if corpus.events.len() != event_count
