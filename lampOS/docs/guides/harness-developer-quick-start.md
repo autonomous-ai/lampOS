@@ -4,7 +4,7 @@ You can read and drive your own lamp from a program on your computer: light it, 
 
 ## What you get
 
-- **Pairing a computer with your lamp.** The owner pairs a computer once with a code, choosing what it may do. The Autonomous app's *Add a developer computer* screen is meant to make that code, but it is not out yet (see "What works today"); until it ships, the lamp's keeper makes it. The computer then connects to the lamp on your home network. The owner can revoke it at any time. The person always wins: a hand on the lamp's head, "stop", the privacy switch, or a conversation takes control back from your program ([develop.md](../develop.md), "What takes control back").
+- **Pairing a computer with your lamp.** The owner turns developer access on in the Autonomous app, then pairs a computer once with a code, choosing what it may do. The computer then connects to the lamp on your home network. The owner can revoke it at any time. The person always wins: a hand on the lamp's head, "stop", the privacy switch, or a conversation takes control back from your program ([develop.md](../develop.md), "What takes control back").
 - **The SDK.** Python (`lampos`) and JavaScript (`lampos`), the same calls in both: events (`person.arrived`, `phrase.heard`, `touch`...), state (`get`), and actions (`light`, `say`, `gesture`, `express`, `sound`...). Each needs a grant the owner gave. See [the SDK map](../../sdk/README.md) for every call and its status.
 - **A fake lamp** on your own computer, so you can try everything with no lamp.
 - **Also there:** `lamp-mcp`, to let an agent drive the lamp ([sdk/mcp](../../sdk/mcp/README.md)), and skills you push to the lamp ([develop.md](../develop.md), part 5).
@@ -19,10 +19,9 @@ What your program never gets: camera frames or audio unless the owner grants `ca
 |---|---|
 | The SDKs and the fake lamp | Merged. Use them now |
 | An example against the fake lamp | Runs (output below) |
-| The lamp's side, `lamp-control` | Merged, but **not a product part yet**: it runs only when the lamp's keeper turns it on (`LAMP_CONTROL=on`). A pull request that makes it a product part is open |
-| The app's *Add a developer computer* screen | **Not out yet.** The lamp's side is merged, so the app can ask the lamp for a code once the screen ships |
+| The lamp's side, `lamp-control` | On every lamp, off until the owner turns developer access on in the app |
 
-So today a real lamp pairs only when its keeper turns lamp-control on and makes the pairing code at the lamp. Ask your lamp's keeper, or use the fake lamp below.
+A real lamp pairs once the owner has turned developer access on. Until then, use the fake lamp below.
 
 ## 1. Install the SDK (2 minutes)
 
@@ -106,9 +105,7 @@ Why it is written this way:
 
 ## 4. Point it at your real lamp
 
-1. **Get a pairing code.** The owner's code comes with the lamp's pin (64 hex characters) and lasts 5 minutes. For this example tick three grants: `light` (the light), `speak` (the voice) and `body` (the nod).
-   - **When the app screen ships:** in the Autonomous app, open your lamp and choose *Add a developer computer*. The lamp also says the first 8 characters of the pin aloud, and they must match what the app shows.
-   - **Today:** on a lamp with lamp-control turned on, the lamp's keeper runs `lamp-control code --grants body,light,speak` as root. It prints the code and the pin.
+1. **Get a pairing code.** The code comes with the lamp's pin (64 hex characters) and lasts 5 minutes. For this example tick three grants: `light` (the light), `speak` (the voice) and `body` (the nod). In the Autonomous app, turn developer access on, open your lamp and choose *Add a developer computer*. The lamp also says the first 8 characters of the pin aloud, and they must match what the app shows.
 2. **On your computer**, with the environment active and no `LAMPOS_HOME` set:
 
 ```sh
