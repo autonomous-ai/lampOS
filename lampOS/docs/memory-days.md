@@ -136,9 +136,10 @@ described with its request below. All three are read-path only: nothing new
 is kept, said or read, and no model is asked. They need a lamp-memory from the
 same build: an older memory refuses an unknown field (`deny_unknown_fields`),
 so a recall with one answers nothing and a session note is unavailable until
-both are updated. All three are on in the product's voice unit by the
-memory owner's call on 5 Nov; a product install ships the voice and the
-memory from one build.
+both are updated. All three were turned on in the product's voice unit by
+the memory owner's call on 5 Nov, and are off for the candidate since 6 Nov
+until a played check passes (#5331, #5464); a product install ships the
+voice and the memory from one build.
 
 With `LAMP_MEMORY_NEWER_FIRST=on` (the memory owner's Tiers-ideas plan, 3
 Nov, part P1; off unless set, with the Days client only; the idea adapted

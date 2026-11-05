@@ -2096,7 +2096,8 @@ order is kept. A written turn is the same from the chat on.
     lamp's answer: answered …", then "first answer audio … its fixed
     line".
   - **A wordless cut-in picked up again** (`LAMP_CUT_IN_WORDLESS_RESUMES`,
-    on in the product; the memory owner, 5 Nov): the same cut-in, counted
+    the memory owner's call on 5 Nov; off in the product since 6 Nov until
+    its busy-room path passes on a lamp, #5430): the same cut-in, counted
     in a run, each within `cut_in_wordless::AGAIN_AFTER` (60 s) of the last
     (`cut_in_wordless::Cuts`). The first in a quiet room still asks
     `cut_in_wordless::LINE`; the first in a busy room says `BRIDGE`

@@ -231,8 +231,8 @@ Khi bật `LAMP_MEMORY_NEWER_FIRST=on` (kế hoạch đưa ý tưởng của Tie
 của người phụ trách trí nhớ, 3/11, phần P1; tắt nếu không đặt; ý tưởng phỏng
 theo cách memory-tiers thay thế bằng "bằng chứng mới hơn của chính chủ",
 [memory-tiers.md](../memory-tiers.md)), `search` hay `recall` của một lần
-truy xuất sẽ có thêm `"newer_first":true`. **Chưa nối cho đến P4: voice chưa
-gửi trường này, nên hôm nay bật công tắc không đổi gì**; chỉ kho trả lời nó.
+truy xuất sẽ có thêm `"newer_first":true` (P4, voice gửi trường này; một
+`recall` không có truy vấn thì không, dù kho cũng trả lời nó ở đó).
 Trong các bản ghi truy vấn đã tìm được cho một người đã nhận ra, một câu mới
 hơn sửa một câu cũ hơn được xếp trước trong `search`, và câu cũ có
 `"earlier":true`; `recall` vẫn giữ thứ tự thời gian và chỉ thêm `earlier`.
@@ -349,12 +349,14 @@ phòng:
   Long today.») được xét như trước. Nhật ký chỉ đếm, không có lời nào. Test:
   `remember::named::tests`.
 
-## Ý tưởng của Tiers trong Days, bật trong bản sản phẩm
+## Ý tưởng của Tiers trong Days, tắt cho bản ứng viên
 
 `LAMP_MEMORY_NEWER_FIRST`, `LAMP_MEMORY_STRENGTH` và `LAMP_MEMORY_PROFILE`
 (kế hoạch ý tưởng Tiers của người phụ trách trí nhớ, 3/11; mỗi công tắc chỉ
-nhận `on`, chỉ với Days) bật trong unit voice của bản sản phẩm từ 5/11, theo
-quyết định của người phụ trách trí nhớ. Một lời sửa nói trong lúc trò chuyện
+nhận `on`, chỉ với Days) được bật trong unit voice của bản sản phẩm từ 5/11
+theo quyết định của người phụ trách trí nhớ, và tắt cho bản ứng viên từ 6/11
+cho đến khi một bài kiểm tra phát thử đạt (#5331, #5464). Khi bật, một lời
+sửa nói trong lúc trò chuyện
 ("thật ra bây giờ là trà xanh") được trả về trước câu cũ mà nó sửa, và câu cũ
 mang `earlier`; một điều nói như "có lẽ" hay một dự định được đánh dấu
 `maybe` hay `plan`, nên đèn không nói như thể nó đã xong hay đã đặt; và ghi chú

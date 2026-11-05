@@ -610,7 +610,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_CUT_IN_NEAR_ASKER` | While answering you, the lamp no longer stops for quieter talk from farther back in the room. |
 | `LAMP_CUT_IN_OVER_BED` | After three ignored turns, only "stop", its name, a tap or the button stops it; needs stop words always on. |
 | `LAMP_CUT_IN_WORDLESS_ASKS` | If a sound with no words cuts its answer, the lamp says "Um, excuse me, did anyone say something?", so you know a noise cut it off; on in the product, and now and then it can ask after its own echo. |
-| `LAMP_CUT_IN_WORDLESS_RESUMES` | If a sound with no words cuts its answer in a noisy room, the lamp says "Anyway," and picks up where it was; cut again within a minute, "Oops, cut off again. Anyway," and goes on; a third time, "It's a bit noisy here, so I'll pause. Just say 'Lamp' when you want me to go on." On in the product. |
+| `LAMP_CUT_IN_WORDLESS_RESUMES` | If a sound with no words cuts its answer in a noisy room, the lamp picks up where it was. |
 | `LAMP_CARRIED_LINES_KEEP_TALK` | A long talk is remembered as one talk, even while the lamp can't see who is speaking for a while. |
 | `LAMP_BACKCHANNEL_DEBUG` | Nothing you'd notice: for debugging, it logs short replies like "yeah" said while the lamp talks. |
 | `LAMP_ASIDES_HOLD` | Short asides like "wow" or "hmm, interesting" while the lamp talks no longer stop its story. |
