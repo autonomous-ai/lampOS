@@ -764,6 +764,10 @@ struct Answers {
     /// read-back ([`face_save_held`]): the face wait does not end the step
     /// within [`FACE_SAVE_HELD_US`] of it.
     save_held_us: Option<u64>,
+    /// The model reported "who you are" done while a face save was held:
+    /// the step ends done, the name only, once the hold is over unless the
+    /// face is saved first.
+    done_while_held: bool,
     quiet_hours: bool,
     hello: bool,
     /// "Preferences"' hello question has been handed out to be said: only
@@ -2903,9 +2907,11 @@ impl Onboarding {
         if step == Step::WhoYouAre
             && quiet_us >= START_QUIET_US
             && !save_held
-            && led.heard.face_answered_us.is_some_and(|at| {
-                now_us.saturating_sub(at.max(led.lamp_said_us.unwrap_or(0))) >= FACE_SAVE_WAIT_US
-            })
+            && (led.heard.done_while_held
+                || led.heard.face_answered_us.is_some_and(|at| {
+                    now_us.saturating_sub(at.max(led.lamp_said_us.unwrap_or(0)))
+                        >= FACE_SAVE_WAIT_US
+                }))
         {
             eprintln!(
                 "lamp-voice: onboarding: who_you_are: no face saved after the yes: done, the name only"
@@ -3657,6 +3663,26 @@ impl Onboarding {
                 self.records
                     .push(json!({"kind":"onboarding_heard","step":step.name(),
                     "face_only":true,"name_kept":false,"at_us":now_us}));
+                continue;
+            }
+            // The model's done while a face save is held for the read-back's
+            // yes waits for the hold (the Reviewer-lead's P3 on #5415): it
+            // ends the step done, the name only, once the hold is over
+            // (`tick`), unless the face is saved first.
+            if led
+                && !by_face
+                && step == Step::WhoYouAre
+                && outcome == Outcome::Done
+                && let Some(held) = self.led.as_mut().filter(|held| {
+                    held.heard
+                        .save_held_us
+                        .is_some_and(|at| now_us.saturating_sub(at) < FACE_SAVE_HELD_US)
+                })
+            {
+                eprintln!(
+                    "lamp-voice: onboarding: who_you_are: the model's done waits for the held face save"
+                );
+                held.heard.done_while_held = true;
                 continue;
             }
             // The model's done after the name, with no face saved, on a lamp
@@ -6714,6 +6740,43 @@ mod tests {
             FACE_SAVE_WAIT_US + START_QUIET_US + 2 * S,
             Some(NEAR_MIDDLE),
         );
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+
+        // The model's own done while the save is held waits for it: the
+        // yes still saves the face, and the owner is kept (the
+        // Reviewer-lead's P3).
+        let mut room = named_with_a_face("face-held-model-done");
+        room.walk.heard("Yes, please.", room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        face_save_held(&room.walk.file);
+        room.walk.lamp_said(room.at);
+        post(
+            &room.walk.file,
+            &json!({"step": "who_you_are", "outcome": "done"}),
+        )
+        .unwrap();
+        room.wait(
+            FACE_SAVE_WAIT_US + START_QUIET_US + 2 * S,
+            Some(NEAR_MIDDLE),
+        );
+        assert_eq!(room.outcome(Step::WhoYouAre), None, "the done waits");
+        face_saved(&room.walk.file, Some("Marie"));
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert_eq!(room.walk.kept().owner.as_deref(), Some("Marie"));
+        // ...and with no yes, it ends done once the hold is over.
+        let mut room = named_with_a_face("face-held-model-done-unanswered");
+        room.walk.heard("Yes, please.", room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        face_save_held(&room.walk.file);
+        post(
+            &room.walk.file,
+            &json!({"step": "who_you_are", "outcome": "done"}),
+        )
+        .unwrap();
+        room.wait(FACE_SAVE_HELD_US - 4 * S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
+        room.wait(6 * S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
 
         // Without the hold, the same wait ends it before the yes (the
