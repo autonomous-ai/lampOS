@@ -35,11 +35,14 @@ Environment=LAMP_BODY_POSE_ASK=on
 # A made skill reads a linked service to its owner alone (#5288, #5303): a skill's read step, said behind its
 # gate (the owner's face alone, no voice, not private), through lamp-services' tools socket. Played on lamp-9adf 5 Nov.
 Environment=LAMP_SKILL_READS=on
-# The owner's typed setup name, for a made skill's read (#5288). An empty fallback when there is none, so the read
+# The owner's typed setup name, for a made skill's read (#5288). A blank fallback when there is none, so the read
 # is skipped ("no owner's face enrolled"), never the unit refused (SetCredential= is LoadCredential='s default,
-# systemd 252). Read at the unit's start, so a later rename or a forget-everything leaves the old name, which fails
-# closed: the eyes' known file no longer shows that name, so the read stops at "not the owner".
-SetCredential=owner:
+# systemd 252). One newline, never empty: an empty SetCredential= in a unit file fails the start at CREDENTIALS
+# ("Protocol error", status 243) with the name file or its folder missing (lamp-75c9 and lamp-9adf, 5 Nov); the
+# name is read trimmed, so a newline is no name. Read at the unit's start, so a later rename or a forget-everything
+# leaves the old name, which fails closed: the eyes' known file no longer shows that name, so the read stops at
+# "not the owner".
+SetCredential=owner:\n
 LoadCredential=owner:/etc/lampOS/person/name
 Environment=LAMP_SKILLS_OWNER_FILE=%d/owner
 # Wellbeing nudges at a present spacing and Comfort break (#5207): each skill's [present] values, read at every load;
