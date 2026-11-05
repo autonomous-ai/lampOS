@@ -18,6 +18,7 @@ each answered `starting` at once, then `success` or `failure`, as
 |---|---|---|
 | `voice.set` | V1's `tts.set` shape: `{"provider"?, "voice", "language"?, "speed"?}`. `provider` absent or `"elevenlabs"`. `voice` is a name from Backend2's `lamp-2-tts-catalog`; every name there is in the lamp's own table (`lamp_msgs::chosen_voice::ELEVENLABS_VOICES`), which is what is checked. `""` goes back to the default. `language` and `speed` are taken and left alone: the language stays `language.set`'s, the speed 1.0 | `{"provider": "elevenlabs", "voice", "speed": 1.0}` |
 | `character.set` | `{"text"}`: the owner's own words, plain text on one line, at most 200 characters. `""` clears them | `{"text"}` |
+| `voice.get` | `{}`: answered at once, nothing written; `lamp-cloud` reads both files as it reads the language | `{"provider": "elevenlabs", "voice", "text"}`: `""` for none kept, and for a kept value that does not fit the rules (as the voice takes it: the default voice, no words) |
 
 A voice the lamp lacks, another provider, or words that break the rules get
 `failure` with the reason, and nothing is written: the voice in use stays.
@@ -67,8 +68,8 @@ Nothing is spoken about it and the voice starts as usual.
 
 ## Not built yet
 
-`tts.preview`, `voice.get`, and a preset list (`character.list`) are not in
-this piece (the lead's scope, 5 Nov). A preset is just words the app sends
+`tts.preview` and a preset list (`character.list`) are not in this piece
+(the lead's scope, 5 Nov). A preset is just words the app sends
 as `character.set`.
 
 ## Lamp check

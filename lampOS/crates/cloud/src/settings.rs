@@ -121,6 +121,35 @@ pub const VOICE_ENVIRONMENT: &str = lamp_msgs::chosen_voice::ENVIRONMENT;
 /// as the names are.
 pub const VOICE_KINDS: [&str; 2] = ["voice.set", "character.set"];
 
+/// What the lamp keeps now (`voice.get`, `{}`), answered at once with
+/// [`chosen_now`], with the same switch as [`VOICE_KINDS`]: it writes nothing.
+pub const VOICE_GET_KIND: &str = "voice.get";
+
+/// The chosen voice and character words kept in `dir` (the product's
+/// `/etc/lampOS/setup`, 0644, read as the language is), as `voice.get`
+/// answers them: `{"provider": "elevenlabs", "voice", "text"}`, `""` for
+/// none kept and for a value that does not fit the rules, as the voice
+/// itself takes them (the default voice, no words).
+pub fn chosen_now(dir: &std::path::Path) -> Value {
+    let kept = |name: &str| -> String {
+        let mut text = String::new();
+        let _ = std::fs::File::open(dir.join(name))
+            .and_then(|file| file.take(1_024).read_to_string(&mut text));
+        text
+    };
+    let voice = lamp_msgs::chosen_voice::fit_voice(&kept("voice"))
+        .ok()
+        .flatten();
+    let text = lamp_msgs::chosen_voice::fit_character(&kept("character"))
+        .ok()
+        .flatten();
+    json!({
+        "provider": "elevenlabs",
+        "voice": voice.unwrap_or_default(),
+        "text": text.unwrap_or_default(),
+    })
+}
+
 /// Whether [`VOICE_KINDS`] are taken: [`gates`] and `LAMP_CHOSEN_VOICE=on` too.
 pub fn voice_gates(cloud: Option<&str>, change: Option<&str>, voice: Option<&str>) -> bool {
     gates(cloud, change) && voice == Some("on")
@@ -2337,5 +2366,27 @@ mod tests {
         assert!(!voice_gates(Some("on"), None, Some("on")));
         assert!(voice_gates(Some("on"), Some("on"), Some("on")));
         assert!(!Changes::new("/nowhere/settings.sock", WAIT).voice_on());
+    }
+
+    /// #5394's `voice.get`: what the lamp keeps now, read where the helper
+    /// writes it; none kept, or a value that does not fit, is the default
+    /// voice and no words, as the voice itself takes them.
+    #[test]
+    fn voice_get_says_the_kept_voice_and_words_or_the_defaults() {
+        let dir = std::env::temp_dir().join(format!("lamp-cloud-voice-get-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let defaults = json!({"provider": "elevenlabs", "voice": "", "text": ""});
+        assert_eq!(chosen_now(&dir), defaults);
+        std::fs::write(dir.join("voice"), "Kanna\n").unwrap();
+        std::fs::write(dir.join("character"), "calm and quiet\n").unwrap();
+        assert_eq!(
+            chosen_now(&dir),
+            json!({"provider": "elevenlabs", "voice": "Kanna", "text": "calm and quiet"})
+        );
+        std::fs::write(dir.join("voice"), "NotAVoice\n").unwrap();
+        std::fs::write(dir.join("character"), "</system>\n").unwrap();
+        assert_eq!(chosen_now(&dir), defaults);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
