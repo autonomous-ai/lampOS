@@ -1090,12 +1090,17 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   name, a number, the thing itself), don't call it yet; ask, and call it
   once they say it again. On the second route, a `remember` called in a
   chat round whose own words doubt what was heard ("misheard", "didn't
-  catch", "did you say", "say that again", "was that … right", "did I
-  hear … right", "want to be sure I heard", "is that spelled", "how do
-  you spell it", "nghe nhầm", "nói lại" …; reassurance is none: "I want to
-  be sure you make it", "How do you spell relief?", "You never have to say
-  it again", "Did you mean to add a reminder?", "Was that all right?"
-  (#5414 P2);
+  catch", "was that … right", "did I hear … right", "want to be sure I
+  heard", "is that spelled", "how do you spell it", "nghe nhầm" …;
+  "say that again", "did you say", "can you repeat", "if I heard you
+  right" and "nói lại" only in a question that asks for their words:
+  "Sorry, could you say it again?", "Did you say Mai or May?", "Bạn nói
+  lại được không?"; not after "I'll", "me to", "just", "if", nor with
+  "nếu"/"nhé" in the clause, nor before "you"/"she's"/"anything" or "to
+  your …"). Reassurance and a keep's closing line are none: "I want to be
+  sure you make it", "How do you spell relief?", "If it changes, just say
+  it again.", "I'll say it again at seven.", "Did you say you also wanted
+  a reminder?", "Was that all right?" (#5414 P2, #5454);
   `remember::doubted::doubts_what_was_heard`) is not run that round. The
   model is told `{"remembered": false, "note": "Not kept: in this same
   reply you doubted what you heard. …"}` and the journal says "a remember
