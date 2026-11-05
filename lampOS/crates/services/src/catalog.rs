@@ -100,8 +100,9 @@ pub const SERVICES: &[Service] = &[
         hosts: &["www.googleapis.com"],
         api: Some("https://www.googleapis.com"),
         graphql: false,
+        // No `/users/me/calendarList`: the link holds only
+        // `calendar.events`, which can't list calendars (#5385).
         reads: &[
-            (Get, "/calendar/v3/users/me/calendarList"),
             (Get, "/calendar/v3/calendars/*/events"),
             (Get, "/calendar/v3/calendars/*/events/*"),
         ],
@@ -550,6 +551,11 @@ mod tests {
             "/calendar/v3/calendars/primary/events"
         ));
         assert!(!ok("google_calendar", Get, "/drive/v3/files"));
+        assert!(!ok(
+            "google_calendar",
+            Get,
+            "/calendar/v3/users/me/calendarList"
+        ));
         assert!(ok("google_drive", Get, "/drive/v3/files/abc/export"));
         assert!(!ok("google_drive", Method::Patch, "/drive/v3/files/abc"));
         assert!(ok("figma", Get, "/v1/files/key/comments"));
