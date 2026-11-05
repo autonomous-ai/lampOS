@@ -31,7 +31,7 @@
       "profile": "month",
       "setup_order": ["none", "full_history", "lampos_today_partial", "tiers"],
       "registration_revision": "6420a2f490263df664a12c8f8848c95421c30abd",
-      "registration_sha256": "3ee255b5921100c268314c905094094d8d2bc4bd87fd46a271c11a287ff50a35",
+      "registration_sha256": "f42b8f340d4b6aed47dfe47a30ec07ec4ee3e842fc50688c0827a4315c099e75",
       "audio_manifest_sha256": "@AUDIO_SHA256@",
       "speech_budget_microusd": 1000000
     }
