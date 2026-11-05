@@ -700,6 +700,63 @@ fn over_a_busy_room_a_sound_that_never_yields_waits_for_the_name_then_is_let_go(
     assert!(!h.mask.plain_onset(&over));
 }
 
+/// #5076 (`LAMP_ONSET_FADE=on`): a run heard over the lamp lowers the reply
+/// from its first block, before any yield, and the reply comes back to full
+/// level over `ONSET_FADE_RISE_CHUNKS` once the run comes to nothing. On
+/// lamp-52e6 on 5 Nov a played "Stop" was lost under the lamp's voice at
+/// full level through the 70 ms a yield takes.
+#[test]
+fn with_the_onset_fade_a_run_over_the_lamp_lowers_the_reply_before_it_yields() {
+    use crate::turn_taking::{ONSET_FADE_FLOOR, ONSET_FADE_RISE_CHUNKS};
+    let mut h = Harness::new(TurnTaking::Duplex, 400);
+    h.mask.fade_at_onset();
+    let chunk = |k: usize| -> Vec<i16> {
+        (k * 240..(k + 1) * 240)
+            .map(|n| (n % 30_000) as i16)
+            .collect()
+    };
+    let mut next = 0;
+    for tick in h.blocks(20, 0.99, Some(evidence(0, OWN))) {
+        assert_eq!(
+            tick.dispatched.unwrap(),
+            chunk(next),
+            "the lamp's own voice: full level"
+        );
+        next += 1;
+    }
+    // Three blocks over the lamp: fewer than a yield takes.
+    let over = h.blocks(3, 0.9, Some(evidence(0, OVER)));
+    assert!(h.events("duplex_yield").is_empty());
+    for tick in over {
+        let got = tick.dispatched.expect("the reply goes on, lowered");
+        let (got, full) = (
+            f32::from(*got.last().unwrap()),
+            f32::from(*chunk(next).last().unwrap()),
+        );
+        assert!(
+            (got - full * ONSET_FADE_FLOOR).abs() <= 1.0,
+            "chunk {next} ends at {got}, not {full} x {ONSET_FADE_FLOOR}"
+        );
+        next += 1;
+    }
+    // The lamp's own voice again: back to full level, never in a step.
+    let back = h.blocks(8, 0.99, Some(evidence(0, OWN)));
+    let rise = usize::from(ONSET_FADE_RISE_CHUNKS);
+    for (i, tick) in back.into_iter().enumerate() {
+        let got = tick.dispatched.unwrap();
+        if i >= rise {
+            assert_eq!(got, chunk(next), "chunk {next}: back at full level");
+        } else {
+            assert!(
+                got.iter()
+                    .zip(chunk(next))
+                    .all(|(g, f)| g.unsigned_abs() <= f.unsigned_abs())
+            );
+        }
+        next += 1;
+    }
+}
+
 #[test]
 fn a_person_over_the_lamp_stops_the_speaker_then_interrupts_with_their_opening_words() {
     let mut h = Harness::new(TurnTaking::Duplex, 400);
