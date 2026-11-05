@@ -578,3 +578,7 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
 - 00:2x (6 Nov): #5448 privacy READ-OK 1ecc6b4960. A conversation opened
   only by the name now carries just the keep, and the line is told as the
   room's. A mutation back to the full carry fails S4 (49/1).
+- 01:1x–01:5x: #5464 HOLD e1d2ea34d0, concurring with the Reviewer-lead
+  (the lampos-promote notes test failed 14/1). Then READ-OK cb9887da49:
+  install 152/0, and putting either switch back fails the pins. Now on
+  NEXT TRAIN as the candidate.
