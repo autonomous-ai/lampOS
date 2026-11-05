@@ -825,6 +825,23 @@ the current build validates references and returns
 See [the full wire contract](memory-days.md#request-contract)
 for fields, errors, retries, invalidation and caller responsibilities.
 
+### Nightly pass B
+
+With `--memory-days`, `nightly_prepare` and `nightly_apply` run a nightly
+model pass for one known person (the memory owner's extraction plan C, step
+B, 3 Nov; the voice's `LAMP_MEMORY_NIGHTLY`, with patterns and feelings
+behind `LAMP_MEMORY_NIGHTLY_PATTERNS` and `LAMP_MEMORY_NIGHTLY_FEELINGS`, off
+even when it is on). It keeps episodes, facts, profile lines, patterns,
+what is ahead and feelings from that person's own records of a day, each
+item checked alone, a bad one dropped and counted: Tiers' kinds and rules
+(memory-tiers, `tiers/recall-adapter`) without its all-or-nothing night.
+No health, money or other person's private matter is kept unless the
+person asked the lamp to remember it. Profile lines join the session
+note's preferences; the rest are found by `search` and `recall` with
+`nightly:true`. Nothing is spoken or shown. The legacy store answers
+`unknown_op`. Rules and limits: [memory-days.md](memory-days.md), "Nightly
+pass B".
+
 ## Limits, and what happens at each
 
 - A request line over 64 KiB: `too_long`; the next line is read as usual.

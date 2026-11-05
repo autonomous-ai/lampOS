@@ -1167,6 +1167,114 @@ response order, frozen session note or conversation-end handoff. The voice's
 switch for them, `LAMP_MEMORY_DAYS=on`, went on later: on lamp-4ace on
 15 Oct (#743), and in the product unit since ([switches.md](switches.md)).
 
+## Nightly pass B (the memory owner's extraction plan C, step B, 3 Nov)
+
+A model pass the voice runs once a night for one known person, behind
+`LAMP_MEMORY_NIGHTLY` (voice side; [switches.md](switches.md)). It fills
+this store with what Tiers proposed: episodes, facts, profile lines,
+patterns, what is ahead and feelings (`crates/memory/src/nightly.rs`). The
+kinds and their validation rules are Tiers' (`docs/memory-design.md`, "How
+memory changes", and `docs/memory-tiers.md` on `tiers/recall-adapter`):
+the model points at record ids and code copies the quotes, only the
+person's own records count, a pattern needs records on two days,
+supersession keeps history, a plan expires 14 days after its latest
+source, an appointment closes after its day, the profile is at most 60
+lines and 2 KiB, and a night changes at most a quarter of it. What differs
+is the commit unit. Tiers applied a night whole or not at all, so one bad
+item lost the night (34 times; Tiers scored 0.35). Here each item is
+checked alone: a bad one is dropped and counted by reason, and the good
+ones commit. This section is the contract the voice side builds against.
+
+**Requests.** Unknown request fields are refused, as for every new
+operation; the model's `proposal` inside `nightly_apply` is lenient.
+
+| Request | Successful response and rules |
+|---|---|
+| `nightly_prepare {person, day, after_id?}` | `{ok:true,input:{job,person,day,generation,records,existing,profile_lines,profile_changes_left,profile_adds_left,more}}`, or `{ok:true,reason:"nothing"}` when the day has no eligible record after `after_id` (no job kept). Only a known person (`p-` and 16 hex digits): the room, a rules scope or anyone else is `bad_person`. `day` is a local `YYYY-MM-DD` not after today (`bad_day`). Records: the person's own active exchanges of that day with nonblank `heard`, and kept things kept that day, by id after `after_id`, at most 128 and 64 KiB of the encoded input (`more:true` when some are left: ask again with the last id). `existing`: every current profile line, then the newest 32 facts, episodes and ahead items, each `{id,kind,day,text,…}` without quotes. The job keeps ids only, never text. A batch (`day`, `after_id`) prepared again while pending is the same job; applied, it is `done`. At most 8 pending per person (`busy`); a job lasts a day. |
+| `nightly_apply {person, job, proposal, patterns?, feelings?}` | `{ok:true,accepted:{episode,fact,profile,pattern,ahead,feeling},dropped:{…},reasons:{…},ids:[…]}`. Each item of `proposal` (`episodes`, `facts`, `profile`, `patterns`, `ahead`, `feelings`; at most 32 of each; unknown fields and arrays ignored; not an object, nothing) is checked alone, in that order; the good ones are written in one transaction and the job is `done`, so a repeat returns the same answer. `patterns` and `feelings` default false: their items are dropped `off`, and an episode's `feeling` is not kept. Another person's job, or one gone, is `stale`. The log line has counts only. |
+| `search {…, nightly?}`, `recall {…, nightly?}` | With `nightly:true` the answer adds `nightly:[{id,kind,day,text,…}]`: the person's current items matching the query (the same FTS rules), or the newest with no query, within the request's day or span by the item's day, at most 8 and 4,096 bytes. A plain `search` also lists items among its observations, each with `nightly:{kind,day}`. Without `nightly`, or `false`, the answer is byte for byte as before. |
+
+**Drop reasons**, counted in `reasons`, never with the item's words:
+`shape` (a field missing or of the wrong type, an unknown kind, strength or
+`what`, a `worry` profile line, blank or over its cap, a control character,
+importance outside 0–1, a cite list empty, over 8 or repeated), `unknown_source`
+(a cite the job did not give), `forgotten` (a cite, or a record in an
+episode's range, gone since the prepare), `lamp_words` (`tidy::said_by_the_person`),
+`question` (`tidy::only_asked`), `restates` (`tidy::restates`), `private_kind`
+(below), `range` (an episode out of order or overlapping another), `days` (a
+pattern on one day), `date` (an end day not real, before its newest source's
+day or more than 60 days after it), `supersede` (nothing current of that
+kind and person, newer than the evidence, or already superseded),
+`profile_cap`, `off`, `too_many`, `full` (2,048 observations or 512 live
+nightly items; superseded or expired items are history and not counted).
+Days keeps no forget fingerprints, so none is checked; a fingerprint store,
+when there is one, adds a check here.
+
+**Privacy (`private_kind`).** The product rule (the voice's `OBSERVE_PROMPT`,
+memory.md): never keep health, medicine, money or another person's private
+matters unless the person asked the lamp to remember them. An item that
+names them is dropped unless every source it cites is a kept thing (the
+person asked) or an item resting on one; one kept thing among exchanges is
+not enough. The check is a word list of health and money terms in
+English and Vietnamese (`nightly::private`, with currency signs); the prompt
+carries the rule, the list is the backstop and misses a paraphrase. A
+`relationship` profile line is a name and a relation, at most 8 words; a
+longer one is dropped `private_kind`. There is no `worry` kind.
+
+**Kinds.** `episode`: a run of the batch's records `first`..`last`, topic
+(64 B), gist (300 B), importance (0–1, default 0.5), optional feeling (kept
+with `feelings`). `fact`: a label, a claim (300 B), 1–8 cites, strength
+`said`/`plan`/`maybe` (never stronger than a cited fact's), optional
+`valid_until`, optional `supersedes`. `profile`: `identity`, `relationship`,
+`taste`, `work`, `value`, `goal` or `behaviour`, a line (200 B), cites,
+optional `supersedes`. `pattern`: a line (300 B), at least 2 cites on at
+least 2 local days. `ahead`: `plan` or `event`, a line, `until` or none.
+`feeling`: the person's own stated feeling (200 B), citing the batch's
+records. Code copies each cited record's words (`heard`, or a kept thing's
+text) into the item's `quotes`; the model writes none.
+
+**Storage.** Each item is an `entries` row, `kind='observation'` with
+`category` its kind, so search, `sources`, `replacements`, `origins`,
+forgetting and FTS secure deletion are the observations'. Its own fields
+are in `nightly_items(rid PRIMARY KEY REFERENCES entries(rid) ON DELETE
+CASCADE, person, kind, night, expires, detail)`; jobs in `nightly_jobs`,
+a night's profile allowance in `nightly_nights`. All are created `IF NOT
+EXISTS`, `user_version` stays 1, and an older build passes them over (an
+older build reading an item sees an observation of an unknown category,
+kept as stored, shown as a plain fact; #1680). No row exists until a pass
+runs, so with the switch off nothing changes.
+
+**Lifetimes.** An item never expires by disuse or with its source
+exchanges' 30 days, unlike an observation. `maintain` closes it after its
+`expires` day: an `ahead` item after its `until`, or 14 days after its
+newest source without one; a `plan` fact 14 days after its newest source; a
+fact with `valid_until` after that day; an item citing one that closes
+goes with it. Others live until forgotten or superseded. A superseded item is inactive history, found only with
+`history:true`.
+
+**Profile.** At most 60 current lines and 2 KiB of their text. A night (one
+`day`, all its batches) may supersede at most a quarter of the lines it
+began with, rounded down, and add at most 15; adding never raises the
+allowance. The lines are observations the session note reads as
+preferences, so P3's band (#5043, `profile`) takes them first. Episodes,
+facts, patterns, ahead items and feelings are never in a session note;
+they are found by `search` and `recall` with `nightly:true`.
+
+**Forgetting.** A forget takes every item citing anything it removes, and
+again what cites those (a profile line citing a forgotten fact), with
+their versions; after the exchanges expired, an item sharing a source
+exchange (`origins`) with a kept thing or observation forgotten goes too.
+A forget during a pass: the job holds ids, so apply finds what is gone
+and drops those items `forgotten`; the rest apply. `forget_all` and
+`forget_person` take every item, job and allowance.
+
+Tests: `nightly::tests` (each kind accepted, every drop reason, the
+privacy rule in English and Vietnamese, a known person's own records only,
+forget cascades, a forget during a pass, the quarter cap, plan and event
+expiry, supersession history and search/recall, patterns needing two days
+and the off switches, the input bounds, and answers without `nightly`
+unchanged).
+
 ## The benchmark's probe (#4748)
 
 The memory benchmark (`docs/memory-bench.md`) runs a month of days through
