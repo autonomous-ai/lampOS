@@ -81,6 +81,9 @@ const ENVIRONMENT: &[&str] = &[
     "XDG_DATA_HOME",
     "XDG_CACHE_HOME",
     "XDG_RUNTIME_DIR",
+    // The service user's own systemd user bus, which `harness start` and
+    // `stop` reach through `systemctl --user` (Harness 0.5.42, #5385).
+    "DBUS_SESSION_BUS_ADDRESS",
     "ADAPTER_DATA_DIR",
     "HARNESS_AUTH_DIR",
     "PORT",
@@ -458,16 +461,53 @@ pub struct CliConfig {
     pub health_after_start: bool,
 }
 
+/// The service user's systemd user manager, for every Harness call: Harness
+/// 0.5.42's `harness start` runs `systemctl --user start harnessd.service`,
+/// which fails with "Failed to connect to bus: No medium found" when the
+/// caller has no `XDG_RUNTIME_DIR` (#5385, lamp-c0a4 on 5 Nov: after a
+/// sign-in from the app, the daemon was never started). A system unit gives
+/// its process neither variable, even with the user lingering, so each one
+/// not already set is taken from the user's own runtime folder,
+/// `/run/user/<uid>`, and its `bus`, only where they exist; one already set
+/// is kept as it is.
+pub fn with_user_bus(
+    mut environment: BTreeMap<String, OsString>,
+    uid: u32,
+    exists: &dyn Fn(&Path) -> bool,
+) -> BTreeMap<String, OsString> {
+    if !environment.contains_key("XDG_RUNTIME_DIR") {
+        let runtime = PathBuf::from(format!("/run/user/{uid}"));
+        if exists(&runtime) {
+            environment.insert("XDG_RUNTIME_DIR".into(), runtime.into_os_string());
+        }
+    }
+    if !environment.contains_key("DBUS_SESSION_BUS_ADDRESS")
+        && let Some(runtime) = environment.get("XDG_RUNTIME_DIR")
+    {
+        let bus = Path::new(runtime).join("bus");
+        if bus.is_absolute() && exists(&bus) {
+            let mut address = OsString::from("unix:path=");
+            address.push(bus.as_os_str());
+            environment.insert("DBUS_SESSION_BUS_ADDRESS".into(), address);
+        }
+    }
+    environment
+}
+
 impl CliConfig {
     pub fn new(executable: PathBuf) -> Self {
         Self {
             executable,
             launch_timeout: Duration::from_secs(60),
             read_timeout: Duration::from_secs(10),
-            environment: ENVIRONMENT
-                .iter()
-                .filter_map(|name| std::env::var_os(name).map(|value| ((*name).into(), value)))
-                .collect(),
+            environment: with_user_bus(
+                ENVIRONMENT
+                    .iter()
+                    .filter_map(|name| std::env::var_os(name).map(|value| ((*name).into(), value)))
+                    .collect(),
+                rustix::process::geteuid().as_raw(),
+                &|place: &Path| place.exists(),
+            ),
             cancel: None,
             as_person: false,
             folder_missing: false,
