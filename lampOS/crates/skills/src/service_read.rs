@@ -162,13 +162,29 @@ pub struct ReadStep {
 
 impl ReadFile {
     /// The step, or why the folder's words are not one. A `query` that is
-    /// an order is left out and marked ([`ReadStep::made_refuses`]).
-    pub fn step(self, quiet: Option<(u16, u16)>) -> Result<ReadStep, String> {
-        let (service, what) = (self.service, self.what);
+    /// an order is left out and marked ([`ReadStep::made_refuses`]), and a
+    /// mail search with it reads the recent mail.
+    pub fn step(mut self, quiet: Option<(u16, u16)>) -> Result<ReadStep, String> {
+        let (service, mut what) = (self.service, self.what);
         // A fixed list of a service with one, never a whole text or a
         // free-form read (Thirteen's P2 on #5303).
         if let Some(why) = spoken::skill_read_refused(&service, &what) {
             return Err(format!("read: {why}"));
+        }
+        // An order is left out whole, search words beside it too: the read
+        // gives the latest, as it meant. Drive's files take no query for
+        // that, and a mail search needs one (`lamp_services::reads::plan`),
+        // so it is the recent mail: the only skill read that needs a query
+        // (Thirteen's P2 on #5402). Any other read takes none.
+        let order_read_as_none = self
+            .query
+            .as_deref()
+            .is_some_and(|query| query.len() <= MOST_ARG_BYTES && ordering(query));
+        if order_read_as_none {
+            self.query = None;
+            if service == "gmail" && what == "search" {
+                what = "recent".into();
+            }
         }
         let events = service == "google_calendar" && what == "events";
         let day = match (events, self.day.as_deref()) {
@@ -182,7 +198,6 @@ impl ReadFile {
             (false, None) => None,
         };
         let mut args = Map::new();
-        let mut order_read_as_none = false;
         let count = match (events, self.count) {
             (true, Some(_)) => return Err("read: a calendar's events take day, not count".into()),
             (true, None) => None,
@@ -206,10 +221,6 @@ impl ReadFile {
             if let Some(value) = value {
                 if value.trim().is_empty() || value.len() > MOST_ARG_BYTES {
                     return Err(format!("read: {key} is 1 to {MOST_ARG_BYTES} bytes"));
-                }
-                if key == "query" && ordering(&value) {
-                    order_read_as_none = true;
-                    continue;
                 }
                 args.insert(key.into(), json!(value));
             }
@@ -483,6 +494,7 @@ fn judge_through_blinks(room: &mut impl Room) -> Result<(), Closed> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lamp_services::{mail::MailAsk, reads::Plan};
 
     fn alone() -> Seen {
         Seen {
@@ -748,6 +760,32 @@ mod tests {
                 assert!(read.args(None).unwrap().get("query").is_none(), "{order}");
             }
         }
+        // As lamp-services plans them: Drive's latest files, and a mail
+        // search, which needs a query, read as the recent mail (Thirteen's
+        // P2 on #5402: left a search, it failed on every run).
+        let entry = lamp_services::store::Entry::default();
+        let plan = |read: &str| {
+            let read = step(read).unwrap();
+            lamp_services::reads::plan(&read.service, &read.args(None).unwrap(), &entry, 0)
+        };
+        let mail = r#"service = "gmail", what = "search", query = "newest first""#;
+        assert_eq!(step(mail).unwrap().what, "recent");
+        assert_eq!(plan(mail), Ok(Plan::Mail(MailAsk::Recent(MAILS as usize))));
+        let counted = r#"service = "gmail", what = "search", query = "latest", count = 3"#;
+        assert_eq!(plan(counted), Ok(Plan::Mail(MailAsk::Recent(3))));
+        let searched = r#"service = "gmail", what = "search", query = "from:mom""#;
+        assert!(
+            matches!(plan(searched), Ok(Plan::Mail(MailAsk::Search(words, _))) if words == "from:mom")
+        );
+        let Ok(Plan::Http { url, .. }) = plan(
+            r#"service = "google_drive", what = "files", query = "order by modifiedTime desc""#,
+        ) else {
+            panic!("Drive's files plan as a call");
+        };
+        assert!(
+            !url.contains("fullText") && url.contains("orderBy"),
+            "{url}"
+        );
         assert!(QUERY_NOT_AN_ORDER.contains("leave query out"));
         for words in [
             "taxes",
