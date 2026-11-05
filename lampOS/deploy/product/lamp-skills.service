@@ -42,6 +42,10 @@ Environment=LAMP_SKILL_READS=on
 SetCredential=owner:
 LoadCredential=owner:/etc/lampOS/person/name
 Environment=LAMP_SKILLS_OWNER_FILE=%d/owner
+# Wellbeing nudges at a present spacing and Comfort break (#5207): each skill's [present] values, read at every load;
+# water after 50 minutes and each 50 after (08:00 to 22:00, six a day), Comfort break after 90, two an hour at most,
+# 30 minutes apart. The same line in lamp-skills-manage@.service and lamp-cloud.service, which list the skills.
+Environment=LAMP_NUDGES_PRESENT=on
 # --zone system: the lamp's zone from /etc/localtime, which setup points at the person's (#820), for a skill's
 # [quiet] hours, which without it never start themselves (docs/skills.md); across summer time (#1384).
 # --state-dir: the skills a person turned off with a skill's [stop], one name a line in off, kept

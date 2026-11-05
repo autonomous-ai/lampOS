@@ -45,6 +45,9 @@ Environment=LAMP_CLOUD_KNOWN_FILE=/run/lampos-eyes/known
 # the other broker-held changes for the broker connection's TLS (LAMP_CLOUD_TLS, docs/cloud.md).
 Environment=LAMP_SETTINGS_CHANGE=on
 Environment=LAMP_SKILLS_PAGE=on
+# Wellbeing nudges at a present spacing and Comfort break (#5207): the skills page and report list the skills with
+# their [present] values, as lamp-skills runs them (Comfort break on). The same line in lamp-skills.service and lamp-skills-manage@.service.
+Environment=LAMP_NUDGES_PRESENT=on
 # The owner's approximate place from the app (#4333): owner.place and owner.place.clear, rounded to about a
 # kilometre and kept in the person's folder through `lamp-setup change`. The lead's yes on 3 Nov.
 Environment=LAMP_OWNER_PLACE=on
