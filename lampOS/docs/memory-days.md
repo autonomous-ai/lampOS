@@ -256,7 +256,16 @@ of that worker. This is bounded at 64 distinct IDs; it is not an exact
 per-answer citation list because the existing call interface supplies no
 request lineage. A finished exchange captures the union when queued and
 uses `append_linked`. Missing or deleted sources cause refusal, never a
-retry as an unlinked append. A confirmed forget, an uncertain mutation
+retry as an unlinked append. A forget sent from outside this voice (the
+app, the eyes' `forget_person`, retention, a test's cleanup) never stopped
+its journal, so a dead id stayed in the context and every later line citing
+it was refused (lamp-06c1, 5 Nov: all four of a person's lines in one long
+talk, so no talk note and no observation pass). Such a refusal, for a source
+or a rule, the memory's exact "a source ID does not exist for this person"
+(`remember::source_gone`), is now taken as a confirmed forget: journalling
+stops (`why=source_gone`), the talk so far ends whole and is observed, and
+lines made before the stop are not written after it; the refused line is
+not kept. A confirmed forget, an uncertain mutation
 acknowledgement, or source-union overflow inhibits subsequent journalling
 until a fresh worker establishes fresh context. A new provider session alone
 does not clear that inhibition. The stop is a privacy guard: a forgotten
@@ -434,6 +443,14 @@ Voice only attempts to enqueue; full queues drop new work. The worker
 collects IDs from acknowledged appends and sends `conversation_end` with
 `submit:true` after 45 seconds without another finished exchange. This is
 an idle approximation, not speaker recognition or a provider-session end.
+With `LAMP_CARRIED_LINES_KEEP_TALK=on` (in the product), a line carried as a
+known person's conversation (`LAMP_CONVERSATION_CARRIES`), which is never
+journalled, still counts as a finished exchange of that person's
+conversation for the 45 seconds (`DaysJob::Touch`): it starts and ends
+nothing, is never stored as theirs, and one of anyone else's, or after the
+gap, changes nothing. Off, a run of carried lines longer than 45 seconds
+ended the person's conversation mid-talk (lamp-06c1, 5 Nov: about 97 s of
+them).
 A conversation with lost/failed writes is skipped for tidy-up rather than
 submitted in part. A conversation that reaches 64 exchanges (`SOURCE_IDS`,
 the end's source bound) with no quiet gap is never skipped (#1693, step 2):

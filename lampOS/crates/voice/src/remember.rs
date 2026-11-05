@@ -1623,9 +1623,11 @@ fn send_with_speaker(
     send: impl Fn(&Value) -> Option<Value>,
 ) -> Option<Value> {
     let answer = send(&line);
-    let refused = answer
-        .as_ref()
-        .is_some_and(|answer| answer["ok"] == false && answer["error"] == "bad_request");
+    // A source forgotten outside this voice ([`source_gone`]) is not the
+    // speaker's fault: sent again, it is refused again.
+    let refused = answer.as_ref().is_some_and(|answer| {
+        answer["ok"] == false && answer["error"] == "bad_request" && !source_gone(answer)
+    });
     if !refused || line.as_object_mut()?.remove("speaker").is_none() {
         return answer;
     }
@@ -1691,15 +1693,30 @@ fn keeper_cited(
 /// as before. Any other line is sent as it is.
 fn send_with_keeper(mut line: Value, send: impl Fn(&Value) -> Option<Value>) -> Option<Value> {
     let answer = send(&line);
-    let refused = answer
-        .as_ref()
-        .is_some_and(|answer| answer["ok"] == false && answer["error"] == "bad_request");
+    let refused = answer.as_ref().is_some_and(|answer| {
+        answer["ok"] == false && answer["error"] == "bad_request" && !source_gone(answer)
+    });
     if !refused || line.as_object_mut()?.remove("keeper").is_none() {
         return answer;
     }
     line.as_object_mut()?.remove("keeper_ids");
     eprintln!("lamp-voice provider: the memory refused a room line's keeper; kept without it");
     send(&line)
+}
+
+/// The memory's refusal of a line citing a source or rule it does not hold
+/// for that person (`days::validate_sources`), word for word.
+const SOURCE_GONE: &str = "a source ID does not exist for this person";
+
+/// Whether `answer` refuses a line for citing a kept thing or rule the
+/// memory no longer holds: one forgotten outside this voice (the app, the
+/// eyes' `forget_person`, retention, a test's cleanup), which never stopped
+/// its journal, so the context still cites it (lamp-06c1, 5 Nov: every
+/// later line of that person was refused, and the talk lost its note and
+/// pass). Only that exact refusal: the bound's ("source IDs must be
+/// unique, with at most 64") and any other are not.
+fn source_gone(answer: &Value) -> bool {
+    answer["ok"] == false && answer["error"] == "bad_request" && answer["message"] == SOURCE_GONE
 }
 
 /// The journal's line for `forget_said`'s answer after a person's forget
@@ -4782,10 +4799,53 @@ pub fn keep_name_with_face(name: &str) {
 /// The same keep/forget exclusion for both journal backends. Scope is carried
 /// by each exchange; completion-time face observations never remap it.
 fn journalable(done: Vec<FinishedExchange>) -> impl Iterator<Item = FinishedExchange> {
-    done.into_iter().filter(|exchange| {
-        !KEPT_OUT
-            .lock()
-            .is_ok_and(|kept_out| kept_out.contains(&exchange.request))
+    done.into_iter()
+        .filter(|exchange| !is_kept_out(exchange.request))
+}
+
+/// Whether `request` is kept out of the journal ([`keep_out`]).
+fn is_kept_out(request: u64) -> bool {
+    KEPT_OUT
+        .lock()
+        .is_ok_and(|kept_out| kept_out.contains(&request))
+}
+
+/// Requests carried as a known person's conversation going on
+/// (`LAMP_CONVERSATION_CARRIES`), each with that person, with
+/// `LAMP_CARRIED_LINES_KEEP_TALK` ([`carried_line`]). The newest
+/// [`GAP_HELD_MOST`].
+static CARRIED: Mutex<VecDeque<(u64, String)>> = Mutex::new(VecDeque::new());
+
+/// With `on` (`LAMP_CARRIED_LINES_KEEP_TALK`): request `request` was carried
+/// as `person`'s conversation going on (`ScopeLease::carried_for`). Its
+/// exchange stays out of the journal, as every carried line's does; at its
+/// end it keeps the writer's conversation of that same person going
+/// ([`DaysJob::Touch`]), so a talk of carried lines longer than the idle
+/// gap is not cut in two and its earlier piece dropped (lamp-06c1, 5 Nov:
+/// about 97 s of carried lines, and the person's conversation idled out
+/// while they were still talking). Never stored as theirs. Off, nothing.
+pub fn carried_line(request: u64, person: &str, on: bool) {
+    if !on {
+        return;
+    }
+    if let Ok(mut carried) = CARRIED.lock() {
+        if carried.iter().any(|(was, _)| *was == request) {
+            return;
+        }
+        if carried.len() == GAP_HELD_MOST {
+            carried.pop_front();
+        }
+        carried.push_back((request, person.to_owned()));
+    }
+}
+
+/// The person `request` was carried for ([`carried_line`]), if it was.
+fn carried_for(request: u64) -> Option<String> {
+    CARRIED.lock().ok().and_then(|carried| {
+        carried
+            .iter()
+            .find(|(was, _)| *was == request)
+            .map(|(_, person)| person.clone())
     })
 }
 
@@ -4801,14 +4861,27 @@ fn hand_on_days(done: Vec<FinishedExchange>, wall: u64, client: &DaysClient) {
     for exchange in done.iter().filter(|exchange| !gap_held(exchange.request)) {
         client.mark_if_asked(&exchange.said, exchange.whose.as_deref());
     }
-    for exchange in journalable(done) {
-        client.finished_exchange_of(
-            exchange.request,
-            wall.saturating_sub(exchange.age.as_millis() as u64),
-            &exchange.heard,
-            &exchange.said,
-            exchange.whose.as_deref(),
-        );
+    for exchange in done {
+        if !is_kept_out(exchange.request) {
+            client.finished_exchange_of(
+                exchange.request,
+                wall.saturating_sub(exchange.age.as_millis() as u64),
+                &exchange.heard,
+                &exchange.said,
+                exchange.whose.as_deref(),
+            );
+            continue;
+        }
+        // A carried line of that person's own (`LAMP_CARRIED_LINES_KEEP_TALK`):
+        // never journalled, it keeps their conversation going, in order.
+        if let Some(person) =
+            carried_for(exchange.request).filter(|person| exchange.whose.as_ref() == Some(person))
+        {
+            let finished = Instant::now()
+                .checked_sub(exchange.age)
+                .unwrap_or_else(Instant::now);
+            client.touch(&person, finished);
+        }
     }
 }
 
@@ -6317,6 +6390,9 @@ enum Stopped {
     RulesLimit,
     /// The context's lock was poisoned while a rule was linked.
     Poisoned,
+    /// The memory refused a line for a source or rule forgotten outside
+    /// this voice ([`source_gone`]).
+    SourceGone,
 }
 
 impl Stopped {
@@ -6328,6 +6404,7 @@ impl Stopped {
             Self::SourcesLimit => "sources_limit",
             Self::RulesLimit => "rules_limit",
             Self::Poisoned => "poisoned",
+            Self::SourceGone => "source_gone",
         }
     }
 }
@@ -6366,7 +6443,7 @@ impl DaysContext {
         // was forgotten: let go, words and all, so no later greeting is
         // told it (reviewer-two's P2 on #3059). The store never offers a
         // forgotten one again; one not forgotten is offered on a later day.
-        if why == Stopped::Forgotten {
+        if matches!(why, Stopped::Forgotten | Stopped::SourceGone) {
             self.asking.clear();
             self.event_turn = None;
         }
@@ -7642,6 +7719,14 @@ enum DaysJob {
     },
     Close(String, Option<String>),
     End,
+    /// A line carried as `person`'s conversation going on, finished at
+    /// `finished`, with `LAMP_CARRIED_LINES_KEEP_TALK` ([`carried_line`]):
+    /// never written, it keeps the writer's conversation of that same
+    /// person from idling out under it. Nothing is stored as theirs.
+    Touch {
+        person: String,
+        finished: Instant,
+    },
     /// A thing kept in the room's scope, by its id, with
     /// [`crate::early_words`] or [`crate::follows_face`]: the
     /// conversation's, should it follow. With the request it was kept in,
@@ -9589,6 +9674,16 @@ impl DaysClient {
                     forgets: crate::follows_face::FORGETS.load(Ordering::Acquire),
                 })
                 .is_ok()
+    }
+
+    /// A line carried as `person`'s conversation, finished at `finished`
+    /// ([`carried_line`]): their writer's conversation goes on. Never waits;
+    /// nothing is written.
+    fn touch(&self, person: &str, finished: Instant) {
+        let _ = self.jobs.try_send(DaysJob::Touch {
+            person: person.to_owned(),
+            finished,
+        });
     }
 
     /// Holds this request's hand-on ([`hold`]): what its turn's end knows
@@ -11682,11 +11777,29 @@ fn days_writer(
                         bounded_exchange(socket, line, WRITER_DEADLINE)
                     })
                 });
-                conversation.person = person;
+                // A source or rule it cites was forgotten outside this voice
+                // ([`source_gone`]): as a forget said here, journalling
+                // stops and the talk so far ends whole. The line is never
+                // kept unlinked: its words may be the forgotten thing's.
+                if answer.as_ref().is_some_and(source_gone) {
+                    let said = hand_ons
+                        .context
+                        .lock()
+                        .ok()
+                        .and_then(|mut context| context.inhibit(Stopped::SourceGone));
+                    say(said);
+                    // Lines made before the stop are not written after it,
+                    // as after a forget said here.
+                    hand_ons.forgotten.fetch_add(1, Ordering::AcqRel);
+                    end(&mut conversation);
+                    hand_ons.done.fetch_add(1, Ordering::AcqRel);
+                    continue;
+                }
                 let id = answer
                     .filter(|answer| answer["ok"] == true)
                     .and_then(|answer| answer["id"].as_u64())
                     .filter(|id| *id > 0 && *id <= i64::MAX as u64);
+                conversation.person = person;
                 report(id.is_some());
                 if let Some(id) = id {
                     if conversation.full() {
@@ -11724,6 +11837,18 @@ fn days_writer(
                     }
                 }
                 hand_ons.done.fetch_add(1, Ordering::AcqRel);
+            }
+            // A carried line of the conversation's own person, before it
+            // idled out: it goes on (`LAMP_CARRIED_LINES_KEEP_TALK`). One of
+            // anyone else's, or after the gap, starts and ends nothing.
+            Ok(DaysJob::Touch { person, finished }) => {
+                if conversation.person.as_deref() == Some(person.as_str())
+                    && conversation
+                        .finished
+                        .is_some_and(|last| finished.saturating_duration_since(last) < idle)
+                {
+                    conversation.finished = conversation.finished.max(Some(finished));
+                }
             }
             Ok(DaysJob::Asked { person, id }) => {
                 // Once: an older memory refuses the operation (unknown_op)
@@ -25295,6 +25420,281 @@ mod tests {
         }
     }
 
+    /// Only the memory's exact refusal of a gone source or rule is one
+    /// (Thirteen's P3 on #5433): the bound's, a bare `bad_request`, another
+    /// code or a written line are not.
+    #[test]
+    fn only_the_exact_refusal_is_a_gone_source() {
+        assert!(source_gone(
+            &json!({"ok":false,"error":"bad_request","message":SOURCE_GONE})
+        ));
+        for answer in [
+            json!({"ok":false,"error":"bad_request","message":"source IDs must be unique, with at most 64"}),
+            json!({"ok":false,"error":"bad_request","message":"invalid fields for this operation"}),
+            json!({"ok":false,"error":"bad_request"}),
+            json!({"ok":false,"error":"bad_time","message":SOURCE_GONE}),
+            json!({"ok":true,"id":3}),
+        ] {
+            assert!(!source_gone(&answer), "{answer}");
+        }
+        // Not the keeper's refusal either: sent once, so a line's sends
+        // stay bounded (Thirteen's P3 on #5433).
+        let line = json!({"op":"append_linked","heard":"hi","source_ids":[4],
+            "keeper":"p-927a0000000000aa","keeper_ids":[4]});
+        let sent = std::cell::RefCell::new(0);
+        let gone = json!({"ok":false,"error":"bad_request","message":SOURCE_GONE});
+        let answer = send_with_keeper(line, |_| {
+            *sent.borrow_mut() += 1;
+            Some(gone.clone())
+        });
+        assert_eq!(answer, Some(gone));
+        assert_eq!(sent.into_inner(), 1);
+    }
+
+    /// lamp-06c1, 5 Nov: a test's cleanup forgot Olivia's kept things through
+    /// the memory's socket, outside this voice, and every later line of hers
+    /// citing one was refused, so her talk was never stored. Now such a
+    /// refusal, for a gone source or a gone rule, is a forget's stop
+    /// (Thirteen's P1 on #5433): sent once, never again unlinked; the talk
+    /// so far ends whole, its line named; journalling stops, so the next
+    /// line is held back, and a line queued before it is not written.
+    #[test]
+    fn a_line_refused_for_a_gone_source_or_rule_stops_the_journal_as_a_forget() {
+        const OLIVIA: &str = "p-b2471d941bf88836";
+        for (n, (sources, rules)) in [(vec![7u64], vec![]), (vec![], vec![3u64])]
+            .into_iter()
+            .enumerate()
+        {
+            let (socket, served) =
+                memory(
+                    &format!("gone-source-{n}"),
+                    4,
+                    |request| match request["op"].as_str() {
+                        Some("append_linked") if request["heard"] == "one" => {
+                            json!({"ok":false,"error":"bad_request","message":SOURCE_GONE})
+                        }
+                        Some("append_linked") => json!({"ok":true,"id":1}),
+                        Some("conversation_end") => {
+                            json!({"ok":true,"submitted":false,"reason":"model_unconfigured"})
+                        }
+                        _ => json!({"ok":true}),
+                    },
+                );
+            let (jobs, work) = sync_channel(8);
+            let mut client = held_test_client(jobs);
+            client.hand_ons = Arc::new(HandOns {
+                context: Arc::clone(&client.context),
+                ..HandOns::default()
+            });
+            let exchange = |heard: &str, sources: Vec<u64>, rules: Vec<u64>| DaysJob::Exchange {
+                request: 0,
+                at_unix_ms: NOW,
+                finished: Instant::now(),
+                heard: heard.into(),
+                said: "Noted.".into(),
+                sources,
+                rules,
+                person: Some(OLIVIA.into()),
+                forgotten: 0,
+                observe_forgets: 0,
+                keeper: None,
+            };
+            let queue = &client.jobs;
+            queue.try_send(exchange("zero", vec![], vec![])).unwrap();
+            queue.try_send(exchange("one", sources, rules)).unwrap();
+            // Made before the stop, queued behind the refused line.
+            queue.try_send(exchange("queued", vec![], vec![])).unwrap();
+            let hand_ons = Arc::clone(&client.hand_ons);
+            let path = socket.clone();
+            let writer = std::thread::spawn(move || {
+                days_writer(
+                    &path,
+                    "voice-test",
+                    &work,
+                    Duration::from_secs(45),
+                    &AtomicU64::new(0),
+                    &Mutex::new(Current::default()),
+                    &hand_ons,
+                    None,
+                );
+            });
+            client.hand_ons.queued.store(3, Ordering::Release);
+            client.hand_ons.settle(Duration::from_secs(10));
+            {
+                let context = client.context.lock().unwrap();
+                assert!(context.journal_inhibited);
+                assert_eq!(context.stopped_by, Some(Stopped::SourceGone));
+            }
+            assert!(!client.finished_exchange_for(NOW, "two", "Noted.", Some(OLIVIA)));
+            client
+                .jobs
+                .try_send(DaysJob::Close("barrier".into(), None))
+                .unwrap();
+            drop(client);
+            writer.join().unwrap();
+            let read = served.join().unwrap();
+            std::fs::remove_file(socket).unwrap();
+            let ops: Vec<(&Value, &Value)> = read
+                .iter()
+                .map(|request| (&request["op"], &request["heard"]))
+                .collect();
+            assert_eq!(
+                ops,
+                [
+                    (&json!("append_linked"), &json!("zero")),
+                    (&json!("append_linked"), &json!("one")),
+                    (&json!("conversation_end"), &Value::Null),
+                    (&json!("session_close"), &Value::Null),
+                ],
+                "case {n}"
+            );
+            assert_eq!(read[2]["source_ids"], json!([1]));
+            assert_eq!(read[2]["person"], OLIVIA);
+        }
+        assert_eq!(Stopped::SourceGone.as_str(), "source_gone");
+    }
+
+    /// `LAMP_CARRIED_LINES_KEEP_TALK`: a line carried as a person's
+    /// conversation, its exchange kept out of the journal, is handed on as a
+    /// touch of that person's talk; off, one now another's (narrowed), or
+    /// held only by a face's gap, nothing.
+    #[test]
+    fn a_carried_line_touches_its_persons_talk_only_with_the_switch() {
+        const OLIVIA: &str = "p-b2471d941bf88836";
+        let first = u64::MAX - 5_385_000;
+        let exchange = |request: u64, whose: Option<&str>| crate::thread::FinishedExchange {
+            request,
+            age: Duration::ZERO,
+            heard: "and then".into(),
+            said: "Go on.".into(),
+            whose: whose.map(str::to_owned),
+        };
+        for request in first..first + 4 {
+            held_by_gap(request);
+        }
+        carried_line(first, OLIVIA, true);
+        carried_line(first + 1, OLIVIA, false);
+        carried_line(first + 2, OLIVIA, true);
+        let (jobs, work) = sync_channel(8);
+        let client = held_test_client(jobs);
+        hand_on_days(
+            vec![
+                exchange(first, Some(OLIVIA)),
+                exchange(first + 1, Some(OLIVIA)),
+                exchange(first + 2, None),
+                exchange(first + 3, Some(OLIVIA)),
+            ],
+            NOW,
+            &client,
+        );
+        let touched: Vec<Option<String>> = work
+            .try_iter()
+            .map(|job| match job {
+                DaysJob::Touch { person, .. } => Some(person),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(touched, [Some(OLIVIA.to_owned())]);
+    }
+
+    /// `LAMP_CARRIED_LINES_KEEP_TALK` from the environment (Thirteen's P3
+    /// on #5433): off unset or for anything but exactly `on`.
+    #[test]
+    fn carried_lines_keep_talk_is_on_only_for_exactly_on() {
+        use crate::second_provider::{
+            CARRIED_LINES_KEEP_TALK_ENVIRONMENT, carried_lines_keep_talk_from,
+        };
+        let given = |value: Option<&'static str>| {
+            move |name: &str| {
+                assert_eq!(name, CARRIED_LINES_KEEP_TALK_ENVIRONMENT);
+                value.map(str::to_owned)
+            }
+        };
+        assert!(carried_lines_keep_talk_from(given(Some("on"))));
+        for value in [
+            None,
+            Some(""),
+            Some("off"),
+            Some("On"),
+            Some("1"),
+            Some("on "),
+        ] {
+            assert!(!carried_lines_keep_talk_from(given(value)), "{value:?}");
+        }
+    }
+
+    /// Two lines of a person's 80 s apart, a carried line of theirs 40 s
+    /// after the first (`touch`): one talk, ended once with both. With no
+    /// touch (the switch off) or another person's, two, as before.
+    fn touched_talk(name: &str, touch: Option<&str>, requests: usize) -> Vec<Value> {
+        let (socket, served) = memory(name, requests, |request| match request["op"].as_str() {
+            Some("append_linked") => {
+                json!({"ok":true,"id":if request["heard"] == "a" {1} else {2}})
+            }
+            Some("conversation_end") => {
+                json!({"ok":true,"submitted":false,"reason":"model_unconfigured"})
+            }
+            _ => json!({"ok":true}),
+        });
+        let (send, receive) = sync_channel(8);
+        let now = Instant::now();
+        let line = |heard: &str, finished: Instant| DaysJob::Exchange {
+            request: 0,
+            at_unix_ms: NOW,
+            finished,
+            heard: heard.into(),
+            said: "Go on.".into(),
+            sources: vec![],
+            rules: vec![],
+            person: Some("p-a".into()),
+            forgotten: 0,
+            observe_forgets: 0,
+            keeper: None,
+        };
+        send.send(line("a", now.checked_sub(Duration::from_secs(80)).unwrap()))
+            .unwrap();
+        if let Some(person) = touch {
+            send.send(DaysJob::Touch {
+                person: person.into(),
+                finished: now.checked_sub(Duration::from_secs(40)).unwrap(),
+            })
+            .unwrap();
+        }
+        send.send(line("b", now)).unwrap();
+        send.send(DaysJob::End).unwrap();
+        send.send(DaysJob::Close("barrier".into(), None)).unwrap();
+        drop(send);
+        days_writer(
+            &socket,
+            "voice-test",
+            &receive,
+            Duration::from_secs(45),
+            &AtomicU64::new(0),
+            &Mutex::new(Current::default()),
+            &HandOns::default(),
+            None,
+        );
+        let read = served.join().unwrap();
+        std::fs::remove_file(socket).unwrap();
+        read.into_iter()
+            .filter(|request| request["op"] == "conversation_end")
+            .map(|end| end["source_ids"].clone())
+            .collect()
+    }
+
+    #[test]
+    fn a_carried_line_keeps_its_persons_talk_one_conversation() {
+        assert_eq!(touched_talk("touch-kept", Some("p-a"), 4), [json!([1, 2])]);
+        assert_eq!(
+            touched_talk("touch-none", None, 5),
+            [json!([1]), json!([2])]
+        );
+        assert_eq!(
+            touched_talk("touch-other", Some("p-b"), 5),
+            [json!([1]), json!([2])]
+        );
+    }
+
     /// An older Days lamp-memory (the first builder's hold on #3127: a part
     /// updated before the other): `kept` there takes `op`, `person` and
     /// `max_bytes` only, and its `deny_unknown_fields` refuses
@@ -25723,23 +26123,27 @@ mod tests {
             drop(client);
             std::fs::remove_file(&socket).unwrap();
 
+            // A source forgotten outside the voice is not the speaker's
+            // refusal: sent once, never again without it, and the journal
+            // stops as after a forget (#5433).
             let (socket, served) = memory(
                 "speaker-refused",
-                4,
-                |_| json!({"ok":false,"error":"bad_request","message":"a source ID does not exist for this person"}),
+                1,
+                |_| json!({"ok":false,"error":"bad_request","message":SOURCE_GONE}),
             );
             let client = speaking_client(&socket, true);
-            for request in [2_849_110, 2_849_111] {
-                saw_line(seen(request, &["b1/f1"], mai_face));
-                assert!(client.finished_exchange_of(request, NOW, "Plants", "Noted", None));
-            }
+            saw_line(seen(2_849_110, &["b1/f1"], mai_face));
+            assert!(client.finished_exchange_of(2_849_110, NOW, "Plants", "Noted", None));
             let read = served.join().unwrap();
-            assert_eq!(read.len(), 4, "{read:?}");
-            let carried: Vec<bool> = read
-                .iter()
-                .map(|line| line.get("speaker").is_some())
-                .collect();
-            assert_eq!(carried, [true, false, true, false]);
+            assert_eq!(read.len(), 1, "{read:?}");
+            assert!(read[0].get("speaker").is_some(), "{read:?}");
+            client.hand_ons.settle(Duration::from_secs(10));
+            assert_eq!(
+                client.context.lock().unwrap().stopped_by,
+                Some(Stopped::SourceGone)
+            );
+            saw_line(seen(2_849_111, &["b1/f1"], mai_face));
+            assert!(!client.finished_exchange_of(2_849_111, NOW, "Plants", "Noted", None));
             assert!(!client.hand_ons.room_speaker.refused.load(Ordering::Acquire));
             drop(client);
             std::fs::remove_file(&socket).unwrap();

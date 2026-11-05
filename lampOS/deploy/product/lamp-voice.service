@@ -418,6 +418,10 @@ Environment=LAMP_CONVERSATION_CARRIED_SAVES=on
 # no longer keep it the room's; a second face seen speaking, or another voice, still does. Accepted risk, approved by
 # the memory's owner on 30 Oct: a silent guest sitting by hears the person's thread on a carried line.
 Environment=LAMP_CONVERSATION_CARRIES_PAST_SILENT=on
+# And a carried line keeps the person's memory conversation going (lamp-06c1, 5 Nov: about 97 s of carried lines let
+# the memory writer's conversation idle out at 45 s mid-talk, and the earlier piece was dropped): still never
+# journalled, summarised or stored as theirs, it only counts as their talk going on.
+Environment=LAMP_CARRIED_LINES_KEEP_TALK=on
 # And a person's turn is also told the room's lines of the same conversation (#4339: a search answered in the room's
 # thread was unknown to their next turn), marked as said in the room, within the chat's 12 exchanges and 10 minutes
 # and the conversation's 45 s chain. Room to person only: a room's or unplaced turn is never told a person's, and
