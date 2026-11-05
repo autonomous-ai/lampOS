@@ -3,7 +3,7 @@
 # right before a train merges, so a HOLD posted while the train ran keeps its PR out. 25 Oct 21:1x: given the PR, as the
 # bot gives it, so a hold lifted in holds-lifted.tsv is lifted here too (its absence threw away trains 129 and 130).
 # 3 Nov 15:4x (the Reviewer-lead's read of #5068): it rechecks everything the bot's eligibility reads from comments, not
-# only markers.py: a Queue (#4710) HOLD on the PR's head (qholds.py) and a TWO READS ask now short (reads2.py), with
+# only markers.py: a Queue HOLD (on any Queue issue, lib.sh) on the PR's head (qholds.py) and a TWO READS ask now short (reads2.py), with
 # markers only from writers (lib.sh). Any fetch error fails (exit 1): the train isn't merged.
 # Paths from the environment (README.md): TOOLS_DIR (default: this folder), LAMP_COORD_STATE, PYTHON (default: python3).
 TOOLS_DIR="${TOOLS_DIR:-${0:A:h}}"

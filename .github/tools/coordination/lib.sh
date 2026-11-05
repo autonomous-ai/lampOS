@@ -41,8 +41,22 @@ coord_pr_comments() {
   $PYTHON -I $TOOLS_DIR/markers.py --merge $2.c $2.r > $2.new && mv $2.new $2; local e=$?; rm -f $2.c $2.r; return $e
 }
 
-# coord_queue OUT: the Queue's (#4710) comments of the last 3 days, where Queue HOLDs are posted.
-coord_queue() { coord_comments 4710 $1 "$(date -u -v-3d +%Y-%m-%dT%H:%M:%SZ)"; }
+# The Queue's issues, oldest first: #4710 hit GitHub's 2,500-comment limit on 5 Nov and the Queue goes on in #5385.
+# The one place their numbers live: every one is read, so a HOLD on an older one still counts; the bot posts on the last.
+COORD_QUEUE_ISSUES=(4710 5385)
+COORD_QUEUE_POST=${COORD_QUEUE_ISSUES[-1]}
+
+# coord_queue OUT: the comments of the last 3 days on every Queue issue, where Queue HOLDs are posted, as one list of
+# JSON lines (issue by issue). Any issue that can't be fetched fails it, with OUT gone: no Queue, no PR eligible.
+coord_queue() {
+  local i since=$(date -u -v-3d +%Y-%m-%dT%H:%M:%SZ)
+  rm -f $1; : > $1.all || return 1
+  for i in $COORD_QUEUE_ISSUES; do
+    coord_comments $i $1.$i "$since" && cat $1.$i >> $1.all || { rm -f $1.all $1.$i; return 1; }
+    rm -f $1.$i
+  done
+  mv $1.all $1
+}
 
 # coord_body PR OUT: the PR body as one JSON line {login:"", body, pr_body:true}, for reads2.py.
 coord_body() {
