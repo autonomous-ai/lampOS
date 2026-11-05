@@ -1646,6 +1646,15 @@ struct Shared {
     /// A forget the model called unasked, held for that person's yes
     /// ([`HeldForget`]).
     held_forget: Mutex<HeldForgets>,
+    /// The first setup save refused only for the read-back's yes, held for
+    /// the person's next turn ([`HeldSave`]).
+    held_save: Mutex<Option<HeldSave>>,
+    /// The save a held one ran: its request, name and answer, so a model
+    /// call after the yes never saves twice.
+    saved_by_hold: Mutex<Option<(u64, String, Value)>>,
+    /// Where a held save reads what was said; the thread's window when
+    /// unset ([`said_window`]).
+    said_window: Option<SaidWindow>,
     /// Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`): the eyes'
     /// looks and their known file, and a held forget's yes counts only
     /// from the held person's face seen saying it (#2377).
@@ -3498,6 +3507,9 @@ impl Engine {
                 first_words: None,
                 speaking: None,
                 held_forget: Mutex::new(HeldForgets::default()),
+                held_save: Mutex::new(None),
+                saved_by_hold: Mutex::new(None),
+                said_window: None,
                 forget_sight: None,
                 forget_through_spelling: false,
                 face_claims: false,
@@ -3904,6 +3916,15 @@ impl Engine {
     ) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.forget_sight = Some((eyes, known));
+        self
+    }
+
+    /// Where a held setup save reads what was said ([`HeldSave`]), in
+    /// place of the thread's window.
+    #[cfg(test)]
+    pub(crate) fn reading_said_from(mut self, window: SaidWindow) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.said_window = Some(window);
         self
     }
 
@@ -10313,6 +10334,150 @@ fn take_held_forget(
     }
 }
 
+/// What a held setup save reads of what was said.
+pub(crate) type SaidWindow = Arc<dyn Fn() -> crate::known_faces::Said + Send + Sync>;
+
+/// How long a held setup save waits for the yes.
+const HELD_SAVE_FOR: Duration = Duration::from_secs(45);
+
+/// The first save at setup the eyes' check refused only for want of the
+/// read-back's yes (`known_faces::refused_for_the_read_back`), held for the
+/// same session's next spoken turn, as [`HeldForget`] is: on lamp-52e6, 5
+/// Nov (#5391's check), the person said yes to "Walter. Have I got that
+/// right?" and the model made no call, so no face was kept. On a plain yes
+/// to the read-back (`known_faces::held_save_verdict`) the voice runs the
+/// call itself, through the same runner and check as a model call; any
+/// other next turn, another remember call, or [`HELD_SAVE_FOR`] drops it.
+struct HeldSave {
+    call: net::ToolCall,
+    request: u64,
+    session: Option<u64>,
+    at: Instant,
+}
+
+fn said_window(shared: &Shared) -> crate::known_faces::Said {
+    match &shared.said_window {
+        Some(window) => window(),
+        None => crate::thread::THREAD
+            .lock()
+            .map(|thread| thread.names_window(crate::known_faces::SAID_EXCHANGES))
+            .unwrap_or_default(),
+    }
+}
+
+/// Holds a setup save refused for the read-back's yes, in place of any.
+fn hold_save(
+    shared: &Shared,
+    request: u64,
+    call: &net::ToolCall,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+    now: Instant,
+) {
+    if let Ok(mut held) = shared.held_save.lock() {
+        eprintln!(
+            "lamp-voice second: request {request}: held the setup face save for the yes to its read-back"
+        );
+        *held = Some(HeldSave {
+            call: call.clone(),
+            request,
+            session: scope.map(|scope| scope.key().session),
+            at: now,
+        });
+    }
+}
+
+/// Drops a held setup save, if any.
+fn drop_held_save(shared: &Shared, request: u64, why: &str) {
+    if let Ok(mut held) = shared.held_save.lock()
+        && let Some(was) = held.take()
+    {
+        eprintln!(
+            "lamp-voice second: request {request}: dropped the held setup face save (held in request {}): {why}",
+            was.request
+        );
+    }
+}
+
+/// The held setup save request `request` runs, if any: only on the next
+/// spoken turn of the same session, within [`HELD_SAVE_FOR`], when that
+/// turn is a plain yes to the lamp's read-back. A turn the lamp wrote
+/// leaves it as it is; any other turn drops it.
+fn take_held_save(
+    shared: &Shared,
+    request: u64,
+    heard: bool,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+    now: Instant,
+) -> Option<net::ToolCall> {
+    let mut hold = shared.held_save.lock().ok()?;
+    let held = hold.take()?;
+    if !heard || held.request >= request {
+        *hold = Some(held);
+        return None;
+    }
+    drop(hold);
+    let seen_speaking = crate::speaking_faces::line_seen(request);
+    let name = held
+        .call
+        .args
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    let why = if now.saturating_duration_since(held.at) > HELD_SAVE_FOR {
+        "too late"
+    } else if held_by_gap(scope) {
+        "a line held only by a face's gap"
+    } else if held.session.is_some() && scope.map(|scope| scope.key().session) != held.session {
+        "not the same session"
+    } else if seen_speaking
+        .as_ref()
+        .is_some_and(|line| line.speakers.len() > 1)
+    {
+        // The save stays the speaker's own: a second face seen speaking
+        // the yes may be someone else's.
+        "a second face seen at the yes"
+    } else if shared.forget_sight.is_some()
+        && seen_speaking
+            .as_ref()
+            .is_none_or(|line| line.speakers.len() != 1)
+    {
+        "the speaker was not seen saying the yes"
+    } else {
+        match crate::known_faces::held_save_verdict(&name, &said_window(shared)) {
+            crate::known_faces::HeldSaveVerdict::Runs => {
+                eprintln!(
+                    "lamp-voice second: request {request}: their yes to the read-back runs the setup face save held in request {}",
+                    held.request
+                );
+                return Some(held.call);
+            }
+            crate::known_faces::HeldSaveVerdict::Waits => "the lamp did not say the name back",
+            crate::known_faces::HeldSaveVerdict::Drops => "not a plain yes to the read-back",
+        }
+    };
+    eprintln!(
+        "lamp-voice second: request {request}: dropped the held setup face save (held in request {}): {why}",
+        held.request
+    );
+    None
+}
+
+/// The answer of a save a held one already ran for `name` in `request`,
+/// for a model call after the yes: never a second save.
+fn saved_already(shared: &Shared, request: u64, call: &net::ToolCall) -> Option<Value> {
+    if call.name != crate::known_faces::REMEMBER
+        || call.args.get("replace").and_then(Value::as_bool) == Some(true)
+    {
+        return None;
+    }
+    let name = call.args.get("name").and_then(Value::as_str)?.trim();
+    let saved = shared.saved_by_hold.lock().ok()?;
+    let (at, kept, _) = saved.as_ref()?;
+    (*at == request && kept.eq_ignore_ascii_case(name))
+        .then(|| serde_json::json!({"remembered": true, "note": crate::remember::ALREADY_KEPT}))
+}
+
 /// What came of holding a forget.
 enum Holding {
     Held,
@@ -11002,6 +11167,8 @@ async fn answer(
         Taken::Runs(call) => (Some(call), None),
         Taken::Unseen(name) => (None, Some(crate::remember::unseen_yes_told(&name))),
     };
+    let mut held_save_runs =
+        take_held_save(shared, request, heard, scope.as_ref(), (shared.clock)());
     // Whom the line's own words ask by name (`LAMP_TASKS_NAMED_ASK`): told
     // once, after round 1 answers.
     let mut named_ask = shared
@@ -11073,7 +11240,7 @@ async fn answer(
     // result, or that its yes did not count, so it does not stand for
     // round 1.
     let prepared_for = prepared
-        .filter(|_| held_forget_runs.is_none() && unseen_yes.is_none())
+        .filter(|_| held_forget_runs.is_none() && unseen_yes.is_none() && held_save_runs.is_none())
         .map(|prepared| (prepared, said.clone()));
     let question = match picture {
         Some(jpeg) => Message::user_seeing(said, &jpeg),
@@ -11259,6 +11426,47 @@ async fn answer(
                 }));
                 }
                 held_forget_ran = true;
+            }
+        }
+        // Their yes to the read-back runs the setup face save held for it
+        // ([`HeldSave`]), before round 1, through the same runner and check
+        // as a model call; the model is told it is kept.
+        if let Some(call) = held_save_runs.take() {
+            let by_rule = shared
+                .hold
+                .as_ref()
+                .is_some_and(|hold| hold(request, &call.name));
+            if by_rule {
+                eprintln!(
+                    "lamp-voice second: request {request}: dropped the held setup face save: the line is held"
+                );
+            } else {
+                let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
+                if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+                    return Err(Stop::Gone);
+                }
+                if result["ok"] == true {
+                    ran_tool.store(true, Ordering::Relaxed);
+                    dispatched.store(true, Ordering::Relaxed);
+                    let name = call
+                        .args
+                        .get("name")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .trim()
+                        .to_owned();
+                    if let Ok(mut saved) = shared.saved_by_hold.lock() {
+                        *saved = Some((request, name, result.clone()));
+                    }
+                    eprintln!("lamp-voice second: request {request}: ran the held setup face save");
+                    messages.push(Message::system(format!(
+                        "(For you to know: they said yes to the name you said back, so their face is kept now, with this result: {result}. Say in a few words that you will know them, and do not call remember_my_face again for it.)"
+                    )));
+                } else {
+                    eprintln!(
+                        "lamp-voice second: request {request}: the held setup face save kept nothing"
+                    );
+                }
             }
         }
         // Their yes did not count (#2377): told once, beside the request.
@@ -12711,6 +12919,16 @@ async fn answer(
                     messages.push(Message::tool(call.id.clone(), told.to_string()));
                     continue;
                 }
+                // A face save their yes already ran ([`HeldSave`]): never a
+                // second.
+                if let Some(told) = saved_already(shared, request, call) {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: the held setup save kept it already",
+                        call.name
+                    );
+                    messages.push(Message::tool(call.id.clone(), told.to_string()));
+                    continue;
+                }
                 // A memory call on a line held only by a gap runs for no one,
                 // by either runner: refused here, before the requested-audio
                 // runner too, which never reaches `run_tool`'s own refusal
@@ -12816,6 +13034,16 @@ async fn answer(
                 };
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
+                }
+                // The first setup save refused only for the read-back's yes
+                // is held for that yes ([`HeldSave`]); any other answer to a
+                // save drops one held.
+                if call.name == crate::known_faces::REMEMBER {
+                    if heard && crate::known_faces::refused_for_the_read_back(&answer.told) {
+                        hold_save(shared, request, call, scope.as_ref(), (shared.clock)());
+                    } else {
+                        drop_held_save(shared, request, "a new save call");
+                    }
                 }
                 call_statuses.push(after_forget::status(&call.name, &answer.told));
                 if after_forget::is_memory_forget(&call.name) {
