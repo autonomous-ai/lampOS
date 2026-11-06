@@ -14,10 +14,17 @@
 //! the same at its start, for lamps installed before this
 //! (crates/tasks/src/hold.rs, `pin_at_start`).
 use crate::install::{HARNESS_HOME, Runner};
+use rustix::{
+    fs::{self as rfs, AtFlags, Mode, OFlags},
+    io::Errno,
+};
 use std::{
     fs,
-    io::{self, Write},
-    os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
+    io::{self, Read, Write},
+    os::{
+        fd::OwnedFd,
+        unix::fs::{MetadataExt, PermissionsExt},
+    },
     path::Path,
 };
 
@@ -93,48 +100,116 @@ pub enum Pinned {
     Missing,
 }
 
-/// The launcher at `launcher` written in the pinned shape with `env_file`,
-/// whole: through a file beside it, with its mode (executable) and owner
-/// (Harness's user, not root), then renamed over it. One already pinned is
-/// not written; a missing one is not made. An error, with the launcher
-/// unchanged, when it is not a plain file, has no `exec` line, or cannot be
-/// written.
+/// The folders between Harness's home and its launcher, and the launcher's
+/// own name: [`LAUNCHER`] in parts.
+const BIN: [&str; 2] = [".local", "bin"];
+const NAME: &str = "harness";
+
+/// The launcher at `launcher` (`<home>/`[`LAUNCHER`]) written in the pinned
+/// shape with `env_file`, whole: through a file beside it, with its mode
+/// (executable) and owner (Harness's user, not root), then renamed over it.
+/// One already pinned is not written; a missing one is not made. An error,
+/// with the launcher unchanged, when it is not a plain file, has no `exec`
+/// line, or cannot be written.
+///
+/// This runs as root in a folder Harness's user owns, so nothing there is
+/// opened through a link (the Reviewer-lead on #5624): `.local` and `bin`
+/// are opened without following one, and the launcher is opened, checked
+/// (fstat), read and its mode and owner taken through that one open file;
+/// the temporary file is made new (`O_CREAT|O_EXCL|O_NOFOLLOW`) in that
+/// folder after any name left there is unlinked, written and given its mode
+/// and owner through its own open file, and renamed in the same folder.
 pub fn pin(launcher: &Path, env_file: &str) -> Result<Pinned, String> {
     let said = |error: &dyn std::fmt::Display| format!("{}: {error}", launcher.display());
-    let metadata = match fs::symlink_metadata(launcher) {
-        Ok(metadata) => metadata,
+    let home = launcher
+        .ancestors()
+        .nth(3)
+        .filter(|_| launcher.ends_with(LAUNCHER))
+        .ok_or_else(|| said(&format!("not at <home>/{LAUNCHER}")))?;
+    let dir = match bin_folder(home) {
+        Ok(dir) => dir,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Pinned::Missing),
         Err(error) => return Err(said(&error)),
     };
+    let mut file = match rfs::openat(
+        &dir,
+        NAME,
+        OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+        Mode::empty(),
+    ) {
+        Ok(fd) => fs::File::from(fd),
+        Err(Errno::NOENT) => return Ok(Pinned::Missing),
+        Err(Errno::LOOP) => {
+            return Err(said(
+                &"a link, left as it is (its target not read or written)",
+            ));
+        }
+        Err(error) => return Err(said(&io::Error::from(error))),
+    };
+    let metadata = file.metadata().map_err(|error| said(&error))?;
     if !metadata.is_file() {
         return Err(said(&"not a plain file"));
     }
-    let text = fs::read_to_string(launcher).map_err(|error| said(&error))?;
+    let mut text = String::new();
+    file.read_to_string(&mut text)
+        .map_err(|error| said(&error))?;
+    drop(file);
     let pinned = pinned_launcher(&text, env_file).ok_or_else(|| said(&"no exec line"))?;
     if pinned == text {
         return Ok(Pinned::Kept);
     }
-    let next = launcher.with_file_name(NEXT);
-    let written =
-        write_next(&next, pinned.as_bytes(), &metadata).and_then(|()| fs::rename(&next, launcher));
+    let written = write_next(&dir, pinned.as_bytes(), &metadata)
+        .and_then(|()| rfs::renameat(&dir, NEXT, &dir, NAME).map_err(io::Error::from));
     if let Err(error) = written {
-        let _ = fs::remove_file(&next);
+        let _ = rfs::unlinkat(&dir, NEXT, AtFlags::empty());
         return Err(said(&error));
     }
     Ok(Pinned::Written)
 }
 
-fn write_next(next: &Path, bytes: &[u8], was: &fs::Metadata) -> io::Result<()> {
+/// `<home>/.local/bin`, opened as a folder, neither `.local` nor `bin`
+/// through a link. `home` itself is root's path to Harness's home.
+fn bin_folder(home: &Path) -> io::Result<OwnedFd> {
+    let mut dir = rfs::open(
+        home,
+        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+        Mode::empty(),
+    )?;
+    for part in BIN {
+        dir = rfs::openat(
+            &dir,
+            part,
+            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .map_err(|error| match error {
+            Errno::LOOP | Errno::NOTDIR => {
+                io::Error::other(format!("{part} is not a plain folder (a link?)"))
+            }
+            error => io::Error::from(error),
+        })?;
+    }
+    Ok(dir)
+}
+
+/// [`NEXT`] in `dir`, made new (any name there unlinked first, never
+/// followed), holding `bytes`, with `was`'s owner and mode (executable).
+fn write_next(dir: &OwnedFd, bytes: &[u8], was: &fs::Metadata) -> io::Result<()> {
     let mut mode = was.mode() & 0o7777;
     if mode & 0o100 == 0 {
         mode = 0o755;
     }
-    let mut file = fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(next)?;
+    match rfs::unlinkat(dir, NEXT, AtFlags::empty()) {
+        Ok(()) | Err(Errno::NOENT) => {}
+        Err(error) => return Err(error.into()),
+    }
+    let fd = rfs::openat(
+        dir,
+        NEXT,
+        OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+        Mode::RUSR | Mode::WUSR,
+    )?;
+    let mut file = fs::File::from(fd);
     file.write_all(bytes)?;
     let now = file.metadata()?;
     if (now.uid(), now.gid()) != (was.uid(), was.gid()) {

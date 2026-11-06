@@ -1301,3 +1301,102 @@ fn an_unread_tasks_unit_is_taken_as_off() {
     );
     assert_eq!(fs::read_to_string(&launcher).unwrap(), UNPINNED);
 }
+
+/// A link planted at the temporary name (the tasks user owns the bin
+/// folder): the root-run pin never opens through it, so the file it points
+/// at is not truncated, written, chowned or chmodded; the launcher is still
+/// pinned, and a second run changes nothing.
+#[test]
+fn a_link_at_the_temporary_name_is_not_followed() {
+    let lamp = Lamp::new();
+    let launcher = launcher_left(&lamp, UNPINNED);
+    let victim = lamp.root().join("victim");
+    fs::write(&victim, "root's own\n").unwrap();
+    fs::set_permissions(&victim, fs::Permissions::from_mode(0o640)).unwrap();
+    let next = launcher.with_file_name(".harness.lampos-pin");
+    symlink(&victim, &next).unwrap();
+    let env_file = "/var/lib/lampos-tasks/harness-hold.env";
+
+    assert_eq!(
+        launcher::pin(&launcher, env_file),
+        Ok(launcher::Pinned::Written)
+    );
+    assert_eq!(fs::read_to_string(&victim).unwrap(), "root's own\n");
+    assert_eq!(
+        fs::metadata(&victim).unwrap().permissions().mode() & 0o777,
+        0o640
+    );
+    assert_eq!(fs::read_to_string(&launcher).unwrap(), PINNED);
+    assert!(
+        !fs::symlink_metadata(&launcher)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert!(
+        fs::symlink_metadata(&next).is_err(),
+        "the planted name is gone"
+    );
+
+    assert_eq!(
+        launcher::pin(&launcher, env_file),
+        Ok(launcher::Pinned::Kept)
+    );
+    assert_eq!(fs::read_to_string(&launcher).unwrap(), PINNED);
+    assert_eq!(fs::read_to_string(&victim).unwrap(), "root's own\n");
+}
+
+/// A launcher that is itself a link: left as it is and said; its target is
+/// neither read nor written.
+#[test]
+fn a_launcher_that_is_a_link_is_left_alone() {
+    let lamp = Lamp::new();
+    let bin = lamp.root().join("var/lib/lampos-tasks/.local/bin");
+    fs::create_dir_all(&bin).unwrap();
+    let target = lamp.root().join("elsewhere");
+    fs::write(&target, UNPINNED).unwrap();
+    fs::set_permissions(&target, fs::Permissions::from_mode(0o755)).unwrap();
+    let launcher = bin.join("harness");
+    symlink(&target, &launcher).unwrap();
+    let mut runs = Runs::new();
+    runs.tasks_environment = HOLD_ON.into();
+    let mut lines = Vec::new();
+    let mut run = runs.runner();
+    launcher::after_install(lamp.root(), &mut run, &mut |line: &str| {
+        lines.push(line.to_owned())
+    });
+    assert_eq!(
+        lines,
+        [format!(
+            "Harness's launcher not pinned: {}: a link, left as it is (its target not read or written)",
+            launcher.display()
+        )]
+    );
+    assert_eq!(fs::read_to_string(&target).unwrap(), UNPINNED);
+    assert!(
+        fs::symlink_metadata(&launcher)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert!(!bin.join(".harness.lampos-pin").exists());
+}
+
+/// A link in place of the bin folder: not followed either.
+#[test]
+fn a_link_in_place_of_the_bin_folder_is_not_followed() {
+    let lamp = Lamp::new();
+    let elsewhere = lamp.root().join("elsewhere-bin");
+    fs::create_dir_all(&elsewhere).unwrap();
+    fs::write(elsewhere.join("harness"), UNPINNED).unwrap();
+    let local = lamp.root().join("var/lib/lampos-tasks/.local");
+    fs::create_dir_all(&local).unwrap();
+    symlink(&elsewhere, local.join("bin")).unwrap();
+    let launcher = local.join("bin/harness");
+    assert!(launcher::pin(&launcher, "/x").is_err());
+    assert_eq!(
+        fs::read_to_string(elsewhere.join("harness")).unwrap(),
+        UNPINNED
+    );
+    assert!(!elsewhere.join(".harness.lampos-pin").exists());
+}

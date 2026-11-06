@@ -1211,9 +1211,14 @@ rewrite only the `exec` line, so the preamble stays.
   line are kept as they are. A launcher already in that shape is not written
   (byte for byte the same, no second preamble). Otherwise it is written whole,
   through `.harness.lampos-pin` beside it, with its own mode (executable) and
-  owner, then renamed over it.
+  owner, then renamed over it. lamp-update (root) does this without following
+  links: `.local`, `bin` and the launcher are opened `O_NOFOLLOW`, the launcher
+  is checked, read and its mode and owner taken through that one open file, and
+  `.harness.lampos-pin` is unlinked, made new (`O_EXCL`) and renamed in that
+  same folder.
 - **Not written:** with the switch off; with no launcher (none is made, one
-  line said); with a launcher that is not a plain file or has no `exec` line.
+  line said); with a launcher that is a link (`a link, left as it is`; its
+  target is not read or written), not a plain file, or has no `exec` line.
 - **Journal:** lamp-tasks says `tasks: Harness's launcher pinned (…): <path>`,
   `tasks: Harness's launcher already pinned: <path>`, `tasks: no Harness
   launcher at <path>: left alone` or `tasks: Harness's launcher not pinned:
