@@ -99,8 +99,9 @@ pub enum Event {
 const MOST_MESSAGE_BYTES: usize = 200;
 
 /// Harness's `message` as the app may show it: plain, bounded text, with
-/// no address in it and no code: no run of eight digits (the privacy
-/// reader's P3 on #5236), so a quoted code never reaches the broker.
+/// no address in it and no code: no eight digits in a row once every
+/// non-digit is taken out (the privacy reader's P3 on #5236, the
+/// reviewer-lead's P2 on #5579), so a quoted code never reaches the broker.
 fn message(value: Option<&Value>) -> Option<String> {
     let message = value?.as_str()?.trim();
     (!message.is_empty()
@@ -111,11 +112,16 @@ fn message(value: Option<&Value>) -> Option<String> {
     .then(|| message.to_owned())
 }
 
-/// Whether `text` holds a run of exactly eight digits, a sign-in code's
-/// shape: `(^|[^0-9])[0-9]{8}([^0-9]|$)`.
+/// Whether `text` holds eight digits, a sign-in code's shape, whatever
+/// the spacing or separators between them: "1234 5678", "1234-5678".
 fn has_eight_digits(text: &str) -> bool {
-    text.split(|c: char| !c.is_ascii_digit())
-        .any(|run| run.len() == 8)
+    digits(text).len() >= 8
+}
+
+/// `text`'s digits alone, every other character taken out, so a code is
+/// found whatever its spacing or separators (#5579).
+fn digits(text: &str) -> String {
+    text.chars().filter(char::is_ascii_digit).collect()
 }
 
 /// How a sign-in ended. Its `Debug` hides the email.
@@ -319,6 +325,10 @@ pub struct Session {
     /// The code already given by a start or initial claim. A same-code
     /// keepalive does not make another initial telling available.
     code_given: Option<String>,
+    /// The last code Harness gave, kept until the sign-in ends so that a
+    /// result after the question can't quote it to the app (#5579). Never
+    /// said, journaled or shown: only matched against Harness's message.
+    last_code: Option<String>,
 }
 
 impl Session {
@@ -332,6 +342,7 @@ impl Session {
             until: now + MOST_LIFE,
             told: None,
             code_given: None,
+            last_code: None,
             by: By::Voice,
             method: Method::Code,
             changes: 0,
@@ -372,6 +383,7 @@ impl Session {
             until: Instant::now(),
             told: None,
             code_given: None,
+            last_code: None,
             by: By::Voice,
             method: Method::Code,
             changes: 0,
@@ -443,6 +455,7 @@ impl Session {
                     if !matches!(&self.state, State::Code { code: was, .. } if *was == code) {
                         said.push(format!("code given (good for {expires_in} s)"));
                     }
+                    self.last_code = Some(code.clone());
                     self.state = State::Code {
                         code,
                         until: now + Duration::from_secs(expires_in),
@@ -466,15 +479,13 @@ impl Session {
                     message,
                     already_signed_in,
                 }) => {
-                    // Not one that quotes the open code, whatever its
-                    // shape (the privacy reader's P3 on #5236).
-                    let open_code = match &self.state {
-                        State::Code { code, .. } => Some(code.as_str()),
-                        _ => self.code_given.as_deref(),
-                    };
-                    self.message = message.filter(|message| {
-                        open_code.is_none_or(|code| code.is_empty() || !message.contains(code))
-                    });
+                    // Not one that holds the sign-in's code's digits,
+                    // whatever the spacing or separators (the privacy
+                    // reader's P3 on #5236, the reviewer-lead's P2 on
+                    // #5579), the question asked or not.
+                    let code = self.last_code.as_deref().map(digits).unwrap_or_default();
+                    self.message = message
+                        .filter(|message| code.is_empty() || !digits(message).contains(&code));
                     self.already_signed_in = already_signed_in;
                     said.push(match &done {
                         Done::Success { .. } if already_signed_in => "already signed in".into(),
@@ -536,6 +547,7 @@ impl Session {
         self.changes += 1;
         self.expires_at_ms = None;
         self.code_given = None;
+        self.last_code = None;
         // Dropped: the program is stopped, if it hasn't ended itself.
         self.link = None;
     }
@@ -1250,7 +1262,7 @@ mod tests {
             })))
         );
         // A quoted code is dropped too (the privacy reader's P3 on #5236):
-        // any run of eight digits, but not a longer or shorter one.
+        // eight digits or more, but not fewer.
         for quoted in ["Code 12345678 has expired.", "12345678", "Code (12345678)."] {
             assert_eq!(
                 parse_line(
@@ -1263,7 +1275,25 @@ mod tests {
                 "{quoted}"
             );
         }
-        for kept in ["Try again in 60 minutes.", "Reference 123456789."] {
+        // Digits only (the reviewer-lead's P2 on #5579): eight digits
+        // spaced, dashed or split by any separator are dropped too.
+        for quoted in [
+            "Code 1234 5678 has expired.",
+            "Code 1234-5678.",
+            "Code 12.34.56.78",
+        ] {
+            assert_eq!(
+                parse_line(
+                    &json!({"type":"result","status":"error","code":"EXPIRED","message":quoted})
+                        .to_string()
+                ),
+                Ok(Some(Event::Result(Done::Error {
+                    code: "EXPIRED".into()
+                }))),
+                "{quoted}"
+            );
+        }
+        for kept in ["Try again in 60 minutes.", "Reference 1234567."] {
             assert!(
                 matches!(
                     parse_line(
@@ -1368,5 +1398,61 @@ mod tests {
         ]);
         session.tend(now);
         assert_eq!(session.code_given, None);
+    }
+    /// The reviewer-lead's P2 on #5579: Harness's message is dropped when
+    /// it holds the open code's digits, whatever the spacing or separators,
+    /// for a code of any length and after the question too.
+    #[test]
+    fn a_sign_in_message_quoting_the_code_with_separators_is_dropped() {
+        let error = |message: &str| {
+            Some(Ok(Event::ResultWith {
+                done: Done::Error {
+                    code: "DENIED".into(),
+                },
+                message: Some(message.into()),
+                already_signed_in: false,
+            }))
+        };
+        let now = Instant::now();
+        // A six-digit open code quoted with dashes.
+        let (mut session, lines, _) = scripted(now);
+        lines
+            .lock()
+            .unwrap()
+            .extend([code("123456"), error("Code 12-34-56 was wrong."), None]);
+        session.tend(now);
+        assert_eq!(
+            session.app_view(now)["message"],
+            done_message("DENIED"),
+            "a dashed six-digit code"
+        );
+        // A six-digit code quoted spaced, after the question was asked.
+        let (mut session, lines, _) = scripted(now);
+        lines.lock().unwrap().extend([
+            code("123456"),
+            Some(Ok(Event::Confirm {
+                email: "someone@example.com".into(),
+            })),
+            None,
+        ]);
+        session.tend(now);
+        lines
+            .lock()
+            .unwrap()
+            .extend([error("Code 123 456 was already used."), None]);
+        session.tend(now);
+        assert_eq!(
+            session.app_view(now)["message"],
+            done_message("DENIED"),
+            "a spaced code after the question"
+        );
+        // One without the code's digits is kept.
+        let (mut session, lines, _) = scripted(now);
+        lines
+            .lock()
+            .unwrap()
+            .extend([code("123456"), error("Try again in 60 minutes."), None]);
+        session.tend(now);
+        assert_eq!(session.app_view(now)["message"], "Try again in 60 minutes.");
     }
 }
