@@ -1440,15 +1440,18 @@ pub(crate) fn spoken_character(character: &str, look_by_call: bool, memory: bool
 }
 
 /// [`spoken_character`] for one version of the instruction: `camera` for
-/// the camera's, told while the eye is open ([`character_now`]).
+/// the camera's, told while the eye is open ([`character_now`]). Only that
+/// version is told [`LOOK_CALL_NOTE`]: the one without a camera says the
+/// eye is closed, and told both, a closed-eye turn called take_a_look, said
+/// "Let me look." and only 2.6 s on that its eye was shut
+/// (`speak_up::NO_LOOK_NOTE`, #5530). The function stays offered either way.
 pub(crate) fn spoken_version(
     character: &str,
     camera: bool,
     look_by_call: bool,
     memory: bool,
 ) -> String {
-    let _ = camera;
-    spoken_character(character, look_by_call, memory)
+    spoken_character(character, camera && look_by_call, memory)
 }
 
 /// The spoken turn's character, `blind` (the version without a camera) or
