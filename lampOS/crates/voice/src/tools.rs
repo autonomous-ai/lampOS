@@ -1562,6 +1562,7 @@ fn face_gone_with_everything(settings: &Settings, route: &Route, told: &Value) {
     {
         crate::known_faces::owner_forgotten();
         crate::onboarding::face_forgotten(file);
+        crate::setup_voice::owner_face_gone(file);
     }
 }
 
@@ -1851,6 +1852,14 @@ fn run_call_with_scope(
                 }
                 _ => (told, answered),
             };
+            // And the owner's prints kept at setup, on the same mark and
+            // rule, its switch on or not (`crate::setup_voice`).
+            let (told, answered) = match lease {
+                Some(lease) if heard && model.name == crate::remember::FORGET_EVERYTHING => {
+                    crate::setup_voice::forget_with_everything((told, answered), lease)
+                }
+                _ => (told, answered),
+            };
             // And the setup's journal the image keeps on the eMMC (#5144),
             // which can hold what they said at setup, on the same mark and
             // rule (`crate::setup_journal`).
@@ -2012,6 +2021,9 @@ fn run_call_with_scope(
             {
                 crate::known_faces::owner_forgotten();
                 crate::onboarding::face_forgotten(file);
+                // The owner mark goes, so the owner's prints kept at setup
+                // go with it (`crate::setup_voice`).
+                crate::setup_voice::owner_face_gone(file);
             }
             // A face saved in a line of the room's: the caller's own lines
             // before it follow them (`LAMP_MEMORY_FOLLOWS_FACE`, #2176).

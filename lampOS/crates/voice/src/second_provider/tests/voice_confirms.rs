@@ -18,6 +18,7 @@ fn confirms(bar: f32, print: Option<[f32; 3]>) -> VoiceConfirms {
     VoiceConfirms {
         owner: Arc::new(OwnerVoice::new(bar)),
         print_of: Arc::new(move |_| print.map(|print| print.to_vec())),
+        setup: None,
     }
 }
 

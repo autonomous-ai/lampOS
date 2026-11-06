@@ -851,6 +851,30 @@ and passes `--same-voice-confirms BAR` after the model's path):
   loose to tell them from another voice. A line the voice confirmed is never
   learnt from, so the voice never vouches for itself. Another known person
   starts it afresh, and so does a restart of the voice. Nothing is written.
+- **Kept from setup, with `LAMP_SAME_VOICE_ENROLS_AT_SETUP=on`** (C115,
+  `crates/voice/src/setup_voice.rs`; off unless set, off everywhere). While
+  the walk leads "who you are", each line one face alone was seen speaking,
+  the one face in view through it, has its print held in RAM with that
+  face's passing id, read in a thread of its own so the step waits for
+  nothing. Once the step ends with a face saved as the owner (the
+  onboarding file's `owner`, their face as the eyes' known file says now),
+  the prints of that face alone, at most 4, are kept in `setup-voice.json`
+  beside the walk's progress (the onboarding folder, root's 0700, wiped
+  whole by the reset plan), a root-owned 0600 file written whole, prints
+  only, never sound. A guest's lines, lines no face was seen speaking, and
+  everything held when no face was saved, go. Each voice start gives them
+  back to the known person's own prints for the owner the onboarding file
+  still names, so with 3 or more kept the owner's first line is judged
+  from the start; with fewer, the first lines seen said by them make up the
+  rest as before. The owner's "forget everything" removes the file and the
+  prints in RAM, whatever the switch says (`setup_voice::forget_with_everything`),
+  and the prints still held for the step: a line whose print is waited for
+  across the forget holds none, and the step's end decides and writes under
+  the same lock, so it never writes them back. The file is also removed when
+  "who you are" opens again, when the step ends with nothing kept, at a start
+  that finds another owner's (or none named), when a face is forgotten
+  (`setup_voice::owner_face_gone`, the walk's owner mark gone), and at a
+  start with the switch off (`setup_voice::switched_off`).
 - **A confirm.** A line admitted as the known person's that no face was seen
   speaking, their known face the one face in view through it, whose print
   scores the bar or over against their kept prints, is taken as seen said

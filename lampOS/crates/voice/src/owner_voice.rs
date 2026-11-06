@@ -233,6 +233,15 @@ impl Store {
     /// folder's files) is not left for them to read; `refused` is told a
     /// fixed reason, never what the file holds.
     fn read_saying(&self, refused: impl FnOnce(&'static str)) -> Option<Kept> {
+        self.read_json_saying(refused)
+    }
+
+    /// [`Self::read_saying`] of any kept JSON value: the same checks, for
+    /// the setup's voice prints too (`crate::setup_voice`).
+    pub(crate) fn read_json_saying<T: serde::de::DeserializeOwned>(
+        &self,
+        refused: impl FnOnce(&'static str),
+    ) -> Option<T> {
         use std::io::Read;
         let flags = rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK;
         let file = match std::fs::OpenOptions::new()
@@ -272,7 +281,7 @@ impl Store {
 
     /// A file that failed [`Self::read_saying`]'s checks: removed, and
     /// `refused` told `why`.
-    fn refuse(&self, why: &'static str, refused: impl FnOnce(&'static str)) -> Option<Kept> {
+    fn refuse<T>(&self, why: &'static str, refused: impl FnOnce(&'static str)) -> Option<T> {
         refused(why);
         let _ = std::fs::remove_file(&self.path);
         None
@@ -281,6 +290,11 @@ impl Store {
     /// Write `kept` whole: a new file of [`MODE`], given to [`Self::uid`],
     /// put in place. Nothing is left behind when a step fails.
     fn write(&self, kept: &Kept) -> io::Result<()> {
+        self.write_json(kept)
+    }
+
+    /// [`Self::write`] of any JSON value, the same way.
+    pub(crate) fn write_json<T: Serialize>(&self, kept: &T) -> io::Result<()> {
         let new = self.new_path();
         let written = (|| {
             let _ = std::fs::remove_file(&new);
@@ -1435,6 +1449,7 @@ mod tests {
             "crates/voice/src/owner_voice.rs",
             "crates/voice/src/second_provider/worker.rs",
             "crates/voice/src/services.rs",
+            "crates/voice/src/setup_voice.rs",
             "crates/voice/src/thread.rs",
             "crates/voice/src/tools.rs",
         ];

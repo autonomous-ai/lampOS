@@ -3176,6 +3176,21 @@ after a take-over, but now for every turn:
   the route judges a line once its words are final, so its print is
   usually back by then. Test:
   `worker::tests::another_voice_going_on_is_held_and_the_conversations_own_goes_on`.
+- **The owner's voice from setup** (`LAMP_SAME_VOICE_ENROLS_AT_SETUP=on`,
+  beside `LAMP_SAME_VOICE_CONFIRMS`, passed to this worker; off unless set;
+  C115, [same-voice.md](same-voice.md), "One way only"). At each line's
+  admission, before anything else is read, the line goes to
+  `setup_voice::SetupVoice::heard`, which returns at once: its own thread
+  reads whether the walk still leads "who you are", the face seen speaking
+  it alone, the one face in view (`SpeakingFaces::speakers_with_boot`,
+  `one_face_in_view`), and waits up to 5 s for its print. Once the step
+  ends with that face saved as the owner, their prints are kept and given
+  to `same_voice::OwnerVoice`; at the worker's start the kept ones are given
+  back for the owner the onboarding file names ("lamp-voice second: the
+  owner's voice is enrolled at setup: … N given back now"). Off, the
+  worker makes no enrolment, removes a file an earlier start kept
+  (`setup_voice::switched_off`), and a forget of everything still knows
+  where it was. Tests: `setup_voice::tests`.
 - **How to take what it heard** (`worker::SPOKEN_NOTE`, spoken turns
   only, after the character): the ears turn some words into others, names
   and places most of all; a question plainly about the weather, a price, a
