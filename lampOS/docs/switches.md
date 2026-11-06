@@ -839,7 +839,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_OWN_KEYS` | You can use your own accounts for the lamp's replies and hearing instead of ours. |
 | `LAMP_LIGHT_TOLD` | Asked about its light, the lamp says the colour and brightness it really shows, never a guess. |
 | `LAMP_ACTION_CLAIM_CHECKED` | The lamp never says it changed its light or volume, or set a timer, unless it really did. |
-| `LAMP_ACTION_CLAIM_WORDED` | The lamp never says it set a timer or changed its light in its own words unless it really did. |
+| `LAMP_ACTION_CLAIM_WORDED` | In any words, the lamp never claims a timer, a light or volume change, or a light kept on, unless it did it. |
 | `LAMP_OWNER_PLACE` | The app can give the lamp your rough area, so "near me" and weather questions are answered for it. |
 | `LAMP_CHOSEN_VOICE` | You can pick the lamp's voice in the app and describe its character in a few words. |
 | `LAMP_CONTROL` | Nothing you'd notice: lets paired computers on your network control the lamp, for developers. |
