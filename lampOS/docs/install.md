@@ -314,8 +314,11 @@ with `dance` given; `crates/voice/src/config.rs`). It also names the lamp's
 microphone, its voice through its speaker and its camera, its eye, and tells
 it to say it is Lamp when asked who or what it is (#5530); "You are Lamp"
 stays its first words, and the owner's chosen character and the setup name
-are told after it. Only the version for no usable camera says the eye is
-off or closed and not to pretend to see. The Live route takes the camera's
+are told after it. Both let it mention its light, arm, eye or voice when that
+fits. Only the version for no usable camera says no picture reaches it ("say
+you can't see right now", with no claim about the eye, since texts, a turn
+after a forget and Live with no picture are told it too) and not to pretend
+to see. The Live route takes the camera's
 version when its session has a camera; the second route only while it has a
 look and the camera is allowed, its privacy slide open, chosen for each turn
 ([second-voice.md](second-voice.md), "Same character, memory, thread and
