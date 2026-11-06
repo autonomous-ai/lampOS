@@ -449,8 +449,9 @@ impl Days {
         keep_origins(&tx)?;
         tx.execute("DELETE FROM doomed", [])?;
         tx.execute("INSERT INTO doomed SELECT rid FROM entries WHERE (kind='exchange' AND day<?1) OR (kind='observation' AND coalesce(category,'') NOT IN ('talk','episode','fact','profile','pattern','ahead','feeling') AND used_unix_ms<?2 AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=entries.rid AND d.day>=?3))",params![day,unused,event])?;
-        // Nightly pass B's items close on their own end days, never by
-        // disuse or with their source exchanges (`nightly::expire`).
+        // Nightly pass B's items close on their own end days, and an
+        // episode, feeling or pattern after 90 unused days, never with
+        // their source exchanges (`nightly::expire`).
         crate::nightly::expire(&tx, &today, &day, self.now)?;
         descendants(&tx, Some(&event))?;
         let count = erase(&tx)?;
@@ -3522,7 +3523,7 @@ fn talk_fitted(text: &str, room: usize) -> Option<String> {
     }
     Some(lines.join("\n"))
 }
-fn erase(tx: &Transaction<'_>) -> Result<u64> {
+pub(crate) fn erase(tx: &Transaction<'_>) -> Result<u64> {
     let people: Vec<String> = tx
         .prepare("SELECT DISTINCT person FROM entries WHERE rid IN (SELECT rid FROM doomed)")?
         .query_map([], |r| r.get(0))?
