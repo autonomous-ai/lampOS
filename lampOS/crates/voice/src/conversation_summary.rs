@@ -418,6 +418,18 @@ pub fn told(whose: Option<&str>, now: Instant, room: usize) -> String {
     told_from(&SUMMARIES, whose, now, room)
 }
 
+/// For a test: `whose`'s note in this process set to `text`, or dropped.
+#[cfg(test)]
+pub(crate) fn keep_for_test(whose: Option<&str>, text: Option<&str>) {
+    let mut summaries = SUMMARIES.lock().unwrap_or_else(|e| e.into_inner());
+    match text {
+        Some(text) => summaries.keep(whose.map(str::to_owned), text.to_owned(), Instant::now()),
+        None => summaries
+            .notes
+            .retain(|(scope, _)| scope.as_deref() != whose),
+    }
+}
+
 /// [`told`] from `summaries`.
 pub fn told_from(
     summaries: &Mutex<Summaries>,
@@ -449,11 +461,14 @@ pub fn conversation_ended(ended: Ended) {
 
 /// The scope's note for its conversation's observation pass, with the
 /// switch on: the lamp's own words, never evidence by themselves.
+/// A name in it is read as one said in the conversation, never what to
+/// call them, with `LAMP_SECOND_FACE_NAME_ONLY` (#5484).
 pub fn for_observing(whose: Option<&str>) -> Option<String> {
     if !on() {
         return None;
     }
     for_scope(whose, now())
+        .map(|note| crate::face_name_only::told(note, crate::face_name_only::on()))
 }
 
 /// After a turn's end, off its path: the exchanges about to leave each
