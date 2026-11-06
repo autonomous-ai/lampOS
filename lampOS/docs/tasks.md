@@ -1196,6 +1196,52 @@ environment list), `harness start` among them. Its journal says `tasks:
 Harness's own updates held (ADAPTER_UPDATE_DISABLE=true,
 HARNESS_ENV_FILE=…)`, or `not held: <why>` when the file can't be written.
 
+**The pinned launcher (#5493).** The environment above reaches only the
+Harness commands lamp-tasks runs. A `harness logout` run by hand over ssh,
+without them, restarted the held daemon from its own environment, and the
+daemon updated itself within 10 s (lamp-c0a4, 6 Nov). So with the same
+switch, Harness's launcher in its home's bin folder
+(`/var/lib/lampos-tasks/.local/bin/harness`, normally `#!/bin/sh` and one
+`exec … cli.js` line) is written in Harness's own pinned shape, the one its
+installer writes with `--no-updates`:
+
+```sh
+#!/bin/sh
+export ADAPTER_UPDATE_DISABLE=true
+export HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env
+exec … cli.js "$@"
+```
+
+Every `harness …` run through the launcher (or through `/usr/local/bin/harness`,
+its link) then holds the updates, whoever runs it. Harness's own updates
+rewrite only the `exec` line, so the preamble stays.
+
+- **Where:** lamp-tasks at its start (`hold::pin_at_start`), for lamps
+  installed before this; and `lamp-update harness-install` right after it
+  installs, before it starts lamp-tasks again
+  (`crates/update/src/harness_install/launcher.rs`). lamp-update reads the
+  switch from lamp-tasks' unit as systemd has it loaded (`systemctl show
+  lamp-tasks.service --property=Environment`), so both follow the one switch
+  (drop-ins included). A failed read is taken as off; either way it says one
+  line (`LAMP_HARNESS_HOLD_UPDATES is not on in lamp-tasks.service: …` or
+  `lamp-tasks.service's environment not read (<why>): … taken as off, …`).
+- **What is written:** any `export ADAPTER_UPDATE_DISABLE=…` or `export
+  HARNESS_ENV_FILE=…` line before the first `exec` line is taken out, and
+  the two lines above are put just before it. The `exec` line and every other
+  line are kept as they are. A launcher already in that shape is not written
+  (byte for byte the same, no second preamble). Otherwise it is written whole,
+  through `.harness.lampos-pin` beside it, with its own mode (executable) and
+  owner, then renamed over it.
+- **Not written:** with the switch off; with no launcher (none is made, one
+  line said); with a launcher that is not a plain file or has no `exec` line.
+- **Journal:** lamp-tasks says `tasks: Harness's launcher pinned (…): <path>`,
+  `tasks: Harness's launcher already pinned: <path>`, `tasks: no Harness
+  launcher at <path>: left alone` or `tasks: Harness's launcher not pinned:
+  <why>`; lamp-update says the same without `tasks: `.
+- lamp-tasks still gives both variables to each Harness command.
+- **Limits:** a direct `node …/cli.js` call skips any launcher; a Team
+  account ignores the hold.
+
 **Health, no credential.** With the same switch, after each `harness start`
 that succeeded (after a sign-in, or at the part's own start), a thread of its own asks `GET /api/health`
 on `127.0.0.1` at `PORT` (18473 unless set, `config/env.ts:124`). It sends
