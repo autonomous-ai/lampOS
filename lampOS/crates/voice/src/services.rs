@@ -1210,10 +1210,8 @@ impl Linked {
                 if let Some(any) = told.as_ref().and_then(any_linked) {
                     linked.kept(any);
                 }
-                if let Some(names) = told.as_ref().and_then(names_in)
-                    && let Ok(mut kept) = linked.names.lock()
-                {
-                    *kept = names;
+                if let Ok(mut kept) = linked.names.lock() {
+                    *kept = names_after(told.as_ref(), &kept);
                 }
                 if let Ok(mut asked) = linked.asked.lock() {
                     asked.1 = false;
@@ -1275,6 +1273,12 @@ fn any_linked(told: &Value) -> Option<bool> {
             .iter()
             .any(|link| link.get("expired").and_then(Value::as_bool) != Some(true)),
     )
+}
+
+/// The names told after an ask (`LAMP_SERVICES_TOLD`): the answer's list,
+/// [`names_in`].
+fn names_after(told: Option<&Value>, kept: &[String]) -> Vec<String> {
+    told.and_then(names_in).unwrap_or_else(|| kept.to_vec())
 }
 
 /// From [`CONNECTED`]'s answer: each service linked by its name as
@@ -1354,6 +1358,20 @@ mod tests {
             Some(Vec::new())
         );
         assert_eq!(names_in(&json!({"ok": false, "error": "busy"})), None);
+    }
+
+    /// The Reviewer-lead's P3 on #5598: an error or no answer from
+    /// `lamp-services` tells no names, not the last ones, so a link just
+    /// removed is never told while it can't say.
+    #[test]
+    fn no_names_are_told_while_lamp_services_cannot_say() {
+        let kept = vec!["Notion".to_owned()];
+        let listed = json!({"ok": true, "result": {"connected": [
+            {"service": "figma", "name": "Figma", "account": "c", "expired": false},
+        ]}});
+        assert_eq!(names_after(Some(&listed), &kept), vec!["Figma".to_owned()]);
+        assert!(names_after(Some(&json!({"ok": false, "error": "busy"})), &kept).is_empty());
+        assert!(names_after(None, &kept).is_empty());
     }
 
     /// What is linked, by code, from `lamp-services`' own answer; none
