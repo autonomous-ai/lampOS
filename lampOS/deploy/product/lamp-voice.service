@@ -547,6 +547,10 @@ Environment=LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language
 # Never in the character: told only to the owner's own known face alone in view, and by default below
 # (LAMP_PERSON_NAME_OWNER_ONLY, #2602, the first builder's piece 2 on #1711; #4461).
 Environment=LAMP_PERSON_NAME_OWNER_ONLY=on
+# The private room (the owner's call, 6 Nov): the lamp is a private room between it and its owner, so whoever speaks
+# to it is the owner, and no ownership check runs, on the linked services, the typed name or reminders. Telling who is
+# speaking was not reliable enough, and the lamp refused its own owner. The checks stay in the code for a later feature.
+Environment=LAMP_PRIVATE_ROOM=on
 # A reply is told the person speaking is most likely the one who set the lamp up, unless someone else is
 # seen or heard now; the reply only, nothing personal kept on it (LAMP_PERSON_NAME_BY_DEFAULT, #3884).
 Environment=LAMP_PERSON_NAME_BY_DEFAULT=on

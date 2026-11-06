@@ -806,6 +806,15 @@ pub fn brief(told: &mut Value) {
 
 /// The owner's memory id when `lease` is theirs ([`Turn::owner`]).
 fn owner_of(lease: Option<&crate::memory_scope::ScopeLease>) -> Option<String> {
+    // The private room (`person::private_room`): whoever speaks is the owner.
+    if crate::person::private_room() {
+        return Some(
+            crate::person::owner_ids()
+                .into_iter()
+                .next()
+                .unwrap_or_else(|| "the-owner".to_owned()),
+        );
+    }
     let person = lease?
         .scope()
         .filter(|scope| !scope.held())?
@@ -961,6 +970,7 @@ pub fn run(
     lease: Option<&crate::memory_scope::ScopeLease>,
 ) -> (Value, bool) {
     let now = Instant::now();
+    let private_room = crate::person::private_room();
     let owner = owner_of(lease);
     let (words, previous) = if heard && owner.is_some() {
         crate::thread::THREAD
@@ -986,10 +996,14 @@ pub fn run(
     // With the owner's enrolled print (`LAMP_SAME_VOICE_FOR=services`,
     // `crate::owner_voice`), the "send" line is held to it; without one, to
     // the line that prepared the write, as before.
-    let enrolled = owner
-        .as_deref()
-        .is_some_and(|owner| crate::owner_voice::enrolled(owner).is_some());
+    let enrolled = private_room
+        || owner
+            .as_deref()
+            .is_some_and(|owner| crate::owner_voice::enrolled(owner).is_some());
     let alike = match (&judge, prepared) {
+        // No voice is held to the owner's in the private room. The read-back
+        // and the plain "send" right after it stay: they catch a mishearing.
+        _ if private_room => Some(1.0),
         (Some(judge), Some(prepared)) if send_id && owner.is_some() && heard => {
             send_likeness(judge, prepared, request, enrolled)
         }
@@ -1005,16 +1019,20 @@ pub fn run(
             )
         );
     }
-    let (seen_owner, other_seen) = owner
-        .as_deref()
-        .filter(|_| heard)
-        .map_or((false, false), |owner| seen_saying_owner(request, owner));
+    let (seen_owner, other_seen) = if private_room {
+        (heard, false)
+    } else {
+        owner
+            .as_deref()
+            .filter(|_| heard)
+            .map_or((false, false), |owner| seen_saying_owner(request, owner))
+    };
     let turn = Turn {
         heard,
         words: words.as_deref(),
         previous,
         owner: owner.as_deref(),
-        sends: judge.is_some(),
+        sends: private_room || judge.is_some(),
         alike,
         seen_owner,
         other_seen,
@@ -1077,7 +1095,7 @@ pub fn run(
                     },
                 )
             });
-            if !read_in_full(alone, likeness, seen_owner) {
+            if !private_room && !read_in_full(alone, likeness, seen_owner) {
                 brief(&mut told);
             }
         }
@@ -2264,5 +2282,16 @@ mod tests {
         let nowhere = Linked::new(std::env::temp_dir().join("linked-none-at-all"));
         assert!(until(|| !nowhere.asked.lock().unwrap().1));
         assert!(!nowhere.now());
+    }
+
+    /// The private room (the owner's call, 6 Nov): no lease, no face and no
+    /// known person still make the line the owner's; with it off, not.
+    #[test]
+    fn the_private_room_makes_every_line_the_owners() {
+        crate::person::set_private_room_for_test(Some(false));
+        assert_eq!(owner_of(None), None);
+        crate::person::set_private_room_for_test(Some(true));
+        assert!(owner_of(None).is_some());
+        crate::person::set_private_room_for_test(None);
     }
 }

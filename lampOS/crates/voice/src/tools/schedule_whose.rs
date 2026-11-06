@@ -88,6 +88,11 @@ fn setter(lease: Option<&ScopeLease>) -> Option<String> {
 /// The caller the executive is told beside `name`'s call, for this line:
 /// `{"asker":{"person","owner"},"setter"}` (`lamp_actions::schedule::Caller`).
 pub fn caller(lease: Option<&ScopeLease>, name: &str) -> Value {
+    // The private room (`person::private_room`): this line sees every item,
+    // as the app's calls do, and what it sets is everyone's.
+    if crate::person::private_room() {
+        return json!({"everyone":true});
+    }
     caller_among(lease, name, &crate::person::owner_ids(), one_face_on())
 }
 
@@ -401,5 +406,13 @@ mod tests {
             Duration::from_millis(50),
         );
         assert_eq!(failed.0["reminders"], json!(REMINDERS_KEPT));
+    }
+
+    /// The private room: the line sees every reminder, whoever set it.
+    #[test]
+    fn the_private_room_asks_for_everyone() {
+        crate::person::set_private_room_for_test(Some(true));
+        assert_eq!(caller(None, "list_reminders"), json!({"everyone": true}));
+        crate::person::set_private_room_for_test(None);
     }
 }
