@@ -157,6 +157,14 @@ pub fn held_keep_told() -> serde_json::Value {
 /// [`held_keep_told`]'s words.
 pub const HELD_KEEP_ASKS: &str = "Not kept yet: you could not see who said it. Do not say it is kept or noted. Ask them once, in a few words, whether you should keep it for them (for example \"Want me to keep that for you?\"), and then stop. Their yes, said where you can see them, keeps it; do not call remember again for it.";
 
+/// What the model is told when the person's answer to its offer to keep a
+/// held keep was neither a yes nor a no (`known_faces::unclear_answer_to_keep`,
+/// lamp-06c1, 5 Nov, S14: "Yes, please keep that." heard as "Yes. Please
+/// keep off."): nothing is kept yet, and it asks once more, in a few words.
+/// Asked once; a second unclear answer drops it
+/// (`second_provider::take_held_forget`).
+pub const KEEP_ASKED_AGAIN: &str = "(For you to know: their answer to your offer to keep it was not clear, so nothing is kept yet. Ask them once more, in a few words, \"Should I keep that?\", and then stop. Their yes keeps it; do not call remember for it now, and do not say it is kept.)";
+
 /// What the model is told when a carried line's `remember` cannot be held
 /// for a yes: one waits already, or the eyes don't read who speaks.
 /// Nothing is kept.

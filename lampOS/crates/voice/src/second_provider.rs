@@ -10683,6 +10683,10 @@ struct HeldForget {
     /// heard words, which its person's seen yes keeps
     /// ([`HeldKeepYes`]). `None` for every other held call.
     line: Option<String>,
+    /// A held keep whose answer was neither a yes nor a no
+    /// (`known_faces::unclear_answer_to_keep`), asked about once more: the
+    /// next unclear answer drops it ([`take_held_forget`]).
+    asked_again: bool,
 }
 
 /// A person's spoken turn, for the turn after it: the forgets its own
@@ -10962,15 +10966,25 @@ enum Taken {
     /// person's face say it (`LAMP_EYES_SPEAKING=on`, #2377): dropped, and
     /// the model is told the yes did not count.
     Unseen(String),
+    /// A held keep's answer that was neither a yes nor a no
+    /// (`known_faces::unclear_answer_to_keep`): held on for this turn, which
+    /// the model is told to ask once more ([`crate::remember::KEEP_ASKED_AGAIN`]).
+    AskAgain,
 }
 
 /// The held forget request `request` runs, if any. Every turn takes the
 /// hold: it runs only on a later spoken turn that is a plain yes and
-/// nothing else (`known_faces::plain_agreement`), from the same session's
-/// person, within `remember::HELD_FORGET_FOR`; where the eyes read speaking
-/// ([`Engine::confirming_forgets_by_sight`]), only with that person's face
-/// seen saying it and no other face (`speaking_faces::seen_saying`). Any
-/// other turn drops it, running nothing. The journal never has the words.
+/// nothing else (`known_faces::plain_agreement`; a held keep's yes may
+/// also say the keep, `known_faces::plain_agreement_to_keep`), from the
+/// same session's person, within `remember::HELD_FORGET_FOR`; where the
+/// eyes read speaking ([`Engine::confirming_forgets_by_sight`]), only with
+/// that person's face seen saying it and no other face
+/// (`speaking_faces::seen_saying`). A held keep's answer from that person
+/// in time that is neither a yes nor a no
+/// (`known_faces::unclear_answer_to_keep`, lamp-06c1, 5 Nov, S14: a yes
+/// misheard) is held on for this turn, once, and the model asks again
+/// ([`Taken::AskAgain`]); it runs nothing. Any other turn drops it,
+/// running nothing. The journal never has the words.
 #[allow(clippy::too_many_arguments)]
 fn take_held_forget(
     shared: &Shared,
@@ -11035,6 +11049,28 @@ fn take_held_forget(
         || (held.call.name == crate::remember::REMEMBER
             && crate::known_faces::plain_agreement_to_keep(said)))
     {
+        if held.call.name == crate::remember::REMEMBER
+            && !held.asked_again
+            && asker == Some(&held.asker)
+            && now.saturating_duration_since(held.at) <= crate::remember::HELD_FORGET_FOR
+            && crate::known_faces::unclear_answer_to_keep(said)
+        {
+            eprintln!(
+                "lamp-voice second: request {request}: held a keep (held in request {}) on: its answer was neither a yes nor a no; the lamp asks once more",
+                held.request
+            );
+            // This turn's answer must ask about it again
+            // ([`settle_held_forget`]), and the next answer is judged as
+            // this one was, from now.
+            hold.held = Some(HeldForget {
+                request,
+                at: now,
+                asked: false,
+                asked_again: true,
+                ..held
+            });
+            return Taken::AskAgain;
+        }
         Some("not a plain yes")
     } else if asker != Some(&held.asker) {
         Some("not the same person")
@@ -11397,6 +11433,7 @@ fn hold_forget(
         spelling: false,
         carried: false,
         line: None,
+        asked_again: false,
     });
     Holding::Held
 }
@@ -11940,6 +11977,7 @@ async fn answer(
         }
         Taken::Runs(call, line) => (Some((call, line)), None),
         Taken::Unseen(name) => (None, Some(crate::remember::unseen_yes_told(&name))),
+        Taken::AskAgain => (None, Some(crate::remember::KEEP_ASKED_AGAIN.to_owned())),
     };
     let (mut held_save_runs, held_save_dropped) =
         match take_held_save(shared, request, heard, scope.as_ref(), (shared.clock)()) {
