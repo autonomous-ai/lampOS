@@ -1123,6 +1123,8 @@ fn held_keeps_a_question_asking_the_lamps_view() {
         "Maybe. What would you do?",
         "How about you?",
         "What's your take?",
+        "Ooh, that sounds nice. How long does it take?",
+        "Is that enough?",
     ] {
         let lines = [LONDON, line(6_800, 2_400, asked, "Okay.")];
         assert_eq!(run(true, &lines), [true, true], "held: {asked}");
