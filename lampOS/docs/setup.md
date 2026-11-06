@@ -1167,10 +1167,11 @@ readlink /etc/localtime
 | `/etc/lampOS/voice/own` (the person's own keys, #2094) | absent; with `LAMP_OWN_KEYS=on` (off in the product), a 700 root folder with each key that worked when checked, 600 | wiped |
 | `/etc/systemd/system/lamp-control.service.d/developer.conf` (the owner's developer setting, `control.set`, docs/control.md) | absent; 644 root while developer access is on in the app | wiped |
 | `/etc/wpa_supplicant/wpa_supplicant-wlan0.conf` | 600 root | wiped |
+| `/var/lib/alsa/asound.state` (the speaker's level, #5551) | the softvol "Speaker" `lamp-actions` changes set to 70 of 100 (about 9 dB under the 100 it is made at) just before the marker, then `alsactl store`; best effort, a failure is a journal line and the lamp starts where the level was. A recovery run sets nothing, so a level the person chose is kept. The C-Media hardware level (`lamp-cmedia-speaker`, the factory's 75 %) is not touched | kept until the next setup, which sets 70 again before the lamp's first line |
 
 Setup saves them in this order: the name, the zone, the language, the backend's link, the
-answer on reports, the key, the person's own keys, then the marker. So a marker means all the others were written, but
-the backend's link, the answer on reports and the own keys: those are best effort, and a marker with no
+answer on reports, the key, the person's own keys, the speaker's first level, then the marker. So a marker means all the others were written, but
+the backend's link, the answer on reports, the own keys and the speaker's level: those are best effort, and a marker with no
 `backend.json` is what a failed write leaves (its journal line is below). The
 reset plan (`reset-plan-product.json`) also wipes the person's stores
 (memory, faces, a labelled session's face reads (`seems.log`) and the glance log (`glance.log`), tasks and Harness's sign-in, schedule, the Policy's and

@@ -399,6 +399,9 @@ impl<S: Save> Save for ReleasingSave<'_, S> {
     fn keeps_settings(&self) -> bool {
         self.save.keeps_settings()
     }
+    fn first_volume(&mut self) -> io::Result<()> {
+        self.save.first_volume()
+    }
     fn marker(&mut self) -> io::Result<()> {
         if let Some(light) = self.light {
             light.release();

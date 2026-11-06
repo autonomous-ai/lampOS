@@ -1811,3 +1811,89 @@ fn setup_md_has_a_row_for_every_file_setup_writes() {
         "docs/setup.md's \"What setup writes\" has no row for {rowless:?}"
     );
 }
+
+/// #5551: a first setup, or the first after the product reset, sets the
+/// speaker's first level just before the marker, through the light's
+/// wrapper too; one that can't be set never fails setup. A set-up lamp's
+/// recovery run keeps the level the person chose: nothing is set.
+#[test]
+fn a_new_lamp_starts_at_70_and_a_set_up_lamp_keeps_its_level() {
+    struct Speaker {
+        saved: Saved,
+        broken: bool,
+    }
+    impl Save for Speaker {
+        fn credential(&mut self, key: &str) -> io::Result<()> {
+            self.saved.credential(key)
+        }
+        fn name(&mut self, name: &str) -> io::Result<()> {
+            self.saved.name(name)
+        }
+        fn timezone(&mut self, zone: &str) -> io::Result<()> {
+            self.saved.timezone(zone)
+        }
+        fn backend(&mut self, link: &Backend) -> io::Result<()> {
+            self.saved.backend(link)
+        }
+        fn first_volume(&mut self) -> io::Result<()> {
+            if self.broken {
+                return Err(io::Error::other("no such control"));
+            }
+            self.saved.record("first_volume", "")
+        }
+        fn marker(&mut self) -> io::Result<()> {
+            self.saved.marker()
+        }
+    }
+    assert_eq!(
+        lamp_setup::serve::FIRST_VOLUME[0],
+        [
+            "/usr/bin/amixer",
+            "-q",
+            "-c",
+            "allwinnerhdmi",
+            "sset",
+            "Speaker",
+            "70%"
+        ]
+    );
+    for broken in [false, true] {
+        let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
+        let mut releasing = lamp_setup::light::ReleasingSave {
+            save: Speaker {
+                saved: Saved::default(),
+                broken,
+            },
+            light: None,
+        };
+        run(
+            &status,
+            &accepted(),
+            "VN",
+            &mut Lamp::new(true),
+            &mut releasing,
+            || Some("192.168.1.23".into()),
+        );
+        assert_eq!(status.lock().unwrap().phase, Phase::Connected, "{broken}");
+        let calls = &releasing.save.saved.calls;
+        let tail: &[&str] = if broken {
+            &["credential=AIza-key_1", "marker="]
+        } else {
+            &["credential=AIza-key_1", "first_volume=", "marker="]
+        };
+        assert!(calls.iter().rev().take(tail.len()).rev().eq(tail), "{calls:?}");
+    }
+    let mut kept = Speaker {
+        saved: Saved::default(),
+        broken: false,
+    };
+    run(
+        &Arc::new(Mutex::new(Status::new("lamp-4ace".into()))),
+        &accepted(),
+        "VN",
+        &mut Lamp::new(true),
+        &mut lamp_setup::serve::NetworkOnly(&mut kept),
+        || Some("192.168.1.23".into()),
+    );
+    assert!(kept.saved.calls.is_empty(), "{:?}", kept.saved.calls);
+}

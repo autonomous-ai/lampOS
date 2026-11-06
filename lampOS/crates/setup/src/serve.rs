@@ -682,6 +682,13 @@ pub trait Save {
     fn reports(&mut self, _share: bool) -> io::Result<()> {
         Ok(())
     }
+    /// The speaker's first level (#5551), set just before the marker: only a
+    /// first setup or one after the product reset comes here, so no level the
+    /// person chose is ever there to override. Nothing by default: only
+    /// [`Files`] sets it.
+    fn first_volume(&mut self) -> io::Result<()> {
+        Ok(())
+    }
     fn marker(&mut self) -> io::Result<()>;
     /// Whether a person's own keys are taken (#2094, `LAMP_OWN_KEYS=on`).
     /// Off by default: nothing is checked, kept or said.
@@ -872,6 +879,24 @@ pub fn rfc3339(at: SystemTime) -> String {
     at
 }
 
+/// What [`Files::first_volume`] runs (#5551): the softvol "Speaker" that
+/// `lamp-actions` changes (`/etc/asound.conf`, -30..0 dB over 0-100) to 70,
+/// about 9 dB under its 100 at creation, then the cards' state stored so a
+/// power cut before a clean shutdown comes back to it. The C-Media hardware
+/// level (`lamp-cmedia-speaker`, the factory's drop-in) is not touched.
+pub const FIRST_VOLUME: [&[&str]; 2] = [
+    &[
+        "/usr/bin/amixer",
+        "-q",
+        "-c",
+        "allwinnerhdmi",
+        "sset",
+        "Speaker",
+        "70%",
+    ],
+    &["/usr/sbin/alsactl", "store"],
+];
+
 /// The files named in the configuration.
 pub struct Files<'a>(pub &'a Config);
 
@@ -968,6 +993,18 @@ impl Save for Files<'_> {
         // 0644: `lamp-cloud` runs as `lampos` and reads it where it is.
         let temporary = stage(&self.0.reports, &bytes, 0o644)?;
         put_in_place(&temporary, &self.0.reports)
+    }
+    fn first_volume(&mut self) -> io::Result<()> {
+        for argv in FIRST_VOLUME {
+            let status = std::process::Command::new(argv[0])
+                .args(&argv[1..])
+                .stdin(std::process::Stdio::null())
+                .status()?;
+            if !status.success() {
+                return Err(io::Error::other(format!("{} {status}", argv[0])));
+            }
+        }
+        Ok(())
     }
     fn marker(&mut self) -> io::Result<()> {
         write_private(&self.0.marker, b"")
@@ -1149,6 +1186,15 @@ pub fn run(
                     };
                     eprintln!("lamp-setup: the person's {} key: {words}", service.name());
                     own_answers.insert(service.id(), json!({"code": code, "answer": words}));
+                }
+            })
+            .map(|()| {
+                // Best effort (#5551): a lamp whose level can't be set still
+                // works, at the softvol's 100.
+                if let Err(why) = save.first_volume() {
+                    eprintln!(
+                        "lamp-setup: the speaker's first level could not be set ({why}); it stays where it is"
+                    );
                 }
             })
             .and_then(|()| save.marker());
