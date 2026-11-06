@@ -22,6 +22,8 @@ use lamp_turn_owner::TurnOwner;
 use std::{collections::VecDeque, io};
 
 pub const TAIL_US: u64 = 100_000;
+/// Masked speech this far apart is two utterances in the journal.
+const MASKED_SPEECH_GAP_US: u64 = 300_000;
 /// How long a block's read is kept for a retained prefix's decision: one
 /// decided later is refused (`RetainedHistoryLoss::Expired`).
 pub(crate) const HISTORY_US: u64 = 600_000;
@@ -420,6 +422,8 @@ pub(crate) struct PlaybackMask {
     last_dispatch: u64,
     last_now: u64,
     suppressed_blocks: u64,
+    /// When speech was last masked ([`Self::masked_speech`]).
+    last_masked_speech_us: std::cell::Cell<Option<u64>>,
     /// Listening gaps (#828, [`crate::listen_gaps`]): with the duplex mask
     /// only, off unless set.
     listen_gaps: Option<crate::listen_gaps::ListenGaps>,
@@ -442,6 +446,7 @@ impl PlaybackMask {
             last_dispatch: 0,
             last_now: 0,
             suppressed_blocks: 0,
+            last_masked_speech_us: std::cell::Cell::new(None),
             listen_gaps: None,
             onset_fade: None,
         }
@@ -1062,12 +1067,21 @@ impl PlaybackMask {
         self.hearing()
             .is_some_and(|duplex| duplex.heard.iter().any(|(heard, _)| *heard == sequence))
     }
-    pub fn suppressed(&mut self) -> io::Result<()> {
+    /// Counts a masked block. True for the first speech block of a masked
+    /// utterance, as [`Self::masked_speech`].
+    pub fn suppressed(&mut self, speech: bool, read_us: u64) -> io::Result<bool> {
         self.suppressed_blocks = self
             .suppressed_blocks
             .checked_add(1)
             .ok_or_else(|| invalid("suppression counter overflow"))?;
-        Ok(())
+        Ok(speech && self.masked_speech(read_us))
+    }
+    /// Speech read at `read_us` was masked. True when it begins a masked
+    /// utterance: more than [`MASKED_SPEECH_GAP_US`] after the last, so the
+    /// journal tells each once (#5536: a drop was in the trace only).
+    pub fn masked_speech(&self, read_us: u64) -> bool {
+        let last = self.last_masked_speech_us.replace(Some(read_us));
+        last.is_none_or(|last| read_us.saturating_sub(last) > MASKED_SPEECH_GAP_US)
     }
     pub fn suppressed_blocks(&self) -> u64 {
         self.suppressed_blocks
@@ -1546,6 +1560,17 @@ mod tests {
     use crate::stop_words::Listen;
     /// A tie is not the lamp's own voice, and `Clear` is a person
     /// (the Reviewer-lead's minor on #2779).
+    /// #5536: masked speech is told once per utterance, not per block.
+    #[test]
+    fn masked_speech_is_told_once_per_utterance() {
+        let mut mask = PlaybackMask::new(TurnTaking::V1Baseline);
+        assert!(!mask.suppressed(false, 10_000).unwrap(), "no speech");
+        assert!(mask.suppressed(true, 20_000).unwrap(), "its first block");
+        assert!(!mask.suppressed(true, 30_000).unwrap());
+        assert!(!mask.masked_speech(320_000), "within 300 ms of the last");
+        assert!(mask.masked_speech(700_000), "another utterance");
+        assert_eq!(mask.suppressed_blocks(), 3);
+    }
     #[test]
     fn a_yield_window_tie_or_a_clear_block_is_not_the_lamps_own_voice() {
         let mut window = YieldEvidence::default();
