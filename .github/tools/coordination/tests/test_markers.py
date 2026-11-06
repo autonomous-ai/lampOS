@@ -384,6 +384,13 @@ class BodyAsks(unittest.TestCase):
         # "ONE READ" in prose is no opt-out.
         self.assertEqual(self.ask("Needs TWO READS, not ONE READ."), "short 1")
 
+    def test_a_read_ok_line_is_no_opt_out(self):
+        # The Reviewer-lead's P2 on #5636: "- ONE READ-OK covers the docs half" opted a privacy PR out.
+        for body in ("Privacy: TWO READS.\n- ONE READ-OK covers the docs half",
+                     "Privacy needs TWO READS.\nONE READ-OK is in already."):
+            self.assertEqual(self.ask(body), "short 1", body)
+        self.assertEqual(self.ask("Privacy needs TWO READS.\nONE READ - tests only."), "none")
+
     def test_no_mention_asks_nothing(self):
         for body in ("Nothing about reads.", "two reads, lowercase", "ONE READ: tests only."):
             self.assertEqual(self.ask(body), "none", body)
@@ -421,6 +428,12 @@ class ReadAskNamesTwoReads(unittest.TestCase):
         ask = c("writer-b", "READ ASK " + HEAD[:10] + " to the Reviewer-lead; the rule says TWO READS for privacy.\n"
                 "ONE READ: tests only.")
         self.assertEqual(self.reads(ask, c("writer-a", "READ-OK " + HEAD)), "none")
+
+    def test_a_read_ok_that_mentions_a_read_ask_asks_nothing(self):
+        # The Reviewer-lead's P3 on #5636: only a comment whose first line is a READ ASK asks.
+        self.assertEqual(self.reads(c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead: read at the READ ASK; one "
+                                                 "read here, not TWO READS.")), "none")
+        self.assertEqual(self.reads(c("writer-b", "Sixth, 10:00: the READ ASK above names TWO READS by mistake.")), "none")
 
     def test_a_non_writer_read_ask_is_ignored(self):
         self.assertEqual(self.reads(c("stranger", "READ ASK " + HEAD[:10] + "\n\nTWO READS"), c("writer-a", "READ-OK " + HEAD)),
