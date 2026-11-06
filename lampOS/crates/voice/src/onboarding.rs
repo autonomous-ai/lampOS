@@ -457,6 +457,16 @@ pub struct Progress {
     /// reads past it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub harness_line: Option<harness_line::Kept>,
+    /// When each yes another part reads ([`ROOM_SOUNDS`],
+    /// [`FACE_EXPRESSIONS`]) was last redone, in Unix seconds: a redo of the
+    /// step or of the whole walk (#5500). A yes the owner gave in the app
+    /// (`"by":"app"`, `lamp_msgs::consent`) is kept by the voice's starts and
+    /// writes, unlike one with no `done` behind it, but only while it is
+    /// newer than this and than a later "no" at the lamp, so a redo takes it
+    /// back as it takes back a spoken one. Kept through a redo of the whole
+    /// walk; a reset wipes it with the file. An older build reads past it.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub yes_redone_at_unix_s: BTreeMap<String, u64>,
 }
 
 impl Progress {
@@ -465,10 +475,26 @@ impl Progress {
     /// never said twice to the same owner, nor the line about Harness
     /// ([`Self::harness_line`]).
     fn redone(&self) -> Self {
-        Self {
+        let mut redone = Self {
             tries_said: self.tries_said,
             harness_line: self.harness_line,
             ..Self::default()
+        };
+        for step in [ROOM_SOUNDS, FACE_EXPRESSIONS] {
+            redone.yes_redone(step);
+        }
+        redone
+    }
+
+    /// `step`'s yes, if it is one another part reads, redone now: one the
+    /// owner gave in the app before this goes at the next write
+    /// ([`Self::yes_redone_at_unix_s`]).
+    fn yes_redone(&mut self, step: &str) {
+        if [ROOM_SOUNDS, FACE_EXPRESSIONS].contains(&step) {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_secs());
+            self.yes_redone_at_unix_s.insert(step.to_owned(), now);
         }
     }
 }
@@ -476,6 +502,10 @@ impl Progress {
 /// [`Progress::face_again_names`]' bound: a name whole and its first word,
 /// as [`told_ids`] gives them.
 const MOST_TOLD_IDS: usize = 2;
+
+/// [`Progress::yes_redone_at_unix_s`]' bound: the two yeses, and room for a
+/// later build's.
+const MOST_YES_REDONE: usize = 8;
 
 fn is_zero(value: &u8) -> bool {
     *value == 0
@@ -609,6 +639,7 @@ impl Progress {
             return Err(invalid());
         }
         if self.face_again_names.len() > MOST_TOLD_IDS
+            || self.yes_redone_at_unix_s.len() > MOST_YES_REDONE
             || !self
                 .face_again_names
                 .iter()
@@ -3641,6 +3672,7 @@ impl Onboarding {
     fn redo_step(&mut self, step: Step, now_us: u64) {
         self.storage_failed = false;
         self.desired.steps.remove(step.name());
+        self.desired.yes_redone(step.name());
         match step {
             Step::HowYouSound => {
                 self.forget_near();
@@ -7586,8 +7618,10 @@ mod tests {
         room.walk.first_tries = true;
         assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE_TRIES);
         assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE);
-        let redone = room.walk.desired.redone();
+        let mut redone = room.walk.desired.redone();
         assert!(redone.tries_said);
+        // The yeses' redo time aside (#5500, its own test below).
+        redone.yes_redone_at_unix_s.clear();
         assert_eq!(
             redone,
             Progress {
@@ -7867,6 +7901,48 @@ mod tests {
             !serde_json::to_string(room.walk.kept())
                 .unwrap()
                 .contains("harness")
+        );
+    }
+
+    /// #5500: a redo of the whole walk, and a redo of either yes step, say
+    /// when, so a yes the owner gave in the app before it is taken back at
+    /// the next write (`storage::app_yes_stands`); a redo of another step
+    /// leaves the time as it was. Kept across a save and a read; an older
+    /// file has none.
+    #[test]
+    fn a_redo_says_when_the_yeses_were_redone() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let redone = Progress::default().redone();
+        for step in [ROOM_SOUNDS, FACE_EXPRESSIONS] {
+            assert!(redone.yes_redone_at_unix_s[step] >= now, "{step}");
+        }
+        let mut room = Room::new("yes-redone");
+        room.walk.redo_step(Step::WhoYouAre, room.at);
+        assert!(room.walk.desired.yes_redone_at_unix_s.is_empty());
+        room.walk.redo_step(Step::FaceExpressions, room.at);
+        assert_eq!(
+            room.walk
+                .desired
+                .yes_redone_at_unix_s
+                .keys()
+                .collect::<Vec<_>>(),
+            [FACE_EXPRESSIONS]
+        );
+        let kept: Progress =
+            serde_json::from_str(&serde_json::to_string(&room.walk.desired).unwrap()).unwrap();
+        assert_eq!(
+            kept.yes_redone_at_unix_s,
+            room.walk.desired.yes_redone_at_unix_s
+        );
+        let old: Progress = serde_json::from_str(r#"{"steps":{}}"#).unwrap();
+        assert!(old.yes_redone_at_unix_s.is_empty());
+        assert!(
+            !serde_json::to_string(&Progress::default())
+                .unwrap()
+                .contains("yes_redone")
         );
     }
 
@@ -9216,7 +9292,7 @@ mod tests {
         let at = room.walk.kept().steps["room_sounds"].at_unix_s;
         assert_eq!(
             kept,
-            json!({"version":1,"room_sounds":"yes","at_unix_s":at})
+            json!({"version":1,"room_sounds":"yes","at_unix_s":at,"by":"voice"})
         );
         assert_eq!(
             std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
@@ -9350,7 +9426,8 @@ mod tests {
         // Exactly what lamp-eyes' `face_expressions_yes` reads as a yes.
         assert_eq!(
             std::fs::read(&path).unwrap(),
-            format!(r#"{{"at_unix_s":{at},"face_expressions":"yes","version":1}}"#).as_bytes()
+            format!(r#"{{"at_unix_s":{at},"by":"voice","face_expressions":"yes","version":1}}"#)
+                .as_bytes()
         );
         assert!(!room_sounds_file(&room).exists());
         report(&room.walk, "preferences", "done");
@@ -9438,7 +9515,8 @@ mod tests {
         let at = room.walk.kept().steps["face_expressions"].at_unix_s;
         assert_eq!(
             std::fs::read(face_expressions_file(&room)).unwrap(),
-            format!(r#"{{"at_unix_s":{at},"face_expressions":"yes","version":1}}"#).as_bytes()
+            format!(r#"{{"at_unix_s":{at},"by":"voice","face_expressions":"yes","version":1}}"#)
+                .as_bytes()
         );
         // The model's late report changes nothing.
         report(&room.walk, "face_expressions", "skipped");

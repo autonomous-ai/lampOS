@@ -130,6 +130,9 @@ pub struct Real {
     /// lamp-control's admin socket, for the developer door from the owner's
     /// app, with `--control-admin-socket` (#5299, `crate::control`).
     pub control: Option<crate::control::Door>,
+    /// The owner's face expressions and room sounds yeses from the app,
+    /// with `LAMP_APP_CONSENT=on` (#5500, `crate::consent`).
+    pub consent: Option<crate::consent::Place>,
 }
 
 /// `on` takes the app's `system.reboot` (#2193), with `LAMP_CLOUD=on`.
@@ -776,6 +779,10 @@ impl Lamp for Real {
         self.control.clone()
     }
 
+    fn consent(&self) -> Option<crate::consent::Place> {
+        self.consent.clone()
+    }
+
     fn update_status(&self) -> Option<lamp_bus::Message> {
         self.latest(lamp_msgs::UpdateStatus::TOPIC)
     }
@@ -996,6 +1003,7 @@ mod tests {
             share: None,
             services: None,
             control: None,
+            consent: None,
             upload: None,
             shutdown: None,
         };
@@ -1080,6 +1088,7 @@ mod tests {
             share: None,
             services: None,
             control: None,
+            consent: None,
             upload: None,
             shutdown: None,
         };
@@ -1173,6 +1182,7 @@ mod tests {
             share: None,
             services: None,
             control: None,
+            consent: None,
             upload: None,
             shutdown: None,
         };
@@ -1279,6 +1289,7 @@ mod tests {
             share: None,
             services: None,
             control: None,
+            consent: None,
             upload: None,
             shutdown: None,
         };

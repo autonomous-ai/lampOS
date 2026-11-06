@@ -115,7 +115,7 @@ lamp says so.
 |---|---|
 | `info` | the identity fields above |
 | `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime, zone and the owner's language (`host.language`, #4473: `en`, `vi`, `ja`, `zh` or `ko` from `/etc/lampOS/setup/language`, always said, `en` with no file or one it doesn't know, so the app tells English from a lamp too old to say). None of it asks the voice: it is answered while `lamp-voice` restarts after a new language, and `mic.get` too, from what the bus kept (`available: false` while the voice is down) |
-| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`, `skills.upload`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `system.reboot`, `system.shutdown`, `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198, `control.code`/`control.clients`/`control.revoke` with `--control-admin-socket` while lamp-control's admin socket is there), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
+| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`, `skills.upload`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `system.reboot`, `system.shutdown`, `consent.get`/`consent.set` with `LAMP_APP_CONSENT=on`, `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198, `control.code`/`control.clients`/`control.revoke` with `--control-admin-socket` while lamp-control's admin socket is there), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
 | `system.info`'s `account` | `signed_out` while this lamp's login is no longer accepted (`LAMP_SIGNED_OUT=on`, "Signed out" below). No field otherwise, read as before: an older lamp, the switch off, and a lamp signed in all say none |
 | `system.info`'s `reset` | whether the reset button's 5 s hold takes this lamp back into setup (#2937): `hold` when `/etc/lampOS/controls/controls-pins.json` names a `reset` line (a product lamp), `none` when not (a lamp moved from V1, whose pins never carry one: its way back is the hotspot, [setup.md](setup.md)). No field when the pins can't be read; the app reads a missing field as before, the hold. The app keeps the last one it heard, for a lamp it can't ask |
@@ -128,6 +128,7 @@ lamp says so.
 | `led.resting.preview` (`{"color": [r, g, b]}`) | asked on `light/request` at `conversation` priority (over a skill's glow, under the person's own light), on the host's boot clock, holding 10 s unless asked again, so an abandoned screen leaves nothing behind (V1's 10 s); a save gives it back first. A light asked for at the lamp ("make your light blue") ends it, and a drag that goes on stays given way until it pauses past its 10 s (the reviewer on #1464). Answered only when it fails, as V1, so a drag does not flood `fd_channel`. Refused where the ring takes no lights that lapse (`LAMP_LIGHT_REQUESTS`, on in the product) |
 | `chat.send` (`{"message", "session_id", "speak"}`) | with `LAMP_MESSAGES=on`: acked with `{"run_id", "session_id"}` and put on `chat/in`; the answer goes out after it as `chat.event`s, in V1's shapes ([messages.md](messages.md)). Refused at once when nothing on the lamp takes texts, and for a photo or a file, which aren't read yet. Without the switch, V1's "not on this lamp" |
 | `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued", "by", "held", "at"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`), how many reports wait, and how the newest choice was made: `by` is `voice` (only ever a stop), `app` or `setup` (`null` for a choice kept before these were), `held` is true for a voice's stop from a line whose answer was held, and `at` is when (as `since`), so the app's row can say "Stopped by voice at 3 pm" (#1880). A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
+| `consent.get` (`{}`), `consent.set` (`{"face_expressions": bool}` or `{"room_sounds": bool}`, exactly one) | with `LAMP_APP_CONSENT=on` (#5500, "The two yeses from the app" below): the owner's face expressions yes and, on a lamp with no privacy slide only (`lamp-cloud`'s own `LAMP_PRIVACY_CONTROLS=no-slide`), the room sounds yes, both off until a yes. `consent.get` reads the files and answers at once, `{"face_expressions": bool}` on a slide lamp, `{"face_expressions": bool, "room_sounds": bool}` on one with none. `consent.set` is handed to root's helper, which writes or removes the file and answers at once; `success` carries the same shape as `consent.get`, read after it. Refused at once, before the helper: no key, two keys, a key this lamp lacks (room sounds on a slide lamp: "room sounds is not on this lamp: it has a privacy slide"), a value not `true` or `false`. Listed in `can` only with the switch; without it, V1's "not on this lamp" |
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Without the switch, V1's "not on this lamp" |
 | `skills.install` (`{"url", "sha256", "name", "version"}`, all but `url` optional) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_STORE=on` and the separate Store public key ("Installing from the Skills Store" below): a Skills Store catalogue entry, passed to root's manage helper, which fetches the package over HTTPS and installs it only when it is signed with the Store's key (never a core skill or a core skill's name; `lamp-cloud` writes and fetches nothing); the reply is `skills.list`'s, read after it. Without the Store switch or a valid key, V1's "not on this lamp" |
 | `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder), on a lamp installed before #2429 only after `lamp-update install` once; the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
@@ -2128,6 +2129,42 @@ passes the key through to the lamp and never stores or logs it** (the
 backend's side, to be confirmed by them). The rest is in
 [own-keys.md](own-keys.md).
 
+## The two yeses from the app (#5500, `consent.get`, `consent.set`)
+
+The owner's face expressions yes (lamp-eyes reads how a near face seems)
+and, on a lamp with no privacy slide, the room sounds yes (lamp-ears notices
+music and laughter), until now given only by a spoken yes at onboarding
+([onboarding.md](onboarding.md), "The two yeses from the app"). Off unless
+`LAMP_APP_CONSENT=on` exactly, with `LAMP_CLOUD=on`; off in the product unit
+until its lamp check. Both yeses stay off by default.
+
+- **Which yeses.** Face expressions on every lamp. Room sounds only where
+  lamp-ears reads it, a lamp whose privacy route is `no-slide`: `lamp-cloud`
+  reads its own `LAMP_PRIVACY_CONTROLS` (no part tells it otherwise), so a
+  no-slide lamp sets `LAMP_PRIVACY_CONTROLS=no-slide` in `lamp-cloud`'s
+  drop-in beside Controls', Voice's and Ears'. Unset (every product lamp,
+  which has the slide) is a slide lamp: no `room_sounds` in either reply,
+  and a set of it refused.
+- **Reading** (`consent.get`): the files in `/var/lib/lampOS/consent`, which
+  `lampos` may read (0750 `root:lampos`, files 0640), with the readers' rule:
+  a JSON object whose key is exactly `"yes"`. Nothing is asked of any part.
+- **Setting** (`consent.set`): checked here, then one line,
+  `{"consent": {KEY: bool}}`, to root's helper `lamp-setup change` on its
+  socket, waited on at most 2 s (the broker's loop waits on it, as on
+  `system.reboot`); the helper checks it again, writes
+  `{"version":1,KEY:"yes","at_unix_s":N,"by":"app"}` whole (0640, the
+  folder's group) or removes the file, and answers before any restart. The
+  reply is what the files say after it. A helper not there is "the lamp's
+  settings are not running", with nothing claimed.
+- **Effect.** lamp-eyes reads its yes every 2 s, so face reads start or
+  stop within that, with no restart. lamp-ears reads the room sounds yes
+  only at its start: after a new yes the helper restarts it
+  (`try-restart lamp-ears.service`) once no update holds lamp-update's
+  lock; an off is followed within 2 s without one.
+- **What takes it back besides the app:** a redo of setup or of the step
+  and a later "no" at the lamp (the voice's next write), a forget of
+  everything and the factory reset, whoever gave it.
+
 ## A person's linked services (Queue #4710, `connector.*`, `services.list`)
 
 Off unless `LAMP_SERVICES=on` beside `LAMP_CLOUD=on`, with the account's base
@@ -2311,7 +2348,10 @@ template instance reduced to its fixed name in the note and report,
 unrelated or empty instances refused, and a local note granting no
 reporting consent; the drop-in's line; the lists against the product's
 units; `reports.get` and
-`reports.set` with and without the switch; and against the test broker, a
+`reports.set` with and without the switch; `consent.get` and `consent.set`
+(#5500) against a stand-in helper: off, on a slide lamp (no `room_sounds`,
+its set refused before the helper), on one with none, each refusal, and the
+helper not there; and against the test broker, a
 report on `fd/…/report` with `info`'s id leaving the queue on the ack, and
 sent again after a dropped connection. `tests/it/report_contract.rs` pins the
 fields by name and type, the topic, and `sent_at` kept on a send again.
