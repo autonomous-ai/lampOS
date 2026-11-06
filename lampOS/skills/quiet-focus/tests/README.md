@@ -17,7 +17,7 @@ on a lamp, with its owner's yes, replaces the written one.
 **Run** with `lamp-skills test lampOS/skills/quiet-focus` (or `cargo test
 -p lamp-skills`, which runs every skill's cases). That it speaks of no body
 or break, asks nothing of them, takes no picture, says nothing when the
-focus comes due and keeps out of the wellbeing group is
+focus comes due and is in the wellbeing group, with its shared `[stop]`, is
 `quiet_focus_says_nothing_of_a_body_or_a_break_and_takes_no_picture` in
 `crates/skills/tests/it/skills.rs`.
 
@@ -38,6 +38,7 @@ up within 10 minutes of it.
 | `once-a-sitting` | 10:00, the word at 50, ten minutes looking up, head down again from 60 to 110, looks up at 110 | Pass: the word only once (`cooldown` 180 minutes, inside the sitting's 3 hours) |
 | `twice-a-day-at-most` | 09:00, three sittings of 55 minutes, looking up at 50 in each, each 3 h 50 after the last | Pass: at 50 and 280, not at 510 (`most_a_day = 2`) |
 | `quiet-in-the-evening` | 19:30, head down from 3, looks up at 50: due at 20:18 | Pass: nothing (`[active]` 09:00 to 20:00) |
+| `off-when-asked` | 10:00, `wellbeing_nudges(how = "off")` at a minute, head down from 3, looks up at 50 | Pass: nothing (`[stop]`) |
 | `quiet-at-night` | 22:00, head down from 3, looks up at 50 | Pass: nothing (`[quiet]` 22:00 to 08:00; outside `[active]` too) |
 
 Red runs, each against these cases: with the word on `focused` instead of
