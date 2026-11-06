@@ -542,11 +542,16 @@ to and the time left. While a round runs (`now` is not `idle`),
 `started_at_unix_ms`, when the round began (its `checking`);
 `step_started_at_unix_ms`, when the phase `now` names began; and `target`
 (`{"sequence", "commit"}`), the build it goes to. `target` is said once the
-round has read the channel's build, checked it, found it newer than the
-lamp's and not one put back on it. It is absent before that, and in a round
-that ends without one (the channel's build is the one the lamp runs, or
-is refused, unreachable, not published, or needs a newer updater first). In `restoring` it is still the
-build that was tried. Times are the lamp's clock in Unix milliseconds. A
+round has read the channel's build, checked its signature and channel, and
+found it newer than the lamp's and not one put back on it. It is absent
+before that, and in a round that ends without reaching it: the channel's
+build is the one the lamp runs or older, unreachable, not published, refused
+on those first checks, or needs a newer updater first. Later checks in the
+same round (its units, models, settings and plan) can still refuse a build
+already said as `target`. While `now` is `checking` the app may briefly
+show it, and the round's end then clears it with `idle`. From `fetching` on,
+`target` is the build being installed. In `restoring` it is still the build
+that was tried. Times are the lamp's clock in Unix milliseconds. A
 round that ends goes back to `idle`, with no `round`; the next starts
 afresh. lamp-cloud passes `round` on as lamp-update said it, and leaves it
 out, without refusing the page, when it comes with `idle` or with a step
