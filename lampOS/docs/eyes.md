@@ -1092,11 +1092,14 @@ analysis on #3126). With the switch on:
 - **The camera closed lets them go at once**: the name and the known file
   go as it closes, held or not.
 
-`LAMP_FACE_KNOWN_HOLD=on` (off unless set, #4493) gives the same hold
+`LAMP_FACE_KNOWN_HOLD=on` (off unless set, #4493; on in the product unit
+since #5522) gives the same hold
 without the full-frame crop, for a lamp that keeps the shrunk picture's
 prints: on lamp-52e6 on 27 Oct each missed check removed the known file
 and the next match wrote it back, and the voice journaled its face cache
-cold each time (8 to 23 times a run).
+cold each time (8 to 23 times a run). On lamp-29e7 (#5522) it was 122
+times in a day and a half, and a line said while the file named nobody,
+with their face still in view, is the room's.
 
 **The followed id** (#4885), only with both `LAMP_FACE_KNOWN_HOLD=on` and
 `LAMP_FACE_REFOUND=on` (off unless set; `bus_out::follows_from_environment`).
