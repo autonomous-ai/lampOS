@@ -4,7 +4,7 @@ import json, os, shutil, subprocess, sys, tempfile, unittest
 sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
-from markers import read_markers, parse_marker, signer, merge_reviews, lifted_commits, held_note
+from markers import read_markers, parse_marker, signer, merge_reviews, lifted_commits, held_note, ignored_reads
 from reads2 import two_reads, body_names_unasked
 from qholds import standing
 
@@ -391,7 +391,7 @@ class BodyAsks(unittest.TestCase):
 
 
 class LiftedByCommit(unittest.TestCase):
-    """6 Nov (#5534): lifting words naming a full commit, and an unsigned READ-OK lifting the same account's signed HOLD."""
+    """6 Nov (#5534): lifting words naming a full commit; an unsigned READ-OK never lifts a signed HOLD (#5542)."""
     OLD = "1d3d9711f8ce871e21483fd840f57b3a5570d174"
 
     def test_the_lifting_words_name_a_full_commit(self):
@@ -407,11 +407,44 @@ class LiftedByCommit(unittest.TestCase):
               c("writer-a", "READ-OK " + HEAD + "  My HOLD on " + self.OLD + " is lifted. - **The rebase:** clean.")]
         self.assertEqual(read_markers(cs, W), "READ-OK " + HEAD)
 
-    def test_a_signed_hold_is_lifted_by_the_same_accounts_unsigned_read_ok_on_its_commit(self):
-        # #5235: "Reviewer-lead: HOLD …" keyed writer-a/reviewer-lead; the READ-OK keyed writer-a/ said so.
+    def test_an_unsigned_read_ok_never_lifts_a_signed_hold(self):
+        # The reviewer's P3 on #5542: on a shared account, reader X's signed HOLD stood alone on the commit, and reader
+        # Y's unsigned "my HOLD on <A> is lifted" cleared it. Now it stands (fail closed).
         cs = [c("writer-a", "HOLD " + self.OLD + "\n\nReviewer-lead, 10:00: one P2."),
               c("writer-a", "READ-OK " + HEAD + "\n\nMy HOLD on `" + self.OLD + "` is lifted: the P2 is fixed.")]
+        self.assertEqual(read_markers(cs, W), "HELD")
+        self.assertEqual(held_note(cs, W), HEAD + " writer-a/reviewer-lead=" + self.OLD[:10])
+
+    def test_a_signed_hold_is_lifted_by_its_own_signer(self):
+        cs = [c("writer-a", "HOLD " + self.OLD + "\n\nReviewer-lead, 10:00: one P2."),
+              c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 11:00: my HOLD on `" + self.OLD + "` is lifted.")]
         self.assertEqual(read_markers(cs, W), "READ-OK " + HEAD)
+        # Another signer on the same account lifts nothing.
+        cs[1] = c("writer-a", "READ-OK " + HEAD + "\n\nSixth, 11:00: my HOLD on `" + self.OLD + "` is lifted.")
+        self.assertEqual(read_markers(cs, W), "HELD")
+
+    def test_negated_lifting_words_lift_nothing(self):
+        # The reviewer's P3 on #5542.
+        for words in ("my HOLD on " + self.OLD + " is not lifted.", "My HOLD on " + self.OLD + " isn't lifted.",
+                      "my HOLD on " + self.OLD + " is not yet cleared.", "I won't lift my HOLD on " + self.OLD + ".",
+                      "Not lifting my HOLD on " + self.OLD + " yet.", "I never lift my HOLD on " + self.OLD + " on words."):
+            self.assertIsNone(lifted_commits(words), words)
+            cs = [c("writer-a", "HOLD " + self.OLD + "  Read at the author's ask."), c("writer-a", "READ-OK " + HEAD + "  " + words)]
+            self.assertEqual(read_markers(cs, W), "HELD", words)
+        for words in ("my HOLD on " + self.OLD + " is lifted.", "I lift my HOLD on " + self.OLD + "."):
+            self.assertEqual(lifted_commits(words), [self.OLD], words)
+            cs = [c("writer-a", "HOLD " + self.OLD + "  Read at the author's ask."), c("writer-a", "READ-OK " + HEAD + "  " + words)]
+            self.assertEqual(read_markers(cs, W), "READ-OK " + HEAD, words)
+        # A "not" in an earlier sentence doesn't negate the lift.
+        self.assertEqual(lifted_commits("Not a P1. My HOLD on " + self.OLD + " is lifted."), [self.OLD])
+
+    def test_a_hold_carried_over_a_rebase_and_lifted_on_the_new_commit_leaves_the_old_one_standing(self):
+        # Intended (fail closed): the lift names only B, so the HOLD on A stands, and --held (held_note) names it.
+        cs = [c("writer-a", "HOLD " + self.OLD + "  Read at the author's ask."),
+              c("writer-a", "HOLD " + OTHER + "  Carried over the rebase."),
+              c("writer-a", "READ-OK " + HEAD + "  My HOLD on " + OTHER + " is lifted.")]
+        self.assertEqual(read_markers(cs, W), "HELD")
+        self.assertEqual(held_note(cs, W), HEAD + " writer-a/unsigned#0=" + self.OLD[:10])
 
     def test_a_read_ok_that_doesnt_say_lifted_clears_nothing(self):
         cs = [c("writer-a", "HOLD " + self.OLD + "\n\nReviewer-lead, 10:00: one P2."), c("writer-a", "READ-OK " + HEAD + "\n\nThe P2 is fixed.")]
@@ -458,6 +491,24 @@ class LiftedByCommit(unittest.TestCase):
             run = subprocess.run([sys.executable, "-I", os.path.join(HERE, "markers.py"), "--writers", wf, "--held"],
                                  input="".join(json.dumps(x) + "\n" for x in cs), capture_output=True, text=True)
             self.assertEqual(run.stdout.strip(), HEAD + " writer-a/reviewer-lead=" + self.OLD[:10])
+        finally:
+            os.unlink(wf)
+
+
+class IgnoredReads(unittest.TestCase):
+    """6 Nov (the PM's ask on #5542): a READ-OK from a login that isn't a writer is named, not skipped in silence."""
+
+    def test_a_non_writers_read_ok_is_named(self):
+        cs = [c("stranger", "READ-OK " + HEAD + "\n\nReviewer-lead, 10:00"), c("stranger", "READ-OK " + HEAD + "\n\nagain"),
+              c("writer-a", "READ-OK " + HEAD + "\n\nSixth, 10:30"), c("stranger", "HOLD " + HEAD), c("stranger", "> READ-OK " + HEAD)]
+        self.assertEqual(ignored_reads(cs, W), ["READ-OK " + HEAD[:7] + " by stranger ignored: not a writer"])
+        self.assertEqual(ignored_reads(cs[2:3], W), [])
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+            f.write("\n".join(sorted(W)) + "\n"); wf = f.name
+        try:
+            run = subprocess.run([sys.executable, "-I", os.path.join(HERE, "markers.py"), "--writers", wf, "--ignored"],
+                                 input="".join(json.dumps(x) + "\n" for x in cs), capture_output=True, text=True)
+            self.assertEqual(run.stdout.strip(), "READ-OK " + HEAD[:7] + " by stranger ignored: not a writer")
         finally:
             os.unlink(wf)
 

@@ -41,6 +41,9 @@ done
 LOG=$SP/train-bot.log; cd $R || exit 1
 say() { echo "$(date +%T) $*" | tee -a $LOG; }
 told=$SP/train-bot.told; touch $told
+# tell KEY: remember KEY in the told list. 6 Nov (the reviewer's P3 on #5542): it was append-only, a line per PR per
+# head; it keeps its last 5000 lines, kept long so a `stacked` or `conflict` key is not dropped and its PR comment posted twice.
+tell() { print -r -- "$1" >> $told; tail -n 5000 $told > $told.new && mv $told.new $told; }
 # 3 Nov 15:4x: the fetches and the writers list are lib.sh's, shared with still-eligible.sh.
 source $TOOLS_DIR/lib.sh
 # once KEY MSG: say MSG the first time KEY fails, not every round; fine KEY forgets it, so a later failure is said again.
@@ -77,7 +80,7 @@ eligible() {
       once qholds$p "#$p left out: qholds.py failed"; continue
     fi
     if [[ -n $held ]]; then
-      grep -qx "$p qhold $head" $told || { say "#$p left out: a HOLD on the Queue ($held) names head ${head:0:9}" >&2; echo "$p qhold $head" >> $told; }
+      grep -qx "$p qhold $head" $told || { say "#$p left out: a HOLD on the Queue ($held) names head ${head:0:9}" >&2; tell "$p qhold $head"; }
       continue
     fi
     # markers.py reads the markers: a HOLD is keyed on the account plus the reader's signed name and stands until that
@@ -85,13 +88,17 @@ eligible() {
     # unsigned HOLD only on that account's READ-OK saying the HOLD is lifted); the PR is eligible on its newest READ-OK
     # when no HOLD stands.
     ok=$($PYTHON -I $TOOLS_DIR/markers.py --writers $wf $p < $cf)
+    # 6 Nov (the PM's ask on #5542): a READ-OK from a login that isn't a writer is skipped; say it once per head.
+    $PYTHON -I $TOOLS_DIR/markers.py --writers $wf --ignored < $cf | while IFS= read -r ign; do
+      grep -qx -- "$p ignored $head $ign" $told || { say "#$p: $ign (head ${head:0:9})" >&2; tell "$p ignored $head $ign"; }
+    done
     # 6 Nov (#5534): a held PR with a READ-OK on its head is said once per head, with the HOLDs that stand (their keys,
     # for holds-lifted.tsv), so a HOLD its reader thinks lifted shows. #5476 sat out trains 672 to 677 with both reads
     # and no line in the log.
     if [[ $ok == HELD ]]; then
       note=$($PYTHON -I $TOOLS_DIR/markers.py --writers $wf --held $p < $cf)
       if [[ -n $note && $head == ${note%% *}* ]] && ! grep -qx "$p held $head" $told; then
-        say "#$p left out: held, though a READ-OK is on head ${head:0:9}; standing: ${note#* }" >&2; echo "$p held $head" >> $told
+        say "#$p left out: held, though a READ-OK is on head ${head:0:9}; standing: ${note#* }" >&2; tell "$p held $head"
       fi
       continue
     fi
@@ -102,7 +109,7 @@ eligible() {
       git cat-file -e "$sha^{commit}" 2>/dev/null || git fetch -q origin $sha 2>/dev/null
       if ! [[ "$(patch_of refs/remotes/pr/$p)" == "$(patch_of $sha)" && -n "$(patch_of $sha)" ]]; then
         # 31 Oct 04:0x: said once per head, as the red-run and two-reads notes are, so a stalled PR shows.
-        grep -qx "$p patch $head" $told || { say "#$p left out: its READ-OK is for ${sha:0:9}, and head ${head:0:9} is another patch" >&2; echo "$p patch $head" >> $told; }
+        grep -qx "$p patch $head" $told || { say "#$p left out: its READ-OK is for ${sha:0:9}, and head ${head:0:9} is another patch" >&2; tell "$p patch $head"; }
         continue
       fi
     fi
@@ -115,7 +122,7 @@ eligible() {
     heads=(${(f)"$(coord_same_patch $head $cf)"})
     two=$(cat $bf $cf | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf $heads)
     if [[ $two == short* ]]; then
-      grep -qx "$p short $head" $told || { say "#$p left out: TWO READS asked, $two on ${head:0:9}" >&2; echo "$p short $head" >> $told; }
+      grep -qx "$p short $head" $told || { say "#$p left out: TWO READS asked, $two on ${head:0:9}" >&2; tell "$p short $head"; }
       continue
     fi
     [[ $two == none || $two == met* ]] || { once reads2$p "#$p left out: reads2.py said '${two}'"; continue; }
@@ -123,7 +130,7 @@ eligible() {
     # 4 Nov 23:4x (Thirteen's P3 on #5305): a body that names TWO READS without a line that asks is said once per head,
     # so an ask in words reads2.py doesn't take is seen before a train merges it on one read.
     if [[ $two == none && $($PYTHON -I $TOOLS_DIR/reads2.py --unasked < $bf) == unasked ]]; then
-      grep -qx "$p unasked $head" $told || { say "#$p: its body names TWO READS but no line asks it, so one READ-OK carries ${head:0:9}" >&2; echo "$p unasked $head" >> $told; }
+      grep -qx "$p unasked $head" $told || { say "#$p: its body names TWO READS but no line asks it, so one READ-OK carries ${head:0:9}" >&2; tell "$p unasked $head"; }
     fi
     # 30 Oct 15:0x (the Reviewer-lead's 14:58): a PR whose own ARM64 run on this head is red sits out. #4507's run was red
     # at 14:17 before trains 407 and 408 carried it; both failed in lamp-update, and the bot held #4524 and #4530 instead.
@@ -133,7 +140,7 @@ eligible() {
     fi
     fine run$p
     if [[ $own == failure ]]; then
-      grep -qx "$p red $head" $told || { say "#$p left out: its own ARM64 run on ${head:0:9} is red" >&2; echo "$p red $head" >> $told; }
+      grep -qx "$p red $head" $told || { say "#$p left out: its own ARM64 run on ${head:0:9} is red" >&2; tell "$p red $head"; }
       continue
     fi
     echo $p
@@ -158,7 +165,7 @@ unstacked() {
       git merge-base --is-ancestor $h origin/lamp-voice 2>/dev/null && continue
       if git merge-base --is-ancestor $h refs/remotes/pr/$p 2>/dev/null; then
         ok=0
-        grep -qx "$p stacked $q $h" $told || { say "#$p left out: it carries open #$q's head ${h:0:9}" >&2; [[ ${DRY:-0} == 1 ]] || gh pr comment $p -R $REPO --body "Train bot, $(date +%H:%M): #$p carries open #$q's commits (its head \`${h:0:9}\`), so a train would merge them with it. It is left out until #$q is on lamp-voice; then rebase onto lamp-voice and your READ-OK carries over if the patch is the same." >/dev/null; [[ ${DRY:-0} == 1 ]] || echo "$p stacked $q $h" >> $told; }
+        grep -qx "$p stacked $q $h" $told || { say "#$p left out: it carries open #$q's head ${h:0:9}" >&2; [[ ${DRY:-0} == 1 ]] || gh pr comment $p -R $REPO --body "Train bot, $(date +%H:%M): #$p carries open #$q's commits (its head \`${h:0:9}\`), so a train would merge them with it. It is left out until #$q is on lamp-voice; then rebase onto lamp-voice and your READ-OK carries over if the patch is the same." >/dev/null; [[ ${DRY:-0} == 1 ]] || tell "$p stacked $q $h"; }
         break
       fi
     done
@@ -232,7 +239,7 @@ build_train() {
       # 4 Nov 04:4x: once per PR head, so a rebased head that conflicts again is told (and logged) once more. #5043 was
       # told on 3 Nov; rebased, it conflicted again on switches.md and sat out train 584 with nothing said.
       ph=$(git rev-parse refs/remotes/pr/$p)
-      grep -q "^$p conflict .* $ph\$" $told || { say "#$p left out of train $tn: it conflicts with lamp-voice $LV" >&2; gh pr comment $p -R $REPO --body "Train bot, $(date +%H:%M): #$p conflicts with lamp-voice \`$LV\` and was left out of train $tn. Please rebase onto lamp-voice; your READ-OK carries over if the patch is the same." >/dev/null; echo "$p conflict $LV $ph" >> $told; }
+      grep -q "^$p conflict .* $ph\$" $told || { say "#$p left out of train $tn: it conflicts with lamp-voice $LV" >&2; gh pr comment $p -R $REPO --body "Train bot, $(date +%H:%M): #$p conflicts with lamp-voice \`$LV\` and was left out of train $tn. Please rebase onto lamp-voice; your READ-OK carries over if the patch is the same." >/dev/null; tell "$p conflict $LV $ph"; }
     fi
   done
   [[ ${#carried} -gt 0 ]] || { if [[ $lane == nc ]]; then m=$((m-1)); else n=$((n-1)); fi; return 1; }
