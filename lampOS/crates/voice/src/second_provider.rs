@@ -1529,6 +1529,9 @@ struct Shared {
     /// With `LAMP_OWNER_PLACE=on`: the note for words that need a place
     /// ([`Engine::noting_the_place`]).
     place: Option<StaffNote>,
+    /// With `LAMP_SERVICES_TOLD=on`: the note for the owner's line naming
+    /// what is linked in the app's Connectors ([`Engine::telling_what_is_linked`]).
+    linked: Option<Remembered>,
     /// What memory holds that may fit a spoken request's words
     /// ([`Engine::remembering`]).
     remembered: Option<Remembered>,
@@ -3894,6 +3897,7 @@ impl Engine {
                 cut_to_a_person: false,
                 staff: None,
                 place: None,
+                linked: None,
                 remembered: None,
                 dont_know: None,
                 event_turn: None,
@@ -5178,6 +5182,17 @@ impl Engine {
     pub fn noting_the_place(mut self, place: StaffNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.place = Some(place);
+        }
+        self
+    }
+
+    /// A spoken request is asked with what the owner linked in the app's
+    /// Connectors beside it, when the line is the owner's and something is
+    /// linked (`LAMP_SERVICES_TOLD=on`, `crate::services_told`, #5523).
+    /// Before any turn only.
+    pub fn telling_what_is_linked(mut self, linked: Remembered) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.linked = Some(linked);
         }
         self
     }
