@@ -4,9 +4,8 @@
 use super::*;
 use lamp_update::walk;
 
-/// A walk one step in, as its voice keeps it: still under way, its second
-/// and last step (#5499) to come.
-const ONE_STEP_IN: &str = r#"{"steps":{"where_you_sit":{"outcome":"done","at_unix_s":1761450000}},"privacy_invitation_tries":0,"privacy_discard_pending":false}"#;
+/// A 7071 walk two steps in, as its voice keeps it.
+const TWO_STEPS_IN: &str = r#"{"steps":{"where_you_sit":{"outcome":"done","at_unix_s":1761450000},"who_you_are":{"outcome":"done","at_unix_s":1761450010}},"privacy_invitation_tries":0,"privacy_discard_pending":false}"#;
 
 fn put(lamp: &Lamp, path: &str, text: &str) {
     let path = lamp.root.join(path.trim_start_matches('/'));
@@ -38,7 +37,7 @@ fn a_walk_under_way_holds_the_round_before_it_fetches_eight_times_at_most() {
     let mut lamp = Lamp::new();
     build_two(&mut lamp);
     set_up(&lamp);
-    put(&lamp, walk::PROGRESS, ONE_STEP_IN);
+    put(&lamp, walk::PROGRESS, TWO_STEPS_IN);
     // A dry round is never held: a climbed updater confirms itself by one
     // (crate::own), so a walk can't keep it unconfirmed until it's put back.
     lamp.config.apply = false;
@@ -68,13 +67,13 @@ fn a_walk_ended_held_once_goes_on_and_its_count_is_kept() {
     let mut lamp = Lamp::new();
     build_two(&mut lamp);
     set_up(&lamp);
-    put(&lamp, walk::PROGRESS, ONE_STEP_IN);
+    put(&lamp, walk::PROGRESS, TWO_STEPS_IN);
     assert_eq!(lamp.round(), held(1));
     // The walk ends before the next round: the switch goes ahead.
     put(&lamp, walk::PROGRESS, &walked());
     assert_eq!(lamp.round(), Outcome::Switched(2));
     // A redo begun later is held for the rounds left, not eight again.
-    put(&lamp, walk::PROGRESS, ONE_STEP_IN);
+    put(&lamp, walk::PROGRESS, TWO_STEPS_IN);
     lamp.publish(
         3,
         &[
@@ -93,7 +92,7 @@ fn no_walk_is_read_without_setup_done_or_a_readable_file() {
     // Setup not done (a lamp set up before its marker, or a bench rig).
     let mut bench = Lamp::new();
     build_two(&mut bench);
-    put(&bench, walk::PROGRESS, ONE_STEP_IN);
+    put(&bench, walk::PROGRESS, TWO_STEPS_IN);
     assert_eq!(bench.round(), Outcome::Switched(2));
     // No file on a lamp whose voice unit doesn't walk (onboarding off).
     let mut off = Lamp::new();
@@ -112,7 +111,7 @@ fn no_walk_is_read_without_setup_done_or_a_readable_file() {
     let mut unread = Lamp::new();
     build_two(&mut unread);
     set_up(&unread);
-    put(&unread, walk::PROGRESS, ONE_STEP_IN);
+    put(&unread, walk::PROGRESS, TWO_STEPS_IN);
     put(&unread, "/var/lib/lampos-update/walk-held", "many");
     assert_eq!(unread.round(), Outcome::Switched(2));
 }
@@ -127,7 +126,7 @@ fn a_walk_begun_while_the_round_fetched_holds_it_at_the_switch() {
     build_two(&mut lamp);
     set_up(&lamp);
     let progress = lamp.root.join(walk::PROGRESS.trim_start_matches('/'));
-    lamp.channel.on_fetch = Some((progress, ONE_STEP_IN.to_owned()));
+    lamp.channel.on_fetch = Some((progress, TWO_STEPS_IN.to_owned()));
     assert_eq!(lamp.round(), held(1));
     assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
     assert!(lamp.exists(&format!(
@@ -166,7 +165,7 @@ fn a_walk_not_written_yet_holds_when_the_voice_walks() {
     assert_eq!(lamp.round(), held(1));
     assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
     // The first step ends, and later the walk: the switch goes ahead.
-    put(&lamp, walk::PROGRESS, ONE_STEP_IN);
+    put(&lamp, walk::PROGRESS, TWO_STEPS_IN);
     assert_eq!(lamp.round(), held(2));
     put(&lamp, walk::PROGRESS, &walked());
     assert_eq!(lamp.round(), Outcome::Switched(2));
@@ -183,7 +182,7 @@ fn a_walk_not_written_yet_holds_when_the_voice_walks() {
     put(
         &elsewhere,
         "/var/lib/lampOS/voice/other/progress.json",
-        ONE_STEP_IN,
+        TWO_STEPS_IN,
     );
     assert_eq!(elsewhere.round(), held(1));
 }

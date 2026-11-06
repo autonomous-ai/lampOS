@@ -9,7 +9,7 @@
 //! switched (Tests' P2 on #4455).
 //!
 //! Under way: setup is done and the voice's onboarding file has no outcome
-//! for one of the walk's steps (where you sit, who you are: #5499), or has not been written yet
+//! for one of [`lamp_msgs::ONBOARDING_STEPS`], or has not been written yet
 //! while the installed voice unit walks (`LAMP_ONBOARDING=on`): the 7071
 //! image writes it only at the first step's end, so the walk's hello and
 //! its wait for the person to sit have none (Tests' and Third's P2 on
@@ -54,8 +54,7 @@ pub fn under_way(config: &Config) -> bool {
     let Some(steps) = file.get("steps").and_then(serde_json::Value::as_object) else {
         return false;
     };
-    // The walk's two steps (#5499); the others are out of its order.
-    ["where_you_sit", "who_you_are"]
+    lamp_msgs::ONBOARDING_STEPS
         .iter()
         .any(|step| !steps.contains_key(*step))
 }
