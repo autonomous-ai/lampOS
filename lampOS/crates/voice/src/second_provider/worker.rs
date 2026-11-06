@@ -2412,6 +2412,19 @@ pub fn serve(
             "lamp-voice second: a turn that is the known face's own person is told their name, as the Live route tells it (LAMP_SECOND_FACE_NAME)"
         );
     }
+    // The face name the only name a person is called, a name in the running
+    // summary told as one said in the conversation (#5484, lamp-29e7).
+    let face_name_only = crate::face_name_only::on_from(
+        std::env::var(crate::face_name_only::ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    );
+    crate::face_name_only::set(face_name_only);
+    if face_name_only {
+        eprintln!(
+            "lamp-voice second: the face name is the only name a known face is called, and a name in the running summary is told as one said in the conversation (LAMP_SECOND_FACE_NAME_ONLY)"
+        );
+    }
     // The typed name, told only to the owner's line, with
     // LAMP_PERSON_NAME_OWNER_ONLY=on (#2602): out of the character, and
     // judged each turn on its own person and the faces in view. Keyed on
@@ -2536,6 +2549,10 @@ pub fn serve(
             // taken out of the conversation's earlier lines too
             // (`person::without_name`).
             let mut withheld: Option<String> = None;
+            // The typed name this reply is told by default, for the face
+            // name's note (`LAMP_SECOND_FACE_NAME_ONLY`, Thirteen's P2 on
+            // #5516).
+            let mut typed_by_default: Option<String> = None;
             let named_by_default = by_default
                 .as_ref()
                 .and_then(|bus| {
@@ -2601,11 +2618,33 @@ pub fn serve(
                             eprintln!(
                                 "lamp-voice second: the owner is named by default to this reply (LAMP_PERSON_NAME_BY_DEFAULT)"
                             );
+                            typed_by_default = Some(name.to_owned());
                             format!("\n\n{}", crate::person::by_default(name))
                         }
                     }
                 })
                 .unwrap_or_default();
+            // Beside the character, where the instruction had it: told after
+            // the exchanges, the model used it for the owner a third as
+            // often (EN, the #2602 probe).
+            // The typed name follows this line's own lease only, never the
+            // person the session is counted for (the reviewer's P2 on #3050:
+            // the owner's sticky presence for 30 s after they go), and no
+            // lease is no name.
+            // Read again for each reply, as above (#4461). Judged once here,
+            // so the face name's note names it exactly when it is told.
+            let setup_name_now = setup_named.then(crate::person::now).flatten();
+            let typed_told = with_typed_name(
+                String::new(),
+                setup_name_now.as_deref(),
+                setup_bus.as_ref(),
+                line.as_ref().map(Option::as_deref),
+            );
+            let typed_named = if typed_told.is_empty() {
+                typed_by_default.as_deref()
+            } else {
+                setup_name_now.as_deref()
+            };
             let facts = facts(session_fact && !going_on, room)
                 + &named_by_default
                 + &health_fact(health.as_deref())
@@ -2616,24 +2655,14 @@ pub fn serve(
                 // which #4090 and #4132 give the owner alone, through the
                 // typed name (the readers' HOLDs on #4158: a silent known
                 // guest's nod would name an off-camera caller's answer).
-                + &known_name_told(known_name, who.as_deref(), named.as_deref());
-            // Beside the character, where the instruction had it: told after
-            // the exchanges, the model used it for the owner a third as
-            // often (EN, the #2602 probe).
-            // The typed name follows this line's own lease only, never the
-            // person the session is counted for (the reviewer's P2 on #3050:
-            // the owner's sticky presence for 30 s after they go), and no
-            // lease is no name.
-            // Read again for each reply, as above (#4461).
-            let setup_name_now = setup_named.then(crate::person::now).flatten();
-            let told = |character: String| {
-                with_typed_name(
-                    character,
-                    setup_name_now.as_deref(),
-                    setup_bus.as_ref(),
-                    line.as_ref().map(Option::as_deref),
-                )
-            };
+                + &known_name_told_as(
+                    known_name,
+                    crate::face_name_only::on(),
+                    who.as_deref(),
+                    named.as_deref(),
+                    typed_named,
+                );
+            let told = |character: String| character + &typed_told;
             if steady_first {
                 steady_first_message_withheld(
                     told(format!("{character}{skills}")),
@@ -5153,7 +5182,19 @@ pub(crate) fn known_person_for(
 /// as the Live route tells it (`known_faces::note`): when the face the eyes
 /// know now, in `who`, is `person`, the turn's own ([`known_person_for`]).
 /// A face gone has none.
-pub(crate) fn known_name_told(on: bool, who: Option<&Path>, person: Option<&str>) -> String {
+///
+/// With `only` (`LAMP_SECOND_FACE_NAME_ONLY`, #5484), told as the name
+/// to call them ([`crate::face_name_only::note`]), with the owner's
+/// `typed` name from the app when this reply is told it too (Thirteen's
+/// P2 on #5516): on lamp-29e7 a running summary's "The person's name is
+/// A" won over the face name B. Off, the Live route's note.
+pub(crate) fn known_name_told_as(
+    on: bool,
+    only: bool,
+    who: Option<&Path>,
+    person: Option<&str>,
+    typed: Option<&str>,
+) -> String {
     if !on {
         return String::new();
     }
@@ -5162,6 +5203,9 @@ pub(crate) fn known_name_told(on: bool, who: Option<&Path>, person: Option<&str>
     };
     if person != Some(crate::known_faces::memory_person(&name).as_str()) {
         return String::new();
+    }
+    if only {
+        return format!("\n\n{}", crate::face_name_only::note(&name, typed));
     }
     format!("\n\n{}", crate::known_faces::note(&name))
 }
@@ -11799,6 +11843,7 @@ fn thread_and_history(
         whose,
         withheld,
         ROOM_LINES_TOLD.load(std::sync::atomic::Ordering::Acquire),
+        crate::face_name_only::on(),
     )
 }
 
@@ -11826,6 +11871,7 @@ fn thread_and_history_told(
     whose: Option<&str>,
     withheld: Option<&str>,
     room_lines: bool,
+    face_name_only: bool,
 ) -> (String, Vec<Message>) {
     let room = lamp_gemini::MAX_INSTRUCTION_BYTES.saturating_sub(used);
     let now = Instant::now();
@@ -11837,6 +11883,11 @@ fn thread_and_history_told(
         Some(name) if !summary.is_empty() => crate::person::without_name(&summary, name),
         _ => summary,
     };
+    // A name in it is told as one said in the conversation, never what to
+    // call them (`LAMP_SECOND_FACE_NAME_ONLY`, #5484), marked after the
+    // room was checked; past the room, its name lines are left out instead,
+    // so its other facts are kept (Thirteen's P3 on #5516).
+    let summary = crate::face_name_only::told_within(summary, face_name_only, room);
     let room = room.saturating_sub(summary.len());
     let (thread, recent) = crate::thread::current(file, |thread| {
         (
@@ -20612,7 +20663,7 @@ mod tests {
                 .cloned()
                 .collect()
         };
-        let (_, theirs) = thread_and_history_told(0, None, Some(&a), None, true);
+        let (_, theirs) = thread_and_history_told(0, None, Some(&a), None, true, false);
         assert_eq!(
             users(&theirs),
             [
@@ -20622,18 +20673,18 @@ mod tests {
             ],
             "A's turn: the room's line among A's, marked"
         );
-        let (_, rooms) = thread_and_history_told(0, None, None, None, true);
+        let (_, rooms) = thread_and_history_told(0, None, None, None, true, false);
         assert_eq!(
             users(&rooms),
             [Message::user("Can you look it up?")],
             "the room's turn: never A's"
         );
-        let (_, others) = thread_and_history_told(0, None, Some(&b), None, true);
+        let (_, others) = thread_and_history_told(0, None, Some(&b), None, true, false);
         assert!(
             others.is_empty(),
             "B's turn: neither A's nor A's conversation's"
         );
-        let (_, off) = thread_and_history_told(0, None, Some(&a), None, false);
+        let (_, off) = thread_and_history_told(0, None, Some(&a), None, false, false);
         assert_eq!(
             users(&off),
             [
@@ -20643,7 +20694,7 @@ mod tests {
             "off: A's alone"
         );
         crate::thread::THREAD.lock().unwrap().forget();
-        let (_, forgotten) = thread_and_history_told(0, None, Some(&a), None, true);
+        let (_, forgotten) = thread_and_history_told(0, None, Some(&a), None, true, false);
         assert!(forgotten.is_empty(), "a forget drops the room's lines too");
     }
 
@@ -21575,6 +21626,106 @@ mod tests {
         assert_eq!(known_person_for(None, Chosen::ByLease), None);
     }
 
+    /// #5484, lamp-29e7 (U1 on #5385): a known face saved as Bryony whose
+    /// running summary says "The user's name is Ashby" (a name said in the
+    /// talk). With `LAMP_SECOND_FACE_NAME_ONLY`, the turn is told "This
+    /// person is Bryony" as the only name to call them, and the summary's
+    /// name line is told as a name said in the conversation, never what to
+    /// call them. Off, both as before: the face note and the bare line, the
+    /// model answering from whichever it read. Made-up names.
+    #[test]
+    fn a_known_face_is_called_its_face_name_whatever_the_summary_says() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let dir = std::env::temp_dir().join(format!("lv-face-name-only-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir(&dir).unwrap();
+        let known = dir.join("known");
+        std::fs::write(&known, "Bryony").unwrap();
+        let bryony = crate::known_faces::memory_person("Bryony");
+        let summary = "Current activity: none\nKey facts:\n- The user's name is Ashby.\n- Takes tea, no sugar.\n";
+        crate::conversation_summary::keep_for_test(Some(&bryony), Some(summary));
+        let face = known_name_told_as(true, true, Some(&known), Some(&bryony), None);
+        assert!(face.contains("This person is Bryony"), "{face}");
+        assert!(face.contains("Call them Bryony, the only name"), "{face}");
+        assert!(!face.contains("Ashby"), "{face}");
+        let (told, _) = thread_and_history_told(0, None, Some(&bryony), None, false, true);
+        let said = crate::face_name_only::SAID;
+        assert!(
+            told.contains(&format!("\n- {said}The user's name is Ashby.\n")),
+            "{told}"
+        );
+        assert!(!told.contains("\n- The user's name is Ashby."), "{told}");
+        assert!(told.contains("\n- Takes tea, no sugar.\n"), "{told}");
+        // Off: as before.
+        assert_eq!(
+            known_name_told_as(true, false, Some(&known), Some(&bryony), None),
+            "\n\n(The person at the lamp now is Bryony: you know their face.)"
+        );
+        let (off, _) = thread_and_history_told(0, None, Some(&bryony), None, false, false);
+        assert!(off.contains("\n- The user's name is Ashby.\n"), "{off}");
+        assert!(!off.contains(said), "{off}");
+        crate::conversation_summary::keep_for_test(Some(&bryony), None);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Thirteen's P2 on #5516: the owner's face saved as Bryony, the name
+    /// typed in the app Bree (told to this reply too), and a running summary
+    /// saying "The user's name is Ashby". With `LAMP_SECOND_FACE_NAME_ONLY`
+    /// the turn is told both Bryony and Bree as theirs, never "the only
+    /// name", and the summary's Ashby is marked as said in the conversation.
+    #[test]
+    fn the_owners_face_and_typed_names_are_both_theirs_a_summarys_is_not() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let dir = std::env::temp_dir().join(format!("lv-face-name-typed-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir(&dir).unwrap();
+        let known = dir.join("known");
+        std::fs::write(&known, "Bryony").unwrap();
+        let bryony = crate::known_faces::memory_person("Bryony");
+        let summary = "Key facts:\n- The user's name is Ashby.\n";
+        crate::conversation_summary::keep_for_test(Some(&bryony), Some(summary));
+        let face = known_name_told_as(true, true, Some(&known), Some(&bryony), Some("Bree"));
+        assert!(face.contains("This person is Bryony"), "{face}");
+        assert!(face.contains("Their name in the app is Bree"), "{face}");
+        assert!(!face.contains("the only name"), "{face}");
+        assert!(!face.contains("Ashby"), "{face}");
+        let (told, _) = thread_and_history_told(0, None, Some(&bryony), None, false, true);
+        let said = crate::face_name_only::SAID;
+        assert!(
+            told.contains(&format!("\n- {said}The user's name is Ashby.\n")),
+            "{told}"
+        );
+        crate::conversation_summary::keep_for_test(Some(&bryony), None);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// #5484 with no face: the room's turn is told no face name, and its
+    /// running summary's "The person's name is Ashby" is told as a name said
+    /// in the conversation, never as what to call them. Off, the bare line.
+    #[test]
+    fn with_no_face_the_summarys_name_is_not_what_they_are_called() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let dir = std::env::temp_dir().join(format!("lv-face-name-none-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir(&dir).unwrap();
+        let known = dir.join("known");
+        std::fs::write(&known, "Bryony").unwrap();
+        let summary = "Current activity: none\nKey facts:\n- The person's name is Ashby.\n";
+        crate::conversation_summary::keep_for_test(None, Some(summary));
+        assert_eq!(known_name_told_as(true, true, Some(&known), None, None), "");
+        let (told, _) = thread_and_history_told(0, None, None, None, false, true);
+        let said = crate::face_name_only::SAID;
+        assert!(
+            told.contains(&format!("\n- {said}The person's name is Ashby.\n")),
+            "{told}"
+        );
+        assert!(!told.contains("\n- The person's name is Ashby."), "{told}");
+        let (off, _) = thread_and_history_told(0, None, None, None, false, false);
+        assert!(off.contains("\n- The person's name is Ashby.\n"), "{off}");
+        crate::conversation_summary::keep_for_test(None, None);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
     /// #2539 (`LAMP_SECOND_FACE_NAME`): a turn that is the known face's own
     /// person is told their name, as the Live route tells it; the room's
     /// turn (or a line narrowed to the room), another person's, a face gone,
@@ -21587,7 +21738,7 @@ mod tests {
         let known = dir.join("known");
         std::fs::write(&known, "Pippa").unwrap();
         let pippa = crate::known_faces::memory_person("Pippa");
-        let told = known_name_told(true, Some(&known), Some(&pippa));
+        let told = known_name_told_as(true, false, Some(&known), Some(&pippa), None);
         assert_eq!(
             told,
             "\n\n(The person at the lamp now is Pippa: you know their face.)"
@@ -21620,14 +21771,17 @@ mod tests {
             (true, None, Some(pippa.as_str())),
         ] {
             assert_eq!(
-                known_name_told(on, who, person),
+                known_name_told_as(on, false, who, person, None),
                 "",
                 "{on} {who:?} {person:?}"
             );
         }
         // The face gone: no known file.
         std::fs::remove_file(&known).unwrap();
-        assert_eq!(known_name_told(true, Some(&known), Some(&pippa)), "");
+        assert_eq!(
+            known_name_told_as(true, false, Some(&known), Some(&pippa), None),
+            ""
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
