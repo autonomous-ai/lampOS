@@ -34,7 +34,12 @@
 //!   `lamp-services` before they come here, and are not said at all.
 //! - **The journal**: counts and the gate's outcome only ([`run`]'s words),
 //!   never a title, a sender or a subject.
-use lamp_services::spoken;
+//! - **Not linked** ([`LINK_NOTE_ENVIRONMENT`], off unless `on`): a read
+//!   refused because its service isn't linked (`lamp_services::serve::
+//!   NOT_LINKED`, never one that couldn't be reached) says so once, as
+//!   exact words behind the same gate, kept per skill ([`Room::link_note`])
+//!   until a read of it succeeds again. Off, a refused read says nothing.
+use lamp_services::{serve::NOT_LINKED, spoken};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 use std::time::Duration;
@@ -47,6 +52,19 @@ pub const ENVIRONMENT: &str = "LAMP_SKILL_READS";
 pub fn on() -> bool {
     std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
 }
+
+/// The switch for saying once that a made skill's service isn't linked,
+/// in `lamp-skills`' unit. `on` only.
+pub const LINK_NOTE_ENVIRONMENT: &str = "LAMP_SKILL_LINK_NOTE";
+
+/// Whether [`LINK_NOTE_ENVIRONMENT`] is on in this process.
+pub fn link_note_on() -> bool {
+    std::env::var(LINK_NOTE_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// The file in `--state-dir` that keeps the skills told their service
+/// isn't linked: one name a line, and nothing else.
+pub const LINK_NOTED_FILE: &str = "link-noted";
 
 /// How long a read that came due waits for its gate, then is skipped for
 /// the day with nothing said.
@@ -409,6 +427,14 @@ pub trait Room {
     fn read(&mut self, args: &Value) -> Result<Value, String>;
     /// Says `text` as exact words: Ok once it was said whole.
     fn say(&mut self, text: &str) -> Result<(), String>;
+    /// With [`LINK_NOTE_ENVIRONMENT`] on and somewhere to keep it: whether
+    /// this skill was told already that its service isn't linked. `None`,
+    /// the default: nothing is told, as before.
+    fn link_note(&mut self) -> Option<bool> {
+        None
+    }
+    /// Keeps whether this skill was told its service isn't linked.
+    fn keep_link_note(&mut self, _told: bool) {}
 }
 
 /// Runs a read that came due, and says how it went for the journal:
@@ -445,8 +471,12 @@ pub fn run(step: &ReadStep, room: &mut impl Room) -> String {
     };
     let answer = match room.read(&args) {
         Ok(answer) => answer,
-        Err(why) => return format!("not read: {}", spoken::said(&why)),
+        Err(why) => return not_read(step, room, &why),
     };
+    // Read: linked again, so a link lost later is told again.
+    if room.link_note() == Some(true) {
+        room.keep_link_note(false);
+    }
     let lines = step.lines(&answer);
     let items = lines.len() - 1;
     for (at, line) in lines.iter().enumerate() {
@@ -472,6 +502,31 @@ pub fn run(step: &ReadStep, room: &mut impl Room) -> String {
         }
     }
     format!("read {items}")
+}
+
+/// A read `lamp-services` refused, `why`, for the journal. Refused because
+/// its service isn't linked ([`NOT_LINKED`]), with the note on
+/// ([`Room::link_note`]) and not told yet, the lamp says so once, in
+/// `lamp-services`' own words for the step's service, as exact words
+/// behind the same gate, and keeps that it did. Anything else (not
+/// reached, refused for another reason, told already, the note off) says
+/// nothing, as before.
+fn not_read(step: &ReadStep, room: &mut impl Room, why: &str) -> String {
+    let said = spoken::said(why);
+    if !why.trim_end().ends_with(NOT_LINKED) || room.link_note() != Some(false) {
+        return format!("not read: {said}");
+    }
+    if let Err(gate) = judge_through_blinks(room) {
+        return format!("not read: {said}; not told: {}", gate.words());
+    }
+    let line = format!("{} {NOT_LINKED}", spoken::name(&step.service));
+    match room.say(&line) {
+        Ok(()) => {
+            room.keep_link_note(true);
+            format!("not read: {said}; told once")
+        }
+        Err(not) => format!("not read: {said}; not told ({not})"),
+    }
 }
 
 /// The gate judged before a line: the owner not told, or nobody, is
@@ -545,6 +600,8 @@ mod tests {
         blinks: usize,
         /// What those looks see, if not one face whose mark is late.
         blink_as: Option<Seen>,
+        /// [`Room::link_note`]'s: `None` with the note off.
+        noted: Option<bool>,
     }
 
     impl Lamp {
@@ -559,6 +616,7 @@ mod tests {
                 after_read: None,
                 blinks: 0,
                 blink_as: None,
+                noted: None,
             }
         }
     }
@@ -603,6 +661,12 @@ mod tests {
         fn say(&mut self, text: &str) -> Result<(), String> {
             self.said.push(text.to_owned());
             Ok(())
+        }
+        fn link_note(&mut self) -> Option<bool> {
+            self.noted
+        }
+        fn keep_link_note(&mut self, told: bool) {
+            self.noted = Some(told);
         }
     }
 
@@ -1043,5 +1107,75 @@ mod tests {
             "not read: Gmail couldn't be reached"
         );
         assert!(lamp.said.is_empty());
+    }
+
+    /// With `LAMP_SKILL_LINK_NOTE` on: a read refused as not linked says
+    /// `lamp-services`' words once, kept, and not again; a read that then
+    /// succeeds lets it be said again when the link is lost again. A read
+    /// that couldn't be reached says nothing, and with the note off a
+    /// refused read says nothing, as before.
+    #[test]
+    fn a_read_not_linked_is_told_once() {
+        let not_linked = format!("Gmail {NOT_LINKED}");
+        let mut lamp = Lamp::new(vec![alone()], events());
+        lamp.noted = Some(false);
+        lamp.answer = Err(not_linked.clone());
+        assert_eq!(
+            run(&mail(), &mut lamp),
+            format!("not read: {}; told once", spoken::said(&not_linked))
+        );
+        assert_eq!(
+            lamp.said,
+            [
+                "Gmail isn't linked to this lamp yet. It can be linked in the app: Skills, then Connectors."
+            ]
+        );
+        assert_eq!(lamp.noted, Some(true));
+        // Again: nothing more said.
+        assert_eq!(
+            run(&mail(), &mut lamp),
+            format!("not read: {}", spoken::said(&not_linked))
+        );
+        assert_eq!(lamp.said.len(), 1);
+        // Linked and read: the note let go, so a link lost again is told.
+        lamp.answer = Ok(json!({"source": "Gmail", "quoted": []}));
+        run(&mail(), &mut lamp);
+        assert_eq!(lamp.noted, Some(false));
+        lamp.answer = Err(not_linked.clone());
+        let before = lamp.said.len();
+        assert!(run(&mail(), &mut lamp).ends_with("; told once"));
+        assert_eq!(lamp.said.len(), before + 1);
+        // Couldn't be reached: nothing said, nothing kept.
+        let mut reached = Lamp::new(vec![alone()], events());
+        reached.noted = Some(false);
+        reached.answer = Err("the lamp's services were not reached (NotFound)".into());
+        run(&mail(), &mut reached);
+        reached.answer = Err("Gmail couldn't be reached".into());
+        run(&mail(), &mut reached);
+        assert!(reached.said.is_empty());
+        assert_eq!(reached.noted, Some(false));
+        // The note off: today's silence.
+        let mut off = Lamp::new(vec![alone()], events());
+        off.answer = Err(not_linked.clone());
+        assert_eq!(
+            run(&mail(), &mut off),
+            format!("not read: {}", spoken::said(&not_linked))
+        );
+        assert!(off.said.is_empty());
+        assert_eq!(off.noted, None);
+        // Someone came before it was said: not told, nor kept as told.
+        let mut came = Lamp::new(vec![alone()], events());
+        came.noted = Some(false);
+        came.answer = Err(not_linked);
+        came.after_read = Some((
+            0,
+            Seen {
+                faces: Some(2),
+                ..alone()
+            },
+        ));
+        assert!(run(&mail(), &mut came).contains("not told"));
+        assert!(came.said.is_empty());
+        assert_eq!(came.noted, Some(false));
     }
 }

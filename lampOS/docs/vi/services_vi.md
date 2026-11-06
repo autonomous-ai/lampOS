@@ -964,6 +964,18 @@ nào. Mọi lý do khác đóng cổng ngay.
 someone came in, 2 of 5 read", "not read: <lỗi rõ ràng của dịch vụ>", không
 bao giờ một tiêu đề, người gửi hay chủ đề.
 
+**Chưa liên kết lúc chạy** (`LAMP_SKILL_LINK_NOTE=on` trong `lamp-skills`,
+cùng `--state-dir` của nó; tắt, [switches.md](../switches.md)). Một lần đọc
+bị từ chối vì dịch vụ chưa liên kết (`NOT_LINKED`; không bao giờ "couldn't
+be reached" hay một lời từ chối khác) được nói một lần, như lời chính xác qua
+socket nói sau khi cổng được xét lại: "Gmail isn't linked to this lamp yet.
+It can be linked in the app: Skills, then Connectors." Tên kỹ năng được giữ
+trong `link-noted` của thư mục trạng thái, nên không lần đọc sau và không lần
+khởi động lại nào nói lại; một lần đọc thành công bỏ nó ra, nên một liên kết
+mất về sau được báo thêm một lần. Dòng "not read" của journal thêm "told
+once", "not told: <kết quả của cổng>" hoặc "not told (<lý do>)". Tắt, một lần
+đọc bị từ chối không nói gì, như trước.
+
 **Tạo bằng giọng nói.** Khi bật công tắc trong `lamp-voice` (nó truyền đúng
 `on` cho các worker của hai route, `provider` và `second`, nơi `make_skill`
 soạn và kiểm tra skill: môi trường của chúng vốn bị xoá sạch, và thiếu nó thì
