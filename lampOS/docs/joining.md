@@ -900,6 +900,36 @@ people at the row's bar.
 there is no `programs-reply` for home accounts; customers speak English;
 GitHub names roles, not people; quality comes before latency.
 
+### The PM's checks (the first builder, on the lead's ask, 6 November 2026)
+
+Five slips in the PM's first two days, each written here as a check so
+none recurs:
+
+- **A default-on pull request trains only after its lamp check.** The bot
+  reads only `READ-OK`. So a pull request that turns a switch on in the
+  product goes on `train-hold.txt` when it is first read, and comes off only
+  when both are posted on its head: a `PASS` of its named lamp check, and the
+  first builder's default-on `READ-OK`. On 5 Nov #5430, #5404 and #5331 merged
+  before their checks, so build 10434 could not be the candidate and #5464
+  had to turn four switches off.
+- **Before naming N, read every pull request merged since the last
+  stable.** That means every `HOLD`, P1 and P2 on it, reads after its merge
+  included. Any open P1 or P2 holds N until its fix lands. On 5 Nov 10395 was
+  named with an open P2 on #5414.
+- **The figures, each hour,** on #1711, from `docs/build-rows.md` on
+  `lamp-voice`. A rescore is posted there with its lamp run. The first
+  builder regenerates the file (`build-rows-pr.sh` reads the review page,
+  which stays off this public repo).
+- **Check what a change can reach before setting its priority.** A shipped
+  lamp takes a change only through the updater it has. Its first walk runs
+  the build it shipped on (#5458 was set P1 for the ten lamps, which it could
+  not reach).
+- **Say whose decision it is.** The lead's words are relayed as said, and
+  the PM's own calls are named as the PM's.
+
+The first builder reads the PM's promote and gate calls for the next three
+days, and posts on the Queue only where one of these is missed.
+
 ### PR markers (as the first builder ran them; the lead, 4 November 2026)
 
 All of them are plain pull request comments, never GitHub reviews: the
