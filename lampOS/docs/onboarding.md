@@ -370,7 +370,10 @@ name back as one clear yes-or-no question on its own, the name and then "did
 I get that right?", never the name alone (lamp-52e6, build 10507: "Leo?
 Leo." asked nothing), and waits for its yes (the setup face save
 needs that read-back, #5140; a read-back folded into the face question was
-refused every time, #5415), then asks "May I remember your face, so I know you
+refused every time, #5415). It asks them to spell their name only if they
+say it is wrong or the model missed it, and only once, then says back the
+name the letters spell, never the letters (lamp-3e83, #5564: "Jane or
+J-A-N-E?"; nobody calls a person by the spelling of their name). Then it asks "May I remember your face, so I know you
 next time?". A face save refused for the read-back is held by the voice, and
 the step stays open for it up to 45 s (`FACE_SAVE_HELD_US`) instead of ending
 15 s after the lamp's last words (`FACE_SAVE_WAIT_US`). Neither the step's give-up nor
@@ -686,7 +689,9 @@ second route, DeepSeek) found two things it changes:
   quiet moment at least 10 s after that note (so an answer on the face can
   come first), and the first line after the lamp spoke its question was one
   or two words (after an "I'm") with no question, yes, no, greeting or
-  thanks: the walk has the model ask "Did I get that right, NAME?", unless
+  thanks, or a name spelled, alone or after the name said ("J-A-N-E.",
+  "Jane, J A N E."), which is the name it spells ("Jane"; two letters stay
+  as said, as initials; #5564): the walk has the model ask "Did I get that right, NAME?", unless
   its face question is still unanswered. The yes, no and greeting words
   are English only. A short yes line keeps
   the step done, as the model's `done` would (the face is kept only by

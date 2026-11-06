@@ -4400,6 +4400,19 @@ fn name_in(text: &str) -> Option<String> {
     {
         return None;
     }
+    // A name spelled, alone or after the name said ("J-A-N-E.", "Jane, J A
+    // N E."), is asked back as the name, never its letters: nobody calls a
+    // person by the spelling of their name (lamp-3e83, #5564).
+    if let Some(name) = crate::known_faces::letters_as_word(&words.join(" ")) {
+        return Some(name);
+    }
+    if let Some((first, rest)) = words.split_first()
+        && crate::known_faces::letters_as_word(&rest.join(" ")).is_some_and(|spelled| {
+            crate::known_faces::folded_words(&spelled) == crate::known_faces::folded_words(first)
+        })
+    {
+        return Some((*first).to_owned());
+    }
     (1..=2).contains(&words.len()).then(|| words.join(" "))
 }
 
@@ -5961,6 +5974,25 @@ mod tests {
             assert_eq!(name_in(line), None, "{line}");
         }
         assert_eq!(name_in("Tovi Ama"), Some("Tovi Ama".into()));
+    }
+
+    /// #5564 (lamp-3e83): a spelled name is asked back as the name it
+    /// spells, never as its letters nor as the name and its letters, "Did
+    /// I get that right, Jane?", not "…, J-A-N-E?". Initials stay as said.
+    #[test]
+    fn a_spelled_name_is_asked_back_as_the_name() {
+        for line in [
+            "J-A-N-E.",
+            "J A N E.",
+            "It's J, A, N, E.",
+            "Jane, J-A-N-E.",
+            "Jane. J A N E.",
+        ] {
+            assert_eq!(name_in(line), Some("Jane".into()), "{line}");
+        }
+        assert_eq!(name_in("José, J O S E."), Some("José".into()));
+        assert_eq!(name_in("A J"), Some("A J".into()));
+        assert_eq!(name_in("Jane"), Some("Jane".into()));
     }
 
     #[test]

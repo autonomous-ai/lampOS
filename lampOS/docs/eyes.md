@@ -1387,6 +1387,16 @@ With the switch:
   to spell it (`known_faces::said_by_them`). A "yes" alone never passes,
   so a name the model made up is asked for again.
 
+  A name the model gives as its letters only ("J-A-N-E", "J A N E"), of
+  three letters or more, is checked and kept as the word they make, the
+  first letter capital ("Jane"; `known_faces::letters_as_word`), so the
+  eyes keep, and the lamp says back and greets them by, a name, never its
+  letters (lamp-3e83, #5564: "Jane or J-A-N-E?"). Two letters ("A J",
+  "T.J.") may be initials and stay as given. The model's words say a
+  spelled name back as a name only, never as letters nor as a choice
+  between the name and its spelling (`SAY_IT_BACK`, `NOT_HEARD`,
+  `NOT_HEARD_SPELLED`, `NEAR_TO`).
+
   Why the turn in hand, from lamp-4ace on 16 October at 16:46 (the first
   builder on #1057, the records described without the words): a
   three-letter name was kept after "Sure." and a lone digit, the turn
@@ -1457,7 +1467,12 @@ With the switch:
     second save call would (#5391's path has the same gap).
     `replace` still needs the read-back in the
     lamp's last answer (`known_faces::agreed_to`).
-  - **Spelled:** a name not heard is asked for spelled out (`NOT_HEARD`).
+  - **Spelled:** a name not heard is asked for spelled out (`NOT_HEARD`),
+    once: when the lamp already asked them to spell in an exchange the
+    check holds, a name still not heard is told `NOT_HEARD_SPELLED`
+    (`known_faces::not_heard`), which never asks again and has the model
+    say back the name the letters make, as a name only, and wait for a yes
+    (lamp-3e83, #5564: the lamp asked for spellings too often).
     When the lamp's last answer asked them to spell
     (`known_faces::spelling_asked`) and the turn in hand spells a name
     letter by letter, the letters are the person's own words: the face is
@@ -1608,8 +1623,10 @@ With the switch:
   remember it, "Could you call me Jim?" or "Do you remember my name is
   Jim?"; `known_faces::gives_a_name`), the worker puts one note beside
   that request (`known_faces::NAME_TOLD_NOTE`): if they have just told
-  their own name, call `remember_my_face` now, or say the name back and
-  ask for its spelling, and never only say it will be remembered. It is a
+  their own name, call `remember_my_face` now, as they said it or as the
+  name their letters make; if not sure of it, say it back as a name and
+  ask if it is right, asking for its spelling only if they say it is
+  wrong, and only once (#5564); and never only say it will be remembered. It is a
   condition, so that a match that is no name ("I'm Irish.") costs
   nothing. The journal says "they gave their
   name, and the model is told to keep it".
