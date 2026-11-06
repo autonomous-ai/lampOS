@@ -1932,6 +1932,8 @@ fn second_route_worker_environment(
         // A refused face request is told the face record as it stands, and a
         // held face forget lasts through a spelling question (#5141).
         crate::known_faces::RECORD_TOLD_ENVIRONMENT,
+        // A face rename's yes judged by its guards, and held for (#5485).
+        crate::known_faces::RENAME_YES_ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_config::OWN_KEYS_ENV,
         // The owner's place for a question that needs one, and cleared
@@ -2128,6 +2130,7 @@ mod tests {
             crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
             crate::known_faces::ASKED_ENVIRONMENT,
             crate::known_faces::RECORD_TOLD_ENVIRONMENT,
+            crate::known_faces::RENAME_YES_ENVIRONMENT,
             crate::light_told::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
@@ -2910,6 +2913,7 @@ mod tests {
                     || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
                     || name == crate::known_faces::ASKED_ENVIRONMENT
                     || name == crate::known_faces::RECORD_TOLD_ENVIRONMENT
+                    || name == crate::known_faces::RENAME_YES_ENVIRONMENT
                     || name == crate::second_config::OWN_KEYS_ENV
                     || name == crate::owner_place::ENVIRONMENT
                     || name == lamp_msgs::chosen_voice::ENVIRONMENT
@@ -3049,6 +3053,7 @@ mod tests {
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_NAMED_ALWAYS=on",
                     "LAMP_NAMES_RECORD_TOLD=on",
+                    "LAMP_NAMES_RENAME_YES=on",
                     "LAMP_NAME_AS_A_SENTENCE=on",
                     "LAMP_NAME_NEAR=on",
                     "LAMP_NAME_REPEAT_NOT_A_CALL=on",

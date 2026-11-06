@@ -1506,6 +1506,57 @@ With the switch:
   they have while they are still correcting it. A name kept from an
   earlier exchange needs the same plain yes. The journal says "did not
   remember a face: it is known by another name", without the name.
+  - **A rename's yes by its guards** (`LAMP_NAMES_RENAME_YES=on`, off
+    unless set; only with `LAMP_NAMES=checked`; the second route; #5485).
+    On lamp-29e7 on 6 Nov a known face B asked to be called A, and every
+    yes was refused: "Yes. Please forget the name B, and this is my face,
+    the face of A." held words outside the list, and "Okay. Can you repeat
+    my name again?" is a question, which the model also answered with no
+    call. The lamp then said it would use A, while the face was still B.
+    With the switch, `replace` takes `known_faces::rename_agreed` in place
+    of the plain yes: the lamp said A in its last answer; a sentence of
+    the turn that is no question agrees (`agrees`); nothing takes it back
+    (the no words, plus "but", "actually", "though", and a maybe:
+    "maybe", "perhaps", "có lẽ"); and the turn names no
+    one else: no name given once A's own words are taken out
+    (`gives_a_name`), no spelled run but A's, and no word one letter from
+    a word of A's of four letters or more ("Dạ, Kess ạ." to "Kesh"). No
+    word is judged by its capital letter, which is the transcript's. A
+    said in an exchange before and agreed to so is heard for the rename
+    (`heard_for_rename`). Every #1208 correction is still asked about
+    again. The voice also holds the rename (`second_provider::held_rename`,
+    as the held setup save): when a `remember_my_face` answer asks about
+    it (the eyes' `known_as`, or a `replace` refused before the yes), it
+    keeps `{"name":A,"replace":true}` with the asker (the line's own known
+    person, or theirs by the one-face rule; never a gap-held or carried
+    line). The same session's next spoken turn, within 60 s, runs it with
+    no model round when that turn is a yes by the guards above and either
+    their face is the one seen saying it, or no face was seen saying it
+    and theirs is alone in view with no other voice heard
+    (`ScopeLease::by_one_face`). That last way is a risk accepted, and
+    the one place the one-face rule counts for a yes: with no face seen
+    saying it, a yes is taken from the known face alone in view when no
+    other voice is heard, so a voice off camera could rename that face.
+    It is kept because on lamp-a63e on 6 Nov the mouth read came back
+    unread in 96% of looks at a known face, so "seen saying it" alone
+    would almost never pass. The risk is accepted only while the switch
+    is off, and is to be confirmed before it is turned on. It runs through the same runner as a
+    model call, so every name and owner check still applies, and the
+    model is told the result. Any other turn drops it: a no, another name,
+    another face seen saying the yes (told), a carried line, another
+    session, a new save call. While a rename asked has not run, each turn
+    of its session by the asker, for as long as the thread remembers the
+    conversation, is told the face is still B (the asker by the same test
+    as the yes: their face seen saying it, or none seen and theirs alone
+    in view; anyone else's turn is told nothing, and the eyes read who
+    said each line while the note waits), nothing was renamed, and never to say it
+    changed. The only wait left on a yes is the eyes' own (`DEADLINE`, 6
+    s; about 2 s on 29e7), under the wait sound. Off, everything is byte
+    for byte as before. Tests: `known_faces::tests::the_29e7_yeses_to_a_rename_are_agreed_by_their_guards`,
+    `every_1208_correction_is_still_refused_by_the_rename_guards`,
+    `the_rename_gate_takes_the_guards_only_with_the_switch`,
+    `second_provider::held_rename::tests` and
+    `second_provider::tests::held_rename`.
 - **A near face with a near name is asked to spell it** (#2176 row 4). On
   lamp-4ace on 20 Oct a person known since 16 Oct was saved again under
   their name misheard by one letter: the new prints came to at most 0.359

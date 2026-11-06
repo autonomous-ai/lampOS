@@ -1106,6 +1106,9 @@ fn face_switches(settings: &Settings) -> crate::known_faces::FaceSwitches {
         record: crate::known_faces::record_told_on(),
         visits: settings.who_visits && settings.memory.is_some(),
         at_setup: false,
+        // A rename's yes judged by its guards (`LAMP_NAMES_RENAME_YES`,
+        // #5485): only with names checked.
+        rename_yes: settings.names_checked && crate::known_faces::rename_yes_on(),
     }
 }
 
@@ -2778,6 +2781,7 @@ mod tests {
             remember_speaker: false,
             at_setup: false,
             record: false,
+            rename_yes: false,
         };
         let route = Route::Faces(socket.clone(), on, None);
         let call = |name: &str| ToolCall {
