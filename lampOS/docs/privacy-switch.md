@@ -238,6 +238,49 @@ gone or late, ends the worker as before. A worker that ended abnormally
 still ends the wait with an error that is not an unreadable switch, so the
 voice exits and the restart guard counts it.
 
+With `LAMP_PRIVACY_RIDES_STALL=on` (#5611; off by default, only exactly `on`,
+passed to the privacy worker and the second worker in their cleared
+environments) a lapse of a lease that grants the microphones or the camera is
+ridden the same way, so the voice stays up and unmuted through a short stall
+of its own. On lamp-06c1 at 21:30:02 on 6 Nov the voice's capture, ring and
+coordinator stalled 120-132 ms together during an SD log flush, one major
+page fault each, past the 100 ms a held turn's lease lasts during playback;
+the voice ended on `service privacy freshness lost`, its workers with exit 1,
+the cleanup failed, and the restart guard muted the next start. With the
+switch on:
+
+- The privacy worker skips a granting authority that lapsed in its queue and
+  rides a granting lease that lapsed while it held it, at both looks of a
+  pass, publishing nothing until a fresh authority comes, for at most 1.5 s
+  from the expiry (`DENIED_LAPSE_MOST_US`). Ears and capture expire what they
+  hold on their own monotonic clocks meanwhile: every `voice/privacy` lease
+  ends 50 ms after its stamp at the latest, capture closes on
+  `AuthorityExpired`, and the speaker goes silent on its own lapse. The
+  journal says `lamp-voice: privacy worker re-armed its lease after <N> ms
+  lapsed in a stall (nothing was published meanwhile; microphones and camera
+  stayed closed)`. The re-armed lease is judged on the switch and the mute as
+  they are then: a slide closed or a software mute in the stall grants
+  nothing after it.
+- The second worker holds closed while its lease lapsed by time and the
+  controller has been silent under 1.5 s (`STALLED_CONTROL_US`): it takes no
+  input, drops what was queued under the lapsed authority, sends nothing and
+  stops listening. The controller's next fresh authority ends the hold.
+- The coordinator treats a freshness loss seen in a pass held up by its own
+  stall as a ridden privacy gap (`privacy_gap::GapRide`, as
+  `LAMP_PRIVACY_GAP_RIDE` rides one): a pass more than 20 ms after the one
+  before, or one already running more than 20 ms since its own top, as a page
+  fault in running code holds it (`HELD_UP_PASS_US`; passes take 2-5 ms, and
+  the reading is up to 20 ms old when a stall starts). It rides for at most
+  1.5 s from where the stall began: the answer is cut, nothing is played,
+  capture and the camera are given no authority, and a fresh, steady open
+  reading reopens it and the conversation goes on. Its trace's `privacy_gap`
+  `began` row then carries `"stall":true`.
+
+Past 1.5 s everything ends exactly as without the switch: the privacy worker
+on `privacy controller lease expired` (exit 1), the second worker on its
+heartbeat, the coordinator on the freshness lost, the cleanup as failed, and
+the voice exits for the restart guard to count. Not yet run on a lamp.
+
 The coordinator keeps renewing every worker's authority through its startup
 prologue too, from its last start-up pulse to its loop's first publish, at
 least every 50 ms between its setup steps (#4332); the lease and its expiry
