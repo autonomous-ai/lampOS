@@ -573,6 +573,11 @@ pub(crate) enum HeldSaveVerdict {
 /// right?" and "Yes, that's my name." the model made no call, and no face
 /// was kept).
 pub(crate) fn held_save_verdict(name: &str, said: &Said) -> HeldSaveVerdict {
+    // The held call keeps the model's raw name; it is judged as the word
+    // its letters make, as `run_switched` judges it: "J-A-N-E" read back
+    // as "Jane" and said yes to runs (Fifth's P2 on #5580).
+    let joined = letters_as_word(name);
+    let name = joined.as_deref().unwrap_or(name);
     if said_back_and_agreed(name, said) {
         return HeldSaveVerdict::Runs;
     }
@@ -5609,7 +5614,7 @@ mod tests {
             .nth(1)
             .and_then(|step| step.split("\n[").next())
             .expect("who_you_are");
-        const ONCE: &str = " and wait for their answer. Ask to spell it only if it's wrong or missed, once; then say the name spelled, not letters. Only after a clear yes to their name";
+        const ONCE: &str = " and wait for their answer. Ask to spell it only if it's wrong or missed, once; then say the name it spells, as a word. Only after a clear yes to their name";
         for mode in ["first = ", "reoffer = "] {
             let note = who
                 .lines()
@@ -5806,6 +5811,27 @@ mod tests {
                 verdict,
                 "{lamp} / {this}"
             );
+        }
+        // A name the model gave as letters is held raw and judged as the
+        // word: "Jane, did I get that right?" and a yes runs it (Fifth's
+        // P2 on #5580), and a no still drops it.
+        for heard in ["My name is Jane.", "J A N E."] {
+            for (name, this, verdict) in [
+                ("J-A-N-E", "Yes.", Runs),
+                ("J A N E", "Yes, that's right.", Runs),
+                ("j.a.n.e.", "Yes.", Runs),
+                ("J-A-N-E", "No.", Drops),
+            ] {
+                let said = Said {
+                    this: this.into(),
+                    before: vec![(heard.into(), "Jane, did I get that right?".into())],
+                };
+                assert_eq!(
+                    held_save_verdict(name, &said),
+                    verdict,
+                    "{heard} / {name} / {this}"
+                );
+            }
         }
         // The held save run on the yes is the call's own eyes request.
         for this in [
