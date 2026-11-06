@@ -1302,6 +1302,12 @@ impl Onboarding {
             if !std::mem::replace(&mut self.started, true) {
                 self.desired.give_unheard_back();
             }
+            self.park_out_of_order(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |since| since.as_secs()),
+                now_us,
+            );
             self.dirty = self.desired != progress;
             self.committed = progress;
             self.storage_epoch = snapshot.epoch;
@@ -3391,10 +3397,16 @@ impl Onboarding {
             json!({"kind":"onboarding_step","step":step.name(),"outcome":outcome,
             "framing":framing,"at_us":now_us}),
         );
-        // Every step in the order ended: each step out of it is kept
-        // `not_available` (#5499), so any lamp-update, which waits for all
-        // nine, sees the walk over. Never offered again: re-offers follow
-        // the order.
+        self.park_out_of_order(at_unix_s, now_us);
+        self.save();
+    }
+
+    /// Every step in the order ended: each step out of it is kept
+    /// `not_available` (#5499), so any lamp-update, which waits for all
+    /// nine, sees the walk over. Never offered again: re-offers follow
+    /// the order. Run when a step ends and at load, so a lamp that ended
+    /// the walk on a build without it is filled too (El's P3 on #5521).
+    fn park_out_of_order(&mut self, at_unix_s: u64, now_us: u64) {
         if self
             .definition
             .order
@@ -3421,7 +3433,6 @@ impl Onboarding {
                 }
             }
         }
-        self.save();
     }
 
     fn save(&mut self) {
@@ -4484,12 +4495,30 @@ const PREFERENCES_ANSWER: &str = "That was the last question. Answer in at most 
 /// setup_step calls left "the onboarding answered" and nothing more, so
 /// what held "who you are" for 5 minutes could not be read (#3883).
 pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
-    run_in(file, call, Path::new(crate::skill_words::INSTALLED))
+    run_in(file, call, installed_order())
 }
 
-/// [`run`], with the onboarding skill read from the skills folder `skills`.
-fn run_in(file: &Path, call: &ToolCall, skills: &Path) -> (Value, bool) {
-    let (told, answered) = answer(file, call, skills);
+/// The installed skill's `order`, read once per worker as it starts
+/// ([`crate::tools::take`]) and kept, never re-read on each redo (the
+/// Reviewer-lead's P3 on #5521): Voice reads its skill once per start too.
+/// ponytail: a worker started after a skill-only install reads the new file
+/// while the runner keeps the order it loaded; pass the runner's order to the
+/// worker if that drift matters.
+pub(crate) fn installed_order() -> Option<&'static [Step]> {
+    static ORDER: std::sync::OnceLock<Option<Vec<Step>>> = std::sync::OnceLock::new();
+    ORDER
+        .get_or_init(|| {
+            skill::read_installed(Path::new(crate::skill_words::INSTALLED))
+                .ok()
+                .map(|definition| definition.order)
+        })
+        .as_deref()
+}
+
+/// [`run`], with the walk's `order` given (`None`: unread, the runner refuses
+/// a step out of it on its own).
+fn run_in(file: &Path, call: &ToolCall, order: Option<&[Step]>) -> (Value, bool) {
+    let (told, answered) = answer(file, call, order);
     let said = |key: &str| call.args.get(key).and_then(Value::as_str).unwrap_or("none");
     eprintln!(
         "lamp-voice: onboarding: {} step {} outcome {}: {}",
@@ -4503,7 +4532,7 @@ fn run_in(file: &Path, call: &ToolCall, skills: &Path) -> (Value, bool) {
     (told, answered)
 }
 
-fn answer(file: &Path, call: &ToolCall, skills: &Path) -> (Value, bool) {
+fn answer(file: &Path, call: &ToolCall, order: Option<&[Step]>) -> (Value, bool) {
     let line = match call.name.as_str() {
         // One step, or the whole walk only when it was asked for by name:
         // on lamp-06c1 on 28 Oct "redo the touch step" reached a redo with no
@@ -4519,12 +4548,10 @@ fn answer(file: &Path, call: &ToolCall, skills: &Path) -> (Value, bool) {
             // A step out of the walk's order, which the runner refuses
             // (#5499): said refused, so the lamp never says it will redo
             // and then says nothing (the Reviewer-lead's P3 on #5521). The
-            // order is read as installed, which the runner loaded at its start.
+            // order is the one read as this worker started ([`installed_order`]).
             Some(name)
-                if Step::named(name).is_some_and(|step| {
-                    skill::read_installed(skills)
-                        .is_ok_and(|definition| !definition.order.contains(&step))
-                }) =>
+                if Step::named(name)
+                    .is_some_and(|step| order.is_some_and(|order| !order.contains(&step))) =>
             {
                 return (
                     json!({"error":"That part is not in my setup now, so nothing was redone. Tell them so, and offer to go through the whole setup again."}),
@@ -4532,11 +4559,15 @@ fn answer(file: &Path, call: &ToolCall, skills: &Path) -> (Value, bool) {
                 );
             }
             Some(name) if Step::named(name).is_some() => json!({"redo_step": name}),
+            // The step ids in the order named, so a one-step redo needs no
+            // guess (El's P3 on #5521).
             _ => {
-                return (
-                    json!({"error":"Nothing was redone. Ask them which step to redo, or whether to go through the whole setup again, then call this again with it."}),
-                    true,
-                );
+                let mut error = "Nothing was redone. Ask them which step to redo, or whether to go through the whole setup again, then call this again with it.".to_owned();
+                if let Some(order) = order {
+                    let ids: Vec<&str> = order.iter().map(|step| step.name()).collect();
+                    error.push_str(&format!(" The steps are: {}.", ids.join(", ")));
+                }
+                return (json!({ "error": error }), true);
             }
         },
         STEP => {
@@ -6609,22 +6640,66 @@ mod tests {
             name: REDO.into(),
             args: json!({"step": "touch"}),
         };
-        let skills = room.walk.file.with_file_name("skills");
-        std::fs::create_dir_all(skills.join("onboarding")).unwrap();
-        std::fs::write(
-            skills.join("onboarding/skill.toml"),
-            include_str!("../../../skills/onboarding/skill.toml"),
-        )
-        .unwrap();
-        let (told, answered) = run_in(&room.walk.file, &redo, &skills);
+        let order = room.walk.definition.order.clone();
+        let (told, answered) = run_in(&room.walk.file, &redo, Some(&order));
         assert!(answered);
         assert!(told["error"].is_string(), "{told}");
         assert!(told.get("ok").is_none(), "{told}");
-        assert!(run_in(&room.walk.file, &redo, &skills.join("none")).1);
+        assert!(run_in(&room.walk.file, &redo, None).1);
+        let unnamed = ToolCall {
+            args: json!({}),
+            ..redo.clone()
+        };
+        let told = run_in(&room.walk.file, &unnamed, Some(&order)).0;
+        assert!(
+            told["error"]
+                .as_str()
+                .is_some_and(|error| error.ends_with("The steps are: where_you_sit, who_you_are.")),
+            "{told}"
+        );
         report(&room.walk, "touch", "skipped");
         assert_eq!(room.wait(10 * S, Some(SIDE)), NONE);
         assert_eq!(room.outcome(Step::Touch), Some(Outcome::NotAvailable));
         assert_eq!(room.walk.kept().steps.len(), Step::IDS.len());
+    }
+
+    /// El's P3 on #5521: a lamp that ended both steps of the order on a
+    /// build that kept only those two gets the seven parked at load, so
+    /// lamp-update's wait for all nine sees the walk over without another
+    /// step ending.
+    #[test]
+    fn a_two_step_walk_ended_before_parking_is_filled_at_load() {
+        let mut room = Room::new("two-steps-parked-at-load");
+        room.walk
+            .finish(Step::WhereYouSit, Outcome::Done, None, room.at);
+        room.walk
+            .finish(Step::WhoYouAre, Outcome::Skipped, None, room.at);
+        room.walk.drain_storage_for_test(room.at);
+        assert_eq!(
+            room.walk.kept().steps.len(),
+            2,
+            "the nine-step fixture parks nothing"
+        );
+        let mut again = Onboarding::at(room.walk.file.clone());
+        again.definition =
+            Arc::new(skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap());
+        // Loaded again under the two-step order, as a restart on this build.
+        again.initialized = false;
+        again.drain_storage_for_test(0);
+        assert_eq!(again.kept().steps.len(), Step::IDS.len());
+        for name in Step::IDS.iter().skip(2) {
+            assert_eq!(
+                again.kept().steps[*name].outcome,
+                Outcome::NotAvailable,
+                "{name}"
+            );
+        }
+        assert_eq!(again.kept().steps["who_you_are"].outcome, Outcome::Skipped);
+        // Written, so the next load reads all nine from the file.
+        assert_eq!(
+            Onboarding::at(room.walk.file.clone()).kept().steps.len(),
+            Step::IDS.len()
+        );
     }
 
     /// #5499: in the two-step walk, "who you are" ended with the name only

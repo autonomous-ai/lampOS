@@ -48,7 +48,9 @@ done; the model then tells them what to try later). `step` is optional:
 left out, the report is for the step led now. Only the step being led is
 taken, and only a step in the skill's `order` is ever led, so a report of
 any other is refused and recorded (`onboarding_report_refused`), and
-`redo_setup` of a step out of the `order` changes nothing (#5499).
+`redo_setup` of a step out of the `order` changes nothing and tells the
+model so (#5499); the order it answers by is the installed skill's, read
+once as the provider worker starts (`installed_order`), never on each redo.
 `where_you_sit` is done only by what the
 eyes measure, `touch` only by what Controls feels, and `how_you_sound`,
 `privacy` and `giving_way` only by their measured evidence: the model may
@@ -179,8 +181,12 @@ hold `where_you_sit` and `who_you_are` (the shipped order is just those two,
 walk follows `order` alone: adding a step back means adding it there. When
 the last step in `order` ends, each step out of it with no outcome yet is
 kept `not_available` (journal `"why":"parked"`), so lamp-update's and
-the journal keep's check of all nine sees the walk over, old updaters too;
-re-offers search only `order`, so none is offered again (test
+the journal keep's (`lamp-journal-keep`) check of all nine, not just the
+`order`, sees the walk over, old updaters too. The same is done as the
+progress is loaded, so a lamp that ended every step in `order` on a build
+without it is filled at the next start (test
+`a_two_step_walk_ended_before_parking_is_filled_at_load`). Re-offers search
+only `order`, so none is offered again (test
 `a_two_step_walk_ended_keeps_all_nine_and_offers_no_parked_step`). `reoffer_after_s` is 1 to 31,536,000
 (the shipped value is 86,400), and so is `later_after_s` (shipped 1,800). Only `who_you_are` and `preferences` may have a
 `nudge`, with `words` and `after_answers` from 1 to 8. `where_you_sit`,
@@ -588,7 +594,8 @@ next rest, a new walk that opens with the setup intro again. "Can we redo the to
 outcome and its own counts (how you sound's prompts and tries, giving way's
 tries) go, and every other step keeps what it ended with. Privacy is never
 redone alone; it goes with `all`. A call that names no step, or a step the
-walk doesn't know, reopens nothing and tells the model to ask which (on
+walk doesn't know, reopens nothing and tells the model to ask which,
+naming the step IDs in the `order` (on
 lamp-06c1 on 28 Oct "redo the touch step" reached a redo with no step and
 reopened every step). Skipping one step is `setup_step … skipped`; skipping
 the rest is that for each step.
