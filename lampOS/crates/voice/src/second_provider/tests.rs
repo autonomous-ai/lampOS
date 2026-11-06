@@ -1138,6 +1138,70 @@ fn the_owners_place_is_told_beside_a_place_question_alone() {
     let _ = std::fs::remove_dir_all(&directory);
 }
 
+/// #5523 on the second route: a tester linked a service in the app's
+/// Connectors, asked the lamp about it, and was told that was the app's job.
+/// With `LAMP_SERVICES_TOLD=on` the spoken line is asked with the note naming
+/// what is linked beside its words; without the switch (no note given to the
+/// engine), or with the note telling nothing (another's line, nothing
+/// linked), it is asked as before.
+#[test]
+fn what_the_owner_linked_is_told_beside_their_line() {
+    let linked = vec!["Notion".to_owned()];
+    let asked = |noted: Option<crate::second_provider::Remembered>| -> Vec<Message> {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("What can you do with my Notion?".to_owned())].into()),
+            chats: Mutex::new([vec![text("I can read it."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            worker::tool_runner(crate::tools::Settings::default(), None, None, false),
+            Arc::new(Instant::now),
+        )
+        .announcing(false);
+        if let Some(noted) = noted {
+            engine = engine.telling_what_is_linked(noted);
+        }
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                engine.submit(start(1));
+                engine.submit(audio(1, 1));
+                engine.submit(end(1));
+                turn(&mut engine).await
+            });
+        let asked_of = script.asked.lock().unwrap();
+        asked_of[0].clone()
+    };
+    let question = "What can you do with my Notion?";
+    let told = linked.clone();
+    assert_eq!(
+        asked(Some(Arc::new(
+            move |_: u64, _: &str, _: Option<&crate::memory_scope::ScopeLease>| {
+                crate::services_told::note_for(Some("owner"), &told)
+            }
+        ))),
+        [
+            Message::system("SYSTEM"),
+            Message::system(crate::services_told::note(&linked)),
+            Message::user(question),
+        ]
+    );
+    assert_eq!(
+        asked(Some(Arc::new(
+            |_: u64, _: &str, _: Option<&crate::memory_scope::ScopeLease>| None
+        ))),
+        [Message::system("SYSTEM"), Message::user(question)]
+    );
+    assert_eq!(
+        asked(None),
+        [Message::system("SYSTEM"), Message::user(question)]
+    );
+}
+
 /// #1390 on the second route (the first builder's 20:15 on #1722): news the
 /// person asks about (`check_agent_task`) is put on the turn it was
 /// answered in, as `NewsAnswered`, and its key is never the model's. A key
