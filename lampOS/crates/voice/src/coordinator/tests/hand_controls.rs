@@ -815,6 +815,7 @@ fn conversation_sends_hand_stop_before_a_provider_fault_queued_in_the_same_tick(
             privacy_said_us: None,
             source: None,
             authorities: Vec::new(),
+            grants: Vec::new(),
             chunk_times: Vec::new(),
             peer,
             input: Some(input),
@@ -1127,6 +1128,11 @@ struct Ran {
     chunks: Vec<SpeakerChunk>,
     /// The loop's controls, as it left them.
     controls: Option<HandControls>,
+    /// Each authority the capture's and the camera's sides were given, when,
+    /// and whether it allowed the microphones and the camera (#5611; stepped
+    /// only).
+    capture_grants: Vec<(u64, bool, bool)>,
+    camera_grants: Vec<(u64, bool, bool)>,
 }
 
 /// How the loop's time passes. On the host's clock, each fixture worker's
@@ -1172,6 +1178,10 @@ thread_local! {
     /// Before the first privacy reading, pause at the first time until the
     /// second. The initial closed-permission pass runs before this fault.
     static WAKE_PRIVACY_START_PAUSE: std::cell::Cell<Option<(u64, u64)>> = const { std::cell::Cell::new(None) };
+    /// At the first time, on the scenario clock, the whole board stalls for
+    /// the second's microseconds: the loop and every worker's side are held
+    /// up together, as lamp-06c1's were during an SD log flush (#5611).
+    static BOARD_STALL: std::cell::Cell<Option<(u64, u64)>> = const { std::cell::Cell::new(None) };
     /// The next loop's onboarding walk, its storage loaded, and its file
     /// (#3747). Unset, no walk, as before.
     static RIG_ONBOARDING: RefCell<Option<(crate::onboarding::storage::ServiceStorage, PathBuf)>> =
@@ -1246,6 +1256,8 @@ struct SteppedPeer {
     source: Option<SourcePeer>,
     /// When each authority reached this side, on the scenario clock.
     authorities: Vec<u64>,
+    /// And whether each allowed the microphones and the camera (#5611).
+    grants: Vec<(u64, bool, bool)>,
     /// When each speaker chunk reached this side.
     chunk_times: Vec<u64>,
     peer: WorkerChannels,
@@ -1312,6 +1324,11 @@ impl SteppedPeer {
                     }
                     if self.keeping {
                         self.authorities.push(monotonic_us());
+                        self.grants.push((
+                            monotonic_us(),
+                            snapshot.microphone_permission() == Permission::Allowed,
+                            snapshot.camera_permission() == Permission::Allowed,
+                        ));
                     }
                 }
                 Control::StartCapture => {
@@ -1351,6 +1368,14 @@ impl SteppedPeer {
             crate::scenario_clock::elapse_for_fault(Duration::from_micros(
                 resume_at_us.saturating_sub(at_us),
             ))?;
+        }
+        if self.privacy
+            && self.keeping
+            && let Some((stall_at_us, stall_us)) = BOARD_STALL.with(std::cell::Cell::get)
+            && monotonic_us() >= stall_at_us
+        {
+            BOARD_STALL.with(|stall| stall.set(None));
+            crate::scenario_clock::elapse_for_fault(Duration::from_micros(stall_us))?;
         }
         let now_us = monotonic_us();
         if self.keeping
@@ -1733,6 +1758,7 @@ fn run_loop_ringed(
                         },
                     ),
                     authorities: Vec::new(),
+                    grants: Vec::new(),
                     chunk_times: Vec::new(),
                     peer,
                     input: Some(input),
@@ -1890,6 +1916,7 @@ fn run_loop_ringed(
     let (mut capture_authorities, mut chunk_times) = (Vec::new(), Vec::new());
     let (mut camera_authorities, mut speaker_authorities) = (Vec::new(), Vec::new());
     let (mut capture, mut provider_inputs) = (None, Vec::new());
+    let (mut capture_grants, mut camera_grants) = (Vec::new(), Vec::new());
     let with_camera = RIG_CAMERA.with(std::cell::Cell::get);
     for peer in threads {
         let (peer, peer_told, peer_chunks) = peer.join().unwrap();
@@ -1908,10 +1935,12 @@ fn run_loop_ringed(
         }
         if index == 1 {
             capture_authorities = peer.authorities.clone();
+            capture_grants = peer.grants.clone();
             capture = peer.capture;
         }
         if with_camera && index == last {
             camera_authorities = peer.authorities.clone();
+            camera_grants = peer.grants.clone();
         }
         chunk_times.extend(peer.chunk_times);
         told.extend(peer.told);
@@ -1943,6 +1972,8 @@ fn run_loop_ringed(
         told,
         chunks,
         controls,
+        capture_grants,
+        camera_grants,
     }
 }
 
@@ -2762,6 +2793,228 @@ fn the_retention_heartbeat_counts_from_a_gaps_reopen() {
         reopened,
         later + CAPTURE_GAP_US - 1
     ));
+}
+
+/// The loop on the Controls privacy route, the switch read open every 5 ms
+/// for 1.5 s, with `LAMP_PRIVACY_RIDES_STALL` `on` and a reply under way,
+/// and the whole board stalled at `stall_at` for `stall_us` (#5611); with
+/// the switch read closed from `closed_from`, if given. The rig has its
+/// camera. What it left, and when it began.
+fn stall_run(on: bool, stall_at: u64, stall_us: u64, closed_from: Option<u64>) -> (Ran, u64) {
+    let began = std::cell::Cell::new(0);
+    RIG_PRIVACY_CONTROLS.with(|rig| rig.set(true));
+    RIG_CAMERA.with(|camera| camera.set(true));
+    super::TEST_PRIVACY_RIDES_STALL.with(|rides| rides.set(on));
+    let ran = run_loop_with(
+        || {
+            let now = monotonic_us();
+            began.set(now);
+            PRIVACY_FRESH_UNTIL.with(|until| until.set(Some(now + 1_500_000)));
+            PRIVACY_CLOSED_FROM.with(|from| from.set(closed_from.map(|at| now + at)));
+            BOARD_STALL.with(|stall| stall.set(Some((now + stall_at, stall_us))));
+            HandControls::with_test_tap("test-hand-clock", now - 10_000_000).unwrap()
+        },
+        || {
+            let (owner, current, _) = active_reply();
+            (owner, Some(current))
+        },
+        false,
+        Clocking::Stepped,
+    );
+    RIG_PRIVACY_CONTROLS.with(|rig| rig.set(false));
+    RIG_CAMERA.with(|camera| camera.set(false));
+    super::TEST_PRIVACY_RIDES_STALL.with(|rides| rides.set(false));
+    PRIVACY_FRESH_UNTIL.with(|until| until.set(None));
+    PRIVACY_CLOSED_FROM.with(|from| from.set(None));
+    BOARD_STALL.with(|stall| stall.set(None));
+    (ran, began.get())
+}
+
+/// #5611, lamp-06c1 at 21:30:02 on 6 Nov: the voice's processes stalled
+/// together for 120-132 ms during an SD log flush while it was saying an
+/// answer; the voice ended on "service privacy freshness lost", its workers
+/// with it, and came back muted by the restart guard. With
+/// `LAMP_PRIVACY_RIDES_STALL=on` a 300 ms stall of the whole board is
+/// ridden closed: the answer is cut, from the stall nothing is played, no
+/// authority allows the microphones or the camera until the switch reads
+/// open and steady again, and the conversation goes on, listening within
+/// 300 ms of that first fresh reading. Off, the same stall ends it there.
+#[test]
+fn a_300_ms_coordinator_stall_during_playback_keeps_the_voice_up_closed_and_listening_after() {
+    let (stall_at, stall_us) = (400_000, 300_000);
+    // Off: as before the switch.
+    let (ran, began) = stall_run(false, stall_at, stall_us, None);
+    let woke = began + stall_at + stall_us;
+    assert!(gap_marks(&ran, "began").is_empty());
+    assert!(
+        ran.error.contains("service privacy freshness lost"),
+        "{}",
+        ran.error
+    );
+    assert!(
+        (woke..woke + 10_000).contains(&ran.ended_us),
+        "off ended {} ms after the stall",
+        ran.ended_us.saturating_sub(woke) / 1_000
+    );
+
+    let (ran, began) = stall_run(true, stall_at, stall_us, None);
+    let (stalled, woke) = (began + stall_at, began + stall_at + stall_us);
+    let started = gap_marks(&ran, "began");
+    let reopened = gap_marks(&ran, "reopened");
+    assert_eq!(started.len(), 1, "{started:?}: {}", ran.error);
+    assert_eq!(reopened.len(), 1, "{reopened:?}: {}", ran.error);
+    let (gap_at, _) = started[0];
+    let (open_at, lasted) = reopened[0];
+    assert!(
+        (woke..woke + 10_000).contains(&gap_at),
+        "{}",
+        gap_at - began
+    );
+    // Counted from the pass before the stall.
+    assert!(lasted.unwrap() >= open_at - woke + stall_us, "{lasted:?}");
+    assert!(ran.trace.iter().any(|row| row["kind"] == "privacy_gap"
+        && row["state"] == "began"
+        && row["stall"] == true));
+    // The answer was being played before, cut at the stall, and not resumed.
+    assert!(
+        ran.chunk_times.iter().any(|at| *at < stalled),
+        "no playback"
+    );
+    assert!(
+        ran.trace
+            .iter()
+            .any(|row| row["kind"] == "turn_finished" && row["outcome"] == "privacy_gap"),
+        "the answer cut"
+    );
+    assert!(ran.left.is_none(), "not resumed");
+    let held = |at: &u64| (stalled..open_at).contains(at);
+    assert!(
+        ran.chunk_times.iter().all(|at| !held(at)),
+        "played in the stall"
+    );
+    // The microphones were not allowed from the stall to the reopen, and the
+    // camera was given no authority at all (it ends itself without one);
+    // both were before and are after.
+    let allowed_in_stall: Vec<u64> = ran
+        .capture_grants
+        .iter()
+        .filter(|grant| held(&grant.0) && grant.1)
+        .map(|grant| grant.0 - stalled)
+        .collect();
+    assert!(
+        allowed_in_stall.is_empty(),
+        "the microphones: {allowed_in_stall:?}"
+    );
+    let camera_in_stall: Vec<u64> = ran
+        .camera_grants
+        .iter()
+        .filter(|grant| held(&grant.0))
+        .map(|grant| grant.0 - stalled)
+        .collect();
+    assert!(
+        camera_in_stall.is_empty(),
+        "the camera: {camera_in_stall:?}"
+    );
+    assert!(
+        ran.capture_grants
+            .iter()
+            .any(|grant| grant.0 < stalled && grant.1)
+    );
+    assert!(ran.camera_grants.iter().any(|grant| grant.0 < stalled));
+    assert!(ran.camera_grants.iter().any(|grant| grant.0 >= open_at));
+    assert!(
+        ran.capture_grants
+            .iter()
+            .any(|grant| grant.0 >= open_at && grant.1)
+    );
+    // Listening again within 300 ms of the first fresh reading after it:
+    // capture given the microphones again (this rig's capture side keeps
+    // no frames, so its snapshots never say `listening_ready`; the second
+    // worker's own test reads that).
+    let listening = ran
+        .capture_grants
+        .iter()
+        .find(|grant| grant.0 >= woke && grant.1)
+        .map(|grant| grant.0)
+        .expect("the microphones never allowed again");
+    assert!(
+        listening - woke < 300_000,
+        "listening {} ms after the renewal",
+        (listening - woke) / 1_000
+    );
+    eprintln!(
+        "#5611 latency: capture allowed again {} ms after the first fresh reading",
+        (listening - woke) / 1_000
+    );
+    // The voice stayed up: it ended only when the readings stopped at 1.5 s,
+    // as every conversation of this run does.
+    assert!(ran.ended_us >= began + 1_500_000, "{}", ran.error);
+    assert!(
+        ran.error.contains("service privacy freshness lost"),
+        "{}",
+        ran.error
+    );
+    assert!(
+        !ran.trace.iter().any(|row| row["kind"] == "physical_mute"),
+        "muted"
+    );
+}
+
+/// The first builder's case 3 on #5611, in the loop: granted, then the
+/// stall, the switch closed during it. What follows is the mute, never a
+/// stale grant: no authority allows the microphones or the camera after
+/// the stall. Off, the stall ended the loop first, as before.
+#[test]
+fn a_switch_closed_during_a_ridden_stall_is_the_mute_and_grants_nothing_after() {
+    let (stall_at, stall_us) = (400_000, 300_000);
+    let (ran, began) = stall_run(true, stall_at, stall_us, Some(stall_at + 100_000));
+    let stalled = began + stall_at;
+    assert!(
+        ran.trace.iter().any(|row| row["kind"] == "physical_mute"),
+        "the mute: {}",
+        ran.error
+    );
+    assert!(gap_marks(&ran, "reopened").is_empty());
+    for (side, grants) in [
+        ("capture", &ran.capture_grants),
+        ("camera", &ran.camera_grants),
+    ] {
+        assert!(
+            grants
+                .iter()
+                .all(|grant| grant.0 < stalled || (!grant.1 && !grant.2)),
+            "{side} allowed after the stall: {grants:?}"
+        );
+    }
+}
+
+/// A coordinator hung past 1.5 s (#5611): with the switch on, the loop ends
+/// at its waking exactly as it does off, on the freshness lost, with no gap
+/// ridden. The workers' own guards end them as before
+/// (`a_granting_lapse_past_1_5_s_still_ends_the_worker`,
+/// `silence_past_1_5_s_still_ends_the_route`).
+#[test]
+fn a_coordinator_hung_past_1_5_s_exits_as_today() {
+    let (stall_at, stall_us) = (400_000, 1_800_000);
+    let mut ends = Vec::new();
+    for on in [false, true] {
+        let (ran, began) = stall_run(on, stall_at, stall_us, None);
+        let woke = began + stall_at + stall_us;
+        assert!(gap_marks(&ran, "began").is_empty(), "on {on}");
+        assert!(
+            (woke..woke + 10_000).contains(&ran.ended_us),
+            "on {on}: ended {} ms after waking: {}",
+            ran.ended_us.saturating_sub(woke) / 1_000,
+            ran.error
+        );
+        ends.push(ran.error);
+    }
+    assert_eq!(ends[0], ends[1]);
+    assert!(
+        ends[0].contains("service privacy freshness lost"),
+        "{}",
+        ends[0]
+    );
 }
 
 /// #2602: off, the same gap ends the conversation at its lapse, as always.

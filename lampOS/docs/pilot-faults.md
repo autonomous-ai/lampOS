@@ -705,6 +705,11 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   Capture ended with that fault, the cleanup failed (`verified cleanup
   failed: capture WorkerFault: … capture WorkerExit: … exit status: 1`),
   and a failed cleanup is never waited out, so the voice exited 1 (#4332).
+  The same freshness loss after a stall of the voice itself, as on
+  lamp-06c1 at 21:30:02 on 6 Nov (capture, ring and the coordinator held
+  120-132 ms during an SD log flush, #5611), is ridden as a closed privacy
+  gap with `LAMP_PRIVACY_RIDES_STALL=on`, so no Stop is sent then; off, or
+  past 1.5 s, it ends as described here.
   Boot 4's same freshness loss had a clean cleanup and the voice was back
   in the wait, ready 0.2 s later. Now, once `prepare()` returns, capture
   reads what the coordinator queued meanwhile (`peer_stop.rs`), keeps it in
@@ -752,7 +757,11 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   stopped being kept about 0.29 s before the end of the failed turn, so
   the clipped expiry froze and every lease lapsed before the lapsed
   capture lease cut the turn; the privacy worker ending on a lapsed
-  granting lease is by design (fail-closed). The coordinator now cuts a
+  granting lease is by design (fail-closed). With
+  `LAMP_PRIVACY_RIDES_STALL=on` (#5611, off by default) a granting lease's
+  lapse is ridden closed for at most 1.5 s instead, publishing nothing
+  (`privacy-switch.md`), so a lapse of that kind no longer ends the worker
+  unless it outlasts that bound. The coordinator now cuts a
   held turn as a capture gap once its lease ends within 40 ms
   (`HELD_TURN_LEASE_MARGIN_US`), judged on the frames its last capture
   drain kept, so a pass held up while frames keep coming cuts nothing,

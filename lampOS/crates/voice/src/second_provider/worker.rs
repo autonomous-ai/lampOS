@@ -60,6 +60,12 @@ struct Gate {
     /// Authority snapshots that lapsed in the queue while this worker was
     /// held up, since the last one installed.
     skipped_expired: u32,
+    /// `LAMP_PRIVACY_RIDES_STALL=on` (#5611): a lease lapsed by a stall of
+    /// the controller under [`STALLED_CONTROL_US`] holds the route closed
+    /// instead of ending it ([`Gate::holds`]).
+    rides_stall: bool,
+    /// Since when it holds closed, the last authority's install.
+    held_since: Option<u64>,
 }
 
 enum Drain {
@@ -77,6 +83,8 @@ impl Gate {
             highest_seen: 0,
             retired_through: 0,
             skipped_expired: 0,
+            rides_stall: false,
+            held_since: None,
         }
     }
 
@@ -115,6 +123,12 @@ impl Gate {
             state.microphone_permission() == lamp_turn_owner::Permission::Allowed,
             state.microphone_generation(),
         ));
+        if let Some(since) = self.held_since.take() {
+            eprintln!(
+                "lamp-voice second: held closed {} ms through a stall; a fresh authority came, going on",
+                now_us.saturating_sub(since) / 1_000
+            );
+        }
         self.last_control_us = now_us;
         if let Some(owner) = state.owner() {
             if owner.turn() <= self.retired_through || owner.turn() < self.highest_seen {
@@ -140,6 +154,46 @@ impl Gate {
             );
         }
         Ok(())
+    }
+
+    /// Whether the route holds closed at `now_us` (#5611,
+    /// `LAMP_PRIVACY_RIDES_STALL=on`): its authority lapsed by time alone,
+    /// valid when it was installed and not since, with the controller silent
+    /// under [`STALLED_CONTROL_US`]: a stall of the controller, or of the
+    /// whole board, as on lamp-06c1 during an SD log flush. Held, it takes no
+    /// input and sends nothing, and listening stops ([`Engine::listening`]);
+    /// the controller's next fresh authority ends the hold (`install`). Off,
+    /// or past the bound, never: `fresh` and the heartbeat end it as before.
+    fn holds(&mut self, now_us: u64, engine: &mut Engine) -> bool {
+        if !self.rides_stall {
+            return false;
+        }
+        let silent = now_us.saturating_sub(self.last_control_us);
+        let at = MonoTime::from_micros;
+        let lapsed = match self.guard.state() {
+            Some(state) => {
+                now_us >= state.expires_at().as_micros()
+                    || (state.owner().is_some()
+                        && !state.listening_ready(at(now_us))
+                        && state.listening_ready(at(self.last_control_us)))
+            }
+            None => silent >= CONTROL_LEASE_US,
+        };
+        if !lapsed || silent > STALLED_CONTROL_US {
+            return false;
+        }
+        if self.held_since.is_none() {
+            self.held_since = Some(self.last_control_us);
+            eprintln!(
+                "lamp-voice second: the controller has been silent {} ms and the lease lapsed: held closed, nothing taken or sent, up to {} ms",
+                silent / 1_000,
+                STALLED_CONTROL_US / 1_000
+            );
+            if let Some(state) = self.guard.state() {
+                engine.listening(false, state.microphone_generation());
+            }
+        }
+        true
     }
 
     /// As the fixture's `fresh`, less its finite-run clock rules: judged
@@ -326,9 +380,11 @@ impl Gate {
         // While a backlog left by a stall is still being read, the fresh
         // authority may be further down it: the heartbeat is judged once
         // the queue is empty, or after the longest stall a gap may be.
+        // With `LAMP_PRIVACY_RIDES_STALL=on` (#5611) a silence under the
+        // longest stall holds the route closed instead (`holds`).
         let silent = monotonic_us().saturating_sub(self.last_control_us);
         if silent > STALLED_CONTROL_US
-            || (matches!(drained, Drain::Empty) && silent >= CONTROL_LEASE_US)
+            || (matches!(drained, Drain::Empty) && silent >= CONTROL_LEASE_US && !self.rides_stall)
         {
             return Err(invalid("second route controller heartbeat expired"));
         }
@@ -12478,6 +12534,9 @@ pub async fn run(
         .control
         .send(WorkerEvent::ProviderLink { link: ready })?;
     let mut gate = Gate::new(boot, monotonic_us());
+    // Riding a stall closed (#5611): in this worker's cleared environment
+    // only as `worker_command` passes it.
+    gate.rides_stall = crate::privacy_gap::rides_stall_from_environment();
     let mut ticker = tokio::time::interval(Duration::from_millis(2));
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     // At most one input read ahead of its authority, and one output waiting
@@ -12512,6 +12571,17 @@ pub async fn run(
             Drain::Deferred => continue,
             Drain::Empty => {}
         }
+        // Held closed through a stall (#5611): input queued under the lapsed
+        // authority is refused, dropped unread, and nothing is sent.
+        if gate.holds(monotonic_us(), &mut engine) {
+            retained = None;
+            for _ in 0..INPUT_SLICE {
+                if channels.data.receive::<ProviderInput>()?.is_none() {
+                    break;
+                }
+            }
+            continue;
+        }
         gate.fresh(monotonic_us())?;
         // As many inputs a tick as the Live worker takes: a line replayed
         // to this route arrives faster than it was spoken, and a packet
@@ -12529,6 +12599,9 @@ pub async fn run(
                 }
                 Drain::Deferred => continue 'tick,
                 Drain::Empty => {}
+            }
+            if gate.holds(monotonic_us(), &mut engine) {
+                continue 'tick;
             }
             let Some(command) = retained.take() else {
                 break;
@@ -12615,6 +12688,9 @@ pub async fn run(
             channels
                 .control
                 .send(WorkerEvent::ProviderLink { link: changed })?;
+        }
+        if gate.holds(monotonic_us(), &mut engine) {
+            continue;
         }
         if let Some(event) = pending.take()
             && !gate.send_or_discard(&engine, monotonic_us(), &event, |event| {
@@ -20191,6 +20267,184 @@ mod tests {
         // Nothing sent since Ready, a lease ago.
         let error = ended(first_drain_after(CONTROL_LEASE_US + 10_000, &[]).0);
         assert!(error.contains("heartbeat expired"), "{error}");
+    }
+
+    /// A second worker holding an admitted turn's authority, its lease and
+    /// listening 100 ms as during playback, installed `stall_us` ago, with
+    /// `LAMP_PRIVACY_RIDES_STALL` `on`, and nothing sent since: the
+    /// controller stalled. Its channels, controller, engine and the turn.
+    fn stalled_controller(
+        stall_us: u64,
+        on: bool,
+    ) -> (
+        Gate,
+        Controller,
+        Engine,
+        WorkerChannels,
+        WorkerChannels,
+        crate::process::SessionDirectory,
+        u64,
+    ) {
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let boot = BootId::new([7; 16]).unwrap();
+        let worker_boot = BootId::new([8; 16]).unwrap();
+        let mut parent =
+            WorkerChannels::bind(&directory.path, "second", boot, worker_boot, false).unwrap();
+        let mut worker =
+            WorkerChannels::bind(&directory.path, "second", boot, worker_boot, true).unwrap();
+        parent.connect(&directory.path, "second", false).unwrap();
+        worker.connect(&directory.path, "second", true).unwrap();
+        let installed_us = monotonic_us() - stall_us;
+        let at = MonoTime::from_micros;
+        let mut owner = Controller::new(boot, at(installed_us));
+        owner
+            .set_microphone_permission(at(installed_us), Permission::Allowed)
+            .unwrap();
+        let until = at(installed_us + 100_000);
+        owner
+            .set_capture(at(installed_us), CaptureState::RetainingUntil(until))
+            .unwrap();
+        owner
+            .set_admission(at(installed_us), AdmissionState::OpenUntil(until))
+            .unwrap();
+        let turn = owner
+            .admit(at(installed_us), AdmittedInput::NewTurn)
+            .unwrap()
+            .turn();
+        let mut engine = Engine::new(
+            Arc::new(Silent),
+            Told::default,
+            Arc::new(|_, _, _, _| Box::pin(async { serde_json::Value::Null })),
+        );
+        let mut gate = Gate::new(boot, installed_us);
+        gate.rides_stall = on;
+        let state = owner.snapshot(at(installed_us)).unwrap();
+        gate.install(installed_us, state, &mut engine).unwrap();
+        assert!(gate.fresh(installed_us + 1_000).is_ok());
+        (gate, owner, engine, parent, worker, directory, turn)
+    }
+
+    /// A line's start for `request`, under `generation`.
+    fn line_start(request: u64, generation: u64) -> ProviderInput {
+        ProviderInput::Start {
+            request,
+            session: 1,
+            privacy_generation: generation,
+            continues: false,
+            continues_cut_off: false,
+            over_the_lamp: false,
+            after_stop: false,
+            follows_on: false,
+            over_the_lamps_voice: false,
+            heard_of_cut: None,
+            soft_lead_us: 0,
+        }
+    }
+
+    /// #5611, lamp-06c1 on 6 Nov: the voice's processes stalled together
+    /// during an SD log flush and the second route ended, exit 1. Both of
+    /// its exits: a 120 ms stall lapses the turn's 100 ms lease (`fresh`),
+    /// a 300 ms one is past the 250 ms heartbeat too (`drain`). Off, both
+    /// end the route as before. With `LAMP_PRIVACY_RIDES_STALL=on` it holds
+    /// closed: no input taken, nothing sent, listening stopped; the
+    /// controller's next renewal lets it go on, listening again at once.
+    #[tokio::test]
+    async fn a_300_ms_controller_silence_holds_the_route_closed_and_goes_on() {
+        for stall_us in [120_000, 300_000] {
+            // Off: as before the switch.
+            let (mut gate, _owner, mut engine, _parent, mut worker, _directory, _turn) =
+                stalled_controller(stall_us, false);
+            let ended = match gate.drain(&mut worker.control, &mut engine) {
+                Err(error) => error.to_string(),
+                Ok(_) => gate
+                    .fresh(monotonic_us())
+                    .map_or_else(|error| error.to_string(), |()| "went on".into()),
+            };
+            let expected = if stall_us >= CONTROL_LEASE_US {
+                "second route controller heartbeat expired"
+            } else {
+                "second route privacy or input lease expired"
+            };
+            assert_eq!(ended, expected, "off, {stall_us} us");
+            assert!(!gate.holds(monotonic_us(), &mut engine));
+
+            // On: held closed.
+            let (mut gate, mut owner, mut engine, mut parent, mut worker, _directory, turn) =
+                stalled_controller(stall_us, true);
+            assert!(matches!(
+                gate.drain(&mut worker.control, &mut engine),
+                Ok(Drain::Empty)
+            ));
+            assert!(gate.holds(monotonic_us(), &mut engine), "{stall_us} us");
+            assert!(gate.held_since.is_some());
+            let generation = gate.guard.state().unwrap().microphone_generation();
+            assert!(
+                gate.admits(monotonic_us(), &line_start(turn, generation))
+                    .is_err(),
+                "input taken while held"
+            );
+            assert!(
+                gate.may_send(
+                    monotonic_us(),
+                    &ProviderOutput::GenerationComplete { request: turn }
+                )
+                .is_err(),
+                "output sent while held"
+            );
+            // The renewal, and listening again within 300 ms of it.
+            let renewed_us = monotonic_us();
+            let at = MonoTime::from_micros(renewed_us);
+            let until = MonoTime::from_micros(renewed_us + 100_000);
+            owner
+                .set_capture(at, CaptureState::RetainingUntil(until))
+                .unwrap();
+            owner
+                .set_admission(at, AdmissionState::OpenUntil(until))
+                .unwrap();
+            // The stalled turn is over; the next line is a turn of its own.
+            let next = owner.admit(at, AdmittedInput::NewTurn).unwrap().turn();
+            let snapshot = owner.snapshot(at).unwrap();
+            parent
+                .control
+                .send(Control::Authority { snapshot })
+                .unwrap();
+            let renewed = Instant::now();
+            assert!(matches!(
+                gate.drain(&mut worker.control, &mut engine),
+                Ok(Drain::Empty)
+            ));
+            assert!(!gate.holds(monotonic_us(), &mut engine));
+            gate.fresh(monotonic_us()).unwrap();
+            assert!(
+                gate.guard
+                    .state()
+                    .unwrap()
+                    .listening_ready(MonoTime::from_micros(monotonic_us()))
+            );
+            assert!(
+                gate.admits(monotonic_us(), &line_start(next, generation))
+                    .unwrap()
+            );
+            let ready_ms = renewed.elapsed().as_millis();
+            assert!(
+                ready_ms < 300,
+                "listening again {ready_ms} ms after the renewal"
+            );
+            assert!(gate.held_since.is_none());
+        }
+    }
+
+    /// The bound holds with the switch on (#5611): a controller silent past
+    /// 1.5 s still ends the route at the heartbeat, as it would off.
+    #[tokio::test]
+    async fn silence_past_1_5_s_still_ends_the_route() {
+        for on in [false, true] {
+            let (mut gate, _owner, mut engine, _parent, mut worker, _directory, _turn) =
+                stalled_controller(STALLED_CONTROL_US + 100_000, on);
+            let error = ended(gate.drain(&mut worker.control, &mut engine));
+            assert!(error.contains("heartbeat expired"), "on {on}: {error}");
+            assert!(!gate.holds(monotonic_us(), &mut engine), "on {on}");
+        }
     }
 
     /// #2305's review: a camera close and a mute, as the worker installs

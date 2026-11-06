@@ -1238,6 +1238,10 @@ fn worker_command(
             role,
             var(crate::person::PRIVATE_ROOM_ENVIRONMENT).as_deref(),
         ))
+        .envs(rides_stall_worker_environment(
+            role,
+            var(crate::privacy_gap::STALL_SWITCH).as_deref(),
+        ))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -1253,6 +1257,17 @@ fn memory_days_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some(("LAMP_MEMORY_DAYS", "on"))
+}
+
+// Riding the voice's own stall closed (#5611, `LAMP_PRIVACY_RIDES_STALL`):
+// the exact `on`, to the two workers whose lease lapse it rides, the privacy
+// worker and the second route. Each reads it itself; no other gets it.
+fn rides_stall_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "privacy" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::privacy_gap::STALL_SWITCH, "on"))
 }
 
 // Each worker's own scheduling (#1608, `LAMP_WORKER_SCHEDULING`): the exact
@@ -2320,6 +2335,45 @@ mod tests {
             Some(std::ffi::OsStr::new("")),
         ] {
             assert_eq!(near_calibrated_worker_environment("provider", off), None);
+        }
+    }
+
+    /// #5611: the stall ride reaches the privacy worker and the second route
+    /// only, and only as the exact `on`, in a real child's cleared
+    /// environment.
+    #[test]
+    fn the_stall_ride_reaches_only_the_privacy_worker_and_the_second_route() {
+        use std::ffi::OsStr;
+        for role in [
+            "privacy", "second", "provider", "capture", "speaker", "ring", "camera", "unknown",
+        ] {
+            for value in [
+                None,
+                Some(OsStr::new("on")),
+                Some(OsStr::new("ON")),
+                Some(OsStr::new("on ")),
+                Some(OsStr::new("1")),
+                Some(OsStr::new("")),
+            ] {
+                let output = Command::new("/usr/bin/env")
+                    .env("LAMP_TEST_UNRELATED", "synthetic")
+                    .env_clear()
+                    .envs(rides_stall_worker_environment(role, value))
+                    .output()
+                    .unwrap();
+                assert!(output.status.success());
+                let expected =
+                    if matches!(role, "privacy" | "second") && value == Some(OsStr::new("on")) {
+                        "LAMP_PRIVACY_RIDES_STALL=on\n"
+                    } else {
+                        ""
+                    };
+                assert_eq!(
+                    output.stdout,
+                    expected.as_bytes(),
+                    "role {role}, value {value:?}"
+                );
+            }
         }
     }
 

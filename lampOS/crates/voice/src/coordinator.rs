@@ -5630,6 +5630,8 @@ thread_local! {
     static TEST_UNCLEAR_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_PRIVACY_GAP_RIDE=on` (#2602), as `TEST_FULL_LOOK`.
     static TEST_PRIVACY_GAP_RIDE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's `LAMP_PRIVACY_RIDES_STALL=on` (#5611), as `TEST_FULL_LOOK`.
+    static TEST_PRIVACY_RIDES_STALL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_MISHEARD_HUM=on` (#828), as `TEST_FULL_LOOK`.
     static TEST_MISHEARD_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_HOLDING_ANSWER=on`, without changing process-wide flags.
@@ -6209,9 +6211,17 @@ fn conversation_with_gate_inner(
         || TEST_PRIVACY_GAP_RIDE.with(std::cell::Cell::get);
     #[cfg(not(test))]
     let gap_ride_on = crate::privacy_gap::enabled_from_environment();
+    // And a lapse seen after the voice's own stall, with
+    // `LAMP_PRIVACY_RIDES_STALL=on` (#5611), on the same route only.
+    #[cfg(test)]
+    let rides_stall_on = crate::privacy_gap::rides_stall_from_environment()
+        || TEST_PRIVACY_RIDES_STALL.with(std::cell::Cell::get);
+    #[cfg(not(test))]
+    let rides_stall_on = crate::privacy_gap::rides_stall_from_environment();
     let mut gap_ride = crate::privacy_gap::GapRide::new(
         gap_ride_on && rig.privacy_controls && lifetime.continuous(),
-    );
+    )
+    .riding_stalls(rides_stall_on && rig.privacy_controls && lifetime.continuous());
     let mut frames_from_us = 0u64;
     // A privacy observation read stale before the microphone was first
     // allowed: said once (lamp-4ace, 19 Oct 01:19).
@@ -7344,6 +7354,9 @@ fn conversation_with_gate_inner(
         }
         termination.check()?;
         let clock = monotonic_us();
+        // A pass long after the last followed the voice's own stall: with
+        // `LAMP_PRIVACY_RIDES_STALL=on` a lapse seen in it is ridden (#5611).
+        gap_ride.pass(clock);
         signed_out.read(clock);
         if cloud.available() {
             if link_down_since.take().is_some() {
@@ -8140,7 +8153,7 @@ fn conversation_with_gate_inner(
                 // The readings are back and open but not yet steady: a gap
                 // ridden waits for the gate's 60 ms, as the first grant does.
                 PrivacyState::Stabilizing => {
-                    gap_ride.lasted(monotonic_us()).is_some()
+                    (gap_ride.lasted(monotonic_us()).is_some() || gap_ride.held_up(monotonic_us()))
                         && gap_ride.rides(permitted, monotonic_us())
                 }
                 _ => false,
@@ -8159,8 +8172,14 @@ fn conversation_with_gate_inner(
                 tell_eyes_no(eyes_link.as_mut(), "privacy gap");
                 // The reply is cut here whatever `gap_cancelled` says: the
                 // next pass's cancel (admission's reset) is skipped only when
-                // a capture gap still open has already run it.
-                cancel_reply(owner, reply, trace, "privacy_gap")?;
+                // a capture gap still open has already run it. After a stall
+                // (#5611) its turn's input leases may have lapsed in it, and
+                // the controller revoked it already: that is the cut too.
+                if gap_ride.after_a_stall() {
+                    cancel_lapsed_reply(owner, reply, trace, "privacy_gap")?;
+                } else {
+                    cancel_reply(owner, reply, trace, "privacy_gap")?;
+                }
                 provider_queue.clear();
                 speaker_pending = None;
                 gap_cut_utterance = true;
@@ -8169,14 +8188,25 @@ fn conversation_with_gate_inner(
                 snapshot = owner.snapshot(now())?;
                 rig.publish(snapshot)?;
                 last_publish = monotonic_us();
-                eprintln!(
-                    "lamp-voice: the privacy switch's readings lapsed: nothing is heard, and the conversation waits up to {} ms for a fresh one",
-                    crate::privacy_gap::RIDE_US / 1_000
-                );
-                record(
-                    trace,
-                    json!({"kind":"privacy_gap","state":"began","at_us":monotonic_us()}),
-                )?;
+                let stall = gap_ride.after_a_stall();
+                if stall {
+                    eprintln!(
+                        "lamp-voice: the voice was held up {} ms and the privacy readings lapsed in it: nothing is heard, and the conversation waits up to {} ms from before the stall for a fresh one",
+                        gap_ride.lasted(monotonic_us()).unwrap_or(0) / 1_000,
+                        gap_ride.most_us() / 1_000
+                    );
+                } else {
+                    eprintln!(
+                        "lamp-voice: the privacy switch's readings lapsed: nothing is heard, and the conversation waits up to {} ms for a fresh one",
+                        gap_ride.most_us() / 1_000
+                    );
+                }
+                let mut began =
+                    json!({"kind":"privacy_gap","state":"began","at_us":monotonic_us()});
+                if stall {
+                    began["stall"] = json!(true);
+                }
+                record(trace, began)?;
             }
         }
         // The gap ridden is over: a fresh reading said open (#2602). The
@@ -16670,6 +16700,27 @@ fn cancel_reply(
         let cancel = owner.cancel_turn(now(), current.owner);
         record_cancelled_reply(current, trace, reason, monotonic_us())?;
         cancel?;
+    }
+    Ok(())
+}
+
+/// As [`cancel_reply`], for a reply whose turn the controller may have
+/// revoked already, its input leases lapsed in a stall of the voice
+/// (#5611): that turn is over either way, so its stale owner is not an
+/// error here. Any other refusal still is.
+fn cancel_lapsed_reply(
+    owner: &mut Controller,
+    reply: &mut Option<Reply>,
+    trace: &mut SessionState,
+    reason: &str,
+) -> Result<()> {
+    if let Some(current) = reply.take() {
+        let cancel = owner.cancel_turn(now(), current.owner);
+        record_cancelled_reply(current, trace, reason, monotonic_us())?;
+        match cancel {
+            Ok(_) | Err(lamp_turn_owner::Error::StaleOwner) => {}
+            Err(error) => return Err(error.into()),
+        }
     }
     Ok(())
 }

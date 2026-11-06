@@ -511,12 +511,18 @@ fn authority(
                     Ok(()) => {}
                     // Queued while the board was held up, it lapsed in the
                     // queue (#4332): a Denied-only one is skipped, as the
-                    // provider workers skip theirs; any other still ends.
-                    // The lease held, older still, lapsed first.
-                    Err(lamp_turn_owner::Error::ExpiredState) if denied_only(snapshot) => {
+                    // provider workers skip theirs; with
+                    // `LAMP_PRIVACY_RIDES_STALL=on` a granting one too
+                    // (#5611); any other still ends. The lease held, older
+                    // still, lapsed first.
+                    Err(lamp_turn_owner::Error::ExpiredState)
+                        if denied_only(snapshot) || lapse.granting =>
+                    {
                         lapse.began(snapshot.expires_at().as_micros());
+                        lapse.granted_lapse |= !denied_only(snapshot);
                         if let Some(held) = guard.state() {
                             lapse.began(held.expires_at().as_micros());
+                            lapse.granted_lapse |= !denied_only(held);
                         }
                     }
                     Err(error) => return Err(error.into()),
@@ -571,9 +577,24 @@ pub(crate) enum Held {
 #[derive(Debug, Default)]
 pub(crate) struct DeniedLapse {
     since_us: Option<u64>,
+    /// `LAMP_PRIVACY_RIDES_STALL=on` (#5611): a lapse of a lease that
+    /// grants is ridden too, the same way, under the same bound.
+    granting: bool,
+    /// The lapse ridden now is of a lease that granted, for its line.
+    granted_lapse: bool,
 }
 
 impl DeniedLapse {
+    /// A lapse ridden as above, and with `granting` (#5611) a lapse of a
+    /// lease that grants the microphones or the camera as well.
+    pub(crate) fn riding_granting(granting: bool) -> Self {
+        Self {
+            since_us: None,
+            granting,
+            granted_lapse: false,
+        }
+    }
+
     /// A lease lapsed at `expired_us`: the lapse began then, unless an
     /// earlier one did. For a Denied-only authority that came already
     /// lapsed, and the lease held before it.
@@ -600,9 +621,14 @@ impl DeniedLapse {
                     None => Held::Current,
                 })
             }
-            Some(state) if !denied_only(state) => Err(expired()),
+            Some(state) if !denied_only(state) && !self.granting => Err(expired()),
+            // A Denied-only lease's lapse (#4332), or with the switch any
+            // (#5611): nothing is published from it, so Ears and capture
+            // expire what they hold on their own clocks, and the bound and
+            // the switch's own reading are as for a Denied one.
             Some(state) => {
                 self.began(state.expires_at().as_micros());
+                self.granted_lapse |= !denied_only(state);
                 self.riding(now_us).map_err(|()| expired())
             }
             None if self.since_us.is_some() => self.riding(now_us).map_err(|()| expired()),
@@ -639,7 +665,11 @@ fn look(
         eprintln!("{}", first_authority_line());
     }
     if let Held::Rearmed(lapsed_ms) = held {
-        eprintln!("{}", rearmed_line(lapsed_ms));
+        if std::mem::take(&mut lapse.granted_lapse) {
+            eprintln!("{}", rearmed_granting_line(lapsed_ms));
+        } else {
+            eprintln!("{}", rearmed_line(lapsed_ms));
+        }
     }
     Ok(held)
 }
@@ -670,6 +700,13 @@ pub(crate) fn first_authority_line() -> String {
         "lamp-voice: privacy worker has had no authority {} ms after its start, riding it up to {} ms (microphones and camera stay closed)",
         FIRST_AUTHORITY_US / 1_000,
         DENIED_LAPSE_MOST_US / 1_000
+    )
+}
+
+/// The journal's line for a ridden lapse of a lease that granted (#5611).
+pub(crate) fn rearmed_granting_line(lapsed_ms: u64) -> String {
+    format!(
+        "lamp-voice: privacy worker re-armed its lease after {lapsed_ms} ms lapsed in a stall (nothing was published meanwhile; microphones and camera stayed closed)"
     )
 }
 
@@ -1082,7 +1119,10 @@ fn serve(
     let mut previous_permission = None;
     let mut granted = false;
     let mut sequence = 0u64;
-    let mut lapse = DeniedLapse::default();
+    // A granting lease's lapse is ridden too with the switch (#5611): it
+    // reaches this worker in its cleared environment (`worker_command`).
+    let mut lapse =
+        DeniedLapse::riding_granting(crate::privacy_gap::rides_stall_from_environment());
     let began = lamp_ipc::monotonic_us();
     channels.control.send(WorkerEvent::Ready)?;
     loop {
@@ -1391,6 +1431,277 @@ pub(crate) mod tests {
         drop(_input);
         let _ = coordinator.shutdown();
         let _ = std::fs::remove_dir(&directory.path);
+    }
+
+    /// A gate read open, steady past the gate's 60 ms, from `from_us` to
+    /// `to_us` every 10 ms, and the last stamp it read.
+    fn read_open(gate: &mut CaptureLeaseGate, from_us: u64, to_us: u64) -> ClockStamp {
+        let mut sequence = 0;
+        let mut at = from_us;
+        loop {
+            sequence += 1;
+            gate.observe(sequence, at, at, false);
+            if at >= to_us {
+                return ClockStamp {
+                    clock_id: "test".into(),
+                    at_us: at,
+                    sequence,
+                };
+            }
+            at += 10_000;
+        }
+    }
+
+    /// #5611, lamp-06c1 at 21:30:02 on 6 Nov: the voice's processes stalled
+    /// 120-132 ms together during an SD log flush, the worker's lease, which
+    /// grants the microphones during playback, lapsed, and the worker ended
+    /// on "privacy controller lease expired", exit 1. With
+    /// `LAMP_PRIVACY_RIDES_STALL=on` the lapse is ridden as a Denied one is:
+    /// nothing published, nothing granted, and the next authority re-arms
+    /// it. Off, it still ends the worker at once, as before.
+    #[test]
+    fn a_granting_lease_lapsed_by_a_300_ms_stall_is_ridden_closed_and_rearms() {
+        let began = 10_000_000;
+        let (mut controller, boot) = controller(began, Permission::Allowed, Permission::Allowed);
+        let held = controller.snapshot(MonoTime::from_micros(began)).unwrap();
+        assert!(!denied_only(held));
+        let expired = held.expires_at().as_micros();
+        let stalled = expired + 300_000;
+        // Off: as before the switch.
+        let mut guard = BoundaryGuard::new(boot, MonoTime::from_micros(began));
+        guard.install(MonoTime::from_micros(began), held).unwrap();
+        let mut off = DeniedLapse::riding_granting(false);
+        let error = off.look(guard.state(), began, stalled).unwrap_err();
+        assert_eq!(error.to_string(), "privacy controller lease expired");
+        assert!(publishing(&mut off, guard.state(), began, stalled).is_err());
+        // On: ridden, closed.
+        let mut gate = CaptureLeaseGate::default();
+        read_open(&mut gate, began, began + 100_000);
+        assert!(gate.permitted(held, began + 100_000), "granted before");
+        let mut lapse = DeniedLapse::riding_granting(true);
+        assert_eq!(
+            lapse.look(guard.state(), began, began + 100_000).unwrap(),
+            Held::Current
+        );
+        for now in (expired..=stalled).step_by(10_000) {
+            assert_eq!(
+                lapse.look(guard.state(), began, now).unwrap(),
+                Held::Waiting
+            );
+            assert_eq!(
+                publishing(&mut lapse, guard.state(), began, now).unwrap(),
+                None,
+                "published at {now}"
+            );
+            assert!(
+                !gate.permitted(held, now),
+                "the microphones opened at {now}"
+            );
+        }
+        // Ridden up to its bound, 1.5 s from the expiry.
+        let mut longest = DeniedLapse::riding_granting(true);
+        assert_eq!(
+            longest
+                .look(guard.state(), began, expired + DENIED_LAPSE_MOST_US - 1)
+                .unwrap(),
+            Held::Waiting
+        );
+        let fresh = controller.snapshot(MonoTime::from_micros(stalled)).unwrap();
+        guard
+            .install(MonoTime::from_micros(stalled), fresh)
+            .unwrap();
+        assert_eq!(
+            lapse.look(guard.state(), began, stalled + 1_000).unwrap(),
+            Held::Rearmed(301)
+        );
+        assert_eq!(
+            lapse.look(guard.state(), began, stalled + 2_000).unwrap(),
+            Held::Current
+        );
+        assert_eq!(
+            rearmed_granting_line(301),
+            "lamp-voice: privacy worker re-armed its lease after 301 ms lapsed in a stall (nothing was published meanwhile; microphones and camera stayed closed)"
+        );
+    }
+
+    /// The bound holds with the switch on (#5611): a granting lapse ridden
+    /// to 1.5 s from its expiry ends the worker there, as it would at once
+    /// with the switch off, and so does one the drain finds that old.
+    #[test]
+    fn a_granting_lapse_past_1_5_s_still_ends_the_worker() {
+        let began = 10_000_000;
+        let (mut controller, boot) = controller(began, Permission::Allowed, Permission::Denied);
+        let held = controller.snapshot(MonoTime::from_micros(began)).unwrap();
+        let expired = held.expires_at().as_micros();
+        let mut guard = BoundaryGuard::new(boot, MonoTime::from_micros(began));
+        guard.install(MonoTime::from_micros(began), held).unwrap();
+        let mut lapse = DeniedLapse::riding_granting(true);
+        let error = lapse
+            .look(guard.state(), began, expired + DENIED_LAPSE_MOST_US)
+            .unwrap_err();
+        assert_eq!(error.to_string(), "privacy controller lease expired");
+        let mut hung = DeniedLapse::riding_granting(true);
+        assert!(
+            hung.look(guard.state(), began, expired + 1_800_000)
+                .is_err()
+        );
+        assert!(
+            publishing(&mut hung, guard.state(), began, expired + 1_800_000).is_err(),
+            "the second look ends it too"
+        );
+    }
+
+    /// The first builder's case 1 on #5611: a stall with a renewal already
+    /// queued lands in the drain, not in `look`. The renewal that lapsed in
+    /// the queue grants the microphones; off, it ends the worker with
+    /// "authority snapshot has expired", as before; on, it is skipped, the
+    /// lapse is ridden from the held lease's expiry, and the fresh one after
+    /// it re-arms.
+    #[test]
+    fn a_granting_authority_lapsed_in_the_queue_is_skipped_and_ridden_with_the_switch() {
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let (mut coordinator, mut worker, _input) =
+            crate::process::Worker::cooperative_fixture(&directory.path, "privacy");
+        let stalled = lamp_ipc::monotonic_us().saturating_sub(600_000);
+        let (mut granting, boot) = controller(stalled, Permission::Allowed, Permission::Allowed);
+        let held = granting.snapshot(MonoTime::from_micros(stalled)).unwrap();
+        for on in [false, true] {
+            let mut guard = BoundaryGuard::new(boot, MonoTime::from_micros(stalled));
+            guard.install(MonoTime::from_micros(stalled), held).unwrap();
+            let queued = granting
+                .snapshot(MonoTime::from_micros(stalled + 100_000))
+                .unwrap();
+            coordinator
+                .channels
+                .control
+                .send(Control::Authority { snapshot: queued })
+                .unwrap();
+            let mut lapse = DeniedLapse::riding_granting(on);
+            let drained = authority(&mut worker, &mut guard, &mut lapse);
+            if !on {
+                assert_eq!(
+                    drained.unwrap_err().to_string(),
+                    "authority snapshot has expired"
+                );
+                continue;
+            }
+            assert!(drained.unwrap());
+            assert_eq!(guard.state(), Some(held), "a lapsed one is never installed");
+            assert_eq!(lapse.since_us, Some(held.expires_at().as_micros()));
+            let now = lamp_ipc::monotonic_us();
+            assert_eq!(
+                lapse.look(guard.state(), stalled, now).unwrap(),
+                Held::Waiting
+            );
+            assert_eq!(
+                publishing(&mut lapse, guard.state(), stalled, now).unwrap(),
+                None
+            );
+            let fresh = granting
+                .snapshot(MonoTime::from_micros(lamp_ipc::monotonic_us()))
+                .unwrap();
+            coordinator
+                .channels
+                .control
+                .send(Control::Authority { snapshot: fresh })
+                .unwrap();
+            assert!(authority(&mut worker, &mut guard, &mut lapse).unwrap());
+            assert!(matches!(
+                lapse
+                    .look(guard.state(), stalled, lamp_ipc::monotonic_us())
+                    .unwrap(),
+                Held::Rearmed(ms) if ms >= 300
+            ));
+        }
+        let _ = coordinator.channels.control.send(Control::Stop);
+        drop(_input);
+        let _ = coordinator.shutdown();
+        let _ = std::fs::remove_dir(&directory.path);
+    }
+
+    /// The first builder's case 3 on #5611: the re-arm reads the switch and
+    /// the mute fresh. Granted, then a stall, the slide closed in it, then
+    /// the renewal: the re-armed lease grants nothing, from no stale grant.
+    /// The same with the software mute set in the stall instead: its fresh
+    /// authority denies the microphones and the camera, and the lease says
+    /// not permitted. With the switch off the stall ended the worker first.
+    #[test]
+    fn a_re_arm_after_a_stall_reads_the_slide_and_the_mute_fresh() {
+        let began = 10_000_000;
+        for software in [false, true] {
+            let (mut controller, boot) =
+                controller(began, Permission::Allowed, Permission::Allowed);
+            let mut guard = BoundaryGuard::new(boot, MonoTime::from_micros(began));
+            let held = controller.snapshot(MonoTime::from_micros(began)).unwrap();
+            guard.install(MonoTime::from_micros(began), held).unwrap();
+            let mut gate = CaptureLeaseGate::default();
+            let stamp = read_open(&mut gate, began, began + 100_000);
+            let observed = Observation::NoSlide(stamp.clone());
+            assert!(grants(&gate, held, Some(&observed), true, began + 100_000));
+            let stalled = held.expires_at().as_micros() + 300_000;
+            let mut off = DeniedLapse::riding_granting(false);
+            assert!(off.look(guard.state(), began, stalled).is_err());
+            let mut lapse = DeniedLapse::riding_granting(true);
+            assert_eq!(
+                lapse.look(guard.state(), began, stalled).unwrap(),
+                Held::Waiting
+            );
+            // In the stall: the slide closed, or the software mute.
+            if software {
+                controller
+                    .set_microphone_permission(MonoTime::from_micros(stalled), Permission::Denied)
+                    .unwrap();
+                controller
+                    .set_camera_permission(MonoTime::from_micros(stalled), Permission::Denied)
+                    .unwrap();
+            } else {
+                gate.observe(stamp.sequence + 1, stalled - 50_000, stalled, true);
+            }
+            let renewal = controller.snapshot(MonoTime::from_micros(stalled)).unwrap();
+            guard
+                .install(MonoTime::from_micros(stalled), renewal)
+                .unwrap();
+            let now = stalled + 1_000;
+            assert!(matches!(
+                lapse.look(guard.state(), began, now).unwrap(),
+                Held::Rearmed(_)
+            ));
+            let state = publishing(&mut lapse, guard.state(), began, now)
+                .unwrap()
+                .expect("published from the renewal");
+            let fresh = ClockStamp {
+                clock_id: "test".into(),
+                at_us: now - 1_000,
+                sequence: stamp.sequence + 2,
+            };
+            if !software {
+                gate.observe(fresh.sequence, fresh.at_us, now, false);
+            }
+            let observed = Observation::NoSlide(fresh);
+            for at in [now, now + 10_000, now + 40_000] {
+                let permitted = grants(&gate, state, Some(&observed), true, at);
+                assert!(
+                    !permitted,
+                    "a stale grant at {at} (software mute {software})"
+                );
+            }
+            let value = lease(
+                ClockStamp {
+                    clock_id: "test".into(),
+                    at_us: now,
+                    sequence: 9,
+                },
+                "0123456789abcdef",
+                boot,
+                state,
+                Some(&observed),
+                grants(&gate, state, Some(&observed), true, now),
+            );
+            assert!(!value.permitted);
+            if software {
+                assert!(!state.camera_allowed(MonoTime::from_micros(now)));
+            }
+        }
     }
 
     /// Only a lease that grants nothing is ridden (#4332): a lapse of one
