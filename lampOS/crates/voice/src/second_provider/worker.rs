@@ -3479,6 +3479,22 @@ pub fn serve(
         );
     }
     engine = engine.saying_at_once(say_at_once);
+    // A line that only asks to keep something, kept plainly, answered at
+    // once with no second round (`LAMP_KEEP_ANSWERS_AT_ONCE=on`, C59). The
+    // line is English: with an owner's language chosen it waits as before.
+    let keep_with_call = crate::keep_at_once::on();
+    let keep_at_once = keep_with_call && language.is_none();
+    if keep_at_once {
+        eprintln!(
+            "lamp-voice second: a line that only asks to keep something, kept plainly, is answered at once with \"{}\" and no second round (LAMP_KEEP_ANSWERS_AT_ONCE)",
+            crate::keep_at_once::KEPT
+        );
+    } else if keep_with_call {
+        eprintln!(
+            "lamp-voice second: the keep's own line is English, and the owner's language is {language:?}; keep turns wait for the model's words as without LAMP_KEEP_ANSWERS_AT_ONCE"
+        );
+    }
+    engine = engine.keeping_at_once(keep_at_once);
     // A reply that claims a light, volume or Schedule action in the acting
     // part's own words, with no call of that kind, is never said as it is
     // (`LAMP_ACTION_CLAIM_CHECKED=on`, #5215).

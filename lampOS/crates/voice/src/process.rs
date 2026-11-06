@@ -1818,6 +1818,8 @@ fn second_route_worker_environment(
         crate::second_provider::FEW_TOOLS_ENVIRONMENT,
         crate::second_provider::SAID_ONCE_ENVIRONMENT,
         crate::second_provider::SAY_WITH_CALL_ENVIRONMENT,
+        // A plain keep answered at once, with no second round (C59).
+        crate::keep_at_once::ENVIRONMENT,
         // A claimed action no call made is never said as it is (#5215).
         crate::action_claim::ENVIRONMENT,
         crate::second_provider::CHECKING_LINE_ENVIRONMENT,
@@ -2031,6 +2033,7 @@ mod tests {
             crate::second_provider::FEW_TOOLS_ENVIRONMENT,
             crate::second_provider::SAID_ONCE_ENVIRONMENT,
             crate::second_provider::SAY_WITH_CALL_ENVIRONMENT,
+            crate::keep_at_once::ENVIRONMENT,
             crate::action_claim::ENVIRONMENT,
             crate::second_provider::CHECKING_LINE_ENVIRONMENT,
             crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
@@ -2780,6 +2783,7 @@ mod tests {
                     || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
                     || name == crate::second_provider::SAID_ONCE_ENVIRONMENT
                     || name == crate::second_provider::SAY_WITH_CALL_ENVIRONMENT
+                    || name == crate::keep_at_once::ENVIRONMENT
                     || name == crate::action_claim::ENVIRONMENT
                     || name == crate::second_provider::CHECKING_LINE_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
@@ -2941,6 +2945,7 @@ mod tests {
                     "LAMP_GOING_ON_NOT_OWN=on",
                     "LAMP_HISTORY_KEEPS_CALLS=on",
                     "LAMP_JOIN_CUT_WORDS=on",
+                    "LAMP_KEEP_ANSWERS_AT_ONCE=on",
                     "LAMP_KEEP_QUIETLY=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language",
