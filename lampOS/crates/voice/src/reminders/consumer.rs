@@ -790,17 +790,21 @@ impl<P: Persistence> Consumer<P> {
             id: oldest.id,
             delivery: oldest.delivery,
         };
-        if !self.known(&key)? {
-            if let Err(error) = self.offer(socket, due, &key, now, deadline) {
-                self.journal.item(&key, format!("not offered: {error}"));
-                self.withdraw()?;
-            }
+        // The oldest is tried first; one that cannot be offered now (refused
+        // by the ledger, e.g. `stale_revision`, or by its own evidence) is
+        // journaled and passed over like a held one, never allowed to
+        // silence every later item (#5498).
+        let tried = if self.known(&key)? {
+            self.held(&key)?;
+            None
+        } else if self.offered(socket, due, &key, now, deadline)? {
             return Ok(());
-        }
-        self.held(&key)?;
-        // A crash-uncertain oldest occurrence is held, not silently replayed
-        // and not allowed to starve every other pending item. Scan one bounded
-        // page per tick; Get still binds the chosen exact current occurrence.
+        } else {
+            Some(key)
+        };
+        // A crash-uncertain or unofferable oldest occurrence is not allowed to
+        // starve every other pending item. Scan one bounded page per tick; Get
+        // still binds the chosen exact current occurrence.
         let request = Request::List {
             after_id: self.cursor,
             limit: 8,
@@ -830,12 +834,14 @@ impl<P: Persistence> Consumer<P> {
                 id,
                 delivery,
             };
+            if tried.as_ref() == Some(&key) {
+                continue;
+            }
             if !self.known(&key)? {
-                if let Err(error) = self.offer(socket, due, &key, now, deadline) {
-                    self.journal.item(&key, format!("not offered: {error}"));
-                    self.withdraw()?;
+                if self.offered(socket, due, &key, now, deadline)? {
+                    return Ok(());
                 }
-                return Ok(());
+                continue;
             }
             self.held(&key)?;
         }
@@ -844,6 +850,28 @@ impl<P: Persistence> Consumer<P> {
             .filter(|id| *id == last && *id > self.cursor)
             .unwrap_or(0);
         Ok(())
+    }
+    /// Offer `key`; true when this tick is done with offers: it was offered,
+    /// or an offer it left current was withdrawn. False when it failed with
+    /// nothing current, journaled once per distinct reason, so the scan
+    /// moves on to the next due item.
+    fn offered(
+        &mut self,
+        socket: &Path,
+        due: &ScheduleDue,
+        key: &DeliveryKey,
+        now: u64,
+        deadline: Instant,
+    ) -> io::Result<bool> {
+        let Err(error) = self.offer(socket, due, key, now, deadline) else {
+            return Ok(true);
+        };
+        self.journal.item(key, format!("not offered: {error}"));
+        if self.current.is_none() {
+            return Ok(false);
+        }
+        self.withdraw()?;
+        Ok(true)
     }
     fn reconciled(&mut self, key: &DeliveryKey, reconciled: &Reconciled) {
         if let Reconciled::Resolved(resolution) = reconciled {
