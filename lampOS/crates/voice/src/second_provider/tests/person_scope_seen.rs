@@ -29,6 +29,13 @@ fn known_file(what: &str, eyes: &SpeakingFaces) -> std::path::PathBuf {
 /// The eyes' boot the known file was written under.
 const BOOT: &str = "eyes";
 
+thread_local! {
+    /// A don't-know's search (`LAMP_MEMORY_DONT_KNOW_RECALLS`) the next
+    /// [`lines_known`] on this thread is given, once.
+    static DONT_KNOW_FOUND: std::cell::RefCell<Option<crate::second_provider::Remembered>> =
+        const { std::cell::RefCell::new(None) };
+}
+
 /// The worker's own setup (`worker::see_who_speaks`) with
 /// `LAMP_SECOND_SPEAKING_FACE` on and `LAMP_PERSON_SCOPE_SEEN` as `seen`,
 /// whose eyes' reader fails to start: a relative bus root, which
@@ -565,6 +572,9 @@ async fn lines_known(
         }),
     });
     let mut engine = engine.saving_carried(saves);
+    if let Some(found) = DONT_KNOW_FOUND.with(|found| found.borrow_mut().take()) {
+        engine = engine.recalling_before_a_dont_know(found);
+    }
     if let Some((hears, another)) = past_silent {
         engine = engine.carrying_past_silent_where_heard(true, hears, another);
     }
@@ -3140,4 +3150,63 @@ async fn another_voice_heard_takes_the_face_in_view_hits_back() {
         ))],
         "no other voice: the face's hits"
     );
+}
+
+/// Heron's P2 on #5508 (`LAMP_MEMORY_DONT_KNOW_RECALLS`): a line no face
+/// was seen speaking, A's face in view and silent, in A's conversation going
+/// on, is carried (`LAMP_CONVERSATION_CARRIES`), and an off-camera guest
+/// beside A looks the same. Its don't-know, "I don't have a time for your
+/// yoga class" (lamp-06c1, 5 Nov, S14, request 75), searches nothing of A's:
+/// the guest is never told A's kept class time. The room's line the same.
+#[tokio::test]
+async fn a_carried_lines_dont_know_searches_nothing_of_theirs() {
+    let first = "I don't have a time for your yoga class — that's not something you've told me. When is it?";
+    let kept = "- My yoga class is at seven in the morning.";
+    for (what, going_on) in [("carried", Some(true)), ("room's", None)] {
+        let searched: Arc<Mutex<Vec<Option<String>>>> = Arc::default();
+        let seen = searched.clone();
+        DONT_KNOW_FOUND.with(|found| {
+            *found.borrow_mut() = Some(Arc::new(
+                move |_, words: &str, lease: Option<&ScopeLease>| {
+                    let person = lease
+                        .and_then(ScopeLease::scope)
+                        .and_then(|scope| scope.person().map(str::to_owned));
+                    seen.lock().unwrap().push(person.clone());
+                    // Nobody's for the room's, as `worker::dont_know_whose`.
+                    (person.is_some() && words.contains("yoga")).then(|| kept.to_owned())
+                },
+            ));
+        });
+        let chats = vec![
+            vec![text(first), Ok(ChatEvent::Done)],
+            vec![text("Seven in the morning."), Ok(ChatEvent::Done)],
+        ];
+        let got = one_line_with(
+            what,
+            "What time is my yoga class?",
+            chats,
+            vec![("f1", false)],
+            BOOT,
+            true,
+            true,
+            None,
+            going_on,
+            true,
+        )
+        .await;
+        let said: String = got
+            .labels
+            .iter()
+            .filter_map(|label| label.strip_prefix("said:"))
+            .collect();
+        if going_on.is_some() {
+            assert!(got.held, "{what}: told from the conversation as it stood");
+        }
+        assert!(
+            searched.lock().unwrap().iter().all(Option::is_none),
+            "{what}: nobody's kept things searched"
+        );
+        assert_eq!(said, first, "{what}: said as it came");
+        assert_eq!(got.rounds.len(), 1, "{what}: never asked again");
+    }
 }

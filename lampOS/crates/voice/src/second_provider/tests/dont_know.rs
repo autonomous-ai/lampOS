@@ -25,6 +25,18 @@ const KEPT: &str = "- My favourite snack is pretzels.";
 /// `later`. `found` searches the person's kept things (`None`: the switch
 /// off): `KEPT` for a line about snacks, nothing for any other.
 fn turn_with(found: Option<bool>, heard: &str, first: &str, later: &[&str]) -> Went {
+    let found = found.map(|kept| kept.then_some(("snack", KEPT)));
+    turn_finding(found, heard, first, later)
+}
+
+/// [`turn_with`] with `found`'s kept thing, `.1`, found for a line with its
+/// word `.0` in it (`Some(None)`: nothing kept fits).
+fn turn_finding(
+    found: Option<Option<(&'static str, &'static str)>>,
+    heard: &str,
+    first: &str,
+    later: &[&str],
+) -> Went {
     let reply = |words: &str| vec![text(words), Ok(ChatEvent::Done)];
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
@@ -42,7 +54,8 @@ fn turn_with(found: Option<bool>, heard: &str, first: &str, later: &[&str]) -> W
         let seen = searched.clone();
         engine = engine.recalling_before_a_dont_know(Arc::new(move |_, words, _| {
             seen.lock().unwrap().push(words.to_owned());
-            (kept && words.contains("snack")).then(|| KEPT.to_owned())
+            kept.filter(|(word, _)| words.contains(word))
+                .map(|(_, kept)| kept.to_owned())
         }));
     }
     let labels = tokio::runtime::Builder::new_current_thread()
@@ -157,4 +170,122 @@ fn the_switch_off_changes_nothing() {
     assert_eq!((off.asked, off.notes.len()), (1, 0));
     let answer = turn_with(None, ASKED, "Pretzels, I think.", &[]);
     assert_eq!(answer.said, said(&["Pretzels, I think."]));
+}
+
+/// lamp-06c1, 5 Nov (S14, build 10343, the switch on): the lamp said each of
+/// these first replies over a kept answer, and the gate (its opening alone)
+/// caught one of them. Each now searches the person's kept things, and the
+/// round asked again with the kept thing is what is said. Its lines as
+/// heard and said on runs 14:21 and 15:08.
+#[test]
+fn the_dont_knows_said_over_kept_things_on_06c1_recall_them() {
+    for (heard, first, word, kept, again) in [
+        (
+            "Lamp, what's my lucky number?",
+            "I don't have a lucky number for you — that's not something you've told me. What is it?",
+            "lucky",
+            "- My lucky number is fifty three.",
+            "Fifty-three — you had me keep that.",
+        ),
+        (
+            "Lamp, what's my favorite board game?",
+            "I don't have a favorite board game for you — that's not something you've told me. What is it?",
+            "board",
+            "- My favorite board game is chess.",
+            "Chess.",
+        ),
+        (
+            "Lamp, what's my goldfish called?",
+            "Your goldfish — I don't remember that. What's it called?",
+            "goldfish",
+            "- My goldfish is called Pip.",
+            "Pip.",
+        ),
+        (
+            "Lamp, what time is my yoga class?",
+            "I don't have a time for your yoga class — that's not something you've told me. When is it?",
+            "yoga",
+            "- My yoga class is at seven in the morning.",
+            "Seven in the morning.",
+        ),
+        (
+            "Lamp, what's my lucky number?",
+            "I can't tell you a lucky number — I've no way to know yours. Pick one you like the look of.",
+            "lucky",
+            "- My lucky number is fifty three.",
+            "Fifty-three.",
+        ),
+        (
+            "Lamp, what color are my running shoes?",
+            "I don't remember any running shoes — nothing about those has been kept.",
+            "shoes",
+            "- My running shoes are orange.",
+            "Orange.",
+        ),
+        (
+            "Lamp, what's my favorite soup?",
+            "Soup — nothing's been kept about that.",
+            "soup",
+            "- My favorite soup is tomato.",
+            "Tomato.",
+        ),
+        (
+            "Cá vàng của tôi tên là gì?",
+            "Cá vàng của bạn — mình không nhớ.",
+            "vàng",
+            "- Cá vàng của tôi tên là Pip.",
+            "Pip.",
+        ),
+    ] {
+        let went = turn_finding(Some(Some((word, kept))), heard, first, &[again]);
+        assert_eq!(went.said.concat(), format!("said:{again}"), "{first}");
+        assert_eq!(went.searched, [heard.to_owned()], "{first}");
+        assert_eq!(
+            went.notes,
+            [format!("{}\n{kept}", crate::dont_know::NOTE)],
+            "{first}"
+        );
+        // Nothing kept fits: the don't-know is said as it came.
+        let none = turn_finding(Some(None), heard, first, &[]);
+        assert_eq!(
+            none.said
+                .iter()
+                .map(|piece| &piece[5..])
+                .collect::<String>(),
+            first,
+            "{first}"
+        );
+        assert_eq!(none.asked, 1, "{first}");
+    }
+}
+
+/// An answer that says its kept thing, on the same lines, is said at once:
+/// it never searches (S14, run 15:08, requests 57, 61 and 66).
+#[test]
+fn an_answer_from_a_kept_thing_searches_nothing() {
+    for (heard, answer) in [
+        (
+            "Lamp, where does my brother live?",
+            "Denver — you told me your brother lives there.",
+        ),
+        (
+            "Lamp, when does my book club meet?",
+            "Thursdays — you told me your book club meets on Thursdays.",
+        ),
+        (
+            "Lamp, what's my favorite color?",
+            "Purple — you told me that.",
+        ),
+    ] {
+        let went = turn_finding(Some(Some(("my", "- anything"))), heard, answer, &[]);
+        assert_eq!(
+            went.said
+                .iter()
+                .map(|piece| &piece[5..])
+                .collect::<String>(),
+            answer,
+            "{answer}"
+        );
+        assert!(went.searched.is_empty(), "{answer}");
+    }
 }
