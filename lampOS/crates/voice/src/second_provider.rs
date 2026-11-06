@@ -4095,6 +4095,17 @@ pub struct Engine {
     eye: Option<Arc<AtomicBool>>,
 }
 
+/// The journal line when the eye a spoken turn is told by changes, and at
+/// the first authority installed ([`Engine::privacy`], #5530): which
+/// version of the character the next spoken turns are told.
+pub(crate) fn eye_line(open: bool) -> &'static str {
+    if open {
+        "the eye is open: spoken turns are told the camera's character (#5530)"
+    } else {
+        "the eye is closed: spoken turns are told the character without the camera (#5530)"
+    }
+}
+
 /// The busy room as this route hears it, in this process's one room
 /// (`crate::room_told::room`), as the Live worker keeps its own: a line
 /// heard and ended, the rule's verdict, the lamp speaking, doing something
@@ -4345,7 +4356,10 @@ impl Engine {
     /// [`Self::forgetting_on_privacy`]'s hook.
     pub(crate) fn privacy(&mut self, now: (bool, u64, bool, u64)) {
         if let Some(eye) = &self.eye {
-            eye.store(now.0, Ordering::Relaxed);
+            let first = self.privacy.is_none();
+            if eye.swap(now.0, Ordering::Relaxed) != now.0 || first {
+                eprintln!("lamp-voice second: {}", eye_line(now.0));
+            }
         }
         if self.privacy.replace(now).is_some_and(|was| was != now) {
             if self.shared.remember_speaker {

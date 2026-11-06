@@ -2607,8 +2607,12 @@ When the coordinator switches (below):
   not to pretend to see (`worker::character_now`, `Engine::telling_the_eye`;
   #5530: this route always took the version without a camera). Chosen for
   each turn as its request is built, so a slide closed between two turns
-  tells the next one the eye is closed. Texts and the instruction after a
-  forget keep the version without a camera. Then the
+  tells the next one the eye is closed. The journal says which version the
+  spoken turns are told when the eye opens or closes, and at the first
+  authority: `lamp-voice second: the eye is open: spoken turns are told the
+  camera's character (#5530)` or `… the eye is closed: spoken turns are
+  told the character without the camera (#5530)` (`second_provider::eye_line`).
+  Texts and the instruction after a forget keep the version without a camera. Then the
   time and place (the time as the request is built, "Second only" below),
   then the memory note (the
   Days note frozen for the process, or the memory writer's, read for each
