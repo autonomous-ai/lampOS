@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-11-06 22:30 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1711, posted by the PM (Faye) since 4 Nov, are the live ones.
+Written by the first builder from the team's review page at 2026-11-07 00:41 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1711, posted by the PM (Faye) since 4 Nov, are the live ones.
 
-**Build 91.2% over 76 rows. Quality 66.5% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
+**Build 91.2% over 76 rows. Quality 67.1% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -106,7 +106,7 @@ Written by the first builder from the team's review page at 2026-11-06 22:30 (+0
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
 | Speaking up on its own | 0.80 | 0.85 | 6 Nov 17:3x, down from 0.85: one stale oldest item silences every later reminder and timer (#5498), on stable; |
 | Onboarding, as a first-time person meets it | 0.55 | 0.90 | 4 Nov 08:3x, down from 0.6: a tester’s lamp-0c4e (3 Nov) never saved the face at setup (a question with “okay” taken as the yes, the face wait closed early), so nothing was kept, and the second try saved a misheard name … |
-| Remembers you: your name and what you told it | 0.60 | 0.90 | 3 Nov 10:4x, down from 0.65: Fourteen on 9699 (9adf): remember and recall right for a known face (coffee, the dentist’s day moved), forget failed (it searched only the room’s; |
+| Remembers you: your name and what you told it | 0.70 | 0.90 | 6 Nov 23:0x, up from 0.6: Friday’s memory scenes on stock 10538 (lamp-06c1): pooled 0.80, scene average 0.73, S0 on 10579. |
 | A good companion | 0.70 | 0.90 | 6 Nov 11:1x, down from 0.75, on stable 10441: the core-verifier counts one claimed action not done (lamp-52e6, 04:24, 10441’s voice: “I’ve kept the light on until ten.” with no call and no schedule item), so claimed-not-… |
 | Both microphones | 0.60 | 0.80 | 6 Nov 17:3x, down from 0.65: tester lamps on 10226 had name lines with no words (220c 29/36, a63e 17/33), and 4ace’s lines came back empty 138 of 153 on 6 Nov; |
 | Body | 0.65 | 0.80 | 4 Nov 08:3x, down from 0.7: in the night’s sleep on lamp-06c1 (9868), the body sat up for each of three room lines and stayed up about 80 s (Jarvis); |
