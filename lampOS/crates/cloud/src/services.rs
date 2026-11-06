@@ -35,9 +35,10 @@ pub const ADMIN_SOCKET: &str = "/run/lampos-services/admin.sock";
 /// The services this lamp knows, by V1's codes. Figma is `figma-api` as
 /// the backend lists it for lamps, and `figma` as V1's helper named it.
 /// `gmail-app` is a Lamp 2's Google sign-in for Gmail, send only; `gmail`
-/// its app password. The last five are MCP services: V1's four, then
-/// Notion, whose app sign-in gives a token only its MCP server takes.
-pub const CODES: [&str; 16] = [
+/// its app password. Then five MCP services: V1's four, then Notion, whose
+/// app sign-in gives a token only its MCP server takes. Last, Spotify
+/// (#5460), which `lamp-services` takes only with `LAMP_SERVICES_SPOTIFY`.
+pub const CODES: [&str; 17] = [
     "gmail",
     "gmail-app",
     "google_calendar",
@@ -54,6 +55,7 @@ pub const CODES: [&str; 16] = [
     "hubspot",
     "amplitude",
     "notion",
+    "spotify",
 ];
 
 /// A service linked: `connector.set.<code>`, its connector fetched.
@@ -93,6 +95,8 @@ pub const WIPE_AGAIN: Duration = Duration::from_secs(30);
 const MOST_AT_ONCE: usize = 4;
 /// The most bytes read of the backend's answer: a connector is small.
 const BODY_MOST: usize = 256 * 1024;
+/// The longest failure code passed on from the admin socket.
+const FAILURE_CODE_MOST: usize = 32;
 /// The most bytes read of the admin socket's line.
 const REPLY_MOST: u64 = 64 * 1024;
 /// The longest reason passed on from the backend or the admin socket.
@@ -295,26 +299,56 @@ pub fn checked(kind: &str, code: &str, connector: &Value) -> Result<(), String> 
 /// The admin socket: `line` out, one JSON line back within `wait`. An
 /// `"ok": true` reply as it is; `"ok": false` its plain `error`.
 pub fn ask(socket: &Path, line: &Value, wait: Duration) -> Result<Value, String> {
-    let mut stream = UnixStream::connect(socket).map_err(|_| NOT_RUNNING.to_owned())?;
+    ask_coded(socket, line, wait).map_err(|(why, _)| why)
+}
+
+/// A failure's code from the admin socket (`relink`, `unreached`,
+/// `not_allowed`): lower-case letters and `_` only, at most
+/// [`FAILURE_CODE_MOST`]; any other is dropped.
+fn failure_code(reply: &Value) -> Option<String> {
+    reply
+        .get("code")
+        .and_then(Value::as_str)
+        .filter(|code| {
+            !code.is_empty()
+                && code.len() <= FAILURE_CODE_MOST
+                && code
+                    .bytes()
+                    .all(|byte| byte.is_ascii_lowercase() || byte == b'_')
+        })
+        .map(str::to_owned)
+}
+
+/// [`ask`], a refusal with its code, when the socket gave one.
+fn ask_coded(
+    socket: &Path,
+    line: &Value,
+    wait: Duration,
+) -> Result<Value, (String, Option<String>)> {
+    let unanswered = |why: &str| (why.to_owned(), None);
+    let mut stream = UnixStream::connect(socket).map_err(|_| unanswered(NOT_RUNNING))?;
     stream
         .set_read_timeout(Some(wait))
         .and_then(|()| stream.set_write_timeout(Some(wait)))
         .and_then(|()| stream.write_all(format!("{line}\n").as_bytes()))
-        .map_err(|_| NOT_RUNNING.to_owned())?;
+        .map_err(|_| unanswered(NOT_RUNNING))?;
     let mut reply = String::new();
     BufReader::new(stream.take(REPLY_MOST))
         .read_line(&mut reply)
-        .map_err(|_| NO_ANSWER.to_owned())?;
-    let reply: Value = serde_json::from_str(reply.trim()).map_err(|_| NO_ANSWER.to_owned())?;
+        .map_err(|_| unanswered(NO_ANSWER))?;
+    let reply: Value = serde_json::from_str(reply.trim()).map_err(|_| unanswered(NO_ANSWER))?;
     match reply.get("ok").and_then(Value::as_bool) {
         Some(true) => Ok(reply),
-        Some(false) => Err(reply
-            .get("error")
-            .and_then(Value::as_str)
-            .map(plain)
-            .filter(|why| !why.is_empty())
-            .unwrap_or_else(|| "the lamp's services refused it".to_owned())),
-        None => Err(NO_ANSWER.to_owned()),
+        Some(false) => Err((
+            reply
+                .get("error")
+                .and_then(Value::as_str)
+                .map(plain)
+                .filter(|why| !why.is_empty())
+                .unwrap_or_else(|| "the lamp's services refused it".to_owned()),
+            failure_code(&reply),
+        )),
+        None => Err(unanswered(NO_ANSWER)),
     }
 }
 
@@ -382,10 +416,16 @@ impl Services {
         let (socket, fetch) = (self.socket.clone(), self.fetch.clone());
         let (under_way, done) = (self.under_way.clone(), self.done.clone());
         std::thread::spawn(move || {
-            let result = match asked {
-                Asked::Set => set(&*fetch, &socket, &kind, &code),
-                Asked::Remove => ask(&socket, &json!({"op": "remove", "code": code}), ADMIN_WAIT)
-                    .map(|_| Some(json!({"connector": code}))),
+            let (result, failure) = match asked {
+                Asked::Set => match set(&*fetch, &socket, &kind, &code) {
+                    Ok(done) => (Ok(done), None),
+                    Err((why, failure)) => (Err(why), failure),
+                },
+                Asked::Remove => (
+                    ask(&socket, &json!({"op": "remove", "code": code}), ADMIN_WAIT)
+                        .map(|_| Some(json!({"connector": code}))),
+                    None,
+                ),
             };
             under_way.fetch_sub(1, Ordering::AcqRel);
             if let Ok(mut done) = done.lock() {
@@ -393,7 +433,7 @@ impl Services {
                     kind,
                     result,
                     request_id: None,
-                    code: None,
+                    code: failure,
                 });
             }
         });
@@ -453,11 +493,17 @@ impl Services {
 }
 
 /// A `connector.set.<code>`: the connector fetched, checked and handed to
-/// the admin socket; the reply's `{connector, scopes}`.
-fn set(fetch: &dyn Fetch, socket: &Path, kind: &str, code: &str) -> Result<Option<Value>, String> {
-    let connector = fetch.fetch(kind)?;
-    checked(kind, code, &connector)?;
-    let reply = ask(
+/// the admin socket; the reply's `{connector, scopes}`, or why not with the
+/// socket's failure code (said in `data.code`), when it gave one.
+fn set(
+    fetch: &dyn Fetch,
+    socket: &Path,
+    kind: &str,
+    code: &str,
+) -> Result<Option<Value>, (String, Option<String>)> {
+    let connector = fetch.fetch(kind).map_err(|why| (why, None))?;
+    checked(kind, code, &connector).map_err(|why| (why, None))?;
+    let reply = ask_coded(
         socket,
         &json!({"op": "set", "code": code, "connector": connector}),
         ADMIN_WAIT,
@@ -628,6 +674,7 @@ pub mod tests {
             Some((Asked::Set, "gmail-app"))
         );
         assert!(known("gmail-app"));
+        assert!(known("spotify"));
         assert_eq!(connector_kind("services.list"), None);
         assert!(CODES.iter().all(|code| known(code)));
         for other in ["dropbox", "", "GMAIL", "gmail.x", "../gmail", "gmail_app"] {
@@ -798,9 +845,38 @@ pub mod tests {
         );
         // Not asked of the socket after a failed fetch.
         assert_eq!(admin.lines.lock().unwrap().len(), 1);
+        assert_eq!(done[0].code, None);
         let gone = services(admin.dir.path().join("none.sock"), Ok(connector("figma")));
         gone.start("connector.set.figma").unwrap();
         assert_eq!(results(&gone, 1)[0].result, Err(NOT_RUNNING.to_owned()));
+    }
+
+    /// A refusal's code from `lamp-services` (Spotify's `relink`, #5460)
+    /// is said in `data.code`; one not in its shape is dropped.
+    #[test]
+    fn a_refusals_code_is_passed_on() {
+        let admin = admin(
+            r#"{"ok":false,"error":"Spotify refused the lamp's link: link it again in the app","code":"relink"}"#,
+        );
+        let services = services(admin.socket(), Ok(connector("spotify")));
+        services.start("connector.set.spotify").unwrap();
+        let done = results(&services, 1);
+        assert_eq!(
+            done[0].result,
+            Err("Spotify refused the lamp's link: link it again in the app".to_owned())
+        );
+        assert_eq!(done[0].code.as_deref(), Some("relink"));
+        for (reply, kept) in [
+            (json!({"ok": false, "code": "Relink"}), None),
+            (json!({"ok": false, "code": "x".repeat(33)}), None),
+            (json!({"ok": false, "code": 5}), None),
+            (
+                json!({"ok": false, "code": "not_allowed"}),
+                Some("not_allowed"),
+            ),
+        ] {
+            assert_eq!(failure_code(&reply).as_deref(), kept, "{reply}");
+        }
     }
 
     #[test]
