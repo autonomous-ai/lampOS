@@ -482,6 +482,24 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "an installable skill, not yet tried on a lamp (#3504): V1's meal reminder, which its \
          owner chooses; a played check on a lamp comes first",
     ),
+    // Installable reads of a linked service (V1's Store skills ported,
+    // #5385, 6 Nov): each owner chooses them from the Skills Store, and a
+    // read needs that owner's own linked account.
+    (
+        "morning-agenda",
+        "an installable skill from the Skills Store: today's Google Calendar read once a morning, \
+         which needs its owner's calendar linked",
+    ),
+    (
+        "morning-mail",
+        "an installable skill from the Skills Store: the newest mail's senders and subjects read \
+         once a morning, which needs its owner's Gmail linked",
+    ),
+    (
+        "tomorrows-plan",
+        "an installable skill from the Skills Store: tomorrow's Google Calendar read once an \
+         evening, which needs its owner's calendar linked",
+    ),
     (
         "quiet-focus",
         "an installable skill, not yet tried on a lamp: one warm word when they look up after 45 \
