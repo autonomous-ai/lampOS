@@ -137,8 +137,11 @@ is kept, said or read, and no model is asked. They need a lamp-memory from the
 same build: an older memory refuses an unknown field (`deny_unknown_fields`),
 so a recall with one answers nothing and a session note is unavailable until
 both are updated. All three were turned on in the product's voice unit by
-the memory owner's call on 5 Nov, and are off for the candidate since 6 Nov
-until a played check passes (#5331, #5464); a product install ships the
+the memory owner's call on 5 Nov and off for the candidate on 6 Nov (#5464).
+`LAMP_MEMORY_PROFILE` is back on after its played check passed on lamp-06c1
+on 6 Nov (PASS bd98421414, #5331); `LAMP_MEMORY_NEWER_FIRST` and
+`LAMP_MEMORY_STRENGTH` stay off until a played check reaches their own
+fields (`earlier:true`, `strength:"maybe"`). A product install ships the
 voice and the memory from one build.
 
 With `LAMP_MEMORY_NEWER_FIRST=on` (the memory owner's Tiers-ideas plan, 3

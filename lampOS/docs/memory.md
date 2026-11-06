@@ -1893,9 +1893,11 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   - `LAMP_MEMORY_PROFILE`: the session note keeps a band for tastes and kept
     facts before promises and threads (`profile`).
   An older lamp-memory refuses the fields, so upgrade both together. All
-  three were turned on in the product by the memory owner's call on 5 Nov,
-  and are off for the candidate since 6 Nov until a played check passes
-  (#5331, #5464).
+  three were turned on in the product by the memory owner's call on 5 Nov
+  and off for the candidate on 6 Nov (#5464). `LAMP_MEMORY_PROFILE` is back
+  on after its played check passed on lamp-06c1 on 6 Nov (PASS bd98421414,
+  #5331); the other two stay off until a played check reaches their own
+  fields.
 
 - **Kept once** (#2176, `LAMP_MEMORY_REMEMBER_ONCE=on`, with the Days
   client only; off unless set; both voice routes; on in the product unit

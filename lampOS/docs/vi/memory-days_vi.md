@@ -349,13 +349,16 @@ phòng:
   Long today.») được xét như trước. Nhật ký chỉ đếm, không có lời nào. Test:
   `remember::named::tests`.
 
-## Ý tưởng của Tiers trong Days, tắt cho bản ứng viên
+## Ý tưởng của Tiers trong Days: PROFILE bật trong bản sản phẩm
 
 `LAMP_MEMORY_NEWER_FIRST`, `LAMP_MEMORY_STRENGTH` và `LAMP_MEMORY_PROFILE`
 (kế hoạch ý tưởng Tiers của người phụ trách trí nhớ, 3/11; mỗi công tắc chỉ
 nhận `on`, chỉ với Days) được bật trong unit voice của bản sản phẩm từ 5/11
-theo quyết định của người phụ trách trí nhớ, và tắt cho bản ứng viên từ 6/11
-cho đến khi một bài kiểm tra phát thử đạt (#5331, #5464). Khi bật, một lời
+theo quyết định của người phụ trách trí nhớ, và tắt cho bản ứng viên ngày 6/11
+(#5464). `LAMP_MEMORY_PROFILE` bật lại sau khi bài kiểm tra phát thử của nó đạt
+trên lamp-06c1 ngày 6/11 (PASS bd98421414, #5331); `LAMP_MEMORY_NEWER_FIRST`
+và `LAMP_MEMORY_STRENGTH` vẫn tắt cho đến khi một bài phát thử chạm tới chính
+trường của chúng (`earlier:true`, `strength:"maybe"`). Khi bật, một lời
 sửa nói trong lúc trò chuyện
 ("thật ra bây giờ là trà xanh") được trả về trước câu cũ mà nó sửa, và câu cũ
 mang `earlier`; một điều nói như "có lẽ" hay một dự định được đánh dấu
