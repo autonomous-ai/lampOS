@@ -400,6 +400,21 @@ class BodyAsks(unittest.TestCase):
         # Outside the fence it still opts out.
         self.assertEqual(self.ask("Privacy needs TWO READS.\n\n```\ncode\n```\nONE READ: tests only."), "none")
 
+    def test_an_opt_out_in_indented_code_or_a_longer_fence_is_no_opt_out(self):
+        # El's P3s on #5643: four spaces or a tab make indented code, and a fence closes only on a line of its own
+        # character, at least as long, with nothing after it.
+        for body in ("Privacy needs TWO READS.\n\n    ONE READ: tests only.",
+                     "Privacy needs TWO READS.\n\n\tONE READ: tests only.",
+                     "Privacy needs TWO READS.\n\n````\n```\nONE READ: tests only.\n````",
+                     "Privacy needs TWO READS.\n\n```\n```python\nONE READ: tests only.\n```",
+                     "Privacy needs TWO READS.\n\n~~~\n```\nONE READ: tests only.\n~~~"):
+            self.assertEqual(self.ask(body), "short 1", body)
+        for body in ("Privacy needs TWO READS.\n\n   ONE READ: tests only.",
+                     "Privacy needs TWO READS.\n\n  - ONE READ: tests only.",
+                     "Privacy needs TWO READS.\n\n````\n```\n````\nONE READ: tests only.",
+                     "Privacy needs TWO READS.\n\n```\nx\n```  \nONE READ: tests only."):
+            self.assertEqual(self.ask(body), "none", body)
+
     def test_no_mention_asks_nothing(self):
         for body in ("Nothing about reads.", "two reads, lowercase", "ONE READ: tests only."):
             self.assertEqual(self.ask(body), "none", body)
