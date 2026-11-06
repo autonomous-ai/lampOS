@@ -3,7 +3,9 @@
 # daily-briefing Store skill, ported as a read of a linked service
 # (Fourteen's marks on the Queue, #5385, 6 Nov 13:30, item A4). It comes
 # after 20 minutes at the desk, so it doesn't follow straight on from
-# Morning agenda's read, which comes after 2. Written to lamp-skills' schema (docs/skills.md,
+# Morning agenda's read, which comes after 2; if the agenda's read was held
+# at its gate, this one waits its turn, a minute after the agenda's last
+# line (one read at a time, #5618). Written to lamp-skills' schema (docs/skills.md,
 # "The schema, as lamp-skills reads it"); the read and its gate are
 # docs/services.md's "A made skill's read" (`LAMP_SKILL_READS`, on in the
 # product). Security mail and one-time codes are left out by lamp-services
