@@ -30,7 +30,7 @@ sau:
 2. **Bản hướng dẫn** (`made_skill::brief`): chữ cố định, gồm định dạng kỹ
    năng và những gì một kỹ năng tạo ra được phép dùng, rồi đến yêu cầu của
    người dùng.
-   - Yêu cầu tối đa 180 byte; dài hơn thì bị từ chối, không bao giờ bị cắt,
+   - Yêu cầu tối đa 480 byte; dài hơn thì bị từ chối, không bao giờ bị cắt,
      và khi đó không hỏi mô hình gì cả.
    - Không có gì khác của cuộc trò chuyện đi kèm.
 3. **Mô hình của đèn viết.** Bản hướng dẫn được gửi tới chat của tuyến thứ
@@ -235,7 +235,7 @@ hỏi thành tiếng; thiếu một trong hai thì socket của ứng dụng kh�
 (`crate::app_make`). Không hỏi phần tasks nào, và không cần phần tasks.
 
 - `{"make": {"words", "request_id"}}`: chữ thành cùng bản hướng dẫn (tối đa
-  180 byte) và được mô hình của đèn tạo ngay trên một luồng riêng
+  480 byte) và được mô hình của đèn tạo ngay trên một luồng riêng
   (`make_skill_local::make_kept`, `app_make::make_here`), được ghi là tạo từ
   `local:app:<ms>:1`: `making`, rồi `kept`, hoặc `not_kept` kèm lý do.
 - `{"ready": {}}`: `{"ready": true}` ngay, vì đèn tự tạo; `lamp-cloud` ghi
