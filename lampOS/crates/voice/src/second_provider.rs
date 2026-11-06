@@ -11051,8 +11051,14 @@ fn drop_held_save(shared: &Shared, request: u64, why: &str) {
 /// Tells the walk a held setup save was let go, so "who you are" is no
 /// longer kept open for it.
 fn let_the_walk_go() {
-    if let Some(file) = crate::onboarding::file_from_environment() {
-        crate::onboarding::face_save_let_go(&file);
+    match crate::onboarding::file_from_environment() {
+        Some(file) => crate::onboarding::face_save_let_go(&file),
+        // Said, not silent: on lamp-52e6 the walk's file never reached this
+        // worker and the step waited out the whole hold with no line to
+        // show why (Fifth's row 6 on 10441, #5139).
+        None => eprintln!(
+            "lamp-voice second: the setup walk's file is not known here: the held face save's let-go is not posted"
+        ),
     }
 }
 

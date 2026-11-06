@@ -325,7 +325,13 @@ done waits, and ends it done with the name only once the hold is over unless
 the face is saved first. A hold the voice lets go before its yes (a
 correction, another name, its 45 s) is posted too (`face_save_let_go`), and
 the step is no longer kept open for it; both sides read one bound
-(`HELD_SAVE_FOR` is `FACE_SAVE_HELD_US`). On a skip or a
+(`HELD_SAVE_FOR` is `FACE_SAVE_HELD_US`). The voice's second worker posts that
+let-go, so it is given `LAMP_ONBOARDING` and `LAMP_ONBOARDING_FILE`, the
+exact `on` and an absolute path, and no other worker is
+(`process::onboarding_worker_environment`). Without them it journals `the
+setup walk's file is not known here: the held face save's let-go is not
+posted`, and the step waits out the hold (#5139: lamp-52e6, 10441, the drop
+at 08:02:39 and the step closed only at 08:03:14). On a skip or a
 failure says only "That's fine. You can tell me your name any time."
 (`who_again`: "Sorry, what should I call you?"). `preferences`' model asks "Are there
 hours when I should keep quiet? For example, 'after ten at night', or 'no'." and
