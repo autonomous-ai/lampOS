@@ -1906,6 +1906,8 @@ fn second_route_worker_environment(
         // An earlier turn's calls told with its words (lamp build 9699).
         crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
         crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
+        // A one-face line read as its person's, forgets refused (#5522).
+        crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
         // A narrowed line named for its reply by the one-face count (5 Nov).
         crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
         // A one-face line's reminder reads are its person's (lamp-29e7).
@@ -2113,6 +2115,7 @@ mod tests {
             crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT,
             crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
+            crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
             crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
             crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT,
             crate::person::BY_DEFAULT_ENVIRONMENT,
@@ -2894,6 +2897,7 @@ mod tests {
                     || name == crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT
                     || name == crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT
+                    || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT
                     || name == crate::second_provider::NAME_ONE_FACE_ENVIRONMENT
                     || name == crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT
                     || name == crate::person::BY_DEFAULT_ENVIRONMENT
@@ -3063,6 +3067,7 @@ mod tests {
                     "LAMP_PERSON_NAME_BY_DEFAULT=on",
                     "LAMP_PERSON_NAME_OWNER_ONLY=on",
                     "LAMP_PERSON_SCOPE_ONE_FACE=on",
+                    "LAMP_PERSON_SCOPE_ONE_FACE_READS=on",
                     "LAMP_PERSON_SCOPE_SEEN=on",
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",

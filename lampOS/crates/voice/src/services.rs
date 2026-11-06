@@ -815,14 +815,27 @@ pub(crate) fn owner_of(lease: Option<&crate::memory_scope::ScopeLease>) -> Optio
                 .unwrap_or_else(|| "the-owner".to_owned()),
         );
     }
-    let person = lease?
+    owner_among(lease, &crate::person::owner_ids())
+}
+
+/// [`owner_of`] outside the private room, with the owner's memory ids
+/// `owners`: the line's person when it is one of them, the line not held.
+/// Never a line that is theirs only by their face alone in view
+/// (`LAMP_PERSON_SCOPE_ONE_FACE_READS`, `ScopeLease::forgets_need_mouth`):
+/// that counts for saving and recall, never for acting as them, and an
+/// off-camera guest's "read my mail" with the owner silent alone in view
+/// must read nothing of theirs (the privacy read's P1 on #5592).
+fn owner_among(
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    owners: &[String],
+) -> Option<String> {
+    let lease = lease.filter(|lease| !lease.forgets_need_mouth())?;
+    let person = lease
         .scope()
         .filter(|scope| !scope.held())?
         .person()?
         .to_owned();
-    crate::person::owner_ids()
-        .contains(&person)
-        .then_some(person)
+    owners.contains(&person).then_some(person)
 }
 
 /// Whether the owner is the only face the eyes see now
@@ -2362,5 +2375,58 @@ mod tests {
         crate::person::set_private_room_for_test(Some(true));
         assert!(owner_of(None).is_some());
         crate::person::set_private_room_for_test(None);
+    }
+
+    /// The privacy read's P1 on #5592: an off-camera guest says "read my
+    /// mail" while the owner A sits silent and alone in view, the line A's
+    /// only by the one-face rule with `LAMP_PERSON_SCOPE_ONE_FACE_READS`.
+    /// It has no owner, so no `service_read` runs: the gate refuses it as
+    /// not the owner's before anything is asked. The same line seen as A's
+    /// is A's, and the private room still gives every line its owner.
+    #[test]
+    fn an_off_camera_guests_read_my_mail_with_the_owner_silent_alone_in_view_runs_no_service_read()
+    {
+        use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+        let key = RequestKey {
+            worker: lamp_turn_owner::BootId::new([57; 16]).unwrap(),
+            session: 1,
+            request: 1,
+        };
+        let a = crate::remember::person_id("A");
+        let owners = [a.clone()];
+        let one_face = RequestScope::new(key, ScopeSnapshot::of("A"));
+        let lease = one_face.lease();
+        assert!(lease.read_by_one_face(), "the one-face rule takes the line");
+        assert_eq!(lease.scope().unwrap().person(), Some(a.as_str()));
+        assert_eq!(owner_among(Some(&lease), &owners), None, "no owner");
+        let read = call(READ, json!({"service": "gmail", "query": "today"}));
+        let owner = owner_among(Some(&lease), &owners);
+        let turn = Turn {
+            heard: true,
+            words: Some("Lamp, read my mail."),
+            previous: None,
+            owner: owner.as_deref(),
+            sends: true,
+            alike: None,
+            seen_owner: false,
+            other_seen: false,
+        };
+        let mut pending = None;
+        assert_eq!(
+            gate(&mut pending, &read, 1, &turn, Instant::now()),
+            Err(json!({ "error": OWNER_ONLY })),
+            "refused before any read"
+        );
+        crate::person::set_private_room_for_test(Some(false));
+        assert_eq!(owner_of(Some(&lease)), None);
+        crate::person::set_private_room_for_test(Some(true));
+        assert!(owner_of(Some(&lease)).is_some(), "the private room's owner");
+        crate::person::set_private_room_for_test(None);
+        let seen = RequestScope::new(key, ScopeSnapshot::of("A"));
+        assert_eq!(
+            owner_among(Some(&seen.lease()), &owners),
+            Some(a),
+            "A's own line: A's"
+        );
     }
 }

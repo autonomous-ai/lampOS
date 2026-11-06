@@ -2387,7 +2387,14 @@ static OBSERVING: OnceLock<SyncSender<ObserveJob>> = OnceLock::new();
 /// shown, by id ([`observations_replacing`]).
 /// And the ids of its exchanges seen spoken by its person ([`seen_by`]),
 /// for a name of theirs ([`named`]).
-type ObserveJob = (Option<String>, Value, u64, Vec<(u64, String)>, Vec<u64>);
+type ObserveJob = (
+    Option<String>,
+    Value,
+    u64,
+    Vec<(u64, String)>,
+    Vec<u64>,
+    bool,
+);
 /// Forgets asked of this process's memory (`forget`, `forget_everything`,
 /// named or not, kept or refused), counted as each is asked. A job waiting for the model, or with it, from
 /// before a forget is closed with nothing kept: its words are never sent,
@@ -3916,6 +3923,19 @@ fn scope_current(lease: Option<&crate::memory_scope::ScopeLease>) -> bool {
     lease.is_none_or(crate::memory_scope::ScopeLease::is_current)
 }
 
+/// Whether `name` with `args` is a `remember` that corrects a kept thing
+/// by its id (`replaces`, #2510): it retires the old fact, so a line its
+/// person's only by their face alone in view
+/// (`LAMP_PERSON_SCOPE_ONE_FACE_READS`) never runs it, as it runs no forget
+/// (the privacy read's P2 on #5592). An id that is no id is not one.
+pub(crate) fn corrects(name: &str, args: &Value) -> bool {
+    name == REMEMBER
+        && args
+            .get("replaces")
+            .and_then(Value::as_u64)
+            .is_some_and(|id| id > 0 && id <= i64::MAX as u64)
+}
+
 /// Whether a recall may ask for history (#2510 take #4): for the scope it
 /// reads, someone known's own or the room's, while the request's lease,
 /// when there is one, still holds that scope. A line narrowed from a
@@ -4905,7 +4925,7 @@ pub fn finished(request: u64) {
             Ok(mut thread) => thread.finished(request, Instant::now()),
             Err(_) => return,
         };
-        hand_on_days(done, wall_ms(), client);
+        hand_on_days(filed_by_one_face(done), wall_ms(), client);
         // What its calls gave and no exchange took (one kept out) is
         // dropped (#2176 finding 14).
         client.drop_fetched(request);
@@ -4916,7 +4936,22 @@ pub fn finished(request: u64) {
         Ok(mut thread) => thread.finished(request, Instant::now()),
         Err(_) => return,
     };
-    hand_on(done, unix_ms(), jobs);
+    hand_on(filed_by_one_face(done), unix_ms(), jobs);
+}
+
+/// Each finished exchange filed as the room's whose line is a known
+/// person's by the one-face rule with `LAMP_PERSON_SCOPE_ONE_FACE_READS`
+/// ([`crate::memory_scope::one_face_record`]) is filed in their record, for
+/// both journal backends: their words and the lamp's answer are theirs, as
+/// their keep is (#5522; lamp-220c, 29e7: the face alone in 17 looks, read
+/// speaking in none, its exchanges all the room's). One told as theirs
+/// already, or as someone else's, is as it was; without the switch nothing
+/// is marked, and nothing changes.
+fn filed_by_one_face(mut done: Vec<FinishedExchange>) -> Vec<FinishedExchange> {
+    for exchange in done.iter_mut().filter(|exchange| exchange.whose.is_none()) {
+        exchange.whose = crate::memory_scope::one_face_record(exchange.request);
+    }
+    done
 }
 
 /// A face was saved as `to`'s (a memory id) in the request `request`: with
@@ -7572,6 +7607,33 @@ fn observations_replacing(
     observations
 }
 
+/// The journal's line for an observation job whose conversation had a
+/// one-face exchange ([`Conversation::one_face`]): its proposals are kept
+/// plainly, none retires a kept thing. Counts only.
+pub const OBSERVE_ONE_FACE_NO_REPLACES: &str = "lamp-voice provider: observation pass: a one-face exchange is in the conversation; nothing it proposes replaces a kept thing";
+
+/// The proposals an observation job gives `tidy_apply`: with `replaces`
+/// (`LAMP_MEMORY_REPLACES`), those that clearly correct one shown kept
+/// thing carry `"replaces"` ([`observations_replacing`]), unless one of the
+/// conversation's exchanges was filed in their record by the one-face rule
+/// (`one_face`, [`Conversation::one_face`]): a lone silent face's line may
+/// be an off-camera guest's, and it counts for saving and recall, never
+/// for retiring what they kept (the owner's rule on #5592, Thirteen's P2).
+/// Those proposals go plainly.
+fn job_replacing(
+    observations: Vec<Value>,
+    person: Option<&str>,
+    shown: &[(u64, String)],
+    replaces: bool,
+    one_face: bool,
+) -> Vec<Value> {
+    if replaces && !one_face {
+        observations_replacing(observations, person, shown)
+    } else {
+        observations
+    }
+}
+
 /// A word as [`content_words`] gives it: a plural's `s` taken off.
 fn plural_off(word: &str) -> &str {
     word.strip_suffix('s')
@@ -8973,7 +9035,15 @@ impl DaysClient {
         // `replaces` out, so bakery and library both stayed current). More
         // than one such thing keeps nothing and asks which; none, or a
         // context busy just now, keeps it plainly, as before.
-        if call.name == REMEMBER && self.replaces.load(Ordering::Acquire) && replaces.is_none() {
+        // Never on a line its person's only by their face alone in view
+        // (`LAMP_PERSON_SCOPE_ONE_FACE_READS`): a correction retires a kept
+        // thing, so there the keep is kept plainly and nothing is replaced
+        // (the privacy read's P2 on #5592; [`corrects`] refuses a given id).
+        if call.name == REMEMBER
+            && self.replaces.load(Ordering::Acquire)
+            && replaces.is_none()
+            && !lease.is_some_and(crate::memory_scope::ScopeLease::forgets_need_mouth)
+        {
             let heard = asked_in.and_then(|id| {
                 crate::thread::THREAD
                     .try_lock()
@@ -11074,6 +11144,13 @@ struct Conversation {
     /// theirs ([`seen_by`]): only these may give a name of theirs to the
     /// observation pass ([`named`]).
     seen: Vec<u64>,
+    /// One of its exchanges was filed in its person's record by the
+    /// one-face rule (`LAMP_PERSON_SCOPE_ONE_FACE_READS`,
+    /// [`crate::memory_scope::one_face_record`]): its words may be an
+    /// off-camera guest's, so its observation pass retires nothing
+    /// ([`job_replacing`]; Thirteen's P2 on #5592). Saving counts; a
+    /// correction is never made from it.
+    one_face: bool,
 }
 
 /// Whether request `request`'s line was seen spoken by `person`, a known
@@ -11112,6 +11189,19 @@ impl Conversation {
         }
     }
 
+    /// Exchange `id`, written for request `request`: seen spoken by its
+    /// person ([`seen_by`]), or filed in their record by the one-face rule
+    /// ([`crate::memory_scope::one_face_record`]), which marks the whole
+    /// conversation ([`Self::one_face`]).
+    fn filed(&mut self, id: u64, request: u64) {
+        if seen_by(self.person.as_deref(), request) {
+            self.seen.push(id);
+        }
+        if request != 0 && crate::memory_scope::one_face_record(request).is_some() {
+            self.one_face = true;
+        }
+    }
+
     /// Full at [`SOURCE_IDS`]: the part said so far is closed as its own
     /// piece, to be ended and observed as a conversation's end is, and the
     /// conversation goes on, the same person's, from the next exchange
@@ -11130,6 +11220,8 @@ impl Conversation {
             incomplete: std::mem::take(&mut self.incomplete),
             forgets: self.forgets,
             seen: std::mem::take(&mut self.seen),
+            // Both pieces keep the mark: the talk goes on as it was.
+            one_face: self.one_face,
             ..Conversation::default()
         };
         self.kept.clear();
@@ -11161,6 +11253,7 @@ fn observe(
     forgets: u64,
     shown: Vec<(u64, String)>,
     seen: Vec<u64>,
+    one_face: bool,
 ) {
     let jobs = OBSERVING.get_or_init(|| {
         let (jobs, work) = sync_channel(OBSERVE_QUEUE);
@@ -11176,7 +11269,7 @@ fn observe(
     if let Err(
         std::sync::mpsc::TrySendError::Full((person, input, ..))
         | std::sync::mpsc::TrySendError::Disconnected((person, input, ..)),
-    ) = jobs.try_send((person, input, forgets, shown, seen))
+    ) = jobs.try_send((person, input, forgets, shown, seen, one_face))
     {
         let job = input["job"].as_str().unwrap_or_default();
         let closed = close_job(socket, person.as_deref(), job);
@@ -11212,7 +11305,7 @@ fn observe_jobs(socket: &Path, jobs: &Receiver<ObserveJob>) {
     // its proposals are not given (`OBSERVE_FORGETS`).
     let forgotten = |forgets: u64| OBSERVE_FORGETS.load(Ordering::Acquire) != forgets;
     let replaces = replaces_on();
-    for (person, input, forgets, shown, seen) in jobs {
+    for (person, input, forgets, shown, seen, one_face) in jobs {
         #[cfg(any(test, lamp_memory_probe))]
         if probe::observe_barrier_reached(&input) {
             continue;
@@ -11276,12 +11369,13 @@ fn observe_jobs(socket: &Path, jobs: &Receiver<ObserveJob>) {
             eprintln!("{} (dropped={unnamed})", named::DROPPED);
         }
         // With `LAMP_MEMORY_REPLACES`, one that clearly corrects a kept
-        // thing of theirs retires it (finding N11 on #3504).
-        let observations = if replaces {
-            observations_replacing(observations, person.as_deref(), &shown)
-        } else {
-            observations
-        };
+        // thing of theirs retires it (finding N11 on #3504), unless the
+        // conversation had a one-face exchange (Thirteen's P2 on #5592).
+        if replaces && one_face {
+            eprintln!("{OBSERVE_ONE_FACE_NO_REPLACES}");
+        }
+        let observations =
+            job_replacing(observations, person.as_deref(), &shown, replaces, one_face);
         let answer = bounded_exchange(
             socket,
             &for_person(
@@ -11898,7 +11992,15 @@ fn days_writer(
                     if let Some(summary) = summary {
                         input["summary"] = json!(summary);
                     }
-                    observe(socket, ended.person, input, forgets, shown, ended.seen);
+                    observe(
+                        socket,
+                        ended.person,
+                        input,
+                        forgets,
+                        shown,
+                        ended.seen,
+                        ended.one_face,
+                    );
                 }
                 None => {
                     // The memory's refusal, by its own fixed code: a pass
@@ -12086,9 +12188,7 @@ fn days_writer(
                         end(&mut piece);
                     }
                     conversation.add(id, finished, observe_forgets);
-                    if seen_by(conversation.person.as_deref(), request) {
-                        conversation.seen.push(id);
-                    }
+                    conversation.filed(id, request);
                     if let Ok(mut current) = current.lock() {
                         *current = (conversation.person.clone(), conversation.sources.clone());
                     }
@@ -17777,6 +17877,84 @@ mod tests {
             early: false,
         };
         (client, work)
+    }
+
+    /// #5522 (`LAMP_PERSON_SCOPE_ONE_FACE_READS`): a known person's line
+    /// taken by the one-face rule with the switch, their face alone in view
+    /// and never read speaking, journals its exchange in their record, for
+    /// both journal backends ([`filed_by_one_face`], before `hand_on` and
+    /// `hand_on_days`), even one filed as the room's (a late-named face).
+    /// Without the switch, or once another voice narrows it, it is the
+    /// room's, as before; one filed as someone's already is untouched.
+    #[test]
+    fn a_one_face_lines_exchange_is_journalled_in_their_record_with_the_switch() {
+        use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+        let a = person_id("One Face Record A");
+        let b = person_id("One Face Record B");
+        let key = |request| RequestKey {
+            worker: lamp_turn_owner::BootId::new([52; 16]).unwrap(),
+            session: 1,
+            request,
+        };
+        let admitted =
+            |request| RequestScope::new(key(request), ScopeSnapshot::of("One Face Record A"));
+        let exchange = |request, whose: Option<&str>| FinishedExchange {
+            request,
+            age: Duration::from_secs(1),
+            heard: "I'm flying to Tokyo next week.".to_owned(),
+            said: "Noted. Have a good trip.".to_owned(),
+            whose: whose.map(str::to_owned),
+        };
+        // Requests no other test names.
+        let (reads, keep_only, narrowed, late, late_off, other) = (
+            u64::MAX - 552_201,
+            u64::MAX - 552_202,
+            u64::MAX - 552_203,
+            u64::MAX - 552_204,
+            u64::MAX - 552_205,
+            u64::MAX - 552_206,
+        );
+        let with_reads = admitted(reads);
+        assert!(with_reads.lease().read_by_one_face());
+        let without = admitted(keep_only);
+        assert!(without.lease().take_by_one_face(), "the switch off");
+        let then_another = admitted(narrowed);
+        assert!(then_another.lease().read_by_one_face());
+        then_another.lease().narrow_to_room();
+        let named_late = RequestScope::new(key(late), ScopeSnapshot::room());
+        assert!(named_late.lease().keep_for_one_face_recorded(&a));
+        let named_late_off = RequestScope::new(key(late_off), ScopeSnapshot::room());
+        assert!(named_late_off.lease().keep_for_one_face(&a));
+        let someones = admitted(other);
+        assert!(someones.lease().read_by_one_face());
+        let filed = filed_by_one_face(vec![
+            exchange(reads, None),
+            exchange(keep_only, None),
+            exchange(narrowed, None),
+            exchange(late, None),
+            exchange(late_off, None),
+            exchange(other, Some(&b)),
+        ]);
+        let whose: Vec<Option<&str>> = filed.iter().map(|done| done.whose.as_deref()).collect();
+        assert_eq!(
+            whose,
+            [
+                Some(a.as_str()),
+                None,
+                None,
+                Some(a.as_str()),
+                None,
+                Some(b.as_str())
+            ],
+            "theirs with the switch; the room's without it or once narrowed"
+        );
+        // The legacy writer's queue is given it as theirs.
+        let (jobs, queued) = std::sync::mpsc::sync_channel(4);
+        hand_on(filed_by_one_face(vec![exchange(reads, None)]), NOW, &jobs);
+        match queued.try_recv() {
+            Ok(Job::Exchange { person, .. }) => assert_eq!(person.as_deref(), Some(a.as_str())),
+            _ => panic!("journalled"),
+        }
     }
 
     /// #1693 (the first builder on #2602, 22 Oct 09:4x): a dated follow-up
@@ -26498,6 +26676,69 @@ mod tests {
             );
             assert!(!seen_by(None, request), "the room's");
             assert!(!seen_by(Some(&mai()), 0));
+        }
+
+        /// Thirteen's P2 on #5592 (`LAMP_PERSON_SCOPE_ONE_FACE_READS` with
+        /// `LAMP_MEMORY_REPLACES`): an exchange filed in her record by the
+        /// one-face rule, her face silent and alone in view, marks its
+        /// conversation, and that conversation's observation pass never
+        /// retires a kept thing of hers: an off-camera guest's "I work at
+        /// the library now, not the bakery" reaches `tidy_apply` without
+        /// `"replaces"`, kept plainly, as saving counts. The same exchange
+        /// her face was seen saying still carries it; a closed piece keeps
+        /// the mark.
+        #[test]
+        fn with_reads_a_one_face_conversations_observation_never_retires_a_kept_thing() {
+            use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+            // Requests no other test names.
+            let (one_face, spoken) = (u64::MAX - 559_201, u64::MAX - 559_202);
+            let scope = RequestScope::new(
+                RequestKey {
+                    worker: lamp_turn_owner::BootId::new([59; 16]).unwrap(),
+                    session: 1,
+                    request: one_face,
+                },
+                ScopeSnapshot::of("Mai"),
+            );
+            assert!(scope.lease().read_by_one_face());
+            saw_line(seen(spoken, &["b1/f1"], Some(("Mai", "b1/f1"))));
+            let written = |request| {
+                let mut conversation = Conversation {
+                    person: Some(mai()),
+                    ..Conversation::default()
+                };
+                conversation.add(7, Instant::now(), 0);
+                conversation.filed(7, request);
+                conversation
+            };
+            let silent = written(one_face);
+            assert!(silent.one_face && silent.seen.is_empty());
+            let said = written(spoken);
+            assert!(!said.one_face);
+            assert_eq!(said.seen, [7]);
+            let shown = vec![(590, "works at a bakery".to_owned())];
+            let proposal = vec![
+                json!({"text":"Works at a library now, not the bakery.","category":"preference","source_ids":[7],"supersedes":null}),
+            ];
+            let sent = |one_face| {
+                job_replacing(proposal.clone(), Some(&mai()), &shown, true, one_face)[0].clone()
+            };
+            let from_silent = sent(silent.one_face);
+            assert!(from_silent.get("replaces").is_none(), "{from_silent}");
+            assert_eq!(from_silent["text"], proposal[0]["text"], "kept plainly");
+            assert_eq!(sent(said.one_face)["replaces"], 590);
+            // Off (`LAMP_MEMORY_REPLACES`), neither carries one.
+            assert!(
+                job_replacing(proposal.clone(), Some(&mai()), &shown, false, false)[0]
+                    .get("replaces")
+                    .is_none()
+            );
+            let mut full = written(one_face);
+            for id in 8..=SOURCE_IDS as u64 + 6 {
+                full.add(id, Instant::now(), 0);
+            }
+            assert!(full.full());
+            assert!(full.close_piece().one_face, "the closed piece keeps it");
         }
 
         fn speaking_client(socket: &Path, on: bool) -> DaysClient {

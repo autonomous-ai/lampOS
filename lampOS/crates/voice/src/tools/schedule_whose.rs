@@ -44,7 +44,7 @@ const READS: [&str; 3] = ["list_reminders", "cancel_reminder", "snooze_reminder"
 pub const ONE_FACE_ENVIRONMENT: &str = "LAMP_ONE_FACE_REMINDERS";
 
 /// Whether [`ONE_FACE_ENVIRONMENT`] is on.
-fn one_face_on() -> bool {
+pub(crate) fn one_face_on() -> bool {
     std::env::var(ONE_FACE_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 

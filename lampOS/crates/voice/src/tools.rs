@@ -1743,6 +1743,41 @@ fn run_call_with_scope(
                         // reviewer-three's P1 on #4584; Fourteen's forget
                         // FAIL on lamp-9adf, build 9699).
                         let late = lease.keeper_within(crate::memory_scope::KEEPER_WAIT);
+                        // With `LAMP_PERSON_SCOPE_ONE_FACE_READS`, a forget
+                        // on a line someone's by the one-face rule never runs,
+                        // the single-item one its keep reaches among them:
+                        // nothing saw the mouth say it (the memory owner,
+                        // 16:49 on #5385). Read after the late look, which
+                        // may take the line by the rule as it ends.
+                        if model.name == crate::remember::FORGET && lease.forgets_need_mouth() {
+                            eprintln!(
+                                "lamp-voice: request {request}: a forget on a line whose keep is the one known face's is not run: nothing saw the mouth say it (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
+                            );
+                            return (
+                                serde_json::json!({
+                                    "forgotten": false,
+                                    "note": crate::second_provider::ONE_FACE_FORGET,
+                                }),
+                                true,
+                            );
+                        }
+                        // Nor a correction of a kept thing (`replaces`): it
+                        // retires the old fact, as a forget would (the
+                        // privacy read's P2 on #5592). A plain keep runs.
+                        if crate::remember::corrects(&model.name, &call.args)
+                            && lease.forgets_need_mouth()
+                        {
+                            eprintln!(
+                                "lamp-voice: request {request}: a correction on a line whose keep is the one known face's is not run: nothing saw the mouth say it (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
+                            );
+                            return (
+                                serde_json::json!({
+                                    "kept": false,
+                                    "note": crate::second_provider::ONE_FACE_FORGET,
+                                }),
+                                true,
+                            );
+                        }
                         // Only a forget naming what (`about`) or which
                         // (`source_id`) reaches their scope: a bare "forget
                         // that" is `forget_last`, and after the room's

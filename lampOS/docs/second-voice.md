@@ -5030,6 +5030,27 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   Known risk, accepted by the memory owner on 4 Nov: a voice not seen saying
   it, with the person's face alone in view, hears their reminders and may
   cancel or snooze them ([schedule.md](schedule.md), [switches.md](switches.md)).
+- **A one-face line is read as its person's; its forgets need the mouth**
+  (`LAMP_PERSON_SCOPE_ONE_FACE_READS=on`, off everywhere, #5522; with
+  `LAMP_PERSON_SCOPE_ONE_FACE` acted on, `Engine::reading_by_one_face`). A
+  line the one-face rule takes is not narrowed at admission
+  (`ScopeLease::read_by_one_face`): its chat is told their context, recall
+  and hits read their scope, and its exchange goes in their thread and their
+  record. Another voice heard as the line is judged still narrows it to the
+  room's, keeps and all, and drops a chat begun on its early words. Every
+  forget, and every yes granted as them, is refused by both runners
+  (`one_face_refused`, before any hold) and by the memory route
+  (`ScopeLease::forgets_need_mouth`, after the late look), and
+  `forget_asker` gives such a line no asker. So are a correction
+  (`remember` with `replaces`), `keep_rule`, `list_rules`, and
+  `cancel_reminder` / `snooze_reminder` unless `LAMP_ONE_FACE_REMINDERS` is
+  on, and the line has no services owner outside the private room
+  (`services::owner_of`). The memory owner, 16:49 on
+  #5385: "tạm thời chưa cho xóa nếu ko detect đc mở miệng" (no forgetting
+  for now unless the mouth is seen opening). Known risk: a guest off camera,
+  their face silent and alone in view, is told their memory, and its
+  words are filed in their record, which their day recall may take as theirs
+  ([memory.md](memory.md), [switches.md](switches.md)).
 - **A session's trust is the caller's** (with `LAMP_QUIET_GOING_ON_SAME_ONE=on`
   or `LAMP_GOING_ON_NOT_OWN=on` and `LAMP_SAME_VOICE_MODEL`, the first
   builder at 09:40 on #2428). Past its first two lines a session is trusted

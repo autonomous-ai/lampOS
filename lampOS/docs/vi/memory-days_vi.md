@@ -681,6 +681,56 @@ nhiều nhất tám điều, và không quên gì khi có nhiều hơn), không 
 (không gì được đọc lại cho giọng ấy). Một câu được lưu là của bạn khi bạn là khuôn mặt duy nhất trong khung
 hình có thể chứa lời người khác nói ngoài khung hình.
 
+**Cả việc đọc, với công tắc riêng; việc quên cần thấy miệng nói**
+(`LAMP_PERSON_SCOPE_ONE_FACE_READS=on`, tắt ở mọi nơi, #5522; lời «áp dụng
+luôn đi» của người phụ trách ký ức lúc 16:43 trên #5385, PM hiểu là cho việc
+lưu và việc nhớ lại, không cho việc quên, và lời của người phụ trách ký ức lúc
+16:49: «tạm thời chưa cho xóa nếu ko detect đc mở miệng»). Khi
+`LAMP_PERSON_SCOPE_ONE_FACE` có tác dụng, một câu mà quy tắc ấy nhận như trên
+**không bị thu hẹp**: câu được nói và đọc như của họ
+(`ScopeLease::read_by_one_face`): `recall`, gợi ý ký ức, ghi chú ký ức, ngữ
+cảnh, chuỗi hội thoại của họ và việc giữ cuộc trò chuyện mà nó mở ra. Lượt trao
+đổi của câu được ghi vào hồ sơ của họ ở cả hai kiểu nhật ký
+(`memory_scope::one_face_record`, `remember::filed_by_one_face`, trước
+`hand_on` và `hand_on_days`); một câu mà lần nhìn muộn gọi tên họ theo cùng
+quy tắc giữ việc đọc là của căn phòng, như đã nói, nhưng hồ sơ cũng là của họ
+(`ScopeLease::keep_for_one_face_recorded`). **Không lệnh quên nào chạy trên
+câu như vậy** (`ScopeLease::forgets_need_mouth`): không `forget_everything`,
+`forget_my_face`, `forget_rule`, lời «có» thay họ, cũng không `forget` một mục
+mà riêng quy tắc ghi nhớ cho chạm tới phạm vi của họ
+(`ScopeLease::reached_by_one_face`); mô hình được báo là không quên gì và hãy
+nhờ họ nhìn vào đèn nói lại. Câu ấy không giữ lệnh quên nào chờ lời «có», và
+lời yêu cầu của nó không tính là yêu cầu ngay trước (`forget_asker`).
+**Cũng không gì mang tính xoá bỏ, hay làm thay họ ngoài việc lưu và nhớ lại**
+(lần đọc riêng tư trên #5592): một `remember` sửa một điều đã giữ theo id
+(`replaces`, `remember::corrects`) bị từ chối như lệnh quên, và khi không có
+id thì bộ so khớp lời sửa bị bỏ qua, nên điều mới được giữ như thường và không
+gì bị thay; `keep_rule`, `list_rules` và `forget_rule` bị từ chối;
+`cancel_reminder` và `snooze_reminder` bị từ chối trừ khi
+`LAMP_ONE_FACE_REMINDERS` bật (điều chấp nhận ngày 4/11); và câu ấy không có
+chủ dịch vụ (`services::owner_of`), nên không `service_read` nào chạy cho nó,
+trừ khi phòng riêng (`LAMP_PRIVATE_ROOM`) đã cho mọi câu một chủ. Lượt quan
+sát sau cuộc trò chuyện không bao giờ cho nghỉ một điều đã giữ của cuộc trò
+chuyện có một lượt trao đổi như vậy được ghi vào: với `LAMP_MEMORY_REPLACES`,
+các đề xuất của nó tới `tidy_apply` không có `"replaces"`, được giữ như thường
+(`Conversation::filed`, `remember::job_replacing`; P2 của Thirteen trên #5592). Một điều mới
+được giữ như thường vẫn được ghi. Câu mà thấy mặt họ nói thì như trước. Các giới hạn riêng tư vẫn giữ: có mặt thứ hai,
+mặt lạ, không có mặt, giọng khác trước câu hoặc nghe thấy khi câu được xét
+(`another voice in the conversation`), thì là của căn phòng, cả việc ghi; câu
+được giữ theo cuộc trò chuyện không bao giờ được đọc (#5508). **Rủi ro đã biết,
+chấp nhận cùng công tắc:** một vị khách nói ngoài khung hình khi mặt họ ngồi im
+một mình trong khung, không nghe thấy giọng khác, sẽ được nghe `recall`, gợi ý
+và chuỗi hội thoại của họ. **Việc ghi cũng xảy ra:** ghi lượt trao đổi vào hồ
+sơ của họ là phần «việc lưu được tính» của chủ đèn, nên lời của khách có thể
+được ghi như của họ, và việc nhớ lại theo ngày cùng việc trích xuất ban đêm
+(nếu có lúc được bật) có thể coi đó là lời của họ. `LAMP_SAME_VOICE_CONFIRMS`,
+khi bật, chỉ coi giọng khách là giọng thứ hai khi cuộc trò chuyện đã có dấu
+giọng để so; nếu khách là giọng đầu tiên thì không gì phân biệt được. Phán
+quyết của trưởng nhóm trên #5522 nói một mặt một mình không bao giờ tính cho
+việc đọc; điều này dựa trên lời của người phụ trách ký ức lúc 16:43 và cách
+hiểu của PM lúc 16:46, nên trưởng nhóm xác nhận trước khi bật công tắc. Tắt công tắc thì quy tắc một mặt
+như trên, giống hệt từng byte.
+
 **Lệnh quên tới cả dòng của căn phòng nói lại điều họ giữ** (GATE 23 FAIL
 của Core-verifier trên lamp-52e6, bản ổn định 9980, ngày 4/11): câu «remember
 my favourite drink is jasmine cheese» của Henry được giữ là của Henry, câu trả

@@ -776,6 +776,23 @@ pub const CONVERSATION_CARRIED_SAVES_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARR
 /// another voice ([`Engine::scoping_by_one_face`]).
 pub const PERSON_SCOPE_ONE_FACE_ENVIRONMENT: &str = "LAMP_PERSON_SCOPE_ONE_FACE";
 
+/// With [`PERSON_SCOPE_ONE_FACE_ENVIRONMENT`] acted on, a line its rule
+/// takes (their known face the one face in view through it, none seen
+/// speaking it, not carried, no other voice heard) is also told and read
+/// as the person's: recall, hits, the memory note, their thread and the
+/// carry it opens, and its exchange is journalled in their record (#5522;
+/// the memory owner's 16:43 "apply it" on #5385, read by the PM as saving
+/// and recall, not forgetting). No forget of any kind and no yes runs on
+/// such a line (`ScopeLease::forgets_need_mouth`), a single-item forget its
+/// keep reaches among them: forgetting still needs the mouth seen speaking
+/// (the memory owner, 16:49). The known risk, accepted with it: a guest off
+/// camera, the person's face silent and alone in view and no other voice
+/// heard, is told the person's memory. A second face, an unknown face,
+/// another voice or a carried line is as before. `on`, and nothing else;
+/// off, the one-face rule is as before, byte for byte
+/// ([`Engine::reading_by_one_face`]).
+pub const PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT: &str = "LAMP_PERSON_SCOPE_ONE_FACE_READS";
+
 /// A known person's line narrowed to the room for want of a face seen
 /// speaking it is still *named* for its reply when no face at all was seen
 /// speaking it, their own known face was the one face in view through it by
@@ -1773,6 +1790,10 @@ struct Shared {
     /// face seen speaking it, keeps for them while this reads `false`, its
     /// reads the room's. None, off.
     one_face: Option<Arc<AtomicBool>>,
+    /// With [`Self::one_face`], a line the one-face rule takes is read as
+    /// its person's, forgets refused (`LAMP_PERSON_SCOPE_ONE_FACE_READS`,
+    /// [`Engine::reading_by_one_face`]).
+    one_face_reads: bool,
     /// With [`Self::scope_seen`], a line narrowed to the room whose known
     /// person's own face was the one face in view through it, none seen
     /// speaking it, is told their name for its reply
@@ -3975,6 +3996,7 @@ impl Engine {
                 services_sight: false,
                 past_silent: None,
                 one_face: None,
+                one_face_reads: false,
                 name_one_face: false,
                 keeps_calls: None,
                 voice_confirms: None,
@@ -4340,6 +4362,19 @@ impl Engine {
     pub fn scoping_by_one_face(mut self, another_voice: Arc<AtomicBool>) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.one_face = Some(another_voice);
+        self
+    }
+
+    /// With [`Self::scoping_by_one_face`], a line its rule takes is told and
+    /// read as its person's, its exchange journalled in their record, and no
+    /// forget or yes runs on it (`LAMP_PERSON_SCOPE_ONE_FACE_READS=on`,
+    /// #5522, `ScopeLease::read_by_one_face`). A line whose known face the
+    /// eyes named late keeps its reads the room's, as they were told, but
+    /// its record is theirs and its forgets refused too
+    /// (`ScopeLease::keep_for_one_face_recorded`). Off, as before.
+    pub fn reading_by_one_face(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.one_face_reads = on;
         self
     }
 
@@ -7498,6 +7533,9 @@ async fn spoken(
     // face the only face in view through it: memory's hits may fall back to their scope
     // (`LAMP_SECOND_MEMORY_HITS`, the memory owner's call of 4 Nov).
     let mut hits_face = false;
+    // Taken by the one-face rule and read as theirs
+    // (`LAMP_PERSON_SCOPE_ONE_FACE_READS`, [`Engine::reading_by_one_face`]).
+    let mut read_by_one_face = false;
     if let Some(scope) = scope.as_ref()
         && let Some(person) = scope
             .scope()
@@ -7691,48 +7729,62 @@ async fn spoken(
                 .then(|| "no eyes read who spoke it (LAMP_PERSON_SCOPE_SEEN)".to_owned()),
         }
     {
-        scope.narrow_to_room();
-        if one_face && scope.take_by_one_face() {
+        // `LAMP_PERSON_SCOPE_ONE_FACE_READS` (#5522): the line the one-face
+        // rule takes is not narrowed, but told and read as theirs, its
+        // forgets refused; checked again once the line is judged, for its
+        // own voice (below). The chat begun on its early words was told as
+        // theirs, and stays.
+        if one_face && shared.one_face_reads && scope.read_by_one_face() {
+            read_by_one_face = true;
             eprintln!(
-                "lamp-voice second: request {request}: no face was seen speaking it, the known person's face the one face in view and no other voice heard: told and read as the room's, its keep theirs (LAMP_PERSON_SCOPE_ONE_FACE)"
-            );
-        }
-        if hits_face && scope.fall_back_to_face_for_hits() {
-            eprintln!(
-                "lamp-voice second: request {request}: no face was seen speaking it, the known person's face the only face in view: memory's hits may read their scope, all else the room's (LAMP_SECOND_MEMORY_HITS)"
-            );
-        }
-        if named {
-            if named_by_one_face {
-                scope.name_for_reply_by_one_face();
-            } else {
-                scope.name_for_reply();
-            }
-            // Its room's exchange opens their conversation going on for a
-            // keep-only carry when `named_alone` named it and the voice rule is
-            // there with no other voice known, failing closed (lamp-06c1,
-            // 5 Nov, S4; Thirteen's P1 on #5448).
-            if named_alone_unseen && no_other_voice_shown(&shared) {
-                scope.name_for_conversation();
-            }
-            // Only the one-face count tells a known face its name; the mouth
-            // rule alone reaches the reply only as the owner's typed name
-            // (`worker::known_person_for`).
-            let told = if named_by_one_face {
-                "its reply told their name (LAMP_SECOND_NAME_ONE_FACE)"
-            } else {
-                "its reply may be told only the owner's typed name"
-            };
-            eprintln!(
-                "lamp-voice second: request {request}: {why}, the known person's face alone in view: kept as the room's, {told}"
+                "lamp-voice second: request {request}: no face was seen speaking it, the known person's face the one face in view and no other voice heard: told, read and kept as theirs, no forget or yes runs on it (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
             );
         } else {
-            eprintln!("lamp-voice second: request {request}: {why}: told and kept as the room's");
-        }
-        if prepared.take().is_some() {
-            eprintln!(
-                "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the person's"
-            );
+            scope.narrow_to_room();
+            if one_face && scope.take_by_one_face() {
+                eprintln!(
+                    "lamp-voice second: request {request}: no face was seen speaking it, the known person's face the one face in view and no other voice heard: told and read as the room's, its keep theirs (LAMP_PERSON_SCOPE_ONE_FACE)"
+                );
+            }
+            if hits_face && scope.fall_back_to_face_for_hits() {
+                eprintln!(
+                    "lamp-voice second: request {request}: no face was seen speaking it, the known person's face the only face in view: memory's hits may read their scope, all else the room's (LAMP_SECOND_MEMORY_HITS)"
+                );
+            }
+            if named {
+                if named_by_one_face {
+                    scope.name_for_reply_by_one_face();
+                } else {
+                    scope.name_for_reply();
+                }
+                // Its room's exchange opens their conversation going on for a
+                // keep-only carry when `named_alone` named it and the voice rule is
+                // there with no other voice known, failing closed (lamp-06c1,
+                // 5 Nov, S4; Thirteen's P1 on #5448).
+                if named_alone_unseen && no_other_voice_shown(&shared) {
+                    scope.name_for_conversation();
+                }
+                // Only the one-face count tells a known face its name; the mouth
+                // rule alone reaches the reply only as the owner's typed name
+                // (`worker::known_person_for`).
+                let told = if named_by_one_face {
+                    "its reply told their name (LAMP_SECOND_NAME_ONE_FACE)"
+                } else {
+                    "its reply may be told only the owner's typed name"
+                };
+                eprintln!(
+                    "lamp-voice second: request {request}: {why}, the known person's face alone in view: kept as the room's, {told}"
+                );
+            } else {
+                eprintln!(
+                    "lamp-voice second: request {request}: {why}: told and kept as the room's"
+                );
+            }
+            if prepared.take().is_some() {
+                eprintln!(
+                    "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the person's"
+                );
+            }
         }
     }
     // A line admitted as the room's, no face named for it (lamp-06c1, 29 Oct:
@@ -7796,6 +7848,7 @@ async fn spoken(
         let speaking = shared.speaking.clone();
         let seen_only = shared.scope_seen;
         let one_voice = shared.one_face.clone();
+        let one_face_reads = shared.one_face_reads;
         let voice_confirms = shared.voice_confirms.clone();
         tokio::spawn(async move {
             let found = late_face.await.ok().flatten();
@@ -7834,7 +7887,11 @@ async fn spoken(
                             finishing,
                         );
                     if crate::speaking_faces::not_theirs(&speakers, &person, pair, seen_only) {
-                        if one_face && lease.keep_for_one_face(&person) {
+                        if one_face && one_face_reads && lease.keep_for_one_face_recorded(&person) {
+                            eprintln!(
+                                "lamp-voice second: request {request}: no face was seen speaking it, the known person's face the one face in view and no other voice heard: its keep and record are theirs, its reads the room's as told, no forget or yes runs on it (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
+                            );
+                        } else if one_face && lease.keep_for_one_face(&person) {
                             eprintln!(
                                 "lamp-voice second: request {request}: no face was seen speaking it, the known person's face the one face in view and no other voice heard: its keep is theirs, its reads the room's (LAMP_PERSON_SCOPE_ONE_FACE)"
                             );
@@ -8316,6 +8373,13 @@ async fn spoken(
         eprintln!(
             "lamp-voice second: request {request}: another voice in the conversation, heard as it was judged: its keep, hits and name are the room's too (LAMP_PERSON_SCOPE_ONE_FACE)"
         );
+        // Read as theirs until now (`LAMP_PERSON_SCOPE_ONE_FACE_READS`):
+        // the chat begun on its early words was told as theirs.
+        if read_by_one_face && prepared.take().is_some() {
+            eprintln!(
+                "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the person's"
+            );
+        }
     }
     // A stop said over the lamp's own answer (#3985: on lamp-29e7 "Stop"
     // heard as "Stop them." was asked of the model, which said "Stop who?",
@@ -10824,6 +10888,59 @@ const MEMORY_CALLS_BUT_REMEMBER: &[&str] = &[
 #[cfg(test)]
 const HELD_REFUSALS: &[&str] = &[crate::known_faces::DONT_TELL, crate::photo_faces::NO];
 
+/// The calls a line someone's by the one-face rule with
+/// `LAMP_PERSON_SCOPE_ONE_FACE_READS` never runs
+/// (`ScopeLease::forgets_need_mouth`): every forget (one thing, everything,
+/// a face, a rule), every yes granted as them, and their standing rules
+/// (kept, listed or forgotten). Nothing saw the mouth say it, and a forget
+/// is not undone (the memory owner, 16:49 on #5385). The lone face counts
+/// for saving and recall only ("apply it" 16:43, the PM's reading 16:46):
+/// a rule told to every later session of theirs acts for them beyond that
+/// (the privacy read's P2 on #5592). A `remember` correcting a kept thing
+/// (`replaces`) and a reminder's cancel or snooze are refused too
+/// ([`one_face_refuses`]).
+const ONE_FACE_REFUSED: &[&str] = &[
+    crate::remember::FORGET,
+    crate::remember::FORGET_EVERYTHING,
+    crate::known_faces::FORGET,
+    crate::rules::KEEP_RULE,
+    crate::rules::LIST_RULES,
+    crate::rules::FORGET_RULE,
+    crate::known_faces::TELL,
+    crate::photo_faces::YES,
+];
+
+/// The reminder calls that change someone's reminders. On a one-face-read
+/// line they run only with `LAMP_ONE_FACE_REMINDERS` on, whose cancel risk
+/// the memory owner accepted on 4 Nov (`tools::schedule_whose`).
+const ONE_FACE_REMINDER_CHANGES: [&str; 2] = ["cancel_reminder", "snooze_reminder"];
+
+/// What such a call is told instead of running ([`ONE_FACE_REFUSED`]).
+pub(crate) const ONE_FACE_FORGET: &str = "Nothing was forgotten, changed or agreed: I couldn't see who was talking, so I can't forget anything, correct what I kept, keep or read their standing rules, change their reminders, or take a yes for anyone. Ask them to look at me and say it again.";
+
+/// Whether the call `name` with `args` is refused on a line someone's by
+/// the one-face rule with `LAMP_PERSON_SCOPE_ONE_FACE_READS`, with
+/// `reminders` the `LAMP_ONE_FACE_REMINDERS` switch: [`ONE_FACE_REFUSED`],
+/// a `remember` that corrects a kept thing (a correction retires the old
+/// fact, so it is destructive like a forget), and a reminder's cancel or
+/// snooze unless `reminders`. A plain new keep still runs.
+fn one_face_refuses(name: &str, args: &Value, reminders: bool) -> bool {
+    ONE_FACE_REFUSED.contains(&name)
+        || crate::remember::corrects(name, args)
+        || (!reminders && ONE_FACE_REMINDER_CHANGES.contains(&name))
+}
+
+/// Whether `call` is refused on this scope by the one-face rule
+/// ([`one_face_refuses`]), by every runner.
+fn one_face_refused(scope: Option<&crate::memory_scope::ScopeLease>, call: &net::ToolCall) -> bool {
+    scope.is_some_and(crate::memory_scope::ScopeLease::forgets_need_mouth)
+        && one_face_refuses(
+            &call.name,
+            &call.args,
+            crate::tools::schedule_whose::one_face_on(),
+        )
+}
+
 /// What a memory call on a gap-held line is told instead of running.
 const HELD_MEMORY_CALL: &str = "I can't see who is talking just now, so I can't look up, keep or forget anything, or take a yes, for anyone. Say so, and ask them to come back where I can see them.";
 
@@ -10989,6 +11106,13 @@ fn forget_asker(scope: Option<&crate::memory_scope::ScopeLease>) -> Option<(u64,
         return None;
     }
     let scope = scope?;
+    // Nor a line theirs only by their face alone in view
+    // (`LAMP_PERSON_SCOPE_ONE_FACE_READS`): nothing saw them say it, so it
+    // holds no forget, and its ask is no ask just before (the memory owner,
+    // 16:49 on #5385).
+    if scope.forgets_need_mouth() {
+        return None;
+    }
     let person = scope.scope()?.person()?.to_owned();
     Some((scope.key().session, person))
 }
@@ -11587,6 +11711,16 @@ async fn run_tool(
             "lamp-voice second: request {request}: a memory call on a line held only by a face's gap runs for no one"
         );
         return serde_json::json!({ "error": HELD_MEMORY_CALL });
+    }
+    // A forget, yes, rule, correction or reminder change on a line
+    // someone's by their face alone in view
+    // (`LAMP_PERSON_SCOPE_ONE_FACE_READS`): never run.
+    if one_face_refused(scope, call) {
+        eprintln!(
+            "lamp-voice second: request {request}: {} not run: nothing saw the mouth say it (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
+            call.name
+        );
+        return serde_json::json!({ "error": ONE_FACE_FORGET });
     }
     let running = async {
         match (&shared.scoped_tools, scope) {
@@ -13738,6 +13872,23 @@ async fn answer(
                 }
                 // Or one their turn just before asked for by name.
                 let asked_just_before = heard && asked_before.contains(&call.name.as_str());
+                // A forget, yes, rule, correction or reminder change on a
+                // line someone's by their face alone in view
+                // (`LAMP_PERSON_SCOPE_ONE_FACE_READS`): never run, and
+                // never held for a yes, by either runner. Forgetting still
+                // needs the mouth seen speaking (the memory owner, 16:49 on
+                // #5385).
+                if one_face_refused(scope.as_ref(), call) {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: nothing saw the mouth say it (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
+                        call.name
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        serde_json::json!({ "error": ONE_FACE_FORGET }).to_string(),
+                    ));
+                    continue;
+                }
                 // `forget_everything` runs on a spoken turn only for its own
                 // request's words asking for everything, their own ask just
                 // before, or their yes to one held (run before round 1),
