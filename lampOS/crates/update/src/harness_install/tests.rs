@@ -168,7 +168,7 @@ fn the_switch_off_changes_nothing_and_says_no_harness() {
     assert_eq!(lamp.said(), None);
     assert_eq!(fs::read_dir(lamp.records()).unwrap().count(), 0);
     assert_eq!(
-        crate::status::status(&lamp.records(), "idle", None).harness,
+        crate::status::status(&lamp.records(), "idle", None, None).harness,
         None
     );
 }
@@ -183,7 +183,7 @@ fn the_switch_on_installs_harness_when_missing_and_never_starts_its_daemon() {
     at_start(lamp.root(), &lamp.records(), true, 1);
     assert_eq!(lamp.said().unwrap().install, "absent");
     assert_eq!(
-        crate::status::status(&lamp.records(), "idle", None)
+        crate::status::status(&lamp.records(), "idle", None, None)
             .harness
             .unwrap()
             .install,
@@ -208,7 +208,7 @@ fn the_switch_on_installs_harness_when_missing_and_never_starts_its_daemon() {
     // Each change one revision on; a read never bumps it.
     assert_eq!(said.revision, 2);
     for _ in 0..2 {
-        let read = crate::status::status(&lamp.records(), "idle", None);
+        let read = crate::status::status(&lamp.records(), "idle", None, None);
         assert_eq!(read.harness.unwrap().revision, 2);
     }
     assert!(lamp.unit_written());
@@ -346,7 +346,7 @@ fn a_failed_install_is_recorded_without_blocking_and_tried_again() {
     assert!(!runs.ran("lamp-tasks.service"));
     let text = fs::read_to_string(lamp.records().join(RECORD)).unwrap();
     assert!(!text.contains("/var/lib/x"), "{text}");
-    let status = crate::status::status(&lamp.records(), "idle", None);
+    let status = crate::status::status(&lamp.records(), "idle", None, None);
     assert_eq!(status.harness.unwrap().error.as_deref(), Some("installer"));
 
     // The retry: the first round past the backoff starts the one-shot

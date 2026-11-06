@@ -145,7 +145,7 @@ lamp says so.
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
 | `face.remove` (`{"name", "entirely"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules (`entirely` true or left out), or the face only (`"entirely": false`, `"memory": "not asked"`). `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; for a face already gone (a remove `entirely` after a face-only one, or a retry after `kept`), `"face": "already gone"` with `"memory": "by name only"` (memory was asked by the name's id only), or `kept`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
 | `schedule.list` (`{"after_id"?: n}`), `schedule.cancel` (`{"id": n}`) | with `LAMP_APP_SCHEDULE=on` (#2195, "The lamp's timers and reminders" below): the list is a page of at most eight, `{"items": [{"id", "kind": "timer"\|"reminder", "text", "state", "local", "due_unix_ms", "repeat", "snoozed", "late"}], "next_after_id", "complete"}`, each as lamp-schedule keeps it; a cancel is `{"cancelled": true, "id": n}`, the timer or the whole reminder series. A refusal is the reminder client's fixed sentence: no longer active, changed meanwhile (list again), or not confirmed (it may have happened). A bad `after_id` or an `id` that isn't a whole number above 0 is refused before lamp-schedule is asked. Without the switch, V1's "not on this lamp" |
-| `update.status` | with `LAMP_APP_UPDATE=on` (#2194, "The lamp's software update" below): `{"running": {"sequence", "commit"} \| null, "now": "idle"\|"checking"\|"fetching"\|"switching"\|"watching"\|"restoring"\|"unknown", "last": {"outcome", "sequence", "at_unix_ms", "reason"?, "started_at_unix_ms"?} \| null, "stale"}`, from lamp-update's kept `update/status`; `unknown` and nulls before lamp-update has said anything; with lamp-update's `LAMP_HARNESS_AT_ONBOARDING=on`, also `"harness"` ("Harness's install" below). Without the switch, V1's "not on this lamp" |
+| `update.status` | with `LAMP_APP_UPDATE=on` (#2194, "The lamp's software update" below): `{"running": {"sequence", "commit"} \| null, "now": "idle"\|"checking"\|"fetching"\|"switching"\|"watching"\|"restoring"\|"unknown", "last": {"outcome", "sequence", "at_unix_ms", "reason"?, "started_at_unix_ms"?} \| null, "stale", "round"?: {"started_at_unix_ms", "step_started_at_unix_ms", "target"?: {"sequence", "commit"}}}`, from lamp-update's kept `update/status`; `round` only while a round runs (#5473, "The round under way" below); `unknown` and nulls before lamp-update has said anything; with lamp-update's `LAMP_HARNESS_AT_ONBOARDING=on`, also `"harness"` ("Harness's install" below). Without the switch, V1's "not on this lamp" |
 | `update.check` (`{}`) | with `LAMP_APP_UPDATE=on` (#4153, "Check for update" below): asks `lamp-update serve` for its next round now. `update.status`'s object with `"check": "started"`, or `failure` with `a round is running` (`now` is not `idle` or `unknown`), `asked less than a minute ago`, or `lamp-update is not listening for a check`. Without the switch, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
@@ -533,6 +533,31 @@ true when lamp-update stopped saying it (it died mid-round), and its `now` is
 then not to be believed. Tests: `app_contract.rs`'s
 `the_software_update_is_answered_from_lamp_updates_status`, and
 `lamp-update`'s `status` tests and `a_round_with_nothing_to_change_only_checks`.
+
+### The round under way (#5473, `round` in `update.status`)
+
+For the app's Software update screen, which shows the build a round goes
+to and the time left. While a round runs (`now` is not `idle`),
+`update/status` also carries `round` (`lamp_msgs::UpdateRound`):
+`started_at_unix_ms`, when the round began (its `checking`);
+`step_started_at_unix_ms`, when the phase `now` names began; and `target`
+(`{"sequence", "commit"}`), the build it goes to. `target` is said once the
+round has read the channel's build, checked it, found it newer than the
+lamp's and not one put back on it. It is absent before that, and in a round
+that ends without one (the channel's build is the one the lamp runs, or
+is refused, unreachable, not published, or needs a newer updater first). In `restoring` it is still the
+build that was tried. Times are the lamp's clock in Unix milliseconds. A
+round that ends goes back to `idle`, with no `round`; the next starts
+afresh. lamp-cloud passes `round` on as lamp-update said it, and leaves it
+out, without refusing the page, when it comes with `idle` or with a step
+that began before its round. It only adds fields: a round does what it did
+before, and an older app or reader passes over it. lamp-cloud pushes none
+of it, so the app reads it by asking `update.status`. Tests: lamp-msgs'
+`an_update_status_carries_the_round_under_way_only_when_set`,
+lamp-update's `a_round_says_its_target_and_when_it_and_its_step_began` and
+`a_new_build_is_installed_beside_the_old_and_switched`, and
+`app_contract.rs`'s
+`the_software_update_is_answered_from_lamp_updates_status`.
 
 ### Harness's install (#5197, `harness` in `update.status`)
 

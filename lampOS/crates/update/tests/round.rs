@@ -548,6 +548,8 @@ struct Lamp {
     said: Vec<String>,
     /// The phases the round said, for `update/status` (#2194).
     phases: Vec<&'static str>,
+    /// The builds the round said it goes to, by sequence (#5473).
+    targets: Vec<u64>,
     config: Config,
 }
 
@@ -673,6 +675,7 @@ impl Lamp {
             free: 10_000_000_000,
             said: Vec::new(),
             phases: Vec::new(),
+            targets: Vec::new(),
             config,
         }
     }
@@ -765,6 +768,8 @@ impl Lamp {
         };
         let phases = &mut self.phases;
         let mut phase = |now: &'static str| phases.push(now);
+        let targets = &mut self.targets;
+        let mut target = |build: &lamp_update::records::Build| targets.push(build.sequence);
         let mut world = World {
             channel: &mut self.channel,
             systemd: &mut self.systemd,
@@ -773,6 +778,7 @@ impl Lamp {
             clock: &clock,
             say: &mut say,
             phase: &mut phase,
+            target: &mut target,
         };
         let outcome = round(&self.config, &mut world);
         self.talking = Some(ears.talking);
@@ -899,6 +905,8 @@ fn a_new_build_is_installed_beside_the_old_and_switched() {
         lamp.phases,
         ["checking", "fetching", "switching", "watching"]
     );
+    // The build it goes to, said once it is read (#5473).
+    assert_eq!(lamp.targets, [2]);
 
     let (old, new) = (sha("voice 1"), sha("voice 2"));
     // The new folder beside the old one: the new voice and worker, and the
@@ -955,19 +963,23 @@ fn a_new_build_is_installed_beside_the_old_and_switched() {
 }
 
 /// #2194: a round with nothing to change says only that it checked, and a
-/// round without `apply` says no phase at all.
+/// round without `apply` says no phase at all. #5473: neither says a build
+/// it goes to.
 #[test]
 fn a_round_with_nothing_to_change_only_checks() {
     let mut lamp = Lamp::new();
     build_two(&mut lamp);
     assert_eq!(lamp.round(), Outcome::Switched(2));
     lamp.phases.clear();
+    lamp.targets.clear();
     assert_eq!(lamp.round(), Outcome::UpToDate(2));
     assert_eq!(lamp.phases, ["checking"]);
+    assert!(lamp.targets.is_empty(), "{:?}", lamp.targets);
     lamp.phases.clear();
     lamp.config.apply = false;
     lamp.round();
     assert!(lamp.phases.is_empty(), "{:?}", lamp.phases);
+    assert!(lamp.targets.is_empty(), "{:?}", lamp.targets);
 }
 
 #[test]
@@ -3298,6 +3310,7 @@ impl Lamp {
             clock: &clock,
             say: &mut say,
             phase: &mut |_| {},
+            target: &mut |_| {},
         };
         own::confirm(&self.config, &mut world, Some(running)).unwrap()
     }

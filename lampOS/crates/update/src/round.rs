@@ -145,6 +145,10 @@ pub struct World<'a> {
     /// Where the round is, one of `lamp_msgs::UpdateStatus::NOW`, for
     /// `update/status` (#2194): said as each phase begins.
     pub phase: &'a mut dyn FnMut(&'static str),
+    /// The build the round goes to (#5473), for `update/status`: said once
+    /// the channel's build is read, checked, newer than the lamp's and not
+    /// one put back on it.
+    pub target: &'a mut dyn FnMut(&Build),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -941,6 +945,12 @@ impl Run<'_, '_> {
                 "build {} was put back on this lamp ({}); waiting for a newer one",
                 manifest.sequence, refusal.why
             )));
+        }
+        if self.config.apply {
+            (self.world.target)(&Build {
+                sequence: manifest.sequence,
+                commit: manifest.commit.clone(),
+            });
         }
         let installed = installed_units(self.config)
             .map_err(|error| Outcome::Failed(format!("the units cannot be read: {error}")))?;
