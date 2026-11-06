@@ -365,6 +365,64 @@ the ring worker's SPI write does while the SD/MMC host re-tunes (#911).
 Workers are started with a cleared environment, so the coordinator passes
 `LAMP_STALLS` and `LAMP_STALLS_DIR` on to each.
 
+## The voice's code kept in memory: `LAMP_VOICE_LOCK_CODE=on`
+
+On lamp-06c1 at 21:30:02 on 6 Nov, during an SD log flush, the capture,
+ring and coordinator processes stalled 120-132 ms together, each on exactly
+one major fault, and the privacy lease lapsed (#5611). Only 606 pages were
+dirty and nothing was blocked, so no write held them: a page all three run
+was read back from the card. They are three processes of one executable
+(`lamp-voice serve` and its `lamp-voice worker <role>` children, each its
+own pid), so the page was most likely the executable's shared text. That is
+inferred; the stall lines don't say which page it was.
+
+With `LAMP_VOICE_LOCK_CODE=on` (exactly `on`; off unless set), the voice and
+each of its workers start a thread of their own, `lamp-lock-code`, at the
+start of `main` (`crates/voice/src/code_lock.rs`). It reads
+`/proc/self/maps` and `mlock`s every executable file mapping (`r-xp` with a
+path): the executable's text and the text of each shared library it maps
+(libc, ld-linux, libasound and the rest). Not the heap, the stacks, the
+data or any model: no `mlockall`. `lamp-voice` links no ONNX Runtime; the
+end-of-turn model runs in the separate `lamp-turn-end` process, which this
+does not lock. Libraries are mapped when the process starts, so the lock
+comes after them; a library loaded later with `dlopen` is not locked. The
+executable's writable segment (`rw-p`, its data and relocations) stays
+unlocked, and a major fault served from zram (swapped anonymous memory) is
+not one this removes: the lamp row's check that the major faults stop is
+the gate for both. The thread first takes the ordinary policy at nice 0
+(`worker_scheduling::take`), not the RR 20 it inherits from the voice and
+its workers, so paging the code in never takes a core from capture, the
+speaker or the ring; a refused change is a line of its own, and the lock
+goes on at the policy it has.
+
+The pages locked are the page cache's own, shared by every process that maps
+the same file (`r-xp`, never copied), so a worker's count is mostly the same
+bytes again, not more memory: the cost is about 27 MiB of text once, not
+once a worker (estimated from the mappings, not yet measured on a lamp). No
+start path waits for the thread, but the I/O is real: at a cold boot the
+first process to lock reads what of that text isn't yet in the page cache
+(about 23 MiB, also an estimate) from the card, beside the startups of
+`serve` and its workers and their 3 s startup deadline. So the lamp row
+also times each start to `listening_ready`, at a cold boot and at a warm
+restart, with the switch on and off: with it on, a start must not be slower.
+The coordinator passes the switch on to each worker, which start with a
+cleared environment. Each process says one line in the journal:
+
+```
+lamp-voice <role>: its code is locked in memory (LAMP_VOICE_LOCK_CODE=on): N mappings, B bytes (M MiB); MemAvailable K kB
+lamp-voice <role>: its code is not all locked in memory (LAMP_VOICE_LOCK_CODE=on): L of N mappings, B bytes (M MiB); the first failure, PATH: ERROR (KIND); RLIMIT_MEMLOCK S/H; MemAvailable K kB; it runs on as before
+```
+
+A failed lock (`EPERM`, `ENOMEM` at `RLIMIT_MEMLOCK`, unreadable maps) is
+that one line, and the voice runs on unlocked; it never exits on it.
+`lamp-voice.service` sets `LimitMEMLOCK=infinity`, which changes nothing
+today: the unit runs as root, whose `CAP_IPC_LOCK` already lifts the limit.
+It is there for a future unit that runs the voice as another user or drops
+that capability. The limit counts each process's own locked bytes, the same
+shared text again in each, and no lamp has measured them yet, so no bound is
+set; what may be locked is bounded by the code instead, file text only. The
+unit does not turn the switch on.
+
 
 ## What each capture stage costs: `LAMP_CAPTURE_STAGES=on`
 

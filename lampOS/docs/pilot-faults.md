@@ -772,6 +772,26 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   next pass cut it as `capture_gap`); the margin check is true only
   for a held turn whose lease ends within 40 ms. Not yet tried on a lamp.
 
+- **The voice's processes stalled together on a page read back from the
+  card.** On lamp-06c1 at 21:30:02 on 6 Nov, during an SD log flush,
+  capture, the ring and the coordinator stalled 120-132 ms together, each
+  on exactly one major fault, with 606 dirty pages and nothing blocked
+  (`stalls-*.log`, #5611). 120 ms is past a held turn's 100 ms lease, so
+  the leases lapsed. Inferred: the page was `lamp-voice`'s own shared text,
+  evicted by the flush. With `LAMP_VOICE_LOCK_CODE=on` (off by default) the
+  voice and each worker `mlock` their executable file mappings, the
+  executable's and its shared libraries' text, and say the bytes locked in
+  one line; a failed lock is that line and the voice runs on. The lock's
+  thread takes the ordinary policy first, not the inherited RR 20. The
+  writable segment stays unlocked and a fault served from zram is not
+  removed; the lamp row's major-fault check is the gate for both, and it
+  also times the start to `listening_ready`, cold and warm, on and off
+  (`serve-runtime.md`, "The voice's code kept in memory"). Unit tests: the
+  maps parser picks only `r-xp` file mappings; a failing `mlock` is counted
+  and the rest still locked, one line, no panic; switched off nothing is
+  read or locked; the thread lowers itself before any lock, and a refused
+  lowering is a line and the lock goes on. Not yet run on a lamp.
+
 - **A slide closed during a held turn ended the voice as a fault.** On
   lamp-e82d on 4 Nov 11:44 the slide closed just after a question, while
   the turn was held (#4332). Relative to the run's end: input admitted at

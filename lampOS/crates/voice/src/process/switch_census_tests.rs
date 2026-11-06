@@ -650,9 +650,16 @@ const THROUGH_HELPERS: &[(&str, &str)] = &[
 
 /// Whether `worker_command` gives the switch to some role with some value.
 /// The stall switches it gives from the voice's own environment
-/// (`stalls::passed_on`), which the census's `var` cannot set.
+/// (`stalls::passed_on`), and the code lock's (`code_lock::passed_on`),
+/// which the census's `var` cannot set.
 fn passed(name: &str) -> bool {
-    if [crate::stalls::ENVIRONMENT, crate::stalls::DIR_ENVIRONMENT].contains(&name) {
+    if [
+        crate::stalls::ENVIRONMENT,
+        crate::stalls::DIR_ENVIRONMENT,
+        crate::code_lock::ENVIRONMENT,
+    ]
+    .contains(&name)
+    {
         return true;
     }
     let boot = super::new_boot().unwrap();
