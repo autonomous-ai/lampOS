@@ -822,7 +822,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_SKILLS_SHARE` | You can send a skill you made to the Skills Store; a reviewer reads it before others can add it. |
 | `LAMP_SCHEDULE_EVERY` | You can ask for a reminder every few minutes or hours, as often as every 15 minutes. |
 | `LAMP_REMINDERS_HIDDEN_COUNT` | Asked your reminders when it can't see you, the lamp says how many more belong to someone, never what. |
-| `LAMP_APP_CONSENT` | You can turn on or off, in the app, whether the lamp notices how people look and, on a lamp with no privacy slide, music and laughter in the room. |
+| `LAMP_APP_CONSENT` | In the app you can turn on or off whether the lamp reads faces and, on a lamp with no slide, room sounds. |
 | `LAMP_APP_RESTART` | You can restart the lamp from the app; it waits for a pause in talk and never restarts during an update. |
 | `LAMP_GUARD_FROM_APP` | You can turn guard mode on and off from the app, not only by voice. |
 | `LAMP_GUARD_SOUNDS` | In guard mode, a door or footsteps followed by a face or speech counts as someone arriving. |
