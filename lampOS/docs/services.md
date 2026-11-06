@@ -934,6 +934,18 @@ apart stopped a read before a word. Anything else closes it at once.
 "stopped: someone came in, 2 of 5 read", "not read: <the service's plain
 error>", never a title, sender or subject.
 
+**Not linked at the run** (`LAMP_SKILL_LINK_NOTE=on` in `lamp-skills`,
+with its `--state-dir`; off, [switches.md](switches.md)). A read refused
+because the service isn't linked (`NOT_LINKED`; never "couldn't be
+reached" or another refusal) is said once, as exact words through the say
+socket after the gate is judged again: "Gmail isn't linked to this lamp
+yet. It can be linked in the app: Skills, then Connectors." The skill's
+name is kept in the state folder's `link-noted`, so no later read and no
+restart says it again; a read that succeeds takes it out, so a link lost
+later is told once more. The journal's "not read" line adds "told once",
+"not told: <the gate's outcome>" or "not told (<why>)". Off, a refused
+read says nothing, as before.
+
 **Making one by voice.** With the switch on in `lamp-voice` (which
 passes the exact `on` to its two routes' workers, `provider` and `second`,
 whose `make_skill` briefs and checks the skill: their environment is
