@@ -2116,6 +2116,25 @@ fn the_product_summarises_a_long_conversation() {
     );
 }
 
+/// The privacy slide is the lamp's sleep and wake in the product (#5182, the
+/// lead's yes on 6 Nov): with the restart guard's own switch beside it, so a
+/// slide closed after a fault lays the lamp down too.
+#[test]
+fn the_product_sleeps_and_wakes_with_the_privacy_slide() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_SLIDE_WAKES=on",
+        "Environment=LAMP_RESTORED_MUTE=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// Tiers' ideas in Days, a newer correction first (`LAMP_MEMORY_NEWER_FIRST`),
 /// a maybe or a plan marked (`LAMP_MEMORY_STRENGTH`) and tastes first in the
 /// session note (`LAMP_MEMORY_PROFILE`), are off for the candidate (the PM,

@@ -1732,7 +1732,7 @@ closed, and an older reader would refuse the whole message. Tests:
 `a_computers_mute_keeps_the_muted_wait_closed_until_it_is_lifted`.
 
 **The slide as the lamp's sleep and wake** (migrate-P4, #5182,
-`LAMP_SLIDE_WAKES`, off unless `on`). `crate::slide_wake` follows the states the
+`LAMP_SLIDE_WAKES`, off unless `on`, and on in the product since the lead's yes on 6 Nov). `crate::slide_wake` follows the states the
 muted wait reads. A slide that closes asks the sleep a hold does
 (`HandControls::slide_look`), which leaves a person's own mute, and turns the
 restart guard's mute into that sleep (`MuteRecord::sleep_over_guard`), so the
