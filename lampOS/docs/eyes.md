@@ -1528,6 +1528,17 @@ With the switch:
   they have while they are still correcting it. A name kept from an
   earlier exchange needs the same plain yes. The journal says "did not
   remember a face: it is known by another name", without the name.
+  - **Never to the typed name by voice:** a rename to the owner's typed
+    name is refused by #5483 (#5519).
+  - **The old name is kept as an alias** (#5485). A rename keeps the names
+    it replaced, and their own aliases, in the person's `aliases`
+    (`who::Person`), each once in any case and never the name now kept; a
+    remembering under the same name keeps them. Only with
+    `LAMP_MEMORY_STABLE_ID=on`, as the memory id is carried: off, the file
+    is as before. An optional field that
+    only adds, so the file keeps its version: a file from before it loads
+    with none, and an older build reads past it and drops it on its next
+    save. Nothing reads the aliases yet.
   - **A rename's yes by its guards** (`LAMP_NAMES_RENAME_YES=on`, off
     unless set; only with `LAMP_NAMES=checked`; the second route; #5485).
     On lamp-29e7 on 6 Nov a known face B asked to be called A, and every

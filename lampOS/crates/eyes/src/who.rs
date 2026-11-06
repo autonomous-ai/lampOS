@@ -388,6 +388,13 @@ pub struct Person {
     /// their old name's id until it is on again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    /// The names this face was kept under before a rename (#5485), any
+    /// case once, never its own name: kept so recall can still find what
+    /// was told under an old one. An optional field that only adds, under
+    /// the rule above: an older build reads past it, and its next save
+    /// drops it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub aliases: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -975,25 +982,40 @@ impl People {
         {
             return Err("no prints, too many, or of the wrong length".into());
         }
-        self.remember_as(&name, prints, now_unix_s, None)
+        self.remember_as(&name, prints, now_unix_s, None, Vec::new())
     }
 
     /// [`Self::remember`], carrying `carried`, a renamed person's memory id
     /// (#2176), to the name: else the id the name already has, else, with
-    /// the stable id on, a new one ([`fresh_id`]).
+    /// the stable id on, a new one ([`fresh_id`]). The name's own aliases
+    /// stay, with `aliases` (a rename's old names) added, each once and
+    /// never the name itself.
     fn remember_as(
         &mut self,
         name: &str,
         prints: Vec<Vec<f32>>,
         now_unix_s: u64,
         carried: Option<String>,
+        aliases: Vec<String>,
     ) -> Result<String> {
         let name = name.to_owned();
-        let had = self
+        let before = self
             .people
             .iter()
-            .find(|person| same_name(&person.name, &name))
-            .and_then(|person| person.id.clone());
+            .find(|person| same_name(&person.name, &name));
+        let had = before.and_then(|person| person.id.clone());
+        let mut kept_aliases: Vec<String> = Vec::new();
+        for alias in before
+            .map(|person| person.aliases.clone())
+            .unwrap_or_default()
+            .into_iter()
+            .chain(aliases)
+        {
+            if !same_name(&alias, &name) && !kept_aliases.iter().any(|seen| same_name(seen, &alias))
+            {
+                kept_aliases.push(alias);
+            }
+        }
         let mut next = self.people.clone();
         next.retain(|person| !same_name(&person.name, &name));
         if next.len() >= MOST_PEOPLE {
@@ -1016,6 +1038,7 @@ impl People {
             // The voice asks again.
             tell_visits: None,
             id,
+            aliases: kept_aliases,
         });
         self.save(&next)?;
         self.people = next;
@@ -1233,6 +1256,7 @@ impl People {
             }
         }
         let mut carried = None;
+        let mut aliases = Vec::new();
         let mut prints = prints;
         if !known.is_empty() {
             if !replace {
@@ -1268,6 +1292,18 @@ impl People {
                     })
                 })
                 .flatten();
+            // The names replaced, and theirs before, stay as aliases
+            // (#5485): recall can still find what was told under them. Only
+            // with the stable id on, as the id is carried: off, the file
+            // is as before.
+            if self.stable_ids {
+                aliases = theirs
+                    .iter()
+                    .flat_map(|person| {
+                        std::iter::once(person.name.clone()).chain(person.aliases.clone())
+                    })
+                    .collect();
+            }
             let mut next = self.people.clone();
             next.retain(|person| !known.iter().any(|other| same_name(other, &person.name)));
             let gone: Vec<String> = self
@@ -1281,7 +1317,7 @@ impl People {
             self.people = next;
             *replaced = gone;
         }
-        self.remember_as(&kept, prints, now_unix_s, carried)
+        self.remember_as(&kept, prints, now_unix_s, carried, aliases)
             .map_err(|error| Refused::Store(error.to_string()))
     }
 
@@ -5221,6 +5257,46 @@ mod tests {
         std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
 
+    /// #5485: a rename keeps the old name as an alias, reopened too; a
+    /// rename back drops the name now kept from the aliases, and none is
+    /// kept twice, any case. A file from before aliases still loads, with
+    /// none, and is only read.
+    #[test]
+    fn a_rename_keeps_the_old_name_as_an_alias() {
+        let path = file("alias-rename");
+        let old = format!(
+            r#"{{"version":1,"people":[{{"name":"Odile","prints":[{:?}],"added_unix_s":1}}]}}"#,
+            print(0.3)
+        );
+        std::fs::write(&path, &old).unwrap();
+        let mut people = People::open(path.clone()).unwrap().with_stable_ids(true);
+        assert!(people.people[0].aliases.is_empty());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), old, "only read");
+        let aliases = |people: &People| people.people[0].aliases.clone();
+        people
+            .remember_one("Bram", vec![print(0.31)], 2, true, false)
+            .unwrap();
+        assert_eq!(aliases(&people), vec!["Odile".to_owned()]);
+        let reopened = People::open(path.clone()).unwrap();
+        assert_eq!(aliases(&reopened), vec!["Odile".to_owned()]);
+        // Remembered again under the same name: the aliases stay.
+        people
+            .remember_one("Bram", vec![print(0.31)], 3, false, false)
+            .unwrap();
+        assert_eq!(aliases(&people), vec!["Odile".to_owned()]);
+        // Renamed back: the name kept is never its own alias.
+        people
+            .remember_one("odile", vec![print(0.31)], 4, true, false)
+            .unwrap();
+        assert_eq!(aliases(&people), vec!["Bram".to_owned()]);
+        // Renamed again, in another case: only the name left behind.
+        people
+            .remember_one("BRAM", vec![print(0.31)], 5, true, false)
+            .unwrap();
+        assert_eq!(aliases(&people), vec!["odile".to_owned()]);
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
     /// Nobody's memory moves: a record from before the stable id, with no
     /// id, is given exactly `person_id` of its name, written with its next
     /// write; until then the file is as it was.
@@ -5349,7 +5425,8 @@ mod tests {
     }
 
     /// Off (the default), nothing changes: no id in the people file or the
-    /// known file, byte for byte as before, and a rename carries nothing.
+    /// known file, byte for byte as before, and a rename carries nothing,
+    /// no alias either (#5485).
     #[test]
     fn without_the_stable_id_the_files_are_as_before() {
         let path = file("stable-off");
