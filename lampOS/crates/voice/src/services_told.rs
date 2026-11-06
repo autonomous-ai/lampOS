@@ -17,6 +17,10 @@
 //! waits. With nothing linked, or `lamp-services` not telling, nothing is
 //! told: the model asks `services_connected`, as before.
 //!
+//! The Live route is told the same note beside the owner's open line, once
+//! a session for each set of names ([`LiveTold`]): its session keeps what
+//! it was told, so a line that says the same again is not told again.
+//!
 //! Off unless the voice's environment says exactly `on`, and only with the
 //! services' folder (`LAMP_SERVICES=on`, `--services-dir`).
 
@@ -49,6 +53,35 @@ pub fn note_for(owner: Option<&str>, names: &[String]) -> Option<String> {
     (!names.is_empty()).then(|| note(names))
 }
 
+/// What the Live route told of what is linked: once a session for each
+/// set of names, so a session is told again only when a link is made or
+/// removed, or in a fresh session.
+#[derive(Debug, Default)]
+pub struct LiveTold {
+    told: Option<(u64, Vec<String>)>,
+}
+
+impl LiveTold {
+    /// The note due beside a line of `session` whose owner is `owner`, with
+    /// `names` linked ([`note_for`]): none when this session was told these
+    /// names already.
+    pub fn due(&self, session: u64, owner: Option<&str>, names: &[String]) -> Option<String> {
+        if self
+            .told
+            .as_ref()
+            .is_some_and(|(told, said)| *told == session && said.as_slice() == names)
+        {
+            return None;
+        }
+        note_for(owner, names)
+    }
+
+    /// `names` told in `session`.
+    pub fn told(&mut self, session: u64, names: Vec<String>) {
+        self.told = Some((session, names));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -69,6 +102,26 @@ mod tests {
         assert!(told.contains("never say it is the app's job"), "{told}");
         assert_eq!(note_for(None, &linked), None);
         assert_eq!(note_for(Some("owner"), &[]), None);
+    }
+
+    /// #5523 on the Live route: the owner's line is told once a session; a
+    /// link made since, or a fresh session, is told again; another's line
+    /// never is.
+    #[test]
+    fn services_told_the_live_route_once_a_session_for_each_set_of_names() {
+        let mut live = LiveTold::default();
+        let notion = names(&["Notion"]);
+        assert_eq!(live.due(1, None, &notion), None);
+        let told = live
+            .due(1, Some("owner"), &notion)
+            .expect("the owner's line is told");
+        assert_eq!(told, note(&notion));
+        live.told(1, notion.clone());
+        assert_eq!(live.due(1, Some("owner"), &notion), None);
+        let both = names(&["Notion", "Gmail"]);
+        assert_eq!(live.due(1, Some("owner"), &both), Some(note(&both)));
+        assert_eq!(live.due(2, Some("owner"), &notion), Some(note(&notion)));
+        assert_eq!(live.due(2, Some("owner"), &[]), None);
     }
 
     #[test]

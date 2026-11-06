@@ -111,7 +111,7 @@ dịch vụ.
 |---|---|---|
 | `LAMP_SERVICES=on` | `lamp-cloud` (với `LAMP_CLOUD=on`), `lamp-voice` và `lamp-services` | `lamp-cloud` trả lời `connector.*` và `services.list` của ứng dụng bằng câu của V1 "not on this lamp: <kind>" và không ghi gì vào `can`; giọng nói không khai báo hàm nào trong ba hàm và không định tuyến hàm nào; `lamp-services` không mở socket nào và thoát |
 | `LAMP_SERVICES_WRITE=on` (bật trong `lamp-services.service` của sản phẩm) | `lamp-services` | `service_write` trả lời "writing to services is off on this lamp", và không gì được chuẩn bị hay gửi; việc đọc vẫn như trước |
-| `LAMP_SERVICES_TOLD=on` (#5523) | tuyến thứ hai của `lamp-voice`, với `LAMP_SERVICES=on` | Câu của chủ đèn không được báo gì về các dịch vụ đã liên kết: mô hình chỉ biết ba hàm và chỉ hỏi `services_connected` khi nó nghĩ tới ("Giọng nói được báo những gì đã liên kết", bên dưới) |
+| `LAMP_SERVICES_TOLD=on` (#5523) | hai tuyến của `lamp-voice`, với `LAMP_SERVICES=on` | Câu của chủ đèn không được báo gì về các dịch vụ đã liên kết: mô hình chỉ biết ba hàm và chỉ hỏi `services_connected` khi nó nghĩ tới ("Giọng nói được báo những gì đã liên kết", bên dưới) |
 | `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và một yêu cầu tạo kỹ năng nêu một dịch vụ được trả lời `NOT_A_SERVICE` ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
@@ -1143,7 +1143,7 @@ Ngày 6/11 một người thử của nhóm marketing liên kết một dịch v
 Connectors của ứng dụng rồi hỏi đèn về nó: đèn nói đó là việc của ứng dụng và
 nó không biết. Ba hàm vẫn có, nhưng không gì báo cho mô hình những gì đã liên
 kết, và phần tính cách dặn nó đừng giả vờ làm được việc nó không với tới. Với
-`LAMP_SERVICES_TOLD=on` (chỉ truyền cho worker của tuyến thứ hai), một câu nói
+`LAMP_SERVICES_TOLD=on` (chỉ truyền cho worker của hai tuyến), ở tuyến thứ hai một câu nói
 được nhận là của chủ đèn (`services::owner_of`: khuôn mặt đã biết của họ,
 không bị giữ) được báo, cạnh lời của nó, các dịch vụ đang liên kết theo tên,
 mỗi cái một lần, và rằng đèn tự dùng chúng: "(For you to know, not to answer:
@@ -1161,7 +1161,12 @@ của quy tắc attention thì một liên kết mới được báo trễ một
 khác, của căn phòng, câu bị giữ, tin nhắn chữ, không có gì liên kết hoặc
 `lamp-services` không trả lời: không báo gì, như trước, nên khách không bao
 giờ biết chủ đèn đã liên kết gì. Nhật ký chỉ ghi số lượng, không ghi tên.
-Tuyến Live không được báo.
+Tuyến Live được báo cùng lời đó cạnh câu đang mở của chủ đèn (lease của nó,
+`services::owner_of`), đọc hai lần mỗi giây khi câu còn mở, mỗi phiên một lần
+cho mỗi bộ tên (`services_told::LiveTold`): phiên của nó giữ những gì đã được
+báo, nên chỉ báo lại khi có liên kết được thêm hay gỡ, hoặc ở một phiên mới.
+Một người khách nói sau đó trong cùng phiên gặp một mô hình đã được báo,
+nhưng mọi lời gọi của họ vẫn bị từ chối (`OWNER_ONLY`).
 
 ## Những gì chưa làm
 

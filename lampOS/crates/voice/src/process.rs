@@ -1188,6 +1188,10 @@ fn worker_command(
             role,
             var(crate::known_faces::AT_DESK_ENVIRONMENT).as_deref(),
         ))
+        .envs(services_told_worker_environment(
+            role,
+            var(crate::services_told::ENVIRONMENT).as_deref(),
+        ))
         .envs(tasks_told_worker_environment(
             role,
             var(crate::task_news::TOLD_ENVIRONMENT).as_deref(),
@@ -1745,6 +1749,18 @@ fn faces_at_desk_worker_environment(
         .map(|_| (crate::known_faces::AT_DESK_ENVIRONMENT, "on"))
 }
 
+// The owner's line told what the app's Connectors linked (#5523), to both
+// routes' workers, which tell it beside the owner's line. Only the exact
+// value `on`.
+fn services_told_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    value
+        .filter(|value| matches!(role, "provider" | "second") && *value == "on")
+        .map(|_| (crate::services_told::ENVIRONMENT, "on"))
+}
+
 // The file of task news already told (#2762), to the two workers that read
 // it as the coordinator does: the second route's text news
 // (`task_news::ForTexts::for_tasks`) and both routes' task tools
@@ -1925,8 +1941,6 @@ fn second_route_worker_environment(
         // Each turn told the light as `light/state` says it now (lamp-52e6,
         // 4 Nov: "what colour is the light?" guessed "White").
         crate::light_told::ENVIRONMENT,
-        // The owner's line told what the app's Connectors linked (#5523).
-        crate::services_told::ENVIRONMENT,
     ]
     .into_iter()
     .filter(|_| role == "second")
@@ -2112,7 +2126,6 @@ mod tests {
             crate::known_faces::ASKED_ENVIRONMENT,
             crate::known_faces::RECORD_TOLD_ENVIRONMENT,
             crate::light_told::ENVIRONMENT,
-            crate::services_told::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
             assert_eq!(
@@ -2655,6 +2668,34 @@ mod tests {
         }
     }
 
+    /// #5523: what the app linked is told by both routes' workers, so the
+    /// switch goes to the provider and second workers only, and only as `on`.
+    #[test]
+    fn the_services_told_switch_reaches_both_routes_alone() {
+        let on = std::ffi::OsStr::new("on");
+        for role in ["provider", "second"] {
+            assert_eq!(
+                services_told_worker_environment(role, Some(on)),
+                Some((crate::services_told::ENVIRONMENT, "on"))
+            );
+            assert_eq!(services_told_worker_environment(role, None), None);
+            for unfit in ["off", "", "ON", "on "] {
+                assert_eq!(
+                    services_told_worker_environment(role, Some(std::ffi::OsStr::new(unfit))),
+                    None,
+                    "{unfit:?}"
+                );
+            }
+        }
+        for role in ["capture", "speaker", "ring", "camera", "privacy"] {
+            assert_eq!(
+                services_told_worker_environment(role, Some(on)),
+                None,
+                "{role}"
+            );
+        }
+    }
+
     /// The a0ae name-forget report (2 Nov): the at-desk switch goes to the
     /// provider and second workers only, and only as `on`.
     #[test]
@@ -2937,6 +2978,7 @@ mod tests {
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PERSON_NAME_OWNER_ONLY=on",
+                    "LAMP_SERVICES_TOLD=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
                 ],
             ),
