@@ -2600,7 +2600,15 @@ When the coordinator switches (below):
 `worker::serve`:
 
 - **Character:** the instruction of the Live route's `provider.json`
-  (`ProviderConfig::instruction`, the version without a camera), then the
+  (`ProviderConfig::instruction`), the camera's version while the route has
+  a look and the eye is open (the camera allowed in the last authority the
+  coordinator installed, so on and with its privacy slide open), and the
+  version without one otherwise, which says the eye is off or closed and
+  not to pretend to see (`worker::character_now`, `Engine::telling_the_eye`;
+  #5530: this route always took the version without a camera). Chosen for
+  each turn as its request is built, so a slide closed between two turns
+  tells the next one the eye is closed. Texts and the instruction after a
+  forget keep the version without a camera. Then the
   time and place (the time as the request is built, "Second only" below),
   then the memory note (the
   Days note frozen for the process, or the memory writer's, read for each
