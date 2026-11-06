@@ -41,8 +41,14 @@
 //! reminder or alarm set ("I've set a timer …", "Timer set for one minute"),
 //! the light or volume changed ("I've turned the volume up.", "Okay,
 //! louder."), or the light kept on or off until a time
-//! ([`Claim::LightKept`]). A colour said ("My light is blue now.") is still
-//! no claim, nor is any sentence the run opens that ends in a '?'.
+//! ([`Claim::LightKept`]; "for" only with a time after it). A colour said
+//! ("My light is blue now.") is still no claim, nor is any sentence the run
+//! opens that ends in a '?'. The worded runs judge only a turn with no call
+//! at all, so work another tool did stands ("I've added a reminder to your
+//! calendar." beside `service_write`), and never a line the person asked as
+//! a question ([`asked_as_a_question`]), whose reply may tell a true state
+//! ("The light stays on until ten."); the strict lines judge every turn
+//! (the first builder's read of #5588).
 
 /// Where the second worker reads the switch. `on` only.
 pub const ENVIRONMENT: &str = "LAMP_ACTION_CLAIM_CHECKED";
@@ -343,14 +349,47 @@ pub fn claim_as(reply: &str, ended: bool, worded: bool) -> Option<Option<Claim>>
     }
 }
 
+/// The words a line the person asked as a question opens with
+/// ([`asked_as_a_question`]), after any [`ADDRESS`].
+const QUESTION_WORDS: [&str; 13] = [
+    "how", "is", "are", "do", "does", "did", "what", "when", "will", "can", "has", "have", "was",
+];
+
+/// Words that only address the lamp before a line's own words ("Hey Lamp,").
+const ADDRESS: [&str; 6] = ["hey", "hi", "hello", "ok", "okay", "lamp"];
+
+/// Whether the person asked `said` as a question: it ends with a '?', or
+/// its first word after any [`ADDRESS`] is one of [`QUESTION_WORDS`] ("Lamp,
+/// how long will the light stay on?", "is my timer still set"). Then a reply
+/// may answer it with the state ("The light stays on until ten.", "Your
+/// timer is set for one minute."), so the worded claims leave the turn
+/// alone (the first builder's P2 on #5588); the strict lines still judge it.
+/// The second route also judges worded claims only in a turn with no call
+/// at all, so work done by another tool ("I've added a reminder to your
+/// calendar." beside `service_write`) stands.
+pub fn asked_as_a_question(said: &str) -> bool {
+    let text = normalised(said);
+    if text
+        .trim_end_matches(|c: char| c.is_whitespace() || matches!(c, '"' | '\'' | ')'))
+        .ends_with('?')
+    {
+        return true;
+    }
+    text.split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty())
+        .find(|word| !ADDRESS.contains(word))
+        .is_some_and(|word| QUESTION_WORDS.contains(&word))
+}
+
 /// The worded claims (`LAMP_ACTION_CLAIM_WORDED`, #5215): a reply that opens
 /// with one of these, bare or after one of [`LEAD_INS`] and a mark, is a
 /// claim of its kind. Each is a run of words: `a|b` is either word, `*` up
-/// to [`ANY_WORDS`] words, and `$` the end or a mark that is not a '?'.
+/// to [`ANY_WORDS`] words, `#` a time ([`Slot::Time`]), and `$` the end or
+/// a mark that is not a '?'.
 /// After the run, the sentence it opens must not end in a '?'. Each run is
 /// tied to a family with a call behind it, and never a colour said ("My
 /// light is blue now." also answers a colour question).
-const WORDED: [(&str, Claim); 25] = [
+const WORDED: [(&str, Claim); 31] = [
     // "Timer set for one minute.", "Reminder set."
     ("timer|reminder|alarm set|started", Claim::Schedule),
     ("timer's|reminder's|alarm's set|started", Claim::Schedule),
@@ -419,28 +458,54 @@ const WORDED: [(&str, Claim); 25] = [
         Claim::LightOrVolume,
     ),
     // "I've kept the light on until ten." (10441, 5 Nov 04:24, no call).
+    // "For" only with a time after it ([`Slot::Time`]): "I left a light on
+    // for you." is a persona line (the first builder's P3 on #5588).
     (
-        "i've|i kept|left * light|lights|lamp on|off until|till|for",
+        "i've|i kept|left * light|lights|lamp on|off until|till",
         Claim::LightKept,
     ),
     (
-        "i'll|i'm keep|keeping|leave|leaving * light|lights|lamp on|off until|till|for",
+        "i've|i kept|left * light|lights|lamp on|off for #",
         Claim::LightKept,
     ),
     (
-        "i will keep|leave * light|lights|lamp on|off until|till|for",
+        "i'll|i'm keep|keeping|leave|leaving * light|lights|lamp on|off until|till",
         Claim::LightKept,
     ),
     (
-        "the|my|your light|lights|lamp stays|stay on|off until|till|for",
+        "i'll|i'm keep|keeping|leave|leaving * light|lights|lamp on|off for #",
         Claim::LightKept,
     ),
     (
-        "the|my|your light|lights|lamp will stay on|off until|till|for",
+        "i will keep|leave * light|lights|lamp on|off until|till",
         Claim::LightKept,
     ),
     (
-        "the|my|your light|lights|lamp is|are staying on|off until|till|for",
+        "i will keep|leave * light|lights|lamp on|off for #",
+        Claim::LightKept,
+    ),
+    (
+        "the|my|your light|lights|lamp stays|stay on|off until|till",
+        Claim::LightKept,
+    ),
+    (
+        "the|my|your light|lights|lamp stays|stay on|off for #",
+        Claim::LightKept,
+    ),
+    (
+        "the|my|your light|lights|lamp will stay on|off until|till",
+        Claim::LightKept,
+    ),
+    (
+        "the|my|your light|lights|lamp will stay on|off for #",
+        Claim::LightKept,
+    ),
+    (
+        "the|my|your light|lights|lamp is|are staying on|off until|till",
+        Claim::LightKept,
+    ),
+    (
+        "the|my|your light|lights|lamp is|are staying on|off for #",
         Claim::LightKept,
     ),
 ];
@@ -504,7 +569,17 @@ enum Slot<'a> {
     End,
     /// A mark that is not a '?' (after a lead-in).
     Mark,
+    /// A time: a word that opens with a digit, one of [`NUMBER_WORDS`],
+    /// "tonight", or "the night".
+    Time,
 }
+
+/// The number words a [`Slot::Time`] takes ("for ten minutes", "for half
+/// an hour").
+const NUMBER_WORDS: [&str; 18] = [
+    "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven",
+    "twelve", "fifteen", "twenty", "thirty", "forty", "ninety", "half",
+];
 
 fn slots(pattern: &str) -> Vec<Slot<'_>> {
     pattern
@@ -512,6 +587,7 @@ fn slots(pattern: &str) -> Vec<Slot<'_>> {
         .map(|slot| match slot {
             "*" => Slot::Any,
             "$" => Slot::End,
+            "#" => Slot::Time,
             words => Slot::Words(words),
         })
         .collect()
@@ -577,6 +653,34 @@ fn fits(slots: &[Slot<'_>], tokens: &[Token<'_>], at: usize, more: bool) -> Opti
             Some(Token::Mark('?') | Token::Word(_) | Token::Part(_)) => Some(false),
             Some(Token::Mark(_)) => fits(rest, tokens, at + 1, more),
         },
+        Slot::Time => {
+            let one = |word: &str| {
+                word.starts_with(|c: char| c.is_ascii_digit())
+                    || word == "tonight"
+                    || NUMBER_WORDS.contains(&word)
+            };
+            let could = |part: &str| {
+                part.starts_with(|c: char| c.is_ascii_digit())
+                    || "tonight".starts_with(part)
+                    || "the".starts_with(part)
+                    || NUMBER_WORDS.iter().any(|word| word.starts_with(part))
+            };
+            match (tokens.get(at), tokens.get(at + 1)) {
+                (None, _) => ran_out,
+                (Some(Token::Word("the")), Some(Token::Word("night"))) => {
+                    fits(rest, tokens, at + 2, more)
+                }
+                (Some(Token::Word("the")), Some(Token::Part(part)))
+                    if "night".starts_with(part) =>
+                {
+                    None
+                }
+                (Some(Token::Word("the")), None) => ran_out,
+                (Some(Token::Word(word)), _) if one(word) => fits(rest, tokens, at + 1, more),
+                (Some(Token::Part(part)), _) if could(part) => None,
+                _ => Some(false),
+            }
+        }
     }
 }
 
@@ -838,6 +942,43 @@ mod tests {
             claim_as("I've set a timer for one minute.", false, true),
             Some(Some(Claim::Schedule))
         );
+    }
+
+    /// The first builder's P2 on #5588: a line the person asked as a
+    /// question ends with a '?' or opens with a question word, after the
+    /// lamp's name or a greeting.
+    #[test]
+    fn a_line_asked_as_a_question() {
+        for said in [
+            "Lamp, how long will the light stay on?",
+            "Lamp how long will the light stay on",
+            "Hey Lamp, is my timer still set",
+            "Is my timer still set?",
+            "Are the lights staying on",
+            "Did you set my timer",
+            "What time does my reminder ring",
+            "When will you remind me",
+            "Will the light stay on",
+            "Can you hear me",
+            "Has my timer gone off",
+            "Have you kept the light on",
+            "Was that you",
+            "Do you remember my timer",
+            "Does the light stay on",
+            "Okay, the light stays on until ten?",
+        ] {
+            assert!(asked_as_a_question(said), "{said:?}");
+        }
+        for said in [
+            "Hey Lamp, keep the light on until ten.",
+            "Lamp, set a timer to one minute.",
+            "Louder.",
+            "Turn off the lights",
+            "Lamp, howl like a wolf.",
+            "",
+        ] {
+            assert!(!asked_as_a_question(said), "{said:?}");
+        }
     }
 
     /// The first builder's P3 on #5588: a light kept "for" a time needs the
