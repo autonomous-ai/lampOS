@@ -1068,6 +1068,10 @@ fn worker_command(
             role,
             var(crate::remember::PROFILE_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_role_worker_environment(
+            role,
+            var(crate::remember::role::ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_early_words_worker_environment(
             role,
             var(crate::early_words::ENVIRONMENT).as_deref(),
@@ -1371,6 +1375,17 @@ fn memory_profile_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::PROFILE_ENVIRONMENT, "on"))
+}
+
+// A person's role (the memory owner's design, 6 Nov), passed the same
+// narrow way: the exact `on`, to the second route alone, the one that tells
+// each turn its role line (`remember::role`).
+fn memory_role_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::role::ENVIRONMENT, "on"))
 }
 
 // A remember of what is kept already (#2176), passed the same narrow way:
@@ -2415,6 +2430,12 @@ mod tests {
                         "LAMP_MEMORY_PROFILE",
                         ["provider", "second"].as_slice(),
                     ),
+                    // A person's role: the second route alone.
+                    (
+                        memory_role_worker_environment,
+                        "LAMP_MEMORY_ROLE",
+                        ["second"].as_slice(),
+                    ),
                     // So does keeping a fact as heard (#2176).
                     (
                         memory_keep_heard_worker_environment,
@@ -2768,6 +2789,7 @@ mod tests {
                     crate::remember::NEWER_FIRST_ENVIRONMENT,
                     crate::remember::STRENGTH_ENVIRONMENT,
                     crate::remember::PROFILE_ENVIRONMENT,
+                    crate::remember::role::ENVIRONMENT,
                     crate::remember::heard::ENVIRONMENT,
                     crate::keep_quietly::ENVIRONMENT,
                     crate::remember::REMEMBER_ONCE_ENVIRONMENT,
@@ -3036,6 +3058,7 @@ mod tests {
                     "LAMP_MEMORY_REMEMBER_ONCE=on",
                     "LAMP_MEMORY_REOPEN_QUIET=on",
                     "LAMP_MEMORY_REPLACES=on",
+                    "LAMP_MEMORY_ROLE=on",
                     "LAMP_MEMORY_ROOM_AFTER_FORGET=on",
                     "LAMP_MEMORY_ROOM_NOT_ASKER=on",
                     "LAMP_MEMORY_ROOM_SPEAKER=on",

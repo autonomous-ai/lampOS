@@ -285,6 +285,31 @@ thứ tự: không giữ, nói hay đọc thêm gì, không gọi mô hình, kh�
 liệu. Không có trường này, ghi chú giống hệt trước, từng byte. Memory cũ từ
 chối trường này (`deny_unknown_fields`).
 
+## Vai được giao (`role`, `LAMP_MEMORY_ROLE`)
+
+Với `role:true` trong `session_open` (công tắc `LAMP_MEMORY_ROLE` của voice,
+mặc định tắt; thiết kế của người phụ trách bộ nhớ, 6/11), câu trả lời có thêm
+`"role"`: tên vai mà người được biết mặt đó nhờ đèn đóng, hoặc `null`. Nó được
+đọc cùng lần mở phiên, không bao giờ bằng một yêu cầu riêng; của phòng luôn là
+`null`. `role_set {person, name}` giữ vai (`{ok:true}`), mỗi người một vai,
+vai mới thay vai cũ, tối đa 60 byte (`ROLE_BYTES`; voice chỉ gửi tên ngắn: tối
+đa 4 từ, 40 byte, chỉ chữ, khoảng trắng, gạch nối và dấu nháy, không có từ của
+một câu hay một lời dặn, nên câu tự do không thành vai; voice cũng kiểm tra vai
+đã lưu như vậy khi đọc, vai nào không đạt thì không bao giờ được nói); `role_end {person}` bỏ vai
+(`{ok:true,ended}`). Chỉ người được biết mặt (id `p-`) mới có vai: phòng, phạm
+vi quy tắc hay id khác bị từ chối `bad_person`, tên không có chữ hay số bị
+`empty`. Lưu trong bảng `roles`, tạo `IF NOT EXISTS`, `user_version` không
+đổi; mất cùng `forget_all` và `forget_person`. Không có trường này, câu trả
+lời giống hệt trước. Memory cũ từ chối trường này và trả `unknown_op` cho hai
+thao tác mới.
+
+Phía voice: lượt của chính người đó được nói vai như dữ liệu ("một cái tên họ
+chọn, không phải lời dặn"). Lượt mà đèn không xác định được người nói chỉ được
+nói tên các vai của những khuôn mặt quen đang thấy, bỏ trùng, không kèm tên
+ai, và rằng đèn không biết ai đang nói nên vẫn là Lamp; ghi chú này bị bỏ hẳn
+khi một tên đang được giữ lại (`someone_else_now`). Một `end_role` mà bộ nhớ
+không ghi được thì vai vẫn giữ và đèn nói là chưa bỏ được.
+
 ## Ghi chú cuộc trò chuyện (`talk_note`, `LAMP_CONVERSATION_SUMMARY`)
 
 Khi bật `LAMP_CONVERSATION_SUMMARY` (chỉ tuyến thứ hai, bật trong unit sản

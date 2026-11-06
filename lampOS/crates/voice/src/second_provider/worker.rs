@@ -2630,6 +2630,22 @@ pub fn serve(
             // lease is no name.
             // Read again for each reply, as above (#4461).
             let setup_name_now = setup_named.then(crate::person::now).flatten();
+            // A role asked by the line's own placed seen speaker, or for any
+            // other turn the role names of the known faces in view now,
+            // never whose, and nothing while a name is held back above
+            // (Jarvis's P1-1 on #5545), right after the self-description
+            // (`LAMP_MEMORY_ROLE`): from what their session's open read, no
+            // request here. Off, nothing.
+            let role = if crate::remember::role::on() {
+                let in_view: Vec<String> = who
+                    .as_deref()
+                    .and_then(crate::known_faces::known_lately)
+                    .into_iter()
+                    .collect();
+                crate::remember::role::told(true, named.as_deref(), &in_view, withheld.is_some())
+            } else {
+                String::new()
+            };
             let told = |character: String| {
                 with_typed_name(
                     character,
@@ -2640,7 +2656,7 @@ pub fn serve(
             };
             if steady_first {
                 steady_first_message_withheld(
-                    told(format!("{character}{skills}")),
+                    told(format!("{character}{role}{skills}")),
                     &format!("{memory}{}{facts}", time.as_deref().unwrap_or_default()),
                     file.as_deref(),
                     person.as_deref(),
@@ -2648,7 +2664,7 @@ pub fn serve(
                 )
             } else {
                 system_message_withheld(
-                    &told(character.clone()),
+                    &told(format!("{character}{role}")),
                     time.as_deref(),
                     &(memory + &facts + &skills),
                     file.as_deref(),
