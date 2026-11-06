@@ -1,0 +1,3 @@
+# 10:00, head down from 3 to 60, due at 48: they look up only at 60, past its 10 minutes: nothing.
+clock = "10:00"
+none = true
