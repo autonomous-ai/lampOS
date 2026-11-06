@@ -1026,6 +1026,11 @@ mod tests {
             "Please, is it possible to set a timer?",
             "Is it okay to set a timer, please?",
             "CAN YOU MAKE IT LOUDER?",
+            // El's P2 on #5615: "why" opens a status question, but these
+            // are requests.
+            "Why don't you turn the light on",
+            "Why not set a timer?",
+            "Lamp, why don’t you make it louder?",
             // Opens as a request, so judged as one; a "Yes, I can hear
             // you." beside it claims no action either way.
             "Can you hear me",
