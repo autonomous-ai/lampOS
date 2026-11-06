@@ -3097,7 +3097,13 @@ then use that person's scope:
   (`everything: false`), and the second route reads the name again for each
   reply, so it names no one from the next (the Live route, not the
   product's, only from the voice's next start; `person::forget_with_everything`,
-  #4461: lamp-52e6 still named its owner after "forget everything"). Another
+  #4461: lamp-52e6 still named its owner after "forget everything"). With a
+  face picked as the owner in the app (`LAMP_OWNER_FACE=on`, #5495,
+  [second-voice.md](second-voice.md), "The owner picked by face in the
+  app"), the owner's ids are that face's alone, so only its own marked
+  forget removes the typed name, the place, the voice likeness and the
+  setup journal; the pick itself is left to the app, and the face's forget
+  leaves the lamp with no owner. Another
   person's forget or the room's leaves it, and their answer still says it
   stays (`setup_name`); the 5 s reset clears it too. When the app set the owner's
   place (#4333, [owner-place.md](owner-place.md)), the same marked forget said by

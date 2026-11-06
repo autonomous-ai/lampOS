@@ -2445,8 +2445,14 @@ pub(crate) fn owner_for_test(owner: Option<Option<String>>) {
 }
 
 /// The owner kept at setup while the eyes still know them, as last found:
-/// no reply waits on the eyes (Reviewer-two's P3 on #4290).
+/// no reply waits on the eyes (Reviewer-two's P3 on #4290). None once a
+/// face was picked as the owner in the app (#5495, `crate::owner_face`):
+/// that face alone is the owner then, under the name
+/// [`crate::person::now`] gives.
 pub fn owner_now() -> Option<String> {
+    if crate::owner_face::owner().is_some() {
+        return None;
+    }
     #[cfg(test)]
     if let Some(owner) = OWNER_FOR_TEST.with(|cell| cell.borrow().clone()) {
         return owner;
@@ -2606,6 +2612,8 @@ pub fn keep_owner_fresh(file: Option<PathBuf>, socket: Option<PathBuf>) {
 }
 
 fn keep_owner_fresh_now(file: Option<PathBuf>, socket: Option<PathBuf>) {
+    // The owner's face picked in the app, by its id (#5495).
+    crate::owner_face::keep_fresh(socket.clone());
     std::thread::spawn(move || {
         loop {
             refresh_owner(file.as_deref(), socket.as_deref());

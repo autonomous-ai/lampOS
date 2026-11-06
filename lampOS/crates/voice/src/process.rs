@@ -1184,6 +1184,11 @@ fn worker_command(
             role,
             var(crate::person::OWNER_ONLY_ENVIRONMENT).as_deref(),
         ))
+        .envs(owner_face_worker_environment(
+            role,
+            var(lamp_msgs::owner_face::ENVIRONMENT).as_deref(),
+            var(crate::owner_face::NAME_FILE_ENVIRONMENT).as_deref(),
+        ))
         .envs(faces_at_desk_worker_environment(
             role,
             var(crate::known_faces::AT_DESK_ENVIRONMENT).as_deref(),
@@ -1684,6 +1689,30 @@ fn person_name_owner_only_worker_environment(
     value
         .filter(|value| matches!(role, "provider" | "second") && *value == "on")
         .map(|_| (crate::person::OWNER_ONLY_ENVIRONMENT, "on"))
+}
+
+// The owner picked by face in the app (#5495), to the same two workers as
+// the typed name's file, which read the pick beside it: the switch only as
+// the exact value `on`, and the file the voice writes the owner's name to
+// for `lamp-skills` only when absolute (written only with the switch on).
+fn owner_face_worker_environment(
+    role: &str,
+    switch: Option<&std::ffi::OsStr>,
+    name_file: Option<&std::ffi::OsStr>,
+) -> Vec<(&'static str, std::ffi::OsString)> {
+    if !matches!(role, "provider" | "second") {
+        return Vec::new();
+    }
+    switch
+        .filter(|switch| *switch == "on")
+        .map(|_| (lamp_msgs::owner_face::ENVIRONMENT, "on".into()))
+        .into_iter()
+        .chain(
+            name_file
+                .filter(|path| Path::new(path).is_absolute())
+                .map(|path| (crate::owner_face::NAME_FILE_ENVIRONMENT, path.to_owned())),
+        )
+        .collect()
 }
 
 // Only faces of people at the desk counted as people at the lamp (the a0ae
@@ -2595,6 +2624,43 @@ mod tests {
             assert_eq!(
                 person_name_owner_only_worker_environment(role, Some(on)),
                 None,
+                "{role}"
+            );
+        }
+    }
+
+    /// #5495: the owner-by-face switch goes to the provider and second
+    /// workers only, only as `on`, and the skills' name file only absolute.
+    #[test]
+    fn the_owner_face_switch_reaches_only_the_workers_that_tell_the_model() {
+        let on = std::ffi::OsStr::new("on");
+        let file = std::ffi::OsStr::new("/run/lampos-owner/name");
+        for role in ["provider", "second"] {
+            assert_eq!(
+                owner_face_worker_environment(role, Some(on), Some(file)),
+                vec![
+                    (lamp_msgs::owner_face::ENVIRONMENT, "on".into()),
+                    (crate::owner_face::NAME_FILE_ENVIRONMENT, file.to_owned()),
+                ]
+            );
+            assert_eq!(
+                owner_face_worker_environment(role, Some(on), Some("relative".as_ref())),
+                vec![(lamp_msgs::owner_face::ENVIRONMENT, "on".into())]
+            );
+            assert_eq!(
+                owner_face_worker_environment(role, None, Some(file)),
+                vec![(crate::owner_face::NAME_FILE_ENVIRONMENT, file.to_owned())]
+            );
+            for unfit in ["off", "", "ON", "on "] {
+                assert!(
+                    owner_face_worker_environment(role, Some(unfit.as_ref()), None).is_empty(),
+                    "{unfit:?}"
+                );
+            }
+        }
+        for role in ["capture", "speaker", "ring", "camera", "privacy"] {
+            assert!(
+                owner_face_worker_environment(role, Some(on), Some(file)).is_empty(),
                 "{role}"
             );
         }

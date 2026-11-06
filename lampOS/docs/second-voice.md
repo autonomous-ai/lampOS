@@ -4683,6 +4683,41 @@ after a take-over, but now for every turn:
   Held talk, talk past the lamp, another voice and the same speaker's
   carry are unchanged. Off, one look is enough, as before. If the looks
   cannot be subscribed to, two faces make no room busy, said once.
+- **The owner picked by face in the app** (`LAMP_OWNER_FACE=on`, #5495,
+  [cloud.md](cloud.md), "The owner by face"; off in the product): once the
+  app picked a saved face as the owner, the owner is that face alone, found
+  by the id the eyes keep for it (`f-` and 16 hex digits, carried through a
+  rename), under the name the eyes keep it by now. The voice (root) reads
+  the pick's file beside the typed name's (`/etc/lampOS/person/owner-face`,
+  `lamp_msgs::owner_face::read`) at each look, and the eyes' faces with
+  their ids (`{"list":true,"waiting":true,"ids":true}`) off any reply's
+  path: once at a worker's start when a face is picked, every 10 s after
+  (`owner_face::keep_fresh`, with `known_faces::keep_owner_fresh` too),
+  and again after any face saved or forgotten by voice
+  (`owner_face::saved`). `person::now` and `person::from_environment` are
+  then that face's name, and `known_faces::owner_now` is none, so every
+  owner check below reads the face: the typed name told only to the
+  owner's line (`may_tell`), the owner by default (`by_default_owner`,
+  `someone_else_now`), the owner's ids (`person::owner_ids`: the linked
+  services, the owner's reminders view, place, voice likeness and setup
+  journal) and the instruction's `told` text, which names the face. The
+  typed name and the face setup kept as "who you are" count no more, so a
+  person saved or renamed under the typed name on another face is not the
+  owner. Fail-closed: a pick cleared, a file that can't be read, or a
+  picked face the eyes don't keep now (removed in the app or by voice,
+  eyes older than the ids, eyes not reached) is no owner, never the typed
+  name back; a face forgotten by voice drops the faces known at once
+  (`owner_face::forgotten`), until the eyes answer again. The voice never
+  writes the pick: a picked face forgotten by voice leaves the file naming
+  an id no face has (never minted again), and the app's next `owner.get`
+  or `face.remove` clears it. With the switch on and `LAMP_OWNER_NAME_FILE`
+  set, the voice writes the owner's name as it knows them now (by face, or
+  the typed name with no pick; empty for none) to that file at each
+  refresh, one line, 0644, for `lamp-skills` ([services.md](services.md)).
+  No face ever picked, or the switch off: the typed name and the setup
+  owner, as below. The switch and the file reach the provider and second
+  workers only (`owner_face_worker_environment`). The Live route reads its
+  name once a session, so a pick made later reaches it at its next one.
 - **The owner named by default in a reply** (`LAMP_PERSON_NAME_BY_DEFAULT=on`,
   #3884, the first builder's call on 28 Oct): with `LAMP_PERSON_NAME`, each
   reply is told the person speaking is most likely the one who set the lamp

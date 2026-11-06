@@ -816,6 +816,12 @@ fn owner_of(lease: Option<&crate::memory_scope::ScopeLease>) -> Option<String> {
         .then_some(person)
 }
 
+/// Tests: [`owner_of`] for the line `lease`.
+#[cfg(test)]
+pub(crate) fn owner_of_for_test(lease: &crate::memory_scope::ScopeLease) -> Option<String> {
+    owner_of(Some(lease))
+}
+
 /// Whether the owner is the only face the eyes see now
 /// (`known_faces::most_faces_lately`); no count is not alone.
 fn owner_alone() -> bool {

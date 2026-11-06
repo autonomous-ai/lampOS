@@ -92,7 +92,23 @@ fn path_from_environment() -> Option<std::path::PathBuf> {
 
 /// The name, from the file `LAMP_PERSON_NAME` names. Unset, relative, missing
 /// or unfit is none; unfit is said, never the name itself.
+///
+/// With a face picked as the owner in the app (`LAMP_OWNER_FACE`, #5495,
+/// [`crate::owner_face`]), it is that face's name as the eyes keep it now,
+/// or none once the eyes don't keep it: the typed name counts no more.
 pub fn from_environment() -> Option<String> {
+    if let Some(owner) = crate::owner_face::owner() {
+        match &owner {
+            Some(name) => eprintln!(
+                "lamp-voice: the owner's face picked in the app is used ({} characters)",
+                name.chars().count()
+            ),
+            None => eprintln!(
+                "lamp-voice: a face was picked as the owner in the app and the eyes don't keep it now, so no owner's name is used"
+            ),
+        }
+        return owner;
+    }
     let path = path_from_environment()?;
     let path = path.as_path();
     if !path.is_absolute() {
@@ -418,14 +434,18 @@ pub(crate) fn set_for_test(path: Option<std::path::PathBuf>) {
 /// what the second route keys its per-reply read on ([`now`]), so a name
 /// typed after start is told too (Reviewer-three's P3 on #4476).
 pub fn named_in_environment() -> bool {
-    path_from_environment().is_some_and(|path| path.is_absolute())
+    path_from_environment().is_some_and(|path| path.is_absolute()) || crate::owner_face::on()
 }
 
 /// The name as the file holds it now ([`from_environment`]), read again for
 /// each reply and said nothing of, so one forgotten ([`forget_with_everything`])
 /// or set again from the app holds from the next reply (#4461). Its read at
-/// start said whether it is used.
+/// start said whether it is used. A face picked as the owner in the app
+/// decides in its place ([`crate::owner_face::owner`], #5495).
 pub fn now() -> Option<String> {
+    if let Some(owner) = crate::owner_face::owner() {
+        return owner;
+    }
     let path = path_from_environment()?;
     if !path.is_absolute() {
         return None;
@@ -467,6 +487,10 @@ pub fn forget_with_everything(
 /// and the typed name must go too (Friday's P2 on #4476). `owner_now` is
 /// still set here: the face's forget clears it only after the call
 /// (`tools::face_gone_with_everything`).
+///
+/// With a face picked as the owner in the app (#5495), only that face's
+/// memory id: [`now`] is its name and `owner_now` is none, so a typed or
+/// spoken name alone never makes anyone the owner.
 pub fn owner_ids() -> Vec<String> {
     let mut ids: Vec<String> = now()
         .into_iter()
@@ -1565,6 +1589,164 @@ mod tests {
         crate::known_faces::owner_for_test(None);
         set_for_test(None);
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// #5495, the owner picked by face in the app: `typed` is the app's
+    /// typed name, `pick` the pick's file, `faces` the eyes' (face id,
+    /// name). Made-up names and ids.
+    fn with_pick<T>(
+        typed: &str,
+        pick: lamp_msgs::owner_face::Pick,
+        faces: Option<Vec<(&str, &str)>>,
+        test: impl FnOnce() -> T,
+    ) -> T {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-person-pick-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("name");
+        fs::write(&file, format!("{typed}\n")).unwrap();
+        set_for_test(Some(file));
+        crate::owner_face::set_for_test(Some((
+            pick,
+            faces.map(|faces| {
+                faces
+                    .into_iter()
+                    .map(|(id, name)| (id.to_owned(), name.to_owned()))
+                    .collect()
+            }),
+        )));
+        let out = test();
+        crate::owner_face::set_for_test(None);
+        crate::known_faces::owner_for_test(None);
+        set_for_test(None);
+        fs::remove_dir_all(&dir).unwrap();
+        out
+    }
+
+    const PICKED: &str = "f-00000000000000b1";
+    const OTHER: &str = "f-00000000000000a1";
+
+    /// Whether a line by the face kept as `name` gets the owner's linked
+    /// services (`services::owner_of`).
+    fn services_for(name: &str, request: u64) -> bool {
+        let line = scoped(Some(name), request);
+        crate::services::owner_of_for_test(&line.lease()).is_some()
+    }
+
+    fn alone(person: &str) -> InView<'_> {
+        InView {
+            person: Some(person),
+            faces: Some(1),
+        }
+    }
+
+    /// The app's typed name differs from the picked face's: the face is the
+    /// owner, by its own name, told it and given the owner's services.
+    #[test]
+    fn a_picked_face_is_the_owner_under_its_own_name() {
+        use lamp_msgs::owner_face::Pick;
+        with_pick(
+            "Robin Example",
+            Pick::Face(PICKED.into()),
+            Some(vec![(PICKED, "Robin"), (OTHER, "Sam")]),
+            || {
+                crate::known_faces::owner_for_test(Some(Some("Robin Example".into())));
+                let robin = crate::known_faces::memory_person("Robin");
+                assert_eq!(now().as_deref(), Some("Robin"));
+                assert_eq!(from_environment().as_deref(), Some("Robin"));
+                assert_eq!(crate::known_faces::owner_now(), None);
+                assert_eq!(owner_ids(), std::slice::from_ref(&robin));
+                assert!(may_tell("Robin", alone(&robin)));
+                assert!(told("Robin").contains("“Robin”"));
+                assert!(services_for("Robin", 5_495_001));
+            },
+        );
+    }
+
+    /// Someone kept under the typed name, on another face than the one
+    /// picked: no owner's access for them, whatever their name.
+    #[test]
+    fn the_typed_names_face_is_not_the_owner_once_another_is_picked() {
+        use lamp_msgs::owner_face::Pick;
+        with_pick(
+            "Robin",
+            Pick::Face(PICKED.into()),
+            Some(vec![(OTHER, "Robin"), (PICKED, "Sam")]),
+            || {
+                crate::known_faces::owner_for_test(Some(Some("Robin".into())));
+                let robin = crate::known_faces::memory_person("Robin");
+                let sam = crate::known_faces::memory_person("Sam");
+                assert_eq!(owner_ids(), [sam]);
+                assert!(!owner_ids().contains(&robin));
+                let name = now().unwrap();
+                assert!(!may_tell(&name, alone(&robin)));
+                assert!(!services_for("Robin", 5_495_002));
+                assert!(services_for("Sam", 5_495_003));
+                assert_eq!(
+                    someone_else_now(&[name], Some(1), Some("Robin"), false, false, None),
+                    Some("a known face that isn't theirs")
+                );
+            },
+        );
+    }
+
+    /// No face ever picked: the typed name and the setup owner, as before.
+    #[test]
+    fn with_no_pick_the_typed_name_is_the_owner_as_before() {
+        use lamp_msgs::owner_face::Pick;
+        with_pick(
+            "Robin Example",
+            Pick::Never,
+            Some(vec![(PICKED, "Sam")]),
+            || {
+                crate::known_faces::owner_for_test(Some(Some("Robin".into())));
+                assert_eq!(now().as_deref(), Some("Robin Example"));
+                assert_eq!(
+                    owner_ids(),
+                    [
+                        crate::known_faces::memory_person("Robin Example"),
+                        crate::known_faces::memory_person("Robin")
+                    ]
+                );
+                assert!(services_for("Robin Example", 5_495_004));
+                assert!(!services_for("Sam", 5_495_005));
+            },
+        );
+    }
+
+    /// The picked face removed (or the eyes not known now), or the pick
+    /// cleared: no owner at all, never the typed name back.
+    #[test]
+    fn a_picked_face_gone_leaves_no_owner() {
+        use lamp_msgs::owner_face::Pick;
+        for (case, (pick, faces)) in [
+            (Pick::Face(PICKED.into()), Some(vec![(OTHER, "Robin")])),
+            (Pick::Face(PICKED.into()), None),
+            (Pick::Nobody, Some(vec![(PICKED, "Sam"), (OTHER, "Robin")])),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let request = 5_495_010 + 2 * case as u64;
+            with_pick("Robin", pick, faces, || {
+                crate::known_faces::owner_for_test(Some(Some("Robin".into())));
+                assert_eq!(now(), None);
+                assert_eq!(from_environment(), None);
+                assert_eq!(crate::known_faces::owner_now(), None);
+                assert!(owner_ids().is_empty());
+                assert!(!services_for("Robin", request));
+                assert!(!services_for("Sam", request + 1));
+                assert_eq!(
+                    by_default_owner(now(), crate::known_faces::owner_now()),
+                    None
+                );
+            });
+        }
     }
 
     /// #4461: the name is read again for each reply, so one cleared or set
