@@ -1893,8 +1893,12 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   three were turned on in the product by the memory owner's call on 5 Nov
   and off for the candidate on 6 Nov (#5464). `LAMP_MEMORY_PROFILE` is back
   on after its played check passed on lamp-06c1 on 6 Nov (PASS bd98421414,
-  #5331); the other two stay off until a played check reaches their own
-  fields.
+  #5331), and `LAMP_MEMORY_STRENGTH` after its played check on lamp-06c1 on
+  6 Nov showed kept entry 579 with `strength:"maybe"` and the pottery answer
+  that read it (#5503, [the run](https://github.com/autonomous-ai/lampOS/pull/5503#issuecomment-6678298333)).
+  `LAMP_MEMORY_NEWER_FIRST` stays off: with `LAMP_MEMORY_REPLACES` and
+  `LAMP_KEEP_QUIETLY` on, a played correction is either replaced or kept
+  alone, so it is not reachable as played.
 
 - **Kept once** (#2176, `LAMP_MEMORY_REMEMBER_ONCE=on`, with the Days
   client only; off unless set; both voice routes; on in the product unit

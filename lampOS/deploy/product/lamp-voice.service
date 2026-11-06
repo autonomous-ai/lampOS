@@ -534,8 +534,12 @@ Environment=LAMP_MEMORY_RECALL_V2=on
 # Tiers' ideas in Days (the memory owner's 3 Nov plan, P1 to P4; docs/memory-days.md). The session note keeps the
 # person's tastes and kept facts first (PROFILE): the memory owner's call on 5 Nov, off for the candidate on 6 Nov
 # (#5464), back on after its played check passed on lamp-06c1 with ElevenLabs voices on 6 Nov (PASS bd98421414,
-# #5331). It needs a lamp-memory from the same build, which a product install ships. LAMP_MEMORY_NEWER_FIRST and
-# LAMP_MEMORY_STRENGTH stay off until a played check reaches their own fields (earlier:true, strength:"maybe").
+# #5331). A maybe or a plan comes back marked as one (STRENGTH), back on after its played check on lamp-06c1 on
+# 6 Nov showed kept entry 579 with strength:"maybe" and the answer that read it (#5503,
+# https://github.com/autonomous-ai/lampOS/pull/5503#issuecomment-6678298333). Each needs a lamp-memory from the
+# same build, which a product install ships. LAMP_MEMORY_NEWER_FIRST stays off: with REPLACES and KEEP_QUIETLY on,
+# a played correction is either replaced or kept alone, so its earlier:true is not reachable as played.
+Environment=LAMP_MEMORY_STRENGTH=on
 Environment=LAMP_MEMORY_PROFILE=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
