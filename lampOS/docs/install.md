@@ -1305,7 +1305,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        starts lamp-tasks again, so a Harness command run by hand holds the
        updates too (#5493; tasks.md, "The pinned launcher"). It runs as
        root in a folder Harness's user owns, so it writes and reads the
-       launcher without following links.
+       launcher without following links, and leaves alone one with a
+       second hard link or owned by another uid than its `bin` folder's
+       owner (one line said; #5624).
    - **Said to the app:** `harness-install.json` in the records,
      `{"install", "revision", "at_unix_ms", "version"?, "pinned"?,
      "error"?, "message"}` (`lamp_msgs::HarnessInstall`), on
