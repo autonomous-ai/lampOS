@@ -758,7 +758,10 @@ fn the_lamp_says_what_happened_in_a_few_words_and_never_the_name() {
         let answered = answer(&request("New Home", FAKE_PASSWORD), "VN", true, &mut fake);
         let (changed, broker) = answered.changed.unwrap();
         let mut heard = Heard::default();
-        assert_eq!(say_after(&mut fake, &mut heard, &changed, &broker), 1);
+        assert_eq!(
+            say_after(&mut fake, &mut heard, &changed, &broker, false),
+            1
+        );
         assert_eq!(heard.0.len(), 1);
         assert_eq!(heard.0[0].1, want);
         for (_, line) in &heard.0 {
@@ -844,7 +847,7 @@ fn with_no_wifi_back_the_lost_line_is_said_at_most_once_a_minute_until_one_is() 
         clock: &clock,
     };
     let changed = Changed::NotBack { why: String::new() };
-    let said = say_after(&mut host, &mut mouth, &changed, BROKER);
+    let said = say_after(&mut host, &mut mouth, &changed, BROKER, false);
     let at: Vec<u64> = mouth.heard.iter().map(|(at, _)| *at - started).collect();
     assert_eq!(said, 3, "{at:?}");
     // Every time the recording, never the model's words (#1959).
@@ -861,7 +864,7 @@ fn with_no_wifi_back_the_lost_line_is_said_at_most_once_a_minute_until_one_is() 
     let mut fake = Fake::new(&[]);
     let started = fake.now_ms;
     let mut heard = Heard::default();
-    let said = say_after(&mut fake, &mut heard, &changed, BROKER);
+    let said = say_after(&mut fake, &mut heard, &changed, BROKER, false);
     assert_eq!(said as u64, LOST_MOST.as_secs() / 60);
     assert_eq!(heard.0.len() as u64, LOST_MOST.as_secs() / 60);
     assert!(heard.0.iter().all(|(_, line)| line == "played wifi_lost"));
@@ -888,7 +891,7 @@ fn a_router_restart_of_two_and_a_half_minutes_never_hears_the_lost_line() {
     let changed = change(&mut fake, "VN", &asked("New Home"));
     assert!(matches!(changed, Changed::Back { .. }), "{changed:?}");
     let mut heard = Heard::default();
-    assert_eq!(say_after(&mut fake, &mut heard, &changed, BROKER), 1);
+    assert_eq!(say_after(&mut fake, &mut heard, &changed, BROKER, false), 1);
     assert_eq!(heard.0.len(), 1);
     assert_eq!(heard.0[0].1, SAY_BACK);
 
@@ -904,7 +907,7 @@ fn a_router_restart_of_two_and_a_half_minutes_never_hears_the_lost_line() {
     let first = fake.now_ms - left;
     assert!(first >= 180_000, "first said {first} ms after the loss");
     let mut heard = Heard::default();
-    let said = say_after(&mut fake, &mut heard, &changed, BROKER);
+    let said = say_after(&mut fake, &mut heard, &changed, BROKER, false);
     assert!(said >= 1);
     assert_eq!(said as u64, LOST_MOST.as_secs() / 60);
 }
@@ -994,7 +997,7 @@ fn the_lost_line_is_the_recording_and_one_missing_is_journalled_not_said() {
     for changed in [Changed::Joined, Changed::Back { why: String::new() }] {
         let mut fake = Fake::new(&[("Old Home", OLD)]);
         let mut heard = Heard::default();
-        assert_eq!(say_after(&mut fake, &mut heard, &changed, BROKER), 1);
+        assert_eq!(say_after(&mut fake, &mut heard, &changed, BROKER, false), 1);
         assert_eq!(heard.0[0].1, line_for(&changed).unwrap());
         assert!(!heard.0[0].1.starts_with("played"));
     }
@@ -1391,7 +1394,7 @@ fn p1_a_lost_line_the_voice_lacks_is_said_in_plain_words() {
     let mut fake = Fake::new(&[]);
     let mut mouth = NoClip(Vec::new());
     let changed = Changed::NotBack { why: String::new() };
-    assert!(say_after(&mut fake, &mut mouth, &changed, BROKER) >= 1);
+    assert!(say_after(&mut fake, &mut mouth, &changed, BROKER, false) >= 1);
     assert_eq!(mouth.0[0], format!("asked {RECORDING_LOST}"));
     assert_eq!(mouth.0[1], SAY_LOST);
 }
@@ -1757,4 +1760,25 @@ fn p2_a_hold_that_fails_part_way_leaves_the_lamp_on_the_live_network() {
     assert!(matches!(changed, Changed::Back { .. }), "{changed:?}");
     assert_eq!(fake.holds, 2);
     assert_eq!(fake.current_ssid().as_deref(), Some("Old Home"));
+}
+
+/// #5550 (#4141): with recovery on, a change that left the lamp on no
+/// network never sends the person to erase it: `recover` opens its hotspot
+/// and says its own line. The lines said while online are said as before.
+#[test]
+fn with_recovery_on_the_lost_line_is_left_to_the_hotspot() {
+    let mut fake = Fake::new(&[]);
+    let started = fake.now_ms;
+    let mut heard = Heard::default();
+    let changed = Changed::NotBack { why: String::new() };
+    assert_eq!(say_after(&mut fake, &mut heard, &changed, BROKER, true), 0);
+    assert!(heard.0.is_empty(), "{:?}", heard.0);
+    // Nor does the helper wait out the lost line's 10 minutes.
+    assert_eq!(fake.now_ms, started);
+    for changed in [Changed::Joined, Changed::Back { why: String::new() }] {
+        let mut fake = Fake::new(&[("Old Home", OLD)]);
+        let mut heard = Heard::default();
+        assert_eq!(say_after(&mut fake, &mut heard, &changed, BROKER, true), 1);
+        assert_eq!(heard.0[0].1, line_for(&changed).unwrap());
+    }
 }
