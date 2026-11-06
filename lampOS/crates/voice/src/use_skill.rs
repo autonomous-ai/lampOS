@@ -66,7 +66,7 @@ fn built(skills: &[Tool]) -> Tool {
     let names: Vec<&str> = skills.iter().map(|skill| skill.name.as_str()).collect();
     Tool {
         name: NAME.to_owned(),
-        description: "Use one of your skills, listed under \"Your skills\" in your instructions, each with when to use it. Call this when what someone asks is what a skill's line says: give the skill's name, and its choice and its yes-or-no only when its line names them. The call runs the skill: then do what its answer tells you, and never call it again for the same ask.".to_owned(),
+        description: "Use one of your skills, listed under \"Your skills\" in your instructions, each with when to use it. Call this when what someone asks is what a skill's line says: give the skill's name, and its choice and its yes-or-no only when its line names them. The call runs the skill: then do what its answer tells you, and don't call it again for the same ask unless its answer tells you to.".to_owned(),
         parameters: Some(json!({
             "type": "object",
             "properties": {
@@ -98,7 +98,12 @@ pub const RAN: &str = "ran";
 /// playful line that you are going to dance", the model called `use_skill`
 /// for `dance` again in the next round, which lamp-skills refused as under
 /// way, and said a stray line; called by its own name, `dance` ran once).
-/// An error, or an answer that is not an object, is left as it is.
+/// An error (lamp-skills sends every refusal, "I'm still doing that."
+/// among them, as `error`), or an answer that is not an object, is left as
+/// it is. The caller gives none to a skill whose tools file gives it a
+/// search (`crate::tools::search_walk`): a search is several calls of its
+/// skill in one turn, each answer telling the model to call again with the
+/// next place (look-for-things' `[search]`, a reader's P2 on #5505).
 pub fn ran(skill: &str, told: &mut Value) {
     if let Some(answer) = told.as_object_mut()
         && !answer.contains_key("error")
@@ -370,19 +375,18 @@ mod tests {
             told["next"],
             "Say one short, playful line that you are going to dance."
         );
-        let mut refused = json!({"error": "dance not run: its run is under way"});
+        // lamp-skills' refusal of a call while its run is under way, as its
+        // `refuse` writes it (`{"error": why}`, with its default `still`).
+        let mut refused = json!({"error": "I'm still doing that."});
         ran("dance", &mut refused);
-        assert_eq!(
-            refused,
-            json!({"error": "dance not run: its run is under way"})
-        );
+        assert_eq!(refused, json!({"error": "I'm still doing that."}));
         let mut plain = json!("Danced.");
         ran("dance", &mut plain);
         assert_eq!(plain, json!("Danced."));
         let tool = function(&installed()).unwrap();
         assert!(
             tool.description
-                .ends_with("never call it again for the same ask."),
+                .ends_with("don't call it again for the same ask unless its answer tells you to."),
             "{}",
             tool.description
         );
