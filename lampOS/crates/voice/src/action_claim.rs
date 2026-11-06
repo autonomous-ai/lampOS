@@ -362,13 +362,16 @@ const ADDRESS: [&str; 6] = ["hey", "hi", "hello", "ok", "okay", "lamp"];
 
 /// How a request asked as a question opens, after any [`ADDRESS`] ("Lamp,
 /// can you set a timer?"): never a status question ([`asked_as_a_question`]).
-const REQUEST_OPENINGS: [&[&str]; 6] = [
+const REQUEST_OPENINGS: [&[&str]; 8] = [
     &["can", "you"],
     &["could", "you"],
     &["will", "you"],
     &["would", "you"],
     &["can", "i", "have"],
     &["please"],
+    // El's P2 on #5615: "why" opens a status question, but not these.
+    &["why", "don't", "you"],
+    &["why", "not"],
 ];
 
 /// Whether the person asked `said` as a status question: a question that is
