@@ -407,7 +407,9 @@ give such a target its folder. A folder target,
 any other refusal, a timeout or a second refusal is never asked again,
 so nothing can start twice, and a named target's hand-overs all start.
 
-**`serve --new-folder`** (subdarren-P3 part 1, off unless set): Claude Code
+**`serve --new-folder`** (subdarren-P3 part 1, off unless set;
+`--targets-from-machines` turns it on for the folder its targets name,
+`~/harnesses/lamp-tasks`, alone, #5541): Claude Code
 and Codex ask the person to trust a folder Harness didn't make ("Do you
 trust this folder?"), and Harness pre-trusts only a folder it made itself
 (`harness new --help`: "Claude Code and Codex ask the person to trust a
@@ -1051,8 +1053,12 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
     and `-2`, `-3` … where two would be the same;
   - **each target:** the machine's id, the folder `~/harnesses/lamp-tasks`
     (lamp-4ace's today; a folder, not the name `lamp-tasks`, which Harness
-    would refuse from the second hand-over on. Harness never makes it, so a
-    computer without it refuses each hand-over: see `--folder-missing`) and
+    would refuse from the second hand-over on. Nothing else makes it, so
+    the first hand-over to each computer asks Harness to make it, as
+    `--new lamp-tasks`, as `serve --new-folder` does but for this folder
+    alone unless `--new-folder` is set (#5541; before it, every first
+    hand-over to a fresh computer failed `CWD_NOT_FOUND`, lamp-a63e on 6
+    Nov). A refusal for it is said with `--folder-missing`) and
     `ENGINE`
     (`claude`, `codex` or `opencode`), until Harness says which engines a
     machine has (openharness#1410's question 2).

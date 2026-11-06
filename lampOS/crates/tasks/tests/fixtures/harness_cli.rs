@@ -70,6 +70,13 @@ pub fn main() -> io::Result<()> {
         Some(steps) if !steps.is_empty() => &steps[before.min(steps.len() - 1)],
         _ => &plan[operation],
     };
+    // `{"with_new": step}` beside a step: a call that asks for `--new NAME`
+    // takes it instead, so a plain folder and a made one can be answered
+    // apart (#5541).
+    let step = match &plan[operation]["with_new"] {
+        with_new if with_new.is_object() && args.iter().any(|arg| arg == "--new") => with_new,
+        _ => step,
+    };
     let environment = env::vars().collect::<std::collections::BTreeMap<_, _>>();
     let mut calls = fs::OpenOptions::new()
         .create(true)

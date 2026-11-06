@@ -41,7 +41,7 @@ StateDirectoryMode=0700
 # #5198, docs/tasks.md). The socket is lampos's, so any unit run as lampos can connect to it; lamp-tasks
 # reads each caller from the kernel (SO_PEERCRED and its cgroup) and closes any that is not
 # lamp-cloud.service run as lampos (#5379).
-ExecStart=/opt/lampOS/tasks/current/lamp-tasks serve --enable --watch --progress --push-wait --close-told --harness-as-person --set-up-later --targets-from-machines claude --sign-in-by-code --app-socket /run/lampos-tasks/app.sock --dir /var/lib/lampos-tasks/store --socket /run/lampos-tasks/request.sock --voice-socket /run/lampos-tasks/voice.sock --targets /var/lib/lampos-tasks/targets.json --harness /usr/local/bin/harness
+ExecStart=/opt/lampOS/tasks/current/lamp-tasks serve --enable --watch --progress --push-wait --close-told --harness-as-person --set-up-later --targets-from-machines claude --folder-missing --sign-in-by-code --app-socket /run/lampos-tasks/app.sock --dir /var/lib/lampos-tasks/store --socket /run/lampos-tasks/request.sock --voice-socket /run/lampos-tasks/voice.sock --targets /var/lib/lampos-tasks/targets.json --harness /usr/local/bin/harness
 Restart=on-failure
 RestartSec=5s
 StandardInput=null
