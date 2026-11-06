@@ -8186,9 +8186,19 @@ impl Heeding {
             over_the_lamps_voice,
         } = heard
         {
-            crate::services::voice_began(over_the_lamps_voice, std::time::Instant::now());
+            self.tell_a_waiting_write(over_the_lamps_voice);
         }
         self.printing(request, heard);
+    }
+
+    /// A line began: a write waiting for its "send" is timed from here, not
+    /// from when its words come, and told if it began within the tail of the
+    /// lamp's words (`crate::services`).
+    fn tell_a_waiting_write(&self, over_the_lamps_voice: bool) {
+        let in_tail = self.said_until_us.is_some_and(|until_us| {
+            monotonic_us() <= until_us.saturating_add(super::own_echo::TAIL_US)
+        });
+        crate::services::voice_began(over_the_lamps_voice, in_tail, std::time::Instant::now());
     }
 
     /// A spoken line's sound, for the same-voice check: judged only if it
@@ -8213,9 +8223,7 @@ impl Heeding {
                     crate::untied_going_on::in_grace(monotonic_us(), until_us)
                 }))
             .then_some(request);
-            // A write waiting for its "send" is timed from when a line
-            // began, not when its words came (`crate::services`).
-            crate::services::voice_began(over_the_lamps_voice, std::time::Instant::now());
+            self.tell_a_waiting_write(over_the_lamps_voice);
         }
         if matches!(heard, Heard::BeganOverTheWaitSound) {
             self.began_over = None;
@@ -9595,8 +9603,11 @@ impl Heeding {
             attention.name_heard_scored(at_us, score);
         }
         attention.heard(heard);
-        attention.lamp_asked(signs.lamp_asked);
-        let (busy, lamp_asked) = (signs.room == crate::room_told::Room::Busy, signs.lamp_asked);
+        // A read-back asks for its "send", however its last sentence reads
+        // (`services::send_awaited`).
+        let lamp_asked = signs.lamp_asked || crate::services::send_awaited(heard);
+        attention.lamp_asked(lamp_asked);
+        let busy = signs.room == crate::room_told::Room::Busy;
         attention.set_near(signs.near);
         // `LAMP_BUSY_CALLED_STRICT=on`: in a busy room with nobody turned to
         // the lamp, a stand-in or "Lamp is broken, …" is no call in itself.
@@ -26751,6 +26762,46 @@ mod tests {
             assert_eq!(verdict, held.then_some(super::LONE_WORDS), "{heard}");
             assert_eq!(heeding.conversation_note_for(9).is_some(), !held, "{heard}");
         }
+        // #5553: the same lone words are the person's while a write waits
+        // for its "send", and a plain send alone.
+        for (heard, waiting, held) in [
+            ("Send it.", true, false),
+            ("Send it.", false, true),
+            ("Oh wow.", true, true),
+        ] {
+            crate::services::pending_for_test(waiting.then(|| {
+                crate::services::Pending::new("id", 8, Instant::now(), "Send an email.", "ann")
+            }));
+            let mut heeding = super::Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            let verdict = heeding.judge(9, line, heard, signs(true, false));
+            assert_eq!(
+                verdict,
+                held.then_some(super::LONE_WORDS),
+                "{heard} {waiting}"
+            );
+        }
+        // Begun within the tail of the lamp's words, the same words may be
+        // its echo: the room's, as before (`Heeding::hear`, the real producer).
+        crate::services::pending_for_test(Some(crate::services::Pending::new(
+            "id",
+            8,
+            Instant::now(),
+            "Send an email.",
+            "ann",
+        )));
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        heeding.said_until_us = Some(super::monotonic_us());
+        heeding.hear(
+            9,
+            crate::second_provider::Heard::Began {
+                over_the_lamps_voice: false,
+            },
+        );
+        let verdict = heeding.judge(9, line, "Send it.", signs(true, false));
+        assert_eq!(verdict, Some(super::LONE_WORDS));
+        crate::services::pending_for_test(None);
         // #3985: "Stop them." over the lamp's answer is said to the lamp
         // with the spoken-stop switch; without it, or not over the lamp's
         // voice, it stays the room's.

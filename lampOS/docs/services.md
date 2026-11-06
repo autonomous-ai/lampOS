@@ -747,14 +747,22 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   language."
 - **A plain send** (`says_send`): the words in lower case, everything but
   letters, digits and `'` as spaces, the fillers `yes`, `yeah`, `yep`, `ok`,
-  `okay`, `sure`, `please`, `now`, `lamp`, `lampy`, `vâng`, `dạ`, `ừ`, `có`
-  taken off both ends, and what is left exactly one of `send`, `send it`,
+  `okay`, `sure`, `please`, `now`, `lamp`, `lampy`, `hey`, `hi`, `hello`,
+  `oh`, `vâng`, `dạ`, `ừ`, `có` taken off both ends, and what is left exactly one of `send`, `send it`,
   `send that`, `send the message`, `send the email`, `go ahead and send it`,
   `gửi`, `gửi đi`, `gửi nó đi`, `gởi`, `gởi đi`, `gui`, `gui di`,
   `gửi đi giúp tôi`, `gui di giup toi`: each has "send", "gửi", "gởi" or
   "gui" in it. So "Yes, send it.", "Vâng, gửi đi" and "Ừ, gửi đi giúp tôi"
-  send; "do it", "don't send it", "send it to
-  Bo instead", "đừng gửi" and "no" don't.
+  send, and so does "Hey Lamp, yes, send it."; "do it", "don't send it",
+  "send it to Bo instead", "đừng gửi" and "no" don't.
+- **A plain send is heard as an answer** (`send_awaited`). While a write
+  waits, a plain send counts as answering the lamp, however the read-back's
+  last sentence reads. So it isn't held as a short sound or as the room's lone
+  words, even with nobody in view. This doesn't apply to a line begun over the
+  lamp's voice or within 1.5 s (`own_echo::TAIL_US`) of its words' end: that
+  may be the lamp's own "send it" heard back, which `own_echo` doesn't hold in
+  under 3 words. Such a line is judged as any other, and `gate` still judges
+  the send.
 
 ### After a read
 
