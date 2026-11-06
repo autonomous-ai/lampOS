@@ -3538,12 +3538,14 @@ after a take-over, but now for every turn:
   ("Okay, louder music it is." is no claim). Still no claim: a colour said
   ("My light is blue now."), "I'll remind you at nine.", "I can keep my
   light on until ten …", a status question or answer that opens with
-  another word. Held, asked again and said not done exactly as above; the
-  journal lines end `(LAMP_ACTION_CLAIM_CHECKED, in other words:
-  LAMP_ACTION_CLAIM_WORDED)` when only the worded runs found it. A turn that
+  another word. Held, asked again and said not done exactly as above; when
+  only the worded runs found it, the held and asked-again lines end
+  `(LAMP_ACTION_CLAIM_CHECKED, in other words: LAMP_ACTION_CLAIM_WORDED)`
+  and the said-not-done line reads `(<kind>, in other words:
+  LAMP_ACTION_CLAIM_WORDED; N call(s) in the turn)`. A turn that
   made its call, an answer that claims nothing and the switch off are byte
   for byte as without it; it does nothing without
-  `LAMP_ACTION_CLAIM_CHECKED`. Tests:
+  `LAMP_ACTION_CLAIM_CHECKED` (the worker's start line says so). Tests:
   `second_provider::tests::action_claim::*worded*`, `*other_words*` and
   `action_claim::tests::*`.
 - **A reply never offers to keep what its `remember` call keeps** (finding
