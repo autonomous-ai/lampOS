@@ -22,8 +22,10 @@
 //! before the call as they always do: the line is said only of an answer
 //! the memory gave.
 //!
-//! In English only: with an owner's language chosen, such turns wait for
-//! the model's words as without the switch.
+//! With an owner's language chosen, [`KEPT`] is said in it
+//! (`language::FIXED_LINES`) only from its clip rendered ahead as the
+//! worker starts, as the wordless cut-in lines are; until that clip is
+//! kept, the turn waits for round 2 as without the switch.
 //!
 //! Off, nothing changes. On, a turn does a few word searches, no I/O.
 use serde_json::Value;
@@ -202,8 +204,9 @@ pub fn covers(said: &str, kept: &[&str]) -> bool {
 }
 
 /// Whether one `remember` answer is a plain keep the lamp may confirm
-/// itself: kept, with nothing for the model to say (no note, no correction,
-/// nothing held, no error). A keep for them alone is plain unless the line
+/// itself: kept, with nothing for the model to say (no note, no correction
+/// or `replaced` one, whose round 2 says what changed, nothing held, no
+/// error; Thirteen's P3 on #5565). A keep for them alone is plain unless the line
 /// asked to keep it for everyone, which its round 2 must answer.
 pub fn kept_plainly(told: &Value, said: &str) -> bool {
     let Some(fields) = told.as_object() else {
@@ -221,7 +224,7 @@ pub fn kept_plainly(told: &Value, said: &str) -> bool {
         })
     };
     fields.keys().all(|key| match key.as_str() {
-        "remembered" | "id" | "replaced" => true,
+        "remembered" | "id" => true,
         "kept_for" => !for_everyone(),
         _ => false,
     })
@@ -279,7 +282,6 @@ mod tests {
         for told in [
             json!({"remembered": true}),
             json!({"remembered": true, "id": 4}),
-            json!({"remembered": true, "replaced": 3}),
             json!({"remembered": true, "kept_for": "Kept for them alone"}),
         ] {
             assert!(kept_plainly(&told, said), "{told}");
@@ -290,6 +292,8 @@ mod tests {
             json!({"remembered": true, "note": "Already kept: tell them you already knew it."}),
             json!({"remembered": true, "held": true}),
             json!({"remembered": true, "not_replaced": 3}),
+            // A correction (Thirteen's P3 on #5565): round 2 says what changed.
+            json!({"remembered": true, "replaced": 3}),
             json!({"ok": true}),
             json!("kept"),
         ] {
