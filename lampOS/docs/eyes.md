@@ -1592,7 +1592,13 @@ With the switch:
   are" save, the voice refuses a `remember_my_face` under that name before
   the eyes are asked: a new keep, a `replace` rename to it, either route
   (the line's words or the speaking face), names checked or not, compared
-  by the memory id made from it (`person_id`, case aside). The model is told
+  by the memory id made from it (`person_id`, case aside), inner whitespace
+  folded first as the eyes fold a name before keeping it (`plain_name`), so
+  "Mai  Tran" or a tab between is the typed "Mai Tran" too. "Who you are"
+  reopened by a voice `redo_setup` (that step, or `all`) is taken only from
+  the app or the owner's own known face seen saying the line
+  ([onboarding.md](onboarding.md), "Starting and redoing"), so a guest can't
+  reopen setup to keep a face under it. The model is told
   to say neither why nor whether it knows anyone by it, that a face can be
   added under that name in the app, and to ask for another name. The
   journal says `owners_name_in_app`. Always on: no switch. A face asked for
