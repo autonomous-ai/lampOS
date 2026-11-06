@@ -3091,3 +3091,27 @@ fn news_a_turn_did_not_get_heard_is_told_not_heard() {
         [Wake::Cut("sign-in-7-asking".into())]
     );
 }
+
+/// Jarvis's P3 on #5579: a turn cancelled by a privacy mute, a privacy gap
+/// or the service stopping was not talked over, so a sign-in's question in
+/// it is not asked again at the next pause. A barge-in still is.
+#[test]
+fn a_sign_in_question_cut_by_privacy_or_a_stop_is_not_talked_over() {
+    use crate::task_news::{NotHeard, Wake};
+    for (reason, cut) in [
+        ("privacy_muted", false),
+        ("privacy_gap", false),
+        ("service_stopped", false),
+        ("barge_in", true),
+    ] {
+        let mut h = Harness::new(TurnTaking::Duplex);
+        let (tx, cuts) = std::sync::mpsc::channel::<Wake>();
+        {
+            let reply = h.reply.as_mut().unwrap();
+            reply.news = vec!["sign-in-7-asking".to_owned()];
+            reply.news_not_heard = Some(NotHeard(tx));
+        }
+        cancel_reply(&mut h.owner, &mut h.reply, &mut h.trace, reason).unwrap();
+        assert_eq!(cuts.try_iter().count() == 1, cut, "{reason}");
+    }
+}
