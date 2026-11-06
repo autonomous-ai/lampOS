@@ -5,6 +5,7 @@ use lamp_tasks::harness::{
     Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED, PS_STDOUT_LIMIT,
     SignIn, Target, iso_unix_ms, parse_auth_status, parse_machines, parse_ps, parse_wait,
 };
+use lamp_tasks::runtime::{HarnessSwitches, NEW_FOLDER_FILE, targets_from_machines};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
@@ -106,6 +107,7 @@ impl Rig {
             route: false,
             absolute_folder: false,
             new_folder: None,
+            new_folder_only: None,
             journal: None,
             calls: None,
             health_after_start: false,
@@ -3158,6 +3160,114 @@ fn with_new_folder_another_failure_marks_nothing() {
         assert_eq!(news[0][4], "--new");
         assert_eq!(news[1][4], "--new");
     }
+}
+
+/// A fixture Harness that refuses a plain `new` in the folder the machines'
+/// targets name, as a computer without it does (`CWD_NOT_FOUND`, lamp-a63e
+/// on 6 Nov), and makes it on `--new lamp-tasks`.
+fn folder_not_there_rig() -> Rig {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines": {"default": true},
+        "new": {
+            "exit": 1,
+            "stdout": "{\"ok\":false,\"error\":\"CWD_NOT_FOUND\"}\n",
+            "with_new": {"default": true}
+        }
+    }));
+    rig
+}
+
+/// The launch of a target written from the person's machines (`serve
+/// --targets-from-machines`), on the rig's computer.
+fn from_the_machines() -> Launch {
+    let machines = [AccountMachine {
+        machine_id: MACHINE.into(),
+        label: "Office Mac".into(),
+        current: false,
+    }];
+    let targets = targets_from_machines(&machines, EngineKind::Claude);
+    Launch {
+        name: "lamp-task-001".into(),
+        prompt: "Inspect the authored fixture".into(),
+        target: targets["office"].clone(),
+    }
+}
+
+/// #5541: a target written by `--targets-from-machines` names
+/// `~/harnesses/lamp-tasks`, which nothing else makes. With that switch on,
+/// and `--new-folder` off as in the product, the first hand-over asks
+/// Harness to make the folder (`--new lamp-tasks`) and starts; later ones
+/// name it.
+#[test]
+fn a_target_from_the_machines_has_its_folder_made_on_the_first_hand_over() {
+    let mut rig = folder_not_there_rig();
+    let root = rig.root.path().to_owned();
+    HarnessSwitches::default().apply(&mut rig.config, &root, true);
+    let cli = rig.cli();
+    assert_eq!(
+        cli.launch(&from_the_machines()),
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    let news = new_args(&rig);
+    assert_eq!(news.len(), 1);
+    assert_eq!(news[0][4], "--new");
+    assert_eq!(news[0][5], "lamp-tasks");
+    // Made: the next hand-over names the folder, as before.
+    rig.plan(json!({"machines":{"default":true},"new":{"default":true}}));
+    assert!(matches!(
+        cli.launch(&from_the_machines()),
+        LaunchOutcome::Created { .. }
+    ));
+    assert_eq!(new_args(&rig)[1][4], "~/harnesses/lamp-tasks");
+    assert!(root.join(NEW_FOLDER_FILE).exists());
+}
+
+/// Hand-written targets keep today's behaviour unless `--new-folder` is
+/// set: with `--targets-from-machines` on, another `~/harnesses/<name>`
+/// folder is sent as it is; and with neither switch, the machines' folder
+/// is sent as it is too, so a refusal is the same as before.
+#[test]
+fn only_the_machines_folder_is_made_unless_new_folder_is_set() {
+    let mut rig = Rig::new();
+    let root = rig.root.path().to_owned();
+    HarnessSwitches::default().apply(&mut rig.config, &root, true);
+    rig.plan(json!({"machines":{"default":true},"new":{"default":true}}));
+    let mut by_hand = from_the_machines();
+    by_hand.target.project = "~/harnesses/my-project".into();
+    assert!(matches!(
+        rig.cli().launch(&by_hand),
+        LaunchOutcome::Created { .. }
+    ));
+    assert_eq!(new_args(&rig)[0][4], "~/harnesses/my-project");
+
+    let mut rig = folder_not_there_rig();
+    let root = rig.root.path().to_owned();
+    HarnessSwitches::default().apply(&mut rig.config, &root, false);
+    assert_eq!(
+        rig.cli().launch(&from_the_machines()),
+        uncertain("new_failed")
+    );
+    assert_eq!(new_args(&rig)[0][4], "~/harnesses/lamp-tasks");
+    assert!(!root.join(NEW_FOLDER_FILE).exists());
+
+    // `--new-folder` set: every made folder, as #5121 has it.
+    let mut rig = Rig::new();
+    let root = rig.root.path().to_owned();
+    let switches = HarnessSwitches {
+        new_folder: true,
+        ..Default::default()
+    };
+    switches.apply(&mut rig.config, &root, true);
+    rig.plan(json!({"machines":{"default":true},"new":{"default":true}}));
+    assert!(matches!(
+        rig.cli().launch(&by_hand),
+        LaunchOutcome::Created { .. }
+    ));
+    assert_eq!(new_args(&rig)[0][4], "--new");
+    assert_eq!(new_args(&rig)[0][5], "my-project");
 }
 
 /// Only `~/harnesses/<name>` with a name Harness keeps as it is is asked

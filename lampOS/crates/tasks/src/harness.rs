@@ -451,6 +451,13 @@ pub struct CliConfig {
     /// trust this folder?" with nobody at the computer (lamp-c0a4, 3 Nov).
     /// `None`: the folder, as before.
     pub new_folder: Option<PathBuf>,
+    /// With [`Self::new_folder`] set, only a target naming this folder has
+    /// it made; `None`: every `~/harnesses/<name>` folder. `serve
+    /// --targets-from-machines` sets it to the folder its targets name
+    /// ([`crate::runtime::MACHINES_PROJECT`]) when `--new-folder` is off, so
+    /// a target it wrote always gets its folder (#5541) and a hand-written
+    /// one goes as before.
+    pub new_folder_only: Option<String>,
     /// Each dispatch's journal line ([`dispatch_line`]) is also kept here,
     /// for a test to read; it always goes to stderr, the unit's journal.
     pub journal: Option<Arc<Mutex<Vec<String>>>>,
@@ -521,6 +528,7 @@ impl CliConfig {
             route: false,
             absolute_folder: false,
             new_folder: None,
+            new_folder_only: None,
             journal: None,
             calls: None,
             health_after_start: false,
@@ -771,6 +779,12 @@ impl Cli {
         // Harness makes it and trusts it ([`NewFolder`]).
         let new_name = project_at
             .filter(|_| self.config.new_folder.is_some())
+            .filter(|_| {
+                self.config
+                    .new_folder_only
+                    .as_ref()
+                    .is_none_or(|only| *only == launch.target.project)
+            })
             .and_then(|at| Some((at, made_name(&launch.target.project)?)))
             .filter(|_| !self.folder_seen(&launch.target));
         if let Some((at, name)) = new_name {
