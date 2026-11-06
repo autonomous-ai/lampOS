@@ -102,6 +102,8 @@ struct Runs {
     installer: Result<String, String>,
     manifest: Result<String, String>,
     id: Result<String, String>,
+    /// lamp-tasks' unit's `Environment`, as `systemctl show` says it.
+    tasks_environment: String,
 }
 
 impl Runs {
@@ -111,6 +113,7 @@ impl Runs {
             installer: Ok(String::new()),
             manifest: Ok(String::new()),
             id: Ok("990\n".into()),
+            tasks_environment: String::new(),
         }
     }
     fn runner(&self) -> impl FnMut(&[String]) -> Result<String, String> + '_ {
@@ -123,6 +126,8 @@ impl Runs {
                 self.manifest.clone()
             } else if install::runs_installer(argv) {
                 self.installer.clone()
+            } else if line.starts_with("systemctl show lamp-tasks.service") {
+                Ok(self.tasks_environment.clone())
             } else if line.ends_with("harness version") {
                 Ok("harness 0.4.25\n".into())
             } else {
@@ -1099,4 +1104,200 @@ fn a_pinned_install_reporting_another_version_records_version() {
         &mut quiet(),
     );
     assert_eq!(install(&lamp, &Runs::new(), 2).install, "installed");
+}
+
+/// Harness's launcher as its installer writes it without `--no-updates`.
+const UNPINNED: &str = "#!/bin/sh\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
+/// The same in Harness's pinned shape (#5493).
+const PINNED: &str = "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
+const HOLD_ON: &str =
+    "HOME=/var/lib/lampos-tasks PATH=/usr/local/bin:/usr/bin:/bin LAMP_HARNESS_HOLD_UPDATES=on";
+
+/// The launcher the (fake) installer left, with no link at Harness's
+/// place yet, so the one-shot installs.
+fn launcher_left(lamp: &Lamp, text: &str) -> PathBuf {
+    let bin = lamp.root().join("var/lib/lampos-tasks/.local/bin");
+    fs::create_dir_all(&bin).unwrap();
+    let launcher = bin.join("harness");
+    fs::write(&launcher, text).unwrap();
+    fs::set_permissions(&launcher, fs::Permissions::from_mode(0o755)).unwrap();
+    launcher
+}
+
+fn asked_for_install(lamp: &Lamp) {
+    write_whole(
+        &lamp.records().join(ASK),
+        &serde_json::to_vec(&Ask {
+            version: 1,
+            pin: None,
+        })
+        .unwrap(),
+        0o600,
+    )
+    .unwrap();
+}
+
+/// With lamp-tasks holding Harness's updates, the install writes Harness's
+/// launcher in its pinned shape before lamp-tasks starts, keeping its exec
+/// line and its mode; a second install keeps it byte for byte.
+#[test]
+fn with_the_hold_on_the_install_pins_harnesss_launcher_once() {
+    let lamp = Lamp::new();
+    let launcher = launcher_left(&lamp, UNPINNED);
+    asked_for_install(&lamp);
+    let mut runs = Runs::new();
+    runs.tasks_environment = HOLD_ON.into();
+    let mut lines = Vec::new();
+    let said = {
+        let mut run = runs.runner();
+        install_now(
+            lamp.root(),
+            &lamp.records(),
+            &mut run,
+            &mut || 3,
+            &mut |line: &str| lines.push(line.to_owned()),
+        )
+        .unwrap()
+    };
+    assert_eq!(said.install, "installed");
+    assert_eq!(fs::read_to_string(&launcher).unwrap(), PINNED);
+    assert_eq!(
+        fs::metadata(&launcher).unwrap().permissions().mode() & 0o777,
+        0o755
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.starts_with("Harness's launcher pinned (")),
+        "{lines:?}"
+    );
+    let log = runs.log.borrow().clone();
+    let shown = log
+        .iter()
+        .position(|line| line.starts_with("systemctl show lamp-tasks.service"))
+        .unwrap();
+    assert!(shown < log.len() - 1, "before lamp-tasks starts: {log:?}");
+    assert_eq!(log.last().unwrap(), "systemctl restart lamp-tasks.service");
+
+    // Pinned already: the same bytes, no second preamble.
+    assert_eq!(
+        launcher::pin(&launcher, "/var/lib/lampos-tasks/harness-hold.env"),
+        Ok(launcher::Pinned::Kept)
+    );
+    let mut run = runs.runner();
+    let mut kept = Vec::new();
+    launcher::after_install(lamp.root(), &mut run, &mut |line: &str| {
+        kept.push(line.to_owned())
+    });
+    assert_eq!(kept, ["Harness's launcher already pinned"]);
+    assert_eq!(fs::read_to_string(&launcher).unwrap(), PINNED);
+    assert!(!launcher.with_file_name(".harness.lampos-pin").exists());
+}
+
+/// An exec line Harness's own update rewrote is kept as it is.
+#[test]
+fn the_launchers_own_exec_line_is_kept() {
+    let updated = UNPINNED.replace("0.5.39", "0.5.57");
+    let pinned =
+        launcher::pinned_launcher(&updated, "/var/lib/lampos-tasks/harness-hold.env").unwrap();
+    assert_eq!(pinned, PINNED.replace("0.5.39", "0.5.57"));
+    assert_eq!(pinned.lines().last(), updated.lines().last());
+    assert_eq!(
+        launcher::pinned_launcher("#!/bin/sh\necho no exec\n", "/x"),
+        None
+    );
+}
+
+/// With the hold off (unset, or anything but `on`), the install leaves the
+/// launcher as it is.
+#[test]
+fn with_the_hold_off_the_install_leaves_the_launcher_alone() {
+    for environment in [
+        "",
+        "HOME=/var/lib/lampos-tasks",
+        "LAMP_HARNESS_HOLD_UPDATES=off",
+        "LAMP_HARNESS_HOLD_UPDATES=ON",
+    ] {
+        let lamp = Lamp::new();
+        let launcher = launcher_left(&lamp, UNPINNED);
+        asked_for_install(&lamp);
+        let mut runs = Runs::new();
+        runs.tasks_environment = environment.into();
+        let mut lines = Vec::new();
+        let mut run = runs.runner();
+        install_now(
+            lamp.root(),
+            &lamp.records(),
+            &mut run,
+            &mut || 3,
+            &mut |line: &str| lines.push(line.to_owned()),
+        )
+        .unwrap();
+        assert_eq!(
+            fs::read_to_string(&launcher).unwrap(),
+            UNPINNED,
+            "{environment}"
+        );
+        let said: Vec<_> = lines
+            .iter()
+            .filter(|line| line.contains("launcher"))
+            .collect();
+        assert_eq!(
+            said,
+            [
+                "LAMP_HARNESS_HOLD_UPDATES is not on in lamp-tasks.service: Harness's launcher left as it is"
+            ],
+            "{environment}"
+        );
+    }
+}
+
+/// With the hold on and no launcher, none is made, and that is said.
+#[test]
+fn a_missing_launcher_is_not_made() {
+    let lamp = Lamp::new();
+    asked_for_install(&lamp);
+    let mut runs = Runs::new();
+    runs.tasks_environment = HOLD_ON.into();
+    let mut lines = Vec::new();
+    {
+        let mut run = runs.runner();
+        install_now(
+            lamp.root(),
+            &lamp.records(),
+            &mut run,
+            &mut || 3,
+            &mut |line: &str| lines.push(line.to_owned()),
+        )
+        .unwrap();
+    }
+    assert!(
+        lines.iter().any(|line| line
+            == "no Harness launcher at /var/lib/lampos-tasks/.local/bin/harness: left alone"),
+        "{lines:?}"
+    );
+    assert!(!lamp.root().join("var/lib/lampos-tasks/.local").exists());
+}
+
+/// lamp-tasks' unit not read (systemctl failed): taken as off, the launcher
+/// left as it is, one line said.
+#[test]
+fn an_unread_tasks_unit_is_taken_as_off() {
+    let lamp = Lamp::new();
+    let launcher = launcher_left(&lamp, UNPINNED);
+    let mut lines = Vec::new();
+    let mut run = |argv: &[String]| -> Result<String, String> {
+        assert_eq!(argv[0], "systemctl");
+        Err("Failed to connect to bus".to_owned())
+    };
+    launcher::after_install(lamp.root(), &mut run, &mut |line: &str| {
+        lines.push(line.to_owned())
+    });
+    assert_eq!(
+        lines,
+        [
+            "lamp-tasks.service's environment not read (Failed to connect to bus): LAMP_HARNESS_HOLD_UPDATES taken as off, Harness's launcher left as it is"
+        ]
+    );
+    assert_eq!(fs::read_to_string(&launcher).unwrap(), UNPINNED);
 }

@@ -599,6 +599,9 @@ fn install_with(
         ));
         said
     };
+    // Pinned before lamp-tasks starts, when lamp-tasks holds Harness's
+    // updates (#5493): a Harness command run by hand holds them too.
+    launcher::after_install(root, run, say);
     // lamp-tasks waits for Harness (its `ConditionPathExists`): started now,
     // so it says why hand-overs are off and takes a sign-in.
     if let Err(why) = run(&["systemctl", "restart", "lamp-tasks.service"].map(str::to_owned)) {
@@ -702,6 +705,7 @@ fn lock(records: &Path) -> Result<fs::File, String> {
     Ok(file)
 }
 
+pub mod launcher;
 pub mod product;
 mod serve;
 
