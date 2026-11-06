@@ -4923,7 +4923,9 @@ impl Engine {
     /// #5215), beside [`Engine::checking_action_claims`]: a reply that
     /// claims a timer, light or volume action in other words ("I've set a
     /// timer for one minute.", "I've kept the light on until ten.", "Okay,
-    /// louder.") is held and judged as one in the acting part's own words.
+    /// louder.") is held and judged as one in the acting part's own words,
+    /// only in a turn with no call at all and never on a line the person
+    /// asked as a question ([`crate::action_claim::asked_as_a_question`]).
     /// Nothing without the claim check. Before any turn only.
     pub fn checking_worded_claims(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
@@ -12069,6 +12071,12 @@ async fn answer(
         && crate::dont_know::about_themself(&said))
     .then(|| said.clone());
     let reminded = said.to_lowercase().contains("remind");
+    // Whether the worded claims judge this turn (`LAMP_ACTION_CLAIM_WORDED`,
+    // #5215): never a line the person asked as a question, whose reply may
+    // tell the state ("The light stays on until ten."), and only while the
+    // turn has made no call at all, so work another tool did stands (the
+    // first builder's two P2s on #5588). The strict lines judge every turn.
+    let worded_turn = shared.worded_claims && !crate::action_claim::asked_as_a_question(&said);
     let words = Message::user(said.clone());
     let event_words = said.clone();
     // The line's words, for a carried keep held on it ([`hold_carried_keep`]).
@@ -12878,7 +12886,7 @@ async fn answer(
                                 match crate::action_claim::claim_as(
                                     held,
                                     false,
-                                    shared.worded_claims,
+                                    worded_turn && turn_called.is_empty(),
                                 ) {
                                     Some(None) => action_held.take().unwrap_or_default(),
                                     Some(Some(kind))
@@ -13300,7 +13308,8 @@ async fn answer(
             // reply, or one in the last round, is said as the plain line that
             // it wasn't done.
             if let Some(held) = action_held.take().filter(|held| !held.is_empty()) {
-                let unmade = crate::action_claim::claim_as(&held, true, shared.worded_claims)
+                let worded_now = worded_turn && turn_called.is_empty() && calls.is_empty();
+                let unmade = crate::action_claim::claim_as(&held, true, worded_now)
                     .flatten()
                     .filter(|kind| {
                         !turn_called
@@ -13310,13 +13319,12 @@ async fn answer(
                             .any(|name| kind.made_by(name))
                     });
                 // Whether only the worded claims found it: the journal says so.
-                let worded = if shared.worded_claims
-                    && crate::action_claim::claim(&held, true).flatten().is_none()
-                {
-                    ", in other words: LAMP_ACTION_CLAIM_WORDED"
-                } else {
-                    ""
-                };
+                let worded =
+                    if worded_now && crate::action_claim::claim(&held, true).flatten().is_none() {
+                        ", in other words: LAMP_ACTION_CLAIM_WORDED"
+                    } else {
+                        ""
+                    };
                 match unmade {
                     None => {
                         for sentence in split.push(&held) {

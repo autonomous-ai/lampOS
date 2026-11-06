@@ -3531,14 +3531,29 @@ after a take-over, but now for every turn:
   "Brighter now.", "I've turned the volume up.", "I turned off the light.",
   "Turned it down.", "I've made it warmer.", "Lights off."); and the light
   kept on or off until a time ("I've kept the light on until ten.", "The
-  light stays on until …", "I'll keep my light on until …",
-  `action_claim::Claim::LightKept`, which a light call, a Schedule set or
-  `keep_rule` makes). The sentence such a run opens must not end in a '?',
-  and a step word after a lead-in must be followed by its end or a mark
-  ("Okay, louder music it is." is no claim). Still no claim: a colour said
-  ("My light is blue now."), "I'll remind you at nine.", "I can keep my
-  light on until ten …", a status question or answer that opens with
-  another word. Held, asked again and said not done exactly as above; when
+  light stays on until …", "I'll keep my light on until …", or "for" with
+  a time after it: digits, a number word, "the night" or "tonight", so
+  "I'll keep my light on for ten minutes." is one and "I left a light on
+  for you." is not; `action_claim::Claim::LightKept`, which a light call, a
+  Schedule set or `keep_rule` makes). The sentence such a run opens must
+  not end in a '?', and a step word after a lead-in must be followed by its
+  end or a mark ("Okay, louder music it is." is no claim). Still no claim:
+  a colour said ("My light is blue now."), "I'll remind you at nine.", "I
+  can keep my light on until ten …", a status question or answer that
+  opens with another word. **The worded runs judge only a turn with no call
+  at all** (the first builder's P2 on #5588): any call in the turn, this
+  round's or an earlier one's, lets them stand, so work another tool did
+  ("I've added a reminder to your calendar." beside `service_write`, "I've
+  turned off the lights." after `use_skill` or a hand-over) is said as it
+  is. **Nor do they judge a line the person asked as a question**
+  (`action_claim::asked_as_a_question`: the heard line ends with a '?', or
+  its first word after "hey", "hi", "hello", "ok", "okay" or "lamp" is
+  how, is, are, do, does, did, what, when, will, can, has, have or was):
+  "Lamp, how long will the light stay on?" answered "The light stays on
+  until ten." and "Lamp, is my timer still set?" answered "Your timer is
+  set for one minute." are said as they are. #5253's strict lines above
+  still judge every turn, questions and turns with other calls included.
+  Held, asked again and said not done exactly as above; when
   only the worded runs found it, the held and asked-again lines end
   `(LAMP_ACTION_CLAIM_CHECKED, in other words: LAMP_ACTION_CLAIM_WORDED)`
   and the said-not-done line reads `(<kind>, in other words:
@@ -3546,7 +3561,9 @@ after a take-over, but now for every turn:
   made its call, an answer that claims nothing and the switch off are byte
   for byte as without it; it does nothing without
   `LAMP_ACTION_CLAIM_CHECKED` (the worker's start line says so). Tests:
-  `second_provider::tests::action_claim::*worded*`, `*other_words*` and
+  `second_provider::tests::action_claim::*worded*`, `*other_words*`,
+  `a_status_answer_to_a_question_is_untouched_by_the_worded_claims`,
+  `a_strict_claim_to_a_question_is_still_held_with_the_worded_claims` and
   `action_claim::tests::*`.
 - **A reply never offers to keep what its `remember` call keeps** (finding
   K2 on #3504: lamp-06c1, 28 Oct, "Want me to keep that as the change?
