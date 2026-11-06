@@ -903,7 +903,7 @@ GitHub names roles, not people; quality comes before latency.
 ### The PM's checks (the first builder, on the lead's ask, 6 November 2026)
 
 Five slips in the PM's first two days, each written here as a check so
-none recurs:
+none recurs, and one rule from the lead:
 
 - **A default-on pull request trains only after its lamp check.** The bot
   reads only `READ-OK`. So a pull request that turns a switch on in the
@@ -926,6 +926,14 @@ none recurs:
   not reach).
 - **Say whose decision it is.** The lead's words are relayed as said, and
   the PM's own calls are named as the PM's.
+- **The 8474 baseline run only when the first update changes** (the lead,
+  6 Nov). A run that puts a lamp back on 8474 (the build the ten shipped
+  lamps carry), resets it, walks setup and takes the candidate as its first
+  update is needed only when the candidate changes the updater or the
+  first-update path: `min_updater`, the climb, the walk hold, the parts'
+  stop order, or a new part installed on the first update (as Harness was
+  in 10441). Otherwise the usual pre-promote check on 52e6 is enough, and
+  the PM doesn't add the 8474 run on its own.
 
 The first builder reads the PM's promote and gate calls for the next three
 days, and posts on the Queue only where one of these is missed.
