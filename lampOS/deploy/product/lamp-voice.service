@@ -182,7 +182,8 @@ Environment=LAMP_SAID_AS_HEARD=on
 Environment=LAMP_CUT_IN_WORDLESS_ASKS=on
 # Such a cut in a busy room says "Anyway," and goes on from the sentence it cut; another within a minute says
 # "Oops, cut off again. Anyway," and goes on; a third says why and pauses (#5430). On again by the memory owner's
-# call, 6 Nov: the quiet-room path played on lamp-06c1 (PASS link to follow); the busy-room path not yet reached.
+# call, 6 Nov: the quiet-room path played on lamp-06c1 was a FAIL (2 of 5 fixed lines cut 40 ms in by the
+# cough's own tail, then quiet; fix in #5511); the busy-room path not yet reached.
 Environment=LAMP_CUT_IN_WORDLESS_RESUMES=on
 Environment=LAMP_SECOND_SAID_ONCE=on
 # A light, volume or timer turn answered at once with the acting part's own result, a single ask ending there, in
