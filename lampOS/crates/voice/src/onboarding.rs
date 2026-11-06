@@ -963,6 +963,9 @@ pub struct Onboarding {
     /// is not decided; let go once it is (#5488 review), which ends its
     /// thread. `None` with the switch off.
     harness_read: Option<harness_line::Read>,
+    /// What starts the read's thread: [`harness_line::spawn`]; a fake in
+    /// tests.
+    harness_spawn: harness_line::Spawn,
     /// The model service refusing turns (#4265, `LAMP_SECOND_REFUSED_HOLD`):
     /// a step that fails meanwhile is held as `later`.
     model_refusing: bool,
@@ -1218,6 +1221,7 @@ impl Onboarding {
             harness_line: false,
             harness_socket: None,
             harness_read: None,
+            harness_spawn: harness_line::spawn,
             model_refusing: false,
             model_held: false,
             face_kept: false,
@@ -3670,14 +3674,16 @@ impl Onboarding {
     /// tasks part's socket if not yet; otherwise let go, so its thread ends
     /// at its next wake rather than asking for the voice's whole life
     /// (#5488 review). Run when the file loads (a restart on a decided file
-    /// starts nothing that lasts; a reset starts it again) and once decided.
+    /// starts nothing that lasts; a reset starts it again) and at each
+    /// closing handed out; a read whose thread could not be started is
+    /// kept as none, so the next of these starts it again.
     fn keep_harness_read(&mut self) {
         if !self.harness_line || self.harness_line_decided() {
             self.harness_read = None;
         } else if self.harness_read.is_none()
             && let Some(socket) = &self.harness_socket
         {
-            self.harness_read = Some(harness_line::start(socket.clone()));
+            self.harness_read = harness_line::start(socket.clone(), self.harness_spawn);
         }
     }
 
@@ -7849,6 +7855,25 @@ mod tests {
         );
         assert!(room.walk.harness_read.is_none(), "let go once decided");
         assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE);
+    }
+
+    /// The reviewer-lead's P3 on #5583: a read whose thread could not be
+    /// started is not kept as a read that stays unknown for good: the
+    /// closing is plain, nothing is decided, and the next closing starts the
+    /// read again, once each time (no loop of tries).
+    #[test]
+    fn a_read_that_could_not_be_started_is_started_again_at_the_next_closing() {
+        let mut room = harness_room("harness-not-started", true, None);
+        room.walk.harness_socket = Some(PathBuf::from("/nonexistent/request.sock"));
+        room.walk.harness_spawn = |_| Err(std::io::Error::other("no threads left"));
+        room.walk.keep_harness_read();
+        assert!(room.walk.harness_read.is_none(), "not started");
+        assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE);
+        assert_eq!(room.walk.kept().harness_line, None, "not decided");
+        assert!(room.walk.harness_read.is_none(), "still not started");
+        room.walk.harness_spawn = |_| Ok(());
+        assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE);
+        assert!(room.walk.harness_read.is_some(), "started again");
     }
 
     /// #5488 review (P3 2): once the sentence is decided the walk lets its

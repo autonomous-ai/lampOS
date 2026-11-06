@@ -116,42 +116,62 @@ pub(crate) fn socket_from_environment() -> Option<PathBuf> {
     Some(directory.join("request.sock"))
 }
 
+/// What starts the read's thread: [`spawn`] in a voice, a fake in tests.
+pub(crate) type Spawn = fn(Box<dyn FnOnce() + Send>) -> std::io::Result<()>;
+
+/// The read's own thread, named for the journal.
+pub(crate) fn spawn(body: Box<dyn FnOnce() + Send>) -> std::io::Result<()> {
+    std::thread::Builder::new()
+        .name("onboarding-harness".into())
+        .spawn(body)
+        .map(drop)
+}
+
 /// A read kept fresh by a thread of its own, every [`EVERY`], until the
 /// walk lets the read go (the walk drops it once the sentence is decided,
-/// #5488 review): the thread then ends at its next wake.
-pub(crate) fn start(socket: PathBuf) -> Read {
+/// #5488 review): the thread then ends at its next wake. `None` when its
+/// thread could not be started.
+pub(crate) fn start(socket: PathBuf, spawn: Spawn) -> Option<Read> {
     let read = Arc::new(Mutex::new(Linked::Unknown));
     let weak: Weak<Mutex<Linked>> = Arc::downgrade(&read);
-    let spawned = std::thread::Builder::new()
-        .name("onboarding-harness".into())
-        .spawn(move || {
-            let mut last = None;
-            loop {
-                let answer = crate::tools::exchange_up_to(
-                    &socket,
-                    &json!({"op":"status"}),
-                    DEADLINE,
-                    crate::tools::MAX_TASKS_ANSWER_BYTES,
-                );
-                let linked = linked_of(answer.as_ref());
-                let Some(read) = weak.upgrade() else {
-                    return;
-                };
-                if let Ok(mut kept) = read.lock() {
-                    *kept = linked;
-                }
-                drop(read);
-                if last != Some(linked) {
-                    eprintln!("lamp-voice: onboarding: Harness signed in, as the tasks part says: {linked:?}");
-                    last = Some(linked);
-                }
-                std::thread::sleep(EVERY);
+    let spawned = spawn(Box::new(move || {
+        let mut last = None;
+        loop {
+            let answer = crate::tools::exchange_up_to(
+                &socket,
+                &json!({"op":"status"}),
+                DEADLINE,
+                crate::tools::MAX_TASKS_ANSWER_BYTES,
+            );
+            let linked = linked_of(answer.as_ref());
+            let Some(read) = weak.upgrade() else {
+                return;
+            };
+            if let Ok(mut kept) = read.lock() {
+                *kept = linked;
             }
-        });
-    if let Err(error) = spawned {
-        eprintln!("lamp-voice: onboarding: Harness's sign-in not read: {error}");
+            drop(read);
+            if last != Some(linked) {
+                eprintln!(
+                    "lamp-voice: onboarding: Harness signed in, as the tasks part says: {linked:?}"
+                );
+                last = Some(linked);
+            }
+            std::thread::sleep(EVERY);
+        }
+    }));
+    // Not started: one line, and no read kept, so the walk starts it again
+    // at its next try (the next closing handed out, or the file's next
+    // load), once each time; before, the read stayed unknown for good.
+    match spawned {
+        Ok(()) => Some(read),
+        Err(error) => {
+            eprintln!(
+                "lamp-voice: onboarding: Harness's sign-in not read: {error}; started again at the next closing"
+            );
+            None
+        }
     }
-    read
 }
 
 #[cfg(test)]
@@ -193,7 +213,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).unwrap();
         let socket = directory.join("request.sock");
-        let nobody = start(directory.join("nobody.sock"));
+        let nobody = start(directory.join("nobody.sock"), spawn).unwrap();
         let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
         let served = std::thread::spawn(move || {
             let (stream, _) = listener.accept().unwrap();
@@ -207,7 +227,7 @@ mod tests {
                 .write_all(b"{\"ok\":true,\"signed_in\":\"no\"}\n")
                 .unwrap();
         });
-        let read = start(socket);
+        let read = start(socket, spawn).unwrap();
         served.join().unwrap();
         let until = std::time::Instant::now() + Duration::from_secs(5);
         while *read.lock().unwrap() != Linked::No && std::time::Instant::now() < until {
@@ -215,5 +235,16 @@ mod tests {
         }
         assert_eq!(*read.lock().unwrap(), Linked::No);
         assert_eq!(*nobody.lock().unwrap(), Linked::Unknown);
+    }
+
+    /// The reviewer-lead's P3 on #5583: a read whose thread cannot be
+    /// started is no read at all, so the walk starts it again later rather
+    /// than keeping a read that stays unknown for good.
+    #[test]
+    fn a_read_whose_thread_is_not_started_is_none() {
+        let refused: Spawn = |_| Err(std::io::Error::other("no threads left"));
+        assert!(start(PathBuf::from("/nonexistent/request.sock"), refused).is_none());
+        let started: Spawn = |_| Ok(());
+        assert!(start(PathBuf::from("/nonexistent/request.sock"), started).is_some());
     }
 }

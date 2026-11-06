@@ -107,6 +107,9 @@ struct Counts {
     /// signed in was asked.
     signed_out: AtomicBool,
     sign_in_reads: AtomicUsize,
+    /// Reading whether Harness is signed in fails while set (#5488
+    /// follow-up), as `harness auth status` that cannot be read.
+    sign_in_fails: AtomicBool,
     /// What `harness machines` lists, and how often it was asked (#1676).
     machines: Mutex<Vec<AccountMachine>>,
     machine_reads: AtomicUsize,
@@ -280,6 +283,9 @@ impl Adapter for Script {
     }
     fn signed_in(&self) -> Result<SignIn, String> {
         self.counts.sign_in_reads.fetch_add(1, Ordering::SeqCst);
+        if self.counts.sign_in_fails.load(Ordering::SeqCst) {
+            return Err("timeout".into());
+        }
         Ok(if self.counts.signed_out.load(Ordering::SeqCst) {
             SignIn::Out
         } else {
@@ -1670,6 +1676,46 @@ fn set_up_later_reads_the_targets_again_and_says_why_hand_overs_are_off() {
     });
     assert!(said(&report, "targets_invalid").is_none());
     assert_eq!(told_targets(&s), 0);
+}
+
+/// #5488 follow-up (the reviewer-lead's P3 on #5583): a sign-in read that
+/// fails, through the part's own loop, keeps what was last read for two
+/// failed reads, lets it go at the third, so `status` says no `signed_in`,
+/// and says it again once a read answers.
+#[test]
+fn a_sign_in_read_failing_three_times_in_a_row_is_let_go_by_the_part() {
+    let mut s = Running::unstarted(false, false, false, false);
+    s.config.set_up_later = Some(SetUpLater {
+        targets: s.root.path().join("targets.json"),
+        every: Duration::from_millis(300),
+        from_machines: None,
+    });
+    s.start();
+    let signed_in = |s: &Running| s.status()["signed_in"].clone();
+    let until = |s: &Running, wanted: Value| {
+        let start = Instant::now();
+        while signed_in(s) != wanted {
+            assert!(start.elapsed() < Duration::from_secs(5), "never {wanted}");
+            thread::sleep(Duration::from_millis(10));
+        }
+    };
+    until(&s, json!("yes"));
+    let base = s.counts.sign_in_reads.load(Ordering::SeqCst);
+    s.counts.sign_in_fails.store(true, Ordering::SeqCst);
+    let start = Instant::now();
+    while s.counts.sign_in_reads.load(Ordering::SeqCst) < base + 2 {
+        assert!(start.elapsed() < Duration::from_secs(5), "no failed reads");
+        thread::sleep(Duration::from_millis(5));
+    }
+    thread::sleep(Duration::from_millis(60));
+    assert_eq!(signed_in(&s), json!("yes"), "two failed reads keep it");
+    until(&s, Value::Null);
+    assert!(
+        s.counts.sign_in_reads.load(Ordering::SeqCst) >= base + 3,
+        "let go only after three failed reads"
+    );
+    s.counts.sign_in_fails.store(false, Ordering::SeqCst);
+    until(&s, json!("yes"));
 }
 
 /// #1676: with `--targets-from-machines`, a lamp signed in to Harness writes
