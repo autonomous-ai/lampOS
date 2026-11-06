@@ -1,0 +1,14 @@
+# 10:00, due at 48 with a conversation from 46 to 50: held, said by 50 once the voice has rested.
+clock = "10:00"
+
+[[expect]]
+at = "50m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "50m"
+within = "1m"
+call = "say"
+args = { note = "They have been quietly focused on their work for a good while. In one short, warm line of a few words, the way a friend would, say you noticed and it's nicely done. Only that: ask nothing of them and suggest nothing to do, and say nothing about their body or looks, the time, or health." }
