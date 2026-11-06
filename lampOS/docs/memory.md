@@ -832,7 +832,10 @@ The base `remember` may also name the person's own exchanges it came from,
 them, one step back. The legacy store ignores them.
 With `"once":true` (#2176, the voice's `LAMP_MEMORY_REMEMBER_ONCE`), a text
 the same person already keeps, active and the same words, ignoring case,
-spacing and a final punctuation mark, is answered
+spacing and a final punctuation mark (and, in a person's own scope, a leading
+"my" or "the": C81, stock 10538 on lamp-06c1, 6 Nov, "The gym locker code is
+441." kept and "My gym locker code is 441." kept again; never in the room's,
+where "my" is whoever said it, `days::own_text`), is answered
 `{"ok":true,"id":24,"existing":true}` with that kept thing's id, and no
 entry is written; it gains this conversation's `source_ids`, so forgetting
 it with `LAMP_MEMORY_FORGET_ALL` removes both conversations' exchanges
@@ -1906,7 +1909,8 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   time called `remember` again with the same text (lamp-06c1, the second
   route, build 4142: kept ids 24 and 25). Now a text the person already
   keeps (the same words, ignoring case, spacing and a final punctuation
-  mark) is that kept thing, no entry is written, it gains this
+  mark, and in their own scope a leading "my" or "the", C81) is that kept
+  thing, no entry is written, it gains this
   conversation's exchanges as sources (so forgetting it with
   `LAMP_MEMORY_FORGET_ALL` removes both conversations'), and the model is told
   `{"remembered":true,"note":"Already kept: tell them you already knew
