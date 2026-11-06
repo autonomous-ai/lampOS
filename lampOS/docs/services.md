@@ -1140,8 +1140,9 @@ a read renews it), asked off the line's path as each line begins
 (`services::Linked`, at most once a second, 500 ms at most) and after each
 note, so the note never waits; without the attention rule's line-begin ask,
 a link made since is told one line later. Another's line, the room's, a
-held one, a text, nothing linked or `lamp-services` not telling: nothing is
-told, as before, so a guest never learns what the owner linked. The journal
+held one, a text, nothing linked or `lamp-services` not telling (its last
+ask answered with an error, busy or not at all, so a link just removed is
+never told; `services::names_after`, #5598): nothing is told, as before, so a guest never learns what the owner linked. The journal
 says how many, never which. The Live route is told the same note beside
 the owner's open line (its lease, `services::owner_of`), read twice a
 second while the line is open, once a session for each set of names
