@@ -1032,6 +1032,16 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
   walk's closing (`LAMP_ONBOARDING_HARNESS_LINE`, [onboarding.md](onboarding.md)).
   Not read yet, the answer has no `signed_in`, as before; every other
   answer is unchanged (`runtime::tests::status_says_harness_signed_in_once_read`).
+  One failed read (`harness auth status` not answering) keeps the last
+  answer; three failed reads in a row (`SIGN_IN_FAILED_READS`, three looks,
+  about three minutes on a lamp) let it go, journal line "Harness's sign-in
+  not read 3 times in a row: not known until it is read again", so `status`,
+  the app's `app_sign_in_state` (#5524) and the report carry no `signed_in`
+  (not known) and the machines are not
+  asked, until a read answers again; before, a sign-out followed by failing
+  reads kept `yes` until a restart. Harness's daemon is still started only
+  after the first read of a run that answers (#5379)
+  (`runtime::tests::a_sign_in_that_cannot_be_read_for_three_looks_is_let_go`).
 - **Without the switch** nothing of this is said or read, and the part
   starts, stops and reports as before.
 

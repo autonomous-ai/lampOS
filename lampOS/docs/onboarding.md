@@ -343,7 +343,9 @@ a reset wipes it with the file. An older voice reads past the field. Tests:
 
 **One sentence about Harness in the closing** (#5488), with
 `LAMP_ONBOARDING_HARNESS_LINE=on` exactly (off unless set; not in the
-product unit, the PM's call after its lamp check). The walk's closing (the
+product unit, the PM's call after its lamp check and once the app's Harness
+section, where the sentence sends the owner, is in the app build a home
+has). The walk's closing (the
 done line above) ends with one more sentence, inside the same quoted line,
 so it is one turn and a new owner never hears two speeches at the end: "If
 you work on a computer, I can take on tasks for you: open Harness in the
@@ -362,18 +364,26 @@ and decides nothing.
 
 It is said only when lamp-tasks says Harness is not signed in: the walk
 reads `{"op":"status"}` on `LAMP_TASKS_DIR`'s `request.sock` every 20 s, off
-the voice's loop, and takes its `signed_in` ([tasks.md](tasks.md), "The
-sign-in on `status`"). `yes` or `offline` drops it; with no tasks part
-(`LAMP_TASKS_DIR` unset), no answer, or a lamp-tasks that does not say (an
-older build, or the sign-in not read yet), it is dropped too, rather than
-claim something untrue: the closing is said without it. Decided once, when
-that closing is handed out, and kept (`Progress::harness_line`: `said`,
-`signed_in`, `no_tasks` or `unknown`), so a restart, a redo of the whole
+the voice's loop, while the sentence is not decided (from when the
+onboarding file loads; the read is let go once it is decided, and a voice
+started on a decided file lets it go as the file loads, so the thread ends
+at its next wake), and takes its `signed_in` ([tasks.md](tasks.md), "The
+sign-in on `status`"). `yes` or `offline` drops it, and so does no tasks part
+(`LAMP_TASKS_DIR` unset). No answer, or a lamp-tasks that does not say (an
+older build, or one restarted just before the closing that has not read
+the sign-in yet), drops it from that closing too, rather than claim
+something untrue, but decides nothing: the session record says `unknown`
+and the next closing handed out (a redo of "preferences" or of the whole
+walk) reads again. Decided once, when a closing is handed out, and kept
+(`Progress::harness_line`: `said`, `signed_in` or `no_tasks`; an `unknown`
+kept by the build before #5488's review is read again), so a restart, a redo of the whole
 walk (`Progress::redone` keeps it) or a later closing never says it again; a
 reset wipes it with the file. An older voice reads past the field. Session
 record: `onboarding_harness_line` with its `outcome`. Tests:
 `onboarding::tests::the_sentence_about_harness_ends_the_closing_once`,
 `the_sentence_about_harness_is_dropped_unless_harness_is_signed_out`,
+`an_unknown_sign_in_is_read_again_at_the_next_closing`,
+`the_read_of_harness_is_let_go_once_the_sentence_is_decided`,
 `with_the_first_tries_the_sentence_about_harness_is_in_the_one_closing`,
 `the_done_note_carries_the_sentence_once_for_each_switch`,
 `the_two_step_walks_one_closing_carries_the_sentence`,
