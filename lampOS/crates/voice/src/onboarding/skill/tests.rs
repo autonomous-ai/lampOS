@@ -54,15 +54,6 @@ fn shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byt
     ];
     // The two-step walk (#5499); every step's words stay.
     assert_eq!(definition.order, [Step::WhereYouSit, Step::WhoYouAre]);
-    // What the model is told is that order.
-    assert_eq!(
-        definition
-            .order
-            .iter()
-            .map(|step| step.name())
-            .collect::<Vec<_>>(),
-        lamp_msgs::ONBOARDING_WALK
-    );
     assert_eq!(definition.reoffer_after_s, 86_400);
     for (step, first, reoffer) in expected {
         assert_eq!(definition.note(step, false).as_bytes(), first.as_bytes());
