@@ -28,9 +28,10 @@
 //!   that comes stops it after the line said, with [`STOP_LINE`] alone.
 //!   In the voice's private room (`LAMP_PRIVATE_ROOM=on`,
 //!   `lamp_voice::person::private_room`, the owner's call on 6 Nov) no
-//!   ownership check runs: any face in view will do, with no owner's name
-//!   or known face and however many faces, so a face that comes no longer
-//!   stops it; a voice heard still does, and nobody in view still holds it.
+//!   ownership check runs: one face alone in view will do, with no owner's
+//!   name or known face. Counting faces is not an ownership check, so two
+//!   faces still hold it and a face that comes still stops it; a voice
+//!   heard still does, and nobody in view still holds it.
 //! - **One read at a time** ([`Turns`], [`TURNS`] for the lamp): two
 //!   skills' reads due together (Morning agenda held at its gate while
 //!   Morning mail came due, #5618) would say their lines in turn, one
@@ -457,8 +458,8 @@ pub struct Seen {
     /// In the lamp's quiet hours or the skill's own `[quiet]`.
     pub quiet: bool,
     /// The voice's private room (`lamp_voice::person::private_room`): no
-    /// ownership check, so the owner's name, their known face and the
-    /// count of faces are not asked; a face in view and no voice still are.
+    /// ownership check, so the owner's name and their known face are not
+    /// asked; one face alone in view and no voice still are.
     pub private_room: bool,
 }
 
@@ -502,9 +503,9 @@ impl Closed {
 }
 
 /// The gate: whether the lamp may read to the owner now. In the private
-/// room ([`Seen::private_room`]) never [`Closed::NoOwner`],
-/// [`Closed::NotAlone`] or [`Closed::NotOwner`]: whoever is in view is the
-/// owner.
+/// room ([`Seen::private_room`]) never [`Closed::NoOwner`] or
+/// [`Closed::NotOwner`]: whoever is alone in view is the owner. A skill
+/// reads unasked, so [`Closed::NotAlone`] still holds there.
 pub fn judge(seen: &Seen) -> Result<(), Closed> {
     if !seen.owner_known && !seen.private_room {
         return Err(Closed::NoOwner);
@@ -519,9 +520,8 @@ pub fn judge(seen: &Seen) -> Result<(), Closed> {
         return Err(Closed::Quiet);
     }
     match seen.faces {
-        Some(n) if seen.private_room && n > 0 => {}
         Some(n) if n > 1 => return Err(Closed::NotAlone),
-        Some(1) if !seen.owner_in_view => return Err(Closed::NotOwner),
+        Some(1) if !seen.private_room && !seen.owner_in_view => return Err(Closed::NotOwner),
         Some(1) => {}
         _ => return Err(Closed::Nobody),
     }
@@ -712,15 +712,23 @@ mod tests {
         }
     }
 
-    /// The private room's lamp: two faces in view, no owner's name, nor
-    /// their known face.
-    fn private_two() -> Seen {
+    /// The private room's lamp: one stranger's face alone in view, no
+    /// owner's name, nor their known face.
+    fn private_one() -> Seen {
         Seen {
             owner_known: false,
-            faces: Some(2),
+            faces: Some(1),
             owner_in_view: false,
             private_room: true,
             ..alone()
+        }
+    }
+
+    /// The private room's lamp with a second face in view.
+    fn private_two() -> Seen {
+        Seen {
+            faces: Some(2),
+            ..private_one()
         }
     }
 
@@ -1490,20 +1498,17 @@ mod tests {
     }
 
     /// The private room (`LAMP_PRIVATE_ROOM`, the owner's call on 6 Nov):
-    /// a read passes with two faces and no owner known, and a face that
-    /// comes mid-read doesn't stop it; a voice heard, nobody in view, the
-    /// privacy switch, a pause and quiet hours still close it. With the
-    /// room off, no owner known and two faces close it as before.
+    /// a read passes with one face alone and no owner known. Two faces
+    /// still hold it and a face that comes mid-read still stops it, as a
+    /// skill reads unasked; a voice heard, nobody in view, the privacy
+    /// switch, a pause and quiet hours still close it. With the room off,
+    /// no owner known and a stranger's face close it as before.
     #[test]
-    fn the_private_room_reads_to_whoever_is_in_view() {
-        assert_eq!(judge(&private_two()), Ok(()));
-        let one_stranger = Seen {
-            faces: Some(1),
-            ..private_two()
-        };
-        assert_eq!(judge(&one_stranger), Ok(()));
+    fn the_private_room_reads_to_whoever_is_alone_in_view() {
+        assert_eq!(judge(&private_one()), Ok(()));
+        assert_eq!(judge(&private_two()), Err(Closed::NotAlone));
         let closed = |change: fn(&mut Seen)| {
-            let mut seen = private_two();
+            let mut seen = private_one();
             change(&mut seen);
             judge(&seen).unwrap_err()
         };
@@ -1523,34 +1528,44 @@ mod tests {
         assert_eq!(closed(|s| s.private_room = false), Closed::NoOwner);
         assert_eq!(
             judge(&Seen {
+                owner_known: true,
+                private_room: false,
+                ..private_one()
+            }),
+            Err(Closed::NotOwner)
+        );
+        assert_eq!(
+            judge(&Seen {
                 faces: Some(2),
                 ..alone()
             }),
             Err(Closed::NotAlone)
         );
 
-        // A whole read with two faces and no owner known.
-        let mut lamp = Lamp::new(vec![private_two()], events());
+        // A whole read with one stranger's face and no owner known.
+        let mut lamp = Lamp::new(vec![private_one()], events());
         assert_eq!(run(&calendar(), &mut lamp), "read 2");
         assert_eq!(lamp.said.len(), 3);
-        // A third face that comes mid-read: read on.
+        // A second face that comes mid-read: stopped, with the stop line.
+        let mut lamp = Lamp::new(vec![private_one()], events());
+        lamp.after_read = Some((2, private_two()));
+        assert_eq!(
+            run(&calendar(), &mut lamp),
+            "stopped: someone came in, 1 of 2 read"
+        );
+        assert_eq!(lamp.said.last().unwrap(), STOP_LINE);
+        // Two faces from the start: nothing read or said.
         let mut lamp = Lamp::new(vec![private_two()], events());
-        lamp.after_read = Some((
-            2,
-            Seen {
-                faces: Some(3),
-                ..private_two()
-            },
-        ));
-        assert_eq!(run(&calendar(), &mut lamp), "read 2");
-        assert!(!lamp.said.iter().any(|line| line == STOP_LINE));
+        let two = run(&calendar(), &mut lamp);
+        assert!(two.starts_with("skipped"), "{two}");
+        assert!(lamp.reads.is_empty() && lamp.said.is_empty());
         // A voice heard mid-read: stopped, with the stop line.
-        let mut lamp = Lamp::new(vec![private_two()], events());
+        let mut lamp = Lamp::new(vec![private_one()], events());
         lamp.after_read = Some((
             2,
             Seen {
                 heard_ago: Some(Duration::from_secs(1)),
-                ..private_two()
+                ..private_one()
             },
         ));
         assert_eq!(
@@ -1562,7 +1577,7 @@ mod tests {
         let mut lamp = Lamp::new(
             vec![Seen {
                 faces: Some(0),
-                ..private_two()
+                ..private_one()
             }],
             events(),
         );
