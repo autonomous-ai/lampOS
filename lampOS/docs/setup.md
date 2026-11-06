@@ -621,6 +621,49 @@ setup the app changes them through root's keys helper,
 `lamp-setup keys` on `lamp-setup-keys.socket`. All of it is in
 [own-keys.md](own-keys.md).
 
+## A new lamp's first volume (#5551, built, off unless set)
+
+The speaker's volume is the softvol control "Speaker" on the HDMI card
+(`allwinnerhdmi`, `device_speaker` in `/etc/asound.conf`, -30 to 0 dB over
+0 to 100), the one `lamp-actions` changes for "louder", "quieter" and the
+app's slider. Read from the code on 6 Nov, before this switch:
+
+- Nothing in lampOS sets or stores it. alsa-lib makes the control at the
+  first open of `device_speaker` (`lamp-cmedia-speaker.service`'s `aplay`)
+  at its loudest, 100 %, and `lamp-actions` keeps no level of its own
+  (`crates/actions/src/sound.rs`). The only level kept across a boot is
+  the image's ALSA state: `alsa-utils`' own `alsa-restore.service` stores
+  every control at a clean shutdown and restores it at boot. So a level
+  survives a clean reboot, and a power cut brings back the level of the
+  last clean shutdown (or of a hand-run `alsactl store`), or 100 % if
+  none was stored. That service comes from the Debian package, not from
+  this repository, and is not shown on a lamp here.
+- The reset touches neither the control nor `/var/lib/alsa/asound.state`
+  (`crates/setup/fixtures/reset-plan-product.json`): a reset in place
+  keeps the level as it was, and one that reboots brings it back from the
+  store, so the next owner hears the last owner's level.
+- `factory-run.sh`'s 75 % is the C-Media hardware "Speaker"
+  (`lamp-cmedia-speaker.service`'s drop-in), a different control,
+  re-pinned at every boot.
+
+With `LAMP_FIRST_VOLUME=on` in `lamp-setup.service`, a setup run that has
+joined the Wi-Fi and saved the settings sets that control to 70 % (about
+9 dB below full) and stores that card alone (`alsactl store allwinnerhdmi`,
+so a power cut before the first clean shutdown keeps it), just before the
+marker (`serve::Save::first_volume`, `crates/setup/src/first_volume.rs`).
+The marker is what starts the voice, so its first line is already at 70 %,
+and the volume waits on nothing slow on the voice's side. Setup runs only
+on a lamp with no marker, a new one or one just reset, so this is once per
+setup: a level the person chooses afterwards, by voice, a button or the
+app, is never changed by an update or anything else, and needs no mark of
+its own. Recovery's network-only run (`NetworkOnly`) never sets it. Both
+commands are bounded (0.8 s and 2 s) and best effort: a control that is
+not there yet or a tool that fails is a line in setup's log, never a failed
+setup. The C-Media hardware level and `--volume-ceiling` are unchanged.
+
+Not shown on a lamp: the hello at 70 % after a reset and setup, and the
+person's level after a reboot and after a power cut.
+
 ## Changed after setup (#1959, on for the product)
 
 The person changes their name, the lamp's name in the app, the time zone or
