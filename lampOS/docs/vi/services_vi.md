@@ -39,6 +39,10 @@ lúc 14:11 ngày 3 Nov 2026):
 
 ## Ai dùng được chúng
 
+**Trong sản phẩm hiện nay, bất kỳ ai nói với đèn** (`LAMP_PRIVATE_ROOM=on`, quyết định của chủ sản phẩm ngày 6/11). Đèn là một căn phòng riêng giữa nó và chủ của nó, nên ai nói với nó thì là chủ đèn, và không có kiểm tra quyền sở hữu nào chạy: việc nhận ra ai đang nói chưa đủ tin cậy, và đèn đã từ chối chính chủ của nó. Một câu vẫn phải được nói ra (`NOT_HEARD`), và một lần ghi vẫn cần phần đọc lại và một câu "send" rõ ràng ngay sau đó, để bắt một lần nghe nhầm. Các quy tắc bên dưới là những gì áp dụng khi công tắc tắt; chúng vẫn nằm trong mã cho một tính năng sau này.
+
+Khi công tắc bật, không câu nào được so với một giọng: một lần đọc được nói đầy đủ mà không hỏi giọng nào ở tuyến thứ hai và không chờ dấu giọng (`services::run`), và tuyến thứ hai không tạo dấu giọng nào cho các dịch vụ, nên `LAMP_SAME_VOICE_FOR=services` không khởi động tiến trình con cùng giọng nào ở đó (`checking_the_voice_for`). Trên tuyến Live một lần đọc cũng được nói đầy đủ, nên chữ "không bao giờ đầy đủ" của nó bên dưới không còn đúng khi công tắc bật; tuyến này vẫn không bao giờ chuẩn bị hay gửi một lần ghi (`NO_SEND_HERE`), dù công tắc bật hay tắt. Một lần đọc của kỹ năng tự tạo cũng ở trong căn phòng riêng: `lamp-skills.service` đặt `LAMP_PRIVATE_ROOM=on`, và khi đó cổng của nó không cần tên chủ đèn hay khuôn mặt quen, cũng không cần chỉ một khuôn mặt ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới).
+
 Chỉ chủ của đèn: người có khuôn mặt quen được giữ dưới tên gõ lúc setup
 (`LAMP_PERSON_NAME`) hoặc dưới tên mà `who_you_are` lưu cùng khuôn mặt của họ
 (`known_faces::owner_now`, được làm mới khi dịch vụ bật),
@@ -941,6 +945,15 @@ hai lần bị mô hình trả về thành thêm một khóa bên trong, bị t�
 | Khuôn mặt đó là khuôn mặt quen của chủ đèn | Tệp known của mắt (mới trong 2 s), tên là tên chủ đèn, không phân biệt hoa thường | "not the owner" / "the owner not in view" |
 | Không nghe giọng nào trong một phút qua | Mỗi dòng trên `voice/heard`, được một luồng riêng của `lamp-skills` đánh dấu khi đến (topic này là event: bus không giữ bản mới nhất, nên trước bản sửa này dòng này chưa từng giữ lại lần đọc nào; lamp-9adf, 5/11) | "a voice heard" |
 
+Trong căn phòng riêng (`LAMP_PRIVATE_ROOM=on`, đặt trong `lamp-skills.service`
+của sản phẩm và được đọc như giọng nói đọc nó,
+`lamp_voice::person::private_room`, vào `Seen::private_room`) không có kiểm
+tra quyền sở hữu nào chạy: các dòng về khuôn mặt chủ đèn đã đăng ký, tối đa
+một khuôn mặt và khuôn mặt quen của chủ đèn không áp dụng, nên bất kỳ khuôn
+mặt nào trong tầm nhìn cũng được, bao nhiêu cũng được, kể cả khi không có tên
+gõ lúc cài đặt. Không thấy ai vẫn giữ cổng đóng ("the owner not in view"), và
+các dòng còn lại vẫn áp dụng như trên.
+
 Tất cả phải đạt liên tục trong 5 s. Trước đó lượt chạy chờ, tối đa 60 phút,
 rồi bỏ qua ngày đó mà không nói gì ("skipped: <why>"). Mỗi kỹ năng đọc một lần
 mỗi ngày địa phương (giữ trong bộ nhớ của `lamp-skills`, nên khởi động lại thì
@@ -970,7 +983,9 @@ Một tiêu đề, người gửi hay chủ đề bị cắt còn 100 ký tự. 
 trước mỗi dòng. Nếu có người đến (khuôn mặt thứ hai, một khuôn mặt khác, một
 giọng nói), đèn dừng sau dòng đang nói và chỉ nói "I'll tell you the rest
 later."; nếu cổng đóng vì lý do khác (riêng tư, tạm dừng, giờ yên lặng, chủ
-đèn rời đi), nó dừng mà không nói gì. Khi không nhận ra chủ đèn, hoặc không
+đèn rời đi), nó dừng mà không nói gì. Trong căn phòng riêng, một khuôn mặt
+đến không làm nó dừng, còn một giọng nói nghe được thì vẫn làm nó dừng, với
+cùng câu đó. Khi không nhận ra chủ đèn, hoặc không
 thấy ai, cổng được xem lại trong tối đa 5 s (`BLINK`) mà không nói gì, vì mắt
 làm mới dấu khuôn mặt quen mỗi 2 s và dấu chỉ được coi là mới trong 2 s: trên
 lamp-9adf một lần làm mới cách 2,1 s đã dừng một lần đọc trước khi nói chữ

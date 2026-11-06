@@ -868,7 +868,16 @@ fn owner_among(
 /// Whether the owner is the only face the eyes see now
 /// (`known_faces::most_faces_lately`); no count is not alone.
 fn owner_alone() -> bool {
+    #[cfg(test)]
+    if let Some(alone) = ALONE_FOR_TEST.with(std::cell::Cell::get) {
+        return alone;
+    }
     crate::known_faces::most_faces_lately() == Some(1)
+}
+
+#[cfg(test)]
+thread_local! {
+    static ALONE_FOR_TEST: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
 /// Whether a read is said in full: the owner's face seen saying the line
@@ -1051,7 +1060,10 @@ pub fn run(
     } else {
         (None, None)
     };
-    let judge = judge();
+    // The private room holds no line to a voice, so the second route's
+    // same-voice check is never asked (and makes no print there,
+    // `second_provider::worker::checking_the_voice_for`).
+    let judge = if private_room { None } else { judge() };
     // A send, with the model's id or the waiting write's ([`waiting_send`]).
     let (prepared, send_id) = kept::pending(|pending| {
         (
@@ -1100,6 +1112,8 @@ pub fn run(
         words: words.as_deref(),
         previous,
         owner: owner.as_deref(),
+        // Sends stay on the second route alone, private room or not: the
+        // Live route never prepares or sends a write (`NO_SEND_HERE`).
         sends: judge.is_some(),
         alike,
         seen_owner,
@@ -1151,12 +1165,12 @@ pub fn run(
                 thread.private_for(request);
             }
             // In full only to the owner alone in view, in the
-            // conversation's voice; on the Live route, never.
-            let alone = owner_alone();
-            let likeness = judge
-                .as_ref()
-                .filter(|_| alone && !private_room)
-                .and_then(|judge| {
+            // conversation's voice; on the Live route, never. In the
+            // private room always in full, with no voice asked and no wait
+            // for a print ([`PRINT_WAIT`]).
+            if !private_room {
+                let alone = owner_alone();
+                let likeness = judge.as_ref().filter(|_| alone).and_then(|judge| {
                     judged(
                         judge,
                         if enrolled {
@@ -1166,8 +1180,9 @@ pub fn run(
                         },
                     )
                 });
-            if !private_room && !read_in_full(alone, likeness, seen_owner) {
-                brief(&mut told);
+                if !read_in_full(alone, likeness, seen_owner) {
+                    brief(&mut told);
+                }
             }
         }
     }
@@ -2572,5 +2587,57 @@ mod tests {
             Some(a),
             "A's own line: A's"
         );
+    }
+
+    /// The private room (P2 on #5553): a read heard at the lamp is said in
+    /// full with no voice asked of the second route, so it never waits
+    /// [`PRINT_WAIT`] for a print the room ignores, even with one face in
+    /// view and a judge that knows no print.
+    #[test]
+    fn a_private_room_read_asks_no_voice_and_does_not_wait() {
+        use std::io::{BufRead, BufReader, Write};
+        let folder = std::env::temp_dir().join(format!("private-read-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let listener =
+            std::os::unix::net::UnixListener::bind(folder.join(crate::tools::CALL_SOCKET)).unwrap();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let mut line = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                let answer = json!({"ok":true,"result":{"source":"Gmail","quoted":[
+                    {"id":"1","from":"Ann","subject":"Dinner","date":"d","text":"Home by 7"}
+                ]}});
+                writeln!(stream, "{answer}").unwrap();
+            }
+        });
+        let asked = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = asked.clone();
+        judging_voices(std::sync::Arc::new(move |_| {
+            counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            None
+        }));
+        crate::person::set_private_room_for_test(Some(true));
+        ALONE_FOR_TEST.with(|alone| alone.set(Some(true)));
+        let began = Instant::now();
+        let (told, answered) = run(
+            &folder,
+            &call(READ, json!({"service":"gmail","what":"recent"})),
+            7_001,
+            true,
+            None,
+        );
+        let took = began.elapsed();
+        crate::person::set_private_room_for_test(None);
+        ALONE_FOR_TEST.with(|alone| alone.set(None));
+        assert!(answered, "{told}");
+        assert_eq!(asked.load(std::sync::atomic::Ordering::SeqCst), 0);
+        assert!(took < PRINT_WAIT, "waited {took:?}");
+        assert_eq!(told["quoted"][0]["text"], "Home by 7", "in full: {told}");
+        assert!(told.get("others_here").is_none(), "{told}");
+        std::fs::remove_dir_all(folder).unwrap();
     }
 }
