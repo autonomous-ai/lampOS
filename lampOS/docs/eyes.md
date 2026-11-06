@@ -1584,6 +1584,19 @@ With the switch:
     (#2199).
   - Before this, any capture misheard as a known name replaced that person.
   - `apart` skips only the near-name check, never this one.
+- **The owner's typed name takes a face only at setup** (#5483, the first
+  builder's interim rule after lamp-29e7). The name typed in the app
+  (`LAMP_PERSON_NAME`) opens the owner's memory and linked services, and
+  with no face kept under it `not_like_them` had nothing to compare with,
+  so anyone who said it was kept as the owner. Past the setup's own "who you
+  are" save, the voice refuses a `remember_my_face` under that name before
+  the eyes are asked: a new keep, a `replace` rename to it, either route
+  (the line's words or the speaking face), names checked or not, compared
+  by the memory id made from it (`person_id`, case aside). The model is told
+  to say neither why nor whether it knows anyone by it, that a face can be
+  added under that name in the app, and to ask for another name. The
+  journal says `owners_name_in_app`. Always on: no switch. A face asked for
+  again after "who you are" closed is pointed to the app too.
 - A face confirmed from a photo keeps its path as before (`apart`). The
   journal says "did not remember a face: it is near someone known by a
   near name", or "its name is someone's whose face it isn't", naming
