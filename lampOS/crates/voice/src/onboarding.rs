@@ -4963,13 +4963,32 @@ pub fn is_tool(name: &str) -> bool {
 const PREFERENCES_ANSWER: &str = "That was the last question. Answer in at most five words, \
      never with a question: there are no more questions, and I say the last line myself.";
 
+/// [`run_by`] for a line from the owner or the app.
+#[cfg(test)]
+pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
+    run_by(file, call, true)
+}
+
+/// What the model is told of a voice `redo_setup` that would reopen "who
+/// you are" from anyone but the owner seen saying it ([`run_by`]): nothing
+/// says who the owner is.
+pub const REDO_WHO_IN_APP: &str = "Nothing was redone. Do not say why. Tell them that \
+     part of the setup can be redone in the Autonomous app, and that every other step can \
+     be redone by voice now.";
+
 /// The provider worker's side: put what the model reported in the mailbox
 /// for the runner, and say what to tell the model. Each call's step,
 /// outcome and answer go in the journal: on lamp-29e7 on 27 Oct three
 /// setup_step calls left "the onboarding answered" and nothing more, so
 /// what held "who you are" for 5 minutes could not be read (#3883).
-pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
-    run_in(file, call, installed_order())
+/// `owner_or_app`: the call's line was a text from the app,
+/// or a heard line the owner's own known face was seen saying. A redo that
+/// reopens "who you are" (that step, or `all`) is taken only then: once it
+/// is open, a face saved under the owner's typed name is the owner's
+/// (`known_faces::owners_typed_name`), so a guest's "redo who you are" would
+/// hand that name a face (the lead's ruling on #5519's HOLD).
+pub fn run_by(file: &Path, call: &ToolCall, owner_or_app: bool) -> (Value, bool) {
+    run_in(file, call, owner_or_app, installed_order())
 }
 
 /// The installed skill's `order`, read once per worker as it starts
@@ -4989,10 +5008,25 @@ pub(crate) fn installed_order() -> Option<&'static [Step]> {
         .as_deref()
 }
 
-/// [`run`], with the walk's `order` given (`None`: unread, the runner refuses
-/// a step out of it on its own).
-fn run_in(file: &Path, call: &ToolCall, order: Option<&[Step]>) -> (Value, bool) {
-    let (told, answered) = answer(file, call, order);
+/// [`run_by`], with the walk's `order` given (`None`: unread, the runner
+/// refuses a step out of it on its own).
+fn run_in(
+    file: &Path,
+    call: &ToolCall,
+    owner_or_app: bool,
+    order: Option<&[Step]>,
+) -> (Value, bool) {
+    let reopens_who = call.name == REDO
+        && call
+            .args
+            .get("step")
+            .and_then(Value::as_str)
+            .is_some_and(|step| step == REDO_ALL || Step::named(step) == Some(Step::WhoYouAre));
+    let (told, answered) = if reopens_who && !owner_or_app {
+        (json!({"error": REDO_WHO_IN_APP}), true)
+    } else {
+        answer(file, call, order)
+    };
     let said = |key: &str| call.args.get(key).and_then(Value::as_str).unwrap_or("none");
     eprintln!(
         "lamp-voice: onboarding: {} step {} outcome {}: {}",
@@ -5919,6 +5953,55 @@ mod tests {
         );
         assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Skipped));
         assert_eq!(room.walk.kept().steps.len(), Step::IDS.len() - 1);
+    }
+
+    /// The lead's ruling on #5519's HOLD: by voice, a redo that reopens "who
+    /// you are" (that step, or the whole walk) is the owner's only, seen
+    /// saying it, or the app's; an unknown voice's reopens nothing and is
+    /// pointed to the app, while its redo of another step goes as before.
+    #[test]
+    fn a_redo_of_who_you_are_is_the_owners_or_the_apps() {
+        let mut room = Room::new("redo-who-owner");
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
+        report(&room.walk, "where_you_sit", "skipped");
+        assert_eq!(
+            room.wait(4 * S, Some(SIDE)),
+            [WHERE_YOU_SIT_SKIPPED, WHO_NOTE]
+        );
+        report(&room.walk, "who_you_are", "skipped");
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [PREFERENCES_NOTE]);
+        report(&room.walk, "preferences", "skipped");
+        assert_eq!(room.wait(4 * S, Some(SIDE)), NONE);
+        let redo = |step: &str| ToolCall {
+            id: "c".into(),
+            name: REDO.into(),
+            args: json!({ "step": step }),
+        };
+        for step in ["who_you_are", REDO_ALL] {
+            assert_eq!(
+                run_by(&room.walk.file, &redo(step), false),
+                (json!({"error": REDO_WHO_IN_APP}), true),
+                "{step}"
+            );
+        }
+        assert_eq!(room.wait(4 * S, Some(SIDE)), NONE);
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Skipped));
+        assert_eq!(room.walk.kept().steps.len(), Step::IDS.len());
+        // Another step, by anyone, as before.
+        assert_eq!(
+            run_by(&room.walk.file, &redo("where_you_sit"), false),
+            (json!({"ok": true}), true)
+        );
+        room.wait(4 * S, Some(SIDE));
+        assert_eq!(room.outcome(Step::WhereYouSit), None, "reopened");
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Skipped));
+        // The owner seen saying it, or the app: reopened.
+        assert_eq!(
+            run_by(&room.walk.file, &redo("who_you_are"), true),
+            (json!({"ok": true}), true)
+        );
+        room.wait(4 * S, Some(SIDE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None, "reopened");
     }
 
     #[test]
@@ -7326,16 +7409,16 @@ mod tests {
             args: json!({"step": "touch"}),
         };
         let order = room.walk.definition.order.clone();
-        let (told, answered) = run_in(&room.walk.file, &redo, Some(&order));
+        let (told, answered) = run_in(&room.walk.file, &redo, true, Some(&order));
         assert!(answered);
         assert!(told["error"].is_string(), "{told}");
         assert!(told.get("ok").is_none(), "{told}");
-        assert!(run_in(&room.walk.file, &redo, None).1);
+        assert!(run_in(&room.walk.file, &redo, true, None).1);
         let unnamed = ToolCall {
             args: json!({}),
             ..redo.clone()
         };
-        let told = run_in(&room.walk.file, &unnamed, Some(&order)).0;
+        let told = run_in(&room.walk.file, &unnamed, true, Some(&order)).0;
         assert!(
             told["error"]
                 .as_str()

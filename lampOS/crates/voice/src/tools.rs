@@ -2218,7 +2218,20 @@ fn run_call_with_scope(
             ("the eyes", told)
         }
         Route::Mark(session) => ("the marks", crate::marked::run(session, call, heard)),
-        Route::Onboarding(file) => ("the onboarding", crate::onboarding::run(file, call)),
+        // A redo that reopens "who you are" is taken from the app, or from
+        // the owner's own known face seen saying the line, never from an
+        // unknown voice (`onboarding::run_by`, the lead's ruling on #5519).
+        Route::Onboarding(file) => {
+            let owner_or_app = !heard
+                || (call.name == crate::onboarding::REDO
+                    && crate::person::owner_ids()
+                        .iter()
+                        .any(|owner| crate::services::seen_saying_owner(request, owner).0));
+            (
+                "the onboarding",
+                crate::onboarding::run_by(file, call, owner_or_app),
+            )
+        }
         Route::ReportsStop(held) => (
             "the reports",
             crate::reports_stop::run(
@@ -3264,6 +3277,32 @@ mod tests {
         flags.pop();
         flags.push("onboarding.json".into());
         assert!(take(&flags).is_err());
+    }
+
+    /// A voice redo of "who you are" with nobody seen saying it is refused
+    /// (the owner's own face is the only voice it is taken from, #5519's
+    /// HOLD); the same call from the app is taken.
+    #[test]
+    fn a_heard_redo_of_who_you_are_needs_the_owner_seen_saying_it() {
+        let dir = std::env::temp_dir().join(format!("lamp-voice-redo-who-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let route = Route::Onboarding(dir.join("onboarding.json"));
+        let call = ToolCall {
+            id: String::new(),
+            name: crate::onboarding::REDO.into(),
+            args: json!({"step": "who_you_are"}),
+        };
+        let (whom, told) = run_call(&route, &call, 1, true);
+        assert_eq!(whom, "the onboarding");
+        assert_eq!(
+            told,
+            (json!({"error": crate::onboarding::REDO_WHO_IN_APP}), true)
+        );
+        assert_eq!(
+            run_call(&route, &call, 2, false).1,
+            (json!({"ok": true}), true)
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// The light's and the volume's functions, whose calls a later turn's

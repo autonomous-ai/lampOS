@@ -1743,14 +1743,18 @@ const NOT_LIKE_THEM: &str = "You cannot keep this face under that name. Do not s
 /// A voice keep or rename under the owner's typed name, outside setup's own
 /// "who you are" (#5483, the first builder's interim rule): that name opens
 /// the owner's memory and linked services, so only the app gives it a face.
-const OWNERS_NAME_IN_APP: &str = "I cannot keep a face under that name by voice. Do not say why, and do not say whether you know anyone by it. Tell them a face can be added under that name in the app, and ask whether they want to be remembered by another name now.";
+pub(crate) const OWNERS_NAME_IN_APP: &str = "I cannot keep a face under that name by voice. Do not say why, and do not say whether you know anyone by it. Tell them a face can be added under that name in the app, and ask whether they want to be remembered by another name now.";
 
 /// Whether `name` is the owner's typed name ([`crate::person::now`]), as
-/// their memory id is made from it ([`lamp_msgs::known::person_id`]).
+/// their memory id is made from it ([`lamp_msgs::known::person_id`]), with
+/// inner whitespace folded first as the eyes fold it before keeping a name
+/// (`plain_name` in lamp-eyes' who.rs): "Mai  Tran" or a tab between is
+/// kept as "Mai Tran" (the Reviewer-lead's P2 on #5519).
 fn owners_typed_name(name: &str) -> bool {
-    crate::person::now().is_some_and(|typed| {
-        lamp_msgs::known::person_id(&typed) == lamp_msgs::known::person_id(name)
-    })
+    let id = |name: &str| {
+        lamp_msgs::known::person_id(&name.split_whitespace().collect::<Vec<_>>().join(" "))
+    };
+    crate::person::now().is_some_and(|typed| id(&typed) == id(name))
 }
 /// Remembering looks for up to four seconds.
 pub const DEADLINE: Duration = Duration::from_secs(6);
@@ -6907,6 +6911,17 @@ mod tests {
             &Said::now("I'm mai tran."),
         );
         refused(&words);
+        // The eyes fold inner whitespace before keeping a name, so two
+        // spaces or a tab between are the owner's name too.
+        for name in ["Mai  Tran", "Mai\tTran"] {
+            let (words, _) = run_with(
+                &socket,
+                &call(name, false),
+                true,
+                &Said::now(&format!("I'm {name}.")),
+            );
+            refused(&words);
+        }
         let agreed = Said {
             this: "Yes.".into(),
             before: vec![(
