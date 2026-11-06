@@ -840,6 +840,49 @@ mod tests {
         );
     }
 
+    /// The first builder's P3 on #5588: a light kept "for" a time needs the
+    /// time after "for" (digits, a number word, "the night" or "tonight");
+    /// "I left a light on for you." is a persona line, no claim.
+    #[test]
+    fn a_light_kept_for_needs_a_time_after_for() {
+        for reply in [
+            "I left a light on for you.",
+            "I've left the light on for your return.",
+            "I'll keep my light on for whoever comes home.",
+            "The light stays on for the cat.",
+            "I'm leaving the lamp on for them, then.",
+        ] {
+            assert_eq!(claim_as(reply, true, true), Some(None), "{reply:?}");
+        }
+        for reply in [
+            "I've left the light on for 10 minutes.",
+            "I'll keep my light on for ten minutes.",
+            "I've kept the light on for the night.",
+            "The light stays on for tonight.",
+            "I'll leave the lamp on for 2 hours.",
+            "I'll keep the light on for half an hour.",
+            "I've kept the light on till ten.",
+        ] {
+            assert_eq!(
+                claim_as(reply, true, true),
+                Some(Some(Claim::LightKept)),
+                "{reply:?}"
+            );
+        }
+        // Streamed: undecided while the word after "for" could be a time.
+        for reply in [
+            "I left a light on for",
+            "I left a light on for t",
+            "I left a light on for the",
+        ] {
+            assert_eq!(claim_as(reply, false, true), None, "{reply:?}");
+        }
+        assert_eq!(
+            claim_as("I left a light on for you", false, true),
+            Some(None)
+        );
+    }
+
     #[test]
     fn the_light_kept_stands_beside_a_light_call_a_set_or_a_kept_rule() {
         for name in [
