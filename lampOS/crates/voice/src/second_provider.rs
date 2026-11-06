@@ -1444,6 +1444,8 @@ struct Shared {
     say_at_once: bool,
     /// [`Engine::checking_action_claims`] (#5215).
     action_claims: bool,
+    /// [`Engine::checking_worded_claims`] (#5215).
+    worded_claims: bool,
     /// [`Engine::asking_again_for_no_words`] (#3704).
     no_words_again: bool,
     /// [`Engine::asking_again_for_answers`] (Queue #4710, item 3).
@@ -3859,6 +3861,7 @@ impl Engine {
                 checking_line: false,
                 say_at_once: false,
                 action_claims: false,
+                worded_claims: false,
                 no_words_again: false,
                 answer_again: false,
                 asked_person: None,
@@ -4908,6 +4911,19 @@ impl Engine {
     pub fn checking_action_claims(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.action_claims = on;
+        }
+        self
+    }
+
+    /// `LAMP_ACTION_CLAIM_WORDED=on` ([`crate::action_claim::claim_as`],
+    /// #5215), beside [`Engine::checking_action_claims`]: a reply that
+    /// claims a timer, light or volume action in other words ("I've set a
+    /// timer for one minute.", "I've kept the light on until ten.", "Okay,
+    /// louder.") is held and judged as one in the acting part's own words.
+    /// Nothing without the claim check. Before any turn only.
+    pub fn checking_worded_claims(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.worded_claims = on;
         }
         self
     }
@@ -12837,7 +12853,11 @@ async fn answer(
                             None => piece,
                             Some(held) => {
                                 held.push_str(&piece);
-                                match crate::action_claim::claim(held, false) {
+                                match crate::action_claim::claim_as(
+                                    held,
+                                    false,
+                                    shared.worded_claims,
+                                ) {
                                     Some(None) => action_held.take().unwrap_or_default(),
                                     Some(Some(kind))
                                         if turn_called.iter().any(|name| kind.made_by(name)) =>
@@ -13258,7 +13278,7 @@ async fn answer(
             // reply, or one in the last round, is said as the plain line that
             // it wasn't done.
             if let Some(held) = action_held.take().filter(|held| !held.is_empty()) {
-                let unmade = crate::action_claim::claim(&held, true)
+                let unmade = crate::action_claim::claim_as(&held, true, shared.worded_claims)
                     .flatten()
                     .filter(|kind| {
                         !turn_called
@@ -13267,6 +13287,14 @@ async fn answer(
                             .chain(calls.iter().map(|call| call.name.as_str()))
                             .any(|name| kind.made_by(name))
                     });
+                // Whether only the worded claims found it: the journal says so.
+                let worded = if shared.worded_claims
+                    && crate::action_claim::claim(&held, true).flatten().is_none()
+                {
+                    ", in other words: LAMP_ACTION_CLAIM_WORDED"
+                } else {
+                    ""
+                };
                 match unmade {
                     None => {
                         for sentence in split.push(&held) {
@@ -13277,7 +13305,7 @@ async fn answer(
                     }
                     Some(kind) if !calls.is_empty() => {
                         eprintln!(
-                            "lamp-voice second: request {request} chat round {round}: its reply claims a {} action with no such call: not said, its {} other call(s) run (LAMP_ACTION_CLAIM_CHECKED)",
+                            "lamp-voice second: request {request} chat round {round}: its reply claims a {} action with no such call: not said, its {} other call(s) run (LAMP_ACTION_CLAIM_CHECKED{worded})",
                             kind.label(),
                             calls.len()
                         );
@@ -13290,7 +13318,7 @@ async fn answer(
                             && !std::mem::replace(&mut action_claim_asked, true) =>
                     {
                         eprintln!(
-                            "lamp-voice second: request {request} chat round {round}: its reply claims a {} action no call made ({} call(s) in the turn): not said, asked again (LAMP_ACTION_CLAIM_CHECKED)",
+                            "lamp-voice second: request {request} chat round {round}: its reply claims a {} action no call made ({} call(s) in the turn): not said, asked again (LAMP_ACTION_CLAIM_CHECKED{worded})",
                             kind.label(),
                             turn_called.len()
                         );
@@ -13303,7 +13331,7 @@ async fn answer(
                             &mut queue,
                             &mut offer_hold,
                             (request, round),
-                            kind.label(),
+                            &format!("{}{worded}", kind.label()),
                             turn_called.len(),
                         )
                         .await;
