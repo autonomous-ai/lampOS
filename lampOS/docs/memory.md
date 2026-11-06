@@ -3414,11 +3414,16 @@ facts stay `remember`.
   words the model can say, so nothing is kept half-typed. A rule without
   a limit stays text only: told to sessions, enforced by nothing. A word in
   a mark this voice does not know is left out, not misread. A time whose
-  hour the rule's own words name after a cue ("from", "after", "past",
-  "between" for `not_from`; "until", "till", "before", "to" for
-  `not_before`) is kept at that hour, in the half of the day the words say
-  ("pm", "at night") or else the model's: on lamp-c0a4 on 5 Nov "ten at
-  night until seven" was kept with `not_from` 21:00 (#4346).
+  hour the rule's own words name after a cue ("from", "after", "between"
+  for `not_from`; "until", "till", "til", "before" for `not_before`) is
+  moved to that hour when it is one off, or twelve off with "am"/"pm" or
+  "at night" said, in the half of the day the words say or else the
+  model's: on lamp-c0a4 on 5 Nov "ten at night until seven" was kept with
+  `not_from` 21:00 (#4346). A time's minutes are never its hour ("ten past
+  eleven" names eleven, "quarter to seven" six; "five to seven" is left as
+  given), and an hour the words name anywhere, after a cue or a window's
+  "to"/"and", is kept as given, so an allowed window ("only greet me from
+  8am to 8pm") is never turned round (`rules::as_said`, #5439).
 - **Kept once, corrected in place (#4346).** A keep is read beside its
   scope's rules first. The same rule again (the same marks, and for a rule
   with no typed mark the same words) is answered kept and nothing is
