@@ -824,6 +824,7 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     }
     if settings.onboarding.is_some() {
         tools.extend(crate::onboarding::tools(
+            &lamp_msgs::ONBOARDING_WALK,
             settings.onboarding_room_sounds,
             settings.onboarding_face_expressions,
         ));
@@ -3045,11 +3046,10 @@ mod tests {
         for word in ["face", "smil", "frown", "express"] {
             assert!(!off.contains(word), "{word}: {off}");
         }
+        // #5499: face_expressions is out of the two-step walk, so even
+        // switched on it is not told.
         let on = told(&["--onboarding-face-expressions"]);
-        assert!(
-            on.contains("face_expressions is done only after a clear yes"),
-            "{on}"
-        );
+        assert!(!on.contains("face_expressions"), "{on}");
     }
 
     #[test]
