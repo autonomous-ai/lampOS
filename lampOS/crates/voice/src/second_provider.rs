@@ -4892,7 +4892,9 @@ impl Engine {
     /// [`crate::keep_at_once::KEPT`] once every call came back kept plainly,
     /// and the turn ends with no second round. A keep failed, refused, held,
     /// doubted or told with a note, other calls, the model's own words, or
-    /// more asked go on as without the switch. Before any turn only.
+    /// more asked go on as without the switch. In an owner's language the
+    /// line is said in it only from its clip rendered ahead ([`FixedClips`]);
+    /// until then such turns ask round 2. Before any turn only.
     pub fn keeping_at_once(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.keep_at_once = on;
@@ -5631,6 +5633,13 @@ impl Engine {
             (shared.wordless_resumes, crate::cut_in_wordless::BRIDGE),
             (shared.wordless_resumes, crate::cut_in_wordless::AGAIN),
             (shared.wordless_resumes, crate::cut_in_wordless::PAUSE),
+            // In English the keep's line is said by the voice as the turn's
+            // piece, as it always was; in the owner's language only from
+            // its clip (C59).
+            (
+                shared.keep_at_once && shared.language.is_some(),
+                crate::keep_at_once::KEPT,
+            ),
         ]
         .into_iter()
         .filter_map(|(on, line)| on.then_some(line))
@@ -13962,19 +13971,40 @@ async fn answer(
             // so itself, and the turn ends with no second round. One held,
             // refused or answered anything else counts short, and the turn
             // goes on as without the switch: its round 2 says what happened.
-            if may_keep_at_once
+            // In the owner's language the line is said only from its clip
+            // rendered ahead ([`FixedClips`]); not rendered yet, round 2 is
+            // asked as without the switch.
+            // An empty clip: English, said by the voice as the turn's piece.
+            let kept_line = match shared.language {
+                None => Some(Vec::new()),
+                Some(_) => shared.fixed_clips.kept(crate::keep_at_once::KEPT),
+            };
+            let plainly = may_keep_at_once
                 && kept_told.len() == calls.len()
                 && kept_told
                     .iter()
-                    .all(|told| crate::keep_at_once::kept_plainly(told, &heard_words))
-            {
+                    .all(|told| crate::keep_at_once::kept_plainly(told, &heard_words));
+            if plainly && let Some(clip) = kept_line {
                 let line = shared.fixed(crate::keep_at_once::KEPT);
                 eprintln!(
-                    "lamp-voice second: request {request} chat round {round}: {} keep(s) kept plainly for a line that only asks to keep; \"{line}\" said at once, and no round 2 is asked (LAMP_KEEP_ANSWERS_AT_ONCE)",
-                    calls.len()
+                    "lamp-voice second: request {request} chat round {round}: {} keep(s) kept plainly for a line that only asks to keep; \"{line}\" said at once{}, and no round 2 is asked (LAMP_KEEP_ANSWERS_AT_ONCE)",
+                    calls.len(),
+                    if clip.is_empty() {
+                        ""
+                    } else {
+                        " from its clip rendered ahead"
+                    }
                 );
-                queue.push(line.to_owned()).await?;
+                if clip.is_empty() {
+                    queue.push(line.to_owned()).await?;
+                } else {
+                    queue.push_clip(line, clip).await?;
+                }
                 return Ok(());
+            } else if plainly {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: the keep's line is not rendered ahead in the owner's language yet; round 2 answers (LAMP_KEEP_ANSWERS_AT_ONCE)"
+                );
             } else if may_keep_at_once {
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round}: a keep was not kept plainly; round 2 says what happened (LAMP_KEEP_ANSWERS_AT_ONCE)"
@@ -14542,6 +14572,37 @@ impl Queue<'_> {
         };
         let packets = start_speech(self.shared, self.speech, spoken, turn);
         self.send(text, packets).await
+    }
+
+    /// A fixed line (`line`) said from its clip rendered ahead, as the
+    /// answer's piece: the same as [`Self::push`], but the voice not asked.
+    async fn push_clip(&mut self, line: &str, clip: Vec<i16>) -> Result<(), Stop> {
+        self.announce().await?;
+        if !self.started {
+            eprintln!(
+                "lamp-voice second: request {} first piece to the voice {} ms after the words were heard, {} words, its clip rendered ahead",
+                self.request,
+                self.heard_at.elapsed().as_millis(),
+                line.split_whitespace().count()
+            );
+        }
+        self.started = true;
+        if let Ok(mut said) = self.shared.lamp_said.lock() {
+            if said.0 != self.request {
+                *said = (self.request, String::new());
+            }
+            said.1.push(' ');
+            said.1.push_str(line);
+        }
+        let (packets, queued) = mpsc::channel(SENTENCE_PACKETS);
+        self.speech.spawn(async move {
+            for part in clip.chunks(PACKET_SAMPLES) {
+                if packets.send(Ok(part.to_vec())).await.is_err() {
+                    break;
+                }
+            }
+        });
+        self.send(line.to_owned(), queued).await
     }
 
     async fn send(&mut self, text: String, packets: Packets) -> Result<(), Stop> {

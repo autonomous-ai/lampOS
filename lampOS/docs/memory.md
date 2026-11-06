@@ -1150,10 +1150,12 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   keep something ("Remember that my dentist is on Tuesday."), whose first
   chat round called `remember` alone with no words, is answered "Okay,
   I'll remember that." as soon as the memory answered a plain keep
-  (`"remembered": true`, no note, nothing held, no error) and the calls'
-  kept texts cover every content word of the line (`keep_at_once::covers`),
-  with no second chat round: on lamp-06c1 on 5 Nov that round was most of a keep turn's
-  extra 2.1 s, the memory 39 ms. A keep that failed, kept nothing, was
+  (`"remembered": true`, no note, no correction, nothing held, no error)
+  and the calls' kept texts cover every content word of the line
+  (`keep_at_once::covers`), in the owner's language from its clip rendered
+  ahead, with no second chat round: on lamp-06c1 on 5 Nov that round was
+  most of a keep turn's extra 2.1 s, the memory 39 ms. A keep that
+  failed, kept nothing, was
   held, doubted or told with a note goes to round 2 as before, which says
   what happened: it is never said kept. The scope and seen-speaker gates
   run before the call, unchanged. Details and the timing replay:
