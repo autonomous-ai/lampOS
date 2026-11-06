@@ -7482,11 +7482,10 @@ impl Heeding {
     /// sister's name again?", [`crate::untied_going_on::asks_of_their_own`]);
     /// or, said right after the lamp's own answer, with no held line
     /// between, it replies to it ("Thanks.", "That's a good idea.",
-    /// [`crate::untied_going_on::replies_to_the_lamp`]) or asks its advice
-    /// ("Any tips to sleep better tonight?",
-    /// [`crate::untied_going_on::asks_for_advice`]) or its view ("What
-    /// would you do?", "How about you?",
-    /// [`crate::untied_going_on::asks_its_view`]). Never in a sure other
+    /// [`crate::untied_going_on::replies_to_the_lamp`]) or asks a question
+    /// not of the addressee's own doings ("How long does it take?", "What
+    /// would you do?", [`crate::untied_going_on::asks_right_after`]). Never
+    /// in a sure other
     /// voice than the conversation's (`Seen::other_voice`), or with desk
     /// talk ([`crate::untied_going_on::desk_talk_read`], with
     /// `no_name_set_off`): a colleague's "Thanks" to the caller is not the
@@ -7555,10 +7554,8 @@ impl Heeding {
         }
         if crate::untied_going_on::replies_to_the_lamp(heard, no_name_set_off) {
             Some("said right after the lamp's answer, it replies to it")
-        } else if crate::untied_going_on::asks_for_advice(heard, no_name_set_off) {
-            Some("said right after the lamp's answer, it asks the lamp's advice")
-        } else if crate::untied_going_on::asks_its_view(heard, no_name_set_off) {
-            Some("said right after the lamp's answer, it asks the lamp's view")
+        } else if crate::untied_going_on::asks_right_after(heard, no_name_set_off) {
+            Some("said right after the lamp's answer, it asks a question")
         } else if self.answer_grace
             && self.began_in_grace == Some(request)
             && !another_face_speaking(&seen.speakers, &self.caller_faces)
