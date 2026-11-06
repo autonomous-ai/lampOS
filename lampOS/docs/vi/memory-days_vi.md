@@ -782,10 +782,22 @@ Lưu trữ: mỗi mục là một hàng `entries` (`kind='observation'`, `catego
 loại của nó), nên tìm kiếm, nguồn, thay thế, quên và xoá an toàn như các
 quan sát; trường riêng nằm trong `nightly_items`, công việc trong
 `nightly_jobs`, hạn mức của đêm trong `nightly_nights`, tạo `IF NOT EXISTS`,
-`user_version` vẫn là 1. Mục không hết hạn vì không dùng hay theo 30 ngày của
-lượt trao đổi; chỉ theo ngày kết thúc của nó (ahead, plan, `valid_until`).
-Mỗi người giữ tối đa 512 mục còn hiệu lực (`full`); mục đã bị thay thế hay đã
-hết hạn là lịch sử và không được tính.
+`user_version` vẫn là 1. Mục không hết hạn theo 30 ngày của lượt trao đổi;
+fact và dòng hồ sơ chỉ hết hạn theo ngày kết thúc của nó (ahead, plan,
+`valid_until`). Episode, feeling và pattern thì phai (`nightly::FADING`, P2
+của Reviewer-lead trên #5097): không được dùng trong 90 ngày (`FADE_DAYS`,
+90 ngày không được nhắc lại của Tiers, memory-tiers.md) thì `maintain` xoá.
+Được dùng là: lúc ghi, khi `search` hay `recall` trả về nó, hoặc với pattern,
+khi đêm đề xuất lại nó (bị bỏ `restates` thì pattern còn hiệu lực mà nó lặp
+lại được xác nhận lại). Độ quan trọng không đổi điều này.
+Mỗi người giữ tối đa 512 mục còn hiệu lực; ở giới hạn (512 mục hay 2.048 quan
+sát), mục mới trước hết xoá mục phai ít dùng nhất (`used_unix_ms` cũ nhất) của
+một đêm trước mà job không đưa ra, và chỉ khi không còn mục nào như thế mới là
+`full`. Không bao giờ phai hay nhường chỗ: mục được một mục còn hiệu lực dẫn
+tới (dòng hồ sơ dựa trên một episode giữ nó lại), và mục dựa trên điều người
+đó đã nhờ giữ, trực tiếp hay qua một mục. Điều đã giữ không bao giờ là mục đêm
+và không bị đụng tới. Tắt `LAMP_MEMORY_NIGHTLY` thì không có mục nào và không
+gì thay đổi. Mục đã bị thay thế hay đã hết hạn là lịch sử và không được tính.
 Một lệnh quên xoá mọi mục dẫn tới thứ bị quên, lan tiếp (dòng hồ sơ dẫn một
 fact bị quên); quên trong lúc lượt đang chạy thì khi áp dụng, các mục dẫn tới
 thứ đã mất bị bỏ `forgotten`, phần còn lại vẫn ghi.
