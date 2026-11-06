@@ -852,7 +852,7 @@ fn a_user_interrupted_reminder_is_retired_for_retry_after_successor_admission() 
     assert_eq!(run.starts.len(), 1, "{boundary:?}: real successor admitted");
     assert_eq!(run.starts[0].0, 2);
     assert_eq!(run.audio[0], (1, 1), "{boundary:?}: first words kept");
-    let ToWorker::Retire { token, proof } = run.settlement else {
+    let ToWorker::Retire { token, proof, .. } = run.settlement else {
         panic!("{boundary:?}: known user interruption must retry after fencing");
     };
     assert_eq!(proof.correlation, token.correlation);
@@ -2278,7 +2278,8 @@ fn four_overdue_reminders_as_the_microphones_open_mid_talk_are_one_line_at_a_pau
         panic!("{given:?}");
     };
     assert_eq!(also, offer.also_texts());
-    let note = crate::provider_worker::reminder_note(&text, &also, late, late_by_ms).unwrap();
+    let note =
+        crate::provider_worker::reminder_note(&text, &also, late, late_by_ms, false).unwrap();
     assert_eq!(note.matches("Reminder data:").count(), 1, "{note}");
     for said in std::iter::once(&offer.text).chain(&also) {
         assert!(note.contains(said.as_str()), "{said}: {note}");

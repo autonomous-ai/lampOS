@@ -24,7 +24,7 @@ pub const STOP_FOR_THE_CUT_US: u64 = 5_000_000;
 /// isn't already marked stopped.
 fn cut_by_a_line(settlement: &ToWorker) -> Option<&PreparedToken> {
     match settlement {
-        ToWorker::Retire { token, proof }
+        ToWorker::Retire { token, proof, .. }
             if matches!(
                 proof.basis,
                 lamp_schedule::delivery::RetirementBasis::OwnerFenced { .. }
@@ -193,6 +193,11 @@ pub(crate) struct Offer {
     /// at most [`MAX_JOINED`], each completed when it is.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub also: Vec<Joined>,
+    /// Offered once more after a line cut an attempt of it, or of one
+    /// joined to it, with some of its audio played: the person may have
+    /// heard part of it, so it is said as a repeat ("Again: …"), once.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub again: bool,
 }
 impl Offer {
     /// Said late enough to be kept as said and to wait for a pause in the
@@ -255,6 +260,21 @@ pub(crate) enum ToWorker {
     Retire {
         token: PreparedToken,
         proof: QualifiedRetirement,
+        /// A real share of it was heard before the line that cut it in
+        /// (the coordinator's `Reply::share_heard_at_cut`: half its answer
+        /// and `CUT_HEARD_MIN_SAMPLES` or more handed to the speaker): the
+        /// consumer offers it once more, said as a repeat
+        /// ([`Offer::again`]), and holds it if such a cut comes again, as for
+        /// an abandon with audio. Sent only when true, so the common packet
+        /// is the same as before.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        heard_some: bool,
+        /// Some of its audio came, but less than that share (an echo's or a
+        /// cough's cut a few frames in, #4938, #5491): offered again as
+        /// before, never counted toward the hold, but at most
+        /// `LIGHT_CUT_RETRIES` times for each item. Sent only when true.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        light_cut: bool,
     },
     /// The reply ended with neither a completion nor a qualified
     /// retirement (#5219).
@@ -309,6 +329,9 @@ struct Progress {
     /// The request whose line cut this reply in (`interrupted_after_owner_fenced`):
     /// only that line's stop may hold the ring (Thirteen's P3 on #5351).
     cut_by: Option<u64>,
+    /// A real share of it was heard before a line cut it in
+    /// ([`Receipt::share_heard_at_cut`]).
+    heard_share: bool,
     settlement: Option<ToWorker>,
 }
 impl Progress {
@@ -330,6 +353,8 @@ impl Progress {
         self.settlement = Some(ToWorker::Retire {
             token: self.token.clone(),
             proof,
+            heard_some: self.had_audio && self.heard_share,
+            light_cut: self.had_audio && !self.heard_share,
         });
     }
 
@@ -425,6 +450,52 @@ impl Receipt {
     /// already be the final words; conservatively do not repeat that attempt.
     /// `cut_by` is the request of the line that cut it in, when the
     /// coordinator knows it: only that line's stop may hold the ring.
+    /// A line cut this reply in after most of its words had played (the
+    /// coordinator's `Reply::mostly_heard_at_cut`): it was heard. It is
+    /// completed on the cut's own cursor, the playback occurrence it was in
+    /// and the frames handed to the speaker, the cut counting as the
+    /// generation that ended it, rather than retired to be said again
+    /// (06c1, 5 Nov 17:04: "Time to drink some water." was cut by a
+    /// wordless cut-in after 4 of its 5 words and said again 10 s later).
+    /// Only a live, qualified receipt with audio and no settlement yet;
+    /// whether it was completed.
+    pub fn heard_before_the_cut(&mut self, playback_sequence: u64, frames: u64) -> bool {
+        let mut state = self.0.borrow_mut();
+        if !state.live
+            || !state.qualified
+            || !state.had_audio
+            || state.settlement.is_some()
+            || playback_sequence == 0
+            || frames == 0
+        {
+            return false;
+        }
+        let proof = QualifiedCompletion {
+            correlation: state.token.correlation.clone(),
+            owner_boot: state.owner.boot().bytes(),
+            turn: state.owner.turn(),
+            microphone_generation: state.privacy,
+            provider_session: state.session,
+            playback_sequence,
+            final_epoch: 0,
+            final_frame: frames,
+            retired_generations: state.retired.saturating_add(1),
+        };
+        state.settlement = Some(ToWorker::Complete {
+            token: state.token.clone(),
+            proof,
+        });
+        true
+    }
+
+    /// A real share of this reply was heard before the line that is cutting
+    /// it in (the coordinator's `Reply::share_heard_at_cut`): its fenced
+    /// retirement then counts toward the hold ([`ToWorker::Retire`]'s
+    /// `heard_some`). Without it, a cut after some audio is a light one.
+    pub fn share_heard_at_cut(&mut self) {
+        self.0.borrow_mut().heard_share = true;
+    }
+
     pub fn interrupted_after_owner_fenced(&mut self, cut_by: Option<u64>) {
         let mut state = self.0.borrow_mut();
         if !state.live || !state.qualified || state.eligible_completion_cursor().is_some() {
@@ -481,6 +552,7 @@ pub(crate) fn receipt_for_test(owner: TurnOwner, privacy: u64, session: u64) -> 
         live: true,
         stopped: false,
         cut_by: None,
+        heard_share: false,
         settlement: None,
     }));
     (Receipt(Rc::clone(&state)), Probe(state))
@@ -639,6 +711,8 @@ impl Reminders {
                                 basis: lamp_schedule::delivery::RetirementBasis::NeverAdmitted {},
                             },
                             token,
+                            heard_some: false,
+                            light_cut: false,
                         });
                         self.sent = false;
                     }
@@ -768,6 +842,7 @@ impl Reminders {
             live: true,
             stopped: false,
             cut_by: None,
+            heard_share: false,
             settlement: None,
         }));
         self.active = Some(Rc::clone(&state));

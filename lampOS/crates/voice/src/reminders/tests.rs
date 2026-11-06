@@ -101,6 +101,7 @@ fn offer() -> Offer {
         observed_at_us: AT,
         expires_at_us: AT + LEASE_US,
         also: Vec::new(),
+        again: false,
     }
 }
 fn owner(boot: u8) -> (TurnOwner, u64) {
@@ -159,7 +160,7 @@ fn withdrawal_before_admission_retires_exact_attempt_and_waits_for_settlement() 
         },
         AT,
     );
-    let Some(ToWorker::Retire { token, proof }) = test.command() else {
+    let Some(ToWorker::Retire { token, proof, .. }) = test.command() else {
         panic!("missing retirement")
     };
     assert_eq!(token, first.token);
@@ -341,7 +342,7 @@ fn interrupted_receipt_retires_before_or_after_audio_without_claiming_completion
         // This is the receipt boundary, not a claim that a speaker was
         // fenced here. The coordinator tests exercise that publication.
         receipt.interrupted_after_owner_fenced(None);
-        let Some(ToWorker::Retire { token, proof }) = probe.settlement() else {
+        let Some(ToWorker::Retire { token, proof, .. }) = probe.settlement() else {
             panic!("known interruption did not retire (audio={audio})");
         };
         assert_eq!(proof.correlation, token.correlation);
@@ -362,7 +363,7 @@ fn interrupted_receipt_retires_before_or_after_audio_without_claiming_completion
         assert!(!receipt.completion_recorded());
         drop(receipt);
         assert!(
-            matches!(probe.settlement(), Some(ToWorker::Retire { token: kept, proof: kept_proof })
+            matches!(probe.settlement(), Some(ToWorker::Retire { token: kept, proof: kept_proof, .. })
             if kept == token && kept_proof == proof)
         );
     }
@@ -494,6 +495,8 @@ fn only_a_ring_cut_by_a_line_waits_for_its_stop() {
                     retired_by_session: token.correlation.consumer_session.clone(),
                     basis: RetirementBasis::NeverAdmitted {},
                 },
+                heard_some: false,
+                light_cut: false,
             },
             false,
         ),
