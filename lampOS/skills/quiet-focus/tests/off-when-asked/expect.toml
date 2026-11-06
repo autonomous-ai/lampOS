@@ -1,8 +1,0 @@
-# 10:00, the wellbeing nudges turned off a minute in, then head down: nothing ([stop]).
-clock = "10:00"
-none = true
-
-[[call_tool]]
-name = "wellbeing_nudges"
-at = "1m"
-args = { how = "off" }

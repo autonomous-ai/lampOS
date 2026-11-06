@@ -484,8 +484,8 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
     ),
     (
         "quiet-focus",
-        "an installable skill, not yet tried on a lamp: one warm word after 45 minutes head down \
-         (the eyes' `room/activity`), which its owner chooses; a played check on a lamp comes first",
+        "an installable skill, not yet tried on a lamp: one warm word when they look up after 45 \
+         minutes head down (the eyes' `room/activity`), which its owner chooses; a played check on a lamp comes first",
     ),
     (
         "who-was-here",

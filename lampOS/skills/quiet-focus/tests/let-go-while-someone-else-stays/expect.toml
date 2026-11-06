@@ -1,3 +1,3 @@
-# 10:00, due at 48 with a second face in view from 46 to 70: nothing (held past its 15-minute wait, then let go).
+# 10:00, due at 48, looks up at 50 with a second face in view from 49 to 70: nothing (its 5-minute wait, and the 10 minutes after the focus, run out).
 clock = "10:00"
 none = true
