@@ -1468,7 +1468,29 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     After a lone no, or with nothing done, a `forget` runs as before.
     Nothing is written either way (lamp-06c1, 5 Nov: a lone yes after
     "Mondays now, not Fridays.", after a done keep and after a done forget
-    was told to ask, and the lamp asked again). The `on` check and the REPLACES journal line use the same words.
+    was told to ask, and the lamp asked again). The done write outlives a
+    new session for the same scope (`replace_session`): each line's note
+    read opens one, and a done write asks the note again (#2540), so on
+    build 10538 (6 Nov, S1 req 271, S6 311, S13 339) every such yes found
+    none and asked again; a session for another scope, or one closing, lets
+    it go. The done write is the yes's "last turn" only when it was done
+    for the request just before the yes (no exchange of the thread's
+    between them: `heard::done_last_turn`, `Thread::answered_between`); a
+    write done two turns back, or for no known request, is none (the
+    Reviewer-lead's P2 on #5607: "My bike is blue." kept, "My goldfish is
+    called Pip." answered with no `remember`, then "Yes. Please keep that."
+    must not be told Pip is kept). And before round 1 of a line that is only a yes, with no offer
+    waiting and nothing asked in the lamp's answer before it, the model is
+    told the same, whatever it then calls (after a done forget, "Yes.
+    Please forget it." counts as that yes: only a yes once its forget
+    words are left out; `heard::done_already`,
+    `DONE_ALREADY_TOLD`): on 10538 the yes after a done forget was answered
+    with a `recall`, never a `forget`, so the call's check never saw it. A
+    done keep or change then backs that turn's "Kept." as a held keep's
+    does; a done forget does not (tests:
+    `a_done_write_outlives_a_new_session_for_the_same_scope`,
+    `a_yes_after_a_done_write_is_told_it_is_done_before_it_answers`,
+    `a_done_write_two_turns_back_is_not_the_yes_last_turn`). The `on` check and the REPLACES journal line use the same words.
     A line that says more than yes ("Yes, my dog is called Moe") is its own,
     as ever. No extra round: one thread lookup in the call.
   - **A yes after a second offer.** On lamp-06c1 on 4 Nov (build 10012),

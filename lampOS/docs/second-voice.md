@@ -3430,7 +3430,25 @@ after a take-over, but now for every turn:
   at its `.` or `!` (never a `?`), or at its first state word. "I'll keep
   the light on until ten.", "I'll keep the music going till six." and
   "I'll keep the timer at ten minutes." and "I'll keep the brightness at
-  40 percent." claim nothing. The softer claims count too (K3: lamp-06c1,
+  40 percent." claim nothing. On a line that is only a yes
+  (`remember::heard::only_a_yes`), a first sentence that says back that
+  it is kept is a hard claim too (`remember::claims_a_keep_said`,
+  lamp-06c1, build 10538, 6 Nov, S14 req 363: "Yes. Please keep that."
+  answered "Your goldfish's name, Pip, is kept." with no call, and the
+  goldfish was never kept): it ends, past only filler (now, for you, too,
+  safe, already) or "in (my) memory", with "kept", "saved" or
+  "remembered" ("Pip is kept in memory.", "Pip is remembered now.") after "is", "are", "now", "been",
+  "stays", "all", "safely", "already", a word ending "'s" ("it's kept",
+  "Pip's kept") or a mark (`,`, `:`, a dash: "Your bike stays red,
+  kept."), decided at its `.` or `!` (never a `?`). Only on such a line,
+  whose reply is short, so only there is the first sentence held to its
+  end; an answer to a question ("Is my goldfish's name kept?" "…, Pip, is
+  kept.") is said as it comes. "Pip is kept as your goldfish's name." and
+  "The light is kept on." claim nothing, nor does a "saved" whose
+  sentence names a reminder, alarm, timer or setting ("Okay, your
+  reminder for seven is saved.", "Got it, your settings are saved.":
+  the Reviewer-lead's P3 on #5607, so a `set_reminder` it set is never
+  said "not kept"); "I've saved that." still is a claim. The softer claims count too (K3: lamp-06c1,
   28 Oct night, "Noted — you work at a library now, not the bakery." and
   "All right, I'll keep it in mind." with no call): "Noted" with what was
   noted after a dash or colon, or "noted that"; "I'll keep it/that in
@@ -3452,7 +3470,9 @@ after a take-over, but now for every turn:
   unrefused, so a reminder set in round 1 may be confirmed in round 2,
   "Got it, I've saved that for five." (reviewer-three's and the
   reviewer-lead's P2 on #3628). Tests: `a reply never says it kept something with no remember
-  call`, `a turn offered no function is never held for a claim` and
+  call`, `a turn offered no function is never held for a claim`,
+  `a keep said back to a yes with no remember is a claim`,
+  `remember::tests::a_keep_said_back_on_a_yes_is_a_hard_claim` and
   `remember::tests::a_reply_that_says_it_kept_something_is_known_by_its_opening`.
   **A face said saved counts the same** (`LAMP_MEMORY_KEEP_ASKED=on`, its
   switch; #5141 row 8). On lamp-0c4e on 3 Nov the model said "hold still

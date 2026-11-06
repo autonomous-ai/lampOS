@@ -9661,6 +9661,91 @@ async fn a_soft_keep_claim_is_a_claim_only_in_a_round_with_no_calls() {
     }
 }
 
+/// lamp-06c1, build 10538, 6 Nov, S14 req 363: "Yes. Please keep that."
+/// was answered "Your goldfish's name, Pip, " then "is kept." with no
+/// `remember` call (`calls=none`), and the goldfish was never kept. On a
+/// line that is only a yes, a reply whose first sentence says back that it
+/// is kept is a keep claim: held, asked again once, then the plain line.
+/// The same reply to a question is said as it comes.
+#[tokio::test]
+async fn a_keep_said_back_to_a_yes_with_no_remember_is_a_claim() {
+    type Chats = Vec<Vec<Result<ChatEvent, net::Error>>>;
+    let claimed = || {
+        vec![
+            text("Your goldfish's name, Pip, "),
+            text("is kept."),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let cases: Vec<(&str, Chats, &str, usize)> = vec![
+        // Claimed twice with no call: the plain line.
+        (
+            "Yes. Please keep that.",
+            vec![claimed(), claimed()],
+            crate::remember::NOT_KEPT_LINE,
+            2,
+        ),
+        // Claimed, then the truth when asked again.
+        (
+            "Yes. Please keep that.",
+            vec![
+                claimed(),
+                vec![text("Sorry, I didn't keep that."), Ok(ChatEvent::Done)],
+            ],
+            "Sorry, I didn't keep that.",
+            2,
+        ),
+        // A question's answer is no claim.
+        (
+            "Lamp, is my goldfish's name kept?",
+            vec![claimed()],
+            "Your goldfish's name, Pip,",
+            1,
+        ),
+    ];
+    for (heard, chats, first_said, rounds) in cases {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(heard.into())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let runner: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) }));
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            runner,
+            Arc::new(Instant::now),
+        )
+        .announcing(false);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: Vec<&String> = labels
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        assert!(
+            said.first()
+                .is_some_and(|said| said.starts_with(&format!("said:{first_said}"))),
+            "{heard}: {first_said}: {labels:?}"
+        );
+        assert_eq!(script.asked.lock().unwrap().len(), rounds, "{labels:?}");
+        let told = script.asked.lock().unwrap().iter().any(|messages| {
+            messages
+                .iter()
+                .any(|message| *message == Message::system(crate::remember::KEEP_CLAIMED_UNKEPT))
+        });
+        assert_eq!(told, rounds == 2, "{heard}: {labels:?}");
+        if rounds == 2 {
+            assert!(
+                !said.iter().any(|said| said.contains("is kept")),
+                "{labels:?}"
+            );
+        }
+    }
+}
+
 /// Finding K2 on #3504 (lamp-06c1, 28 Oct, "Want me to keep that as the
 /// change? Kept — library now, not the bakery."): an offer to keep, beside
 /// the `remember` call that keeps it or after one, is not said; with no
