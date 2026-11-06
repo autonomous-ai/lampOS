@@ -2091,6 +2091,22 @@ fn the_product_is_a_private_room_with_its_owner() {
     );
 }
 
+/// The private room reaches a made skill's read too: `lamp-skills` judges
+/// its gate itself, so without the switch there it would still ask for the
+/// owner's known face alone.
+#[test]
+fn a_made_skills_read_is_in_the_private_room_too() {
+    let skills = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-skills.service")
+        .unwrap()
+        .1;
+    assert!(
+        section(skills, "Service").contains(&"Environment=LAMP_PRIVATE_ROOM=on"),
+        "lamp-skills lacks LAMP_PRIVATE_ROOM"
+    );
+}
+
 /// Only faces of people at the desk count as people at the lamp
 /// (`LAMP_FACES_AT_DESK_ONLY`): on lamp-a0ae on 2 Nov tiny, unsure faces
 /// beside the owner held their name back on 51 of 79 turns as "more than one
