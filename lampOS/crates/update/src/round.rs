@@ -146,8 +146,9 @@ pub struct World<'a> {
     /// `update/status` (#2194): said as each phase begins.
     pub phase: &'a mut dyn FnMut(&'static str),
     /// The build the round goes to (#5473), for `update/status`: said once
-    /// the channel's build is read, checked, newer than the lamp's and not
-    /// one put back on it.
+    /// the channel's build is read, its signature and channel checked, and
+    /// found newer than the lamp's and not one put back on it. Later checks
+    /// in `checking` can still refuse it; the round's end then clears it.
     pub target: &'a mut dyn FnMut(&Build),
 }
 
