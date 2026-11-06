@@ -1,0 +1,57 @@
+# Morning mail: once a morning, with its owner at the desk a while, the lamp
+# reads them who their newest mail is from and its subject. V1's
+# daily-briefing Store skill, ported as a read of a linked service
+# (Fourteen's marks on the Queue, #5385, 6 Nov 13:30, item A4). It comes
+# after 20 minutes at the desk, so it doesn't follow straight on from
+# Morning agenda's read, which comes after 2. Written to lamp-skills' schema (docs/skills.md,
+# "The schema, as lamp-skills reads it"); the read and its gate are
+# docs/services.md's "A made skill's read" (`LAMP_SKILL_READS`, on in the
+# product). Security mail and one-time codes are left out by lamp-services
+# before the answer leaves it, neither said nor counted.
+needs = ["eyes", "voice"]
+# Its owner puts it on from the Skills Store and takes it off; not in the
+# product's install (`install::NOT_PRODUCT_SKILLS`).
+kind = "installable"
+version = "1.0.0"
+# One morning read; the read itself runs at most once a local day too.
+most_a_day = 1
+
+# What it may read and use, and nothing more: the faces, the voice's state,
+# and one read of the owner's linked Gmail, senders and subjects only, said
+# as exact text. No light, no body, no look.
+[permissions]
+speak = true
+topics = ["humans/faces/tracked", "voice/state"]
+services = { gmail = "read" }
+
+# Someone at the desk 20 minutes in the morning.
+[trigger]
+topic = "humans/faces/tracked"
+present = true
+near = 0.14               # at the desk, not across the room (Stretch break's line)
+for = "20m"
+gap = "2m"                # looking away or leaning out of view does not end it
+rearm = "leaves"
+wait = "30m"              # a talk under way: once it ends, while they stay
+during = { from = "07:00", to = "11:00" }
+
+[[while]]                 # the lamp itself has not spoken for 30 s: not on top of its own words
+topic = "voice/state"
+field = "state"
+not_equals = "speaking"
+for = "30s"
+
+[[while]]                 # never in the middle of a conversation
+topic = "voice/state"
+field = "state"
+equals = "resting"
+for = "5s"
+
+[ask]
+policy = "nudge"
+
+# The five newest: who each is from and its subject, never a message's text.
+# The read's own gate holds it until the owner is alone in view and nobody
+# has spoken for a minute, for up to an hour, then lets the day go.
+[[do]]
+read = { service = "gmail", what = "recent", count = 5 }
