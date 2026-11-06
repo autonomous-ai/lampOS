@@ -45,7 +45,7 @@ pub const WAIT: Duration = Duration::from_secs(2);
 pub const UNREACHED: &str = "making a skill can't be reached on the lamp now";
 
 /// The longest words: the voice's own bound for a skill's request.
-pub const MOST_WORDS_BYTES: usize = 180;
+pub const MOST_WORDS_BYTES: usize = 480;
 
 /// How often lamp-cloud asks lamp-voice whether making a skill is ready
 /// ([`watch`]).

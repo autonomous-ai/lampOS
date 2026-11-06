@@ -34,8 +34,9 @@ pub const ENVIRONMENT: &str = "LAMP_MAKE_SKILL";
 /// The function the model calls for a skill to be made.
 pub const MAKE: &str = "make_skill";
 /// The most of the person's request carried in the brief: the brief and it
-/// fit in 1,000 bytes.
-pub const MOST_REQUEST_BYTES: usize = 180;
+/// fit in [`MOST_BRIEF_BYTES`] (480 since the owner found 180 too short in
+/// the app, 6 Nov).
+pub const MOST_REQUEST_BYTES: usize = 480;
 /// At most this many made skills are kept; the oldest not on is let go,
 /// and one on never is.
 pub const KEPT_MOST: usize = 5;
@@ -286,7 +287,7 @@ fn names_a_linked_service(request: &str) -> bool {
 }
 
 /// The brief: the format of a skill a lamp can make, what it may use, and
-/// the person's request, within 1,000 bytes. Nothing of
+/// the person's request, within [`MOST_BRIEF_BYTES`]. Nothing of
 /// the conversation but the request: the model passes it, in the person's
 /// words.
 pub fn brief(request: &str) -> Result<String, &'static str> {
@@ -367,6 +368,15 @@ const REPAIR_ASK: &str = " Answer again with both blocks, fixed. ";
 /// request the brief stays within 2,000 bytes (the first
 /// builder on #3126, 23 Oct 13:07).
 pub const MOST_REPAIR_BYTES: usize = 600;
+/// The longest a [`brief`] is with the longest request, any service's
+/// read step included: no longer half the tasks part's 2,000 bytes, but
+/// small enough that its repair, with the [`REPAIR_MARK`], the check's
+/// [`MOST_REPAIR_BYTES`] and the ask, still fits that bound.
+pub const MOST_BRIEF_BYTES: usize = 1_300;
+const _: () = assert!(
+    MOST_BRIEF_BYTES + REPAIR_MARK.len() + MOST_REPAIR_BYTES + REPAIR_ASK.len()
+        <= crate::agent_tasks::MOST_TASK_BYTES
+);
 
 /// The brief for a repair (#2813 piece 2): when the lamp's check refuses
 /// a made skill, the model is asked once more, with the whole [`brief`]
@@ -2318,15 +2328,15 @@ light = { dim = 1 }
         format!("Here it is.\n\n```skill.toml\n{toml}```\n\n```markdown SKILL.md\n{card}```\n")
     }
 
-    /// The brief and the longest request fit in 1,000 bytes, half the tasks
-    /// part's 2,000, so a repair has room for the check's lines;
+    /// The brief and the longest request fit in [`MOST_BRIEF_BYTES`], so a
+    /// repair with the check's lines still fits the tasks part's 2,000;
     /// it carries the request and nothing else of the conversation, and a
     /// longer request is refused, never cut.
     #[test]
     fn the_brief_fits_the_hand_over_and_carries_only_the_request() {
         let request = "x".repeat(MOST_REQUEST_BYTES);
         let longest = brief(&request).unwrap();
-        assert!(longest.len() <= 1_000, "{}", longest.len());
+        assert!(longest.len() <= MOST_BRIEF_BYTES, "{}", longest.len());
         assert!(is_brief(&longest));
         assert_eq!(request_of(&longest), request);
         let asked = brief("make me a skill  that dims\nthe light at 10 pm").unwrap();
@@ -2378,7 +2388,7 @@ light = { dim = 1 }
     }
 
     /// #5288: with a made skill's reads on, a request to be read a calendar
-    /// or mail is briefed with its one read step, within the brief's 1,000
+    /// or mail is briefed with its one read step, within [`MOST_BRIEF_BYTES`]
     /// bytes; a write, another service or both are still [`NOT_A_SERVICE`],
     /// and with the switch off every one is, as before.
     #[test]
@@ -2487,7 +2497,11 @@ light = { dim = 1 }
             let words = format!("read my {service} ");
             let longest = format!("{words}{}", "x".repeat(MOST_REQUEST_BYTES - words.len()));
             let brief = brief_with(&longest, true).unwrap();
-            assert!(brief.len() <= 1_000, "{service}: {}", brief.len());
+            assert!(
+                brief.len() <= MOST_BRIEF_BYTES,
+                "{service}: {}",
+                brief.len()
+            );
         }
     }
 

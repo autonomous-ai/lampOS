@@ -2080,7 +2080,7 @@ gone ([switches.md](switches.md)). What happens:
    - It says `skill.toml` has no `name` key: the name is SKILL.md's, and
      `name =` in `skill.toml` fails the check as an unknown field. That was
      what failed #2813's rerun on lamp-0c89.
-   - The request is at most 180 bytes, refused if longer, never cut, and
+   - The request is at most 480 bytes, refused if longer, never cut, and
      the model is asked nothing then.
    - Nothing else of the conversation goes with it.
 3. **Written by the lamp's own model.** The brief goes to the second
@@ -2315,7 +2315,8 @@ Tests:
   one, and `with_no_tasks_part_a_skill_is_made_and_put_on_by_voice` (made,
   asked, and put on by a plain spoken yes through a manage helper, on a
   lamp with no tasks part at all).
-- `made_skill::tests`: the brief within 1,000 bytes, exactly two files, the
+- `made_skill::tests`: the brief within 1,300 bytes (so its repair fits the
+  tasks part's 2,000), exactly two files, the
   cap, each wider use refused, the card marked, nothing kept without the
   checker, the ask's window, the spoken and plain yes, no helper, the
   helper's refusal and silence.
@@ -2338,7 +2339,7 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    `LAMP_APP_MAKE_GROUP`, `lampos` unset, for `lamp-cloud`: one JSON line
    in, one out. A group not known starts nothing (`app_make::group_named`).
 2. `{"make": {"words", "request_id"}}`: the words become the same brief
-   (`made_skill::brief`, at most 180 bytes) and are made at once on a
+   (`made_skill::brief`, at most 480 bytes) and are made at once on a
    thread of their own by the lamp's own model, the same example, check
    and one repair (`make_skill_local::make_kept`, `app_make::make_here`).
    Typing them in the app is the person's ask. The answer, before it is

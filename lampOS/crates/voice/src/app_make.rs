@@ -9,7 +9,7 @@
 //! - **The socket** ([`SOCKET_ENVIRONMENT`], [`DEFAULT_SOCKET`] if unset),
 //!   for `lamp-cloud`: one JSON line in, one out, then closed.
 //!   - `{"make": {"words", "request_id"}}`: the words become the voice's
-//!     own brief ([`crate::made_skill::brief`], at most 180 bytes) and are
+//!     own brief ([`crate::made_skill::brief`], at most 480 bytes) and are
 //!     made at once on a thread of their own: typing them in the app is the
 //!     person's ask. The answer is `{"making": true}` once the ask is
 //!     recorded, before it is made, or `{"refused": WHY}` in plain words.
@@ -997,7 +997,8 @@ mod tests {
         let dir = folder("bounded");
         let made = dir.as_path();
         assert!(begin(made, "make me a skill", "", NOW).is_err());
-        assert!(begin(made, &"a".repeat(200), "r0", NOW).is_err());
+        let long = "a".repeat(made_skill::MOST_REQUEST_BYTES + 1);
+        assert!(begin(made, &long, "r0", NOW).is_err());
         begin(made, "make me a skill that dims the light", "r1", NOW).unwrap();
         assert_eq!(
             begin(made, "make me another", "r2", NOW + 1).unwrap_err(),
