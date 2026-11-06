@@ -148,6 +148,10 @@ Environment=LAMP_FIRST_SECONDS_QUIET=on
 Environment=LAMP_SECOND_OPEN_NAME=on
 Environment=LAMP_NAME_NEAR=on
 Environment=LAMP_NAME_SECOND_SIGN=on
+# A line opened by "Ma'am," or "Sir," said to a person is no call of the lamp's on a start hearing alone (#3945,
+# #5233): on lamp-c0a4 on 6 Nov (10441), a person's own "Ma'am, could you pass me the salt, please?", turned away,
+# was heard as the name at the line's start and held; every "Ma'am/Sir" line held, every "Lamp, …" answered.
+Environment=LAMP_NAME_SAID_TO_A_PERSON=on
 # A line that begins with the lamp's name, said to a face turned to the lamp, is answered in a busy room (#2191): on
 # lamp-52e6 on 20 Oct, under two other voices' talk, a named line was held back with it off and none with it on, and
 # talk without the name went the same way. The face it needs is a second sign above, so every name it answers counts.
