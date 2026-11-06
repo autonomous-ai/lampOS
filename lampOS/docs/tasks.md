@@ -2276,6 +2276,17 @@ bound. The contract the app builds on is in #5198.
   app was given an `asking` view (`not_read`), within
   [`sign_in::ANSWER_WINDOW`](../crates/tasks/src/sign_in.rs) of that
   (`too_late`, which ends it), once.
+- **Whether Harness is signed in** (#5524, for the app's Harness row, app
+  #111): with `serve --set-up-later`, once the part has read Harness's own
+  sign-in (the same read as its journal's "Harness signed in: …", at start
+  and every `--set-up-later` look), `app_sign_in_state` carries
+  `signed_in` (`yes`, `offline` or `no`) beside the sign-in's view, as
+  `status` does ("The sign-in on `status`"). It comes from Harness, not
+  from the last sign-in this run saw, so after a restart, with no sign-in
+  open and the view `none`, it still says it. Not read yet, it is absent;
+  the app's other operations are unchanged. Tests:
+  `runtime::tests::the_apps_state_says_harness_signed_in_once_read` and the
+  service's `the_apps_state_says_harness_signed_in_across_a_restart`.
 - **The id only grows** (Backend2 on #5198: the backend tells an ended
   sign-in from one not put yet by it). Each new id is the larger of the
   clock in ms and the newest kept + 1; the newest is kept in the state
