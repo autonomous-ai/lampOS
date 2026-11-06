@@ -58,6 +58,10 @@ Take them from a real run on a lamp with the build above. No names, emails or re
 - Anything about a phone receiving work from the lamp.
 - A dated or timed promise ("in a minute") beyond what the lamp's code reads: the page says "in a minute or two", from the once-a-minute read of the targets file.
 
+## When the developer quick start is true
+
+The pairing steps use the app's developer access setting and its *Add a developer computer* screen. Link the quick start from the app only for an app build that has both. The page carries one line for a lamp whose app has no setting yet (the keeper's `lamp-control code`). `docs/develop.md:259-265` still calls the app screen pending; it is left as it is here because the app's own screens were not read, and the Mobile team can bring it in line once the screen ships.
+
 ## Sources for the developer quick start
 
 | Claim | Source |
