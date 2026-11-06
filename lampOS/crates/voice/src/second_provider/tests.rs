@@ -12199,6 +12199,82 @@ async fn a_spoken_go_on_after_the_pause_starts_the_run_again() {
     );
 }
 
+/// 06c1's lamp check on #5430 (request 13): in a quiet room the first cough
+/// asks "did anyone say something?"; the person asks for the story again,
+/// and a cough over that answer within the minute is cut again ("Oops, cut
+/// off again. Anyway," and the rest), never the question twice; a third
+/// cough pauses. The story asked again is the line the question asked for,
+/// so it keeps the run.
+#[tokio::test]
+async fn a_story_asked_again_after_the_question_keeps_the_run() {
+    use crate::cut_in_wordless::{AGAIN, LINE, PAUSE};
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok(String::new()),
+                Ok("Lamp, tell me a long story about a fox in the snow.".to_owned()),
+                Ok(String::new()),
+                Ok(String::new()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [vec![
+                text("A fox woke in the snow. It sniffed the cold air. It ran to the wood."),
+                Ok(ChatEvent::Done),
+            ]]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (built, _, now) = scripted(script.clone());
+    let mut engine = built
+        .asking_after_wordless_cut_ins(true)
+        .resuming_after_wordless_cut_ins(true)
+        .judging_busy(Arc::new(|_| false));
+    let said_of = |out: &[String]| -> Vec<String> {
+        out.iter()
+            .filter(|label| label.starts_with("said:"))
+            .cloned()
+            .collect()
+    };
+    // A quiet room's first cough: the question.
+    story_sent(&engine, 1, true);
+    let out = wordless_cut_of(&mut engine, 2, 1, 1_500).await;
+    assert_eq!(said_of(&out), [format!("said:{LINE}")], "{out:?}");
+    // The story asked again, 5 s later, and answered.
+    *now.lock().unwrap() += Duration::from_secs(5);
+    engine.submit(start(3));
+    engine.submit(audio(3, 1));
+    engine.submit(end(3));
+    let out = turn(&mut engine).await;
+    assert!(
+        out.contains(&"heard:Lamp, tell me a long story about a fox in the snow.".to_owned()),
+        "{out:?}"
+    );
+    assert_eq!(*engine.shared.said_whole.lock().unwrap(), Some(3));
+    let (pieces, played) = {
+        let said = engine.shared.said.lock().unwrap();
+        assert_eq!(said.0, 3);
+        let all: u64 = said.1.iter().map(|piece| piece.samples).sum();
+        let last = said.1.last().unwrap();
+        (last.words.clone().unwrap(), all - last.samples / 2)
+    };
+    // A cough over it, 50 s after the first: cut again, then the rest.
+    *now.lock().unwrap() += Duration::from_secs(45);
+    let out = wordless_cut_of(&mut engine, 4, 3, played).await;
+    assert_eq!(
+        said_of(&out),
+        [format!("said:{AGAIN}"), format!("said: {}", pieces.trim())],
+        "{out:?}"
+    );
+    // A third, 10 s later, over that line: the pause.
+    *now.lock().unwrap() += Duration::from_secs(10);
+    let out = wordless_cut_of(&mut engine, 5, 4, AGAIN_PLAYED).await;
+    assert_eq!(said_of(&out), [format!("said:{PAUSE}")], "{out:?}");
+    assert_eq!(script.asked.lock().unwrap().len(), 1);
+}
+
 /// Samples of the "cut off again" line played, less than all of it.
 const AGAIN_PLAYED: u64 = 10;
 

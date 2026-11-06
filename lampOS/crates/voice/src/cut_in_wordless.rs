@@ -102,6 +102,9 @@ impl Answer {
 pub struct Cuts {
     last: Option<std::time::Instant>,
     run: u32,
+    /// The last cut was answered [`LINE`]: the person's next spoken line is
+    /// what the line asked for, said again, so it keeps the run.
+    asked: bool,
 }
 
 impl Cuts {
@@ -116,19 +119,28 @@ impl Cuts {
             1
         };
         self.last = Some(now);
-        match self.run {
+        let answer = match self.run {
             1 if busy => Answer::Resume,
             1 => Answer::Ask,
             2 => Answer::ResumeAgain,
             3 => Answer::Pause,
             _ => Answer::Quiet,
-        }
+        };
+        self.asked = answer == Answer::Ask;
+        answer
     }
 
     /// The person spoke, with words, and was answered: the run starts again,
     /// so a cut after "Lamp, go on" that followed [`PAUSE`] picks the answer
-    /// up, never left quiet (the Reviewer-lead's P2 on #5430).
+    /// up, never left quiet (the Reviewer-lead's P2 on #5430). The one line
+    /// right after [`LINE`] is not a new start: it is the person saying
+    /// again what the cough hid, as the line asked, so a cough over its
+    /// answer within the minute is cut again, not asked twice (06c1's lamp
+    /// check on #5430, request 13). Any line after that starts afresh.
     pub fn spoke(&mut self) {
+        if std::mem::take(&mut self.asked) {
+            return;
+        }
         *self = Self::default();
     }
 }
@@ -199,7 +211,11 @@ mod tests {
             "a minute after the last"
         );
         assert_eq!(cuts.next(at(220), false), Answer::Ask);
-        // The person spoke after the pause: the run starts again.
+        // The line said again after the ask keeps the run; the next spoken
+        // line (after the pause, say) starts it afresh.
+        cuts.spoke();
+        assert_eq!(cuts.next(at(225), false), Answer::ResumeAgain);
+        assert_eq!(cuts.next(at(228), false), Answer::Pause);
         cuts.spoke();
         assert_eq!(cuts.next(at(230), true), Answer::Resume);
         let mut busy = Cuts::default();
