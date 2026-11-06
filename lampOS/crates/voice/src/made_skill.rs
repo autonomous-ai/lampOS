@@ -540,6 +540,47 @@ fn service_name(code: &str) -> &str {
     lamp_services::spoken::name(code)
 }
 
+/// The linked services a made skill reads that aren't linked now: for the
+/// app's finished make, `[{"code", "name"}]` (its `needs_link`), and the
+/// voice's [`needs_link_said`]. `linked` gives the codes linked now
+/// (`crate::services::linked_codes`), asked only for a skill that reads
+/// one. Either Gmail code is linked by the other, as `lamp-services`
+/// reads it. Empty when nothing is missing; `None` when it can't be told,
+/// and nothing is said of it.
+pub fn needs_link(uses: &Uses, linked: impl FnOnce() -> Option<Vec<String>>) -> Option<Vec<Value>> {
+    let Some(code) = uses.reads.as_deref() else {
+        return Some(Vec::new());
+    };
+    let linked = linked()?;
+    let alike = |linked: &str| {
+        linked == code
+            || matches!(
+                (code, linked),
+                ("gmail", "gmail-app") | ("gmail-app", "gmail")
+            )
+    };
+    if linked.iter().any(|linked| alike(linked)) {
+        return Some(Vec::new());
+    }
+    Some(vec![json!({"code": code, "name": service_name(code)})])
+}
+
+/// What the lamp adds aloud for each of [`needs_link`]'s services: one
+/// short plain sentence where the person links it. None with none.
+pub fn needs_link_said(needs: &[Value]) -> Option<String> {
+    let said: Vec<String> = needs
+        .iter()
+        .filter_map(|need| need["name"].as_str())
+        .map(|name| {
+            format!(
+                "{name} isn't linked yet: link it in the app, under Skills, then Connectors, and \
+                 the skill will start then."
+            )
+        })
+        .collect();
+    (!said.is_empty()).then(|| said.join(" "))
+}
+
 /// A made skill's `skill.toml` held to what one may use (the coordinator's
 /// cap, 19 Oct): installable, with a version; `[permissions]` with only
 /// `light`, `body` and `topics` among [`TOPICS`]; no function for the
@@ -3692,5 +3733,52 @@ body = { gesture = "nod" }
             assert!(written_capped(&wider).is_err(), "{wider}");
             assert!(put_on_cap(&wider).is_err(), "{wider}");
         }
+    }
+
+    /// What a made skill needs linked: the service it reads, by code and
+    /// name, unless it is linked now (either Gmail by the other); nothing
+    /// for a skill that reads none, never asking; `None` when what is
+    /// linked can't be told.
+    #[test]
+    fn a_made_skill_needs_linked_only_the_service_it_reads_not_linked() {
+        let reads = |code: &str| Uses {
+            speak: true,
+            reads: Some(code.to_owned()),
+            ..Default::default()
+        };
+        let linked = |codes: &[&str]| Some(codes.iter().map(|code| (*code).to_owned()).collect());
+        assert_eq!(
+            needs_link(&reads("gmail"), || linked(&[])),
+            Some(vec![json!({"code": "gmail", "name": "Gmail"})])
+        );
+        assert_eq!(
+            needs_link(&reads("gmail"), || linked(&["notion"])),
+            Some(vec![json!({"code": "gmail", "name": "Gmail"})])
+        );
+        assert_eq!(
+            needs_link(&reads("gmail"), || linked(&["gmail"])),
+            Some(vec![])
+        );
+        assert_eq!(
+            needs_link(&reads("gmail"), || linked(&["gmail-app"])),
+            Some(vec![])
+        );
+        assert_eq!(
+            needs_link(&reads("google_calendar"), || linked(&["gmail"])).unwrap()[0]["name"],
+            "Google Calendar"
+        );
+        assert_eq!(needs_link(&reads("gmail"), || None), None);
+        assert_eq!(
+            needs_link(&Uses::default(), || panic!("never asked")),
+            Some(vec![])
+        );
+        assert_eq!(
+            needs_link_said(&[json!({"code": "gmail", "name": "Gmail"})]).as_deref(),
+            Some(
+                "Gmail isn't linked yet: link it in the app, under Skills, then Connectors, and \
+                 the skill will start then."
+            )
+        );
+        assert_eq!(needs_link_said(&[]), None);
     }
 }

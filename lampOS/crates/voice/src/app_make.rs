@@ -285,6 +285,32 @@ pub fn handed(directory: &Path, request_id: &str, task: &str) {
     }
 }
 
+/// The linked services the ask `request_id`'s skill reads that weren't
+/// linked when it was made (`made_skill::needs_link`, empty with none),
+/// kept against the ask: told to the app as `needs_link` ([`status`]).
+pub fn link_noted(directory: &Path, request_id: &str, needs: &[Value]) {
+    let changed = transact(directory, false, |entries| {
+        let Some(entry) = entries
+            .iter_mut()
+            .find(|entry| entry["request_id"] == request_id)
+        else {
+            return (false, ());
+        };
+        entry["needs_link"] = json!(needs);
+        (true, ())
+    });
+    match changed {
+        Ok(_) if !needs.is_empty() => eprintln!(
+            "lamp-voice: an app's skill: {} service(s) it reads not linked yet",
+            needs.len()
+        ),
+        Ok(_) => {}
+        Err(error) => {
+            eprintln!("lamp-voice: an app's skill: what it needs linked not kept: {error}")
+        }
+    }
+}
+
 /// The made skill `key` (`local:app:<ms>:1`) not kept, and why, in the
 /// maker's plain words ([`made_skill::Refused`]): kept against the app's
 /// ask it came from.
@@ -374,6 +400,11 @@ pub fn status(directory: &Path, request_id: Option<&str>, now_unix_ms: u64) -> V
         for field in ["name", "description", "version", "sha256", "uses"] {
             told[field] = made[field].clone();
         }
+        // The linked services it reads that weren't linked when it was
+        // made, `[{"code", "name"}]`; absent when that couldn't be told.
+        if entry["needs_link"].is_array() {
+            told["needs_link"] = entry["needs_link"].clone();
+        }
     }
     told
 }
@@ -406,6 +437,12 @@ const MOST_ASKED_DESCRIPTION_BYTES: usize = 200;
 /// own example, check and one repair, and kept in `keeping`; then `say` is
 /// given the line the lamp says aloud to ask about it ([`ask_line`]) and
 /// the skill's SHA-256. Not kept: why, for the app. Blocking.
+///
+/// Kept, a skill that reads a linked service is checked against what
+/// `lamp-services` says is linked now ([`crate::services::linked_codes`]),
+/// and what isn't is kept against the ask for the app, its `needs_link`
+/// ([`link_noted`]); a check that can't be made keeps nothing, and the
+/// make stands either way.
 pub fn make_here(
     keeping: &made_skill::Keeping,
     brief: &str,
@@ -413,6 +450,21 @@ pub fn make_here(
     at_unix_ms: u64,
     chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
     say: impl FnOnce(&str, &str),
+) {
+    make_here_with(keeping, brief, request_id, at_unix_ms, chat, say, || {
+        crate::services::linked_codes(Path::new(crate::services::FOLDER))
+    })
+}
+
+/// [`make_here`], what is linked given by `linked`.
+pub fn make_here_with(
+    keeping: &made_skill::Keeping,
+    brief: &str,
+    request_id: &str,
+    at_unix_ms: u64,
+    chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
+    say: impl FnOnce(&str, &str),
+    linked: impl FnOnce() -> Option<Vec<String>>,
 ) {
     handed(
         &keeping.directory,
@@ -428,6 +480,9 @@ pub fn make_here(
         &from,
     ) {
         Ok(made) => {
+            if let Some(needs) = made_skill::needs_link(&made.uses, linked) {
+                link_noted(&keeping.directory, request_id, &needs);
+            }
             eprintln!("lamp-voice: an app's skill: made here and kept; its ask goes to be said");
             say(&ask_line(&made), &made.sha256);
         }
@@ -1258,6 +1313,63 @@ mod tests {
         let told = status(&keeping.directory, Some("r1"), at);
         assert_eq!(told["state"], "not_kept", "{told}");
         assert!(told["why"].is_string(), "{told}");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// A made skill's `needs_link` for the app: a skill that reads no
+    /// service never asks what is linked and is told none missing; one that
+    /// reads Gmail, not linked, is told Gmail; linked, none; and with
+    /// `lamp-services` not telling, no `needs_link` at all, the skill kept
+    /// all the same.
+    #[test]
+    fn the_app_is_told_what_a_made_skill_needs_linked() {
+        use crate::make_skill_local::tests::{chat_at, good, keeping, service};
+        let (root, keeping) = keeping("app-needs-link");
+        let at = now_unix_ms();
+        let brief = begin(
+            &keeping.directory,
+            "make me a skill that dims at 10",
+            "r1",
+            at,
+        )
+        .unwrap();
+        let (url, served) = service(vec![(200, good())]);
+        make_here_with(
+            &keeping,
+            &brief,
+            "r1",
+            at,
+            chat_at(url),
+            |_, _| {},
+            || panic!("a skill that reads nothing never asks what is linked"),
+        );
+        assert_eq!(served.join().unwrap(), 1);
+        let told = status(&keeping.directory, Some("r1"), at);
+        assert_eq!(told["state"], "kept", "{told}");
+        assert_eq!(told["needs_link"], json!([]), "{told}");
+        // The same ask, as a skill that reads Gmail would be noted.
+        let reads = made_skill::Uses {
+            speak: true,
+            reads: Some("gmail".into()),
+            ..Default::default()
+        };
+        let gmail = json!([{"code": "gmail", "name": "Gmail"}]);
+        for (linked, needs) in [
+            (Some(vec![]), Some(gmail.clone())),
+            (Some(vec!["notion".to_owned()]), Some(gmail.clone())),
+            (Some(vec!["gmail".to_owned()]), Some(json!([]))),
+            (None, None),
+        ] {
+            let mut entries = asks(&keeping.directory);
+            entries[0].as_object_mut().unwrap().remove("needs_link");
+            write_asks(&keeping.directory, &entries).unwrap();
+            if let Some(noted) = made_skill::needs_link(&reads, || linked.clone()) {
+                link_noted(&keeping.directory, "r1", &noted);
+            }
+            let told = status(&keeping.directory, Some("r1"), at);
+            assert_eq!(told["state"], "kept", "{told}");
+            assert_eq!(told.get("needs_link").cloned(), needs, "{linked:?}: {told}");
+        }
         let _ = fs::remove_dir_all(&root);
     }
 

@@ -967,6 +967,27 @@ can't say (a whole text, a free-form read, a read the service doesn't
 list) refuses the
 skill. Its uses add "reading your <service>".
 
+**Not linked when it is made** (`made_skill::needs_link`, no switch: it
+only adds a field and a sentence). Once a made skill that reads a service
+is kept, `lamp-voice` asks `lamp-services` `services_connected` on the
+tools socket (`services::linked_codes`, at most 500 ms; a skill that reads
+nothing asks nothing). Either Gmail code counts as linked for the other,
+as a read reaches it, and an expired link is still linked. If the service
+it reads isn't in the list, the skill is still kept and asked about as
+before, and:
+
+- made by voice, the make's answer carries `needs_link`
+  (`[{"code", "name"}]`), and the lamp says one sentence before its ask:
+  "Gmail isn't linked yet: link it in the app, under Skills, then
+  Connectors, and the skill will start then.";
+- made from the app, the ask keeps it, and `skills.made` tells it as
+  `needs_link: [{"code": "gmail", "name": "Gmail"}]` ([cloud.md](cloud.md),
+  "A skill typed in the app"), `[]` when nothing is missing.
+
+When `lamp-services` can't say (no socket, no answer in time, a
+refusal), `needs_link` is left out and nothing is said; the make never
+fails for it.
+
 ## Refresh
 
 An OAuth link is renewed through the backend, as V1's `connector_refresh.go`

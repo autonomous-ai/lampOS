@@ -993,6 +993,27 @@ the text."). Một bước đọc mà câu "có" không nói được (toàn vă
 việc đọc dịch vụ không liệt kê) làm kỹ năng bị từ chối. Phần uses của nó thêm "reading your
 <service>".
 
+**Chưa liên kết lúc tạo** (`made_skill::needs_link`, không có công tắc: nó
+chỉ thêm một trường và một câu). Khi một kỹ năng tự tạo có đọc một dịch vụ
+đã được giữ, `lamp-voice` hỏi `lamp-services` `services_connected` trên
+socket tools (`services::linked_codes`, tối đa 500 ms; kỹ năng không đọc gì
+thì không hỏi gì). Mỗi code Gmail được tính là đã liên kết cho code kia,
+như việc đọc đến được nó, và một liên kết đã hết hạn vẫn là đã liên kết.
+Nếu dịch vụ nó đọc không có trong danh sách, kỹ năng vẫn được giữ và được
+hỏi như trước, và:
+
+- tạo bằng giọng nói, câu trả lời của việc tạo có `needs_link`
+  (`[{"code", "name"}]`), và đèn nói một câu trước lời hỏi: "Gmail isn't
+  linked yet: link it in the app, under Skills, then Connectors, and the
+  skill will start then.";
+- tạo từ ứng dụng, lời yêu cầu giữ nó, và `skills.made` báo nó là
+  `needs_link: [{"code": "gmail", "name": "Gmail"}]`, `[]` khi không thiếu
+  gì.
+
+Khi `lamp-services` không trả lời được (không có socket, không trả lời kịp,
+bị từ chối), `needs_link` bị bỏ ra và không nói gì; việc tạo không bao giờ
+hỏng vì nó.
+
 ## Làm mới
 
 Một liên kết OAuth được gia hạn qua backend, như `connector_refresh.go` của V1
