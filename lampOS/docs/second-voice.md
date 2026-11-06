@@ -3568,7 +3568,9 @@ after a take-over, but now for every turn:
   is. **Nor do they judge a status question**
   (`action_claim::asked_as_a_question`: the heard line ends with a '?', or
   its first word after "hey", "hi", "hello", "ok", "okay" or "lamp" is
-  how, is, are, do, does, did, what, when, will, can, has, have or was;
+  how, is, are, do, does, did, what, when, will, can, has, have, was,
+  what's, how's, where, where's, who, who's, why or which (a contraction
+  kept whole, a curly apostrophe read as a straight one; #5604's P3);
   and it is no request, which opens there with "can you", "could you",
   "will you", "would you", "can I have" or "please", or says "please"
   anywhere, case aside). "Lamp, can you set a timer for one minute?"
