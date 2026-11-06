@@ -10300,10 +10300,16 @@ impl DaysClient {
                     )
                 })
                 .and_then(|answer| crate::rules::rules(&answer));
-            match kept.map(|kept| crate::rules::admit(&kept)) {
-                None => return (gone(), false),
-                Some(Err(told)) => return (told, true),
-                Some(Ok(())) => {}
+            let Some(kept) = kept else {
+                return (gone(), false);
+            };
+            // A rule kept already is not kept twice, even at the scope's
+            // most: it is told kept.
+            if let Some(told) = crate::rules::already(&kept, &line) {
+                return (told, true);
+            }
+            if let Err(told) = crate::rules::admit(&kept) {
+                return (told, true);
             }
             Some(keeping)
         } else {
@@ -10433,10 +10439,24 @@ impl DaysClient {
             .map(|rule| rule.id)
             .collect();
         if ids.is_empty() {
-            return (
-                json!({"forgotten": false, "note": "Nobody asked you to keep the light on: nothing to take back."}),
-                true,
-            );
+            // The rules forget_rule acts on: theirs, or the room's when
+            // nobody is known, as the session's note numbers them.
+            let numbered = match person {
+                None => Some(room),
+                Some(person) => left()
+                    .and_then(|left| {
+                        bounded_exchange(
+                            &self.socket,
+                            &crate::rules::read_request(&crate::rules::scope(Some(person))),
+                            left,
+                        )
+                    })
+                    .and_then(|answer| crate::rules::rules(&answer)),
+            };
+            return match numbered {
+                Some(numbered) => (crate::rules::no_light_rule(&numbered), true),
+                None => (gone(), false),
+            };
         }
         // As for any write: journalling waits until it is acknowledged.
         match self.context.try_lock() {
@@ -21290,9 +21310,11 @@ mod tests {
         });
         let client = DaysClient::new(socket.clone()).unwrap();
         let deadline = Duration::from_secs(1);
+        // Not word for word the one kept (id 9), which would be told kept
+        // already and not written again.
         let keep = call(
             KEEP_RULE,
-            json!({"rule":"Keep the light on.","about":"light","never":true}),
+            json!({"rule":"Keep your light on.","about":"light","never":true}),
         );
         let (told, _) = client.rule_for(&keep, deadline, Some("p-be9688998f085098"));
         assert_eq!(told["kept_rule"], true, "{told}");
@@ -21320,6 +21342,87 @@ mod tests {
         assert_eq!(forgets[0]["person"], "r-everyone");
         drop(client);
         std::fs::remove_file(socket).unwrap();
+    }
+
+    /// lamp-9adf, 6 Nov (Fourteen's P2 on #5385): "keep the light on until
+    /// ten tonight" kept as words (a light rule takes `never` only) is not
+    /// kept twice, and "forget every rule about the light" is never told
+    /// nobody asked while such a rule stands: it gets the numbered rules
+    /// forget_rule acts on, the room's for nobody known, theirs for a
+    /// known person.
+    #[test]
+    fn a_rule_kept_already_is_not_written_again_and_forget_light_lists_rules_in_words() {
+        use crate::rules::{FORGET_RULE, KEEP_RULE};
+        let _one = crate::provider_worker::tests::one_thread();
+        let call = |name: &str, args: Value| ToolCall {
+            id: "c1".into(),
+            name: name.into(),
+            args,
+        };
+        let deadline = Duration::from_secs(1);
+        // A repeat, its case and punctuation aside: one read, no write.
+        let (socket, served) = memory_lines("rule-repeat", 1, |request| {
+            assert_eq!(
+                (request["op"].as_str(), request["person"].as_str()),
+                (Some("kept"), Some("r-everyone"))
+            );
+            json!({"ok":true,"entries":[{"id":4,"at_unix_ms":1,"text":"Keep the light on until ten tonight."}]})
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let keep = call(
+            KEEP_RULE,
+            json!({"rule":"keep the light on until ten tonight"}),
+        );
+        let (told, _) = client.rule_for(&keep, deadline, None);
+        assert_eq!(told["kept_rule"], true, "{told}");
+        assert!(
+            told["note"].as_str().unwrap().contains("already kept"),
+            "{told}"
+        );
+        assert_eq!(served.join().unwrap().len(), 1);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+        // Nobody known: the room's rules, numbered, and nothing removed.
+        let (socket, served) = memory_lines("light-words", 1, |_| {
+            json!({"ok":true,"entries":[
+                {"id":4,"at_unix_ms":1,"text":"Keep the light on until ten tonight."},
+                {"id":5,"at_unix_ms":2,"text":"Keep the light on until ten tonight."}
+            ]})
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let forget = call(FORGET_RULE, json!({"about":"light"}));
+        let (told, _) = client.rule_for(&forget, deadline, None);
+        assert_eq!(told["forgotten"], false, "{told}");
+        let numbers: Vec<u64> = told["rules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|rule| rule["number"].as_u64().unwrap())
+            .collect();
+        assert_eq!(numbers, [4, 5]);
+        assert!(
+            !told["note"].as_str().unwrap().contains("Nobody asked"),
+            "{told}"
+        );
+        let read = served.join().unwrap();
+        assert!(read.iter().all(|line| !line.contains("\"forget\"")));
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+        // A known person: theirs, which forget_rule's numbers name.
+        let (socket, served) = memory_lines("light-words-theirs", 2, |request| {
+            match request["person"].as_str() {
+                Some("r-everyone") => json!({"ok":true,"entries":[]}),
+                _ => {
+                    json!({"ok":true,"entries":[{"id":7,"at_unix_ms":1,"text":"Keep the light on until ten tonight."}]})
+                }
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let (told, _) = client.rule_for(&forget, deadline, Some("p-be9688998f085098"));
+        assert_eq!(told["rules"][0]["number"], 7, "{told}");
+        assert_eq!(served.join().unwrap().len(), 2);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
     }
 
     /// #1747 (the reviewer's P2): at the voice's start, with no session,
