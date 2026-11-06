@@ -91,11 +91,6 @@ pub const ONBOARDING_STEPS: [&str; 9] = [
     "preferences",
 ];
 
-/// The walk's steps, the shipped onboarding skill's `order` (#5499): the
-/// steps the model is told of. The other steps are out of the walk, their
-/// words kept.
-pub const ONBOARDING_WALK: [&str; 2] = ["where_you_sit", "who_you_are"];
-
 pub fn onboarding_topics() -> Vec<(&'static str, Declaration)> {
     vec![(OnboardingPending::TOPIC, OnboardingPending::declaration())]
 }
