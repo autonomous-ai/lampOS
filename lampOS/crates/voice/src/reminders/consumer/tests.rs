@@ -1679,6 +1679,49 @@ fn old_uncertain_item_does_not_starve_the_next_pending_occurrence() {
     );
 }
 
+/// One due item that cannot be offered, oldest or not, never silences the
+/// later ones, and each one passed over says why once (#5498).
+#[test]
+fn an_unofferable_oldest_does_not_silence_later_items_and_each_failure_is_journaled() {
+    let engine = Arc::new(Mutex::new(prepared_engine(Disk::default(), 3)));
+    let shared = engine.clone();
+    let socket = Socket::new(move |request| {
+        Some(match request {
+            Request::Get { id: 1 | 2 } => refusal("stale_revision", "refused for the test"),
+            request => answer(&mut shared.lock().unwrap(), request),
+        })
+    });
+    let mut consumer = consumer(Disk::default());
+    let now = lamp_ipc::monotonic_us();
+    let report = due(&engine.lock().unwrap(), now);
+    assert_eq!(key(&report).id, 1);
+    consumer.tick(&socket.path(), Some(&report), now).unwrap();
+    assert_eq!(take_offer(&mut consumer).token.key.id, 3);
+    // The oldest is asked for once in the tick, not again by the scan.
+    let gets = |id| {
+        socket
+            .requests()
+            .iter()
+            .filter(|r| **r == Request::Get { id })
+            .count()
+    };
+    assert_eq!((gets(1), gets(2)), (1, 1));
+    for id in [1, 2] {
+        let said = format!("reminder id {id} delivery ");
+        assert_eq!(
+            consumer
+                .journal
+                .lines
+                .iter()
+                .filter(|line| line.contains(&said) && line.contains("not offered"))
+                .count(),
+            1,
+            "{:?}",
+            consumer.journal.lines
+        );
+    }
+}
+
 #[test]
 fn full_ledger_refuses_new_admission_without_evicting_any_uncertain_delivery() {
     let mut engine = prepared_engine(Disk::default(), 1);
