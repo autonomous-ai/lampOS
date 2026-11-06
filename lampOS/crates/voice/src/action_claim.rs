@@ -988,6 +988,12 @@ mod tests {
             ("Setting a timer for one minute.", Claim::Schedule),
             ("I'm setting a reminder for 6 pm.", Claim::Schedule),
             ("Starting a timer now.", Claim::Schedule),
+            ("Setting a timer for five minutes.", Claim::Schedule),
+            ("Okay, setting an alarm for 6 pm.", Claim::Schedule),
+            ("Setting a timer for half an hour.", Claim::Schedule),
+            ("Setting a reminder for tonight.", Claim::Schedule),
+            ("Setting a timer.", Claim::Schedule),
+            ("Lowering the volume.", Claim::LightOrVolume),
         ] {
             assert_eq!(claim_as(reply, true, true), Some(Some(kind)), "{reply:?}");
             assert_eq!(claim(reply, true), Some(None), "{reply:?}");
@@ -1001,6 +1007,17 @@ mod tests {
             "Making it to ten is hard.",
             "Turning it up?",
             "Making it warmer would help?",
+            // The first builder's HOLD on #5628: refusals, advice and talk.
+            "Starting a reminder now isn't possible.",
+            "Setting a reminder for tomorrow might help.",
+            "Setting an alarm for six is a good idea.",
+            "Starting a timer for pasta is the easy part.",
+            "Setting a timer for ten minutes works well for tea.",
+            "Setting a timer now would be smart.",
+            "Setting the alarm for six means an early night.",
+            // The arm, not the light (its P3).
+            "Raising the lamp.",
+            "Lowering the lamp.",
         ] {
             assert_eq!(claim_as(reply, true, true), Some(None), "{reply:?}");
         }
