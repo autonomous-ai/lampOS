@@ -159,12 +159,15 @@ pub fn reply(
                     || crate::settings::PLACE_KINDS.contains(&kind.as_str())
                     || crate::settings::VOICE_KINDS.contains(&kind.as_str())
                     || kind == crate::settings::WIFI_KIND
+                    || kind == crate::owner::KINDS[1]
                     || crate::services::connector_kind(&kind).is_some()
                     || crate::upload::id_of(&kind).is_some())
             {
                 let mut starting = identity.starting(now, &kind);
-                // The keys' kinds say the app's id back at once too (#2094).
-                if crate::settings::KEYS_KINDS.contains(&kind.as_str())
+                // The keys' kinds and the owner's pick say the app's id back
+                // at once too (#2094, #5495).
+                if (crate::settings::KEYS_KINDS.contains(&kind.as_str())
+                    || kind == crate::owner::KINDS[1])
                     && let Some(id) = data
                         .get("request_id")
                         .and_then(serde_json::Value::as_str)

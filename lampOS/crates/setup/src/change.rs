@@ -39,7 +39,16 @@
 //!   root's, 0644, checked by [`lamp_msgs::chosen_voice`]'s rules; an empty
 //!   one removes the file. The voice reads them at start, so it restarts as
 //!   for a new language. The reset's plan wipes both. `lamp-cloud` sends
-//!   them only with `LAMP_CHOSEN_VOICE=on`.
+//!   them only with `LAMP_CHOSEN_VOICE=on`;
+//! - the owner picked by face in the app (`/etc/lampOS/person/owner-face`,
+//!   beside the name, #5495, `docs/cloud.md`, "The owner by face"): one JSON
+//!   line, `{"face", "set_at"}`, root's, 0600, staged and renamed into
+//!   place, written here only. `{"owner_face": null}` keeps `"face": null`
+//!   once a face was picked, so the lamp has no owner until the app picks
+//!   again, never the typed name; with no pick ever made it writes nothing.
+//!   The voice reads it at each look, so nothing restarts. `lamp-cloud`
+//!   reads it back through `{"owner_read": true}`, since only root can.
+//!   The journal never says which face or name.
 use crate::serve::{Config, Files, Save, write_private};
 use lamp_update::quiet::{Heard, QUIET, Quiet};
 use serde_json::{Value, json};
@@ -84,6 +93,11 @@ pub enum Change {
     Voice(Option<String>),
     /// The owner's words for the character; `None` clears them.
     Character(Option<String>),
+    /// The owner picked by face (#5495): a face id, or `None` to clear it.
+    OwnerFace(Option<String>),
+    /// The pick and the typed name read back for `lamp-cloud`, which can't
+    /// read root's files: nothing is written.
+    OwnerRead,
 }
 
 /// Where the chosen voice and the character words are kept: beside the
@@ -115,7 +129,8 @@ pub fn fit_name(name: &str) -> Result<String, &'static str> {
 /// `{"person_name": s}`, `{"display_name": s}`, `{"timezone": s}`,
 /// `{"language": s}`, `{"voice": s}`, `{"character": s}` (`""` clears
 /// either), or `{"owner_place": {"name", "lat", "lon", "set_at"}}`
-/// (`null` clears it), or `{"control": bool}`.
+/// (`null` clears it), or `{"control": bool}`, or `{"owner_face": id}`
+/// (`null` clears it), or `{"owner_read": true}`.
 pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
     if line.len() > LINE_MOST {
         return Err("the request is too long".into());
@@ -171,6 +186,16 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
         "control" => Ok(Change::Control(
             given.as_bool().ok_or("control must be true or false")?,
         )),
+        // Checked again here, whatever lamp-cloud sent: never echoed.
+        "owner_face" if given.is_null() => Ok(Change::OwnerFace(None)),
+        "owner_face" => match text {
+            Some(face) if lamp_msgs::owner_face::is_face_id(face) => {
+                Ok(Change::OwnerFace(Some(face.to_owned())))
+            }
+            _ => Err("owner_face must be a saved face's id or null".into()),
+        },
+        "owner_read" if given == &Value::Bool(true) => Ok(Change::OwnerRead),
+        "owner_read" => Err("owner_read must be true".into()),
         _ => Err("the request names no change this lamp makes".into()),
     }
 }
@@ -345,6 +370,23 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 },
             })
         }
+        Change::OwnerFace(face) => owner_face(face.as_deref(), config),
+        Change::OwnerRead => {
+            let pick =
+                lamp_msgs::owner_face::read(&lamp_msgs::owner_face::beside_name(&config.name));
+            Ok(Done {
+                data: json!({
+                    "face": pick.face(),
+                    "picked": pick.made(),
+                    "typed_name": typed_name(&config.name),
+                }),
+                restart_schedule: false,
+                restart_voice: false,
+                restart_control: false,
+                // A read changes nothing: no line.
+                said: String::new(),
+            })
+        }
         Change::OwnerPlace(None) => {
             remove(&lamp_msgs::owner_place::beside_name(&config.name))?;
             Ok(Done {
@@ -354,6 +396,65 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_control: false,
                 said: "the owner's place was cleared".into(),
             })
+        }
+    }
+}
+
+/// The typed name kept at `name`, its first line trimmed; `None` for none.
+fn typed_name(name: &Path) -> Option<String> {
+    let text = fs::read_to_string(name).ok()?;
+    let line = text.lines().next()?.trim();
+    (!line.is_empty()).then(|| line.to_owned())
+}
+
+/// The owner's pick set to `face`, or cleared for `None` (#5495). The same
+/// face again writes nothing. A clear with no pick ever made writes
+/// nothing either, so the typed name stays the owner; after a pick it
+/// keeps `"face": null`. The journal's line says what it was before, never
+/// which face or name.
+fn owner_face(face: Option<&str>, config: &Config) -> io::Result<Done> {
+    use lamp_msgs::owner_face::{Pick, beside_name, read, text};
+    let path = beside_name(&config.name);
+    let before = read(&path);
+    let was = match &before {
+        Pick::Face(_) => "another face",
+        Pick::Never if typed_name(&config.name).is_some() => "typed name",
+        Pick::Never | Pick::Nobody => "none",
+    };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs());
+    let done = |data: Value, said: String| Done {
+        data,
+        restart_schedule: false,
+        restart_voice: false,
+        restart_control: false,
+        said,
+    };
+    match face {
+        Some(face) if before.face() == Some(face) => Ok(done(
+            json!({"face": face, "changed": false}),
+            "the owner is that saved face already".into(),
+        )),
+        Some(face) => {
+            write_private(&path, text(Some(face), now).as_bytes())?;
+            Ok(done(
+                json!({"face": face, "changed": true}),
+                format!("the owner was set to a saved face from the app (before: {was})"),
+            ))
+        }
+        None if !before.made() => Ok(done(
+            json!({"face": null, "changed": false}),
+            "no face was picked as the owner, so nothing was cleared".into(),
+        )),
+        // Written again even when it already said nobody: a file that
+        // couldn't be read is put right.
+        None => {
+            write_private(&path, text(None, now).as_bytes())?;
+            Ok(done(
+                json!({"face": null, "changed": before.face().is_some()}),
+                format!("the owner pick was cleared (before: {was})"),
+            ))
         }
     }
 }

@@ -100,6 +100,90 @@ fn the_chosen_voice_and_character_are_kept_beside_the_language() {
     assert!(!voice.exists());
 }
 
+/// #5495: the owner picked by face is kept beside the person's name, one
+/// line, root's 0600; the same face again changes nothing; a clear with no
+/// pick ever made writes nothing (the typed name stays the owner), and
+/// after a pick keeps `"face": null` (no owner). Anything not a face id is
+/// refused without echoing it, and no journal line holds the id or a name.
+/// `owner_read` gives lamp-cloud the pick and the typed name.
+#[test]
+fn the_owners_face_is_kept_beside_the_name_and_a_clear_after_a_pick_keeps_nobody() {
+    use lamp_msgs::owner_face::{Pick, beside_name, read};
+    let root = Root::new();
+    let config = root.config();
+    let file = beside_name(&config.name);
+    assert_eq!(file, root.0.join("etc/person/owner-face"));
+    let (reply, _) = answer(r#"{"owner_read": true}"#, &config, true);
+    assert_eq!(
+        reply,
+        json!({"done": {"face": null, "picked": false, "typed_name": null}})
+    );
+    // No pick ever made: a clear writes nothing.
+    let (reply, done) = answer(r#"{"owner_face": null}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"face": null, "changed": false}}));
+    assert!(!done.unwrap().said.is_empty());
+    assert!(!file.exists());
+    let (_, done) = answer(r#"{"person_name": "Lan"}"#, &config, true);
+    assert!(done.is_some());
+    let face = "f-3c9a51d07be24e18";
+    let (reply, done) = answer(&json!({"owner_face": face}).to_string(), &config, true);
+    assert_eq!(reply, json!({"done": {"face": face, "changed": true}}));
+    let said = done.unwrap().said;
+    assert_eq!(
+        said,
+        "the owner was set to a saved face from the app (before: typed name)"
+    );
+    assert_eq!(read(&file), Pick::Face(face.into()));
+    assert_eq!(mode(&file), 0o600);
+    let written = fs::read_to_string(&file).unwrap();
+    assert_eq!(written.lines().count(), 1);
+    assert!(!written.contains("Lan"));
+    let (reply, _) = answer(r#"{"owner_read": true}"#, &config, true);
+    assert_eq!(
+        reply,
+        json!({"done": {"face": face, "picked": true, "typed_name": "Lan"}})
+    );
+    // The same face again: nothing written.
+    let (reply, _) = answer(&json!({"owner_face": face}).to_string(), &config, true);
+    assert_eq!(reply["done"]["changed"], false);
+    assert_eq!(fs::read_to_string(&file).unwrap(), written);
+    // Another face.
+    let other = "f-91e0c2aa4f7d3b65";
+    let (_, done) = answer(&json!({"owner_face": other}).to_string(), &config, true);
+    assert!(done.unwrap().said.ends_with("(before: another face)"));
+    // Cleared after a pick: nobody, never the typed name.
+    let (reply, done) = answer(r#"{"owner_face": null}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"face": null, "changed": true}}));
+    assert!(!done.unwrap().said.contains(other));
+    assert_eq!(read(&file), Pick::Nobody);
+    assert!(read(&file).made());
+    let (reply, _) = answer(r#"{"owner_read": true}"#, &config, true);
+    assert_eq!(
+        reply,
+        json!({"done": {"face": null, "picked": true, "typed_name": "Lan"}})
+    );
+    let (_, done) = answer(&json!({"owner_face": face}).to_string(), &config, true);
+    assert!(done.unwrap().said.ends_with("(before: none)"));
+    for wrong in [
+        json!({"owner_face": "Lan"}),
+        json!({"owner_face": "F-3C9A51D07BE24E18"}),
+        json!({"owner_face": "p-3c9a51d07be24e18"}),
+        json!({"owner_face": 7}),
+        json!({"owner_face": face, "x": 1}),
+        json!({"owner_read": false}),
+    ] {
+        let (reply, done) = answer(&wrong.to_string(), &config, true);
+        assert!(done.is_none(), "{wrong}");
+        assert!(!reply.to_string().contains("Lan"), "{reply}");
+        assert!(!reply.to_string().contains("3c9a"), "{reply}");
+    }
+    assert_eq!(read(&file), Pick::Face(face.into()));
+    // Off, nothing is taken.
+    let (reply, _) = answer(&json!({"owner_face": other}).to_string(), &config, false);
+    assert_eq!(reply, json!({"refused": change::OFF}));
+    assert_eq!(read(&file), Pick::Face(face.into()));
+}
+
 /// #4333: the owner's place, rounded again here whatever was sent, is kept
 /// beside the person's name, root's 0600, and `null` clears it; a clear
 /// with none kept is no error. The journal says only that it changed, and
@@ -678,6 +762,8 @@ fn the_products_reset_wipes_the_lamps_name_and_the_unit_runs_the_helper() {
     assert!(wiped("/etc/lampOS/person/name"));
     // The owner's place, beside the name (#4333).
     assert!(wiped("/etc/lampOS/person/place"));
+    // The owner picked by face, beside the name (#5495).
+    assert!(wiped(lamp_msgs::owner_face::FILE));
     // The chosen voice and character words, beside the language (#5394).
     assert!(wiped(lamp_msgs::chosen_voice::VOICE_FILE));
     assert!(wiped(lamp_msgs::chosen_voice::CHARACTER_FILE));

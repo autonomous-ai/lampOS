@@ -51,6 +51,9 @@ Environment=LAMP_NUDGES_PRESENT=on
 # The owner's approximate place from the app (#4333): owner.place and owner.place.clear, rounded to about a
 # kilometre and kept in the person's folder through `lamp-setup change`. The lead's yes on 3 Nov.
 Environment=LAMP_OWNER_PLACE=on
+# Not set, so off: LAMP_OWNER_FACE (#5495, cloud.md "The owner by face"), the owner picked as one saved face in the
+# app (owner.get, owner.set). On, it also needs LAMP_FACES_PAGE=on and the eyes' socket here, which this unit
+# doesn't set yet; it waits for its lamp check, with the same switch in lamp-eyes.service and lamp-voice.service.
 # A skill typed in the app (#2813, fourteen-P15): `can` names skills.make only while lamp-voice's maker
 # has a computer to hand it to (make_skill::watch, asked every 60 s).
 Environment=LAMP_APP_MAKE_SKILL=on

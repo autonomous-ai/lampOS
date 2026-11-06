@@ -34,6 +34,8 @@ Environment=LAMP_EYES_SPEAKING=on
 # row 3); the voice's unit sets it too. Anyone remembered before is given exactly `person_id` of their name, so no
 # memory moves. The memory owner's yes on 4 Nov (#4710).
 Environment=LAMP_MEMORY_STABLE_ID=on
+# Not set, so off: LAMP_OWNER_FACE (#5495, cloud.md "The owner by face") mints each saved face a random id the app
+# picks the owner by. It waits for its lamp check, with the same switch in lamp-cloud.service and lamp-voice.service.
 # Whether anyone is at the lamp, on room/presence (presence.md): a face seen, or a voice said to the
 # lamp (addressed, so chatter at the next desk never counts), within 20 s. Read by skills made on the
 # lamp ("when I come back to my desk"); Light out stays off until its own check (the first builder, 2 Nov).

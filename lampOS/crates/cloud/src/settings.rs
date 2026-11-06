@@ -284,6 +284,11 @@ pub fn place_line(kind: &str, data: &Value) -> Result<String, String> {
     }
 }
 
+/// Whether `id` is a `request_id` said back: 1 to 64 printable characters.
+pub fn fit_request_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= REQUEST_ID_MOST && id.bytes().all(|b| b.is_ascii_graphic())
+}
+
 /// The app's `request_id`, if it gave one: 1 to 64 printable characters.
 fn request_id(data: &Value) -> Result<Option<String>, String> {
     match data.get("request_id") {
@@ -816,6 +821,9 @@ pub struct Changes {
     place: bool,
     /// [`VOICE_KINDS`] are taken, with `LAMP_CHOSEN_VOICE=on` (#5394).
     voice: bool,
+    /// The owner by face (`crate::owner`) is taken, with
+    /// `LAMP_OWNER_FACE=on` (#5495).
+    owner: bool,
     done: Arc<Mutex<Vec<Outcome>>>,
     /// How long a failure with no join waits for the broker's ack before
     /// the link is made again: [`WIFI_RESULT_ACK_WAIT`], shorter only in
@@ -855,6 +863,7 @@ impl Changes {
             keys_busy: Arc::default(),
             place: false,
             voice: false,
+            owner: false,
             done: Arc::default(),
             result_ack_wait: WIFI_RESULT_ACK_WAIT,
         })
@@ -912,6 +921,20 @@ impl Changes {
     /// Whether [`VOICE_KINDS`] are taken.
     pub fn voice_on(&self) -> bool {
         self.voice
+    }
+
+    /// The same, taking the owner by face too when `on` (#5495,
+    /// `crate::owner`), as [`Changes::taking_the_place`].
+    pub fn taking_the_owner(mut self: Arc<Self>, on: bool) -> Arc<Self> {
+        if let Some(changes) = Arc::get_mut(&mut self) {
+            changes.owner = on;
+        }
+        self
+    }
+
+    /// Whether the owner by face is taken.
+    pub fn owner_on(&self) -> bool {
+        self.owner
     }
 
     /// Whether [`KEYS_KINDS`] are taken.
@@ -1119,6 +1142,29 @@ impl Changes {
             done.extend(again);
             done.extend(later);
         }
+    }
+
+    /// `work` on a thread of its own; its result is kept for
+    /// [`Self::take`] with the app's `request_id`, as a change's is.
+    pub fn start_with(
+        &self,
+        kind: &str,
+        request_id: Option<String>,
+        work: impl FnOnce() -> Result<Option<Value>, String> + Send + 'static,
+    ) {
+        let done = self.done.clone();
+        let kind = kind.to_owned();
+        std::thread::spawn(move || {
+            let result = work();
+            if let Ok(mut done) = done.lock() {
+                done.push(Outcome {
+                    kind,
+                    result,
+                    request_id,
+                    code: None,
+                });
+            }
+        });
     }
 
     /// Asks the helper for `line` on a thread of its own; its result is

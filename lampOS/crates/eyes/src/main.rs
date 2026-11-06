@@ -1474,6 +1474,17 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             .map(|unconfirmed| unconfirmed.names())
                             .unwrap_or_default(),
                     }),
+                    // The same, with each kept person's face id and when it
+                    // was first saved (#5495): lamp-cloud's owner pick and the
+                    // voice's owner by face. Never a print.
+                    Some(Ask::ListIds) => serde_json::json!({
+                        "people": who.people.faces(),
+                        "waiting": who
+                            .unconfirmed
+                            .as_ref()
+                            .map(|unconfirmed| unconfirmed.names())
+                            .unwrap_or_default(),
+                    }),
                     Some(Ask::Forget(name)) => {
                         if who.remember_speaker {
                             who.speaker_anchors.clear();
@@ -1502,6 +1513,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         // remove forgets their memory, kept under it since a
                         // rename (#2176): only with LAMP_MEMORY_STABLE_ID=on.
                         let id = who.people.id_of(&name);
+                        // Their face id, said with the answer so lamp-cloud
+                        // clears the owner's pick when it was theirs (#5495).
+                        let face = who.people.face_of(&name);
                         let forgot = who.people.forget(&name).map_err(|error| error.to_string());
                         // Whether memory's by-name id for the name is nobody
                         // else's now: a person renamed from it keeps it, and
@@ -1524,6 +1538,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 if let Some(id) = id {
                                     answer["id"] = id.into();
                                 }
+                                if let Some(face) = face {
+                                    answer["face"] = face.into();
+                                }
                                 answer
                             }
                             Ok(lamp_eyes::who::Forgot { forgot, .. }) => {
@@ -1532,6 +1549,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 let mut answer = serde_json::json!({"forgot": forgot, "name_id_free": name_id_free});
                                 if let Some(id) = id {
                                     answer["id"] = id.into();
+                                }
+                                if let Some(face) = face {
+                                    answer["face"] = face.into();
                                 }
                                 answer
                             }

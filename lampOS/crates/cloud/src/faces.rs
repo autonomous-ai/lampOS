@@ -209,6 +209,20 @@ pub fn remove(
     data: &Value,
     schedule: Option<&lamp_actions::schedule::Adapter>,
 ) -> Result<Value, String> {
+    remove_with(eyes, data, schedule, None)
+}
+
+/// [`remove`], with root's helper's socket when the owner by face is on
+/// (#5495, `crate::owner`): when the face removed was the picked owner's,
+/// the pick is cleared and the answer says `"owner_cleared": true`, so the
+/// app asks for a new pick. The lamp then has no owner, never the typed
+/// name.
+pub fn remove_with(
+    eyes: &Eyes,
+    data: &Value,
+    schedule: Option<&lamp_actions::schedule::Adapter>,
+    owner: Option<&std::path::Path>,
+) -> Result<Value, String> {
     // A lamp that takes `entirely` says so in a nameless remove's refusal:
     // that refusal is the app's probe for its two choices (Mobile on
     // #2563). A lamp without the field refuses it plainly.
@@ -220,9 +234,11 @@ pub fn remove(
         }
     })?;
     let entirely = entirely(data)?;
+    let face_gone: Option<String>;
     let (mut told, id, name_id_free) =
         match crate::photos::exchange(&eyes.socket, &json!({"forget": name}), DEADLINE) {
             Some(answer) => {
+                face_gone = answer["face"].as_str().map(str::to_owned);
                 let id = answer["id"].as_str().map(str::to_owned);
                 // Eyes that say no word (an older build) said no id either:
                 // the name is then theirs alone.
@@ -274,6 +290,17 @@ pub fn remove(
     }
     if let Some(reminders) = reminders {
         told["reminders"] = reminders;
+    }
+    if let (Some(socket), Some(face)) = (owner, face_gone) {
+        let picked = crate::owner::read(socket)
+            .map(|kept| kept.face.as_deref() == Some(face.as_str()))
+            // Unread, the pick may be this face's: the voice already finds
+            // no owner by it, and the next `owner.get` clears it.
+            .unwrap_or(false);
+        if picked {
+            crate::owner::clear(socket, "the face was removed");
+            told["owner_cleared"] = json!(true);
+        }
     }
     Ok(told)
 }

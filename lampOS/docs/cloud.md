@@ -141,8 +141,9 @@ lamp says so.
 | `skills.upload.<upload_id>` (`upload_id` the first 16 lowercase hex of the file's SHA-256; no file inline) | with `LAMP_SKILL_UPLOAD=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit ("A skill added from a file" below); `can` names it `skills.upload`: answered `starting` at once, which keeps the file on the backend; the file is taken from the backend's `get-message` for that kind, checked and handed to `lamp-voice`, and a second reply of the same kind follows once it settles: `success` with `{"state": "on", "upload_id", "added": "file", "uploaded": true, "name", "description", "version", "sha256", "may_use"}` once a spoken yes put it on, or `failure` with why (a check, or left off at the lamp). Either deletes the file on the backend; with no reply it is gone after a day. Nothing from the app puts it on |
 | `skills.write` | with `LAMP_SKILL_WRITTEN=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit ("A skill written in the app" below; off), named in `can` on the switch alone, with `skills.made`: `{"name", "when", "instructions", "request_id"}`, a skill the person wrote in their own words, held to the voice's bounds and sent to `lamp-voice`'s app-make socket as `{"written": {...}}`, which keeps it as written, with no model; `{"making": true, "request_id"}`, or why not in plain words. `skills.made` tells what became of it, with `"written": true`. Nothing from the app puts it on: only a spoken yes at the lamp. Without the switches, V1's "not on this lamp" |
 | `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
-| `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
-| `face.remove` (`{"name", "entirely"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules (`entirely` true or left out), or the face only (`"entirely": false`, `"memory": "not asked"`). `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; for a face already gone (a remove `entirely` after a face-only one, or a retry after `kept`), `"face": "already gone"` with `"memory": "by name only"` (memory was asked by the name's id only), or `kept`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
+| `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. With `LAMP_OWNER_FACE=on` too (#5495, "The owner by face" below), each also has `face_id` (`f-` and 16 hex digits, or `null`), `saved_at` (ISO 8601 UTC, or `null`) and `owner` (true for at most one). Without the switch, V1's "not on this lamp" |
+| `face.remove` (`{"name", "entirely"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules (`entirely` true or left out), or the face only (`"entirely": false`, `"memory": "not asked"`). `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; for a face already gone (a remove `entirely` after a face-only one, or a retry after `kept`), `"face": "already gone"` with `"memory": "by name only"` (memory was asked by the name's id only), or `kept`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. With `LAMP_OWNER_FACE=on`, `"owner_cleared": true` when the face removed was the picked owner's (#5495). Without the switch, V1's "not on this lamp" |
+| `owner.get` (`{}`), `owner.set` (`{"face_id": "f-…" \| null, "request_id"?}`) | with `LAMP_OWNER_FACE=on`, `LAMP_FACES_PAGE=on` and `LAMP_SETTINGS_CHANGE=on` (#5495, "The owner by face" below): `owner.get` answered at once, `{"how": "face" \| "typed_name" \| "none", "owner_face_id", "owner_face_name", "typed_name", "suggested_face_id", "can_pick"}`; `owner.set` `starting` at once (with `data.request_id`), then `success` with `{"how", "owner_face_id", "owner_face_name", "request_id"?}` or `failure` with `face_id must be a saved face's id or null`, `the lamp doesn't know that face`, or root's helper's reason. Listed in `can` only with the switches; without them, V1's "not on this lamp" |
 | `schedule.list` (`{"after_id"?: n}`), `schedule.cancel` (`{"id": n}`) | with `LAMP_APP_SCHEDULE=on` (#2195, "The lamp's timers and reminders" below): the list is a page of at most eight, `{"items": [{"id", "kind": "timer"\|"reminder", "text", "state", "local", "due_unix_ms", "repeat", "snoozed", "late"}], "next_after_id", "complete"}`, each as lamp-schedule keeps it; a cancel is `{"cancelled": true, "id": n}`, the timer or the whole reminder series. A refusal is the reminder client's fixed sentence: no longer active, changed meanwhile (list again), or not confirmed (it may have happened). A bad `after_id` or an `id` that isn't a whole number above 0 is refused before lamp-schedule is asked. Without the switch, V1's "not on this lamp" |
 | `update.status` | with `LAMP_APP_UPDATE=on` (#2194, "The lamp's software update" below): `{"running": {"sequence", "commit"} \| null, "now": "idle"\|"checking"\|"fetching"\|"switching"\|"watching"\|"restoring"\|"unknown", "last": {"outcome", "sequence", "at_unix_ms", "reason"?, "started_at_unix_ms"?} \| null, "stale"}`, from lamp-update's kept `update/status`; `unknown` and nulls before lamp-update has said anything; with lamp-update's `LAMP_HARNESS_AT_ONBOARDING=on`, also `"harness"` ("Harness's install" below). Without the switch, V1's "not on this lamp" |
 | `update.check` (`{}`) | with `LAMP_APP_UPDATE=on` (#4153, "Check for update" below): asks `lamp-update serve` for its next round now. `update.status`'s object with `"check": "started"`, or `failure` with `a round is running` (`now` is not `idle` or `unknown`), `asked less than a minute ago`, or `lamp-update is not listening for a check`. Without the switch, V1's "not on this lamp" |
@@ -481,6 +482,98 @@ said. `tests/it/app_contract.rs` pins what the page reads of both (`memory`,
 and `reason` with `kept`), in V1's envelope, and both refused without the
 switch. `online.rs`: only the lamp's own account channel commands it
 (`commanded`).
+
+## The owner by face (#5495, `owner.get`, `owner.set`)
+
+Off unless `LAMP_OWNER_FACE=on` (exactly `on`), with the faces page
+(`LAMP_FACES_PAGE=on`, the eyes' request socket) and changes after setup
+(`LAMP_SETTINGS_CHANGE=on`, root's helper). Off, `face.list` and
+`face.remove` answer as before, `owner.get` and `owner.set` are not in
+`can`, and the owner is the typed name, as before. The product's units
+don't set it yet.
+
+Before it, the owner was the typed name (`person.name.set`, kept in
+`/etc/lampOS/person/name`), matched by text against the name a face is
+saved under, so a name was enough to count as the owner. Now the app can
+pick the owner as one face saved on the lamp, kept by that face's id and
+not by its name.
+
+- **The face id.** The eyes mint it at random when a face is first saved
+  (`f-` and 16 lower-case hex digits, `lamp_msgs::owner_face`) and never
+  give it again: a face removed and saved later under the same name gets
+  another. A rename by voice keeps it; a merge keeps only the id of the face
+  it was recognised as (eyes.md, "Who it knows"). It is not the memory id
+  (`p-…`), which comes back with a name. A face from a photo still waiting
+  for its yes has none and can't be picked.
+- **`face.list`** asks the eyes `{"list":true,"waiting":true,"ids":true}`
+  (names, ids and when each was first saved, never a print) and root's
+  helper for the pick, and adds `face_id`, `saved_at` and `owner` to each
+  face. Eyes of an older build answer no ids: the list is as before, with
+  no `face_id`, and the app hides "pick owner". A pick the helper can't
+  read leaves no badge.
+- **`owner.get`** is answered at once. `how` is `face` while a picked face
+  is kept; `typed_name` while no face was ever picked and a name is typed
+  (today's behaviour, unchanged); `none` otherwise. `typed_name` is shown
+  so the person recognises it, and decides nothing once a face was picked.
+  `suggested_face_id` is set only with `typed_name`, and only when exactly
+  one saved face is under the typed name (in any case, trimmed): the app
+  may preselect it, and the lamp never applies it. lamp-cloud can't see the
+  voice's setup "who you are" face, so it is not suggested on that alone.
+  `can_pick` is false while no face kept has an id.
+- **`owner.set`** is answered `starting`, then its result. It checks, in
+  order, changing nothing on any failure: the command came on the lamp's
+  own `fa_channel` (`online::commanded`; anything else gets no answer);
+  `face_id` is a face id or `null` (`face_id must be a saved face's id or
+  null`); the eyes keep a face with that id now (`the lamp doesn't know
+  that face`); root's helper wrote the pick (its own reason). The same face
+  again succeeds and changes nothing. Its success carries `how`,
+  `owner_face_id` and `owner_face_name`, read back after the write, so the
+  page settles on it.
+- **The pick's file** is `/etc/lampOS/person/owner-face`, beside the name:
+  one JSON line, `{"face": "f-…", "set_at": UNIX_S}`, root's, 0600, staged
+  and renamed into place by root's helper (`{"owner_face": ID}`; setup.md,
+  "Changed after setup") and by nothing else. lamp-cloud reads it back
+  through the helper (`{"owner_read": true}`), since only root can.
+- **Fail-closed.** Once a face was picked, only that face is the owner:
+  the typed name and setup's "who you are" no longer count. A pick whose
+  face the eyes no longer keep (removed, merged away, forgotten by voice,
+  or dropped by an older eyes build) is no owner, never the typed name.
+  `face_id: null` after a pick keeps `{"face": null, …}`, so the lamp has
+  no owner until the app picks again; with no pick ever made it writes
+  nothing, and the typed name stays the owner. Only a reset removes the
+  file (the reset plans wipe it with the name).
+- **Removed.** `face.remove` of the picked face clears the pick through
+  the helper and answers `"owner_cleared": true`, so the app asks for a new
+  pick. A face forgotten by voice or merged away leaves the pick naming an
+  id no face has: the voice finds no owner by it at once, and the next
+  `owner.get` says `none` and asks the helper to clear it.
+- **What the pick grants:** the owner's role at the lamp (second-voice.md):
+  being told the typed name, the owner's view of reminders, reads from the
+  owner's linked services, the owner's voice print, and "forget
+  everything about me" clearing the owner's name and place.
+- **Who may pick:** only the lamp's own account channel, the same guard as
+  `face.remove` and `control.code`. The lamp has no per-phone identity, so
+  any app signed in to the lamp's account. Nothing at the lamp, by voice or
+  by face, sets or moves the owner. Until broker TLS (`LAMP_CLOUD_TLS`) the
+  link is plain MQTT, the same accepted risk as the other owner kinds
+  ("Limit" below).
+- **Journal:** one line per change, never a name or an id: the helper's
+  `the owner was set to a saved face from the app (before: typed name)`
+  (or `another face`, `none`), `the owner pick was cleared (before: …)`,
+  and lamp-cloud's `the owner pick was cleared: the face was removed`. A
+  refusal is logged by kind, without the id asked.
+- **2 s** for the eyes' answer and for the helper's read; the helper's
+  write is waited on as the names' (10 s), off the broker's loop.
+
+Tests (`owner.rs`): the eyes' ids read, an older eyes' answer as none; a
+picked face the owner whatever the names; a pick whose face is gone
+`none`, never the typed name; with no pick, the typed name and its one
+match only suggested; the app's `face_id` an id or `null`; the helper's read
+fail-closed. `tests/it/app_contract.rs`: `owner.get`, `owner.set` (with
+its `request_id`, and both refusals), `face.list`'s new fields and
+`face.remove`'s `owner_cleared`, over stand-ins for the eyes and the
+helper, and neither kind in `can` with the switch off. setup's
+`tests/it/change.rs` and eyes' `who.rs` pin the file and the ids.
 
 ## The lamp's timers and reminders (#2195, `schedule.list`, `schedule.cancel`)
 

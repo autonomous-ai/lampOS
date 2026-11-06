@@ -803,7 +803,20 @@ this room" until someone asks to be recognised.
   memory owner's yes on #4710), their memory `id` too (#2176), kept through a
   rename, `person_id` of the name for anyone remembered before it, never
   two people's (ids already held are kept first, then the rest given one;
-  the voice follows the eyes' switch) ([memory.md](memory.md#each-persons-own-764)). At most 20 people. No
+  the voice follows the eyes' switch) ([memory.md](memory.md#each-persons-own-764)). With
+  `LAMP_OWNER_FACE=on` (#5495, off in the product), their face id `face`
+  too (`f-` and 16 random lower-case hex digits, `lamp_msgs::owner_face`)
+  and `face_saved_unix_s`, when it was first saved: minted when the face is
+  first saved and never given again (a face forgotten and saved later
+  under the same name gets another), kept through a remembering of the same
+  face (`LAMP_NAMES=checked`) and through a rename, where a merge keeps only
+  the id of the face it was recognised as; prints put in place of a name's
+  by the name alone (`{"remember":NAME}`, not checked) get a new one. A
+  person from before the switch is given one on open, written at once.
+  The app picks the owner by it (cloud.md, "The owner by face"). Optional
+  fields that only add, so the file keeps version 1; an older build drops
+  them at its next save, and a pick made by one then finds no face (no
+  owner). Off, nothing is minted or carried. At most 20 people. No
   picture is kept, and no print leaves the lamp. With `LAMP_ACTIVITY=on`
   the sitter's prints (up to six, for telling the sitter from others) are
   held in memory for the sitting only, never in this file
@@ -901,7 +914,12 @@ this room" until someone asks to be recognised.
     photo still waiting for its yes. `{"list":true,"waiting":true}`, which
     only lamp-cloud asks for the owner's own page (`face.list`, #2192),
     names those too (`waiting`). They are never said at the lamp, counted
-    or greeted.
+    or greeted. `{"list":true,"waiting":true,"ids":true}` (#5495), asked by
+    lamp-cloud for the owner's pick, answers each kept person as `{"name", "face",
+    "added_unix_s"}` (the face id, `null` without one, and when it was first
+    saved), never a print, beside `waiting`. A forget's answer says the
+    forgotten person's `face` too, so lamp-cloud clears the owner's pick
+    when it was theirs.
   - A forget also lets go a face from a photo by that name, and one let
     go is a face forgotten (`forgot: true`). A let-go its file couldn't be
     written for answers `{"error":"storage"}`, as a failed forget does.

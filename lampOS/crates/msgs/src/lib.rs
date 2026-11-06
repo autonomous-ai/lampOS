@@ -119,6 +119,10 @@ pub mod known;
 /// (#4333, `docs/owner-place.md`).
 pub mod owner_place;
 
+/// The owner picked by face in the app, the face ids and the pick's file
+/// (#5495, `docs/cloud.md`, "The owner by face").
+pub mod owner_face;
+
 /// The voice and character the owner chose in the app (#5394,
 /// `docs/chosen-voice.md`).
 pub mod chosen_voice;
