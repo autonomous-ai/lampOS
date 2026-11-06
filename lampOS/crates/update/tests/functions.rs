@@ -28,6 +28,9 @@ const DECLARED: &str = "declared: ";
 const LEFT_OUT: &str = "left out: ";
 /// Each function a chat request of the product's voice route is given.
 const CHAT: &str = "chat: ";
+/// Each skill a chat request reaches through `use_skill`
+/// (`LAMP_USE_SKILL=on` in the product since #2826), by its own name.
+const REACHED: &str = "reached: ";
 /// What a chat request with those functions is told to say to "I'm
 /// unplugging you" (#4595): `app`, `plug`, or `none` with
 /// `prepare_to_unplug` offered.
@@ -35,18 +38,20 @@ const UNPLUG: &str = "unplug: ";
 
 /// The lamp's own functions a product lamp's chat request offers now, on the
 /// product's route (`LAMP_VOICE_ROUTE=second`, bound
-/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 23 (with
+/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 22 (with
 /// onboarding's two and memory's `forget_everything` since 25 Oct,
 /// reports' `reports_stop` and `reports_state` since #2862, a made
 /// skill's `make_skill` and `put_on_made_skill` since fourteen-P15, and
 /// the Harness sign-in's `sign_in_computer` and `sign_in_answer` since
 /// `LAMP_TASKS_SIGN_IN` is on in the product, #5198), the
-/// actions part's 17 and the skills' 2 (Dance's `dance` and, since #4135,
-/// Pose's `set_pose`), before the search
-/// and the look. The test prints this split. A change to it
-/// is a change to what every session is told: say in its pull request what
-/// is left out past the bound, if anything.
-const PRODUCT_FUNCTIONS: usize = 42;
+/// actions part's 17 and the skills' 1: `use_skill`, which reaches every
+/// skill's function (`LAMP_USE_SKILL=on` since #2826; Dance's `dance`,
+/// Pose's `set_pose` and the wellbeing skills' `[stop]`, `wellbeing_nudges`,
+/// were 3 before it), before the search and the look. However many skills
+/// are installed, the skills' stay 1. The test prints this split. A change
+/// to it is a change to what every session is told: say in its pull
+/// request what is left out past the bound, if anything.
+const PRODUCT_FUNCTIONS: usize = 40;
 
 /// Every `Environment=` of a voice unit's `[Service]`.
 fn voice_environment(unit: &str) -> Vec<(String, String)> {
@@ -104,6 +109,12 @@ fn the_product_voice_s_functions_in_a_process_of_their_own() {
     let chat = lamp_voice::second_provider::worker::chat_tools(&settings, &search, look);
     for tool in &chat {
         println!("{CHAT}{}", tool.name);
+        let named = format!("{}:", lamp_voice::use_skill::NAME);
+        for reached in lamp_voice::use_skill::reached(tool) {
+            if let Some(skill) = reached.strip_prefix(&named) {
+                println!("{REACHED}{skill}");
+            }
+        }
     }
     let told = lamp_voice::without_a_tool::for_declared(&chat, settings.shutdown_from_app);
     let unplug = if told.contains(lamp_voice::without_a_tool::NO_UNPLUG_APP) {
@@ -126,6 +137,7 @@ struct Product {
     declared: Vec<String>,
     left_out: Vec<String>,
     chat: Vec<String>,
+    reached: Vec<String>,
     unplug: Vec<String>,
 }
 
@@ -205,6 +217,7 @@ fn product_with(extra: &[(&str, &str)]) -> Product {
         declared: found(DECLARED),
         left_out: found(LEFT_OUT),
         chat: found(CHAT),
+        reached: found(REACHED),
         unplug: found(UNPLUG),
     }
 }
@@ -214,27 +227,35 @@ fn product_with(extra: &[(&str, &str)]) -> Product {
 /// order or by the link, and the lamp's own are [`PRODUCT_FUNCTIONS`],
 /// within that route's bound. Live's 32 (a per-lamp drop-in, not the
 /// product's route) no longer bounds them since #3430: there the cut takes
-/// the last past 32 and says so on the setup line.
+/// the last past 32 and says so on the setup line. The skills' are reached
+/// through `use_skill` alone (#2826), never by their own names.
 #[test]
 fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
     let Product {
         executive,
         skill_tools,
         chat,
+        reached,
         left_out,
         ..
     } = product_with(&[]);
     assert!(left_out.is_empty(), "left out by the link: {left_out:?}");
-    for name in executive
-        .iter()
-        .map(|function| function.name)
-        .chain(skill_tools.iter().map(String::as_str))
-    {
+    for name in executive.iter().map(|function| function.name) {
         assert!(
             chat.iter().any(|told| told == name),
             "{name} is left out of a product lamp's chat requests, past {}: {chat:?}",
             lamp_voice::second_provider::MAX_TOOLS
         );
+    }
+    assert!(
+        chat.iter().any(|told| told == lamp_voice::use_skill::NAME),
+        "{chat:?}"
+    );
+    for name in &skill_tools {
+        assert!(reached.contains(name), "{name}: {reached:?}");
+    }
+    for name in &reached {
+        assert!(!chat.contains(name), "{name} by its own name: {chat:?}");
     }
     let routes_own = [
         lamp_voice::second_provider::net::search::NAME,
@@ -246,13 +267,13 @@ fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
         .filter(|name| !routes_own.contains(&name.as_str()))
         .collect();
     println!(
-        "A product lamp's chat request offers {} of the lamp's own functions (of at most {} in all): the voice's own {}, the actions part's {}, the skills' {} ({})",
+        "A product lamp's chat request offers {} of the lamp's own functions (of at most {} in all): the voice's own {}, the actions part's {}, the skills' 1 ({} reaching {})",
         lamps.len(),
         lamp_voice::second_provider::MAX_TOOLS,
-        lamps.len() - executive.len() - skill_tools.len(),
+        lamps.len() - executive.len() - 1,
         executive.len(),
-        skill_tools.len(),
-        skill_tools.join(", ")
+        lamp_voice::use_skill::NAME,
+        reached.join(", ")
     );
     assert!(chat.len() <= lamp_voice::second_provider::MAX_TOOLS);
     assert_eq!(lamps.len(), PRODUCT_FUNCTIONS, "{chat:?}");
@@ -292,12 +313,14 @@ fn a_product_lamp_told_it_is_being_unplugged_says_the_plug_until_the_app_can_tur
 /// Within the second route's own bound
 /// (`lamp_voice::second_provider::MAX_TOOLS`), not Live's, nothing is left
 /// out: the search's fetch is there too (lamp-4ace, 22 Oct, where Live's
-/// bound left out the search itself).
+/// bound left out the search itself). Since #2826 `dance` is reached
+/// through `use_skill`.
 #[test]
 fn a_product_chat_request_offers_dance_at_the_bound() {
     let Product {
         declared,
         chat,
+        reached,
         skill_tools,
         ..
     } = product_with(&[]);
@@ -311,7 +334,19 @@ fn a_product_chat_request_offers_dance_at_the_bound() {
         "{chat:?}"
     );
     assert_eq!(skill_tools, ["dance", "set_pose"]);
-    assert!(chat.iter().any(|name| name == "dance"), "{chat:?}");
+    assert!(
+        chat.iter().any(|name| name == lamp_voice::use_skill::NAME),
+        "{chat:?}"
+    );
+    assert!(reached.iter().any(|name| name == "dance"), "{reached:?}");
+    // A lamp's drop-in with the switch off: `dance` by its own name again.
+    let off = product_with(&[(lamp_voice::use_skill::ENVIRONMENT, "off")]);
+    assert!(
+        off.chat.iter().any(|name| name == "dance"),
+        "{:?}",
+        off.chat
+    );
+    assert!(off.reached.is_empty(), "{:?}", off.reached);
     assert!(
         chat.iter()
             .any(|name| name == lamp_voice::second_provider::net::search::NAME),
@@ -341,7 +376,8 @@ fn a_product_chat_request_offers_dance_at_the_bound() {
 /// `reports_state`, a Live session `reports_state` alone, with no error
 /// line, and `dance` stays in both. Since the second route's own bound
 /// (22 Oct) its chat request leaves none of them out; a Live session still
-/// leaves out `reports_state`.
+/// leaves out `reports_state`. Since #2826 Dance's is reached through
+/// `use_skill`, which is a core name in both and never the one cut.
 #[test]
 fn with_reports_on_dance_stays_at_the_bound() {
     let Product {
@@ -350,6 +386,7 @@ fn with_reports_on_dance_stays_at_the_bound() {
         declared,
         left_out,
         chat,
+        reached,
         ..
     } = product_with(&[(lamp_voice::reports_stop::ENVIRONMENT, "on")]);
     assert_eq!(skill_tools, ["dance", "set_pose"]);
@@ -357,7 +394,11 @@ fn with_reports_on_dance_stays_at_the_bound() {
         chat.len() > lamp_gemini::MAX_TOOLS && chat.len() <= lamp_voice::second_provider::MAX_TOOLS,
         "{chat:?}"
     );
-    assert!(chat.iter().any(|told| told == "dance"), "{chat:?}");
+    assert!(
+        chat.iter().any(|told| told == lamp_voice::use_skill::NAME),
+        "{chat:?}"
+    );
+    assert!(reached.iter().any(|told| told == "dance"), "{reached:?}");
     for kept in [
         lamp_voice::second_provider::net::search::FETCH,
         lamp_voice::reports_stop::STATE_NAME,
@@ -376,7 +417,12 @@ fn with_reports_on_dance_stays_at_the_bound() {
 
     assert!(left_out.is_empty(), "left out by the link: {left_out:?}");
     assert_eq!(declared.len(), lamp_gemini::MAX_TOOLS, "{declared:?}");
-    assert!(declared.iter().any(|told| told == "dance"), "{declared:?}");
+    assert!(
+        declared
+            .iter()
+            .any(|told| told == lamp_voice::use_skill::NAME),
+        "{declared:?}"
+    );
     assert!(
         !declared
             .iter()

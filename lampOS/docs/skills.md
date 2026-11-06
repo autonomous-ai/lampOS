@@ -733,8 +733,9 @@ list in the tools' names' order whatever order the skills load in), and
 the voice cuts the other skills' functions, the last first, after the
 second route's fetch and time elsewhere and `reports_state` (with
 `LAMP_REPORTS=on`) and before its weather and its search (`tools::uncut`,
-`worker::chat_cut`). With `LAMP_USE_SKILL=on`, `use_skill` carries the
-core skills and is never cut either (#2644). The lamp's own and core skills'
+`worker::chat_cut`). With `LAMP_USE_SKILL=on`, on in the product since
+#2826, `use_skill` carries the core skills and is never cut either (#2644),
+and the skills are that one function however many are installed. The lamp's own and core skills'
 functions alone past 32 are an error line naming what was left out
 ([install.md](install.md)).
 An update round brings them up to date from the build (#2014's P2,
@@ -944,7 +945,8 @@ more (`Restart=on-failure`; the reviewer and the first builder on #1656).
 Until 19 Oct `DIR` was inside
 the actions part's folder, which systemd removes at each restart of
 actions, and the voice had no skill functions until lamp-skills restarted
-(lamp-4ace, 04:33). With the voice's `LAMP_USE_SKILL=on`, the model is
+(lamp-4ace, 04:33). With the voice's `LAMP_USE_SKILL=on` (on in the
+product since #2826), the model is
 given one `use_skill` function for every skill instead, with each skill's
 description, choice and yes-or-no in its instruction, and the call reaches
 the skill as its own (#1668). A call runs the skill's steps without
@@ -1727,7 +1729,9 @@ for it.
   and the actions part's first (30 on a product lamp), and past 32 the last
   skills' are dropped unless the voice runs with `LAMP_USE_SKILL=on` (#1696),
   which gives every skill through one function, `use_skill`
-  ([tools.md](tools.md), "Many skills").
+  ([tools.md](tools.md), "Many skills"). The product's voice runs with it
+  since #2826; the count `install` and `list` say is still each skill's own
+  functions, what a lamp with the switch off by drop-in is given.
 
 - **`pack`** makes a package of an installable skill folder, below; with
   `--key-file`, the Store's private key (in the form `lamp-update sign`
@@ -2027,7 +2031,8 @@ person; the lamp's `skills.off` and `skills.on` for it are built, #2815).
 (`the_product_skills_are_exactly_the_core_skills` in
 `crates/update/tests/install.rs`).
 A skill's functions past a session's 32 are #1668's (`LAMP_USE_SKILL=on`,
-#1696): `install` and `list` say the count, and nothing here changes it.
+#1696, on in the product since #2826): `install` and `list` say the count,
+and nothing here changes it.
 
 ### Reflexes stay in the body and Expression
 

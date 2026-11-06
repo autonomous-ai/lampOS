@@ -149,7 +149,14 @@ async fn dance_is_declared_from_the_skills_tools_file_and_reaches_their_socket()
             json!({"skill": "dance"})
         )
         .await,
-        json!({"next": "Danced."})
+        // Told the call already ran it, so it is not called again in the
+        // turn's next round (#2826, lamp-9adf on 6 Nov: twice through
+        // `use_skill`, once by its own name).
+        json!({
+            "next": "Danced.",
+            crate::use_skill::RAN:
+                "This call has already run dance. Do not call use_skill for dance again in this turn."
+        })
     );
     assert_eq!(
         served.join().unwrap(),
