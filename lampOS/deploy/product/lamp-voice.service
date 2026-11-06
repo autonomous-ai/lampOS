@@ -44,6 +44,13 @@ ExecStart=/opt/lampOS/voice/current/lamp-voice serve /etc/lampOS/voice/provider.
 # Microphone and speaker threads may not wait behind other work (lamp-4ace, 2026-10-13).
 CPUSchedulingPolicy=rr
 CPUSchedulingPriority=20
+# With LAMP_VOICE_LOCK_CODE=on (off here) the voice and each worker lock their code's file pages, the executable's
+# and its shared libraries' text, so an SD log flush can't evict them (#5611, serve-runtime.md). As root, CAP_IPC_LOCK
+# already lifts the limit, so this changes nothing today; it is there for a future non-root unit, or one without that
+# capability. Not a bound: the limit counts each process's locked bytes, the same shared text again in each, and no
+# lamp has measured them yet. What may be locked is bounded by the code instead: file text only, never the heap or
+# the models.
+LimitMEMLOCK=infinity
 Restart=on-failure
 RestartSec=4s
 KillMode=mixed
