@@ -591,12 +591,17 @@ fn say_lost(mouth: &mut impl Mouth) {
 /// After `changed`, the line once; and with neither network back, the lost
 /// line again at most once a minute until one is, [`LOST_MOST`] at most.
 /// The lost line is always the recording ([`RECORDING_LOST`]), never words
-/// for the model. Returns how many lines were asked for.
+/// for the model. With `recovering` (#5550, #4141: `recover` runs with
+/// `LAMP_WIFI_RECOVERY=on` and no kept old file holds it busy), the lost
+/// line is not said at all: `recover` opens its hotspot and says
+/// [`crate::recover::SAY_OPENED`], so nobody is sent to erase a lamp that
+/// opens setup by itself. Returns how many lines were asked for.
 pub fn say_after(
     host: &mut impl Rejoin,
     mouth: &mut impl Mouth,
     changed: &Changed,
     broker: &str,
+    recovering: bool,
 ) -> u32 {
     let Some(line) = line_for(changed) else {
         return 0;
@@ -604,6 +609,9 @@ pub fn say_after(
     if !matches!(changed, Changed::NotBack { .. }) {
         mouth.say(line);
         return 1;
+    }
+    if recovering {
+        return 0;
     }
     say_lost(mouth);
     let started = host.now_ms();
