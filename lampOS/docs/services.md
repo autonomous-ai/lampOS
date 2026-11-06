@@ -47,6 +47,8 @@ at 14:11 on 3 Nov 2026):
 
 The rules below are what applies with the switch off; they stay in the code for a later feature.
 
+With the switch on, no line is held to a voice: a read is said in full with no voice asked of the second route and no wait for a print (`services::run`), and the second route makes no services prints, so `LAMP_SAME_VOICE_FOR=services` starts no same-voice child there (`checking_the_voice_for`). On the Live route a read is said in full too, so its "never in full" below no longer holds with the switch on; it still never prepares or sends a write (`NO_SEND_HERE`), switch on or off. A made skill's read is in the private room as well: `lamp-skills.service` sets `LAMP_PRIVATE_ROOM=on`, and its gate then asks for no owner's name or known face and no lone face ("A made skill's read", below).
+
 Only the lamp's owner: the person whose known face is kept under the name
 typed at setup (`LAMP_PERSON_NAME`) or under the name `who_you_are` saved
 with their face (`known_faces::owner_now`, kept fresh while services are on),
@@ -1859,6 +1861,14 @@ publishes, every 250 ms:
 | That face is the owner's known face | The eyes' known file (fresh within 2 s), its name the owner's, case aside | "not the owner" / "the owner not in view" |
 | No voice heard in the last minute | Each line on `voice/heard`, marked as it comes by a thread of `lamp-skills`' own (the topic is an event: the bus keeps no latest of it, so before this fix the row never held a read back; lamp-9adf, 5 Nov) | "a voice heard" |
 
+In the private room (`LAMP_PRIVATE_ROOM=on`, set in the product's
+`lamp-skills.service` and read as the voice reads it,
+`lamp_voice::person::private_room`, into `Seen::private_room`) no ownership
+check runs: the rows for an owner face enrolled, one face at most and the
+owner's known face don't apply, so any face in view will do, however many,
+with no name typed at setup. Nobody in view still holds it ("the owner not
+in view"), and the other rows hold as above.
+
 All must hold steadily for 5 s. Until then the run waits, at most 60
 minutes, and then skips the day with nothing said ("skipped: <why>").
 A configured trigger window determines when a read becomes due, not a
@@ -1905,7 +1915,9 @@ counted. A title, sender or subject is cut to 100 characters. The gate is
 judged again before every line. If someone comes (a second face, another
 face, a voice), the lamp stops after the line it is on and says only "I'll
 tell you the rest later."; if the gate closes for another reason (privacy,
-a pause, quiet hours, the owner gone), it stops with nothing said. The
+a pause, quiet hours, the owner gone), it stops with nothing said. In the
+private room a face that comes doesn't stop it, and a voice heard still
+does, with the same line. The
 owner not told, or nobody in view, is looked at again for up to 5 s
 (`BLINK`) with nothing said meanwhile, as the eyes renew the known face's
 mark every 2 s and it is read fresh for 2 s: on lamp-9adf a renewal 2.1 s

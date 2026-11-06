@@ -6860,6 +6860,15 @@ fn checking_the_voice_for(
         let Some(model) = model else {
             return Printing::None;
         };
+        // The private room (`person::private_room`): no line is held to a
+        // voice there (`crate::services::run`), so the services' prints
+        // would be made for nothing.
+        if crate::person::private_room() {
+            eprintln!(
+                "lamp-voice second: the same voice is for the linked services only (LAMP_SAME_VOICE_FOR=services), and the lamp is a private room (LAMP_PRIVATE_ROOM): not started, no line printed"
+            );
+            return Printing::None;
+        }
         if !services_on {
             eprintln!(
                 "lamp-voice second: the same voice is for the linked services only (LAMP_SAME_VOICE_FOR=services), and none are on: not started"
@@ -18171,6 +18180,10 @@ mod tests {
         assert!(starts(false, true));
         assert!(!starts(true, false), "no services, no child");
         assert!(!starts(false, false));
+        // The private room: no line is held to a voice, so no child.
+        crate::person::set_private_room_for_test(Some(true));
+        assert!(!starts(true, true), "the private room, no child");
+        crate::person::set_private_room_for_test(None);
         // No model: nothing, as without the switch.
         let heeding = Mutex::new(Heeding::new(true, true, None, None));
         assert_eq!(

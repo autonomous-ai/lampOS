@@ -5553,6 +5553,8 @@ impl lamp_skills::service_read::Room for LampRoom {
             private,
             paused,
             quiet,
+            // The voice's own switch, read the same way (`on` only).
+            private_room: lamp_voice::person::private_room(),
         }
     }
 
