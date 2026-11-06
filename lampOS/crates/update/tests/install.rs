@@ -2150,28 +2150,28 @@ fn the_product_sleeps_and_wakes_with_the_privacy_slide() {
     }
 }
 
-/// Tiers' ideas in Days, a newer correction first (`LAMP_MEMORY_NEWER_FIRST`),
-/// a maybe or a plan marked (`LAMP_MEMORY_STRENGTH`) and tastes first in the
-/// session note (`LAMP_MEMORY_PROFILE`), are off for the candidate (the PM,
-/// 6 Nov): they merged with their played check never posted (#5331). Days
-/// itself stays on.
+/// Tastes first in the session note (`LAMP_MEMORY_PROFILE`), one of Tiers'
+/// ideas in Days, is on in the product (the memory owner's call on 5 Nov, off
+/// for the candidate on 6 Nov, #5464, and back on after its played check
+/// passed on lamp-06c1 on 6 Nov, #5331). A newer correction first
+/// (`LAMP_MEMORY_NEWER_FIRST`) and a maybe or a plan marked
+/// (`LAMP_MEMORY_STRENGTH`) stay off until a played check reaches their own
+/// fields. Each sends its field only with Days on.
 #[test]
-fn the_product_leaves_tiers_ideas_off_until_their_played_check() {
+fn the_product_keeps_tastes_first_and_leaves_newer_first_and_strength_off() {
     let voice = install::PRODUCT
         .iter()
         .find(|(unit, _)| *unit == "lamp-voice.service")
         .unwrap()
         .1;
     let service = section(voice, "Service");
-    assert!(
-        service.contains(&"Environment=LAMP_MEMORY_DAYS=on"),
-        "the voice lacks LAMP_MEMORY_DAYS=on"
-    );
-    for switch in [
-        "LAMP_MEMORY_NEWER_FIRST",
-        "LAMP_MEMORY_STRENGTH",
-        "LAMP_MEMORY_PROFILE",
+    for line in [
+        "Environment=LAMP_MEMORY_PROFILE=on",
+        "Environment=LAMP_MEMORY_DAYS=on",
     ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+    for switch in ["LAMP_MEMORY_NEWER_FIRST", "LAMP_MEMORY_STRENGTH"] {
         assert!(
             !service.iter().any(|line| line.contains(switch)),
             "the voice sets {switch}"
