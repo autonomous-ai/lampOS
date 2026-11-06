@@ -17061,7 +17061,12 @@ fn record_cancelled_reply(
             .cloned()
             .collect();
         crate::task_news::cut_short(&retold);
-        if let Some(not_heard) = current.news_not_heard.take() {
+        // A privacy mute, a privacy gap or the service stopping is no
+        // talk-over: its question is not asked again at the next pause
+        // (Jarvis's P3 on #5579).
+        if let Some(not_heard) = current.news_not_heard.take()
+            && !matches!(reason, "privacy_muted" | "privacy_gap" | "service_stopped")
+        {
             not_heard.not_heard(std::mem::take(&mut current.news));
         }
     }
