@@ -1144,8 +1144,7 @@ Connectors của ứng dụng rồi hỏi đèn về nó: đèn nói đó là vi
 nó không biết. Ba hàm vẫn có, nhưng không gì báo cho mô hình những gì đã liên
 kết, và phần tính cách dặn nó đừng giả vờ làm được việc nó không với tới. Với
 `LAMP_SERVICES_TOLD=on` (chỉ truyền cho worker của hai tuyến), ở tuyến thứ hai một câu nói
-được nhận là của chủ đèn (`services::owner_of`: khuôn mặt đã biết của họ,
-không bị giữ) được báo, cạnh lời của nó, các dịch vụ đang liên kết theo tên,
+được nhận là của chủ đèn (`services::owner_of`) được báo, cạnh lời của nó, các dịch vụ đang liên kết theo tên,
 mỗi cái một lần, và rằng đèn tự dùng chúng: "(For you to know, not to answer:
 the lamp's owner linked these services to you in the app's Connectors:
 Notion, Gmail. They are yours to use for the owner: read from one with
@@ -1161,14 +1160,25 @@ của quy tắc attention thì một liên kết mới được báo trễ một
 khác, của căn phòng, câu bị giữ, tin nhắn chữ, không có gì liên kết hoặc
 `lamp-services` không trả lời (lần hỏi gần nhất bị lỗi, bận hoặc không có trả
 lời, nên một liên kết vừa gỡ không bao giờ được báo; `services::names_after`,
-#5598): không báo gì, như trước, nên khách không bao
-giờ biết chủ đèn đã liên kết gì. Nhật ký chỉ ghi số lượng, không ghi tên.
+#5598): không báo gì, như trước. Nhật ký chỉ ghi số lượng, không ghi tên.
+
+**Câu nào là của chủ đèn.** Với `LAMP_PRIVATE_ROOM=on`, như trong sản phẩm,
+mọi câu nói đều là của chủ đèn (`person::private_room`, #5553), nên mọi câu
+nói đều được báo các tên: cả câu của khách, của một giọng lạ, của TV và câu
+bị giữ. Đó là quyết định (a) của PM trên #5523. Khi tắt, chỉ câu mà lease
+của chính nó có khuôn mặt đã biết của chủ đèn, không bị giữ, mới được báo;
+câu của khách, của căn phòng và câu bị giữ thì không. Tin nhắn chữ không bao
+giờ được báo.
+
 Tuyến Live được báo cùng lời đó cạnh câu đang mở của chủ đèn (lease của nó,
 `services::owner_of`), đọc hai lần mỗi giây khi câu còn mở, mỗi phiên một lần
-cho mỗi bộ tên (`services_told::LiveTold`): phiên của nó giữ những gì đã được
-báo, nên chỉ báo lại khi có liên kết được thêm hay gỡ, hoặc ở một phiên mới.
-Một người khách nói sau đó trong cùng phiên gặp một mô hình đã được báo,
-nhưng mọi lời gọi của họ vẫn bị từ chối (`OWNER_ONLY`).
+cho mỗi bộ tên (`services_told::LiveTold`), và chỉ khi `LAMP_PRIVATE_ROOM=on`:
+phiên của nó giữ những gì đã được báo, nên khi tắt căn phòng riêng, một người
+khách nói sau trong phiên sẽ nghe được các tên (#5598), vì vậy khi đó tuyến
+Live không được báo gì. Nó được báo lại khi có liên kết được thêm hay gỡ, hoặc
+ở một phiên mới; khi mọi thứ đã báo đều bị gỡ, nó được báo một lần rằng giờ
+không có gì liên kết (`services_told::UNLINKED_NOTE`). Mọi lời gọi từ một câu
+không phải của chủ đèn vẫn bị từ chối (`OWNER_ONLY`).
 
 ## Những gì chưa làm
 
