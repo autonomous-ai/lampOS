@@ -854,16 +854,25 @@ impl Days {
     }
 
     /// The id of this person's active kept thing with `text`, the same by
-    /// [`same_text`].
+    /// [`same_text`], and in a person's own scope by [`own_text`] too.
     fn kept_already(&self, person: &Person, text: &str) -> Result<Option<u64>> {
-        let wanted = same_text(text);
+        let own = person.as_str() != Person::EVERYONE;
+        let fold = |text: &str| {
+            let same = same_text(text);
+            if own {
+                own_text(&same).to_owned()
+            } else {
+                same
+            }
+        };
+        let wanted = fold(text);
         let mut statement = self.db.prepare(
             "SELECT id,text FROM entries WHERE person=? AND kind='kept' AND active=1 ORDER BY id",
         )?;
         let mut rows = statement.query([person.as_str()])?;
         while let Some(row) = rows.next()? {
             let kept: String = row.get(1)?;
-            if same_text(&kept) == wanted {
+            if fold(&kept) == wanted {
                 return Ok(Some(row.get(0)?));
             }
         }
@@ -2749,6 +2758,18 @@ pub(crate) fn same_text(text: &str) -> String {
         .to_owned()
 }
 
+/// [`same_text`]'s text in a person's own scope, for `once` alone: a
+/// leading "my" or "the" dropped, as both name the same thing of theirs
+/// there (C81, stock 10538 on lamp-06c1, 6 Nov: "The gym locker code is
+/// 441." kept, "My gym locker code is 441." said again and kept twice). In
+/// the room's, "my" is whoever said it, so it is never folded.
+fn own_text(same: &str) -> &str {
+    ["my ", "the "]
+        .iter()
+        .find_map(|lead| same.strip_prefix(lead))
+        .unwrap_or(same)
+}
+
 fn is_punctuation(c: char) -> bool {
     c.is_ascii_punctuation() || matches!(c, '…' | '。' | '！' | '？' | '，' | '、' | '；' | '：')
 }
@@ -3615,6 +3636,45 @@ mod tests {
             .unwrap();
         let anew = store.remember_once_from(&everyone, now, "coffee black", &[], true);
         assert_eq!(anew.unwrap(), (2, false));
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// C81 on stock 10538 (lamp-06c1, 6 Nov, S8 req 316/324): "my gym
+    /// locker code is four four one" was kept as "The gym locker code is
+    /// 441." and, said again, sent as "My gym locker code is 441.": `once`
+    /// missed it and a second entry was kept, so "last said" never moved. In
+    /// a person's own scope "my" and "the" at the start name the same thing
+    /// of theirs. In the room's, "my" is whoever said it, so it stays apart;
+    /// and a different word after the start is a different thing.
+    #[test]
+    fn a_remember_once_in_their_scope_finds_my_and_the_alike() {
+        let dir = std::env::temp_dir().join(format!("lamp-days-once-my-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let now = 1_791_892_800_000;
+        let options = Options {
+            dir: dir.clone(),
+            keep_days: 30,
+            local: LocalTime::Offset(0),
+        };
+        let mut store = Days::open(options, now).unwrap();
+        let olivia = Person::new("p-b2471d941bf88836").unwrap();
+        let (gym, existing) = store
+            .remember_once_from(&olivia, now, "The gym locker code is 441.", &[], true)
+            .unwrap();
+        assert!(!existing);
+        let again = store.remember_once_from(&olivia, now, "My gym locker code is 441.", &[], true);
+        assert_eq!(again.unwrap(), (gym, true), "the same kept thing");
+        let other = store
+            .remember_once_from(&olivia, now, "My bike lock code is 441.", &[], true)
+            .unwrap();
+        assert!(!other.1, "another thing");
+        let everyone = Person::everyone();
+        let (room, _) = store
+            .remember_once_from(&everyone, now, "The wifi is Kestrel-7", &[], true)
+            .unwrap();
+        let mine = store.remember_once_from(&everyone, now, "My wifi is Kestrel-7", &[], true);
+        assert_ne!(mine.unwrap(), (room, true), "the room's my is apart");
         drop(store);
         fs::remove_dir_all(dir).unwrap();
     }
