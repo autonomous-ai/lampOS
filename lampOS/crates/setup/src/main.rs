@@ -31,7 +31,9 @@ usage: lamp-setup COMMAND [OPTIONS]
       missing: finish an interrupted reset, bring up the lamp's hotspot and
       answer V1's setup API until the home's Wi-Fi is joined and the
       person's settings are saved; then write the marker, and go on
-      answering for 10 minutes so the page can follow the lamp.
+      answering for 10 minutes so the page can follow the lamp. With
+      LAMP_FIRST_VOLUME=on (#5551), just before the marker: the speaker's
+      softvol \"Speaker\" at 70%, stored, once per setup.
   check --plan FILE
       Check a reset plan and print it. Touches nothing.
   watch-reset --plan FILE [--bus-root PATH] [--clock-id ID] [--seconds N] [--enable]
