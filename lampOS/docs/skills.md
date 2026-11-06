@@ -726,17 +726,18 @@ skills (`LAMP_SCHEDULE_SPEAK=skill`, `LAMP_TASK_NEWS=skill`; install.md).
 A skill with a tool costs one of the 32 functions a Live session takes (48
 on the second route's chat requests, `second_provider::MAX_TOOLS`), after
 the voice's own and the actions part's: a product lamp's are 31
-(`crates/update/tests/functions.rs`). Past 32 a core skill's function is
-never the one cut (the owner's rule, on #2614): the tools file names core
-skills' tools in `core` beside `tools` (`lamp_skills::tools_file`, each
-list in the tools' names' order whatever order the skills load in), and
-the voice cuts the other skills' functions, the last first, after the
-second route's fetch and time elsewhere and `reports_state` (with
-`LAMP_REPORTS=on`) and before its weather and its search (`tools::uncut`,
-`worker::chat_cut`). With `LAMP_USE_SKILL=on`, `use_skill` carries the
-core skills and is never cut either (#2644). The lamp's own and core skills'
-functions alone past 32 are an error line naming what was left out
-([install.md](install.md)).
+(`crates/update/tests/functions.rs`). Past the bound core tools come
+before skills (the first builder on Queue #5385, 6 Nov): the tools file
+names core skills' tools and their `[stop]` functions in `core` beside
+`tools` (`lamp_skills::tools_file`, each list in the tools' names' order
+whatever order the skills load in), and the voice cuts the other skills'
+functions first, then a core skill's, each the last by name first, and
+only then the second route's fetch, time elsewhere, `reports_state` (with
+`LAMP_REPORTS=on`), weather and search (`tools::uncut_within`,
+`worker::chat_cut`); never the rest of the voice's own or the actions
+part's. With `LAMP_USE_SKILL=on`, `use_skill` carries every skill and is
+never cut (#2644). The lamp's own functions alone past the bound are an
+error line naming what was left out ([tools.md](tools.md)).
 An update round brings them up to date from the build (#2014's P2,
 [updates.md](updates.md), "The product's skills"): each build carries the
 product skills as one signed file, `lamp-product-skills`, and a round writes
@@ -928,7 +929,8 @@ the file's `body` names the tools whose skill asks for the body
 runs one (#1673, [messages.md](messages.md)). Primary declared tools of disabled
 skills, and requested-audio tools while their switch is off, enter neither
 `tools`, `body` nor `core`. The optional `core` list gives emitted primary
-tools of core skills their priority at the function bound. All three lists
+tools of core skills, and the `[stop]` functions a core skill emits, their
+priority at the function bound (installed skills' are cut first). All three lists
 use the same first emitted definition for a primary tool name; an omitted
 duplicate cannot add metadata for that tool. The existing auxiliary
 unplug-cancellation tool is separate: a supplied inventory entry can contribute

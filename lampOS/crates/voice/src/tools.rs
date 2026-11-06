@@ -611,20 +611,28 @@ pub fn time_now() -> Value {
 /// ([`crate::use_skill`], #1668). A name the voice uses itself is left out
 /// of the executive's.
 ///
-/// Past [`lamp_gemini::MAX_TOOLS`] the bound cuts by [`fit`]: only the
-/// skills' functions that are not a core skill's, the last first.
+/// Past [`lamp_gemini::MAX_TOOLS`] the bound cuts by [`fit`]: the skills'
+/// functions first, those not a core skill's before a core skill's, each
+/// the last first, then `reports_state`; the lamp's own only when they
+/// alone are past it.
 pub fn declared(settings: &Settings) -> Vec<Tool> {
     let (tools, cut, core) = uncut(settings);
     fit(tools, &cut, &core)
 }
 
 /// [`declared`]'s functions before the bound, the order it cuts them in,
-/// and the core skills' functions, never cut (the owner's rule, on #2614):
-/// the cut is `reports_state` with `LAMP_REPORTS=on` (reading reports'
-/// state is rare; `reports_stop` stays), then the skills' functions that
-/// are not a core skill's ([`core_skills`]), the last first. With
-/// `LAMP_USE_SKILL=on`, `use_skill` carries every core skill, so it is a
-/// core name (the first builder on #2644).
+/// and the core names, which [`fit`]'s last resort never takes. Core tools
+/// before skills (the first builder on Queue #5385, 6 Nov 12:14: "a skill
+/// must never cost the lamp a core tool"; on lamp-9adf the chat route's
+/// bound of 48 had left out `the_time`, `reports_state` and `fetch_page`
+/// while installed skills' functions stayed): the cut is the skills'
+/// functions that are not a core skill's ([`core_skills`]), then a core
+/// skill's, each the last by name first (the tools file lists them by
+/// name, so which skill came last is not known here), then
+/// `reports_state` with `LAMP_REPORTS=on`. The voice's own and the
+/// actions part's are never in it. With `LAMP_USE_SKILL=on`, `use_skill`
+/// carries every skill, so it is a core name and the cut is
+/// `reports_state` alone (the first builder on #2644).
 pub fn uncut(settings: &Settings) -> (Vec<Tool>, Vec<String>, BTreeSet<String>) {
     uncut_within(settings, lamp_gemini::MAX_TOOLS)
 }
@@ -643,31 +651,37 @@ pub fn uncut_within(
     let skills = skills_after(settings, &tools);
     let mut core = core_skills(settings);
     let mut cut: Vec<String> = Vec::new();
-    if settings.reports_stop {
-        cut.push(crate::reports_stop::STATE_NAME.to_owned());
-    }
     if settings.use_skill {
         tools.extend(crate::use_skill::function(&skills));
         core.insert(crate::use_skill::NAME.to_owned());
-        return (tools, cut, core);
+    } else {
+        cut.extend(skills_cut(&skills, &core));
+        tools.extend(skills);
     }
-    cut.extend(
-        skills
-            .iter()
-            .rev()
-            .filter(|tool| !core.contains(&tool.name))
-            .map(|tool| tool.name.clone()),
-    );
-    tools.extend(skills);
+    if settings.reports_stop {
+        cut.push(crate::reports_stop::STATE_NAME.to_owned());
+    }
     (tools, cut, core)
+}
+
+/// The order the bound cuts `skills`' functions in ([`uncut_within`]):
+/// those not a core skill's (`core`) first, then a core skill's, each the
+/// last first.
+fn skills_cut(skills: &[Tool], core: &BTreeSet<String>) -> Vec<String> {
+    let (core_skills, others): (Vec<&Tool>, Vec<&Tool>) =
+        skills.iter().partition(|tool| core.contains(&tool.name));
+    others
+        .into_iter()
+        .rev()
+        .chain(core_skills.into_iter().rev())
+        .map(|tool| tool.name.clone())
+        .collect()
 }
 
 /// `tools` within [`lamp_gemini::MAX_TOOLS`], cut only by `cut`: each
 /// named there left out in its order until the rest fit, and none other.
 /// When nothing in `cut` is left and the rest are still past the bound,
-/// the error is the list as it then is: the lamp's own and its core
-/// skills' functions alone are over (the owner's rule, on #2614: at the
-/// bound a core skill's function is never the one cut).
+/// the error is the list as it then is: the lamp's own alone are over.
 pub fn within_bound(tools: Vec<Tool>, cut: &[String]) -> Result<Vec<Tool>, Vec<Tool>> {
     within(tools, cut, lamp_gemini::MAX_TOOLS)
 }
@@ -689,8 +703,8 @@ pub fn within(mut tools: Vec<Tool>, cut: &[String], bound: usize) -> Result<Vec<
 }
 
 /// [`within_bound`]; when it fails, a session still opens: the last
-/// functions that are not a core skill's (`core`) are left out until the
-/// rest fit, and named on an error line, never silently. Whatever is cut
+/// functions not named in `core` are left out until the rest fit, and
+/// named on an error line, never silently. Whatever is cut
 /// is said once, on a plain line naming each ([`said_cut`]).
 pub fn fit(tools: Vec<Tool>, cut: &[String], core: &BTreeSet<String>) -> Vec<Tool> {
     fit_within(tools, cut, core, lamp_gemini::MAX_TOOLS)
@@ -753,7 +767,7 @@ fn past_bound(
             past.push(said_name(&over.remove(last).name));
         }
         eprintln!(
-            "lamp-voice: error: the lamp's own and its core skills' functions alone are past the bound of {}; left out: {}",
+            "lamp-voice: error: the lamp's own functions alone are past the bound of {}; left out: {}",
             bound,
             past.join(", ")
         );
@@ -4479,8 +4493,9 @@ mod tests {
 
     /// The first builder on #2644: past 32, `use_skill` is a core name and
     /// never the one cut, so `dance` stays reachable through it; with
-    /// `LAMP_REPORTS=on` the cut takes `reports_state` before any of the
-    /// lamp's own actions, and `reports_stop` stays.
+    /// `LAMP_REPORTS=on` and no `use_skill` the cut takes the skills'
+    /// functions, a core skill's last, before `reports_state` or any of the
+    /// lamp's own actions (core tools before skills, Queue #5385).
     #[test]
     fn past_the_bound_use_skill_and_the_lamps_actions_stay() {
         let (dir, mut settings) = many_skills("never-cut");
@@ -4508,25 +4523,45 @@ mod tests {
             route(&settings, crate::use_skill::NAME),
             Route::UseSkill(Box::new(settings.clone()))
         );
-        // Reports on: the voice's seven and twenty-five actions are 32, and
-        // three skills more; the cut is `reports_state`, then the two that
-        // are not core, and every action and `dance` stay.
-        let lights: Vec<Value> = (0..25)
-            .map(|n| json!({"name": format!("light_{n}"), "description": "A light."}))
-            .collect();
-        std::fs::write(dir.join(CATALOG_FILE), json!({"tools": lights}).to_string()).unwrap();
+        // Reports on: the voice's seven and twenty-four actions are 31, and
+        // three skills more; the cut is the two that are not core, the last
+        // first, and every action, both reports' and `dance` stay.
+        let lights = |count: usize| -> String {
+            let lights: Vec<Value> = (0..count)
+                .map(|n| json!({"name": format!("light_{n}"), "description": "A light."}))
+                .collect();
+            json!({ "tools": lights }).to_string()
+        };
+        std::fs::write(dir.join(CATALOG_FILE), lights(24)).unwrap();
         settings.use_skill = false;
         settings.reports_stop = true;
         let told = names(declared(&settings));
         assert_eq!(told.len(), lamp_gemini::MAX_TOOLS);
-        for kept in ["light_24", "dance", crate::reports_stop::NAME] {
+        for kept in [
+            "light_23",
+            "dance",
+            crate::reports_stop::NAME,
+            crate::reports_stop::STATE_NAME,
+        ] {
             assert!(told.iter().any(|name| name == kept), "{kept}: {told:?}");
         }
-        for cut in [
+        for cut in ["check_my_work", "show_verdict"] {
+            assert!(!told.iter().any(|name| name == cut), "{cut}: {told:?}");
+        }
+        // One action more: 32 of the lamp's own, so the core skill's
+        // `dance` goes too, and still none of the voice's own (core tools
+        // before skills, Queue #5385).
+        std::fs::write(dir.join(CATALOG_FILE), lights(25)).unwrap();
+        let told = names(declared(&settings));
+        assert_eq!(told.len(), lamp_gemini::MAX_TOOLS);
+        for kept in [
+            "light_24",
+            crate::reports_stop::NAME,
             crate::reports_stop::STATE_NAME,
-            "check_my_work",
-            "show_verdict",
         ] {
+            assert!(told.iter().any(|name| name == kept), "{kept}: {told:?}");
+        }
+        for cut in ["dance", "check_my_work", "show_verdict"] {
             assert!(!told.iter().any(|name| name == cut), "{cut}: {told:?}");
         }
         std::fs::remove_dir_all(dir).unwrap();
@@ -4685,8 +4720,9 @@ mod tests {
 
     /// The reviewer's P3 on #1906: `LAMP_REPORTS=on` declares two more,
     /// `reports_stop` and `reports_state`, before the executive's and the
-    /// skills'; past 32 the cut is `reports_state`, then the last skills'
-    /// functions, and the setup line names the skills'.
+    /// skills'; past 32 the cut is the skills' functions, the last first,
+    /// before `reports_state` (core tools before skills, Queue #5385), and
+    /// the setup line names the skills'.
     #[test]
     fn reports_add_two_functions_and_the_last_skills_are_cut_past_32() {
         let (dir, mut settings) = many_skills("reports-count");
@@ -4699,27 +4735,28 @@ mod tests {
             .collect();
         assert_eq!(off.len(), 32);
         assert_eq!(&off[30..], ["dance", "check_my_work"]);
-        // On: two more of the voice's own; the cut takes `reports_state`
-        // first, then the last skill's that fitted (the first builder on
-        // #2644); `reports_stop` and the executive's all stay.
+        // On: two more of the voice's own, 32 with the executive's; the cut
+        // takes every skill's function, the last first, and never one of
+        // the voice's own (core tools before skills, Queue #5385):
+        // `reports_stop`, `reports_state` and the executive's all stay.
         settings.reports_stop = true;
         assert_eq!(core_tools(&settings).len(), 32);
         let on = declared(&settings);
         assert_eq!(on.len(), 32);
         let names: Vec<&str> = on.iter().map(|tool| tool.name.as_str()).collect();
         assert_eq!(names[5], crate::reports_stop::NAME);
-        assert!(!names.contains(&crate::reports_stop::STATE_NAME));
+        assert!(names.contains(&crate::reports_stop::STATE_NAME));
         assert!((0..25).all(|n| names.contains(&format!("light_{n}").as_str())));
         let cut: Vec<&str> = off
             .iter()
             .map(String::as_str)
             .filter(|name| !names.contains(name))
             .collect();
-        assert_eq!(cut, ["check_my_work"]);
+        assert_eq!(cut, ["dance", "check_my_work"]);
         let said = crate::session_tools::setup_line(&on, &settings);
         assert!(
             said.ends_with(
-                "; skills not given: check_my_work, show_verdict (past 32: LAMP_USE_SKILL=on reaches them)"
+                "; skills not given: dance, check_my_work, show_verdict (past 32: LAMP_USE_SKILL=on reaches them)"
             ),
             "{said}"
         );
@@ -4737,6 +4774,131 @@ mod tests {
             kept.iter()
                 .all(|tool| tool.name != crate::reports_stop::STATE_NAME)
         );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A lamp like lamp-9adf on 6 Nov: the voice's own seven (reports' two
+    /// among them), the actions part's seventeen, a core skill's `dance`
+    /// and thirty installable skills' functions. Settings with the clock's
+    /// places on, as the product's.
+    fn many_installed(name: &str) -> (PathBuf, Settings) {
+        let dir = directory(name);
+        let executive: Vec<Value> = (0..17)
+            .map(|n| json!({"name": format!("light_{n}"), "description": "A light."}))
+            .collect();
+        std::fs::write(
+            dir.join(CATALOG_FILE),
+            json!({"tools": executive}).to_string(),
+        )
+        .unwrap();
+        std::fs::create_dir(dir.join(SKILLS_DIR)).unwrap();
+        // In the tools' names' order, as `lamp_skills::tools_file` writes it.
+        let mut skills: Vec<Value> = vec![json!({"name": "dance", "description": "Dance."})];
+        skills.extend(
+            (0..30).map(|n| json!({"name": format!("skill_{n:02}"), "description": "A skill."})),
+        );
+        std::fs::write(
+            dir.join(SKILLS_DIR).join(CATALOG_FILE),
+            json!({"tools": skills, "core": ["dance"]}).to_string(),
+        )
+        .unwrap();
+        let settings = Settings {
+            decline: true,
+            exec: Some(dir.clone()),
+            clock: true,
+            places: true,
+            memory: Some("/run/lampos-memory/memory.sock".into()),
+            reports_stop: true,
+            ..Default::default()
+        };
+        (dir, settings)
+    }
+
+    /// Core tools before skills (the first builder on Queue #5385, 6 Nov
+    /// 12:14; on lamp-9adf the chat route's 48 left out `the_time`,
+    /// `reports_state` and `fetch_page` while installed skills' stayed):
+    /// past either bound the installable skills' functions are cut, the
+    /// last first, and the cut's line names them; the time, the reports'
+    /// state, the search's fetch, the actions part's and the core skill's
+    /// stay.
+    #[test]
+    fn past_the_bound_installed_skills_go_before_any_core_tool() {
+        let (dir, settings) = many_installed("core-first");
+        let names = |tools: &[Tool]| -> Vec<String> {
+            tools.iter().map(|tool| tool.name.clone()).collect()
+        };
+        let search = crate::second_provider::net::search::Search::deepseek("test")
+            .unwrap()
+            .declarations();
+        let fetch = crate::second_provider::net::search::FETCH;
+        assert!(names(&search).iter().any(|name| name == fetch));
+        let (before, _, _) = uncut_within(&settings, crate::second_provider::MAX_TOOLS);
+        let before = names(&before);
+        let core: Vec<String> = names(&core_tools(&settings));
+        assert_eq!(core.len(), 24, "{core:?}");
+        // The chat route: 24 of the lamp's own, the search's two and 31
+        // skills' are 57, so the last nine installed go.
+        let chat = names(&crate::second_provider::worker::chat_tools(
+            &settings, &search, false,
+        ));
+        assert_eq!(chat.len(), crate::second_provider::MAX_TOOLS, "{chat:?}");
+        // Live: 24 and 31 are 55, so the last 23 installed go.
+        let live = names(&declared(&settings));
+        assert_eq!(live.len(), lamp_gemini::MAX_TOOLS, "{live:?}");
+        for (told, bound, gone) in [
+            (&chat, crate::second_provider::MAX_TOOLS, 9),
+            (&live, lamp_gemini::MAX_TOOLS, 23),
+        ] {
+            for kept in core.iter().map(String::as_str).chain(["dance"]) {
+                assert!(told.iter().any(|name| name == kept), "{kept}: {told:?}");
+            }
+            for kept in [THE_TIME, crate::reports_stop::STATE_NAME] {
+                assert!(told.iter().any(|name| name == kept), "{kept}: {told:?}");
+            }
+            let left: Vec<String> = before
+                .iter()
+                .filter(|name| !told.contains(name))
+                .cloned()
+                .collect();
+            let expected: Vec<String> = (30 - gone..30).map(|n| format!("skill_{n:02}")).collect();
+            assert_eq!(left, expected, "{told:?}");
+            let line = said_cut(&left, bound).unwrap();
+            assert!(
+                line.starts_with(&format!(
+                    "lamp-voice: past the bound of {bound}, left out: "
+                )),
+                "{line}"
+            );
+            assert!(line.ends_with("skill_29"), "{line}");
+            assert!(!line.contains(THE_TIME) && !line.contains(fetch), "{line}");
+        }
+        assert!(chat.iter().any(|name| name == fetch), "{chat:?}");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// With no skills nothing changes: within either bound every function
+    /// is told, in its order, and the cut holds only `reports_state`.
+    #[test]
+    fn with_no_skills_the_bound_cuts_nothing() {
+        let (dir, settings) = many_installed("no-skills");
+        std::fs::remove_dir_all(dir.join(SKILLS_DIR)).unwrap();
+        let names = |tools: &[Tool]| -> Vec<String> {
+            tools.iter().map(|tool| tool.name.clone()).collect()
+        };
+        let (tools, cut, _) = uncut(&settings);
+        assert_eq!(cut, [crate::reports_stop::STATE_NAME]);
+        assert_eq!(names(&declared(&settings)), names(&tools));
+        assert_eq!(names(&tools), names(&core_tools(&settings)));
+        let search = crate::second_provider::net::search::Search::deepseek("test")
+            .unwrap()
+            .declarations();
+        let chat = names(&crate::second_provider::worker::chat_tools(
+            &settings, &search, true,
+        ));
+        let mut expected = names(&core_tools(&settings));
+        expected.extend(names(&search));
+        expected.push(crate::second_provider::LOOK_CALL.to_owned());
+        assert_eq!(chat, expected);
         std::fs::remove_dir_all(dir).unwrap();
     }
 

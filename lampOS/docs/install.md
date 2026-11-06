@@ -298,16 +298,17 @@ count changes). On the product's route a chat request takes 48
 (`second_provider::MAX_TOOLS`), and each offers every one, with the
 search's `web_search` and `fetch_page`
 (`a_product_lamp_declares_every_function_it_has_within_the_bound`,
-`a_product_chat_request_offers_dance_at_the_bound`). At the bound a core
-skill's function is never the one cut (the owner's rule, on #2614): a chat
-request leaves out the search's `fetch_page`, then `the_time` (asked only
-for elsewhere), then the skills' functions that are not a core skill's,
-the last first, then `web_search`; a Live session only the skills'
-not a core skill's. Core skills say theirs in the skills' tools file's
-`core` list (`lamp_skills::tools_file`). A Live
-session (a per-lamp drop-in, not the product's route) is cut to 32, and its
-error line names `reports_state`; `reports_stop` and `dance` stay
-(`with_reports_on_dance_stays_at_the_bound`). The built-in
+`a_product_chat_request_offers_dance_at_the_bound`). At the bound core
+tools come before skills (the first builder on Queue #5385): a chat
+request leaves out the skills' functions that are not a core skill's, then
+a core skill's, each the last first, and only then the search's
+`fetch_page`, `the_time` (asked only for elsewhere), `reports_state` and
+`web_search`; a Live session the skills' and then `reports_state`. Core
+skills say theirs, their `[stop]` functions too, in the skills' tools
+file's `core` list (`lamp_skills::tools_file`). A Live session (a
+per-lamp drop-in, not the product's route) is cut to 32, and its line
+names the skills' it left out, `dance` among them; `reports_stop` and
+`reports_state` stay (`with_reports_on_dance_stays_at_the_bound`). The built-in
 instruction tells the model its head sits on an arm that moves and that a
 dance is a call (lamp-0c89, 21 Oct, answered "I've no legs to dance with"
 with `dance` given; `crates/voice/src/config.rs`). The voice leaves out by that order what

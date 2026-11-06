@@ -8405,9 +8405,11 @@ fn calls(
 /// never runs one, since a lamp that moves for a text nobody in the room sent
 /// looks wrong (#1673, the first builder, 19 Oct). A key of the file's own,
 /// not of each tool, which the voice's function declarations refuse.
-/// `core` names the tools of core skills ([`SkillKind::Core`]), when any:
-/// at a session's bound of functions the voice never cuts one of them, and
-/// cuts others first (the owner's rule, on #2614).
+/// `core` names the tools of core skills ([`SkillKind::Core`]) and their
+/// `[stop]` functions, when any: at a session's bound of functions the
+/// voice cuts the other skills' first, and a core skill's only before any
+/// of its own (the owner's rule on #2614, then core tools before skills,
+/// the first builder on Queue #5385).
 /// `searches` gives, by tool, a search's note and walk, when any says them
 /// (`[search]`'s `note`, `walk` and `looked`, and its choice's `default`):
 /// the second voice route's note and walk read them (docs/second-voice.md).
@@ -8502,6 +8504,12 @@ pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) ->
         if let Some(stop) = &skill.stop
             && !tools.iter().any(|tool| tool["name"] == *stop.tool)
         {
+            // A core skill's stop is a core skill's function: at the bound
+            // the voice cuts the other skills' first (`wellbeing_nudges`,
+            // cut before installed skills' on lamp-9adf, 6 Nov).
+            if skill.kind == SkillKind::Core {
+                core.push(&stop.tool);
+            }
             let mut properties = serde_json::Map::new();
             properties.insert(
                 STOP_CHOICE.into(),

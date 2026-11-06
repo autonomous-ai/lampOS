@@ -10148,6 +10148,28 @@ fn a_skills_stop_snoozes_it_until_the_morning_or_turns_it_off_until_asked() {
     assert!(nudges(&mut engine, 12 * 3_600 + 4));
 }
 
+/// A core skill's `[stop]` is a core skill's function: the tools file's
+/// `core` names it, so at the bound the voice cuts installed skills'
+/// functions before it (lamp-9adf, 6 Nov: `wellbeing_nudges` was left out
+/// while installed skills' stayed). An installable skill's stop is not core.
+#[test]
+fn a_core_skills_stop_is_named_core_in_the_tools_file() {
+    let sit_back = load(&skills_root().join("sit-back")).unwrap();
+    assert_eq!(sit_back.kind, SkillKind::Core);
+    let tools = tools_file(std::slice::from_ref(&sit_back));
+    assert!(
+        tools["core"]
+            .as_array()
+            .is_some_and(|core| core.iter().any(|name| name == "wellbeing_nudges")),
+        "{tools}"
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let sip = load(&stoppable(dir.path())).unwrap();
+    assert_eq!(sip.kind, SkillKind::Installable);
+    let tools = tools_file(std::slice::from_ref(&sip));
+    assert!(tools.get("core").is_none(), "{tools}");
+}
+
 /// #1685: a `[stop]` is one function a skill, in its tools file beside the
 /// skill's own, so a session's 32 count it once; `lamp-skills list` counts
 /// it. Its name is one skill's, as a tool's is. It is held to its rules:
