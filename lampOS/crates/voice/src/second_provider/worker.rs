@@ -3503,6 +3503,21 @@ pub fn serve(
         );
     }
     engine = engine.checking_action_claims(action_claims);
+    // The same for a claim in other words ("I've set a timer for one
+    // minute.", "I've kept the light on until ten.";
+    // `LAMP_ACTION_CLAIM_WORDED=on`, #5215), only beside the check above.
+    let worded_claims = crate::action_claim::worded_on();
+    if worded_claims {
+        eprintln!(
+            "{}",
+            if action_claims {
+                "lamp-voice second: a reply claiming a timer, light or volume action in other words, with no call, is held the same way (LAMP_ACTION_CLAIM_WORDED)"
+            } else {
+                "lamp-voice second: LAMP_ACTION_CLAIM_WORDED does nothing without LAMP_ACTION_CLAIM_CHECKED"
+            }
+        );
+    }
+    engine = engine.checking_worded_claims(action_claims && worded_claims);
     // A line said to the lamp by name never ends in silence from an empty
     // answer (`LAMP_NO_WORDS_AGAIN=on`, #3704).
     let no_words_again = std::env::var(crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT)
