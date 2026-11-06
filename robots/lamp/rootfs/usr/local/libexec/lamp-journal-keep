@@ -62,8 +62,6 @@ run=${LAMP_JOURNAL_RUN:-/run/log/journal}
 budget=5000000
 # `setup`'s bound, its runs after the walk, and the onboarding's steps
 # (lamp_msgs::ONBOARDING_STEPS; lamp-update's tests check they match).
-# All nine, not just the skill's `order`: when the order's last step ends,
-# the voice keeps each step out of it `not_available` (#5499).
 setup_budget=24000000
 setup_after=20
 # 72 hours, and a time before which the clock isn't set yet (2026-01-01).
