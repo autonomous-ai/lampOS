@@ -171,17 +171,20 @@ impl Definition {
         self.words.later.clone().unwrap_or_else(|| LATER.to_owned())
     }
 
-    /// Exactly the nine mechanisms, in the skill's order. Data cannot add an
-    /// actuator, relax a physical check, or remove the privacy flow's priority.
+    /// Words for all nine mechanisms; the walk is the skill's `order`, where
+    /// you sit and who you are among some of them, each once (#5499). Data
+    /// cannot add an actuator, relax a physical check, or remove the privacy
+    /// flow's priority.
     pub fn checked(self) -> Result<Self, String> {
         let distinct: BTreeSet<_> = self.order.iter().copied().collect();
-        if self.order.len() != Step::IDS.len()
-            || distinct.len() != Step::IDS.len()
+        if distinct.len() != self.order.len()
+            || !distinct.contains(&Step::WhereYouSit)
+            || !distinct.contains(&Step::WhoYouAre)
             || self.steps.len() != Step::IDS.len()
-            || !distinct.iter().all(|step| self.steps.contains_key(step))
         {
             return Err(
-                "[onboarding] order and steps must each name all nine steps exactly once".into(),
+                "[onboarding] steps must name all nine steps, and order where_you_sit, who_you_are and others once each"
+                    .into(),
             );
         }
         if !(1..=31_536_000).contains(&self.reoffer_after_s) {
@@ -395,9 +398,16 @@ pub fn read_installed(dir: &Path) -> Result<Definition, String> {
 }
 
 /// Tests load the shipped data explicitly; production never embeds it.
+/// The runner's tests walk all nine steps in their order before #5499 (the
+/// steps' declared order), so each stays tested while out of the walk.
 #[cfg(test)]
 pub(crate) fn fixture() -> std::sync::Arc<Definition> {
-    std::sync::Arc::new(parse(include_str!("../../../../skills/onboarding/skill.toml")).unwrap())
+    let mut definition = parse(include_str!("../../../../skills/onboarding/skill.toml")).unwrap();
+    definition.order = Step::IDS
+        .iter()
+        .filter_map(|name| Step::named(name))
+        .collect();
+    std::sync::Arc::new(definition.checked().unwrap())
 }
 
 #[cfg(test)]

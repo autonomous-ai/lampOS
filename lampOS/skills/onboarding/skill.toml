@@ -26,7 +26,7 @@ say = { from = "onboarding" }
 
 # The walk reads this checked data once when Voice starts. Physical proof stays in Voice.
 [onboarding]
-order = ["where_you_sit", "who_you_are", "how_you_sound", "touch", "privacy", "giving_way", "room_sounds", "face_expressions", "preferences"]
+order = ["where_you_sit", "who_you_are"]
 reoffer_after_s = 86400
 # A step nobody tried (no words, push, tap or call): `later`, offered again this long after the walk, then once after reoffer_after_s (#3996).
 later_after_s = 1800
