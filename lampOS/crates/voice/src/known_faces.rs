@@ -4846,8 +4846,14 @@ mod tests {
         let face = quoted[1];
         assert!(face.contains("face"), "{face}");
         let back = who
-            .find("say their name back as a question on its own")
+            .find("say their name back as one clear yes-or-no question on its own")
             .expect("the script says the name back");
+        // A clear yes-or-no question, never the bare name: on lamp-52e6
+        // (build 10507) the read-back was "Leo? Leo.", no question to answer.
+        assert!(
+            who.contains("their name and then did I get that right, never their name alone"),
+            "{who}"
+        );
         assert!(back < who.find(face).unwrap(), "read-back before the face");
         let call = ToolCall {
             id: "1".into(),
