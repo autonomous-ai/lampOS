@@ -123,7 +123,7 @@ impl Systemd for Systemctl {
             Command::new("systemctl")
                 .args([
                     "show",
-                    "--property=Id,ActiveState,SubState,MainPID,NRestarts,Result",
+                    "--property=Id,ActiveState,SubState,MainPID,NRestarts,Result,ConditionResult",
                     "--",
                 ])
                 .args(units),
@@ -534,6 +534,7 @@ pub fn parse_show(text: &str) -> Vec<UnitState> {
                 "MainPID" => unit.pid = value.parse().unwrap_or(0),
                 "NRestarts" => unit.restarts = value.parse().unwrap_or(0),
                 "Result" => unit.result = value.to_owned(),
+                "ConditionResult" => unit.condition = value.to_owned(),
                 _ => {}
             }
         }

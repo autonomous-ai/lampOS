@@ -231,6 +231,8 @@ struct Running {
     pid: u32,
     restarts: u32,
     result: String,
+    /// `ConditionResult`: "no" for a start its condition skipped.
+    condition: String,
 }
 
 struct FakeSystemd {
@@ -308,9 +310,13 @@ impl FakeSystemd {
         .unwrap_or_default();
         self.next_pid += 1;
         let running = if self.condition_skipped.iter().any(|name| name == unit) {
+            // As systemd says it: inactive, its last run a success, and
+            // its condition not met.
             Running {
                 active: "inactive".into(),
                 sub: "dead".into(),
+                result: "success".into(),
+                condition: "no".into(),
                 ..Running::default()
             }
         } else if binary.contains("crash") || self.crashing.iter().any(|name| name == unit) {
@@ -372,6 +378,7 @@ impl Systemd for FakeSystemd {
                     pid: running.pid,
                     restarts: running.restarts,
                     result: running.result,
+                    condition: running.condition,
                 }
             })
             .collect())
@@ -1891,6 +1898,29 @@ fn a_folder_made_two_builds_ago_is_removed_and_one_never_made_is_kept() {
     assert_eq!(made, [folder("voice 3"), folder("voice 4")]);
 }
 
+/// lamp-52e6, 6 Nov (Fifth's P2 on #5385): a running part whose restart
+/// its own `Condition…=` skipped (lamp-tasks, with Harness gone under it)
+/// was counted as stopped, so 10441 was put back, and every later build
+/// would be. It is not this lamp's now, as at boot: the build is kept, and
+/// it is never put back for it.
+#[test]
+fn a_part_its_own_condition_skips_at_the_restart_keeps_the_build() {
+    let mut lamp = Lamp::new();
+    assert!(lamp.systemd.units["lamp-body.service"].active == "active");
+    lamp.systemd
+        .condition_skipped
+        .push("lamp-body.service".into());
+    lamp.publish(2, &[("lamp-body", "body 2")], &[]);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.systemd.units["lamp-body.service"].active, "inactive");
+    assert!(lamp.state()["refused"].as_array().is_none_or(Vec::is_empty));
+    // A part that fails at the same restart still puts the build back.
+    let mut lamp = Lamp::new();
+    lamp.systemd.crashing.push("lamp-body.service".into());
+    lamp.publish(2, &[("lamp-body", "body 2")], &[]);
+    assert!(matches!(lamp.round(), Outcome::RolledBack { .. }));
+}
+
 #[test]
 fn a_part_whose_folder_is_gone_is_installed_afresh() {
     let mut lamp = Lamp::new();
@@ -3187,6 +3217,7 @@ fn update_unit(active: &str, sub: &str) -> UnitState {
         pid: 0,
         restarts: 0,
         result: String::new(),
+        condition: String::new(),
     }
 }
 

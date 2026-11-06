@@ -23,6 +23,9 @@ pub struct UnitState {
     pub restarts: u32,
     /// `Result`: how its last run ended: success, exit-code, signal, ...
     pub result: String,
+    /// `ConditionResult`: whether its `Condition…=` held at its last start
+    /// (`yes`, `no`), empty when not said.
+    pub condition: String,
 }
 
 impl UnitState {
@@ -33,6 +36,12 @@ impl UnitState {
     /// Ended by itself with nothing wrong: inactive, its run a success.
     pub fn ended_cleanly(&self) -> bool {
         self.active == "inactive" && self.result == "success"
+    }
+
+    /// Not started at all, because its own `Condition…=` does not hold on
+    /// this lamp: as at boot, and as the build before would be.
+    pub fn skipped_by_condition(&self) -> bool {
+        self.ended_cleanly() && self.condition == "no"
     }
 }
 
@@ -45,6 +54,17 @@ impl UnitState {
 /// the same way, "the previous build is not well either". One that failed,
 /// crashed or is started again by systemd is still not well.
 pub const ENDS_BY_DESIGN: &[&str] = &["lamp-waking.service"];
+
+// A unit whose restart its own condition skipped ([`UnitState::skipped_by_condition`])
+// is not this lamp's now, not stopped: lamp-52e6 on 6 Nov put back 10441
+// for "lamp-tasks.service stopped" (its `ConditionPathExists=` Harness gone
+// under it), and "the previous build is not well either" for the same
+// reason, so every later build would be put back too (Fifth's P2 on #5385).
+// Putting a build back can't make a condition hold that neither build owns.
+// Not setup's own unit: a completed setup the round restarted anyway, then
+// skipped by its marker, is a phone grace period cut short, which
+// `setup_lifecycle` exists to prevent; its watch rules stand as they are.
+const CONDITION_OWN_RULES: &[&str] = &["lamp-setup.service"];
 
 /// A part's name in the lamp's health: its binary's without `lamp-`.
 pub fn part_of(binary: &str) -> &str {
@@ -103,6 +123,11 @@ impl Watch {
     /// One look during the minute. An error at once is a part that is not
     /// well, whatever the rest of the minute would show.
     pub fn look(&mut self, state: &UnitState) -> Result<(), String> {
+        if state.skipped_by_condition() && !CONDITION_OWN_RULES.contains(&self.unit.as_str()) {
+            self.ended = true;
+            self.first = None;
+            return Ok(());
+        }
         if ENDS_BY_DESIGN.contains(&self.unit.as_str()) && state.ended_cleanly() {
             // Its job done: a later start of it is seen afresh.
             self.ended = true;
@@ -187,6 +212,7 @@ mod tests {
             pid,
             restarts,
             result: "success".into(),
+            condition: "yes".into(),
         }
     }
 
@@ -304,6 +330,7 @@ mod tests {
             pid,
             restarts: 0,
             result: result.into(),
+            condition: "yes".into(),
         }
     }
 
@@ -366,5 +393,60 @@ mod tests {
         };
         assert!(watch.look(&ended).is_err());
         assert!(watch.finish(&ended, None).is_err());
+    }
+
+    /// lamp-52e6, 6 Nov (Fifth's P2 on #5385): lamp-tasks restarted with
+    /// its `ConditionPathExists=` Harness gone under it was skipped by
+    /// systemd, and counted as stopped, so 10441 was put back, and every
+    /// later build would be. Skipped by its own condition is not this
+    /// lamp's now, as at boot; ended any other way is still not well.
+    #[test]
+    fn a_restart_its_own_condition_skipped_is_not_a_stop() {
+        let skipped = UnitState {
+            unit: "lamp-tasks.service".into(),
+            active: "inactive".into(),
+            sub: "dead".into(),
+            pid: 0,
+            restarts: 0,
+            result: "success".into(),
+            condition: "no".into(),
+        };
+        let mut watch = Watch::new("lamp-tasks.service", "tasks", Before::default());
+        assert!(watch.look(&skipped).is_ok());
+        assert!(watch.finish(&skipped, None).is_ok());
+        // A part that reported before and is skipped now is still judged
+        // by systemd alone: it never started, so it can say nothing.
+        let mut watch = Watch::new(
+            "lamp-tasks.service",
+            "tasks",
+            Before::of("tasks", Some(&health(&[("tasks", Level::Ok)]))),
+        );
+        assert!(watch.finish(&skipped, Some(&health(&[]))).is_ok());
+        // Stopped with its condition met, or failed, is not well.
+        for (condition, result, active) in [
+            ("yes", "success", "inactive"),
+            ("", "success", "inactive"),
+            ("no", "exit-code", "inactive"),
+            ("no", "exit-code", "failed"),
+        ] {
+            let ended = UnitState {
+                condition: condition.into(),
+                result: result.into(),
+                active: active.into(),
+                ..skipped.clone()
+            };
+            let mut watch = Watch::new("lamp-tasks.service", "tasks", Before::default());
+            assert!(
+                watch.finish(&ended, None).is_err(),
+                "{condition} {result} {active}"
+            );
+        }
+        // Setup's own unit keeps setup_lifecycle's rules: skipped is stopped.
+        let setup = UnitState {
+            unit: "lamp-setup.service".into(),
+            ..skipped.clone()
+        };
+        let mut watch = Watch::new("lamp-setup.service", "setup", Before::default());
+        assert!(watch.finish(&setup, None).is_err());
     }
 }
