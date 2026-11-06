@@ -1230,6 +1230,10 @@ fn worker_command(
             var(crate::onboarding::ENVIRONMENT).as_deref(),
             var(crate::onboarding::FILE_ENVIRONMENT).as_deref(),
         ))
+        .envs(private_room_worker_environment(
+            role,
+            var(crate::person::PRIVATE_ROOM_ENVIRONMENT).as_deref(),
+        ))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -1438,6 +1442,17 @@ fn keep_quietly_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::keep_quietly::ENVIRONMENT, "on"))
+}
+
+// The private room (`person::private_room`), to the two routes that run the
+// linked services, the name and the reminders. Cleared like every other
+// switch, it would not reach them.
+fn private_room_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::person::PRIVATE_ROOM_ENVIRONMENT, "on"))
 }
 
 // The setup walk's file (`LAMP_ONBOARDING`, `LAMP_ONBOARDING_FILE`), to the
@@ -3103,6 +3118,37 @@ mod tests {
         let written = std::fs::read_to_string(home.path.join("env-provider.txt")).unwrap();
         let got = given(&written);
         assert!(got.is_empty(), "the child got {:?}", names(&got));
+    }
+
+    /// The private room reaches the workers that act on it, and only as `on`:
+    /// a switch set in the unit and cleared on the way would change nothing.
+    #[test]
+    fn the_routes_are_given_the_private_room() {
+        use std::os::unix::fs::PermissionsExt;
+        let home = SessionDirectory::create().unwrap();
+        let script = home.path.join("worker.sh");
+        std::fs::write(&script, "#!/bin/sh\n/usr/bin/env > \"$3/env-$2.txt\"\n").unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let boot = new_boot().unwrap();
+        let given = |role: &str, value: &'static str| -> bool {
+            let status = status_of_fresh(&mut worker_command(
+                &script,
+                &home.path,
+                role,
+                (boot, boot),
+                &[],
+                |name| (name == crate::person::PRIVATE_ROOM_ENVIRONMENT).then(|| value.into()),
+            ));
+            assert!(status.success(), "{role}");
+            std::fs::read_to_string(home.path.join(format!("env-{role}.txt")))
+                .unwrap()
+                .lines()
+                .any(|line| line == "LAMP_PRIVATE_ROOM=on")
+        };
+        assert!(given("second", "on"));
+        assert!(given("provider", "on"));
+        assert!(!given("ring", "on"));
+        assert!(!given("second", "off"));
     }
 
     /// The setup walk's file reaches the second worker, and only it: a held
