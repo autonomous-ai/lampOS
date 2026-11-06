@@ -65,9 +65,26 @@ use std::{
 pub const ENVIRONMENT: &str = "LAMP_KEEP_QUIETLY";
 static ON: OnceLock<bool> = OnceLock::new();
 
+#[cfg(test)]
+thread_local! {
+    /// The switch for one test's own thread ([`set_on_for_test`]): the
+    /// process switch is read once, and other tests read it off.
+    static ON_FOR_TEST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 /// Whether the switch is on in this process, read once.
 pub fn on() -> bool {
+    #[cfg(test)]
+    if ON_FOR_TEST.with(std::cell::Cell::get) {
+        return true;
+    }
     *ON.get_or_init(|| std::env::var(ENVIRONMENT).ok().as_deref() == Some("on"))
+}
+
+/// The switch on or off for the calling test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_on_for_test(on: bool) {
+    ON_FOR_TEST.with(|cell| cell.set(on));
 }
 
 /// Told beside the person's words, in a known person's own scope, when the
@@ -232,15 +249,18 @@ pub fn unheard(
         Ok(thread) => refusal(
             model,
             thread.heard_for(request, now).as_deref(),
-            thread
-                .offered_line(
-                    request,
-                    Some(person),
-                    now,
-                    crate::remember::heard::offers_to_keep,
-                    crate::remember::heard::only_a_yes,
-                )
-                .is_some(),
+            // Their seen yes to a carried line's held keep answers the
+            // lamp's offer, told as the room's (lamp-06c1, 6 Nov, C55).
+            crate::remember::heard::released(lease).is_some()
+                || thread
+                    .offered_line(
+                        request,
+                        Some(person),
+                        now,
+                        crate::remember::heard::offers_to_keep,
+                        crate::remember::heard::only_a_yes,
+                    )
+                    .is_some(),
             seen,
         ),
         Err(_) => Some(if seen { not_kept() } else { not_seen() }),
