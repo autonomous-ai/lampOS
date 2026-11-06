@@ -2476,6 +2476,13 @@ pub fn serve(
             crate::known_faces::keep_owner_fresh(owner_file.clone(), owner_faces.clone());
             bus
         });
+    // One owner status per reply, with the by-default name (LAMP_OWNER_STATUS).
+    let owner_status = by_default.is_some() && crate::person::owner_status_on();
+    if owner_status {
+        eprintln!(
+            "lamp-voice second: a reply is told whether the person speaking is the owner, a known face that isn't, a face it doesn't recognise, or can't be seen, never the owner's name but to the owner (LAMP_OWNER_STATUS)"
+        );
+    }
     // The connected services are the owner's only, and read in full only
     // with them alone in view (`crate::services`): the owner and the faces
     // counted, whatever the by-default name's switch.
@@ -2566,6 +2573,25 @@ pub fn serve(
                     // is the only voice (`LAMP_FACES_AT_DESK_ONLY`).
                     let speaking_not_at_desk = bus.is_some()
                         && crate::known_faces::spoke_not_at_desk_lately();
+                    // The reply's owner status (LAMP_OWNER_STATUS), from the
+                    // same signs, kept for a services call refused in it.
+                    let status = owner_status.then(|| {
+                        crate::person::owner_status(
+                            &owners,
+                            faces,
+                            known_now.as_deref(),
+                            another,
+                            speaking_not_at_desk,
+                            carried.as_deref(),
+                        )
+                    });
+                    if let Some(status) = &status {
+                        eprintln!(
+                            "lamp-voice second: owner status for this reply: {} (LAMP_OWNER_STATUS)",
+                            status.told()
+                        );
+                        crate::person::note_status(status.clone());
+                    }
                     match crate::person::someone_else_now(
                         &owners,
                         faces,
@@ -2593,7 +2619,7 @@ pub fn serve(
                                 "lamp-voice second: the owner is not named by default: {why}{sizes}; their name is taken out of the conversation's earlier lines (LAMP_PERSON_NAME_BY_DEFAULT)"
                             );
                             withheld = Some(name.to_owned());
-                            format!("\n\n{}", crate::person::HELD_BACK_NOTE)
+                            format!("\n\n{}", crate::person::held_back_told(status.as_ref()))
                         }
                         None => {
                             // Said without the name, so a miss shows whether
