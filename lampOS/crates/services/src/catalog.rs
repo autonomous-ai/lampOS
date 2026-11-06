@@ -288,6 +288,21 @@ pub const SERVICES: &[Service] = &[
         writes: &[],
         mcp: Some("https://mcp.notion.com/mcp"),
     },
+    // Spotify (#5460), behind `LAMP_SERVICES_SPOTIFY`, read and renewed by
+    // `spotify.rs` alone: its link is a refresh token the lamp renews at
+    // `accounts.spotify.com` itself (PKCE, no secret), and only the access
+    // token goes to `api.spotify.com`. Both hosts exactly, no subdomain.
+    // No write: playback control is not built.
+    Service {
+        code: "spotify",
+        name: "Spotify",
+        hosts: &["accounts.spotify.com", "api.spotify.com"],
+        api: Some("https://api.spotify.com"),
+        graphql: false,
+        reads: &[(Get, "/v1/me/player/currently-playing")],
+        writes: &[],
+        mcp: None,
+    },
 ];
 
 /// The Graph API version the lamp asks Facebook with.
@@ -299,14 +314,15 @@ pub fn service(code: &str) -> Option<&'static Service> {
 }
 
 /// Whether `code`'s token may go to `host`: one of its hosts or a
-/// subdomain of one (V1's `host_allowed`); for an MCP service one of its
-/// hosts exactly.
+/// subdomain of one (V1's `host_allowed`); for an MCP service and Spotify
+/// one of its hosts exactly.
 pub fn host_allowed(code: &str, host: &str) -> bool {
     let host = host.to_ascii_lowercase();
     service(code).is_some_and(|service| {
+        let exact = service.mcp.is_some() || service.code == crate::spotify::CODE;
         service.hosts.iter().any(|allowed| {
             host == *allowed
-                || (service.mcp.is_none()
+                || (!exact
                     && host
                         .strip_suffix(allowed)
                         .is_some_and(|below| below.ends_with('.') && below.len() > 1))
@@ -504,6 +520,31 @@ mod tests {
         ] {
             assert!(!host_allowed(code, host), "{code} to {host}");
         }
+    }
+
+    #[test]
+    fn spotify_is_its_two_hosts_exactly_and_reads_one_route() {
+        for host in ["accounts.spotify.com", "api.spotify.com", "API.Spotify.com"] {
+            assert!(host_allowed("spotify", host), "{host}");
+        }
+        for host in [
+            "x.api.spotify.com",
+            "spotify.com",
+            "open.spotify.com",
+            "api.spotify.com.evil.test",
+        ] {
+            assert!(!host_allowed("spotify", host), "{host}");
+        }
+        let ok = |method, path| read_allowed("spotify", method, path, None).is_ok();
+        assert!(ok(Get, "/v1/me/player/currently-playing"));
+        assert!(!ok(Get, "/v1/me/player"));
+        assert!(!ok(Post, "/v1/me/player/currently-playing"));
+        assert!(!write_allowed(
+            "spotify",
+            Method::Patch,
+            "/v1/me/player/play"
+        ));
+        assert!(service("spotify").unwrap().writes.is_empty());
     }
 
     #[test]

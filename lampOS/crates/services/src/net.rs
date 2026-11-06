@@ -141,6 +141,67 @@ pub fn scrub(text: &str, secret: &str) -> String {
         .replace(&encoded, "[credential]")
 }
 
+/// The client every service call is made with: no redirect followed (one
+/// comes back as its own status), bounded in time, its own TLS. Only a
+/// test against a local server passes `https_only` false.
+pub fn client(https_only: bool) -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .tls_backend_preconfigured(tls()?)
+        .https_only(https_only)
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(WITHIN)
+        .connect_timeout(CONNECT_WITHIN)
+        .build()
+        .map_err(|_| "HTTPS client setup".to_owned())
+}
+
+/// `call` sent on `client`: its answer's status, kept headers and at most
+/// [`BODY_MOST`] of its body. An error never names the URL.
+pub async fn send_on(client: &reqwest::Client, call: Call) -> Result<Reply, String> {
+    let method = match call.method {
+        Method::Get => reqwest::Method::GET,
+        Method::Post => reqwest::Method::POST,
+        Method::Patch => reqwest::Method::PATCH,
+    };
+    let mut request = client.request(method, &call.url);
+    for (name, value) in &call.headers {
+        request = request.header(name, value);
+    }
+    if let Some(body) = call.body {
+        request = request.body(body);
+    }
+    // reqwest's errors name the URL: dropped whole.
+    let mut response = tokio::time::timeout(WITHIN, request.send())
+        .await
+        .map_err(|_| "the service didn't answer in time".to_owned())?
+        .map_err(|_| "the service couldn't be reached".to_owned())?;
+    let status = response.status().as_u16();
+    let headers = KEPT_HEADERS
+        .iter()
+        .filter_map(|name| {
+            let value = response.headers().get(*name)?.to_str().ok()?;
+            (value.len() <= HEADER_MOST).then(|| ((*name).to_owned(), value.to_owned()))
+        })
+        .collect();
+    let mut body = Vec::new();
+    while let Some(chunk) = tokio::time::timeout(WITHIN, response.chunk())
+        .await
+        .map_err(|_| "the service didn't answer in time".to_owned())?
+        .map_err(|_| "the service's answer broke off".to_owned())?
+    {
+        let room = BODY_MOST.saturating_sub(body.len());
+        body.extend_from_slice(&chunk[..chunk.len().min(room)]);
+        if body.len() >= BODY_MOST {
+            break;
+        }
+    }
+    Ok(Reply {
+        status,
+        body,
+        headers,
+    })
+}
+
 /// The real sender: a client made for each call (no connection outlives
 /// the request's own runtime), https only, no redirect.
 #[derive(Clone, Copy, Debug, Default)]
@@ -148,56 +209,7 @@ pub struct Https;
 
 impl Http for Https {
     async fn send(&self, call: Call) -> Result<Reply, String> {
-        let client = reqwest::Client::builder()
-            .tls_backend_preconfigured(tls()?)
-            .https_only(true)
-            .redirect(reqwest::redirect::Policy::none())
-            .timeout(WITHIN)
-            .connect_timeout(CONNECT_WITHIN)
-            .build()
-            .map_err(|_| "HTTPS client setup".to_owned())?;
-        let method = match call.method {
-            Method::Get => reqwest::Method::GET,
-            Method::Post => reqwest::Method::POST,
-            Method::Patch => reqwest::Method::PATCH,
-        };
-        let mut request = client.request(method, &call.url);
-        for (name, value) in &call.headers {
-            request = request.header(name, value);
-        }
-        if let Some(body) = call.body {
-            request = request.body(body);
-        }
-        // reqwest's errors name the URL: dropped whole.
-        let mut response = tokio::time::timeout(WITHIN, request.send())
-            .await
-            .map_err(|_| "the service didn't answer in time".to_owned())?
-            .map_err(|_| "the service couldn't be reached".to_owned())?;
-        let status = response.status().as_u16();
-        let headers = KEPT_HEADERS
-            .iter()
-            .filter_map(|name| {
-                let value = response.headers().get(*name)?.to_str().ok()?;
-                (value.len() <= HEADER_MOST).then(|| ((*name).to_owned(), value.to_owned()))
-            })
-            .collect();
-        let mut body = Vec::new();
-        while let Some(chunk) = tokio::time::timeout(WITHIN, response.chunk())
-            .await
-            .map_err(|_| "the service didn't answer in time".to_owned())?
-            .map_err(|_| "the service's answer broke off".to_owned())?
-        {
-            let room = BODY_MOST.saturating_sub(body.len());
-            body.extend_from_slice(&chunk[..chunk.len().min(room)]);
-            if body.len() >= BODY_MOST {
-                break;
-            }
-        }
-        Ok(Reply {
-            status,
-            body,
-            headers,
-        })
+        send_on(&client(true)?, call).await
     }
 }
 

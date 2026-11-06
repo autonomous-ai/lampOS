@@ -111,6 +111,7 @@ dịch vụ.
 |---|---|---|
 | `LAMP_SERVICES=on` | `lamp-cloud` (với `LAMP_CLOUD=on`), `lamp-voice` và `lamp-services` | `lamp-cloud` trả lời `connector.*` và `services.list` của ứng dụng bằng câu của V1 "not on this lamp: <kind>" và không ghi gì vào `can`; giọng nói không khai báo hàm nào trong ba hàm và không định tuyến hàm nào; `lamp-services` không mở socket nào và thoát |
 | `LAMP_SERVICES_WRITE=on` (bật trong `lamp-services.service` của sản phẩm) | `lamp-services` | `service_write` trả lời "writing to services is off on this lamp", và không gì được chuẩn bị hay gửi; việc đọc vẫn như trước |
+| `LAMP_SERVICES_SPOTIFY=on` (tắt trong sản phẩm) | `lamp-services` | Spotify (#5460) bị từ chối: một `connector.set.spotify` là `failure` "Spotify is off on this lamp" với `data.code` `not_allowed`, không giữ gì và không hỏi Spotify gì; một `service_read` của nó nhận cùng lời đó; `tools.json` không nêu `spotify` ("Spotify: đang phát gì", bên dưới) |
 | `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và một yêu cầu tạo kỹ năng nêu một dịch vụ được trả lời `NOT_A_SERVICE` ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
@@ -280,6 +281,7 @@ backend của đèn, không bao giờ đến Google).
 | `hubspot` | HubSpot | `mcp.hubspot.com` | như Slack | như Slack |
 | `amplitude` | Amplitude | `mcp.amplitude.com`, `mcp.eu.amplitude.com` | như Slack | như Slack |
 | `notion` | Notion | `mcp.notion.com` | như Slack | như Slack |
+| `spotify` | Spotify (với `LAMP_SERVICES_SPOTIFY`) | `accounts.spotify.com` (chỉ route token của nó), `api.spotify.com`, mỗi host đúng chính xác | `now_playing` | không có |
 
 Calendar không có lần đọc `calendars`: liên kết của nó chỉ giữ
 `calendar.events` (#5385), và Google chỉ liệt kê lịch với scope calendar hoặc
@@ -505,6 +507,79 @@ câu trả lời được đọc dưới dạng `application/json` hoặc `text/
   độ sâu nào (`mcp::WRITE_KEYS_REFUSED`). Một lần ghi được phép vẫn được đọc
   lại với tool và đích của nó, và chỉ gửi khi chủ nói "send", sau
   `LAMP_SERVICES_WRITE`. Các dịch vụ MCP khác không có danh sách như vậy.
+
+## Spotify: đang phát gì (#5460, `LAMP_SERVICES_SPOTIFY`, tắt)
+
+`crates/services/src/spotify.rs`, theo hợp đồng đã thống nhất trên #5460
+(bản sửa của Backend2, 6/11 10:57, Fourteen đồng ý lúc 11:03). Tắt trừ khi
+`LAMP_SERVICES_SPOTIFY=on` trong môi trường của `lamp-services`;
+`lamp-services.service` của sản phẩm không đặt nó.
+
+- **Liên kết.** Điện thoại tự chạy PKCE tại `accounts.spotify.com` với
+  client id riêng của người dùng, rồi chỉ chuyển refresh token, client id
+  và các scope đã cấp qua route token cá nhân của backend. Đèn nhận
+  `connector.set.spotify` như mọi code: `{"auth_type": "pat", "api_key":
+  <refresh token>, "credentials": {"client_id", "scopes": "<cách nhau bằng
+  dấu cách>"}}`. Chỉ được giữ khi là `pat` có `api_key` và không có access
+  token (nếu không: "Spotify's link is its refresh token alone"), và client
+  id gồm chữ và số, tối đa 64 (`credentials.client_id`, nếu không thì
+  `client_id`; nếu không: "Spotify's link needs its client id"). Các scope
+  được tách vào `scopes` của mục. Mục được giữ với `refresh` false, không
+  `refresh_token` và không hạn, nên việc gia hạn qua backend ("Làm mới",
+  bên dưới) không bao giờ thấy nó.
+- **Lúc `set`** liên kết được chứng minh bằng một lần gia hạn tại Spotify
+  (bên dưới), và refresh token được giữ là token đã xoay khi Spotify trả
+  token mới. Bị từ chối: `failure` với "Spotify refused the lamp's link:
+  link it again in the app" và `data.code` `relink`; không tới được:
+  "Spotify couldn't be reached: try again in a while" và `unreached`. Cả hai
+  trường hợp đều không giữ gì. `lamp-cloud` chuyển `code` của
+  `lamp-services` vào `data.code` của câu trả lời, hiện chỉ cho liên kết
+  này (chữ thường và `_`, tối đa 32, nếu không thì bỏ).
+- **Gia hạn, trên đèn.** Liên kết duy nhất do chính đèn gia hạn, vì PKCE
+  không có secret: `POST https://accounts.spotify.com/api/token`,
+  `application/x-www-form-urlencoded`, `grant_type=refresh_token`,
+  `refresh_token`, `client_id`, và không có header `Authorization`. Một 200
+  có `access_token` và `expires_in` lớn hơn 0 cho một access token, chỉ giữ
+  trong bộ nhớ của `lamp-services` (không bao giờ trong kho, journal hay một
+  câu trả lời) trong thời hạn của nó, tối đa một giờ, trừ 60 s. Một
+  `refresh_token` đã xoay trong câu trả lời thay token đang giữ ngay lập
+  tức, ghi trọn như mọi mục (0600, của root, ghi bên cạnh, sync, rename);
+  nếu không ghi được thì vẫn giữ trong bộ nhớ cho lần gia hạn sau. Mỗi lúc
+  chỉ một lần gia hạn (token đã xoay chỉ dùng được một lần). 400 với
+  `invalid_grant`, `invalid_client` hoặc `unauthorized_client`, hoặc 401, là
+  liên kết bị từ chối (kể cả bị thu hồi trong Spotify): mục được đánh dấu
+  hết hạn trong kho, `list` và `services_connected` nói `expired: true`, và
+  mọi lần đọc nói "Spotify refused the lamp's link: link it again in the
+  app", không hỏi Spotify nữa cho đến khi được liên kết lại. Mọi trường hợp
+  khác, kể cả một redirect, để nguyên liên kết.
+- **Host.** Đúng `accounts.spotify.com` cho `POST /api/token` và
+  `api.spotify.com` cho `GET /v1/me/player/currently-playing`, https, không
+  user, port hay fragment, không subdomain, và không gì khác
+  (`spotify::guard`, trước mọi lệnh gọi). Không theo redirect nào: nó trở
+  về như status của nó. 5 s để kết nối, 15 s mỗi lệnh gọi, 15 s cho cả lần
+  đọc cùng việc gia hạn, dưới 20 s của giọng nói.
+- **Lần đọc.** Chỉ `service_read {service: "spotify", what: "now_playing"}`,
+  với mọi quy tắc chủ đèn như mọi lần đọc ("Ai dùng được chúng"): access
+  token đang giữ, nếu không thì một lần gia hạn, rồi `GET
+  /v1/me/player/currently-playing?additional_types=track,episode` với nó
+  làm bearer. Câu trả lời, được trích dẫn như mọi lần đọc: `playing`,
+  `type` (track hoặc episode), `title`, `artists`, `album` hoặc `show`,
+  không gì khác của Spotify (không thiết bị, id hay link); 204, hoặc không
+  có gì đang phát, là "Nothing is playing on Spotify right now.". 401 quên
+  token đang giữ, nên lần đọc sau gia hạn; 403 là "Spotify refused the
+  lamp's link: it may need linking again in the app"; 429 là "Spotify is
+  busy: try again in a while". Cả hai token được xoá khỏi câu trả lời. Lần
+  đọc đầu sau khi khởi động gồm một lần gia hạn và lần đọc (hai vòng); các
+  lần sau một vòng.
+- **Không phải của kỹ năng, không bao giờ ghi.** Kỹ năng tự tạo không đọc
+  được Spotify (`spoken::not_readable`: "read only by the owner's voice").
+  Điều khiển phát nhạc chưa được xây: `service_write` cho Spotify trả lời
+  "The lamp doesn't control Spotify's playback: it only reads what is
+  playing", và scope `user-modify-playback-state` mà liên kết có không bao
+  giờ được dùng. Nó được dành cho `LAMP_SERVICES_PLAYBACK`, hiện chưa gì
+  đọc; danh sách `service` của hàm ghi không bao giờ nêu Spotify.
+- **Tắt**, như bảng công tắc nói; bật, `tools.json` nêu `spotify` trong
+  danh sách `service` của hàm đọc và "spotify: now_playing" trong mô tả.
 
 ## Đọc
 
@@ -996,7 +1071,7 @@ việc đọc dịch vụ không liệt kê) làm kỹ năng bị từ chối. P
 ## Làm mới
 
 Một liên kết OAuth được gia hạn qua backend, như `connector_refresh.go` của V1
-làm (`crates/services/src/refresh.rs`): `POST <base>/connector/refresh-token`
+làm (trừ Spotify, do chính đèn gia hạn: "Spotify: đang phát gì", ở trên) (`crates/services/src/refresh.rs`): `POST <base>/connector/refresh-token`
 với `{"connector", "refresh_token"}`, khoá của đèn làm bearer và id của nó
 trong `X-Device-ID`. Không có client secret nào trên đèn. `<base>` là
 `llm_base_url` trong `backend.json` của setup với `/v1` bị cắt bỏ (chỉ
@@ -1038,7 +1113,7 @@ Câu trả lời theo dạng của V1, `{"type":"data","kind":"connector.set.<co
 "the lamp's services are busy: try again in a moment"), chờ 30 s (việc kiểm
 tra Gmail, một lần đăng nhập IMAP hoặc một lần đọc profile, nằm trong đó); kết quả của nó đi ra ở tick kế tiếp và được gửi lại
 nếu kết nối mất trước khi broker ack. Lỗi bằng lời thường: "not a service this
-lamp knows" (một code không nằm trong 15 code, ngay lập tức), "the lamp's
+lamp knows" (một code không nằm trong 17 code, ngay lập tức), "the lamp's
 services are not running", "the lamp's services did not answer in time",
 "fetch privacy data: http <status>" / "backend rejected: …" / "backend
 response missing data block", "connector is required", "auth_type is
@@ -1105,6 +1180,11 @@ kỹ năng trong cùng lượt vẫn giữ.
 
 ## Những gì chưa làm
 
+- **Spotify tắt và chưa chạy trên đèn nào** (`LAMP_SERVICES_SPOTIFY`,
+  #5460): còn nợ màn hình PKCE của ứng dụng, một lần gia hạn thật tại
+  Spotify và một lần đọc trình phát thật, và lần đọc quyền riêng tư về việc
+  gia hạn phía đèn đi trước. Điều khiển phát nhạc chưa được xây
+  (`LAMP_SERVICES_PLAYBACK`).
 - **Việc đọc của kỹ năng tự tạo đã bật trong sản phẩm, chưa chạy trên một
   đèn sản phẩm.** Sau `LAMP_SKILL_READS` (bật trong bốn unit sản phẩm từ
   5/11): chỉ thư và lịch có lời nói riêng, mọi dịch vụ
@@ -1143,7 +1223,19 @@ kỹ năng trong cùng lượt vẫn giữ.
 
 ## Kiểm thử
 
-`cargo test -p lamp-services`: kho chỉ root (0700/0600) và được ghi trọn, một
+`cargo test -p lamp-services` (`spotify`, với một máy chủ HTTP giả cục bộ
+trên 127.0.0.1 và client của sản phẩm: không redirect, các timeout của nó):
+liên kết Spotify là refresh token và client id, không bao giờ để backend
+gia hạn; chỉ hai host và hai route của nó được gọi, ngoài ra không gì tới
+máy chủ; việc gia hạn theo PKCE, không secret và không `Authorization`,
+access token giữ trong bộ nhớ và dùng lại, không bao giờ được lưu, refresh
+token đã xoay được ghi trọn (0600, không để lại tệp bên cạnh) và dùng sau
+khi khởi động lại; thu hồi (`invalid_grant`, 401) được nói là "link it
+again" lúc `set` và lúc đọc, liên kết bị đánh dấu hết hạn và Spotify không
+bị hỏi lại; redirect không bao giờ được theo; khi công tắc tắt, liên kết bị
+từ chối với `not_allowed` và lần đọc bị từ chối, không gọi gì; ghi và lần
+đọc của kỹ năng tự tạo bị từ chối; unit sản phẩm không đặt nó; `tools.json`
+chỉ nêu nó khi có công tắc, và chỉ là một lần đọc. Ngoài ra: kho chỉ root (0700/0600) và được ghi trọn, một
 code không bao giờ là một đường dẫn, gỡ và xoá; không bí mật nào trong một
 `Debug` hay một lời từ chối; một token chỉ qua https đến các host của chính nó
 (không port, user, fragment hay host giả mạo), đọc chỉ trong danh sách cho
@@ -1165,7 +1257,8 @@ trọn; câu trả lời được trích dẫn và dưới mức trần của gi
 bị từ chối khi tắt, được đọc lại đầy đủ và gửi một lần trong hai phút; luật
 đọc/ghi MCP, host được ghim của nó, một liên kết trên host khác không bao giờ
 được gọi, một tool ghi được đọc lại trọn và gọi một lần khi gửi; yêu cầu làm
-mới giống V1; người hỏi được nhận biết qua cgroup của họ. `-p lamp-cloud`
+mới giống V1; người hỏi được nhận biết qua cgroup của họ. `-p lamp-cloud` (cũng: `spotify` được biết và `code` của một lời từ chối
+được chuyển vào `data.code`, code sai dạng bị bỏ)
 (`services`, `online`, `answer`): cần cả hai từ công tắc, câu trả lời của
 backend được đọc như V1 đọc, connector lấy về được kiểm tra và không bao giờ
 nói ra, `starting` ngay và kết quả sau đó không có token của nó, gỡ, liệt kê

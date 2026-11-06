@@ -9,6 +9,7 @@ use crate::mcp::{self, Client, Endpoint};
 use crate::net::{self, Call, Http};
 use crate::reads::{self, ANSWER_MOST, Plan};
 use crate::refresh::Backend;
+use crate::spotify::{self, Spotify};
 use crate::store::{Entry, Store};
 use crate::writes::{self, Action, Desk};
 use crate::{spoken, tools};
@@ -185,6 +186,10 @@ pub struct Services<H, M> {
     /// `LAMP_SKILL_READS=on`: `lamp-skills` may call the tools' socket, for
     /// `service_read` alone ([`Services::skill_tool`]).
     pub skill_reads: bool,
+    /// `LAMP_SERVICES_SPOTIFY=on`: Spotify may be linked and read (#5460).
+    pub spotify_on: bool,
+    /// Spotify's access token, in memory only.
+    pub spotify: Spotify,
     pub desk: Desk,
 }
 
@@ -214,8 +219,16 @@ impl<H: Http, M: Mail> Services<H, M> {
             backend,
             write_on,
             skill_reads: false,
+            spotify_on: false,
+            spotify: Spotify::default(),
             desk: Desk::default(),
         }
+    }
+
+    /// With `LAMP_SERVICES_SPOTIFY` as `on` gives it.
+    pub fn with_spotify(mut self, on: bool) -> Self {
+        self.spotify_on = on;
+        self
     }
 
     /// With `LAMP_SKILL_READS` as `on` gives it.
@@ -228,6 +241,8 @@ impl<H: Http, M: Mail> Services<H, M> {
     /// it (a code and what happened, never a secret).
     pub async fn admin(&self, line: &str) -> (Value, String) {
         let refused = |why: &str| json!({"ok": false, "error": why});
+        // A refusal the app's tile tells by its code (`data.code`).
+        let coded = |why: &str, code: &str| json!({"ok": false, "error": why, "code": code});
         let asked = match parse_admin(line.trim_end_matches(['\r', '\n'])) {
             Ok(asked) => asked,
             Err(why) => return (refused(&why), format!("a request refused: {why}")),
@@ -239,6 +254,7 @@ impl<H: Http, M: Mail> Services<H, M> {
             ),
             Admin::Wipe => {
                 self.desk.forget(None);
+                self.spotify.forget().await;
                 match self.store.wipe() {
                     Ok(()) => (json!({"ok": true}), "every service unlinked".into()),
                     Err(error) => (
@@ -249,6 +265,9 @@ impl<H: Http, M: Mail> Services<H, M> {
             }
             Admin::Remove(code) => {
                 self.desk.forget(Some(&code));
+                if code == spotify::CODE {
+                    self.spotify.forget().await;
+                }
                 match self.store.remove(&code) {
                     Ok(()) => (json!({"ok": true}), format!("{code} unlinked")),
                     Err(error) => (
@@ -258,6 +277,13 @@ impl<H: Http, M: Mail> Services<H, M> {
                 }
             }
             Admin::Set { code, connector } => {
+                if code == spotify::CODE && !self.spotify_on {
+                    let why = spotify::OFF;
+                    return (
+                        coded(why, "not_allowed"),
+                        format!("{code} not linked: {why}"),
+                    );
+                }
                 let entry = match Entry::from_set(&code, &connector, crate::now_secs()) {
                     Ok(entry) => entry,
                     Err(why) => return (refused(why), format!("{code} not linked: {why}")),
@@ -285,6 +311,19 @@ impl<H: Http, M: Mail> Services<H, M> {
                         let why = "Gmail needs the account's email";
                         return (refused(why), format!("gmail not linked: {why}"));
                     }
+                }
+                // Spotify's link is proved by one renewal at Spotify itself,
+                // its rotated refresh token the one kept.
+                if code == spotify::CODE
+                    && let Err(refusal) = self
+                        .spotify
+                        .link(&self.http, &mut entry, crate::now_secs())
+                        .await
+                {
+                    return (
+                        coded(refusal.words(), refusal.code()),
+                        format!("{code} not linked: {}", refusal.words()),
+                    );
                 }
                 match self.store.keep(&entry) {
                     Ok(()) => (
@@ -660,6 +699,14 @@ impl<H: Http, M: Mail> Services<H, M> {
         }) {
             return Err(why.into());
         }
+        // Spotify is read and renewed by its own client, its access token
+        // never through `call` (its kept token is the refresh token).
+        if asked == Some(spotify::CODE) {
+            if !self.spotify_on {
+                return Err(spotify::OFF.into());
+            }
+            return self.spotify.read(&self.http, &self.store, args).await;
+        }
         let (service, entry) = self.linked(args).await?;
         if service.mcp.is_some() {
             return self.mcp_read(service, &entry, args).await;
@@ -711,6 +758,11 @@ impl<H: Http, M: Mail> Services<H, M> {
     }
 
     async fn write(&self, args: &Value) -> Result<Value, String> {
+        // Playback control is not built: nothing is prepared or sent, and
+        // the link's modify scope is never used.
+        if args.get("service").and_then(Value::as_str) == Some(spotify::CODE) {
+            return Err(spotify::NO_PLAYBACK.into());
+        }
         if !self.write_on {
             return Err("writing to services is off on this lamp".into());
         }
@@ -1297,6 +1349,56 @@ mod tests {
 
     fn read_line(args: Value) -> String {
         json!({"op":"call","name":"service_read","args":args}).to_string()
+    }
+
+    /// Spotify (#5460) behind `LAMP_SERVICES_SPOTIFY`: off, a link is
+    /// refused with its code and a read is refused, nothing called; on, a
+    /// refused renewal at `set` keeps nothing and says its code; a write,
+    /// and a made skill's read, are refused either way.
+    #[test]
+    fn spotify_needs_its_switch_and_never_writes() {
+        let dir = tempfile::tempdir().unwrap();
+        let link = json!({"connector":"spotify","auth_type":"pat","api_key":"rt-planted",
+                          "credentials":{"client_id":"abc123","scopes":"user-read-currently-playing"}});
+        let off = services(dir.path(), "{}", true);
+        let (answer, said) = run(off.admin(&set_line("spotify", link.clone())));
+        assert_eq!(
+            answer,
+            json!({"ok": false, "error": spotify::OFF, "code": "not_allowed"})
+        );
+        assert!(!said.contains("planted"));
+        let read = run(off.tool(&read_line(
+            json!({"service":"spotify","what":"now_playing"}),
+        )));
+        assert_eq!(read, json!({"ok": false, "error": spotify::OFF}));
+        assert!(off.http.calls.lock().unwrap().is_empty());
+        assert!(off.store.load("spotify").is_none());
+        // On, with a token answer the lamp can't use: refused, coded,
+        // nothing kept, and only Spotify's token route asked.
+        let on = services(dir.path(), "{}", true).with_spotify(true);
+        let (answer, _) = run(on.admin(&set_line("spotify", link)));
+        assert_eq!(
+            answer,
+            json!({"ok": false, "error": spotify::UNREACHED, "code": "unreached"})
+        );
+        assert!(on.store.load("spotify").is_none());
+        let calls = on.http.calls.lock().unwrap().clone();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].url, "https://accounts.spotify.com/api/token");
+        let write = json!({"op":"call","name":"service_write",
+                           "args":{"service":"spotify","action":"play"}});
+        assert_eq!(
+            run(on.tool(&write.to_string())),
+            json!({"ok": false, "error": spotify::NO_PLAYBACK})
+        );
+        let skill = run(on.skill_tool(&read_line(
+            json!({"service":"spotify","what":"now_playing"}),
+        )));
+        assert!(skill["error"].as_str().unwrap().contains("can't read yet"));
+        assert_eq!(on.http.calls.lock().unwrap().len(), 1);
+        // The product's unit leaves it off.
+        let unit = include_str!("../../../deploy/product/lamp-services.service");
+        assert!(!unit.contains(spotify::ENVIRONMENT));
     }
 
     #[test]

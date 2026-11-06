@@ -4,7 +4,7 @@
 //! which takes `{"op":"call","name":...,"args":{...}}` and answers
 //! `{"ok":true,"result":...}` or `{"ok":false,"error":"..."}` in one line of
 //! at most 8 KB.
-use crate::{catalog, reads, writes};
+use crate::{catalog, reads, spotify, writes};
 use serde_json::{Value, json};
 use std::{fs, io, os::unix::fs::PermissionsExt, path::Path};
 
@@ -19,10 +19,12 @@ pub const CONNECTED: &str = "services_connected";
 pub const READ: &str = "service_read";
 pub const WRITE: &str = "service_write";
 
-fn codes() -> Vec<&'static str> {
+/// Every service's code, Spotify's only with its switch on (#5460).
+fn codes(spotify_on: bool) -> Vec<&'static str> {
     catalog::SERVICES
         .iter()
         .map(|service| service.code)
+        .filter(|code| spotify_on || *code != spotify::CODE)
         .collect()
 }
 
@@ -66,13 +68,14 @@ fn offset(minutes: i32) -> String {
     format!("{sign}{:02}:{:02}", minutes / 60, minutes % 60)
 }
 
-/// The three functions, with the lamp's own offset now.
-pub fn catalog() -> Value {
-    catalog_at(offset_here())
+/// The three functions, with the lamp's own offset now; Spotify's read
+/// only with `LAMP_SERVICES_SPOTIFY=on`.
+pub fn catalog(spotify_on: bool) -> Value {
+    catalog_at(offset_here(), spotify_on)
 }
 
 /// The three functions, the time fields' example at `offset_minutes`.
-fn catalog_at(offset_minutes: Option<i32>) -> Value {
+fn catalog_at(offset_minutes: Option<i32>, spotify_on: bool) -> Value {
     // The MCP services read and write alike: named once, together.
     let mcp = catalog::SERVICES
         .iter()
@@ -85,6 +88,9 @@ fn catalog_at(offset_minutes: Option<i32>) -> Value {
         .map(|(code, whats)| format!("{code}: {whats}"))
         .collect();
     whats.push(format!("{mcp}: tools, call {{tool, arguments}}"));
+    if spotify_on {
+        whats.push(format!("{}: {}", spotify::CODE, spotify::WHATS));
+    }
     let mut actions: Vec<String> = writes::ACTIONS
         .iter()
         .map(|(code, actions)| format!("{code}: {actions}"))
@@ -105,7 +111,7 @@ fn catalog_at(offset_minutes: Option<i32>) -> Value {
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "service": {"type": "string", "enum": codes()},
+                    "service": {"type": "string", "enum": codes(spotify_on)},
                     "what": string("What to read, as listed for the service."),
                     "query": string("Search words."),
                     "id": string("An id a list gave."),
@@ -134,7 +140,8 @@ fn catalog_at(offset_minutes: Option<i32>) -> Value {
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "service": {"type": "string", "enum": codes()},
+                    // Never Spotify: its playback control is not built.
+                    "service": {"type": "string", "enum": codes(false)},
                     "action": string("What to do, as listed for the service."),
                     "to": addresses("Recipients' email addresses."),
                     "cc": addresses("Copies' email addresses."),
@@ -164,9 +171,9 @@ fn catalog_at(offset_minutes: Option<i32>) -> Value {
 
 /// Write `tools.json` in `dir` whole (beside, then renamed), readable by
 /// the voice.
-pub fn write(dir: &Path) -> io::Result<()> {
+pub fn write(dir: &Path, spotify_on: bool) -> io::Result<()> {
     let fresh = dir.join(".tools.json");
-    fs::write(&fresh, catalog().to_string())?;
+    fs::write(&fresh, catalog(spotify_on).to_string())?;
     fs::set_permissions(&fresh, fs::Permissions::from_mode(0o644))?;
     fs::rename(&fresh, dir.join(CATALOG_FILE))
 }
@@ -186,12 +193,12 @@ mod tests {
             (330, "2026-11-03T09:00:00+05:30"),
             (0, "2026-11-03T09:00:00+00:00"),
         ] {
-            let catalog = catalog_at(Some(minutes)).to_string();
+            let catalog = catalog_at(Some(minutes), false).to_string();
             assert!(catalog.contains(shown), "{minutes}");
             let other = if minutes == 420 { "+00:00" } else { "+07:00" };
             assert!(!catalog.contains(other), "{minutes}");
         }
-        let unknown = catalog_at(None).to_string();
+        let unknown = catalog_at(None, false).to_string();
         assert!(unknown.contains("own UTC offset (+HH:MM)"));
         assert!(!unknown.contains("2026-11-03T"));
     }
@@ -199,9 +206,32 @@ mod tests {
     /// What the voice's provider link takes (`docs/tools.md`): a name of
     /// `[a-z][a-z0-9_]{0,47}`, a description of at most 1,024 bytes and
     /// parameters an object of at most 4,096 bytes; the file under 64 KiB.
+    /// Spotify (#5460): named to the model only with its switch on, as a
+    /// read alone, never a write.
+    #[test]
+    fn spotify_is_a_read_only_with_its_switch() {
+        let off = catalog(false);
+        assert!(!off.to_string().contains("spotify"));
+        let on = catalog(true);
+        let tools = on["tools"].as_array().unwrap();
+        let reads = tools[1]["parameters"]["properties"]["service"]["enum"].to_string();
+        assert!(reads.contains("\"spotify\""));
+        assert!(
+            tools[1]["description"]
+                .as_str()
+                .unwrap()
+                .contains("spotify: now_playing")
+        );
+        assert!(!tools[2].to_string().contains("spotify"));
+        for tool in tools {
+            assert!(tool["description"].as_str().unwrap().len() <= 1_024);
+            assert!(tool["parameters"].to_string().len() <= 4_096);
+        }
+    }
+
     #[test]
     fn the_functions_fit_what_the_voice_takes() {
-        let catalog = catalog();
+        let catalog = catalog(false);
         assert!(catalog.to_string().len() < 65_536);
         let tools = catalog["tools"].as_array().unwrap();
         let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
@@ -249,7 +279,7 @@ mod tests {
             assert!(tool["parameters"].to_string().len() <= 4_096, "{name}");
         }
         let dir = tempfile::tempdir().unwrap();
-        write(dir.path()).unwrap();
+        write(dir.path(), false).unwrap();
         let read: Value =
             serde_json::from_slice(&fs::read(dir.path().join(CATALOG_FILE)).unwrap()).unwrap();
         assert_eq!(read, catalog);
