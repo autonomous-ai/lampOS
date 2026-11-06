@@ -1402,7 +1402,9 @@ build could carry it units or settings.
    `lamp-update.service`'s `ReadWritePaths`, so no round writes it itself.
    `install` writes it, and so does the writer's one-shot unit, which a round
    starts to refresh it from a confirmed lamp-update ("The settings writer
-   refreshed", #4178). `lamp-update-back.service` runs it as
+   refreshed", #4178). An `install` that changes its bytes clears the
+   refresh's `.prev`, request and record (#5539, same section).
+   `lamp-update-back.service` runs it as
    `lamp-update-back back`. It is started by `lamp-update.service`'s
    `OnFailure=` and every 2 min by `lamp-update-back.timer`. When
    `self.json` is there and lamp-update is not `active`/`running`, or 10 min
@@ -3379,6 +3381,38 @@ bound. Until the refreshed writer is proved:
   the next `back`, about 2 minutes on, and said (`… back failed in a run
   that began before it was refreshed: the next back judges it`). When
   systemd can't say, it counts (El's P3 on #4178).
+
+**An install that changes the writer** (#5539). `install` writes the
+writer from the build it installs, under the records' lock. A refresh's
+`lamp-update-back.prev`, `writer-refresh.request` and
+`writer-refresh.done` then describe a writer that is gone: a `.prev` left
+behind is one `fixed_copy::place` may refuse, and an unproven record would
+hold every switch of lamp-update's own waiting. So `writer_swap::forget_writer`
+clears them, right after the writer is written (`write_whole`: fsync, rename,
+folder synced). It acts only when the install changed the writer's bytes
+(missing or unreadable counts as changed), or when `writer-refresh.done`
+names another build than the one installed. That second trigger covers an
+install cut after it wrote the writer and before it cleared: the next run
+finds equal bytes and would otherwise skip. With equal bytes and a record
+naming this build, nothing is touched, and a bare `.prev` with no record is
+left to the refresh's own check (above). The order:
+
+1. `.prev` removed (missing is fine), its folder synced.
+2. The request removed (missing is fine).
+3. The record last, its folder synced. It is removed, unless it names a
+   build put back: then a fresh record replaces it, for the installed build,
+   proven, with no build before, and `put_back` and `for_good` carried as
+   they are (a record from before #5539, with `for_good` unset, stays so).
+   That build is still never asked, and nothing is left unproven.
+
+Because the record goes last, a cut anywhere leaves it naming the old
+build, so the next install clears again; a rerun after the clear changes
+nothing. A remove or sync that fails stops install with the path and the
+error. `writer-back.ok` is left: it names the old build, and nothing
+matches it to the new one. A `back` holds the records' lock while it works,
+so it can't be mid-run here (install then says another lamp-update is
+running); an unproven writer is replaced as install has always replaced it
+since #1680, and its `.prev` with it.
 
 `installed_units` leaves out the writer's unit, as it leaves out
 lamp-update's own. It starts `update/current` too, and taken for a part it

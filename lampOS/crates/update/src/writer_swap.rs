@@ -373,6 +373,65 @@ fn prove(root: &Path, records: &Path) -> Result<Done, String> {
     Ok(done)
 }
 
+/// Install's side, under its lock, once it has placed build `build` of
+/// lamp-update as the writer (crate::install, #5539): the refresh's
+/// [`PREV`], [`REQUEST`] and [`DONE`] describe a writer that is gone, so
+/// they are cleared. Only when install `changed` the writer's bytes, or
+/// when [`DONE`] names another build than `build` (a run cut after it
+/// placed the writer and before it cleared): otherwise nothing is touched,
+/// and a bare [`PREV`] stays with [`clear_stale_prev`]. In this order, so a
+/// cut anywhere leaves [`DONE`] naming the old build for the next run:
+/// [`PREV`] removed and its folder synced, the request removed, and
+/// [`DONE`] last. A build put back (and whether for good) is kept in a
+/// fresh proven record for `build`, with nothing before it, rather than
+/// dropped with [`DONE`], so that build is still not asked. A record from
+/// before #5539 carries as it is. Whether anything was there to clear;
+/// what could not be removed or synced, as Err.
+pub fn forget_writer(
+    root: &Path,
+    records: &Path,
+    build: &str,
+    changed: bool,
+    now_unix_ms: u64,
+) -> Result<bool, String> {
+    let old = done(records);
+    let stale = old.as_ref().is_some_and(|done| done.build != build);
+    if !changed && !stale {
+        return Ok(false);
+    }
+    let gone = |path: &Path| match fs::remove_file(path) {
+        Ok(()) => Ok(true),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(format!("{}: {error}", path.display())),
+    };
+    let synced =
+        |path: &Path| sync_parent(path).map_err(|error| format!("{}: {error}", path.display()));
+    let prev = on_root(root, PREV);
+    let mut acted = gone(&prev)?;
+    synced(&prev)?;
+    acted |= gone(&records.join(REQUEST))?;
+    let record = records.join(DONE);
+    match old.filter(|done| done.put_back.is_some()) {
+        Some(old) => {
+            let done = Done {
+                build: build.to_owned(),
+                before: None,
+                synced: true,
+                at_unix_ms: now_unix_ms,
+                proven: true,
+                put_back: old.put_back,
+                for_good: old.for_good,
+            };
+            let bytes = serde_json::to_vec(&done).map_err(|error| error.to_string())?;
+            write_whole(&record, &bytes, 0o600).map_err(|error| format!("{DONE}: {error}"))?;
+            acted = true;
+        }
+        None => acted |= gone(&record)?,
+    }
+    synced(&record)?;
+    Ok(acted)
+}
+
 /// The round's request taken back, when its unit could not run it.
 pub fn forget(records: &Path) {
     let _ = fs::remove_file(records.join(REQUEST));
