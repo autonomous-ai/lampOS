@@ -14006,10 +14006,17 @@ fn observe_prospective_heard(
     )?;
     if !admission.owns_stream() && !admission.draining() && mask.frame() == Disposition::Suppress {
         let rejection = admission.suppress_prospective(context, at_us)?;
+        let captured_at_us = observation.captured_at_us;
         detector
             .suppress(&observation, probability)
             .map_err(io::Error::other)?;
-        mask.suppressed()?;
+        // In the journal once per utterance, not only the trace (#5536).
+        if mask.suppressed(probability >= 0.5, captured_at_us)? {
+            eprintln!(
+                "lamp-voice: turn-taking: speech heard during the lamp's own sound or its {} ms tail was masked: not a turn",
+                crate::turn_taking::TAIL_US / 1_000
+            );
+        }
         return Ok((
             AdmissionUpdate {
                 rejection,
@@ -14044,6 +14051,11 @@ fn decide_prospective_input(
     match mask.candidate(candidate)? {
         Disposition::AwaitWriteEvidence => return Ok(None),
         Disposition::Suppress => {
+            if mask.masked_speech(candidate.trigger_read_at_us) {
+                eprintln!(
+                    "lamp-voice: turn-taking: a sound whose start was heard as the lamp's own was masked: not a turn"
+                );
+            }
             if let Some(rejection) = admission.suppress_prospective(context, at_us)? {
                 record_input_rejection(trace, rejection)?;
             }
@@ -14097,6 +14109,12 @@ fn decide_prospective_input(
                 .checked_sub(u64::from(crate::activity::START_BLOCKS) - 1)
                 .ok_or_else(|| io::Error::other("candidate has no complete onset"))?;
             if through_sequence >= first_onset {
+                if mask.masked_speech(candidate.trigger_read_at_us) {
+                    eprintln!(
+                        "lamp-voice: turn-taking: a sound whose start fell in the lamp's own sound or its {} ms tail was masked: not a turn",
+                        crate::turn_taking::TAIL_US / 1_000
+                    );
+                }
                 if let Some(rejection) = admission.suppress_prospective(context, at_us)? {
                     record_input_rejection(trace, rejection)?;
                 }

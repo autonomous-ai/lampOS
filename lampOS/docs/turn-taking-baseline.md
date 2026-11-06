@@ -109,6 +109,14 @@ budget remain unchanged. Missing original read coverage fails; a masked onset
 rejects the prospective candidate. The `input_prefix_sanitized` trace records
 the removed block count and cutoff without recording PCM.
 
+Speech the mask drops is also told in the journal, once per masked utterance
+(speech masked more than 300 ms after the last masked speech begins another),
+with no words: `lamp-voice: turn-taking: speech heard during the lamp's own
+sound or its 100 ms tail was masked: not a turn` for blocks masked before any
+candidate, and `... a sound whose start ... was masked: not a turn` for a
+candidate whose onset the mask rejects (#5536: these drops were in the trace
+only).
+
 `SpeechDrained` reports that the latest actual accepted speech cursor has
 retired according to the existing speaker queue observation. It closes the mask
 at that original observation plus the 100 ms tail. It is **not** provider,
