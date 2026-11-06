@@ -47,9 +47,14 @@ Chỉ chủ của đèn: người có khuôn mặt quen được giữ dưới t
 nhớ tuân theo (`memory_scope::ScopeLease::scope`): câu nói phải được nhận là
 của khuôn mặt quen của chủ đèn, không được giữ bởi khoảng trống của một khuôn
 mặt hay được mang theo như một cuộc trò chuyện đang tiếp diễn, và không bị thu
-hẹp về cả phòng (một khuôn mặt khác được thấy đang nói nó). Câu của một người
-khách, của một khuôn mặt lạ, của cả phòng, một câu bị giữ hay bị thu hẹp, và
-một yêu cầu không có phạm vi đều được báo `OWNER_ONLY`, "Not done: only the
+hẹp về cả phòng (một khuôn mặt khác được thấy đang nói nó), cũng không phải
+của chủ đèn chỉ vì mặt họ một mình trong khung (`LAMP_PERSON_SCOPE_ONE_FACE_READS`,
+`ScopeLease::forgets_need_mouth`: điều đó chỉ tính cho việc lưu và nhớ lại,
+không bao giờ cho việc làm thay họ, nên câu «read my mail» của một vị khách
+ngoài khung hình khi chủ đèn ngồi im một mình trong khung không đọc gì). Câu
+của một người khách, của một khuôn mặt lạ, của cả phòng, một câu bị giữ hay
+bị thu hẹp, một câu đọc theo một mặt, và một yêu cầu không có phạm vi đều được
+báo `OWNER_ONLY`, "Not done: only the
 lamp's owner can use their linked services, and I can't tell it is them now.
 Say so plainly, in a few words, and ask them to look at the lamp so it can
 see who is asking.", và không gì được gọi, cho cả đọc lẫn ghi.

@@ -241,6 +241,7 @@ fn observe_barrier() -> Option<Result<u64, ()>> {
             0,
             Vec::new(),
             Vec::new(),
+            false,
         )) {
             Ok(()) => Ok(id),
             Err(_) => Err(()),

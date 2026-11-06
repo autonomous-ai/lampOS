@@ -505,6 +505,12 @@ struct RequestContext {
     /// `remember` goes to their scope, and nothing else does. Its reads stay
     /// the room's. Cleared by any narrow after it ([`ScopeLease::narrow_to_room`]).
     one_face: Mutex<Option<Arc<str>>>,
+    /// [`Self::one_face`] taken by `LAMP_PERSON_SCOPE_ONE_FACE_READS`
+    /// ([`ScopeLease::read_by_one_face`], [`ScopeLease::keep_for_one_face_recorded`]):
+    /// its exchange is journalled in their record, and no forget or yes runs
+    /// on it, as nothing saw the mouth say it ([`ScopeLease::forgets_need_mouth`]).
+    /// Set under `one_face`'s lock; it counts only while `one_face` is held.
+    one_face_reads: AtomicBool,
 }
 
 /// A keep's late look (#2807): the face cache and its generation when the
@@ -554,8 +560,10 @@ const KEEPER_POLL: Duration = Duration::from_millis(50);
 /// [`ScopeLease::keep_for_one_face`]; a narrow takes a line off): read
 /// after the line is over, when its lease is gone, to tell whose kept
 /// things its room exchange may cite (`remember::keeper_cited`). Far more
-/// lines than run at once, each a number and an id.
-static ONE_FACE_LINES: Mutex<std::collections::VecDeque<(u64, String)>> =
+/// lines than run at once, each a number, an id, and whether its exchange
+/// is journalled in their record (`LAMP_PERSON_SCOPE_ONE_FACE_READS`,
+/// [`one_face_record`]).
+static ONE_FACE_LINES: Mutex<std::collections::VecDeque<(u64, String, bool)>> =
     Mutex::new(std::collections::VecDeque::new());
 const ONE_FACE_LINES_MOST: usize = 64;
 
@@ -563,13 +571,24 @@ const ONE_FACE_LINES_MOST: usize = 64;
 /// no longer anyone's. What the lease does; public for the memory's
 /// contract tests, which have no lease.
 pub fn mark_one_face_line(request: u64, person: Option<&str>) {
+    mark_one_face(request, person, false);
+}
+
+/// [`mark_one_face_line`], its exchange also journalled in `person`'s
+/// record (`LAMP_PERSON_SCOPE_ONE_FACE_READS`, [`one_face_record`]).
+/// Public for the memory's contract tests, which have no lease.
+pub fn mark_one_face_record(request: u64, person: &str) {
+    mark_one_face(request, Some(person), true);
+}
+
+fn mark_one_face(request: u64, person: Option<&str>, records: bool) {
     let mut lines = ONE_FACE_LINES.lock().unwrap_or_else(|e| e.into_inner());
-    lines.retain(|(line, _)| *line != request);
+    lines.retain(|(line, ..)| *line != request);
     if let Some(person) = person {
         if lines.len() == ONE_FACE_LINES_MOST {
             lines.pop_front();
         }
-        lines.push_back((request, person.to_owned()));
+        lines.push_back((request, person.to_owned(), records));
     }
 }
 
@@ -581,8 +600,23 @@ pub fn one_face_line(request: u64) -> Option<String> {
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .iter()
-        .find(|(line, _)| *line == request)
-        .map(|(_, person)| person.clone())
+        .find(|(line, ..)| *line == request)
+        .map(|(_, person, _)| person.clone())
+}
+
+/// Whose record `request`'s exchange is journalled in by the one-face rule
+/// (`LAMP_PERSON_SCOPE_ONE_FACE_READS`, [`mark_one_face_record`]), as last
+/// marked: `None` for a line marked without it, any other line, one a
+/// narrow took off (another voice), or one forgotten past
+/// [`ONE_FACE_LINES_MOST`]. Read by `remember::finished`, after the lease
+/// is gone, before either journal backend.
+pub fn one_face_record(request: u64) -> Option<String> {
+    ONE_FACE_LINES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+        .find(|(line, _, records)| *line == request && *records)
+        .map(|(_, person, _)| person.clone())
 }
 
 /// Only this non-cloneable owner keeps the request authorized. Task leases
@@ -601,6 +635,7 @@ impl RequestScope {
                 carried_saves: AtomicBool::new(false),
                 released_keep: OnceLock::new(),
                 one_face: Mutex::new(None),
+                one_face_reads: AtomicBool::new(false),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
@@ -653,6 +688,7 @@ impl RequestScope {
                 carried_saves: AtomicBool::new(false),
                 released_keep: OnceLock::new(),
                 one_face: Mutex::new(None),
+                one_face_reads: AtomicBool::new(false),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
@@ -974,6 +1010,18 @@ impl ScopeLease {
     /// `false`, and nothing changed, for a revoked, narrowed or carried line,
     /// or one admitted as someone's.
     pub fn keep_for_one_face(&self, person: &str) -> bool {
+        self.keep_for_one_face_with(person, false)
+    }
+
+    /// [`Self::keep_for_one_face`] with `LAMP_PERSON_SCOPE_ONE_FACE_READS`:
+    /// its reads were told the room's already, but its exchange is
+    /// journalled in `person`'s record ([`one_face_record`]) and no forget
+    /// or yes runs on it ([`Self::forgets_need_mouth`]).
+    pub fn keep_for_one_face_recorded(&self, person: &str) -> bool {
+        self.keep_for_one_face_with(person, true)
+    }
+
+    fn keep_for_one_face_with(&self, person: &str, records: bool) -> bool {
         let mut one_face = self
             .context
             .one_face
@@ -987,8 +1035,64 @@ impl ScopeLease {
             return false;
         }
         *one_face = Some(Arc::from(person));
-        mark_one_face_line(self.context.key.request, Some(person));
+        self.context
+            .one_face_reads
+            .store(records, Ordering::Release);
+        mark_one_face(self.context.key.request, Some(person), records);
         true
+    }
+
+    /// [`Self::take_by_one_face`] with `LAMP_PERSON_SCOPE_ONE_FACE_READS`
+    /// (the memory owner's 16:43 "apply it" on #5385, read by the PM as
+    /// saving and recall, not forgetting; #5522): the line is not narrowed,
+    /// so it is told and read as the admitted person's ([`Self::scope`]):
+    /// recall, hits, the memory note, their thread and its exchange's
+    /// record. Its keep is theirs ([`Self::kept_by_one_face`]). No forget,
+    /// and no yes to a held one, runs on it ([`Self::forgets_need_mouth`]):
+    /// a forget is not undone, and still needs the mouth seen saying it (the
+    /// memory owner, 16:49). The known risk: a guest off camera, the
+    /// person's face silent and alone in view and no other voice heard, is
+    /// told the person's memory. Any later narrow (another voice) makes it
+    /// the room's, keeps and all. `false`, and nothing changed, for a
+    /// revoked, narrowed, carried or held line, or one admitted as nobody's.
+    pub fn read_by_one_face(&self) -> bool {
+        let Some(person) = self.context.scope.person().filter(|_| self.is_current()) else {
+            return false;
+        };
+        let mut one_face = self
+            .context
+            .one_face
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if self.context.narrowed.load(Ordering::Acquire)
+            || self.context.carried.get().is_some()
+            || self.context.scope.held
+        {
+            return false;
+        }
+        *one_face = Some(Arc::from(person));
+        self.context.one_face_reads.store(true, Ordering::Release);
+        mark_one_face(self.context.key.request, Some(person), true);
+        true
+    }
+
+    /// Whether this line is someone's by the one-face rule with
+    /// `LAMP_PERSON_SCOPE_ONE_FACE_READS` ([`Self::read_by_one_face`],
+    /// [`Self::keep_for_one_face_recorded`]), while current and no narrow
+    /// came after: nothing saw the mouth say it, so no forget of any kind
+    /// (one thing, everything, a face, a rule) and no yes runs on it, a
+    /// single-item forget its keep reaches ([`Self::reached_by_one_face`])
+    /// among them (the memory owner, 16:49 on #5385).
+    pub fn forgets_need_mouth(&self) -> bool {
+        if !self.is_current() {
+            return false;
+        }
+        let one_face = self
+            .context
+            .one_face
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        one_face.is_some() && self.context.one_face_reads.load(Ordering::Acquire)
     }
 
     /// Whose scope this line's `remember` goes to by the one-face rule
@@ -1284,6 +1388,68 @@ mod tests {
         revoked.revoke();
         assert!(!lease.carry_conversation(&a_id), "revoked");
         assert_eq!(lease.carried_for(), None, "revoked");
+    }
+    /// `LAMP_PERSON_SCOPE_ONE_FACE_READS` (#5522): a line A's by the
+    /// one-face rule with the switch is read and kept as A's, and needs the
+    /// mouth for any forget; a narrow after it (another voice) makes it the
+    /// room's, keeps and forgets alike. A carried, held, revoked or
+    /// nobody's line takes none. Without it (`take_by_one_face`) no forget
+    /// is refused by this, as before.
+    #[test]
+    fn a_one_face_line_with_reads_is_read_as_its_persons_and_forgets_need_the_mouth() {
+        let key = RequestKey {
+            worker: lamp_turn_owner::BootId::new([55; 16]).unwrap(),
+            session: 1,
+            request: 1,
+        };
+        let a_id = crate::remember::person_id("A");
+        let scope = RequestScope::new(key, ScopeSnapshot::of("A"));
+        let lease = scope.lease();
+        assert!(!lease.forgets_need_mouth());
+        assert!(lease.read_by_one_face());
+        assert_eq!(
+            lease.scope().unwrap().person(),
+            Some(a_id.as_str()),
+            "reads: A's"
+        );
+        assert_eq!(lease.kept_by_one_face(), Some(a_id.clone()), "keeps: A's");
+        assert!(lease.forgets_need_mouth(), "no forget on it");
+        lease.narrow_to_room();
+        assert_eq!(
+            lease.scope().unwrap().person(),
+            None,
+            "narrowed: the room's"
+        );
+        assert_eq!(lease.kept_by_one_face(), None);
+        assert!(
+            !lease.forgets_need_mouth(),
+            "the room's, as without the rule"
+        );
+        assert!(!lease.read_by_one_face(), "never widened again");
+        let off = RequestScope::new(key, ScopeSnapshot::of("A"));
+        assert!(off.lease().take_by_one_face());
+        assert!(
+            !off.lease().forgets_need_mouth(),
+            "the switch off: as before"
+        );
+        let carried = RequestScope::new(key, ScopeSnapshot::of("A"));
+        assert!(carried.lease().carry_conversation(&a_id));
+        assert!(!carried.lease().read_by_one_face(), "carried: no reads");
+        let held = RequestScope::new(key, ScopeSnapshot::held_of("A"));
+        assert!(!held.lease().read_by_one_face(), "held: no reads");
+        let room = RequestScope::new(key, ScopeSnapshot::room());
+        assert!(!room.lease().read_by_one_face(), "nobody's");
+        assert!(room.lease().keep_for_one_face_recorded(&a_id), "named late");
+        assert_eq!(
+            room.lease().scope().unwrap().person(),
+            None,
+            "reads as told"
+        );
+        assert!(room.lease().forgets_need_mouth());
+        let revoked = RequestScope::new(key, ScopeSnapshot::of("A"));
+        let lease = revoked.lease();
+        revoked.revoke();
+        assert!(!lease.read_by_one_face(), "revoked");
     }
     /// `LAMP_PERSON_SCOPE_ONE_FACE` (reviewer-three's P1 on #4584, option
     /// 2): a line A's only by the one-face rule reads the room's, and only

@@ -4205,6 +4205,17 @@ pub fn serve(
                         "lamp-voice second: a known person's keep on a line no face was seen speaking is theirs, its reads the room's, when their known face was the one face in view and no other voice was heard in the conversation (LAMP_PERSON_SCOPE_ONE_FACE)"
                     );
                     engine = engine.scoping_by_one_face(another_voice.clone());
+                    // Read as theirs too, forgets refused (#5522).
+                    if std::env::var(
+                        crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
+                    )
+                    .is_ok_and(|value| value == "on")
+                    {
+                        eprintln!(
+                            "lamp-voice second: such a line is also told and read as theirs and journalled in their record; no forget or yes runs on it (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
+                        );
+                        engine = engine.reading_by_one_face(true);
+                    }
                 }
                 Some(why) => eprintln!(
                     "lamp-voice second: LAMP_PERSON_SCOPE_ONE_FACE is on, but not acted on: {why}"

@@ -693,6 +693,68 @@ apart, may be kept in their memory, and its single-item forget may remove
 from it up to eight things that match (a `forget {about}` forgets at most
 eight, and none when more match), never all; nothing is read back to that
 voice.
+
+**Reads, too, with their own switch; forgets need the mouth**
+(`LAMP_PERSON_SCOPE_ONE_FACE_READS=on`, off everywhere, #5522; the memory
+owner's 16:43 "apply it" on #5385, read by the PM as saving and recall, not
+forgetting, and the memory owner's 16:49: "tạm thời chưa cho xóa nếu ko
+detect đc mở miệng", for now no forgetting unless the mouth is seen
+opening). With `LAMP_PERSON_SCOPE_ONE_FACE` acted on, a line its rule takes
+as above is **not narrowed**: it is told and read as theirs
+(`ScopeLease::read_by_one_face`): recall, memory's hits, the memory note,
+their context, their thread and the carry it opens. Its exchange is
+journalled in their record by both journal backends
+(`memory_scope::one_face_record`, `remember::filed_by_one_face`, before
+`hand_on` and `hand_on_days`); a line whose face the late look names by
+the same rule keeps its reads the room's, as they were told, but its record
+is theirs too (`ScopeLease::keep_for_one_face_recorded`). **No forget runs on
+such a line** (`ScopeLease::forgets_need_mouth`): not `forget_everything`,
+`forget_my_face`, `forget_rule`, a yes said as them, nor the single-item
+`forget` the keep's rule alone lets reach their scope
+(`ScopeLease::reached_by_one_face`); the model is told nothing was
+forgotten and to ask them to say it again looking at the lamp. It holds no
+forget for a yes and its ask is no ask just before (`forget_asker`). **Nor
+anything destructive, or acting for them beyond saving and recall** (the
+privacy read on #5592): a `remember` that corrects a kept thing by id
+(`replaces`, `remember::corrects`) is refused like a forget, and without an
+id the plain correction matcher is skipped, so the keep is kept plainly and
+nothing is replaced; `keep_rule`, `list_rules` and `forget_rule` are refused;
+`cancel_reminder` and `snooze_reminder` are refused unless
+`LAMP_ONE_FACE_REMINDERS` is on (the 4 Nov acceptance); and the line has no
+services owner (`services::owner_of`), so no `service_read` runs for it,
+unless the private room (`LAMP_PRIVATE_ROOM`) already gives every line one.
+The after-conversation observation pass never retires a kept thing for a
+conversation one such exchange was filed in: with `LAMP_MEMORY_REPLACES`,
+its proposals reach `tidy_apply` without `"replaces"`, kept plainly
+(`Conversation::filed`, `remember::job_replacing`; Thirteen's P2 on #5592).
+A plain new keep still writes. A line their face was seen saying is as
+before. The privacy limits hold: a second
+face, an unknown face, no face, another voice before the line or heard as
+it is judged (`another voice in the conversation`), and it is the room's,
+keeps and all; a carried line is never read (#5508). **Known risk, accepted
+with the switch:** a guest speaking off camera while their face sits silent
+and alone in view, with no other voice heard, is told their recall, hits
+and thread. **Writes happen too:** filing the exchange in their record is
+the owner's "saving counts", so a guest's words can be filed as theirs, and
+their day recall and the nightly extraction (if it is ever on) may take
+them as theirs. `LAMP_SAME_VOICE_CONFIRMS`, when on, makes the guest's voice a
+second voice only once the conversation has a print to tell it from; with
+the guest the conversation's first voice, nothing tells them apart. The
+lead's ruling on #5522 said a lone face never counts for reads; this rests
+on the memory owner's 16:43 word and the PM's 16:46 reading, so the lead
+confirms before the switch goes on. Off,
+the one-face rule is as above, byte for byte. Tests:
+`second_provider::tests::person_scope_seen::a_lone_known_face_never_read_speaking_writes_its_words_in_their_memory_and_record`,
+`with_reads_a_second_face_an_unknown_face_or_another_voice_is_the_rooms`,
+`with_reads_a_forget_the_mouth_was_not_read_saying_never_runs`,
+`with_reads_a_forget_their_mouth_was_read_saying_runs_as_before`,
+`with_reads_a_correction_is_refused_and_a_plain_keep_still_writes`,
+`with_reads_rules_are_never_kept_listed_or_forgotten`,
+`with_reads_a_reminders_cancel_or_snooze_is_refused_unless_one_face_reminders`,
+`services::tests::an_off_camera_guests_read_my_mail_with_the_owner_silent_alone_in_view_runs_no_service_read`,
+`remember::tests::a_one_face_lines_exchange_is_journalled_in_their_record_with_the_switch`,
+`remember::tests::room_speaker::with_reads_a_one_face_conversations_observation_never_retires_a_kept_thing`,
+`memory_scope::tests::a_one_face_line_with_reads_is_read_as_its_persons_and_forgets_need_the_mouth`.
 A line kept as yours while you were the only face in view can include words
 someone else said out of view.
 
