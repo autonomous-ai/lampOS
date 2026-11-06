@@ -1094,7 +1094,17 @@ hai lần bị mô hình trả về thành thêm một khóa bên trong, bị t�
 | Không nghe giọng nào trong một phút qua | Mỗi dòng trên `voice/heard`, được một luồng riêng của `lamp-skills` đánh dấu khi đến (topic này là event: bus không giữ bản mới nhất, nên trước bản sửa này dòng này chưa từng giữ lại lần đọc nào; lamp-9adf, 5/11) | "a voice heard" |
 
 Tất cả phải đạt liên tục trong 5 s. Trước đó lượt chạy chờ, tối đa 60 phút,
-rồi bỏ qua ngày đó mà không nói gì ("skipped: <why>"). Mỗi kỹ năng đọc một lần
+rồi bỏ qua ngày đó mà không nói gì ("skipped: <why>").
+**Mỗi lần chỉ một lượt đọc** (`service_read::Turns`, #5618): một lượt đọc chỉ
+bắt đầu khi giữ được lượt duy nhất của đèn, và giữ nó từ lúc cổng mở tới dòng
+cuối. Lượt này rảnh khi không có lượt đọc nào của kỹ năng khác đang giữ và đã
+qua một phút (`AFTER_ANOTHER`) kể từ khi lượt trước kết thúc; trước đó cổng
+được tính là đóng ("another read under way"). Sau đó lượt đọc vẫn cần cổng
+của chính nó liên tục 5 s, và thời gian chờ vẫn tính trong cùng 60 phút kể từ
+khi đến hạn, nên một lượt đọc xếp hàng sau lượt khác sẽ bỏ qua ngày đó khi hết
+giờ ("skipped: another read under way"), không bao giờ bắt đầu một giờ mới.
+Nếu không có quy tắc này, hai lượt đọc của hai kỹ năng cùng chờ ở cổng (Morning
+agenda và Morning mail khi có khách) sẽ nói xen kẽ từng dòng của nhau. Mỗi kỹ năng đọc một lần
 mỗi ngày địa phương (giữ trong bộ nhớ của `lamp-skills`, nên khởi động lại thì
 quên). Trong lúc lượt chạy chờ cổng, và sau khi đến hạn cho tới nửa đêm địa
 phương, trigger của kỹ năng không được ghi là triggered hay hỏi Policy mỗi
@@ -1511,7 +1521,9 @@ Linear) và không cho `gmail-app`, toàn văn hay việc đọc dạng tự do 
 `get`, `call`, hay các khoá của chúng), schema và
 bộ nạp khớp nhau; một lần đọc Drive được nói theo tên; cổng chờ 5 s liên tục,
 bỏ qua sau 60 phút, dừng trước một lời, dừng với "I'll tell you the rest
-later." khi có người đến, và các dòng được nói. `-p lamp-update` (unit được
+later." khi có người đến, và các dòng được nói; mỗi lần một lượt đọc (hai
+lượt cùng đến hạn được nói lần lượt, cách nhau một phút; một lượt xếp hàng sau
+lượt khác bỏ qua khi hết giờ của chính nó). `-p lamp-update` (unit được
 cài với `LAMP_SERVICES=on` trong đó, như trong `lamp-cloud.service` và
 `lamp-voice.service`, `LAMP_SERVICES_WRITE=on` chỉ trong
 `lamp-services.service`, `LAMP_SAME_VOICE_FOR=services` cạnh mô hình được ghim

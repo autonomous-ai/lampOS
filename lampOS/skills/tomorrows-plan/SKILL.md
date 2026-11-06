@@ -1,6 +1,6 @@
 ---
 name: tomorrows-plan
-description: Once an evening, when you have settled at the desk between 6 and 9:30 pm, the lamp reads you tomorrow's Google Calendar, how many events and then each time and title. Needs Google Calendar linked in the app.
+description: Once an evening, when you have settled at the desk between 6 and 9:30 pm, the lamp reads you tomorrow's Google Calendar, how many events and then each time and title. Needs Google Calendar linked in the app and your face known to the lamp.
 ---
 
 # Tomorrow's plan
@@ -14,11 +14,13 @@ in the app, under Skills, then Connectors.
 When it reads:
 
 - Once a day at most, and only in the evening window.
-- Only when you are alone with the lamp and nobody has spoken for a minute.
+- Only when you are alone with the lamp, it knows your face as its
+  owner's, and nobody has spoken for a minute.
   If that doesn't happen within an hour, it lets the day go and says
   nothing.
-- Never in the middle of a conversation, right after the lamp has spoken,
-  while the lamp is private, paused or muted, or at night.
+- Never in the middle of a conversation, while the lamp is private,
+  paused or muted, or at night.
+- Never while another skill reads to you, or in the minute after.
 - Someone coming into view stops it: "I'll tell you the rest later."
 
 It reads only tomorrow's events' times and titles, never a description, a
