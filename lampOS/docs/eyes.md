@@ -2678,6 +2678,29 @@ with the known face's id the eyes keep beside the known file
   moving; no reading within 160 ms either side unknown and taken as moving;
   the history held to about a second; and a window with
   one held pair `few_steady_pairs`. Off, nothing is read and nothing changes.
+- **One look's eye jump at the desk (`LAMP_EYES_SPEAKING_SKIP_JUMP=on`, with
+  `LAMP_EYES_SPEAKING_STEADY=on`; off unless set, off in the product,
+  #5522).** With the steady read alone, a talking face at the desk is mostly
+  `unknown`: its own landmarks step its eye distance past 5% on 61 to 71% of
+  steps (lamp-52e6, 2 Nov, 17 to 28 px between the eyes, median 1.5 to 3
+  px), mostly one look away from two neighbours that agree, and each such
+  look drops both its pairs, so the window has under two steady pairs
+  (`few_steady_pairs`, 84 of 117 unread looks of a talking face at about
+  19 px). A lone known face then reads speaking in too few of a line's looks
+  for the voice's half (`speaking_faces::speakers`), and the line goes to
+  the room. On, a still look that jumps past `MOST_EYES_STEP` from both its
+  neighbours, they agreeing within it, is skipped and its neighbours are
+  paired across it; every other step past 5% still drops its pair, and a
+  window with a look skipped is held to `LEAST_HELD_PAIRS_YES` for `yes`. A
+  box that flips for one look on a still face then pairs its fit with
+  itself. In an offline replay of the lamp-52e6 `--mouth-diagnostics` lines
+  (PR #4984, matching the lamp on every fully logged look) talking at about
+  19 px read `yes` in 102 of 145 looks instead of 70, at about 27 px 45 of
+  71 instead of 31, and still faces stayed at no `yes`. Host tests only: a
+  real 8-look talking window from that run `unknown` off and `yes` on; the
+  #4585 still face whose box flips for one look, the flipping box, and a
+  still face with the desk window's eye jumps never `yes`. Not played on a
+  lamp.
 - **The pace:** the eyes look every 250 ms while they follow a face, up to
   350 ms on the 10 fps camera (`main.rs`), so 2 s holds 5 to 8 looks. With
   `--steady-rate` a still face is looked at 500 to 600 ms apart, 4 looks a
