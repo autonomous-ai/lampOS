@@ -351,8 +351,10 @@ pub fn claim_as(reply: &str, ended: bool, worded: bool) -> Option<Option<Claim>>
 
 /// The words a line the person asked as a question opens with
 /// ([`asked_as_a_question`]), after any [`ADDRESS`].
-const QUESTION_WORDS: [&str; 13] = [
+const QUESTION_WORDS: [&str; 21] = [
     "how", "is", "are", "do", "does", "did", "what", "when", "will", "can", "has", "have", "was",
+    // The first builder's P3 on #5604: the split keeps a contraction whole.
+    "what's", "how's", "where", "where's", "who", "who's", "why", "which",
 ];
 
 /// Words that only address the lamp before a line's own words ("Hey Lamp,").
