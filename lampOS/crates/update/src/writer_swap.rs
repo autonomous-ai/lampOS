@@ -17,10 +17,12 @@
 //! noted ([`note_back`]). Once one has run since the refresh, the round asks
 //! the unit to remove [`PREV`] ([`Op::Proven`]). Until then no switch of
 //! lamp-update's own begins, since that `back` is its only way back
-//! ([`unproven`]). A new writer whose `back` fails, or whose first `apply`
-//! fails (after that apply's own undo, which it made), is put back:
-//! [`PREV`] renamed over it ([`Op::PutBack`]), and that build never asked
-//! to be the writer again.
+//! ([`unproven`]). A new writer whose `back` fails is put back: [`PREV`]
+//! renamed over it ([`Op::PutBack`]), and that build never asked to be the
+//! writer again. One whose first `apply` fails (after that apply's own
+//! undo, which it made) is put back the same way ([`Op::PutBackForApply`]),
+//! but the failure is the build's, refused for good, and the writer may be
+//! asked again (#5539).
 use crate::{
     fixed_copy::{self, Placed},
     manifest::sha256_hex,
@@ -89,8 +91,14 @@ pub enum Op {
     /// kept at [`PREV`].
     #[default]
     Refresh,
-    /// The new writer failed: [`PREV`] renamed back over it.
+    /// The new writer's own `back` failed: [`PREV`] renamed back over it,
+    /// and its build put back for good.
     PutBack,
+    /// The new writer's first `apply` failed: [`PREV`] renamed back over
+    /// it, and its build not put back, since the failure is the build's
+    /// (#5539). Only the lamp-update that asked runs it: the unit's program
+    /// acts on a request naming its own bytes alone.
+    PutBackForApply,
     /// The new writer proved itself: [`PREV`] removed.
     Proven,
 }
@@ -110,9 +118,15 @@ pub struct Done {
     #[serde(default)]
     pub proven: bool,
     /// A build of lamp-update put back as the writer: never asked to be it
-    /// again.
+    /// again, when [`Done::for_good`].
     #[serde(default)]
     pub put_back: Option<String>,
+    /// `put_back` is for good (#5539). A record from before #5539 has none:
+    /// it named a writer put back only for a failed first apply the same
+    /// way, so its build is asked once more, and the refresh that asks it
+    /// keeps it put back, now for good.
+    #[serde(default)]
+    pub for_good: bool,
 }
 
 /// A writer's `back` that ended well, noted by that `back` itself.
@@ -129,9 +143,9 @@ pub struct BackOk {
 /// it answers yes a request is written for the unit's program and Ok(true)
 /// returned. Why not, when not.
 pub fn ask(root: &Path, held: &Lock, running: &[u8], now_unix_ms: u64) -> Result<bool, String> {
-    // A build put back as the writer before is not asked again.
+    // A build put back as the writer for good is not asked again.
     let build = sha256_hex(running);
-    if done(held.folder()).is_some_and(|done| done.put_back.as_ref() == Some(&build)) {
+    if put_back_for_good(held.folder(), &build) {
         return Ok(false);
     }
     // A lamp with no writer at all (installed before #1680) is not given
@@ -145,6 +159,13 @@ pub fn ask(root: &Path, held: &Lock, running: &[u8], now_unix_ms: u64) -> Result
     writer_ready::ready(root, held, running)?;
     request(held, running, Op::Refresh, now_unix_ms)?;
     Ok(true)
+}
+
+/// Whether the build `build` of lamp-update was put back as the writer for
+/// good: its own `back` failed, or it was asked once more after a record
+/// from before #5539 named it (crate::writer_swap, [`Done::for_good`]).
+pub fn put_back_for_good(records: &Path, build: &str) -> bool {
+    done(records).is_some_and(|done| done.for_good && done.put_back.as_deref() == Some(build))
 }
 
 /// The round's request for `op`, under its lock `held`, from `running`.
@@ -221,29 +242,43 @@ pub fn refresh(
         Err(error) => Err(format!("the records' lock: {error}")),
     };
     let done = op.and_then(|op| match op {
-        Op::Refresh => fixed_copy::place(
-            &on_root(root, BACK),
-            running,
-            Some(&on_root(root, PREV)),
-            probe,
-        )
-        .map(|placed| {
-            let (before, synced) = match placed {
-                Placed::Already => (None, true),
-                Placed::Replaced { before, synced } => (before, synced),
-            };
-            Done {
-                build: sha256_hex(running),
-                before,
-                synced,
-                at_unix_ms: clock(),
-                proven: false,
-                // A build put back before stays so through a later
-                // refresh (Seventh's P3 on #4107).
-                put_back: done(records).and_then(|done| done.put_back),
-            }
-        }),
-        Op::PutBack => put_back(root, now_unix_ms),
+        Op::Refresh => clear_stale_prev(root, records)
+            .and_then(|()| {
+                fixed_copy::place(
+                    &on_root(root, BACK),
+                    running,
+                    Some(&on_root(root, PREV)),
+                    probe,
+                )
+            })
+            .map(|placed| {
+                let (before, synced) = match placed {
+                    Placed::Already => (None, true),
+                    Placed::Replaced { before, synced } => (before, synced),
+                };
+                let build = sha256_hex(running);
+                // A build put back before stays so through a later refresh
+                // (Seventh's P3 on #4107). This build asked once more after a
+                // record from before #5539 named it is put back for good from
+                // now on, whatever puts it back next.
+                let (put_back, for_good) = done(records)
+                    .map(|done| {
+                        let again = done.put_back.as_deref() == Some(build.as_str());
+                        (done.put_back, done.for_good || again)
+                    })
+                    .unwrap_or_default();
+                Done {
+                    build,
+                    before,
+                    synced,
+                    at_unix_ms: clock(),
+                    proven: false,
+                    put_back,
+                    for_good,
+                }
+            }),
+        Op::PutBack => put_back(root, now_unix_ms, None),
+        Op::PutBackForApply => put_back(root, now_unix_ms, Some(records)),
         Op::Proven => prove(root, records),
     });
     match fs::remove_file(records.join(REQUEST)) {
@@ -259,12 +294,21 @@ pub fn refresh(
 }
 
 /// [`PREV`] renamed back over the writer, which failed: the copy that ran
-/// before is the writer again, and the failed one's build is kept as put
-/// back.
-fn put_back(root: &Path, now_unix_ms: u64) -> Result<Done, String> {
+/// before is the writer again. With no `records`, its own `back` failed,
+/// and the failed one's build is kept as put back for good. With them, its
+/// first apply failed: the build put back before, if any, is carried
+/// forward from the refresh's record, and the failed one is not put back
+/// (#5539).
+fn put_back(root: &Path, now_unix_ms: u64, records: Option<&Path>) -> Result<Done, String> {
     let (writer, prev) = (on_root(root, BACK), on_root(root, PREV));
     let read = |path: &Path| fs::read(path).map_err(|error| format!("{}: {error}", path.display()));
     let (failed, kept) = (read(&writer)?, read(&prev)?);
+    let (put_back, for_good) = match records {
+        None => (Some(sha256_hex(&failed)), true),
+        Some(records) => done(records)
+            .map(|done| (done.put_back, done.for_good))
+            .unwrap_or_default(),
+    };
     fs::rename(&prev, &writer).map_err(|error| format!("{}: {error}", writer.display()))?;
     Ok(Done {
         build: sha256_hex(&kept),
@@ -272,8 +316,46 @@ fn put_back(root: &Path, now_unix_ms: u64) -> Result<Done, String> {
         synced: sync_parent(&writer).is_ok(),
         at_unix_ms: now_unix_ms,
         proven: true,
-        put_back: Some(sha256_hex(&failed)),
+        put_back,
+        for_good,
     })
+}
+
+/// A [`PREV`] that holds another copy than the writer, and that no record
+/// pairs with (lamp-52e6, #5539), removed before a refresh: only when
+/// [`BACK_OK`] names the writer now in place. That writer's own `back` has
+/// ended well, so [`PREV`] isn't the only good copy. Without that note it
+/// is kept, and the refresh refuses. A [`PREV`] the record of a refresh
+/// not proved yet names as its copy before is left to
+/// [`fixed_copy::place`], which refuses it. Anything but two regular files
+/// is left to it as well.
+fn clear_stale_prev(root: &Path, records: &Path) -> Result<(), String> {
+    let (writer, prev) = (on_root(root, BACK), on_root(root, PREV));
+    let regular = |path: &Path| fs::symlink_metadata(path).is_ok_and(|meta| meta.is_file());
+    if !regular(&prev) || !regular(&writer) {
+        return Ok(());
+    }
+    let read = |path: &Path| fs::read(path).map_err(|error| format!("{}: {error}", path.display()));
+    let (there, kept) = (read(&writer)?, read(&prev)?);
+    if there == kept {
+        return Ok(());
+    }
+    let kept = sha256_hex(&kept);
+    let paired = done(records)
+        .is_some_and(|done| !done.proven && done.before.as_deref() == Some(kept.as_str()));
+    if paired {
+        return Ok(());
+    }
+    if back_ok(records).is_none_or(|ok| ok.build != sha256_hex(&there)) {
+        return Err(format!(
+            "{} holds another copy than {}, no refresh in the records kept it, and the writer in place has no back noted as ended well: it may be the only good copy, so nothing was replaced",
+            prev.display(),
+            writer.display()
+        ));
+    }
+    fs::remove_file(&prev).map_err(|error| format!("{}: {error}", prev.display()))?;
+    let _ = sync_parent(&prev);
+    Ok(())
 }
 
 /// [`PREV`] removed: the writer refreshed has proved itself.
