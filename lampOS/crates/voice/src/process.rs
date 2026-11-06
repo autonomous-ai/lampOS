@@ -1028,6 +1028,7 @@ fn worker_command(
         .args(extra)
         .env_clear()
         .envs(crate::stalls::passed_on())
+        .envs(crate::code_lock::passed_on())
         .envs(memory_days_worker_environment(
             role,
             var("LAMP_MEMORY_DAYS").as_deref(),
@@ -2929,9 +2930,10 @@ mod tests {
             ))
         };
         // What the child has that the command did not give it: the shell's
-        // own, and the stall switches this test process may have.
+        // own, and the stall and code-lock switches this test process may have.
         let stalls: Vec<String> = crate::stalls::passed_on()
             .into_iter()
+            .chain(crate::code_lock::passed_on())
             .map(|(name, value)| format!("{name}={}", value.to_string_lossy()))
             .collect();
         // A failure says only the names it got, never their values: a

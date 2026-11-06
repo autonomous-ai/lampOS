@@ -30,6 +30,14 @@ fn main() {
         && lamp_voice::log_relay::install()
             .map_err(|error| eprintln!("lamp-voice: log lines go straight to the journal: {error}"))
             .is_ok();
+    // The voice's and each worker's code pages locked in memory, on a
+    // thread of their own that nothing waits for (#5611,
+    // `LAMP_VOICE_LOCK_CODE=on`): its libraries are mapped by now.
+    match (std::env::args().nth(1).as_deref(), std::env::args().nth(2)) {
+        (Some("serve"), _) => lamp_voice::code_lock::start("serve".to_owned()),
+        (Some("worker"), Some(role)) => lamp_voice::code_lock::start(role),
+        _ => {}
+    }
     // The stall recorders (#1178) finish their lines once every device is
     // closed: after `run`, or while a panic unwinds out of it.
     let stalls_end = lamp_voice::stalls::Finishing(std::time::Duration::from_millis(300));

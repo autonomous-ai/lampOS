@@ -68,8 +68,10 @@ unicode-normalization = "0.1"
 [target.'cfg(target_os = "linux")'.dependencies]
 # A thread's own page faults and switches over one pass (`stalls`, #1178;
 # `RUSAGE_THREAD` is Linux's), and the capture worker's cores
-# (`capture_cores`, `sched_setaffinity`, #705).
-nix = { version = "=0.29.0", default-features = false, features = ["resource", "sched"] }
+# (`capture_cores`, `sched_setaffinity`, #705), and `mlock` of the voice's
+# own code pages (`code_lock`, #5611): a feature of the same version, no new
+# package.
+nix = { version = "=0.29.0", default-features = false, features = ["mman", "resource", "sched"] }
 gpiocdev = "=0.8.0"
 thread-priority = "=3.1.1"
 
