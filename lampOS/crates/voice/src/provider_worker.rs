@@ -12159,7 +12159,11 @@ pub(crate) mod tests {
             assert_eq!(
                 rig.service_message(&mut dial).await,
                 json!({"toolResponse":{"functionResponses":[{
-                    "id":"music-original", "name":name, "response":{"next":"Confirm. The recording has only been offered for preparation; playback has not started and may still be refused. Confirm only that you will try to play it. Do not say it is playing, has started, or is ready."}
+                    "id":"music-original", "name":name, "response":crate::use_skill::told_through(
+                        wrapped,
+                        "play_relaxing_music",
+                        json!({"next":"Confirm. The recording has only been offered for preparation; playback has not started and may still be refused. Confirm only that you will try to play it. Do not say it is playing, has started, or is ready."}),
+                    )
                 }]}})
             );
             let offer = skill.join().unwrap();
@@ -12319,7 +12323,8 @@ pub(crate) mod tests {
         assert_eq!(
             rig.service_message(&mut dial).await,
             json!({"toolResponse":{"functionResponses":[
-                {"id":"c8","name":"use_skill","response":{"next":"Look.","look":true}}
+                {"id":"c8","name":"use_skill","response":{"next":"Look.","look":true,
+                    crate::use_skill::RAN: "This call has already run check_my_work. Do not call use_skill for check_my_work again in this turn."}}
             ]}})
         );
         assert_eq!(

@@ -1586,7 +1586,13 @@ fn run_spoken_call_inner(
         match crate::use_skill::translate(call, crate::use_skill::offered(&skills)) {
             Ok(skill) => match self::route(settings, &skill.name) {
                 found @ Route::Executive(_) if is_skills(settings, &found) => {
-                    run_spoken_call_inner(settings, &found, &skill, request, heard, context, lease)
+                    let (whom, mut answer, answered) = run_spoken_call_inner(
+                        settings, &found, &skill, request, heard, context, lease,
+                    );
+                    if answered {
+                        crate::use_skill::ran(&skill.name, &mut answer.told);
+                    }
+                    (whom, answer, answered)
                 }
                 _ => ("nobody", ToolAnswer::plain(unavailable()), false),
             },
@@ -2206,7 +2212,12 @@ fn run_call_with_scope(
                 // on #1696, #1656).
                 Ok(skill) => match crate::tools::route(settings, &skill.name) {
                     found @ Route::Executive(_) if is_skills(settings, &found) => {
-                        run_call_with_scope(&found, &skill, request, heard, lease)
+                        let (whom, (mut told, answered)) =
+                            run_call_with_scope(&found, &skill, request, heard, lease);
+                        if answered {
+                            crate::use_skill::ran(&skill.name, &mut told);
+                        }
+                        (whom, (told, answered))
                     }
                     _ => ("nobody", (unavailable(), false)),
                 },
@@ -3795,7 +3806,12 @@ mod tests {
                     assert!(note.contains("playback has not started and may still be refused"));
                     assert!(note.contains("Confirm only that you will try to play it."));
                     assert!(note.contains("Do not say it is playing, has started, or is ready."));
-                    assert_eq!(answer.told.as_object().unwrap().len(), 1);
+                    // Through `use_skill`, told it already ran (#2826).
+                    assert_eq!(
+                        answer.told.as_object().unwrap().len(),
+                        1 + usize::from(wrapped)
+                    );
+                    assert_eq!(answer.told.get(crate::use_skill::RAN).is_some(), wrapped);
                     assert!(!note.contains("relaxing.wav"));
                     assert_eq!(answer.requested_audio, Some(offer));
                     assert!(lease.is_current());
@@ -3956,7 +3972,12 @@ mod tests {
             assert!(note.contains("playback has not started and may still be refused"));
             assert!(note.contains("Confirm only that you will try to play it."));
             assert!(note.contains("Do not say it is playing, has started, or is ready."));
-            assert_eq!(answer.told.as_object().unwrap().len(), 1);
+            // Through `use_skill`, told it already ran (#2826).
+            assert_eq!(
+                answer.told.as_object().unwrap().len(),
+                1 + usize::from(wrapped)
+            );
+            assert_eq!(answer.told.get(crate::use_skill::RAN).is_some(), wrapped);
             assert!(!note.contains("relaxing.wav"));
             assert_eq!(
                 server.join().unwrap(),
@@ -4029,7 +4050,11 @@ mod tests {
                 _ => answer_spoken(&settings, &call, &context),
             };
             assert!(answer.requested_audio.is_none(), "{mode}");
-            assert_eq!(answer.told, json!({"next":"Say one short confirmation."}));
+            let mut told = answer.told;
+            // Through `use_skill`, told it already ran (#2826).
+            let ran = told.as_object_mut().unwrap().remove(crate::use_skill::RAN);
+            assert_eq!(ran.is_some(), mode == "typed-wrapped", "{mode}");
+            assert_eq!(told, json!({"next":"Say one short confirmation."}));
             assert!(
                 server
                     .join()
@@ -4817,6 +4842,99 @@ mod tests {
         assert!(chat.len() <= crate::second_provider::MAX_TOOLS);
     }
 
+    /// #2826: on lamp-9adf (stable 10441), with installable skills added,
+    /// the chat route was past its 48 and left out `the_time`,
+    /// `reports_state` and `fetch_page`. With `LAMP_USE_SKILL=on` the skills
+    /// are one function however many are installed, so the chat request
+    /// keeps every one of the lamp's own and the route's, under its bound,
+    /// and `use_skill` still names every skill.
+    #[test]
+    fn with_use_skill_many_skills_leave_none_of_the_lamps_own_out() {
+        let (dir, mut settings) = many_skills("use-skill-many");
+        let skills = dir.join(SKILLS_DIR).join(CATALOG_FILE);
+        let mut catalog: Value =
+            serde_json::from_str(&std::fs::read_to_string(&skills).unwrap()).unwrap();
+        let installed = catalog["tools"].as_array_mut().unwrap();
+        installed.extend((0..40).map(
+            |n| json!({"name": format!("installed_{n}"), "description": "An installed skill."}),
+        ));
+        let every_skill: Vec<String> = installed
+            .iter()
+            .map(|tool| tool["name"].as_str().unwrap().to_owned())
+            .collect();
+        std::fs::write(&skills, catalog.to_string()).unwrap();
+        settings.reports_stop = true;
+        settings.places = true;
+        let tool = |name: &str| Tool {
+            name: name.into(),
+            description: String::new(),
+            parameters: None,
+            silent: false,
+        };
+        let search = [
+            tool(crate::second_provider::net::search::NAME),
+            tool(crate::second_provider::net::search::FETCH),
+        ];
+        let names = |tools: &[Tool]| -> Vec<String> {
+            tools.iter().map(|tool| tool.name.clone()).collect()
+        };
+        let own: Vec<String> = core_tools_within(&settings, crate::second_provider::MAX_TOOLS)
+            .iter()
+            .map(|tool| tool.name.clone())
+            .chain(search.iter().map(|tool| tool.name.clone()))
+            .collect();
+        for name in [
+            THE_TIME,
+            crate::reports_stop::NAME,
+            crate::reports_stop::STATE_NAME,
+            crate::second_provider::net::search::FETCH,
+        ] {
+            assert!(own.iter().any(|told| told == name), "{name}: {own:?}");
+        }
+        // Off: the skills' own functions put the request past 48, and the
+        // cut takes the route's fetch, the time elsewhere and
+        // `reports_state` first, as on lamp-9adf.
+        let off = names(&crate::second_provider::worker::chat_tools(
+            &settings, &search, true,
+        ));
+        assert_eq!(off.len(), crate::second_provider::MAX_TOOLS, "{off:?}");
+        for cut in [
+            crate::second_provider::net::search::FETCH,
+            THE_TIME,
+            crate::reports_stop::STATE_NAME,
+        ] {
+            assert!(!off.iter().any(|told| told == cut), "{cut}: {off:?}");
+        }
+        // On: one function for all 43 skills, and none of the lamp's own
+        // nor the route's left out.
+        settings.use_skill = true;
+        let on = crate::second_provider::worker::chat_tools(&settings, &search, true);
+        let told = names(&on);
+        assert!(told.len() <= crate::second_provider::MAX_TOOLS, "{told:?}");
+        assert_eq!(told.len(), own.len() + 2, "{told:?}");
+        for name in own
+            .iter()
+            .map(String::as_str)
+            .chain([crate::use_skill::NAME, crate::second_provider::LOOK_CALL])
+        {
+            assert!(told.iter().any(|told| told == name), "{name}: {told:?}");
+        }
+        assert!(
+            told.iter().all(|name| !every_skill.contains(name)),
+            "{told:?}"
+        );
+        let use_skill = on
+            .iter()
+            .find(|tool| tool.name == crate::use_skill::NAME)
+            .unwrap();
+        let reached: Vec<String> = every_skill
+            .iter()
+            .map(|skill| format!("{}:{skill}", crate::use_skill::NAME))
+            .collect();
+        assert_eq!(crate::use_skill::reached(use_skill), reached);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     /// The reviewer's P3 on #1906: `LAMP_REPORTS=on` declares two more,
     /// `reports_stop` and `reports_state`, before the executive's and the
     /// skills'; past 32 the cut is `reports_state`, then the last skills'
@@ -5012,7 +5130,12 @@ mod tests {
             name: crate::use_skill::NAME.into(),
             args: json!({"skill":"dance","choice":"jazz","flag":true}),
         };
-        assert_eq!(answer(&settings, &call, 7, true), json!({"next":"Dance."}));
+        // Told the call already ran it (#2826).
+        assert_eq!(
+            answer(&settings, &call, 7, true),
+            json!({"next":"Dance.", crate::use_skill::RAN:
+                "This call has already run dance. Do not call use_skill for dance again in this turn."})
+        );
         assert_eq!(
             served.join().unwrap(),
             json!({"op":"call","name":"dance","args":{"style":"jazz","long":true}})
@@ -5186,15 +5309,15 @@ mod tests {
             assert_eq!(answer_typed(&settings, &through, text), refused);
             let mut context = audio_context();
             context.call_id = through.id.clone();
+            // Told the call already ran it (#2826).
+            let done = json!({"next":"Done.", crate::use_skill::RAN:
+                "This call has already run dance. Do not call use_skill for dance again in this turn."});
             if requested_audio {
                 let answer = answer_spoken(&settings, &through, &context);
-                assert_eq!(answer.told, json!({"next":"Done."}));
+                assert_eq!(answer.told, done);
                 assert!(answer.requested_audio.is_none());
             } else {
-                assert_eq!(
-                    answer(&settings, &through, 9, true),
-                    json!({"next":"Done."})
-                );
+                assert_eq!(answer(&settings, &through, 9, true), done);
             }
             let asked = served.join().unwrap();
             assert_eq!(asked["name"], "dance");
@@ -5241,7 +5364,7 @@ mod tests {
             name: crate::use_skill::NAME.into(),
             args: json!({"skill":"dance"}),
         };
-        assert_eq!(answer(&settings, &call, 7, true), json!({"next":"Dance."}));
+        assert_eq!(answer(&settings, &call, 7, true)["next"], "Dance.");
         assert_eq!(
             served.join().unwrap(),
             json!({"op":"call","name":"dance","args":{}})
