@@ -605,3 +605,16 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   any audio, so two early fenced cuts (the lamp's own echo) hold a
   reminder forever. Thirteen moved to HOLD too. reminders 139/0,
   consumer 39/0, reminder_policy 5/0.
+- 13:5x: #5474 READ-OK 77d1826e4d (in place of the first builder). The
+  walk's file reaches the `second` worker only; mutations pin the wiring
+  and the one-role limit.
+- 14:0x: #5519 READ-OK 22bf16e685, then HOLD at 14:1x, agreeing with the
+  Reviewer-lead's two P2s that I missed: the eyes fold inner spaces, so
+  "Mai  Tran" slips the guard onto the owner's id; and a voice
+  `redo_setup step:who_you_are` reopens "at setup" for anyone. P3: the
+  `run_speaker` guard has no test (off in the product).
+- 14:3x: #5509 READ-OK cb95951efb. Only a real share heard counts toward
+  the hold; light cuts are capped at 3. Mutations pin all three parts.
+- 14:5x: #5508 privacy READ-OK 75a009e00a. Carried lines search nothing
+  again (mutation fails 50/1). P3: six ordinary replies still read as a
+  don't-know; now that costs only a search of the person's own memory.
