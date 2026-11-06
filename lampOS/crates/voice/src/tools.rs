@@ -439,6 +439,9 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
             return Err(std::io::Error::other("--onboarding-file must be absolute"));
         }
         settings.onboarding = Some(PathBuf::from(file));
+        // The walk's order, read as the worker starts (the Reviewer-lead's
+        // P3 on #5521).
+        crate::onboarding::installed_order();
         flags = rest;
     }
     if let [flag, rest @ ..] = flags
