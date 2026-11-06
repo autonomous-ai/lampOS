@@ -3462,7 +3462,7 @@ then use that person's scope:
   lamp keeps is the one asking. Someone else only in view is never named.
   The journal says each refusal's reason name
   (`known_faces::refusal_reason`: `not_heard`, `not_agreed`, `near_to`,
-  `not_like_them`, `not_theirs`, `speaker_not_seen`, the eyes' own codes
+  `not_like_them`, `owners_name_in_app`, `not_theirs`, `speaker_not_seen`, the eyes' own codes
   such as `no_face` or `known_as`, else `other`) with the function:
   "lamp-voice: forget_my_face refused: not_theirs; …". It never logs the
   person's words, a name or an id. Off, every refusal is byte for byte as
