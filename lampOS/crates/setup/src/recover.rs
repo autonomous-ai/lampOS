@@ -44,6 +44,12 @@ pub const SAY_OPENED: &str =
 /// [`SAY_OPENED`]'s recording, by the name the say service takes, the
 /// failure notice `wifi_recovering` (`docs/failure-notices.md`).
 pub const RECORDING_OPENED: &str = "wifi_recovering";
+/// A [`RECORDING_OPENED`] not played (refused: the lamp speaking, a higher
+/// say, the voice not up yet; or no say service) is asked again this long
+/// after, the wait doubling each time (#5550): at 5 s, 15 s and 35 s.
+pub const SAY_AGAIN_FIRST_MS: u64 = 5_000;
+/// Never past this from the first ask: its ask's `expires_in_ms`.
+pub const SAY_AGAIN_WITHIN_MS: u64 = 60_000;
 
 /// Whether the switch's value turns recovery on.
 pub fn on(value: Option<&str>) -> bool {
@@ -102,6 +108,16 @@ pub struct Recovery {
     /// retry that went back to `Lost` (only slow, or busy) says it again
     /// (Second's P3 on #4157).
     told: bool,
+    /// [`SAY_OPENED`] not played and asked again: the first ask, the wait,
+    /// and when it is due (`u64::MAX` once asked).
+    again: Option<Again>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Again {
+    first_ms: u64,
+    wait_ms: u64,
+    due_ms: u64,
 }
 
 impl Default for Recovery {
@@ -109,6 +125,7 @@ impl Default for Recovery {
         Self {
             state: State::Online,
             told: false,
+            again: None,
         }
     }
 }
@@ -130,7 +147,42 @@ impl Recovery {
     pub fn says_opened(&mut self, act: Option<Act>) -> bool {
         let first = act == Some(Act::OpenHotspot) && !self.told;
         self.told |= first;
+        if first {
+            self.again = None;
+        }
         first
+    }
+
+    /// [`SAY_OPENED`], asked at `now_ms`, was not played: asked again after
+    /// [`SAY_AGAIN_FIRST_MS`], then twice the wait each time, while that is
+    /// within [`SAY_AGAIN_WITHIN_MS`] of the first ask.
+    pub fn not_played(&mut self, now_ms: u64) {
+        let (first_ms, wait_ms) = match self.again {
+            Some(again) => (again.first_ms, again.wait_ms.saturating_mul(2)),
+            None => (now_ms, SAY_AGAIN_FIRST_MS),
+        };
+        let due_ms = now_ms.saturating_add(wait_ms);
+        self.again = (due_ms.saturating_sub(first_ms) <= SAY_AGAIN_WITHIN_MS).then_some(Again {
+            first_ms,
+            wait_ms,
+            due_ms,
+        });
+    }
+
+    /// Whether [`SAY_OPENED`] is to be asked again now: due, within its
+    /// minute, and the hotspot open (not during a try of the saved network,
+    /// when it is closed, nor once the lamp is online).
+    pub fn says_again(&mut self, now_ms: u64) -> bool {
+        let Some(again) = self.again.as_mut() else {
+            return false;
+        };
+        let due = now_ms >= again.due_ms
+            && now_ms.saturating_sub(again.first_ms) <= SAY_AGAIN_WITHIN_MS
+            && matches!(self.state, State::Hotspot { .. });
+        if due {
+            again.due_ms = u64::MAX;
+        }
+        due
     }
 
     /// What `seen` at `now_ms` asks for.
@@ -186,6 +238,7 @@ impl Recovery {
         };
         if state == State::Online {
             self.told = false;
+            self.again = None;
         }
         self.state = state;
         act

@@ -626,3 +626,61 @@ fn the_start_waits_for_the_interface_a_bounded_time() {
     assert_eq!(radio.now_ms, lamp_setup::recover::INTERFACE_WAIT_MS);
     assert_eq!(radio.stations, 1);
 }
+
+/// #5550: a refused `wifi_recovering` (the lamp speaking, a higher say, the
+/// voice not up yet) is asked again 5 s, 10 s and 20 s apart, never past
+/// its ask's 60 s from the first, and only while the hotspot is open.
+#[test]
+fn a_refused_hotspot_line_is_asked_again_within_its_minute() {
+    use lamp_setup::recover::SAY_AGAIN_WITHIN_MS;
+    let mut policy = Recovery::default();
+    let open = looks(&mut policy, 0, LOSS_GRACE_MS, GONE);
+    assert_eq!(open, [(LOSS_GRACE_MS, Act::OpenHotspot)]);
+    assert!(policy.says_opened(Some(Act::OpenHotspot)));
+    // Refused every time: asked at +5 s, +15 s and +35 s, then no more.
+    policy.not_played(LOSS_GRACE_MS);
+    let phone = Seen {
+        phones: Some(1),
+        ..GONE
+    };
+    let mut again = Vec::new();
+    for at in (LOSS_GRACE_MS + 5_000..LOSS_GRACE_MS + RETRY_EVERY_MS).step_by(5_000) {
+        assert_eq!(policy.step(at, phone), None);
+        if policy.says_again(at) {
+            again.push(at - LOSS_GRACE_MS);
+            policy.not_played(at);
+        }
+    }
+    assert_eq!(again, [5_000, 15_000, 35_000]);
+    assert!(again.iter().all(|at| *at <= SAY_AGAIN_WITHIN_MS));
+
+    // Played at its first retry: not asked again.
+    let mut policy = Recovery::default();
+    looks(&mut policy, 0, LOSS_GRACE_MS, GONE);
+    assert!(policy.says_opened(Some(Act::OpenHotspot)));
+    policy.not_played(LOSS_GRACE_MS);
+    assert!(!policy.says_again(LOSS_GRACE_MS + 4_000));
+    assert!(policy.says_again(LOSS_GRACE_MS + 5_000));
+    assert!(!policy.says_again(LOSS_GRACE_MS + 30_000));
+
+    // Back online before it is due: not said, and not owed to a new loss.
+    let mut policy = Recovery::default();
+    looks(&mut policy, 0, LOSS_GRACE_MS, GONE);
+    assert!(policy.says_opened(Some(Act::OpenHotspot)));
+    policy.not_played(LOSS_GRACE_MS);
+    policy.step(LOSS_GRACE_MS + 2_000, BACK);
+    assert!(!policy.says_again(LOSS_GRACE_MS + 5_000));
+    policy.step(LOSS_GRACE_MS + 6_000, GONE);
+    assert!(!policy.says_again(LOSS_GRACE_MS + 10_000));
+
+    // A try of the saved network (the hotspot closed): not said then.
+    let mut policy = Recovery::default();
+    looks(&mut policy, 0, LOSS_GRACE_MS, GONE);
+    assert!(policy.says_opened(Some(Act::OpenHotspot)));
+    policy.not_played(LOSS_GRACE_MS + RETRY_EVERY_MS - 5_000);
+    assert_eq!(
+        policy.step(LOSS_GRACE_MS + RETRY_EVERY_MS, GONE),
+        Some(Act::Rejoin)
+    );
+    assert!(!policy.says_again(LOSS_GRACE_MS + RETRY_EVERY_MS));
+}
