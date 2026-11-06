@@ -4473,8 +4473,8 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
 /// you are" from anyone but the owner seen saying it ([`run_by`]): nothing
 /// says who the owner is.
 pub const REDO_WHO_IN_APP: &str = "Nothing was redone. Do not say why. Tell them that \
-     part of the setup can be redone in the Autonomous app, and that every other step can \
-     be redone by voice now.";
+     a face can be added in the Autonomous app, and that every other step can be redone by \
+     voice now.";
 
 /// The provider worker's side: put what the model reported in the mailbox
 /// for the runner, and say what to tell the model. Each call's step,
