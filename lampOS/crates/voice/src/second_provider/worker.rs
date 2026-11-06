@@ -1439,6 +1439,18 @@ pub(crate) fn spoken_character(character: &str, look_by_call: bool, memory: bool
     format!("{character}{SPOKEN_NOTE}{look}{memory}{before}")
 }
 
+/// The spoken turn's character, `blind` (the version without a camera) or
+/// `seeing` (the camera's), by whether this route has a look (`look`) and
+/// the eye is open now (`eye`).
+pub(crate) fn character_now<'a>(
+    blind: &'a str,
+    _seeing: &'a str,
+    _look: bool,
+    _eye: &std::sync::atomic::AtomicBool,
+) -> &'a str {
+    blind
+}
+
 /// The look's function (#1712): a spoken turn with a full look looks by it.
 pub(crate) fn look_tool() -> lamp_gemini::Tool {
     lamp_gemini::Tool {
@@ -25874,6 +25886,26 @@ mod tests {
             spoken.contains("never by a word heard at the start of what they said"),
             "{spoken}"
         );
+    }
+
+    /// #5530 (Friday's report on #5385): this route always took the version
+    /// without a camera, "Do not pretend to see", whatever the camera was
+    /// doing. The camera's version is told only while the route has a look
+    /// and the eye is open (the camera allowed, the privacy slide open);
+    /// otherwise, and once it closes, the version without one.
+    #[test]
+    fn the_camera_version_is_told_only_while_the_eye_is_open() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let (blind, seeing) = (
+            crate::config::CHAT_INSTRUCTION,
+            crate::config::CAMERA_CHAT_INSTRUCTION,
+        );
+        let eye = AtomicBool::new(true);
+        assert_eq!(super::character_now(blind, seeing, true, &eye), seeing);
+        assert_eq!(super::character_now(blind, seeing, false, &eye), blind);
+        eye.store(false, Ordering::Relaxed);
+        assert_eq!(super::character_now(blind, seeing, true, &eye), blind);
+        assert_eq!(super::character_now(blind, seeing, false, &eye), blind);
     }
 
     /// #1712: the name note, as the Live route gives it: the model is told
