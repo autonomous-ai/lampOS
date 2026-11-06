@@ -99,6 +99,20 @@ fn walk() -> (Store, Onboarding) {
     pump(&mut walk, T);
     (store, walk)
 }
+/// #5499: a lamp with a verified switch and a receipt, walking the
+/// two-step order, is never asked privacy first, or at all.
+#[test]
+fn a_two_step_walk_is_not_asked_privacy_on_a_lamp_with_the_switch() {
+    let (_store, mut walk) = walk();
+    walk.definition =
+        Arc::new(skill::parse(include_str!("../../../../skills/onboarding/skill.toml")).unwrap());
+    context(&mut walk, T, 2, false);
+    assert!(walk.privacy_available(), "the switch is verified");
+    assert_eq!(walk.next_step(), Some(Step::WhereYouSit));
+    walk.tick(T, START_QUIET_US, true, false, face(), true);
+    assert!(walk.privacy_pending().invitations.is_empty());
+}
+
 fn offer(walk: &mut Onboarding, now: u64, seq: u64) -> u64 {
     context(walk, now, seq, false);
     walk.drain_storage_for_test(now);
