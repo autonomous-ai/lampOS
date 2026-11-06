@@ -19,7 +19,11 @@
 //!
 //! The Live route is told the same note beside the owner's open line, once
 //! a session for each set of names ([`LiveTold`]): its session keeps what
-//! it was told, so a line that says the same again is not told again.
+//! it was told, so a line that says the same again is not told again. As a
+//! session keeps it, a guest later in it would hear the names, so the Live
+//! route is told only in the private room (`LAMP_PRIVATE_ROOM`, every line
+//! the owner's); and a session whose services are all since unlinked is
+//! told so once.
 //!
 //! Off unless the voice's environment says exactly `on`, and only with the
 //! services' folder (`LAMP_SERVICES=on`, `--services-dir`).
@@ -68,20 +72,34 @@ pub struct LiveTold {
 impl LiveTold {
     /// The note due beside a line of `session` whose owner is `owner`, with
     /// `names` linked ([`note_for`]): none when this session was told these
-    /// names already.
+    /// names already, and none outside the private room (`private_room`,
+    /// `crate::person::private_room`): a Live session keeps what it was
+    /// told, so a guest later in it would hear the names (Jarvis's P2 on
+    /// #5598). Everything told in this session since unlinked:
+    /// [`UNLINKED_NOTE`], once.
     pub fn due(
         &self,
         session: u64,
         owner: Option<&str>,
         names: &[String],
-        _private_room: bool,
+        private_room: bool,
     ) -> Option<String> {
-        if self
+        if !private_room {
+            return None;
+        }
+        let said = self
             .told
             .as_ref()
-            .is_some_and(|(told, said)| *told == session && said.as_slice() == names)
-        {
+            .filter(|(told, _)| *told == session)
+            .map(|(_, said)| said.as_slice());
+        if said == Some(names) {
             return None;
+        }
+        if names.is_empty() {
+            owner?;
+            return said
+                .is_some_and(|said| !said.is_empty())
+                .then(|| UNLINKED_NOTE.to_owned());
         }
         note_for(owner, names)
     }

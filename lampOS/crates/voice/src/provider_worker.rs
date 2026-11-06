@@ -1977,7 +1977,7 @@ async fn serve_with_visual<C: Connect>(
         .filter(|_| crate::services_told::on_from_environment())
         .map(|folder| {
             eprintln!(
-                "lamp-voice provider: the owner's line is told what is linked in the app's Connectors, once a session; no other line is (LAMP_SERVICES_TOLD)"
+                "lamp-voice provider: the owner's line is told what is linked in the app's Connectors, once a session, in the private room only; no other line is (LAMP_SERVICES_TOLD)"
             );
             crate::services::Linked::new(folder)
         });
@@ -2722,11 +2722,18 @@ async fn serve_with_visual<C: Connect>(
                     if let Some(note) = services_told.due(live.get(), owner.as_deref(), &names, crate::person::private_room())
                         && add_note(&provider, &mut intake.handoff.noted, open.request, &note).is_ok()
                     {
-                        eprintln!(
-                            "lamp-voice provider: request {}: told the session {} service(s) linked in the app, the line being the owner's",
-                            open.request.get(),
-                            names.len()
-                        );
+                        if names.is_empty() {
+                            eprintln!(
+                                "lamp-voice provider: request {}: told the session nothing is linked in the app now",
+                                open.request.get()
+                            );
+                        } else {
+                            eprintln!(
+                                "lamp-voice provider: request {}: told the session {} service(s) linked in the app, the line being the owner's",
+                                open.request.get(),
+                                names.len()
+                            );
+                        }
                         services_told.told(live.get(), names);
                     }
                 }
