@@ -3623,18 +3623,18 @@ pub fn serve(
     }
     engine = engine.saying_at_once(say_at_once);
     // A line that only asks to keep something, kept plainly, answered at
-    // once with no second round (`LAMP_KEEP_ANSWERS_AT_ONCE=on`, C59). The
-    // line is English: with an owner's language chosen it waits as before.
-    let keep_with_call = crate::keep_at_once::on();
-    let keep_at_once = keep_with_call && language.is_none();
+    // once with no second round (`LAMP_KEEP_ANSWERS_AT_ONCE=on`, C59). In
+    // an owner's language, only from its clip rendered ahead in it.
+    let keep_at_once = crate::keep_at_once::on();
     if keep_at_once {
         eprintln!(
-            "lamp-voice second: a line that only asks to keep something, kept plainly, is answered at once with \"{}\" and no second round (LAMP_KEEP_ANSWERS_AT_ONCE)",
-            crate::keep_at_once::KEPT
-        );
-    } else if keep_with_call {
-        eprintln!(
-            "lamp-voice second: the keep's own line is English, and the owner's language is {language:?}; keep turns wait for the model's words as without LAMP_KEEP_ANSWERS_AT_ONCE"
+            "lamp-voice second: a line that only asks to keep something, kept plainly, is answered at once with \"{}\" and no second round (LAMP_KEEP_ANSWERS_AT_ONCE){}",
+            crate::language::fixed_in(language, crate::keep_at_once::KEPT),
+            if language.is_some() {
+                ", from its clip rendered ahead; until then round 2 answers"
+            } else {
+                ""
+            }
         );
     }
     engine = engine.keeping_at_once(keep_at_once);
