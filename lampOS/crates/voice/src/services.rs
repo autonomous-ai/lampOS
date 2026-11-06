@@ -156,9 +156,13 @@ const READ_BACK_NEXT: &str = "Nothing is sent yet. Say read_back in full, word f
 pub const SENT_NEXT: &str = "Say only that it was sent, in the conversation's language.";
 /// What the model is told to say when the service did not send it.
 pub const NOT_SENT_NEXT: &str = "Say only that it was not sent, in the conversation's language.";
-/// How long after the lamp last said a word of the read-back its "send"
-/// may come: the very next line, said soon.
+/// How long after the read-back could have finished playing ([`send_by`]) its
+/// "send" may come: the very next line, said soon.
 pub const SEND_WITHIN: Duration = Duration::from_secs(30);
+/// The most each word of a read-back takes to play. Its words come as text
+/// well before they are heard: on lamp-9adf on 6 Nov 43 words played for
+/// about 23 s, which left about 7 s of [`SEND_WITHIN`] counted from the text.
+const WORD_PLAYS_AT_MOST: Duration = Duration::from_millis(600);
 /// The least time each word of a read-back takes to say: the lamp's voice
 /// says about 350 to 400 ms a word, so a line that begins sooner after the
 /// read-back began was said over it.
@@ -672,9 +676,7 @@ pub fn gate(
         && kept.lines <= 1
         && kept.person == owner
         && now.saturating_duration_since(kept.at) <= PENDING_FOR
-        && kept
-            .spoken_at
-            .is_some_and(|at| now.saturating_duration_since(at) <= SEND_WITHIN)
+        && send_by(&kept).is_some_and(|by| now <= by)
         && turn.words.is_some_and(says_send);
     if !timely {
         // Which of the checks above failed, for the journal: a "send"
@@ -698,7 +700,7 @@ pub fn gate(
             (kept.person != owner, "another person"),
             (late(Some(kept.at), PENDING_FOR), "prepared too long ago"),
             (
-                late(kept.spoken_at, SEND_WITHIN),
+                send_by(&kept).is_none_or(|by| now > by),
                 "the read-back not said, or said too long ago",
             ),
             (!turn.words.is_some_and(says_send), "not a plain send"),
@@ -996,6 +998,20 @@ pub fn voice_began_in(pending: &mut Option<Pending>, over_the_lamps_voice: bool,
     if over_the_lamps_voice || !said_whole_by(kept, now) {
         kept.cut = true;
     }
+}
+
+/// The last moment `kept`'s "send" may come: [`SEND_WITHIN`] after the lamp's
+/// last word of it, or after the read-back could have finished playing, if
+/// later. After the lamp asked once more, from that asking alone. `None`: no
+/// word of it was said.
+fn send_by(kept: &Pending) -> Option<Instant> {
+    let said = kept.spoken_at?;
+    let words = u32::try_from(kept.spoken.split_whitespace().count()).unwrap_or(u32::MAX);
+    let played = kept
+        .spoken_from
+        .filter(|_| kept.asked_again.is_none())
+        .map(|from| from + WORD_PLAYS_AT_MOST.saturating_mul(words));
+    Some(played.map_or(said, |played| played.max(said)) + SEND_WITHIN)
 }
 
 /// Whether the read-back kept in `kept` could have been said whole by `now`.
@@ -1908,7 +1924,7 @@ mod tests {
                 send("s1"),
                 11,
                 heard("send it", 10),
-                now + SEND_WITHIN + Duration::from_secs(1),
+                send_by(waiting(now).as_ref().unwrap()).unwrap() + Duration::from_secs(1),
             ),
             (
                 "another known person",
@@ -2034,6 +2050,36 @@ mod tests {
         )
         .expect("timed from the asking");
         assert_eq!(passed.args["said"], "send");
+
+        // A long read-back's words come as text well before they play: its
+        // "send" is timed from when it could have finished, not from the text.
+        let long = ["word"; 43].join(" ");
+        let long_waiting = || {
+            let mut pending = Some(Pending::new("s1", 10, now, &long, "ann"));
+            said_in(&mut pending, 10, &long, now);
+            began_in(&mut pending, now + Duration::from_secs(40));
+            pending
+        };
+        let mut pending = long_waiting();
+        let passed = gate(
+            &mut pending,
+            &send("s1"),
+            11,
+            &heard("send it", 10),
+            now + Duration::from_secs(40),
+        )
+        .expect("heard soon after it played");
+        assert_eq!(passed.args["said"], "send");
+        let mut pending = long_waiting();
+        let refused = gate(
+            &mut pending,
+            &send("s1"),
+            11,
+            &heard("send it", 10),
+            now + WORD_PLAYS_AT_MOST.saturating_mul(43) + SEND_WITHIN + Duration::from_secs(1),
+        )
+        .expect_err("long after it played");
+        assert_eq!(refused["error"], CANCELLED);
 
         // Its own window: a second "send" long after the asking cancels.
         let mut pending = waiting(now);
