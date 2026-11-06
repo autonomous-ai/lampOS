@@ -2076,6 +2076,21 @@ fn the_product_names_a_lone_known_face_by_the_one_face_count() {
     }
 }
 
+/// The lamp is a private room between it and its owner, with no ownership
+/// check (`LAMP_PRIVATE_ROOM`, the owner's call on 6 Nov).
+#[test]
+fn the_product_is_a_private_room_with_its_owner() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    assert!(
+        section(voice, "Service").contains(&"Environment=LAMP_PRIVATE_ROOM=on"),
+        "the voice lacks LAMP_PRIVATE_ROOM"
+    );
+}
+
 /// Only faces of people at the desk count as people at the lamp
 /// (`LAMP_FACES_AT_DESK_ONLY`): on lamp-a0ae on 2 Nov tiny, unsure faces
 /// beside the owner held their name back on 51 of 79 turns as "more than one

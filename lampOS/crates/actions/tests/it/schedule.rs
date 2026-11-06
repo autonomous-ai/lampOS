@@ -1211,6 +1211,41 @@ fn texts(list: &Value) -> Vec<String> {
         .collect()
 }
 
+/// The voice's private room (`LAMP_PRIVATE_ROOM`, the owner's call on 6 Nov):
+/// the line hears and changes every reminder, whoever set it, through the
+/// real server, and what it sets is everyone's.
+#[test]
+fn a_private_room_line_hears_and_changes_every_reminder_through_the_real_server() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter()));
+    let everyone = json!({"everyone":true});
+    let set = |text: &str, who: &Value| {
+        let told = actions.call_as(
+            "set_reminder",
+            json!({"text":text,"time":"08:10"}),
+            who.clone(),
+        );
+        assert_eq!(told["result"]["status"], "committed", "{told}");
+        told["result"]["id"].as_u64().unwrap()
+    };
+    let pills = set("Ann's pills", &caller(Some(ANN), true));
+    set("Bo's call", &caller(Some(BO), false));
+    set("Water the plant", &everyone);
+    let list = |who: &Value| actions.call_as("list_reminders", json!({}), who.clone());
+    assert_eq!(
+        texts(&list(&everyone)),
+        ["Ann's pills", "Bo's call", "Water the plant"]
+    );
+    // What it set is the room's, so a line that isn't in the room hears it too.
+    assert_eq!(
+        texts(&list(&caller(Some(BO), false))),
+        ["Bo's call", "Water the plant"]
+    );
+    let cancelled = actions.call_as("cancel_reminder", json!({"id":pills}), everyone.clone());
+    assert_eq!(cancelled["ok"], true, "{cancelled}");
+    assert_eq!(texts(&list(&everyone)), ["Bo's call", "Water the plant"]);
+}
+
 /// Reviewer-three's after-merge P2 on #4527, the first builder's (a): two
 /// people each asking "my reminders" hear their own; a guest's cancel or
 /// snooze by the owner's id is refused as not found; a call without its

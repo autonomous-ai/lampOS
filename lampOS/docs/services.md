@@ -35,6 +35,8 @@ at 14:11 on 3 Nov 2026):
 
 ## Who can use them
 
+**In the product today, anyone who speaks to the lamp** (`LAMP_PRIVATE_ROOM=on`, the owner's call on 6 Nov). The lamp is a private room between it and its owner, so whoever speaks is the owner, and no ownership check runs: telling who is speaking wasn't reliable enough, and the lamp refused its own owner. A line must still be spoken (`NOT_HEARD`), and a write still needs its read-back and a plain "send" right after it, which catch a mishearing. The rules below are what applies with the switch off; they stay in the code for a later feature.
+
 Only the lamp's owner: the person whose known face is kept under the name
 typed at setup (`LAMP_PERSON_NAME`) or under the name `who_you_are` saved
 with their face (`known_faces::owner_now`, kept fresh while services are on),
