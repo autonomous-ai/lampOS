@@ -405,6 +405,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "알겠어요.",
         ],
     ),
+    // What the second route says at once for a plain keep
+    // (`LAMP_KEEP_ANSWERS_AT_ONCE`, C59), from its clip rendered ahead.
+    (
+        crate::keep_at_once::KEPT,
+        [
+            "Được, mình sẽ nhớ điều đó.",
+            "わかった、覚えておくね。",
+            "好的，我会记住的。",
+            "알겠어요, 기억해 둘게요.",
+        ],
+    ),
     // The first stand's ask and its "here I go", sent to the say service as
     // text (Fourth's finding on #4710). In another language than English it
     // asks for the touch alone, never the spoken yes.
@@ -786,7 +797,7 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 26);
+        assert_eq!(FIXED_LINES.len(), 27);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }
