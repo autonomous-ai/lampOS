@@ -3102,6 +3102,8 @@ fn a_sign_in_question_cut_by_privacy_or_a_stop_is_not_talked_over() {
         ("privacy_muted", false),
         ("privacy_gap", false),
         ("service_stopped", false),
+        ("runtime_failed", false),
+        ("deadline_cancelled", false),
         ("barge_in", true),
     ] {
         let mut h = Harness::new(TurnTaking::Duplex);

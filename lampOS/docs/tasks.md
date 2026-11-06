@@ -2335,11 +2335,13 @@ bound. The contract the app builds on is in #5198.
   shows its code and never its email. `revision` is the sign-in's id times
   1000 plus its changes: every change moves it, a read never does. A done
   sign-in has `message`: Harness's own result `message` (bounded, never one
-  holding an `@`, eight digits, or the sign-in's code, matched on the
-  message's digits alone whatever the spacing or separators ("1234 5678",
-  "1234-5678"), and still after the question was asked; spelled-out digits
-  are not matched: the privacy reader's P3 on #5236 and the reviewer-lead's
-  P2 on #5579; tests
+  holding an `@`, eight or more digits in all, or the sign-in's code,
+  counted on the message's digits alone whatever the spacing or separators ("1234 5678",
+  "1234-5678"), and still after the question was asked. This is fail-closed
+  on purpose: any message holding eight or more digits in all is dropped, a
+  phone number, a date or a time too, and the lamp's own words are said
+  instead. Spelled-out digits are not counted: the privacy reader's P3 on
+  #5236 and the reviewer-lead's P2 and P3 on #5579; tests
   `a_result_keeps_harness_message_and_already_signed_in_for_the_app` and
   `a_sign_in_message_quoting_the_code_with_separators_is_dropped`) or the lamp's
   words for its code; Harness's
@@ -2570,8 +2572,10 @@ never have asked or taken an answer on a lamp).
   (`AskAgain::cut`), not 30 s later, so it is told at the next pause. It
   still counts toward `ASKED_MOST`: one talked over on its last telling is
   let go. Other news is left as it was. A turn cancelled by
-  `privacy_muted`, `privacy_gap` or `service_stopped` was not talked over:
-  its question is not offered again at once. Tests:
+  `privacy_muted`, `privacy_gap`, `service_stopped`, `runtime_failed` (the
+  session ended on an error) or `deadline_cancelled` (the session's
+  deadline) was not talked over: its question is not offered again at once
+  (the reviewer-lead's P3 on #5579). Tests:
   `a_sign_ins_question_talked_over_is_offered_again_at_once`,
   `a_question_talked_over_is_due_at_once`,
   `news_a_turn_did_not_get_heard_is_told_not_heard` and
