@@ -377,13 +377,15 @@ Controls word stale, still counts as closed.
 
 **Classes stay off without a yes.** lamp-ears' room sound classes (#1923,
 `LAMP_EARS_CLASSES=on`) start on `on`, a lamp with a slide, as built. With
-`no-slide` they start only with the person's stored yes from setup (the
+`no-slide` they start only with the person's stored yes from setup, or
+from the app with `LAMP_APP_CONSENT=on` (#5500) (the
 lead's decision, #1711, 07:33 on #1722): `classes::start` reads
 `/var/lib/lampOS/consent/room-sounds.json` (Seventh's #2110, `root:lampos`
 0640) as lamp-ears starts, and only a JSON object whose `room_sounds` is
-exactly `"yes"` counts. Missing, unreadable, over 4096 bytes or anything else
+exactly `"yes"` counts (`by`, who gave it, is not read). Missing, unreadable, over 4096 bytes or anything else
 is no; then no classifier runs, whatever the switch says, and the journal
-says so once. While it runs, the classifier reads the yes again every 2 s
+says so once. A yes from the app restarts lamp-ears through root's change
+helper, since the classifier starts only with lamp-ears. While it runs, the classifier reads the yes again every 2 s
 (`YES_EVERY_US`): once a forget or a redo of setup has removed it, the
 window is dropped, `ears/classes` says `privacy`, the journal says so once
 and the classifier stays stopped until lamp-ears starts again.
@@ -408,10 +410,14 @@ answer more warmly (never said aloud, no picture of a face kept), and keeps
 only a yes: a yes for this lamp, covering everyone it sees, not the yes of
 the one who answered; a no or silence leaves no file, as never asked does. `redo_setup`, a
 forget of everything and the reset plan remove it, as `room-sounds.json`
-([onboarding.md](onboarding.md), "Face expressions"). Those are the only
-ways to take it back: a forget of everything, a redo of the step, or the
-reset. There is no separate "stop noticing my face" yet. Without the ask (the
-product's unit doesn't set it yet), a test lamp's yes is written by hand, as
+([onboarding.md](onboarding.md), "Face expressions"), whoever gave it. With
+`LAMP_APP_CONSENT=on` on `lamp-cloud` (#5500, off in the product for now) the
+owner also turns it on and off in the app (`consent.set`, [cloud.md](cloud.md),
+"The two yeses from the app"): root's change helper writes the same file
+with `"by":"app"`, which the eyes ignore, and removes it for an off; the
+voice's starts and writes keep that yes until a redo or a "no" at the lamp
+after it. Without the ask or the app (the
+product's units set neither yet), a test lamp's yes is written by hand, as
 root:
 `printf '{"face_expressions":"yes"}' > /var/lib/lampOS/consent/face-expressions.json`,
 `chown root:lampos` and `chmod 0640` it, and remove it after.

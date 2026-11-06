@@ -515,18 +515,48 @@ fn kept_yes(progress: &Progress, step: &str) -> Option<u64> {
         .map(|kept| kept.at_unix_s)
 }
 
+/// When the owner's yes for `step` from the app, if older, no longer
+/// stands: the step's last redo, or a "no" (`skipped`) at the lamp after it.
+fn app_yes_taken_back_at(progress: &Progress, step: &str) -> Option<u64> {
+    let redone = progress.yes_redone_at_unix_s.get(step).copied();
+    let no = progress
+        .steps
+        .get(step)
+        .filter(|kept| kept.outcome == super::Outcome::Skipped)
+        .map(|kept| kept.at_unix_s);
+    redone.max(no)
+}
+
+/// Whether the file at `path` is the owner's yes for `step` from the app
+/// (`"by":"app"`, written by `lamp-setup change`, #5500) that still stands
+/// against `progress`: given after the step's last redo and after any "no"
+/// at the lamp. With no time, it doesn't.
+fn app_yes_stands(path: &Path, progress: &Progress, step: &str) -> bool {
+    let kept = lamp_msgs::consent::read(path, step);
+    kept.yes
+        && kept.by_app()
+        && kept
+            .at_unix_s
+            .is_some_and(|at| app_yes_taken_back_at(progress, step).is_none_or(|taken| at > taken))
+}
+
 /// A yes for another part (room sounds for lamp-ears, face expressions for
 /// lamp-eyes; `docs/onboarding.md`), from the progress just written or
-/// read: removed unless the step's kept outcome is a yes (`done`); written,
-/// when `new` (the write that first keeps the yes), whole as
-/// `{"version":1,STEP:"yes","at_unix_s":..}`, 0640 and the reader group's
-/// (0600 with no group). Never written again from the progress: a forget of
-/// everything removes it for good (`remember.rs`). Only the answer and its
-/// time, never words, sound or a face.
+/// read: removed unless the step's kept outcome is a yes (`done`), or it is
+/// the owner's yes from the app that still stands ([`app_yes_stands`]);
+/// written, when `new` (the write that first keeps the yes), whole as
+/// `{"version":1,STEP:"yes","at_unix_s":..,"by":"voice"}`, 0640 and the
+/// reader group's (0600 with no group). Never written again from the
+/// progress: a forget of everything removes it for good (`remember.rs`),
+/// whoever gave it. Only the answer and its time, never words, sound or a
+/// face.
 fn consent(paths: &Paths, progress: &Progress, step: &str, new: bool) -> io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
     let path = &consent_path(paths, step);
     let Some(at) = kept_yes(progress, step) else {
+        if app_yes_stands(path, progress, step) {
+            return Ok(());
+        }
         return match fs::remove_file(path) {
             Err(e) if e.kind() != io::ErrorKind::NotFound => Err(e),
             _ => Ok(()),
@@ -538,8 +568,7 @@ fn consent(paths: &Paths, progress: &Progress, step: &str, new: bool) -> io::Res
     let folder = path
         .parent()
         .ok_or_else(|| io::Error::other("a consent file has no folder"))?;
-    let bytes = serde_json::to_vec(&serde_json::json!({"version":1,step:"yes","at_unix_s":at}))
-        .map_err(io::Error::other)?;
+    let bytes = lamp_msgs::consent::bytes(step, at, lamp_msgs::consent::BY_VOICE);
     let next = path.with_extension("storage-next");
     let _ = fs::remove_file(&next);
     let result = (|| {
@@ -804,7 +833,7 @@ mod tests {
         assert_eq!(kept.gid(), group);
         assert_eq!(
             fs::read(&paths.room_sounds).unwrap(),
-            br#"{"at_unix_s":7,"room_sounds":"yes","version":1}"#
+            br#"{"at_unix_s":7,"by":"voice","room_sounds":"yes","version":1}"#
         );
         // The face expressions yes, kept the same way for lamp-eyes.
         let kept = fs::metadata(&face).unwrap();
@@ -812,7 +841,7 @@ mod tests {
         assert_eq!(kept.gid(), group);
         assert_eq!(
             fs::read(&face).unwrap(),
-            br#"{"at_unix_s":7,"face_expressions":"yes","version":1}"#
+            br#"{"at_unix_s":7,"by":"voice","face_expressions":"yes","version":1}"#
         );
         fs::remove_file(&paths.room_sounds).unwrap();
         fs::remove_file(&face).unwrap();
@@ -832,6 +861,105 @@ mod tests {
         execute(&paths, Operation::Commit(Progress::default(), false)).unwrap();
         assert!(!paths.room_sounds.exists());
         assert!(!face.exists());
+    }
+
+    /// The owner's yes from the app (`"by":"app"`, #5500): kept by a start
+    /// and by every write whose progress holds no yes for its step (none
+    /// asked, `not_available`, `later`), where a voice's yes would go; taken
+    /// back by a redo of the step or of the walk after it, and by a "no" at
+    /// the lamp after it. One given after either stands again, and a yes
+    /// said at the lamp is the voice's.
+    #[test]
+    fn an_app_yes_survives_starts_and_writes_until_a_redo_or_a_no() {
+        use super::super::{Kept, Outcome};
+        let files = Files::new();
+        let paths = files.paths();
+        let face = super::super::face_expressions_beside(&paths.room_sounds);
+        let app = |path: &Path, step: &str, at| {
+            fs::write(path, lamp_msgs::consent::bytes(step, at, "app")).unwrap();
+        };
+        let with = |step: &str, outcome, at_unix_s| {
+            let mut progress = Progress::default();
+            progress.steps.insert(
+                step.into(),
+                Kept {
+                    outcome,
+                    at_unix_s,
+                    framing: None,
+                    offered_at_unix_s: None,
+                    later_offers: 0,
+                },
+            );
+            progress
+        };
+        app(&face, "face_expressions", 100);
+        app(&paths.room_sounds, "room_sounds", 100);
+        // A start, and writes with no yes behind either step: both stay.
+        execute(&paths, Operation::Initialize).unwrap();
+        for progress in [
+            Progress::default(),
+            with("face_expressions", Outcome::NotAvailable, 50),
+            with("face_expressions", Outcome::Later, 150),
+            with("room_sounds", Outcome::Failed, 150),
+        ] {
+            execute(&paths, Operation::Commit(progress, false)).unwrap();
+            execute(&paths, Operation::Initialize).unwrap();
+            assert!(face.exists() && paths.room_sounds.exists());
+        }
+        // The voice's own yes with no `done` behind it goes, as before.
+        fs::write(
+            &face,
+            lamp_msgs::consent::bytes("face_expressions", 100, "voice"),
+        )
+        .unwrap();
+        execute(&paths, Operation::Initialize).unwrap();
+        assert!(!face.exists());
+        // A "no" at the lamp before the app's yes leaves it; one after takes it.
+        app(&face, "face_expressions", 100);
+        execute(
+            &paths,
+            Operation::Commit(with("face_expressions", Outcome::Skipped, 90), false),
+        )
+        .unwrap();
+        assert!(face.exists());
+        execute(
+            &paths,
+            Operation::Commit(with("face_expressions", Outcome::Skipped, 110), false),
+        )
+        .unwrap();
+        assert!(!face.exists());
+        // A redo of the step after the app's yes takes it, kept across the
+        // start that follows; one given after the redo stands.
+        let mut redone = Progress::default();
+        redone
+            .yes_redone_at_unix_s
+            .insert("room_sounds".into(), 120);
+        execute(&paths, Operation::Commit(redone.clone(), false)).unwrap();
+        assert!(!paths.room_sounds.exists());
+        app(&paths.room_sounds, "room_sounds", 120);
+        execute(&paths, Operation::Initialize).unwrap();
+        assert!(!paths.room_sounds.exists(), "the same second as the redo");
+        app(&paths.room_sounds, "room_sounds", 121);
+        execute(&paths, Operation::Initialize).unwrap();
+        execute(&paths, Operation::Commit(redone, false)).unwrap();
+        assert!(paths.room_sounds.exists());
+        // An app yes with no time, or one not `"yes"`, never stands.
+        fs::write(&face, br#"{"face_expressions":"yes","by":"app"}"#).unwrap();
+        execute(&paths, Operation::Initialize).unwrap();
+        assert!(!face.exists());
+        // A yes said at the lamp is written as the voice's, over the app's.
+        app(&face, "face_expressions", 100);
+        execute(
+            &paths,
+            Operation::Commit(with("face_expressions", Outcome::Done, 130), false),
+        )
+        .unwrap();
+        assert_eq!(
+            lamp_msgs::consent::read(&face, "face_expressions")
+                .by
+                .as_deref(),
+            Some("voice")
+        );
     }
 
     /// A room sounds file that fails to go (here a folder in its place)

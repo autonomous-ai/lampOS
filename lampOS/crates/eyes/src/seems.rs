@@ -303,6 +303,14 @@ mod tests {
         assert!(read(
             r#"{"at_unix_s":7,"face_expressions":"yes","version":1}"#
         ));
+        // With who gave it (#5500): the voice's onboarding, and the owner's
+        // switch in the app through `lamp-setup change`, byte for byte as
+        // `lamp_msgs::consent::bytes` writes them.
+        for by in ["voice", "app"] {
+            assert!(read(&format!(
+                r#"{{"at_unix_s":7,"by":"{by}","face_expressions":"yes","version":1}}"#
+            )));
+        }
         assert_eq!(due(None, &file), Due::Now);
         let long_ago = std::time::Instant::now().checked_sub(READ_EVERY);
         assert_eq!(due(long_ago, &file), Due::Now);

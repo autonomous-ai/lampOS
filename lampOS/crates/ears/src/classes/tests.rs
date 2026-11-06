@@ -577,6 +577,14 @@ fn only_a_stored_room_sounds_yes_is_a_yes() {
         read(r#"{"version":2,"room_sounds":"yes","new":true}"#),
         "one version ahead"
     );
+    // With who gave it (#5500): the voice's onboarding, and the owner's
+    // switch in the app through `lamp-setup change`, byte for byte as
+    // `lamp_msgs::consent::bytes` writes them.
+    for by in ["voice", "app"] {
+        assert!(read(&format!(
+            r#"{{"at_unix_s":7,"by":"{by}","room_sounds":"yes","version":1}}"#
+        )));
+    }
     let padded = format!(r#"{{"room_sounds":"yes","pad":"{}"}}"#, "x".repeat(4096));
     for text in [
         r#"{"room_sounds":"no"}"#,
