@@ -1235,9 +1235,60 @@ fn any_linked(told: &Value) -> Option<bool> {
     )
 }
 
+/// The codes of the services linked now, asked of `lamp-services`
+/// [`CONNECTED`] on `folder`'s socket within [`LINKED_DEADLINE`], for a
+/// made skill that reads one (`made_skill::needs_link`). An expired link
+/// is still linked: a read renews it, and is never told "isn't linked".
+/// `None` when it can't be told: no socket, no answer in time, a refusal
+/// or an answer with no list. Blocking.
+pub fn linked_codes(folder: &Path) -> Option<Vec<String>> {
+    let told = crate::tools::exchange(
+        &folder.join(crate::tools::CALL_SOCKET),
+        &json!({"op":"call","name":CONNECTED}),
+        LINKED_DEADLINE,
+    )?;
+    codes_in(&told)
+}
+
+/// [`linked_codes`]' list, from [`CONNECTED`]'s answer.
+fn codes_in(told: &Value) -> Option<Vec<String>> {
+    if told.get("ok").and_then(Value::as_bool) != Some(true) {
+        return None;
+    }
+    let connected = told.get("result")?.get("connected")?.as_array()?;
+    Some(
+        connected
+            .iter()
+            .filter_map(|link| link.get("service").and_then(Value::as_str))
+            .map(str::to_owned)
+            .collect(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// What is linked, by code, from `lamp-services`' own answer; none
+    /// told for anything else, or with nobody on the socket.
+    #[test]
+    fn the_linked_codes_are_read_from_the_connected_answer() {
+        let told = json!({"ok": true, "result": {"connected": [
+            {"service": "gmail", "name": "Gmail", "account": "me", "expired": true},
+            {"service": "notion", "name": "Notion", "account": "me", "expired": false},
+        ], "writes": false}});
+        assert_eq!(
+            codes_in(&told),
+            Some(vec!["gmail".to_owned(), "notion".to_owned()])
+        );
+        assert_eq!(
+            codes_in(&json!({"ok": true, "result": {"connected": []}})),
+            Some(vec![])
+        );
+        assert_eq!(codes_in(&json!({"ok": false, "error": "refused"})), None);
+        assert_eq!(codes_in(&json!({"ok": true, "result": {}})), None);
+        assert_eq!(linked_codes(Path::new("/nonexistent-services")), None);
+    }
 
     const READ_BACK: &str = "Send an email from me@home.test to ann@b.test. Subject: \"Hi\". It says: \"Home by 7\". Only the people named get it.";
 

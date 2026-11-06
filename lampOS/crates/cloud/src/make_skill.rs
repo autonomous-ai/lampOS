@@ -507,7 +507,8 @@ mod tests {
                 json!({"request_id": "r1", "state": "kept", "name": "evening-dim",
                     "description": "Dims the light a shade at 10 pm.", "version": "1.0.0",
                     "sha256": "a".repeat(64),
-                    "uses": {"light": true, "body": false, "topics": ["room/presence"]}}),
+                    "uses": {"light": true, "body": false, "topics": ["room/presence"]},
+                    "needs_link": [{"code": "gmail", "name": "Gmail"}]}),
                 json!({"state": "none"}),
             ],
         );
@@ -516,6 +517,11 @@ mod tests {
             .unwrap();
         assert_eq!(seen.recv().unwrap(), json!({"made": {"request_id": "r1"}}));
         assert_eq!(told["state"], "kept");
+        // What it reads that isn't linked yet reaches the app as told.
+        assert_eq!(
+            told["needs_link"],
+            json!([{"code": "gmail", "name": "Gmail"}])
+        );
         assert_eq!(told["sha256"], "a".repeat(64));
         assert!(told.get("uses").is_none(), "{told}");
         let names: Vec<&str> = told["may_use"]

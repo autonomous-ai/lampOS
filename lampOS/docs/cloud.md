@@ -642,7 +642,13 @@ before ([skills.md](skills.md), "Asked for in the app").
   `why` in the maker's plain words. Once kept: `name`,
   `description`, `version`, `sha256` (what the lamp asks about) and
   `may_use`, the skills page's rows (`skills::may_use`). With no ask,
-  `{"state": "none"}`.
+  `{"state": "none"}`. A skill made here is also told with `needs_link`,
+  the linked services it reads that weren't linked when it was made:
+  `[{"code": "gmail", "name": "Gmail"}]`, or `[]` with none missing (and
+  for a skill that reads none); absent when `lamp-services` couldn't say, or before the check
+  is kept, a moment after `kept` first shows ([services.md](services.md),
+  "Not linked when it is made"). The skill is kept and asked about either
+  way; the app can show where to link it (Skills, then Connectors).
 - **Put on only by a spoken yes at the lamp** (the lead's ruling on #1711,
   20 Oct 08:37): the lamp tells the kept skill aloud at a good moment with
   someone there, and only a spoken yes within 120 s of that ask puts it on,
