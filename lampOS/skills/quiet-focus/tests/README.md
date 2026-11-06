@@ -23,7 +23,10 @@ focus comes due and is in the wellbeing group, with its shared `[stop]`, is
 
 The focus (`focused`, head down 45 minutes) comes due at minute 48 in each
 case below, and says nothing; the word (`looked_up`) comes when they look
-up within 10 minutes of it.
+up within 10 minutes of it. Only the word is a nudge, in the day's two and
+the wellbeing group's hour: that the silent focus takes no hour is
+`a_silent_trigger_spends_no_hour_and_the_word_after_it_is_the_nudge` in
+`crates/skills/tests/it/skills.rs`.
 
 | Case | What it holds | Result (`lamp-skills test`) |
 |---|---|---|
