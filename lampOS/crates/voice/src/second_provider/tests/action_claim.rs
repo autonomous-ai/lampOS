@@ -301,3 +301,70 @@ fn a_claim_beside_another_kind_of_call_is_not_said() {
     assert!(went.notes.contains(&beside), "{:?}", went.notes);
     assert!(!told_claim(&went), "{:?}", went.notes);
 }
+
+/// One turn with the claim check on and the worded claims too
+/// (`LAMP_ACTION_CLAIM_WORDED`, #5215's open shapes).
+fn worded(
+    heard: &str,
+    first: Vec<net::Result<ChatEvent>>,
+    later: Vec<Vec<net::Result<ChatEvent>>>,
+) -> Went {
+    claimed(true, heard, first, later)
+}
+
+/// #5215, what still counts as claimed-not-done after the acting part's own
+/// lines are checked: the model words a timer it never set in its own way
+/// ("I've set a timer for one minute.", "Timer set for one minute."). The
+/// reply is held and the model asked once more; the retry's call is answered
+/// by the timer's own line.
+#[test]
+fn a_timer_claimed_in_other_words_with_no_call_is_held_and_asked_again() {
+    for claim in [
+        "I've set a timer for one minute. It rings at 9:39 am.",
+        "Timer set for one minute, it rings at 9:39 am.",
+        "Okay, your one-minute timer is set.",
+    ] {
+        let went = worded(
+            "Lamp, set a timer to one minute.",
+            saying(claim),
+            vec![calling("set_timer")],
+        );
+        assert_eq!(
+            went.said,
+            said(&["Timer set. It rings at 7:52 am."]),
+            "{claim}"
+        );
+        assert_eq!(
+            (went.asked, went.ran.as_slice()),
+            (2, ["set_timer".to_owned()].as_slice()),
+            "{claim}"
+        );
+        assert!(told_claim(&went), "{claim}: {:?}", went.notes);
+    }
+}
+
+/// #5215: a light or volume change claimed in other words, twice, with no
+/// call ("I've kept the light on until ten." on 10441, 5 Nov 04:24, with
+/// `calls=none`; "Okay, louder."; "Brighter now."): said as the plain line
+/// that it wasn't done.
+#[test]
+fn a_device_change_claimed_in_other_words_twice_with_no_call_says_it_was_not_done() {
+    for (heard, claim) in [
+        (
+            "Hey Lamp, keep the light on until ten.",
+            "I've kept the light on until ten.",
+        ),
+        ("Louder.", "Okay, louder."),
+        ("Brighter.", "Brighter now."),
+        ("Louder.", "I've turned the volume up."),
+    ] {
+        let went = worded(heard, saying(claim), vec![saying(claim)]);
+        assert_eq!(
+            went.said,
+            said(&[crate::action_claim::NOT_DONE_LINE]),
+            "{claim}"
+        );
+        assert_eq!((went.asked, went.ran.len()), (2, 0), "{claim}");
+        assert!(told_claim(&went), "{claim}: {:?}", went.notes);
+    }
+}
