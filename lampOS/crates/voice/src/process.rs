@@ -2004,6 +2004,8 @@ fn second_route_worker_environment(
         crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
         // A narrowed line named for its reply by the one-face count (5 Nov).
         crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
+        // The face name the only name a person is called (#5484).
+        crate::face_name_only::ENVIRONMENT,
         // A one-face line's reminder reads are its person's (lamp-29e7).
         crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT,
         // Read by the second worker for the reply's owner-by-default (#3884).
@@ -2248,6 +2250,7 @@ mod tests {
             crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
             crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
+            crate::face_name_only::ENVIRONMENT,
             crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT,
             crate::person::BY_DEFAULT_ENVIRONMENT,
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
@@ -3101,6 +3104,7 @@ mod tests {
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT
                     || name == crate::second_provider::NAME_ONE_FACE_ENVIRONMENT
+                    || name == crate::face_name_only::ENVIRONMENT
                     || name == crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT
                     || name == crate::person::BY_DEFAULT_ENVIRONMENT
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
@@ -3301,6 +3305,7 @@ mod tests {
                     "LAMP_SECOND_CUE_AFTER_MS=on",
                     "LAMP_SECOND_DEEPSEEK_BASE_URL=https://relay.example.invalid/deepseek",
                     "LAMP_SECOND_FACE_NAME=on",
+                    "LAMP_SECOND_FACE_NAME_ONLY=on",
                     "LAMP_SECOND_FEW_TOOLS=on",
                     "LAMP_SECOND_FIRST_WORDS=4",
                     "LAMP_SECOND_FLUX=on",
