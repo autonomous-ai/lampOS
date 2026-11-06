@@ -5089,8 +5089,10 @@ async fn a_short_sound_not_heard_as_a_short_word_is_held_when_sounds_are_checked
 /// send is answered; with none waiting it is held, and so is any other word.
 #[tokio::test]
 async fn a_checked_sound_is_answered_only_as_the_send_a_waiting_write_asked_for() {
-    let waiting =
-        || crate::services::Pending::new("id", 8, std::time::Instant::now(), "Send a mail.", "ann");
+    let waiting = || crate::services::Pending {
+        began_clear: true,
+        ..crate::services::Pending::new("id", 8, std::time::Instant::now(), "Send a mail.", "ann")
+    };
     crate::services::pending_for_test(Some(waiting()));
     let (labels, asked) = sound_turn(true, true, "Send.").await;
     assert!(

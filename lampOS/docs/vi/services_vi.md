@@ -784,11 +784,12 @@ only reads …").
 - **Một câu gửi thuần được nghe là câu trả lời** (`send_awaited`). Khi một lệnh
   ghi đang chờ, một câu gửi thuần được tính là trả lời đèn, bất kể câu cuối
   của phần đọc lại ra sao. Vì vậy nó không bị giữ lại như một âm thanh ngắn hay
-  vài từ lẻ của căn phòng, kể cả khi không có ai trong tầm nhìn. Điều này không
-  áp dụng cho câu bắt đầu đè lên giọng của đèn hoặc trong vòng 1,5 s
-  (`own_echo::TAIL_US`) sau khi lời của đèn kết thúc: đó có thể là chính "send
-  it" của đèn vọng lại, mà `own_echo` không giữ khi dưới 3 từ. Câu như vậy được
-  xét như mọi câu khác, và `gate` vẫn xét lần gửi đó.
+  vài từ lẻ của căn phòng, kể cả khi không có ai trong tầm nhìn. Điều này chỉ áp
+  dụng cho câu được biết là bắt đầu tách khỏi lời của đèn. Câu bắt đầu đè lên
+  giọng của đèn, trong vòng 1,5 s (`own_echo::TAIL_US`) sau khi lời của đèn kết
+  thúc, hoặc khi không có hook nghe nào cho biết nó bắt đầu lúc nào, có thể là
+  chính "send it" của đèn vọng lại, mà `own_echo` không giữ khi dưới 3 từ. Câu
+  như vậy được xét như mọi câu khác, và `gate` vẫn xét lần gửi đó.
 
 ### Sau một lần đọc
 
