@@ -1001,7 +1001,9 @@ pub fn run(
             .as_deref()
             .is_some_and(|owner| crate::owner_voice::enrolled(owner).is_some());
     let alike = match (&judge, prepared) {
-        // No voice is held to the owner's in the private room. The read-back
+        // No voice is held to the owner's in the private room, and no face is
+        // asked for: the owner accepted on 6 Nov that a TV, a call or a
+        // recording can be taken as them (docs/services.md). The read-back
         // and the plain "send" right after it stay: they catch a mishearing.
         _ if private_room => Some(1.0),
         (Some(judge), Some(prepared)) if send_id && owner.is_some() && heard => {
@@ -1085,16 +1087,19 @@ pub fn run(
             // In full only to the owner alone in view, in the
             // conversation's voice; on the Live route, never.
             let alone = owner_alone();
-            let likeness = judge.as_ref().filter(|_| alone).and_then(|judge| {
-                judged(
-                    judge,
-                    if enrolled {
-                        VoiceAsk::Owner(request)
-                    } else {
-                        VoiceAsk::Conversation(request)
-                    },
-                )
-            });
+            let likeness = judge
+                .as_ref()
+                .filter(|_| alone && !private_room)
+                .and_then(|judge| {
+                    judged(
+                        judge,
+                        if enrolled {
+                            VoiceAsk::Owner(request)
+                        } else {
+                            VoiceAsk::Conversation(request)
+                        },
+                    )
+                });
             if !private_room && !read_in_full(alone, likeness, seen_owner) {
                 brief(&mut told);
             }
