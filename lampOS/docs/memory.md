@@ -479,8 +479,8 @@ such a line was the room's, so one turn of a known person's talk lost it
 (lamp-3e83, 29 Oct: the chat saw 16, then 4, then 16 messages, and the lamp
 asked its question again). It now stays that conversation's when the newest
 exchange before it is theirs and began within 45 s (or is the room's, named
-for their face alone in view with no face seen speaking it and no other
-voice known; that opens it for a keep only, held for their seen yes, the
+for their face alone in view with no face seen speaking it, their mouth
+read speaking in at least one look, and no other voice known; that opens it for a keep only, held for their seen yes, the
 line itself told as the room's), and the eyes saw through
 it with no face but theirs in view, and their face was in view through it
 or within 5 s before it began (`CARRY_UNSEEN_WITHIN`; an empty view from the
