@@ -3333,6 +3333,14 @@ impl Onboarding {
         // `not_available` (an invitation left unsaid), so the cap is never
         // escaped (the Reviewer-lead's P3 on #4012).
         let kept = self.desired.steps.get(step.name());
+        // The step had already ended with an answer this walk: led again
+        // only by the face asked for once more, which says nothing more.
+        let ended_before = kept.is_some_and(|kept| {
+            matches!(
+                kept.outcome,
+                Outcome::Done | Outcome::Skipped | Outcome::Failed
+            )
+        });
         let later_offers = kept
             .filter(|kept| {
                 matches!(outcome, Outcome::Later | Outcome::NotAvailable) && kept.later_offers > 0
@@ -3365,9 +3373,12 @@ impl Onboarding {
         // the walk says its done line as soon as the lamp may speak, never
         // waiting for the person's next line (lamp-29e7, 29 Oct, 8545).
         // Also the last step in the skill's order, however it ended (#5499:
-        // the two-step walk).
+        // the two-step walk), once per walk: not when an ask made after the
+        // walk (the face asked for once more) ends it again; a redo removes
+        // the step's outcome, so its new end says it again.
         if (outcome == Outcome::Done && step == Step::Preferences)
             || (step != Step::Preferences
+                && !ended_before
                 && self.definition.order.last() == Some(&step)
                 && matches!(outcome, Outcome::Done | Outcome::Skipped | Outcome::Failed))
         {
@@ -4473,7 +4484,12 @@ const PREFERENCES_ANSWER: &str = "That was the last question. Answer in at most 
 /// setup_step calls left "the onboarding answered" and nothing more, so
 /// what held "who you are" for 5 minutes could not be read (#3883).
 pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
-    let (told, answered) = answer(file, call);
+    run_in(file, call, Path::new(crate::skill_words::INSTALLED))
+}
+
+/// [`run`], with the onboarding skill read from the skills folder `skills`.
+fn run_in(file: &Path, call: &ToolCall, skills: &Path) -> (Value, bool) {
+    let (told, answered) = answer(file, call, skills);
     let said = |key: &str| call.args.get(key).and_then(Value::as_str).unwrap_or("none");
     eprintln!(
         "lamp-voice: onboarding: {} step {} outcome {}: {}",
@@ -4487,7 +4503,7 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
     (told, answered)
 }
 
-fn answer(file: &Path, call: &ToolCall) -> (Value, bool) {
+fn answer(file: &Path, call: &ToolCall, skills: &Path) -> (Value, bool) {
     let line = match call.name.as_str() {
         // One step, or the whole walk only when it was asked for by name:
         // on lamp-06c1 on 28 Oct "redo the touch step" reached a redo with no
@@ -4497,6 +4513,21 @@ fn answer(file: &Path, call: &ToolCall) -> (Value, bool) {
             Some(name) if Step::named(name) == Some(Step::Privacy) => {
                 return (
                     json!({"error":"Privacy can't be redone on its own. Ask whether they want to go through the whole setup again."}),
+                    true,
+                );
+            }
+            // A step out of the walk's order, which the runner refuses
+            // (#5499): said refused, so the lamp never says it will redo
+            // and then says nothing (the Reviewer-lead's P3 on #5521). The
+            // order is read as installed, which the runner loaded at its start.
+            Some(name)
+                if Step::named(name).is_some_and(|step| {
+                    skill::read_installed(skills)
+                        .is_ok_and(|definition| !definition.order.contains(&step))
+                }) =>
+            {
+                return (
+                    json!({"error":"That part is not in my setup now, so nothing was redone. Tell them so, and offer to go through the whole setup again."}),
                     true,
                 );
             }
@@ -6570,13 +6601,26 @@ mod tests {
         }
         assert_eq!(room.walk.next_step(), None);
         // Nor redone or reported by the model: a step out of the order is
-        // refused, its outcome kept.
+        // refused, its outcome kept. With the skill installed, the model is
+        // told so, never "ok" (the Reviewer-lead's P3 on #5521); unread, the
+        // runner still refuses it.
         let redo = ToolCall {
             id: "r".into(),
             name: REDO.into(),
             args: json!({"step": "touch"}),
         };
-        assert!(run(&room.walk.file, &redo).1);
+        let skills = room.walk.file.with_file_name("skills");
+        std::fs::create_dir_all(skills.join("onboarding")).unwrap();
+        std::fs::write(
+            skills.join("onboarding/skill.toml"),
+            include_str!("../../../skills/onboarding/skill.toml"),
+        )
+        .unwrap();
+        let (told, answered) = run_in(&room.walk.file, &redo, &skills);
+        assert!(answered);
+        assert!(told["error"].is_string(), "{told}");
+        assert!(told.get("ok").is_none(), "{told}");
+        assert!(run_in(&room.walk.file, &redo, &skills.join("none")).1);
         report(&room.walk, "touch", "skipped");
         assert_eq!(room.wait(10 * S, Some(SIDE)), NONE);
         assert_eq!(room.outcome(Step::Touch), Some(Outcome::NotAvailable));
@@ -6600,6 +6644,46 @@ mod tests {
             room.wait(4 * S, Some(NEAR_MIDDLE)),
             [skill::NAME_ONLY, skill::PREFERENCES_DONE]
         );
+    }
+
+    /// The Reviewer-lead's P2 on #5521: the walk's last line is said once
+    /// per walk. The face asked for once more leads "who you are" again;
+    /// its end, a no or a face saved, says nothing more.
+    #[test]
+    fn the_two_step_walk_says_its_last_line_once_after_the_face_asked_again() {
+        for saved in [false, true] {
+            let mut room = Room::new("two-steps-last-line-once");
+            room.walk.definition = Arc::new(
+                skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap(),
+            );
+            room.walk.face_kept = true;
+            room.walk
+                .finish(Step::WhereYouSit, Outcome::Done, None, room.at);
+            room.walk
+                .finish(Step::WhoYouAre, Outcome::Done, None, room.at);
+            room.walk.name_only(false, Vec::new());
+            assert_eq!(
+                room.wait(4 * S, Some(NEAR_MIDDLE)),
+                [skill::NAME_ONLY, skill::PREFERENCES_DONE]
+            );
+            back_date(&mut room, 1_801);
+            assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [skill::FACE_AGAIN]);
+            if saved {
+                face_saved(&room.walk.file, Some("Marie"));
+            } else {
+                room.walk.heard("No thanks.", room.at);
+            }
+            assert_eq!(
+                room.wait(
+                    FACE_SAVE_WAIT_US + START_QUIET_US + 2 * S,
+                    Some(NEAR_MIDDLE)
+                ),
+                NONE,
+                "saved: {saved}"
+            );
+            assert!(!room.walk.leading(), "saved: {saved}");
+            assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        }
     }
 
     /// lamp-52e6 on 6 Nov 13:45 (stable 10467, a redo): the name heard, the
