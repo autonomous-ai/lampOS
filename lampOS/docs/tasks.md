@@ -1238,7 +1238,11 @@ rewrite only the `exec` line, so the preamble stays.
   same folder.
 - **Not written:** with the switch off; with no launcher (none is made, one
   line said); with a launcher that is a link (`a link, left as it is`; its
-  target is not read or written), not a plain file, or has no `exec` line.
+  target is not read or written), not a plain file, or has no `exec` line;
+  with one that has a second hard link (`hard-linked (N names), left as it
+  is`) or is owned by another uid than its `bin` folder's owner (`owned by
+  uid U, not the bin folder's owner B, left as it is`), both checked on the
+  one `O_NOFOLLOW` open file (two security reads' P3 on #5624).
 - **Journal:** lamp-tasks says `tasks: Harness's launcher pinned (…): <path>`,
   `tasks: Harness's launcher already pinned: <path>`, `tasks: no Harness
   launcher at <path>: left alone` or `tasks: Harness's launcher not pinned:

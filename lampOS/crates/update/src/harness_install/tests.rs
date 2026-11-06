@@ -1,6 +1,11 @@
 use super::*;
 use crate::judge::UnitState;
-use std::{cell::RefCell, os::unix::fs::symlink, path::PathBuf, rc::Rc};
+use std::{
+    cell::RefCell,
+    os::unix::fs::{MetadataExt, symlink},
+    path::PathBuf,
+    rc::Rc,
+};
 
 /// What a round asked systemd, in order.
 #[derive(Default)]
@@ -1399,4 +1404,67 @@ fn a_link_in_place_of_the_bin_folder_is_not_followed() {
         UNPINNED
     );
     assert!(!elsewhere.join(".harness.lampos-pin").exists());
+}
+
+/// A launcher with a second hard link (a name elsewhere for the same file):
+/// left as it is, one line said, the other name unchanged (two security
+/// reads' P3 on #5624).
+#[test]
+fn a_hard_linked_launcher_is_left_alone() {
+    let lamp = Lamp::new();
+    let launcher = launcher_left(&lamp, UNPINNED);
+    let other = lamp.root().join("elsewhere");
+    fs::hard_link(&launcher, &other).unwrap();
+    let mut runs = Runs::new();
+    runs.tasks_environment = HOLD_ON.into();
+    let mut lines = Vec::new();
+    let mut run = runs.runner();
+    launcher::after_install(lamp.root(), &mut run, &mut |line: &str| {
+        lines.push(line.to_owned())
+    });
+    assert_eq!(
+        lines,
+        [format!(
+            "Harness's launcher not pinned: {}: hard-linked (2 names), left as it is",
+            launcher.display()
+        )]
+    );
+    assert_eq!(fs::read_to_string(&launcher).unwrap(), UNPINNED);
+    assert_eq!(fs::read_to_string(&other).unwrap(), UNPINNED);
+    assert!(!launcher.with_file_name(".harness.lampos-pin").exists());
+}
+
+/// A launcher owned by another uid than its bin folder's owner is not
+/// pinned; one with one name and the folder's owner is.
+#[test]
+fn a_launcher_owned_by_another_uid_is_not_pinned() {
+    assert_eq!(launcher::refused(1, 1000, 1000), None);
+    assert_eq!(
+        launcher::refused(1, 0, 1000).as_deref(),
+        Some("owned by uid 0, not the bin folder's owner 1000, left as it is")
+    );
+    assert_eq!(
+        launcher::refused(3, 1000, 1000).as_deref(),
+        Some("hard-linked (3 names), left as it is")
+    );
+}
+
+/// The same through `pin`, where the test can give the launcher another
+/// owner: only as root (skipped otherwise, e.g. on a builder's Mac).
+#[test]
+fn a_foreign_owned_launcher_is_left_alone_when_run_as_root() {
+    let lamp = Lamp::new();
+    if fs::metadata(lamp.root()).unwrap().uid() != 0 {
+        return;
+    }
+    let launcher = launcher_left(&lamp, UNPINNED);
+    std::os::unix::fs::chown(&launcher, Some(4242), None).unwrap();
+    assert_eq!(
+        launcher::pin(&launcher, "/x"),
+        Err(format!(
+            "{}: owned by uid 4242, not the bin folder's owner 0, left as it is",
+            launcher.display()
+        ))
+    );
+    assert_eq!(fs::read_to_string(&launcher).unwrap(), UNPINNED);
 }

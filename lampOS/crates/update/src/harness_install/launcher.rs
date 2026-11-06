@@ -109,8 +109,9 @@ const NAME: &str = "harness";
 /// shape with `env_file`, whole: through a file beside it, with its mode
 /// (executable) and owner (Harness's user, not root), then renamed over it.
 /// One already pinned is not written; a missing one is not made. An error,
-/// with the launcher unchanged, when it is not a plain file, has no `exec`
-/// line, or cannot be written.
+/// with the launcher unchanged, when it is not a plain file, has a second
+/// hard link, is not owned by its bin folder's owner, has no `exec` line,
+/// or cannot be written.
 ///
 /// This runs as root in a folder Harness's user owns, so nothing there is
 /// opened through a link (the Reviewer-lead on #5624): `.local` and `bin`
@@ -150,6 +151,12 @@ pub fn pin(launcher: &Path, env_file: &str) -> Result<Pinned, String> {
     if !metadata.is_file() {
         return Err(said(&"not a plain file"));
     }
+    let bin_uid = rfs::fstat(&dir)
+        .map_err(|error| said(&io::Error::from(error)))?
+        .st_uid;
+    if let Some(why) = refused(metadata.nlink(), metadata.uid(), bin_uid) {
+        return Err(said(&why));
+    }
     let mut text = String::new();
     file.read_to_string(&mut text)
         .map_err(|error| said(&error))?;
@@ -165,6 +172,18 @@ pub fn pin(launcher: &Path, env_file: &str) -> Result<Pinned, String> {
         return Err(said(&error));
     }
     Ok(Pinned::Written)
+}
+
+/// Why a plain-file launcher is not pinned (two security reads' P3 on
+/// #5624): a second hard link (another name for the same file, which the
+/// rename would part from it) or an owner other than its bin folder's
+/// (Harness's user). `None` when it may be pinned.
+pub(crate) fn refused(nlink: u64, uid: u32, bin_uid: u32) -> Option<String> {
+    if nlink != 1 {
+        return Some(format!("hard-linked ({nlink} names), left as it is"));
+    }
+    (uid != bin_uid)
+        .then(|| format!("owned by uid {uid}, not the bin folder's owner {bin_uid}, left as it is"))
 }
 
 /// `<home>/.local/bin`, opened as a folder, neither `.local` nor `bin`
