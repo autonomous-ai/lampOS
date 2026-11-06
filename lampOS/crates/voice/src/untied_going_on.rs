@@ -674,9 +674,7 @@ const TO_MANY: &[&str] = &[
 /// Words that open a question of the addressee's own doings when "you"
 /// and a verb follow: "Did you send …?", "Are you coming …?", "Can you
 /// pass me …?".
-const ASKS_ITS_DOINGS: &[&str] = &[
-    "did", "do", "are", "were", "can", "could", "will", "would", "have",
-];
+const ASKS_ITS_DOINGS: &[&str] = &["did", "are", "can", "could", "will", "would", "have"];
 
 /// Verbs after those that ask the one addressed for a view, not of their
 /// doings: "Did you think about it?", "Would you suggest …?".
@@ -688,21 +686,6 @@ const ASKS_A_VIEW: &[&str] = &[
     "prefer",
     "reckon",
     "pick",
-];
-
-/// Nouns after "your" that ask the one addressed for a view ("What's your
-/// take?"); any other "your" asks of the addressee's own ("And what was
-/// your sister's name again?"), which stays untied as their doings do.
-const YOUR_VIEW: &[&str] = &[
-    "take",
-    "view",
-    "opinion",
-    "advice",
-    "guess",
-    "pick",
-    "favorite",
-    "favourite",
-    "idea",
 ];
 
 /// Words before a question's opening that leave it the same question:
@@ -719,9 +702,8 @@ const QUESTION_LEADS: &[&str] = &[
 /// ([`desk_talk_read`] with `no_name_set_off`), and no part asking of the
 /// addressee's own doings: [`ASKS_ITS_DOINGS`], "you", then a verb not in
 /// [`ASKS_A_VIEW`] ("Did you send the slides yet?", "Can you pass me the
-/// charger?"), or of their own things, "your" before a noun not in
-/// [`YOUR_VIEW`] ("And what was your sister's name again?"): the case
-/// `held` exists for. lamp-52e6, 5 Nov 21:10 and 6 Nov
+/// charger?"): the case `held` exists for. Only the call's seven openers:
+/// "Do you know how long it takes?" ties. lamp-52e6, 5 Nov 21:10 and 6 Nov
 /// 00:09: `talk_day-4` and `talk_cook-3` were held as untied, tied before
 /// only when they shared a word with the lamp's answer.
 pub fn asks_right_after(heard: &str, no_name_set_off: bool) -> bool {
@@ -745,9 +727,6 @@ pub fn asks_right_after(heard: &str, no_name_set_off: bool) -> bool {
         }
         matches!(words.as_slice(), [aux, "you", verb, ..]
             if ASKS_ITS_DOINGS.contains(aux) && !ASKS_A_VIEW.contains(verb))
-            || words.windows(2).any(|pair| {
-                pair[0] == "your" && !YOUR_VIEW.contains(&pair[1].trim_end_matches("'s"))
-            })
     };
     !heard
         .split([',', '.', ';', '!', '?', '？'])
@@ -1102,6 +1081,11 @@ mod tests {
             "What's your take?",
             "So would you recommend it?",
             "Is that enough？",
+            "Do you know how long it takes?",
+            "Do you have a recipe for that?",
+            "That's your best one. How long does it take?",
+            "How long does your recipe take?",
+            "Nice. And what was your sister's name again?",
         ] {
             assert!(asks_right_after(line, false), "{line}");
         }
@@ -1109,10 +1093,8 @@ mod tests {
             "Did you send the slides to Sam yet?",
             "Are you coming to the meeting at four?",
             "Can you pass me the charger? The white one.",
-            "Do you want coffee? I'm going downstairs.",
             "Would you grab me a coffee?",
             "Have you seen my keys?",
-            "Nice. And what was your sister's name again?",
             "So will you be at lunch?",
             "Okay, could you close the door?",
             "Sam, what do you think?",

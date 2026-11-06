@@ -1838,6 +1838,9 @@ cases are now that person's, with the switch:
   bank.", "Seriously, what time is it?") is the lamp's: times and sentence
   words like these are among the words that are no one's name (`NOT_NAMES`,
   Second on #1090), and a line with no question puts none to anyone.
+  Exclamations are too: "Ooh,", "Aw,", "Mm," (#5400, 6 Nov, every route,
+  no switch: lamp-52e6's talk_cook-3, "Ooh, that sounds nice. How long does
+  it take?", was read as a question to someone named "Ooh").
   A set-off name that is also a common word (`NAMES_ALSO_WORDS`: May,
   Will, Grace, Mark, Bill, Hope, Joy, Rose, Faith, Art) at a line's start
   is no call to someone else inside a conversation going on, in a room not
