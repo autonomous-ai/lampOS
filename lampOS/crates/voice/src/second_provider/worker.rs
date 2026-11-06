@@ -6214,6 +6214,10 @@ pub(crate) struct Heeding {
     /// `LAMP_WINDOW_FROM_START=on` ([`Self::measuring_windows_from_start`]).
     from_start: bool,
     said_lately: std::collections::VecDeque<(u64, (u64, u64), bool, u64)>,
+    /// The requests of [`Self::said_lately`] the rule let out, newest last:
+    /// a let-out line the lamp didn't answer (`not_for_me`) holds nothing
+    /// between the lamp's last answer and the next line (#5110).
+    let_out_lately: std::collections::VecDeque<u64>,
     /// The faces the eyes saw speaking each of the last lines judged, newest
     /// last, at most [`SPOKE_KEPT`] ([`Self::same_speaker`]).
     spoke: std::collections::VecDeque<(u64, crate::speaking_faces::Speakers)>,
@@ -7219,6 +7223,7 @@ impl Heeding {
             name_stays: false,
             from_start: false,
             said_lately: std::collections::VecDeque::new(),
+            let_out_lately: std::collections::VecDeque::new(),
             spoke: std::collections::VecDeque::new(),
             near: None,
             turned_near_speaks: false,
@@ -7587,7 +7592,11 @@ impl Heeding {
             return Some(crate::untied_going_on::CALLER_SPEAKING_KEPT);
         }
         // The line judged before this one is the one the lamp answered
-        // last: nothing was held between its answer and this line.
+        // last: nothing was held between its answer and this line. A line
+        // let out between that the lamp didn't answer (the model's
+        // `not_for_me`) holds nothing: lamp-52e6, 7 Nov 00:51, HELD
+        // `talk_cook-5` was held as untied after the model declined
+        // `talk_cook-4` (#5110).
         let answered = crate::thread::current(self.thread.as_deref(), |thread| {
             thread.answered_request_but(request)
         })
@@ -7597,7 +7606,8 @@ impl Heeding {
             .iter()
             .rev()
             .map(|(before, ..)| *before)
-            .find(|before| *before != request);
+            .filter(|before| *before != request)
+            .find(|before| Some(*before) == answered || !self.let_out_lately.contains(before));
         if answered.is_none() || before != answered {
             return None;
         }
@@ -9246,6 +9256,12 @@ impl Heeding {
         let start = self.attention.start_of(said.0, signs.soft_lead_us);
         self.said_lately
             .push_back((request, said, self.attention.called_in_its_words(), start));
+        if verdict.is_none() {
+            if self.let_out_lately.len() == SAID_KEPT {
+                self.let_out_lately.pop_front();
+            }
+            self.let_out_lately.push_back(request);
+        }
         if self.noted.is_none_or(|(judged, _)| judged != request) {
             self.note_the_name(request, said, &signs);
         }
