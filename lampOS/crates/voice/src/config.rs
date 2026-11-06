@@ -940,6 +940,36 @@ mod tests {
         }
     }
 
+    /// #5530 (Friday's report on #5385): asked "who are you?", the lamp
+    /// often did not say it was Lamp, and did not know it had a camera, a
+    /// speaker or a microphone. Both say its name first, as the line a role
+    /// is told after (`crate::chosen_voice`), how to answer "who or what are
+    /// you?", and its eye, voice and ears; only the version without a
+    /// camera says the eye is closed and not to pretend to see.
+    #[test]
+    fn both_instructions_tell_the_lamp_its_name_eye_voice_and_microphone() {
+        for instruction in [CHAT_INSTRUCTION, CAMERA_CHAT_INSTRUCTION] {
+            assert!(instruction.starts_with("You are Lamp, "), "{instruction}");
+            assert!(
+                instruction.contains("If asked who or what you are, say you are Lamp"),
+                "{instruction}"
+            );
+            assert!(instruction.contains("a camera, your eye"), "{instruction}");
+            assert!(
+                instruction.contains("through your speaker"),
+                "{instruction}"
+            );
+            assert!(
+                instruction.contains("through your microphone"),
+                "{instruction}"
+            );
+        }
+        assert!(CHAT_INSTRUCTION.contains("Your eye is off or closed now"));
+        assert!(CHAT_INSTRUCTION.contains("Do not pretend to see"));
+        assert!(!CAMERA_CHAT_INSTRUCTION.contains("pretend to see"));
+        assert!(!CAMERA_CHAT_INSTRUCTION.contains("Your eye is off or closed"));
+    }
+
     /// #705 (17 Oct): `LAMP_PROVIDER_WRITES=patient`, and nothing else, asks
     /// for patient writes. The worker reads its flag where the coordinator
     /// puts it, after the first-output log, on both routes, and the bounds
