@@ -43,8 +43,9 @@
 //! misses all held as untied. With `held` the worker also ties a line said
 //! right after the lamp's own answer, with nothing held between and in no
 //! sure other voice, that replies to it ([`replies_to_the_lamp`]:
-//! "Thanks.", "That's a good idea.") or an ask of its advice
-//! ([`asks_for_advice`]: "Any tips to sleep better tonight?"), and,
+//! "Thanks.", "That's a good idea.") or asks a question
+//! ([`asks_right_after`]: "How long does it take?", "Any tips to sleep
+//! better tonight?"), and,
 //! anywhere in the conversation, a question of what or who the speaker's
 //! own is or was ([`asks_of_their_own`]: "Nice. And what was my sister's
 //! name again?", held as untied on lamp-52e6 on 5 Nov 08:07). With `on`,
@@ -384,6 +385,9 @@ pub fn asks_the_lamp_read(heard: &str, no_name_set_off: bool) -> bool {
 const NOT_NAMES: &[&str] = &[
     "okay", "ok", "yes", "yeah", "no", "nope", "well", "so", "oh", "hey", "sorry", "wait",
     "please", "thanks", "lamp", "alright", "right", "hmm", "um", "uh", "and", "but", "now",
+    // Sounds, not names: "Ooh, that sounds nice. How long does it take?"
+    // (`talk_cook-3`, lamp-52e6, 6 Nov 00:09).
+    "ooh", "ah", "aw", "wow", "hm", "mm", "huh",
 ];
 
 /// Words after which a capitalised word is someone else's name: "Tell Sam
@@ -601,30 +605,6 @@ const REPLY_LEADS: &[&str] = &[
     "oh", "ah", "aw", "okay", "ok", "well", "yeah", "yes", "wow", "hmm", "alright", "lamp",
 ];
 
-/// Words that open a question asking for advice of the one who knows: "Any
-/// tips to sleep better tonight?", "How can I stop waking up at night?",
-/// "And what do I need to buy for it?" (#5110: `talk_cook-4`, held on
-/// lamp-52e6 on 5 Nov 12:21, answered with it off).
-const ASKS_FOR_ADVICE: &[&str] = &[
-    "any tips",
-    "any tip",
-    "any advice",
-    "any ideas",
-    "any suggestions",
-    "what should i",
-    "what can i",
-    "how should i",
-    "how can i",
-    "how do i",
-    "what do i need",
-    "what else do i need",
-    "what else should i",
-    "what do you suggest",
-    "what would you suggest",
-    "what do you recommend",
-    "what would you recommend",
-];
-
 /// Whether `heard` opens in reply to what was just said to it
 /// ([`REPLIES`], after any of [`REPLY_LEADS`]), says no one's name right
 /// after ("Thanks Sam, …") and shows no desk talk ([`desk_talk`]). The
@@ -680,56 +660,8 @@ fn reply_names_someone(heard: &str) -> Option<bool> {
     Some(names_someone)
 }
 
-/// Whether `heard` asks for advice ([`ASKS_FOR_ADVICE`] opening any part
-/// of a question, after any of [`ASK_LEADS`]) with no sign of desk talk
-/// ([`desk_talk`]). The worker asks it only of a line said right after
-/// the lamp's own answer. With `no_name_set_off`, desk talk as
-/// [`desk_talk_read`] reads it.
-pub fn asks_for_advice(heard: &str, no_name_set_off: bool) -> bool {
-    let asks = |part: &str| {
-        let words = words_of(part);
-        let rest = ASK_LEADS
-            .iter()
-            .filter(|lead| words.starts_with(&format!(" {lead} ")))
-            .max_by_key(|lead| lead.len())
-            .map_or(words.as_str(), |lead| &words[lead.len() + 1..]);
-        ASKS_FOR_ADVICE
-            .iter()
-            .any(|phrase| rest.starts_with(&format!(" {phrase} ")))
-    };
-    heard.contains('?')
-        && heard.split([',', '.', ';', '!', '?']).any(asks)
-        && !desk_talk_read(heard, no_name_set_off)
-}
-
-/// Words in a question that ask the one addressed for their own view:
-/// "what do you think", "your take", "how about you", "and you".
-const ASKS_ITS_VIEW: &[&str] = &[
-    "you think",
-    "you reckon",
-    "you suggest",
-    "you recommend",
-    "you prefer",
-    "you say",
-    "your take",
-    "your view",
-    "your opinion",
-    "your advice",
-    "your guess",
-    "your pick",
-    "your favorite",
-    "your favourite",
-    "about you",
-    "and you",
-    "if you were",
-];
-
-/// The words that open a question asking how the one addressed would
-/// choose or act: "What would you do?", "Which one would you pick?".
-const ASKS_HOW_IT_WOULD: &[&str] = &["what", "which", "how", "where", "when", "who"];
-
-/// Calls to more than one person: a question to them is no one's view of
-/// the lamp ("What do you think, you all?").
+/// Calls to more than one person: a question to them is not the caller's
+/// to the lamp ("What do you think, you guys?").
 const TO_MANY: &[&str] = &[
     "you guys",
     "you all",
@@ -739,19 +671,62 @@ const TO_MANY: &[&str] = &[
     "everyone",
 ];
 
-/// Whether `heard` asks the one addressed for their own view in a
-/// question ([`ASKS_ITS_VIEW`] in any part, or a part opening with one of
-/// [`ASKS_HOW_IT_WOULD`] then "would you", after any of [`ASK_LEADS`]),
-/// called to no more than one ([`TO_MANY`]) and with no sign of desk talk
-/// ([`desk_talk_read`] with `no_name_set_off`). The worker reads it only
-/// right after the lamp's own answer, so "you" is the lamp: lamp-52e6, 5
-/// Nov 21:10, `talk_day-4` ("Maybe. What would you do?") was held as
-/// untied, tied before only when it shared a word with the answer. A
-/// question of the addressee's own doings ("Did you send …?", "Are you
-/// coming …?", "Can you pass me …?") asks no view and stays untied.
-pub fn asks_its_view(heard: &str, no_name_set_off: bool) -> bool {
+/// Words that open a question of the addressee's own doings when "you"
+/// and a verb follow: "Did you send …?", "Are you coming …?", "Can you
+/// pass me …?".
+const ASKS_ITS_DOINGS: &[&str] = &[
+    "did", "do", "are", "were", "can", "could", "will", "would", "have",
+];
+
+/// Verbs after those that ask the one addressed for a view, not of their
+/// doings: "Did you think about it?", "Would you suggest …?".
+const ASKS_A_VIEW: &[&str] = &[
+    "think",
+    "say",
+    "suggest",
+    "recommend",
+    "prefer",
+    "reckon",
+    "pick",
+];
+
+/// Nouns after "your" that ask the one addressed for a view ("What's your
+/// take?"); any other "your" asks of the addressee's own ("And what was
+/// your sister's name again?"), which stays untied as their doings do.
+const YOUR_VIEW: &[&str] = &[
+    "take",
+    "view",
+    "opinion",
+    "advice",
+    "guess",
+    "pick",
+    "favorite",
+    "favourite",
+    "idea",
+];
+
+/// Words before a question's opening that leave it the same question:
+/// "So did you send it?", "Okay, how long does it take?".
+const QUESTION_LEADS: &[&str] = &[
+    "so", "and", "but", "then", "okay", "ok", "hey", "well", "oh", "um", "hmm", "lamp",
+];
+
+/// Whether `heard` is a question the worker may tie when it is said right
+/// after the lamp's own answer (the first builder's 01:23 ruling on #5400,
+/// 6 Nov): any question ("How long does it take?", "What would you do?",
+/// "Is that enough?", "Any tips to sleep better tonight?"), called to no
+/// more than one ([`TO_MANY`]), with no sign of desk talk
+/// ([`desk_talk_read`] with `no_name_set_off`), and no part asking of the
+/// addressee's own doings: [`ASKS_ITS_DOINGS`], "you", then a verb not in
+/// [`ASKS_A_VIEW`] ("Did you send the slides yet?", "Can you pass me the
+/// charger?"), or of their own things, "your" before a noun not in
+/// [`YOUR_VIEW`] ("And what was your sister's name again?"): the case
+/// `held` exists for. lamp-52e6, 5 Nov 21:10 and 6 Nov
+/// 00:09: `talk_day-4` and `talk_cook-3` were held as untied, tied before
+/// only when they shared a word with the lamp's answer.
+pub fn asks_right_after(heard: &str, no_name_set_off: bool) -> bool {
     let all = words_of(heard);
-    if !heard.contains('?')
+    if !(heard.contains('?') || heard.contains('？'))
         || TO_MANY
             .iter()
             .any(|call| all.contains(&format!(" {call} ")))
@@ -759,20 +734,24 @@ pub fn asks_its_view(heard: &str, no_name_set_off: bool) -> bool {
     {
         return false;
     }
-    heard.split([',', '.', ';', '!', '?']).any(|part| {
+    let of_its_doings = |part: &str| {
         let words = words_of(part);
-        let rest = ASK_LEADS
-            .iter()
-            .filter(|lead| words.starts_with(&format!(" {lead} ")))
-            .max_by_key(|lead| lead.len())
-            .map_or(words.as_str(), |lead| &words[lead.len() + 1..]);
-        ASKS_ITS_VIEW
-            .iter()
-            .any(|cue| words.contains(&format!(" {cue} ")))
-            || ASKS_HOW_IT_WOULD
-                .iter()
-                .any(|wh| rest.starts_with(&format!(" {wh} ")) && rest.contains(" would you "))
-    })
+        let mut words: Vec<&str> = words.split_whitespace().collect();
+        while words
+            .first()
+            .is_some_and(|word| QUESTION_LEADS.contains(word))
+        {
+            words.remove(0);
+        }
+        matches!(words.as_slice(), [aux, "you", verb, ..]
+            if ASKS_ITS_DOINGS.contains(aux) && !ASKS_A_VIEW.contains(verb))
+            || words.windows(2).any(|pair| {
+                pair[0] == "your" && !YOUR_VIEW.contains(&pair[1].trim_end_matches("'s"))
+            })
+    };
+    !heard
+        .split([',', '.', ';', '!', '?', '？'])
+        .any(of_its_doings)
 }
 
 /// Whether `heard` asks what or who the speaker's own is or was
@@ -1101,52 +1080,30 @@ mod tests {
         }
     }
 
-    /// #5110: `talk_day-5`'s "Any tips …?" asks advice of the one who
-    /// knows; a statement, or one asked of a colleague by name, does not.
+    /// The first builder's 01:23 ruling on #5400 (6 Nov): every talk_*
+    /// follow-up question ties right after the lamp's answer, and so do
+    /// phrasings the kit never plays; a question of the addressee's own
+    /// doings, to many, to a name, or no question at all does not.
     #[test]
-    fn advice_is_asked_in_a_question() {
-        for line in [
-            "Any tips to sleep better tonight?",
-            "That's a good idea. Any tips to sleep better tonight?",
-            "How can I stop waking up at night?",
-            "So what should I eat before a run?",
-            "What would you recommend?",
-            "And what do I need to buy for it?",
-            "What else do I need?",
-        ] {
-            assert!(asks_for_advice(line, false), "{line}");
-        }
-        for line in [
-            "Any tips are welcome.",
-            "Sam, how do I get to the meeting room?",
-            "How do I look, you guys?",
-            "Are you coming to the meeting at four?",
-            "Can you pass me the charger? The white one.",
-            "Sam, what do I need to bring to the meeting?",
-            "I know what I need to buy.",
-        ] {
-            assert!(!asks_for_advice(line, false), "{line}");
-        }
-    }
-
-    /// lamp-52e6, 5 Nov 21:10 (`talk_day-4`): a question asking the one
-    /// addressed for their view, in phrasings the kit never plays; a
-    /// question of their own doings, to many, or to a name asks none.
-    #[test]
-    fn a_question_asking_its_view() {
+    fn a_question_right_after_the_answer() {
         for line in [
             "Maybe. What would you do?",
+            "That's a good idea. Any tips to sleep better tonight?",
+            "Ooh, that sounds nice. How long does it take?",
+            "And what do I need to buy for it?",
+            "Hmm, I don't have coconut milk. What can I use instead?",
+            "She loves hiking. Any ideas for the two of us?",
+            "Nice. And what was my sister's name again?",
+            "Is that enough?",
             "How about you?",
-            "And you?",
+            "Did you think about it?",
+            "Where do I get them?",
+            "Really? Even in winter?",
             "What's your take?",
-            "Which one would you pick?",
-            "Do you think that's enough?",
-            "What do you reckon?",
-            "If you were me, would you go?",
-            "Hmm, so what would you suggest instead?",
-            "Is that your favorite?",
+            "So would you recommend it?",
+            "Is that enough？",
         ] {
-            assert!(asks_its_view(line, false), "{line}");
+            assert!(asks_right_after(line, false), "{line}");
         }
         for line in [
             "Did you send the slides to Sam yet?",
@@ -1154,13 +1111,18 @@ mod tests {
             "Can you pass me the charger? The white one.",
             "Do you want coffee? I'm going downstairs.",
             "Would you grab me a coffee?",
+            "Have you seen my keys?",
+            "Nice. And what was your sister's name again?",
+            "So will you be at lunch?",
+            "Okay, could you close the door?",
             "Sam, what do you think?",
             "What do you think, you guys?",
             "And you all?",
-            "What would you do.",
+            "Should I bring an umbrella, you guys?",
             "I think you're right.",
+            "What would you do.",
         ] {
-            assert!(!asks_its_view(line, false), "{line}");
+            assert!(!asks_right_after(line, false), "{line}");
         }
     }
 
