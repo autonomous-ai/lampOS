@@ -755,11 +755,12 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
 - **A plain send is heard as an answer** (`send_awaited`). While a write
   waits, a plain send counts as answering the lamp, however the read-back's
   last sentence reads. So it isn't held as a short sound or as the room's lone
-  words, even with nobody in view. This doesn't apply to a line begun over the
-  lamp's voice or within 1.5 s (`own_echo::TAIL_US`) of its words' end: that
-  may be the lamp's own "send it" heard back, which `own_echo` doesn't hold in
-  under 3 words. Such a line is judged as any other, and `gate` still judges
-  the send.
+  words, even with nobody in view. This applies only to a line known to have
+  begun clear of the lamp's words. One begun over its voice, within 1.5 s
+  (`own_echo::TAIL_US`) of its words' end, or with no hearing hook to say when
+  it began may be the lamp's own "send it" heard back, which `own_echo` doesn't
+  hold in under 3 words. Such a line is judged as any other, and `gate` still
+  judges the send.
 
 ### After a read
 

@@ -8170,15 +8170,20 @@ async fn spoken(
     // conversation going on, is the person's answer, as on the Live route
     // (lamp-4ace, 17 October 16:11: "Yes. Please start it." heard as
     // "bien"). The rule (`heed`) judges it as it does any line.
+    let asked_by_the_lamp = marked
+        && text.chars().any(char::is_alphanumeric)
+        && shared.asked.as_ref().is_some_and(|asked| asked(request));
     // So too the plain "send" a prepared write waits for: the read-back asked
     // for it (`services::send_awaited`).
-    let answers = marked
-        && text.chars().any(char::is_alphanumeric)
-        && (shared.asked.as_ref().is_some_and(|asked| asked(request))
-            || crate::services::send_awaited(&text));
-    if answers {
+    let send_awaited = marked && crate::services::send_awaited(&text);
+    let answers = asked_by_the_lamp || send_awaited;
+    if asked_by_the_lamp {
         eprintln!(
             "lamp-voice second: request {request}: a short sound with a word in it, right after the lamp's own question, in a conversation going on: judged as a line"
+        );
+    } else if send_awaited {
+        eprintln!(
+            "lamp-voice second: request {request}: a short sound that is the send a waiting write asked for: judged as a line"
         );
     }
     let held = marked && !answers;

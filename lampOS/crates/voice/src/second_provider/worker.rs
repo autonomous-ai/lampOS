@@ -26701,8 +26701,9 @@ mod tests {
             ("Send it.", false, true),
             ("Oh wow.", true, true),
         ] {
-            crate::services::pending_for_test(waiting.then(|| {
-                crate::services::Pending::new("id", 8, Instant::now(), "Send an email.", "ann")
+            crate::services::pending_for_test(waiting.then(|| crate::services::Pending {
+                began_clear: true,
+                ..crate::services::Pending::new("id", 8, Instant::now(), "Send an email.", "ann")
             }));
             let mut heeding = super::Heeding::new(false, false, None, None);
             heeding.as_the_only_voice(false, true, false);
@@ -26713,26 +26714,27 @@ mod tests {
                 "{heard} {waiting}"
             );
         }
-        // Begun within the tail of the lamp's words, the same words may be
-        // its echo: the room's, as before (`Heeding::hear`, the real producer).
-        crate::services::pending_for_test(Some(crate::services::Pending::new(
-            "id",
-            8,
-            Instant::now(),
-            "Send an email.",
-            "ann",
-        )));
-        let mut heeding = super::Heeding::new(false, false, None, None);
-        heeding.as_the_only_voice(false, true, false);
-        heeding.said_until_us = Some(super::monotonic_us());
-        heeding.hear(
-            9,
-            crate::second_provider::Heard::Began {
-                over_the_lamps_voice: false,
-            },
-        );
-        let verdict = heeding.judge(9, line, "Send it.", signs(true, false));
-        assert_eq!(verdict, Some(super::LONE_WORDS));
+        // Through the real producer (`Heeding::hear`): begun within the tail
+        // of the lamp's words, the same words may be its echo, so the room's,
+        // as before; begun past it, the person's. A read-back long since said,
+        // so nothing but the tail decides.
+        for (ended_ago_us, held) in [(0, true), (10_000_000, false)] {
+            crate::services::pending_for_test(Some(crate::services::Pending {
+                spoken_from: Some(Instant::now() - Duration::from_secs(60)),
+                ..crate::services::Pending::new("id", 8, Instant::now(), "Send an email.", "ann")
+            }));
+            let mut heeding = super::Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.said_until_us = Some(super::monotonic_us().saturating_sub(ended_ago_us));
+            heeding.hear(
+                9,
+                crate::second_provider::Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            let verdict = heeding.judge(9, line, "Send it.", signs(true, false));
+            assert_eq!(verdict, held.then_some(super::LONE_WORDS), "{ended_ago_us}");
+        }
         crate::services::pending_for_test(None);
         // #3985: "Stop them." over the lamp's answer is said to the lamp
         // with the spoken-stop switch; without it, or not over the lamp's
