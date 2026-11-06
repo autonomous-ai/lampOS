@@ -26606,8 +26606,8 @@ mod tests {
         assert_eq!(super::character_now(blind, seeing, false, &eye), blind);
     }
 
-    /// #5530: the version without a camera says the eye is closed, so it is
-    /// never also told to look by calling take_a_look; the camera's version
+    /// #5530: the version without a camera says no picture reaches it, so it
+    /// is never also told to look by calling take_a_look; the camera's version
     /// is, with a full look. A closed-eye turn that called it was answered
     /// "Let me look." and, 2.6 s on, that the eye was shut
     /// (`speak_up::NO_LOOK_NOTE`).
@@ -26619,7 +26619,7 @@ mod tests {
         );
         for memory in [false, true] {
             let closed = super::spoken_version(blind, false, true, memory);
-            assert!(closed.contains("Your eye is off or closed now"), "{closed}");
+            assert!(closed.contains(crate::config::NO_PICTURE), "{closed}");
             assert!(!closed.contains("take_a_look"), "{closed}");
             let open = super::spoken_version(seeing, true, true, memory);
             assert!(open.contains(super::LOOK_CALL_NOTE), "{open}");
