@@ -192,6 +192,7 @@ fn hand(at_ms: u64, pushed: bool) -> Felt {
         &lamp_msgs::Hand {
             pushed,
             since_us: if pushed { 7_000_000 } else { 0 },
+            moved: None,
         },
     )
 }
@@ -425,6 +426,7 @@ fn a_head_not_moved_far_or_not_held_where_the_hand_put_it_is_not_done() {
         &lamp_msgs::Hand {
             pushed: false,
             since_us: 0,
+            moved: None,
         },
     );
     assert_eq!(forged, Felt::Invalid);

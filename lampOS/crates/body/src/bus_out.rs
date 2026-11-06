@@ -805,9 +805,12 @@ impl Publishing {
         // may itself have taken time the hand has aged by.
         let age = Instant::now().saturating_duration_since(seen);
         if let Some(left) = LASTS.checked_sub(age).filter(|left| !left.is_zero()) {
+            // Whether the hand moved the head is said only while pushed: a
+            // reader takes a push without it as moved, as before #5566.
             let hand = Hand {
                 pushed: glimpse.hand,
                 since_us: self.pushed_since.unwrap_or(0),
+                moved: glimpse.hand.then_some(glimpse.hand_moved),
             };
             self.hand.expires_after(Some(left));
             let _ = self.hand.publish_json(seen_us, &hand);
@@ -1062,6 +1065,7 @@ mod tests {
             released: 0,
             limp: false,
             hand: false,
+            hand_moved: false,
             tipping: Default::default(),
             gesture_fates: Default::default(),
             handed_over: None,
@@ -1848,6 +1852,8 @@ mod tests {
         for step in 0..20 {
             let mut seen = glimpse(step);
             seen.hand = (4..12).contains(&step);
+            // Moved only from step 8 (#5566); never said while not pushed.
+            seen.hand_moved = (8..20).contains(&step);
             out.offer(&seen);
         }
         let said: Vec<Hand> = (0..5)
@@ -1868,6 +1874,10 @@ mod tests {
         assert!(said[1].since_us > 0);
         assert_eq!(said[2].since_us, said[1].since_us, "the push began once");
         assert_eq!((said[3].since_us, said[4].since_us), (0, 0));
+        assert_eq!(
+            said.iter().map(|h| h.moved).collect::<Vec<_>>(),
+            [None, Some(false), Some(true), None, None]
+        );
         drop(out);
         std::fs::remove_dir_all(root).unwrap();
     }

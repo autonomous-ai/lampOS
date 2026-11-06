@@ -530,7 +530,13 @@ Stop. A Stop already sent stands: waiting to feel a push would break the
 during a push asks nothing from its first sample. Only a fresh message from
 the body that says `pushed` counts: missing, expired (the body gives each one
 at most a second) or from anyone else is not a push, so a stopped body never
-silences the head. A change is recorded as `head_pushed`, and a replay applies
+silences the head. A hand the body says only presses the head (`moved:
+false`: it pushes on the head, which stays within 15 counts of where it stood
+when it gave way) is not a push either: it is a hand on the head, and its
+Touch, Tap, Stroke and 3 s Hold (sleep) count, on one pad or two (#5566). Only
+a head that really moves, or a body that does not say `moved`, spoils the
+touch as above; a contact once spoiled stays so, even when the body later says
+`moved: false` again. A change is recorded as `head_pushed`, and a replay applies
 it as the runtime did. The body feels a push reliably with `--give-way`, on
 lamp-4ace since 2026-10-15 (the fifth, #703).
 Polling can miss a pulse shorter than its interval; start qualification at

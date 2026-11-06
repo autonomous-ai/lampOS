@@ -6369,6 +6369,7 @@ mod tests {
     const RELEASED: lamp_msgs::Hand = lamp_msgs::Hand {
         pushed: false,
         since_us: 0,
+        moved: None,
     };
 
     #[test]
@@ -6400,6 +6401,7 @@ mod tests {
             Heard::Fresh(lamp_msgs::Hand {
                 pushed: true,
                 since_us: 5,
+                moved: None,
             })
         };
         felt(&mut room, S, || Heard::Fresh(body(0.0)), pushed);
@@ -6658,6 +6660,7 @@ mod tests {
             Heard::Fresh(lamp_msgs::Hand {
                 pushed: true,
                 since_us: 5,
+                moved: None,
             })
         };
         let mut room = Room::nudged("hand");
@@ -6918,6 +6921,7 @@ mod tests {
             Heard::Fresh(lamp_msgs::Hand {
                 pushed: true,
                 since_us: 5,
+                moved: None,
             })
         };
         felt(&mut room, 20 * S, joints, pushed);

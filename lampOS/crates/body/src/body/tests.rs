@@ -7598,6 +7598,182 @@ fn a_pinned_pitch_held_thirteen_counts_away_still_says_a_hand_before_slump() {
     }
 }
 
+/// #5566: a hand that presses on the head, its load over the bound while
+/// the head stays where it gave way, is said as a hand that has not moved
+/// it, with the body's limp guard on or off.
+#[test]
+fn a_hand_pressing_a_head_that_does_not_move_is_said_as_not_moved() {
+    let ms = Duration::from_millis;
+    for limp in [false, true] {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(7));
+        lamp.strains = vec![(ms(1_500), ms(4_500), PITCH, 300)];
+        let mut seen = Vec::new();
+        let report = run(
+            &mut lamp,
+            &mut clock,
+            Limits {
+                limp,
+                ..giving_way(GiveWay::Return)
+            },
+            Some(HOME),
+            || Some((Mood::Resting, 0)),
+            |glimpse| seen.push(*glimpse),
+        );
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        let pressed: Vec<_> = seen
+            .iter()
+            .filter(|g| (ms(1_700)..ms(4_400)).contains(&clock_of(g)))
+            .collect();
+        assert!(!pressed.is_empty());
+        assert!(
+            pressed.iter().all(|g| g.loads[0] == 300
+                && g.positions[0].abs_diff(g.goals[0]) <= HAND_MOVED
+                && g.hand),
+            "limp {limp}: the press was not said as a hand: {pressed:?}"
+        );
+        assert!(
+            seen.iter().all(|g| !g.hand_moved),
+            "limp {limp}: a press said as moved: {:?}",
+            seen.iter().find(|g| g.hand_moved)
+        );
+    }
+}
+
+/// #5566: a hand that carries the head more than `HAND_MOVED` counts from
+/// where it gave way has moved it, and stays said so while it holds the
+/// head, even once it brings the head back to where it gave.
+#[test]
+fn a_hand_that_carried_the_head_is_said_as_moved_until_it_lets_go() {
+    let ms = Duration::from_millis;
+    let (mut lamp, mut clock) = folded(Duration::from_secs(12));
+    let at = lamp.servos[PITCH].position;
+    // Carried at a hand's pace, then brought back and held where it was.
+    lamp.hand = Some((ms(1_500), ms(3_500), PITCH, at + 40.0));
+    lamp.hands = vec![(ms(3_500), ms(7_000), PITCH, at)];
+    lamp.strains = vec![(ms(1_500), ms(7_000), PITCH, 300)];
+    let mut seen = Vec::new();
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        giving_way(GiveWay::Return),
+        Some(HOME),
+        || Some((Mood::Resting, 0)),
+        |glimpse| seen.push(*glimpse),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let carried = seen
+        .iter()
+        .position(|g| g.hand && g.hand_moved)
+        .expect("the carry was never said as moved");
+    assert!(clock_of(&seen[carried]) < ms(3_500), "{:?}", seen[carried]);
+    let back: Vec<_> = seen
+        .iter()
+        .filter(|g| (ms(4_500)..ms(6_900)).contains(&clock_of(g)))
+        .collect();
+    assert!(!back.is_empty());
+    assert!(
+        back.iter()
+            .all(|g| g.positions[0].abs_diff(at as u16) <= 1 && g.hand),
+        "the fixture did not hold the head back where it gave: {back:?}"
+    );
+    assert!(
+        back.iter().all(|g| g.hand_moved),
+        "a head brought back was said as not moved: {:?}",
+        back.iter().find(|g| !g.hand_moved)
+    );
+    assert!(
+        seen.iter().all(|g| g.hand || !g.hand_moved),
+        "moved said without a hand"
+    );
+    let late: Vec<_> = seen.iter().filter(|g| clock_of(g) > ms(10_000)).collect();
+    assert!(late.iter().all(|g| !g.hand && !g.hand_moved), "{late:?}");
+}
+
+/// #5566 (the Reviewer-lead's and Twelve's P2): a firm press that sinks the
+/// head past its tracking before it gives way gives way off its goal, and is
+/// measured from where the head stood when it gave, not from its goal: held
+/// still there it is said as not moved, and carried on from there more than
+/// `HAND_MOVED` it is said as moved.
+#[test]
+fn a_press_that_sinks_the_head_off_its_goal_and_stays_is_said_as_not_moved() {
+    let ms = Duration::from_millis;
+    let (mut lamp, mut clock) = folded(Duration::from_secs(10));
+    let at = lamp.servos[PITCH].position;
+    // Sunk 40 counts at once, past the tracking of 30, under the head's
+    // load bound of 240 but over its stall load, held there, then carried
+    // on 30 counts at a hand's pace.
+    lamp.hands = vec![(ms(1_500), ms(4_000), PITCH, at + 40.0)];
+    lamp.hand = Some((ms(4_000), ms(6_000), PITCH, at + 70.0));
+    lamp.strains = vec![(ms(1_500), ms(6_000), PITCH, 150)];
+    let mut seen = Vec::new();
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        giving_way(GiveWay::Return),
+        Some(HOME),
+        || Some((Mood::Resting, 0)),
+        |glimpse| seen.push(*glimpse),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.eased[0] >= 1, "never gave way: {report:?}");
+    let still: Vec<_> = seen
+        .iter()
+        .filter(|g| (ms(2_000)..ms(3_950)).contains(&clock_of(g)))
+        .collect();
+    assert!(!still.is_empty());
+    assert!(
+        still
+            .iter()
+            .all(|g| g.hand && g.loads[0] == 150 && g.positions[0].abs_diff(at as u16 + 40) <= 1),
+        "the fixture did not hold the sunk head as a hand: {still:?}"
+    );
+    assert!(
+        still.iter().all(|g| !g.hand_moved),
+        "a still press that gave way off its goal said as moved: {:?}",
+        still.iter().find(|g| g.hand_moved)
+    );
+    let carried = seen
+        .iter()
+        .find(|g| g.hand && g.hand_moved)
+        .expect("the carry from where it gave was never said as moved");
+    assert!(
+        clock_of(carried) >= ms(4_000)
+            && carried.positions[0].abs_diff(at as u16 + 40) > HAND_MOVED,
+        "{carried:?}"
+    );
+}
+
+/// #5566: a head joint the stall rule let go under a gentle hand that
+/// carried it off its goal is said as moved.
+#[test]
+fn a_head_carried_under_the_stall_rule_is_said_as_moved() {
+    let s = Duration::from_secs;
+    let (mut lamp, mut clock) = folded(s(20));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    lamp.hand = Some((s(7), s(60), ROLL, 2_044.0 - 26.0));
+    lamp.strains = vec![(s(7), s(60), ROLL, 116)];
+    let mut said = Vec::new();
+    let report = run_standing(
+        &mut lamp,
+        &mut clock,
+        giving_way(GiveWay::Return),
+        Some(HOME),
+        Some(standing(100, 60)),
+        || Some((Mood::Resting, 100)),
+        |glimpse| said.push((glimpse.hand, glimpse.hand_moved)),
+    );
+    assert_eq!(report.eased, [0; 3], "under its bound: {report:?}");
+    assert!(report.stalls[1] >= 1, "{report:?}");
+    assert!(said.iter().any(|(hand, _)| *hand), "never said a hand");
+    assert!(
+        said.iter()
+            .filter(|(hand, _)| *hand)
+            .all(|(_, moved)| *moved),
+        "a stall carry said as not moved"
+    );
+}
+
 /// A gentle hand that stays on the base is still said after the joint has
 /// repeatedly adopted its position. Reporting must not time out while
 /// the same physical push still holds it there under its load bound.

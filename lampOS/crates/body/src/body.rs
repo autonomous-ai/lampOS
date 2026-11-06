@@ -1318,6 +1318,14 @@ pub struct Glimpse {
     /// A head or base joint met resistance and is held where it gave way:
     /// a hand, as far as the body can tell (`body/hand`).
     pub hand: bool,
+    /// While `hand`: whether the hand moved the head or base, not only
+    /// pressed on it. True once a held joint is more than `HAND_MOVED`
+    /// counts from where it stood when it first gave way in this push (its
+    /// own position, on the off-track rule too), and stays so until
+    /// the push ends; true too while the stall rule's carried joint is said
+    /// as a hand, and for the test input's hand. False for a press that
+    /// leaves every held joint where it gave (`body/hand`'s `moved`).
+    pub hand_moved: bool,
     /// What V1's anti-tip rule has done so far.
     pub tipping: Tipping,
     /// The gestures asked on the mood socket that were taken or dropped on
@@ -5472,6 +5480,16 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // second, `gave_at` follows the hand, and a hand that keeps a joint off
     // its rest, pressing under its bound, is still one.
     let mut gave_first = [0u16; 3];
+    // Where each joint stood when it first gave way in this push: unlike
+    // `gave_first`, the joint's own position on the off-track rule too, not
+    // its goal. A press that sank the head past its tracking before it gave
+    // has not moved it if it stays where it sank (#5566).
+    let mut moved_from = [0u16; 3];
+    // Whether a hand has carried each joint more than `HAND_MOVED` from
+    // `moved_from` in this push, kept until a new push begins there: a
+    // shove that moved the head and then stopped has still moved it, and a
+    // press that never did has not (`body/hand`'s `moved`, #5566).
+    let mut moved_in_push = [false; 3];
     // The step each joint was last held on: one that gives way again within
     // a hold's length (`EASE_STEPS`) of it is the same push, and keeps where
     // it first gave. On lamp-52e6 on 2026-10-27 a hand turned the base about
@@ -7414,6 +7432,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             // from it (#2904).
             hand: (0..3).any(|index| (held[index] && felt[index]) || stalled_hand[index] > 0)
                 || test_held,
+            // Said as moved while any joint the hand is said on was carried
+            // in this push, or the stall rule's carried joint is; the test
+            // input's hand stands for one that moves the head.
+            hand_moved: (0..3).any(|index| {
+                (held[index] && felt[index] && moved_in_push[index]) || stalled_hand[index] > 0
+            }) || test_held,
             tipping: report.tipping,
             gesture_fates: std::mem::take(&mut gesture_fates),
             handed_over: handed_over.take(),
@@ -7707,6 +7731,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 last_held[index] = Some(report.steps);
             }
             let moved = is.position.abs_diff(gave_first[index]) > HAND_MOVED;
+            moved_in_push[index] |=
+                held[index] && is.position.abs_diff(moved_from[index]) > HAND_MOVED;
             // Pressure over its own rest load: over half the bound and a
             // quarter of it over its own weight. A press at 300 easing to
             // 130 on a pitch bound 240 that read 25 is; one that read 130
@@ -7957,6 +7983,23 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     };
                     if last_held[index].is_none_or(|at| report.steps - at > u64::from(EASE_STEPS)) {
                         gave_first[index] = gave_at[index];
+                        moved_from[index] = is.position;
+                        moved_in_push[index] = false;
+                        // Once a push: which rule gave way, for reading a
+                        // hand's row in the journal (#5566).
+                        let rule = if over_load[index] >= limits.load_steps.max(1) {
+                            "its load"
+                        } else if pushed {
+                            "off its goal"
+                        } else {
+                            "a touch"
+                        };
+                        eprintln!(
+                            "lamp-body: step {}: {joint} gave way to a push, on {rule}: load {}, {} off its goal",
+                            report.steps,
+                            is.load,
+                            written[index].abs_diff(is.position)
+                        );
                     }
                     over_full[index] = is.load > strained;
                     in_hand[index] = 0;

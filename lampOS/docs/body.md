@@ -3579,7 +3579,21 @@ way again. A joint moved and left there reads the same as one a hand holds
 still: lamp-06c1's head, its weight 130 over the 100 a moved joint is
 judged by, was said `pushed` until lamp-body was restarted (#5196);
 `since_us` is when that push began, on the body's
-own clock (0 when not pushed). A joint held at its rest that reads only its
+own clock (0 when not pushed). While pushed, `moved` says whether the hand
+moved the lamp or only presses on it (#5566): true once a held joint is more
+than 15 counts from where it stood when it first gave way in this push,
+kept until the push ends (a shove that moved the head and stopped has still moved it),
+true too while the stall rule's carried joint is said and for the test
+input's hand; false for a press that leaves every held joint where it gave.
+That is the joint's own position at the give-way, on the off-track rule too,
+whose give-way itself is laid from the goal: a firm press that sinks the head
+past its tracking (30) before it gives, and then stays, has not moved it. The
+first give-way of each push says which rule fired in the journal, once:
+`lamp-body: step N: <joint> gave way to a push, on its load | off its goal |
+a touch: load L, D off its goal`.
+It is absent while not pushed, and from a body before it, which a reader
+takes as moved. Controls reads a press as a hand on the head, not a push
+([controls.md](controls.md)). A joint held at its rest that reads only its
 own weight and jitters a few counts is not a push, whichever lamp's
 calibration: lamp-06c1's head, held where it gave way to its own push at its
 rest, read 124 to 136 there and said `pushed` 8 times a second with nobody
@@ -3601,7 +3615,13 @@ once it lets go (pitch and base); a pitch pressed over its contact floor
 in a glance says one until it slumps; a base turned 33 counts a hold over
 two holds, pressed under its bound, says one in the second hold and none
 once the hand has gone, while one such turn held still does not; the bus
-says it with each step passed on and keeps when the push began.
+says it with each step passed on and keeps when the push began, and says
+`moved` only while pushed. Four more for `moved` (#5566): a head pressed at
+300 that stays where it gave is a hand not moved, with `--limp` on or off;
+one carried 40 counts and brought back is moved until it lets go; a roll
+carried under the stall rule is moved; a head sunk 40 counts at once, past its
+tracking, gives way off its goal and is not moved while it stays there, then
+moved once carried more than 15 counts on from there.
 
 ## Preparing to unplug (#1674)
 
