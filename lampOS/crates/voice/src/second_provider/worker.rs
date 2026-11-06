@@ -2225,6 +2225,9 @@ pub fn serve(
     // A line that asks the lamp to remember the person's face, with their
     // name, must call remember_my_face: only with the eyes' faces and names
     // checked, so a name not in their words is still refused.
+    // Read here, before `tools` is handed on: a face rename held for its
+    // yes needs names checked and the eyes (`LAMP_NAMES_RENAME_YES`).
+    let renames_checked = tools.names_checked && tools.who.is_some();
     let remember = (crate::known_faces::asked_on() && tools.who.is_some() && tools.names_checked)
         .then(|| {
             eprintln!(
@@ -3336,6 +3339,23 @@ pub fn serve(
             crate::known_faces::RECORD_TOLD_ENVIRONMENT
         );
         engine = engine.holding_forgets_through_spelling(true);
+    }
+    // A face rename's yes is judged by its guards, and a rename the lamp
+    // asked about is held for that yes and run by the voice
+    // (`LAMP_NAMES_RENAME_YES`, #5485): only with names checked.
+    if crate::known_faces::rename_yes_on() {
+        if renames_checked {
+            eprintln!(
+                "lamp-voice second: a face rename's yes is judged by its guards, and a rename asked about is held for it ({})",
+                crate::known_faces::RENAME_YES_ENVIRONMENT
+            );
+            engine = engine.holding_renames_for_yes(true);
+        } else {
+            eprintln!(
+                "lamp-voice second: {} is on but names are not checked or the eyes' socket is not known: renames are as before",
+                crate::known_faces::RENAME_YES_ENVIRONMENT
+            );
+        }
     }
     // A reply that says it saved their face with no remember_my_face call
     // is judged as a keep claim with no keep (`LAMP_MEMORY_KEEP_ASKED`,
