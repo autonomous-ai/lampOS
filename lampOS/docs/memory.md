@@ -640,7 +640,23 @@ about or by the id recall gave reaches their scope: a bare "forget that",
 or any forget the memory would run as "the last kept thing" (the legacy
 memory, a switch off), is the room's only, since after the room's recall
 on such a line it would take their last kept thing (Thirteen's P2 on
-#5022). Ids are counted per person, so their 3 and the room's 3 are two
+#5022). **Forgetting needs the mouth seen speaking** (the memory owner, 16:49 on
+#5385: "tạm thời chưa cho xóa nếu ko detect đc mở miệng", no deleting while
+an open mouth is not detected), with no exception: a bare forget on such a
+line, theirs by their face alone in view or named late on a line admitted
+as the room's (`ScopeLease::reached_by_one_face`), is asked of no memory,
+theirs or the room's (`tools::run_call_with_scope`). Right after their own
+plain new keep (the very next request of the same worker and session, the
+same person, no other memory call or forget by what on the line before it,
+within `HELD_FORGET_FOR`: `tools::one_face_just_kept`) the lamp says it will
+forget that when it sees them say it (`ONE_FACE_JUST_KEPT`); otherwise it
+asks which thing (`ONE_FACE_BARE_FORGET`), never the room's `forget_last` on
+a guess. C88 on stock 10538, lamp-06c1, 6 Nov: "remember that my umbrella
+is yellow" was kept as Olivia's, her next line "forget that" ran as the
+room's `forget_last`, and the room's Wi-Fi name went (#5608, Jarvis's P2s).
+A guest off camera or a TV saying "forget that" beside her silent face
+forgets nothing. Said with their mouth read speaking, the line is theirs and
+the forget runs in their scope as any of theirs. Ids are counted per person, so their 3 and the room's 3 are two
 kept things: a forget by id goes only to the scope whose listing showed
 that id this session, and an id shown of both forgets nothing and the
 model asks which one (`remember::by_where_shown`; Thirteen's second P2 on

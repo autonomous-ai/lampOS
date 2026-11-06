@@ -671,7 +671,23 @@ căn phòng. Chỉ lệnh quên theo điều nó nói tới hoặc theo id mà `
 tới phạm vi của họ: một câu «forget that» trống, hoặc bất kỳ lệnh quên nào mà
 ký ức sẽ chạy như «điều được lưu gần nhất» (ký ức cũ, công tắc tắt), chỉ là của
 căn phòng, vì sau lần `recall` của căn phòng trên câu như vậy nó sẽ lấy mất
-điều họ lưu gần nhất (P2 của Thirteen trên #5022). Id được đếm theo từng
+điều họ lưu gần nhất (P2 của Thirteen trên #5022). **Việc quên cần thấy miệng đang nói** (người phụ trách ký ức, 16:49 trên
+#5385: «tạm thời chưa cho xóa nếu ko detect đc mở miệng»), không có ngoại lệ:
+một câu «forget that» trống trên câu như vậy, của họ vì chỉ có mặt họ trong
+khung hình hoặc được gọi tên muộn trên một câu nhận là của căn phòng
+(`ScopeLease::reached_by_one_face`), không được hỏi tới ký ức nào, của họ hay
+của căn phòng (`tools::run_call_with_scope`). Ngay sau một lần lưu mới thông
+thường của chính họ (yêu cầu kế tiếp của cùng worker và phiên, cùng người,
+không có lệnh ký ức nào khác hay lệnh quên theo tên trước nó trong câu ấy,
+trong `HELD_FORGET_FOR`: `tools::one_face_just_kept`), đèn nói sẽ quên điều đó
+khi thấy họ nói (`ONE_FACE_JUST_KEPT`); nếu không thì hỏi là điều nào
+(`ONE_FACE_BARE_FORGET`), không bao giờ đoán bằng `forget_last` của căn phòng.
+C88 trên bản 10538, lamp-06c1, 6/11: «remember that my umbrella is yellow»
+được lưu là của Olivia, câu kế tiếp «forget that» chạy như `forget_last` của
+căn phòng và tên Wi-Fi của căn phòng bị xoá (#5608, các P2 của Jarvis). Một
+vị khách ngoài khung hình hay TV nói «forget that» bên cạnh khuôn mặt im lặng
+của họ không làm quên gì. Nói khi thấy miệng họ đang nói thì câu là của họ và
+lệnh quên chạy trong phạm vi của họ như mọi lệnh khác. Id được đếm theo từng
 người, nên số 3 của họ và số 3 của căn phòng là hai điều khác nhau: một lệnh
 quên theo id chỉ đi tới phạm vi mà danh sách của nó đã cho thấy id ấy trong
 phiên này, và một id đã hiện ở cả hai thì không quên gì và mô hình hỏi là
