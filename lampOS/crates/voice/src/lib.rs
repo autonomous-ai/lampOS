@@ -99,6 +99,7 @@ pub mod misheard_hum;
 pub mod motion_voice;
 pub mod nightly;
 pub mod nightly_prompt;
+pub mod owner_face;
 pub mod owner_place;
 pub mod owner_voice;
 pub mod pause_join;

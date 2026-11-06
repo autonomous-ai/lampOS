@@ -4424,6 +4424,12 @@ const SERVICES_SOCKET_ENVIRONMENT: &str = "LAMP_SKILLS_SERVICES_SOCKET";
 /// gives it as `%d/owner` (#5288). Unset, no owner is known and no skill
 /// reads a service.
 const OWNER_FILE_ENVIRONMENT: &str = "LAMP_SKILLS_OWNER_FILE";
+/// With `LAMP_OWNER_FACE=on` (#5495), the file the voice writes the owner's
+/// name to as it knows them now, by the face picked in the app or else the
+/// typed name (`lamp_voice::owner_face::NAME_FILE_ENVIRONMENT`), read in
+/// place of [`OWNER_FILE_ENVIRONMENT`]'s: unset, no owner is known and no
+/// skill reads a service, so the typed name alone never makes the owner.
+const RESOLVED_OWNER_FILE_ENVIRONMENT: &str = "LAMP_SKILLS_RESOLVED_OWNER_FILE";
 /// The longest a service's read is waited for: `lamp-services`' own 20 s,
 /// and room for the line.
 const SERVICES_TIMEOUT: Duration = Duration::from_secs(30);
@@ -4533,7 +4539,12 @@ fn read_service(
             days.insert(skill.to_owned(), day);
         }
     }
-    let owner = std::env::var_os(OWNER_FILE_ENVIRONMENT)
+    let owner_file = if lamp_msgs::owner_face::on() {
+        RESOLVED_OWNER_FILE_ENVIRONMENT
+    } else {
+        OWNER_FILE_ENVIRONMENT
+    };
+    let owner = std::env::var_os(owner_file)
         .map(PathBuf::from)
         .filter(|path| path.is_absolute())
         .and_then(|path| lamp_voice::person::read(&path).ok().flatten());

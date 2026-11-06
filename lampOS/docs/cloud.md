@@ -505,6 +505,13 @@ not by its name.
   it was recognised as (eyes.md, "Who it knows"). It is not the memory id
   (`p-…`), which comes back with a name. A face from a photo still waiting
   for its yes has none and can't be picked.
+- **"That face" is that record, near prints included.** The eyes keep
+  the near prints of a look-alike who says the owner's name (`apart`)
+  beside the owner's record. They then match as the owner too, so a pick
+  decides the owner by that record, not by one print. This predates #5495;
+  clearing a look-alike's near prints means removing the owner's face and
+  saving it again, which gives it a new id, so the app picks the owner
+  again (Heron's P3 on #5526).
 - **`face.list`** asks the eyes `{"list":true,"waiting":true,"ids":true}`
   (names, ids and when each was first saved, never a print) and root's
   helper for the pick, and adds `face_id`, `saved_at` and `owner` to each

@@ -1966,6 +1966,9 @@ async fn serve_with_visual<C: Connect>(
     // is the owner's (`crate::person::may_tell`). A session that may hold
     // it is renewed fresh before a line that may not have it
     // (`crate::person::live_holds`).
+    // The owner's face picked in the app (`LAMP_OWNER_FACE`, #5495), by its
+    // id, before the name is read.
+    crate::owner_face::keep_fresh(options.tools.who.clone());
     let setup_name = crate::person::for_lines();
     let setup_root = crate::person::bus_root(BUS_ROOT.get().map(std::path::PathBuf::as_path))
         .filter(|_| setup_name.is_some());

@@ -38,7 +38,10 @@ at 14:11 on 3 Nov 2026):
 Only the lamp's owner: the person whose known face is kept under the name
 typed at setup (`LAMP_PERSON_NAME`) or under the name `who_you_are` saved
 with their face (`known_faces::owner_now`, kept fresh while services are on),
-`person::owner_ids`. The voice checks it on every services call
+`person::owner_ids`; with a face picked as the owner in the app
+(`LAMP_OWNER_FACE=on`, #5495), only that face, by its id, whatever name is
+typed ([second-voice.md](second-voice.md), "The owner picked by face in the
+app"). The voice checks it on every services call
 (`services::run`) by the request's memory scope, the same lease memory reads
 are held to (`memory_scope::ScopeLease::scope`): the line must be admitted as
 the owner's known face, not held by a face's gap or carried as a
@@ -1086,7 +1089,7 @@ the same turn stands.
   5 Nov): only mail and the calendar have their own
   spoken words, and every other service says titles or names, by keys an
   item may not have (an item with none is counted, not said); the MCP
-  services and Ahrefs have no fixed read, so no made skill reads them; the owner is only the name typed at setup, so a face saved under
+  services and Ahrefs have no fixed read, so no made skill reads them; with `LAMP_OWNER_FACE=on` (#5495) the owner's name is read from `LAMP_SKILLS_RESOLVED_OWNER_FILE` in place of `LAMP_SKILLS_OWNER_FILE`, the file the voice writes as it knows the owner (`LAMP_OWNER_NAME_FILE`, by the face picked in the app, else the typed name), and unset it is no owner; the product sets neither, and pointing the unit at it needs a folder both units reach; otherwise the owner is only the name typed at setup, so a face saved under
   another name by `who_you_are` never counts; once a day is kept in memory
   and lost on a restart; the owner's name is the credential copied at
   `lamp-skills`' start, so a later rename or a forget-everything leaves the

@@ -1580,6 +1580,11 @@ fn run_spoken_call_inner(
 /// before "who you are" was asked no longer ends it (Reviewer-two's P3 on
 /// #4243).
 fn face_gone_with_everything(settings: &Settings, route: &Route, told: &Value) {
+    // The owner's face picked in the app is known again only from the
+    // eyes' next answer (#5495): a picked face just forgotten is no owner.
+    if matches!(route, Route::Memory(..)) && told["face"] == "forgotten too" {
+        crate::owner_face::forgotten();
+    }
     if matches!(route, Route::Memory(..))
         && told["face"] == "forgotten too"
         && let Some(file) = &settings.onboarding
@@ -2029,6 +2034,16 @@ fn run_call_with_scope(
                         .as_str()
                         .or_else(|| call.args.get("name").and_then(Value::as_str)),
                 );
+            }
+            // Any face forgotten, or saved (a rename moves its id to the new
+            // name): the owner's face picked in the app is asked again
+            // (#5495), and none is the owner until the eyes answer after a
+            // forget.
+            if call.name == crate::known_faces::FORGET && told.0["ok"] == true {
+                crate::owner_face::forgotten();
+                crate::owner_face::saved(Some(socket.as_path()));
+            } else if call.name == crate::known_faces::REMEMBER && told.0["ok"] == true {
+                crate::owner_face::saved(Some(socket.as_path()));
             }
             if call.name == crate::known_faces::FORGET
                 && told.0["ok"] == true

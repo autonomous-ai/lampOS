@@ -2418,6 +2418,9 @@ pub fn serve(
     // the switch and the file's path, not on a name there at start: the
     // name is read for each reply, so one typed again in the app after a
     // forget holds from the next (Reviewer-three's P3 on #4476).
+    // The owner's face picked in the app (`LAMP_OWNER_FACE`, #5495), by its
+    // id, before the typed name is first read below.
+    crate::owner_face::keep_fresh(tools.who.clone());
     let setup_named = crate::person::owner_only() && crate::person::named_in_environment();
     if setup_named {
         // Said once, at start, whether a name is used.

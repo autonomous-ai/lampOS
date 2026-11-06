@@ -42,7 +42,10 @@ lúc 14:11 ngày 3 Nov 2026):
 Chỉ chủ của đèn: người có khuôn mặt quen được giữ dưới tên gõ lúc setup
 (`LAMP_PERSON_NAME`) hoặc dưới tên mà `who_you_are` lưu cùng khuôn mặt của họ
 (`known_faces::owner_now`, được làm mới khi dịch vụ bật),
-`person::owner_ids`. Giọng nói kiểm tra điều này ở mọi lệnh gọi dịch vụ
+`person::owner_ids`; khi app đã chọn một khuôn mặt làm chủ đèn
+(`LAMP_OWNER_FACE=on`, #5495), chỉ khuôn mặt đó, theo id của nó, dù tên gõ
+là gì ([second-voice.md](../second-voice.md), "The owner picked by face in
+the app"). Giọng nói kiểm tra điều này ở mọi lệnh gọi dịch vụ
 (`services::run`) bằng phạm vi bộ nhớ của yêu cầu, cùng lease mà việc đọc bộ
 nhớ tuân theo (`memory_scope::ScopeLease::scope`): câu nói phải được nhận là
 của khuôn mặt quen của chủ đèn, không được giữ bởi khoảng trống của một khuôn
@@ -1110,7 +1113,7 @@ kỹ năng trong cùng lượt vẫn giữ.
   5/11): chỉ thư và lịch có lời nói riêng, mọi dịch vụ
   khác nói tiêu đề hoặc tên theo những khoá mà một mục có thể không có (mục
   không có khoá nào thì được đếm, không được nói); các dịch vụ MCP và Ahrefs
-  không có việc đọc cố định nên không kỹ năng tự tạo nào đọc chúng; chủ đèn chỉ là tên gõ lúc cài đặt, nên một khuôn mặt
+  không có việc đọc cố định nên không kỹ năng tự tạo nào đọc chúng; với `LAMP_OWNER_FACE=on` (#5495) tên chủ đèn được đọc từ `LAMP_SKILLS_RESOLVED_OWNER_FILE` thay cho `LAMP_SKILLS_OWNER_FILE`, tệp giọng nói ghi tên chủ đèn như nó biết (`LAMP_OWNER_NAME_FILE`, theo khuôn mặt chọn trong app, nếu không thì tên gõ), và không đặt thì không có chủ đèn; bản sản phẩm chưa đặt cả hai, và trỏ unit tới đó cần một thư mục cả hai unit đều tới được; ngoài ra chủ đèn chỉ là tên gõ lúc cài đặt, nên một khuôn mặt
   được `who_you_are` lưu dưới tên khác không bao giờ được tính; "một lần mỗi
   ngày" giữ trong bộ nhớ và mất khi khởi động lại; tên chủ đèn là credential
   được chép lúc `lamp-skills` khởi động, nên một lần đổi tên hay "quên hết"
