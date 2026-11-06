@@ -919,6 +919,14 @@ each under the quiet rule. A round
    is well, not stopped; one that failed, crashed or is started again by
    systemd is still not well. Before this, an awake lamp put the build back:
    lamp-9adf, 1 Nov, 9276 and 9424, "lamp-waking.service stopped".
+   A unit whose restart its own `Condition…=` skipped (`ConditionResult=no`,
+   inactive with `Result=success`) is not this lamp's now, as at boot, and is
+   well too: putting the build back can't make a condition hold that neither
+   build owns. Before this, lamp-52e6 on 6 Nov put 10441 back for
+   "lamp-tasks.service stopped" (its Harness gone under it), and so would
+   every later build. `lamp-setup.service` keeps its own rules
+   (`setup_lifecycle`): a completed setup restarted and skipped by its marker
+   is still not well.
 10. **Back.** A part not well: the journal's validated old startup order is
     used without rereading the installed dependency graph. Later changes or
     read failures in that graph cannot veto the saved restart order. Every
