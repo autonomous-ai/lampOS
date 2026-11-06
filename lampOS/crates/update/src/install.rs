@@ -1956,7 +1956,24 @@ fn before_units(
         let placed = format!("{}{}", unit::folder(&part.folder, build), part.binary);
         let from = config.on(&placed);
         let bytes = fs::read(&from).map_err(|error| format!("{}: {error}", from.display()))?;
+        // A writer whose bytes this changes (missing or unreadable counts)
+        // leaves a refresh's `.prev`, request and record describing a
+        // writer that is gone: cleared once it is in place, the record
+        // last (crate::writer_swap::forget_writer, #5539).
+        let writer_changed = fs::read(config.on(crate::own::BACK)).map_or(true, |now| now != bytes);
         put(config, crate::own::BACK, &bytes, 0o755, &mut changed)?;
+        if crate::writer_swap::forget_writer(
+            &config.root,
+            records.folder(),
+            &manifest::sha256_hex(&bytes),
+            writer_changed,
+            crate::records::unix_ms(),
+        )? {
+            changed.push(
+                "cleared the settings writer's refresh (.prev, request and record) it replaced"
+                    .to_owned(),
+            );
+        }
         own = Some(placed);
     }
 

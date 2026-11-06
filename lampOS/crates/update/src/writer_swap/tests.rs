@@ -413,3 +413,123 @@ fn a_prev_an_unproven_refresh_kept_is_never_cleared() {
     assert_eq!(writer(&lamp), "new");
     assert_eq!(prev(&lamp).as_deref(), Some("old"));
 }
+
+/// What [`forget_writer`] leaves: whether PREV, the request and the record
+/// are there, in that order.
+fn left(lamp: &Lamp) -> [bool; 3] {
+    [
+        fs::symlink_metadata(on_root(lamp.root.path(), PREV)).is_ok(),
+        lamp.records.join(REQUEST).exists(),
+        lamp.records.join(DONE).exists(),
+    ]
+}
+
+#[test]
+fn forget_writer_clears_what_is_there_with_any_of_its_files_missing() {
+    for there in 0..8u8 {
+        let lamp = lamp();
+        let prev = on_root(lamp.root.path(), PREV);
+        if there & 4 != 0 {
+            refresh(lamp.root.path(), &lamp.records, b"new", &|| NOW, &mut good).unwrap();
+        }
+        if there & 1 != 0 {
+            fs::write(&prev, "oldest").unwrap();
+        } else if prev.exists() {
+            fs::remove_file(&prev).unwrap();
+        }
+        if there & 2 != 0 {
+            let held = Records::new(lamp.records.clone()).lock().unwrap();
+            request(&held, b"new", Op::Proven, NOW).unwrap();
+        }
+        let build = sha256_hex(b"newer");
+        let acted = forget_writer(lamp.root.path(), &lamp.records, &build, true, NOW).unwrap();
+        assert_eq!(acted, there != 0, "{there}");
+        assert_eq!(left(&lamp), [false, false, false], "{there}");
+        // Run again, it changes nothing.
+        assert!(!forget_writer(lamp.root.path(), &lamp.records, &build, true, NOW).unwrap());
+    }
+}
+
+#[test]
+fn forget_writer_leaves_all_as_it_is_when_the_writer_is_unchanged_and_named_by_the_record() {
+    let lamp = lamp();
+    refresh(lamp.root.path(), &lamp.records, b"new", &|| NOW, &mut good).unwrap();
+    let before = super::done(&lamp.records);
+    let build = sha256_hex(b"new");
+    assert!(!forget_writer(lamp.root.path(), &lamp.records, &build, false, NOW + 1).unwrap());
+    assert_eq!(left(&lamp), [true, false, true]);
+    assert_eq!(super::done(&lamp.records), before);
+    assert!(unproven(lamp.root.path(), &lamp.records));
+}
+
+#[test]
+fn forget_writer_acts_on_unchanged_bytes_when_the_record_names_another_build() {
+    // A run cut after it placed the writer and before it cleared.
+    let lamp = lamp();
+    refresh(lamp.root.path(), &lamp.records, b"new", &|| NOW, &mut good).unwrap();
+    let build = sha256_hex(b"newer");
+    assert!(forget_writer(lamp.root.path(), &lamp.records, &build, false, NOW + 1).unwrap());
+    assert_eq!(left(&lamp), [false, false, false]);
+    assert!(!unproven(lamp.root.path(), &lamp.records));
+}
+
+#[test]
+fn forget_writer_keeps_a_build_put_back_in_a_fresh_proven_record() {
+    for for_good in [true, false] {
+        let lamp = lamp();
+        if for_good {
+            refresh(lamp.root.path(), &lamp.records, b"new", &|| NOW, &mut good).unwrap();
+            op(&lamp, Op::PutBack, NOW + 1).unwrap();
+        } else {
+            // A record from before #5539 carries as it is: for_good unset.
+            put_back_before_5539(&lamp);
+            fs::write(on_root(lamp.root.path(), PREV), "oldest").unwrap();
+        }
+        let build = sha256_hex(b"newer");
+        assert!(forget_writer(lamp.root.path(), &lamp.records, &build, true, NOW + 2).unwrap());
+        assert_eq!(left(&lamp), [false, false, true]);
+        assert_eq!(
+            super::done(&lamp.records),
+            Some(Done {
+                build: build.clone(),
+                before: None,
+                synced: true,
+                at_unix_ms: NOW + 2,
+                proven: true,
+                put_back: Some(sha256_hex(b"new")),
+                for_good,
+            })
+        );
+        assert!(!unproven(lamp.root.path(), &lamp.records));
+        assert_eq!(
+            put_back_for_good(&lamp.records, &sha256_hex(b"new")),
+            for_good
+        );
+        // Run again, the writer now this build, it changes nothing.
+        let kept = super::done(&lamp.records);
+        assert!(!forget_writer(lamp.root.path(), &lamp.records, &build, false, NOW + 3).unwrap());
+        assert_eq!(super::done(&lamp.records), kept);
+    }
+}
+
+#[test]
+fn forget_writer_that_cannot_remove_the_prev_says_so_and_keeps_the_record() {
+    let lamp = lamp();
+    refresh(lamp.root.path(), &lamp.records, b"new", &|| NOW, &mut good).unwrap();
+    let prev = on_root(lamp.root.path(), PREV);
+    fs::remove_file(&prev).unwrap();
+    fs::create_dir_all(prev.join("inside")).unwrap();
+    let held = Records::new(lamp.records.clone()).lock().unwrap();
+    request(&held, b"new", Op::Proven, NOW).unwrap();
+    drop(held);
+    let why = forget_writer(
+        lamp.root.path(),
+        &lamp.records,
+        &sha256_hex(b"newer"),
+        true,
+        NOW,
+    )
+    .unwrap_err();
+    assert!(why.contains("lamp-update-back.prev"), "{why}");
+    assert_eq!(left(&lamp), [true, true, true]);
+}
