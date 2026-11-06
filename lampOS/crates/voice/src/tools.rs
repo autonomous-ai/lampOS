@@ -1473,6 +1473,18 @@ fn named_beside(settings: &Settings, key: &str) -> BTreeSet<String> {
     named
 }
 
+/// `use_skill`'s note that this call already ran `skill`
+/// ([`crate::use_skill::ran`]), but none for a skill whose tools file gives
+/// it a search ([`search_walk`], as the second route's note and walk read
+/// it): a search is several calls of its skill in one turn, each look's
+/// answer telling the model to call again with the next place
+/// (look-for-things' `[search]`, a reader's P2 on #5505).
+fn told_ran(settings: &Settings, skill: &str, told: &mut Value) {
+    if search_walk(settings, skill).is_none() {
+        crate::use_skill::ran(skill, told);
+    }
+}
+
 /// Each skills folder's tools file that can be read, in order.
 fn tools_files(settings: &Settings) -> Vec<Value> {
     let mut files = Vec::new();
@@ -1550,7 +1562,7 @@ fn run_spoken_call_inner(
                         settings, &found, &skill, request, heard, context, lease,
                     );
                     if answered {
-                        crate::use_skill::ran(&skill.name, &mut answer.told);
+                        told_ran(settings, &skill.name, &mut answer.told);
                     }
                     (whom, answer, answered)
                 }
@@ -2075,7 +2087,7 @@ fn run_call_with_scope(
                         let (whom, (mut told, answered)) =
                             run_call_with_scope(&found, &skill, request, heard, lease);
                         if answered {
-                            crate::use_skill::ran(&skill.name, &mut told);
+                            told_ran(settings, &skill.name, &mut told);
                         }
                         (whom, (told, answered))
                     }
@@ -5037,6 +5049,95 @@ mod tests {
         // answered, not the skills (the reviewer on #1706).
         let (whom, (_, answered)) = run_call(&route(&settings, &juggle.name), &juggle, 7, true);
         assert_eq!((whom, answered), (crate::use_skill::NAME, true));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A reader's P2 on #5505: a search skill (look-for-things' `[search]`,
+    /// its tools file's `searches`) is several calls in one turn, each look
+    /// told to call again with the next place, so its answer through
+    /// `use_skill` carries no "already ran" note, and a second look in the
+    /// same request runs: on the cascade's path ([`answer`]) as on the Live
+    /// worker's ([`run_call`]). `dance`, with no search, is still told it
+    /// ran; lamp-skills' refusal of a run under way is not.
+    #[test]
+    fn a_search_skill_through_use_skill_is_not_told_it_already_ran() {
+        let dir = schedule_directory("ls");
+        std::fs::write(
+            dir.join(CATALOG_FILE),
+            json!({"tools":[
+                {"name":"look_for","description":"Look for a thing.",
+                 "parameters":{"type":"object","properties":{
+                    "place":{"type":"string","enum":["desk","left","right","far_left","far_right","found"],"description":"Where to look."}}}},
+                {"name":"dance","description":"Dance."}],
+              "searches":{"look_for":{"note":"Not found yet? Call look_for with the next place.",
+                "walk":["left","right","far_left","far_right","desk"],
+                "looked":{"desk":"at the desk","left":"to the left"},"default":"desk"}}})
+            .to_string(),
+        )
+        .unwrap();
+        let settings = Settings {
+            skills: Some(dir.clone()),
+            use_skill: true,
+            ..Default::default()
+        };
+        let look = |place: &str| ToolCall {
+            id: "c1".into(),
+            name: crate::use_skill::NAME.into(),
+            args: json!({"skill":"look_for","choice":place}),
+        };
+        let next: &'static [u8] = b"{\"ok\":true,\"result\":{\"look\":true,\"next\":\"If not, call look_for once more with the next place.\"}}\n";
+        // The first look, at the desk: no note.
+        let served = executive(&dir, next, Duration::ZERO);
+        let told = answer(&settings, &look("desk"), 7, true);
+        assert_eq!(
+            told["next"],
+            "If not, call look_for once more with the next place."
+        );
+        assert!(told.get(crate::use_skill::RAN).is_none(), "{told}");
+        assert_eq!(
+            served.join().unwrap(),
+            json!({"op":"call","name":"look_for","args":{"place":"desk"}})
+        );
+        std::fs::remove_file(dir.join(CALL_SOCKET)).unwrap();
+        // The second, to the left, in the same request: it runs, no note.
+        let served = executive(&dir, next, Duration::ZERO);
+        let left = look("left");
+        let (whom, (told, answered)) = run_call(&route(&settings, &left.name), &left, 7, true);
+        assert_eq!((whom, answered), ("the executive", true));
+        assert!(told.get(crate::use_skill::RAN).is_none(), "{told}");
+        assert_eq!(
+            served.join().unwrap(),
+            json!({"op":"call","name":"look_for","args":{"place":"left"}})
+        );
+        std::fs::remove_file(dir.join(CALL_SOCKET)).unwrap();
+        // Dance has no search: still told it ran.
+        let dance = ToolCall {
+            args: json!({"skill":"dance"}),
+            ..look("desk")
+        };
+        let served = executive(
+            &dir,
+            b"{\"ok\":true,\"result\":{\"next\":\"Dance.\"}}\n",
+            Duration::ZERO,
+        );
+        assert_eq!(
+            answer(&settings, &dance, 7, true),
+            json!({"next":"Dance.", crate::use_skill::RAN:
+                "This call has already run dance. Do not call use_skill for dance again in this turn."})
+        );
+        served.join().unwrap();
+        std::fs::remove_file(dir.join(CALL_SOCKET)).unwrap();
+        // lamp-skills' refusal while its run is under way, as its socket
+        // writes it: no note on it.
+        let served = executive(
+            &dir,
+            b"{\"ok\":false,\"error\":\"I'm still doing that.\"}\n",
+            Duration::ZERO,
+        );
+        let (_, (told, answered)) = run_call(&route(&settings, &dance.name), &dance, 7, true);
+        assert!(answered);
+        assert_eq!(told, json!({"error": "I'm still doing that."}));
+        served.join().unwrap();
         std::fs::remove_dir_all(dir).unwrap();
     }
 
