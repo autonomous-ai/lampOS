@@ -329,8 +329,9 @@ pub(super) fn yes_alone_in(
     thread: &crate::thread::Thread,
     (request, whose, now): (u64, Option<&str>, Instant),
     forget: bool,
-    done: Option<super::MemoryDone>,
+    done: Option<super::DoneWrite>,
 ) -> Option<Value> {
+    let done = done_last_turn(thread, request, done);
     let said = thread.heard_for(request, now);
     let yes = said.as_deref().is_some_and(only_a_yes);
     let held = held(said, || {
@@ -404,6 +405,99 @@ fn yes_alone_told(done: Option<super::MemoryDone>, forget: bool) -> Value {
         json!({"remembered": done != MemoryDone::Forgotten, "already": true, "note": note})
     }
 }
+
+/// What the model is told before round 1 of heard line `request`, with the
+/// switch on, when the line is only a yes, no offer of the lamp's waits,
+/// the lamp's answer before it asked nothing, and the scope's last memory
+/// write was done within the held window ([`super::done_last_in`]): that it
+/// is done already, by what was done, and what was done. On lamp-06c1 at
+/// build 10538 (6 Nov, S13 req 339) "Yes. Please forget it." after a done
+/// forget was answered with a `recall`, not a `forget`, so [`yes_alone`]
+/// never saw it, and the lamp asked again what to forget. `None` else.
+pub(crate) fn done_already(
+    request: u64,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Option<(String, super::MemoryDone)> {
+    if !on() || released(lease).is_some() {
+        return None;
+    }
+    // Read before the thread is locked, as [`yes_alone`] does.
+    let done = super::done_last_in(lease)?;
+    let thread = crate::thread::THREAD.lock().ok()?;
+    done_already_in(
+        &thread,
+        (request, writes_for(lease), Instant::now()),
+        Some(done),
+    )
+}
+
+/// [`done_already`] for heard line `request` on `thread`, in scope `whose`,
+/// at `now`, with `done` the scope's last memory write done.
+pub(super) fn done_already_in(
+    thread: &crate::thread::Thread,
+    (request, whose, now): (u64, Option<&str>, Instant),
+    done: Option<super::DoneWrite>,
+) -> Option<(String, super::MemoryDone)> {
+    use super::MemoryDone;
+    let done = done_last_turn(thread, request, done)?;
+    // A lamp's answer that asked nothing offers nothing to keep
+    // ([`crate::thread::Thread::offered_line`] needs a question), so the
+    // yes is a yes alone ([`Held::YesAlone`]); after "Anything else?" or
+    // "Want me to keep that?" it answers that question instead.
+    let said = thread.heard_for(request, now);
+    // After a done forget, "Yes. Please forget it." is that yes too (S13
+    // req 339): only a yes once its forget words are left out.
+    let yes = |line: &str| {
+        only_a_yes(line)
+            || (done == MemoryDone::Forgotten && words(line).any(|word| asks_to_forget(&word)) && {
+                let rest: Vec<String> = words(line).filter(|word| !asks_to_forget(word)).collect();
+                only_a_yes(&rest.join(" "))
+            })
+    };
+    if !said.as_deref().is_some_and(yes)
+        || thread.lamp_asked_by_its_end(request)
+        || thread
+            .offered_line(request, whose, now, offers_to_keep, only_a_yes)
+            .is_some()
+    {
+        return None;
+    }
+    let note = match done {
+        MemoryDone::Kept => DONE_ALREADY_KEPT,
+        MemoryDone::Changed => DONE_ALREADY_CHANGED,
+        MemoryDone::Forgotten => DONE_ALREADY_FORGOTTEN,
+    };
+    eprintln!("{DONE_ALREADY_TOLD_LINE}");
+    Some((format!("{DONE_ALREADY_TOLD} {note})"), done))
+}
+
+/// What of `done`, the scope's last memory write done and the request it
+/// was done for, is "your last turn"'s for heard line `request`: the write,
+/// when that request is `request` itself or the one just before it, no
+/// exchange of the thread's between them (the forget's own answer may be
+/// kept out of it, S13 req 339). The Reviewer-lead's P2 on #5607: "My bike
+/// is blue." kept, then "My goldfish is called Pip." answered with no
+/// `remember`, then "Yes. Please keep that.": the bike's keep is not the
+/// yes's last turn, and Pip was never kept. A write done for no known
+/// request is none.
+fn done_last_turn(
+    thread: &crate::thread::Thread,
+    request: u64,
+    done: Option<super::DoneWrite>,
+) -> Option<super::MemoryDone> {
+    let (done, done_for) = done?;
+    let done_for = done_for.filter(|&done_for| done_for <= request)?;
+    (!thread.answered_between(done_for, request)).then_some(done)
+}
+
+/// How [`done_already`]'s note opens; it ends with the done write's own
+/// note ([`DONE_ALREADY_KEPT`], [`DONE_ALREADY_CHANGED`] or
+/// [`DONE_ALREADY_FORGOTTEN`]) and a closing parenthesis.
+pub const DONE_ALREADY_TOLD: &str =
+    "(For you to know: they only said yes, just after your last turn's memory write was done.";
+
+/// The journal's line for it: no words of it.
+pub const DONE_ALREADY_TOLD_LINE: &str = "lamp-voice provider: a line that was only a yes, after a done write: the model is told before it answers that it is done already";
 
 /// NFC, lower case, đ as d: `lamp_memory::search::text`.
 fn fold(value: &str) -> String {
@@ -1258,7 +1352,12 @@ mod tests {
             thread
         };
         let forget = |thread: &Thread| {
-            yes_alone_in(thread, (2, None, now), true, Some(MemoryDone::Forgotten))
+            yes_alone_in(
+                thread,
+                (2, None, now),
+                true,
+                Some((MemoryDone::Forgotten, Some(1))),
+            )
         };
         for lamp in [
             "Done. Should I clear the locker number too?",
@@ -1296,5 +1395,131 @@ mod tests {
         ] {
             assert!(!asks_to_forget(said), "{said}");
         }
+    }
+    /// lamp-06c1, build 10538, 6 Nov, S13 reqs 338-339: after "Lamp, forget
+    /// what I said about my water bottle." was done, "Yes. Please forget it."
+    /// was answered with a `recall` and "Nothing was kept from that
+    /// exchange… What was it you wanted forgotten?". A line that is only a
+    /// yes after a done write is told before it answers that it is done
+    /// already, by what was done; never after a question of the lamp's, nor
+    /// for a line that is more than a yes, nor with no done write.
+    #[test]
+    fn a_yes_after_a_done_write_is_told_it_is_done_before_it_answers() {
+        use super::super::MemoryDone;
+        use crate::thread::Thread;
+        let now = Instant::now();
+        let after = |lamp: &str, person: &str| {
+            let mut thread = Thread::new();
+            thread.person("Lamp, forget what I said about my water bottle.", true, now);
+            thread.lamp(1, lamp, now);
+            thread.person(person, true, now);
+            thread
+        };
+        let forgotten = "That's forgotten \u{2014} nothing about your water bottle is kept now.";
+        for (done, note, yes) in [
+            (
+                MemoryDone::Forgotten,
+                DONE_ALREADY_FORGOTTEN,
+                "Yes. Please forget it.",
+            ),
+            (
+                MemoryDone::Changed,
+                DONE_ALREADY_CHANGED,
+                "Yes. Please keep that.",
+            ),
+            (MemoryDone::Kept, DONE_ALREADY_KEPT, "Yes."),
+        ] {
+            let (told, was) = done_already_in(
+                &after(forgotten, yes),
+                (2, None, now),
+                Some((done, Some(1))),
+            )
+            .unwrap();
+            assert_eq!(was, done);
+            assert!(told.starts_with(DONE_ALREADY_TOLD), "{told}");
+            assert!(told.contains(note), "{told}");
+        }
+        // The forget's answer left out of the thread (S13 req 339): the yes
+        // still follows a lamp's line that asked nothing.
+        let mut thread = Thread::new();
+        thread.person("Yes. Please forget it.", true, now);
+        assert!(
+            done_already_in(
+                &thread,
+                (2, None, now),
+                Some((MemoryDone::Forgotten, Some(1)))
+            )
+            .is_some()
+        );
+        for (lamp, person, done) in [
+            (forgotten, "Yes. Please forget it.", None),
+            ("Done. Anything else?", "Yes.", Some(MemoryDone::Forgotten)),
+            (
+                "Your bike is blue. Want me to keep that?",
+                "Yes.",
+                Some(MemoryDone::Kept),
+            ),
+            (forgotten, "No.", Some(MemoryDone::Forgotten)),
+            (
+                "Kept: your bike is blue.",
+                "Yes, forget it.",
+                Some(MemoryDone::Kept),
+            ),
+            (
+                forgotten,
+                "What colour is my water bottle?",
+                Some(MemoryDone::Forgotten),
+            ),
+        ] {
+            assert_eq!(
+                done_already_in(
+                    &after(lamp, person),
+                    (2, None, now),
+                    done.map(|done| (done, Some(1)))
+                ),
+                None,
+                "{lamp} / {person}"
+            );
+        }
+    }
+
+    /// The Reviewer-lead's P2 on #5607: a done write is "your last turn"'s
+    /// only for the yes just after the turn it was done in. "My bike is
+    /// blue." was kept (request 1); "My goldfish is called Pip." was
+    /// answered "Pip, lovely name." with no `remember` (request 2, as S14
+    /// req 363); "Yes. Please keep that." (request 3) is not told that its
+    /// last turn kept it, and a `remember` of it is told nothing was kept.
+    /// The yes just after the bike's own turn still is.
+    #[test]
+    fn a_done_write_two_turns_back_is_not_the_yes_last_turn() {
+        use super::super::MemoryDone;
+        use crate::thread::Thread;
+        let now = Instant::now();
+        let mut thread = Thread::new();
+        thread.person("My bike is blue.", true, now);
+        thread.lamp(1, "Kept: your bike is blue.", now);
+        thread.person("My goldfish is called Pip.", true, now);
+        thread.lamp(2, "Pip, lovely name.", now);
+        thread.person("Yes. Please keep that.", true, now);
+        let bike = Some((MemoryDone::Kept, Some(1)));
+        assert_eq!(done_already_in(&thread, (3, None, now), bike), None);
+        assert_eq!(
+            yes_alone_in(&thread, (3, None, now), false, bike),
+            Some(json!({"remembered": false, "note": YES_ALONE}))
+        );
+        // Done for no known request: never "your last turn".
+        let unknown = Some((MemoryDone::Kept, None));
+        assert_eq!(done_already_in(&thread, (3, None, now), unknown), None);
+        // Done in the turn just before the yes: told it is done already.
+        let pip = Some((MemoryDone::Kept, Some(2)));
+        assert!(done_already_in(&thread, (3, None, now), pip).is_some());
+        let told = yes_alone_in(&thread, (3, None, now), false, pip).unwrap();
+        assert_eq!(told["already"], true, "{told}");
+        // The yes just after the bike's own turn, too.
+        let mut thread = Thread::new();
+        thread.person("My bike is blue.", true, now);
+        thread.lamp(1, "Kept: your bike is blue.", now);
+        thread.person("Yes. Please keep that.", true, now);
+        assert!(done_already_in(&thread, (2, None, now), bike).is_some());
     }
 }

@@ -1186,6 +1186,15 @@ impl Thread {
         self.held = self.held.max(Some(SystemTime::now()));
     }
 
+    /// Whether the thread holds an exchange of a request after `after` and
+    /// before `before`: a turn between them (`remember::heard`'s "your last
+    /// turn", the Reviewer-lead's P2 on #5607).
+    pub fn answered_between(&self, after: u64, before: u64) -> bool {
+        self.exchanges
+            .iter()
+            .any(|exchange| exchange.request > after && exchange.request < before)
+    }
+
     /// Whether the lamp's newest line before `request` ended in a question:
     /// then a bare answer ("23") is an answer to it (#926).
     pub fn lamp_asked(&self, request: u64) -> bool {
