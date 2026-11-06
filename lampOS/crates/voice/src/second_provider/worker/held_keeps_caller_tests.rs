@@ -456,13 +456,15 @@ fn held_keeps_a_question_of_the_callers_own() {
     ];
     assert_eq!(run(false, &sis), [true; 3], "off: talk_sis-3");
     assert_eq!(run(true, &sis), [true; 3], "held: talk_sis-3");
-    for desk in [
-        "Nice. And what was your sister's name again?",
-        "Sam, what was my sister's name again?",
-    ] {
-        let lines = [SISTER, COOK, line(12_000, 2_400, desk, "Lan.")];
-        assert_eq!(run(true, &lines), [true, true, false], "held: {desk}");
-    }
+    // Set off to a name, it stays held. Without one, "your sister" is no
+    // longer told apart: the 01:23 ruling ties any question right after the
+    // answer but one of the addressee's own doings (Reviewer-lead's P2).
+    let desk = "Sam, what was my sister's name again?";
+    let lines = [SISTER, COOK, line(12_000, 2_400, desk, "Lan.")];
+    assert_eq!(run(true, &lines), [true, true, false], "held: {desk}");
+    let yours = "Nice. And what was your sister's name again?";
+    let lines = [SISTER, COOK, line(12_000, 2_400, yours, "Lan.")];
+    assert_eq!(run(true, &lines), [true; 3], "held: {yours}");
 }
 
 const LONDON: Line = line(
@@ -881,15 +883,21 @@ fn the_callers_face_speaking_takes_no_room_line() {
         ],
         vec![1, 2],
     ));
-    for desk in [
-        "Nice. And what was your sister's name again?",
-        "Sam, what was my sister's name again?",
-    ] {
-        quiet.push((
-            vec![SISTER, COOK, line(12_000, 2_400, desk, "Lan.")],
-            vec![2],
-        ));
-    }
+    // "And what was your sister's name again?" ties by the 01:23 ruling, a
+    // question right after the answer: no room line by its words alone.
+    quiet.push((
+        vec![
+            SISTER,
+            COOK,
+            line(
+                12_000,
+                2_400,
+                "Sam, what was my sister's name again?",
+                "Lan.",
+            ),
+        ],
+        vec![2],
+    ));
     for desk in [
         "Ma'am, did you send the slides to Sam yet?",
         "Look, did you send the slides to Sam yet?",
@@ -1125,6 +1133,12 @@ fn held_keeps_a_question_asking_the_lamps_view() {
         "What's your take?",
         "Ooh, that sounds nice. How long does it take?",
         "Is that enough?",
+        // Reviewer-lead's HOLD probes: only the ruling's seven openers hold,
+        // and "your" holds nothing.
+        "Do you know how long it takes?",
+        "Do you have a recipe for that?",
+        "That's your best one. How long does it take?",
+        "How long does your recipe take?",
     ] {
         let lines = [LONDON, line(6_800, 2_400, asked, "Okay.")];
         assert_eq!(run(true, &lines), [true, true], "held: {asked}");
