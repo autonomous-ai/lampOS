@@ -1082,6 +1082,11 @@ fn owner<C: Clock>(
                         body["instance_id"] = instance_id.as_str().into();
                         body
                     });
+                    let answer = with_sign_in(
+                        &work.request,
+                        answer,
+                        set_up.and_then(|found| found.sign_in),
+                    );
                     requests = requests.saturating_add(1);
                     let _ = work.response.try_send(answer);
                 } else if let (Some(starter), true) = (
@@ -2930,17 +2935,21 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     }
 }
 
-/// `status` answered with Harness's sign-in as `serve --set-up-later`
-/// last read it (`signed_in`: `yes`, `offline` or `no`, its journal's
-/// "Harness signed in: …"), for the voice's sentence about Harness at the end
-/// of onboarding (#5488). Not read yet, or without `--set-up-later`, the
-/// answer is as it was; so is every other answer.
+/// `status` and the app's `app_sign_in_state` answered with Harness's
+/// sign-in as `serve --set-up-later` last read it from Harness itself
+/// (`signed_in`: `yes`, `offline` or `no`, its journal's "Harness signed in:
+/// …"): for the voice's sentence about Harness at the end of onboarding
+/// (#5488), and for the app's Harness row (#5524), which is right after a
+/// restart too, when no sign-in is open and the view says `none`. Not read
+/// yet, or without `--set-up-later`, the answer is as it was; so is every
+/// other answer.
 fn with_sign_in(
     request: &Request,
     answer: Result<Value, EngineError>,
     sign_in: Option<SignIn>,
 ) -> Result<Value, EngineError> {
-    let (Request::Status {}, Some(sign_in)) = (request, sign_in) else {
+    let (Request::Status {} | Request::AppSignInState {}, Some(sign_in)) = (request, sign_in)
+    else {
         return answer;
     };
     answer.map(|mut body| {
@@ -2973,6 +2982,35 @@ mod tests {
         assert_eq!(unread, serde_json::json!({"summary": {}}));
         let targets = with_sign_in(&Request::Targets {}, body(), Some(SignIn::Out)).unwrap();
         assert_eq!(targets, serde_json::json!({"summary": {}}));
+    }
+
+    /// #5524: the app's state says Harness's sign-in once it was read,
+    /// beside the sign-in's own view; the app's other operations, and the
+    /// state before the first read, are as they were.
+    #[test]
+    fn the_apps_state_says_harness_signed_in_once_read() {
+        use super::{Request, SignIn, with_sign_in};
+        let view = || Ok(serde_json::json!({"sign_in": "none", "revision": 0}));
+        for (sign_in, said) in [
+            (SignIn::In, "yes"),
+            (SignIn::Offline, "offline"),
+            (SignIn::Out, "no"),
+        ] {
+            let answer = with_sign_in(&Request::AppSignInState {}, view(), Some(sign_in)).unwrap();
+            assert_eq!(answer["signed_in"], said);
+            assert_eq!(answer["sign_in"], "none");
+        }
+        let unread = with_sign_in(&Request::AppSignInState {}, view(), None).unwrap();
+        assert_eq!(unread, view().unwrap());
+        let started = with_sign_in(
+            &Request::AppSignInStart {
+                method: Default::default(),
+            },
+            view(),
+            Some(SignIn::Out),
+        )
+        .unwrap();
+        assert_eq!(started, view().unwrap());
     }
 
     #[test]
