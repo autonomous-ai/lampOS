@@ -1552,6 +1552,13 @@ impl UpdateCheck {
 pub struct Hand {
     pub pushed: bool,
     pub since_us: u64,
+    /// While pushed: whether the hand moved the head or base (`true`: a
+    /// held joint went more than 15 counts from where it stood when it gave
+    /// way in this push, or the stall rule's joint was carried off its goal) or only
+    /// presses on it (`false`). Absent while not pushed, and from a body
+    /// before #5566: a reader takes absent as moved, the push as it was.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub moved: Option<bool>,
 }
 
 impl Hand {
@@ -3320,6 +3327,40 @@ mod tests {
             now: String,
         }
         assert_eq!(serde_json::from_str::<Older>(text).unwrap().now, "fetching");
+    }
+
+    /// #5566: `moved` is said only while pushed, and a hand from an older
+    /// body, without it, reads as `None`.
+    #[test]
+    fn a_hand_says_moved_only_when_set_and_an_older_one_reads_none() {
+        round_trip(
+            &Hand {
+                pushed: false,
+                since_us: 0,
+                moved: None,
+            },
+            r#"{"pushed":false,"since_us":0}"#,
+        );
+        round_trip(
+            &Hand {
+                pushed: true,
+                since_us: 7,
+                moved: Some(false),
+            },
+            r#"{"pushed":true,"since_us":7,"moved":false}"#,
+        );
+        round_trip(
+            &Hand {
+                pushed: true,
+                since_us: 7,
+                moved: Some(true),
+            },
+            r#"{"pushed":true,"since_us":7,"moved":true}"#,
+        );
+        let older: Hand = serde_json::from_str(r#"{"pushed":true,"since_us":7}"#).unwrap();
+        assert_eq!(older.moved, None);
+        needs::<Hand>(r#"{"pushed":true,"since_us":7}"#, "pushed");
+        needs::<Hand>(r#"{"pushed":true,"since_us":7}"#, "since_us");
     }
 
     /// #5197: `harness` is absent unless set, so a status without it reads
