@@ -1395,7 +1395,7 @@ With the switch:
   "T.J.") may be initials and stay as given. The model's words say a
   spelled name back as a name only, never as letters nor as a choice
   between the name and its spelling (`SAY_IT_BACK`, `NOT_HEARD`,
-  `NOT_HEARD_SPELLED`, `NEAR_TO`).
+  `NOT_HEARD_SPELLED`, `NEAR_TO`); `NOT_HEARD_SAY_AGAIN` says no name back.
 
   Why the turn in hand, from lamp-4ace on 16 October at 16:46 (the first
   builder on #1057, the records described without the words): a
@@ -1469,10 +1469,15 @@ With the switch:
     lamp's last answer (`known_faces::agreed_to`).
   - **Spelled:** a name not heard is asked for spelled out (`NOT_HEARD`),
     once: when the lamp already asked them to spell in an exchange the
-    check holds, a name still not heard is told `NOT_HEARD_SPELLED`
-    (`known_faces::not_heard`), which never asks again and has the model
-    say back the name the letters make, as a name only, and wait for a yes
-    (lamp-3e83, #5564: the lamp asked for spellings too often).
+    check holds, a name still not heard never asks again
+    (`known_faces::not_heard`; lamp-3e83, #5564: the lamp asked for
+    spellings too often). If they spelled after that ask, it is told
+    `NOT_HEARD_SPELLED`, which has the model say back the name the letters
+    make, as a name only, and wait for a yes. If they gave no letters, it
+    is told `NOT_HEARD_SAY_AGAIN`, which has the model ask for the name
+    once more and say no name back: a name they never said or spelled
+    can't pass a read-back's yes, so "Lauren?" and "Yes." would only loop
+    (Jarvis's P2 on #5580).
     When the lamp's last answer asked them to spell
     (`known_faces::spelling_asked`) and the turn in hand spells a name
     letter by letter, the letters are the person's own words: the face is
