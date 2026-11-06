@@ -1,0 +1,108 @@
+# Quiet focus: someone who has worked head down at the desk for about 45
+# minutes in one sitting is given one small, warm word, the way a friend at
+# the next desk would notice: they've been focused a while, nicely done.
+# Never a lecture and never a break (Stretch break, Stand up and A comfort
+# break do that). It reads only what the eyes already say of the person at
+# the desk (`room/activity`'s `head_down`, against this sitting's own
+# baseline, never a picture), and it never speaks of a body or looks.
+# Shaped like A meal check and Sit back (#1685's wellbeing nudges). Written
+# to lamp-skills' schema (docs/skills.md, "The schema, as lamp-skills reads
+# it").
+needs = ["eyes", "body", "voice"]
+# Installable: its owner chooses it (`lamp-skills install`), and it is not in
+# the product's install (`install::NOT_PRODUCT_SKILLS`) until tried on a lamp.
+# It has no `tool`: only the wellbeing group's shared `[stop]`.
+kind = "installable"
+version = "1.0.0"
+# Twice a day at most, counted from the local midnight.
+most_a_day = 2
+
+# What it may read and use, and nothing more: the eyes' reading of the person
+# at the desk, the faces, the voice's state, and a turn toward the face. One
+# short line, worded by the voice. Nothing heard is read.
+[permissions]
+speak = true
+topics = ["room/activity", "humans/faces/tracked", "voice/state"]
+body = true
+
+# Head down for 45 minutes: the eyes say `head_down` once it has held 20 s
+# (eyes/src/activity.rs, the nose lower than it sat). A look up shorter than
+# 2 minutes (a glance, a sip, a thought) does not end the focus, as a sitting
+# forgives (`RoomActivity::SITTING_GAP_S`); one longer does.
+[[trigger]]
+name = "focused"
+topic = "room/activity"
+field = "state"
+equals = "head_down"
+for = "45m"
+gap = "2m"
+rearm = "leaves"          # once each time they settle in
+cooldown = "180m"         # with the sitting's 3 hours below: once a sitting, never twice
+wait = "15m"              # someone else in view, or a talk: once they go, while still focused
+
+[[while]]                 # once a sitting: inside its first 3 hours, so a second focus in the
+topic = "room/activity"   # same sitting always falls in the cooldown of the first word. A
+field = "sitting_s"       # gap over 2 minutes is a new sitting (sitting_s from 0).
+below = 10800
+
+[[while]]                 # nobody else in view: never said in front of others
+topic = "humans/faces/tracked"
+faces_at_most = 1
+for = "1m"
+
+[[while]]                 # the lamp itself has not spoken for 30 s: not on top of its own last words
+topic = "voice/state"
+field = "state"
+not_equals = "speaking"
+for = "30s"
+
+[[while]]                 # never while they talk, or in the middle of a conversation
+topic = "voice/state"
+field = "state"
+equals = "resting"
+for = "5s"                # nothing heard or said for 5 s, as Welcome back waits (#1140)
+
+[active]                  # in the day
+from = "09:00"
+to = "20:00"
+
+[quiet]                   # never at night
+from = "22:00"
+to = "08:00"
+
+# One nudge an hour between the wellbeing skills.
+[budget]
+group = "wellbeing"
+per_hour = 1
+
+# Two words in a row nobody noticed (no look up, no move, nothing heard,
+# within a minute): it rests until the next morning, as the other wellbeing
+# nudges do.
+[rest]
+after_ignored = 2
+
+# The wellbeing skills' one function (#1685): it stops the one that came
+# last, or with all, every one. The model is told the `about` of the first
+# wellbeing skill in folder order (A comfort break's on a product lamp); this
+# one says the same as A meal check's and Sit back's (512 bytes at most, so
+# it names no warm word of its own); the function still stops the last one.
+[stop]
+tool = "wellbeing_nudges"
+about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, a word to take a short break, a mealtime question, a word to sit back, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them. Never a reminder they set ('stop reminding me to drink water'): that is cancel_reminder."
+
+[ask]
+policy = "nudge"
+
+[[do]]
+on = "focused"
+body = { look_at = "face" }
+say = "They have been quietly focused on their work for a good while. In one short, warm line of a few words, the way a friend would, say you noticed and it's nicely done. Only that: ask nothing of them and suggest nothing to do, and say nothing about their body or looks, the time, or health."
+
+# With LAMP_NUDGES_PRESENT=on (#5207, off unless set): the wellbeing
+# group's two an hour, never within 30 minutes of each other, which
+# Sip of water and Comfort break name too (a group keeps its quietest).
+[present.budget]
+group = "wellbeing"
+per_hour = 2
+gap = "30m"
+give_back_unsaid = true   # a nudge that said nothing (expired unheard) gives its place back
