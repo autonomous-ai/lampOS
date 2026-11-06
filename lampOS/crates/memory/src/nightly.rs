@@ -60,6 +60,21 @@ pub const WITHIN_DAYS: u32 = 60;
 pub const MAX_ITEMS: u64 = 512;
 /// Pending nightly jobs of one person.
 pub const MAX_PENDING: u64 = 8;
+/// The kinds that fade: an episode, a feeling or a pattern is a day's
+/// detail, not a lasting fact, so it ages out unused and gives way at
+/// [`MAX_ITEMS`] (the Reviewer-lead's P2 on #5097). Facts, profile lines
+/// and ahead items keep their own lifetimes.
+pub const FADING: [&str; 3] = ["episode", "feeling", "pattern"];
+/// A fading item lives this many days after its last use: written,
+/// returned by a search or recall, or, for a pattern, seen again. Tiers'
+/// 90 days without a recall before an episode's detail fades
+/// (`docs/memory-tiers.md`).
+pub const FADE_DAYS: u64 = 90;
+/// A fading item that may age out or give way, as a condition on
+/// `nightly_items n JOIN entries e ON e.rid=n.rid`: live, cited by no
+/// live entry (a profile line resting on it keeps it), and resting on no
+/// kept thing, directly or through an item (the person asked for that).
+const FADES: &str = "n.kind IN ('episode','feeling','pattern') AND e.active=1 AND NOT EXISTS (SELECT 1 FROM sources s JOIN entries c ON c.rid=s.child WHERE s.parent=e.rid AND c.active=1) AND NOT EXISTS (SELECT 1 FROM sources s JOIN entries p ON p.rid=s.parent WHERE s.child=e.rid AND (p.kind='kept' OR EXISTS (SELECT 1 FROM sources s2 JOIN entries q ON q.rid=s2.parent WHERE s2.child=p.rid AND q.kind='kept')))";
 pub const PROFILE_KINDS: [&str; 7] = [
     "identity",
     "relationship",
@@ -1110,7 +1125,17 @@ impl Days {
                 };
                 let written = match checked {
                     Ok(item) => write(&tx, &mut apply, item, now)?,
-                    Err(reason) => Err(reason),
+                    Err(reason) => {
+                        // A pattern seen again, on new days, is re-confirmed:
+                        // the live one it restates is used now.
+                        if *kind == "pattern"
+                            && reason == "restates"
+                            && let Some(text) = item.get("text").and_then(Value::as_str)
+                        {
+                            seen_again(&tx, person, text, now)?;
+                        }
+                        Err(reason)
+                    }
                 };
                 match written {
                     Ok(id) => {
@@ -1144,7 +1169,7 @@ impl Days {
     /// `from` to `to` by the item's day: at most `limit` and `max_bytes`
     /// of text, for `search`/`recall` with `nightly:true`.
     pub fn nightly_find(
-        &self,
+        &mut self,
         person: &Person,
         query: Option<&str>,
         second: bool,
@@ -1192,6 +1217,15 @@ impl Days {
             room -= size;
             found.push(item);
         }
+        // What a search or recall returns is used: it does not fade.
+        let tx = self.db.transaction()?;
+        for item in &found {
+            tx.execute(
+                "UPDATE entries SET used_unix_ms=max(used_unix_ms,?3) WHERE person=?1 AND id=?2",
+                params![person.as_str(), item["id"].as_u64(), self.now],
+            )?;
+        }
+        tx.commit()?;
         Ok(found)
     }
 
@@ -1219,18 +1253,25 @@ fn write(
     let today = Day::at(now, apply.local)
         .ok_or_else(|| Error::new("bad_time", "the timestamp is outside 1970 through 9999"))?
         .to_string();
-    let items: u64 = tx.query_row(
-        "SELECT count(*) FROM nightly_items n JOIN entries e ON e.rid=n.rid WHERE n.person=?1 AND e.active=1 AND (n.expires IS NULL OR n.expires>=?2)",
-        params![person.as_str(), today],
-        |r| r.get(0),
-    )?;
-    let observations: u64 = tx.query_row(
-        "SELECT count(*) FROM entries WHERE person=? AND kind='observation' AND coalesce(category,'')!='talk'",
-        [person.as_str()],
-        |r| r.get(0),
-    )?;
-    if items >= MAX_ITEMS || observations >= crate::days::MAX_OBSERVATIONS {
-        return Ok(Err("full"));
+    // At a cap, the least used fading item of an earlier night gives way
+    // ([`FADES`]), so a new item is never starved; with none, `full`.
+    loop {
+        let items: u64 = tx.query_row(
+            "SELECT count(*) FROM nightly_items n JOIN entries e ON e.rid=n.rid WHERE n.person=?1 AND e.active=1 AND (n.expires IS NULL OR n.expires>=?2)",
+            params![person.as_str(), today],
+            |r| r.get(0),
+        )?;
+        let observations: u64 = tx.query_row(
+            "SELECT count(*) FROM entries WHERE person=? AND kind='observation' AND coalesce(category,'')!='talk'",
+            [person.as_str()],
+            |r| r.get(0),
+        )?;
+        if items < MAX_ITEMS && observations < crate::days::MAX_OBSERVATIONS {
+            break;
+        }
+        if !give_way(tx, apply)? {
+            return Ok(Err("full"));
+        }
     }
     if item.kind == "profile" {
         let (lines, changes, adds) = allowance(tx, person, &apply.night)?;
@@ -1321,6 +1362,59 @@ fn write(
     Ok(Ok(id))
 }
 
+/// At a cap: erases the person's least used fading item ([`FADES`]) of an
+/// earlier night that this job did not give, so nothing written tonight or
+/// cited by tonight's items goes. False when there is none.
+fn give_way(tx: &Transaction<'_>, apply: &mut Apply<'_>) -> Result<bool> {
+    let given = serde_json::to_string(&apply.existing_ids).unwrap_or_else(|_| "[]".into());
+    let found: Option<(i64, String)> = tx
+        .query_row(
+            &format!(
+                "SELECT e.rid,e.text FROM nightly_items n JOIN entries e ON e.rid=n.rid WHERE n.person=?1 AND n.night!=?2 AND e.id NOT IN (SELECT value FROM json_each(?3)) AND {FADES} ORDER BY e.used_unix_ms,e.at_unix_ms,e.id LIMIT 1"
+            ),
+            params![apply.person.as_str(), apply.night, given],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .optional()?;
+    let Some((rid, text)) = found else {
+        return Ok(false);
+    };
+    tx.execute("DELETE FROM doomed", [])?;
+    tx.execute("INSERT INTO doomed(rid) VALUES(?)", [rid])?;
+    crate::days::erase(tx)?;
+    tx.execute("DELETE FROM doomed", [])?;
+    if let Some(at) = apply.kept.iter().position(|kept| *kept == text) {
+        apply.kept.remove(at);
+    }
+    Ok(true)
+}
+
+/// A pattern proposed again that restates a live one of the person's: the
+/// live one is re-confirmed, used `now`, so it does not fade.
+fn seen_again(tx: &Transaction<'_>, person: &Person, text: &str, now: u64) -> Result<()> {
+    let proposal = tidy::Proposal {
+        text: text.into(),
+        category: tidy::Category::Preference,
+        source_ids: vec![],
+        supersedes: None,
+        on: None,
+        replaces: None,
+    };
+    let live: Vec<(u64, String)> = tx
+        .prepare("SELECT e.id,e.text FROM nightly_items n JOIN entries e ON e.rid=n.rid WHERE n.person=?1 AND n.kind='pattern' AND e.active=1")?
+        .query_map([person.as_str()], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    for (id, pattern) in live {
+        if tidy::restates(&proposal, &[pattern]) {
+            tx.execute(
+                "UPDATE entries SET used_unix_ms=max(used_unix_ms,?3) WHERE person=?1 AND id=?2",
+                params![person.as_str(), id, now],
+            )?;
+        }
+    }
+    Ok(())
+}
+
 /// A forget's nightly items: every item citing anything going, again for
 /// what that takes (a profile line citing a forgotten fact), with its
 /// versions; and, past their exchanges' expiry, an item sharing a source
@@ -1362,14 +1456,20 @@ fn marked(tx: &rusqlite::Connection, person: &Person, day: &str, at: u64) -> Res
     )?)
 }
 
-/// Expiry (`maintain`): an item whose end day is before `today` joins the
-/// doomed rows, with the items citing it; nightly jobs older than a day, and night allowances of
+/// Expiry (`maintain`): an item whose end day is before `today`, or a
+/// fading one unused for [`FADE_DAYS`], joins the doomed rows, with the
+/// items citing it; nightly jobs older than a day, and night allowances of
 /// days long gone, go; and forget marks of days before `oldest`, the first
 /// day whose exchanges are still kept.
 pub(crate) fn expire(tx: &Transaction<'_>, today: &str, oldest: &str, now: u64) -> Result<()> {
     tx.execute(
         "INSERT OR IGNORE INTO doomed SELECT rid FROM nightly_items WHERE expires IS NOT NULL AND expires<?",
         [today],
+    )?;
+    // A fading item unused for [`FADE_DAYS`] ages out ([`FADES`]).
+    tx.execute(
+        &format!("INSERT OR IGNORE INTO doomed SELECT n.rid FROM nightly_items n JOIN entries e ON e.rid=n.rid WHERE e.used_unix_ms<?1 AND {FADES}"),
+        [now.saturating_sub(FADE_DAYS * DAY_MS)],
     )?;
     // What cites an item that closes goes with it (a profile line citing a
     // plan fact), as Tiers drops a line whose fact is gone; an exchange that
@@ -1825,6 +1925,220 @@ mod tests {
         );
         assert_eq!(got["accepted"]["fact"], 1, "{got}");
         assert_eq!(got["reasons"], json!({}), "{got}");
+    }
+
+    /// A live nightly item of Mai's of `kind`, written and last used at
+    /// `at`, on that night: its rid.
+    fn put(s: &mut Scratch, kind: &str, id: u64, at: u64) -> i64 {
+        let day = Day::at(at, &crate::store::LocalTime::Offset(0))
+            .unwrap()
+            .to_string();
+        s.1.db
+            .execute(
+                "INSERT INTO entries(person,id,kind,at_unix_ms,day,heard,said,text,category,used_unix_ms,active) VALUES(?1,?2,'observation',?3,?4,'','',?5,?6,?3,1)",
+                params![MAI, id, at, day, format!("Old {kind} {id}."), kind],
+            )
+            .unwrap();
+        let rid = s.1.db.last_insert_rowid();
+        s.1.db
+            .execute(
+                "INSERT INTO nightly_items(rid,person,kind,night,expires,detail) VALUES(?1,?2,?3,?4,NULL,'{}')",
+                params![rid, MAI, kind, day],
+            )
+            .unwrap();
+        rid
+    }
+
+    fn live(s: &Scratch) -> u64 {
+        s.1.db
+            .query_row(
+                "SELECT count(*) FROM nightly_items n JOIN entries e ON e.rid=n.rid WHERE e.active=1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap()
+    }
+
+    #[test]
+    fn at_the_cap_a_new_item_gets_in_and_the_least_used_fading_one_goes() {
+        let mut s = Scratch::new("give-way");
+        let said = s.say(NOW, "I work at the city library now.", "Nice.");
+        let input = s.prepare(NOW, NOW + 10);
+        put(&mut s, "episode", 2_000_000, NOW - 50 * DAY_MS);
+        put(&mut s, "feeling", 2_000_001, NOW - 10 * DAY_MS);
+        let filler = fill(&mut s, MAX_ITEMS - 2);
+        assert_eq!(live(&s), MAX_ITEMS);
+        let got = s.apply(
+            &input["input"]["job"],
+            json!({"facts":[{"kind":"work","claim":"Works at the city library.","cites":[said]}]}),
+            false,
+            NOW + 20,
+        );
+        assert_eq!(got["accepted"]["fact"], 1, "{got}");
+        assert_eq!(got["reasons"], json!({}), "{got}");
+        assert_eq!(s.active(2_000_000), None, "the least used episode gave way");
+        assert_eq!(s.active(2_000_001), Some(true));
+        assert!(filler.iter().all(|id| s.active(*id) == Some(true)));
+        assert_eq!(live(&s), MAX_ITEMS);
+    }
+
+    #[test]
+    fn a_kept_thing_and_what_rests_on_it_never_give_way_or_fade() {
+        let mut s = Scratch::new("give-way-kept");
+        let person = Person::new(MAI).unwrap();
+        let kept =
+            s.1.remember(
+                &person,
+                NOW - 60 * DAY_MS,
+                "remember my locker code is 4412",
+            )
+            .unwrap();
+        let kept_rid: i64 =
+            s.1.db
+                .query_row(
+                    "SELECT rid FROM entries WHERE person=? AND id=?",
+                    params![MAI, kept],
+                    |r| r.get(0),
+                )
+                .unwrap();
+        let resting = put(&mut s, "episode", 2_000_000, NOW - 60 * DAY_MS);
+        s.1.db
+            .execute(
+                "INSERT INTO sources(child,parent) VALUES(?1,?2)",
+                params![resting, kept_rid],
+            )
+            .unwrap();
+        put(&mut s, "episode", 2_000_001, NOW - 10 * DAY_MS);
+        fill(&mut s, MAX_ITEMS - 2);
+        let said = s.say(NOW, "I work at the city library now.", "Nice.");
+        let input = s.prepare(NOW, NOW + 10);
+        let got = s.apply(
+            &input["input"]["job"],
+            json!({"facts":[{"kind":"work","claim":"Works at the city library.","cites":[said]}]}),
+            false,
+            NOW + 20,
+        );
+        assert_eq!(got["accepted"]["fact"], 1, "{got}");
+        assert_eq!(s.active(2_000_001), None, "the unkept episode gave way");
+        assert_eq!(s.active(2_000_000), Some(true), "never the kept one's");
+        // Nothing else may give way: the next is `full`.
+        let more = s.say(NOW + DAY_MS, "I bike to the library.", "Nice.");
+        let input = s.prepare(NOW + DAY_MS, NOW + DAY_MS + 10);
+        let got = s.apply(
+            &input["input"]["job"],
+            json!({"facts":[{"kind":"travel","claim":"Bikes to the library.","cites":[more]}]}),
+            false,
+            NOW + DAY_MS + 20,
+        );
+        assert_eq!(got["reasons"], json!({"full":1}), "{got}");
+        s.1.maintain(NOW + 400 * DAY_MS).unwrap();
+        assert_eq!(s.active(2_000_000), Some(true), "nor does it fade");
+        assert_eq!(s.active(kept), Some(true));
+    }
+
+    #[test]
+    fn an_unused_episode_fades_and_a_recalled_one_stays() {
+        let mut s = Scratch::new("fade");
+        let ids = day(&mut s, NOW);
+        let input = s.prepare(NOW, NOW + 10);
+        let got = s.apply(
+            &input["input"]["job"],
+            json!({"episodes":[
+                {"first":ids[0],"last":ids[1],"topic":"library","gist":"Mai's new library job and Lan's visit."},
+                {"first":ids[2],"last":ids[2],"topic":"trip","gist":"Mai is excited about the trip."}
+            ]}),
+            false,
+            NOW + 20,
+        );
+        assert_eq!(got["accepted"]["episode"], 2, "{got}");
+        let (recalled, unused) = (
+            got["ids"][0].as_u64().unwrap(),
+            got["ids"][1].as_u64().unwrap(),
+        );
+        let found = s.ask(
+            json!({"op":"recall","person":MAI,"query":"library","nightly":true}),
+            NOW + 60 * DAY_MS,
+        );
+        assert!(
+            found["nightly"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|i| i["id"] == recalled),
+            "{found}"
+        );
+        s.1.maintain(NOW + (FADE_DAYS - 1) * DAY_MS).unwrap();
+        assert_eq!(s.active(unused), Some(true), "not yet {FADE_DAYS} days");
+        s.1.maintain(NOW + (FADE_DAYS + 1) * DAY_MS).unwrap();
+        assert_eq!(s.active(unused), None, "unused for {FADE_DAYS} days");
+        assert_eq!(s.active(recalled), Some(true), "recalled on day 60");
+        s.1.maintain(NOW + (60 + FADE_DAYS + 1) * DAY_MS).unwrap();
+        assert_eq!(s.active(recalled), None, "and {FADE_DAYS} days after");
+    }
+
+    #[test]
+    fn a_pattern_seen_again_stays_and_one_not_seen_fades() {
+        let mut s = Scratch::new("fade-pattern");
+        let first = s.say(NOW - DAY_MS, "I went running this morning.", "Nice.");
+        let input = s.prepare(NOW - DAY_MS, NOW);
+        let fact = s.apply(
+            &input["input"]["job"],
+            json!({"facts":[{"kind":"habit","claim":"Went running in the morning.","cites":[first]}]}),
+            false,
+            NOW,
+        )["ids"][0]
+            .as_u64()
+            .unwrap();
+        let pattern = json!({"text":"Goes running most mornings."});
+        let propose = |s: &mut Scratch, at: u64| {
+            let run = s.say(at, "I went running again this morning.", "Nice.");
+            let input = s.prepare(at, at + 10);
+            let mut item = pattern.clone();
+            item["cites"] = json!([run, fact]);
+            s.apply(
+                &input["input"]["job"],
+                json!({"patterns":[item]}),
+                true,
+                at + 20,
+            )
+        };
+        let got = propose(&mut s, NOW);
+        assert_eq!(got["accepted"]["pattern"], 1, "{got}");
+        let kept = got["ids"][0].as_u64().unwrap();
+        let again = propose(&mut s, NOW + 60 * DAY_MS);
+        assert_eq!(again["reasons"], json!({"restates":1}), "{again}");
+        s.1.maintain(NOW + (FADE_DAYS + 1) * DAY_MS).unwrap();
+        assert_eq!(s.active(kept), Some(true), "re-confirmed on day 60");
+        s.1.maintain(NOW + (60 + FADE_DAYS + 1) * DAY_MS).unwrap();
+        assert_eq!(s.active(kept), None, "not seen again since");
+    }
+
+    #[test]
+    fn with_the_switch_off_nothing_fades_or_gives_way() {
+        // No pass ran: the store's own rules hold as before, and no nightly
+        // row is made by maintain or a search.
+        let mut s = Scratch::new("fade-off");
+        let person = Person::new(MAI).unwrap();
+        let kept =
+            s.1.remember(&person, NOW, "remember my locker code is 4412")
+                .unwrap();
+        let said = s.say(NOW, "I work at the city library now.", "Nice.");
+        let plain = s.ask(
+            json!({"op":"search","person":MAI,"query":"locker"}),
+            NOW + 1,
+        );
+        s.1.maintain(NOW + (FADE_DAYS + 1) * DAY_MS).unwrap();
+        assert_eq!(s.active(kept), Some(true));
+        assert_eq!(s.active(said), None, "an exchange still goes at 30 days");
+        let after = s.ask(
+            json!({"op":"search","person":MAI,"query":"locker"}),
+            NOW + (FADE_DAYS + 1) * DAY_MS,
+        );
+        assert_eq!(
+            plain["entries"].as_array().map(Vec::len),
+            after["entries"].as_array().map(Vec::len)
+        );
+        assert_eq!(live(&s), 0);
     }
 
     #[test]

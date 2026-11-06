@@ -873,7 +873,10 @@ item checked alone, a bad one dropped and counted: Tiers' kinds and rules
 No health, money or other person's private matter is kept unless the
 person asked the lamp to remember it. Profile lines join the session
 note's preferences; the rest are found by `search` and `recall` with
-`nightly:true`. Nothing is spoken or shown. Any forget a person asks
+`nightly:true`. Episodes, feelings and patterns fade after 90 days
+unused (found by a search or recall, or a pattern seen again, is use), and
+at the 512-item cap the least used of them gives way to a new item, never
+one resting on a kept thing. Nothing is spoken or shown. Any forget a person asks
 (`forget`, `forget_last`, `forget {about}` found or not) marks the day, and
 the night passes over their exchanges of that day said before it and the
 forget's own turn, so a line said, never kept and asked to be forgotten is
