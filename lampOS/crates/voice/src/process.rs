@@ -1225,6 +1225,11 @@ fn worker_command(
             role,
             var(crate::made_skill::READS_ENVIRONMENT).as_deref(),
         ))
+        .envs(onboarding_worker_environment(
+            role,
+            var(crate::onboarding::ENVIRONMENT).as_deref(),
+            var(crate::onboarding::FILE_ENVIRONMENT).as_deref(),
+        ))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -1433,6 +1438,32 @@ fn keep_quietly_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::keep_quietly::ENVIRONMENT, "on"))
+}
+
+// The setup walk's file (`LAMP_ONBOARDING`, `LAMP_ONBOARDING_FILE`), to the
+// second route alone: a held setup face save it drops or takes posts the
+// walk's let-go there (`second_provider::let_the_walk_go`). Cleared like
+// every other switch, it never reached the worker, so on lamp-52e6 the step
+// waited out the whole hold after a drop (Fifth's row 6 on 10441, #5139).
+// Only as the walk itself reads it: the exact `on` and an absolute path.
+fn onboarding_worker_environment(
+    role: &str,
+    switch: Option<&std::ffi::OsStr>,
+    file: Option<&std::ffi::OsStr>,
+) -> Vec<(&'static str, std::ffi::OsString)> {
+    if role != "second" {
+        return Vec::new();
+    }
+    let Some(file) = crate::onboarding::switched_on(
+        switch.and_then(std::ffi::OsStr::to_str),
+        file.and_then(std::ffi::OsStr::to_str),
+    ) else {
+        return Vec::new();
+    };
+    vec![
+        (crate::onboarding::ENVIRONMENT, "on".into()),
+        (crate::onboarding::FILE_ENVIRONMENT, file.into_os_string()),
+    ]
 }
 
 // A correction replacing a kept thing (#2510), passed the same narrow way:
@@ -3067,6 +3098,64 @@ mod tests {
         let written = std::fs::read_to_string(home.path.join("env-provider.txt")).unwrap();
         let got = given(&written);
         assert!(got.is_empty(), "the child got {:?}", names(&got));
+    }
+
+    /// The setup walk's file reaches the second worker, and only it: a held
+    /// setup face save dropped there lets the walk go at once. Without it,
+    /// lamp-52e6 journalled the drop at 08:02:39 and the step closed only
+    /// when the 45 s hold ran out at 08:03:14 (Fifth's row 6 on 10441, #5139).
+    #[test]
+    fn the_second_worker_is_given_the_setup_walks_file() {
+        use std::os::unix::fs::PermissionsExt;
+        let home = SessionDirectory::create().unwrap();
+        let script = home.path.join("worker.sh");
+        std::fs::write(&script, "#!/bin/sh\n/usr/bin/env > \"$3/env-$2.txt\"\n").unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let boot = new_boot().unwrap();
+        let walk = "/var/lib/lamp-voice/onboarding.json";
+        let given = |role: &str, switch: &'static str, file: &'static str| -> Vec<String> {
+            let status = status_of_fresh(&mut worker_command(
+                &script,
+                &home.path,
+                role,
+                (boot, boot),
+                &[],
+                |name| {
+                    if name == crate::onboarding::ENVIRONMENT {
+                        Some(switch.into())
+                    } else if name == crate::onboarding::FILE_ENVIRONMENT {
+                        Some(file.into())
+                    } else {
+                        None
+                    }
+                },
+            ));
+            assert!(status.success(), "{role}");
+            std::fs::read_to_string(home.path.join(format!("env-{role}.txt")))
+                .unwrap()
+                .lines()
+                .filter(|line| line.starts_with("LAMP_ONBOARDING"))
+                .map(str::to_owned)
+                .collect()
+        };
+        let mut got = given("second", "on", walk);
+        got.sort_unstable();
+        assert_eq!(
+            got,
+            [
+                "LAMP_ONBOARDING=on".to_owned(),
+                format!("LAMP_ONBOARDING_FILE={walk}")
+            ]
+        );
+        for role in ["provider", "privacy", "ring", "speaker"] {
+            assert!(given(role, "on", walk).is_empty(), "{role}");
+        }
+        assert!(given("second", "off", walk).is_empty(), "off");
+        assert!(
+            given("second", "on", "onboarding.json").is_empty(),
+            "relative"
+        );
+        assert!(given("second", "on", "").is_empty(), "empty");
     }
 
     /// `LAMP_PRIVACY_CONTROLS=no-slide`: the privacy worker's environment is
