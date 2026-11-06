@@ -582,3 +582,7 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   (the lampos-promote notes test failed 14/1). Then READ-OK cb9887da49:
   install 152/0, and putting either switch back fails the pins. Now on
   NEXT TRAIN as the candidate.
+- 11:4x: #5486 HOLD 13c98a8a83, concurring with the Reviewer-lead. The
+  played PASS never showed NEWER_FIRST's `earlier` or STRENGTH's `maybe`
+  working. PROFILE stands. My watcher missed Friday's 11:04 ask until
+  11:29.
