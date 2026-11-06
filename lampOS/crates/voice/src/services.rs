@@ -1176,7 +1176,8 @@ impl Linked {
     }
 
     /// The services linked when `lamp-services` last said, by name, each
-    /// once; none until it first answers.
+    /// once; none until it first answers, and none after an ask it answered
+    /// with no list ([`names_after`]).
     pub fn names(&self) -> Vec<String> {
         self.names
             .lock()
@@ -1211,7 +1212,7 @@ impl Linked {
                     linked.kept(any);
                 }
                 if let Ok(mut kept) = linked.names.lock() {
-                    *kept = names_after(told.as_ref(), &kept);
+                    *kept = names_after(told.as_ref());
                 }
                 if let Ok(mut asked) = linked.asked.lock() {
                     asked.1 = false;
@@ -1276,9 +1277,11 @@ fn any_linked(told: &Value) -> Option<bool> {
 }
 
 /// The names told after an ask (`LAMP_SERVICES_TOLD`): the answer's list,
-/// [`names_in`].
-fn names_after(told: Option<&Value>, kept: &[String]) -> Vec<String> {
-    told.and_then(names_in).unwrap_or_else(|| kept.to_vec())
+/// [`names_in`], and none when it gives no list (an error, busy, no
+/// socket), so a link just removed is never told while `lamp-services`
+/// can't say (#5598).
+fn names_after(told: Option<&Value>) -> Vec<String> {
+    told.and_then(names_in).unwrap_or_default()
 }
 
 /// From [`CONNECTED`]'s answer: each service linked by its name as
@@ -1361,17 +1364,16 @@ mod tests {
     }
 
     /// The Reviewer-lead's P3 on #5598: an error or no answer from
-    /// `lamp-services` tells no names, not the last ones, so a link just
+    /// `lamp-services` tells no names, not the last ones told, so a link just
     /// removed is never told while it can't say.
     #[test]
     fn no_names_are_told_while_lamp_services_cannot_say() {
-        let kept = vec!["Notion".to_owned()];
         let listed = json!({"ok": true, "result": {"connected": [
             {"service": "figma", "name": "Figma", "account": "c", "expired": false},
         ]}});
-        assert_eq!(names_after(Some(&listed), &kept), vec!["Figma".to_owned()]);
-        assert!(names_after(Some(&json!({"ok": false, "error": "busy"})), &kept).is_empty());
-        assert!(names_after(None, &kept).is_empty());
+        assert_eq!(names_after(Some(&listed)), vec!["Figma".to_owned()]);
+        assert!(names_after(Some(&json!({"ok": false, "error": "busy"}))).is_empty());
+        assert!(names_after(None).is_empty());
     }
 
     /// What is linked, by code, from `lamp-services`' own answer; none
