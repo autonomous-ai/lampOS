@@ -28,26 +28,28 @@ What it says and when:
   look up, it waits until they have been gone a minute, for up to five
   minutes while the 10 minutes last, and then speaks, or lets it go.
 - Never in the middle of a conversation, or while you talk.
-- It keeps out of the wellbeing nudges' hour (A comfort break, A sip of
-  water, Rest your eyes, Sit back, Stand up, Stretch break, Wind down): it
-  never takes one of their turns. What it can't do: it can't keep 30
-  minutes away from one of them, so its word can come soon after a nudge,
-  or a nudge soon after it.
+- It is one of the wellbeing nudges (this, A comfort break, A meal check,
+  A sip of water, Rest your eyes, Sit back, Stand up, Stretch break and
+  Wind down), and shares their hour: at most one of them an hour, or in the
+  product two, never within 30 minutes of each other. That is counted from
+  when the 45 minutes come, said or not, so a nudge comes at least 30
+  minutes before its word and 20 after it.
 - If two focuses in a row pass with you neither looking up nor moving nor
   saying anything within five minutes, it rests until tomorrow morning.
-- "Stop the nudges" or "not today" to the lamp doesn't stop it: a skill
-  outside the wellbeing nudges' group can't share their stop, and a stop of
-  its own would be one more function for the lamp's voice. Turn it off, or
-  take it off, where it was installed.
+- "Not today" or "stop the nudges" to the lamp snoozes it until tomorrow
+  morning or turns it off until you ask for it again. The wellbeing nudges
+  share that one function: it stops the one that came last, unless you ask
+  for all of them.
 
 It looks at nothing but how your face sits at the desk: it takes no
 picture, never speaks of your body or looks, and keeps nothing about you,
 only, in memory, how many times it came due today and whether it is
-resting. It does not listen to what you say.
+resting; off is one line with its name. It does not listen to what you
+say.
 
 An installable skill: its owner puts it on the lamp (`lamp-skills install`)
 and takes it off. Not in the product yet.
 
 If asked about it, the lamp says something like: "When you've been deep in
 your work for a while, I'll wait till you look up and tell you it's nicely
-done."
+done. Say 'not today' and I'll stop until tomorrow."
