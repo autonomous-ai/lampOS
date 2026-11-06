@@ -137,6 +137,13 @@ pub const OTHER_VOICE: &str = "Not sent, and cancelled: I send only when the voi
 /// seen saying (`speaking_faces`, `LAMP_SECOND_SPEAKING_FACE` with
 /// `LAMP_EYES_SPEAKING`): nothing is prepared.
 pub const NOT_SEEN_SAYING: &str = "Not done: I write for the lamp's owner only when I see them say it. Say so in a few words, and ask them to face the lamp and ask again.";
+/// What the model is told of a write in the private room
+/// (`person::private_room`) with nobody in view ([`someone_in_view`]): any
+/// face will do, never compared with the owner's, but none is none.
+pub const NOBODY_IN_VIEW: &str = "Not done: I write or send for someone only when I can see a person at the lamp, and I see nobody now. Say so in a few words, and ask them to face the lamp and ask again.";
+/// What the model is told of a "send" in the private room with nobody in
+/// view: the write is cancelled, as any refused send is.
+pub const NOBODY_IN_VIEW_SEND: &str = "Not sent, and cancelled: I send only when I can see a person at the lamp, and I saw nobody as \"send\" was said. Say it was not sent, and that they can ask again facing the lamp.";
 /// What the model is told when a "send" had no voice print to compare (a
 /// line too short): the write still waits, for one more try.
 pub const NO_PRINT_YET: &str = "Not sent yet: I couldn't hear whose voice that was.";
@@ -148,6 +155,9 @@ pub const AFTER_READ: &str = "Not done: after reading from a linked service, I d
 /// What a read's answer carries when the lamp can't tell its owner is
 /// alone ([`brief`]).
 pub const BRIEF_NOTE: &str = "Someone else may be here: say only how many there are, who they are from and what they are about, never what they say.";
+/// What a read's answer carries in the private room with nobody in view
+/// ([`someone_in_view`]), in place of [`BRIEF_NOTE`].
+pub const NOBODY_IN_VIEW_NOTE: &str = "I can't see anyone at the lamp: say only how many there are, who they are from and what they are about, never what they say, and that I read them in full when they face the lamp.";
 /// What the model is told after a write is prepared.
 const READ_BACK_NEXT: &str = "Nothing is sent yet. Say read_back in full, word for word, leaving nothing out, then ask them to say \"go ahead and send it\" (in Vietnamese \"ừ, gửi đi giúp tôi\") to send it. Send only if their next words are that.";
 /// What the model is told to say once a write was sent.
@@ -538,7 +548,9 @@ pub struct Turn<'a> {
     pub alike: Option<f32>,
     /// The owner's face was seen speaking through this line
     /// (`speaking_faces`, `remember::speaker_of`): positive evidence the
-    /// owner said it, needed to prepare a write and for a full read.
+    /// owner said it, needed to prepare a write and for a full read. In the
+    /// private room (`person::private_room`), any face in view
+    /// ([`someone_in_view`]), needed also for a send.
     pub seen_owner: bool,
     /// Another face than the owner's was seen speaking through this line.
     pub other_seen: bool,
@@ -633,7 +645,12 @@ pub fn gate(
         // same one: a write is prepared only for a line the owner's face
         // was seen saying.
         if !turn.seen_owner {
-            return Err(json!({ "error": NOT_SEEN_SAYING }));
+            let why = if crate::person::private_room() {
+                NOBODY_IN_VIEW
+            } else {
+                NOT_SEEN_SAYING
+            };
+            return Err(json!({ "error": why }));
         }
         return Ok(call);
     };
@@ -695,6 +712,11 @@ pub fn gate(
     // The voice says the "send" is the one that asked, which the owner's
     // face was seen saying: a known other voice, or another face seen
     // speaking it, cancels it; no print yet keeps it for one more try.
+    // In the private room, a face in view as "send" is said, or nothing is
+    // sent: the read-back's face may have gone, and a TV may say "send".
+    if crate::person::private_room() && !turn.seen_owner {
+        return Err(json!({ "error": NOBODY_IN_VIEW_SEND }));
+    }
     match turn.alike {
         _ if turn.other_seen => return Err(json!({ "error": OTHER_VOICE })),
         Some(alike) if alike >= crate::same_voice::SERVICES_SAME_FROM => {}
@@ -835,9 +857,22 @@ fn owner_alone() -> bool {
     crate::known_faces::most_faces_lately() == Some(1)
 }
 
+/// Whether the eyes see any face now (`known_faces::most_faces_lately`),
+/// whoever's, however many: the private room's one check that a person,
+/// not a TV, a call or a recording, is at the lamp (the PM's 17:40 rule on
+/// #5553). No mouth read, no comparison with the owner; no count is nobody.
+fn someone_in_view() -> bool {
+    #[cfg(test)]
+    if let Some(seen) = IN_VIEW_FOR_TEST.with(std::cell::Cell::get) {
+        return seen;
+    }
+    crate::known_faces::most_faces_lately().is_some_and(|faces| faces > 0)
+}
+
 #[cfg(test)]
 thread_local! {
     static ALONE_FOR_TEST: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+    static IN_VIEW_FOR_TEST: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
 /// Whether a read is said in full: the owner's face seen saying the line
@@ -1032,7 +1067,7 @@ pub fn run(
         );
     }
     let (seen_owner, other_seen) = if private_room {
-        (heard, false)
+        (heard && someone_in_view(), false)
     } else {
         owner
             .as_deref()
@@ -1098,9 +1133,17 @@ pub fn run(
             }
             // In full only to the owner alone in view, in the
             // conversation's voice; on the Live route, never. In the
-            // private room always in full, with no voice asked and no wait
-            // for a print ([`PRINT_WAIT`]).
-            if !private_room {
+            // private room in full to any face in view, with no voice asked
+            // and no wait for a print ([`PRINT_WAIT`]); with nobody in
+            // view, brief, saying why.
+            if private_room {
+                if !seen_owner {
+                    brief(&mut told);
+                    if told.get("others_here").is_some() {
+                        told["others_here"] = json!(NOBODY_IN_VIEW_NOTE);
+                    }
+                }
+            } else {
                 let alone = owner_alone();
                 let likeness = judge.as_ref().filter(|_| alone).and_then(|judge| {
                     judged(
@@ -1921,6 +1964,48 @@ mod tests {
         assert!(gate(&mut pending, &write, 10, &heard("email Bob", 9), now).is_ok());
     }
 
+    /// The private room (the PM's 17:40 rule on #5553): any face in view
+    /// lets a write be prepared and sent; with nobody in view, neither, and
+    /// the model is told why in plain words. Off, as before.
+    #[test]
+    fn the_private_room_writes_and_sends_only_with_a_face_in_view() {
+        let now = Instant::now();
+        let write = call(WRITE, json!({"service":"gmail","action":"send_mail"}));
+        let nobody = |words, previous| Turn {
+            seen_owner: false,
+            ..heard(words, previous)
+        };
+        crate::person::set_private_room_for_test(Some(true));
+        let mut pending = None;
+        let refused = gate(&mut pending, &write, 10, &nobody("email Bob", 9), now);
+        assert_eq!(refused.unwrap_err()["error"], NOBODY_IN_VIEW);
+        assert!(gate(&mut pending, &write, 10, &heard("email Bob", 9), now).is_ok());
+        let mut pending = waiting(now);
+        let refused = gate(
+            &mut pending,
+            &send("s1"),
+            11,
+            &nobody("send it", 10),
+            at(now),
+        );
+        assert_eq!(refused.unwrap_err()["error"], NOBODY_IN_VIEW_SEND);
+        assert_eq!(pending, None, "cancelled");
+        let mut pending = waiting(now);
+        let sent = gate(
+            &mut pending,
+            &send("s1"),
+            11,
+            &heard("send it", 10),
+            at(now),
+        );
+        assert_eq!(sent.unwrap().args["said"], "send");
+        crate::person::set_private_room_for_test(Some(false));
+        let mut pending = None;
+        let refused = gate(&mut pending, &write, 10, &nobody("email Bob", 9), now);
+        assert_eq!(refused.unwrap_err()["error"], NOT_SEEN_SAYING);
+        crate::person::set_private_room_for_test(None);
+    }
+
     #[test]
     fn the_live_route_never_prepares_or_sends() {
         let now = Instant::now();
@@ -2313,10 +2398,11 @@ mod tests {
         crate::person::set_private_room_for_test(None);
     }
 
-    /// The private room (P2 on #5553): a read heard at the lamp is said in
-    /// full with no voice asked of the second route, so it never waits
-    /// [`PRINT_WAIT`] for a print the room ignores, even with one face in
-    /// view and a judge that knows no print.
+    /// The private room (P2 on #5553): a read heard at the lamp with a face
+    /// in view is said in full with no voice asked of the second route, so
+    /// it never waits [`PRINT_WAIT`] for a print the room ignores, even with
+    /// a judge that knows no print; with nobody in view, it is brief and
+    /// says why (the PM's 17:40 rule).
     #[test]
     fn a_private_room_read_asks_no_voice_and_does_not_wait() {
         use std::io::{BufRead, BufReader, Write};
@@ -2346,22 +2432,26 @@ mod tests {
         }));
         crate::person::set_private_room_for_test(Some(true));
         ALONE_FOR_TEST.with(|alone| alone.set(Some(true)));
+        IN_VIEW_FOR_TEST.with(|seen| seen.set(Some(true)));
+        let read = call(READ, json!({"service":"gmail","what":"recent"}));
         let began = Instant::now();
-        let (told, answered) = run(
-            &folder,
-            &call(READ, json!({"service":"gmail","what":"recent"})),
-            7_001,
-            true,
-            None,
-        );
+        let (told, answered) = run(&folder, &read, 7_001, true, None);
         let took = began.elapsed();
+        // Nobody in view (the PM's 17:40 rule): brief, saying why.
+        IN_VIEW_FOR_TEST.with(|seen| seen.set(Some(false)));
+        let (unseen, unseen_answered) = run(&folder, &read, 7_002, true, None);
         crate::person::set_private_room_for_test(None);
         ALONE_FOR_TEST.with(|alone| alone.set(None));
+        IN_VIEW_FOR_TEST.with(|seen| seen.set(None));
         assert!(answered, "{told}");
         assert_eq!(asked.load(std::sync::atomic::Ordering::SeqCst), 0);
         assert!(took < PRINT_WAIT, "waited {took:?}");
         assert_eq!(told["quoted"][0]["text"], "Home by 7", "in full: {told}");
         assert!(told.get("others_here").is_none(), "{told}");
+        assert!(unseen_answered, "{unseen}");
+        assert!(unseen["quoted"][0].get("text").is_none(), "brief: {unseen}");
+        assert_eq!(unseen["quoted"][0]["from"], "Ann", "{unseen}");
+        assert_eq!(unseen["others_here"], NOBODY_IN_VIEW_NOTE, "{unseen}");
         std::fs::remove_dir_all(folder).unwrap();
     }
 }
