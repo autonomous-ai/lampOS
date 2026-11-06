@@ -85,6 +85,16 @@ eligible() {
     # unsigned HOLD only on that account's READ-OK saying the HOLD is lifted); the PR is eligible on its newest READ-OK
     # when no HOLD stands.
     ok=$($PYTHON -I $TOOLS_DIR/markers.py --writers $wf $p < $cf)
+    # 6 Nov (#5534): a held PR with a READ-OK on its head is said once per head, with the HOLDs that stand (their keys,
+    # for holds-lifted.tsv), so a HOLD its reader thinks lifted shows. #5476 sat out trains 672 to 677 with both reads
+    # and no line in the log.
+    if [[ $ok == HELD ]]; then
+      note=$($PYTHON -I $TOOLS_DIR/markers.py --writers $wf --held $p < $cf)
+      if [[ -n $note && $head == ${note%% *}* ]] && ! grep -qx "$p held $head" $told; then
+        say "#$p left out: held, though a READ-OK is on head ${head:0:9}; standing: ${note#* }" >&2; echo "$p held $head" >> $told
+      fi
+      continue
+    fi
     [[ $ok == READ-OK* ]] || continue
     sha=${ok#READ-OK }; [[ -n $sha ]] || continue
     git fetch -q origin "+refs/pull/$p/head:refs/remotes/pr/$p" 2>/dev/null

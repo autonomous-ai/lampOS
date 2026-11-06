@@ -6,11 +6,11 @@
 # same account posts a READ-OK on the PR, after it, saying the HOLD is lifted or cleared. Train 546 took #5013 on
 # Fourteen's READ-OK while Seventh's "HOLD a13408fb8d…: lamp check pending" stood only on the Queue.
 # 15:4x: only writers' comments count (markers.py's --writers / LAMP_COORD_WRITERS), the marker and the lifting words
-# are markers.py's own (so `**READ-OK**` lifts and a quoted READ-OK doesn't), and LIFT_RE is the one markers.py uses.
+# are markers.py's own (so `**READ-OK**` lifts and a quoted READ-OK doesn't), and so are its lifting words (lifted_commits).
 import json, os, sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from markers import parse_marker, writers_from_args, is_writer, LIFT_RE
+from markers import parse_marker, writers_from_args, is_writer, lifted_commits, names_commit
 
 
 def standing(head, queue, comments, writers):
@@ -26,7 +26,9 @@ def standing(head, queue, comments, writers):
             if c["created_at"] <= q["created_at"] or (c.get("login") or "").lower() != q["login"].lower():
                 continue
             ck = parse_marker(c["body"])
-            if ck and ck[0] == "READ-OK" and LIFT_RE.search(c["body"].lstrip()[:400]):
+            # 6 Nov (#5534): lifting words with a full commit count; naming a commit, it must be this HOLD's.
+            lift = lifted_commits(c["body"].lstrip()[:400]) if ck and ck[0] == "READ-OK" else None
+            if lift is not None and (not lift or names_commit(mk[1], lift)):
                 lifted = True; break
         if not lifted:
             return q["created_at"]
