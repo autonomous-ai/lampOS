@@ -1032,7 +1032,7 @@ pub fn run(
         words: words.as_deref(),
         previous,
         owner: owner.as_deref(),
-        sends: private_room || judge.is_some(),
+        sends: judge.is_some(),
         alike,
         seen_owner,
         other_seen,
