@@ -969,20 +969,20 @@ fn owner<C: Clock>(
                     daemon_tries += 1;
                     match started {
                         Ok(()) => eprintln!(
-                            "tasks: Harness's daemon started after the sign-in (openharness#1463)"
+                            "tasks: Harness's daemon started (openharness#1463)"
                         ),
                         Err(code) if daemon_tries < DAEMON_START_TRIES => {
                             let after = daemon_retry_after * (1 << (daemon_tries - 1));
                             eprintln!(
-                                "tasks: Harness's daemon not started after the sign-in: {code}; \
+                                "tasks: Harness's daemon not started: {code}; \
                                  tried again in {} s",
                                 after.as_secs_f32()
                             );
                             start_daemon_due = Some(Instant::now() + after);
                         }
                         Err(code) => eprintln!(
-                            "tasks: Harness's daemon not started after the sign-in: {code}; \
-                             {daemon_tries} tries, not tried again until the next sign-in"
+                            "tasks: Harness's daemon not started: {code}; \
+                             {daemon_tries} tries, not tried again until the next sign-in or start"
                         ),
                     }
                     Ok(())

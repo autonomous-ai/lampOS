@@ -133,6 +133,22 @@ fn read(answer: &[u8]) -> Health {
     if !(status.starts_with(b"HTTP/1.1 200 ") || status.starts_with(b"HTTP/1.0 200 ")) {
         return Health::Bad("not_200");
     }
+    let chunked = head.split(|&b| b == b'\n').any(|line| {
+        let line = String::from_utf8_lossy(line).to_ascii_lowercase();
+        line.trim()
+            .strip_prefix("transfer-encoding:")
+            .is_some_and(|value| value.trim() == "chunked")
+    });
+    let whole;
+    let body = if chunked {
+        let Some(joined) = dechunk(body) else {
+            return Health::Bad("not_json");
+        };
+        whole = joined;
+        &whole[..]
+    } else {
+        body
+    };
     let Ok(value) = serde_json::from_slice::<serde_json::Value>(body) else {
         return Health::Bad("not_json");
     };
@@ -150,6 +166,27 @@ fn read(answer: &[u8]) -> Health {
         })
         .map(str::to_owned);
     Health::Ok(version)
+}
+
+/// A chunked body joined, up to its last (empty) chunk; `None` when a size
+/// isn't hex or a chunk is cut short.
+fn dechunk(mut body: &[u8]) -> Option<Vec<u8>> {
+    let mut whole = Vec::new();
+    loop {
+        let end = body.windows(2).position(|crlf| crlf == b"\r\n")?;
+        let size = std::str::from_utf8(&body[..end]).ok()?;
+        let size = size.split(';').next()?.trim();
+        let size = usize::from_str_radix(size, 16).ok()?;
+        body = &body[end + 2..];
+        if size == 0 {
+            return Some(whole);
+        }
+        if body.len() < size + 2 || &body[size..size + 2] != b"\r\n" {
+            return None;
+        }
+        whole.extend_from_slice(&body[..size]);
+        body = &body[size + 2..];
+    }
 }
 
 /// The journal line for what the health said within `within`, asking every
@@ -261,6 +298,22 @@ mod tests {
             Health::Bad("not_json")
         );
         assert_eq!(read(b"HTTP/1.1 200"), Health::Bad("no_answer"));
+    }
+
+    #[test]
+    fn a_chunked_answer_is_read_whole() {
+        // An HTTP/1.1 server may answer in chunks: on lamp-c0a4
+        // (#5379) the line said not_json though the daemon was up.
+        let chunked = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n10\r\n{\"ok\":true,\"vers\r\nE\r\nion\":\"0.5.39\"}\r\n0\r\n\r\n";
+        assert_eq!(read(chunked), Health::Ok(Some("0.5.39".into())));
+        let upper =
+            b"HTTP/1.1 200 OK\r\ntransfer-encoding: Chunked\r\n\r\nB\r\n{\"ok\":true}\r\n0\r\n\r\n";
+        assert_eq!(read(upper), Health::Ok(None));
+        // A chunk cut short or a size that isn't hex is still not json.
+        let cut = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n40\r\n{\"ok\":true}";
+        assert_eq!(read(cut), Health::Bad("not_json"));
+        let bad = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nzz\r\n{}\r\n0\r\n\r\n";
+        assert_eq!(read(bad), Health::Bad("not_json"));
     }
 
     /// A one-answer server on loopback, the request it was sent kept.
