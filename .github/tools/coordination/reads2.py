@@ -34,15 +34,18 @@ ASK_LINE = re.compile(r"^[ \t]*(?:#+[ \t]*|[-*+][ \t]+|>[ \t]*)?\**[ \t]*TWO REA
 ASK_READERS = re.compile(r"\bTWO READS\**[ \t]*:\**[ \t]*\S")
 
 
-# 7 Nov (#5635, the PM): fail closed. The patterns above failed open: #5572 and #5580 merged on one read, and #5606,
-# #5579 and #5633 were stopped by hand, each with TWO READS in its body's prose or on a READ ASK's second line. Now a
-# body (or a writer's READ ASK) that names TWO READS anywhere asks; a false match only costs a second read. A line that
-# opens with ONE READ (after the same marks as ASK_LINE), followed by ":", a dash, "(" or the line's end, opts out of a
-# mere mention ("ONE READ: the body names the rule only"); it never clears a line that asks (ASK_LINE, ASK_READERS).
+# 7 Nov (#5635, the PM): fail closed. The patterns above failed open: #5580 merged on one read, and #5606, #5579 and
+# #5633 were stopped by hand, each with TWO READS in its body's prose or on a READ ASK's second line. (#5572 merged on
+# one read too, but its second reader was asked on the Queue, which reads2.py doesn't read.) Now a body (or a writer's
+# READ ASK) that names TWO READS, in capitals, anywhere asks; a false match only costs a second read. A line that opens
+# with ONE READ (after an optional heading, list or bold mark, not a quote mark), followed by ":", a dash, "(" or the
+# line's end, opts out of a mere mention in its own text ("ONE READ: the body names the rule only"); it never clears a
+# line that asks (ASK_LINE, ASK_READERS). El's P3 on #5636: an opt-out line in a quote or a fence (``` or ~~~) is
+# someone else's text, so it opts nothing out.
 NAMES = re.compile(r"\bTWO\s+READS\b")
 # The Reviewer-lead's P2 on #5636: a dash followed by a letter is no separator, so "- ONE READ-OK covers the docs half"
 # opts nothing out.
-OPT_OUT = re.compile(r"^[ \t]*(?:#+[ \t]*|[-*+][ \t]+|>[ \t]*)?\**[ \t]*ONE READ\**[ \t]*"
+OPT_OUT = re.compile(r"^[ \t]*(?:#+[ \t]*|[-*+][ \t]+)?\**[ \t]*ONE READ\**[ \t]*"
                      r"(?::|[-\u2013\u2014](?![A-Za-z])|\(|$)", re.M)
 # The Reviewer-lead's P3 on #5636: a READ ASK is a comment whose first line asks with a commit ("READ ASK <sha>", after
 # a signature or not), as joining.md's markers say; a READ-OK or a note that mentions "the READ ASK" asks nothing.
@@ -54,7 +57,21 @@ def body_asks(body):
     without an opt-out line."""
     if ASK_LINE.search(body) or ASK_READERS.search(body):
         return True
-    return bool(NAMES.search(body)) and not OPT_OUT.search(body)
+    return bool(NAMES.search(body)) and not OPT_OUT.search(unfenced(body))
+
+
+def unfenced(body):
+    """The body without its fenced blocks (``` or ~~~); an unclosed fence runs to the end."""
+    out, fence = [], None
+    for line in body.split("\n"):
+        m = re.match(r"[ \t]*(`{3,}|~{3,})", line)
+        if fence is None and m:
+            fence = m.group(1)[0] * 3
+        elif fence is not None and line.strip().startswith(fence):
+            fence = None
+        elif fence is None:
+            out.append(line)
+    return "\n".join(out)
 
 
 # 4 Nov 23:4x (Thirteen's P3 on #5305); 7 Nov (#5635): the bot's log says, once per head (`reads2.py --unasked`), a
