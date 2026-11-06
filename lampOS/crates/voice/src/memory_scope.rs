@@ -495,6 +495,10 @@ struct RequestContext {
     /// Carried, its keep waits for that conversation's person's yes
     /// (`LAMP_CONVERSATION_CARRIED_SAVES`, [`ScopeLease::save_carried`]).
     carried_saves: AtomicBool,
+    /// The heard words of an earlier carried line whose held keep this
+    /// request's seen yes released ([`ScopeLease::release_held_keep`]): its
+    /// `remember` is a yes to the lamp's offer about that line.
+    released_keep: OnceLock<String>,
     /// The known person (a memory id) whose face was the one face in view
     /// through this line, none seen speaking it, and no other voice heard
     /// (`LAMP_PERSON_SCOPE_ONE_FACE`, [`ScopeLease::take_by_one_face`]): its
@@ -595,6 +599,7 @@ impl RequestScope {
                 carried: OnceLock::new(),
                 keep_for: OnceLock::new(),
                 carried_saves: AtomicBool::new(false),
+                released_keep: OnceLock::new(),
                 one_face: Mutex::new(None),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
@@ -646,6 +651,7 @@ impl RequestScope {
                 carried: OnceLock::new(),
                 keep_for: OnceLock::new(),
                 carried_saves: AtomicBool::new(false),
+                released_keep: OnceLock::new(),
                 one_face: Mutex::new(None),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
@@ -1071,6 +1077,24 @@ impl ScopeLease {
     /// Whether [`Self::mark_everything_asked`] was marked for this request.
     pub(crate) fn everything_marked(&self) -> bool {
         self.context.everything.load(Ordering::Acquire)
+    }
+
+    /// This request's line is the carried person's seen yes to a carried
+    /// line's held keep (`LAMP_CONVERSATION_CARRIED_SAVES`), and `line` is
+    /// that carried line's heard words: the `remember` its yes runs is a yes
+    /// to the lamp's offer about that line, as a yes to an offer made in
+    /// their own scope is (lamp-06c1, 6 Nov, C55: the offer was told as the
+    /// room's, so the yes alone kept nothing). Only the second route's held
+    /// run marks it, as only it can make a [`crate::second_provider::HeldKeepYes`],
+    /// after the yes was found theirs and seen. Once; it goes with the
+    /// request.
+    pub(crate) fn release_held_keep(&self, line: &str, _yes: &crate::second_provider::HeldKeepYes) {
+        let _ = self.context.released_keep.set(line.to_owned());
+    }
+
+    /// The carried line's words [`Self::release_held_keep`] marked.
+    pub(crate) fn released_keep(&self) -> Option<&str> {
+        self.context.released_keep.get().map(String::as_str)
     }
 
     /// A face was remembered in this line: the face cache it was admitted

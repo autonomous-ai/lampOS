@@ -40,9 +40,26 @@ const TEXT_BYTES: usize = 300;
 /// How a kept heard line begins, so the note reads as theirs.
 pub(crate) const SAID: &str = "They said: ";
 
+#[cfg(test)]
+thread_local! {
+    /// The switch for one test's own thread ([`set_on_for_test`]): the
+    /// process switch is read once, and other tests read it off.
+    static ON_FOR_TEST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 /// Whether the switch is on in this process, read once.
 pub fn on() -> bool {
+    #[cfg(test)]
+    if ON_FOR_TEST.with(std::cell::Cell::get) {
+        return true;
+    }
     *ON.get_or_init(|| std::env::var(ENVIRONMENT).ok().as_deref() == Some("on"))
+}
+
+/// The switch on or off for the calling test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_on_for_test(on: bool) {
+    ON_FOR_TEST.with(|cell| cell.set(on));
 }
 
 /// Words nearly every sentence has, in [`fold`]'s form with accents kept:
@@ -215,12 +232,25 @@ fn writes_for(lease: Option<&crate::memory_scope::ScopeLease>) -> Option<&str> {
 /// that writes under `lease`: an offer counts only when it was made in that
 /// same scope.
 fn held_now(request: u64, lease: Option<&crate::memory_scope::ScopeLease>) -> Option<Held> {
+    // Only a plain yes releases a held keep (`second_provider`'s
+    // `take_held_forget`): it keeps the carried line, never its own words.
+    if let Some(line) = released(lease) {
+        return Some(Held::Offered(line.to_owned()));
+    }
     let now = Instant::now();
     let whose = writes_for(lease);
     let thread = crate::thread::THREAD.lock().ok()?;
     Some(held(thread.heard_for(request, now), || {
         thread.offered_line(request, whose, now, offers_to_keep, only_a_yes)
     }))
+}
+
+/// The carried line's heard words whose held keep this request's seen yes
+/// released (`ScopeLease::release_held_keep`): the line the lamp's offer was
+/// about, though that offer was told as the room's, so no offer of theirs
+/// is in the thread (lamp-06c1, 6 Nov, C55).
+pub(crate) fn released(lease: Option<&crate::memory_scope::ScopeLease>) -> Option<&str> {
+    lease.and_then(crate::memory_scope::ScopeLease::released_keep)
 }
 
 /// The words a `remember` in heard line `request` is held against, with
@@ -271,6 +301,11 @@ pub fn yes_alone(
 ) -> Option<Value> {
     let forget = call.name == super::FORGET;
     if !heard || !(call.name == super::REMEMBER || forget) || !on() {
+        return None;
+    }
+    // The carried person's seen yes to a carried line's held keep: a yes to
+    // the lamp's offer about that line ([`released`]).
+    if !forget && released(lease).is_some() {
         return None;
     }
     // Read before the thread is locked: the two locks are never held

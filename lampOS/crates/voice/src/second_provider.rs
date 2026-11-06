@@ -393,6 +393,12 @@ pub type ToolRunner =
 /// ([`crate::memory_scope::ScopeLease::mark_everything_asked`], #3564).
 pub(crate) struct EverythingShown(());
 
+/// A carried line's held keep released by its person's own seen yes
+/// ([`take_held_forget`]). Only this module makes one, so only the second
+/// route's held run marks a request's `remember` as that yes
+/// ([`crate::memory_scope::ScopeLease::release_held_keep`]).
+pub(crate) struct HeldKeepYes(());
+
 /// [`EverythingShown`] for a test of the face step itself.
 #[cfg(test)]
 pub(crate) fn everything_shown_for_test() -> EverythingShown {
@@ -10575,6 +10581,10 @@ struct HeldForget {
     spelling: bool,
     /// Carried once already: a second spelling question drops it.
     carried: bool,
+    /// A carried line's held keep ([`hold_carried_keep`]): that line's
+    /// heard words, which its person's seen yes keeps
+    /// ([`HeldKeepYes`]). `None` for every other held call.
+    line: Option<String>,
 }
 
 /// A person's spoken turn, for the turn after it: the forgets its own
@@ -10783,7 +10793,7 @@ fn memory_refused(scope: Option<&crate::memory_scope::ScopeLease>, name: &str) -
 /// speaking: without them nothing is held. What the model is told.
 fn hold_carried_keep(
     shared: &Shared,
-    request: u64,
+    (request, said): (u64, &str),
     heard: bool,
     call: &net::ToolCall,
     scope: &crate::memory_scope::ScopeLease,
@@ -10799,7 +10809,16 @@ fn hold_carried_keep(
         )
     });
     match holding {
-        Some(Holding::Held) => crate::remember::held_keep_told(),
+        Some(Holding::Held) => {
+            // The line's own heard words go with the hold: their yes keeps
+            // those, never the yes's words.
+            if let Ok(mut hold) = shared.held_forget.lock()
+                && let Some(held) = hold.held.as_mut().filter(|held| held.request == request)
+            {
+                held.line = Some(said.to_owned());
+            }
+            crate::remember::held_keep_told()
+        }
         _ => {
             eprintln!(
                 "lamp-voice second: request {request}: a carried line's keep is not held: nothing kept (LAMP_CONVERSATION_CARRIED_SAVES)"
@@ -10838,8 +10857,9 @@ fn forget_asker(scope: Option<&crate::memory_scope::ScopeLease>) -> Option<(u64,
 enum Taken {
     /// Nothing held, or dropped: nothing runs and nothing is told.
     Nothing,
-    /// Their yes runs exactly this call.
-    Runs(net::ToolCall),
+    /// Their yes runs exactly this call, with a carried keep's heard line
+    /// ([`HeldForget::line`]).
+    Runs(net::ToolCall, Option<String>),
     /// A yes that would have run it, but the eyes did not see the held
     /// person's face say it (`LAMP_EYES_SPEAKING=on`, #2377): dropped, and
     /// the model is told the yes did not count.
@@ -10957,7 +10977,7 @@ fn take_held_forget(
             );
             Taken::Nothing
         }
-        None => Taken::Runs(held.call),
+        None => Taken::Runs(held.call, held.line),
     }
 }
 
@@ -11272,6 +11292,7 @@ fn hold_forget(
         asked: false,
         spelling: false,
         carried: false,
+        line: None,
     });
     Holding::Held
 }
@@ -11802,7 +11823,7 @@ async fn answer(
         Taken::Nothing => (None, None),
         // Their yes to a held `forget_everything` does not run it when the
         // same words say not to ("Yes. No, don't forget everything.").
-        Taken::Runs(call)
+        Taken::Runs(call, _)
             if call.name == crate::remember::FORGET_EVERYTHING
                 && everything_now == Some(false)
                 && !crate::remember::forget_unguarded() =>
@@ -11813,7 +11834,7 @@ async fn answer(
             );
             (None, None)
         }
-        Taken::Runs(call) => (Some(call), None),
+        Taken::Runs(call, line) => (Some((call, line)), None),
         Taken::Unseen(name) => (None, Some(crate::remember::unseen_yes_told(&name))),
     };
     let (mut held_save_runs, held_save_dropped) =
@@ -11868,6 +11889,8 @@ async fn answer(
     let reminded = said.to_lowercase().contains("remind");
     let words = Message::user(said.clone());
     let event_words = said.clone();
+    // The line's words, for a carried keep held on it ([`hold_carried_keep`]).
+    let carried_line = said.clone();
     // One of the onboarding walk's fixed lines, written by the lamp: if its
     // chat has not begun in time, its exact words are said as they are
     // rather than the walk's line left unsaid (lamp-52e6, 28 Oct 16:42).
@@ -12011,7 +12034,7 @@ async fn answer(
         let mut held_keep_ran = false;
         let mut call_statuses = Vec::new();
         let mut forgot_before_question = false;
-        if let Some(call) = held_forget_runs.take() {
+        if let Some((call, line)) = held_forget_runs.take() {
             let by_rule = shared
                 .hold
                 .as_ref()
@@ -12054,6 +12077,16 @@ async fn answer(
                     && let Some(scope) = scope.as_ref()
                 {
                     scope.mark_everything_asked(&EverythingShown(()));
+                }
+                // Their seen yes to a carried line's held keep: its
+                // `remember` keeps that line's words in their scope, a yes
+                // to the lamp's offer about it, though the offer was told as
+                // the room's (lamp-06c1, 6 Nov, C55).
+                if call.name == crate::remember::REMEMBER
+                    && let Some(line) = line.as_deref()
+                    && let Some(scope) = scope.as_ref()
+                {
+                    scope.release_held_keep(line, &HeldKeepYes(()));
                 }
                 let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
@@ -13588,7 +13621,14 @@ async fn answer(
                     && let Some(lease) = scope.as_ref()
                     && let Some(person) = lease.saves_carried()
                 {
-                    let told = hold_carried_keep(shared, request, heard, call, lease, person);
+                    let told = hold_carried_keep(
+                        shared,
+                        (request, &carried_line),
+                        heard,
+                        call,
+                        lease,
+                        person,
+                    );
                     messages.push(Message::tool(call.id.clone(), told.to_string()));
                     continue;
                 }
