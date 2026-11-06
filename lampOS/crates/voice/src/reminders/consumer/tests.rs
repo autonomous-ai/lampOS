@@ -1877,6 +1877,49 @@ fn an_unofferable_oldest_does_not_silence_later_items_and_each_failure_is_journa
     }
 }
 
+/// A ledger whose fence is ahead of the store under the same `store_id`
+/// (lamp-52e6, 6 Nov: fence 96, store 92) refused every offer with
+/// `stale_revision`, so a timer the voice set was never said. A voice that
+/// starts on such a ledger says a timer due now.
+///
+/// Needs fix 1 of the #5498 follow-up: re-fence to the store's revision at
+/// the voice's start, on the start path this test reaches (`Consumer::new`,
+/// `retire_earlier_voices` or the first tick), not only in `run`.
+#[test]
+fn a_voice_started_on_a_ledger_ahead_of_the_store_says_a_due_timer() {
+    let (engine, socket) = served(1);
+    let store = engine.lock().unwrap().revision();
+    // A compacted ledger: no entries, its fence four revisions ahead.
+    let ahead = json!({
+        "kind": "lamp_schedule_delivery_ledger",
+        "schema": 1,
+        "ledger_id": LEDGER_ID,
+        "revision": 1,
+        "next_attempt": 2,
+        "schedule": { "store_id": STORE_ID, "revision": store + 4 },
+        "entries": [],
+    });
+    let disk = Disk(Arc::new(Mutex::new(Data {
+        bytes: Some(serde_json::to_vec(&ahead).unwrap()),
+        ..Data::default()
+    })));
+    let mut consumer = consumer(disk);
+    assert_eq!(consumer.ledger.schedule_revision(), Some(store + 4));
+    consumer.retire_earlier_voices().unwrap();
+    let now = lamp_ipc::monotonic_us();
+    let report = due(&engine.lock().unwrap(), now);
+    consumer.tick(&socket.path(), Some(&report), now).unwrap();
+    assert!(
+        consumer
+            .outgoing
+            .iter()
+            .any(|m| matches!(m, FromWorker::Offer { .. })),
+        "the due timer was not offered: {:?}",
+        consumer.journal.lines
+    );
+    assert_eq!(take_offer(&mut consumer).token.key, key(&report));
+}
+
 #[test]
 fn full_ledger_refuses_new_admission_without_evicting_any_uncertain_delivery() {
     let mut engine = prepared_engine(Disk::default(), 1);
