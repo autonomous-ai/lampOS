@@ -3363,9 +3363,12 @@ impl Onboarding {
         // "Preferences" done, by its answers heard or by the model's report:
         // the walk says its done line as soon as the lamp may speak, never
         // waiting for the person's next line (lamp-29e7, 29 Oct, 8545).
-        // Also the last step in the skill's order (#5499: the two-step walk).
-        if outcome == Outcome::Done
-            && (step == Step::Preferences || self.definition.order.last() == Some(&step))
+        // Also the last step in the skill's order, however it ended (#5499:
+        // the two-step walk).
+        if (outcome == Outcome::Done && step == Step::Preferences)
+            || (step != Step::Preferences
+                && self.definition.order.last() == Some(&step)
+                && matches!(outcome, Outcome::Done | Outcome::Skipped | Outcome::Failed))
         {
             self.owed = Some(self.preferences_done().to_owned());
         }
@@ -3376,6 +3379,36 @@ impl Onboarding {
             json!({"kind":"onboarding_step","step":step.name(),"outcome":outcome,
             "framing":framing,"at_us":now_us}),
         );
+        // Every step in the order ended: each step out of it is kept
+        // `not_available` (#5499), so any lamp-update, which waits for all
+        // nine, sees the walk over. Never offered again: re-offers follow
+        // the order.
+        if self
+            .definition
+            .order
+            .iter()
+            .all(|step| self.desired.steps.contains_key(step.name()))
+        {
+            for parked in Step::IDS {
+                if !self.desired.steps.contains_key(parked)
+                    && Step::named(parked).is_some_and(|s| !self.definition.order.contains(&s))
+                {
+                    self.desired.steps.insert(
+                        parked.to_owned(),
+                        Kept {
+                            outcome: Outcome::NotAvailable,
+                            at_unix_s,
+                            framing: None,
+                            offered_at_unix_s: None,
+                            later_offers: 0,
+                        },
+                    );
+                    self.pending_records
+                        .push(json!({"kind":"onboarding_step","step":parked,
+                        "outcome":Outcome::NotAvailable,"why":"parked","at_us":now_us}));
+                }
+            }
+        }
         self.save();
     }
 
@@ -6525,6 +6558,38 @@ mod tests {
         assert_eq!(room.outcome(Step::WhoYouAre), None);
         room.wait(2 * S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+    }
+
+    /// #5499: once the two-step walk ends, its progress holds all nine
+    /// steps, the seven out of its order `not_available`, so any
+    /// lamp-update sees it over; none of them is ever offered again.
+    #[test]
+    fn a_two_step_walk_ended_keeps_all_nine_and_offers_no_parked_step() {
+        let mut room = Room::new("two-steps-parked");
+        room.walk.definition =
+            Arc::new(skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap());
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
+        report(&room.walk, "where_you_sit", "skipped");
+        assert_eq!(room.wait(S, None), [WHERE_YOU_SIT_SKIPPED]);
+        assert_eq!(room.walk.kept().steps.len(), 1, "not before the end");
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "skipped");
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [skill::PREFERENCES_DONE]);
+        assert_eq!(room.walk.kept().steps.len(), Step::IDS.len());
+        for name in Step::IDS.iter().skip(2) {
+            assert_eq!(
+                room.walk.kept().steps[*name].outcome,
+                Outcome::NotAvailable,
+                "{name}"
+            );
+        }
+        // A day on, as the re-offers count it: nothing is offered.
+        for kept in room.walk.desired.steps.values_mut() {
+            kept.at_unix_s = 0;
+            kept.offered_at_unix_s = Some(0);
+        }
+        assert_eq!(room.walk.next_step(), None);
+        assert_eq!(room.wait(10 * S, Some(SIDE)), NONE);
     }
 
     /// #5499: in the two-step walk, "who you are" ended with the name only
