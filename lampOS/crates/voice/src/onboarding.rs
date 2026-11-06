@@ -773,6 +773,9 @@ struct Led {
     held_at: Option<Framing>,
     /// Lines with words the person has said since the step was asked.
     answers: u8,
+    /// Whether the person has said any words since the step was asked,
+    /// counted with the nudge off too ([`Onboarding::first_note_finished`]).
+    words: bool,
     /// When the one note to report the step was given.
     nudged_us: Option<u64>,
     /// "Who you are": whether the lamp has spoken since the ask, and
@@ -2405,7 +2408,9 @@ impl Onboarding {
     /// line heard as no words) was never heard: the step is asked again as
     /// soon as the lamp may speak and the room is quiet, [`MOST_UNSAID`]
     /// times at most, not left waiting [`STEP_GIVE_UP_US`] in silence.
-    /// Only while that same ask is led and nothing has been answered; one
+    /// Only while that same ask is led and the person has said no words
+    /// since it: words heard are answered by the normal path, never met
+    /// with "Nobody has spoken" (the Reviewer-lead's P3 on #5532). One
     /// partly played is not said again.
     fn first_note_finished(&mut self, then: Asking, delivery: Delivery, now_us: u64) {
         if delivery != Delivery::Unsaid {
@@ -2418,7 +2423,7 @@ impl Onboarding {
         else {
             return;
         };
-        let again = led.answers == 0 && led.first_unsaid < MOST_UNSAID;
+        let again = !led.words && led.first_unsaid < MOST_UNSAID;
         if again {
             led.asked_us = None;
             led.guided_us = None;
@@ -2857,6 +2862,11 @@ impl Onboarding {
     /// a step the model ends (the skill's nudge) being led.
     pub fn heard_line(&mut self, text: &str) {
         self.heard_words(text);
+        if let Some(led) = self.led.as_mut().filter(|led| led.asked_us.is_some())
+            && text.chars().any(char::is_alphanumeric)
+        {
+            led.words = true;
+        }
         let language = self.language;
         let Some(led) = self.led.as_mut().filter(|led| {
             self.nudge && led.asked_us.is_some() && self.definition.nudge(led.step).is_some()
@@ -9927,6 +9937,44 @@ mod tests {
         );
         // Heard this time: not said again.
         assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), NONE);
+    }
+
+    /// The Reviewer-lead's P3 on #5532: a first note unsaid, but the person
+    /// spoke words since the ask, is not asked again with "Nobody has
+    /// spoken"; the normal path answers their words.
+    #[test]
+    fn a_first_note_unsaid_after_words_is_not_asked_again() {
+        let mut room = Room::new("first-note-words");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        let mut note = None;
+        while note.is_none() && room.at < 60 * S {
+            room.walk.drain_storage_for_test(room.at);
+            note = room.walk.tick(
+                room.at,
+                room.at - room.said,
+                true,
+                false,
+                Some(NEAR_MIDDLE),
+                room.still,
+            );
+            room.at += S / 4;
+        }
+        assert_eq!(note.as_deref(), Some(WHO_NOTE));
+        let (boot, turn) = (BootId::new([3; 16]).unwrap(), room.at);
+        assert!(room.walk.bind_opener(boot, turn));
+        room.walk.heard_line("Hi there, who is this?");
+        room.walk
+            .invitation_finished(boot, turn, Delivery::Unsaid, room.at);
+        room.said = room.at;
+        let records = room.walk.take_records();
+        assert!(
+            records
+                .iter()
+                .any(|line| line["kind"] == "onboarding_note_unsaid"
+                    && line["said_again"] == false),
+            "{records:?}"
+        );
+        assert_eq!(room.wait(START_QUIET_US + S, Some(NEAR_MIDDLE)), NONE);
     }
 
     /// A first note any of which played (whole, or cut by someone speaking)
