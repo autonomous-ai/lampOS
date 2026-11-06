@@ -994,6 +994,17 @@ mod tests {
             "Okay, the light stays on until ten?",
             "How long will the light stay on?",
             "Can the light stay on until ten?",
+            // The first builder's P3 on #5604: a contraction or another
+            // question word opens a question with its '?' lost.
+            "Lamp, what's left on my timer",
+            "What\u{2019}s left on my timer",
+            "How's my timer doing",
+            "Where's my reminder",
+            "Where is my timer at",
+            "Who set the timer",
+            "Who's keeping the light on",
+            "Why is the light still on",
+            "Which timer is set",
         ] {
             assert!(asked_as_a_question(said), "{said:?}");
         }
