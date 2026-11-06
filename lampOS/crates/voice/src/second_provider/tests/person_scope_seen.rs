@@ -542,7 +542,7 @@ async fn lines_known(
         // answer waits for the line after it, which is said by it.
         engine = engine.checking_sounds(true).carrying_the_name(true);
         let done = Arc::new(AtomicBool::new(false));
-        let feeder = feed_faces(eyes.clone(), vec![("f1", false)], boot, done.clone());
+        let feeder = feed_faces(eyes.clone(), vec![("f1", false)], &[], boot, done.clone());
         engine.submit(start(1));
         engine.submit(audio(1, 1));
         tokio::time::sleep(Duration::from_millis(40)).await;

@@ -1432,7 +1432,20 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `LAMP_MEMORY_FORGET_JUST_KEPT` it takes their just kept thing only when
     that has every word of the dropped `about` (`remember::kept_has_about`),
     so the bicycle line just after the jasmine tea keep asks which and never
-    forgets the tea. The guard (`remember::named_forget`, run in
+    forgets the tea. A bare forget that came with no `about` is marked the
+    same way with the line's own words outside its forget part
+    (`remember::line_names`: without the lamp's name, fillers, the words
+    that name nothing and those that only explain, "I got it wrong"; a
+    sentence or clause of one word alone is a misheard call, "Elan. Forget
+    that.", and says nothing): on
+    lamp-06c1 (6 Nov, build 10343) "I sold my bicycle. Lamp, forget it."
+    heard as "I stole my bicycle lamp. Forget it." came with no `about` and,
+    on the carried path, took the tea just kept. Now "stole bicycle" is not
+    the tea, so it asks which; "My tea is jasmine. Forget it." after that
+    keep forgets it; "Lamp, forget that." and "Forget it." stay bare and
+    take the just kept thing. Spoken, one-face and carried alike, and a
+    guessed `source_id` on such a line runs only when the last kept thing
+    has those words. The guard (`remember::named_forget`, run in
     `tools::run_call_with_scope` for spoken turns and in `messages` for
     texts) sends a `Named` pick as `forget {about, heard_named}`.
   - **What names a thing** (`remember::named_subject`): the last sentence

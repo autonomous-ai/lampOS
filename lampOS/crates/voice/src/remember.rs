@@ -3180,6 +3180,44 @@ fn named_anywhere(said: &str) -> bool {
         .is_some()
 }
 
+/// What a line whose forget part names nothing ("I stole my bicycle lamp.
+/// Forget it.") says of its own, in a sentence or clause before or after
+/// that part: its words without the lamp's name and fillers ([`FILLERS`]),
+/// the words that name nothing ([`subject_of`]) and those that only explain
+/// a forget ([`EXPLAINS`]: "Forget that, I got it wrong"). `None` for
+/// "Lamp, forget that." or "Forget it.", a bare forget still. A bare forget
+/// marked with them ([`ABOUT_DROPPED`]) takes the just kept thing only when
+/// it has them ([`kept_has_about`]), and otherwise asks which (lamp-06c1,
+/// 6 Nov: the line came with no `about` and took the tea just kept).
+fn line_names(said: &str) -> Option<String> {
+    let lower = lower_line(said);
+    // A sentence or clause of one word alone is a call, the lamp's name
+    // misheard ("Elan. Forget that.", "Alone. Forget that."), never a thing
+    // said: "I stole my bicycle lamp." says something.
+    let words: Vec<&str> = lower
+        .split(|c: char| SENTENCE_ENDS.contains(&c) || c == ',')
+        .filter_map(|part| {
+            let words: Vec<&str> = part
+                .split(|c: char| !c.is_alphanumeric())
+                .filter(|word| {
+                    !word.is_empty() && !FILLERS.contains(word) && !EXPLAINS.contains(word)
+                })
+                .collect();
+            (words.len() > 1).then_some(words)
+        })
+        .flatten()
+        .collect();
+    subject_of(words)
+}
+
+/// Words that only explain or close a forget, naming nothing of their own
+/// ([`line_names`]): "I got it wrong", "that's not true any more", "thanks".
+/// Lower case.
+const EXPLAINS: &[&str] = &[
+    "got", "wrong", "mean", "meant", "not", "no", "true", "right", "anymore", "any", "more",
+    "longer", "changed", "thanks", "thank", "yes", "yeah", "now",
+];
+
 /// Words a clause between a forget and its thing may be only of, which name
 /// nothing: "Forget, um, you know, my address." Lower case.
 const FILLERS: &[&str] = &[
@@ -3842,6 +3880,9 @@ pub fn named_forget_with(
         })
     {
         let mut args = call.args.clone();
+        if let Some(about) = said.and_then(line_names) {
+            args[ABOUT_DROPPED] = json!(about);
+        }
         args[HEARD_BARE] = json!(true);
         return Some(ToolCall {
             id: call.id.clone(),
@@ -3875,7 +3916,11 @@ pub fn named_forget_with(
                 .filter(|about| {
                     subject_of(words_of(&search_text(about)).iter().map(String::as_str)).is_some()
                 });
-            if let Some(about) = dropped {
+            // With no such `about`, the line's own words outside its forget
+            // part are that `about`: "I stole my bicycle lamp. Forget it."
+            // came with none on lamp-06c1 (6 Nov, build 10343) and took the
+            // tea just kept.
+            if let Some(about) = dropped.or_else(|| said.and_then(line_names)) {
                 args[ABOUT_DROPPED] = json!(about);
             }
             args[HEARD_BARE] = json!(true);
@@ -9072,12 +9117,16 @@ impl DaysClient {
                 // thing shown, nothing runs and the model asks which.
                 if call.args.get(HEARD_BARE) == Some(&json!(true)) {
                     let shown = context.shown(person).len();
+                    // The line's own words ([`ABOUT_DROPPED`]): the last
+                    // kept thing is plainly "that" only when it has them.
+                    let dropped = call.args.get(ABOUT_DROPPED).and_then(Value::as_str);
                     let plain = bare_forget_target(&context, person) == Some(id)
                         || context.last_given.as_ref().is_some_and(|(given, at)| {
                             at.elapsed() <= HELD_FORGET_FOR
                                 && *given == [(person.map(str::to_owned), id)]
+                                && dropped.is_none_or(|about| kept_has_about(&context, about))
                         });
-                    if !plain && shown > 1 {
+                    if !plain && (shown > 1 || dropped.is_some()) {
                         eprintln!(
                             "lamp-voice provider: a bare forget's source_id {id} is not run: {shown} shown could be meant, asked which"
                         );
@@ -13587,6 +13636,7 @@ mod tests {
             context.last_given = Some((vec![(Some(ann.clone()), 5)], Instant::now()));
             context.given_by_recall = false;
             context.given_one_face = one_face;
+            context.given_text = Some("my favourite tea is jasmine".to_owned());
         };
         // Each request's line as heard, for the tools' own reading of it.
         let heard = |request: u64, words: &str| {
@@ -13612,6 +13662,35 @@ mod tests {
             &route,
             &call(FORGET, json!({})),
             5_419_001,
+            true,
+            &scope.lease(),
+        );
+        assert!(answered && told["forgotten"] == true, "{told}");
+        // 1b. Carried, right after her tea keep, a line that says something
+        // else before its bare forget (lamp-06c1, 6 Nov: no `about` came):
+        // asked which, nothing sent. One that says the tea: forgotten.
+        kept(false);
+        heard(5_419_006, "I stole my bicycle lamp. Forget it.");
+        let scope = carried(5_419_006);
+        let (_, (told, answered)) = crate::tools::run_call_scoped(
+            &route,
+            &call(FORGET, json!({})),
+            5_419_006,
+            true,
+            &scope.lease(),
+        );
+        assert_eq!(
+            (told.clone(), answered),
+            (forget_which(true), true),
+            "{told}"
+        );
+        kept(false);
+        heard(5_419_007, "My tea is jasmine. Forget it.");
+        let scope = carried(5_419_007);
+        let (_, (told, answered)) = crate::tools::run_call_scoped(
+            &route,
+            &call(FORGET, json!({})),
+            5_419_007,
             true,
             &scope.lease(),
         );
@@ -13675,11 +13754,39 @@ mod tests {
             &scope.lease(),
         );
         assert!(answered && told["forgotten"] == true, "{told}");
+        // 5. A one-face line after her one-face tea keep, saying something
+        // else: asked which; saying the tea: forgotten.
+        kept(true);
+        heard(5_419_008, "I stole my bicycle lamp. Forget it.");
+        let scope = one_face(5_419_008);
+        let (_, (told, answered)) = crate::tools::run_call_scoped(
+            &route,
+            &call(FORGET, json!({})),
+            5_419_008,
+            true,
+            &scope.lease(),
+        );
+        assert_eq!(
+            (told.clone(), answered),
+            (forget_which(true), true),
+            "{told}"
+        );
+        kept(true);
+        heard(5_419_009, "My tea is jasmine. Forget it.");
+        let scope = one_face(5_419_009);
+        let (_, (told, answered)) = crate::tools::run_call_scoped(
+            &route,
+            &call(FORGET, json!({})),
+            5_419_009,
+            true,
+            &scope.lease(),
+        );
+        assert!(answered && told["forgotten"] == true, "{told}");
         done.store(true, Ordering::Release);
         let read = served.join().unwrap();
         assert!(read.iter().all(|r| r["op"] != "forget_last"), "{read:?}");
         let sent: Vec<&Value> = read.iter().filter(|r| r["op"] == "forget").collect();
-        assert_eq!(sent.len(), 2, "{read:?}");
+        assert_eq!(sent.len(), 4, "{read:?}");
         for forget in sent {
             assert_eq!(
                 *forget,
@@ -15077,6 +15184,114 @@ mod tests {
                 json!({"op":"forget","id":5,"person":OLIVIA,"selective":true}),
                 "{index}: {read:?}"
             );
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+        }
+    }
+
+    /// lamp-06c1, 6 Nov (build 10343, the FAIL on #5419): "I sold my
+    /// bicycle. Lamp, forget it." heard as "I stole my bicycle lamp. Forget
+    /// it." right after the tea keep came with no `about` at all, and the
+    /// bare forget took the tea. The line's own words outside its forget
+    /// part are its `about` ([`line_names`]): the tea is not "stole
+    /// bicycle", so it asks which and nothing is forgotten; "My tea is
+    /// jasmine. Forget it." after the jasmine tea keep forgets it; "Lamp,
+    /// forget that." stays bare and forgets the keep. Spoken and carried
+    /// alike, and a guessed `source_id` the same.
+    #[test]
+    fn a_bare_forget_whose_line_says_something_takes_the_just_kept_thing_only_when_it_matches() {
+        const OLIVIA: &str = "p-b247000000000001";
+        let route = |args: Value, said: &str| {
+            named_forget_with(
+                &call(FORGET, args),
+                Some(said),
+                Some(OLIVIA),
+                &Carry::default(),
+            )
+            .expect("a bare forget is marked")
+        };
+        let stole = "I stole my bicycle lamp. Forget it.";
+        assert_eq!(
+            route(json!({}), stole).args,
+            json!({ HEARD_BARE: true, ABOUT_DROPPED: "stole bicycle" })
+        );
+        assert_eq!(
+            route(json!({}), "My tea is jasmine. Forget it.").args,
+            json!({ HEARD_BARE: true, ABOUT_DROPPED: "tea jasmine" })
+        );
+        for plain in [
+            "Lamp, forget that.",
+            "Forget it.",
+            "Okay lamp, um, please forget that.",
+            "That was wrong. Forget it.",
+            "Elan. Forget that.",
+            "Alone, forget it.",
+        ] {
+            assert_eq!(
+                route(json!({}), plain).args,
+                json!({ HEARD_BARE: true }),
+                "{plain}"
+            );
+        }
+        let carried = |forget: ToolCall| {
+            let mut carried = forget;
+            carried.args[JUST_KEPT_CARRIED] = json!(true);
+            carried
+        };
+        let cases = [
+            (route(json!({}), stole), false),
+            (carried(route(json!({}), stole)), false),
+            (route(json!({"source_id": 5}), stole), false),
+            (route(json!({}), "My tea is jasmine. Forget it."), true),
+            (
+                carried(route(json!({}), "My tea is jasmine. Forget it.")),
+                true,
+            ),
+            (route(json!({}), "Lamp, forget that."), true),
+            (carried(route(json!({}), "Lamp, forget that.")), true),
+        ];
+        for (index, (forget, forgets)) in cases.iter().enumerate() {
+            let (socket, served) = memory(
+                &format!("line-names-{index}"),
+                1 + usize::from(*forgets),
+                just_kept_memory,
+            );
+            let client = DaysClient::new(socket.clone()).unwrap();
+            client.forget_about.store(true, Ordering::Release);
+            client.forget_all.store(true, Ordering::Release);
+            client.forget_just_kept.store(true, Ordering::Release);
+            let run = |call: &ToolCall| {
+                client.run_at(call, Duration::from_secs(3), NOW, Some(&EAST), Some(OLIVIA))
+            };
+            assert!(
+                run(&call(
+                    REMEMBER,
+                    json!({"text": "my favourite tea is jasmine"})
+                ))
+                .1
+            );
+            let (told, answered) = run(forget);
+            if *forgets {
+                assert!(answered && told["forgotten"] == true, "{index}: {told}");
+            } else {
+                assert_eq!(
+                    (told.clone(), answered),
+                    (forget_which(true), true),
+                    "{index}"
+                );
+            }
+            let read = served.join().unwrap();
+            let ops: Vec<&str> = read.iter().filter_map(|line| line["op"].as_str()).collect();
+            if *forgets {
+                assert_eq!(ops, ["remember", "forget"], "{index}: {read:?}");
+                assert_eq!(
+                    read[1],
+                    json!({"op":"forget","id":5,"person":OLIVIA,"selective":true}),
+                    "{index}: {read:?}"
+                );
+            } else {
+                assert_eq!(ops, ["remember"], "{index}: {read:?}");
+            }
             drop(client);
             std::fs::remove_file(&socket).unwrap();
         }
