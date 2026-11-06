@@ -275,11 +275,16 @@ and none of the skills' own (`crate::use_skill`):
   same line as when it is called itself, and its answer goes to the model
   under `use_skill`, with `ran`: "This call has already run dance. Do not
   call use_skill for dance again in this turn." (`use_skill::ran`; not on a
-  refusal). On lamp-9adf on 6 Nov, without it, "Dance with me." called
+  refusal, which lamp-skills sends as `error`, "I'm still doing that."
+  among them). On lamp-9adf on 6 Nov, without it, "Dance with me." called
   `use_skill` for `dance` twice, the second refused as under way, and said a
-  stray line; by its own name `dance` was called once (#2826). The
-  function's description says the same: the call runs the skill, and it is
-  never called again for the same ask.
+  stray line; by its own name `dance` was called once (#2826). A skill whose
+  tools file gives it a search (`searches`, as the second route's note and
+  walk read it: look-for-things' `[search]`) gets no `ran`, since a search
+  is several calls in one turn, each look told to call again with the next
+  place (`a_search_skill_through_use_skill_is_not_told_it_already_ran`,
+  #5505). The function's description says: the call runs the skill, and it
+  is not called again for the same ask unless its answer says to.
   - **Told instead, never dropped** (the reviewer on #1696):
     - a skill that isn't installed ("There is no skill named juggle. Your
       skills are …");
