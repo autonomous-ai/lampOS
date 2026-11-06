@@ -150,15 +150,16 @@ func (r *Relay) Handle(ev domain.MQTTDiscordEventCommand) string {
 	if r.seenBefore(ev.EventID) {
 		return "duplicate"
 	}
-	text, ok := Accept(Inbound{
+	in := Inbound{
 		AuthorID:    ev.DiscordUserID,
 		BotUserID:   ev.BotUserID,
 		GuildID:     ev.GuildID,
 		Content:     ev.Text,
 		MentionsBot: ev.MentionsBot,
-	}, r.cfg.DiscordUserID, r.cfg.DiscordGuildID)
+	}
+	text, ok := Accept(in, r.cfg.DiscordUserID, r.cfg.DiscordGuildID)
 	if !ok {
-		return "not from the owner"
+		return RejectReason(in, r.cfg.DiscordUserID, r.cfg.DiscordGuildID)
 	}
 
 	select {
@@ -171,6 +172,8 @@ func (r *Relay) Handle(ev domain.MQTTDiscordEventCommand) string {
 
 	reqID, runID := r.gw.NextChatRunID()
 	r.addRun(runID, ev.ChannelID, ev.WasSealed)
+	// The via marker also tells a runtime that merges concurrent messages into a running
+	// turn to keep this one separate, so its reply is never shared with another message.
 	turn := domain.AppendVia(TurnText(ev.AuthorUsername, ev.DiscordUserID, text), domain.ViaDiscord)
 	go r.send(reqID, runID, ev.ChannelID, ev.WasSealed, turn)
 	return ""

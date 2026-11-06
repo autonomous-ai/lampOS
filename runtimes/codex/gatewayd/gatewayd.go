@@ -87,6 +87,8 @@ type Server struct {
 	activeRunID       string      // originating device run, carried through queued turns
 	activeTurnID      string      // current App Server turn; non-empty means steer
 	activeStarting    bool        // thread/turn start RPC is in flight
+	activeDiscord     bool        // the active turn answers a Discord message (valid while a turn is active)
+	held              int         // messages waiting for a turn of another reply destination
 	resetPending      bool        // session.new received during an active turn
 	appTurnTimer      *time.Timer // bounded by CODEX_TURN_TIMEOUT_S
 	appTurnTimedOut   bool

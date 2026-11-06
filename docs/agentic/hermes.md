@@ -271,6 +271,14 @@ does not imply immediate interruption of the current model call or tool.
 `stopping` acknowledgment is not a terminal result. Requests that cannot steer, including images, wait for their own native turn
 rather than being dropped or moved to a disconnected Responses conversation.
 
+A request merges into the active native run only when both answer to the same place,
+because one final reply is delivered to every merged request. A Discord turn
+(`[via:discord]`, see [Discord relay](../discord-relay.md)) is never merged in either
+direction: speech, ambient speech and web chat that arrive during it, another Discord
+message (same channel or not), and a Discord message that arrives during a speech turn all wait
+for the active run to end, then start their own native run in arrival order. Steering
+between requests for the same destination is unchanged and adds no delay.
+
 An accepted steer that arrives too late may return in terminal `pending_steer`.
 It must be retained for a subsequent turn, not counted as work completed by the
 finished run. Multiple pending steer texts are concatenated with newlines by

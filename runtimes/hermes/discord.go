@@ -1,11 +1,14 @@
 package hermes
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"go.autonomous.ai/os/system/lib/discordscrub"
 )
@@ -78,8 +81,13 @@ var discordStateFiles = []string{
 	filepath.Join("cache", "discord_capabilities.json"),
 }
 
-// RemoveDiscordState deletes the Discord adapter's state files under home. Missing
-// files are not an error. Reports whether any file was removed.
+// channelDirectoryFile is the channel list hermes-gateway keeps under its home: one list
+// of channels per platform, under "platforms".
+const channelDirectoryFile = "channel_directory.json"
+
+// RemoveDiscordState deletes the Discord adapter's state files under home and drops the
+// Discord entries from the channel directory. Missing files are not an error. Reports
+// whether anything was changed.
 func RemoveDiscordState(home string) (bool, error) {
 	removed := false
 	var errs []error
@@ -92,5 +100,117 @@ func RemoveDiscordState(home string) (bool, error) {
 			errs = append(errs, err)
 		}
 	}
-	return removed, errors.Join(errs...)
+	changed, err := ScrubDiscordChannelDirectory(home)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	return removed || changed, errors.Join(errs...)
+}
+
+// ScrubDiscordChannelDirectory removes the stale Discord entries from
+// <home>/channel_directory.json and keeps every other platform as it is. A missing file,
+// a file that is not a JSON object, and a file without Discord entries are left alone and
+// are not errors, so the call is safe on every boot. The file is replaced atomically with
+// its mode and owner kept. Reports whether the file was rewritten.
+func ScrubDiscordChannelDirectory(home string) (bool, error) {
+	path := filepath.Join(home, channelDirectoryFile)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("read hermes channel directory: %w", err)
+	}
+	var doc map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &doc); err != nil || doc == nil {
+		return false, nil
+	}
+	changed := false
+	if _, ok := doc["discord"]; ok {
+		delete(doc, "discord")
+		changed = true
+	}
+	if rawPlatforms, ok := doc["platforms"]; ok {
+		var platforms map[string]json.RawMessage
+		if json.Unmarshal(rawPlatforms, &platforms) == nil && platforms != nil {
+			if _, ok := platforms["discord"]; ok {
+				delete(platforms, "discord")
+				out, err := marshalNoEscape(platforms)
+				if err != nil {
+					return false, fmt.Errorf("encode hermes channel directory: %w", err)
+				}
+				doc["platforms"] = out
+				changed = true
+			}
+		}
+	}
+	if !changed {
+		return false, nil
+	}
+	out, err := marshalNoEscape(doc)
+	if err != nil {
+		return false, fmt.Errorf("encode hermes channel directory: %w", err)
+	}
+	if err := replaceFileKeepingOwner(path, append(out, '\n')); err != nil {
+		return false, fmt.Errorf("write hermes channel directory: %w", err)
+	}
+	return true, nil
+}
+
+// marshalNoEscape encodes v indented with two spaces, leaving non-ASCII text and
+// <, >, & as they are.
+func marshalNoEscape(v any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	return bytes.TrimRight(buf.Bytes(), "\n"), nil
+}
+
+// replaceFileKeepingOwner writes data to a temporary file beside path and renames it over
+// path, so a reader never sees a partial file. The file keeps the mode of the one it
+// replaces; its owner is kept too when the process may set it (hermes runs as another
+// user than os-server on some devices and must still be able to rewrite the file).
+func replaceFileKeepingOwner(path string, data []byte) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	cleanup := func() { _ = os.Remove(tmpPath) }
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		cleanup()
+		return err
+	}
+	if err := tmp.Chmod(info.Mode().Perm()); err != nil {
+		_ = tmp.Close()
+		cleanup()
+		return err
+	}
+	if st, ok := info.Sys().(*syscall.Stat_t); ok {
+		// Best effort: only a privileged process may hand the file to another user.
+		_ = tmp.Chown(int(st.Uid), int(st.Gid))
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		cleanup()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		cleanup()
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		cleanup()
+		return err
+	}
+	return nil
 }
