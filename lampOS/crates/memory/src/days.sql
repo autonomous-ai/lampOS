@@ -184,3 +184,14 @@ CREATE TABLE IF NOT EXISTS nightly_nights (
     added INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY(person,day)
 );
+-- A role a known person asked the lamp to play (the voice's LAMP_MEMORY_ROLE,
+-- the memory owner's design of 6 Nov): the name it answers to with them,
+-- until they end it. One row a known person (`p-` ids only), set by
+-- `role_set`, removed by `role_end`, and read only by their `session_open`
+-- with `role`. Goes with `forget_all` and `forget_person`. Older builds pass
+-- this table over; `user_version` stays 1.
+CREATE TABLE IF NOT EXISTS roles (
+    person TEXT PRIMARY KEY REFERENCES people(person),
+    name TEXT NOT NULL,
+    at_unix_ms INTEGER NOT NULL
+);

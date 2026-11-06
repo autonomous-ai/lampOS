@@ -380,8 +380,12 @@ pub fn memory_forgot_from(
     summaries: &Mutex<Summaries>,
     thread: &Mutex<crate::thread::Thread>,
 ) -> usize {
-    let forgets = forgot
-        .forgotten(now_us)
+    let forgotten = forgot.forgotten(now_us);
+    // A role went with its person's everything (`LAMP_MEMORY_ROLE`).
+    for person in &forgotten {
+        crate::remember::role::forgot(person.as_deref());
+    }
+    let forgets = forgotten
         .iter()
         .filter(|person| memory_forgot_talk(person.as_deref()))
         .count();

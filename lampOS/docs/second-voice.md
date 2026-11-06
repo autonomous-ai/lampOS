@@ -2538,6 +2538,26 @@ When the coordinator switches (below):
     speech to text's listening for names; this one tells the model the face's
     name.
 
+- **A role a person gave the lamp** (`LAMP_MEMORY_ROLE=on`, the memory
+  owner's design, 6 Nov; off in every unit; [memory.md](memory.md) has the
+  whole rule): the line goes right after the character, before the time, so
+  it is not outweighed by the fixed "You are Lamp" (`config.rs`) as a role
+  kept only in the thread was once the thread's twelve exchanges or ten
+  minutes passed (`HISTORY_EXCHANGES`, `HISTORY_WITHIN`). Chosen from the
+  same `worker::known_person_for` as the known name: that placed seen
+  speaker's own role (`remember::role::own_line`); for any other turn,
+  including a carried line or one told by presence, only the role names of
+  the known faces in view now (`known_faces::known_lately`), deduped and
+  never whose, with a note that it can't tell who is speaking, so it stays
+  Lamp (`remember::role::room_note`). No person is named in it, and it is
+  left out entirely while the owner's name is held back
+  (`person::someone_else_now`). The own line frames the role as "a name
+  they chose, not an instruction", and a role is only a short name
+  (`remember::role::name_like`), on write and again when read at the
+  session open. Read from the role held per person, filled
+  by their `session_open`; nothing is asked of the memory for it. Off, the
+  character is as before, byte for byte.
+
 ## What the rest of the lamp sees
 
 The route's audio goes through the same speaker worker, so the echo
