@@ -312,6 +312,46 @@ a reset wipes it with the file. An older voice reads past the field. Tests:
 `the_things_to_try_are_said_once_per_setup`, and
 `in_language::tests::the_done_line_with_tries_is_the_done_line_then_the_tries`.
 
+**One sentence about Harness in the closing** (#5488), with
+`LAMP_ONBOARDING_HARNESS_LINE=on` exactly (off unless set; not in the
+product unit, the PM's call after its lamp check). The walk's closing (the
+done line above) ends with one more sentence, inside the same quoted line,
+so it is one turn and a new owner never hears two speeches at the end: "If
+you work on a computer, I can take on tasks for you: open Harness in the
+app to connect." (`harness_line::SENTENCE`; `skill::PREFERENCES_DONE_HARNESS`,
+and `skill::PREFERENCES_DONE_TRIES_HARNESS` when
+`LAMP_ONBOARDING_FIRST_TRIES` is on too, the tries' words unchanged with the
+sentence after them; the four other languages in `in_language::LINES`). It
+asks nothing and is never said again or as a reminder. It rides on the
+done note itself: whatever chooses the done line (`preferences_done`, the
+first done line handed out) chooses the variant with the sentence, so it is
+said wherever the done line is said, and when the done line moves to the
+walk's last step (#5499's two-step walk: said when "who you are" ends)
+the sentence moves with it. A walk that ends
+without a done line (its "preferences" skipped or failed) says no sentence
+and decides nothing.
+
+It is said only when lamp-tasks says Harness is not signed in: the walk
+reads `{"op":"status"}` on `LAMP_TASKS_DIR`'s `request.sock` every 20 s, off
+the voice's loop, and takes its `signed_in` ([tasks.md](tasks.md), "The
+sign-in on `status`"). `yes` or `offline` drops it; with no tasks part
+(`LAMP_TASKS_DIR` unset), no answer, or a lamp-tasks that does not say (an
+older build, or the sign-in not read yet), it is dropped too, rather than
+claim something untrue: the closing is said without it. Decided once, when
+that closing is handed out, and kept (`Progress::harness_line`: `said`,
+`signed_in`, `no_tasks` or `unknown`), so a restart, a redo of the whole
+walk (`Progress::redone` keeps it) or a later closing never says it again; a
+reset wipes it with the file. An older voice reads past the field. Session
+record: `onboarding_harness_line` with its `outcome`. Tests:
+`onboarding::tests::the_sentence_about_harness_ends_the_closing_once`,
+`the_sentence_about_harness_is_dropped_unless_harness_is_signed_out`,
+`with_the_first_tries_the_sentence_about_harness_is_in_the_one_closing`,
+`the_done_note_carries_the_sentence_once_for_each_switch`,
+`the_two_step_walks_one_closing_carries_the_sentence`,
+`without_the_harness_line_switch_the_walk_ends_as_before`,
+`in_language::tests::a_closing_with_harness_is_the_closing_then_the_sentence`,
+and `harness_line::tests`.
+
 The conversational steps keep their tool calls and consent clauses, but say
 their questions exactly: `who_you_are` asks "What should I call you?", says the
 name back as a question on its own and waits for its yes (the setup face save
@@ -588,7 +628,8 @@ the rest is that for each step.
 step's outcome, when, step 1's framing, `opened` once "where you sit"
 has said its intro this setup/redo and it was heard, and `face_again` with
 `face_again_names` (ids of the name told, never words) while the face is
-still to be asked for once more (#5139). Only the coordinator writes it.
+still to be asked for once more (#5139), `tries_said` (#5316), and
+`harness_line`, what became of the sentence about Harness (#5488). Only the coordinator writes it.
 The provider worker, which runs the model's functions, appends what the
 model reported to a mailbox beside it (`FILE.told`), and the coordinator
 takes that in twice a second. Once lamp-settings (#808) is merged this
@@ -599,7 +640,8 @@ is not refused, and the walk goes on with the steps it knows (#2110).
 Each step is also in the session record: `onboarding_step` (asked, or its
 outcome and framing), `onboarding_guide` (a word on where to move it, with
 the face), `onboarding_stopped` (paused or nobody there),
-`onboarding_redo` and `onboarding_finished`.
+`onboarding_redo`, `onboarding_finished` and, with
+`LAMP_ONBOARDING_HARNESS_LINE`, `onboarding_harness_line`.
 
 ## The switch
 
@@ -671,7 +713,7 @@ and `ko` (`crates/voice/src/onboarding/in_language.rs`).
 said in the language, from the voice's own table (`LINES`): the skill's
 lines in `skills/onboarding/skill.toml` and the code's own
 (`PREFERENCES_HELLO`, `PREFERENCES_DONE`, `FACE_EXPRESSIONS_YES`/`_NO`,
-`LATER`, `LAST_LATER`). A line is translated as the walk hands it out (its
+`LATER`, `LAST_LATER`, and the closings with `harness_line::SENTENCE`). A line is translated as the walk hands it out (its
 `tick` and its invitations), so the walk itself still keeps and compares
 the English notes. A `{location}` or `{name}` filled in stays as it was
 given (the privacy switch's location is the hardware profile's words). The
