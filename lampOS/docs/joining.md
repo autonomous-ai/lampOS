@@ -839,8 +839,9 @@ A `HOLD` stands until the same reader's later `READ-OK` (it is keyed by the
 reader's account and signed name). A `HOLD <sha>` as the first line of a
 comment on the Queue holds that head too. A HOLD closed in words only is
 lifted by the PM with a line in `holds-lifted.tsv`, noted on the pull
-request. **TWO READS**, said in a comment's first line or the first 400
-characters of the body, need two different readers on the head. A pull
+request. **TWO READS**, said in a comment's first line, anywhere in a
+`READ ASK` or anywhere in the body, need two different readers on the head
+(a body line opening `ONE READ:` opts out of a mere mention). A pull
 request that conflicts is told once per head: rebase it. A train is one
 ARM64 run and then a rebase merge; there is one train open at a time, and a
 pull request that fails gets `HOLD train N` and is left out. Pull requests
