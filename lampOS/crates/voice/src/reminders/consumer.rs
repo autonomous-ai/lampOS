@@ -152,6 +152,17 @@ const HELD: &str = "held: an attempt may have been heard and was never proven sa
 /// #5258, with `LAMP_RING_STOP_ENDS_IT`).
 const STOPPED_HELD: &str = "held: stopped by the person over its ring, so it is not \
                             offered again";
+/// A fenced cut-in after some of its audio: once more, as a repeat.
+const CUT_ONCE_MORE: &str = "not completed: this attempt can no longer speak, cut after some of \
+                             it played: to be offered again once, said as a repeat";
+/// A line cut in on an attempt after some of its audio, less than a real
+/// share (an echo's or a cough's cut, Heron's P2 on #5509): offered again,
+/// not counted toward the hold, this many times for each item; the next
+/// light cut holds it ([`LIGHT_CUT_HELD`]).
+const LIGHT_CUT_RETRIES: u8 = 3;
+/// Its held line.
+const LIGHT_CUT_HELD: &str = "held: cut early by a line each time it was offered, \
+                              so it is not offered again";
 /// A due item given up with nothing proven the first time (#5219).
 const ONCE_MORE: &str = "not completed: given up before it was proven said, \
                          to be offered once more";
@@ -256,6 +267,9 @@ struct Consumer<P: Persistence> {
     /// How often each item was offered again after an attempt given up
     /// before any of its audio came ([`NO_AUDIO_RETRIES`]).
     unvoiced: BTreeMap<DeliveryKey, u8>,
+    /// How often each item was offered again after a light cut
+    /// ([`LIGHT_CUT_RETRIES`]).
+    light_cuts: BTreeMap<DeliveryKey, u8>,
     /// The attempts the last cut put on the retry, its own first and those
     /// joined to it: a stop the person said for that cut holds them
     /// ([`ToWorker::RingStopped`]).
@@ -279,6 +293,7 @@ impl<P: Persistence> Consumer<P> {
             retry: BTreeMap::new(),
             abandoned: BTreeSet::new(),
             unvoiced: BTreeMap::new(),
+            light_cuts: BTreeMap::new(),
             last_cut: Vec::new(),
             next_offer_us: 0,
             cursor: 0,
@@ -374,7 +389,12 @@ impl<P: Persistence> Consumer<P> {
                     }
                 }
             }
-            ToWorker::Retire { proof, .. } => {
+            ToWorker::Retire {
+                proof,
+                heard_some,
+                light_cut,
+                ..
+            } => {
                 // Validate the exact correlation now; durable retry validates
                 // all qualification fields again before a later admission.
                 if proof.correlation != token.correlation
@@ -382,24 +402,18 @@ impl<P: Persistence> Consumer<P> {
                 {
                     return Err(invalid("consumer retirement correlation differs"));
                 }
+                if heard_some || light_cut {
+                    self.prune_abandoned();
+                }
                 for joined in joined {
                     let proof = QualifiedRetirement {
                         correlation: joined.token.correlation.clone(),
                         retired_by_session: proof.retired_by_session.clone(),
                         basis: proof.basis.clone(),
                     };
-                    self.journal.item(
-                        &joined.token.key,
-                        "not completed: this attempt can no longer speak, to be offered again",
-                    );
-                    self.retry
-                        .insert(joined.token.key.clone(), (joined.token, proof));
+                    self.retire(joined.token, proof, heard_some, light_cut);
                 }
-                self.retry.insert(token.key.clone(), (token.clone(), proof));
-                self.journal.item(
-                    &token.key,
-                    "not completed: this attempt can no longer speak, to be offered again",
-                );
+                self.retire(token.clone(), proof, heard_some, light_cut);
             }
             ToWorker::Abandon {
                 no_audio, stopped, ..
@@ -453,9 +467,9 @@ impl<P: Persistence> Consumer<P> {
             }
         }
     }
-    fn abandoned(&mut self, token: PreparedToken, no_audio: bool, stopped: bool) {
-        // Only items still waiting to be said are counted, so the counts
-        // stay within the ledger's bound.
+    /// Only items still waiting to be said are counted, so the counts stay
+    /// within the ledger's bound.
+    fn prune_abandoned(&mut self) {
         let ledger = &self.ledger;
         let waiting = |key: &DeliveryKey| {
             ledger.view(key).map_or(true, |view| {
@@ -464,6 +478,47 @@ impl<P: Persistence> Consumer<P> {
         };
         self.abandoned.retain(|key| waiting(key));
         self.unvoiced.retain(|key, _| waiting(key));
+        self.light_cuts.retain(|key, _| waiting(key));
+    }
+    /// A fenced retirement of `token`'s attempt: offered again. One a line
+    /// cut in on after some of its audio came (`heard_some`) is offered
+    /// once more only, as a repeat ([`Offer::again`]), as an abandon with
+    /// audio is: the second such cut holds it (06c1, 5 Nov 17:04).
+    /// A light cut (`light_cut`: some audio, under a real share, as an
+    /// echo's or a cough's cut makes) never counts toward that hold: it is
+    /// offered again as before, at most [`LIGHT_CUT_RETRIES`] times for each
+    /// item, then held (Heron's P2 on #5509).
+    fn retire(
+        &mut self,
+        token: PreparedToken,
+        proof: QualifiedRetirement,
+        heard_some: bool,
+        light_cut: bool,
+    ) {
+        if heard_some && !self.abandoned.insert(token.key.clone()) {
+            self.journal.item(&token.key, HELD);
+            return;
+        }
+        if light_cut && !heard_some {
+            let tries = self.light_cuts.entry(token.key.clone()).or_default();
+            if *tries >= LIGHT_CUT_RETRIES {
+                self.journal.item(&token.key, LIGHT_CUT_HELD);
+                return;
+            }
+            *tries += 1;
+        }
+        self.journal.item(
+            &token.key,
+            if heard_some {
+                CUT_ONCE_MORE
+            } else {
+                "not completed: this attempt can no longer speak, to be offered again"
+            },
+        );
+        self.retry.insert(token.key.clone(), (token, proof));
+    }
+    fn abandoned(&mut self, token: PreparedToken, no_audio: bool, stopped: bool) {
+        self.prune_abandoned();
         // Stopped by the person over its ring: heard, and not rung again.
         if stopped && !no_audio {
             self.abandoned.insert(token.key.clone());
@@ -593,6 +648,10 @@ impl<P: Persistence> Consumer<P> {
         let expires_at_us = now
             .saturating_add(LEASE_US)
             .min(due.stamp.at_us.saturating_add(DUE_AGE_US));
+        // Cut after some of it played and offered once more: a repeat.
+        let again = std::iter::once(&token.key)
+            .chain(also.iter().map(|joined| &joined.token.key))
+            .any(|key| self.abandoned.contains(key));
         let offer = Offer {
             token,
             text,
@@ -601,6 +660,7 @@ impl<P: Persistence> Consumer<P> {
             observed_at_us: now,
             expires_at_us,
             also,
+            again,
         };
         // Disk latency cannot refresh the observation that preceded it.
         if !offer.fresh(monotonic_us()) {
@@ -614,12 +674,17 @@ impl<P: Persistence> Consumer<P> {
         self.journal.item(
             &offer.token.key,
             format!(
-                "due, offered to the voice (attempt {}{}{})",
+                "due, offered to the voice (attempt {}{}{}{})",
                 offer.token.attempt,
                 if offer.late { ", late" } else { "" },
                 match offer.also.len() {
                     0 => String::new(),
                     joined => format!(", {joined} more as late in the same line"),
+                },
+                if offer.again {
+                    ", said as a repeat"
+                } else {
+                    ""
                 }
             ),
         );

@@ -773,6 +773,155 @@ fn ticks_offer_nothing(
 /// never rang. An attempt given up with nothing proven is offered once
 /// more, after the pacing, under a new attempt; given up a second time it
 /// is held, so it is said twice at most.
+/// A fenced cut-in of `token`'s attempt, some of its audio played or not.
+fn cut_in(
+    worker: &mut Consumer<Disk>,
+    token: &PreparedToken,
+    heard_some: bool,
+    light_cut: bool,
+) -> u64 {
+    let now = lamp_ipc::monotonic_us();
+    worker
+        .command(
+            ToWorker::Retire {
+                token: token.clone(),
+                proof: QualifiedRetirement {
+                    correlation: token.correlation.clone(),
+                    retired_by_session: SESSION.into(),
+                    basis: RetirementBasis::OwnerFenced {
+                        owner_boot: [7; 16],
+                        turn: 1,
+                        microphone_generation: 1,
+                    },
+                },
+                heard_some,
+                light_cut,
+            },
+            now,
+        )
+        .unwrap();
+    worker.outgoing.clear();
+    now
+}
+
+/// 06c1, 5 Nov 17:04 (build 10343): "Time to drink some water." (req 256)
+/// was cut by a wordless cut-in (req 257) and offered again as new, and
+/// said again (req 258). A cut-in after some of its audio offers it once
+/// more, said as a repeat; a second such cut holds it. One cut before any
+/// audio is offered again as before, and not as a repeat.
+#[test]
+fn a_cut_in_after_some_audio_offers_it_once_more_as_a_repeat_then_holds_it() {
+    let (engine, socket) = served(1);
+    let mut worker = consumer(Disk::default());
+    let first = begin(&mut worker, &engine, &socket);
+    assert!(!first.again);
+    // Cut before any of it played: offered again, not as a repeat.
+    cut_in(&mut worker, &first.token, false, false);
+    worker.next_offer_us = 0;
+    let second = begin(&mut worker, &engine, &socket);
+    assert!(!second.again, "nothing of it was heard");
+    // Cut after some of it played: once more, as a repeat.
+    cut_in(&mut worker, &second.token, true, false);
+    assert_eq!(
+        worker.journal.lines.last().unwrap(),
+        &format!("reminder id 1 delivery 1: {CUT_ONCE_MORE}")
+    );
+    worker.next_offer_us = 0;
+    let third = begin(&mut worker, &engine, &socket);
+    assert_eq!(third.token.key, first.token.key);
+    assert!(third.again, "the re-offer is said as a repeat");
+    assert!(
+        worker
+            .journal
+            .lines
+            .iter()
+            .any(|line| line.ends_with(", said as a repeat)")),
+        "{:?}",
+        worker.journal.lines
+    );
+    // Cut again after some of it: held, never a third time.
+    cut_in(&mut worker, &third.token, true, false);
+    assert_eq!(
+        worker.journal.lines.last().unwrap(),
+        &format!("reminder id 1 delivery 1: {HELD}")
+    );
+    ticks_offer_nothing(&mut worker, &engine, &socket, 4);
+    assert!(
+        socket
+            .requests()
+            .iter()
+            .all(|request| !matches!(request, Request::Ack { .. }))
+    );
+}
+
+/// Heron's P2 on #5509: two cuts a few frames in each (the lamp's own
+/// echo, a cough's tail) never hold it: it is still offered a third time,
+/// not as a repeat; light cuts are capped at `LIGHT_CUT_RETRIES`, then held.
+/// A cut with a real share heard after them still counts toward the hold.
+#[test]
+fn light_cuts_never_count_toward_the_hold_and_are_capped() {
+    let (engine, socket) = served(1);
+    let mut worker = consumer(Disk::default());
+    let mut offer = begin(&mut worker, &engine, &socket);
+    for n in 1..=LIGHT_CUT_RETRIES {
+        cut_in(&mut worker, &offer.token, false, true);
+        worker.next_offer_us = 0;
+        offer = begin(&mut worker, &engine, &socket);
+        assert!(
+            !offer.again,
+            "light cut {n}: nothing of it was heard to repeat"
+        );
+    }
+    // A real share heard: once more, as a repeat.
+    cut_in(&mut worker, &offer.token, true, false);
+    worker.next_offer_us = 0;
+    let repeat = begin(&mut worker, &engine, &socket);
+    assert!(repeat.again);
+    // A light cut now: past the cap, held.
+    cut_in(&mut worker, &repeat.token, false, true);
+    assert_eq!(
+        worker.journal.lines.last().unwrap(),
+        &format!("reminder id 1 delivery 1: {LIGHT_CUT_HELD}")
+    );
+    ticks_offer_nothing(&mut worker, &engine, &socket, 4);
+}
+
+/// The same run's line as the coordinator now settles it: cut after most
+/// of it played, it is completed, acknowledged and never offered again.
+#[test]
+fn a_reminder_completed_at_its_cut_is_acknowledged_and_not_offered_again() {
+    let (engine, socket) = served(1);
+    let mut worker = consumer(Disk::default());
+    let first = begin(&mut worker, &engine, &socket);
+    let now = lamp_ipc::monotonic_us();
+    worker
+        .command(
+            ToWorker::Complete {
+                token: first.token.clone(),
+                proof: completion(&first.token),
+            },
+            now,
+        )
+        .unwrap();
+    assert!(
+        worker
+            .ledger
+            .view(&first.token.key)
+            .unwrap()
+            .unwrap()
+            .completion
+            .is_some()
+    );
+    assert!(!worker.retry.contains_key(&first.token.key));
+    assert!(
+        !worker
+            .journal
+            .lines
+            .iter()
+            .any(|line| line.contains("to be offered again"))
+    );
+}
+
 #[test]
 fn abandoned_once_is_offered_again_after_the_pace_and_twice_is_held() {
     let (engine, socket) = served(1);
@@ -881,6 +1030,8 @@ fn a_stop_for_the_ring_a_cut_in_retired_takes_it_off_the_retry() {
                 ToWorker::Retire {
                     token: first.token.clone(),
                     proof: fenced(&first.token),
+                    heard_some: false,
+                    light_cut: false,
                 },
                 now,
             )
@@ -1311,6 +1462,8 @@ fn qualified_pre_audio_retirement_retries_once_with_a_new_durable_correlation() 
             ToWorker::Retire {
                 token: first.token.clone(),
                 proof,
+                heard_some: false,
+                light_cut: false,
             },
             now,
         )
@@ -1375,6 +1528,8 @@ fn interrupted_owner_retry_keeps_old_proof_out_of_the_new_attempt_and_ack() {
                         microphone_generation: 1,
                     },
                 },
+                heard_some: false,
+                light_cut: false,
             },
             now,
         )
@@ -1859,7 +2014,8 @@ fn the_journal_says_what_became_of_each_due_item_once_per_change() {
         [
             "reminder id 1 delivery 1: due, offered to the voice (attempt 1)".to_owned(),
             format!("reminder id 1 delivery 1: {ONCE_MORE}"),
-            "reminder id 1 delivery 1: due, offered to the voice (attempt 2)".to_owned(),
+            "reminder id 1 delivery 1: due, offered to the voice (attempt 2, said as a repeat)"
+                .to_owned(),
             format!("reminder id 1 delivery 1: {HELD}"),
         ]
     );

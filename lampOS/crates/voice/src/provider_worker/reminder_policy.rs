@@ -22,6 +22,8 @@ pub(super) struct Policy {
 }
 
 impl Policy {
+    // The item's fields as the provider input carries them, one each.
+    #[allow(clippy::too_many_arguments)]
     pub fn prepare(
         &mut self,
         request: u64,
@@ -30,6 +32,7 @@ impl Policy {
         also: &[String],
         late: bool,
         late_by_ms: Option<u64>,
+        again: bool,
     ) -> Result<String, ReminderDeferral> {
         if let Some((previous, _)) = self.last
             && previous < request
@@ -43,7 +46,7 @@ impl Policy {
         if !self.enabled {
             return Err(ReminderDeferral::Disabled);
         }
-        checked_note(text, also, late, late_by_ms)
+        checked_note(text, also, late, late_by_ms, again)
     }
 
     pub fn is_reminder(&self, lineage: Lineage) -> bool {
@@ -71,12 +74,14 @@ impl Policy {
 }
 
 /// The note for a due item's `text`, or why it cannot be said. The same for
-/// both voice routes ([`super::reminder_note`]).
+/// both voice routes ([`super::reminder_note`]). Said `again`, after a line
+/// cut it with some of it played, the note says it is a repeat ([`AGAIN`]).
 pub(super) fn checked_note(
     text: &str,
     also: &[String],
     late: bool,
     late_by_ms: Option<u64>,
+    again: bool,
 ) -> Result<String, ReminderDeferral> {
     let invalid = |text: &str| {
         text.trim().is_empty() || text.len() > 300 || text.chars().any(char::is_control)
@@ -90,16 +95,28 @@ pub(super) fn checked_note(
     // JSON quoting makes the data boundary explicit; the tool gate,
     // rather than prompt wording, enforces the ban on side effects.
     let words = ReminderWords::installed();
-    if also.is_empty() {
-        return Ok(note(&words, text, late, late_by_ms));
-    }
-    let joined = joined_note(&words, text, also);
+    let note = if also.is_empty() {
+        note(&words, text, late, late_by_ms)
+    } else {
+        joined_note(&words, text, also)
+    };
+    let note = if again {
+        format!("{AGAIN} {note}")
+    } else {
+        note
+    };
     // The consumer joins only what fits ([`crate::reminders::JOINED_TEXT_BYTES`]).
-    if joined.len() > lamp_gemini::wire::MAX_NOTE_BYTES {
+    if (again || !also.is_empty()) && note.len() > lamp_gemini::wire::MAX_NOTE_BYTES {
         return Err(ReminderDeferral::Invalid);
     }
-    Ok(joined)
+    Ok(note)
 }
+
+/// How one is said once more after a line cut it with some of it played
+/// (06c1, 5 Nov 17:04: "Time to drink some water." was cut after 4 of its 5
+/// words and said again as if new): once, as a repeat, opening with
+/// "Again:".
+pub(crate) const AGAIN: &str = "This was cut off while it was being said, so it is said once more: say it once, as a repeat, beginning with \"Again:\", for example \"Again: time to drink some water.\"";
 
 /// How several late ones are said together, once (29e7, 2 Nov: four were
 /// said back to back in 34 s, as the microphones opened mid-talk).
@@ -229,11 +246,27 @@ mod tests {
             "{}",
             one.len()
         );
-        assert!(checked_note("a", &["b".to_owned()], true, None).is_ok());
+        assert!(checked_note("a", &["b".to_owned()], true, None, false).is_ok());
         assert_eq!(
-            checked_note("a", &vec!["b".to_owned(); 5], true, None),
+            checked_note("a", &vec!["b".to_owned(); 5], true, None, false),
             Err(ReminderDeferral::Invalid)
         );
+    }
+
+    /// 06c1, 5 Nov 17:04: one said once more after a cut is said as a
+    /// repeat ("Again: …"), once; the first time, as before.
+    #[test]
+    fn one_said_again_after_a_cut_is_a_repeat() {
+        let first = checked_note("drink some water", &[], false, None, false).unwrap();
+        let again = checked_note("drink some water", &[], false, None, true).unwrap();
+        assert!(!first.contains("Again:"));
+        assert!(again.starts_with(AGAIN), "{again}");
+        assert!(
+            again.ends_with(&first),
+            "the same note after the repeat's words"
+        );
+        let joined = checked_note("a", &["b".to_owned()], true, None, true).unwrap();
+        assert!(joined.starts_with(AGAIN) && joined.contains(JOINED));
     }
 
     fn delay(ms: u64) -> String {

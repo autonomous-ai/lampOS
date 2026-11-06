@@ -1492,6 +1492,47 @@ The same occurrence is offered after the conversation when ordinary fresh
 capture, silence, readiness and the five-second attempt pace permit it. Words
 already heard may repeat; no time limit alone authorizes replay.
 
+**A reminder cut after most of it played counts as said; cut earlier, it is
+said once more as a repeat** (06c1, 5 Nov 17:04, build 10343). Two reminders
+were said on time as separate lines; "Time to drink some water." (request
+256) was cut by a wordless cut-in (request 257) after 4 of its 5 words,
+1950 ms of it, retired as a fenced cut-in (`not completed: this attempt can no
+longer speak, to be offered again`) and said again as if new (request 258).
+Now, as a line cuts in on a reminder's reply (`take_interrupted_reminder`),
+a reply whose provider answer was complete, with at least
+`CUT_HEARD_MIN_SAMPLES` (8,000) samples handed to the speaker, and those at
+least `MOSTLY_PLAYED_PERCENT` (80%) of its whole answer plus the zeros of its
+gaps (`Reply::mostly_heard_at_cut`), completes its receipt on the cut's own
+cursor (`Receipt::heard_before_the_cut`: its playback occurrence and the
+frames handed, the cut counting as the generation that ended it). The voice
+says `lamp-voice: the reminder was cut after H of its W samples had played:
+counted as said, not offered again`, and the consumer acknowledges it as for
+any completion. Cut earlier with a real share heard (`Reply::share_heard_at_cut`:
+a complete answer, at least `CUT_HEARD_MIN_SAMPLES` handed and at least
+`CUT_HEARD_SHARE_PERCENT` (50%) of the whole), the fenced `Retire` carries
+`heard_some`: the consumer offers it once more only (`not completed: this
+attempt can no longer speak, cut after some of it played: to be offered again
+once, said as a repeat`) and holds a second such cut, as for an abandon with
+audio (below). Any fenced retirement with a real share heard counts toward
+that hold, whatever cut it. A light cut, some audio but under that share (the
+lamp's own echo committing as a 0-word cut-in, #4938, or a cough's tail a few
+frames in, #5491), carries `light_cut` instead: never counted toward the hold,
+it is offered again as before, at most `LIGHT_CUT_RETRIES` (3) times for each
+item, then held (`held: cut early by a line each time it was offered, so it
+is not offered again`), so two early cuts never lose it silently (Heron's P2
+on #5509). Such a re-offer, and one after an abandon with audio,
+carries `Offer::again` (`due, offered to the voice (attempt N, said as a
+repeat)`), and the provider's note opens with `reminder_policy::AGAIN`: said
+once, as a repeat, beginning "Again:". A cut before any audio retries as
+before, not as a repeat. Tests:
+`a_reminder_cut_after_most_of_it_played_counts_as_said`,
+`a_reminder_cut_halfway_is_retired_as_heard_in_part` and
+`a_reminder_cut_early_is_a_light_cut` (`coordinator.rs`),
+`a_cut_in_after_some_audio_offers_it_once_more_as_a_repeat_then_holds_it`,
+`light_cuts_never_count_toward_the_hold_and_are_capped` and `a_reminder_completed_at_its_cut_is_acknowledged_and_not_offered_again`
+(`reminders/consumer/tests.rs`), `one_said_again_after_a_cut_is_a_repeat`
+(`provider_worker/reminder_policy.rs`).
+
 **An abandoned attempt is offered once more (#5219).** When a reminder's
 reply ends with neither a completion nor a qualified retirement (failed,
 privacy-cancelled, cut by talk after a generation retired, or otherwise

@@ -1186,6 +1186,17 @@ impl SleepOwed {
 /// said and said again, three times in three hours).
 const MOSTLY_PLAYED_PERCENT: u64 = 80;
 
+/// A reminder's reply cut with fewer samples than this handed to the
+/// speaker is never taken as heard at the cut
+/// ([`Reply::mostly_heard_at_cut`]): half a second at 16 kHz, a third at
+/// 24 kHz, the most the speaker's own buffer may still hold unplayed.
+const CUT_HEARD_MIN_SAMPLES: u64 = 8_000;
+
+/// A reminder's reply cut with at least this share, in percent, of its
+/// answer handed to the speaker (and [`CUT_HEARD_MIN_SAMPLES`]) was heard in
+/// part: its cut counts toward the hold ([`Reply::share_heard_at_cut`]).
+const CUT_HEARD_SHARE_PERCENT: u64 = 50;
+
 /// The zeros the speaker wrote into a reply's delivery gaps, the gaps
 /// `Reply::playback_gaps` counts (#5258).
 #[derive(Clone, Copy, Debug, Default)]
@@ -1222,6 +1233,14 @@ impl GapZeros {
             _ => {}
         }
     }
+}
+
+/// Where a line cut a reminder's reply that had mostly played
+/// ([`Reply::mostly_heard_at_cut`]): its playback occurrence and how many
+/// samples its whole answer had.
+struct HeardAtCut {
+    playback_sequence: u64,
+    whole: u64,
 }
 
 struct Reply {
@@ -1362,6 +1381,49 @@ impl Reply {
             && self.reminder.is_some()
             && self.heard_through(speaker_pending, snapshot)
             && self.mostly_played()
+    }
+
+    /// A reply that a line is cutting in on after most of it
+    /// played: the provider's answer had ended, so all its audio is here,
+    /// and the samples handed to the speaker are at least
+    /// [`MOSTLY_PLAYED_PERCENT`] of those, the ones still queued and the
+    /// zeros of its gaps. Its playback occurrence and the whole, or none
+    /// (06c1, 5 Nov 17:04: 4 of 5 words played before a wordless cut-in,
+    /// and the reminder was said again).
+    fn mostly_heard_at_cut(&self) -> Option<HeardAtCut> {
+        let playback = self.playback?;
+        let words = self.handed;
+        let whole = words.saturating_add(self.pcm.len() as u64);
+        let written = whole.saturating_add(self.gap_zeros.total);
+        // Read as its receipt is taken ([`take_interrupted_reminder`]).
+        (self.had_audio
+            && self.notice.origin() == SpeechOrigin::Provider
+            && matches!(self.cloud.outcome, Some(RequestOutcome::Complete))
+            && words >= CUT_HEARD_MIN_SAMPLES
+            && words.saturating_mul(100) >= written.saturating_mul(MOSTLY_PLAYED_PERCENT))
+        .then_some(HeardAtCut {
+            playback_sequence: playback.sequence(),
+            whole,
+        })
+    }
+
+    /// A real share of this reply was heard as a line cuts in on it: the
+    /// provider's answer was complete, and the samples handed to the
+    /// speaker are at least [`CUT_HEARD_MIN_SAMPLES`] and at least
+    /// [`CUT_HEARD_SHARE_PERCENT`] of its whole answer and gap zeros. Only
+    /// such a cut counts toward a reminder's hold; one a few frames in, as
+    /// the lamp's own echo or a cough's tail makes (#4938, #5491), is
+    /// offered again (Heron's P2 on #5509).
+    fn share_heard_at_cut(&self) -> bool {
+        let words = self.handed;
+        let written = words
+            .saturating_add(self.pcm.len() as u64)
+            .saturating_add(self.gap_zeros.total);
+        self.had_audio
+            && self.notice.origin() == SpeechOrigin::Provider
+            && matches!(self.cloud.outcome, Some(RequestOutcome::Complete))
+            && words >= CUT_HEARD_MIN_SAMPLES
+            && words.saturating_mul(100) >= written.saturating_mul(CUT_HEARD_SHARE_PERCENT)
     }
 
     fn complete_reminder(&mut self, speaker_pending: &Option<PendingSpeaker>, snapshot: Snapshot) {
@@ -14878,6 +14940,7 @@ fn commit_reminder_turn(
         late: offer.late,
         late_by_ms: offer.late_by_ms,
         also: offer.also_texts(),
+        again: offer.again,
     };
     current.reminder = Some(reminders.admitted(
         offer,
@@ -16515,7 +16578,22 @@ fn take_interrupted_reminder(reply: &mut Option<Reply>) -> Option<crate::reminde
     if matches!(current.cloud.outcome, Some(RequestOutcome::Failed { .. })) {
         return None;
     }
-    current.reminder.take()
+    let mut receipt = current.reminder.take()?;
+    // Cut after most of it played: heard, so completed, not said again
+    // (06c1, 5 Nov 17:04).
+    if let Some(cut) = current.mostly_heard_at_cut()
+        && receipt.heard_before_the_cut(cut.playback_sequence, current.handed)
+    {
+        eprintln!(
+            "lamp-voice: the reminder was cut after {} of its {} samples had played: counted as said, not offered again",
+            current.handed, cut.whole
+        );
+    } else if current.share_heard_at_cut() {
+        // A real share heard: its retirement counts toward the hold. Less,
+        // an echo's or a cough's cut, is a light one (Heron's P2 on #5509).
+        receipt.share_heard_at_cut();
+    }
+    Some(receipt)
 }
 
 fn cancel_reply(
@@ -18076,6 +18154,79 @@ mod tests {
             },
             permit,
         )
+    }
+
+    /// A reminder's reply with `handed` samples handed to the speaker and
+    /// `left` still queued, its answer ended, cut by a line: the
+    /// settlement its receipt sends.
+    fn cut_reminder(handed: u64, left: usize) -> crate::reminders::ToWorker {
+        let (_owner, mut current, _) = active_reply();
+        let (mut receipt, probe) = crate::reminders::receipt_for_test(current.owner, 1, 1);
+        receipt.audio();
+        current.reminder = Some(receipt);
+        current.handed = handed;
+        current.pcm = vec![7; left].into();
+        current.cloud.outcome = Some(RequestOutcome::Complete);
+        let mut reply = Some(current);
+        let mut interrupted = take_interrupted_reminder(&mut reply).unwrap();
+        // The cut-in's successor is admitted and published, then:
+        interrupted.interrupted_after_owner_fenced(Some(2));
+        drop(interrupted);
+        probe.settlement().unwrap()
+    }
+
+    /// 06c1, 5 Nov 17:04 (build 10343): "Time to drink some water." (req
+    /// 256) was cut by a wordless cut-in (req 257) after 4 of its 5 words,
+    /// 1950 ms of it, and said again (req 258). Cut after most of it
+    /// played, it is completed, never retired to be said again.
+    #[test]
+    fn a_reminder_cut_after_most_of_it_played_counts_as_said() {
+        // 1950 ms played of about 2250 ms at 16 kHz.
+        let settlement = cut_reminder(31_200, 4_800);
+        let crate::reminders::ToWorker::Complete { proof, .. } = settlement else {
+            panic!("cut after most of it played, it must count as said: {settlement:?}");
+        };
+        assert_eq!(proof.final_frame, 31_200);
+        assert!(proof.retired_generations > 0 && proof.playback_sequence > 0);
+    }
+
+    /// Cut with half of it played or more, it is retired as heard in part,
+    /// counting toward the hold, so its one more offer is said as a repeat.
+    #[test]
+    fn a_reminder_cut_halfway_is_retired_as_heard_in_part() {
+        let settlement = cut_reminder(18_000, 18_000);
+        assert!(
+            matches!(
+                settlement,
+                crate::reminders::ToWorker::Retire {
+                    heard_some: true,
+                    light_cut: false,
+                    ..
+                }
+            ),
+            "{settlement:?}"
+        );
+    }
+
+    /// Heron's P2 on #5509: a cut a few frames in (the lamp's own echo, a
+    /// cough's tail) is a light one, never counted toward the hold: under
+    /// half of it played, or too little to tell from the speaker's buffer.
+    #[test]
+    fn a_reminder_cut_early_is_a_light_cut() {
+        for (handed, left) in [(2_400, 33_600), (8_000, 28_000), (480, 0)] {
+            let settlement = cut_reminder(handed, left);
+            assert!(
+                matches!(
+                    settlement,
+                    crate::reminders::ToWorker::Retire {
+                        heard_some: false,
+                        light_cut: true,
+                        ..
+                    }
+                ),
+                "{handed} of {left}: {settlement:?}"
+            );
+        }
     }
 
     fn provider_audio(sequence: u64, samples: Vec<i16>) -> ProviderOutput {
