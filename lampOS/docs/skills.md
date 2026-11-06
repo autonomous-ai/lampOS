@@ -2118,7 +2118,14 @@ gone ([switches.md](switches.md)). What happens:
    you're alone with the lamp, it reads you tomorrow's Google Calendar:
    how many events, then each time and title." Off, any request that
    names a service is `NOT_A_SERVICE`, as before ([services.md](services.md),
-   "A made skill's read").
+   "A made skill's read"). Kept, a skill whose step reads a service not
+   linked now (`services_connected`, asked once, at most 500 ms) is still
+   kept, and the make tells it: by voice, `needs_link` in the make's
+   answer and one sentence said before the ask, "Gmail isn't linked yet:
+   link it in the app, under Skills, then Connectors, and the skill will
+   start then."; from the app, `needs_link: [{"code", "name"}]` in
+   `skills.made`. With `lamp-services` not answering, neither, and the
+   make stands ([services.md](services.md), "Not linked when it is made").
 5. **Checked.** The card is marked `made: here` (`lamp-cloud`'s "Made on
    this lamp" group) and by its maker, `made_by: voice` or `made_by: app`
    (`made_skill::Maker`, from what it is kept as made from: an app's ask's

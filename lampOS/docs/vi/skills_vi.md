@@ -66,7 +66,15 @@ sau:
    dù yêu cầu không hề nói giờ), và câu "có" nói ra của nó nêu dịch vụ, thứ nó đọc và điều kiện, "when
    you're alone with the lamp, it reads you tomorrow's Google Calendar: how
    many events, then each time and title." Khi tắt, mọi yêu cầu nêu một dịch
-   vụ là `NOT_A_SERVICE`, như trước.
+   vụ là `NOT_A_SERVICE`, như trước. Khi đã giữ, một kỹ năng có bước đọc một
+   dịch vụ chưa liên kết lúc đó (`services_connected`, hỏi một lần, tối đa
+   500 ms) vẫn được giữ, và việc tạo báo điều đó: tạo bằng giọng nói,
+   `needs_link` trong câu trả lời của việc tạo và một câu nói trước lời hỏi,
+   "Gmail isn't linked yet: link it in the app, under Skills, then
+   Connectors, and the skill will start then."; tạo từ ứng dụng,
+   `needs_link: [{"code", "name"}]` trong `skills.made`. Khi `lamp-services`
+   không trả lời thì không có cả hai, và việc tạo vẫn thành
+   ([services_vi.md](services_vi.md), "Chưa liên kết lúc tạo").
 
    Bước `read = { service, what, ... }` (`lamp-skills`, `service_read`): mọi
    dịch vụ có việc đọc cố định (không phải `gmail-app` chỉ gửi, các dịch vụ

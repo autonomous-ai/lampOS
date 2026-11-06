@@ -243,11 +243,30 @@ pub fn own_chat() -> Result<Chat, String> {
 /// model `chat` gives, kept in `keeping` as made at `now_unix_ms`, and
 /// asked about then. Blocking: the model is asked on a thread of its own,
 /// with a runtime of its own. What the model is told.
+///
+/// A kept skill that reads a linked service not linked now, as
+/// `lamp-services` tells it ([`crate::services::linked_codes`], asked only
+/// then), is told with `needs_link` and a sentence to say where to link it
+/// ([`made_skill::needs_link`]); none when that can't be told, and the
+/// make stands either way.
 pub fn make(
     request: &str,
     keeping: &Keeping,
     chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
     now_unix_ms: u64,
+) -> Value {
+    make_with(request, keeping, chat, now_unix_ms, || {
+        crate::services::linked_codes(std::path::Path::new(crate::services::FOLDER))
+    })
+}
+
+/// [`make`], what is linked given by `linked`.
+pub fn make_with(
+    request: &str,
+    keeping: &Keeping,
+    chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
+    now_unix_ms: u64,
+    linked: impl FnOnce() -> Option<Vec<String>>,
 ) -> Value {
     let brief = match made_skill::brief(request) {
         Ok(brief) => brief,
@@ -271,7 +290,11 @@ pub fn make(
     if made.is_err() {
         crate::made_counts::refused(&keeping.directory, made_skill::Maker::Voice);
     }
-    told(made)
+    let needs = made
+        .as_ref()
+        .ok()
+        .and_then(|made| made_skill::needs_link(&made.uses, linked));
+    told(made, needs.as_deref())
 }
 
 /// The skill for `request` (its `brief` made already) written by the
@@ -355,20 +378,33 @@ fn ask(
 /// why, in plain words. It is not kept as asked here: only an answer that
 /// said [`made_skill::ASK_TO_PUT_ON`] makes it asked, when the yes comes
 /// ([`answer`], the Reviewer-lead's P2 on #4914).
-fn told(made: Result<Made, Refused>) -> Value {
+///
+/// `needs`: the linked services it reads that aren't linked now
+/// ([`made_skill::needs_link`]): told as `needs_link`, and their sentence
+/// said before the ask, so the ask stays last.
+fn told(made: Result<Made, Refused>, needs: Option<&[Value]>) -> Value {
     match made {
         Ok(made) => {
-            json!({
+            let link = needs
+                .and_then(made_skill::needs_link_said)
+                .map(|said| format!("then say exactly: \"{said}\" "))
+                .unwrap_or_default();
+            let mut told = json!({
                 "made": made.name,
                 "description": made.description,
                 "uses": made.uses.spoken(),
                 "next": format!(
                     "Say what it does as its description says, leaving nothing out, then what it \
-                     uses, then ask exactly: \"{}\" Only if they then say yes out loud, call {}.",
+                     uses, {link}then ask exactly: \"{}\" Only if they then say yes out loud, \
+                     call {}.",
                     made_skill::ASK_TO_PUT_ON,
                     made_skill::PUT_ON
                 )
-            })
+            });
+            if let Some(needs) = needs.filter(|needs| !needs.is_empty()) {
+                told["needs_link"] = json!(needs);
+            }
+            told
         }
         Err(Refused(why, _)) => json!({
             "error": format!("the skill couldn't be made: {why}"),
@@ -1273,5 +1309,65 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             assert!(make.description.contains("you'll make it now"));
             assert!(!make.description.contains("confirm_agent_task"));
         }
+    }
+
+    /// Made by voice, a skill that reads Gmail not linked is told with
+    /// `needs_link` and the sentence where to link it, said before the ask
+    /// so the ask stays last; linked, or with `lamp-services` not telling,
+    /// neither, and the make stands. A skill that reads nothing never asks.
+    #[test]
+    fn a_made_skill_that_reads_a_service_not_linked_says_where_to_link_it() {
+        let made = |reads: Option<&str>| Made {
+            name: "morning-mail".into(),
+            version: "1.0.0".into(),
+            sha256: "a".repeat(64),
+            description: "Reads your latest mail at eight.".into(),
+            uses: made_skill::Uses {
+                speak: true,
+                reads: reads.map(str::to_owned),
+                ..Default::default()
+            },
+            package: PathBuf::from("morning-mail.tar"),
+        };
+        let gmail = made(Some("gmail"));
+        let needs = made_skill::needs_link(&gmail.uses, || Some(vec![]));
+        let answer = told(Ok(gmail.clone()), needs.as_deref());
+        assert_eq!(
+            answer["needs_link"],
+            json!([{"code": "gmail", "name": "Gmail"}]),
+            "{answer}"
+        );
+        let next = answer["next"].as_str().unwrap();
+        let sentence = "Gmail isn't linked yet: link it in the app, under Skills, then \
+                        Connectors, and the skill will start then.";
+        let (link, ask) = (
+            next.find(sentence).expect(next),
+            next.find(made_skill::ASK_TO_PUT_ON).expect(next),
+        );
+        assert!(link < ask, "{next}");
+        for linked in [Some(vec!["gmail".to_owned()]), None] {
+            let needs = made_skill::needs_link(&gmail.uses, || linked.clone());
+            let answer = told(Ok(gmail.clone()), needs.as_deref());
+            assert!(answer.get("needs_link").is_none(), "{answer}");
+            assert!(!answer["next"].as_str().unwrap().contains("isn't linked"));
+            assert_eq!(answer["made"], "morning-mail");
+        }
+        let plain = made(None);
+        let needs = made_skill::needs_link(&plain.uses, || panic!("never asked"));
+        assert_eq!(needs, Some(vec![]));
+        assert!(
+            told(Ok(plain), needs.as_deref())
+                .get("needs_link")
+                .is_none()
+        );
+        // The make itself, with `lamp-services` not telling: kept and
+        // asked about as before.
+        let (root, keeping) = keeping("needs-link-unknown");
+        let (url, served) = service(vec![(200, good())]);
+        let answer = make_with(REQUEST, &keeping, chat_at(url), NOW, || None);
+        assert_eq!(answer["made"], "evening-dim", "{answer}");
+        assert!(answer.get("needs_link").is_none(), "{answer}");
+        assert_eq!(served.join().unwrap(), 1);
+        let _ = std::fs::remove_dir_all(&root);
     }
 }
