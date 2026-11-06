@@ -1378,14 +1378,14 @@ pub(super) const LINES: &[Line] = &[
     ]),
     ("Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.", [
         "Rồi, vậy là xong hết. Lúc nào bạn cũng có thể bảo mình cài đặt lại. Muốn biết các nút và cách chạm vào mình, bạn mở app Autonomous, chọn mình, rồi vào General, About, Buttons and gestures nhé. Nếu bạn làm việc trên máy tính, mình có thể nhận việc giúp bạn: mở mục Harness trong app để kết nối nhé.",
-        "はい、これで全部です。設定はいつでもやり直せるので、言ってくださいね。ボタンやタッチの使い方は、Autonomous アプリで私を選んで、General、About、Buttons and gestures の順に開くと見られますよ。 パソコンでお仕事をしているなら、アプリの Harness でつなぐと、私が作業を引き受けられますよ。",
-        "好的，全部完成了。你随时可以让我重新设置。想知道我的按键和触摸怎么用，可以打开 Autonomous App，选中我，再依次打开 General、About、Buttons and gestures。 如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
+        "はい、これで全部です。設定はいつでもやり直せるので、言ってくださいね。ボタンやタッチの使い方は、Autonomous アプリで私を選んで、General、About、Buttons and gestures の順に開くと見られますよ。パソコンでお仕事をしているなら、アプリの Harness でつなぐと、私が作業を引き受けられますよ。",
+        "好的，全部完成了。你随时可以让我重新设置。想知道我的按键和触摸怎么用，可以打开 Autonomous App，选中我，再依次打开 General、About、Buttons and gestures。如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
         "좋아요. 이걸로 설정이 모두 끝났어요. 다시 설정하고 싶으시면 언제든 말씀해 주세요. 제 버튼이랑 터치 사용법은 Autonomous 앱에서 저를 선택하고 General, About, Buttons and gestures 순서로 들어가면 볼 수 있어요. 컴퓨터로 일하신다면 앱의 Harness에서 연결해 주세요, 제가 일을 맡아 드릴게요.",
     ]),
     ("Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.", [
         "Rồi, vậy là xong hết. Lúc nào bạn cũng có thể bảo mình cài đặt lại. Muốn biết các nút và cách chạm vào mình, bạn mở app Autonomous, chọn mình, rồi vào General, About, Buttons and gestures nhé. Nếu bạn muốn bắt đầu từ đâu đó, cứ nhờ mình hẹn giờ, hỏi thời tiết, hay hỏi bất cứ điều gì bạn tò mò. Bạn cũng có thể thêm kỹ năng từ Skill Store trong app, hoặc cứ nhờ mình tạo một kỹ năng. Nếu bạn làm việc trên máy tính, mình có thể nhận việc giúp bạn: mở mục Harness trong app để kết nối nhé.",
-        "はい、これで全部です。設定はいつでもやり直せるので、言ってくださいね。ボタンやタッチの使い方は、Autonomous アプリで私を選んで、General、About、Buttons and gestures の順に開くと見られますよ。まずは、タイマーや天気、気になることを何でも聞いてみてください。アプリの Skill Store からスキルを追加したり、私にスキルを作ってと頼んだりもできますよ。 パソコンでお仕事をしているなら、アプリの Harness でつなぐと、私が作業を引き受けられますよ。",
-        "好的，全部完成了。你随时可以让我重新设置。想知道我的按键和触摸怎么用，可以打开 Autonomous App，选中我，再依次打开 General、About、Buttons and gestures。想先试试的话，可以让我定个计时器、问问天气，或者问任何你好奇的事。你也可以在 App 的 Skill Store 里添加技能，或者直接让我帮你做一个。 如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
+        "はい、これで全部です。設定はいつでもやり直せるので、言ってくださいね。ボタンやタッチの使い方は、Autonomous アプリで私を選んで、General、About、Buttons and gestures の順に開くと見られますよ。まずは、タイマーや天気、気になることを何でも聞いてみてください。アプリの Skill Store からスキルを追加したり、私にスキルを作ってと頼んだりもできますよ。パソコンでお仕事をしているなら、アプリの Harness でつなぐと、私が作業を引き受けられますよ。",
+        "好的，全部完成了。你随时可以让我重新设置。想知道我的按键和触摸怎么用，可以打开 Autonomous App，选中我，再依次打开 General、About、Buttons and gestures。想先试试的话，可以让我定个计时器、问问天气，或者问任何你好奇的事。你也可以在 App 的 Skill Store 里添加技能，或者直接让我帮你做一个。如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
         "좋아요. 이걸로 설정이 모두 끝났어요. 다시 설정하고 싶으시면 언제든 말씀해 주세요. 제 버튼이랑 터치 사용법은 Autonomous 앱에서 저를 선택하고 General, About, Buttons and gestures 순서로 들어가면 볼 수 있어요. 처음이라면 타이머나 날씨, 아니면 궁금한 건 뭐든 물어봐 주세요. 앱의 Skill Store에서 스킬을 추가하거나, 저한테 하나 만들어 달라고 하셔도 돼요. 컴퓨터로 일하신다면 앱의 Harness에서 연결해 주세요, 제가 일을 맡아 드릴게요.",
     ]),
     ("That's fine, you can redo the setup later. Just ask me to redo the setup.", [
@@ -1606,9 +1606,12 @@ mod tests {
                     || sentence.to_owned(),
                     |language| line_in(sentence, language).unwrap(),
                 );
+                // Japanese and Chinese write no space after their full stop.
+                let plain = words(plain);
+                let space = if plain.ends_with('。') { "" } else { " " };
                 assert_eq!(
                     words(with),
-                    format!("{} {alone}", words(plain)),
+                    format!("{plain}{space}{alone}"),
                     "{language:?}"
                 );
             }

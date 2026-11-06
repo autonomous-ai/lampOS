@@ -681,8 +681,39 @@ struct SetUp {
     /// The targets file changed and is not valid: the targets before it
     /// are kept.
     targets_invalid: bool,
-    /// Harness's sign-in, once read.
+    /// Harness's sign-in, as last read; let go after
+    /// [`SIGN_IN_FAILED_READS`] failed reads in a row.
     sign_in: Option<SignIn>,
+    /// A read of the sign-in has answered in this run (whether its daemon
+    /// was started at this start, #5379, is decided once).
+    sign_in_answered: bool,
+    /// Failed reads of the sign-in since the last that answered.
+    sign_in_failures: u32,
+}
+
+/// Failed reads of Harness's sign-in in a row after which what was last read
+/// is let go: three looks, about three minutes on a lamp. Before, a sign-out
+/// followed by failing reads kept `yes` on `status` until a restart (#5488
+/// follow-up); one failed read still says nothing about the account.
+const SIGN_IN_FAILED_READS: u32 = 3;
+
+impl SetUp {
+    /// A read of Harness's sign-in that answered: kept, and the failures
+    /// counted from naught again.
+    fn sign_in_read(&mut self, sign_in: SignIn) {
+        self.sign_in = Some(sign_in);
+        self.sign_in_answered = true;
+        self.sign_in_failures = 0;
+    }
+
+    /// A read of Harness's sign-in that failed: what was last read is kept
+    /// until [`SIGN_IN_FAILED_READS`] fail in a row, then let go, so
+    /// `status` says no `signed_in` (not known) until a read answers again.
+    /// True when it is let go.
+    fn sign_in_not_read(&mut self) -> bool {
+        self.sign_in_failures = self.sign_in_failures.saturating_add(1);
+        self.sign_in_failures >= SIGN_IN_FAILED_READS && self.sign_in.take().is_some()
+    }
 }
 enum Job {
     Launch(LaunchJob),
@@ -1002,7 +1033,7 @@ fn owner<C: Clock>(
                                 // install puts Harness on with no daemon at
                                 // boot, so a signed-in lamp had none after a
                                 // reboot (lamp-c0a4, 5 Nov, #5379).
-                                if found.sign_in.is_none()
+                                if !found.sign_in_answered
                                     && sign_in_starter.is_some()
                                     && start_daemon_due.is_none()
                                     && matches!(sign_in, SignIn::In | SignIn::Offline)
@@ -1013,11 +1044,20 @@ fn owner<C: Clock>(
                                     start_daemon_due = Some(Instant::now());
                                     daemon_tries = 0;
                                 }
-                                found.sign_in = Some(sign_in);
+                                found.sign_in_read(sign_in);
                             }
                             // Kept as it was: one failed read says nothing
-                            // about the account.
-                            Err(code) => eprintln!("tasks: Harness's sign-in not read: {code}"),
+                            // about the account; failing for
+                            // `SIGN_IN_FAILED_READS` looks in a row, it is
+                            // let go as not known.
+                            Err(code) => {
+                                eprintln!("tasks: Harness's sign-in not read: {code}");
+                                if found.sign_in_not_read() {
+                                    eprintln!(
+                                        "tasks: Harness's sign-in not read {SIGN_IN_FAILED_READS} times in a row: not known until it is read again"
+                                    );
+                                }
+                            }
                         }
                     }
                     Ok(())
@@ -3011,6 +3051,38 @@ mod tests {
         )
         .unwrap();
         assert_eq!(started, view().unwrap());
+    }
+
+    /// #5488 follow-up: a sign-in read that keeps failing (after a sign-out,
+    /// say) does not keep the last answer for good: after
+    /// `SIGN_IN_FAILED_READS` failed reads in a row (three looks, about
+    /// three minutes on a lamp) it is let go, and `status` says no
+    /// `signed_in` until a read answers again. Fewer failures keep it, and
+    /// a read that answers starts the count again.
+    #[test]
+    fn a_sign_in_that_cannot_be_read_for_three_looks_is_let_go() {
+        use super::{Request, SetUp, SignIn, with_sign_in};
+        let mut found = SetUp::default();
+        found.sign_in_read(SignIn::In);
+        assert!(!found.sign_in_not_read());
+        assert!(!found.sign_in_not_read());
+        assert_eq!(found.sign_in, Some(SignIn::In), "two failures keep it");
+        found.sign_in_read(SignIn::In);
+        assert!(!found.sign_in_not_read());
+        assert!(!found.sign_in_not_read());
+        assert_eq!(found.sign_in, Some(SignIn::In), "an answer counts again");
+        assert!(found.sign_in_not_read(), "the third in a row lets it go");
+        assert_eq!(found.sign_in, None);
+        let status = with_sign_in(
+            &Request::Status {},
+            Ok(serde_json::json!({"summary": {}})),
+            found.sign_in,
+        )
+        .unwrap();
+        assert_eq!(status, serde_json::json!({"summary": {}}));
+        assert!(!found.sign_in_not_read(), "let go once");
+        found.sign_in_read(SignIn::Out);
+        assert_eq!(found.sign_in, Some(SignIn::Out));
     }
 
     #[test]
