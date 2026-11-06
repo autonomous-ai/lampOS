@@ -1,6 +1,6 @@
 # reads2.py (31 Oct 03:1x, first builder): whether a PR asked for two reads is met, read from its comments as JSON lines
 # {login, body} on stdin. argv: [--writers FILE] HEAD [EARLIER_HEAD...]. A comment whose first line is "TWO READS" (bold allowed) asks
-# for two; then two different readers must each have a READ-OK marker for a commit the head starts with. Prints "none"
+# for two, as does a body or a READ ASK that names TWO READS anywhere (7 Nov, #5635, below); then two different readers must each have a READ-OK marker for a commit the head starts with. Prints "none"
 # (not asked), "met N" or "short N". #4633 (23:37) and #4656 (02:58) went in trains on one READ-OK where two had been
 # named, since the train bot read only the newest READ-OK.
 #
@@ -34,18 +34,29 @@ ASK_LINE = re.compile(r"^[ \t]*(?:#+[ \t]*|[-*+][ \t]+|>[ \t]*)?\**[ \t]*TWO REA
 ASK_READERS = re.compile(r"\bTWO READS\**[ \t]*:\**[ \t]*\S")
 
 
+# 7 Nov (#5635, the PM): fail closed. The patterns above failed open: #5572 and #5580 merged on one read, and #5606,
+# #5579 and #5633 were stopped by hand, each with TWO READS in its body's prose or on a READ ASK's second line. Now a
+# body (or a writer's READ ASK) that names TWO READS anywhere asks; a false match only costs a second read. A line that
+# opens with ONE READ (after the same marks as ASK_LINE), followed by ":", a dash, "(" or the line's end, opts out of a
+# mere mention ("ONE READ: the body names the rule only"); it never clears a line that asks (ASK_LINE, ASK_READERS).
+NAMES = re.compile(r"\bTWO\s+READS\b")
+OPT_OUT = re.compile(r"^[ \t]*(?:#+[ \t]*|[-*+][ \t]+|>[ \t]*)?\**[ \t]*ONE READ\**[ \t]*(?::|-|\u2013|\u2014|\(|$)", re.M)
+READ_ASK = re.compile(r"\bREAD ASK\b")
+
+
 def body_asks(body):
-    """Whether a PR body asks this PR for two reads (ASK_LINE or ASK_READERS), not merely names the rule."""
-    return bool(ASK_LINE.search(body) or ASK_READERS.search(body))
+    """Whether a PR body (or a writer's READ ASK) asks for two reads: a line that asks, or TWO READS named anywhere
+    without an opt-out line."""
+    if ASK_LINE.search(body) or ASK_READERS.search(body):
+        return True
+    return bool(NAMES.search(body)) and not OPT_OUT.search(body)
 
 
-# 4 Nov 23:4x (Thirteen's P3 on #5305): the patterns fail open. A body that does ask, in words they don't take
-# ("This PR needs TWO READS (privacy).", "Readers: TWO READS (privacy and tests)"), asks nothing, and a privacy PR could
-# go on one read. A body that names TWO READS without asking is said in the bot's log, once per head
-# (`reads2.py --unasked`), so an ask that wasn't taken is seen before the merge, not after.
+# 4 Nov 23:4x (Thirteen's P3 on #5305); 7 Nov (#5635): the bot's log says, once per head (`reads2.py --unasked`), a
+# body that names TWO READS and opts out with a ONE READ line, so an opt-out is seen before a train takes it on one read.
 def body_names_unasked(body):
-    """Whether a PR body names TWO READS but doesn't ask for them by body_asks."""
-    return "TWO READS" in body and not body_asks(body)
+    """Whether a PR body names TWO READS but opts out (so body_asks is False)."""
+    return bool(NAMES.search(body)) and not body_asks(body)
 
 
 def two_reads(items, heads, writers):
@@ -62,7 +73,8 @@ def two_reads(items, heads, writers):
             continue
         if not is_writer(c, writers):
             continue
-        if re.match(r"\**TWO READS\b", body):
+        # 7 Nov (#5635): or a READ ASK that names TWO READS anywhere, as a body does.
+        if re.match(r"\**TWO READS\b", body) or (READ_ASK.search(body) and body_asks(body)):
             asked = True
         mk = parse_marker(body)
         if not mk or mk[0] != "READ-OK" or not mk[1] or not any(h.startswith(mk[1]) for h in heads):
