@@ -4954,6 +4954,13 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   (`remember::asks_about_keeping`), and runs only on their plain yes on the
   next spoken line within 60 s with their face seen saying it
   (`take_held_forget`, `LAMP_EYES_SPEAKING`); anything else drops it.
+  The hold keeps the carried line's heard words (`HeldForget::line`); the
+  yes's run marks its lease with them (`ScopeLease::release_held_keep`), so
+  memory's route takes the yes as a yes to the lamp's offer about that line
+  (`remember::heard::released`, also counted as offered by
+  `LAMP_KEEP_QUIETLY`), though the offer was told as the room's. Before it
+  (lamp-06c1, 6 Nov, C55) the route found no offer of theirs, took the
+  line for a yes alone (`YES_ALONE`) and nothing was written.
   `same_voice_releases` is the hook for the same-voice follow-up. Without
   the eyes' speaking read nothing is held (`HELD_KEEP_REFUSED`).
   `keep_scoped` keeps the carried line out of the journal

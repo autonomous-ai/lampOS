@@ -264,6 +264,62 @@ enum Voice {
 /// ([`feed_faces`]), and the seconds since the line before.
 type Line = (String, Vec<(&'static str, bool)>, u64);
 
+/// [`lines_known`]'s calls run on the voice's own memory route against a
+/// memory socket at `socket`, and `said`, the lamp's words for each line,
+/// kept in the voice's thread as the worker keeps them.
+struct Real {
+    socket: std::path::PathBuf,
+    said: Vec<&'static str>,
+    /// Added to each line's request: the voice's thread is shared by the
+    /// crate's tests, so the real route's lines are numbered apart.
+    base: u64,
+}
+
+/// A short socket path for a test's memory, by its requests' base: a Unix
+/// socket's path has at most 104 bytes on macOS, which the temp dir with a
+/// thread id passes.
+fn memory_socket(base: u64) -> std::path::PathBuf {
+    std::path::PathBuf::from(format!("/tmp/lv-{base}-{}.sock", std::process::id()))
+}
+
+/// A memory at `socket`, answering every ask kept: the asks it is sent,
+/// one JSON object each, until `stop`.
+fn memory_at(
+    socket: &std::path::Path,
+    stop: Arc<AtomicBool>,
+) -> (Arc<Mutex<Vec<Value>>>, std::thread::JoinHandle<()>) {
+    use std::io::{BufRead, Write};
+    let _ = std::fs::remove_file(socket);
+    let listener = std::os::unix::net::UnixListener::bind(socket).unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let asked: Arc<Mutex<Vec<Value>>> = Arc::default();
+    let kept = asked.clone();
+    let serving = std::thread::spawn(move || {
+        while !stop.load(Ordering::Acquire) {
+            let Ok((mut stream, _)) = listener.accept() else {
+                std::thread::sleep(Duration::from_millis(2));
+                continue;
+            };
+            stream.set_nonblocking(false).unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut line = String::new();
+            if std::io::BufReader::new(&stream)
+                .read_line(&mut line)
+                .is_err()
+            {
+                continue;
+            }
+            if let Ok(ask) = serde_json::from_str::<Value>(&line) {
+                kept.lock().unwrap().push(ask);
+            }
+            let _ = stream.write_all(b"{\"ok\":true,\"id\":1}\n");
+        }
+    });
+    (asked, serving)
+}
+
 /// [`one_line_saving`] over `lines`, said one after another, requests 1,
 /// 2, … With `saves` the eyes also judge a held call's yes
 /// ([`Engine::confirming_forgets_by_sight`]), as on the lamp.
@@ -319,7 +375,7 @@ async fn lines_past_silent(
         voice,
         (false, &[]),
         |_, _| {},
-        (false, None),
+        (false, None, None),
     )
     .await
 }
@@ -357,7 +413,7 @@ async fn lines_named(
         voice,
         (name_one_face, mouths),
         |_, _| {},
-        (false, None),
+        (false, None, None),
     )
     .await
 }
@@ -382,7 +438,7 @@ async fn lines_known(
     voice: Voice,
     (name_one_face, mouths): (bool, &'static [lamp_msgs::SpeakingState]),
     known_at: fn(u64, &std::path::Path),
-    (thread, murmur): (bool, Option<u64>),
+    (thread, murmur, real): (bool, Option<u64>, Option<&Real>),
 ) -> Outcome {
     let eyes = Arc::new(SpeakingFaces::default());
     let path = known_file(what, &eyes);
@@ -408,8 +464,21 @@ async fn lines_known(
     let calls: Arc<Mutex<Vec<Option<String>>>> = Arc::default();
     let leases: Arc<Mutex<Vec<ScopeLease>>> = Arc::default();
     let (seen_calls, seen_leases) = (calls.clone(), leases.clone());
-    let runner: ScopedToolRunner =
-        Arc::new(move |_, _, name: String, _, lease: ScopeLease| {
+    // With `real`, each call runs on the voice's own memory route
+    // (`tools::run_call_scoped`, as the worker's runner does) against the
+    // test's memory socket, here on the test's thread so the test's switches
+    // hold for it.
+    let route = real.map(|real| {
+        crate::tools::route(
+            &crate::tools::Settings {
+                memory: Some(real.socket.clone()),
+                ..Default::default()
+            },
+            crate::remember::REMEMBER,
+        )
+    });
+    let runner: ScopedToolRunner = Arc::new(
+        move |request, heard, name: String, args, lease: ScopeLease| {
             // Whose scope the call runs in first, as the memory's route picks
             // it: a `remember` or single-item `forget` on a one-face line is
             // its person's (`ScopeLease::reached_by_one_face`, the route's own
@@ -426,8 +495,22 @@ async fn lines_known(
                 .reached_by_one_face(&name)
                 .or_else(|| lease.scope().unwrap().person().map(str::to_owned))
         });
-            Box::pin(async { json!({"ok":true}) })
-        });
+            let told = match &route {
+                Some(route) if crate::remember::is_tool(&name) => {
+                    let call = lamp_gemini::ToolCall {
+                        id: String::new(),
+                        name,
+                        args,
+                    };
+                    crate::tools::run_call_scoped(route, &call, request, heard, &lease)
+                        .1
+                        .0
+                }
+                _ => json!({"ok":true}),
+            };
+            Box::pin(async move { told })
+        },
+    );
     // The lease each context was told for: a held line asks memory nothing,
     // so it never reaches `remembering` below.
     let told_leases: Arc<Mutex<Vec<ScopeLease>>> = Arc::default();
@@ -514,18 +597,22 @@ async fn lines_known(
         );
     }
     let mut labels = Vec::new();
+    // On the real route the voice's thread is the crate's own, shared by
+    // every test: requests of this test's own.
+    let base = real.map_or(0, |real| real.base);
     for (at, (_, in_view, after)) in lines.into_iter().enumerate() {
-        let request = at as u64 + 1;
+        let line = at as u64 + 1;
+        let request = base + line;
         // The line before is over; the last stays current, for its lease.
-        if request > 1 {
+        if line > 1 {
             engine.retire_through(request - 1);
         }
         *now.lock().unwrap() += Duration::from_secs(after);
-        known_at(request, &path);
+        known_at(line, &path);
         let done = Arc::new(AtomicBool::new(false));
         // S4's opening line: her mouth read speaking in one look of four,
         // unread in the rest (lamp-06c1, 5 Nov: read speaking in 1 of 9).
-        let mouths = if murmur == Some(request) {
+        let mouths = if murmur == Some(line) {
             S4_OPENING_MOUTHS
         } else {
             mouths
@@ -556,6 +643,17 @@ async fn lines_known(
                     scope.person(),
                     lease.named_for_conversation(),
                 );
+                // The lamp's own words in the voice's thread, as the worker
+                // keeps them: what memory's route reads for a yes.
+                if let Some(said) = real.and_then(|real| real.said.get(at)) {
+                    crate::thread::THREAD.lock().unwrap().lamp_for_named(
+                        request,
+                        said,
+                        Instant::now(),
+                        scope.person(),
+                        lease.named_for_conversation(),
+                    );
+                }
             }
         }
     }
@@ -1584,7 +1682,7 @@ async fn an_off_camera_keep_just_after_her_face_left_is_carried_and_held_for_her
             Voice::Off,
             (false, &[]),
             left_then_back,
-            (false, None),
+            (false, None, None),
         )
         .await;
         assert_eq!(got.calls, expected, "{what}");
@@ -1619,7 +1717,7 @@ async fn a_keep_just_after_her_face_alone_opened_as_the_rooms_is_carried_for_her
             _ => {}
         }
     }
-    for (what, opening_in_view, car_in_view, expected) in [
+    for (at, (what, opening_in_view, car_in_view, expected)) in [
         (
             "s4-room-named",
             vec![("f1", false)],
@@ -1638,13 +1736,34 @@ async fn a_keep_just_after_her_face_alone_opened_as_the_rooms_is_carried_for_her
             vec![("f3", false)],
             vec![None],
         ),
-    ] {
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let mut chats = vec![vec![
             text("Off to the garden center on Saturday, Olivia?"),
             Ok(ChatEvent::Done),
         ]];
         chats.extend(keep_the_hotel_asking());
         chats.push(vec![text("Okay."), Ok(ChatEvent::Done)]);
+        // On the voice's own memory route, with the lamp's switches: the
+        // held keep's run must reach the memory, not only the runner (C55,
+        // lamp-06c1, 6 Nov: the runner ran it, and memory's route kept
+        // nothing).
+        crate::remember::heard::set_on_for_test(true);
+        crate::keep_quietly::set_on_for_test(true);
+        let socket = memory_socket(9_905_600 + 10 * at as u64);
+        let stop = Arc::new(AtomicBool::new(false));
+        let (memory, serving) = memory_at(&socket, stop.clone());
+        let real = Real {
+            socket: socket.clone(),
+            said: vec![
+                "Off to the garden center on Saturday, Olivia?",
+                "Want me to keep that for you?",
+                "Okay.",
+            ],
+            base: 9_905_600 + 10 * at as u64,
+        };
         let got = lines_known(
             what,
             vec![
@@ -1670,10 +1789,34 @@ async fn a_keep_just_after_her_face_alone_opened_as_the_rooms_is_carried_for_her
             Voice::One,
             (false, &[]),
             left_then_back,
-            (true, Some(1)),
+            (true, Some(1), Some(&real)),
         )
         .await;
+        stop.store(true, Ordering::Release);
+        serving.join().unwrap();
+        let _ = std::fs::remove_file(&socket);
+        crate::remember::heard::set_on_for_test(false);
+        crate::keep_quietly::set_on_for_test(false);
         assert_eq!(got.calls, expected, "{what}");
+        let memory = memory.lock().unwrap().clone();
+        let kept: Vec<&Value> = memory
+            .iter()
+            .filter(|ask| ask["op"] == "remember")
+            .collect();
+        assert_eq!(
+            kept.len(),
+            1,
+            "{what}: one keep reached the memory: {memory:?}"
+        );
+        assert!(
+            kept[0].to_string().contains("car is in for service"),
+            "{what}: the car line kept: {memory:?}"
+        );
+        assert_eq!(
+            kept[0]["person"] == json!(a),
+            expected == [Some(a.clone())],
+            "{what}: whose scope: {memory:?}"
+        );
         // Line 2's rounds (the keep and its ask) are never told A's context
         // or thread: a conversation opened only by a line named for her
         // carries the keep alone (Heron's P2 on #5448: her partner off
@@ -1686,6 +1829,122 @@ async fn a_keep_just_after_her_face_alone_opened_as_the_rooms_is_carried_for_her
             &got.asked[1..3]
         );
     }
+}
+
+/// lamp-06c1, 6 Nov, kit S4 on #5448's head (C55), replayed on the voice's
+/// own memory route with `LAMP_MEMORY_KEEP_HEARD` and `LAMP_KEEP_QUIETLY`
+/// on, as on the lamp: Olivia's opening line, her face alone in view, kept
+/// as the room's and named for her; her car line just after, her face
+/// hidden, carried, its keep held for her yes and the offer told as the
+/// room's; then "Yes, please keep that.", her face back and seen saying it.
+/// The yes ran the held keep, but memory's route found no offer of hers in
+/// the thread (the offer was the room's), took the line for a yes alone and
+/// kept nothing: no `remember` reached the memory, and the model was told
+/// nothing was waiting ("I don't have a pending question from you to
+/// keep"). Her seen yes keeps the car line in her scope, and the model is
+/// told it is kept.
+#[tokio::test]
+async fn her_seen_yes_to_a_carried_keep_writes_the_car_in_her_scope() {
+    let a = crate::remember::person_id("A");
+    fn hidden_then_back(request: u64, known: &std::path::Path) {
+        match request {
+            2 => {
+                let _ = std::fs::remove_file(known);
+                let _ = std::fs::remove_file(known_face_of(known));
+            }
+            3 => {
+                std::fs::write(known, "A").unwrap();
+                std::fs::write(known_face_of(known), "f2\n").unwrap();
+            }
+            _ => {}
+        }
+    }
+    crate::remember::heard::set_on_for_test(true);
+    crate::keep_quietly::set_on_for_test(true);
+    const OPENING: &str = "Off to the garden center on Saturday, Olivia?";
+    const ASKS: &str = "Your car is silver. Should I keep that for you?";
+    const KEPT: &str = "Kept: your car is silver.";
+    let chats = vec![
+        vec![text(OPENING), Ok(ChatEvent::Done)],
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c1",
+                crate::remember::REMEMBER,
+                json!({"text": "Olivia's car is silver."}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![text(ASKS), Ok(ChatEvent::Done)],
+        vec![text(KEPT), Ok(ChatEvent::Done)],
+        // Spare: a "Kept." with nothing kept is asked again
+        // (`held_keep_ran`), so a failing run reaches the asserts.
+        vec![text("Okay."), Ok(ChatEvent::Done)],
+    ];
+    let socket = memory_socket(9_905_500);
+    let stop = Arc::new(AtomicBool::new(false));
+    let (asked, serving) = memory_at(&socket, stop.clone());
+    let real = Real {
+        socket: socket.clone(),
+        said: vec![OPENING, ASKS, KEPT],
+        base: 9_905_500,
+    };
+    let got = lines_known(
+        "c55-carried-yes",
+        vec![
+            (
+                "I'm going to the garden centre on Saturday.".to_owned(),
+                vec![("f1", false)],
+                0,
+            ),
+            ("My car is silver.".to_owned(), vec![], 0),
+            ("Yes, please keep that.".to_owned(), vec![("f2", true)], 5),
+        ],
+        chats,
+        (BOOT, true, true),
+        None,
+        None,
+        true,
+        true,
+        None,
+        Voice::One,
+        (false, &[]),
+        hidden_then_back,
+        (true, Some(1), Some(&real)),
+    )
+    .await;
+    stop.store(true, Ordering::Release);
+    serving.join().unwrap();
+    let _ = std::fs::remove_file(&socket);
+    crate::remember::heard::set_on_for_test(false);
+    crate::keep_quietly::set_on_for_test(false);
+    // The held keep ran once, on her yes, in her scope.
+    assert_eq!(got.calls, [Some(a.clone())], "the yes's run");
+    let asked = asked.lock().unwrap().clone();
+    let kept: Vec<&Value> = asked.iter().filter(|ask| ask["op"] == "remember").collect();
+    assert_eq!(kept.len(), 1, "one remember reached the memory: {asked:?}");
+    assert_eq!(kept[0]["person"], json!(a), "in her scope: {asked:?}");
+    assert!(
+        kept[0].to_string().to_lowercase().contains("car is silver"),
+        "the car line kept: {asked:?}"
+    );
+    // The yes's round is told it is kept, never that nothing waited.
+    let yes_round = got.rounds.last().unwrap();
+    let told: Vec<String> = yes_round
+        .iter()
+        .map(|message| format!("{message:?}"))
+        .collect();
+    assert!(
+        told.iter().any(
+            |told| told.contains("what you asked to keep for them is kept now")
+                && told.contains("\\\"remembered\\\":true")
+        ),
+        "told it is kept: {told:?}"
+    );
+    assert!(
+        told.iter()
+            .all(|told| !told.contains("no offer of yours to keep")),
+        "never told nothing was waiting: {told:?}"
+    );
 }
 
 /// Thirteen's P1 on #5448: a guest speaks line 1 off camera while A's
@@ -1804,7 +2063,7 @@ async fn a_guests_line_beside_her_named_lone_face_opens_no_conversation_of_hers(
             voice,
             (name_one_face, mouths),
             left,
-            (true, murmur),
+            (true, murmur, None),
         )
         .await;
         assert_eq!(
@@ -2604,6 +2863,7 @@ async fn a_yes_on_a_line_theirs_by_one_face_alone_runs_no_held_forget() {
                 asked: true,
                 spelling: false,
                 carried: false,
+                line: None,
             });
         }
         let taken = take_held_forget(
@@ -2616,7 +2876,7 @@ async fn a_yes_on_a_line_theirs_by_one_face_alone_runs_no_held_forget() {
             now,
         );
         match taken {
-            Taken::Runs(_) => assert!(runs, "by one face: no yes"),
+            Taken::Runs(..) => assert!(runs, "by one face: no yes"),
             Taken::Unseen(_) => assert!(!runs, "not by one face: runs"),
             Taken::Nothing => panic!("dropped for another reason"),
         }

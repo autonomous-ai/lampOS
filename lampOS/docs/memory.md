@@ -754,7 +754,11 @@ the hold stands only if the reply said whole asks it
 (`remember::asks_about_keeping`). Their plain yes on the next spoken line,
 within `HELD_FORGET_FOR` (60 s), with their own face seen saying it and no
 other (`LAMP_EYES_SPEAKING`, `speaking_faces::seen_saying`), writes it in
-their scope, and the reply says it is kept. Their face merely in view is not
+their scope, and the reply says it is kept. What is written is the carried
+line's own heard words, held with the call: the yes is taken as a yes to the
+lamp's offer about that line (`ScopeLease::release_held_keep`), since the
+offer itself was told as the room's and no offer of theirs is in the thread
+(lamp-06c1, 6 Nov, C55: the yes ran, but kept nothing as a yes alone). Their face merely in view is not
 enough: it is in view while a guest speaks off camera (Reviewer-three, 14:46).
 Anything else drops it, writing nothing anywhere: no yes, a yes not seen (the
 model is told it did not count), another face seen saying it, a forget, the
