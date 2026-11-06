@@ -670,7 +670,9 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   this one is that read-back's, and the lamp spoke in no other request
   since; the person's line is the very first begun since the write was
   prepared; it is the same owner who asked; at most 2 minutes since it was
-  prepared and 30 s (`SEND_WITHIN`) since the lamp last said a word of it;
+  prepared and 30 s (`SEND_WITHIN`, `send_by`) since the lamp last said a
+  word of it, or since the read-back could have finished playing at 600 ms a
+  word, if later (after the lamp asks once more, since that asking alone);
   and the person's words in this turn are a plain send. Otherwise the model
   is told `CANCELLED`, "Not sent, and cancelled: I send only on a plain
   "send" said to me right after I read the message back. Say it was not

@@ -697,8 +697,9 @@ only reads …").
   lượt này là lượt của phần đọc lại đó, và từ đó đèn không nói trong yêu cầu
   nào khác; câu của người đó là câu đầu tiên được bắt đầu kể từ khi lần ghi
   được chuẩn bị; đó là cùng chủ đèn đã yêu cầu; tối đa 2 phút kể từ khi chuẩn
-  bị và 30 s (`SEND_WITHIN`) kể từ khi đèn nói lời cuối của nó; và lời của
-  người đó trong lượt này là một câu gửi thuần. Nếu không, mô hình được báo
+  bị và 30 s (`SEND_WITHIN`, `send_by`) kể từ khi đèn nói lời cuối của nó, hoặc
+  kể từ khi phần đọc lại có thể đã phát xong với 600 ms mỗi từ, nếu muộn hơn
+  (sau khi đèn hỏi lại, chỉ tính từ lần hỏi đó); và lời của người đó trong lượt này là một câu gửi thuần. Nếu không, mô hình được báo
   `CANCELLED`, "Not sent, and cancelled: I send only on a plain "send" said
   to me right after I read the message back. Say it was not sent." Journal
   ghi tên từng điều kiện không đạt ("a send cancelled: …"), và mỗi lần từ
