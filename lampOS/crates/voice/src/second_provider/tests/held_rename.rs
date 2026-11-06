@@ -400,3 +400,32 @@ async fn an_unrun_rename_is_told_only_to_its_asker() {
         last_notes(&ran)
     );
 }
+
+/// The Reviewer-lead on #5586: an asker's turn that can't be proven theirs
+/// (two faces in view and none seen speaking, or two seen speaking, theirs
+/// one of them) is still told no rename has run, so the lamp can't say
+/// "That's what I'll use." (lamp-29e7, 6 Nov), but without the old name,
+/// which can't be shown to whoever is speaking.
+#[tokio::test]
+async fn an_unproven_askers_turn_is_told_no_rename_ran_without_the_old_name() {
+    for (line, speaking) in [
+        ("Okay. Can you repeat my name again?", &[][..]),
+        ("Okay. Can you repeat my name again?", &["f1", "f2"][..]),
+        ("What's my name, Lamp?", &[][..]),
+    ] {
+        let turns: [Turn; 2] = [ASKS, (line, Lamp::Says("Sure."), speaking)];
+        let ran = run(&turns, true).await;
+        assert_eq!(ran.sent, Vec::<Value>::new(), "{line} {speaking:?}");
+        let notes = last_notes(&ran);
+        assert!(
+            notes.iter().any(|note| note.contains("no rename has run")
+                && note.contains("Marisol")
+                && note.contains("Never say the name was changed")),
+            "{line} {speaking:?}: {notes:?}"
+        );
+        assert!(
+            !notes.iter().any(|note| note.contains("Tove")),
+            "{line} {speaking:?}: {notes:?}"
+        );
+    }
+}

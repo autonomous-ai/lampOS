@@ -3287,8 +3287,10 @@ then use that person's scope:
   to be confirmed before it is turned on. Carried lines stay refused. Any other turn drops it; a yes
   dropped for another face is told so. While the rename has not run,
   each turn of its session by the asker (by the same test as the yes) is
-  told the face is still B and nothing was renamed (anyone else's turn is
-  told nothing), so the lamp never says it changed. The memory's own side of a
+  told the face is still B and nothing was renamed; a turn not proven
+  theirs (two faces, another voice) is told only that no rename has run,
+  without B; one proven someone else's is told nothing. So the lamp never
+  says it changed. The memory's own side of a
   rename (`LAMP_MEMORY_STABLE_ID`) is unchanged. Off, everything is as
   before.
 - **With nobody known**, or without eyes, every line to the memory is
