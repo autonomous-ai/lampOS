@@ -50,6 +50,15 @@ pub fn voice_name(provider: TtsProvider, voice: Option<&str>) -> &str {
         TtsProvider::ElevenLabs => ELEVENLABS_VOICES[0].0,
     })
 }
+/// [`voice_name`] as the journal says it (#5394): an ElevenLabs voice that is
+/// not one of the lamp's names is an id, never written there.
+pub fn voice_told(provider: TtsProvider, voice: Option<&str>) -> &str {
+    let name = voice_name(provider, voice);
+    if provider == TtsProvider::ElevenLabs && !ELEVENLABS_VOICES.iter().any(|(n, _)| *n == name) {
+        return "a voice id from the configuration";
+    }
+    name
+}
 const ELEVENLABS_HOSTS: &[&str] = &[
     "api.elevenlabs.io",
     "api.us.elevenlabs.io",
@@ -1392,6 +1401,11 @@ mod tests {
         assert_eq!(voice_name(TtsProvider::ElevenLabs, None), "Rachel");
         assert_eq!(voice_name(TtsProvider::OpenAi, None), "nova");
         assert_eq!(voice_name(TtsProvider::ElevenLabs, Some("Ngan")), "Ngan");
+        assert_eq!(voice_told(TtsProvider::ElevenLabs, Some("Ngan")), "Ngan");
+        assert_eq!(voice_told(TtsProvider::OpenAi, None), "nova");
+        // An id is never said.
+        let id = "21m00Tcm4TlvDq8ikWAM";
+        assert!(!voice_told(TtsProvider::ElevenLabs, Some(id)).contains(id));
         // The default named is the one a request is made with.
         let asked = request(
             TtsProvider::ElevenLabs,
