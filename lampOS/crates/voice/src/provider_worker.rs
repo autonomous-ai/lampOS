@@ -2719,7 +2719,7 @@ async fn serve_with_visual<C: Connect>(
                     let names = linked.names();
                     let lease = intake.handoff.line_lease(open.request);
                     let owner = crate::services::owner_of(lease.as_ref());
-                    if let Some(note) = services_told.due(live.get(), owner.as_deref(), &names)
+                    if let Some(note) = services_told.due(live.get(), owner.as_deref(), &names, crate::person::private_room())
                         && add_note(&provider, &mut intake.handoff.noted, open.request, &note).is_ok()
                     {
                         eprintln!(
