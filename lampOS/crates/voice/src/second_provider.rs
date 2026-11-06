@@ -4014,6 +4014,9 @@ pub struct Engine {
     /// ([`Engine::forgetting_on_privacy`]).
     privacy: Option<(bool, u64, bool, u64)>,
     on_privacy: Option<Box<dyn FnMut() + Send>>,
+    /// Whether the camera is allowed in the last authority installed
+    /// ([`Engine::telling_the_eye`], #5530).
+    eye: Option<Arc<AtomicBool>>,
 }
 
 /// The busy room as this route hears it, in this process's one room
@@ -4221,6 +4224,7 @@ impl Engine {
             memory_camera_generation: None,
             privacy: None,
             on_privacy: None,
+            eye: None,
         }
     }
 
@@ -4242,10 +4246,22 @@ impl Engine {
         self
     }
 
+    /// `eye` is kept to whether the camera is allowed (on, its privacy
+    /// slide open) in each authority installed, so a spoken turn is told
+    /// the camera's character only while it is (#5530,
+    /// `worker::character_now`). Before any turn only.
+    pub fn telling_the_eye(mut self, eye: Arc<AtomicBool>) -> Self {
+        self.eye = Some(eye);
+        self
+    }
+
     /// The camera's and the microphone's permission and generation from an
     /// installed authority; a change from the last tells
     /// [`Self::forgetting_on_privacy`]'s hook.
     pub(crate) fn privacy(&mut self, now: (bool, u64, bool, u64)) {
+        if let Some(eye) = &self.eye {
+            eye.store(now.0, Ordering::Relaxed);
+        }
         if self.privacy.replace(now).is_some_and(|was| was != now) {
             if self.shared.remember_speaker {
                 crate::remember_speaker::forget();
