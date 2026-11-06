@@ -43,6 +43,14 @@
 /// the question itself, or the next minute's, leaves the lamp quiet, never
 /// asking again and again.
 pub const AGAIN_AFTER: std::time::Duration = std::time::Duration::from_secs(60);
+/// A wordless line begun within this of one of these fixed lines' start
+/// is the same sound's tail, never a new cut: the line is said again, once,
+/// not counted. 06c1's FAIL on #5491: a 1.2 s cough's tail (or the lamp's
+/// own line heard back) began 40 ms into "Oops, cut off again. Anyway," and
+/// into the pause line, 2 of 5 times, and the lamp fell silent. 1.5 s is
+/// the cough's length with room, and the 1.5 s of sound a line carries on
+/// from the one before; a real cough after it, seconds in, still counts.
+pub const TAIL_WITHIN: std::time::Duration = std::time::Duration::from_millis(1_500);
 /// Where the second route's worker reads the switch.
 pub const ENVIRONMENT: &str = "LAMP_CUT_IN_WORDLESS_ASKS";
 /// What the lamp says when a cut-in ended its answer with no words: a
