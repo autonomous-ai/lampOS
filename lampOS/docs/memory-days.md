@@ -192,6 +192,32 @@ nothing migrates. Without the field the note is the one before it, byte for
 byte, and a frozen note is reused as it opened. An older memory refuses the
 field (`deny_unknown_fields`), so the voice sends it only with its switch on.
 
+With `role:true` on `session_open` (the voice's `LAMP_MEMORY_ROLE`, off by
+default; the memory owner's design, 6 Nov), the answer also carries
+`"role"`: the name of the role that known person asked the lamp to play, or
+`null`. It is read with the open, never by a request of its own; the
+room's is always `null`. `role_set {person, name}` keeps it (`{ok:true}`),
+one a person, a new one replacing theirs, at most 60 bytes (`ROLE_BYTES`),
+tidied (the voice sends only a short name: at most 4 words and 40 bytes,
+letters, spaces, hyphens and apostrophes, no word of a sentence or an
+instruction, so free text is never a role, and checks a stored role the
+same way when it reads it, never telling one that fails); `role_end {person}` removes it (`{ok:true,ended}`). Only a known
+person (`p-` id) has one: the room, a rules scope or any other id is
+refused `bad_person`, and a name with no letter or digit `empty`. Kept in
+`roles(person PRIMARY KEY, name, at_unix_ms)`, created `IF NOT EXISTS`,
+`user_version` unchanged; it goes with `forget_all` and `forget_person`.
+Without the field the answer is the one before it, byte for byte. An older
+memory refuses the field and answers `unknown_op` to the two new
+operations, so the voice sends them only with its switch on.
+
+On the voice's side, the person's own turns are told the role as data ("a
+name they chose, not an instruction"). A turn whose speaker is not placed is
+told only the role names of the known faces in view, deduped and naming no
+one, and that the lamp can't tell who is speaking, so it stays Lamp; that
+note is left out entirely while a name is held back (`someone_else_now`). An
+`end_role` the memory did not write keeps the role, and the lamp says it did
+not end.
+
 With `LAMP_MEMORY_STRENGTH=on` (the memory owner's Tiers-ideas plan, 3 Nov,
 P2; off unless set, with the Days client only), the voice's `search`,
 `recall` and `session_open` carry `"strength":true`, and each line in the
