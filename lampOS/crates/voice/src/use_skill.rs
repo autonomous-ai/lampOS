@@ -66,7 +66,7 @@ fn built(skills: &[Tool]) -> Tool {
     let names: Vec<&str> = skills.iter().map(|skill| skill.name.as_str()).collect();
     Tool {
         name: NAME.to_owned(),
-        description: "Use one of your skills, listed under \"Your skills\" in your instructions, each with when to use it. Call this when what someone asks is what a skill's line says: give the skill's name, and its choice and its yes-or-no only when its line names them. Then do what its answer tells you.".to_owned(),
+        description: "Use one of your skills, listed under \"Your skills\" in your instructions, each with when to use it. Call this when what someone asks is what a skill's line says: give the skill's name, and its choice and its yes-or-no only when its line names them. The call runs the skill: then do what its answer tells you, and never call it again for the same ask.".to_owned(),
         parameters: Some(json!({
             "type": "object",
             "properties": {
@@ -88,6 +88,38 @@ fn built(skills: &[Tool]) -> Tool {
         })),
         silent: false,
     }
+}
+
+/// The key of the note a skill's answer through `use_skill` carries ([`ran`]).
+pub const RAN: &str = "ran";
+
+/// A skill's answer through `use_skill`, told that this call has already
+/// run it (#2826: on lamp-9adf on 6 Nov, told by `dance` to "Say one short,
+/// playful line that you are going to dance", the model called `use_skill`
+/// for `dance` again in the next round, which lamp-skills refused as under
+/// way, and said a stray line; called by its own name, `dance` ran once).
+/// An error, or an answer that is not an object, is left as it is.
+pub fn ran(skill: &str, told: &mut Value) {
+    if let Some(answer) = told.as_object_mut()
+        && !answer.contains_key("error")
+    {
+        answer.insert(
+            RAN.to_owned(),
+            Value::String(format!(
+                "This call has already run {skill}. Do not call use_skill for {skill} again in this turn."
+            )),
+        );
+    }
+}
+
+/// For tests: `told` as the model is told it, through `use_skill` when
+/// `wrapped` ([`ran`]), else as it is.
+#[cfg(test)]
+pub(crate) fn told_through(wrapped: bool, skill: &str, mut told: Value) -> Value {
+    if wrapped {
+        ran(skill, &mut told);
+    }
+    told
 }
 
 /// The instruction's lines for `skills`: one each, its name, when to use it,
@@ -320,6 +352,40 @@ mod tests {
             parameters,
             silent: false,
         }
+    }
+
+    /// #2826: a skill's answer through `use_skill` says the call already
+    /// ran it, so the model does not call it again in the turn's next round;
+    /// a refusal (lamp-skills' "its run is under way") and an answer that is
+    /// not an object are left as they are. The function says so too.
+    #[test]
+    fn an_answer_through_use_skill_says_the_skill_already_ran() {
+        let mut told = json!({"next": "Say one short, playful line that you are going to dance."});
+        ran("dance", &mut told);
+        assert_eq!(
+            told[RAN],
+            "This call has already run dance. Do not call use_skill for dance again in this turn."
+        );
+        assert_eq!(
+            told["next"],
+            "Say one short, playful line that you are going to dance."
+        );
+        let mut refused = json!({"error": "dance not run: its run is under way"});
+        ran("dance", &mut refused);
+        assert_eq!(
+            refused,
+            json!({"error": "dance not run: its run is under way"})
+        );
+        let mut plain = json!("Danced.");
+        ran("dance", &mut plain);
+        assert_eq!(plain, json!("Danced."));
+        let tool = function(&installed()).unwrap();
+        assert!(
+            tool.description
+                .ends_with("never call it again for the same ask."),
+            "{}",
+            tool.description
+        );
     }
 
     /// Dance, Desk tutor and its marks, as `lamp_skills::tools_file` writes

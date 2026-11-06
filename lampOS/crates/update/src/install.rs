@@ -394,7 +394,7 @@ pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
     (
         "light-scenes",
         "not yet tried on a lamp (#1679), and its function would put a product session past its \
-         32 without `LAMP_USE_SKILL=on`, which the product doesn't run",
+         32 without `LAMP_USE_SKILL=on`, on in the product since #2826",
     ),
     (
         "point-light",
@@ -405,7 +405,7 @@ pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
     (
         "light-show",
         "not yet tried on a lamp (#1679), and its function would put a product session past its \
-         32 without `LAMP_USE_SKILL=on`, which the product doesn't run",
+         32 without `LAMP_USE_SKILL=on`, on in the product since #2826",
     ),
     // #1684's two core skills, merged off (the first builder, #1722): a
     // trial puts them on by hand. Each comes with the product once the four

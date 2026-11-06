@@ -341,6 +341,10 @@ Environment=LAMP_ACTIONS_DIR=/run/lampos-actions
 # The skills' functions, in lamp-skills' own folder; the old one inside the actions part's is still
 # read after it for one release.
 Environment=LAMP_SKILLS_DIR=/run/lampos-skills
+# Every skill reached through one function, use_skill, instead of one function each (#2826, use_skill.rs):
+# installed skills no longer push the lamp's own past the chat route's 48 (lamp-9adf, 6 Nov, on 10441: the_time,
+# reports_state and fetch_page left out). Who was here and Guard mode answered through it there by drop-in (#1685).
+Environment=LAMP_USE_SKILL=on
 # "Stop sending reports" and asking whether they're sent (#2862, reports_stop.rs): the voice can only
 # turn them off, never on.
 Environment=LAMP_REPORTS=on
