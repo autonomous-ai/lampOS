@@ -981,6 +981,20 @@ fn serve(
             ),
         }
     }
+    // A made skill's read told once that its service isn't linked (#5288's
+    // fallback, `LAMP_SKILL_LINK_NOTE=on`): kept in the state folder, so a
+    // restart never tells it again. Nowhere to keep it, nothing is told.
+    if lamp_skills::service_read::link_note_on() {
+        match &options.state {
+            Some(state) => {
+                let _ = LINK_NOTED.set(state.join(lamp_skills::service_read::LINK_NOTED_FILE));
+            }
+            None => eprintln!(
+                "lamp-skills: {} is on without --state-dir, so a read not linked is not told",
+                lamp_skills::service_read::LINK_NOTE_ENVIRONMENT
+            ),
+        }
+    }
     if let Some(state) = &options.state {
         match engine.keep_off_in(state) {
             Ok(off) => eprintln!(
@@ -4433,6 +4447,14 @@ const SERVICES_TIMEOUT: Duration = Duration::from_secs(30);
 static READ_DAYS: Mutex<std::collections::BTreeMap<String, i64>> =
     Mutex::new(std::collections::BTreeMap::new());
 
+/// With `LAMP_SKILL_LINK_NOTE=on` and a `--state-dir`: the file that keeps
+/// the skills told their service isn't linked
+/// (`lamp_skills::service_read::LINK_NOTED_FILE`).
+static LINK_NOTED: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+/// Held across [`LINK_NOTED`]'s read and write: two reads at once never
+/// undo each other.
+static LINK_NOTED_LOCK: Mutex<()> = Mutex::new(());
+
 /// When the voice last heard a line (`voice/heard`), in Unix ms, 0 for
 /// never: a skill's read waits a minute after any voice (#5288). The topic
 /// is an event, so the bus keeps no latest of it; [`hear_voices`] marks
@@ -4671,6 +4693,44 @@ impl lamp_skills::service_read::Room for LampRoom {
             Some("spoken") => Ok(()),
             Some(other) => Err(other.to_owned()),
             None => Err(outcome),
+        }
+    }
+
+    fn link_note(&mut self) -> Option<bool> {
+        let file = LINK_NOTED.get()?;
+        let _held = LINK_NOTED_LOCK
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        match lamp_skills::read_names(file) {
+            Ok(names) => Some(names.contains(&self.skill)),
+            // Not read: told as if it was, so it is never said twice.
+            Err(error) => {
+                eprintln!("lamp-skills: the reads told not linked not read: {error}");
+                Some(true)
+            }
+        }
+    }
+
+    fn keep_link_note(&mut self, told: bool) {
+        let Some(file) = LINK_NOTED.get() else {
+            return;
+        };
+        let _held = LINK_NOTED_LOCK
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        let kept = lamp_skills::read_names(file).and_then(|mut names| {
+            let changed = if told {
+                names.insert(self.skill.clone())
+            } else {
+                names.remove(&self.skill)
+            };
+            if changed {
+                lamp_skills::keep_names(file, &names)?;
+            }
+            Ok(())
+        });
+        if let Err(error) = kept {
+            eprintln!("lamp-skills: a read told not linked not kept: {error}");
         }
     }
 }
