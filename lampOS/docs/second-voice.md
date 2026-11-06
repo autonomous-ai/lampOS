@@ -3564,7 +3564,8 @@ after a take-over, but now for every turn:
   what's, how's, where, where's, who, who's, why or which (a contraction
   kept whole, a curly apostrophe read as a straight one; #5604's P3);
   and it is no request, which opens there with "can you", "could you",
-  "will you", "would you", "can I have" or "please", or says "please"
+  "will you", "would you", "can I have", "please", "why don't you" or
+  "why not" (El's P2 on #5615), or says "please"
   anywhere, case aside). "Lamp, can you set a timer for one minute?"
   answered "Timer set for one minute." with no call is still held:
   "Lamp, how long will the light stay on?" answered "The light stays on
