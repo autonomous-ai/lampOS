@@ -324,9 +324,10 @@ pub struct Pending {
     /// once more ([`SAY_IT_LONGER`]): its words are no other request's, and
     /// the next line may still send.
     pub asked_again: Option<u64>,
-    /// The latest line since it began within the tail of the lamp's words
-    /// ([`voice_began`]): it may be their echo.
-    pub began_in_tail: bool,
+    /// The latest line since began clear of the lamp's words: past their
+    /// tail, not over its voice ([`voice_began`]). False until told, so with
+    /// no hearing hook to tell it a plain send is held as before.
+    pub began_clear: bool,
 }
 
 impl Pending {
@@ -346,7 +347,7 @@ impl Pending {
             lines: 0,
             other: None,
             asked_again: None,
-            began_in_tail: false,
+            began_clear: false,
         }
     }
 }
@@ -531,16 +532,17 @@ pub fn says_send(words: &str) -> bool {
 /// read-back asked for it, whether or not its last sentence reads as a
 /// question, so the line is an answer to the lamp and not a short sound or
 /// the room's lone words: on lamp-9adf on 6 Nov, with nobody in view, "Send."
-/// was held as a short sound (#5553). Not a line begun over the lamp's voice,
-/// or before its tail is over ([`voice_began`]): that may be the lamp's own
-/// "send it" heard back, which `own_echo` doesn't hold in so few words. Those
-/// are judged as any line, and [`gate`] still judges the send itself.
+/// was held as a short sound (#5553). Only a line known to have begun clear
+/// of the lamp's words ([`voice_began`]): one over its voice, before its tail
+/// is over, or with no word of when it began may be the lamp's own "send it"
+/// heard back, which `own_echo` doesn't hold in so few words. Those are judged
+/// as any line, and [`gate`] still judges the send itself.
 pub fn send_awaited(words: &str) -> bool {
     says_send(words)
         && kept::pending(|pending| {
             pending
                 .as_ref()
-                .is_some_and(|kept| !kept.cut && !kept.began_in_tail)
+                .is_some_and(|kept| !kept.cut && kept.began_clear)
         })
 }
 
@@ -985,7 +987,7 @@ pub fn voice_began(over_the_lamps_voice: bool, in_tail: bool, now: Instant) {
     kept::pending(|pending| {
         voice_began_in(pending, over_the_lamps_voice, now);
         if let Some(kept) = pending.as_mut() {
-            kept.began_in_tail = in_tail;
+            kept.began_clear = !over_the_lamps_voice && !in_tail;
         }
     });
 }
@@ -1780,13 +1782,15 @@ mod tests {
     fn only_a_plain_send_with_a_write_waiting_is_awaited() {
         pending_for_test(None);
         assert!(!send_awaited("Send."));
-        pending_for_test(Some(Pending::new(
-            "id",
-            10,
-            Instant::now(),
-            "Send an email.",
-            "ann",
-        )));
+        let waiting = || {
+            let mut kept = Pending::new("id", 10, Instant::now(), "Send an email.", "ann");
+            kept.spoken_from = Some(Instant::now() - Duration::from_secs(60));
+            kept
+        };
+        // With no word of when the line began: maybe an echo, so held.
+        pending_for_test(Some(waiting()));
+        assert!(!send_awaited("Send."));
+        voice_began(false, false, Instant::now());
         for said in ["Send.", "send it", "Hey Lamp, send it."] {
             assert!(send_awaited(said), "{said}");
         }
@@ -1794,11 +1798,6 @@ mod tests {
             assert!(!send_awaited(said), "{said}");
         }
         // Begun over the lamp's voice, or within its tail: maybe its echo.
-        let waiting = || {
-            let mut kept = Pending::new("id", 10, Instant::now(), "Send an email.", "ann");
-            kept.spoken_from = Some(Instant::now() - Duration::from_secs(60));
-            kept
-        };
         for (over, in_tail, awaited) in [
             (true, false, false),
             (false, true, false),
