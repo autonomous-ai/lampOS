@@ -1493,6 +1493,15 @@ mod tests {
         );
     }
 
+    /// #5394: the helper's wait for lamp-update's lock (turning developer
+    /// access off, a change that restarts the voice) ends before this side
+    /// stops waiting for its reply, so the app hears the result, never a
+    /// timeout.
+    #[test]
+    fn the_helpers_lock_wait_ends_before_the_reply_wait() {
+        assert!(lamp_setup::change::CLOSE_LOCK_MOST < WAIT);
+    }
+
     /// #4473: `host.language` is the file's code, else `en`, the voice's
     /// own reading; the codes are setup's.
     #[test]
