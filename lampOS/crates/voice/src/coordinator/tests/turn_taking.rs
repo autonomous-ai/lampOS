@@ -3026,3 +3026,26 @@ fn with_words_a_stop_said_before_the_own_line_sounds_stops_it() {
         );
     }
 }
+
+/// #5536: a short "yes" to the lamp's question, begun 10 ms after its
+/// sound drained, is heard: only its first 100 ms fall in the tail. With no
+/// echo evidence (this mask) a sound wholly inside the tail, and too short
+/// to make an onset after it, is the lamp's own and is not.
+#[test]
+fn a_short_yes_begun_as_the_lamps_question_drains_is_heard() {
+    for (ms, heard) in [(250u64, true), (150, false)] {
+        let mut h = Harness::new(TurnTaking::V1Baseline);
+        h.dispatch(10_000);
+        h.accepted(11_000, 11_000);
+        h.drain(20_000);
+        let mut accepted = None;
+        for n in 1..=80u64 {
+            let score = if n * 10 <= ms { 0.99 } else { 0.01 };
+            if let Some(a) = h.feed(20_000 + n * 10_000, score).unwrap() {
+                accepted = Some(a);
+                break;
+            }
+        }
+        assert_eq!(accepted.is_some(), heard, "a {ms} ms yes");
+    }
+}
