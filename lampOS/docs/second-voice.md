@@ -3545,13 +3545,19 @@ after a take-over, but now for every turn:
   round's or an earlier one's, lets them stand, so work another tool did
   ("I've added a reminder to your calendar." beside `service_write`, "I've
   turned off the lights." after `use_skill` or a hand-over) is said as it
-  is. **Nor do they judge a line the person asked as a question**
+  is. **Nor do they judge a status question**
   (`action_claim::asked_as_a_question`: the heard line ends with a '?', or
   its first word after "hey", "hi", "hello", "ok", "okay" or "lamp" is
-  how, is, are, do, does, did, what, when, will, can, has, have or was):
+  how, is, are, do, does, did, what, when, will, can, has, have or was;
+  and it is no request, which opens there with "can you", "could you",
+  "will you", "would you", "can I have" or "please", or says "please"
+  anywhere, case aside). "Lamp, can you set a timer for one minute?"
+  answered "Timer set for one minute." with no call is still held:
   "Lamp, how long will the light stay on?" answered "The light stays on
   until ten." and "Lamp, is my timer still set?" answered "Your timer is
-  set for one minute." are said as they are. #5253's strict lines above
+  set for one minute." are said as they are, while "Lamp, could you keep
+  the light on until ten?" answered "I've kept the light on until ten."
+  with no call is held. #5253's strict lines above
   still judge every turn, questions and turns with other calls included.
   Held, asked again and said not done exactly as above; when
   only the worded runs found it, the held and asked-again lines end
@@ -3563,7 +3569,8 @@ after a take-over, but now for every turn:
   `LAMP_ACTION_CLAIM_CHECKED` (the worker's start line says so). Tests:
   `second_provider::tests::action_claim::*worded*`, `*other_words*`,
   `a_status_answer_to_a_question_is_untouched_by_the_worded_claims`,
-  `a_strict_claim_to_a_question_is_still_held_with_the_worded_claims` and
+  `a_strict_claim_to_a_question_is_still_held_with_the_worded_claims`,
+  `a_request_asked_as_a_question_is_still_judged_by_the_worded_claims` and
   `action_claim::tests::*`.
 - **A reply never offers to keep what its `remember` call keeps** (finding
   K2 on #3504: lamp-06c1, 28 Oct, "Want me to keep that as the change?
