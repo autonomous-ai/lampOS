@@ -114,6 +114,7 @@ connected apps.
 | `LAMP_SERVICES=on` | `lamp-cloud` (with `LAMP_CLOUD=on`), `lamp-voice` and `lamp-services` | `lamp-cloud` answers the app's `connector.*` and `services.list` with V1's "not on this lamp: <kind>" and puts nothing in `can`; the voice declares none of the three functions and routes none; `lamp-services` opens no socket and exits |
 | `LAMP_SERVICES_WRITE=on` (on in the product's `lamp-services.service`) | `lamp-services` | `service_write` answers "writing to services is off on this lamp", and nothing is prepared or sent; reads are as before |
 | `LAMP_SERVICES_TOLD=on` (#5523) | `lamp-voice`'s two routes, with `LAMP_SERVICES=on` | The owner's line is told nothing of what is linked: the model knows only the three functions and asks `services_connected` when it thinks to ("The voice is told what is linked", below) |
+| `LAMP_SERVICES_SPOTIFY=on` (off in the product) | `lamp-services` | Spotify (#5460) is refused: a `connector.set.spotify` is `failure` "Spotify is off on this lamp" with `data.code` `not_allowed`, nothing kept and nothing asked of Spotify; a `service_read` of it gets the same words; `tools.json` names no `spotify` ("Spotify: what is playing", below) |
 | `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and a request to make a skill naming a service is answered `NOT_A_SERVICE` ("A made skill's read", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
@@ -278,6 +279,7 @@ refresh goes to the lamp's backend, never to Google).
 | `hubspot` | HubSpot | `mcp.hubspot.com` | as Slack | as Slack |
 | `amplitude` | Amplitude | `mcp.amplitude.com`, `mcp.eu.amplitude.com` | as Slack | as Slack |
 | `notion` | Notion | `mcp.notion.com` | as Slack | as Slack |
+| `spotify` | Spotify (with `LAMP_SERVICES_SPOTIFY`) | `accounts.spotify.com` (its token route alone), `api.spotify.com`, each exactly | `now_playing` | none |
 
 Calendar has no `calendars` read: its link holds only `calendar.events`
 (#5385), and Google lists calendars only with a calendar or calendarlist
@@ -494,6 +496,77 @@ an answer read as `application/json` or a `text/event-stream`.
   (`mcp::WRITE_KEYS_REFUSED`). An allowed write is still read back with its
   tool and target and sent only on the owner's "send", behind
   `LAMP_SERVICES_WRITE`. The other MCP services have no such list.
+
+## Spotify: what is playing (#5460, `LAMP_SERVICES_SPOTIFY`, off)
+
+`crates/services/src/spotify.rs`, the contract agreed on #5460 (Backend2's
+amendment, 6 Nov 10:57, which Fourteen agreed at 11:03). Off unless
+`LAMP_SERVICES_SPOTIFY=on` in `lamp-services`' environment; the product's
+`lamp-services.service` does not set it.
+
+- **The link.** The phone runs PKCE at `accounts.spotify.com` itself with
+  the person's own client id, and hands over only the refresh token, the
+  client id and the granted scopes, through the backend's personal-token
+  route. The lamp gets `connector.set.spotify` as any code's:
+  `{"auth_type": "pat", "api_key": <refresh token>, "credentials":
+  {"client_id", "scopes": "<space-separated>"}}`. Kept as Spotify's link
+  only as a `pat` with an `api_key` and no access token (else "Spotify's
+  link is its refresh token alone"), and a client id of letters and digits,
+  at most 64 (`credentials.client_id`, else `client_id`; else "Spotify's link
+  needs its client id"). The scopes are split into the entry's `scopes`.
+  The entry is kept with `refresh` false, no `refresh_token` and no expiry,
+  so the backend's renewal ("Refresh", below) never sees it.
+- **At `set`** the link is proved by one renewal at Spotify (below), and the
+  refresh token kept is the rotated one when Spotify gives one. Refused:
+  `failure` with "Spotify refused the lamp's link: link it again in the app"
+  and `data.code` `relink`; not reached: "Spotify couldn't be reached: try
+  again in a while" and `unreached`. Either way nothing is kept. `lamp-cloud`
+  passes `lamp-services`' `code` on in the reply's `data.code`, for this
+  link alone so far (lower-case letters and `_`, at most 32, else dropped).
+- **Renewal, on the lamp.** The one link renewed by the lamp itself, since
+  PKCE has no secret: `POST https://accounts.spotify.com/api/token`,
+  `application/x-www-form-urlencoded`, `grant_type=refresh_token`,
+  `refresh_token`, `client_id`, and no `Authorization` header. A 200 with an
+  `access_token` and an `expires_in` over 0 gives an access token, held in
+  `lamp-services`' memory only (never in the store, the journal or an
+  answer) for its lifetime, at most an hour, less 60 s. A rotated
+  `refresh_token` in the answer replaces the kept one at once, written whole
+  as every entry is (0600, root's, beside, synced, renamed); if it can't be
+  written it is still held in memory for the next renewal. One renewal runs
+  at a time (a rotated token is good once). 400 with `invalid_grant`,
+  `invalid_client` or `unauthorized_client`, or 401, is a refused link (a
+  revoke in Spotify among them): the entry is marked expired in the store,
+  `list` and `services_connected` say `expired: true`, and every read says
+  "Spotify refused the lamp's link: link it again in the app", asking
+  Spotify nothing more until it is linked again. Anything else, a redirect
+  among them, leaves the link as it was.
+- **Hosts.** Exactly `accounts.spotify.com` for `POST /api/token` and
+  `api.spotify.com` for `GET /v1/me/player/currently-playing`, https, no
+  user, port or fragment, no subdomain, and nothing else
+  (`spotify::guard`, before every call). No redirect is followed: one comes
+  back as its status. 5 s to connect, 15 s a call, 15 s for a whole read
+  with its renewal, under the voice's 20 s.
+- **The read.** `service_read {service: "spotify", what: "now_playing"}`
+  alone, with the owner's every rule as any read ("Who can use them"): the
+  held access token, else one renewal, then `GET
+  /v1/me/player/currently-playing?additional_types=track,episode` with it as
+  the bearer. The answer, quoted as every read's: `playing`, `type` (track
+  or episode), `title`, `artists`, `album` or `show`, nothing else of
+  Spotify's (no device, id or link); 204, or nothing playing, is "Nothing is
+  playing on Spotify right now.". 401 forgets the held token, so the next
+  read renews; 403 is "Spotify refused the lamp's link: it may need linking
+  again in the app"; 429 "Spotify is busy: try again in a while". Both
+  tokens are scrubbed from the answer. The first read after a start takes
+  a renewal and the read (two round trips); later ones one.
+- **Not a skill's, never a write.** A made skill can't read Spotify
+  (`spoken::not_readable`: "read only by the owner's voice"). Playback
+  control is not built: `service_write` for Spotify answers "The lamp
+  doesn't control Spotify's playback: it only reads what is playing", and
+  the `user-modify-playback-state` scope a link holds is never used. It is
+  reserved for `LAMP_SERVICES_PLAYBACK`, which nothing reads yet; the
+  write's `service` list never names Spotify.
+- **Off**, as the switches' table says; on, `tools.json` names `spotify` in
+  the read's `service` list and "spotify: now_playing" in its description.
 
 ## Reads
 
@@ -1052,7 +1125,8 @@ fails for it.
 ## Refresh
 
 An OAuth link is renewed through the backend, as V1's `connector_refresh.go`
-does (`crates/services/src/refresh.rs`): `POST <base>/connector/refresh-token`
+does (all but Spotify's, renewed on the lamp itself: "Spotify: what is
+playing", above) (`crates/services/src/refresh.rs`): `POST <base>/connector/refresh-token`
 with `{"connector", "refresh_token"}`, the lamp's key as the bearer and its
 id in `X-Device-ID`. No client secret is on the lamp. `<base>` is setup's
 `backend.json` `llm_base_url` with `/v1` cut off (https only), and the key is
@@ -1095,7 +1169,7 @@ Replies are V1's shape, `{"type":"data","kind":"connector.set.<code>",
 "the lamp's services are busy: try again in a moment"), waited on 30 s (the
 Gmail check, an IMAP login or a profile read, is in it); its result goes out on the next tick and is said
 again if the connection is lost before the broker's ack. Failures in plain
-words: "not a service this lamp knows" (a code not among the 15, at once),
+words: "not a service this lamp knows" (a code not among the 17, at once),
 "the lamp's services are not running", "the lamp's services did not answer
 in time", "fetch privacy data: http <status>" / "backend rejected: …" /
 "backend response missing data block", "connector is required",
@@ -1206,6 +1280,10 @@ still refused (`OWNER_ONLY`).
 
 ## What is not done yet
 
+- **Spotify is off and has not run on a lamp** (`LAMP_SERVICES_SPOTIFY`,
+  #5460): the app's PKCE screen, a real renewal at Spotify and a read of a
+  real player are owed, and the privacy read of the lamp-side renewal comes
+  first. Playback control is not built (`LAMP_SERVICES_PLAYBACK`).
 - **A made skill's read is on in the product, not yet run on a product
   lamp.** Behind `LAMP_SKILL_READS` (on in the four product units since
   5 Nov): only mail and the calendar have their own
@@ -1242,7 +1320,19 @@ still refused (`OWNER_ONLY`).
 
 ## Tests
 
-`cargo test -p lamp-services`: the store root-only (0700/0600) and written
+`cargo test -p lamp-services` (`spotify`, against a local fake HTTP
+server on 127.0.0.1 with the product's client: no redirect, its timeouts):
+Spotify's link its refresh token and client id and never the backend's to
+renew; only its two hosts and two routes called, nothing reaching the
+server otherwise; the renewal PKCE's with no secret and no `Authorization`,
+the access token held in memory and used again, never kept, a rotated
+refresh token kept whole (0600, nothing left beside) and used after a
+restart; a revoke (`invalid_grant`, 401) said as "link it again" at `set`
+and at a read, the link marked expired and Spotify not asked again; a
+redirect never followed; with the switch off a link refused with
+`not_allowed` and a read refused, nothing called; a write and a made
+skill's read refused; the product unit not setting it; `tools.json` naming
+it only with the switch, as a read alone. Also: the store root-only (0700/0600) and written
 whole, a code never a path, remove and wipe; no secret in a `Debug` or a
 refusal; a token only over https to its own hosts (no port, user, fragment or
 lookalike host), reads only on the allow-list, writes only on the write list;
@@ -1262,7 +1352,9 @@ and under the voice's cap; a write refused when off, read back in full and
 sent once within two minutes; the MCP read/write rule, its pinned host, a
 link on another host never called, a write tool read back whole and called
 once on send; the refresh request as V1's; the askers told by their cgroup.
-`-p lamp-cloud` (`services`, `online`, `answer`): both switch words needed,
+`-p lamp-cloud` (`services`, `online`, `answer`): `spotify` known and a
+refusal's `code` passed on in `data.code` (one not in its shape dropped),
+both switch words needed,
 the backend's answer read as V1 reads it, the fetched connector checked and
 never said, `starting` at once and the result later without its token,
 remove, list and wipe asking their ops, an unknown code refused at once,

@@ -17,8 +17,9 @@ path = "src/main.rs"
 serde.workspace = true
 serde_json.workspace = true
 # One small runtime per request, as the keys helper's check has it; `io-util`
-# for the mail protocols, `net` for their connections.
-tokio = { version = "=1.53.1", features = ["rt", "net", "time", "io-util", "macros"] }
+# for the mail protocols, `net` for their connections, `sync` for Spotify's one
+# renewal at a time.
+tokio = { version = "=1.53.1", features = ["rt", "net", "time", "io-util", "macros", "sync"] }
 # The same TLS as the other lampOS clients: rustls with the ring provider,
 # no provider of reqwest's own.
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
