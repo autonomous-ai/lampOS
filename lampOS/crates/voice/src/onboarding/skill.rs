@@ -55,6 +55,17 @@ pub(crate) const FACE_AGAIN: &str = "(Nobody has spoken. Ask exactly this: \"One
 /// a few everyday things, never a list of features.
 pub(crate) const PREFERENCES_DONE_TRIES: &str = "(Say only this, nothing before or after it: \"Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one.\")";
 
+/// [`PREFERENCES_DONE`] ending with the one sentence about Harness
+/// (`harness_line::SENTENCE`), inside the same quoted line: one closing
+/// turn (#5488, with `LAMP_ONBOARDING_HARNESS_LINE` on and Harness not
+/// signed in).
+pub(crate) const PREFERENCES_DONE_HARNESS: &str = "(Say only this, nothing before or after it: \"Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.\")";
+
+/// [`PREFERENCES_DONE_TRIES`] ending with the same sentence, with
+/// `LAMP_ONBOARDING_FIRST_TRIES` on too: still one closing turn, so a new
+/// owner never hears two speeches at the end (the PM on #5488).
+pub(crate) const PREFERENCES_DONE_TRIES_HARNESS: &str = "(Say only this, nothing before or after it: \"Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.\")";
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Definition {

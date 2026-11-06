@@ -17,6 +17,7 @@
 //! file is read or written.
 pub(crate) mod giving_way;
 pub(crate) mod hardware;
+pub(crate) mod harness_line;
 mod in_language;
 #[cfg(test)]
 pub(crate) mod legacy_words;
@@ -459,15 +460,24 @@ pub struct Progress {
     /// line. A reset wipes it with the file. An older build reads past it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub tries_said: bool,
+    /// What became of the one line about Harness after the walk's last
+    /// step ([`harness_line::ENVIRONMENT`], #5488): said, or why it was
+    /// skipped. Decided once, so a later walk, a redo of it or a restart
+    /// never says it again. A reset wipes it with the file. An older build
+    /// reads past it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub harness_line: Option<harness_line::Kept>,
 }
 
 impl Progress {
     /// What a redo of the whole walk starts from: nothing kept but whether
     /// the things to try were said ([`Self::tries_said`]), so they are
-    /// never said twice to the same owner.
+    /// never said twice to the same owner, nor the line about Harness
+    /// ([`Self::harness_line`]).
     fn redone(&self) -> Self {
         Self {
             tries_said: self.tries_said,
+            harness_line: self.harness_line,
             ..Self::default()
         }
     }
@@ -920,6 +930,11 @@ pub struct Onboarding {
     nudge: bool,
     /// [`FIRST_TRIES_ENVIRONMENT`].
     first_tries: bool,
+    /// [`harness_line::ENVIRONMENT`] (#5488).
+    harness_line: bool,
+    /// Harness's sign-in as the tasks part last said it; `None` with no
+    /// tasks part (`LAMP_TASKS_DIR`), and always with the switch off.
+    harness_read: Option<harness_line::Read>,
     /// The model service refusing turns (#4265, `LAMP_SECOND_REFUSED_HOLD`):
     /// a step that fails meanwhile is held as `later`.
     model_refusing: bool,
@@ -1081,6 +1096,10 @@ impl Onboarding {
         walk.eyes = lamp_bus::Bus::from_environment().ok();
         walk.nudge = std::env::var(NUDGE_ENVIRONMENT).as_deref() == Ok("on");
         walk.first_tries = std::env::var(FIRST_TRIES_ENVIRONMENT).as_deref() == Ok("on");
+        walk.harness_line = std::env::var(harness_line::ENVIRONMENT).as_deref() == Ok("on");
+        if walk.harness_line {
+            walk.harness_read = harness_line::from_environment();
+        }
         walk.face_kept =
             std::env::var(crate::known_faces::ENVIRONMENT).is_ok_and(|socket| !socket.is_empty());
         // The head pads' touches, from `--touch` Controls, only with the
@@ -1168,6 +1187,8 @@ impl Onboarding {
             body_heard: false,
             nudge: false,
             first_tries: false,
+            harness_line: false,
+            harness_read: None,
             model_refusing: false,
             model_held: false,
             face_kept: false,
@@ -3511,16 +3532,51 @@ impl Onboarding {
         Some(skill::FACE_AGAIN.to_owned())
     }
 
+    /// Whether the line about Harness is said, decided once and kept
+    /// ([`Progress::harness_line`]), from the tasks part's last read, with
+    /// its session record.
+    fn decide_harness_line(&mut self) -> harness_line::Kept {
+        let linked = self.harness_read.as_ref().map(|read| {
+            read.lock()
+                .map_or(harness_line::Linked::Unknown, |read| *read)
+        });
+        let kept = harness_line::decide(linked);
+        self.desired.harness_line = Some(kept);
+        eprintln!(
+            "lamp-voice: onboarding: the line about Harness: {}",
+            kept.name()
+        );
+        self.pending_records.push(
+            json!({"kind":"onboarding_harness_line","outcome":kept.name(),
+                "at_unix_ms":(self.unix_clock)()}),
+        );
+        kept
+    }
+
     /// "Preferences"' done line: with [`FIRST_TRIES_ENVIRONMENT`] on, the
     /// first time only, the one that also names a few things to try first
     /// (#5316); kept as said once handed to [`Self::owed`], so a cut line
     /// offered again is the same line, and nothing later says it again.
+    ///
+    /// With [`harness_line::ENVIRONMENT`] on, the first done line handed
+    /// out also ends with the one sentence about Harness (#5488) when
+    /// Harness is not signed in: inside the same quoted line, one turn,
+    /// never a second speech; signed in, it is dropped. It rides on the done
+    /// line wherever that is said. Decided once
+    /// ([`Progress::harness_line`]), so no later done line says it.
     fn preferences_done(&mut self) -> &'static str {
-        if self.first_tries && !self.desired.tries_said {
+        let tries = self.first_tries && !self.desired.tries_said;
+        if tries {
             self.desired.tries_said = true;
-            skill::PREFERENCES_DONE_TRIES
-        } else {
-            skill::PREFERENCES_DONE
+        }
+        let harness = self.harness_line
+            && self.desired.harness_line.is_none()
+            && self.decide_harness_line() == harness_line::Kept::Said;
+        match (tries, harness) {
+            (true, true) => skill::PREFERENCES_DONE_TRIES_HARNESS,
+            (true, false) => skill::PREFERENCES_DONE_TRIES,
+            (false, true) => skill::PREFERENCES_DONE_HARNESS,
+            (false, false) => skill::PREFERENCES_DONE,
         }
     }
 
@@ -7315,6 +7371,272 @@ mod tests {
         let kept: Progress =
             serde_json::from_str(&serde_json::to_string(&room.walk.desired).unwrap()).unwrap();
         assert!(kept.tries_said);
+    }
+
+    /// The walk from its first step to "preferences"' done line, with
+    /// someone sitting in the middle.
+    fn walk_to_the_done_line(room: &mut Room) {
+        walk_to(room, skill::PREFERENCES_DONE);
+    }
+
+    /// As [`walk_to_the_done_line`], the walk's last line being `done`.
+    fn walk_to(room: &mut Room, done: &str) {
+        assert_eq!(
+            room.wait(27 * S, Some(NEAR_MIDDLE)),
+            [SIT_NOTE, SIT_DONE, WHO_NOTE]
+        );
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        room.walk.heard("Quiet from 10PM, please.", room.at);
+        room.walk.lamp_said(room.at);
+        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
+        room.walk.heard("Yes, that's fine.", room.at);
+        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [done]);
+    }
+
+    /// A walk with [`harness_line::ENVIRONMENT`] as `switch`, the tasks part
+    /// saying `linked` (`None`: no tasks part).
+    fn harness_room(name: &str, switch: bool, linked: Option<harness_line::Linked>) -> Room {
+        let mut room = Room::new(name);
+        room.walk.harness_line = switch;
+        room.walk.harness_read = linked.map(|linked| Arc::new(std::sync::Mutex::new(linked)));
+        room
+    }
+
+    /// The same file read by a voice started again, with the switch on and
+    /// Harness signed out.
+    fn restarted(room: &Room) -> Room {
+        let mut again = Room {
+            walk: Onboarding::at(room.walk.file.clone()),
+            at: room.at,
+            said: room.said,
+            still: true,
+            body_on_bus: false,
+        };
+        again.walk.harness_line = true;
+        again.walk.harness_read = Some(Arc::new(std::sync::Mutex::new(harness_line::Linked::No)));
+        again
+    }
+
+    fn fixed(note: &str) -> String {
+        fixed_words(note).unwrap().to_owned()
+    }
+
+    /// #5488: with the switch on and Harness not signed in, the walk's
+    /// closing ends with the one sentence about Harness, inside the same
+    /// quoted line (one turn); nothing follows it. A restart, and a redo of
+    /// the whole walk to its end, never say it again: the plain done line.
+    #[test]
+    fn the_sentence_about_harness_ends_the_closing_once() {
+        let mut room = harness_room("harness-line", true, Some(harness_line::Linked::No));
+        walk_to(&mut room, skill::PREFERENCES_DONE_HARNESS);
+        assert_eq!(
+            fixed(skill::PREFERENCES_DONE_HARNESS),
+            format!(
+                "{} {}",
+                fixed(skill::PREFERENCES_DONE),
+                harness_line::SENTENCE
+            )
+        );
+        assert_eq!(
+            room.walk.kept().harness_line,
+            Some(harness_line::Kept::Said)
+        );
+        assert!(room.wait(60 * S, Some(NEAR_MIDDLE)).is_empty());
+        // The voice restarts: the walk is over and the sentence was said.
+        let mut again = restarted(&room);
+        assert!(again.wait(60 * S, Some(NEAR_MIDDLE)).is_empty());
+        // "Lamp, let's redo the setup": walked again to its end, plain.
+        let redo = ToolCall {
+            id: "c".into(),
+            name: REDO.into(),
+            args: json!({"step": "all"}),
+        };
+        assert!(run(&again.walk.file, &redo).1);
+        walk_to_the_done_line(&mut again);
+        assert!(again.wait(60 * S, Some(NEAR_MIDDLE)).is_empty());
+        assert_eq!(
+            again.walk.kept().harness_line,
+            Some(harness_line::Kept::Said)
+        );
+        // An older file without the field reads as not yet decided.
+        let old: Progress = serde_json::from_str(r#"{"steps":{}}"#).unwrap();
+        assert_eq!(old.harness_line, None);
+    }
+
+    /// #5488: signed in (or signed in and offline), with no tasks part, or
+    /// with a tasks part that does not say, the closing is the plain done
+    /// line, and the sentence is kept as skipped, so no later closing says it.
+    #[test]
+    fn the_sentence_about_harness_is_dropped_unless_harness_is_signed_out() {
+        for (linked, kept) in [
+            (
+                Some(harness_line::Linked::Yes),
+                harness_line::Kept::SignedIn,
+            ),
+            (None, harness_line::Kept::NoTasks),
+            (
+                Some(harness_line::Linked::Unknown),
+                harness_line::Kept::Unknown,
+            ),
+        ] {
+            let mut room = harness_room(&format!("harness-skip-{kept:?}"), true, linked);
+            walk_to_the_done_line(&mut room);
+            assert!(room.wait(60 * S, Some(NEAR_MIDDLE)).is_empty(), "{kept:?}");
+            assert_eq!(room.walk.kept().harness_line, Some(kept));
+            // Signed out later: a later closing is still the plain one.
+            room.walk.harness_read =
+                Some(Arc::new(std::sync::Mutex::new(harness_line::Linked::No)));
+            assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE);
+        }
+    }
+
+    /// #5488, the PM's condition: with `LAMP_ONBOARDING_FIRST_TRIES` on
+    /// too, a new owner hears one closing, not two: the sentence ends the
+    /// done line with the tries, one note and one turn, and nothing follows
+    /// it. Signed in, it is dropped: the done line with the tries alone.
+    /// Either way it is kept as decided, as alone.
+    #[test]
+    fn with_the_first_tries_the_sentence_about_harness_is_in_the_one_closing() {
+        for (linked, done, kept) in [
+            (
+                harness_line::Linked::No,
+                skill::PREFERENCES_DONE_TRIES_HARNESS,
+                harness_line::Kept::Said,
+            ),
+            (
+                harness_line::Linked::Yes,
+                skill::PREFERENCES_DONE_TRIES,
+                harness_line::Kept::SignedIn,
+            ),
+        ] {
+            let mut room = harness_room(&format!("harness-tries-{kept:?}"), true, Some(linked));
+            room.walk.first_tries = true;
+            walk_to(&mut room, done);
+            assert!(room.wait(60 * S, Some(NEAR_MIDDLE)).is_empty(), "{kept:?}");
+            assert_eq!(room.walk.kept().harness_line, Some(kept));
+            assert!(room.walk.kept().tries_said);
+        }
+        assert_eq!(
+            fixed(skill::PREFERENCES_DONE_TRIES_HARNESS),
+            format!(
+                "{} {}",
+                fixed(skill::PREFERENCES_DONE_TRIES),
+                harness_line::SENTENCE
+            )
+        );
+    }
+
+    /// #5488 on #5499's two-step walk: its done line, now said when "who you
+    /// are" ends, carries the sentence as it does after "preferences": one
+    /// closing turn, said once (a restart says nothing more). With the
+    /// tries on too, that one closing has both.
+    #[test]
+    fn the_two_step_walks_one_closing_carries_the_sentence() {
+        for (tries, done) in [
+            (false, skill::PREFERENCES_DONE_HARNESS),
+            (true, skill::PREFERENCES_DONE_TRIES_HARNESS),
+        ] {
+            let mut room = harness_room(
+                &format!("harness-two-steps-{tries}"),
+                true,
+                Some(harness_line::Linked::No),
+            );
+            room.walk.first_tries = tries;
+            let mut definition = (*room.walk.definition).clone();
+            definition.order = vec![Step::WhereYouSit, Step::WhoYouAre];
+            room.walk.definition = Arc::new(definition.checked().unwrap());
+            assert_eq!(
+                room.wait(27 * S, Some(NEAR_MIDDLE)),
+                [SIT_NOTE, SIT_DONE, WHO_NOTE]
+            );
+            report(&room.walk, "who_you_are", "done");
+            assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [done], "{tries}");
+            assert!(room.wait(60 * S, Some(NEAR_MIDDLE)).is_empty(), "{tries}");
+            assert_eq!(
+                room.walk.kept().harness_line,
+                Some(harness_line::Kept::Said)
+            );
+            let mut again = restarted(&room);
+            again.walk.definition = room.walk.definition.clone();
+            assert!(again.wait(60 * S, Some(NEAR_MIDDLE)).is_empty(), "{tries}");
+        }
+    }
+
+    /// #5488: the done note itself carries the sentence, so it goes
+    /// wherever the done line is said: chosen by [`Onboarding::preferences_done`]
+    /// for each switch combination, appended once, dropped when Harness is
+    /// signed in.
+    #[test]
+    fn the_done_note_carries_the_sentence_once_for_each_switch() {
+        for (harness, tries, linked, first) in [
+            (
+                true,
+                false,
+                harness_line::Linked::No,
+                skill::PREFERENCES_DONE_HARNESS,
+            ),
+            (
+                true,
+                true,
+                harness_line::Linked::No,
+                skill::PREFERENCES_DONE_TRIES_HARNESS,
+            ),
+            (
+                true,
+                false,
+                harness_line::Linked::Yes,
+                skill::PREFERENCES_DONE,
+            ),
+            (
+                true,
+                true,
+                harness_line::Linked::Yes,
+                skill::PREFERENCES_DONE_TRIES,
+            ),
+            (
+                false,
+                false,
+                harness_line::Linked::No,
+                skill::PREFERENCES_DONE,
+            ),
+            (
+                false,
+                true,
+                harness_line::Linked::No,
+                skill::PREFERENCES_DONE_TRIES,
+            ),
+        ] {
+            let mut room = harness_room(
+                &format!("harness-done-{harness}-{tries}-{linked:?}"),
+                harness,
+                Some(linked),
+            );
+            room.walk.first_tries = tries;
+            let case = format!("{harness} {tries} {linked:?}");
+            assert_eq!(room.walk.preferences_done(), first, "{case}");
+            assert_eq!(
+                room.walk.preferences_done(),
+                skill::PREFERENCES_DONE,
+                "{case}: once"
+            );
+            assert_eq!(room.walk.desired.harness_line.is_some(), harness, "{case}");
+        }
+    }
+
+    /// #5488: the switch off, nothing changes: the plain done line, no
+    /// sentence, nothing kept.
+    #[test]
+    fn without_the_harness_line_switch_the_walk_ends_as_before() {
+        let mut room = harness_room("harness-off", false, Some(harness_line::Linked::No));
+        walk_to_the_done_line(&mut room);
+        assert!(room.wait(60 * S, Some(NEAR_MIDDLE)).is_empty());
+        assert_eq!(room.walk.kept().harness_line, None);
+        assert!(
+            !serde_json::to_string(room.walk.kept())
+                .unwrap()
+                .contains("harness")
+        );
     }
 
     /// Reviewer-two's P2 on #4326: the hello is owed after the first answer

@@ -1135,6 +1135,11 @@ fn owner<C: Clock>(
                     moved = true;
                     let answer =
                         engine.handle(&work.request, &clock.sample()?, work.route == Route::Voice);
+                    let answer = with_sign_in(
+                        &work.request,
+                        answer,
+                        set_up.and_then(|found| found.sign_in),
+                    );
                     requests = requests.saturating_add(1);
                     let _ = work.response.try_send(answer);
                     if engine.failed() {
@@ -2907,9 +2912,50 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     }
 }
 
+/// `status` answered with Harness's sign-in as `serve --set-up-later`
+/// last read it (`signed_in`: `yes`, `offline` or `no`, its journal's
+/// "Harness signed in: …"), for the voice's sentence about Harness at the end
+/// of onboarding (#5488). Not read yet, or without `--set-up-later`, the
+/// answer is as it was; so is every other answer.
+fn with_sign_in(
+    request: &Request,
+    answer: Result<Value, EngineError>,
+    sign_in: Option<SignIn>,
+) -> Result<Value, EngineError> {
+    let (Request::Status {}, Some(sign_in)) = (request, sign_in) else {
+        return answer;
+    };
+    answer.map(|mut body| {
+        if body.is_object() {
+            body["signed_in"] = sign_in.name().into();
+        }
+        body
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::code_handed;
+
+    /// #5488: `status` says Harness's sign-in once it was read, and nothing
+    /// else changes.
+    #[test]
+    fn status_says_harness_signed_in_once_read() {
+        use super::{Request, SignIn, with_sign_in};
+        let body = || Ok(serde_json::json!({"summary": {}}));
+        for (sign_in, said) in [
+            (SignIn::In, "yes"),
+            (SignIn::Offline, "offline"),
+            (SignIn::Out, "no"),
+        ] {
+            let answer = with_sign_in(&Request::Status {}, body(), Some(sign_in)).unwrap();
+            assert_eq!(answer["signed_in"], said);
+        }
+        let unread = with_sign_in(&Request::Status {}, body(), None).unwrap();
+        assert_eq!(unread, serde_json::json!({"summary": {}}));
+        let targets = with_sign_in(&Request::Targets {}, body(), Some(SignIn::Out)).unwrap();
+        assert_eq!(targets, serde_json::json!({"summary": {}}));
+    }
 
     #[test]
     fn a_code_handed_to_the_voice_is_one_line_without_its_digits() {

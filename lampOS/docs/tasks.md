@@ -227,7 +227,7 @@ inspection evidence, not a playback grant.
 
 | Operation | Fields besides `op` | Route / meaning |
 |---|---|---|
-| `status` | none | Counts, bounds, current identities, last receipt |
+| `status` | none | Counts, bounds, current identities, last receipt; with `serve --set-up-later` and the sign-in read, `signed_in` (`yes`, `offline` or `no`, #5488) |
 | `targets` | none | Each target's `alias` and `engine`, in alias order; never its machine or project (since task 41, for the voice) |
 | `list` | optional `after_id` (default 0), `limit` (1–8, default 8) | Metadata page; follow `next_after_id` |
 | `get_task` | `id` | Exact task, configured target, dispatch and observation metadata |
@@ -1024,6 +1024,12 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
   keep their own warning. Being signed out doesn't refuse a `prepare`: the
   sign-in read is up to a minute old, and the hand-over then fails as
   before ("could not hand the last task over").
+- **The sign-in on `status`** (#5488): once read, the `status` answer
+  carries the same `signed_in` (`yes`, `offline` or `no`), on any route.
+  The voice's onboarding reads it for its one sentence about Harness in the
+  walk's closing (`LAMP_ONBOARDING_HARNESS_LINE`, [onboarding.md](onboarding.md)).
+  Not read yet, the answer has no `signed_in`, as before; every other
+  answer is unchanged (`runtime::tests::status_says_harness_signed_in_once_read`).
 - **Without the switch** nothing of this is said or read, and the part
   starts, stops and reports as before.
 
