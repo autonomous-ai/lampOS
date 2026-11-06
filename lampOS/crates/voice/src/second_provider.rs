@@ -8850,6 +8850,12 @@ async fn spoken(
         .place
         .as_ref()
         .and_then(|place| place(request, &text));
+    // What the owner linked in the app's Connectors, beside the owner's own
+    // line alone (#5523): read from what `lamp-services` last said, no wait.
+    let linked = shared
+        .linked
+        .as_ref()
+        .and_then(|linked| linked(request, &text, scope.as_ref()));
     // What memory holds for these words: the prepared chat's, when it was
     // begun on them (so its round still stands), else asked now, off the
     // runtime's thread (Fourth's P3 on #2229).
@@ -8990,6 +8996,7 @@ async fn spoken(
         .chain(misheard)
         .chain(staff)
         .chain(place)
+        .chain(linked)
         .chain(remembered)
         .chain(named)
         .chain(wake)

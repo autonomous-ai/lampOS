@@ -1925,6 +1925,8 @@ fn second_route_worker_environment(
         // Each turn told the light as `light/state` says it now (lamp-52e6,
         // 4 Nov: "what colour is the light?" guessed "White").
         crate::light_told::ENVIRONMENT,
+        // The owner's line told what the app's Connectors linked (#5523).
+        crate::services_told::ENVIRONMENT,
     ]
     .into_iter()
     .filter(|_| role == "second")
@@ -2110,6 +2112,7 @@ mod tests {
             crate::known_faces::ASKED_ENVIRONMENT,
             crate::known_faces::RECORD_TOLD_ENVIRONMENT,
             crate::light_told::ENVIRONMENT,
+            crate::services_told::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
             assert_eq!(
@@ -2737,6 +2740,7 @@ mod tests {
                     crate::second_provider::net::key_terms::ENVIRONMENT,
                     crate::second_config::FLUX_ENV,
                     crate::light_told::ENVIRONMENT,
+                    crate::services_told::ENVIRONMENT,
                     crate::attention::NEAR_CALIBRATED_ENVIRONMENT,
                     crate::memory_scope::GAP_ENVIRONMENT,
                     crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
@@ -3066,6 +3070,7 @@ mod tests {
                     "LAMP_SECOND_UNFINISHED_WAIT=on",
                     "LAMP_SECOND_WEATHER=on",
                     "LAMP_SECOND_WRITTEN_WAIT=on",
+                    "LAMP_SERVICES_TOLD=on",
                     "LAMP_SHORT_DONE=on",
                     "LAMP_STOP_WORDS_KEYTERM=on",
                     "LAMP_TASKS_NAMED_ASK=on",

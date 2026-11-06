@@ -2711,6 +2711,18 @@ pub fn serve(
         );
         place_noting(std::path::PathBuf::from(lamp_msgs::owner_place::FILE))
     });
+    // What the owner linked in the app's Connectors, told beside the
+    // owner's own line, with LAMP_SERVICES_TOLD=on and the services' folder
+    // (#5523): known from `lamp-services` as each line begins, never waited.
+    let linked_told = services_folder
+        .clone()
+        .filter(|_| crate::services_told::on_from_environment())
+        .map(|folder| {
+            eprintln!(
+                "lamp-voice second: the owner's spoken line is told what is linked in the app's Connectors, when anything is; no other line is (LAMP_SERVICES_TOLD)"
+            );
+            crate::services::Linked::new(folder)
+        });
     let has_tasks = tools.tasks.is_some();
     // Whom a line's words ask by name, with `LAMP_TASKS_NAMED_ASK=on`: its
     // forced call goes to that one, and the journal says so (#1722).
@@ -2852,6 +2864,9 @@ pub fn serve(
     }
     if let Some(place) = owner_place {
         engine = engine.noting_the_place(place);
+    }
+    if let Some(linked) = linked_told.clone() {
+        engine = engine.telling_what_is_linked(linked_noting(linked));
     }
     // What memory holds that may fit a spoken turn's words (#2176 row 5c,
     // `LAMP_SECOND_MEMORY_HITS=on`, Days only, on in the product since the
@@ -3679,7 +3694,18 @@ pub fn serve(
             && let Some(folder) = services_folder
             && let Ok(mut heeding) = heeding.lock()
         {
-            heeding.printing_only_while_linked(crate::services::Linked::new(folder));
+            heeding.printing_only_while_linked(
+                linked_told
+                    .clone()
+                    .unwrap_or_else(|| crate::services::Linked::new(folder)),
+            );
+        }
+        // What is linked, told to the owner's line, asked again as each line
+        // begins (#5523), with or without the services' prints.
+        if let Some(linked) = linked_told
+            && let Ok(mut heeding) = heeding.lock()
+        {
+            heeding.asking_what_is_linked(linked);
         }
         // Only prints for every rule are the voice heard; the services'
         // alone are heard by none of them.
@@ -5117,6 +5143,28 @@ pub(crate) fn staff_noting(place: crate::agent_tasks::Place) -> super::StaffNote
             who.join(" and ")
         );
         Some(crate::staff_note::note(&who))
+    })
+}
+
+/// The note for the owner's spoken line naming what is linked in the app's
+/// Connectors (`LAMP_SERVICES_TOLD=on`, `crate::services_told`, #5523): read
+/// from what `lamp-services` last said, journalled by count, never by name.
+pub(crate) fn linked_noting(
+    linked: Arc<crate::services::Linked>,
+) -> crate::second_provider::Remembered {
+    Arc::new(move |request, _words, lease| {
+        // Asked again for the next line too: without the attention rule's
+        // line-begin ask (`Heeding::asking_what_is_linked`), a link made
+        // since is told one line later. Never waits.
+        linked.check();
+        let owner = crate::services::owner_of(lease)?;
+        let names = linked.names();
+        let note = crate::services_told::note_for(Some(owner.as_str()), &names)?;
+        eprintln!(
+            "lamp-voice second: request {request}: the owner's line is told {} service(s) linked in the app",
+            names.len()
+        );
+        Some(note)
     })
 }
 
@@ -8093,6 +8141,15 @@ impl Heeding {
         if let Some(voices) = self.for_services.take() {
             let open = linked.clone();
             self.for_services = Some(voices.asking_only_while(move || open.now()));
+            self.services_linked = Some(linked);
+        }
+    }
+
+    /// `linked` asked again as each line begins ([`Self::printing`]), for
+    /// what the owner's line is told is linked (`LAMP_SERVICES_TOLD`,
+    /// #5523), when the services' prints don't ask it already.
+    pub(crate) fn asking_what_is_linked(&mut self, linked: Arc<crate::services::Linked>) {
+        if self.services_linked.is_none() {
             self.services_linked = Some(linked);
         }
     }
