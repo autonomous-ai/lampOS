@@ -1536,12 +1536,14 @@ mod tests {
 
     /// #4705: with the switch, the lamp's own voice misjudged as a person at
     /// its words' tails, the render fallen 7 dB, makes no late yield either.
+    /// Since 32a00aa48e a word's tail under a fallen render is the lamp's
+    /// own, so these blocks make no yield at all, with the switch or without.
     #[test]
     fn the_lamps_own_voice_at_its_word_tails_is_not_a_late_yield() {
         for switch in [false, true] {
             let (late, steps) = own_voice_yielded_to_late(switch, 70);
             assert!(!late, "{switch}");
-            assert_eq!(steps, [(276, Step::Yield), (345, Step::Resume)], "{switch}");
+            assert_eq!(steps, [], "{switch}");
         }
     }
 
