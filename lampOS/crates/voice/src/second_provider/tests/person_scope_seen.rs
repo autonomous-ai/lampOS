@@ -34,6 +34,10 @@ thread_local! {
     /// [`lines_known`] on this thread is given, once.
     static DONT_KNOW_FOUND: std::cell::RefCell<Option<crate::second_provider::Remembered>> =
         const { std::cell::RefCell::new(None) };
+    /// The murmured line's mouths the next [`lines_known`] on this thread
+    /// reads in place of [`S4_OPENING_MOUTHS`], once.
+    static MURMUR_MOUTHS: std::cell::Cell<Option<&'static [lamp_msgs::SpeakingState]>> =
+        const { std::cell::Cell::new(None) };
 }
 
 /// The worker's own setup (`worker::see_who_speaks`) with
@@ -610,6 +614,9 @@ async fn lines_known(
     // On the real route the voice's thread is the crate's own, shared by
     // every test: requests of this test's own.
     let base = real.map_or(0, |real| real.base);
+    let murmured = MURMUR_MOUTHS
+        .with(std::cell::Cell::take)
+        .unwrap_or(S4_OPENING_MOUTHS);
     for (at, (_, in_view, after)) in lines.into_iter().enumerate() {
         let line = at as u64 + 1;
         let request = base + line;
@@ -623,7 +630,7 @@ async fn lines_known(
         // S4's opening line: her mouth read speaking in one look of four,
         // unread in the rest (lamp-06c1, 5 Nov: read speaking in 1 of 9).
         let mouths = if murmur == Some(line) {
-            S4_OPENING_MOUTHS
+            murmured
         } else {
             mouths
         };
@@ -1954,6 +1961,172 @@ async fn her_seen_yes_to_a_carried_keep_writes_the_car_in_her_scope() {
         told.iter()
             .all(|told| !told.contains("no offer of yours to keep")),
         "never told nothing was waiting: {told:?}"
+    );
+}
+
+/// lamp-06c1, 6 Nov, stock 10538, S4 requests 291 to 293 (C54, C55), with
+/// the product unit's switches (`LAMP_SECOND_NAME_ONE_FACE`,
+/// `LAMP_PERSON_SCOPE_ONE_FACE`, `LAMP_CONVERSATION_CARRIED_SAVES`;
+/// `LAMP_CONVERSATION_CARRIES_PAST_SILENT` inactive, as the journal's "no
+/// other face in view" shows). Olivia's opening (291) had her face alone in
+/// 9 of 9 looks, read speaking in 1, still in 7, unread in 1: never
+/// `alone_in_view` (still in over half), so named by the one-face count
+/// alone, and its room's exchange opened no conversation of hers. Her car
+/// line (292) began 21 s later, her face hidden under a second before it:
+/// no carry, `speaker unknown (skipped=1)`; and her yes (293), 21 s after
+/// that, her face back and seen saying it, had nothing held. Her face alone
+/// in view through the opening, its mouth read speaking at least once,
+/// opens her conversation for a keep only: the car is held and written in
+/// her scope on her seen yes.
+#[tokio::test]
+async fn stock_s4_carried_keep_on_the_product_switches_writes_the_car_on_her_yes() {
+    use lamp_msgs::SpeakingState::{No, Unknown, Yes};
+    // Request 291's looks: speaking 1, still 7, unread 1.
+    const OPENING_291: &[lamp_msgs::SpeakingState] = &[Yes, No, No, No, No, No, No, No, Unknown];
+    let a = crate::remember::person_id("A");
+    fn hidden_then_back(request: u64, known: &std::path::Path) {
+        match request {
+            2 => {
+                let _ = std::fs::remove_file(known);
+                let _ = std::fs::remove_file(known_face_of(known));
+            }
+            3 => {
+                std::fs::write(known, "A").unwrap();
+                std::fs::write(known_face_of(known), "f2\n").unwrap();
+            }
+            _ => {}
+        }
+    }
+    crate::remember::heard::set_on_for_test(true);
+    crate::keep_quietly::set_on_for_test(true);
+    const OPENING: &str = "Garden centre on Saturday, Olivia? Nice.";
+    const ASKS: &str = "Your car is silver. Should I keep that for you?";
+    const KEPT: &str = "Kept: your car is silver.";
+    let chats = vec![
+        vec![text(OPENING), Ok(ChatEvent::Done)],
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c1",
+                crate::remember::REMEMBER,
+                json!({"text": "Olivia's car is silver."}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![text(ASKS), Ok(ChatEvent::Done)],
+        vec![text(KEPT), Ok(ChatEvent::Done)],
+        vec![text("Okay."), Ok(ChatEvent::Done)],
+    ];
+    let socket = memory_socket(9_905_700);
+    let stop = Arc::new(AtomicBool::new(false));
+    let (asked, serving) = memory_at(&socket, stop.clone());
+    let real = Real {
+        socket: socket.clone(),
+        said: vec![OPENING, ASKS, KEPT],
+        base: 9_905_700,
+    };
+    MURMUR_MOUTHS.with(|mouths| mouths.set(Some(OPENING_291)));
+    let got = lines_known(
+        "c54-c55-stock-10538",
+        vec![
+            (
+                "Lamp, I'm going to the garden centre on Saturday.".to_owned(),
+                vec![("f1", false)],
+                0,
+            ),
+            (
+                "Lamp, remember that my car is silver.".to_owned(),
+                vec![],
+                21,
+            ),
+            ("Yes, please keep that.".to_owned(), vec![("f2", true)], 21),
+        ],
+        chats,
+        (BOOT, true, true),
+        None,
+        None,
+        true,
+        true,
+        None,
+        Voice::One,
+        (true, &[]),
+        hidden_then_back,
+        (true, Some(1), Some(&real)),
+    )
+    .await;
+    stop.store(true, Ordering::Release);
+    serving.join().unwrap();
+    let _ = std::fs::remove_file(&socket);
+    crate::remember::heard::set_on_for_test(false);
+    crate::keep_quietly::set_on_for_test(false);
+    assert_eq!(got.calls, [Some(a.clone())], "the yes's run, in her scope");
+    let asked = asked.lock().unwrap().clone();
+    let kept: Vec<&Value> = asked.iter().filter(|ask| ask["op"] == "remember").collect();
+    assert_eq!(kept.len(), 1, "one remember reached the memory: {asked:?}");
+    assert_eq!(kept[0]["person"], json!(a), "in her scope: {asked:?}");
+    assert!(
+        kept[0].to_string().to_lowercase().contains("car is silver"),
+        "the car line kept: {asked:?}"
+    );
+    // The car line's rounds are never told her context or thread.
+    let as_a = Message::system(format!("for {:?}", Some(a.as_str())));
+    assert!(
+        got.asked[1..3].iter().all(|told| *told != as_a),
+        "line 2 told A's context: {:?}",
+        &got.asked[1..3]
+    );
+}
+
+/// [`stock_s4_carried_keep_on_the_product_switches_writes_the_car_on_her_yes`]'s
+/// guard: her lone face named by the one-face count but never read
+/// speaking (still or unread in every look), no other voice heard, opens no
+/// conversation of hers: the car line's keep is the room's, never held for
+/// her, and never told her context.
+#[tokio::test]
+async fn a_lone_face_never_read_speaking_opens_no_carried_keep() {
+    use lamp_msgs::SpeakingState::{No, Unknown};
+    const NEVER_SPEAKING: &[lamp_msgs::SpeakingState] = &[No, No, No, Unknown];
+    let a = crate::remember::person_id("A");
+    fn left(request: u64, known: &std::path::Path) {
+        if request == 2 {
+            let _ = std::fs::remove_file(known);
+            let _ = std::fs::remove_file(known_face_of(known));
+        }
+    }
+    let mut chats = vec![vec![text("Sure."), Ok(ChatEvent::Done)]];
+    chats.extend(keep_the_hotel_asking());
+    MURMUR_MOUTHS.with(|mouths| mouths.set(Some(NEVER_SPEAKING)));
+    let got = lines_known(
+        "c54-never-speaking",
+        vec![
+            (
+                "Lamp, I'm going to the garden centre on Saturday.".to_owned(),
+                vec![("f1", false)],
+                0,
+            ),
+            (
+                "Lamp, remember that my car is silver.".to_owned(),
+                vec![],
+                21,
+            ),
+        ],
+        chats,
+        (BOOT, true, true),
+        None,
+        None,
+        true,
+        true,
+        None,
+        Voice::One,
+        (true, &[]),
+        left,
+        (true, Some(1), None),
+    )
+    .await;
+    assert_eq!(got.calls, [None], "the room's keep, never held for A");
+    let as_a = Message::system(format!("for {:?}", Some(a.as_str())));
+    assert!(
+        got.asked[1..].iter().all(|told| *told != as_a),
+        "line 2 never told A's context"
     );
 }
 
