@@ -292,8 +292,9 @@ fn typed_mark(args: &Value) -> Result<String, Value> {
 /// "after ten", "between ten and seven"), and before its `not_before`'s
 /// ("until seven", "not before nine"). Not "to": it is also a time's own
 /// word ("quarter to seven"), and an allowed window's end ("only from 8am
-/// to 10pm", the reviewer-lead's P1 and P2 on #5439).
-const FROM_CUES: &[&str] = &["from", "after", "past", "between"];
+/// to 10pm", the reviewer-lead's P1 and P2 on #5439). Not "past" either:
+/// it is a time's own word ("quarter past ten", P3 on 35630e1ce0).
+const FROM_CUES: &[&str] = &["from", "after", "between"];
 const BEFORE_CUES: &[&str] = &["until", "till", "til", "before"];
 
 /// `minute`, or the hour the rule's words name after one of `cues` when it
@@ -301,10 +302,15 @@ const BEFORE_CUES: &[&str] = &["until", "till", "til", "before"];
 /// #4346), or twelve off with the half of the day said ("until 7am" given
 /// as 19:00). The half comes from the words ("pm", "at night", "in the
 /// evening"; "am", "in the morning"), else from `minute`; its minutes are
-/// kept. A digit hour past twelve is taken as said. Any other hour is the
-/// model reading the words another way, such as an allowed window ("only
-/// greet me from 8am to 10pm" kept as quiet before 08:00 and from 22:00),
-/// and `minute` stands, as do words that name no hour after a cue.
+/// kept. A digit hour past twelve is taken as said. A time's minutes are
+/// never its hour: "ten past eleven" names eleven and "quarter to seven"
+/// six, while "five to seven" may be a window as well as 06:55, so it
+/// leaves `minute` as given. `minute` also stands when its hour is one the
+/// words name anywhere, after a cue or a window's "to" / "and": the model
+/// may have read an allowed window ("only greet me from 8am to 8pm", kept
+/// as quiet before 08:00 and from 20:00) the other way round from the cues.
+/// Any other hour is the model reading the words another way, and `minute`
+/// stands, as do words that name no hour after a cue.
 fn as_said(minute: u16, words: &str, cues: &[&str]) -> u16 {
     const HOURS: [&str; 12] = [
         "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven",
@@ -334,31 +340,76 @@ fn as_said(minute: u16, words: &str, cues: &[&str]) -> u16 {
                 .filter(|hour| *hour < 24)?;
         Some((hour, half))
     };
-    let said = (1..words.len()).find_map(|at| {
-        cues.contains(&words[at - 1])
-            .then(|| hour_of(words[at]).map(|(hour, half)| (at, hour, half)))
-            .flatten()
-    });
-    let Some((at, hour, mut half)) = said else {
-        return minute;
+    // The time that begins at `at`, as its hour, its half when said, and
+    // the index after it: None when no time begins there, Some(None) when
+    // the words could name two different hours ("five to seven").
+    let time_at = |at: usize| -> Option<Option<(u16, Option<bool>, usize)>> {
+        let minutes = |word: &str| {
+            matches!(word, "quarter" | "half" | "twenty")
+                || HOURS.contains(&word)
+                || (word.len() <= 2 && word.bytes().all(|b| b.is_ascii_digit()))
+        };
+        if let (Some(&first), Some(&by), Some(hour)) = (
+            words.get(at),
+            words.get(at + 1),
+            words.get(at + 2).and_then(|word| hour_of(word)),
+        ) {
+            if minutes(first) && by == "past" {
+                return Some(Some((hour.0, hour.1, at + 3)));
+            }
+            if minutes(first) && by == "to" {
+                if first != "quarter" {
+                    return Some(None);
+                }
+                let earlier = match hour.0 {
+                    0 => 23,
+                    1 => 12,
+                    hour => hour - 1,
+                };
+                return Some(Some((earlier, hour.1, at + 3)));
+            }
+        }
+        if matches!(words.get(at), Some(&("quarter" | "half"))) {
+            return Some(None);
+        }
+        hour_of(words.get(at)?).map(|(hour, half)| Some((hour, half, at + 1)))
     };
-    if half.is_none() {
-        half = match &words[at + 1..] {
+    // The said hour in 24 hours, the half from the words after it, else
+    // from `minute`; with whether the half was said.
+    let in_hours = |(hour, half, after): (u16, Option<bool>, usize)| -> (u16, bool) {
+        let half = half.or(match &words[after.min(words.len())..] {
             ["pm" | "tonight", ..] | ["at", "night", ..] | ["in", "the", "evening", ..] => {
                 Some(true)
             }
             ["am", ..] | ["in", "the", "morning", ..] => Some(false),
             _ => None,
+        });
+        let said_half = half.is_some() || hour > 12;
+        let hour = match (hour, half) {
+            (13.., _) | (0, _) => hour,
+            (hour, Some(true)) => hour % 12 + 12,
+            (hour, Some(false)) => hour % 12,
+            (hour, None) => hour % 12 + if minute / 60 >= 12 { 12 } else { 0 },
         };
-    }
-    let said_half = half.is_some() || hour > 12;
-    let hour = match (hour, half) {
-        (13.., _) | (0, _) => hour,
-        (hour, Some(true)) => hour % 12 + 12,
-        (hour, Some(false)) => hour % 12,
-        (hour, None) if (minute / 60) % 12 == hour % 12 => return minute,
-        (hour, None) => hour % 12 + if minute / 60 >= 12 { 12 } else { 0 },
+        (hour, said_half)
     };
+    let mut named = (1..words.len())
+        .filter(|at| {
+            FROM_CUES.contains(&words[at - 1])
+                || BEFORE_CUES.contains(&words[at - 1])
+                || matches!(words[at - 1], "to" | "and")
+        })
+        .filter_map(|at| time_at(at).flatten());
+    if named.any(|time| in_hours(time).0 == minute / 60) {
+        return minute;
+    }
+    let said = (1..words.len())
+        .filter(|at| cues.contains(&words[at - 1]))
+        .find_map(time_at);
+    let Some(Some(time)) = said else {
+        return minute;
+    };
+    let (hour, said_half) = in_hours(time);
     let off = (24 + hour - minute / 60) % 24;
     if matches!(off, 1 | 23) || (said_half && off == 12) {
         hour * 60 + minute % 60
@@ -1224,6 +1275,87 @@ mod tests {
             ),
             "[unprompted greeting not_before=405] Don't greet me before quarter to seven."
         );
+        // The reviewer-lead's HOLD on 35630e1ce0: a twelve-hour allowed
+        // window (P1), a time's minutes taken as its hour (P2), and "past"
+        // as a cue (P3), with the hours already right kept as they are.
+        for (rule, before, from, mark) in [
+            (
+                "Only greet me from 8am to 8pm.",
+                "08:00",
+                "20:00",
+                "not_before=480 not_from=1200",
+            ),
+            (
+                "Only greet me from 7am to 7pm.",
+                "07:00",
+                "19:00",
+                "not_before=420 not_from=1140",
+            ),
+            (
+                "Only greet me from 9pm to 10pm.",
+                "21:00",
+                "22:00",
+                "not_before=1260 not_from=1320",
+            ),
+            ("Quiet from ten past eleven.", "", "23:10", "not_from=1390"),
+            ("Quiet from ten past nine.", "", "21:10", "not_from=1270"),
+            (
+                "Don't greet me until five to seven.",
+                "06:55",
+                "",
+                "not_before=415",
+            ),
+            (
+                "No news before quarter past ten; quiet from eleven.",
+                "10:15",
+                "23:00",
+                "not_before=615 not_from=1380",
+            ),
+            // Kept working, as given or corrected as before.
+            ("Quiet from ten.", "", "21:00", "not_from=1320"),
+            ("Quiet from half past eleven.", "", "22:30", "not_from=1410"),
+            ("No news after 9 pm.", "", "20:00", "not_from=1260"),
+            (
+                "No news between 7 and 9.",
+                "21:00",
+                "19:00",
+                "not_before=1260 not_from=1140",
+            ),
+            ("Quiet from midnight.", "", "00:00", "not_from=0"),
+            ("No news before noon.", "12:00", "", "not_before=720"),
+            ("Quiet from 12am.", "", "00:00", "not_from=0"),
+            ("No news before 12pm.", "12:00", "", "not_before=720"),
+            (
+                "Chỉ chào từ 8 giờ sáng đến 10 giờ tối.",
+                "08:00",
+                "22:00",
+                "not_before=480 not_from=1320",
+            ),
+            (
+                "Quiet from ten at night until seven.",
+                "07:00",
+                "21:00",
+                "not_before=420 not_from=1320",
+            ),
+            (
+                "Only greet me from 8am to 10pm.",
+                "08:00",
+                "22:00",
+                "not_before=480 not_from=1320",
+            ),
+        ] {
+            let mut args = json!({"rule": rule, "about": "both"});
+            for (name, time) in [("not_before", before), ("not_from", from)] {
+                if !time.is_empty() {
+                    args[name] = json!(time);
+                }
+            }
+            assert_eq!(
+                text(args),
+                format!("[unprompted both {mark}] {rule}"),
+                "{rule}"
+            );
+        }
     }
 
     /// #4346: "no hello" said twice is one rule, and "ten, not nine"
