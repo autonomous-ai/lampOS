@@ -549,7 +549,11 @@ nói đã lưu. Lời «có» có thể nhắc lại việc lưu
 một mình, hay «keep off» đi cùng một lời «có», vì chuyển giọng nói thành chữ đã
 nghe «keep that» thành như vậy trên lamp-06c1 (5/11, S14 lượt chạy 14:21, yêu
 cầu 424: «Yes. Please keep off.», và điều về người anh không bao giờ được lưu).
-«Off» chỉ tính khi đứng ngay sau «keep» và có một từ «có»; mọi lời «không»
+«Off» chỉ tính khi đứng ngay sau «keep» và có một từ «có». Một lời nhắc lại
+việc lưu mà không có từ «có» chỉ được đi cùng «please», «lamp», «for», «me»
+hay một lời cảm ơn, nên một câu hỏi bị mất dấu «?» («Do you keep that», «I'd
+keep it») không phải lời «có» và được hỏi lại một lần (lượt đọc quyền riêng
+tư của #5572). Mọi lời «không»
 («No, keep off.», «Don't keep it.») đều từ chối. Một câu trả lời của họ, trong
 thời hạn, không phải «có» cũng không phải «không»
 (`known_faces::unclear_answer_to_keep`: tối đa 6 từ, có một từ «có» hoặc
