@@ -40,8 +40,13 @@ ASK_READERS = re.compile(r"\bTWO READS\**[ \t]*:\**[ \t]*\S")
 # opens with ONE READ (after the same marks as ASK_LINE), followed by ":", a dash, "(" or the line's end, opts out of a
 # mere mention ("ONE READ: the body names the rule only"); it never clears a line that asks (ASK_LINE, ASK_READERS).
 NAMES = re.compile(r"\bTWO\s+READS\b")
-OPT_OUT = re.compile(r"^[ \t]*(?:#+[ \t]*|[-*+][ \t]+|>[ \t]*)?\**[ \t]*ONE READ\**[ \t]*(?::|-|\u2013|\u2014|\(|$)", re.M)
-READ_ASK = re.compile(r"\bREAD ASK\b")
+# The Reviewer-lead's P2 on #5636: a dash followed by a letter is no separator, so "- ONE READ-OK covers the docs half"
+# opts nothing out.
+OPT_OUT = re.compile(r"^[ \t]*(?:#+[ \t]*|[-*+][ \t]+|>[ \t]*)?\**[ \t]*ONE READ\**[ \t]*"
+                     r"(?::|[-\u2013\u2014](?![A-Za-z])|\(|$)", re.M)
+# The Reviewer-lead's P3 on #5636: a READ ASK is a comment whose first line asks with a commit ("READ ASK <sha>", after
+# a signature or not), as joining.md's markers say; a READ-OK or a note that mentions "the READ ASK" asks nothing.
+READ_ASK = re.compile(r"\bREAD ASK\**[ \t]+`?[0-9a-f]{7,40}\b")
 
 
 def body_asks(body):
@@ -74,7 +79,7 @@ def two_reads(items, heads, writers):
         if not is_writer(c, writers):
             continue
         # 7 Nov (#5635): or a READ ASK that names TWO READS anywhere, as a body does.
-        if re.match(r"\**TWO READS\b", body) or (READ_ASK.search(body) and body_asks(body)):
+        if re.match(r"\**TWO READS\b", body) or (READ_ASK.search(body.split("\n", 1)[0]) and body_asks(body)):
             asked = True
         mk = parse_marker(body)
         if not mk or mk[0] != "READ-OK" or not mk[1] or not any(h.startswith(mk[1]) for h in heads):
