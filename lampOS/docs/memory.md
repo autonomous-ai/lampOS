@@ -756,7 +756,21 @@ fifty-three?" and "Want me to keep Thursday book club for you?" do; on
 lamp-06c1 on 5 Nov, S14, both were missed and the keep dropped). Their plain yes on the next spoken line,
 within `HELD_FORGET_FOR` (60 s), with their own face seen saying it and no
 other (`LAMP_EYES_SPEAKING`, `speaking_faces::seen_saying`), writes it in
-their scope, and the reply says it is kept. What is written is the carried
+their scope, and the reply says it is kept. The yes may say the keep back
+(`known_faces::plain_agreement_to_keep`): "Yes, please keep that.", "Keep
+it." alone, or "keep off" beside a yes, which is how speech to text heard
+"keep that" on lamp-06c1 (5 Nov, S14 run 14:21, request 424: "Yes. Please
+keep off.", and the brother fact was never kept). "Off" counts only right
+after "keep" and with a yes word; any no ("No, keep off.", "Don't keep
+it.") refuses. An answer from them, in time, that is neither a yes nor a no
+(`known_faces::unclear_answer_to_keep`: at most 6 words, a yes word or
+"keep"/"save" among them, no word of a no, such as "Yes. Please key that."
+or "Keep off." alone) is not dropped unsaid: the hold stays for that turn,
+the model is told to ask once more, "Should I keep that?"
+(`remember::KEEP_ASKED_AGAIN`), and the hold stands if that reply asks it.
+It is asked again once only; a second unclear answer drops it. The ask
+runs and reads nothing, so it needs no face seen saying it; the yes after
+it still does. What is written is the carried
 line's own heard words, held with the call: the yes is taken as a yes to the
 lamp's offer about that line (`ScopeLease::release_held_keep`), since the
 offer itself was told as the room's and no offer of theirs is in the thread

@@ -544,7 +544,21 @@ lamp-06c1 ngày 5/11, S14, cả hai bị bỏ sót và việc giữ bị bỏ). 
 trong vòng `HELD_FORGET_FOR` (60 giây), với chính khuôn mặt họ được thấy đang
 nói và không mặt nào khác (`LAMP_EYES_SPEAKING`,
 `speaking_faces::seen_saying`), mới ghi nó vào phạm vi của họ, và câu trả lời
-nói đã lưu. Khuôn mặt họ chỉ ở trong khung hình là chưa đủ: nó vẫn ở đó khi một
+nói đã lưu. Lời «có» có thể nhắc lại việc lưu
+(`known_faces::plain_agreement_to_keep`): «Yes, please keep that.», «Keep it.»
+một mình, hay «keep off» đi cùng một lời «có», vì chuyển giọng nói thành chữ đã
+nghe «keep that» thành như vậy trên lamp-06c1 (5/11, S14 lượt chạy 14:21, yêu
+cầu 424: «Yes. Please keep off.», và điều về người anh không bao giờ được lưu).
+«Off» chỉ tính khi đứng ngay sau «keep» và có một từ «có»; mọi lời «không»
+(«No, keep off.», «Don't keep it.») đều từ chối. Một câu trả lời của họ, trong
+thời hạn, không phải «có» cũng không phải «không»
+(`known_faces::unclear_answer_to_keep`: tối đa 6 từ, có một từ «có» hoặc
+«keep»/«save», không có từ nào của lời «không», như «Yes. Please key that.» hay
+«Keep off.» một mình) không bị bỏ lặng lẽ: việc giữ còn cho lượt đó, mô hình
+được báo hỏi lại một lần, «Should I keep that?» (`remember::KEEP_ASKED_AGAIN`),
+và việc giữ còn nếu câu trả lời đó có hỏi. Chỉ hỏi lại một lần; câu trả lời
+không rõ thứ hai sẽ bỏ nó. Việc hỏi lại không chạy và không đọc gì, nên không
+cần thấy mặt họ nói; lời «có» sau đó thì vẫn cần. Khuôn mặt họ chỉ ở trong khung hình là chưa đủ: nó vẫn ở đó khi một
 vị khách nói từ ngoài khung hình (Reviewer-three, 14:46). Mọi trường hợp khác
 đều bỏ nó, không ghi gì ở đâu cả: không có «có», «có» không được thấy (mô hình
 được báo là không tính), một mặt khác được thấy nói, một lệnh quên, cuộc trò

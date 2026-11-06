@@ -2236,6 +2236,99 @@ async fn yes_please_keep_that_writes_a_held_keep_and_runs_no_held_forget() {
     }
 }
 
+/// A near yes's case: its name, its lines, whether each line after the
+/// held one is told to ask again, and the scopes the keep is written in.
+type AskedAgainCase = (&'static str, Vec<Line>, Vec<bool>, Vec<Option<String>>);
+
+/// lamp-06c1, 5 Nov, S14 run 14:21 (requests 422 and 424): A's carried
+/// "my brother lives in Denver" was held and the lamp asked "Want me to keep
+/// that for you?"; her "Yes, please keep that." was heard as "Yes. Please
+/// keep off.", dropped as not a plain yes, and the fact was never kept. A
+/// near yes, seen on her face, writes it in her scope. An answer neither a
+/// yes nor a no holds it on, the model is told to ask once more, and her
+/// next plain yes writes it; asked once only, so a second unclear answer
+/// drops it. A no, however said, drops it, and her yes after runs nothing.
+#[tokio::test]
+async fn a_near_yes_to_a_held_keep_writes_it_and_an_unclear_one_is_asked_again() {
+    let a = crate::remember::person_id("A");
+    let hotel = || (THE_HOTEL.to_owned(), vec![("f1", false)], 0);
+    let seen = |said: &str| (said.to_owned(), vec![("f1", true)], 5);
+    let okay = || vec![text("Okay."), Ok(ChatEvent::Done)];
+    let again = || vec![text("Should I keep that?"), Ok(ChatEvent::Done)];
+    let told_again = Message::system(crate::remember::KEEP_ASKED_AGAIN.to_owned());
+    let cases: Vec<AskedAgainCase> = vec![
+        (
+            "keep-off",
+            vec![hotel(), seen("Yes. Please keep off.")],
+            vec![false],
+            vec![Some(a.clone())],
+        ),
+        (
+            "keep-it-alone",
+            vec![hotel(), seen("Keep it.")],
+            vec![false],
+            vec![Some(a.clone())],
+        ),
+        (
+            "unclear-then-yes",
+            vec![hotel(), seen("Yes. Please key that."), seen("Yes.")],
+            vec![true, false],
+            vec![Some(a.clone())],
+        ),
+        (
+            "unclear-twice",
+            vec![
+                hotel(),
+                seen("Yes. Please key that."),
+                seen("Yes, keep it off."),
+                seen("Yes."),
+            ],
+            vec![true, false, false],
+            vec![],
+        ),
+        (
+            "no-then-yes",
+            vec![hotel(), seen("No, don't keep it."), seen("Yes.")],
+            vec![false, false],
+            vec![],
+        ),
+        (
+            "keep-off-no",
+            vec![hotel(), seen("No, keep off."), seen("Yes.")],
+            vec![false, false],
+            vec![],
+        ),
+    ];
+    for (what, lines, asked_again, expected) in cases {
+        let mut chats = keep_the_hotel_asking();
+        for asks in &asked_again {
+            chats.push(if *asks { again() } else { okay() });
+        }
+        let got = lines_saving(
+            what,
+            lines,
+            chats,
+            BOOT,
+            true,
+            true,
+            None,
+            Some(true),
+            true,
+            true,
+            Voice::Off,
+        )
+        .await;
+        assert_eq!(got.calls, expected, "{what}");
+        // Round 1 and its tool round are the held line's; one round a line
+        // after it.
+        let told: Vec<bool> = got.rounds[2..]
+            .iter()
+            .map(|round| round.contains(&told_again))
+            .collect();
+        assert_eq!(told, asked_again, "{what}: who was told to ask again");
+    }
+}
+
 /// #4339 with `LAMP_CONVERSATION_CARRIED_SAVES`: a carried line still
 /// cannot forget, one thing or everything; only `remember` runs.
 #[tokio::test]
@@ -2874,6 +2967,7 @@ async fn a_yes_on_a_line_theirs_by_one_face_alone_runs_no_held_forget() {
                 spelling: false,
                 carried: false,
                 line: None,
+                asked_again: false,
             });
         }
         let taken = take_held_forget(
@@ -2888,7 +2982,7 @@ async fn a_yes_on_a_line_theirs_by_one_face_alone_runs_no_held_forget() {
         match taken {
             Taken::Runs(..) => assert!(runs, "by one face: no yes"),
             Taken::Unseen(_) => assert!(!runs, "not by one face: runs"),
-            Taken::Nothing => panic!("dropped for another reason"),
+            Taken::Nothing | Taken::AskAgain => panic!("dropped for another reason"),
         }
     }
 }

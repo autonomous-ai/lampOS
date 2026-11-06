@@ -254,13 +254,8 @@ const BESIDE_THE_SAVE: &[&str] = &[
     "remember", "face", "save", "keep", "and", "now", "go", "ahead", "can", "you",
 ];
 
-/// [`plain_yes`], with `beside` also standing beside the yes.
-fn plain_yes_beside(name: &str, turn: &str, beside: &[&str]) -> bool {
-    if turn.trim_end().ends_with('?') {
-        return false;
-    }
-    let words = lower_words(turn);
-    let name = folded_words(name);
+/// Which of `words` are a yes's own ([`AGREE`], [`AGREE_WITH_A_NO`]).
+fn agreeing_words(words: &[String]) -> Vec<bool> {
     let phrase_at = |at: usize, phrase: &[&str]| {
         phrase
             .iter()
@@ -275,6 +270,17 @@ fn plain_yes_beside(name: &str, turn: &str, beside: &[&str]) -> bool {
             }
         }
     }
+    covered
+}
+
+/// [`plain_yes`], with `beside` also standing beside the yes.
+fn plain_yes_beside(name: &str, turn: &str, beside: &[&str]) -> bool {
+    if turn.trim_end().ends_with('?') {
+        return false;
+    }
+    let words = lower_words(turn);
+    let name = folded_words(name);
+    let covered = agreeing_words(&words);
     agrees(turn)
         && words.iter().zip(&covered).all(|(word, covered)| {
             *covered
@@ -291,16 +297,65 @@ pub(crate) fn plain_agreement(turn: &str) -> bool {
     plain_yes("", turn)
 }
 
-/// Beside a yes to a held keep only ([`plain_agreement_to_keep`]).
-const BESIDE_A_KEEP: &[&str] = &["keep"];
+/// What a yes to a held keep may say it keeps, right after "keep"
+/// ([`plain_agreement_to_keep`]): "keep that", "keep it".
+const KEEP_WHAT: &[&str] = &["that", "it", "this", "those", "them"];
 
 /// [`plain_agreement`], or a plain yes that also says to keep it: "Yes,
 /// please keep that.", "Yes, keep it." (lamp-06c1, 5 Nov, S4: the held
-/// keep was dropped as not a plain yes). Only for a keep held for the
-/// person's yes; a held forget, and every other ask, takes
-/// [`plain_agreement`].
+/// keep was dropped as not a plain yes). Also, with no yes word, the keep
+/// said back alone, "Please keep that.", "Keep it.", and, beside a yes,
+/// "keep off", which is how speech to text heard "keep that" on lamp-06c1
+/// (5 Nov, S14 run 14:21, request 424: "Yes. Please keep off.", and the
+/// brother fact was never kept). "Off" only right after "keep", and never
+/// without a yes word: "Keep off." alone, or "Yes, keep it off.", is not
+/// one ([`unclear_answer_to_keep`]). Any no ([`DISAGREE`]) refuses. Only
+/// for a keep held for the person's yes; a held forget, and every other
+/// ask, takes [`plain_agreement`].
 pub(crate) fn plain_agreement_to_keep(turn: &str) -> bool {
-    plain_yes_beside("", turn, BESIDE_A_KEEP)
+    if turn.trim_end().ends_with('?') {
+        return false;
+    }
+    let words = lower_words(turn);
+    let after_keep = |at: usize, these: &[&str]| {
+        at > 0 && words[at - 1] == "keep" && these.contains(&words[at].as_str())
+    };
+    let agreeing = agrees(turn);
+    let keeps_it = (1..words.len()).any(|at| after_keep(at, KEEP_WHAT))
+        && !words.iter().any(|word| DISAGREE.contains(&word.as_str()));
+    let covered = agreeing_words(&words);
+    (agreeing || keeps_it)
+        && (0..words.len()).all(|at| {
+            covered[at]
+                || BESIDE_A_YES.contains(&words[at].as_str())
+                || words[at] == "keep"
+                || after_keep(at, KEEP_WHAT)
+                || (agreeing && after_keep(at, &["off"]))
+        })
+}
+
+/// The most words an answer to a held keep is asked about again in
+/// ([`unclear_answer_to_keep`]): a line that says more says something else.
+const UNCLEAR_MOST: usize = 6;
+
+/// Whether `turn`, the person's answer to the lamp's offer to keep a held
+/// keep, is neither a yes to it ([`plain_agreement_to_keep`]) nor a no: a
+/// yes or a keep with a word misheard ("Yes. Please key that.", "Please
+/// keep of."), "Keep off." with no yes, or a yes asked back ("Yes?"). At
+/// most [`UNCLEAR_MOST`] words, a yes word or "keep"/"save" among them,
+/// and no word of a no ([`DISAGREE`]). The lamp asks once more, "Should I
+/// keep that?", rather than dropping the keep unsaid
+/// (`second_provider::take_held_forget`).
+pub(crate) fn unclear_answer_to_keep(turn: &str) -> bool {
+    let words = lower_words(turn);
+    !words.is_empty()
+        && words.len() <= UNCLEAR_MOST
+        && !plain_agreement_to_keep(turn)
+        && !words.iter().any(|word| DISAGREE.contains(&word.as_str()))
+        && (agrees(turn)
+            || words
+                .iter()
+                .any(|word| matches!(word.as_str(), "keep" | "save")))
 }
 
 /// Whether the lamp said `name` back in the exchange just before the turn
@@ -3188,6 +3243,70 @@ mod tests {
             "Yes, keep my face.",
         ] {
             assert!(!plain_agreement_to_keep(not), "{not}");
+        }
+    }
+
+    /// lamp-06c1, 5 Nov, S14 run 14:21, request 424: "Yes, please keep
+    /// that." to "Want me to keep that for you?" was heard as "Yes. Please
+    /// keep off.", and the brother fact was never kept. A keep said back
+    /// ("keep that", "keep it"), or "keep off" beside a yes, is a yes to a
+    /// held keep; any no still refuses, and to nothing but a keep is it a
+    /// yes.
+    #[test]
+    fn a_near_yes_to_a_held_keep_is_one() {
+        for yes in [
+            "Yes. Please keep off.",
+            "Yes, keep off.",
+            "Please keep that.",
+            "Keep it.",
+            "Keep that, please.",
+            "Yes, keep this.",
+        ] {
+            assert!(plain_agreement_to_keep(yes), "{yes}");
+            assert!(!plain_agreement(yes), "{yes}");
+            assert!(!unclear_answer_to_keep(yes), "{yes}");
+        }
+        for not in [
+            "Keep off.",
+            "No, keep off.",
+            "Don't keep it.",
+            "No, don't keep that.",
+            "Please don't keep that.",
+            "Yes, keep it off.",
+            "Keep it?",
+            "Keep my face.",
+        ] {
+            assert!(!plain_agreement_to_keep(not), "{not}");
+        }
+    }
+
+    /// An answer to a held keep that is neither a yes nor a no (a yes with a
+    /// word misheard, a cut "keep", a yes asked back) is asked about once
+    /// more; a no, any line that says more, or another ask is not.
+    #[test]
+    fn an_unclear_answer_to_a_held_keep_is_asked_again() {
+        for unclear in [
+            "Yes. Please key that.",
+            "Yes, please kee.",
+            "Yes?",
+            "Yeah, keep it off.",
+            "Keep off.",
+            "Please keep of.",
+        ] {
+            assert!(!plain_agreement_to_keep(unclear), "{unclear}");
+            assert!(unclear_answer_to_keep(unclear), "{unclear}");
+        }
+        for not in [
+            "No.",
+            "No, don't keep it.",
+            "Not now.",
+            "Yes. Please keep that.",
+            "",
+            "Lamp, what's the tallest mountain in Africa?",
+            "Lamp, please remember that my goldfish is called Pip.",
+            "Yes, and my sister lives in Boston too.",
+        ] {
+            assert!(!unclear_answer_to_keep(not), "{not}");
         }
     }
 
