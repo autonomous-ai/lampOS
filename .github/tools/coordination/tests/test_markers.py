@@ -391,6 +391,15 @@ class BodyAsks(unittest.TestCase):
             self.assertEqual(self.ask(body), "short 1", body)
         self.assertEqual(self.ask("Privacy needs TWO READS.\nONE READ - tests only."), "none")
 
+    def test_an_opt_out_quoted_or_fenced_is_no_opt_out(self):
+        # El's P3 on #5636: a "> ONE READ:" line quoted from another PR, or one inside a fence, opted the body out.
+        for body in ("Privacy needs TWO READS.\n\n> ONE READ: tests only (quoted from #5600).",
+                     "Privacy needs TWO READS.\n\n```\nONE READ: tests only.\n```",
+                     "Privacy needs TWO READS.\n\n~~~text\nONE READ: tests only.\n~~~"):
+            self.assertEqual(self.ask(body), "short 1", body)
+        # Outside the fence it still opts out.
+        self.assertEqual(self.ask("Privacy needs TWO READS.\n\n```\ncode\n```\nONE READ: tests only."), "none")
+
     def test_no_mention_asks_nothing(self):
         for body in ("Nothing about reads.", "two reads, lowercase", "ONE READ: tests only."):
             self.assertEqual(self.ask(body), "none", body)
