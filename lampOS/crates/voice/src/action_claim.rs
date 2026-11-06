@@ -358,27 +358,54 @@ const QUESTION_WORDS: [&str; 13] = [
 /// Words that only address the lamp before a line's own words ("Hey Lamp,").
 const ADDRESS: [&str; 6] = ["hey", "hi", "hello", "ok", "okay", "lamp"];
 
-/// Whether the person asked `said` as a question: it ends with a '?', or
-/// its first word after any [`ADDRESS`] is one of [`QUESTION_WORDS`] ("Lamp,
-/// how long will the light stay on?", "is my timer still set"). Then a reply
-/// may answer it with the state ("The light stays on until ten.", "Your
-/// timer is set for one minute."), so the worded claims leave the turn
-/// alone (the first builder's P2 on #5588); the strict lines still judge it.
-/// The second route also judges worded claims only in a turn with no call
-/// at all, so work done by another tool ("I've added a reminder to your
-/// calendar." beside `service_write`) stands.
+/// How a request asked as a question opens, after any [`ADDRESS`] ("Lamp,
+/// can you set a timer?"): never a status question ([`asked_as_a_question`]).
+const REQUEST_OPENINGS: [&[&str]; 6] = [
+    &["can", "you"],
+    &["could", "you"],
+    &["will", "you"],
+    &["would", "you"],
+    &["can", "i", "have"],
+    &["please"],
+];
+
+/// Whether the person asked `said` as a status question: a question that is
+/// not a request. A question ends with a '?', or its first word after any
+/// [`ADDRESS`] is one of [`QUESTION_WORDS`] ("Lamp, how long will the light
+/// stay on?", "is my timer still set"). A request opens with one of
+/// [`REQUEST_OPENINGS`] or says "please" anywhere ("Lamp, can you set a
+/// timer for one minute?"), and a claim with no call answering it is
+/// #5215's own bug, so it is still judged. A status question's reply may
+/// tell the state ("The light stays on until ten.", "Your timer is set for
+/// one minute."), so the worded claims leave its turn alone (the first
+/// builder's P2 on #5588, as Twelve refined it); the strict lines still
+/// judge it. The second route also judges worded claims only in a turn with
+/// no call at all, so work done by another tool ("I've added a reminder to
+/// your calendar." beside `service_write`) stands.
 pub fn asked_as_a_question(said: &str) -> bool {
     let text = normalised(said);
-    if text
-        .trim_end_matches(|c: char| c.is_whitespace() || matches!(c, '"' | '\'' | ')'))
-        .ends_with('?')
-    {
-        return true;
-    }
-    text.split(|c: char| !(c.is_alphanumeric() || c == '\''))
+    let words: Vec<&str> = text
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
         .filter(|word| !word.is_empty())
-        .find(|word| !ADDRESS.contains(word))
-        .is_some_and(|word| QUESTION_WORDS.contains(&word))
+        .collect();
+    if words.contains(&"please") {
+        return false;
+    }
+    let own = words
+        .iter()
+        .position(|word| !ADDRESS.contains(word))
+        .map_or(&[][..], |at| &words[at..]);
+    if REQUEST_OPENINGS
+        .iter()
+        .any(|opening| own.starts_with(opening))
+    {
+        return false;
+    }
+    text.trim_end_matches(|c: char| c.is_whitespace() || matches!(c, '"' | '\'' | ')'))
+        .ends_with('?')
+        || own
+            .first()
+            .is_some_and(|word| QUESTION_WORDS.contains(word))
 }
 
 /// The worded claims (`LAMP_ACTION_CLAIM_WORDED`, #5215): a reply that opens
@@ -959,7 +986,6 @@ mod tests {
             "What time does my reminder ring",
             "When will you remind me",
             "Will the light stay on",
-            "Can you hear me",
             "Has my timer gone off",
             "Have you kept the light on",
             "Was that you",
@@ -987,6 +1013,9 @@ mod tests {
             "Please, is it possible to set a timer?",
             "Is it okay to set a timer, please?",
             "CAN YOU MAKE IT LOUDER?",
+            // Opens as a request, so judged as one; a "Yes, I can hear
+            // you." beside it claims no action either way.
+            "Can you hear me",
         ] {
             assert!(!asked_as_a_question(said), "{said:?}");
         }
