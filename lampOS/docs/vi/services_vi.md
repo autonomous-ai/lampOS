@@ -1159,7 +1159,9 @@ làm mới nó), được hỏi ngoài đường đi của câu khi mỗi câu b
 lần báo, nên lời báo không bao giờ phải chờ; không có lần hỏi lúc câu bắt đầu
 của quy tắc attention thì một liên kết mới được báo trễ một câu. Câu của người
 khác, của căn phòng, câu bị giữ, tin nhắn chữ, không có gì liên kết hoặc
-`lamp-services` không trả lời: không báo gì, như trước, nên khách không bao
+`lamp-services` không trả lời (lần hỏi gần nhất bị lỗi, bận hoặc không có trả
+lời, nên một liên kết vừa gỡ không bao giờ được báo; `services::names_after`,
+#5598): không báo gì, như trước, nên khách không bao
 giờ biết chủ đèn đã liên kết gì. Nhật ký chỉ ghi số lượng, không ghi tên.
 Tuyến Live được báo cùng lời đó cạnh câu đang mở của chủ đèn (lease của nó,
 `services::owner_of`), đọc hai lần mỗi giây khi câu còn mở, mỗi phiên một lần
