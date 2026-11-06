@@ -636,7 +636,8 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
     // Developer access turned off with its drop-in there: the door is closed
     // (lamp-update's lock, the drop-in removed, reload, stop) before the
     // reply is written. Every other change is answered first, and a new
-    // language holds lamp-update's lock through the voice's restart.
+    // language, voice or character waits for lamp-update's lock (at most
+    // 8 s) and holds it through the voice's restart.
     let (reply, done, _lock) = match change::close_before_answer(
         &line,
         &config,
@@ -646,7 +647,13 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
         &mut change::Systemctl,
     ) {
         Some((reply, done)) => (reply, done, None),
-        None => change::answer_holding(&line, &config, enabled, &records),
+        None => change::answer_holding(
+            &line,
+            &config,
+            enabled,
+            &records,
+            &mut change::Clock::default(),
+        ),
     };
     {
         let mut out = io::stdout().lock();
