@@ -586,3 +586,22 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   played PASS never showed NEWER_FIRST's `earlier` or STRENGTH's `maybe`
   working. PROFILE stands. My watcher missed Friday's 11:04 ask until
   11:29.
+- 11:5x: #5491 HOLD 74043db348. The unit turns the switch on while its
+  lamp check FAILs, and the comment doesn't say so. Restate after the
+  cough-tail fix (#5511) and a PASS, or when the unit states the FAIL.
+- 12:xx: the 10467 timer FAIL read as kit state. The put-back restored
+  the schedule store but not the voice delivery ledger, so `observe`
+  answered `stale_revision`. Fifth and Sixth agreed; the recheck passed
+  6/6. The code bug behind it (one stale oldest item silences later
+  reminders) is #5498, fixed in #5510.
+- 12:5x: #5486 READ-OK 34ae67aeea, restated after the replayed checks.
+- 13:0x: #5508 privacy HOLD 1b7ebe400c, P2. A "don't know" may search
+  when a carried conversation is open, but nothing checks that only one
+  voice is in it. Restate on a voice-tracker guard, or when Faye and the
+  first builder accept the risk in the switch row.
+- 13:1x: #5497 privacy READ-OK e5f81c905e. The `heard` filter's
+  failures at provider_worker.rs:10383 also fail on base (187/3): load.
+- 13:1x: #5509 HOLD 62f871f4a4, P2. `heard_some = had_audio` is true for
+  any audio, so two early fenced cuts (the lamp's own echo) hold a
+  reminder forever. Thirteen moved to HOLD too. reminders 139/0,
+  consumer 39/0, reminder_policy 5/0.
