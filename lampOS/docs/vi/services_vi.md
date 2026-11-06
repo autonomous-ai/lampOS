@@ -39,9 +39,13 @@ lúc 14:11 ngày 3 Nov 2026):
 
 ## Ai dùng được chúng
 
-**Trong sản phẩm hiện nay, bất kỳ ai nói với đèn** (`LAMP_PRIVATE_ROOM=on`, quyết định của chủ sản phẩm ngày 6/11). Đèn là một căn phòng riêng giữa nó và chủ của nó, nên ai nói với nó thì là chủ đèn, và không có kiểm tra quyền sở hữu nào chạy: việc nhận ra ai đang nói chưa đủ tin cậy, và đèn đã từ chối chính chủ của nó. Một câu vẫn phải được nói ra (`NOT_HEARD`), và một lần ghi vẫn cần phần đọc lại và một câu "send" rõ ràng ngay sau đó, để bắt một lần nghe nhầm. Các quy tắc bên dưới là những gì áp dụng khi công tắc tắt; chúng vẫn nằm trong mã cho một tính năng sau này.
+**Trong sản phẩm hiện nay, bất kỳ ai nói với đèn** (`LAMP_PRIVATE_ROOM=on`, quyết định của chủ sản phẩm ngày 6/11). Đèn là một căn phòng riêng giữa nó và chủ của nó, nên ai nói với nó thì là chủ đèn, và không có kiểm tra quyền sở hữu nào chạy: việc nhận ra ai đang nói chưa đủ tin cậy, và đèn đã từ chối chính chủ của nó. Một câu vẫn phải được nói ra (`NOT_HEARD`), và một lần ghi vẫn cần phần đọc lại và một câu "send" rõ ràng ngay sau đó, để bắt một lần nghe nhầm. Các lần ghi chỉ ở tuyến thứ hai.
+
+**Cái giá đã được chấp nhận (chủ dự án, 6/11, 18:08: "no more checking ownership"):** không hỏi khuôn mặt nào cả, kể cả khi không có ai trong tầm nhìn. Nên một TV, một cuộc gọi video hay một bản ghi âm nói "read my mail" có thể khiến thư được đọc to đầy đủ; một lần gửi vẫn cần đọc lại và một câu "send" rõ ràng ngay sau đó. Chủ dự án đã chọn điều này thay cho bất kỳ quy tắc khuôn mặt trong tầm nhìn nào, nên đèn không từ chối.
 
 Khi công tắc bật, không câu nào được so với một giọng: một lần đọc được nói đầy đủ mà không hỏi giọng nào ở tuyến thứ hai và không chờ dấu giọng (`services::run`), và tuyến thứ hai không tạo dấu giọng nào cho các dịch vụ, nên `LAMP_SAME_VOICE_FOR=services` không khởi động tiến trình con cùng giọng nào ở đó (`checking_the_voice_for`). Trên tuyến Live một lần đọc cũng được nói đầy đủ, nên chữ "không bao giờ đầy đủ" của nó bên dưới không còn đúng khi công tắc bật; tuyến này vẫn không bao giờ chuẩn bị hay gửi một lần ghi (`NO_SEND_HERE`), dù công tắc bật hay tắt. Một lần đọc của kỹ năng tự tạo cũng ở trong căn phòng riêng: `lamp-skills.service` đặt `LAMP_PRIVATE_ROOM=on`, và khi đó cổng của nó không cần tên chủ đèn hay khuôn mặt quen, cũng không cần chỉ một khuôn mặt ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới).
+
+Các quy tắc bên dưới là những gì áp dụng khi công tắc tắt; chúng vẫn nằm trong mã cho một tính năng sau này.
 
 Chỉ chủ của đèn: người có khuôn mặt quen được giữ dưới tên gõ lúc setup
 (`LAMP_PERSON_NAME`) hoặc dưới tên mà `who_you_are` lưu cùng khuôn mặt của họ
