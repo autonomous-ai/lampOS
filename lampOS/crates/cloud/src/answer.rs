@@ -1794,6 +1794,7 @@ pub mod tests {
                 now: "switching".into(),
                 last: None,
                 harness: None,
+                round: None,
             },
         )
         .unwrap();

@@ -577,6 +577,7 @@ fn a_same_binary_product_unit_records_good_only_after_climb_and_confirmation() {
             clock: &clock,
             say: &mut say,
             phase: &mut phase,
+            target: &mut |_| {},
         };
         round(&lamp.config, &mut world)
     };

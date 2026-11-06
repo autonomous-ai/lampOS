@@ -685,6 +685,15 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
                 started_at_unix_ms: None,
             }),
             harness: None,
+            // #5473: the round under way, for the Software update screen.
+            round: Some(lamp_msgs::UpdateRound {
+                started_at_unix_ms: 1_762_440_000_000,
+                step_started_at_unix_ms: 1_762_440_004_000,
+                target: Some(lamp_msgs::UpdateBuild {
+                    sequence: 3310,
+                    commit: "5b40a1523".into(),
+                }),
+            }),
         },
     )
     .unwrap();
@@ -699,6 +708,10 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         ("last.sequence", Type::Whole),
         ("last.at_unix_ms", Type::Whole),
         ("stale", Type::Flag),
+        ("round.started_at_unix_ms", Type::Whole),
+        ("round.step_started_at_unix_ms", Type::Whole),
+        ("round.target.sequence", Type::Whole),
+        ("round.target.commit", Type::Text),
     ] {
         let value = field(data, path);
         assert!(
@@ -708,6 +721,15 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
     }
     assert_eq!(data["now"], "fetching");
     assert_eq!(data["running"]["sequence"], 3309);
+    assert_eq!(
+        data["round"],
+        json!({
+            "started_at_unix_ms": 1_762_440_000_000_u64,
+            "step_started_at_unix_ms": 1_762_440_004_000_u64,
+            "target": {"sequence": 3310, "commit": "5b40a1523"},
+        }),
+        "{told}"
+    );
 
     // #4153: the app's Check for update, in the reply the app reads. While
     // the round runs it is refused with the reason the app shows.
@@ -726,8 +748,13 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         now: "idle".into(),
         last: None,
         harness: None,
+        round: None,
     };
     says.publish_json(0, &idle).unwrap();
+    assert!(
+        replied(&mut real)["data"].get("round").is_none(),
+        "no round between rounds"
+    );
     // Between rounds with no lamp-update reading checks: said, not counted.
     let nobody = asked(&mut real);
     assert_eq!(
@@ -802,6 +829,27 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
     let unsaid = replied(&mut real);
     assert_eq!(unsaid["status"], "success", "{unsaid}");
     assert!(unsaid["data"].get("harness").is_none(), "{unsaid}");
+
+    // #5473: a round whose step began before it, or one said while idle,
+    // is left out, not the page refused.
+    for (now, step) in [("fetching", 1), ("idle", 9)] {
+        says.publish_json(
+            0,
+            &lamp_msgs::UpdateStatus {
+                now: now.into(),
+                round: Some(lamp_msgs::UpdateRound {
+                    started_at_unix_ms: 5,
+                    step_started_at_unix_ms: step,
+                    target: None,
+                }),
+                ..idle.clone()
+            },
+        )
+        .unwrap();
+        let unsaid = replied(&mut real);
+        assert_eq!(unsaid["status"], "success", "{unsaid}");
+        assert!(unsaid["data"].get("round").is_none(), "{now}: {unsaid}");
+    }
 
     // Without the switch neither kind is here.
     real.update_page = false;

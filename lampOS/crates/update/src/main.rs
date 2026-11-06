@@ -818,6 +818,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     clock: &clock,
                     say: &mut say,
                     phase: &mut |_| {},
+                    target: &mut |_| {},
                 };
                 own::confirm(&config, &mut world, running.as_deref())
             };
@@ -888,14 +889,20 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     // `update/status` (#2194): where each round is, and how the last ended,
     // only for a round that acts; Harness's record looked at often only
     // with its switch on.
-    let mut telling = config.apply.then(|| {
+    // Held in a cell: the round's phase and target both tell it (#5473).
+    let telling = std::cell::RefCell::new(config.apply.then(|| {
         lamp_update::status::Telling::start(&bus_root, &records, harness.is_some(), &mut say)
-    });
+    }));
     loop {
         let outcome = {
             let mut phase = |now: &'static str| {
-                if let Some(telling) = &mut telling {
+                if let Some(telling) = telling.borrow_mut().as_mut() {
                     telling.phase(now);
+                }
+            };
+            let mut target = |build: &lamp_update::records::Build| {
+                if let Some(telling) = telling.borrow_mut().as_mut() {
+                    telling.target(build);
                 }
             };
             let mut world = World {
@@ -906,6 +913,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 clock: &clock,
                 say: &mut say,
                 phase: &mut phase,
+                target: &mut target,
             };
             round(&config, &mut world)
         };
@@ -926,7 +934,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 &mut say,
             );
         }
-        if let Some(telling) = &mut telling {
+        if let Some(telling) = telling.borrow_mut().as_mut() {
             let at_unix_ms = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map_or(0, |since| since.as_millis() as u64);
