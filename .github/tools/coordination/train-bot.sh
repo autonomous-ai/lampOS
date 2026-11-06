@@ -127,10 +127,10 @@ eligible() {
     fi
     [[ $two == none || $two == met* ]] || { once reads2$p "#$p left out: reads2.py said '${two}'"; continue; }
     fine reads2$p
-    # 4 Nov 23:4x (Thirteen's P3 on #5305): a body that names TWO READS without a line that asks is said once per head,
-    # so an ask in words reads2.py doesn't take is seen before a train merges it on one read.
+    # 4 Nov 23:4x (Thirteen's P3 on #5305); 7 Nov (#5635): a body that names TWO READS but opts out with a ONE READ line
+    # is said once per head, so an opt-out is seen before a train merges it on one read.
     if [[ $two == none && $($PYTHON -I $TOOLS_DIR/reads2.py --unasked < $bf) == unasked ]]; then
-      grep -qx "$p unasked $head" $told || { say "#$p: its body names TWO READS but no line asks it, so one READ-OK carries ${head:0:9}" >&2; tell "$p unasked $head"; }
+      grep -qx "$p unasked $head" $told || { say "#$p: its body names TWO READS but opts out with ONE READ, so one READ-OK carries ${head:0:9}" >&2; tell "$p unasked $head"; }
     fi
     # 30 Oct 15:0x (the Reviewer-lead's 14:58): a PR whose own ARM64 run on this head is red sits out. #4507's run was red
     # at 14:17 before trains 407 and 408 carried it; both failed in lamp-update, and the bot held #4524 and #4530 instead.
