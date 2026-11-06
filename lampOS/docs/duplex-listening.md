@@ -551,12 +551,13 @@ and including the one that made it (`LATE_YIELD_WINDOW_BLOCKS`) commits
 where stillness would resume it (`Interruption::commit_late_yields`). Its
 deadline still resumes it; talk well under the asker
 (`LAMP_CUT_IN_NEAR_ASKER`) and a yield awaiting or holding its words are
-as before, and `duplex_commit` gives `late_yield`. On lamp-c0a4 on 31 Oct,
+as before. `duplex_commit` gives `late_yield` with the switch or without
+it, the one trace field that differs with the switch off. On lamp-c0a4 on 31 Oct,
 every cut-in switch off, "Wait, what was the keeper's name?" over a story
 was dropped 3 times in 27 played cut-ins, with 15, 17 and 20 `Over` blocks
 in that window; the lamp's own voice had 7-8, side remarks at most 11, and
 "What was that?" 7-8. Those counts took every `Over` block, plain or not.
-Only plain blocks count since lamp-4ace on 1 Nov (#4705): with the switch,
+Only plain blocks count since lamp-4ace on 1 Nov (#4705, #5084): with the switch,
 the lamp's own voice, misjudged as `Over` but still partly explained by the
 render, made late yields, and two of five stopped its own story with
 nobody talking. Neither `Hearing`'s own-tail rules after a yield
