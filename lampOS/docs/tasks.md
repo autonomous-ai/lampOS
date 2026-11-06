@@ -1943,8 +1943,9 @@ used only to say it.
   request (`audio_written_with_playback_gaps_unscored`), was otherwise
   neither told again nor closed. A news the person stopped on purpose is not: the button
   (`hand_stop`), a touch on the head (`head_stop`), "stop" said over it
-  (`spoken_stop`), the head's sleep (`head_sleep`) or the software mute
-  (`software_muted`); they heard enough (the reviewer's P2 on #5118,
+  (`spoken_stop`), the head's sleep (`head_sleep`), the software mute
+  (`software_muted`), the privacy cover (`privacy_muted`, `privacy_gap`) or
+  the service stopping (`service_stopped`); they heard enough (the reviewer's P2 on #5118,
   `deliberate_stop`). It is told once more
   (`TaskNews::not_heard`): the reader offers it again though it is kept as
   told, with the note's words worked out afresh, and the voice tells it

@@ -16762,9 +16762,10 @@ fn record_mute_revocation(trace: &mut SessionState, revoked: MuteRevocation) {
 }
 
 /// Whether `reason` is a stop the person meant: the button, a touch on the
-/// head, "stop" said over the lamp, the head's sleep or the software mute.
-/// A news cut so is not told once more; one cut by a barge-in or a gap is
-/// (the reviewer's P2 on #5118).
+/// head, "stop" said over the lamp, the head's sleep, the software mute,
+/// the privacy cover (a physical mute or a privacy gap) or the service
+/// stopped. A news cut so is not told once more; one cut by a barge-in or
+/// a capture gap is (the reviewer's P2 on #5118, as on #5579).
 fn deliberate_stop(reason: &str) -> bool {
     use crate::receipt_history::{HAND_STOP, HEAD_SLEEP, HEAD_STOP, SOFTWARE_MUTED, SPOKEN_STOP};
     [
@@ -16773,6 +16774,9 @@ fn deliberate_stop(reason: &str) -> bool {
         SPOKEN_STOP,
         HEAD_SLEEP,
         SOFTWARE_MUTED,
+        "privacy_muted",
+        "privacy_gap",
+        "service_stopped",
     ]
     .contains(&reason)
 }
@@ -18597,6 +18601,15 @@ mod tests {
     #[test]
     fn news_stopped_by_the_software_mute_is_not_handed_on() {
         assert!(news_handed_on_after(crate::receipt_history::SOFTWARE_MUTED).is_empty());
+    }
+
+    /// The privacy cover (a physical mute, a privacy gap) and the service
+    /// stopping are deliberate too: the news is not handed on (as on #5579).
+    #[test]
+    fn news_stopped_by_the_privacy_cover_or_a_service_stop_is_not_handed_on() {
+        for reason in ["privacy_muted", "privacy_gap", "service_stopped"] {
+            assert!(news_handed_on_after(reason).is_empty(), "{reason}");
+        }
     }
 
     /// A barge-in and a capture gap still hand the news on.
