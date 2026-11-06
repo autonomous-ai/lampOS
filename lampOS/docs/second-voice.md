@@ -2106,8 +2106,18 @@ order is kept. A written turn is the same from the chat on.
     ("It's a bit noisy here, so I'll pause. Just say 'Lamp' when you want
     me to go on."); any more stay quiet, so it never loops. A line of the
     person's words that is answered starts the run again
-    (`Cuts::spoke`), so a cut after "Lamp, go on" picks the answer up; a
-    cut with nothing left to go on with is quiet and not counted. It goes on
+    (`Cuts::spoke`), so a cut after "Lamp, go on" picks the answer up;
+    the one line right after the question is not a new start but what the
+    question asked for, said again, so it keeps the run: a quiet room's
+    cough asks, the person asks for the story again, and a cough over that
+    answer within the minute says `AGAIN` and goes on, a third pauses
+    (06c1's lamp check on #5430: request 13 was asked twice). A cut with
+    nothing left to go on with is quiet and not counted. On the product's
+    switches (`LAMP_SPOKEN_TO` on, `LAMP_NAME_OR_FOLLOW_UP` and
+    `LAMP_UNTIED_GOING_ON` off) desk chatter held as said to nobody is not
+    talk (`room_told::RoomTold::held`), and chatter let out is answered, so
+    a busy room comes only from lines the model leaves unanswered; the
+    busy-room path waits on that (`room_told.rs`). It goes on
     with the cut answer's unplayed pieces as they were sent, from the start
     of the sentence playing at the cut (`said_as_heard::unheard`, with the
     line's `heard_of_cut`), the model not asked, when that answer was sent
