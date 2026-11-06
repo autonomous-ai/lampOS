@@ -38,9 +38,22 @@ def lifted_commits(text):
     plain = COMMIT_RE.sub(short, text)
     found = None
     for m in LIFT_RE.finditer(plain):
+        if negated(plain, m):
+            continue
         found = found or []
         found += [commits[int(i)] for i in re.findall(r"\x00(\d+)\x00", m.group(0))]
     return found
+
+
+# 6 Nov (the reviewer's P3 on #5542): "my HOLD on <A> is not lifted", "isn't lifted", "is not yet cleared", "won't lift my
+# HOLD", "not lifting my HOLD" matched LIFT_RE and lifted A. Lifting words with "not", "n't" or "never" inside them, or
+# in the same clause right before them, lift nothing.
+NEG_RE = re.compile(r"(?i)\b(?:not|never)\b|n['’]t\b")
+
+
+def negated(plain, m):
+    clause = re.split(r"[.;:!?\n]", plain[max(0, m.start() - 16):m.start()])[-1]
+    return bool(NEG_RE.search(clause + m.group(0)))
 
 
 def names_commit(sha, commits):
@@ -209,13 +222,9 @@ def standing_holds(comments, writers, pr=None, lifted_path=None):
                 unsigned = (c["login"] + "/unsigned#", c["login"] + "/unsigned-review#")
                 for k in [k for k in holds if k.startswith(unsigned) and (not lift or names_commit(holds[k], lift))]:
                     holds.pop(k)
-                # 6 Nov (#5534, #5235): a signed HOLD ("Reviewer-lead: HOLD …") and that account's unsigned READ-OK saying
-                # it is lifted, on the commit it names. One account can sign for two readers, so only when exactly one of
-                # its signed HOLDs is on that commit (fail closed: another reader's HOLD is never touched).
-                if not name and lift:
-                    signed = [k for k in holds if k.startswith(c["login"] + "/") and not k.startswith(unsigned)
-                              and names_commit(holds[k], lift)]
-                    if len(signed) == 1: holds.pop(signed[0])
+                # 6 Nov (the reviewer's P3 on #5542): an unsigned READ-OK never lifts a signed HOLD, even the only one on
+                # the commit: on a shared account it may be another reader's ("my HOLD on <A> is lifted" from reader Y
+                # cleared reader X's). A signed HOLD is lifted only by its own signer's READ-OK (holds.pop(who) above).
     # 29 Oct 18:0x: "HOLD b9bb97e67a, Third, 16:45" (a comma after the commit) read as unsigned, and "this lifts my 16:45 HOLD"
     # didn't clear it, so #4353 sat out trains 363 and 364 with three READ-OKs. Both read now.
     # 25 Oct 20:0x: a HOLD its own reader closed in writing but never cleared with a READ-OK (Second's on #3437, closed in
@@ -244,6 +253,20 @@ def held_note(comments, writers, pr=None, lifted_path=None):
     return " ".join([ok] + ["%s=%s" % (k, v[:10] or "-") for k, v in sorted(holds.items())])
 
 
+def ignored_reads(comments, writers):
+    """6 Nov (the PM's ask on #5542): the READ-OK markers skipped because their login is not a writer, which was silent,
+    as lines "READ-OK <sha7> by <login> ignored: not a writer" (oldest first, one per login and commit)."""
+    out = []
+    for c in comments:
+        if is_writer(c, writers):
+            continue
+        mk = parse_marker(c.get("body") or "")
+        if mk and mk[0] == "READ-OK" and mk[1]:
+            line = "READ-OK %s by %s ignored: not a writer" % (mk[1][:7], c.get("login") or "?")
+            if line not in out: out.append(line)
+    return out
+
+
 def merge_reviews(comments, reviews):
     """4 Nov (#5212 part 1): a PR's comments plus its reviews' bodies, as one list in time order. reviews: dicts
     {login, body, created_at (submitted_at), state}. A review with an empty body, not submitted (PENDING) or
@@ -267,11 +290,16 @@ def main():
         for c in merge_reviews(*lists):
             print(json.dumps(c))
         return
-    # markers.py [--writers FILE] [--held] [PR]; --held prints held_note's line instead (#5534).
+    # markers.py [--writers FILE] [--held|--ignored] [PR]; --held prints held_note's line instead (#5534), --ignored
+    # ignored_reads' lines, one a line.
     held = "--held" in sys.argv[1:]
-    writers, args = writers_from_args([a for a in sys.argv[1:] if a != "--held"])
+    ignored = "--ignored" in sys.argv[1:]
+    writers, args = writers_from_args([a for a in sys.argv[1:] if a not in ("--held", "--ignored")])
     comments = [json.loads(line) for line in sys.stdin if line.strip()]
     pr = args[0] if args else None
+    if ignored:
+        for line in ignored_reads(comments, writers): print(line)
+        return
     print(held_note(comments, writers, pr=pr) if held else read_markers(comments, writers, pr=pr))
 
 
