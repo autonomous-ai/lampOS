@@ -400,15 +400,20 @@ pub fn answer(line: &str, config: &Config, enabled: bool) -> (Value, Option<Done
 /// [`answer`], with lamp-update's lock in `records` for a new language
 /// (#4473, Fourth's P2 on #4485): the voice restarts after it, and a round
 /// puts its build back when a unit it watches restarts within its watch.
-/// So the lock is taken before anything is written; held by an update,
-/// the change is refused with the restart's words and nothing is written.
-/// Otherwise it is given back with the reply, to hold through the voice's
-/// restart, or let go at once when there is none (the same language).
+/// So the lock is taken before anything is written, waited for as turning
+/// developer access off waits for it ([`CLOSE_LOCK_MOST`], under
+/// lamp-cloud's wait for the reply): the change before it holds it until
+/// the voice has restarted (#5394), so one made meanwhile waits and then
+/// applies. Still held then, the change is refused with [`STILL_APPLYING`]
+/// and nothing is written. Otherwise the lock is given back with the
+/// reply, to hold through the voice's restart, or let go at once when
+/// there is none (the same language).
 pub fn answer_holding(
     line: &str,
     config: &Config,
     enabled: bool,
     records: &lamp_update::records::Records,
+    ears: &mut impl Ears,
 ) -> (Value, Option<Done>, Option<lamp_update::records::Lock>) {
     // The chosen voice and character restart the voice too (#5394).
     let language = enabled
@@ -420,8 +425,11 @@ pub fn answer_holding(
         let (reply, done) = answer(line, config, enabled);
         return (reply, done, None);
     }
-    let lock = match lamp_keeper::restart::update_lock(records) {
+    let lock = match unlocked(ears, records, CLOSE_LOCK_EVERY, CLOSE_LOCK_MOST) {
         Ok(lock) => lock,
+        Err(why) if why == STILL_HELD => {
+            return (json!({ "refused": STILL_APPLYING }), None, None);
+        }
         Err(why) => return (json!({ "refused": why }), None, None),
     };
     let (reply, done) = answer(line, config, enabled);
@@ -561,17 +569,27 @@ pub fn unlocked(
             Err(why) => return Err(format!("the update's state could not be checked: {why}")),
         }
         if ears.now_ms().saturating_sub(started) >= most.as_millis() as u64 {
-            return Err("an update was installing all along".into());
+            return Err(STILL_HELD.into());
         }
         ears.listen(every);
     }
 }
 
-/// How long turning developer access off waits for lamp-update's lock
-/// before it refuses: under lamp-cloud's 10 s wait for this helper.
+/// Why [`unlocked`] gave up: the lock was held all along.
+pub const STILL_HELD: &str = "an update was installing all along";
+
+/// How long turning developer access off, and a change that restarts the
+/// voice, wait for lamp-update's lock before they refuse: under
+/// lamp-cloud's 10 s wait for this helper (`lamp_cloud::settings::WAIT`),
+/// so the app hears the result, never a timeout.
 pub const CLOSE_LOCK_MOST: Duration = Duration::from_secs(8);
 /// How often it looks for the lock meanwhile.
 pub const CLOSE_LOCK_EVERY: Duration = Duration::from_secs(1);
+/// The refusal of a change that restarts the voice while the lock is held
+/// past [`CLOSE_LOCK_MOST`]: by the change before it, still waiting for the
+/// voice to rest (at most [`REST_MOST`]), or by an update; which one is not
+/// told, so the words fit both.
+pub const STILL_APPLYING: &str = "the lamp is still applying a change; try again in a moment";
 /// The refusal while an update holds the lock past [`CLOSE_LOCK_MOST`].
 pub const CLOSE_INSTALLING: &str = "an update is installing: try again in a few minutes";
 /// Said when the drop-in is gone but lamp-control did not stop.

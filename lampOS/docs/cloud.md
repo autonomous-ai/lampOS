@@ -1969,9 +1969,12 @@ the Wi-Fi needs `LAMP_SETTINGS_WIFI=on` too (below).
     `mic.get` and the link stay answered through the restart: `lamp-cloud`
     keeps running and none of them asks the voice. An old lamp lists no
     `language.set` in `can` and answers "not on this lamp: language.set".
-    A language set while an update installs is refused ("an update is being
-    installed: try again once it is done") and nothing is written: the
-    helper holds lamp-update's lock through the write and the restart.
+    The helper holds lamp-update's lock through the write and the restart,
+    and a language, voice or character set while it is held (by the change
+    before it, until the voice has restarted, or by an update) waits for it
+    up to 8 s (`change::CLOSE_LOCK_MOST`, under the 10 s here) and then
+    applies (#5394); still held then, it is refused ("the lamp is still
+    applying a change; try again in a moment") and nothing is written.
 - **The ack at once, the result after:** the reply is `starting` as soon as
   the request is read, before anything is written. The result goes out as a
   second reply of the same kind, looked for every 50 ms on the loop texts use,

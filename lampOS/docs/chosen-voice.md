@@ -46,7 +46,11 @@ alone, so both are kept across updates. The voice reads them at start, so
 after a change that altered a file the helper restarts `lamp-voice` once it
 rests between turns (5 s, at most 45 s), under lamp-update's lock, as for a
 new language: the next line is in the new voice and the next answer has the
-words. The same value again restarts nothing.
+words. The same value again restarts nothing. A change made while the one
+before it still holds the lock (until its voice has restarted) waits up to
+8 s for it and then applies, so the app hears `success`; past that it is
+refused, "the lamp is still applying a change; try again in a moment", and
+nothing is written.
 
 The chosen voice wins over the language's voice (`second_config.rs`): a
 Vietnamese lamp told "Rachel" speaks Vietnamese in Rachel's voice, with the

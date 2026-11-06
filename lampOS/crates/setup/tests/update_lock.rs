@@ -119,48 +119,135 @@ fn a_restart_or_shutdown_is_answered_first_and_refused_under_an_update() {
     let _ = fs::remove_dir_all(folder);
 }
 
+/// A clock for `answer_holding` under which nothing lets go of the lock.
+fn idle() -> Script {
+    Script {
+        now: 0,
+        at: Box::new(|_| Vec::new()),
+    }
+}
+
 /// Fourth's P2 on #4485: a language takes lamp-update's lock before it is
-/// written. Under an update it is refused with the restart's words and the
-/// file is untouched; otherwise the lock is held for the voice's restart and
-/// let go after it, and the same language again holds none.
+/// written. Held past the wait, it is refused with words that fit an update
+/// and a change before it alike (#5394), and the file is untouched;
+/// otherwise the lock is held for the voice's restart and let go after it,
+/// and the same language again holds none.
 #[test]
 fn a_language_takes_the_update_lock_before_it_is_written() {
-    use lamp_keeper::restart::INSTALLING;
     let root = Root::new();
     let config = root.config();
     let records = lamp_update::records::Records::new(root.0.join("update"));
     let held = records.lock().unwrap();
+    let mut ears = idle();
     let (reply, done, lock) =
-        change::answer_holding(r#"{"language": "ja"}"#, &config, true, &records);
-    assert_eq!(reply, json!({ "refused": INSTALLING }));
+        change::answer_holding(r#"{"language": "ja"}"#, &config, true, &records, &mut ears);
+    assert_eq!(reply, json!({ "refused": change::STILL_APPLYING }));
+    assert_eq!(
+        ears.now,
+        change::CLOSE_LOCK_MOST.as_millis() as u64,
+        "waited first"
+    );
     assert!(done.is_none() && lock.is_none());
     assert!(!config.language.exists(), "nothing written");
     // Other changes don't wait on it.
-    let (reply, _, lock) =
-        change::answer_holding(r#"{"person_name": "Lan"}"#, &config, true, &records);
+    let mut ears = idle();
+    let (reply, _, lock) = change::answer_holding(
+        r#"{"person_name": "Lan"}"#,
+        &config,
+        true,
+        &records,
+        &mut ears,
+    );
     assert_eq!(reply, json!({"done": {"name": "Lan"}}));
     assert!(lock.is_none());
+    assert_eq!(ears.now, 0);
     drop(held);
-    let (reply, done, lock) =
-        change::answer_holding(r#"{"language": "ja"}"#, &config, true, &records);
+    let (reply, done, lock) = change::answer_holding(
+        r#"{"language": "ja"}"#,
+        &config,
+        true,
+        &records,
+        &mut idle(),
+    );
     assert_eq!(reply, json!({"done": {"language": "ja"}}));
     assert!(done.unwrap().restart_voice);
     assert!(lock.is_some(), "held through the restart");
     assert!(records.lock().is_err(), "no update starts meanwhile");
     drop(lock);
     assert!(records.lock().is_ok(), "let go after the restart");
-    let (_, done, lock) = change::answer_holding(r#"{"language": "ja"}"#, &config, true, &records);
+    let (_, done, lock) = change::answer_holding(
+        r#"{"language": "ja"}"#,
+        &config,
+        true,
+        &records,
+        &mut idle(),
+    );
     assert!(!done.unwrap().restart_voice);
     assert!(lock.is_none());
     assert!(records.lock().is_ok(), "the same language holds nothing");
     // A bad language under no update: refused, nothing held.
-    let (reply, _, lock) = change::answer_holding(r#"{"language": "fr"}"#, &config, true, &records);
+    let (reply, _, lock) = change::answer_holding(
+        r#"{"language": "fr"}"#,
+        &config,
+        true,
+        &records,
+        &mut idle(),
+    );
     assert_eq!(
         reply,
         json!({"refused": "language must be one of en, vi, ja, zh, ko"})
     );
     assert!(lock.is_none());
     assert_eq!(fs::read_to_string(&config.language).unwrap(), "ja\n");
+}
+
+/// #5394, seen on a lamp: a voice change held the lock 38 s while the voice
+/// came to rest, and the changes made meanwhile were refused as if an update
+/// were installing. One made while the last one holds it waits for it and
+/// then applies, so the app hears `success`.
+#[test]
+fn a_change_made_while_the_last_one_holds_the_lock_waits_and_applies() {
+    use std::{cell::RefCell, rc::Rc};
+    let root = Root::new();
+    let config = root.config();
+    let records = lamp_update::records::Records::new(root.0.join("update"));
+    let (_, done, first) = change::answer_holding(
+        r#"{"voice": "Kanna"}"#,
+        &config,
+        true,
+        &records,
+        &mut idle(),
+    );
+    assert!(done.unwrap().restart_voice);
+    assert!(first.is_some());
+    // The first change's voice rests and restarts 3 s into the second's wait.
+    let first = Rc::new(RefCell::new(first));
+    let letting = Rc::clone(&first);
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(move |now| {
+            if now >= 3 * S {
+                letting.borrow_mut().take();
+            }
+            Vec::new()
+        }),
+    };
+    let (reply, done, second) = change::answer_holding(
+        r#"{"character": "calm"}"#,
+        &config,
+        true,
+        &records,
+        &mut ears,
+    );
+    assert_eq!(ears.now, 3 * S);
+    assert!(first.borrow().is_none());
+    assert!(reply.get("done").is_some(), "{reply}");
+    assert!(done.unwrap().restart_voice);
+    assert!(second.is_some(), "held through its own restart");
+    assert_eq!(
+        fs::read_to_string(change::beside_language(&config, "character")).unwrap(),
+        "calm\n"
+    );
 }
 
 fn records_folder(name: &str) -> (PathBuf, lamp_update::records::Records) {
