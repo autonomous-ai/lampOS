@@ -1434,6 +1434,33 @@ fn a_hard_linked_launcher_is_left_alone() {
     assert!(!launcher.with_file_name(".harness.lampos-pin").exists());
 }
 
+/// A launcher over the 64 KiB cap (Harness's is a few hundred bytes): not
+/// read or pinned, left byte for byte as it is, one line said (a security read's P3
+/// on #5647).
+#[test]
+fn a_launcher_over_the_size_cap_is_left_alone() {
+    let lamp = Lamp::new();
+    let big = format!("#!/bin/sh\n{}{}", "#\n".repeat(64 * 1024), &UNPINNED[10..]);
+    let launcher = launcher_left(&lamp, &big);
+    let mut runs = Runs::new();
+    runs.tasks_environment = HOLD_ON.into();
+    let mut lines = Vec::new();
+    let mut run = runs.runner();
+    launcher::after_install(lamp.root(), &mut run, &mut |line: &str| {
+        lines.push(line.to_owned())
+    });
+    assert_eq!(
+        lines,
+        [format!(
+            "Harness's launcher not pinned: {}: {} bytes, over the 64 KiB cap, left as it is",
+            launcher.display(),
+            big.len()
+        )]
+    );
+    assert_eq!(fs::read_to_string(&launcher).unwrap(), big);
+    assert!(!launcher.with_file_name(".harness.lampos-pin").exists());
+}
+
 /// A launcher owned by another uid than its bin folder's owner is not
 /// pinned; one with one name and the folder's owner is.
 #[test]
