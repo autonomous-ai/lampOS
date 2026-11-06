@@ -2603,11 +2603,14 @@ When the coordinator switches (below):
   (`ProviderConfig::instruction`), the camera's version while the route has
   a look and the eye is open (the camera allowed in the last authority the
   coordinator installed, so on and with its privacy slide open), and the
-  version without one otherwise, which says the eye is off or closed and
-  not to pretend to see (`worker::character_now`, `Engine::telling_the_eye`;
+  version without one otherwise, which says no picture reaches it ("if
+  asked what you see, say you can't see right now", `config::NO_PICTURE`;
+  no claim about the eye, since texts, a turn after a forget and Live with
+  no picture are told it too, with the camera perhaps on) and not to
+  pretend to see (`worker::character_now`, `Engine::telling_the_eye`;
   #5530: this route always took the version without a camera). Chosen for
   each turn as its request is built, so a slide closed between two turns
-  tells the next one the eye is closed. The journal says which version the
+  tells the next one it can't see now. The journal says which version the
   spoken turns are told when the eye opens or closes, and at the first
   authority: `lamp-voice second: the eye is open: spoken turns are told the
   camera's character (#5530)` or `… the eye is closed: spoken turns are
