@@ -43,11 +43,11 @@ at 14:11 on 3 Nov 2026):
 
 **In the product today, anyone who speaks to the lamp** (`LAMP_PRIVATE_ROOM=on`, the owner's call on 6 Nov). The lamp is a private room between it and its owner, so whoever speaks is the owner, and no ownership check runs: telling who is speaking wasn't reliable enough, and the lamp refused its own owner. A line must still be spoken (`NOT_HEARD`), and a write is still read back, and sent only by the model's call with its `send_id` after a spoken answer (the owner, 10 Nov: the model decides confirm or cancel; the lamp checks only the send_id, a later request, two minutes and an uncut read-back). Writes stay on the second route only.
 
-**The accepted cost (the owner, 6 Nov):** no face is asked for at all, with nobody in view too. So a TV, a video call or a recording that says "read my mail" can get it read aloud in full. The owner chose this over any face-in-view rule, so the lamp doesn't refuse.
-
-The rules below are what applies with the switch off; they stay in the code for a later feature.
+**The accepted cost (the project owner, 6 Nov, 18:08: "no more checking ownership"):** no face is asked for at all, with nobody in view too. So a TV, a video call or a recording that says "read my mail" can get it read aloud in full; a send still needs its read-back and a spoken answer after it. The owner chose this over any face-in-view rule, so the lamp doesn't refuse.
 
 With the switch on, no line is held to a voice: a read is said in full with no voice asked of the second route and no wait for a print (`services::run`), and the second route makes no services prints, so `LAMP_SAME_VOICE_FOR=services` starts no same-voice child there (`checking_the_voice_for`). On the Live route a read is said in full too, so its "never in full" below no longer holds with the switch on; it still never prepares or sends a write (`NO_SEND_HERE`), switch on or off. A made skill's read is in the private room as well: `lamp-skills.service` sets `LAMP_PRIVATE_ROOM=on`, and its gate then asks for no owner's name or known face and no lone face ("A made skill's read", below).
+
+The rules below are what applies with the switch off; they stay in the code for a later feature.
 
 Only the lamp's owner: the person whose known face is kept under the name
 typed at setup (`LAMP_PERSON_NAME`) or under the name `who_you_are` saved

@@ -56,15 +56,15 @@ của nó. Một câu vẫn phải được nói ra (`NOT_HEARD`), và một l�
 nói ra (chủ đèn, 10/11: mô hình quyết định xác nhận hay huỷ; đèn chỉ kiểm tra
 send_id, một yêu cầu sau, hai phút và phần đọc lại không bị cắt). Lệnh ghi vẫn chỉ ở trên tuyến thứ hai.
 
-**Cái giá đã chấp nhận (chủ đèn, 6/11):** không hề cần khuôn mặt nào, kể cả
+**Cái giá đã chấp nhận (chủ dự án, 6/11, 18:08: "no more checking ownership"):** không hề cần khuôn mặt nào, kể cả
 khi không có ai trong tầm nhìn. Nên một TV, một cuộc gọi video hay một bản ghi
-âm nói "read my mail" có thể khiến thư được đọc to đầy đủ. Chủ đèn chọn điều
-này thay vì bất kỳ luật cần-thấy-mặt nào, để đèn không từ chối.
-
-Các luật dưới đây là những gì áp dụng khi tắt công tắc; chúng ở lại trong mã
-cho một tính năng sau này.
+âm nói "read my mail" có thể khiến thư được đọc to đầy đủ; một lần gửi vẫn cần
+phần đọc lại và một câu trả lời nói ra sau đó. Chủ dự án chọn điều này thay vì
+bất kỳ luật cần-thấy-mặt nào, để đèn không từ chối.
 
 Khi công tắc bật, không câu nào được so với một giọng: một lần đọc được nói đầy đủ mà không hỏi giọng nào ở tuyến thứ hai và không chờ dấu giọng (`services::run`), và tuyến thứ hai không tạo dấu giọng nào cho các dịch vụ, nên `LAMP_SAME_VOICE_FOR=services` không khởi động tiến trình con cùng giọng nào ở đó (`checking_the_voice_for`). Trên tuyến Live một lần đọc cũng được nói đầy đủ, nên chữ "không bao giờ đầy đủ" của nó bên dưới không còn đúng khi công tắc bật; tuyến này vẫn không bao giờ chuẩn bị hay gửi một lần ghi (`NO_SEND_HERE`), dù công tắc bật hay tắt. Một lần đọc của kỹ năng tự tạo cũng ở trong căn phòng riêng: `lamp-skills.service` đặt `LAMP_PRIVATE_ROOM=on`, và khi đó cổng của nó không cần tên chủ đèn hay khuôn mặt quen, cũng không cần chỉ một khuôn mặt ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới).
+
+Các quy tắc bên dưới là những gì áp dụng khi công tắc tắt; chúng vẫn nằm trong mã cho một tính năng sau này.
 
 Chỉ chủ của đèn: người có khuôn mặt quen được giữ dưới tên gõ lúc setup
 (`LAMP_PERSON_NAME`) hoặc dưới tên mà `who_you_are` lưu cùng khuôn mặt của họ
