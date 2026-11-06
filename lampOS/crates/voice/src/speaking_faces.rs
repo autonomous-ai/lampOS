@@ -690,6 +690,26 @@ impl SpeakingFaces {
             && still * 2 < during.len()
     }
 
+    /// Whether the face `face` (`boot/f3`) had its mouth read speaking
+    /// (`yes`) in at least one of the eyes' own looks from `from` to `to`,
+    /// however many read it still: beside [`Self::one_face_in_view`], a lone
+    /// face that is not silent (lamp-06c1, stock 10538, S4 request 291: read
+    /// speaking in 1 of 9 looks and still in 7, so never
+    /// [`Self::alone_in_view`]).
+    pub fn read_speaking_in(&self, face: &str, from: Instant, to: Instant) -> bool {
+        self.looks.lock().is_ok_and(|looks| {
+            looks
+                .kept
+                .iter()
+                .filter(|look| look.at >= from && look.at <= to && !look.boot.is_empty())
+                .any(|look| {
+                    look.speaking
+                        .iter()
+                        .any(|id| format!("{}/{id}", look.boot) == face)
+                })
+        })
+    }
+
     /// Whether the known face `face` (`boot/f3`, [`Self::known_with_boot`])
     /// was the one face the eyes saw through a line from `from` to `to`
     /// (`LAMP_PERSON_SCOPE_ONE_FACE`, the launch testers' item 1 on #3997):
