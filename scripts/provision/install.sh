@@ -1,6 +1,6 @@
 #!/bin/bash
 # Run this on the Pi to download and execute the latest setup from CDN.
-# Usage: curl -fsSL https://storage.googleapis.com/s3-autonomous-upgrade-3/os/install.sh | sudo bash
+# Usage: curl -fsSL https://cdn.autonomous.ai/os/install.sh | sudo DEVICE_TYPE=lamp bash
 set -euo pipefail
 
 # Per-deployment OTA metadata URL; override by exporting OTA_METADATA_URL.
