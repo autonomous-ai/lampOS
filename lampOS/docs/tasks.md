@@ -1051,7 +1051,9 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
   asked, until a read answers again; before, a sign-out followed by failing
   reads kept `yes` until a restart. Harness's daemon is still started only
   after the first read of a run that answers (#5379)
-  (`runtime::tests::a_sign_in_that_cannot_be_read_for_three_looks_is_let_go`).
+  (`runtime::tests::a_sign_in_that_cannot_be_read_for_three_looks_is_let_go`,
+  and through the part's own loop
+  `tests/runtime.rs`: `a_sign_in_read_failing_three_times_in_a_row_is_let_go_by_the_part`).
 - **Without the switch** nothing of this is said or read, and the part
   starts, stops and reports as before.
 

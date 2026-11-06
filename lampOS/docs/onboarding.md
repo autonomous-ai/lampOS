@@ -367,7 +367,9 @@ reads `{"op":"status"}` on `LAMP_TASKS_DIR`'s `request.sock` every 20 s, off
 the voice's loop, while the sentence is not decided (from when the
 onboarding file loads; the read is let go once it is decided, and a voice
 started on a decided file lets it go as the file loads, so the thread ends
-at its next wake), and takes its `signed_in` ([tasks.md](tasks.md), "The
+at its next wake; a read whose thread cannot be started logs "Harness's
+sign-in not read: …" once and is not kept, so the next closing handed out
+starts it again, one try each time), and takes its `signed_in` ([tasks.md](tasks.md), "The
 sign-in on `status`"). `yes` or `offline` drops it, and so does no tasks part
 (`LAMP_TASKS_DIR` unset). No answer, or a lamp-tasks that does not say (an
 older build, or one restarted just before the closing that has not read
@@ -384,6 +386,7 @@ record: `onboarding_harness_line` with its `outcome`. Tests:
 `the_sentence_about_harness_is_dropped_unless_harness_is_signed_out`,
 `an_unknown_sign_in_is_read_again_at_the_next_closing`,
 `the_read_of_harness_is_let_go_once_the_sentence_is_decided`,
+`a_read_that_could_not_be_started_is_started_again_at_the_next_closing`,
 `with_the_first_tries_the_sentence_about_harness_is_in_the_one_closing`,
 `the_done_note_carries_the_sentence_once_for_each_switch`,
 `the_two_step_walks_one_closing_carries_the_sentence`,
