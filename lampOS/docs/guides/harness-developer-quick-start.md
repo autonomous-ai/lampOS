@@ -106,6 +106,7 @@ Why it is written this way:
 ## 4. Point it at your real lamp
 
 1. **Get a pairing code.** The code comes with the lamp's pin (64 hex characters) and lasts 5 minutes. For this example tick three grants: `light` (the light), `speak` (the voice) and `body` (the nod). In the Autonomous app, turn developer access on, open your lamp and choose *Add a developer computer*. The lamp also says the first 8 characters of the pin aloud, and they must match what the app shows.
+   If your app has no developer access setting yet, the lamp's keeper can make the code instead: as root on the lamp, `lamp-control code --grants body,light,speak` prints the code and the pin.
 2. **On your computer**, with the environment active and no `LAMPOS_HOME` set:
 
 ```sh

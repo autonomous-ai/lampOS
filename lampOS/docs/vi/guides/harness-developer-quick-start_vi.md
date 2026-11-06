@@ -32,7 +32,7 @@ Terminal 2 in `connected to lamp-fake with [...]` và trạng thái đèn; termi
 
 ## Dùng đèn thật
 
-Lấy mã ghép đôi 8 chữ số kèm pin của đèn (64 ký tự hex), hiệu lực 5 phút, với ba quyền `light`, `speak`, `body`. Trong ứng dụng, bật quyền truy cập cho nhà phát triển, mở đèn và chọn *Add a developer computer*. Rồi:
+Lấy mã ghép đôi 8 chữ số kèm pin của đèn (64 ký tự hex), hiệu lực 5 phút, với ba quyền `light`, `speak`, `body`. Trong ứng dụng, bật quyền truy cập cho nhà phát triển, mở đèn và chọn *Add a developer computer*. Nếu ứng dụng của bạn chưa có cài đặt này, người giữ đèn có thể tạo mã: chạy `lamp-control code --grants body,light,speak` bằng quyền root trên đèn, lệnh in ra mã và pin. Rồi:
 
 ```sh
 lamp pair 12345678 --pin <64 ký tự của pin>
