@@ -12215,8 +12215,10 @@ async fn wordless_cuts_resume_the_answer_then_pause() {
         .filter(|label| label.starts_with("said:"))
         .collect();
     assert_eq!(said, [&format!("said:{LINE}")], "{out:?}");
-    // A cut of that question, soon after: nothing of the lamp's own answer
-    // to go on with, so quiet.
+    // A cut of that question, seconds after it began (past the tail's
+    // `TAIL_WITHIN`): nothing of the lamp's own answer to go on with, so
+    // quiet.
+    *now.lock().unwrap() += Duration::from_secs(3);
     let out = wordless_cut_of(&mut engine, 9, 8, 3).await;
     assert!(
         !out.iter().any(|label| label.starts_with("said:")),
@@ -12238,6 +12240,7 @@ async fn a_spoken_go_on_after_the_pause_starts_the_run_again() {
                 Ok(String::new()),
                 Ok(String::new()),
                 Ok(String::new()),
+                Ok(String::new()),
                 Ok("Lamp, go on.".to_owned()),
             ]
             .into(),
@@ -12256,28 +12259,38 @@ async fn a_spoken_go_on_after_the_pause_starts_the_run_again() {
         .asking_after_wordless_cut_ins(true)
         .resuming_after_wordless_cut_ins(true)
         .judging_busy(Arc::new(|_| true));
+    // Three real coughs, 5 s apart: past the tail's `TAIL_WITHIN`, so
+    // each is counted (at one instant the second would be the first's
+    // tail, #5511).
     story_sent(&engine, 1, true);
     wordless_cut_of(&mut engine, 2, 1, 1_500).await;
+    *now.lock().unwrap() += Duration::from_secs(5);
     wordless_cut_of(&mut engine, 3, 2, 3).await;
+    *now.lock().unwrap() += Duration::from_secs(5);
     let out = wordless_cut_of(&mut engine, 4, 3, AGAIN_PLAYED).await;
     assert!(out.contains(&format!("said:{PAUSE}")), "{out:?}");
+    // The pause's own tail, 40 ms in: the pause said again, not counted,
+    // and the spoken "go on" still starts the run again.
+    *now.lock().unwrap() += Duration::from_millis(40);
+    let out = wordless_cut_of(&mut engine, 5, 4, TAIL_PLAYED).await;
+    assert!(out.contains(&format!("said:{PAUSE}")), "{out:?}");
     *now.lock().unwrap() += Duration::from_secs(20);
-    engine.submit(start(5));
-    engine.submit(audio(5, 1));
-    engine.submit(end(5));
+    engine.submit(start(6));
+    engine.submit(audio(6, 1));
+    engine.submit(end(6));
     let out = turn(&mut engine).await;
     assert!(out.contains(&"heard:Lamp, go on.".to_owned()), "{out:?}");
-    assert_eq!(*engine.shared.said_whole.lock().unwrap(), Some(5));
+    assert_eq!(*engine.shared.said_whole.lock().unwrap(), Some(6));
     // Cut in its last sentence: the bridge, then that sentence again.
     let (pieces, played) = {
         let said = engine.shared.said.lock().unwrap();
-        assert_eq!(said.0, 5);
+        assert_eq!(said.0, 6);
         let all: u64 = said.1.iter().map(|piece| piece.samples).sum();
         let last = said.1.last().unwrap();
         (last.words.clone().unwrap(), all - last.samples / 2)
     };
     *now.lock().unwrap() += Duration::from_secs(30);
-    let out = wordless_cut_of(&mut engine, 6, 5, played).await;
+    let out = wordless_cut_of(&mut engine, 7, 6, played).await;
     let said: Vec<&String> = out
         .iter()
         .filter(|label| label.starts_with("said:"))
@@ -12370,6 +12383,122 @@ async fn a_story_asked_again_after_the_question_keeps_the_run() {
 
 /// Samples of the "cut off again" line played, less than all of it.
 const AGAIN_PLAYED: u64 = 10;
+
+/// Samples of a fixed line played when the same cough's tail cut it on
+/// 06c1 (FAIL on #5491: "0 words were played, 40 ms of it").
+const TAIL_PLAYED: u64 = 40 * 24;
+
+/// 06c1's FAIL on #5491, round 1 and 2: the fixed line ("Oops, cut off
+/// again. Anyway," or the pause line) began, and 40 ms later the tail of
+/// the same cough opened a wordless line that cut it, judged Quiet: the
+/// lamp fell silent. The tail, begun within `TAIL_WITHIN` of the line's
+/// start, is the same sound: the line is said again with its rest, not
+/// counted, so a real cough seconds later is still the third (the pause).
+/// A tail of the line said again is not said a third time: no loop.
+#[tokio::test]
+async fn a_coughs_tail_40_ms_into_the_fixed_line_says_it_again() {
+    use crate::cut_in_wordless::{AGAIN, LINE, PAUSE};
+    let script = Arc::new(Script::default());
+    let (built, _, now) = scripted(script.clone());
+    let mut engine = built
+        .asking_after_wordless_cut_ins(true)
+        .resuming_after_wordless_cut_ins(true)
+        .judging_busy(Arc::new(|_| false));
+    let said_of = |out: &[String]| -> Vec<String> {
+        out.iter()
+            .filter(|label| label.starts_with("said:"))
+            .cloned()
+            .collect()
+    };
+    let rest = [
+        "said: The keeper lit the lamp.".to_owned(),
+        "said: Then a ship came.".to_owned(),
+    ];
+    // The first cough: asked.
+    story_sent(&engine, 1, true);
+    let out = wordless_cut_of(&mut engine, 2, 1, 1_500).await;
+    assert_eq!(said_of(&out), [format!("said:{LINE}")], "{out:?}");
+    // The story asked again, cut by a cough 20 s later: cut again.
+    *now.lock().unwrap() += Duration::from_secs(20);
+    story_sent(&engine, 3, true);
+    let out = wordless_cut_of(&mut engine, 4, 3, 1_500).await;
+    assert_eq!(
+        said_of(&out),
+        [format!("said:{AGAIN}"), rest[0].clone(), rest[1].clone()],
+        "{out:?}"
+    );
+    // The same cough's tail, 40 ms into that line: said again, the story
+    // goes on.
+    *now.lock().unwrap() += Duration::from_millis(40);
+    let out = wordless_cut_of(&mut engine, 5, 4, TAIL_PLAYED).await;
+    assert_eq!(
+        said_of(&out),
+        [format!("said:{AGAIN}"), rest[0].clone(), rest[1].clone()],
+        "{out:?}"
+    );
+    // A real cough 5 s later is the third: the pause.
+    *now.lock().unwrap() += Duration::from_secs(5);
+    let out = wordless_cut_of(&mut engine, 6, 5, AGAIN_PLAYED).await;
+    assert_eq!(said_of(&out), [format!("said:{PAUSE}")], "{out:?}");
+    // Its tail, 40 ms in: the pause said again, not a fourth cut.
+    *now.lock().unwrap() += Duration::from_millis(40);
+    let out = wordless_cut_of(&mut engine, 7, 6, TAIL_PLAYED).await;
+    assert_eq!(said_of(&out), [format!("said:{PAUSE}")], "{out:?}");
+    // A tail of the pause said again: quiet, never a loop.
+    *now.lock().unwrap() += Duration::from_millis(40);
+    let out = wordless_cut_of(&mut engine, 8, 7, TAIL_PLAYED).await;
+    assert!(said_of(&out).is_empty(), "{out:?}");
+    // A fourth real cough within the minute: quiet, as before.
+    *now.lock().unwrap() += Duration::from_secs(5);
+    story_sent(&engine, 9, true);
+    let out = wordless_cut_of(&mut engine, 10, 9, 1_500).await;
+    assert!(said_of(&out).is_empty(), "{out:?}");
+    assert!(script.asked.lock().unwrap().is_empty());
+}
+
+/// The same tail over the line when the rest is the model's (06c1's run:
+/// "the rest not kept: the model goes on" on every cut): the line is said
+/// again and the model asked to go on, as for the line it cut.
+#[tokio::test]
+async fn a_coughs_tail_over_the_line_before_the_models_rest_asks_it_again() {
+    use crate::cut_in_wordless::AGAIN;
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [
+                vec![text("And the ship was his."), Ok(ChatEvent::Done)],
+                vec![text("And the ship was his."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (built, _, now) = scripted(script.clone());
+    let mut engine = built
+        .resuming_after_wordless_cut_ins(true)
+        .judging_busy(Arc::new(|_| true));
+    story_sent(&engine, 1, true);
+    wordless_cut_of(&mut engine, 2, 1, 1_500).await;
+    *now.lock().unwrap() += Duration::from_secs(20);
+    story_sent(&engine, 3, false);
+    let out = wordless_cut_of(&mut engine, 4, 3, 1_500).await;
+    assert_eq!(
+        out.iter().find(|label| label.starts_with("said:")),
+        Some(&format!("said:{AGAIN}")),
+        "{out:?}"
+    );
+    *now.lock().unwrap() += Duration::from_millis(40);
+    let out = wordless_cut_of(&mut engine, 5, 4, TAIL_PLAYED).await;
+    assert_eq!(
+        out.iter().find(|label| label.starts_with("said:")),
+        Some(&format!("said:{AGAIN}")),
+        "{out:?}"
+    );
+    assert!(
+        out.contains(&"said:And the ship was his.".to_owned()),
+        "{out:?}"
+    );
+    assert_eq!(script.asked.lock().unwrap().len(), 2);
+}
 
 /// The rest not kept (the answer was cut before it was sent whole): the
 /// bridge is said at once, then the model is asked to go on from the cut,
