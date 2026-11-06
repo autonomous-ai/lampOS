@@ -766,14 +766,22 @@ only reads …").
   language." (nói bằng ngôn ngữ của cuộc trò chuyện).
 - **Một câu gửi thuần** (`says_send`): các từ viết thường, mọi thứ trừ chữ
   cái, chữ số và `'` thành dấu cách, các từ đệm `yes`, `yeah`, `yep`, `ok`,
-  `okay`, `sure`, `please`, `now`, `lamp`, `lampy`, `vâng`, `dạ`, `ừ`, `có`
-  được bỏ ở cả hai đầu, và phần còn lại đúng là một trong `send`, `send it`,
+  `okay`, `sure`, `please`, `now`, `lamp`, `lampy`, `hey`, `hi`, `hello`,
+  `oh`, `vâng`, `dạ`, `ừ`, `có` được bỏ ở cả hai đầu, và phần còn lại đúng là một trong `send`, `send it`,
   `send that`, `send the message`, `send the email`, `go ahead and send it`,
   `gửi`, `gửi đi`, `gửi nó đi`, `gởi`, `gởi đi`, `gui`, `gui di`,
   `gửi đi giúp tôi`, `gui di giup toi`: câu nào cũng có "send", "gửi", "gởi"
   hoặc "gui". Vì vậy "Yes, send it.", "Vâng, gửi đi" và "Ừ, gửi đi giúp tôi"
-  thì gửi; "do it", "don't send it", "send
-  it to Bo instead", "đừng gửi" và "no" thì không.
+  thì gửi, "Hey Lamp, yes, send it." cũng vậy; "do it", "don't send it",
+  "send it to Bo instead", "đừng gửi" và "no" thì không.
+- **Một câu gửi thuần được nghe là câu trả lời** (`send_awaited`). Khi một lệnh
+  ghi đang chờ, một câu gửi thuần được tính là trả lời đèn, bất kể câu cuối
+  của phần đọc lại ra sao. Vì vậy nó không bị giữ lại như một âm thanh ngắn hay
+  vài từ lẻ của căn phòng, kể cả khi không có ai trong tầm nhìn. Điều này không
+  áp dụng cho câu bắt đầu đè lên giọng của đèn hoặc trong vòng 1,5 s
+  (`own_echo::TAIL_US`) sau khi lời của đèn kết thúc: đó có thể là chính "send
+  it" của đèn vọng lại, mà `own_echo` không giữ khi dưới 3 từ. Câu như vậy được
+  xét như mọi câu khác, và `gate` vẫn xét lần gửi đó.
 
 ### Sau một lần đọc
 

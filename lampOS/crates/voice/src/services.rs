@@ -82,10 +82,12 @@ pub const SEND_WORDS: [&str; 15] = [
     "gửi đi giúp tôi",
     "gui di giup toi",
 ];
-/// Words around a "send" that change nothing.
-const FILLERS: [&str; 14] = [
-    "yes", "yeah", "yep", "ok", "okay", "sure", "please", "now", "lamp", "lampy", "vâng", "dạ",
-    "ừ", "có",
+/// Words around a "send" that change nothing. "hey", "hi", "hello" and "oh"
+/// open a call to the lamp: on lamp-9adf on 6 Nov "Hey Lamp, yes, send it."
+/// cancelled the write it was said to send (#5553).
+const FILLERS: [&str; 18] = [
+    "yes", "yeah", "yep", "ok", "okay", "sure", "please", "now", "lamp", "lampy", "hey", "hi",
+    "hello", "oh", "vâng", "dạ", "ừ", "có",
 ];
 
 /// What the model is told of every services function, before the
@@ -318,6 +320,9 @@ pub struct Pending {
     /// once more ([`SAY_IT_LONGER`]): its words are no other request's, and
     /// the next line may still send.
     pub asked_again: Option<u64>,
+    /// The line after it began within the tail of the lamp's words
+    /// ([`voice_began`]): it may be their echo.
+    pub began_in_tail: bool,
 }
 
 impl Pending {
@@ -337,6 +342,7 @@ impl Pending {
             lines: 0,
             other: None,
             asked_again: None,
+            began_in_tail: false,
         }
     }
 }
@@ -515,6 +521,23 @@ pub fn says_send(words: &str) -> bool {
         words.pop();
     }
     SEND_WORDS.contains(&words.join(" ").as_str())
+}
+
+/// Whether `words` are the plain "send" a write waiting now asks for. The
+/// read-back asked for it, whether or not its last sentence reads as a
+/// question, so the line is an answer to the lamp and not a short sound or
+/// the room's lone words: on lamp-9adf on 6 Nov, with nobody in view, "Send."
+/// was held as a short sound (#5553). Not a line begun over the lamp's voice,
+/// or before its tail is over ([`voice_began`]): that may be the lamp's own
+/// "send it" heard back, which `own_echo` doesn't hold in so few words. Those
+/// are judged as any line, and [`gate`] still judges the send itself.
+pub fn send_awaited(words: &str) -> bool {
+    says_send(words)
+        && kept::pending(|pending| {
+            pending
+                .as_ref()
+                .is_some_and(|kept| !kept.cut && !kept.began_in_tail)
+        })
 }
 
 /// What is known of the turn a call comes in.
@@ -894,6 +917,12 @@ pub fn judging_voices(judge: VoiceJudge) {
     JUDGE.with(|cell| *cell.borrow_mut() = Some(judge));
 }
 
+/// Sets the write waiting for its "send", for a test on this thread.
+#[cfg(test)]
+pub(crate) fn pending_for_test(pending: Option<Pending>) {
+    kept::pending(|kept| *kept = pending);
+}
+
 fn judge() -> Option<VoiceJudge> {
     #[cfg(not(test))]
     return JUDGE.get().cloned();
@@ -935,9 +964,15 @@ fn send_likeness(judge: &VoiceJudge, prepared: u64, request: u64, enrolled: bool
 /// A line began, as the second route hears it (`Heeding::hear`), at `now`:
 /// earlier than its words come. One begun over the lamp's own voice, or
 /// before the read-back could have been said whole, marks the waiting
-/// write's read-back as talked over.
-pub fn voice_began(over_the_lamps_voice: bool, now: Instant) {
-    kept::pending(|pending| voice_began_in(pending, over_the_lamps_voice, now));
+/// write's read-back as talked over; `in_tail` says it began within the tail
+/// of the lamp's words ([`send_awaited`]).
+pub fn voice_began(over_the_lamps_voice: bool, in_tail: bool, now: Instant) {
+    kept::pending(|pending| {
+        voice_began_in(pending, over_the_lamps_voice, now);
+        if let Some(kept) = pending.as_mut() {
+            kept.began_in_tail = in_tail;
+        }
+    });
 }
 
 /// [`voice_began`] on `pending`.
@@ -1629,6 +1664,41 @@ mod tests {
     }
 
     #[test]
+    fn only_a_plain_send_with_a_write_waiting_is_awaited() {
+        pending_for_test(None);
+        assert!(!send_awaited("Send."));
+        pending_for_test(Some(Pending::new(
+            "id",
+            10,
+            Instant::now(),
+            "Send an email.",
+            "ann",
+        )));
+        for said in ["Send.", "send it", "Hey Lamp, send it."] {
+            assert!(send_awaited(said), "{said}");
+        }
+        for said in ["Do it.", "don't send it", "What a day."] {
+            assert!(!send_awaited(said), "{said}");
+        }
+        // Begun over the lamp's voice, or within its tail: maybe its echo.
+        let waiting = || {
+            let mut kept = Pending::new("id", 10, Instant::now(), "Send an email.", "ann");
+            kept.spoken_from = Some(Instant::now() - Duration::from_secs(60));
+            kept
+        };
+        for (over, in_tail, awaited) in [
+            (true, false, false),
+            (false, true, false),
+            (false, false, true),
+        ] {
+            pending_for_test(Some(waiting()));
+            voice_began(over, in_tail, Instant::now());
+            assert_eq!(send_awaited("Send."), awaited, "{over} {in_tail}");
+        }
+        pending_for_test(None);
+    }
+
+    #[test]
     fn a_plain_send_sends_and_nothing_else_does() {
         for said in [
             "send",
@@ -1646,6 +1716,10 @@ mod tests {
             "Go ahead and send it.",
             "Ừ, gửi đi giúp tôi",
             "gui di giup toi",
+            "Hey Lamp, yes, send it.",
+            "Hi lamp, send it",
+            "Oh, send it.",
+            "Hello Lamp, go ahead and send it.",
         ] {
             assert!(says_send(said), "{said}");
         }
@@ -1661,6 +1735,11 @@ mod tests {
             "wait",
             "what did it say?",
             "",
+            "hey",
+            "Hey Lamp",
+            "hey don't send it",
+            "oh no, don't send it",
+            "hey, send it to Bob instead",
         ] {
             assert!(!says_send(said), "{said}");
         }

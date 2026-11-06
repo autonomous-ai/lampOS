@@ -5019,6 +5019,26 @@ async fn a_short_sound_not_heard_as_a_short_word_is_held_when_sounds_are_checked
     }
 }
 
+/// #5553: on lamp-9adf on 6 Nov, with nobody in view, "Send." after a
+/// read-back was held as a short sound. While a write waits for it, a plain
+/// send is answered; with none waiting it is held, and so is any other word.
+#[tokio::test]
+async fn a_checked_sound_is_answered_only_as_the_send_a_waiting_write_asked_for() {
+    let waiting =
+        || crate::services::Pending::new("id", 8, std::time::Instant::now(), "Send a mail.", "ann");
+    crate::services::pending_for_test(Some(waiting()));
+    let (labels, asked) = sound_turn(true, true, "Send.").await;
+    assert!(
+        labels.iter().any(|label| label.starts_with("audio:")),
+        "{labels:?}"
+    );
+    assert_eq!(asked, 1);
+    crate::services::pending_for_test(Some(waiting()));
+    assert_eq!(sound_turn(true, true, "Bien.").await.1, 0);
+    crate::services::pending_for_test(None);
+    assert_eq!(sound_turn(true, true, "Send.").await.1, 0);
+}
+
 /// The Live route's case of 17 October on this route: "Yes. Please start
 /// it." to the lamp's "Shall I start it?" ended after "Yes." as a short
 /// sound heard as "bien". Checked, with the lamp having just asked, it is
