@@ -2578,3 +2578,54 @@ fn a_sign_in_id_grows_across_a_restart_with_the_clock_gone_back() {
         .unwrap();
     assert_eq!(third, ahead + 1);
 }
+
+/// #5524, for the app's Harness row (app #111): the app's state says
+/// whether Harness is signed in from the part's own read of Harness, not
+/// from the last sign-in it saw, so a restart, with no sign-in open and the
+/// view `none`, still says it. Signed out from a computer, it says `no`, and
+/// after a restart still `no`; signed in again, `yes`. Without
+/// `--set-up-later` nothing is read, and the view is as before.
+#[test]
+fn the_apps_state_says_harness_signed_in_across_a_restart() {
+    let mut s = Running::unstarted(false, false, false, false);
+    s.config.sign_in_by_code = true;
+    s.config.app_socket = Some(s.root.path().join("run/app"));
+    // This test stands in for lamp-cloud (#5379).
+    s.config.app_caller = |_| true;
+    s.config.set_up_later = Some(SetUpLater {
+        targets: s.root.path().join("targets.json"),
+        every: Duration::from_millis(20),
+        from_machines: None,
+    });
+    let said_until = |s: &Running, want: &str| {
+        let start = Instant::now();
+        loop {
+            let view = s.app(json!({"op":"app_sign_in_state"}));
+            if view["signed_in"] == want {
+                return view;
+            }
+            assert!(start.elapsed() < Duration::from_secs(5), "{view}");
+            thread::sleep(Duration::from_millis(10));
+        }
+    };
+    s.start();
+    let view = said_until(&s, "yes");
+    assert_eq!(view["ok"], true);
+    assert_eq!(view["sign_in"], "none");
+    s.counts.signed_out.store(true, Ordering::SeqCst);
+    said_until(&s, "no");
+    s.stop();
+    s.start();
+    let view = said_until(&s, "no");
+    assert_eq!(view["sign_in"], "none", "nothing of the last run's sign-in");
+    s.counts.signed_out.store(false, Ordering::SeqCst);
+    said_until(&s, "yes");
+    s.stop();
+    // Without `--set-up-later`: no read, no `signed_in`.
+    s.config.set_up_later = None;
+    s.start();
+    thread::sleep(Duration::from_millis(100));
+    let view = s.app(json!({"op":"app_sign_in_state"}));
+    assert_eq!(view["sign_in"], "none");
+    assert!(view.get("signed_in").is_none(), "{view}");
+}

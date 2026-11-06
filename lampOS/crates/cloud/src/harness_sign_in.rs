@@ -11,8 +11,14 @@
 //!
 //! While the switch is on, lamp-cloud also follows the sign-in ([`Follow`])
 //! and pushes its view unasked on `fd_channel`, as `harness.sign_in.state`,
-//! whenever its `revision` (or lamp-tasks' `instance_id`) moves: every
-//! second while one is open, every [`IDLE_EVERY`] otherwise.
+//! whenever its `revision` (or lamp-tasks' `instance_id`, or `signed_in`)
+//! moves: every second while one is open, every [`IDLE_EVERY`] otherwise.
+//!
+//! The state's `signed_in` (`yes`, `offline` or `no`, #5524) is whether
+//! Harness is signed in, as lamp-tasks last read it from Harness itself
+//! (`serve --set-up-later`), so the app's Harness row is right after a
+//! restart too, when no sign-in is open and the view says `none`. Before
+//! lamp-tasks' first read it is absent.
 //!
 //! **The code and the email never go on the broker** (the PM's privacy
 //! rule on #5198). A view replied or pushed on `fd_channel` holds the state
@@ -83,8 +89,9 @@ const MOST_REPLY_BYTES: u64 = 16 * 1024;
 
 /// The view's fields the app is given on the broker; any other (the code,
 /// the email, lamp-tasks' store id and revision) stays off it.
-pub const BROKER_FIELDS: [&str; 15] = [
+pub const BROKER_FIELDS: [&str; 16] = [
     "sign_in",
+    "signed_in",
     "id",
     "revision",
     "instance_id",
@@ -540,11 +547,11 @@ fn exchange(socket: &Path, line: &Value) -> Result<Value, String> {
 }
 
 /// The sign-in followed for pushes: the last view pushed, by lamp-tasks'
-/// `instance_id` and its `revision`.
+/// `instance_id`, its `revision` and Harness's `signed_in` (#5524).
 pub struct Follow {
     place: Place,
     next: std::time::Instant,
-    last: Option<(Value, Value)>,
+    last: Option<(Value, Value, Value)>,
     open: bool,
 }
 
@@ -576,7 +583,11 @@ impl Follow {
         self.next = now + if open { OPEN_EVERY } else { IDLE_EVERY };
         let view = view?;
         self.place.hand_offs.seen(&view);
-        let key = (view["instance_id"].clone(), view["revision"].clone());
+        let key = (
+            view["instance_id"].clone(),
+            view["revision"].clone(),
+            view["signed_in"].clone(),
+        );
         let first = self.last.is_none();
         self.open = open;
         if self.last.as_ref() == Some(&key) {
@@ -817,6 +828,50 @@ pub(crate) mod tests {
             ]
         );
         assert_eq!(*kept.deletes.lock().unwrap(), [5]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #5524: whether Harness is signed in reaches the app in the state's
+    /// view, and a change of it is pushed with no sign-in open (signed out
+    /// from a computer, or lamp-tasks' first read after a restart), once.
+    #[test]
+    fn harness_signed_in_is_in_the_view_and_its_change_is_pushed() {
+        let dir = folder("signed");
+        let _asked = tasks(
+            &dir,
+            vec![
+                r#"{"ok":true,"sign_in":"none","revision":0,"instance_id":"a","signed_in":"yes"}"#,
+                r#"{"ok":true,"sign_in":"none","revision":0,"instance_id":"a","signed_in":"yes"}"#,
+                r#"{"ok":true,"sign_in":"none","revision":0,"instance_id":"a","signed_in":"no"}"#,
+                r#"{"ok":true,"sign_in":"none","revision":0,"instance_id":"b"}"#,
+                r#"{"ok":true,"sign_in":"none","revision":0,"instance_id":"b","signed_in":"yes"}"#,
+                r#"{"ok":true,"sign_in":"none","revision":0,"instance_id":"b","signed_in":"yes"}"#,
+            ],
+        );
+        let kept = Arc::new(Kept::default());
+        let place = place(&dir, kept);
+        let read = ask(&place, "harness.sign_in.state", &json!({}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(read["signed_in"], "yes");
+        assert_eq!(read["sign_in"], "none");
+        let mut follow = Follow::new(place);
+        let t = std::time::Instant::now();
+        // The first look, none open: nothing pushed, as before.
+        assert_eq!(follow.due(t), None);
+        // Signed out from a computer: pushed, with no sign-in open.
+        assert_eq!(follow.due(t + IDLE_EVERY).unwrap()["signed_in"], "no");
+        // lamp-tasks restarted, not read yet: pushed for its new instance.
+        assert!(
+            follow
+                .due(t + IDLE_EVERY * 2)
+                .unwrap()
+                .get("signed_in")
+                .is_none()
+        );
+        // Its first read: pushed once, then nothing for the same.
+        assert_eq!(follow.due(t + IDLE_EVERY * 3).unwrap()["signed_in"], "yes");
+        assert_eq!(follow.due(t + IDLE_EVERY * 4), None);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
