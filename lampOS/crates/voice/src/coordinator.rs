@@ -11593,11 +11593,10 @@ fn conversation_with_gate_inner(
             // `LAMP_TASK_NEWS_RETELL=on` (#4342). On lamp-c0a4 on 3 Nov a news
             // played through with gaps under someone's words was otherwise
             // neither told again nor closed.
-            let unheard = heard.is_empty();
             if let Some(news) = task_news.as_mut() {
                 if !heard.is_empty() {
                     news.heard(turn, heard);
-                } else if unheard && !told_news.is_empty() {
+                } else if !told_news.is_empty() {
                     news.not_heard(told_news);
                 }
             }
@@ -16762,6 +16761,22 @@ fn record_mute_revocation(trace: &mut SessionState, revoked: MuteRevocation) {
     }
 }
 
+/// Whether `reason` is a stop the person meant: the button, a touch on the
+/// head, "stop" said over the lamp, the head's sleep or the software mute.
+/// A news cut so is not told once more; one cut by a barge-in or a gap is
+/// (the reviewer's P2 on #5118).
+fn deliberate_stop(reason: &str) -> bool {
+    use crate::receipt_history::{HAND_STOP, HEAD_SLEEP, HEAD_STOP, SOFTWARE_MUTED, SPOKEN_STOP};
+    [
+        HAND_STOP,
+        HEAD_STOP,
+        SPOKEN_STOP,
+        HEAD_SLEEP,
+        SOFTWARE_MUTED,
+    ]
+    .contains(&reason)
+}
+
 fn record_cancelled_reply(
     current: Reply,
     trace: &mut SessionState,
@@ -16784,8 +16799,11 @@ fn record_cancelled_reply(
             current.news.join(", ")
         );
         // Told once more at the next quiet pause, with
-        // `LAMP_TASK_NEWS_RETELL=on` (#4342).
-        crate::task_news::cut_short(&current.news);
+        // `LAMP_TASK_NEWS_RETELL=on` (#4342), unless the person stopped it
+        // on purpose ([`deliberate_stop`]).
+        if !deliberate_stop(reason) {
+            crate::task_news::cut_short(&current.news);
+        }
     }
     finish_duplex_yield(trace, cancelled_at_us, reason, None, None)?;
     trace
@@ -18537,6 +18555,58 @@ mod tests {
         cancel_reply(&mut owner, &mut reply, &mut trace, "user_interrupted").unwrap();
         assert_eq!(crate::task_news::take_cut_short(), ["s1:2:4"]);
         assert!(crate::task_news::take_cut_short().is_empty());
+    }
+
+    /// What a news turn cut by `reason` hands on to be told once more.
+    fn news_handed_on_after(reason: &str) -> Vec<String> {
+        let _ = crate::task_news::take_cut_short();
+        let (mut owner, mut current, _permit) = active_reply();
+        current.news = vec!["s1:2:4".into()];
+        let mut reply = Some(current);
+        let mut trace = SessionState::default();
+        cancel_reply(&mut owner, &mut reply, &mut trace, reason).unwrap();
+        crate::task_news::take_cut_short()
+    }
+
+    /// The reviewer's P2 on #5118: a news the person stopped on purpose is
+    /// not told once more. The button's stop.
+    #[test]
+    fn news_stopped_by_the_button_is_not_handed_on() {
+        assert!(news_handed_on_after(crate::receipt_history::HAND_STOP).is_empty());
+    }
+
+    /// A touch on the head while the lamp told news.
+    #[test]
+    fn news_stopped_by_the_head_is_not_handed_on() {
+        assert!(news_handed_on_after(crate::receipt_history::HEAD_STOP).is_empty());
+    }
+
+    /// "Stop" said over the lamp's news.
+    #[test]
+    fn news_stopped_by_a_spoken_stop_is_not_handed_on() {
+        assert!(news_handed_on_after(crate::receipt_history::SPOKEN_STOP).is_empty());
+    }
+
+    /// The head put to sleep during news.
+    #[test]
+    fn news_stopped_by_the_head_sleep_is_not_handed_on() {
+        assert!(news_handed_on_after(crate::receipt_history::HEAD_SLEEP).is_empty());
+    }
+
+    /// The software mute during news.
+    #[test]
+    fn news_stopped_by_the_software_mute_is_not_handed_on() {
+        assert!(news_handed_on_after(crate::receipt_history::SOFTWARE_MUTED).is_empty());
+    }
+
+    /// A barge-in and a capture gap still hand the news on.
+    #[test]
+    fn news_cut_by_a_barge_in_or_a_gap_is_still_handed_on() {
+        assert_eq!(news_handed_on_after("user_interrupted"), ["s1:2:4"]);
+        assert_eq!(
+            news_handed_on_after(crate::receipt_history::CAPTURE_GAP),
+            ["s1:2:4"]
+        );
     }
 
     #[test]

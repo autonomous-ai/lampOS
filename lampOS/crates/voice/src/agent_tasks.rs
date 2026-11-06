@@ -2428,21 +2428,38 @@ fn now_entry(task: &Value, asked: Option<&str>) -> Value {
 }
 
 /// `words` with every path-like word (one holding `/` or `\\`, or starting
-/// with `~`) put as "a file": a last step or an ask such as "Editing
-/// /Users/name/payroll.xlsx" never brings a folder or a username to the
-/// model, which could say it aloud (the reviewer-lead's P2 on #5118).
+/// with `~`) and every bare file name ([`file_name`]) put as "a file": a
+/// last step or an ask such as "Editing /Users/name/payroll.xlsx" or
+/// "Opening payroll_lee.xlsx" never brings a folder, a username or a file's
+/// name to the model, which could say it aloud (the reviewer-lead's P2 and
+/// P3 on #5118).
 fn without_paths(words: &str) -> String {
     words
         .split_whitespace()
         .map(|word| {
             if word.contains('/') || word.contains('\\') || word.starts_with('~') {
-                "a file"
+                "a file".to_owned()
+            } else if let Some(after) = file_name(word) {
+                format!("a file{after}")
             } else {
-                word
+                word.to_owned()
             }
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// For a bare file name, a word such as `payroll_lee.xlsx` (a name of at
+/// least two characters, a dot, then an extension of one to five letters
+/// or digits holding a letter), the punctuation after it, to keep. A
+/// number such as `3.5` or `v1.2` is not one.
+fn file_name(word: &str) -> Option<&str> {
+    let name = word.trim_end_matches(|c: char| ",.;:!?)\"'".contains(c));
+    let (stem, extension) = name.rsplit_once('.')?;
+    let extension_like = (1..=5).contains(&extension.len())
+        && extension.chars().all(|c| c.is_ascii_alphanumeric())
+        && extension.chars().any(|c| c.is_ascii_alphabetic());
+    (stem.chars().count() >= 2 && extension_like).then(|| &word[name.len()..])
 }
 
 /// A state on `tasks/status` in the words the model says it in.
@@ -2650,6 +2667,26 @@ pub(crate) mod tests {
         }
         assert!(said.contains("Editing a file"), "{said}");
         assert!(said.contains("fix the parser in a file"), "{said}");
+    }
+
+    /// The reviewer-lead's P3 on #5118: a bare file name is given as "a
+    /// file" too; a number with a dot is kept.
+    #[test]
+    fn tasks_now_gives_no_bare_file_names() {
+        assert_eq!(
+            super::without_paths("Opening payroll_lee.xlsx, then notes.md."),
+            "Opening a file, then a file."
+        );
+        assert_eq!(
+            super::without_paths("Moved to v1.2 at 3.5 seconds, e.g. now"),
+            "Moved to v1.2 at 3.5 seconds, e.g. now"
+        );
+        let task = serde_json::json!({
+            "task": 3, "agent": "claude", "target": "office", "state": "working",
+            "last_step": {"untrusted": "Reading payroll_lee.xlsx"},
+        });
+        let said = super::now_entry(&task, Some("sum up payroll_lee.xlsx")).to_string();
+        assert!(!said.contains("payroll"), "{said}");
     }
 
     use super::*;

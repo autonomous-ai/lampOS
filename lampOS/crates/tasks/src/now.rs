@@ -54,12 +54,17 @@ pub struct Now {
     tasks: BTreeMap<u64, Entry>,
 }
 
-/// The agent's line as a last step: control characters removed, spaces at
-/// its ends trimmed, at most `most` characters (so cut at a whole
-/// character). Empty is none.
+/// The agent's line as a last step: each control character (a tab, a
+/// newline) put as a space, so "Reading\tthe brief" stays two words, runs
+/// of spaces made one, spaces at its ends trimmed, at most `most`
+/// characters (so cut at a whole character). Empty is none.
 pub fn step(about: &str, most: usize) -> Option<String> {
-    let clean: String = about.chars().filter(|c| !c.is_control()).collect();
-    let cut: String = clean.trim().chars().take(most).collect();
+    let spaced: String = about
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
+    let clean = spaced.split_whitespace().collect::<Vec<_>>().join(" ");
+    let cut: String = clean.chars().take(most).collect();
     let cut = cut.trim_end().to_owned();
     (!cut.is_empty()).then_some(cut)
 }
@@ -276,7 +281,13 @@ mod tests {
     fn a_step_is_cleaned_and_cut_at_a_whole_character() {
         assert_eq!(
             step("  Reading\tthe\u{7}brief\n ", 160).unwrap(),
-            "Readingthebrief"
+            "Reading the brief"
+        );
+        // The reviewer's P3 on #5118: a tab or a newline is a space, and a
+        // run of them one.
+        assert_eq!(
+            step("Reading\tthe brief\n\nthen  the\r\nnotes", 160).unwrap(),
+            "Reading the brief then the notes"
         );
         assert_eq!(step("\u{1b}[31m", 160).as_deref(), Some("[31m"));
         assert_eq!(step(" \n\t ", 160), None);

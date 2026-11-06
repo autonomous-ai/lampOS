@@ -816,7 +816,7 @@ started once its answer is told:
 | CLI | One worker, one job/result slot; preflight/read 10 s each, new 60 s (a name-taken retry included) |
 | CLI capture | 64 KiB stdout, 16 KiB stderr; individual poll waits capped at 10 ms |
 | Progress (`--progress`) | One `ps` per machine per watch period, 10 s each; 256 KiB stdout; 256 harnesses a reply; a progress line cut to 2 KiB; memory only, at most 16 tasks |
-| Tasks now (`tasks_now`, with `--progress`) | Memory only; at most 8 tasks, newest first; the reply under 2 KiB (body at most 1,900 bytes); a last step at most 160 characters, cut at a whole character, control characters removed; a settled task kept 30 min after it was told and at most 2 h after it settled; no Harness call of its own |
+| Tasks now (`tasks_now`, with `--progress`) | Memory only; at most 8 tasks, newest first; the reply under 2 KiB (body at most 1,900 bytes); a last step at most 160 characters, cut at a whole character, control characters made spaces and runs of spaces one; a settled task kept 30 min after it was told and at most 2 h after it settled; no Harness call of its own |
 | Push (`--push-wait`) | One `wait` held per machine with watched tasks, on at most 64 agents, 600 s each (killed at 630 s), beside the CLI worker; the next on a machine no sooner than 3 s after one came back with an end, 30 s after one failed; a pushed task left out until the watch reads it again; 64 KiB stdout |
 | Private persistence | 8 MiB snapshot, 32 MiB database, 40 MiB journal; 4,096-byte pages |
 | SQLite | DELETE journal, FULL sync, fullfsync requested, 2 MiB cache, 50 ms busy wait, no mmap/WAL |
@@ -1936,11 +1936,16 @@ used only to say it.
   expired, the tasks part's `told` stayed null, and the news was never said
   again. With the switch, settled news (done, failed, stopped, or an agent
   waiting for the person, and a hand-over that failed) whose turn was cut
-  short or ended not heard whole is told once more. That includes news
+  short (by a barge-in or a capture gap) or ended not heard whole is told
+  once more. That includes news
   played through with gaps, whose harness stays open (#4035): on lamp-c0a4
   on 3 November such a news, played under someone's words that made no
   request (`audio_written_with_playback_gaps_unscored`), was otherwise
-  neither told again nor closed. It is told once more
+  neither told again nor closed. A news the person stopped on purpose is not: the button
+  (`hand_stop`), a touch on the head (`head_stop`), "stop" said over it
+  (`spoken_stop`), the head's sleep (`head_sleep`) or the software mute
+  (`software_muted`); they heard enough (the reviewer's P2 on #5118,
+  `deliberate_stop`). It is told once more
   (`TaskNews::not_heard`): the reader offers it again though it is kept as
   told, with the note's words worked out afresh, and the voice tells it
   itself, alone, at the next quiet pause: someone there and nothing said by
@@ -2397,16 +2402,11 @@ finish?" for any recent piece of work.
   `{"untrusted": "…"}` (at most 160 characters, quoted), and, for settled
   work, `told`. `not_listed` counts what the record left out. No task
   number, store or machine id. Every word of `asked` and `last_step` that
-  looks like a path (it holds `/` or `\`, or starts with `~`) is given as
-  "a file", so a folder or a username never reaches the model
+  looks like a path (it holds `/` or `\`, or starts with `~`), and every
+  bare file name (`payroll_lee.xlsx`: a name, a dot and an extension of one
+  to five letters or digits; not a number such as `3.5`), is given as "a
+  file", so a folder, a username or a file's name never reaches the model
   (`without_paths`).
-- **Anyone who asks hears it.** The voice does not know who is asking, and
-  tasks have no owner. So a guest who asks "what is Claude doing?" hears
-  every recent piece of work and its ask, the owner's included, where
-  `check_agent_task` told only the newest. That is why the switch stays
-  off until answers are kept to the person who asked for the work, or to
-  the lamp's owner (the reviewer-lead's P2 on #5118).
-
   ```json
   {"tasks":[{"who":"Claude Code","where":"their computer","asked":"Fix the parser",
     "state":"still working on it","since":"7 minutes ago","quiet_for":"5 minutes",
@@ -2434,6 +2434,12 @@ finish?" for any recent piece of work.
   `--progress` (`progress_off`), or a build older that doesn't know the op:
   the light words of a part that can't do it, and the journal says only
   the refusal's code. A step is never in a journal line.
+- **Anyone who asks hears it.** The voice does not know who is asking, and
+  tasks have no owner. So a guest who asks "what is Claude doing?" hears
+  every recent piece of work and its ask, the owner's included, where
+  `check_agent_task` told only the newest. That is why the switch stays
+  off until answers are kept to the person who asked for the work, or to
+  the lamp's owner (the reviewer-lead's P2 on #5118).
 - **Not yet shown:** a played "did the poem one finish?" with two pieces of
   work on a lamp with Harness. The product unit's tasks part needs
   `--progress` before the switch is any use.
@@ -3656,7 +3662,9 @@ bytes, so the whole reply stays under 2 KiB. Over either bound, settled
 tasks give way first, the oldest first. Then every step is cut shorter
 (120, 80, 40 characters, then none). Then the oldest tasks still at work
 give way. A step is at most 160 characters, cut at a whole character, with
-control characters removed and spaces at its ends trimmed.
+each control character (a tab, a newline) made a space, so "Reading\tthe
+brief" stays "Reading the brief", runs of spaces made one and spaces at its
+ends trimmed.
 
 **What stays here.** The record is in memory only, beside the tracker,
 and begins empty at each start; a step from before a restart is gone
