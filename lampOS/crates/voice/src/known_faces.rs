@@ -323,16 +323,35 @@ pub(crate) fn plain_agreement_to_keep(turn: &str) -> bool {
     let agreeing = agrees(turn);
     let keeps_it = (1..words.len()).any(|at| after_keep(at, KEEP_WHAT))
         && !words.iter().any(|word| DISAGREE.contains(&word.as_str()));
+    if !agreeing {
+        // The keep said back with no yes word: only "please", "lamp", "for",
+        // "me" and a thanks may stand around it, never a word that makes it a
+        // question whose "?" was lost ("Do you keep that", "I'd keep it";
+        // #5572's privacy read, Jarvis, 18:41).
+        return keeps_it
+            && (0..words.len()).all(|at| {
+                words[at] == "keep"
+                    || after_keep(at, KEEP_WHAT)
+                    || BESIDE_A_KEEP_ALONE.contains(&words[at].as_str())
+                    || (words[at] == "you" && at > 0 && words[at - 1] == "thank")
+            });
+    }
     let covered = agreeing_words(&words);
-    (agreeing || keeps_it)
-        && (0..words.len()).all(|at| {
-            covered[at]
-                || BESIDE_A_YES.contains(&words[at].as_str())
-                || words[at] == "keep"
-                || after_keep(at, KEEP_WHAT)
-                || (agreeing && after_keep(at, &["off"]))
-        })
+    (0..words.len()).all(|at| {
+        covered[at]
+            || BESIDE_A_YES.contains(&words[at].as_str())
+            || words[at] == "keep"
+            || after_keep(at, KEEP_WHAT)
+            || after_keep(at, &["off"])
+    })
 }
+
+/// What may stand around a keep said back with no yes word
+/// ([`plain_agreement_to_keep`]): "Please keep that for me, thanks.", "Lamp,
+/// keep it.". Not [`BESIDE_A_YES`]'s "do", "would", "i", "i'd" or a "you" of
+/// its own, which make the keep a question: "Do you keep that" is asked about
+/// once more ([`unclear_answer_to_keep`]).
+const BESIDE_A_KEEP_ALONE: &[&str] = &["please", "lamp", "for", "me", "thanks", "thank"];
 
 /// The most words an answer to a held keep is asked about again in
 /// ([`unclear_answer_to_keep`]): a line that says more says something else.
@@ -3252,6 +3271,42 @@ mod tests {
     /// ("keep that", "keep it"), or "keep off" beside a yes, is a yes to a
     /// held keep; any no still refuses, and to nothing but a keep is it a
     /// yes.
+    /// #5572's privacy read (Jarvis, 18:41): with no yes word, the keep said
+    /// back alone let every word that stands beside a yes sit around it, so a
+    /// question whose "?" speech to text dropped ("Do you keep that", to
+    /// "Want me to keep that for you?") kept the fact. Only "please", "lamp",
+    /// "for", "me" and a thanks may stand around a keep said with no yes; a
+    /// line that asks back is asked about once more, never a yes.
+    #[test]
+    fn a_question_that_lost_its_mark_is_not_a_yes_to_a_held_keep() {
+        for asked_back in [
+            "Do you keep that",
+            "Would you keep it",
+            "You keep that",
+            "I would keep it",
+            "I'd keep that",
+            "Do you keep it, lamp",
+        ] {
+            assert!(!plain_agreement_to_keep(asked_back), "{asked_back}");
+            assert!(unclear_answer_to_keep(asked_back), "{asked_back}");
+        }
+        for keep in [
+            "Please keep that.",
+            "Keep it.",
+            "Keep that, please.",
+            "Keep it for me, thanks.",
+            "Thank you, keep that.",
+            "Lamp, keep it.",
+            "Please keep that for me, thank you.",
+        ] {
+            assert!(plain_agreement_to_keep(keep), "{keep}");
+        }
+        // With a yes word, the yes's own company is unchanged.
+        for yes in ["Yes, I'd like that, keep it.", "Yes please, do keep it."] {
+            assert!(plain_agreement_to_keep(yes), "{yes}");
+        }
+    }
+
     #[test]
     fn a_near_yes_to_a_held_keep_is_one() {
         for yes in [

@@ -761,8 +761,11 @@ their scope, and the reply says it is kept. The yes may say the keep back
 it." alone, or "keep off" beside a yes, which is how speech to text heard
 "keep that" on lamp-06c1 (5 Nov, S14 run 14:21, request 424: "Yes. Please
 keep off.", and the brother fact was never kept). "Off" counts only right
-after "keep" and with a yes word; any no ("No, keep off.", "Don't keep
-it.") refuses. An answer from them, in time, that is neither a yes nor a no
+after "keep" and with a yes word. A keep said back with no yes word may
+have only "please", "lamp", "for", "me" or a thanks around it, so a
+question whose "?" was lost ("Do you keep that", "I'd keep it") is not a
+yes and is asked about once more (#5572's privacy read). Any no ("No, keep
+off.", "Don't keep it.") refuses. An answer from them, in time, that is neither a yes nor a no
 (`known_faces::unclear_answer_to_keep`: at most 6 words, a yes word or
 "keep"/"save" among them, no word of a no, such as "Yes. Please key that."
 or "Keep off." alone) is not dropped unsaid: the hold stays for that turn,
