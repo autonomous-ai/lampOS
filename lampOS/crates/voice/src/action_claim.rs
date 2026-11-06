@@ -915,6 +915,40 @@ mod tests {
         );
     }
 
+    /// #5215's rest: a claim said as it is done ("Turning it up.") is a
+    /// worded claim too, and talk that opens with the same words is not.
+    #[test]
+    fn a_claim_said_as_it_is_done_is_a_worded_claim() {
+        for (reply, kind) in [
+            ("Turning it up.", Claim::LightOrVolume),
+            ("Okay, turning the light off.", Claim::LightOrVolume),
+            ("Turning off the light.", Claim::LightOrVolume),
+            ("Dimming the light.", Claim::LightOrVolume),
+            ("Raising the volume.", Claim::LightOrVolume),
+            ("Making it warmer.", Claim::LightOrVolume),
+            ("I'm turning it down.", Claim::LightOrVolume),
+            ("Sure, I'm turning up the volume.", Claim::LightOrVolume),
+            ("Setting a timer for one minute.", Claim::Schedule),
+            ("I'm setting a reminder for 6 pm.", Claim::Schedule),
+            ("Starting a timer now.", Claim::Schedule),
+        ] {
+            assert_eq!(claim_as(reply, true, true), Some(Some(kind)), "{reply:?}");
+            assert_eq!(claim(reply, true), Some(None), "{reply:?}");
+        }
+        for reply in [
+            "Turning it off and on again usually helps.",
+            "Setting a timer needs a time.",
+            "Turning to the weather, it's sunny.",
+            "Setting up takes a minute.",
+            "I'm turning in for the night.",
+            "Making it to ten is hard.",
+            "Turning it up?",
+            "Making it warmer would help?",
+        ] {
+            assert_eq!(claim_as(reply, true, true), Some(None), "{reply:?}");
+        }
+    }
+
     /// Ordinary talk with the same words, questions and status answers are
     /// no claims, worded or not.
     #[test]
