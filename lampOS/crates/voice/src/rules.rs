@@ -306,9 +306,11 @@ const BEFORE_CUES: &[&str] = &["until", "till", "til", "before"];
 /// never its hour: "ten past eleven" names eleven and "quarter to seven"
 /// six, while "five to seven" may be a window as well as 06:55, so it
 /// leaves `minute` as given. `minute` also stands when its hour is one the
-/// words name anywhere, after a cue or a window's "to" / "and": the model
+/// words name after one of `cues` or a window's "to" / "and": the model
 /// may have read an allowed window ("only greet me from 8am to 8pm", kept
 /// as quiet before 08:00 and from 20:00) the other way round from the cues.
+/// The hour after the other end's cues does not count: "from ten at night
+/// until nine" given as from 21:00 is still the model an hour off.
 /// Any other hour is the model reading the words another way, and `minute`
 /// stands, as do words that name no hour after a cue.
 fn as_said(minute: u16, words: &str, cues: &[&str]) -> u16 {
@@ -394,11 +396,7 @@ fn as_said(minute: u16, words: &str, cues: &[&str]) -> u16 {
         (hour, said_half)
     };
     let mut named = (1..words.len())
-        .filter(|at| {
-            FROM_CUES.contains(&words[at - 1])
-                || BEFORE_CUES.contains(&words[at - 1])
-                || matches!(words[at - 1], "to" | "and")
-        })
+        .filter(|at| cues.contains(&words[at - 1]) || matches!(words[at - 1], "to" | "and"))
         .filter_map(|at| time_at(at).flatten());
     if named.any(|time| in_hours(time).0 == minute / 60) {
         return minute;
@@ -1343,6 +1341,21 @@ mod tests {
                 "22:00",
                 "not_before=480 not_from=1320",
             ),
+            // The reviewer-lead's HOLD on f5124c87a6: the hour an hour off
+            // is the other end's, and is corrected all the same.
+            (
+                "Quiet from ten at night until nine.",
+                "",
+                "21:00",
+                "not_from=1320",
+            ),
+            (
+                "Quiet from nine at night until eight.",
+                "",
+                "20:00",
+                "not_from=1260",
+            ),
+            ("Quiet from ten until nine.", "10:00", "", "not_before=540"),
         ] {
             let mut args = json!({"rule": rule, "about": "both"});
             for (name, time) in [("not_before", before), ("not_from", from)] {
