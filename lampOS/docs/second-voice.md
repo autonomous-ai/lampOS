@@ -3516,6 +3516,36 @@ after a take-over, but now for every turn:
   function. Only English replies can match: in another language the
   model's words are never the acting part's English lines. Tests:
   `second_provider::tests::action_claim::*` and `action_claim::tests::*`.
+- **With `LAMP_ACTION_CLAIM_WORDED=on` too, a claim the model words its own
+  way is held the same way** (off; #5215's open shape: on 10441, 5 Nov
+  04:24, "Hey Lamp, keep the light on until ten." got `calls=none` and
+  "I've kept the light on until ten.", and nothing held the light, so
+  claimed-not-done stayed at 1). `action_claim::claim_as` reads, beside the
+  strict lines above, a short run of words at the reply's start, bare or
+  after a lead-in and a mark ("Okay,", "Sure.", "All right,", "Got it,"),
+  each tied to one family with a call behind it (`action_claim::WORDED`):
+  a timer, reminder or alarm set ("Timer set for one minute.", "I've set a
+  timer for …", "Reminder set …", "I'll remind you in …", "Your
+  one-minute timer is set.", the last also standing beside
+  `list_reminders`); the light or volume changed ("Okay, louder.",
+  "Brighter now.", "I've turned the volume up.", "I turned off the light.",
+  "Turned it down.", "I've made it warmer.", "Lights off."); and the light
+  kept on or off until a time ("I've kept the light on until ten.", "The
+  light stays on until …", "I'll keep my light on until …",
+  `action_claim::Claim::LightKept`, which a light call, a Schedule set or
+  `keep_rule` makes). The sentence such a run opens must not end in a '?',
+  and a step word after a lead-in must be followed by its end or a mark
+  ("Okay, louder music it is." is no claim). Still no claim: a colour said
+  ("My light is blue now."), "I'll remind you at nine.", "I can keep my
+  light on until ten …", a status question or answer that opens with
+  another word. Held, asked again and said not done exactly as above; the
+  journal lines end `(LAMP_ACTION_CLAIM_CHECKED, in other words:
+  LAMP_ACTION_CLAIM_WORDED)` when only the worded runs found it. A turn that
+  made its call, an answer that claims nothing and the switch off are byte
+  for byte as without it; it does nothing without
+  `LAMP_ACTION_CLAIM_CHECKED`. Tests:
+  `second_provider::tests::action_claim::*worded*`, `*other_words*` and
+  `action_claim::tests::*`.
 - **A reply never offers to keep what its `remember` call keeps** (finding
   K2 on #3504: lamp-06c1, 28 Oct, "Want me to keep that as the change?
   Kept — library now, not the bakery." in one breath). On by default, on

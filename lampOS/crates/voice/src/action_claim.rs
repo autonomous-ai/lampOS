@@ -29,6 +29,20 @@
 //! with [`NOTE`], and a second claim with no call is said as
 //! [`NOT_DONE_LINE`]. Anything else, an answer to a question included, is
 //! untouched. Off unless the environment says exactly `on`.
+//!
+//! **Worded claims** (`LAMP_ACTION_CLAIM_WORDED`, beside the switch above,
+//! #5215's open shape): the model also words claims its own way, which the
+//! strict test lets through. On 10441 (5 Nov 04:24) "Hey Lamp, keep the
+//! light on until ten." got `calls=none` and "I've kept the light on until
+//! ten.", and nothing held it: claimed-not-done stayed at 1. With this
+//! switch a reply that opens (bare or after a lead-in such as "Okay,") with
+//! one of [`WORDED`]'s short word runs is a claim too, held and judged the
+//! same way. Each run is tied to one family with a call behind it: a timer,
+//! reminder or alarm set ("I've set a timer …", "Timer set for one minute"),
+//! the light or volume changed ("I've turned the volume up.", "Okay,
+//! louder."), or the light kept on or off until a time
+//! ([`Claim::LightKept`]). A colour said ("My light is blue now.") is still
+//! no claim, nor is any sentence the run opens that ends in a '?'.
 
 /// Where the second worker reads the switch. `on` only.
 pub const ENVIRONMENT: &str = "LAMP_ACTION_CLAIM_CHECKED";
@@ -36,6 +50,15 @@ pub const ENVIRONMENT: &str = "LAMP_ACTION_CLAIM_CHECKED";
 /// Whether the switch is on in this process's environment.
 pub fn on() -> bool {
     std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// Where the second worker reads the worded claims' switch. `on` only, and
+/// it does nothing without [`ENVIRONMENT`].
+pub const WORDED_ENVIRONMENT: &str = "LAMP_ACTION_CLAIM_WORDED";
+
+/// Whether the worded claims' switch is on in this process's environment.
+pub fn worded_on() -> bool {
+    std::env::var(WORDED_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
 /// The executive's own lines after a light or volume call
@@ -106,6 +129,10 @@ pub enum Claim {
     Schedule,
     /// "I'll remind you at H:MM am.": a set line, or what a list answers.
     ReminderTime,
+    /// The light kept on or off until a time, in other words ("I've kept
+    /// the light on until ten."): a light call, a Schedule set or a kept
+    /// rule makes it.
+    LightKept,
 }
 
 impl Claim {
@@ -119,6 +146,11 @@ impl Claim {
                 "set_timer" | "set_reminder" | "repeat_reminder" | "snooze_reminder"
             ),
             Self::ReminderTime => Self::Schedule.made_by(name) || name == "list_reminders",
+            Self::LightKept => {
+                Self::LightOrVolume.made_by(name)
+                    || Self::Schedule.made_by(name)
+                    || name == crate::rules::KEEP_RULE
+            }
         }
     }
 
@@ -129,6 +161,7 @@ impl Claim {
             Self::AnyCall => "an action",
             Self::Schedule => "a timer or a reminder",
             Self::ReminderTime => "a reminder",
+            Self::LightKept => "keeping the light on or off until a time",
         }
     }
 
@@ -139,6 +172,7 @@ impl Claim {
             Self::AnyCall => "done",
             Self::Schedule => "timer or reminder",
             Self::ReminderTime => "reminder time",
+            Self::LightKept => "light kept",
         }
     }
 }
@@ -290,6 +324,286 @@ pub fn claim(reply: &str, ended: bool) -> Option<Option<Claim>> {
     if undecided { None } else { Some(None) }
 }
 
+/// [`claim`], and with `worded` ([`WORDED_ENVIRONMENT`]) the worded claims
+/// too ([`WORDED`]): as [`claim`] says it. A claim in the acting part's own
+/// words is judged first; without `worded` this is [`claim`] exactly.
+pub fn claim_as(reply: &str, ended: bool, worded: bool) -> Option<Option<Claim>> {
+    let strict = claim(reply, ended);
+    if !worded || matches!(strict, Some(Some(_))) {
+        return strict;
+    }
+    let mut text = normalised(reply);
+    if ended {
+        text.truncate(text.trim_end().len());
+    }
+    match (strict, worded_claim(&text, ended)) {
+        (_, Some(Some(kind))) => Some(Some(kind)),
+        (Some(None), Some(None)) => Some(None),
+        _ => None,
+    }
+}
+
+/// The worded claims (`LAMP_ACTION_CLAIM_WORDED`, #5215): a reply that opens
+/// with one of these, bare or after one of [`LEAD_INS`] and a mark, is a
+/// claim of its kind. Each is a run of words: `a|b` is either word, `*` up
+/// to [`ANY_WORDS`] words, and `$` the end or a mark that is not a '?'.
+/// After the run, the sentence it opens must not end in a '?'. Each run is
+/// tied to a family with a call behind it, and never a colour said ("My
+/// light is blue now." also answers a colour question).
+const WORDED: [(&str, Claim); 25] = [
+    // "Timer set for one minute.", "Reminder set."
+    ("timer|reminder|alarm set|started", Claim::Schedule),
+    ("timer's|reminder's|alarm's set|started", Claim::Schedule),
+    // "Your one-minute timer is set.": also how a status answer may open,
+    // so a `list_reminders` in the turn makes it stand.
+    (
+        "your|the|a * timer|reminder|alarm is set|started",
+        Claim::ReminderTime,
+    ),
+    (
+        "your|the|a * timer|reminder|alarm has been set|started",
+        Claim::ReminderTime,
+    ),
+    (
+        "your|the * timer's|reminder's|alarm's set|started",
+        Claim::ReminderTime,
+    ),
+    // "I've set a timer for one minute."
+    (
+        "i've|i set|started|added * timer|reminder|alarm|timers|reminders|alarms",
+        Claim::Schedule,
+    ),
+    (
+        "i have set|started|added * timer|reminder|alarm|timers|reminders|alarms",
+        Claim::Schedule,
+    ),
+    // "I'll remind you in ten minutes.": a set, never an answer about one
+    // already kept ("I'll remind you at nine." is left as it is).
+    ("i'll remind you in", Claim::Schedule),
+    ("i will remind you in", Claim::Schedule),
+    // "Okay, louder.", "Louder now."
+    (
+        "louder|quieter|softer|brighter|dimmer|warmer|cooler $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "louder|quieter|softer|brighter|dimmer|warmer|cooler now",
+        Claim::LightOrVolume,
+    ),
+    ("volume up|down $", Claim::LightOrVolume),
+    ("light|lights on|off|up|down $", Claim::LightOrVolume),
+    // "I've turned the volume up.", "I turned off the light."
+    (
+        "i've|i turned|switched|made|set|dimmed|brightened|raised|lowered * light|lights|lamp|volume|sound",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i have turned|switched|made|set|dimmed|brightened|raised|lowered * light|lights|lamp|volume|sound",
+        Claim::LightOrVolume,
+    ),
+    // "I've turned it up.", "Turned it down."
+    (
+        "i've|i turned|switched it|that up|down|on|off",
+        Claim::LightOrVolume,
+    ),
+    (
+        "turned|switched it|that up|down|on|off",
+        Claim::LightOrVolume,
+    ),
+    (
+        "turned|switched the|my|your light|lights|volume up|down|on|off",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i've|i made it|that louder|quieter|softer|brighter|dimmer|warmer|cooler",
+        Claim::LightOrVolume,
+    ),
+    // "I've kept the light on until ten." (10441, 5 Nov 04:24, no call).
+    (
+        "i've|i kept|left * light|lights|lamp on|off until|till|for",
+        Claim::LightKept,
+    ),
+    (
+        "i'll|i'm keep|keeping|leave|leaving * light|lights|lamp on|off until|till|for",
+        Claim::LightKept,
+    ),
+    (
+        "i will keep|leave * light|lights|lamp on|off until|till|for",
+        Claim::LightKept,
+    ),
+    (
+        "the|my|your light|lights|lamp stays|stay on|off until|till|for",
+        Claim::LightKept,
+    ),
+    (
+        "the|my|your light|lights|lamp will stay on|off until|till|for",
+        Claim::LightKept,
+    ),
+    (
+        "the|my|your light|lights|lamp is|are staying on|off until|till|for",
+        Claim::LightKept,
+    ),
+];
+
+/// Words said before a worded claim, then a mark ("Okay, louder."). Never a
+/// '?'.
+const LEAD_INS: [&str; 5] = [
+    "okay|ok|sure|alright|there|right|done",
+    "all right",
+    "there you go",
+    "got it",
+    "you got it",
+];
+
+/// How many words a `*` takes at most.
+const ANY_WORDS: usize = 3;
+
+/// One piece of a reply as the worded claims read it.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Token<'a> {
+    Word(&'a str),
+    /// The last word while more text may come: it may yet grow.
+    Part(&'a str),
+    Mark(char),
+}
+
+/// `text` (already [`normalised`]) as words and marks.
+fn tokens(text: &str, ended: bool) -> Vec<Token<'_>> {
+    let mut out = Vec::new();
+    let mut start: Option<usize> = None;
+    for (at, c) in text.char_indices() {
+        if c.is_alphanumeric() || c == '\'' || (c == '-' && start.is_some()) {
+            start.get_or_insert(at);
+            continue;
+        }
+        if let Some(from) = start.take() {
+            out.push(Token::Word(&text[from..at]));
+        }
+        if !c.is_whitespace() {
+            out.push(Token::Mark(c));
+        }
+    }
+    if let Some(from) = start {
+        out.push(if ended {
+            Token::Word(&text[from..])
+        } else {
+            Token::Part(&text[from..])
+        });
+    }
+    out
+}
+
+/// One slot of a worded claim.
+#[derive(Clone, Copy)]
+enum Slot<'a> {
+    /// One of these words, '|' between them.
+    Words(&'a str),
+    /// Up to [`ANY_WORDS`] words.
+    Any,
+    /// The end, or a mark that is not a '?'.
+    End,
+    /// A mark that is not a '?' (after a lead-in).
+    Mark,
+}
+
+fn slots(pattern: &str) -> Vec<Slot<'_>> {
+    pattern
+        .split(' ')
+        .map(|slot| match slot {
+            "*" => Slot::Any,
+            "$" => Slot::End,
+            words => Slot::Words(words),
+        })
+        .collect()
+}
+
+/// `Some(true)` if any of `found` is, else `None` if any is, else
+/// `Some(false)`.
+fn any_of(found: impl IntoIterator<Item = Option<bool>>) -> Option<bool> {
+    let mut undecided = false;
+    for one in found {
+        match one {
+            Some(true) => return Some(true),
+            None => undecided = true,
+            Some(false) => {}
+        }
+    }
+    if undecided { None } else { Some(false) }
+}
+
+/// Whether `tokens[at..]` opens with `slots`, and the sentence they open
+/// ends with no '?': `None` while more text could still decide it.
+fn fits(slots: &[Slot<'_>], tokens: &[Token<'_>], at: usize, more: bool) -> Option<bool> {
+    let ran_out = if more { None } else { Some(false) };
+    let Some((slot, rest)) = slots.split_first() else {
+        for token in &tokens[at..] {
+            match token {
+                Token::Mark('?') => return Some(false),
+                Token::Mark('.' | '!') => return Some(true),
+                _ => {}
+            }
+        }
+        return if more { None } else { Some(true) };
+    };
+    match slot {
+        Slot::Words(words) => match tokens.get(at) {
+            None => ran_out,
+            Some(Token::Word(word)) if words.split('|').any(|one| one == *word) => {
+                fits(rest, tokens, at + 1, more)
+            }
+            Some(Token::Part(part)) if words.split('|').any(|one| one.starts_with(part)) => None,
+            Some(_) => Some(false),
+        },
+        Slot::Any => any_of((0..=ANY_WORDS).map(|taken| {
+            let taking = &tokens[at..tokens.len().min(at + taken)];
+            if taking.iter().any(|token| matches!(token, Token::Mark(_))) {
+                Some(false)
+            } else if taking.iter().any(|token| matches!(token, Token::Part(_)))
+                || taking.len() < taken
+            {
+                ran_out
+            } else {
+                fits(rest, tokens, at + taken, more)
+            }
+        })),
+        Slot::End => match tokens.get(at) {
+            None if more => None,
+            None => Some(true),
+            Some(Token::Mark('?') | Token::Word(_) | Token::Part(_)) => Some(false),
+            Some(Token::Mark(_)) => Some(true),
+        },
+        Slot::Mark => match tokens.get(at) {
+            None => ran_out,
+            Some(Token::Mark('?') | Token::Word(_) | Token::Part(_)) => Some(false),
+            Some(Token::Mark(_)) => fits(rest, tokens, at + 1, more),
+        },
+    }
+}
+
+/// Whether `text` (already [`normalised`]) claims an action in other words
+/// ([`WORDED`]), as [`claim`] says it.
+fn worded_claim(text: &str, ended: bool) -> Option<Option<Claim>> {
+    let tokens = tokens(text, ended);
+    let more = !ended;
+    let mut undecided = false;
+    for (pattern, kind) in WORDED {
+        let run = slots(pattern);
+        let bare = fits(&run, &tokens, 0, more);
+        let led = LEAD_INS.iter().map(|lead| {
+            let mut led = slots(lead);
+            led.push(Slot::Mark);
+            led.extend(run.iter().copied());
+            fits(&led, &tokens, 0, more)
+        });
+        match any_of(std::iter::once(bare).chain(led)) {
+            Some(true) => return Some(Some(kind)),
+            None => undecided = true,
+            Some(false) => {}
+        }
+    }
+    if undecided { None } else { Some(None) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -421,5 +735,123 @@ mod tests {
         assert!(!Claim::ReminderTime.made_by("light_brighter"));
         assert!(!Claim::Schedule.made_by("light_brighter"));
         assert!(Claim::AnyCall.made_by("set_timer"));
+    }
+    /// #5215's open shape: claims the model words its own way are claims
+    /// only with the worded switch; without it, [`claim`] exactly.
+    #[test]
+    fn a_reply_in_other_words_is_a_claim_only_when_worded() {
+        for (reply, kind) in [
+            (
+                "I've set a timer for one minute. It rings at 9:39 am.",
+                Claim::Schedule,
+            ),
+            (
+                "Timer set for one minute, it rings at 9:39 am.",
+                Claim::Schedule,
+            ),
+            ("Okay, your one-minute timer is set.", Claim::ReminderTime),
+            ("Reminder set for 6 pm.", Claim::Schedule),
+            ("I'll remind you in ten minutes.", Claim::Schedule),
+            ("Sure. I've added a reminder for the oven.", Claim::Schedule),
+            ("Okay, louder.", Claim::LightOrVolume),
+            ("Sure \u{2014} brighter.", Claim::LightOrVolume),
+            ("Brighter now.", Claim::LightOrVolume),
+            ("I've turned the volume up.", Claim::LightOrVolume),
+            ("I turned off the light.", Claim::LightOrVolume),
+            ("Turned it down.", Claim::LightOrVolume),
+            ("I've made it warmer.", Claim::LightOrVolume),
+            ("Lights off.", Claim::LightOrVolume),
+            ("I\u{2019}ve kept the light on until ten.", Claim::LightKept),
+            ("The light stays on until 10 tonight.", Claim::LightKept),
+            ("I'll keep my light on until ten.", Claim::LightKept),
+        ] {
+            assert_eq!(claim_as(reply, true, true), Some(Some(kind)), "{reply:?}");
+            assert_eq!(
+                claim_as(reply, true, false),
+                claim(reply, true),
+                "{reply:?}"
+            );
+            assert_eq!(claim(reply, true), Some(None), "{reply:?}");
+        }
+        // The acting part's own lines stay claims of their own kind.
+        assert_eq!(
+            claim_as("Timer set. It rings at 9:39 am.", true, true),
+            Some(Some(Claim::Schedule))
+        );
+        assert_eq!(
+            claim_as("Louder.", true, true),
+            Some(Some(Claim::LightOrVolume))
+        );
+    }
+
+    /// Ordinary talk with the same words, questions and status answers are
+    /// no claims, worded or not.
+    #[test]
+    fn talk_with_the_same_words_is_no_worded_claim() {
+        for reply in [
+            "Timer settings are in the app.",
+            "Is your timer set?",
+            "Did I set a timer?",
+            "I've set my heart on tea.",
+            "I set out early today.",
+            "Okay, louder music it is.",
+            "Louder?",
+            "Okay, brighter?",
+            "I can keep my light on until ten, with a reminder.",
+            "I've turned into a night owl.",
+            "Your timer has been cancelled.",
+            "Your timer is set, isn't it?",
+            "My light is blue now.",
+            "The light is warm white.",
+            "I'll remind you at nine.",
+            "You have one timer, for tea, at 9:39 am.",
+            "Sure, what should the light be set to?",
+            "Done with that?",
+            "Sounds good.",
+            "It's 9:39.",
+            "",
+        ] {
+            assert_eq!(claim_as(reply, true, true), Some(None), "{reply:?}");
+        }
+    }
+
+    /// Streamed, a worded claim is undecided while its words could still
+    /// make one, and decided no claim at the first word that fits none.
+    #[test]
+    fn a_reply_in_other_words_is_judged_as_it_comes() {
+        for reply in [
+            "I",
+            "I've",
+            "I've set a",
+            "I've set a timer for one",
+            "Okay,",
+            "Timer set for one",
+            "Okay, louder",
+            "The light stays on",
+        ] {
+            assert_eq!(claim_as(reply, false, true), None, "{reply:?}");
+        }
+        for reply in ["It's", "I think", "Okay, what", "Sure, here", "Sounds"] {
+            assert_eq!(claim_as(reply, false, true), Some(None), "{reply:?}");
+        }
+        assert_eq!(
+            claim_as("I've set a timer for one minute.", false, true),
+            Some(Some(Claim::Schedule))
+        );
+    }
+
+    #[test]
+    fn the_light_kept_stands_beside_a_light_call_a_set_or_a_kept_rule() {
+        for name in [
+            "light_on",
+            "set_timer",
+            "set_reminder",
+            crate::rules::KEEP_RULE,
+        ] {
+            assert!(Claim::LightKept.made_by(name), "{name}");
+        }
+        for name in ["list_reminders", "forget_rule", "web_search"] {
+            assert!(!Claim::LightKept.made_by(name), "{name}");
+        }
     }
 }

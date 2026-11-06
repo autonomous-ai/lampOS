@@ -54,6 +54,19 @@ fn turn_as(
     first: Vec<net::Result<ChatEvent>>,
     later: Vec<Vec<net::Result<ChatEvent>>>,
 ) -> Went {
+    turn_with(on, false, product, heard, first, later)
+}
+
+/// [`turn_as`], with the worded claims (`LAMP_ACTION_CLAIM_WORDED`) as
+/// `worded_on`.
+fn turn_with(
+    on: bool,
+    worded_on: bool,
+    product: bool,
+    heard: &str,
+    first: Vec<net::Result<ChatEvent>>,
+    later: Vec<Vec<net::Result<ChatEvent>>>,
+) -> Went {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new(std::iter::once(first).chain(later).collect()),
@@ -75,7 +88,8 @@ fn turn_as(
     .announcing(false)
     .answering_short(product)
     .saying_at_once(product)
-    .checking_action_claims(on);
+    .checking_action_claims(on)
+    .checking_worded_claims(worded_on);
     let labels = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -309,7 +323,7 @@ fn worded(
     first: Vec<net::Result<ChatEvent>>,
     later: Vec<Vec<net::Result<ChatEvent>>>,
 ) -> Went {
-    claimed(true, heard, first, later)
+    turn_with(true, true, true, heard, first, later)
 }
 
 /// #5215, what still counts as claimed-not-done after the acting part's own
@@ -367,4 +381,76 @@ fn a_device_change_claimed_in_other_words_twice_with_no_call_says_it_was_not_don
         assert_eq!((went.asked, went.ran.len()), (2, 0), "{claim}");
         assert!(told_claim(&went), "{claim}: {:?}", went.notes);
     }
+}
+
+/// A turn that made its call is untouched by the worded claims, byte for
+/// byte: the words beside the call, and after it.
+#[test]
+fn a_claim_in_other_words_beside_its_call_is_untouched() {
+    for (heard, words, name) in [
+        (
+            "Lamp, set a timer to one minute.",
+            "I've set a timer for one minute.",
+            "set_timer",
+        ),
+        ("Louder.", "I've turned the volume up.", "volume_up"),
+        ("Brighter.", "Okay, brighter.", "light_brighter"),
+    ] {
+        let mut beside = vec![text(words)];
+        beside.extend(calling(name));
+        let went = |worded_on: bool| {
+            turn_with(
+                true,
+                worded_on,
+                true,
+                heard,
+                beside.clone(),
+                vec![saying("Anything else?")],
+            )
+        };
+        assert_eq!(went(true), went(false), "{words}");
+        assert_eq!(went(true).ran, [name], "{words}");
+        // The call first, its words after.
+        let after = |worded_on: bool| {
+            turn_with(
+                true,
+                worded_on,
+                true,
+                heard,
+                calling(name),
+                vec![saying(words)],
+            )
+        };
+        assert_eq!(after(true), after(false), "{words}");
+    }
+}
+
+/// An answer that claims nothing in other words either is untouched, byte
+/// for byte; and without the worded switch a worded claim is said as
+/// before, as on the lamp.
+#[test]
+fn talk_and_the_switch_off_are_untouched_by_the_worded_claims() {
+    for (heard, answer) in [
+        ("Is my timer set?", "Is your timer set? Let me look."),
+        (
+            "Can you keep the light on until ten?",
+            "I can keep my light on until ten, with a reminder. Want one?",
+        ),
+        ("What did you do today?", "I've set my heart on tea."),
+        ("Put on some music.", "Okay, louder music it is."),
+        ("What colour is the light?", "My light is blue now."),
+    ] {
+        let on = worded(heard, saying(answer), vec![]);
+        assert_eq!(on, claimed(true, heard, saying(answer), vec![]), "{heard}");
+        assert_eq!(on.asked, 1, "{heard}");
+        assert!(!told_claim(&on), "{heard}");
+    }
+    let went = claimed(
+        true,
+        "Hey Lamp, keep the light on until ten.",
+        saying("I've kept the light on until ten."),
+        vec![],
+    );
+    assert_eq!(went.said, said(&["I've kept the light on until ten."]));
+    assert_eq!((went.asked, went.ran.len()), (1, 0));
 }
