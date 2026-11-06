@@ -52,7 +52,8 @@ fn shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byt
         ),
         (Step::Preferences, PREFERENCES_NOTE, PREFERENCES_NOTE),
     ];
-    assert_eq!(definition.order, expected.map(|(step, _, _)| step));
+    // The two-step walk (#5499); every step's words stay.
+    assert_eq!(definition.order, [Step::WhereYouSit, Step::WhoYouAre]);
     assert_eq!(definition.reoffer_after_s, 86_400);
     for (step, first, reoffer) in expected {
         assert_eq!(definition.note(step, false).as_bytes(), first.as_bytes());
@@ -167,6 +168,22 @@ fn shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byt
         definition.words.who_confirm.as_bytes(),
         WHO_CONFIRM.as_bytes()
     );
+}
+
+/// #5499: a two-step order loads; a repeated or unknown step, or one
+/// without who you are, is still refused.
+#[test]
+fn a_two_step_order_loads_and_a_repeated_or_unknown_step_is_refused() {
+    const TWO: &str = "order = [\"where_you_sit\", \"who_you_are\"]";
+    assert!(SHIPPED.contains(TWO));
+    assert!(parse(SHIPPED).is_ok());
+    for bad in [
+        "order = [\"where_you_sit\", \"who_you_are\", \"who_you_are\"]",
+        "order = [\"where_you_sit\", \"who_you_are\", \"unknown\"]",
+        "order = [\"where_you_sit\"]",
+    ] {
+        assert!(parse(&SHIPPED.replacen(TWO, bad, 1)).is_err(), "{bad}");
+    }
 }
 
 #[test]

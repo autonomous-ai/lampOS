@@ -3362,7 +3362,10 @@ impl Onboarding {
         // "Preferences" done, by its answers heard or by the model's report:
         // the walk says its done line as soon as the lamp may speak, never
         // waiting for the person's next line (lamp-29e7, 29 Oct, 8545).
-        if outcome == Outcome::Done && step == Step::Preferences {
+        // Also the last step in the skill's order (#5499: the two-step walk).
+        if outcome == Outcome::Done
+            && (step == Step::Preferences || self.definition.order.last() == Some(&step))
+        {
             self.owed = Some(self.preferences_done().to_owned());
         }
         if self.led.as_ref().is_some_and(|led| led.step == step) {
