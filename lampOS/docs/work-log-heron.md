@@ -618,3 +618,15 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
 - 14:5x: #5508 privacy READ-OK 75a009e00a. Carried lines search nothing
   again (mutation fails 50/1). P3: six ordinary replies still read as a
   don't-know; now that costs only a search of the person's own memory.
+- 15:3x: #5526 security READ-OK cd967bd6f3 (helper reached only from
+  lamp-cloud's cgroup; the pick fails closed; four mutations pin it).
+  P3: a spelled look-alike's near prints sit in the owner's record
+  (now noted in cloud.md on #5527).
+- 15:5x: handover to the Harness session. Open: #5527 at ad2400835f
+  (docs-only after adbfdec38a): tests green (person 27, owner_face 4,
+  services 48, known_faces 51); mutations M1 and M2 fail as they should;
+  the lamp-skills mutation was not run; no verdict posted yet. #5519
+  HOLD, waiting on Seventh's two fixes. #5491 waits on Friday's docs.
+  #5505 is Heron's if El hasn't read it by 17:00. #5118 waits on its new
+  head. Faye's 15:44 ruling (D, A, part of B) brings PRs that need two
+  security reads.
