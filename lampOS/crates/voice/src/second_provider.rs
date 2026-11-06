@@ -1490,7 +1490,12 @@ struct Shared {
     wordless_cuts: Mutex<crate::cut_in_wordless::Cuts>,
     /// The newest line's request and how much of the answer it cut was
     /// played (`Start`'s `heard_of_cut`, `LAMP_SAID_AS_HEARD`).
-    heard_of_cut: Mutex<Option<(u64, crate::said_as_heard::HeardOfCut)>>,
+    /// With when that line began, by the engine's clock: a tail of the
+    /// sound that cut is told from a new cut by it ([`WordlessSaid`]).
+    heard_of_cut: Mutex<Option<(u64, crate::said_as_heard::HeardOfCut, Instant)>>,
+    /// The fixed line the newest wordless cut was answered with
+    /// (`LAMP_CUT_IN_WORDLESS_RESUMES`, [`WordlessSaid`]).
+    wordless_said: Mutex<Option<WordlessSaid>>,
     /// The request whose answer was last sent whole: all its pieces are in
     /// [`Shared::said`], so its unplayed rest can be said again.
     said_whole: Mutex<Option<u64>>,
@@ -3228,7 +3233,7 @@ async fn play_fixed(
 
 /// What is left of the answer a wordless cut ended, to go on with
 /// (`LAMP_CUT_IN_WORDLESS_RESUMES`).
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum CutRest {
     /// None: no answer of the lamp's own was cut (one of its fixed lines
     /// was, or nothing), or all of it was played.
@@ -3239,14 +3244,49 @@ enum CutRest {
     Model,
 }
 
+/// A wordless cut's fixed line, as it was chosen (`LAMP_CUT_IN_WORDLESS_RESUMES`):
+/// a wordless line that cuts it, begun within
+/// [`crate::cut_in_wordless::TAIL_WITHIN`] of its start, is the same sound's
+/// tail (06c1's FAIL on #5491: the cough still going, or the lamp's own
+/// line heard back, cut "Oops, cut off again." 40 ms in, and the lamp fell
+/// silent). That line is said again, once, not counted as a new cut.
+#[derive(Clone, Debug)]
+struct WordlessSaid {
+    /// The wordless line it answered, whose answer a tail cuts.
+    request: u64,
+    /// When it began, by the engine's clock.
+    at: Instant,
+    /// The line, and whether the rest follows it.
+    line: (&'static str, bool),
+    /// What it went on with.
+    rest: CutRest,
+    /// Itself said again for a tail: a tail of it is not said a third time.
+    again: bool,
+}
+
 impl Shared {
-    /// What is left of the answer `request`, a wordless line, cut.
-    fn cut_rest(&self, request: u64) -> CutRest {
-        let cut = self
+    /// The fixed line `request`, a wordless line, cut as the same sound's
+    /// tail, begun within [`crate::cut_in_wordless::TAIL_WITHIN`] of that
+    /// line's start ([`WordlessSaid`]), and how long after.
+    fn cut_tail(&self, request: u64) -> Option<(WordlessSaid, Duration)> {
+        let (cut, began) = self
             .heard_of_cut
             .lock()
-            .ok()
-            .and_then(|kept| kept.filter(|(of, _)| *of == request).map(|(_, cut)| cut));
+            .ok()?
+            .filter(|(of, ..)| *of == request)
+            .map(|(_, cut, began)| (cut, began))?;
+        let said = self.wordless_said.lock().ok()?.clone()?;
+        let after = began.saturating_duration_since(said.at);
+        (said.request == cut.request && !said.again && after < crate::cut_in_wordless::TAIL_WITHIN)
+            .then_some((said, after))
+    }
+
+    /// What is left of the answer `request`, a wordless line, cut.
+    fn cut_rest(&self, request: u64) -> CutRest {
+        let cut = self.heard_of_cut.lock().ok().and_then(|kept| {
+            kept.filter(|(of, ..)| *of == request)
+                .map(|(_, cut, _)| cut)
+        });
         let Ok(said) = self.said.lock() else {
             return CutRest::Nothing;
         };
@@ -3303,8 +3343,28 @@ async fn wordless_cut(
     times: Arc<Mutex<Times>>,
 ) {
     const WHY: &str = "LAMP_CUT_IN_WORDLESS_RESUMES";
-    let busy = shared.busy(request);
     let now = (shared.clock)();
+    // The same sound's tail cut the fixed line just begun: that line again,
+    // once, not counted ([`WordlessSaid`]).
+    if let Some((said, after)) = shared.cut_tail(request) {
+        eprintln!(
+            "lamp-voice second: request {request}: a cut-in with no words began {} ms after request {}'s line \"{}\": the same sound's tail, so that line is said again, not counted ({WHY})",
+            after.as_millis(),
+            said.request,
+            shared.fixed(said.line.0)
+        );
+        if let Ok(mut kept) = shared.wordless_said.lock() {
+            *kept = Some(WordlessSaid {
+                request,
+                at: now,
+                again: true,
+                ..said.clone()
+            });
+        }
+        say_wordless(shared, request, scope, times, Some(said.line), said.rest).await;
+        return;
+    }
+    let busy = shared.busy(request);
     // Nothing of the lamp's own answer to go on with (one of its fixed lines
     // was cut, or all was played): quiet, and not counted in the run.
     let rest = shared.cut_rest(request);
@@ -3335,6 +3395,29 @@ async fn wordless_cut(
             CutRest::Model => "not kept: the model goes on".to_owned(),
         }
     );
+    if let Ok(mut kept) = shared.wordless_said.lock() {
+        *kept = line.map(|line| WordlessSaid {
+            request,
+            at: now,
+            line,
+            rest: rest.clone(),
+            again: false,
+        });
+    }
+    say_wordless(shared, request, scope, times, line, rest).await;
+}
+
+/// A wordless cut's answer ([`wordless_cut`]): `line`, then `rest` when it
+/// follows, or the lamp quiet with no line.
+async fn say_wordless(
+    shared: &Shared,
+    request: u64,
+    scope: Option<crate::memory_scope::ScopeLease>,
+    times: Arc<Mutex<Times>>,
+    line: Option<(&'static str, bool)>,
+    rest: CutRest,
+) {
+    const WHY: &str = "LAMP_CUT_IN_WORDLESS_RESUMES";
     match (line, rest) {
         (None, _) => {
             if shared.stages(request, &times).await {
@@ -3872,6 +3955,7 @@ impl Engine {
                 wordless_resumes: false,
                 wordless_cuts: Mutex::default(),
                 heard_of_cut: Mutex::new(None),
+                wordless_said: Mutex::new(None),
                 said_whole: Mutex::new(None),
                 fixed_clips: Arc::default(),
                 announce: true,
@@ -5635,7 +5719,8 @@ impl Engine {
                 if self.shared.wordless_resumes
                     && let Ok(mut kept) = self.shared.heard_of_cut.lock()
                 {
-                    *kept = heard_of_cut.map(|cut| (request, cut));
+                    let began = (self.shared.clock)();
+                    *kept = heard_of_cut.map(|cut| (request, cut, began));
                 }
                 let previous = self.begun_last;
                 // Begun over nothing of the lamp's but the last request's

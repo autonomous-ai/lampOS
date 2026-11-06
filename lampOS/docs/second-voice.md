@@ -2128,7 +2128,19 @@ order is kept. A written turn is the same from the chat on.
     person's words), to go on from the cut, not from the start, with no
     apology (`cut_in_wordless::resume_ask`). A cut of one
     of its own fixed lines (the question, the pause, the stop line), or of
-    an answer played whole, has nothing to go on with and stays quiet. The
+    an answer played whole, has nothing to go on with and stays quiet. A
+    wordless line that cuts one of these fixed lines within
+    `cut_in_wordless::TAIL_WITHIN` (1.5 s) of its start is the same
+    sound's tail (the cough still going, or the line heard back), never a
+    new cut: the line is said again with its rest, once, and not counted;
+    a tail of the line said again stays quiet, so it never loops (06c1's
+    FAIL on #5491: a tail 40 ms in, 2 of 5 fixed lines, left the lamp
+    silent). The journal says "a cut-in with no words began N ms after
+    request M's line …: the same sound's tail, so that line is said again,
+    not counted". On 06c1 the rest was never kept: a long story's pieces go
+    to the voice as it plays (piece 14 of request 28 at 31.6 s, cut at
+    38.8 s), and the answer is marked sent whole only when its last piece is
+    sent, so a cut mid-story always asks the model. The
     journal says "a cut-in with no words ended the lamp's answer, a busy
     (quiet) room: Resume, answered …, the rest kept, N pieces", then the
     line's "first answer audio … its fixed line" and "the cut answer's
