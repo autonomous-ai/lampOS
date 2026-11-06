@@ -250,9 +250,19 @@ func (s *Server) steerAppTurn(p turnPayload) {
 		return
 	}
 	p = s.prepareSkill(s.lifetimeContext, p)
+	// prepareSkill runs unlocked, so the active turn may have changed meanwhile: check the
+	// destination again in the same critical section that reads the turn to steer into.
+	// expectedTurnId then makes the app server refuse the steer if the turn changes after.
 	s.mu.Lock()
 	app, thread, turn = s.app, s.threadID, s.activeTurnID
+	hold := s.mustHold(p)
 	s.mu.Unlock()
+	if hold {
+		if !s.holdForDestination(p) {
+			s.enqueue(op{kind: opTurn, payload: p})
+		}
+		return
+	}
 	if app == nil || thread == "" || turn == "" {
 		s.enqueue(op{kind: opTurn, payload: p})
 		return

@@ -2,6 +2,8 @@ package gatewayd
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -130,4 +132,32 @@ func TestHeldMessageStopsWhenServerStops(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatal("held message goroutine did not stop")
+}
+
+// A Discord turn that starts while the skill preload runs (unlocked) must not receive
+// speech that passed the first destination check.
+func TestSteerRechecksDestinationAfterPreload(t *testing.T) {
+	s := newHoldServer(t)
+	capture := &jevCaptureWriter{}
+	s.app = &appServer{s: s, in: capture, callbacks: map[int]func(json.RawMessage, json.RawMessage){}}
+	s.threadID = "thread"
+	s.activeTurnID = "voice-turn"
+	s.preloadContext = func(context.Context, string) string {
+		s.mu.Lock()
+		s.activeTurnID, s.activeDiscord = "discord-turn", true
+		s.mu.Unlock()
+		return ""
+	}
+
+	s.steerAppTurn(turnPayload{Content: voiceText, Source: "user", RunID: "voice"})
+
+	if strings.Contains(capture.String(), "turn/steer") {
+		t.Fatalf("speech was steered into the Discord turn: %s", capture.String())
+	}
+	s.mu.Lock()
+	held := s.held
+	s.mu.Unlock()
+	if held != 1 {
+		t.Fatalf("speech should wait for the Discord turn, held=%d", held)
+	}
 }
