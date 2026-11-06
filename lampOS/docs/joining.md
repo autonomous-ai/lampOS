@@ -842,7 +842,8 @@ lifted by the PM with a line in `holds-lifted.tsv`, noted on the pull
 request. **TWO READS** (in capitals), said in a comment's first line,
 anywhere in a `READ ASK` or anywhere in the body, need two different
 readers on the head; an ask on the Queue is not read. A line opening
-`ONE READ` then `:`, a dash or `(`, outside quotes and fences, opts out of a
+`ONE READ` then `:`, a dash, `(` or the line's end, outside quotes, fences
+and indented code, opts out of a
 mere mention in its own text only; a later `ONE READ` doesn't undo an ask. A pull
 request that conflicts is told once per head: rebase it. A train is one
 ARM64 run and then a rebase merge; there is one train open at a time, and a
