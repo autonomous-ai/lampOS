@@ -1251,11 +1251,7 @@ mod tests {
         );
         // A quoted code is dropped too (the privacy reader's P3 on #5236):
         // any run of eight digits, but not a longer or shorter one.
-        for quoted in [
-            "Code 12345678 has expired.",
-            "12345678",
-            "Code (12345678).",
-        ] {
+        for quoted in ["Code 12345678 has expired.", "12345678", "Code (12345678)."] {
             assert_eq!(
                 parse_line(
                     &json!({"type":"result","status":"error","code":"EXPIRED","message":quoted})
@@ -1274,7 +1270,10 @@ mod tests {
                         &json!({"type":"result","status":"error","code":"DENIED","message":kept})
                             .to_string()
                     ),
-                    Ok(Some(Event::ResultWith { message: Some(_), .. }))
+                    Ok(Some(Event::ResultWith {
+                        message: Some(_),
+                        ..
+                    }))
                 ),
                 "{kept}"
             );
