@@ -428,8 +428,27 @@ pub(crate) fn agreed_to(name: &str, said: &Said) -> bool {
 /// Words that take a rename's yes back besides [`DISAGREE`]: "Yes, but
 /// it's Kess.", "Okay, actually it's Kess.", "Sure, it's Kess though." (the
 /// reviewer on #1208), and a maybe: "Có lẽ." ("maybe", whose "có" is a
-/// yes word), "Yes, maybe.", "Perhaps.".
-const TAKE_BACK: &[&str] = &["but", "actually", "though", "maybe", "perhaps", "lẽ"];
+/// yes word), "Yes, maybe.", "Perhaps."; a hesitant yes, asked once more
+/// as #5572 asks an unclear one: "Okay, wait.", "Yes, hold on.", "Okay,
+/// let me think."; and the Vietnamese "nhưng" (but) and "khoan" (wait):
+/// "Ừ, nhưng thôi.", "Khoan đã." (Thirteen on #5586). Whole words or
+/// phrases of them in a row ([`lower_words`], accents kept, so "nhưng" is
+/// not "nhung"), never part of a word: "holding" or "think" alone take
+/// nothing back.
+const TAKE_BACK: &[&[&str]] = &[
+    &["but"],
+    &["actually"],
+    &["though"],
+    &["maybe"],
+    &["perhaps"],
+    &["lẽ"],
+    &["wait"],
+    &["hold", "on"],
+    &["hang", "on"],
+    &["let", "me", "think"],
+    &["nhưng"],
+    &["khoan"],
+];
 
 /// Whether the lamp said `name` back in its last answer and the turn in
 /// hand agrees to it, judged by its guards, not by a word list
@@ -454,9 +473,15 @@ pub(crate) fn rename_agreed(name: &str, said: &Said) -> bool {
         .split_inclusive(['.', '!', '?'])
         .filter(|sentence| !sentence.trim_end().ends_with('?'))
         .any(agrees);
-    let taken_back = lower_words(turn)
-        .iter()
-        .any(|word| TAKE_BACK.contains(&word.as_str()));
+    let words = lower_words(turn);
+    let taken_back = (0..words.len()).any(|at| {
+        TAKE_BACK.iter().any(|phrase| {
+            phrase
+                .iter()
+                .enumerate()
+                .all(|(next, word)| words.get(at + next).is_some_and(|said| said == word))
+        })
+    });
     said_back
         && agrees(turn)
         && a_statement_agrees
@@ -4445,6 +4470,50 @@ mod tests {
             )],
         };
         assert!(rename_agreed("Ann", &ann));
+    }
+
+    /// Thirteen's reads on #5586: a hesitant yes ("wait", "hold on", "hang
+    /// on", "let me think") and the Vietnamese "nhưng" (but) and "khoan"
+    /// (wait) take a rename's yes back, so it is asked once more (#5572:
+    /// unclear means ask again). Whole words and phrases only: "holding",
+    /// "on" alone or "think" alone take nothing back.
+    #[test]
+    fn a_hesitant_yes_to_a_rename_is_asked_again() {
+        let to = |name: &str, this: &str| Said {
+            this: this.into(),
+            before: vec![(
+                format!("Can you call me {name} instead?"),
+                format!("I know you as A. Shall I call you {name} instead?"),
+            )],
+        };
+        for not in [
+            "Okay, wait.",
+            "Okay, let me think.",
+            "Yes, hold on.",
+            "Sure, hang on.",
+            "Ừ, nhưng thôi.",
+            "Ừ, khoan đã.",
+            "Khoan đã.",
+        ] {
+            assert!(!rename_agreed("Kess", &to("Kess", not)), "{not}");
+            assert!(!heard_for_rename("Kess", &to("Kess", not)), "{not}");
+        }
+        for yes in [
+            "Yes, call me Kess.",
+            "Yes, go on.",
+            "Yes, I think so.",
+            "Yes, holding my breath, call me Kess.",
+        ] {
+            assert!(rename_agreed("Kess", &to("Kess", yes)), "{yes}");
+        }
+        // Near words still err safe: "like" is one letter from "Mike" and
+        // "Luke", so this yes is asked again for them.
+        for name in ["Mike", "Luke"] {
+            assert!(
+                !rename_agreed(name, &to(name, "Yes, I'd like that.")),
+                "{name}"
+            );
+        }
     }
 
     /// The rename gate with the switch on and off, on the eyes: on, the
