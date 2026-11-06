@@ -324,7 +324,7 @@ pub struct Pending {
     /// once more ([`SAY_IT_LONGER`]): its words are no other request's, and
     /// the next line may still send.
     pub asked_again: Option<u64>,
-    /// The line after it began within the tail of the lamp's words
+    /// The latest line since it began within the tail of the lamp's words
     /// ([`voice_began`]): it may be their echo.
     pub began_in_tail: bool,
 }
