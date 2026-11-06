@@ -921,8 +921,11 @@ each under the quiet rule. A round
    lamp-9adf, 1 Nov, 9276 and 9424, "lamp-waking.service stopped".
    A unit whose restart its own `Condition…=` skipped (`ConditionResult=no`,
    inactive with `Result=success`) is not this lamp's now, as at boot, and is
-   well too: putting the build back can't make a condition hold that neither
-   build owns. Before this, lamp-52e6 on 6 Nov put 10441 back for
+   well too, when the build left that unit's `Condition…=` lines as the build
+   before had them: putting the build back can't make a condition hold that
+   neither build owns. One the new build added or changed is its own doing,
+   and still puts it back, as does a skip of a unit the build added. This holds
+   on every lamp, with no switch, as `ENDS_BY_DESIGN` does. Before this, lamp-52e6 on 6 Nov put 10441 back for
    "lamp-tasks.service stopped" (its Harness gone under it), and so would
    every later build. `lamp-setup.service` keeps its own rules
    (`setup_lifecycle`): a completed setup restarted and skipped by its marker

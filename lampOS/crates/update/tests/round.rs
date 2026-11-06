@@ -1921,6 +1921,37 @@ fn a_part_its_own_condition_skips_at_the_restart_keeps_the_build() {
     assert!(matches!(lamp.round(), Outcome::RolledBack { .. }));
 }
 
+/// The Reviewer-lead's P2 on #5476: a build whose only change is a
+/// condition added to a running part's unit, which then skips its restart,
+/// did that itself: it is put back, never kept with the part not running.
+#[test]
+fn a_condition_the_new_build_adds_still_puts_it_back() {
+    let mut lamp = Lamp::new();
+    let conditioned = body_unit(&"0".repeat(64), "").replacen(
+        "[Unit]\n",
+        "[Unit]\nConditionPathExists=/etc/lampOS/nowhere\n",
+        1,
+    );
+    lamp.systemd
+        .condition_skipped
+        .push("lamp-body.service".into());
+    lamp.publish(
+        2,
+        &[
+            ("lamp-voice", "voice 1"),
+            ("lamp-turn-end", "turn-end 1"),
+            ("lamp-body", "body 1"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[("lamp-body.service", &conditioned)],
+    );
+    assert!(
+        matches!(lamp.round(), Outcome::RolledBack { .. }),
+        "{:?}",
+        lamp.said
+    );
+}
+
 #[test]
 fn a_part_whose_folder_is_gone_is_installed_afresh() {
     let mut lamp = Lamp::new();
