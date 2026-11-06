@@ -107,6 +107,10 @@ pub struct Watch {
     first: Option<UnitState>,
     /// A unit made to end ([`ENDS_BY_DESIGN`]) that has ended cleanly.
     ended: bool,
+    /// Whether a restart its own condition skipped counts as well: only
+    /// when the build being judged left the unit's `Condition…=` lines as
+    /// the build before had them ([`Watch::conditions_unchanged`]).
+    skip_is_well: bool,
 }
 
 impl Watch {
@@ -117,13 +121,27 @@ impl Watch {
             before,
             first: None,
             ended: false,
+            skip_is_well: false,
         }
+    }
+
+    /// A restart skipped by its own condition is well (not this lamp's now,
+    /// as at boot) only when `unchanged`: the unit's `Condition…=` lines are
+    /// the build before's. One the new build added or changed is that
+    /// build's own doing, and stays a stop (the Reviewer-lead's P2 on
+    /// #5476).
+    pub fn conditions_unchanged(mut self, unchanged: bool) -> Self {
+        self.skip_is_well = unchanged;
+        self
     }
 
     /// One look during the minute. An error at once is a part that is not
     /// well, whatever the rest of the minute would show.
     pub fn look(&mut self, state: &UnitState) -> Result<(), String> {
-        if state.skipped_by_condition() && !CONDITION_OWN_RULES.contains(&self.unit.as_str()) {
+        if state.skipped_by_condition()
+            && self.skip_is_well
+            && !CONDITION_OWN_RULES.contains(&self.unit.as_str())
+        {
             self.ended = true;
             self.first = None;
             return Ok(());
@@ -411,16 +429,21 @@ mod tests {
             result: "success".into(),
             condition: "no".into(),
         };
-        let mut watch = Watch::new("lamp-tasks.service", "tasks", Before::default());
+        let mut watch =
+            Watch::new("lamp-tasks.service", "tasks", Before::default()).conditions_unchanged(true);
         assert!(watch.look(&skipped).is_ok());
         assert!(watch.finish(&skipped, None).is_ok());
+        // Skipped by a condition the new build added or changed: a stop.
+        let mut watch = Watch::new("lamp-tasks.service", "tasks", Before::default());
+        assert!(watch.finish(&skipped, None).is_err());
         // A part that reported before and is skipped now is still judged
         // by systemd alone: it never started, so it can say nothing.
         let mut watch = Watch::new(
             "lamp-tasks.service",
             "tasks",
             Before::of("tasks", Some(&health(&[("tasks", Level::Ok)]))),
-        );
+        )
+        .conditions_unchanged(true);
         assert!(watch.finish(&skipped, Some(&health(&[]))).is_ok());
         // Stopped with its condition met, or failed, is not well.
         for (condition, result, active) in [
@@ -435,7 +458,8 @@ mod tests {
                 active: active.into(),
                 ..skipped.clone()
             };
-            let mut watch = Watch::new("lamp-tasks.service", "tasks", Before::default());
+            let mut watch = Watch::new("lamp-tasks.service", "tasks", Before::default())
+                .conditions_unchanged(true);
             assert!(
                 watch.finish(&ended, None).is_err(),
                 "{condition} {result} {active}"
@@ -446,7 +470,8 @@ mod tests {
             unit: "lamp-setup.service".into(),
             ..skipped.clone()
         };
-        let mut watch = Watch::new("lamp-setup.service", "setup", Before::default());
+        let mut watch =
+            Watch::new("lamp-setup.service", "setup", Before::default()).conditions_unchanged(true);
         assert!(watch.finish(&setup, None).is_err());
     }
 }

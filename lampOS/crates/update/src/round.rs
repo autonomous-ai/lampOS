@@ -2548,7 +2548,17 @@ impl Run<'_, '_> {
                 let told = self.told(&unit);
                 return self.put_back(state, &build, &backs, Some(&unit), why, told);
             }
-            watches.push(Watch::new(&back.unit, &back.part, back.before.clone()));
+            // A skip by the unit's own condition counts as well only when
+            // this build left its conditions as they were (judge::Watch).
+            let unchanged = back.added.is_none()
+                && changes
+                    .iter()
+                    .find(|change| change.unit == back.unit)
+                    .is_none_or(|change| conditions(&change.after) == conditions(&back.text));
+            watches.push(
+                Watch::new(&back.unit, &back.part, back.before.clone())
+                    .conditions_unchanged(unchanged),
+            );
         }
         (self.world.phase)("watching");
         if let Err((unit, why, judged)) = self.watch(&mut watches) {
@@ -2811,7 +2821,12 @@ impl Run<'_, '_> {
                 }
             }
             match self.world.systemd.restart(&back.unit) {
-                Ok(()) => watches.push(Watch::new(&back.unit, &back.part, back.before.clone())),
+                // The build before's own unit, written back: its conditions
+                // are its own.
+                Ok(()) => watches.push(
+                    Watch::new(&back.unit, &back.part, back.before.clone())
+                        .conditions_unchanged(true),
+                ),
                 Err(why) => troubles.push(why),
             }
         }
@@ -4037,5 +4052,14 @@ fn to_fetch(config: &Config, changes: &[Change], placings: &[models::Placing]) -
         .filter(|model| !models::stored(config, &model.sha256))
         .filter(|model| seen.insert(model.sha256.clone()))
         .cloned()
+        .collect()
+}
+
+/// A unit's `Condition…=` lines, as written, in order: what decides whether
+/// systemd starts it at all.
+fn conditions(text: &str) -> Vec<&str> {
+    text.lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with("Condition"))
         .collect()
 }
