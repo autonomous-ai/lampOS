@@ -26,6 +26,14 @@
 //!   paused, not in quiet hours. Waited for up to [`WAIT`], then skipped
 //!   with nothing said. Judged again before each line: a face or a voice
 //!   that comes stops it after the line said, with [`STOP_LINE`] alone.
+//! - **One read at a time** ([`Turns`], [`TURNS`] for the lamp): two
+//!   skills' reads due together (Morning agenda held at its gate while
+//!   Morning mail came due, #5618) would say their lines in turn, one
+//!   skill's between the other's. A read begins only with the lamp's one
+//!   turn, which is free when no other read holds it and [`AFTER_ANOTHER`]
+//!   has passed since the last one ended; until then its gate counts as
+//!   closed ("another read under way"), under the same [`WAIT`], so a read
+//!   queued behind another still skips the day when its hour runs out.
 //! - **What is said**: one rule keyed by service
 //!   (`lamp_services::spoken::lines`): the count, then each event's time
 //!   and title, each mail's sender and subject, and for any other service
@@ -42,6 +50,7 @@
 use lamp_services::{serve::NOT_LINKED, spoken};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
+use std::sync::Mutex;
 use std::time::Duration;
 
 /// The switch, here and in `lamp-services` (`LAMP_SKILL_READS`), its
@@ -77,6 +86,98 @@ pub const VOICE_WITHIN: Duration = Duration::from_secs(60);
 pub const POLL: Duration = Duration::from_millis(250);
 /// What the lamp says, and only this, when someone comes mid-read.
 pub const STOP_LINE: &str = "I'll tell you the rest later.";
+/// How long after one read ended before another may begin, so a second
+/// skill's read never follows straight on from the first (#5618).
+pub const AFTER_ANOTHER: Duration = Duration::from_secs(60);
+
+/// The lamp's one turn to read: a read holds it from its gate's opening
+/// to its last line, and the next may take it [`AFTER_ANOTHER`] after.
+/// Times are its rooms' [`Room::now_ms`], one clock for the lamp.
+#[derive(Debug, Default)]
+pub struct Turns {
+    state: Mutex<TurnState>,
+}
+
+#[derive(Debug, Default)]
+struct TurnState {
+    /// A read holds the turn now.
+    held: bool,
+    /// When the last read gave it back.
+    ended_ms: Option<u64>,
+}
+
+impl TurnState {
+    fn free(&self, now_ms: u64) -> bool {
+        !self.held
+            && self.ended_ms.is_none_or(|ended| {
+                now_ms.saturating_sub(ended) >= AFTER_ANOTHER.as_millis() as u64
+            })
+    }
+}
+
+impl Turns {
+    pub const fn new() -> Self {
+        Self {
+            state: Mutex::new(TurnState {
+                held: false,
+                ended_ms: None,
+            }),
+        }
+    }
+
+    fn state(&self) -> std::sync::MutexGuard<'_, TurnState> {
+        self.state
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+    }
+
+    /// Whether a read could take the turn at `now_ms`.
+    pub fn free(&self, now_ms: u64) -> bool {
+        self.state().free(now_ms)
+    }
+
+    /// Takes the turn at `now_ms`, if it is free then.
+    pub fn take(&self, now_ms: u64) -> bool {
+        let mut state = self.state();
+        if !state.free(now_ms) {
+            return false;
+        }
+        state.held = true;
+        true
+    }
+
+    /// Gives the turn back, the read ended at `now_ms`.
+    pub fn give_back(&self, now_ms: u64) {
+        let mut state = self.state();
+        state.held = false;
+        state.ended_ms = Some(now_ms);
+    }
+}
+
+/// The lamp's turn, for every skill's read in this program.
+pub static TURNS: Turns = Turns::new();
+
+/// A taken turn: given back when its read ends, and on a panic, with no
+/// time then, so the next read waits for no gap (never held for good).
+struct Taken<'a> {
+    turns: &'a Turns,
+}
+
+impl Taken<'_> {
+    /// The read ended at `now_ms`: the turn given back, once.
+    fn end(self, now_ms: u64) {
+        self.turns.give_back(now_ms);
+        // Given back already: dropping it would free a turn another read
+        // may have taken since.
+        std::mem::forget(self);
+    }
+}
+
+impl Drop for Taken<'_> {
+    fn drop(&mut self) {
+        self.turns.state().held = false;
+    }
+}
 /// How long a read already under way says nothing while the eyes may only
 /// have blinked: the known face's mark is renewed every 2 s and read fresh
 /// for 2 s, and a renewal a moment late reads as "not the owner" or
@@ -363,6 +464,9 @@ pub enum Closed {
     NotOwner,
     Nobody,
     VoiceHeard,
+    /// Another skill's read holds the lamp's turn, or ended under
+    /// [`AFTER_ANOTHER`] ago ([`Turns`]): never [`judge`]'s.
+    AnotherRead,
 }
 
 impl Closed {
@@ -377,6 +481,7 @@ impl Closed {
             Self::NotOwner => "not the owner",
             Self::Nobody => "the owner not in view",
             Self::VoiceHeard => "a voice heard",
+            Self::AnotherRead => "another read under way",
         }
     }
 
@@ -435,6 +540,11 @@ pub trait Room {
     }
     /// Keeps whether this skill was told its service isn't linked.
     fn keep_link_note(&mut self, _told: bool) {}
+    /// The turn this read waits for, shared by every read on the lamp
+    /// ([`TURNS`] in `lamp-skills`). `None`, the default: none waited for.
+    fn turns(&self) -> Option<&'static Turns> {
+        None
+    }
 }
 
 /// Runs a read that came due, and says how it went for the journal:
@@ -442,11 +552,18 @@ pub trait Room {
 /// `not read: <why>`. Counts and the gate's words only.
 pub fn run(step: &ReadStep, room: &mut impl Room) -> String {
     let began = room.now_ms();
+    let turns = room.turns();
     let mut steady: Option<u64> = None;
     let mut last = Closed::Nobody;
-    loop {
+    let taken = loop {
         let now = room.now_ms();
-        match judge(&room.seen()) {
+        // Another read's turn closes the gate as the room does, under the
+        // same wait: a read queued behind it still skips at its hour.
+        let judged = judge(&room.seen()).and_then(|()| match turns {
+            Some(turns) if !turns.free(now) => Err(Closed::AnotherRead),
+            _ => Ok(()),
+        });
+        match judged {
             // Nobody to wait for: never on a lamp with no owner's face.
             Err(Closed::NoOwner) => return format!("skipped: {}", Closed::NoOwner.words()),
             Err(why) => {
@@ -456,7 +573,15 @@ pub fn run(step: &ReadStep, room: &mut impl Room) -> String {
             Ok(()) => {
                 let since = *steady.get_or_insert(now);
                 if now.saturating_sub(since) >= STEADY.as_millis() as u64 {
-                    break;
+                    match turns {
+                        None => break None,
+                        Some(turns) if turns.take(now) => break Some(Taken { turns }),
+                        // Taken by another read between the look and now.
+                        Some(_) => {
+                            steady = None;
+                            last = Closed::AnotherRead;
+                        }
+                    }
                 }
             }
         }
@@ -464,7 +589,17 @@ pub fn run(step: &ReadStep, room: &mut impl Room) -> String {
             return format!("skipped: {}", last.words());
         }
         room.wait(POLL);
+    };
+    let outcome = speak(step, room);
+    if let Some(taken) = taken {
+        taken.end(room.now_ms());
     }
+    outcome
+}
+
+/// A read whose gate opened, with the lamp's turn: the read itself and
+/// its lines, each behind the gate again.
+fn speak(step: &ReadStep, room: &mut impl Room) -> String {
     let args = match step.args(room.local()) {
         Ok(args) => args,
         Err(why) => return format!("not read: {why}"),
@@ -602,6 +737,12 @@ mod tests {
         blink_as: Option<Seen>,
         /// [`Room::link_note`]'s: `None` with the note off.
         noted: Option<bool>,
+        /// [`Room::turns`]'s: `None`, no other read to wait for.
+        turns: Option<&'static Turns>,
+        /// When another read, holding `turns` from the start, ends.
+        other_ends_at: Option<u64>,
+        /// When each line was said, by the clock.
+        said_at: Vec<u64>,
     }
 
     impl Lamp {
@@ -617,6 +758,9 @@ mod tests {
                 blinks: 0,
                 blink_as: None,
                 noted: None,
+                turns: None,
+                other_ends_at: None,
+                said_at: Vec::new(),
             }
         }
     }
@@ -649,6 +793,12 @@ mod tests {
         }
         fn wait(&mut self, wait: Duration) {
             self.now += wait.as_millis() as u64;
+            if let (Some(turns), Some(at)) = (self.turns, self.other_ends_at)
+                && self.now >= at
+            {
+                turns.give_back(at);
+                self.other_ends_at = None;
+            }
         }
         fn local(&mut self) -> Option<(u64, i32)> {
             // 4 Nov 2026 20:00 at +07:00.
@@ -660,6 +810,7 @@ mod tests {
         }
         fn say(&mut self, text: &str) -> Result<(), String> {
             self.said.push(text.to_owned());
+            self.said_at.push(self.now);
             Ok(())
         }
         fn link_note(&mut self) -> Option<bool> {
@@ -668,6 +819,139 @@ mod tests {
         fn keep_link_note(&mut self, told: bool) {
             self.noted = Some(told);
         }
+        fn turns(&self) -> Option<&'static Turns> {
+            self.turns
+        }
+    }
+
+    /// A turn of its own for a test, as the lamp's one [`TURNS`] is.
+    fn turns() -> &'static Turns {
+        Box::leak(Box::new(Turns::new()))
+    }
+
+    /// Another skill's read holds the lamp's turn (Morning agenda's, as
+    /// on #5618): this one says nothing until a minute after it ended,
+    /// then waits for its own steady gate, and is said whole.
+    #[test]
+    fn a_read_waits_its_turn_behind_another() {
+        let turns = turns();
+        assert!(turns.take(1_000));
+        let mut lamp = Lamp::new(vec![alone()], events());
+        lamp.turns = Some(turns);
+        lamp.other_ends_at = Some(120_000);
+        assert_eq!(run(&calendar(), &mut lamp), "read 2");
+        let first = lamp.said_at[0];
+        assert!(
+            first >= 120_000 + (AFTER_ANOTHER + STEADY).as_millis() as u64,
+            "said at {first} ms, the other read ended at 120000 ms"
+        );
+        assert!(first < 120_000 + (AFTER_ANOTHER + STEADY).as_millis() as u64 + 1_000);
+        assert_eq!(lamp.said.len(), 3);
+        // Given back as it ended: the next waits a minute from now.
+        assert!(!turns.free(lamp.now));
+        assert!(turns.free(lamp.now + AFTER_ANOTHER.as_millis() as u64));
+    }
+
+    /// A read queued behind another counts its wait under its own hour:
+    /// the other never ending, it skips the day at that hour, nothing
+    /// read or said, and never takes a fresh hour.
+    #[test]
+    fn a_queued_read_skips_the_day_when_its_hour_runs_out() {
+        let turns = turns();
+        assert!(turns.take(1_000));
+        let mut lamp = Lamp::new(vec![alone()], events());
+        lamp.turns = Some(turns);
+        assert_eq!(
+            run(&calendar(), &mut lamp),
+            "skipped: another read under way"
+        );
+        assert!(lamp.reads.is_empty() && lamp.said.is_empty());
+        let waited = lamp.now - 1_000;
+        assert!(waited >= WAIT.as_millis() as u64, "{waited} ms");
+        assert!(waited < (WAIT + POLL * 2).as_millis() as u64, "{waited} ms");
+    }
+
+    /// Two skills' reads due together on one lamp, each on its own thread
+    /// as `lamp-skills` runs them: one says every line, and the other's
+    /// first comes a minute after, never between them.
+    #[test]
+    fn two_reads_due_together_are_said_one_after_the_other() {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        use std::sync::{Arc, Mutex};
+
+        /// A room on the lamp's one clock, writing what it says to the
+        /// lamp's one speaker.
+        struct Shared {
+            name: &'static str,
+            clock: Arc<AtomicU64>,
+            speaker: Arc<Mutex<Vec<(&'static str, u64)>>>,
+            turns: &'static Turns,
+            answer: Value,
+        }
+        impl Room for Shared {
+            fn seen(&mut self) -> Seen {
+                alone()
+            }
+            fn now_ms(&mut self) -> u64 {
+                self.clock.load(Ordering::SeqCst)
+            }
+            fn wait(&mut self, wait: Duration) {
+                self.clock
+                    .fetch_add(wait.as_millis() as u64, Ordering::SeqCst);
+                std::thread::yield_now();
+            }
+            fn local(&mut self) -> Option<(u64, i32)> {
+                Some((1_793_797_200_000, 420))
+            }
+            fn read(&mut self, _args: &Value) -> Result<Value, String> {
+                Ok(self.answer.clone())
+            }
+            fn say(&mut self, _text: &str) -> Result<(), String> {
+                let at = self.clock.fetch_add(2_000, Ordering::SeqCst);
+                self.speaker.lock().unwrap().push((self.name, at));
+                std::thread::yield_now();
+                Ok(())
+            }
+            fn turns(&self) -> Option<&'static Turns> {
+                Some(self.turns)
+            }
+        }
+
+        let clock = Arc::new(AtomicU64::new(1_000));
+        let speaker = Arc::new(Mutex::new(Vec::new()));
+        let turns = turns();
+        let mails = json!({"source": "Gmail", "quoted": [
+            {"from": "Sam <sam@x.test>", "subject": "Lunch on Friday"},
+            {"from": "Ann <ann@x.test>", "subject": "Notes"},
+        ]});
+        let reads: Vec<_> = [("agenda", calendar(), events()), ("mail", mail(), mails)]
+            .into_iter()
+            .map(|(name, step, answer)| {
+                let mut room = Shared {
+                    name,
+                    clock: clock.clone(),
+                    speaker: speaker.clone(),
+                    turns,
+                    answer,
+                };
+                std::thread::spawn(move || run(&step, &mut room))
+            })
+            .collect();
+        for read in reads {
+            assert_eq!(read.join().unwrap(), "read 2");
+        }
+        let said = speaker.lock().unwrap().clone();
+        assert_eq!(said.len(), 6, "{said:?}");
+        let first = said[0].0;
+        let (one, other) = said.split_at(3);
+        assert!(one.iter().all(|(name, _)| *name == first), "{said:?}");
+        assert!(other.iter().all(|(name, _)| *name != first), "{said:?}");
+        // The first's last line took 2 s; the next began a minute after.
+        let ended = one[2].1 + 2_000;
+        assert!(
+            other[0].1 >= ended + AFTER_ANOTHER.as_millis() as u64,
+            "{said:?}"
+        );
     }
 
     fn events() -> Value {
