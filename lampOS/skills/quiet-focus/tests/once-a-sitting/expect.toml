@@ -1,14 +1,14 @@
-# 10:00, the word at 48, ten minutes looking up from 55, head down again from 65 to 115: the word only once (cooldown, inside the sitting's 3 hours).
+# 10:00, the word at 50, ten minutes looking up, head down again from 60 to 110, looks up at 110: the word only once (cooldown, inside the sitting's 3 hours).
 clock = "10:00"
 
 [[expect]]
-at = "48m"
+at = "50m"
 within = "1m"
 call = "body.gaze"
 args = { look_at = "face" }
 
 [[expect]]
-at = "48m"
+at = "50m"
 within = "1m"
 call = "say"
-args = { note = "They have been quietly focused on their work for a good while. In one short, warm line of a few words, the way a friend would, say you noticed and it's nicely done. Only that: ask nothing of them and suggest nothing to do, and say nothing about their body or looks, the time, or health." }
+args = { note = "They have just looked up after being quietly focused on their work for a good while. In one short, warm line of a few words, the way a friend would, say you noticed and it's nicely done. Only that: ask nothing of them and suggest nothing to do, and say nothing about their body or looks, the time, or health." }

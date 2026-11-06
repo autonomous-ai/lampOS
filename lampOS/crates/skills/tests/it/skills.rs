@@ -3315,11 +3315,13 @@ fn sit_back_says_nothing_of_a_body_and_takes_no_picture() {
     assert_eq!(skill.kind, SkillKind::Core);
 }
 
-/// Quiet focus: one warm word after 45 minutes head down. The voice is told
-/// to ask nothing and suggest nothing, and to say nothing of a body or looks:
-/// what it is told, and its description, name no break, no stretch and no
-/// body. It reads no picture and nothing heard, and it has no function of its
-/// own: only the wellbeing nudges' shared `[stop]`.
+/// Quiet focus: one warm word when they look up after 45 minutes head down,
+/// never while still head down: its one step is the `looked_up` word's,
+/// which `follows` the silent `focused` trigger. The voice is told to ask
+/// nothing and suggest nothing, and to say nothing of a body or looks: what
+/// it is told, and its description, name no break, no stretch and no body.
+/// It reads no picture and nothing heard. It has no function at all, and its
+/// own `[budget]` group, so it never takes a wellbeing nudge's turn.
 #[test]
 fn quiet_focus_says_nothing_of_a_body_or_a_break_and_takes_no_picture() {
     let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/quiet-focus");
@@ -3334,6 +3336,15 @@ fn quiet_focus_says_nothing_of_a_body_or_a_break_and_takes_no_picture() {
         toml::from_str(&fs::read_to_string(folder.join("skill.toml")).unwrap()).unwrap();
     let steps = toml["do"].as_array().unwrap();
     assert_eq!(steps.len(), 1);
+    // The word is the look up's alone, and it follows the focus.
+    assert_eq!(steps[0]["on"].as_str(), Some("looked_up"));
+    let triggers = toml["trigger"].as_array().unwrap();
+    assert_eq!(triggers.len(), 2);
+    assert_eq!(triggers[0]["name"].as_str(), Some("focused"));
+    assert_eq!(triggers[0]["equals"].as_str(), Some("head_down"));
+    assert_eq!(triggers[1]["name"].as_str(), Some("looked_up"));
+    assert_eq!(triggers[1]["equals"].as_str(), Some("at_desk"));
+    assert_eq!(triggers[1]["follows"]["trigger"].as_str(), Some("focused"));
     let say = steps[0]["say"].as_str().unwrap();
     assert!(
         say.contains("ask nothing of them and suggest nothing to do"),
@@ -3365,14 +3376,13 @@ fn quiet_focus_says_nothing_of_a_body_or_a_break_and_takes_no_picture() {
     );
     assert!(toml["permissions"].get("camera").is_none());
     assert!(toml["permissions"].get("look").is_none());
-    // No function of its own, so a product session's count is unchanged:
-    // only the wellbeing group's one `wellbeing_nudges`.
+    // No function, so a session's count is unchanged. A `[stop]` is shared
+    // only within one `[budget]` group, so outside the wellbeing group it
+    // has none: `wellbeing_nudges` would be refused at load.
     assert!(skill.tool.is_none());
-    assert_eq!(
-        skill.stop.as_ref().map(|stop| stop.tool.as_str()),
-        Some("wellbeing_nudges")
-    );
-    assert_eq!(skill.budget, Some(("wellbeing".to_owned(), 1)));
+    assert!(skill.stop.is_none());
+    assert_eq!(skill.budget, Some(("focus".to_owned(), 1)));
+    assert!(toml.get("present").is_none());
     assert_eq!(skill.rest.map(|rest| rest.after_ignored), Some(2));
     assert_eq!(skill.most_a_day, Some(2));
     assert_eq!(skill.kind, SkillKind::Installable);
@@ -11997,7 +12007,6 @@ fn with_the_switch_the_wellbeing_skills_share_two_an_hour_never_within_30_minute
     let names = [
         "comfort-break",
         "meal-check",
-        "quiet-focus",
         "rest-your-eyes",
         "sip-of-water",
         "sit-back",
