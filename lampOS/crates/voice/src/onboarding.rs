@@ -3101,6 +3101,7 @@ impl Onboarding {
     fn next_step(&self) -> Option<Step> {
         let unix_s = unix_ms() / 1_000;
         if self.privacy_flow.context.is_some()
+            && self.definition.order.contains(&Step::Privacy)
             && self.desired.steps.get("privacy").is_none_or(|kept| {
                 kept.outcome == Outcome::NotAvailable && self.privacy_available()
             })
@@ -3397,7 +3398,8 @@ impl Onboarding {
             "lamp-voice: onboarding: who_you_are done with the name only: memory waits for a face, asked for once more later"
         );
         self.desired.face_again = true;
-        self.owed = Some(skill::NAME_ONLY.to_owned());
+        // A last line the step's end owed is said after it (#5499).
+        self.owed_after = self.owed.replace(skill::NAME_ONLY.to_owned());
         self.save();
     }
 
@@ -5032,7 +5034,7 @@ mod tests {
         let changed = shipped
             .replacen(
                 "order = [\"where_you_sit\", \"who_you_are\"",
-                "order = [\"who_you_are\", \"where_you_sit\"",
+                "order = [\"who_you_are\", \"where_you_sit\", \"privacy\"",
                 1,
             )
             .replacen(
@@ -6523,6 +6525,25 @@ mod tests {
         assert_eq!(room.outcome(Step::WhoYouAre), None);
         room.wait(2 * S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+    }
+
+    /// #5499: in the two-step walk, "who you are" ended with the name only
+    /// still says the walk's last line, after its own.
+    #[test]
+    fn the_two_step_walk_ended_name_only_still_says_the_last_line() {
+        let mut room = Room::new("two-steps-name-only");
+        room.walk.definition =
+            Arc::new(skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap());
+        room.walk.face_kept = true;
+        room.walk
+            .finish(Step::WhereYouSit, Outcome::Done, None, room.at);
+        room.walk
+            .finish(Step::WhoYouAre, Outcome::Done, None, room.at);
+        room.walk.name_only(false, Vec::new());
+        assert_eq!(
+            room.wait(4 * S, Some(NEAR_MIDDLE)),
+            [skill::NAME_ONLY, skill::PREFERENCES_DONE]
+        );
     }
 
     /// The Reviewer-lead's P2 on #3992: "No, it's Mary." after a name
