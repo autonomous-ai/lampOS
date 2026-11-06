@@ -540,7 +540,10 @@ fn every_skill_folder_says_its_kind_and_version() {
             "guard-mode",
             "look-for-things",
             "meal-check",
+            "morning-agenda",
+            "morning-mail",
             "quiet-focus",
+            "tomorrows-plan",
             "who-was-here"
         ]
     );
