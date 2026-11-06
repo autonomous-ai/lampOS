@@ -1432,7 +1432,9 @@ With the switch:
     it is right (`SAY_IT_BACK`). The voice keeps that refused save
     (`second_provider::HeldSave`, as a held forget is kept) and runs it
     itself on the person's next turn when that turn is a plain yes to the
-    read-back (`known_faces::held_save_verdict`), through the same runner
+    read-back (`known_faces::held_save_verdict`, which judges a name held
+    as letters, "J-A-N-E", as the word they make, "Jane", as the run
+    does: Fifth's P2 on #5580), through the same runner
     and check as a model call, so it counts as the walk's face save; the
     model is told the face is kept, or, when the eyes keep nothing, that it
     was not kept and why, and a model call after it gets
