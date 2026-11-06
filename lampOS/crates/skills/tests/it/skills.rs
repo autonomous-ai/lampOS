@@ -9849,6 +9849,64 @@ fn a_shared_budget_gives_its_group_its_runs_an_hour_between_them() {
     assert!(stuffy(&mut engine, 60_000).is_empty());
 }
 
+/// Quiet focus's shape: a trigger no step names makes nothing, so it takes
+/// none of its group's hour and is not held back by it; the word that
+/// `follows` it is the nudge, counted and held back as one. A word after a
+/// trigger that has steps (Sit back's warm word) is still not counted
+/// (`sit-back`'s cases).
+#[test]
+fn a_silent_trigger_spends_no_hour_and_the_word_after_it_is_the_nudge() {
+    let dir = tempfile::tempdir().unwrap();
+    let focus = || {
+        load(&skill_with(
+            dir.path(),
+            "focus",
+            "[budget]\ngroup = \"nudges\"\nper_hour = 1\n\
+             [[trigger]]\nname = \"mark\"\ntopic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1000\nrearm = \"ends\"\n\
+             [[trigger]]\nname = \"word\"\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n\
+             rearm = \"ends\"\nfollows = { trigger = \"mark\", within = \"10m\" }\n\
+             [ask]\npolicy = \"nudge\"\n[[do]]\non = \"word\"\nlight = { colour = \"warm\", for = \"5s\" }\n",
+        ))
+        .unwrap()
+    };
+    let sip = || {
+        nudge_skill(
+            dir.path(),
+            "sip",
+            "[budget]\ngroup = \"nudges\"\nper_hour = 1",
+            ONCE,
+        )
+    };
+    let mark = |engine: &mut Engine, at_ms: u64| {
+        engine.observe("air/state", at_ms * 1_000, br#"{"co2_ppm":1200}"#, None)
+    };
+    let word = |engine: &mut Engine, at_ms: u64| -> Vec<String> {
+        engine
+            .observe(
+                "voice/state",
+                at_ms * 1_000,
+                br#"{"state":"resting"}"#,
+                None,
+            )
+            .into_iter()
+            .filter(|run| !run.calls.is_empty())
+            .map(|run| run.skill)
+            .collect()
+    };
+    // The silent mark runs, making nothing, and Sip still has the hour;
+    // then the word is held back by Sip's hour.
+    let mut engine = Engine::new(vec![focus(), sip()], true);
+    let marked = mark(&mut engine, 0);
+    assert!(marked.iter().all(|run| run.calls.is_empty()), "{marked:?}");
+    assert_eq!(stuffy(&mut engine, 1_000), ["sip"]);
+    assert!(word(&mut engine, 2_000).is_empty());
+    // The word spends the hour: Sip waits for it.
+    let mut engine = Engine::new(vec![focus(), sip()], true);
+    mark(&mut engine, 0);
+    assert_eq!(word(&mut engine, 1_000), ["focus"]);
+    assert!(stuffy(&mut engine, 2_000).is_empty());
+}
+
 /// A face at the desk, a fifth of the picture wide, its box from `left`
 /// and `top` and `tall` of the picture, turned to the lamp or not.
 fn desk_face(left: f32, top: f32, tall: f32, facing: bool) -> String {
