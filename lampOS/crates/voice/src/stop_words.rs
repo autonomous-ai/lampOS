@@ -1386,8 +1386,13 @@ impl StopWords {
                 let request = waiting.request;
                 self.waiting = None;
                 self.ears.forget();
+                // Its held audio reaches back into the lamp's speech, so
+                // the lamp's own words are no stop here either (the
+                // reviewer-lead's P2 on #5054).
+                let lamp: Vec<&str> = self.lamp.iter().map(|(_, text)| text.as_str()).collect();
+                let lamp = lamp.join(" ");
                 let heard = words.map(|words| {
-                    let stop = stop_phrase(&words);
+                    let stop = stop_over(&words, &lamp);
                     let count = word_count(&words);
                     self.waited_words = stop.then_some(words);
                     (stop, count)
@@ -1467,8 +1472,12 @@ impl StopWords {
             if let Some(line) = self.debug_words(&words) {
                 eprintln!("{line}");
             }
+            // The held blocks reach up to 1.8 s back into the lamp's
+            // speech: its own words are no stop (the reviewer-lead's P2 on
+            // #5054), as with `heard-always`.
+            let lamp: Vec<&str> = self.lamp.iter().map(|(_, text)| text.as_str()).collect();
             tell = Tell::Words {
-                stop: stop_phrase(&words),
+                stop: stop_over(&words, &lamp.join(" ")),
                 count: word_count(&words),
                 backchannel: !self.lamp_asked && backchannel(&words, self.vietnamese, self.asides),
             };
@@ -2786,6 +2795,54 @@ mod tests {
         expected.extend(["hear 6"; 10]);
         expected.extend(["finalize", "forget", "rest"]);
         assert_eq!(told, expected);
+    }
+
+    /// The reviewer-lead's P2 on #5054: with `heard`, a yield's held audio
+    /// reaches back into the lamp's speech, so its words can be only the
+    /// lamp's own tail. A "stop" in that tail commits nothing, whether its
+    /// words come in the yield or while a commit waits for them; a
+    /// person's stop word said over the same tail still does.
+    #[test]
+    fn with_heard_a_yields_words_are_no_stop_if_the_lamp_said_them() {
+        let lamp = "The little bus will stop at the green gate.";
+        let in_yield = |heard: &str| {
+            let script = Arc::new(Mutex::new(Script::default()));
+            let mut words = StopWords::new(Box::new(Scripted(Arc::clone(&script))));
+            words.lamp_said(lamp, 1_000_000, false);
+            words.block(true, true, false, None, None, 1_000_000, &block(1));
+            words.block(true, true, true, Some(0), None, 1_010_000, &block(2));
+            script.lock().unwrap().words = Some(heard.into());
+            match words.block(true, true, true, Some(1), None, 1_020_000, &block(3)) {
+                Tell::Words { stop, .. } => stop,
+                other => panic!("{other:?}"),
+            }
+        };
+        let committed = |heard: &str| {
+            let script = Arc::new(Mutex::new(Script::default()));
+            let mut words =
+                StopWords::new(Box::new(Scripted(Arc::clone(&script)))).with_commit_waits(true);
+            words.lamp_said(lamp, 1_000_000, false);
+            words.block(true, true, false, None, None, 1_000_000, &block(1));
+            words.block(true, true, true, Some(0), None, 1_010_000, &block(2));
+            words.yield_committed(true);
+            words.block(true, true, false, None, None, 1_020_000, &block(3));
+            script.lock().unwrap().words = Some(heard.into());
+            match words.block(true, true, false, None, None, 1_030_000, &block(4)) {
+                Tell::Waited {
+                    heard: Some((stop, _)),
+                    ..
+                } => stop,
+                other => panic!("{other:?}"),
+            }
+        };
+        for told in [&in_yield as &dyn Fn(&str) -> bool, &committed] {
+            assert!(!told("will stop at the green gate"));
+            // A stop word the lamp did not say, over its tail. Its own
+            // "stop" is no stop however it is heard, as with
+            // `heard-always` ([`stop_over`]).
+            assert!(told("at the green gate, wait"));
+            assert!(told("Lamp, wait."));
+        }
     }
 
     /// #5111: with the linear or raw source, a yield's held audio is heard
