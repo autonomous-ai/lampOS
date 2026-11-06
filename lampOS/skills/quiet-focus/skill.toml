@@ -15,8 +15,8 @@ needs = ["eyes", "body", "voice"]
 # function to a session.
 kind = "installable"
 version = "1.0.0"
-# Twice a day at most, counted from the local midnight: the focus that
-# came due counts, said or not; the word after it is that focus's (`follows`).
+# Twice a day at most, counted from the local midnight: only the word when
+# they look up counts. The silent focus (no step names it) is no nudge.
 most_a_day = 2
 
 # What it may read and use, and nothing more: the eyes' reading of the person
@@ -31,7 +31,8 @@ body = true
 # (eyes/src/activity.rs, the nose lower than it sat). A look up shorter than
 # 2 minutes (a glance, a sip, a thought) does not end the focus, as a sitting
 # forgives (`RoomActivity::SITTING_GAP_S`); one longer does. It does nothing
-# itself: it only opens the moment for the word below.
+# itself, and no step names it, so it is no nudge (no day's count, no
+# group's hour, no rest): it only opens the moment for the word below.
 [[trigger]]
 name = "focused"
 topic = "room/activity"
@@ -88,15 +89,15 @@ from = "22:00"
 to = "08:00"
 
 # One nudge an hour between the wellbeing skills, so the wellbeing nudges'
-# shared `[stop]` (below) stops it too. The focus coming due is what the
-# group counts, said or not; the word after it is not counted (`follows`).
+# shared `[stop]` (below) stops it too. Only the word takes the group's
+# hour, and waits for it; the silent focus takes none, so it never eats a
+# sip of water's or a rest for the eyes' turn.
 [budget]
 group = "wellbeing"
 per_hour = 1
 
-# Two focuses in a row with no look up, move or word within 5 minutes of
-# each: it rests until the next morning, as the wellbeing nudges do. The word
-# after a focus is not counted (`follows`).
+# Two words in a row nobody noticed (no look back down, move or word within
+# 5 minutes): it rests until the next morning, as the wellbeing nudges do.
 [rest]
 after_ignored = 2
 within = "5m"
@@ -120,10 +121,8 @@ say = "They have just looked up after being quietly focused on their work for a 
 
 # With LAMP_NUDGES_PRESENT=on (#5207, off unless set): the wellbeing
 # group's two an hour, never within 30 minutes of each other, which
-# Sip of water and Comfort break name too (a group keeps its quietest). The
-# gap is counted from the focus coming due, not the word up to 10 minutes
-# after it: a wellbeing nudge is at least 30 minutes before the word and 20
-# after it.
+# Sip of water and Comfort break name too (a group keeps its quietest): the
+# word is never within 30 minutes of a wellbeing nudge, either way.
 [present.budget]
 group = "wellbeing"
 per_hour = 2

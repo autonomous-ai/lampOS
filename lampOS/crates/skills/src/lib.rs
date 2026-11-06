@@ -7452,8 +7452,21 @@ impl Engine {
                 let day = day_of(self.clock, now_us);
                 // A word after a run is that run's, not a nudge of its own
                 // (#3504): the day's most, the rest and the group's hour
-                // count and hold back the nudges only.
-                let nudge = trigger.follows.is_none();
+                // count and hold back the nudges only. A trigger no step
+                // names makes nothing, so it is no nudge either; the word
+                // that follows it is then the nudge (Quiet focus: the
+                // silent 45 minutes take none of the wellbeing group's hour,
+                // the word when they look up does).
+                let silent = |name: Option<&String>| {
+                    !skill.steps.iter().any(|(on, _)| match on {
+                        Some(Only::Trigger(on)) => Some(on) == name,
+                        None | Some(Only::Choice(_)) => true,
+                    })
+                };
+                let nudge = match &trigger.follows {
+                    None => !silent(trigger.name.as_ref()),
+                    Some((other, _)) => silent(Some(other)),
+                };
                 if let Some(most) = skill.most_a_day.filter(|most| {
                     nudge
                         && self

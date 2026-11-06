@@ -21,8 +21,7 @@ What it says and when:
 - A glance up shorter than two minutes before the 45 minutes doesn't end
   the focus; a longer one does, and the 45 minutes begin again.
 - Once a sitting at most, and twice a day, from 09:00 to 20:00: never in
-  the evening or at night. A focus it waited on counts toward the two, even
-  if you didn't look up in time.
+  the evening or at night. Only a word said counts toward the two.
 - Only when nobody else is in view: someone out of the camera's sight
   isn't seen, so it can still speak then. If someone is with you when you
   look up, it waits until they have been gone a minute, for up to five
@@ -31,11 +30,10 @@ What it says and when:
 - It is one of the wellbeing nudges (this, A comfort break, A meal check,
   A sip of water, Rest your eyes, Sit back, Stand up, Stretch break and
   Wind down), and shares their hour: at most one of them an hour, or in the
-  product two, never within 30 minutes of each other. That is counted from
-  when the 45 minutes come, said or not, so a nudge comes at least 30
-  minutes before its word and 20 after it.
-- If two focuses in a row pass with you neither looking up nor moving nor
-  saying anything within five minutes, it rests until tomorrow morning.
+  product two, never within 30 minutes of each other. Only its word takes a
+  turn: the 45 minutes it waits through silently take none.
+- If it speaks twice and you neither look back down nor move nor say
+  anything within five minutes, it rests until tomorrow morning.
 - "Not today" or "stop the nudges" to the lamp snoozes it until tomorrow
   morning or turns it off until you ask for it again. The wellbeing nudges
   share that one function: it stops the one that came last, unless you ask
@@ -43,7 +41,7 @@ What it says and when:
 
 It looks at nothing but how your face sits at the desk: it takes no
 picture, never speaks of your body or looks, and keeps nothing about you,
-only, in memory, how many times it came due today and whether it is
+only, in memory, how many times it spoke today and whether it is
 resting; off is one line with its name. It does not listen to what you
 say.
 
