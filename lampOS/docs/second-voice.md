@@ -657,12 +657,12 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   model beside the lamp's tools, within this route's own bound of 48
   functions (`second_provider::MAX_TOOLS`; Live's is 32, Gemini Live's own;
   the chat models take more, DeepSeek's API up to 128), cut
-  in the order `worker::chat_cut` declares: the fetch, the time elsewhere,
-  `reports_state` with `LAMP_REPORTS=on`, the skills' functions not a core
-  skill's (the last first), the weather with `LAMP_SECOND_WEATHER=on`, then
-  the search, and never a core skill's
-  function, `use_skill`, `reports_stop` or the actions part's (#2614,
-  #2644, `worker::chat_tools`). What is cut is said once, on a plain
+  in the order `worker::chat_cut` declares, core tools before skills (the
+  first builder on Queue #5385, 6 Nov): the skills' functions not a core
+  skill's, then a core skill's (each the last first), then the fetch, the
+  time elsewhere, `reports_state` with `LAMP_REPORTS=on`, the weather with
+  `LAMP_SECOND_WEATHER=on`, then the search, and never `use_skill`,
+  `reports_stop` or the actions part's (#2644, `worker::chat_tools`). What is cut is said once, on a plain
   journal line (`past the bound of 48, left out: …`). On lamp-4ace on 22 Oct the lamp's own,
   its skills' and the search's came to 37, and Live's bound had left out the time, the
   light scenes and the search; at 37 the chat's first answer began a median 856 ms after

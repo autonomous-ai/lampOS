@@ -1,10 +1,11 @@
 //! The functions a product lamp's voice tells each session of, with every
 //! product skill installed. A session takes at most `lamp_gemini::MAX_TOOLS`
-//! (32). Past it the bound cuts by a declared order, never a core skill's
-//! function (the owner's rule, on #2614): on the chat route the search's
-//! fetch, the time elsewhere, the skills' not a core skill's, then the
-//! search; with the lamp's own and core skills' alone over, the voice says
-//! so on an error line (the coordinator, 19 Oct: lamp-4ace sat at exactly
+//! (32). Past it the bound cuts by a declared order, core tools before
+//! skills (the first builder on Queue #5385): the skills' not a core
+//! skill's, then a core skill's, and on the chat route only then the
+//! search's fetch, the time elsewhere, `reports_state` and the search;
+//! with the lamp's own alone over, the voice says so on an error line
+//! (the coordinator, 19 Oct: lamp-4ace sat at exactly
 //! 32, and switching onboarding on there pushed one of the actions part's
 //! out). So the
 //! product's count is pinned here, worked out by each part's own code: the
@@ -334,14 +335,12 @@ fn a_product_chat_request_offers_dance_at_the_bound() {
 /// declares its two reports functions too, `reports_stop` and
 /// `reports_state`, before the actions part's and the skills'. Then the
 /// voice's own 15, the actions part's 17 and Dance's are 33, and the chat
-/// request's search makes 35. By the owner's rule (on #2614) Dance's, a
-/// core skill's function, is never the one cut, and by the first builder's
-/// on #2644 neither are the actions part's nor `reports_stop`: the chat
-/// request leaves out the search's fetch, the time elsewhere and
-/// `reports_state`, a Live session `reports_state` alone, with no error
-/// line, and `dance` stays in both. Since the second route's own bound
-/// (22 Oct) its chat request leaves none of them out; a Live session still
-/// leaves out `reports_state`.
+/// request's search makes 35. Since the second route's own bound (22 Oct)
+/// its chat request leaves none of them out, and `dance` stays there. On
+/// Live's 32 the cut takes the skills' functions before any of the lamp's
+/// own (core tools before skills, the first builder on Queue #5385, 6 Nov),
+/// so a Live session keeps `reports_state` and leaves out the skills'
+/// functions, Dance's among them.
 #[test]
 fn with_reports_on_dance_stays_at_the_bound() {
     let Product {
@@ -376,18 +375,20 @@ fn with_reports_on_dance_stays_at_the_bound() {
 
     assert!(left_out.is_empty(), "left out by the link: {left_out:?}");
     assert_eq!(declared.len(), lamp_gemini::MAX_TOOLS, "{declared:?}");
-    assert!(declared.iter().any(|told| told == "dance"), "{declared:?}");
+    for cut in &skill_tools {
+        assert!(!declared.contains(cut), "{cut}: {declared:?}");
+    }
     assert!(
-        !declared
+        declared
             .iter()
             .any(|told| told == lamp_voice::reports_stop::STATE_NAME),
         "{declared:?}"
     );
-    // On Live, a per-lamp drop-in, `reports_stop` and Dance's are never the
-    // ones cut. Past 32 the actions part's last are taken out before the cut
-    // there, and the error line names only what the cut took (here
-    // `reports_state`): a Live limit, not the product's. The product's route
-    // offers every one of them (above, #3430).
+    // On Live, a per-lamp drop-in, the voice's own are never the ones cut.
+    // Past 32 the actions part's last are taken out before the cut there,
+    // and the cut's line names the skills' it took: a Live limit, not the
+    // product's. The product's route offers every one of them (above,
+    // #3430).
     assert!(
         declared
             .iter()

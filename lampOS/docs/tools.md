@@ -432,30 +432,42 @@ The switch declares two functions, `reports_stop` and `reports_state`
 unit sets it: a product lamp's chat request offers 40 of the lamp's own
 functions (`PRODUCT_FUNCTIONS`, `crates/update/tests/functions.rs`), the
 voice's own 21 with these two among them, the actions part's 17, Dance's
-`dance` and Pose's `set_pose` (#4135). At the bound a core skill's function is never the one cut (the
-owner's rule, on #2614; [install.md](install.md)), and on the chat route
-neither is `reports_stop` nor any of the actions part's (the first builder,
-on #2644): the cut takes the second route's fetch, then its time
-elsewhere, then `reports_state` (reading reports' state is rare), then the
-skills' functions that are not a core skill's, the last first (the skills'
-tools file lists them by name, `lamp_skills::tools_file`), then the
-weather, then the search (`chat_cut`). A Live session's bound is 32
+`dance` and Pose's `set_pose` (#4135). At the bound core tools come
+before skills (the first builder on Queue #5385, 6 Nov: on lamp-9adf the
+chat route's 48 had left out `the_time`, `reports_state` and `fetch_page`
+while installed skills' functions stayed): a skill never costs the lamp
+one of its own. The cut takes the skills' functions first, those that are
+not a core skill's, then a core skill's (its tool or its `[stop]`, such as
+`wellbeing_nudges`, both in the tools file's `core`), each the last by
+name first (the skills' tools file lists them by name,
+`lamp_skills::tools_file`, so which skill was installed last is not
+known to the voice; `tools::uncut_within`). Only then, on the chat route,
+the voice's own it can most spare: the second route's fetch, its time
+elsewhere, `reports_state` (reading reports' state is rare), the weather,
+then the search (`worker::chat_cut`); a Live session has only
+`reports_state` there. `reports_stop`, the rest of the voice's own and the
+actions part's are never in the cut. A Live session's bound is 32
 (`lamp_gemini::MAX_TOOLS`); the second route's chat requests have their
 own, 48 (`second_provider::MAX_TOOLS`, 22 Oct: Live's bound had left out
 the time, the light scenes and the search on lamp-4ace). On the product's
 chat route nothing is left out. In a Live session, a per-lamp drop-in, the
 voice's own come first and the actions part's catalog fills only the room
-left, so its last are left out, and the cut then takes `reports_state`;
-`reports_stop` and `dance` stay in both. With `LAMP_USE_SKILL=on`, `use_skill` carries every
-core skill, so it is a core name and never the one cut. Whatever is cut is
-said once, at start, on a plain journal line naming the bound (`past the
-bound of 32, left out: …` on Live, 48 on the chat route); only the lamp's own
-and core skills' functions alone past it are an error line (`alone are past
-the bound of 32; left out: …`). Tests:
+left, so its last are left out, and the cut then takes the skills'
+functions, `dance` among them; `reports_stop` and `reports_state` stay.
+With `LAMP_USE_SKILL=on`, `use_skill` carries every skill, so it is a
+core name and never the one cut, and the cut is `reports_state` alone, as
+before. Whatever is cut is said once, at start, on a plain journal line
+naming the bound and each function left out (`past the bound of 32, left
+out: …` on Live, 48 on the chat route); only the lamp's own functions
+alone past it are an error line (`the lamp's own functions alone are past
+the bound of 32; left out: …`), which leaves out their last. Tests:
 `with_reports_on_dance_stays_at_the_bound`
 (`crates/update/tests/functions.rs`),
-`reports_add_two_functions_and_the_last_skills_are_cut_past_32` and
-`past_the_bound_use_skill_and_the_lamps_actions_stay`.
+`reports_add_two_functions_and_the_last_skills_are_cut_past_32`,
+`past_the_bound_use_skill_and_the_lamps_actions_stay`,
+`past_the_bound_installed_skills_go_before_any_core_tool`,
+`with_no_skills_the_bound_cuts_nothing` and, on the chat route,
+`the_bound_cuts_the_skills_before_the_fetch_and_the_time`.
 
 The voice puts `{"share": false}` on `reports/request` and answers from `lamp-cloud`'s
 `reports/state` within 2 s: `{"ok": true, "say": "I've stopped sending
