@@ -1744,6 +1744,11 @@ struct Shared {
     /// A carried line may save into the conversation's scope
     /// (`LAMP_CONVERSATION_CARRIED_SAVES`, [`Engine::saving_carried`]).
     carried_saves: bool,
+    /// "Forget that" right after a keep forgets that keep
+    /// (`LAMP_MEMORY_FORGET_JUST_KEPT`, [`Engine::forgetting_just_kept`]):
+    /// a carried line's bare forget may run, and a line after a bare call
+    /// counts that call's looks for the one-face rule.
+    forget_just_kept: bool,
     /// Who was seen saying a known person's line is kept for its services
     /// write (`LAMP_SERVICES`, [`Engine::keeping_sight_for_services`]).
     services_sight: bool,
@@ -2046,6 +2051,19 @@ fn no_other_voice_known(another_voice: Option<&AtomicBool>) -> bool {
 fn no_other_voice_shown(shared: &Shared) -> bool {
     no_other_voice_known(shared.one_face.as_deref())
         && !shared.past_silent.as_ref().is_some_and(|another| another())
+}
+
+/// Where the one-face rule's looks of a line begin
+/// ([`Marks::name_began`]): at the bare call's own first sound when the
+/// line goes on from one and `LAMP_MEMORY_FORGET_JUST_KEPT` is on, so the
+/// name, the pause and the line must all show their face alone; else, and
+/// always with the switch off, at the line's own start, as before (Heron's
+/// P3 and the Reviewer-lead's P2 on #5419). Only the one-face count reads
+/// it, never who was seen speaking.
+fn one_face_from(begun: Instant, name_began: Option<Instant>, forget_just_kept: bool) -> Instant {
+    name_began
+        .filter(|name| forget_just_kept && *name < begun)
+        .unwrap_or(begun)
 }
 
 fn one_face_theirs(
@@ -3612,6 +3630,17 @@ struct Marks {
     /// When it began by the engine's clock, or, folded, when the line it
     /// began with did ([`KeptSound::began`]); none for a line not spoken.
     began: Option<Instant>,
+    /// When the bare call it goes on from began, by the engine's clock
+    /// (`LAMP_CALL_TAKES_NEXT_LINE`, [`KeptSound::began`]): that call's
+    /// sound goes first in this line, so with `LAMP_MEMORY_FORGET_JUST_KEPT`
+    /// the one-face rule counts the looks from the name's own first sound
+    /// to this line's end (C88 / #5022, lamp-06c1, 5 Nov: "Lamp" then
+    /// "forget that", 2 looks each, under the 3 the rule needs, so the
+    /// forget ran as the room's). Measured from the name's own start, not
+    /// back from this line's by the name's length, which would cover the
+    /// pause between instead (the Reviewer-lead's P2 on #5419). None for
+    /// any other line.
+    name_began: Option<Instant>,
     /// Begun while the line before it, the lamp's name, waited for it
     /// (`LAMP_SECOND_NAME_CARRIES`): said by that name when one person said
     /// both ([`said_by_the_name`]); taken by its task.
@@ -3956,6 +3985,7 @@ impl Engine {
                 scope_seen: false,
                 carries: None,
                 carried_saves: false,
+                forget_just_kept: false,
                 services_sight: false,
                 past_silent: None,
                 one_face: None,
@@ -4248,6 +4278,19 @@ impl Engine {
     pub fn saving_carried(mut self, on: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.carried_saves = on;
+        self
+    }
+
+    /// With `LAMP_MEMORY_FORGET_JUST_KEPT=on` (C88 / #5022): a `forget` on a
+    /// line carried as a person's conversation going on is let through to
+    /// the memory, which runs it only as a bare "forget that" of the thing
+    /// their last keep gave, within `remember::HELD_FORGET_FOR`
+    /// (`remember::run_carried_just_kept`); and a line that goes on from a
+    /// bare call counts that call's looks for the one-face rule. Off, both
+    /// are as before.
+    pub fn forgetting_just_kept(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.forget_just_kept = on;
         self
     }
 
@@ -5905,6 +5948,7 @@ impl Engine {
                     folded,
                     over_the_lamps_voice,
                     began: Some(began),
+                    name_began: calls_sound.as_ref().map(|call| call.began),
                     name_of: Mutex::new(name_of),
                     ended_at: Mutex::new(None),
                     words_back: Mutex::default(),
@@ -7591,6 +7635,7 @@ async fn spoken(
                     named = true;
                     named_by_one_face = true;
                 }
+                let one_face_from = one_face_from(begun, marks.name_began, shared.forget_just_kept);
                 one_face = !carried
                     && shared.scope_seen
                     && speakers.is_empty()
@@ -7598,7 +7643,7 @@ async fn spoken(
                         shared.one_face.as_deref(),
                         eyes,
                         own_face,
-                        begun,
+                        one_face_from,
                         finishing,
                     );
                 let theirs = carried
@@ -10770,6 +10815,32 @@ fn memory_refused(scope: Option<&crate::memory_scope::ScopeLease>, name: &str) -
     held_by_gap(scope) && MEMORY_CALLS.contains(&name)
 }
 
+/// The one memory call a held line still runs: a `forget` on a line
+/// carried as the person's conversation going on, no face but theirs seen
+/// through it, when their last memory call was their own keep within
+/// `remember::HELD_FORGET_FOR` (`LAMP_MEMORY_FORGET_JUST_KEPT`, C88 /
+/// #5022; lamp-06c1, 5 Nov, request 202: "Lamp, forget that." right after
+/// her keep was told "I can't tell who's speaking"). It forgets that keep
+/// by its id or nothing, and only for a bare "forget that"
+/// (`remember::run_carried_just_kept`, which refuses any other); a line
+/// held only by a gap, their face gone, still runs none. Only with
+/// [`Engine::forgetting_just_kept`].
+fn carried_forget_runs(
+    shared: &Shared,
+    request: u64,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+    name: &str,
+) -> bool {
+    let runs =
+        shared.forget_just_kept && crate::remember::carried_forget_lease(scope, name).is_some();
+    if runs {
+        eprintln!(
+            "lamp-voice second: request {request}: a forget on a carried line right after their keep may run for that keep alone (LAMP_MEMORY_FORGET_JUST_KEPT)"
+        );
+    }
+    runs
+}
+
 /// A carried line's `remember` (`LAMP_CONVERSATION_CARRIED_SAVES`,
 /// `ScopeLease::saves_carried`), held for the carried person's own yes, in
 /// memory only, never written or journalled while it waits (the first
@@ -11382,7 +11453,8 @@ async fn run_tool(
 ) -> Value {
     // A memory call on a line held only by a gap runs for no one, however
     // it was asked: not declared to it, and refused if written anyway.
-    if memory_refused(scope, &call.name) {
+    if memory_refused(scope, &call.name) && !carried_forget_runs(shared, request, scope, &call.name)
+    {
         eprintln!(
             "lamp-voice second: request {request}: a memory call on a line held only by a face's gap runs for no one"
         );
@@ -13606,7 +13678,9 @@ async fn answer(
                 // by either runner: refused here, before the requested-audio
                 // runner too, which never reaches `run_tool`'s own refusal
                 // (Reviewer-two, 03:38 on #3614).
-                if memory_refused(scope.as_ref(), &call.name) {
+                if memory_refused(scope.as_ref(), &call.name)
+                    && !carried_forget_runs(shared, request, scope.as_ref(), &call.name)
+                {
                     eprintln!(
                         "lamp-voice second: request {request}: a memory call on a line held only by a face's gap runs for no one"
                     );

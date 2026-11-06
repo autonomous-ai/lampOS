@@ -260,6 +260,20 @@ enum Voice {
     Unchecked,
 }
 
+thread_local! {
+    /// `LAMP_MEMORY_FORGET_JUST_KEPT` for [`lines_past_silent`]'s engine
+    /// ([`Engine::forgetting_just_kept`]), set by the test that asks for it
+    /// on its own thread (a `tokio::test` runs on the thread it starts on);
+    /// off for every other.
+    static FORGET_JUST_KEPT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// Whether [`lines_past_silent`]'s lines go on from a bare call of the
+    /// lamp's name, request 1, said with A's known face the one face in
+    /// view (`LAMP_SECOND_NAME_CARRIES`); the lines are then requests 2, 3,
+    /// … Set by the test that asks for it on its own thread; off for every
+    /// other.
+    static BARE_CALL_FIRST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 /// One line said: its words, the faces in the eyes' looks while it is said
 /// ([`feed_faces`]), and the seconds since the line before.
 type Line = (String, Vec<(&'static str, bool)>, u64);
@@ -386,8 +400,15 @@ async fn lines_known(
 ) -> Outcome {
     let eyes = Arc::new(SpeakingFaces::default());
     let path = known_file(what, &eyes);
+    let bare_call = BARE_CALL_FIRST.with(std::cell::Cell::get);
     let script = Arc::new(Script {
-        heard: Mutex::new(lines.iter().map(|(words, ..)| Ok(words.clone())).collect()),
+        heard: Mutex::new(
+            bare_call
+                .then(|| Ok("Lamp".to_owned()))
+                .into_iter()
+                .chain(lines.iter().map(|(words, ..)| Ok(words.clone())))
+                .collect(),
+        ),
         chats: Mutex::new(chats.into()),
         early: Mutex::new(
             early
@@ -399,7 +420,9 @@ async fn lines_known(
     });
     let (engine, _, now) = scripted(script.clone());
     // `LAMP_SECOND_PREPARED`, with early words to prepare on.
-    let engine = engine.preparing(early.is_some());
+    let engine = engine
+        .preparing(early.is_some())
+        .forgetting_just_kept(FORGET_JUST_KEPT.with(std::cell::Cell::get));
     let noted: Arc<Mutex<Vec<Noted>>> = Arc::default();
     let seen_noted = noted.clone();
     let hits: Arc<Mutex<Vec<HitsRead>>> = Arc::default();
@@ -514,10 +537,35 @@ async fn lines_known(
         );
     }
     let mut labels = Vec::new();
+    let first = if bare_call {
+        // "Lamp", alone and short, with A's face the one face in view: its
+        // answer waits for the line after it, which is said by it.
+        engine = engine.checking_sounds(true).carrying_the_name(true);
+        let done = Arc::new(AtomicBool::new(false));
+        let feeder = feed_faces(eyes.clone(), vec![("f1", false)], &[], boot, done.clone());
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        tokio::time::sleep(Duration::from_millis(40)).await;
+        engine.submit(ProviderInput::Called {
+            request: 1,
+            privacy_generation: 1,
+        });
+        engine.submit(ProviderInput::End {
+            request: 1,
+            privacy_generation: 1,
+            sound: true,
+            cut_in: false,
+        });
+        done.store(true, Ordering::Release);
+        feeder.join().unwrap();
+        2
+    } else {
+        1
+    };
     for (at, (_, in_view, after)) in lines.into_iter().enumerate() {
-        let request = at as u64 + 1;
+        let request = at as u64 + first;
         // The line before is over; the last stays current, for its lease.
-        if request > 1 {
+        if request > first {
             engine.retire_through(request - 1);
         }
         *now.lock().unwrap() += Duration::from_secs(after);
@@ -1023,6 +1071,96 @@ async fn a_carried_lines_memory_calls_run_for_no_one() {
     .await;
     assert!(got.calls.is_empty(), "no memory call runs: {:?}", got.calls);
     assert!(got.held);
+}
+
+fn forget_that() -> Vec<Vec<net::Result<ChatEvent>>> {
+    vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "f1",
+                crate::remember::FORGET,
+                json!({}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![text("Done."), Ok(ChatEvent::Done)],
+    ]
+}
+
+/// C88 / #5022 (Heron's P2 on #5419, lamp-06c1's request 202): with
+/// `LAMP_MEMORY_FORGET_JUST_KEPT`, a `forget` on A's carried line is let
+/// through both of the second route's refusals of memory calls on held
+/// lines, to the memory's route in A's scope, which runs it only for A's
+/// just kept thing (`remember::run_carried_just_kept`, pinned through the
+/// tools in `remember`'s tests). Switch off, it runs for no one as before;
+/// a carried `forget_everything` runs for no one either way.
+#[tokio::test]
+async fn a_carried_lines_forget_reaches_the_memory_only_with_the_switch() {
+    let a = crate::remember::person_id("A");
+    for (what, on, chats, expected) in [
+        (
+            "carried-forget-that-on",
+            true,
+            forget_that(),
+            vec![Some(a.clone())],
+        ),
+        ("carried-forget-that-off", false, forget_that(), vec![]),
+        ("carried-forget-all-on", true, forget_everything(), vec![]),
+    ] {
+        FORGET_JUST_KEPT.with(|switch| switch.set(on));
+        let got = one_line_with(
+            what,
+            "Lamp, forget that.",
+            chats,
+            vec![("f1", false)],
+            BOOT,
+            true,
+            true,
+            None,
+            Some(true),
+            true,
+        )
+        .await;
+        FORGET_JUST_KEPT.with(|switch| switch.set(false));
+        assert!(got.held, "{what}: carried");
+        assert_eq!(got.calls, expected, "{what}");
+    }
+}
+
+/// The Reviewer-lead's P3 on #5419 (second_provider.rs:6938): "Lamp."
+/// with A's known face the one face in view, then "Forget that." with no
+/// face in view, said by that call. With `LAMP_MEMORY_FORGET_JUST_KEPT`
+/// the one-face rule counts the call's looks too, so the forget reaches
+/// A's scope, where the memory takes only their just kept thing. Off, it
+/// counts the line's own looks, as before: none of A's, so the forget is
+/// the room's and never takes A's just kept thing.
+#[tokio::test]
+async fn a_forget_after_a_bare_call_reaches_their_scope_by_the_calls_looks_only_with_the_switch() {
+    let a = crate::remember::person_id("A");
+    for (what, on, expected) in [
+        ("bare-call-forget-on", true, Some(a.clone())),
+        ("bare-call-forget-off", false, None),
+    ] {
+        FORGET_JUST_KEPT.with(|switch| switch.set(on));
+        BARE_CALL_FIRST.with(|bare| bare.set(true));
+        let got = lines_saving(
+            what,
+            vec![("Forget that.".to_owned(), vec![], 0)],
+            forget_that(),
+            BOOT,
+            true,
+            true,
+            None,
+            None,
+            true,
+            false,
+            Voice::One,
+        )
+        .await;
+        BARE_CALL_FIRST.with(|bare| bare.set(false));
+        FORGET_JUST_KEPT.with(|switch| switch.set(false));
+        assert_eq!(got.calls, [expected], "{what}: {:?}", got.labels);
+    }
 }
 
 /// #4339: a line no face was seen speaking stays the room's, as before,
@@ -2880,4 +3018,20 @@ async fn another_voice_heard_takes_the_face_in_view_hits_back() {
         ))],
         "no other voice: the face's hits"
     );
+}
+
+/// Heron's P3 and the Reviewer-lead's P2 on #5419: a line that goes on
+/// from a bare call counts the one-face rule's looks from the call's own
+/// first sound, only with `LAMP_MEMORY_FORGET_JUST_KEPT`; off, or with no
+/// call before it, from its own start, as before. A call stamped after the
+/// line's start (another clock) moves nothing.
+#[test]
+fn the_one_face_window_takes_the_bare_calls_start_only_with_the_switch() {
+    let begun = Instant::now();
+    let name = begun - Duration::from_millis(3_900);
+    assert_eq!(super::super::one_face_from(begun, Some(name), true), name);
+    assert_eq!(super::super::one_face_from(begun, Some(name), false), begun);
+    assert_eq!(super::super::one_face_from(begun, None, true), begun);
+    let later = begun + Duration::from_millis(10);
+    assert_eq!(super::super::one_face_from(begun, Some(later), true), begun);
 }

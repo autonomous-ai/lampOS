@@ -1040,8 +1040,13 @@ impl ScopeLease {
 
     /// The person (a memory id) this line is carried for as their
     /// conversation going on ([`Self::carry_conversation`], #4339), while
-    /// the lease is current and not narrowed. Never authority to act: only
-    /// the by-default name reads it, for the reply (`person::someone_else_now`).
+    /// the lease is current and not narrowed. Read for the reply's
+    /// by-default name (`person::someone_else_now`), and as the one
+    /// authority a held line has: with `LAMP_MEMORY_FORGET_JUST_KEPT`, a
+    /// bare "forget that" on it forgets that person's just kept thing, by
+    /// its id in their scope, and nothing else
+    /// (`remember::carried_forget_lease`, `remember::run_carried_just_kept`;
+    /// C88 / #5022). Every other memory call on it still runs for no one.
     pub fn carried_for(&self) -> Option<&str> {
         (self.is_current() && !self.context.narrowed.load(Ordering::Acquire))
             .then(|| self.context.carried.get())

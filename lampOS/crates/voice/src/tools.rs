@@ -1752,6 +1752,20 @@ fn run_call_with_scope(
                     // waits for the eyes' bounded late identity. A person
                     // named by the line's end plus 300 ms gets their own
                     // scope; otherwise the room's scope is used (#2807).
+                    // A carried line's forget right after the person's keep
+                    // (`LAMP_MEMORY_FORGET_JUST_KEPT`, C88 / #5022): that
+                    // keep by its id, for a bare "forget that" alone.
+                    Some(lease)
+                        if let Some(person) =
+                            crate::remember::carried_forget_lease(Some(lease), &model.name) =>
+                    {
+                        eprintln!(
+                            "lamp-voice: request {request}: a forget on a carried line right after their keep is for that keep, in their scope (LAMP_MEMORY_FORGET_JUST_KEPT)"
+                        );
+                        crate::remember::run_carried_just_kept(
+                            socket, call, deadline, lease, &person,
+                        )
+                    }
                     Some(lease)
                         if matches!(
                             model.name.as_str(),
@@ -1773,16 +1787,34 @@ fn run_call_with_scope(
                         // recall on this line it would take their last kept
                         // thing, so it stays the room's (Thirteen's P2 on
                         // #5022).
+                        // With `LAMP_MEMORY_FORGET_JUST_KEPT`, a bare one
+                        // right after their keep by this same rule reaches
+                        // their scope for that keep alone, by its id, or
+                        // asks which (C88, #5022).
                         let named = |key: &str| call.args.get(key).is_some_and(|v| !v.is_null());
-                        let one_face = late
+                        let reached = late
                             .is_none()
                             .then(|| lease.reached_by_one_face(&model.name))
-                            .flatten()
-                            .filter(|_| {
-                                model.name != crate::remember::FORGET
-                                    || named("about")
-                                    || named("source_id")
-                            });
+                            .flatten();
+                        if let Some(person) = reached.as_deref()
+                            && crate::remember::one_face_just_kept(socket, call, person)
+                        {
+                            eprintln!(
+                                "lamp-voice: request {request}: a bare forget on a one-face line right after their one-face keep is for that keep, in their scope (LAMP_MEMORY_FORGET_JUST_KEPT)"
+                            );
+                            return crate::remember::run_one_face_just_kept(
+                                socket,
+                                call,
+                                deadline.saturating_sub(started.elapsed()),
+                                lease,
+                                person,
+                            );
+                        }
+                        let one_face = reached.filter(|_| {
+                            model.name != crate::remember::FORGET
+                                || named("about")
+                                || named("source_id")
+                        });
                         match (late, one_face) {
                             // Their scope, then the room's only on a real
                             // no-match in theirs, never when theirs found

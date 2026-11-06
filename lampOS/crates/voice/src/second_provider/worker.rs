@@ -3035,6 +3035,12 @@ pub fn serve(
             engine = engine.saving_carried(true);
         }
     }
+    // "Forget that" right after a keep (C88 / #5022): a carried line's bare
+    // forget may reach the memory, which runs it only for that keep.
+    if std::env::var(crate::remember::FORGET_JUST_KEPT_ENVIRONMENT).is_ok_and(|value| value == "on")
+    {
+        engine = engine.forgetting_just_kept(true);
+    }
     // Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`, #2377): a held
     // forget's yes counts only from the held person's face seen saying it.
     // The faces seeing who speaks reads, when it is on, or else its own
