@@ -15,6 +15,7 @@ pub mod lamp;
 pub mod light;
 pub mod make_skill;
 pub mod online;
+pub mod owner;
 pub mod photos;
 pub mod ping;
 pub mod reports;

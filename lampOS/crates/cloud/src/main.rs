@@ -250,6 +250,8 @@ fn main() -> ExitCode {
             )
             .taking_the_place(lamp_cloud::settings::place_on_from_environment())
             .taking_the_voice(lamp_cloud::settings::voice_on_from_environment())
+            // The owner picked by face only with LAMP_OWNER_FACE=on (#5495).
+            .taking_the_owner(lamp_msgs::owner_face::on())
         }),
         // A face from the app's photo (#1968): only with LAMP_PHOTO_FACES=on.
         photos: lamp_cloud::photos::Place::from_environment(),

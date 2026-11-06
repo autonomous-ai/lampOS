@@ -239,6 +239,217 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
     let _ = std::fs::remove_dir_all(root);
 }
 
+/// A stand-in on `socket` answering each line by `answer`, until `count`
+/// lines are asked: the lines asked.
+fn answering(
+    socket: PathBuf,
+    count: usize,
+    answer: impl Fn(&Value) -> Value + Send + 'static,
+) -> std::thread::JoinHandle<Vec<Value>> {
+    let listener = UnixListener::bind(&socket).unwrap();
+    std::thread::spawn(move || {
+        let mut asked = Vec::new();
+        for _ in 0..count {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            let line: Value = serde_json::from_str(line.trim()).unwrap();
+            writeln!(&stream, "{}", answer(&line)).unwrap();
+            asked.push(line);
+        }
+        asked
+    })
+}
+
+/// The owner picked by face (#5495, `LAMP_OWNER_FACE=on`): `face.list`
+/// gains each face's id, when it was first saved and the owner's badge;
+/// `owner.get` says how the owner is kept; `owner.set` picks a face the
+/// eyes keep, by id, through root's helper; removing the owner's face says
+/// `owner_cleared`. The app's name A and the face's B differ, and B is the
+/// owner once picked. Off, none of it is in `can` and `face.list` is as
+/// before.
+#[test]
+fn the_owner_is_picked_by_face_and_removing_it_clears_the_pick() {
+    let root = PathBuf::from(format!("/tmp/lco-{}", std::process::id()));
+    let places = lamp(&root);
+    let (who, helper) = (root.join("who.sock"), root.join("change.sock"));
+    let b = "f-3c9a51d07be24e18";
+    let people = json!({"people": [
+        {"name": "B", "face": b, "added_unix_s": 1_762_071_243_u64},
+        {"name": "A", "face": "f-91e0c2aa4f7d3b65", "added_unix_s": 1_762_371_611_u64},
+    ], "waiting": ["C"]});
+    let eyes = answering(who.clone(), 5, move |line| {
+        if line.get("forget").is_some() {
+            json!({"forgot": true, "face": b})
+        } else {
+            people.clone()
+        }
+    });
+    // Root's helper, as a file of its own: the pick, and the typed name A.
+    let pick = std::sync::Arc::new(std::sync::Mutex::new(
+        json!({"face": null, "picked": false, "typed_name": "A"}),
+    ));
+    let kept = pick.clone();
+    let settings = answering(helper.clone(), 6, move |line| {
+        let mut pick = kept.lock().unwrap();
+        match line.get("owner_face") {
+            Some(face) => {
+                *pick = json!({"face": face, "picked": true, "typed_name": "A"});
+                json!({"done": {"face": face, "changed": true}})
+            }
+            None => json!({"done": *pick}),
+        }
+    });
+    let changes = lamp_cloud::settings::Changes::new(&helper, std::time::Duration::from_secs(2))
+        .taking_the_owner(true);
+    let mut real = Real {
+        places,
+        bus: None,
+        device_id: "d-42".into(),
+        build: "812+460a1a1aa2b3".into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: Some(changes.clone()),
+        photos: None,
+        faces: Some(lamp_cloud::faces::Eyes {
+            socket: who,
+            memory: None,
+        }),
+        schedule: None,
+        update_page: false,
+        update_checks: Default::default(),
+        restart: None,
+        guard: None,
+        make_skill: None,
+        write_skill: None,
+        share: None,
+        services: None,
+        control: None,
+        upload: None,
+        shutdown: None,
+        harness_sign_in: None,
+    };
+    let me = Identity {
+        device: "lamp".into(),
+        version: "812+460a1a1aa2b3".into(),
+        id: "d-42".into(),
+        mac: "lamp-7f72".into(),
+        ..Identity::default()
+    };
+    let reply = |real: &mut Real, kind: &str, data: Value| -> Value {
+        let result = answer(real, kind, &data);
+        let sent = me.data("2026-10-20T12:00:00Z", kind, &result).to_string();
+        serde_json::from_str(&sent).unwrap()
+    };
+    let can = lamp_cloud::answer::can(&real);
+    assert!(
+        can.contains(&"owner.get") && can.contains(&"owner.set"),
+        "{can:?}"
+    );
+    // Before any pick: the typed name, its one match only suggested.
+    let got = reply(&mut real, "owner.get", json!({}));
+    assert_eq!(got["status"], "success", "{got}");
+    assert_eq!(
+        got["data"],
+        json!({"how": "typed_name", "owner_face_id": null, "owner_face_name": null,
+               "typed_name": "A", "suggested_face_id": "f-91e0c2aa4f7d3b65", "can_pick": true})
+    );
+    // Picked by id: B, whatever the app's name says.
+    assert_eq!(
+        answer(
+            &mut real,
+            "owner.set",
+            &json!({"face_id": b, "request_id": "r-12"})
+        ),
+        Ok(None)
+    );
+    let started = std::time::Instant::now();
+    let mut done = Vec::new();
+    while done.is_empty() && started.elapsed() < std::time::Duration::from_secs(5) {
+        done = changes.take();
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    let set = done[0].reply(&me, "2026-10-20T12:00:00Z");
+    assert_eq!(set["kind"], "owner.set");
+    assert_eq!(set["status"], "success", "{set}");
+    assert_eq!(
+        set["data"],
+        json!({"how": "face", "owner_face_id": b, "owner_face_name": "B", "request_id": "r-12"})
+    );
+    let listed = reply(&mut real, "face.list", json!({}));
+    let faces = listed["data"]["faces"].as_array().unwrap();
+    assert_eq!(
+        faces[0],
+        json!({"name": "B", "waiting": false, "face_id": b, "saved_at": "2025-11-02T08:14:03Z", "owner": true})
+    );
+    assert_eq!(faces[1]["owner"], false);
+    assert!(is(&faces[1]["saved_at"], Type::Text), "{listed}");
+    assert_eq!(
+        faces[2],
+        json!({"name": "C", "waiting": true, "face_id": null, "saved_at": null, "owner": false})
+    );
+    // An id the eyes don't keep, or not an id: refused, nothing written.
+    for (face, why) in [
+        (
+            json!("f-0000000000000001"),
+            "the lamp doesn't know that face",
+        ),
+        (json!("B"), "face_id must be a saved face's id or null"),
+    ] {
+        answer(&mut real, "owner.set", &json!({"face_id": face})).unwrap();
+        let mut done = Vec::new();
+        while done.is_empty() && started.elapsed() < std::time::Duration::from_secs(10) {
+            done = changes.take();
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let refused = done[0].reply(&me, "2026-10-20T12:00:00Z");
+        assert_eq!(refused["status"], "failure", "{refused}");
+        assert_eq!(refused["error"], why, "{refused}");
+    }
+    assert_eq!(pick.lock().unwrap()["face"], b);
+    // The owner's face removed: the pick is cleared, and the app is told.
+    let removed = reply(
+        &mut real,
+        "face.remove",
+        json!({"name": "B", "entirely": false}),
+    );
+    assert_eq!(removed["status"], "success", "{removed}");
+    assert_eq!(removed["data"]["owner_cleared"], true, "{removed}");
+    assert_eq!(pick.lock().unwrap()["face"], Value::Null);
+    assert_eq!(pick.lock().unwrap()["picked"], true);
+    let asked = eyes.join().unwrap();
+    assert_eq!(
+        asked[0],
+        json!({"list": true, "waiting": true, "ids": true})
+    );
+    assert_eq!(asked[4], json!({"forget": "B"}));
+    let lines = settings.join().unwrap();
+    assert!(lines.contains(&json!({"owner_face": b})), "{lines:?}");
+    assert_eq!(lines.last(), Some(&json!({"owner_face": null})));
+    // Off: neither kind is on this lamp.
+    real.changes = Some(lamp_cloud::settings::Changes::new(
+        root.join("none.sock"),
+        std::time::Duration::from_secs(1),
+    ));
+    let can = lamp_cloud::answer::can(&real);
+    assert!(
+        !can.contains(&"owner.get") && !can.contains(&"owner.set"),
+        "{can:?}"
+    );
+    for kind in ["owner.get", "owner.set"] {
+        let refused = reply(&mut real, kind, json!({"face_id": b}));
+        assert_eq!(refused["status"], "failure", "{kind}: {refused}");
+        assert!(
+            refused.to_string().contains("not on this lamp"),
+            "{refused}"
+        );
+    }
+    let _ = std::fs::remove_dir_all(root);
+}
+
 /// The Lamp 2 page's faces (#2192, `face.list` and `face.remove`): what it
 /// reads of each, by name and type, from `lamp-cloud`'s own answer to a
 /// stand-in for the eyes' request socket, in V1's envelope. Without

@@ -388,6 +388,39 @@ pub struct Person {
     /// their old name's id until it is on again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    /// Their face id (#5495, `lamp_msgs::owner_face`): `f-` and 16 random
+    /// hex digits, minted when the face is first saved and never given
+    /// again, kept through a rename and a remembering of the same face,
+    /// never another's. Not the memory id, which comes back with a name.
+    /// The app picks the owner by it. An optional field under the rule
+    /// above: an older build reads past it and its next save drops it, so
+    /// a pick made by it then finds no face and the lamp has no owner,
+    /// which only ever narrows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub face: Option<String>,
+    /// When [`Self::face`] was first saved, in Unix seconds: carried with
+    /// it through a rename, where `added_unix_s` starts again (a forget
+    /// that waits reads that one, #1586).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub face_saved_unix_s: Option<u64>,
+}
+
+/// A new face id, none of `taken`'s.
+fn fresh_face(taken: &[&str]) -> String {
+    loop {
+        let mut random = [0u8; 8];
+        if getrandom::fill(&mut random).is_err() {
+            // No randomness: the clock's nanoseconds, never a fixed id.
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_nanos() as u64);
+            random = now.to_le_bytes();
+        }
+        let id = lamp_msgs::owner_face::face_id(random);
+        if !taken.contains(&id.as_str()) {
+            return id;
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -564,6 +597,10 @@ pub struct People {
     /// With `LAMP_MEMORY_STABLE_ID=on`: each person keeps one memory id
     /// ([`Person::id`]), told beside their name in the known file.
     stable_ids: bool,
+    /// With `LAMP_OWNER_FACE=on` (#5495): each person keeps one face id
+    /// ([`Person::face`]). Off, none is minted or carried, and the file is
+    /// as before.
+    face_ids: bool,
     /// Process-local store identity and save revision. Any visible write
     /// invalidates staged repairs, including a delete followed by recreation.
     /// Exhaustion disables new repairs instead of wrapping to an old revision.
@@ -600,6 +637,7 @@ impl People {
                     counted: Vec::new(),
                     unscored: Vec::new(),
                     stable_ids: lamp_msgs::known::stable_ids(),
+                    face_ids: lamp_msgs::owner_face::on(),
                     repair_revision: Arc::new(AtomicU64::new(0)),
                 });
             }
@@ -619,6 +657,7 @@ impl People {
                 counted: Vec::new(),
                 unscored: Vec::new(),
                 stable_ids: lamp_msgs::known::stable_ids(),
+                face_ids: lamp_msgs::owner_face::on(),
                 repair_revision: Arc::new(AtomicU64::new(0)),
             })
         };
@@ -664,6 +703,7 @@ impl People {
             counted: Vec::new(),
             unscored: Vec::new(),
             stable_ids: false,
+            face_ids: false,
             repair_revision: Arc::new(AtomicU64::new(0)),
         };
         if !aside.is_empty() {
@@ -686,7 +726,90 @@ impl People {
         if let Err(error) = opened.finish_pending() {
             eprintln!("lamp-eyes: the forgets that wait could not be finished now: {error}");
         }
-        Ok(opened.with_stable_ids(lamp_msgs::known::stable_ids()))
+        Ok(opened
+            .with_stable_ids(lamp_msgs::known::stable_ids())
+            .with_face_ids(lamp_msgs::owner_face::on()))
+    }
+
+    /// The same people, each keeping one face id or not
+    /// (`LAMP_OWNER_FACE`, read by [`Self::open`], #5495). On, everyone
+    /// without one is given one now, saved when their face was, and the
+    /// file is written at once: an id only in memory would be another
+    /// after a restart, and a pick made by it would then find no face. Off,
+    /// nothing changes.
+    #[must_use]
+    pub fn with_face_ids(mut self, on: bool) -> Self {
+        self.face_ids = on;
+        if on
+            && self.mint_faces()
+            && let Err(error) = self.save(&self.people)
+        {
+            eprintln!(
+                "lamp-eyes: the faces' new ids could not be written now ({error}); they are written with the next save"
+            );
+        }
+        self
+    }
+
+    /// Each person without a face id, or with one that isn't one or is an
+    /// earlier record's, given a new one, saved when the face was
+    /// (`added_unix_s`). Whether any was given.
+    fn mint_faces(&mut self) -> bool {
+        let mut taken: Vec<String> = Vec::new();
+        let mut minted = false;
+        for index in 0..self.people.len() {
+            let kept = self.people[index]
+                .face
+                .clone()
+                .filter(|face| lamp_msgs::owner_face::is_face_id(face) && !taken.contains(face));
+            let face = match kept {
+                Some(face) => face,
+                None => {
+                    minted = true;
+                    let mut held: Vec<&str> = taken.iter().map(String::as_str).collect();
+                    held.extend(
+                        self.people
+                            .iter()
+                            .filter_map(|person| person.face.as_deref()),
+                    );
+                    let face = fresh_face(&held);
+                    let person = &mut self.people[index];
+                    person.face = Some(face.clone());
+                    person.face_saved_unix_s = Some(person.added_unix_s);
+                    face
+                }
+            };
+            if self.people[index].face_saved_unix_s.is_none() {
+                minted = true;
+                self.people[index].face_saved_unix_s = Some(self.people[index].added_unix_s);
+            }
+            taken.push(face);
+        }
+        minted
+    }
+
+    /// Each person kept, by name, with their face id and when it was first
+    /// saved (#5495): only lamp-cloud's ask, for the app's owner pick. No
+    /// print.
+    pub fn faces(&self) -> Vec<serde_json::Value> {
+        self.people
+            .iter()
+            .map(|person| {
+                serde_json::json!({
+                    "name": person.name,
+                    "face": person.face,
+                    "added_unix_s": person.face_saved_unix_s.unwrap_or(person.added_unix_s),
+                })
+            })
+            .collect()
+    }
+
+    /// The face id of the person kept under `name`, if any.
+    pub fn face_of(&self, name: &str) -> Option<String> {
+        self.people
+            .iter()
+            .find(|person| same_name(&person.name, name))
+            .and_then(|person| person.face.clone())
     }
 
     /// The same people, each keeping one memory id or not
@@ -975,18 +1098,53 @@ impl People {
         {
             return Err("no prints, too many, or of the wrong length".into());
         }
-        self.remember_as(&name, prints, now_unix_s, None)
+        // Prints put in place of a name's by its name alone may be anyone's
+        // face: a new face id (#5495), so a pick never follows a name.
+        self.remember_as(&name, prints, now_unix_s, None, None)
+    }
+
+    /// [`Self::remember`] of prints already found to be the face kept under
+    /// `name`: its face id, and when it was first saved, stay (#5495).
+    fn remember_same_face(
+        &mut self,
+        name: &str,
+        prints: Vec<Vec<f32>>,
+        now_unix_s: u64,
+    ) -> Result<String> {
+        let name = plain_name(name).ok_or("that is not a name the lamp keeps")?;
+        if prints.is_empty()
+            || prints.len() > MOST_PRINTS
+            || prints.iter().any(|p| p.len() != PRINT)
+        {
+            return Err("no prints, too many, or of the wrong length".into());
+        }
+        let face = self
+            .people
+            .iter()
+            .find(|person| same_name(&person.name, &name))
+            .and_then(|person| {
+                person.face.clone().map(|face| {
+                    (
+                        face,
+                        person.face_saved_unix_s.unwrap_or(person.added_unix_s),
+                    )
+                })
+            });
+        self.remember_as(&name, prints, now_unix_s, None, face)
     }
 
     /// [`Self::remember`], carrying `carried`, a renamed person's memory id
     /// (#2176), to the name: else the id the name already has, else, with
-    /// the stable id on, a new one ([`fresh_id`]).
+    /// the stable id on, a new one ([`fresh_id`]). `face` is the face id
+    /// kept, and when it was first saved: a renamed person's, or the same
+    /// face's; else a new one (#5495).
     fn remember_as(
         &mut self,
         name: &str,
         prints: Vec<Vec<f32>>,
         now_unix_s: u64,
         carried: Option<String>,
+        face: Option<(String, u64)>,
     ) -> Result<String> {
         let name = name.to_owned();
         let had = self
@@ -999,6 +1157,16 @@ impl People {
         if next.len() >= MOST_PEOPLE {
             return Err("the lamp already knows as many people as it keeps".into());
         }
+        let face = self.face_ids.then(|| {
+            face.unwrap_or_else(|| {
+                let taken: Vec<&str> = self
+                    .people
+                    .iter()
+                    .filter_map(|person| person.face.as_deref())
+                    .collect();
+                (fresh_face(&taken), now_unix_s)
+            })
+        });
         let id = carried.or(had).or_else(|| {
             self.stable_ids.then(|| {
                 let taken: Vec<String> = next.iter().filter_map(|other| other.id.clone()).collect();
@@ -1016,6 +1184,8 @@ impl People {
             // The voice asks again.
             tell_visits: None,
             id,
+            face: face.as_ref().map(|face| face.0.clone()),
+            face_saved_unix_s: face.map(|face| face.1),
         });
         self.save(&next)?;
         self.people = next;
@@ -1200,7 +1370,7 @@ impl People {
                 .map(|(print, _)| print.clone())
                 .collect();
             return self
-                .remember(&kept, own, now_unix_s)
+                .remember_same_face(&kept, own, now_unix_s)
                 .map_err(|error| Refused::Store(error.to_string()));
         } else if known.is_empty() && !apart {
             let near = self
@@ -1233,6 +1403,7 @@ impl People {
             }
         }
         let mut carried = None;
+        let mut carried_face = None;
         let mut prints = prints;
         if !known.is_empty() {
             if !replace {
@@ -1268,6 +1439,23 @@ impl People {
                     })
                 })
                 .flatten();
+            // Its face id, and when that was first saved, go with it too
+            // (#5495), whatever the stable id's switch: a rename never
+            // changes who the owner is. The other faces a merge took leave
+            // theirs behind, never to be given again.
+            carried_face = known.first().and_then(|first| {
+                self.people
+                    .iter()
+                    .find(|person| same_name(&person.name, first))
+                    .and_then(|person| {
+                        person.face.clone().map(|face| {
+                            (
+                                face,
+                                person.face_saved_unix_s.unwrap_or(person.added_unix_s),
+                            )
+                        })
+                    })
+            });
             let mut next = self.people.clone();
             next.retain(|person| !known.iter().any(|other| same_name(other, &person.name)));
             let gone: Vec<String> = self
@@ -1281,7 +1469,7 @@ impl People {
             self.people = next;
             *replaced = gone;
         }
-        self.remember_as(&kept, prints, now_unix_s, carried)
+        self.remember_as(&kept, prints, now_unix_s, carried, carried_face)
             .map_err(|error| Refused::Store(error.to_string()))
     }
 
@@ -1566,6 +1754,10 @@ pub enum Ask {
     /// for their person's yes: only lamp-cloud asks this, for the owner's
     /// page (`face.list`, #2192). The plain list never names those.
     ListWaiting,
+    /// [`Self::ListWaiting`] with each kept person's face id and when it was
+    /// first saved (#5495): lamp-cloud asks this, for the app's owner pick.
+    /// No print.
+    ListIds,
     Who,
 }
 
@@ -1664,13 +1856,21 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
     struct ListWaiting {
         list: bool,
         waiting: bool,
+        ids: Option<bool>,
     }
-    if let Ok(ListWaiting {
-        list: true,
-        waiting: true,
-    }) = serde_json::from_slice(line)
-    {
-        return Some(Ask::ListWaiting);
+    match serde_json::from_slice(line) {
+        Ok(ListWaiting {
+            list: true,
+            waiting: true,
+            ids: None,
+        }) => return Some(Ask::ListWaiting),
+        Ok(ListWaiting {
+            list: true,
+            waiting: true,
+            ids: Some(true),
+        }) => return Some(Ask::ListIds),
+        Ok(_) => return None,
+        Err(_) => {}
     }
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
@@ -4638,6 +4838,12 @@ mod tests {
             ask_of(br#"{"list":true,"waiting":true}"#),
             Some(Ask::ListWaiting)
         );
+        assert_eq!(
+            ask_of(br#"{"list":true,"waiting":true,"ids":true}"#),
+            Some(Ask::ListIds)
+        );
+        assert_eq!(ask_of(br#"{"list":true,"waiting":true,"ids":false}"#), None);
+        assert_eq!(ask_of(br#"{"list":true,"ids":true}"#), None);
         assert_eq!(ask_of(br#"{"list":true,"waiting":false}"#), None);
         assert_eq!(ask_of(br#"{"waiting":true}"#), None);
         assert_eq!(ask_of(br#"{"who":true}"#), Some(Ask::Who));
@@ -5368,6 +5574,97 @@ mod tests {
         let known = path.with_file_name("known");
         keep_known(&known, Some("Sam"), people.id_of("Sam").as_deref(), None);
         assert_eq!(std::fs::read_to_string(&known).unwrap(), "Sam\n");
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+    /// #5495: with `LAMP_OWNER_FACE=on`, each face saved gets a random face
+    /// id, kept through a remembering of the same face and through a
+    /// rename, with when it was first saved; never given again after a
+    /// forget, and never kept by prints put in place of a name's by its
+    /// name alone. The list for lamp-cloud says name, id and time, no print.
+    #[test]
+    fn a_face_id_follows_the_face_never_the_name() {
+        let path = file("face-ids");
+        let mut people = People::open(path.clone()).unwrap().with_face_ids(true);
+        people.remember("Minh", vec![print(0.3)], 10).unwrap();
+        let first = people.face_of("Minh").unwrap();
+        assert!(lamp_msgs::owner_face::is_face_id(&first), "{first}");
+        // The same face again, checked: the same id, first saved at 10.
+        people
+            .remember_one("Minh", vec![print(0.3)], 20, false, false)
+            .unwrap();
+        assert_eq!(people.face_of("Minh"), Some(first.clone()));
+        // Renamed: the id and its time go with the face.
+        let kept = people
+            .remember_one_replacing("Sam", vec![print(0.3)], 30, true, false)
+            .unwrap();
+        assert_eq!(kept.replaced, ["Minh"]);
+        assert_eq!(people.face_of("Sam"), Some(first.clone()));
+        let listed = people.faces();
+        assert_eq!(
+            listed,
+            [serde_json::json!({"name": "Sam", "face": first, "added_unix_s": 10})]
+        );
+        assert!(!serde_json::to_string(&listed).unwrap().contains("prints"));
+        // Written, and read back the same.
+        let again = People::open(path.clone()).unwrap().with_face_ids(true);
+        assert_eq!(again.face_of("Sam"), Some(first.clone()));
+        // Prints put in place of a name's by its name alone: a new id.
+        people.remember("Sam", vec![print(1.7)], 40).unwrap();
+        let other = people.face_of("Sam").unwrap();
+        assert_ne!(other, first);
+        // Forgotten and saved again under the same name: never the old id.
+        people.forget("Sam").unwrap();
+        people.remember("Sam", vec![print(0.3)], 50).unwrap();
+        let later = people.face_of("Sam").unwrap();
+        assert!(later != first && later != other);
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    /// #5495: a merge keeps the id of the face it was recognised as; the
+    /// other face's id is gone for good.
+    #[test]
+    fn a_merge_keeps_only_the_recognised_faces_id() {
+        let path = file("face-merge");
+        let mut people = People::open(path.clone()).unwrap().with_face_ids(true);
+        people.remember("Ann", vec![print(0.3)], 1).unwrap();
+        people.remember("Bo", vec![print(1.7)], 2).unwrap();
+        let (ann, bo) = (
+            people.face_of("Ann").unwrap(),
+            people.face_of("Bo").unwrap(),
+        );
+        let kept = people
+            .remember_one_replacing("Cy", vec![print(0.3), print(1.7)], 3, true, false)
+            .unwrap();
+        assert_eq!(kept.replaced.len(), 2);
+        assert_eq!(people.face_of("Cy"), Some(ann));
+        assert!(people.faces().iter().all(|face| face["face"] != bo));
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    /// #5495: records from before the switch get an id on open, written at
+    /// once; off, nothing is minted and the file is as before.
+    #[test]
+    fn older_faces_get_an_id_on_open_only_with_the_switch() {
+        let path = file("face-old");
+        let old = format!(
+            r#"{{"version":1,"people":[{{"name":"Lan","prints":[{:?}],"added_unix_s":7}}]}}"#,
+            print(0.3)
+        );
+        std::fs::write(&path, &old).unwrap();
+        let off = People::open(path.clone()).unwrap().with_face_ids(false);
+        assert_eq!(off.face_of("Lan"), None);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), old);
+        let on = People::open(path.clone()).unwrap().with_face_ids(true);
+        let face = on.face_of("Lan").unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains(&face), "{text}");
+        assert_eq!(
+            on.faces(),
+            [serde_json::json!({"name": "Lan", "face": face, "added_unix_s": 7})]
+        );
+        // Opened again: the same id, nothing minted.
+        let again = People::open(path.clone()).unwrap().with_face_ids(true);
+        assert_eq!(again.face_of("Lan"), Some(face));
         std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
 }

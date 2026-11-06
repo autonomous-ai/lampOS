@@ -662,6 +662,8 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
     }
     // What was changed, never the value: the journal is not the person's.
     match (&done, reply.get("refused")) {
+        // A read (the owner's pick for lamp-cloud, #5495) says nothing.
+        (Some(done), _) if done.said.is_empty() => {}
         (Some(done), _) => eprintln!("lamp-setup: change: {}", done.said),
         (None, Some(why)) => {
             eprintln!("lamp-setup: change refused: {}", why.as_str().unwrap_or(""))

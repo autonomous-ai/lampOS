@@ -266,7 +266,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 62] = [
+pub const KINDS: [(&str, Switch); 64] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -308,6 +308,10 @@ pub const KINDS: [(&str, Switch); 62] = [
     ("faces.add_photo", |lamp| lamp.photos().is_some()),
     ("face.list", |lamp| lamp.faces().is_some()),
     ("face.remove", |lamp| lamp.faces().is_some()),
+    // The owner picked by face (#5495): with the faces page and root's
+    // helper, and LAMP_OWNER_FACE=on.
+    (crate::owner::KINDS[0], OWNER),
+    (crate::owner::KINDS[1], OWNER),
     ("schedule.list", |lamp| lamp.schedule().is_some()),
     ("schedule.cancel", |lamp| lamp.schedule().is_some()),
     ("guard.on", |lamp| lamp.guard().is_some()),
@@ -344,6 +348,15 @@ pub const KINDS: [(&str, Switch); 62] = [
 ];
 
 const HARNESS_SIGN_IN: Switch = |lamp| lamp.harness_sign_in().is_some();
+/// The faces page, and root's helper taking the owner by face (#5495).
+const OWNER: Switch = |lamp| lamp.faces().is_some() && owner_helper(lamp).is_some();
+
+/// Root's helper's socket, when the owner by face is on (#5495).
+fn owner_helper(lamp: &(impl Lamp + ?Sized)) -> Option<std::path::PathBuf> {
+    lamp.changes()
+        .filter(|changes| changes.owner_on())
+        .map(|changes| changes.socket.clone())
+}
 
 const WIFI: Switch = |lamp| lamp.changes().is_some_and(|c| c.wifi_on());
 /// The switch, and a computer to make the skill on (fourteen-P15).
@@ -563,13 +576,37 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         }
         // The faces the lamp knows, and removing one (#2192): names only,
         // and the eyes' own forget. Over the lamp's own account channel only.
+        // With the owner by face (#5495), each face's id, when it was first
+        // saved and the owner's badge too; a remove of the owner's face
+        // clears the pick and says `owner_cleared`.
         "face.list" if on(lamp, kind) => {
             let eyes = lamp.faces().ok_or_else(|| not_here(kind))?;
-            crate::faces::list(&eyes).map(Some)
+            match owner_helper(lamp) {
+                Some(socket) => crate::owner::list(&eyes, &socket).map(Some),
+                None => crate::faces::list(&eyes).map(Some),
+            }
         }
         "face.remove" if on(lamp, kind) => {
             let eyes = lamp.faces().ok_or_else(|| not_here(kind))?;
-            crate::faces::remove(&eyes, data, lamp.schedule()).map(Some)
+            let owner = owner_helper(lamp);
+            crate::faces::remove_with(&eyes, data, lamp.schedule(), owner.as_deref()).map(Some)
+        }
+        // The owner by face (#5495): read at once; a pick goes to root's
+        // helper, `starting` now and its result later, as the names go.
+        "owner.get" if on(lamp, kind) => {
+            let eyes = lamp.faces().ok_or_else(|| not_here(kind))?;
+            let socket = owner_helper(lamp).ok_or_else(|| not_here(kind))?;
+            crate::owner::get(&eyes, &socket).map(Some)
+        }
+        "owner.set" if on(lamp, kind) => {
+            let eyes = lamp.faces().ok_or_else(|| not_here(kind))?;
+            let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
+            let socket = changes.socket.clone();
+            let data = data.clone();
+            changes.start_with(kind, crate::owner::request_id(&data), move || {
+                crate::owner::set(&eyes, &socket, &data).map(Some)
+            });
+            Ok(None)
         }
         // The lamp's timers and reminders, for the app's Lamp 2 page
         // (#2195): only with `LAMP_APP_SCHEDULE=on`.

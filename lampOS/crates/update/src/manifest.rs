@@ -1359,6 +1359,7 @@ mod tests {
             "/etc/lampOS/body/lamp.env",
             "/etc/lampOS/person/name",
             "/etc/lampOS/person/place",
+            "/etc/lampOS/person/owner-face",
             "/etc/lampOS/controls/../update/key.pub",
             "/etc/lampOS/controls/.hidden",
             "/etc/lampOS/controls/",
