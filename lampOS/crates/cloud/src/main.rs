@@ -290,6 +290,9 @@ fn main() -> ExitCode {
             socket,
             device_id: account.device_id.clone(),
         }),
+        // The owner's face expressions and room sounds yeses (#5500): only
+        // with LAMP_APP_CONSENT=on; room sounds only with LAMP_PRIVACY_CONTROLS=no-slide.
+        consent: lamp_cloud::consent::Place::from_environment(),
     };
     // `can` names skills.make only while lamp-voice's maker has a computer (fourteen-P15).
     if let Some(socket) = &lamp.make_skill {
@@ -342,6 +345,7 @@ fn main() -> ExitCode {
         share: None,
         services: None,
         control: None,
+        consent: None,
         upload: None,
         shutdown: None,
     };

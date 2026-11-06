@@ -7,6 +7,7 @@ pub mod account;
 pub mod answer;
 pub mod beat;
 pub mod chat;
+pub mod consent;
 pub mod control;
 pub mod faces;
 pub mod guard;

@@ -471,3 +471,36 @@ fn on_replies_then_restarts_once_unlocked() {
     );
     let _ = fs::remove_dir_all(folder);
 }
+
+/// #5500: a new room sounds yes from the app restarts lamp-ears under
+/// lamp-update's lock alone, as lamp-control: no quiet, never in a round.
+#[test]
+fn a_room_sounds_yes_restarts_ears_once_unlocked() {
+    use std::{cell::RefCell, rc::Rc};
+    let (folder, records) = records_folder("ears-on");
+    // An update holds the lock until 20 s; the voice never rests.
+    let update = Rc::new(RefCell::new(Some(records.lock().unwrap())));
+    let letting = Rc::clone(&update);
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(move |now| {
+            if now >= 20 * S {
+                letting.borrow_mut().take();
+            }
+            vec![Heard::State(Voice::Speaking)]
+        }),
+    };
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    let said = change::restart_ears_when_unlocked(&mut ears, &records, &mut units);
+    assert_eq!(said, "lamp-ears restarted on the room sounds yes");
+    assert_eq!(ears.now, 20 * S);
+    assert_eq!(
+        units.calls,
+        vec![("try-restart lamp-ears.service".to_owned(), true)]
+    );
+    let _ = fs::remove_dir_all(folder);
+}

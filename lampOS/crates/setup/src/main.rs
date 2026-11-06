@@ -678,6 +678,16 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
         );
         eprintln!("lamp-setup: change: {said}");
     }
+    // A new room sounds yes from the app (#5500): lamp-ears reads it only
+    // at its start. No quiet, only no update at work, as lamp-control.
+    if done.as_ref().is_some_and(|done| done.restart_ears) {
+        let said = change::restart_ears_when_unlocked(
+            &mut change::Clock::default(),
+            &records,
+            &mut change::Systemctl,
+        );
+        eprintln!("lamp-setup: change: {said}");
+    }
     let Some(done) = done.filter(|done| done.restart_schedule || done.restart_voice) else {
         return Ok(true);
     };
