@@ -3086,7 +3086,10 @@ bound. The contract the app builds on is in #5198.
   shows its code and never its email. `revision` is the sign-in's id times
   1000 plus its changes: every change moves it, a read never does. A done
   sign-in has `message`: Harness's own result `message` (bounded, never one
-  holding an `@`) or the lamp's words for its code; Harness's
+  holding an `@`, a run of exactly eight digits, or the open sign-in's code
+  in any shape: the privacy reader's P3 on #5236; test
+  `a_result_keeps_harness_message_and_already_signed_in_for_the_app`) or the lamp's
+  words for its code; Harness's
   `alreadySignedIn:true` is `done` success with `already_signed_in:true`.
 - **The app's answer** (`Session::answer_from_app`): only for an app-started
   sign-in (`started_by_voice`), for its `id` (`not_this_sign_in`), once the
@@ -3279,7 +3282,9 @@ be taken are kept in the tasks part alone, each sign-in by its `id`
 (#2137's redesign, after its first version kept them per process and could
 never have asked or taken an answer on a lamp).
 
-- **`sign_in_computer`**, when the person asks to sign the lamp in: the code
+- **`sign_in_computer`**, when the person asks to sign the lamp in, to
+  connect the lamp to their computer or to Harness, or to set up hand-overs
+  to their computer (the first two since #5198's follow-up): the code
   is said digit by digit in two groups ("1 2 3 4, 5 6 7 8"), with where to
   type it (the Harness app under Machines ▸ Approve a device, or
   harness.autonomous.ai). A start refused says why: only the switch being
