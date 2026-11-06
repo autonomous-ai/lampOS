@@ -45,7 +45,8 @@ ASK_READERS = re.compile(r"\bTWO READS\**[ \t]*:\**[ \t]*\S")
 NAMES = re.compile(r"\bTWO\s+READS\b")
 # The Reviewer-lead's P2 on #5636: a dash followed by a letter is no separator, so "- ONE READ-OK covers the docs half"
 # opts nothing out.
-OPT_OUT = re.compile(r"^[ \t]*(?:#+[ \t]*|[-*+][ \t]+)?\**[ \t]*ONE READ\**[ \t]*"
+# El's P3 on #5643: at most three spaces before it, as four spaces or a tab make an indented code block.
+OPT_OUT = re.compile(r"^ {0,3}(?:#+[ \t]*|[-*+][ \t]+)?(?:\*+[ \t]*)?ONE READ\**[ \t]*"
                      r"(?::|[-\u2013\u2014](?![A-Za-z])|\(|$)", re.M)
 # The Reviewer-lead's P3 on #5636: a READ ASK is a comment whose first line asks with a commit ("READ ASK <sha>", after
 # a signature or not), as joining.md's markers say; a READ-OK or a note that mentions "the READ ASK" asks nothing.
@@ -61,16 +62,19 @@ def body_asks(body):
 
 
 def unfenced(body):
-    """The body without its fenced blocks (``` or ~~~); an unclosed fence runs to the end."""
+    """The body without its fenced blocks (``` or ~~~); an unclosed fence runs to the end. El's P3 on #5643: as in
+    CommonMark, a fence closes only on a line of its own character, at least as long as the opener, with nothing but
+    spaces after it, so "```" inside a "````" fence, or "```python" inside a "```" one, closes nothing."""
     out, fence = [], None
     for line in body.split("\n"):
-        m = re.match(r"[ \t]*(`{3,}|~{3,})", line)
-        if fence is None and m:
-            fence = m.group(1)[0] * 3
-        elif fence is not None and line.strip().startswith(fence):
+        if fence is None:
+            m = re.match(r" {0,3}(`{3,}|~{3,})", line)
+            if m:
+                fence = m.group(1)
+            else:
+                out.append(line)
+        elif re.fullmatch(r" {0,3}" + re.escape(fence[0]) + "{%d,}[ \t]*\r?" % len(fence), line):
             fence = None
-        elif fence is None:
-            out.append(line)
     return "\n".join(out)
 
 
