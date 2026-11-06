@@ -266,6 +266,7 @@ func (s *Server) runCorrelatedAppTurn(payload turnPayload) {
 	}
 	s.activeRequestID, s.activeRunID = payload.RequestID, payload.RunID
 	s.activeStarting = true
+	s.activeDiscord = isDiscordTurn(payload)
 	s.mu.Unlock()
 	s.startAppTurn(payload)
 }

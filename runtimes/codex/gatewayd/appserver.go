@@ -239,6 +239,9 @@ func appInput(p turnPayload) []map[string]any {
 }
 
 func (s *Server) steerAppTurn(p turnPayload) {
+	if s.holdForDestination(p) {
+		return
+	}
 	s.mu.Lock()
 	app, thread, turn := s.app, s.threadID, s.activeTurnID
 	s.mu.Unlock()

@@ -42,6 +42,24 @@ func Accept(in Inbound, allowedUser, allowedGuild string) (string, bool) {
 	return text, true
 }
 
+// RejectReason says why Accept refused a message, for the device log. It mirrors
+// Accept's checks in the same order.
+func RejectReason(in Inbound, allowedUser, allowedGuild string) string {
+	switch {
+	case allowedUser == "" || in.AuthorID != allowedUser:
+		return "not from the owner"
+	case in.BotUserID != "" && in.AuthorID == in.BotUserID:
+		return "from the bot itself"
+	case in.GuildID != "" && allowedGuild != "" && in.GuildID != allowedGuild:
+		return "from another server"
+	case in.GuildID != "" && !in.MentionsBot:
+		return "server message without an @mention of the bot"
+	case stripMention(in.Content, in.BotUserID) == "":
+		return "empty message"
+	}
+	return ""
+}
+
 // stripMention removes every mention of the bot user (<@id> and the nickname form
 // <@!id>) from content and trims the result.
 func stripMention(content, botUserID string) string {

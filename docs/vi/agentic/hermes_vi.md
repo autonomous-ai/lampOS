@@ -261,6 +261,13 @@ call hoặc tool đang chạy. `POST /v1/runs/{run_id}/stop` là thao tác cance
 acknowledgment `stopping` chưa phải terminal. Request không thể steer, gồm ảnh, đợi run native riêng thay vì bị bỏ hoặc
 chuyển sang conversation Responses không nối được lịch sử.
 
+Một request chỉ được gộp vào run native đang hoạt động khi cả hai trả lời về cùng một nơi, vì
+một câu trả lời cuối được gửi cho mọi request đã gộp. Lượt Discord (`[via:discord]`, xem
+[Discord relay](../discord-relay_vi.md)) không bao giờ được gộp theo cả hai chiều: giọng nói,
+giọng nói ambient và web chat đến trong lúc đó, tin Discord khác (cùng kênh hay không), và tin
+Discord đến trong lúc lượt giọng nói đang chạy đều đợi run hiện tại kết thúc, rồi bắt đầu run
+native riêng theo thứ tự đến. Steer giữa các request cùng đích đến không đổi và không thêm độ trễ.
+
 Steer đã nhận nhưng đến quá muộn có thể được trả lại trong `pending_steer` của
 terminal. Phải giữ phần này cho lượt tiếp theo, không tính là công việc run vừa
 kết thúc đã hoàn thành. Hermes nối nhiều text steer còn chờ bằng newline.

@@ -47,7 +47,11 @@ thread. Once that turn is terminal, the next input follows the normal start or
 resume path. This removes runtime FIFO delay for an active conversation, but it
 does not override OS safety policy: passive sensing, speaker/TTS safety gates,
 offline delivery, and inputs that cannot safely join the active thread may
-still be queued by os-server.
+still be queued by os-server. A Discord turn (`[via:discord]`) is the exception that the
+gateway enforces itself: it never shares a turn, because one reply answers every steered input.
+Speech or chat that arrives during a Discord turn, and a Discord message that arrives during any
+other turn, wait (up to 8 at once, checked every 200 ms) until the active turn ends and then
+start their own turn; steering between other inputs is unchanged.
 
 `agent_runtime` in `config.json` picks the backend; resolution lives in
 `system/agent/factory.go` `ProvideGateway()` — `"codex"` →

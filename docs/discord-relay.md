@@ -61,6 +61,25 @@ An accepted message becomes a normal chat turn on the active runtime, whichever 
 It waits (up to 2 minutes) for the agent to finish its current turn, then is sent. The run is
 marked silent, so the reply is **not** spoken. Up to 8 messages can be waiting at once.
 
+A Discord turn is never merged with another message. Runtimes that can fold a new message into
+the turn already running (Hermes native steering, Codex `turn/steer`) give every folded-in
+message the same final reply, so merging would put the room's conversation into the Discord
+channel, or the Discord answer onto the speaker. Instead:
+
+- Speech, ambient speech and web or phone chat that arrive while a Discord turn runs wait for it
+  to end, then run in order as their own turn.
+- A Discord message that arrives while another turn runs waits the same way, then runs as its own
+  turn.
+- Two Discord messages never share a turn, whichever channel they came from, so a reply never
+  crosses channels.
+- Messages for the same destination keep merging as before: speech into a speech turn is steered
+  with no added delay.
+
+A Discord turn that fails or is cancelled ends like any other turn: its typing signal stops and
+the messages waiting behind it run. Nothing waiting is dropped silently: a message a runtime
+cannot keep waiting (Codex holds at most 8, and none for longer than a turn can last) is rejected
+and ends with an error.
+
 There is no acknowledgement message for `discord_event`.
 
 ## Messages up: `discord_reply`, `discord_typing`
@@ -117,7 +136,10 @@ On startup the device switches itself to relay mode:
    sequence, every boot, a no-op once clean):
    - OpenClaw: `channels.discord` removed from `openclaw.json`, the discord plugin entry disabled.
    - Hermes: all `DISCORD_*` lines removed from `~/.hermes/.env`, and its Discord state files
-     (`gateway/discord_command_sync_state.json`, `cache/discord_capabilities.json`) deleted.
+     (`gateway/discord_command_sync_state.json`, `cache/discord_capabilities.json`) deleted, and
+     the stale Discord entries removed from `~/.hermes/channel_directory.json`. Every other
+     platform in that file is kept; the file is replaced atomically with its mode and owner kept,
+     and a missing or unreadable file is left as it is. This runs whichever runtime is active.
    - PicoClaw: `channel_list.discord` disabled in `config.json`, its settings removed from
      `.security.yml`.
    - Claude Code, Codex, OpenCode keep nothing outside `config.json`.

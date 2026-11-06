@@ -100,6 +100,35 @@ func TestDiscordRelayReconcileLeavesActiveRuntimeRunningWhenOnlyAnotherWasDirty(
 	}
 }
 
+func TestDiscordRelayReconcileCleansHermesChannelDirectoryWhateverRuntimeIsActive(t *testing.T) {
+	for _, active := range []string{domain.AgentRuntimeHermes, domain.AgentRuntimeOpenClaw, domain.AgentRuntimePicoclaw} {
+		t.Run(active, func(t *testing.T) {
+			oc, hm, pc := legacyRuntimeHomes(t)
+			directory := filepath.Join(hm, "channel_directory.json")
+			if err := os.WriteFile(directory, []byte(`{"platforms":{"discord":[{"id":"1","name":"general","guild":"Old Server"}],"telegram":[{"id":"42","name":"Owner"}]}}`), 0600); err != nil {
+				t.Fatal(err)
+			}
+			gw := &restartGateway{}
+			r := &DiscordRelayReconcile{
+				cfg: &config.Config{AgentRuntime: active},
+				gw:  gw, openclawDir: oc, hermesHome: hm, picoHome: pc,
+			}
+
+			r.Reconcile()
+
+			got, _ := os.ReadFile(directory)
+			if strings.Contains(string(got), "Old Server") || !strings.Contains(string(got), `"telegram"`) {
+				t.Fatalf("channel directory = %s", got)
+			}
+			before := string(got)
+			r.Reconcile()
+			if after, _ := os.ReadFile(directory); string(after) != before {
+				t.Error("second pass rewrote a clean channel directory")
+			}
+		})
+	}
+}
+
 func TestChannelReconcileAppliesDiscordWithoutCredential(t *testing.T) {
 	t.Chdir(t.TempDir())
 	gw := &fakeGateway{supported: []string{domain.ChannelDiscord}}

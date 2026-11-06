@@ -130,6 +130,31 @@ func managedStop(message string) bool {
 	return strings.EqualFold(text, "stop") || strings.EqualFold(text, "stop.") || text == "/stop" || text == "/interrupt"
 }
 
+// managedDiscordTurn reports whether the request is a Discord turn: its reply is
+// posted to one Discord channel, never spoken and never shared with another request.
+func managedDiscordTurn(request managedChat) bool {
+	text, ok := request.body.Input.(string)
+	return ok && domain.HasVia(text, domain.ViaDiscord)
+}
+
+// managedSameDestination reports whether request may be merged into the active turn.
+// One final reply is delivered to every merged request, so a request may join only a
+// turn that answers to the same place. A Discord turn keeps its own turn in every
+// direction (speech, chat or another Discord message, whatever the channel), so the
+// answer to one never lands in the other's destination; a request that does not
+// qualify waits for the active turn to end and then runs in order.
+func managedSameDestination(active *managedTurn, request managedChat) bool {
+	if managedDiscordTurn(request) {
+		return false
+	}
+	for _, merged := range active.requests {
+		if managedDiscordTurn(merged) {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *HermesService) managedAudible(request managedChat) bool {
 	text, ok := request.body.Input.(string)
 	return ok && managedUserInput(text, request.source) && !s.IsWebChatRun(request.runID) && !s.IsSilentRun(request.runID)
@@ -396,7 +421,7 @@ func (s *HermesService) managedLoop() {
 			for _, request := range incoming {
 				text, textOnly := request.body.Input.(string)
 				canControl := textOnly && managedUserInput(text, request.source) && (!s.IsSilentRun(request.runID) || s.IsWebChatRun(request.runID))
-				if active == nil || !canControl || active.stopping || request.body.Conversation != active.conversation {
+				if active == nil || !canControl || active.stopping || request.body.Conversation != active.conversation || !managedSameDestination(active, request) {
 					waiting = append(waiting, request)
 					continue
 				}
