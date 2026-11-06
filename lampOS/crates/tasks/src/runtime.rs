@@ -2557,6 +2557,15 @@ pub fn serve<C: Clock>(
         );
     }
     serve_with_adapter(config, clock, stop, move |session| {
+        // Harness's launcher in its pinned shape with the update hold
+        // (#5493), so a Harness command run by hand holds it too; a
+        // missing launcher is only said. Off unless set.
+        if let Some(line) = crate::hold::pin_at_start(
+            std::env::var(crate::hold::SWITCH).ok().as_deref(),
+            std::env::var_os("HOME").as_deref().map(Path::new),
+        ) {
+            eprintln!("{line}");
+        }
         if absent {
             return Ok(Production::Absent);
         }

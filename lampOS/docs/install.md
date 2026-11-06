@@ -1299,7 +1299,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        file.
      - **Held there:** Harness's own self-update is held by lamp-tasks'
        `LAMP_HARNESS_HOLD_UPDATES` (tasks.md, "Harness held at its pinned
-       version"). A Team account ignores it.
+       version"). A Team account ignores it. With that switch on in
+       lamp-tasks' unit, `harness-install` also writes Harness's launcher
+       in Harness's own pinned shape right after it installs, before it
+       starts lamp-tasks again, so a Harness command run by hand holds the
+       updates too (#5493; tasks.md, "The pinned launcher").
    - **Said to the app:** `harness-install.json` in the records,
      `{"install", "revision", "at_unix_ms", "version"?, "pinned"?,
      "error"?, "message"}` (`lamp_msgs::HarnessInstall`), on
