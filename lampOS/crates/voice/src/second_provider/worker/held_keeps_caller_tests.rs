@@ -208,7 +208,12 @@ fn play_seen(switches: Switches, lines: &[Line]) -> Vec<bool> {
             },
         );
         let held_why = heeding.heed(request, said, line.heard, None);
-        if held_why.is_none() {
+        // A let-out line with no answer is one the model declined
+        // (`not_for_me`): nothing is said, and the thread keeps no words of
+        // the lamp's for it.
+        if held_why.is_none() && line.answer.is_empty() {
+            answered.push((request, line.heard, line.answer, line.at + line.long));
+        } else if held_why.is_none() {
             let ended = line.at + line.long;
             answered.push((request, line.heard, line.answer, ended));
             let end_us =
@@ -1148,4 +1153,44 @@ fn held_keeps_a_question_asking_the_lamps_view() {
         line(6_800, 2_400, "Did you send the slides to Sam yet?", "Okay."),
     ];
     assert_eq!(run(true, &desk), [true, false], "held: desk");
+}
+
+/// lamp-52e6, 7 Nov 00:51 (#5110's re-sitting, HELD `talk_cook`): the
+/// model declined `talk_cook-4` (`not_for_me`), so the lamp said nothing
+/// to it, and `talk_cook-5`, a question right after, was held as untied:
+/// the line judged before it was not the one the lamp answered last. A
+/// let-out line the lamp didn't answer holds nothing: the next line still
+/// comes right after the lamp's last answer. A held desk line between
+/// still breaks the chain (`held_keeps_a_follow_up_sharing_no_word_with_the_answer`).
+#[test]
+fn held_keeps_the_chain_past_a_line_the_lamp_did_not_answer() {
+    let cook = [
+        line(
+            0,
+            2_600,
+            "Lamp, I want to cook something new this weekend.",
+            "How about a chicken curry? It's easy and tasty.",
+        ),
+        line(
+            7_600,
+            2_400,
+            "Ooh, that sounds nice. How long does it take?",
+            "About forty minutes, start to finish.",
+        ),
+        line(15_000, 2_000, "And what do I need to buy for it?", ""),
+        line(
+            19_000,
+            3_200,
+            "Hmm, I don't have coconut milk. What can I use instead?",
+            "Plain yogurt works well instead.",
+        ),
+        line(
+            27_700,
+            2_000,
+            "Perfect. I'll try that on Saturday.",
+            "Enjoy it!",
+        ),
+    ];
+    assert_eq!(run(false, &cook), [true; 5], "off");
+    assert_eq!(run(true, &cook), [true; 5], "held");
 }
