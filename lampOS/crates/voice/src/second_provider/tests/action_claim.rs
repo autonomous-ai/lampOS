@@ -573,3 +573,30 @@ fn a_worded_claim_in_a_turn_with_any_call_stands() {
         assert_eq!(went.asked, 2, "{name}");
     }
 }
+
+/// Twelve's refinement of the first builder's P2 on #5588: a request asked
+/// as a question ("Can you set a timer for one minute?") is still judged by
+/// the worded runs, since a claim with no call there is #5215's own bug.
+#[test]
+fn a_request_asked_as_a_question_is_still_judged_by_the_worded_claims() {
+    let went = worded(
+        "Lamp, can you set a timer for one minute?",
+        saying("Timer set for one minute."),
+        vec![calling("set_timer")],
+    );
+    assert_eq!(went.said, said(&["Timer set. It rings at 7:52 am."]));
+    assert_eq!(
+        (went.asked, went.ran.as_slice()),
+        (2, ["set_timer".to_owned()].as_slice())
+    );
+    assert!(told_claim(&went), "{:?}", went.notes);
+    let claim = "I've kept the light on until ten.";
+    let went = worded(
+        "Lamp, could you keep the light on until ten?",
+        saying(claim),
+        vec![saying(claim)],
+    );
+    assert_eq!(went.said, said(&[crate::action_claim::NOT_DONE_LINE]));
+    assert_eq!((went.asked, went.ran.len()), (2, 0));
+    assert!(told_claim(&went), "{:?}", went.notes);
+}

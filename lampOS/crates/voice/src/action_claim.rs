@@ -966,6 +966,8 @@ mod tests {
             "Do you remember my timer",
             "Does the light stay on",
             "Okay, the light stays on until ten?",
+            "How long will the light stay on?",
+            "Can the light stay on until ten?",
         ] {
             assert!(asked_as_a_question(said), "{said:?}");
         }
@@ -976,6 +978,15 @@ mod tests {
             "Turn off the lights",
             "Lamp, howl like a wolf.",
             "",
+            // A request asked as a question is still a request.
+            "Lamp, can you set a timer for one minute?",
+            "Lamp, could you keep the light on until ten?",
+            "Will you turn it up?",
+            "Hey Lamp, would you dim the light",
+            "Can I have a timer for ten minutes?",
+            "Please, is it possible to set a timer?",
+            "Is it okay to set a timer, please?",
+            "CAN YOU MAKE IT LOUDER?",
         ] {
             assert!(!asked_as_a_question(said), "{said:?}");
         }
