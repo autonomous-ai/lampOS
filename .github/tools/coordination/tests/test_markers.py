@@ -4,7 +4,7 @@ import json, os, shutil, subprocess, sys, tempfile, unittest
 sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
-from markers import read_markers, parse_marker, signer, merge_reviews
+from markers import read_markers, parse_marker, signer, merge_reviews, lifted_commits, held_note
 from reads2 import two_reads, body_names_unasked
 from qholds import standing
 
@@ -388,6 +388,78 @@ class BodyAsks(unittest.TestCase):
         self.assertEqual(run("This PR needs TWO READS (privacy)."), "unasked")
         self.assertEqual(run("TWO READS: Fourth."), "")
         self.assertEqual(run("Nothing about reads."), "")
+
+
+class LiftedByCommit(unittest.TestCase):
+    """6 Nov (#5534): lifting words naming a full commit, and an unsigned READ-OK lifting the same account's signed HOLD."""
+    OLD = "1d3d9711f8ce871e21483fd840f57b3a5570d174"
+
+    def test_the_lifting_words_name_a_full_commit(self):
+        self.assertEqual(lifted_commits("My HOLD on " + self.OLD + " is lifted."), [self.OLD])
+        self.assertEqual(lifted_commits("My HOLD on `" + self.OLD + "` is lifted."), [self.OLD])
+        self.assertEqual(lifted_commits("This lifts my HOLD on `" + self.OLD[:10] + "`."), [self.OLD[:10]])
+        self.assertEqual(lifted_commits("my P2 is fixed; HOLD lifted"), [])
+        self.assertIsNone(lifted_commits("No P1 or P2. My HOLD stands on " + self.OLD + "."))
+
+    def test_an_unsigned_hold_on_a_full_commit_is_lifted(self):
+        # The Reviewer-lead on #5521: "HOLD <full>  Read at Fifth's ask." then "READ-OK <new>  My HOLD on <full> is lifted."
+        cs = [c("writer-a", "HOLD " + self.OLD + "  Read at the author's ask. The base went in by train."),
+              c("writer-a", "READ-OK " + HEAD + "  My HOLD on " + self.OLD + " is lifted. - **The rebase:** clean.")]
+        self.assertEqual(read_markers(cs, W), "READ-OK " + HEAD)
+
+    def test_a_signed_hold_is_lifted_by_the_same_accounts_unsigned_read_ok_on_its_commit(self):
+        # #5235: "Reviewer-lead: HOLD …" keyed writer-a/reviewer-lead; the READ-OK keyed writer-a/ said so.
+        cs = [c("writer-a", "HOLD " + self.OLD + "\n\nReviewer-lead, 10:00: one P2."),
+              c("writer-a", "READ-OK " + HEAD + "\n\nMy HOLD on `" + self.OLD + "` is lifted: the P2 is fixed.")]
+        self.assertEqual(read_markers(cs, W), "READ-OK " + HEAD)
+
+    def test_a_read_ok_that_doesnt_say_lifted_clears_nothing(self):
+        cs = [c("writer-a", "HOLD " + self.OLD + "\n\nReviewer-lead, 10:00: one P2."), c("writer-a", "READ-OK " + HEAD + "\n\nThe P2 is fixed.")]
+        self.assertEqual(read_markers(cs, W), "HELD")
+        cs = [c("writer-a", "HOLD " + self.OLD + "  Read at the author's ask."), c("writer-a", "READ-OK " + HEAD + "  Read again on " + self.OLD + ".")]
+        self.assertEqual(read_markers(cs, W), "HELD")
+
+    def test_only_the_same_login_lifts(self):
+        for hold in ("HOLD " + self.OLD + "  Read at the author's ask.", "HOLD " + self.OLD + "\n\nReviewer-lead, 10:00: one P2."):
+            cs = [c("writer-a", hold), c("writer-b", "READ-OK " + HEAD + "  My HOLD on " + self.OLD + " is lifted.")]
+            self.assertEqual(read_markers(cs, W), "HELD", hold)
+
+    def test_only_a_hold_on_the_commit_it_names(self):
+        for hold in ("HOLD " + self.OLD + "  Read at the author's ask.", "HOLD " + self.OLD + "\n\nReviewer-lead, 10:00: one P2."):
+            cs = [c("writer-a", hold), c("writer-a", "READ-OK " + HEAD + "  My HOLD on " + OTHER + " is lifted.")]
+            self.assertEqual(read_markers(cs, W), "HELD", hold)
+
+    def test_another_readers_hold_on_the_same_account_is_never_touched(self):
+        # One account signs for two readers, both holding the commit: an unsigned lift can't say whose, so both stand.
+        cs = [c("writer-a", "HOLD " + self.OLD + "\n\nReviewer-lead, 10:00: one P2."),
+              c("writer-a", "HOLD " + self.OLD + "\n\nSixth, 10:05: a privacy P2."),
+              c("writer-a", "READ-OK " + HEAD + "\n\nMy HOLD on " + self.OLD + " is lifted.")]
+        self.assertEqual(read_markers(cs, W), "HELD")
+        # Signed, it lifts only its own: Sixth's stands.
+        cs[2] = c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 11:00: my HOLD on " + self.OLD + " is lifted.")
+        self.assertEqual(read_markers(cs, W), "HELD")
+        cs.append(c("writer-a", "READ-OK " + HEAD + "\n\nSixth, 11:10: the privacy P2 is fixed."))
+        self.assertEqual(read_markers(cs, W), "READ-OK " + HEAD)
+
+    def test_a_queue_hold_is_lifted_by_a_full_commit_and_only_its_own(self):
+        q = [c("writer-b", "HOLD " + self.OLD + "\n\nSeventh, 09:40: lamp check pending.", "2026-11-03T02:40:00Z")]
+        lift = lambda sha: [c("writer-b", "READ-OK " + self.OLD + "\n\nSeventh, 10:30: my HOLD on " + sha + " is lifted.", "2026-11-03T03:30:00Z")]
+        self.assertEqual(standing(self.OLD, q, lift(self.OLD), W), "")
+        self.assertNotEqual(standing(self.OLD, q, lift(OTHER), W), "")
+
+    def test_a_held_pr_with_a_read_ok_is_noted_with_its_standing_holds(self):
+        cs = [c("writer-a", "HOLD " + self.OLD + "\n\nReviewer-lead, 10:00: one P2."), c("writer-b", "READ-OK " + HEAD + "\n\nSixth, 10:30")]
+        self.assertEqual(held_note(cs, W), HEAD + " writer-a/reviewer-lead=" + self.OLD[:10])
+        self.assertEqual(held_note(cs[:1], W), "", "no READ-OK: nothing to note")
+        self.assertEqual(held_note(cs[1:], W), "", "not held")
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+            f.write("\n".join(sorted(W)) + "\n"); wf = f.name
+        try:
+            run = subprocess.run([sys.executable, "-I", os.path.join(HERE, "markers.py"), "--writers", wf, "--held"],
+                                 input="".join(json.dumps(x) + "\n" for x in cs), capture_output=True, text=True)
+            self.assertEqual(run.stdout.strip(), HEAD + " writer-a/reviewer-lead=" + self.OLD[:10])
+        finally:
+            os.unlink(wf)
 
 
 if __name__ == "__main__":

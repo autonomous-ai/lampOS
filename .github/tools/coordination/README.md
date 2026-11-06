@@ -16,7 +16,7 @@ Each script keeps its dated comments. They are the history of each rule.
 | `behind-unrelated.sh [--no-crates] TRAIN_HEAD [LAMP_VOICE]` | Used by `merge-when-green.sh --behind-unrelated`. Read-only. Prints `merge as is: ...` (exit 0) or `rebuild: <reason>` (exit 1); see "A green train behind lamp-voice" below. |
 | `still-eligible.sh PR...` | Used before a merge. Fails if any carried PR is now held (on the PR or on the Queue), unread, short of a TWO READS ask, or can't be fetched. |
 | `lv-quiet.sh` | Used by `merge-when-green.sh`. Waits (at most 45 min) until no `lamp-voice` push build is still running. |
-| `markers.py [--writers FILE] [PR]` | Reads a PR's comments and review bodies as JSON lines `{login, body}` on stdin. Prints `HELD`, `READ-OK <sha>` or nothing. `markers.py --merge COMMENTS REVIEWS` merges the two fetches into one list in time order (`lib.sh`). |
+| `markers.py [--writers FILE] [--held] [PR]` | Reads a PR's comments and review bodies as JSON lines `{login, body}` on stdin. Prints `HELD`, `READ-OK <sha>` or nothing. With `--held`, a held PR that has a READ-OK prints `<READ-OK sha> <key>=<commit> …`, one per standing HOLD (the train bot logs it once per head), else nothing. `markers.py --merge COMMENTS REVIEWS` merges the two fetches into one list in time order (`lib.sh`). |
 | `reads2.py [--writers FILE] HEAD_SHA [EARLIER_HEAD...]` | Reads the PR body, comments and review bodies as JSON lines. Prints `none`, `met N` or `short N` for a TWO READS ask. A READ-OK for an earlier head given (the bot gives those with the same patch) counts as one for the head. |
 | `qholds.py [--writers FILE] HEAD QUEUE_JSONL` | Reads the PR's comments and review bodies as JSON lines `{login, body, created_at}` on stdin, and the Queue's from the file. Prints the time of a Queue HOLD that holds this head, or nothing. |
 | `lib.sh` | Sourced by the scripts: the writers list and the fetches, each failing closed, and the build-input and lane tests (`coord_input`, `coord_lane`), read from `lampos-arm64.yml`'s and `lampos-sdk.yml`'s `pull_request` paths. |
@@ -191,7 +191,11 @@ If any Queue issue (#4710 or #5385) can't be fetched, no PR is eligible that rou
 - A signed HOLD is keyed on the login plus the signed name. It stands until the same login and name post a later READ-OK.
   Words alone ("this clears my HOLD" in a comment that is not a READ-OK) never lift it.
 - An unsigned HOLD stands until that login posts a later READ-OK whose first 400 characters say the HOLD is lifted or cleared
-  ("HOLD lifted", "clears my HOLD", "lifts my 16:45 HOLD").
+  ("HOLD lifted", "clears my HOLD", "lifts my 16:45 HOLD", "My HOLD on <full commit> is lifted").
+  Lifting words that name a commit clear only that login's HOLDs on that commit (#5534).
+- A signed HOLD is also lifted by the same login's unsigned READ-OK whose lifting words name its commit, but only when
+  exactly one signed HOLD of that login is on that commit: one account may sign for two readers, and neither reader's
+  HOLD is lifted by words that can't say whose (#5534).
 - The bot's own `HOLD train N` clears on any writer's later READ-OK marker that names a commit. A quoted READ-OK does not clear it.
 - Any HOLD closed in words but never cleared by a READ-OK as above is lifted only by a row in `holds-lifted.tsv`.
   A row's key is `<login>/<signed name, lowercase>`, `<login>/unsigned#<N>` (N counts the PR's comments from 0; reviews never count),
