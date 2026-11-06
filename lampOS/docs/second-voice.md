@@ -5668,7 +5668,12 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   `LAMP_LOOK_FULL`), spoken turns are offered `take_a_look`
   (`second_provider::LOOK_CALL`, `worker::chat_tools` with `look`; texts
   are not) and told "When you would look, call take_a_look"
-  (`worker::LOOK_CALL_NOTE`). It is one of the core within the route's bound of 48:
+  (`worker::LOOK_CALL_NOTE`), in the camera's version of the character
+  only (`worker::spoken_version`): the version without one says the eye
+  is closed, so a closed-eye turn is not also told to look (#5530). The
+  function stays offered; called with the eye closed, the lamp says "Let
+  me look." and the look turn, with no still within 2.6 s, says the eye
+  was shut (`speak_up::NO_LOOK_NOTE`). It is one of the core within the route's bound of 48:
   a list at the bound before it keeps it, and the bound cuts the next in
   its order instead (`fetch_page` first), said once as every cut is
   (`past the bound of 48, left out: …`). Added after the bound before, a
