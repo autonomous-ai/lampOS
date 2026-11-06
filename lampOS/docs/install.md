@@ -313,7 +313,16 @@ error line names `reports_state`; `reports_stop` and `dance` stay
 (`with_reports_on_dance_stays_at_the_bound`). The built-in
 instruction tells the model its head sits on an arm that moves and that a
 dance is a call (lamp-0c89, 21 Oct, answered "I've no legs to dance with"
-with `dance` given; `crates/voice/src/config.rs`). The voice leaves out by that order what
+with `dance` given; `crates/voice/src/config.rs`). It also names the lamp's
+microphone, its voice through its speaker and its camera, its eye, and tells
+it to say it is Lamp when asked who or what it is (#5530); "You are Lamp"
+stays its first words, and the owner's chosen character and the setup name
+are told after it. Only the version for no usable camera says the eye is
+off or closed and not to pretend to see. The Live route takes the camera's
+version when its session has a camera; the second route only while it has a
+look and the camera is allowed, its privacy slide open, chosen for each turn
+([second-voice.md](second-voice.md), "Same character, memory, thread and
+tools"). The voice leaves out by that order what
 is past 32, so Desk tutor's two (installable) would push its marks'
 `show_verdict` out, never `dance`. lamp-4ace's
 own unit keeps `LAMP_SCHEDULE_SPEAK=on` and the voice's own news until the
