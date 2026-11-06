@@ -1243,6 +1243,10 @@ rewrite only the `exec` line, so the preamble stays.
   is`) or is owned by another uid than its `bin` folder's owner (`owned by
   uid U, not the bin folder's owner B, left as it is`), both checked on the
   one `O_NOFOLLOW` open file (two security reads' P3 on #5624).
+  Nor with one over 64 KiB (Harness's is a few hundred bytes): its size is
+  checked on that open file and the read stops past the cap, so a launcher
+  that grows meanwhile is still bounded (`N bytes, over the 64 KiB cap, left
+  as it is`; a P3 on #5647).
 - **Journal:** lamp-tasks says `tasks: Harness's launcher pinned (…): <path>`,
   `tasks: Harness's launcher already pinned: <path>`, `tasks: no Harness
   launcher at <path>: left alone` or `tasks: Harness's launcher not pinned:
