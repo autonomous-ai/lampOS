@@ -53,6 +53,10 @@ pub fn note_for(owner: Option<&str>, names: &[String]) -> Option<String> {
     (!names.is_empty()).then(|| note(names))
 }
 
+/// What the Live route is told when everything it was told of in this
+/// session has since been unlinked (Jarvis's P3 on #5598).
+pub const UNLINKED_NOTE: &str = "(For you to know, not to answer: nothing is linked to you in the app's Connectors now. The services you were told of earlier in this conversation are no longer linked.)";
+
 /// What the Live route told of what is linked: once a session for each
 /// set of names, so a session is told again only when a link is made or
 /// removed, or in a fresh session.
@@ -65,7 +69,13 @@ impl LiveTold {
     /// The note due beside a line of `session` whose owner is `owner`, with
     /// `names` linked ([`note_for`]): none when this session was told these
     /// names already.
-    pub fn due(&self, session: u64, owner: Option<&str>, names: &[String]) -> Option<String> {
+    pub fn due(
+        &self,
+        session: u64,
+        owner: Option<&str>,
+        names: &[String],
+        _private_room: bool,
+    ) -> Option<String> {
         if self
             .told
             .as_ref()
@@ -111,17 +121,53 @@ mod tests {
     fn services_told_the_live_route_once_a_session_for_each_set_of_names() {
         let mut live = LiveTold::default();
         let notion = names(&["Notion"]);
-        assert_eq!(live.due(1, None, &notion), None);
+        assert_eq!(live.due(1, None, &notion, true), None);
         let told = live
-            .due(1, Some("owner"), &notion)
+            .due(1, Some("owner"), &notion, true)
             .expect("the owner's line is told");
         assert_eq!(told, note(&notion));
         live.told(1, notion.clone());
-        assert_eq!(live.due(1, Some("owner"), &notion), None);
+        assert_eq!(live.due(1, Some("owner"), &notion, true), None);
         let both = names(&["Notion", "Gmail"]);
-        assert_eq!(live.due(1, Some("owner"), &both), Some(note(&both)));
-        assert_eq!(live.due(2, Some("owner"), &notion), Some(note(&notion)));
-        assert_eq!(live.due(2, Some("owner"), &[]), None);
+        assert_eq!(live.due(1, Some("owner"), &both, true), Some(note(&both)));
+        assert_eq!(
+            live.due(2, Some("owner"), &notion, true),
+            Some(note(&notion))
+        );
+        assert_eq!(live.due(2, Some("owner"), &[], true), None);
+    }
+
+    /// Jarvis's P2 on #5598: a Live session keeps what it was told, so a
+    /// guest later in it could hear the names. Only the private room, where
+    /// every line is the owner's (the PM's ruling (a) on #5523), tells the
+    /// Live route; with it off, the Live route is told nothing.
+    #[test]
+    fn the_live_route_is_told_only_in_the_private_room() {
+        let live = LiveTold::default();
+        let notion = names(&["Notion"]);
+        assert_eq!(live.due(1, Some("owner"), &notion, false), None);
+        assert_eq!(
+            live.due(1, Some("owner"), &notion, true),
+            Some(note(&notion))
+        );
+    }
+
+    /// Jarvis's P3 on #5598: once everything told in a session is unlinked,
+    /// the session is told so once, not left with the old names; a session
+    /// told nothing is told nothing.
+    #[test]
+    fn a_live_session_is_told_once_when_everything_is_unlinked() {
+        let mut live = LiveTold::default();
+        assert_eq!(live.due(1, Some("owner"), &[], true), None);
+        live.told(1, names(&["Notion"]));
+        assert_eq!(
+            live.due(1, Some("owner"), &[], true),
+            Some(UNLINKED_NOTE.to_owned())
+        );
+        assert_eq!(live.due(1, None, &[], true), None);
+        live.told(1, Vec::new());
+        assert_eq!(live.due(1, Some("owner"), &[], true), None);
+        assert_eq!(live.due(2, Some("owner"), &[], true), None);
     }
 
     #[test]
