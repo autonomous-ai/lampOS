@@ -49,8 +49,12 @@ with their face (`known_faces::owner_now`, kept fresh while services are on),
 are held to (`memory_scope::ScopeLease::scope`): the line must be admitted as
 the owner's known face, not held by a face's gap or carried as a
 conversation going on, and not narrowed to the room (another face seen
-speaking it). A guest's line, an unknown face's, the room's, a line held or
-narrowed, and a request with no scope are told `OWNER_ONLY`, "Not done: only
+speaking it), nor the owner's only by their face alone in view
+(`LAMP_PERSON_SCOPE_ONE_FACE_READS`, `ScopeLease::forgets_need_mouth`: that
+counts for saving and recall, never for acting as them, so an off-camera
+guest's "read my mail" with the owner silent alone in view reads nothing). A
+guest's line, an unknown face's, the room's, a line held or narrowed, a
+one-face-read line, and a request with no scope are told `OWNER_ONLY`, "Not done: only
 the lamp's owner can use their linked services, and I can't tell it is them
 now. Say so plainly, in a few words, and ask them to look at the lamp so it
 can see who is asking.", and nothing is called, for reads and writes alike. A request not heard live (a scheduled run, a skill's or the
