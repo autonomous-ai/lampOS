@@ -2150,15 +2150,16 @@ fn the_product_sleeps_and_wakes_with_the_privacy_slide() {
     }
 }
 
-/// Tastes first in the session note (`LAMP_MEMORY_PROFILE`), one of Tiers'
-/// ideas in Days, is on in the product (the memory owner's call on 5 Nov, off
-/// for the candidate on 6 Nov, #5464, and back on after its played check
-/// passed on lamp-06c1 on 6 Nov, #5331). A newer correction first
-/// (`LAMP_MEMORY_NEWER_FIRST`) and a maybe or a plan marked
-/// (`LAMP_MEMORY_STRENGTH`) stay off until a played check reaches their own
-/// fields. Each sends its field only with Days on.
+/// Tastes first in the session note (`LAMP_MEMORY_PROFILE`) and a maybe or a
+/// plan marked (`LAMP_MEMORY_STRENGTH`), two of Tiers' ideas in Days, are on
+/// in the product (the memory owner's call on 5 Nov, off for the candidate on
+/// 6 Nov, #5464, and back on after their played checks on lamp-06c1 on 6 Nov,
+/// #5331 and #5503). A newer correction first (`LAMP_MEMORY_NEWER_FIRST`)
+/// stays off: with REPLACES and KEEP_QUIETLY on, a played correction is
+/// replaced or kept alone, so it is not reachable as played. Each sends its
+/// field only with Days on.
 #[test]
-fn the_product_keeps_tastes_first_and_leaves_newer_first_and_strength_off() {
+fn the_product_keeps_tastes_first_marks_maybes_and_leaves_newer_first_off() {
     let voice = install::PRODUCT
         .iter()
         .find(|(unit, _)| *unit == "lamp-voice.service")
@@ -2166,17 +2167,18 @@ fn the_product_keeps_tastes_first_and_leaves_newer_first_and_strength_off() {
         .1;
     let service = section(voice, "Service");
     for line in [
+        "Environment=LAMP_MEMORY_STRENGTH=on",
         "Environment=LAMP_MEMORY_PROFILE=on",
         "Environment=LAMP_MEMORY_DAYS=on",
     ] {
         assert!(service.contains(&line), "the voice lacks {line}");
     }
-    for switch in ["LAMP_MEMORY_NEWER_FIRST", "LAMP_MEMORY_STRENGTH"] {
-        assert!(
-            !service.iter().any(|line| line.contains(switch)),
-            "the voice sets {switch}"
-        );
-    }
+    assert!(
+        !service
+            .iter()
+            .any(|line| line.contains("LAMP_MEMORY_NEWER_FIRST")),
+        "the voice sets LAMP_MEMORY_NEWER_FIRST"
+    );
 }
 
 /// #2860: the product sees who speaks, the eyes reading each face's speaking
