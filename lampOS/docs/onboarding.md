@@ -154,6 +154,18 @@ owed line, and not once the walk has moved on: a step's own line only while
 that step is still led as it was, a line between asks only while nothing
 has been asked since (`Onboarding::still_owed`).
 
+**A step's first note never said is asked again at once.** Every step's
+first note (its ask: "What should I call you?" and the rest, not only
+`where_you_sit`'s intro) is bound to its turn the same way. Ended `Unsaid`
+(lamp-52e6, build 10507, 14:57:20: `who_you_are` asked, its turn retired by
+a room line heard as no words, and the walk waited the 90 s give-up in
+silence before asking again; stable 10467 did too), the step is asked again
+as soon as the lamp may speak and the room has been quiet `START_QUIET_US`,
+`MOST_UNSAID` (2) times at most, only while that same ask is led and
+nothing has been answered (`Onboarding::first_note_finished`,
+`onboarding_note_unsaid` with `"first": true`). Any of it played, it is
+not; the step gate and the 90 s give-up of a heard ask are as before.
+
 ## Installed walk data
 
 Voice reads `/var/lib/lampOS/skills/onboarding/skill.toml` once when its service
@@ -314,7 +326,9 @@ a reset wipes it with the file. An older voice reads past the field. Tests:
 
 The conversational steps keep their tool calls and consent clauses, but say
 their questions exactly: `who_you_are` asks "What should I call you?", says the
-name back as a question on its own and waits for its yes (the setup face save
+name back as one clear yes-or-no question on its own, the name and then "did
+I get that right?", never the name alone (lamp-52e6, build 10507: "Leo?
+Leo." asked nothing), and waits for its yes (the setup face save
 needs that read-back, #5140; a read-back folded into the face question was
 refused every time, #5415), then asks "May I remember your face, so I know you
 next time?". A face save refused for the read-back is held by the voice, and

@@ -711,6 +711,9 @@ struct Led {
     touched: bool,
     /// Asked again after its conversation ended unanswered ([`MOST_UNSAID`]).
     asked_again: u8,
+    /// Its first note's turns that played none of it, each asked again at
+    /// once ([`Onboarding::first_note_finished`], [`MOST_UNSAID`]).
+    first_unsaid: u8,
     /// A `later` re-offer: the step's count before this offer was counted,
     /// given back if the offer is dropped with nothing tried ([`Onboarding::drop_led`]).
     counted_from: Option<u8>,
@@ -874,12 +877,16 @@ pub struct Onboarding {
     /// A second word owed once [`Self::owed`] is said: how_you_sound's
     /// `near_failed`, after its sentence's line.
     owed_after: Option<String>,
-    /// "Where you sit"'s intro was handed out by this tick, for the caller
-    /// to bind to its turn ([`Self::bind_opener`]).
+    /// A step's first note ("where you sit"'s intro among them) was handed
+    /// out by this tick, for the caller to bind to its turn
+    /// ([`Self::bind_opener`]).
     opener_said: bool,
-    /// The turn the intro is said in: `opened` is kept only when it is
-    /// heard (the Reviewer-lead's P3 on #4095).
+    /// The turn that note is said in: the intro's `opened` is kept only
+    /// when it is heard (the Reviewer-lead's P3 on #4095); any step's
+    /// first note never said is asked again at once.
     opener_turn: Option<(BootId, u64)>,
+    /// What was being asked when [`Self::opener_turn`] was bound.
+    opener_asking: Asking,
     /// Intro turns not heard this walk: past [`MOST_UNSAID`] the intro is
     /// kept as said anyway, so it is not repeated forever.
     opener_unsaid: u8,
@@ -1133,6 +1140,7 @@ impl Onboarding {
             owed_after: None,
             opener_said: false,
             opener_turn: None,
+            opener_asking: None,
             opener_unsaid: 0,
             seen_us: None,
             read_us: None,
@@ -2081,8 +2089,9 @@ impl Onboarding {
             .or(self.owed_note.turn)
     }
 
-    /// Binds "where you sit"'s intro, handed out by this loop's tick, to the
-    /// turn it is said in; false for any other note.
+    /// Binds a step's first note ("where you sit"'s intro among them),
+    /// handed out by this loop's tick, to the turn it is said in; false for
+    /// any other note.
     /// An owed line handed out by this loop's tick is bound the same way
     /// ([`OwedNote`]).
     pub(crate) fn bind_opener(&mut self, voice_boot: BootId, turn: u64) -> bool {
@@ -2094,6 +2103,7 @@ impl Onboarding {
             return false;
         }
         self.opener_turn = Some((voice_boot, turn));
+        self.opener_asking = self.asking();
         true
     }
 
@@ -2110,6 +2120,12 @@ impl Onboarding {
             return;
         }
         self.opener_turn = None;
+        let then = self.opener_asking.take();
+        let intro = then.is_some_and(|(step, _)| step == Step::WhereYouSit) && !self.desired.opened;
+        if !intro {
+            self.first_note_finished(then, delivery, now_us);
+            return;
+        }
         let heard = matches!(delivery, Delivery::Whole | Delivery::Gapped);
         if !heard {
             self.opener_unsaid = self.opener_unsaid.saturating_add(1);
@@ -2134,6 +2150,36 @@ impl Onboarding {
             self.desired.opened = true;
             self.save();
         }
+    }
+
+    /// A step's first note whose turn played none of it (lamp-52e6, build
+    /// 10507: who_you_are's "What should I call you?" retired by a room
+    /// line heard as no words) was never heard: the step is asked again as
+    /// soon as the lamp may speak and the room is quiet, [`MOST_UNSAID`]
+    /// times at most, not left waiting [`STEP_GIVE_UP_US`] in silence.
+    /// Only while that same ask is led and nothing has been answered; one
+    /// partly played is not said again.
+    fn first_note_finished(&mut self, then: Asking, delivery: Delivery, now_us: u64) {
+        if delivery != Delivery::Unsaid {
+            return;
+        }
+        let Some(led) = self
+            .led
+            .as_mut()
+            .filter(|led| led.asked_us.is_some() && then == Some((led.step, led.asked_us)))
+        else {
+            return;
+        };
+        let again = led.answers == 0 && led.first_unsaid < MOST_UNSAID;
+        if again {
+            led.asked_us = None;
+            led.guided_us = None;
+            led.first_unsaid += 1;
+        }
+        let step = led.step.name();
+        self.records
+            .push(json!({"kind":"onboarding_note_unsaid","step":step,
+            "first":true,"said_again":again,"at_us":now_us}));
     }
 
     /// The bound invitation's first audio reached the speaker
@@ -2856,7 +2902,9 @@ impl Onboarding {
                     return None;
                 }
                 let opened = step == Step::WhereYouSit && self.desired.opened;
-                self.opener_said = step == Step::WhereYouSit && !opened;
+                // Bound to its turn, so one never said is asked again at
+                // once ([`Self::first_note_finished`]).
+                self.opener_said = true;
                 return Some(self.definition.note(step, opened).into());
             }
             return None;
@@ -8380,7 +8428,17 @@ mod tests {
         let (mut room, _says, root) = at_touch("owed-unsaid");
         assert_eq!(
             room.wait_played(90 * S, Some(NEAR_MIDDLE), Delivery::Unsaid),
-            [TOUCH_REMIND, later, later, later, PREFERENCES_NOTE]
+            // The next step's first note, never said either, is asked again
+            // at once too.
+            [
+                TOUCH_REMIND,
+                later,
+                later,
+                later,
+                PREFERENCES_NOTE,
+                PREFERENCES_NOTE,
+                PREFERENCES_NOTE
+            ]
         );
         std::fs::remove_dir_all(root).unwrap();
         let (mut room, _says, root) = at_touch("owed-cut");
@@ -8389,6 +8447,52 @@ mod tests {
             [TOUCH_REMIND, later, PREFERENCES_NOTE]
         );
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// Who you are, asked: [`WHO_NOTE`] handed out, its turn played as
+    /// `delivery` says.
+    fn who_asked(name: &str, delivery: Delivery) -> Room {
+        let mut room = Room::new(name);
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        let mut notes = Vec::new();
+        while notes.is_empty() && room.at < 60 * S {
+            notes = room.wait_played(S / 4, Some(NEAR_MIDDLE), delivery);
+        }
+        assert_eq!(notes, [WHO_NOTE]);
+        room
+    }
+
+    /// lamp-52e6, build 10507: who_you_are's first note committed, its turn
+    /// retired by a room line heard as no words before any audio. Never
+    /// heard, it is asked again once the room is quiet, not after
+    /// [`STEP_GIVE_UP_US`] of silence.
+    #[test]
+    fn a_first_note_never_said_is_asked_again_at_once() {
+        let mut room = who_asked("first-note-unsaid", Delivery::Unsaid);
+        let lost = room.at;
+        assert_eq!(room.wait(START_QUIET_US + S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        assert!(room.at - lost < STEP_GIVE_UP_US);
+        let records = room.walk.take_records();
+        assert!(
+            records
+                .iter()
+                .any(|line| line["kind"] == "onboarding_note_unsaid"
+                    && line["step"] == "who_you_are"
+                    && line["said_again"] == true),
+            "{records:?}"
+        );
+        // Heard this time: not said again.
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), NONE);
+    }
+
+    /// A first note any of which played (whole, or cut by someone speaking)
+    /// is not said again while the step waits for its answer.
+    #[test]
+    fn a_first_note_played_is_not_asked_again() {
+        for delivery in [Delivery::Whole, Delivery::Cut] {
+            let mut room = who_asked(&format!("first-note-{delivery:?}"), delivery);
+            assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), NONE, "{delivery:?}");
+        }
     }
 
     /// The Reviewer-lead's P3s on #4012: an offer that ends unsaid keeps
