@@ -383,6 +383,7 @@ pub(crate) fn refused_here(told: &Value) -> bool {
             NO_NAME,
             NOT_HEARD,
             NOT_HEARD_SPELLED,
+            NOT_HEARD_SAY_AGAIN,
             ONLY_THE_CALL,
             SAY_IT_BACK,
             NOT_AGREED,
@@ -440,15 +441,34 @@ fn spelling_asked(said: &Said) -> bool {
 }
 
 /// What a name not heard is told: [`NOT_HEARD`], which asks for a
-/// spelling, or [`NOT_HEARD_SPELLED`] once the lamp asked them to spell in
-/// any exchange the check holds, so a spelling is asked for at most once
-/// (lamp-3e83, #5564).
+/// spelling, or, once the lamp asked them to spell in any exchange the
+/// check holds, never a second ask (lamp-3e83, #5564):
+/// [`NOT_HEARD_SPELLED`] when they spelled after that ask, so the name
+/// their letters make is said back, and [`NOT_HEARD_SAY_AGAIN`] when they
+/// didn't, since no name of theirs could pass a read-back's yes then
+/// (Jarvis's P2 on #5580: "Lord in." again, "Lauren?", "Yes." looped).
 fn not_heard(said: &Said) -> &'static str {
-    if said.before.iter().any(|(_, lamp)| asks_to_spell(lamp)) {
-        NOT_HEARD_SPELLED
-    } else {
-        NOT_HEARD
+    match said.before.iter().position(|(_, lamp)| asks_to_spell(lamp)) {
+        None => NOT_HEARD,
+        Some(at) if spelled_after(said, at) => NOT_HEARD_SPELLED,
+        Some(_) => NOT_HEARD_SAY_AGAIN,
     }
+}
+
+/// Whether any of their lines after the lamp's line `before[at]` (its
+/// answer, and the turn in hand) spells letter by letter: a run of two
+/// letters or more ([`spelled_runs`]), whether or not it agrees with a
+/// count they gave ("four letters", five spelled is still a spelling).
+fn spelled_after(said: &Said, at: usize) -> bool {
+    said.before[at + 1..]
+        .iter()
+        .map(|(person, _)| person.as_str())
+        .chain([said.this.as_str()])
+        .any(|person| {
+            spelled_runs(&folded_words(person))
+                .iter()
+                .any(|letters| letters.chars().count() >= 2)
+        })
 }
 
 /// The provider worker's argument for the names switch.
@@ -1264,6 +1284,12 @@ const NOT_HEARD: &str = "You did not hear that name in what they said. Say the n
 /// they were asked to spell it ([`not_heard`]): never asked again
 /// (lamp-3e83, #5564: the lamp asked for spellings too often).
 const NOT_HEARD_SPELLED: &str = "You did not hear that name in what they said, and they were already asked to spell it, so do not ask them to spell it again. Say back the name their letters make, as a name only, never its letters and never as a choice between the name and its spelling, and ask if you have it right. Only if they say yes, call this again with that name.";
+/// What the model is told when the name is not in what they said, they
+/// were asked to spell it, and gave no letters ([`not_heard`]): a name
+/// they never said or spelled can't pass a read-back's yes, so it asks for
+/// the name once more, never a spelling again and never a name read back
+/// (Jarvis's P2 on #5580).
+const NOT_HEARD_SAY_AGAIN: &str = "You did not hear that name in what they said, and they were already asked to spell it, so do not ask them to spell it again, and do not say a name back to them. Ask them to say their name once more, then call this again with the name as they say it.";
 /// What the model is told at setup, before the first save, when the name
 /// was not said back and agreed to (#5140 row 5).
 pub(crate) const SAY_IT_BACK: &str = "I have not kept their face yet. First say the name back to them and ask if you have it right, the name as a word only, never its letters and never as a choice between the name and its spelling. Only if they say yes, call this again with that name; if they correct it, say the new one back the same way.";
@@ -1753,6 +1779,7 @@ pub fn refusal_reason(error: &str) -> &'static str {
     const REASONS: &[(&str, &str)] = &[
         (NOT_HEARD, "not_heard"),
         (NOT_HEARD_SPELLED, "not_heard_spelled"),
+        (NOT_HEARD_SAY_AGAIN, "not_heard_say_again"),
         (ONLY_THE_CALL, "only_the_call"),
         (NOT_OWN_NAME, "not_own_name"),
         (NAME_UNCHANGED, "name_unchanged"),
@@ -4949,6 +4976,46 @@ mod tests {
         }
         assert!(refused_here(&json!({"error": NOT_HEARD_SPELLED})));
         assert_eq!(refusal_reason(NOT_HEARD_SPELLED), "not_heard_spelled");
+        // Jarvis's P2 on #5580: asked to spell, they gave no letters. No
+        // name of theirs can pass a read-back's yes then, so the lamp asks
+        // for the name once more: never a second spelling, never a name
+        // read back, so no "Lauren?", "Yes." loop.
+        for said in [
+            // Their name again, no letters.
+            Said {
+                this: "Lord in.".into(),
+                before: vec![("I'm Lord in.".into(), ask.into())],
+            },
+            // The loop itself: said back without letters, and a yes.
+            Said {
+                this: "Yes.".into(),
+                before: vec![
+                    ("I'm Lord in.".into(), ask.into()),
+                    ("Lord in.".into(), "Lauren, did I get that right?".into()),
+                ],
+            },
+        ] {
+            let (words, _) = run_at_setup(&socket, &call("Lauren"), &said);
+            assert_eq!(words, json!({"error": NOT_HEARD_SAY_AGAIN}), "{said:?}");
+            let (words, _) = run_with(&socket, &call("Lauren"), true, &said);
+            assert_eq!(words, json!({"error": NOT_HEARD_SAY_AGAIN}), "{said:?}");
+        }
+        assert!(refused_here(&json!({"error": NOT_HEARD_SAY_AGAIN})));
+        assert_eq!(refusal_reason(NOT_HEARD_SAY_AGAIN), "not_heard_say_again");
+        // Said once more, and heard: the name is theirs, so at setup it
+        // goes on to the read-back and its yes, as any heard name does.
+        let again = Said {
+            this: "Lauren.".into(),
+            before: vec![
+                ("I'm Lord in.".into(), ask.into()),
+                (
+                    "Lord in.".into(),
+                    "Could you say your name once more?".into(),
+                ),
+            ],
+        };
+        let (words, _) = run_at_setup(&socket, &call("Lauren"), &again);
+        assert_eq!(words, json!({"error": SAY_IT_BACK}));
         // Their letters after the ask are still their name (#5140 row 6).
         let spelled = Said {
             this: "L, O, R, E, N.".into(),
@@ -4980,6 +5047,10 @@ mod tests {
         assert_eq!(
             NOT_HEARD_SPELLED,
             "You did not hear that name in what they said, and they were already asked to spell it, so do not ask them to spell it again. Say back the name their letters make, as a name only, never its letters and never as a choice between the name and its spelling, and ask if you have it right. Only if they say yes, call this again with that name."
+        );
+        assert_eq!(
+            NOT_HEARD_SAY_AGAIN,
+            "You did not hear that name in what they said, and they were already asked to spell it, so do not ask them to spell it again, and do not say a name back to them. Ask them to say their name once more, then call this again with the name as they say it."
         );
         assert_eq!(
             SAY_IT_BACK,
@@ -5948,6 +6019,7 @@ mod tests {
         for (error, reason) in [
             (NOT_HEARD, "not_heard"),
             (NOT_HEARD_SPELLED, "not_heard_spelled"),
+            (NOT_HEARD_SAY_AGAIN, "not_heard_say_again"),
             (ONLY_THE_CALL, "only_the_call"),
             (NOT_OWN_NAME, "not_own_name"),
             (NAME_UNCHANGED, "name_unchanged"),
