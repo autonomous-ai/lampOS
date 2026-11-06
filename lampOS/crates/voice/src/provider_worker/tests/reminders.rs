@@ -73,6 +73,7 @@ fn reminder(request: u64, handoff: &InputHandoff, text: &str) -> ProviderInput {
         late: false,
         late_by_ms: Some(0),
         also: Vec::new(),
+        again: false,
     }
 }
 
@@ -197,6 +198,7 @@ fn reminder_preserves_authority_and_session_validation_before_policy() {
                 late: false,
                 late_by_ms: None,
                 also: Vec::new(),
+                again: false,
             },
             NOW,
             &sink,
@@ -246,6 +248,7 @@ fn reminder_text_is_quoted_data_and_lateness_is_preserved_with_no_picture() {
                 late: true,
                 late_by_ms: Some(7 * 60_000 + 20_000),
                 also: Vec::new(),
+                again: false,
             },
             NOW,
             &sink,
@@ -300,11 +303,11 @@ async fn an_older_reminder_tool_event_cannot_escape_after_a_new_reminder_replace
     handoff.reminders.enabled = true;
     handoff
         .reminders
-        .prepare(1, 1, "First", &[], false, None)
+        .prepare(1, 1, "First", &[], false, None, false)
         .unwrap();
     handoff
         .reminders
-        .prepare(3, 1, "Second", &[], false, None)
+        .prepare(3, 1, "Second", &[], false, None, false)
         .unwrap();
     let lineage = lamp_gemini::Lineage {
         request: RequestId::new(1).unwrap(),
@@ -367,6 +370,7 @@ impl LiveRig {
                 late: false,
                 late_by_ms: Some(0),
                 also: Vec::new(),
+                again: false,
             })
             .unwrap();
         owner.turn()

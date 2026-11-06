@@ -907,6 +907,10 @@ pub enum ProviderInput {
         /// Others as late, said with it in one line (29e7, 2 Nov).
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         also: Vec<String>,
+        /// Said once more after a line cut it with some of it played: a
+        /// repeat ([`crate::reminders::Offer::again`]).
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        again: bool,
     },
 }
 impl ProviderInput {
@@ -1215,8 +1219,9 @@ pub(crate) fn reminder_note(
     also: &[String],
     late: bool,
     late_by_ms: Option<u64>,
+    again: bool,
 ) -> std::result::Result<String, ReminderDeferral> {
-    reminder_policy::checked_note(text, also, late, late_by_ms)
+    reminder_policy::checked_note(text, also, late, late_by_ms, again)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -6229,6 +6234,7 @@ impl InputHandoff {
                 late,
                 late_by_ms,
                 also,
+                again,
                 ..
             } => {
                 if self.submitted.is_some() {
@@ -6242,6 +6248,7 @@ impl InputHandoff {
                     &also,
                     late,
                     late_by_ms,
+                    again,
                 ) {
                     Ok(note) => note,
                     Err(reason) => {
