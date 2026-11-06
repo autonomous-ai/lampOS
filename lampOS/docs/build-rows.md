@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-11-06 17:11 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1711, posted by the PM (Faye) since 4 Nov, are the live ones.
+Written by the first builder from the team's review page at 2026-11-06 22:29 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1711, posted by the PM (Faye) since 4 Nov, are the live ones.
 
-**Build 92.2% over 76 rows. Quality 66.5% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
+**Build 91.4% over 76 rows. Quality 66.5% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -63,9 +63,9 @@ Written by the first builder from the team's review page at 2026-11-06 17:11 (+0
 | Its light by voice and in the app, kept across a restart | 1.00 | #1472 #1484 #1464 #1468 | — | Built |
 | Volume by voice and in the app | 1.00 | #1458 #1465 | — | Built |
 | A light for booting and a “not feeling well” face for a failed part, built into the system | 0.95 | #2847 #2848 | third, el, tests | 26 Oct 08:0x, up from 0.9: the waking face is on in the product unit (#3518, #2848). |
-| Light scenes (“reading light”) and pointing the head and light (“light my book”), core skills | 1.00 | #1679 #1730 | twelve | 20 Oct 12:07, built: tried on lamp-52e6 with the lead, row 5 (reading tipped the head 148 counts down and leaned the arm in, focus too) and row 4 (pointing the light toward a named side). |
+| Light scenes (“reading light”) and pointing the head and light (“light my book”), core skills | 0.85 | #1679 #1730 | twelve | 6 Nov 21:5x, down from 1.0, as Build now counts what a customer gets (the lead’s agent for the lead, 21:34): built and tried on a lamp, but `light-scenes` and `point-light` are installed off on customer lamps (install::P… |
 | “Look for my keys”, an installable skill | 0.90 | #1685 #1738 #2444 #2466 #2835 #2904 | first, thirteen | 6 Nov 17:3x, up from 0.85: installed from the Store through the app on 9adf at 10226, and it looked and answered. |
-| The light dims and goes out when nobody is there, a core skill | 1.00 | #1677 #1721 #1747 | nine | Built and tried on lamp-4ace 20 Oct 01:23 (trials.sh with Tests’ #1999 stages, lamp-skills at 782e6ef34): with nobody there the light-out skill asked the ring to fade the light over 30 s, held it while nobody was there, … |
+| The light dims and goes out when nobody is there, a core skill | 0.85 | #1677 #1721 #1747 | nine | 6 Nov 21:5x, down from 1.0, as Build now counts what a customer gets (the lead’s agent for the lead, 21:34): it is built and was tried on a lamp, but `light-out` is installed off on customer lamps (install::PRODUCT_SKILL… |
 | What you teach it (“don’t say hello in the morning”) is kept and honoured | 1.00 | #813 | seventh | Built |
 | Forgets on request: that, everything, my face, and everything it came from | 0.97 | #1586 #1693 #2849 #2850 | fourth, friday, twelve | 23 Oct 10:1x, up from 0.95: after “forget everything”, the room’s lines about that person are left out for their day (#3142, train 29). |
 | Remembers what matters without being asked (“how was the wedding?”) | 0.90 | #1693 #2648 #2680 #2805 #2806 #2807 #2808 | friday, twelve, thirteen | 26 Oct 09:5x, up from 0.85: the product keeps what matters without being asked, dated things and one open thread, for the person seen saying it only, and “forget everything about me” reaches it (#3450, merged 08:4x: OBSE… |
@@ -87,8 +87,8 @@ Written by the first builder from the team's review page at 2026-11-06 17:11 (+0
 | A meal reminder, an installable skill | 0.50 | #3504 | — | 29 Oct 00:2x, up from 0: this row was stale (Third, 00:19). |
 | Posture: a kind word when you slouch, and a praise when you sit well, an installable skill | 0.90 | #3504 | — | 6 Nov 17:3x, up from 0.50: the product’s Sit back said its nudge after 600 s and its warm word on lamp-9adf at 10300, on stable since 10343; |
 | Faces from a photo and “who is this?”, an installable skill | 0.80 | #2854 #2855 #2856 | mobile, ten, fourth | 6 Nov 17:3x, down from 0.90: LAMP_PHOTO_FACES is off in the product, with its acceptance run still owed. |
-| Light shows and effects, a core skill | 1.00 | #1730 #2028 | — | Built and merged (#1730): party, music and calm, under a minute, no flashing, stopping within 0.2 s when someone speaks. |
-| “I’m unplugging you”: it folds safely first, a core skill | 1.00 | #1699 #2478 | fifth | 21 Oct 11:30, built: #1699 merged as #2478 after its rebase, and Prepare to unplug is in every lamp’s default skills. |
+| Light shows and effects, a core skill | 0.85 | #1730 #2028 | — | 6 Nov 21:5x, down from 1.0, as Build now counts what a customer gets (the lead’s agent for the lead, 21:34): built and tried on a lamp, but `light-show` is installed off on customer lamps (install::PRODUCT_SKILLS_OFF). |
+| “I’m unplugging you”: it folds safely first, a core skill | 0.85 | #1699 #2478 | fifth | 6 Nov 21:5x, down from 1.0, as Build now counts what a customer gets (the lead’s agent for the lead, 21:34): built and tried on a lamp, but the product doesn’t set `LAMP_UNPLUG`, so a customer’s lamp hides and ignores it… |
 | Smoke and bad-air alerts, a core skill | 1.00 | — | — | 20 Oct 11:42, built: tried on lamp-52e6 with the lead (row 18): a smoke reading said once, the head lifted a little, an amber breath. |
 | Every lamp passes an approved hardware test before it ships: stations, records, a 3–5 lamp pilot | 0.45 | #1700 #812 #1682 #1741 #2794 #2795 | first, ten, thirteen, hw-first | 23 Oct 10:1x, up from 0.4: the matrix’s version 1, version 0’s checks and limits approved for the pilot, is merged (#2461, train 29). |
 
