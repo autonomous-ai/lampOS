@@ -1307,7 +1307,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        root in a folder Harness's user owns, so it writes and reads the
        launcher without following links, and leaves alone one with a
        second hard link or owned by another uid than its `bin` folder's
-       owner (one line said; #5624).
+       owner (one line said; #5624), or over 64 KiB (Harness's is a few
+       hundred bytes; not read past the cap, one line said; #5647).
    - **Said to the app:** `harness-install.json` in the records,
      `{"install", "revision", "at_unix_ms", "version"?, "pinned"?,
      "error"?, "message"}` (`lamp_msgs::HarnessInstall`), on

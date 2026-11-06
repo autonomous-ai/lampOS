@@ -105,13 +105,19 @@ pub enum Pinned {
 const BIN: [&str; 2] = [".local", "bin"];
 const NAME: &str = "harness";
 
+/// The most of a launcher read or pinned: 64 KiB. Harness's own launcher is a
+/// few hundred bytes (a shebang, maybe two exports, one `exec` line), so a
+/// bigger one is not Harness's; it is left as it is, so a launcher made huge
+/// cannot make root read it all into memory (a security read's P3 on #5647).
+pub(crate) const MAX_LAUNCHER: u64 = 64 * 1024;
+
 /// The launcher at `launcher` (`<home>/`[`LAUNCHER`]) written in the pinned
 /// shape with `env_file`, whole: through a file beside it, with its mode
 /// (executable) and owner (Harness's user, not root), then renamed over it.
 /// One already pinned is not written; a missing one is not made. An error,
 /// with the launcher unchanged, when it is not a plain file, has a second
-/// hard link, is not owned by its bin folder's owner, has no `exec` line,
-/// or cannot be written.
+/// hard link, is not owned by its bin folder's owner, is over
+/// [`MAX_LAUNCHER`], has no `exec` line, or cannot be written.
 ///
 /// This runs as root in a folder Harness's user owns, so nothing there is
 /// opened through a link (the Reviewer-lead on #5624): `.local` and `bin`
@@ -132,7 +138,7 @@ pub fn pin(launcher: &Path, env_file: &str) -> Result<Pinned, String> {
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Pinned::Missing),
         Err(error) => return Err(said(&error)),
     };
-    let mut file = match rfs::openat(
+    let file = match rfs::openat(
         &dir,
         NAME,
         OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
@@ -157,9 +163,18 @@ pub fn pin(launcher: &Path, env_file: &str) -> Result<Pinned, String> {
     if let Some(why) = refused(metadata.nlink(), metadata.uid(), bin_uid) {
         return Err(said(&why));
     }
+    if let Some(why) = too_big(metadata.len()) {
+        return Err(said(&why));
+    }
+    // Bounded again while reading, for a launcher that grew after the fstat.
     let mut text = String::new();
-    file.read_to_string(&mut text)
+    let read = (&file)
+        .take(MAX_LAUNCHER + 1)
+        .read_to_string(&mut text)
         .map_err(|error| said(&error))?;
+    if let Some(why) = too_big(read as u64) {
+        return Err(said(&why));
+    }
     drop(file);
     let pinned = pinned_launcher(&text, env_file).ok_or_else(|| said(&"no exec line"))?;
     if pinned == text {
@@ -184,6 +199,11 @@ pub(crate) fn refused(nlink: u64, uid: u32, bin_uid: u32) -> Option<String> {
     }
     (uid != bin_uid)
         .then(|| format!("owned by uid {uid}, not the bin folder's owner {bin_uid}, left as it is"))
+}
+
+/// Why a launcher of `bytes` is not read or pinned: over [`MAX_LAUNCHER`].
+fn too_big(bytes: u64) -> Option<String> {
+    (bytes > MAX_LAUNCHER).then(|| format!("{bytes} bytes, over the 64 KiB cap, left as it is"))
 }
 
 /// `<home>/.local/bin`, opened as a folder, neither `.local` nor `bin`
