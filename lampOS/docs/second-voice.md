@@ -3544,9 +3544,12 @@ after a take-over, but now for every turn:
   "Turned it down.", "I've made it warmer.", "Lights off."); the same said
   as it is done ("Turning it up.", "I'm turning off the light.", "Dimming
   the light.", "Making it warmer.", "Setting a timer for one minute.",
-  "Starting a timer now."), only where the sentence ends, or with "for" or
-  "now" after a timer, so "Turning it off and on again usually helps." and
-  "Setting a timer needs a time." are no claims; and the light
+  "Starting a timer now."), each closing at the sentence's end, a timer's
+  "for" only with a time and its unit after it ("for five minutes", "for 6
+  pm", "for half an hour", "for tonight"), so "Turning it off and on again
+  usually helps.", "Setting a timer now would be smart.", "Setting an alarm
+  for six is a good idea." and "Starting a reminder now isn't possible." are
+  no claims, and "Raising the lamp." (the arm) is none either; and the light
   kept on or off until a time ("I've kept the light on until ten.", "The
   light stays on until …", "I'll keep my light on until …", or "for" with
   a time after it: digits, a number word, "the night" or "tonight", so
