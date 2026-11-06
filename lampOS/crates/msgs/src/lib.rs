@@ -1331,8 +1331,10 @@ pub struct UpdateStatus {
 
 /// A round under way (#5473): when it began (its `checking`), when the step
 /// `now` names began, and the build it is going to, once the round has read
-/// it from the channel (absent before, and in a round that ends before it
-/// does). In `restoring` it is still the build that was tried. Times are
+/// it from the channel and found it newer (absent before, and in a round
+/// that ends before it does). A later check in `checking` may still refuse
+/// it, and the round's end clears it; from `fetching` on it is the build
+/// being installed, and in `restoring` still the build that was tried. Times are
 /// the lamp's clock in Unix milliseconds; the step's is never before the
 /// round's.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
