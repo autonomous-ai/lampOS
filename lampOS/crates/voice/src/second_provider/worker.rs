@@ -1439,6 +1439,18 @@ pub(crate) fn spoken_character(character: &str, look_by_call: bool, memory: bool
     format!("{character}{SPOKEN_NOTE}{look}{memory}{before}")
 }
 
+/// [`spoken_character`] for one version of the instruction: `camera` for
+/// the camera's, told while the eye is open ([`character_now`]).
+pub(crate) fn spoken_version(
+    character: &str,
+    camera: bool,
+    look_by_call: bool,
+    memory: bool,
+) -> String {
+    let _ = camera;
+    spoken_character(character, look_by_call, memory)
+}
+
 /// The spoken turn's character, `blind` (the version without a camera) or
 /// `seeing` (the camera's), by whether this route has a look (`look`) and
 /// the eye is open now (`eye`: the camera allowed in the last authority
@@ -2369,27 +2381,31 @@ pub fn serve(
     let texts_from = (character.clone(), tools.clone());
     // Spoken turns only: a text is typed, not heard (#1712).
     let forget_character = provider.instruction_without_person(false)?;
-    let [character, seeing, forget_character] =
-        [character, seeing, forget_character].map(|character| {
-            let character = spoken_character(&character, look_by_call, tools.memory.is_some());
-            // Nothing said beside a call the acting part answers at once
-            // (`LAMP_SECOND_SAY_WITH_CALL`, #2135).
-            let character = quiet_with_calls(
-                character,
-                says_at_once(
-                    std::env::var(crate::second_provider::SAY_WITH_CALL_ENVIRONMENT)
-                        .ok()
-                        .as_deref()
-                        == Some("on"),
-                    crate::language::at_start(),
-                ),
-            );
-            if speech_tags == Some(true) {
-                format!("{character}{}", crate::second_provider::speech_tags::NOTE)
-            } else {
-                character
-            }
-        });
+    let [character, seeing, forget_character] = [
+        (character, false),
+        (seeing, true),
+        (forget_character, false),
+    ]
+    .map(|(character, camera)| {
+        let character = spoken_version(&character, camera, look_by_call, tools.memory.is_some());
+        // Nothing said beside a call the acting part answers at once
+        // (`LAMP_SECOND_SAY_WITH_CALL`, #2135).
+        let character = quiet_with_calls(
+            character,
+            says_at_once(
+                std::env::var(crate::second_provider::SAY_WITH_CALL_ENVIRONMENT)
+                    .ok()
+                    .as_deref()
+                    == Some("on"),
+                crate::language::at_start(),
+            ),
+        );
+        if speech_tags == Some(true) {
+            format!("{character}{}", crate::second_provider::speech_tags::NOTE)
+        } else {
+            character
+        }
+    });
     let reopen_quiet =
         days && std::env::var(REOPEN_QUIET_ENVIRONMENT).ok().as_deref() == Some("on");
     if reopen_quiet {
@@ -25962,6 +25978,28 @@ mod tests {
         eye.store(false, Ordering::Relaxed);
         assert_eq!(super::character_now(blind, seeing, true, &eye), blind);
         assert_eq!(super::character_now(blind, seeing, false, &eye), blind);
+    }
+
+    /// #5530: the version without a camera says the eye is closed, so it is
+    /// never also told to look by calling take_a_look; the camera's version
+    /// is, with a full look. A closed-eye turn that called it was answered
+    /// "Let me look." and, 2.6 s on, that the eye was shut
+    /// (`speak_up::NO_LOOK_NOTE`).
+    #[test]
+    fn the_look_line_is_told_only_in_the_camera_version() {
+        let (blind, seeing) = (
+            crate::config::CHAT_INSTRUCTION,
+            crate::config::CAMERA_CHAT_INSTRUCTION,
+        );
+        for memory in [false, true] {
+            let closed = super::spoken_version(blind, false, true, memory);
+            assert!(closed.contains("Your eye is off or closed now"), "{closed}");
+            assert!(!closed.contains("take_a_look"), "{closed}");
+            let open = super::spoken_version(seeing, true, true, memory);
+            assert!(open.contains(super::LOOK_CALL_NOTE), "{open}");
+            let no_look = super::spoken_version(seeing, true, false, memory);
+            assert!(!no_look.contains("take_a_look"), "{no_look}");
+        }
     }
 
     /// #1712: the name note, as the Live route gives it: the model is told
