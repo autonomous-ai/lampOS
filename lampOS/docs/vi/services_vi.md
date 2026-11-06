@@ -43,7 +43,7 @@ lúc 14:11 ngày 3 Nov 2026):
 
 **Cái giá đã được chấp nhận (chủ dự án, 6/11, 18:08: "no more checking ownership"):** không hỏi khuôn mặt nào cả, kể cả khi không có ai trong tầm nhìn. Nên một TV, một cuộc gọi video hay một bản ghi âm nói "read my mail" có thể khiến thư được đọc to đầy đủ; một lần gửi vẫn cần đọc lại và một câu "send" rõ ràng ngay sau đó. Chủ dự án đã chọn điều này thay cho bất kỳ quy tắc khuôn mặt trong tầm nhìn nào, nên đèn không từ chối.
 
-Khi công tắc bật, không câu nào được so với một giọng: một lần đọc được nói đầy đủ mà không hỏi giọng nào ở tuyến thứ hai và không chờ dấu giọng (`services::run`), và tuyến thứ hai không tạo dấu giọng nào cho các dịch vụ, nên `LAMP_SAME_VOICE_FOR=services` không khởi động tiến trình con cùng giọng nào ở đó (`checking_the_voice_for`). Trên tuyến Live một lần đọc cũng được nói đầy đủ, nên chữ "không bao giờ đầy đủ" của nó bên dưới không còn đúng khi công tắc bật; tuyến này vẫn không bao giờ chuẩn bị hay gửi một lần ghi (`NO_SEND_HERE`), dù công tắc bật hay tắt. Một lần đọc của kỹ năng tự tạo cũng ở trong căn phòng riêng: `lamp-skills.service` đặt `LAMP_PRIVATE_ROOM=on`, và khi đó cổng của nó không cần tên chủ đèn hay khuôn mặt quen, cũng không cần chỉ một khuôn mặt ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới).
+Khi công tắc bật, không câu nào được so với một giọng: một lần đọc được nói đầy đủ mà không hỏi giọng nào ở tuyến thứ hai và không chờ dấu giọng (`services::run`), và tuyến thứ hai không tạo dấu giọng nào cho các dịch vụ, nên `LAMP_SAME_VOICE_FOR=services` không khởi động tiến trình con cùng giọng nào ở đó (`checking_the_voice_for`). Trên tuyến Live một lần đọc cũng được nói đầy đủ, nên chữ "không bao giờ đầy đủ" của nó bên dưới không còn đúng khi công tắc bật; tuyến này vẫn không bao giờ chuẩn bị hay gửi một lần ghi (`NO_SEND_HERE`), dù công tắc bật hay tắt. Một lần đọc của kỹ năng tự tạo cũng ở trong căn phòng riêng: `lamp-skills.service` đặt `LAMP_PRIVATE_ROOM=on`, và khi đó cổng của nó không cần tên chủ đèn hay khuôn mặt quen, còn hai khuôn mặt trong tầm nhìn vẫn giữ nó lại ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới).
 
 Các quy tắc bên dưới là những gì áp dụng khi công tắc tắt; chúng vẫn nằm trong mã cho một tính năng sau này.
 
@@ -952,11 +952,15 @@ hai lần bị mô hình trả về thành thêm một khóa bên trong, bị t�
 Trong căn phòng riêng (`LAMP_PRIVATE_ROOM=on`, đặt trong `lamp-skills.service`
 của sản phẩm và được đọc như giọng nói đọc nó,
 `lamp_voice::person::private_room`, vào `Seen::private_room`) không có kiểm
-tra quyền sở hữu nào chạy: các dòng về khuôn mặt chủ đèn đã đăng ký, tối đa
-một khuôn mặt và khuôn mặt quen của chủ đèn không áp dụng, nên bất kỳ khuôn
-mặt nào trong tầm nhìn cũng được, bao nhiêu cũng được, kể cả khi không có tên
-gõ lúc cài đặt. Không thấy ai vẫn giữ cổng đóng ("the owner not in view"), và
-các dòng còn lại vẫn áp dụng như trên.
+tra quyền sở hữu nào chạy: các dòng về khuôn mặt chủ đèn đã đăng ký và khuôn
+mặt quen của chủ đèn không áp dụng, nên chỉ cần một khuôn mặt một mình trong
+tầm nhìn, quen hay không, kể cả khi không có tên gõ lúc cài đặt. Dòng tối đa
+một khuôn mặt vẫn giữ ("not alone"): đếm khuôn mặt không phải là kiểm tra
+quyền sở hữu, và một kỹ năng đọc khi không ai hỏi, nên người thứ hai trong
+tầm nhìn không nghe được thư hay lịch của chủ đèn. Không thấy ai vẫn giữ cổng
+đóng ("the owner not in view"), và các dòng còn lại vẫn áp dụng như trên. Cái
+giá chủ sản phẩm đã chấp nhận: một người lạ ở một mình trong tầm nhìn vẫn
+nghe được.
 
 Tất cả phải đạt liên tục trong 5 s. Trước đó lượt chạy chờ, tối đa 60 phút,
 rồi bỏ qua ngày đó mà không nói gì ("skipped: <why>"). Mỗi kỹ năng đọc một lần
@@ -988,8 +992,8 @@ trước mỗi dòng. Nếu có người đến (khuôn mặt thứ hai, một k
 giọng nói), đèn dừng sau dòng đang nói và chỉ nói "I'll tell you the rest
 later."; nếu cổng đóng vì lý do khác (riêng tư, tạm dừng, giờ yên lặng, chủ
 đèn rời đi), nó dừng mà không nói gì. Trong căn phòng riêng, một khuôn mặt
-đến không làm nó dừng, còn một giọng nói nghe được thì vẫn làm nó dừng, với
-cùng câu đó. Khi không nhận ra chủ đèn, hoặc không
+thứ hai đến và một giọng nói nghe được đều làm nó dừng như vậy, với cùng câu
+đó. Khi không nhận ra chủ đèn, hoặc không
 thấy ai, cổng được xem lại trong tối đa 5 s (`BLINK`) mà không nói gì, vì mắt
 làm mới dấu khuôn mặt quen mỗi 2 s và dấu chỉ được coi là mới trong 2 s: trên
 lamp-9adf một lần làm mới cách 2,1 s đã dừng một lần đọc trước khi nói chữ
