@@ -4714,4 +4714,74 @@ mod tests {
         assert!(told.get("others_here").is_none(), "{told}");
         std::fs::remove_dir_all(folder).unwrap();
     }
+
+    /// A tools folder whose socket answers every call with `result`, and
+    /// counts the calls.
+    fn services_saying(
+        name: &str,
+        result: Value,
+    ) -> (PathBuf, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+        use std::io::{BufRead, BufReader, Write};
+        let folder = std::env::temp_dir().join(format!("saying-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let listener =
+            std::os::unix::net::UnixListener::bind(folder.join(crate::tools::CALL_SOCKET)).unwrap();
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = calls.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let mut line = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                writeln!(stream, "{}", json!({"ok":true,"result":result})).unwrap();
+            }
+        });
+        (folder, calls)
+    }
+
+    /// The private room (P2 on #5569): the second route still prepares a
+    /// write, with no voice asked, and the model is told to say its
+    /// read-back; the Live route, with no judge, still never does.
+    #[test]
+    fn a_private_room_write_is_prepared_on_the_second_route_only() {
+        let write = call(
+            WRITE,
+            json!({"service":"gmail","action":"send","to":"ann@b.test"}),
+        );
+        let prepared = json!({"read_back":"To Ann: home by 7","send_id":"s1"});
+        crate::person::set_private_room_for_test(Some(true));
+
+        // The Live route: no judge, so refused before any service call.
+        let (folder, calls) = services_saying("private-live", prepared.clone());
+        let (told, answered) = run(&folder, &write, 7_101, true, None);
+        assert!(answered, "{told}");
+        assert_eq!(told["error"], NO_SEND_HERE, "{told}");
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+        assert!(kept::pending(|pending| pending.is_none()));
+        std::fs::remove_dir_all(folder).unwrap();
+
+        // The second route: prepared and kept, its voice never asked.
+        let asked = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = asked.clone();
+        judging_voices(std::sync::Arc::new(move |_| {
+            counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            None
+        }));
+        let (folder, calls) = services_saying("private-second", prepared);
+        let (told, answered) = run(&folder, &write, 7_102, true, None);
+        crate::person::set_private_room_for_test(None);
+        assert!(answered, "{told}");
+        assert!(told.get("error").is_none(), "{told}");
+        assert_eq!(told["next"], READ_BACK_NEXT, "{told}");
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(asked.load(std::sync::atomic::Ordering::SeqCst), 0);
+        let kept = kept::pending(|pending| pending.clone()).expect("a write waiting");
+        assert_eq!((kept.send_id.as_str(), kept.request), ("s1", 7_102));
+        assert_eq!(kept.service, "gmail");
+        std::fs::remove_dir_all(folder).unwrap();
+    }
 }
