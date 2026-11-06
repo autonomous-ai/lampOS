@@ -2121,9 +2121,15 @@ order is kept. A written turn is the same from the chat on.
     with the cut answer's unplayed pieces as they were sent, from the start
     of the sentence playing at the cut (`said_as_heard::unheard`, with the
     line's `heard_of_cut`), the model not asked, when that answer was sent
-    whole; the first piece's speech begins before the line plays, so the
-    rest follows the line's clip with no wait. Otherwise (cut before it was
-    sent whole, or `LAMP_SAID_AS_HEARD` off) the line is played and the
+    whole or written whole: the model's stream ended (the writing half's
+    end), so all its pieces are known though not all are said
+    (`second_provider::Written`). Then the rest is the unheard part of the
+    pieces the saying half took (a piece taken whose speech has not begun,
+    at the end of what played, included) and every piece not yet taken; a
+    resumed rest is written whole as it starts, so a cut in it keeps what
+    it has not said too. The first piece's speech begins before the line
+    plays, so the rest follows the line's clip with no wait. Otherwise (cut
+    before the model's stream ended, or `LAMP_SAID_AS_HEARD` off) the line is played and the
     model asked, as a written turn whose only message is that note (no
     person's words), to go on from the cut, not from the start, with no
     apology (`cut_in_wordless::resume_ask`). A cut of one
@@ -2137,10 +2143,14 @@ order is kept. A written turn is the same from the chat on.
     FAIL on #5491: a tail 40 ms in, 2 of 5 fixed lines, left the lamp
     silent). The journal says "a cut-in with no words began N ms after
     request M's line …: the same sound's tail, so that line is said again,
-    not counted". On 06c1 the rest was never kept: a long story's pieces go
-    to the voice as it plays (piece 14 of request 28 at 31.6 s, cut at
-    38.8 s), and the answer is marked sent whole only when its last piece is
-    sent, so a cut mid-story always asks the model. The
+    not counted". On 06c1 the rest was never kept before the written-whole
+    rule (bug 2 of #5491): a long story's pieces go to the voice as it plays
+    (piece 14 of request 28 at 31.6 s, cut at 38.8 s), and the answer was
+    marked sent whole only when its last piece was sent, so a cut mid-story
+    always asked the model, and once it gave 100 characters and stopped.
+    The journal then says "request M's answer was written whole before it
+    was all sent: N pieces from the cut sentence, K not yet taken for the
+    voice". The
     journal says "a cut-in with no words ended the lamp's answer, a busy
     (quiet) room: Resume, answered …, the rest kept, N pieces", then the
     line's "first answer audio … its fixed line" and "the cut answer's
