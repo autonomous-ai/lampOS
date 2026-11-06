@@ -685,6 +685,11 @@ impl Run<'_, '_> {
                     "the settings writer refreshed is put back ({why}): the copy before is the writer again"
                 )
             }
+            (crate::writer_swap::Op::PutBackForApply, Ok(())) => {
+                format!(
+                    "the settings writer refreshed is put back ({why}): the copy before is the writer again, and this lamp-update may be asked to be it again"
+                )
+            }
             (crate::writer_swap::Op::Proven, Ok(())) => {
                 format!(
                     "the settings writer refreshed has proved itself ({why}): the copy before is removed"
@@ -1386,6 +1391,18 @@ impl Run<'_, '_> {
                     && fs::read(self.config.on(crate::own::BACK))
                         .is_ok_and(|there| there != running.bytes())
                 {
+                    // Put back for good after its own `back` failed, this
+                    // lamp-update is never asked to be the writer again:
+                    // only a newer one ends the wait (#5539).
+                    if crate::writer_swap::put_back_for_good(
+                        self.records.folder(),
+                        &manifest::sha256_hex(running.bytes()),
+                    ) {
+                        return Err(Outcome::Refused(format!(
+                            "build {} carries {}, and this lamp-update was put back as the settings writer for good: waiting for a newer lamp-update",
+                            manifest.sequence, newer.path
+                        )));
+                    }
                     return Err(Outcome::Refused(format!(
                         "build {} carries {}, and this lamp's settings writer is older than this lamp-update: waiting for it to be refreshed",
                         manifest.sequence, newer.path
@@ -2201,9 +2218,14 @@ impl Run<'_, '_> {
             }
             // Undone above by the writer that made the apply, if it wrote
             // at all; only then is a new writer whose first apply failed
-            // put back itself, whether or not it wrote before failing.
+            // put back itself, whether or not it wrote before failing. The
+            // failure is the build's, refused for good: the writer is not
+            // put back for good, so a later round asks for it again (#5539).
             if self.apply_failed && crate::writer_swap::unproven(&self.config.root, &records) {
-                self.writer_op(crate::writer_swap::Op::PutBack, "its first apply failed");
+                self.writer_op(
+                    crate::writer_swap::Op::PutBackForApply,
+                    "its first apply failed",
+                );
             }
         }
         if troubles.is_empty() {
