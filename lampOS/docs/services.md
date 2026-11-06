@@ -45,7 +45,7 @@ at 14:11 on 3 Nov 2026):
 
 **The accepted cost (the project owner, 6 Nov, 18:08: "no more checking ownership"):** no face is asked for at all, with nobody in view too. So a TV, a video call or a recording that says "read my mail" can get it read aloud in full; a send still needs its read-back and a spoken answer after it. The owner chose this over any face-in-view rule, so the lamp doesn't refuse.
 
-With the switch on, no line is held to a voice: a read is said in full with no voice asked of the second route and no wait for a print (`services::run`), and the second route makes no services prints, so `LAMP_SAME_VOICE_FOR=services` starts no same-voice child there (`checking_the_voice_for`). On the Live route a read is said in full too, so its "never in full" below no longer holds with the switch on; it still never prepares or sends a write (`NO_SEND_HERE`), switch on or off. A made skill's read is in the private room as well: `lamp-skills.service` sets `LAMP_PRIVATE_ROOM=on`, and its gate then asks for no owner's name or known face and no lone face ("A made skill's read", below).
+With the switch on, no line is held to a voice: a read is said in full with no voice asked of the second route and no wait for a print (`services::run`), and the second route makes no services prints, so `LAMP_SAME_VOICE_FOR=services` starts no same-voice child there (`checking_the_voice_for`). On the Live route a read is said in full too, so its "never in full" below no longer holds with the switch on; it still never prepares or sends a write (`NO_SEND_HERE`), switch on or off. A made skill's read is in the private room as well: `lamp-skills.service` sets `LAMP_PRIVATE_ROOM=on`, and its gate then asks for no owner's name or known face, while two faces in view still hold it ("A made skill's read", below).
 
 The rules below are what applies with the switch off; they stay in the code for a later feature.
 
@@ -1894,10 +1894,13 @@ publishes, every 250 ms:
 In the private room (`LAMP_PRIVATE_ROOM=on`, set in the product's
 `lamp-skills.service` and read as the voice reads it,
 `lamp_voice::person::private_room`, into `Seen::private_room`) no ownership
-check runs: the rows for an owner face enrolled, one face at most and the
-owner's known face don't apply, so any face in view will do, however many,
-with no name typed at setup. Nobody in view still holds it ("the owner not
-in view"), and the other rows hold as above.
+check runs: the rows for an owner face enrolled and the owner's known face
+don't apply, so one face alone in view will do, known or not, with no name
+typed at setup. One face at most still holds ("not alone"): counting faces
+is not an ownership check, and a skill reads unasked, so a second person
+in view doesn't hear the owner's mail or calendar. Nobody in view still
+holds it ("the owner not in view"), and the other rows hold as above. The
+cost the owner accepted: one stranger alone in view hears it.
 
 All must hold steadily for 5 s. Until then the run waits, at most 60
 minutes, and then skips the day with nothing said ("skipped: <why>").
@@ -1946,8 +1949,8 @@ judged again before every line. If someone comes (a second face, another
 face, a voice), the lamp stops after the line it is on and says only "I'll
 tell you the rest later."; if the gate closes for another reason (privacy,
 a pause, quiet hours, the owner gone), it stops with nothing said. In the
-private room a face that comes doesn't stop it, and a voice heard still
-does, with the same line. The
+private room a second face that comes and a voice heard stop it the same
+way, with the same line. The
 owner not told, or nobody in view, is looked at again for up to 5 s
 (`BLINK`) with nothing said meanwhile, as the eyes renew the known face's
 mark every 2 s and it is read fresh for 2 s: on lamp-9adf a renewal 2.1 s
