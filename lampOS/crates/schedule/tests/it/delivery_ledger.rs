@@ -757,6 +757,70 @@ fn store_switch_and_revision_rollback_preserve_all_existing_evidence() {
     assert_eq!(disk.bytes(), before);
 }
 
+/// A ledger fenced ahead of its store under the same `store_id` (lamp-52e6,
+/// 6 Nov: fence 96, store 92) refuses every item with `stale_revision`, so
+/// nothing is said. Reopened at a voice's start, its first fresh observation
+/// below the fence re-fences it to the store, while a stale one in the same
+/// open is still refused. The risk: an item acknowledged at the newer
+/// revision, and compacted, is pending again in the older store; it must not
+/// be admitted again, so the ledger keeps the acknowledged keys.
+///
+/// Needs fix 1 of the #5498 follow-up: re-fence at the voice's start.
+#[test]
+fn a_reopened_ledger_ahead_of_its_store_refences_but_never_readmits_an_acknowledged_item() {
+    let schedule_disk = Disk::default();
+    let mut schedule = engine(schedule_disk.clone());
+    let acked = set(&mut schedule, 0, When::After { seconds: 1 });
+    let other = set(&mut schedule, 0, When::After { seconds: 1 });
+    let first = pending(&mut schedule, acked, 1000);
+    let older_store = schedule_disk.json();
+    let disk = Disk::default();
+    let mut running = ledger(disk.clone());
+    let (_, ack) = prepare_ack(&mut running, &first);
+    let response = schedule.answer(ack.request.clone(), &now(1000)).unwrap();
+    let evidence = AckEvidence::from_reply(&ack, &response).unwrap();
+    assert!(matches!(
+        running
+            .reconcile(first.key(), &Evidence::Ack(evidence))
+            .unwrap(),
+        Reconciled::Resolved(Resolution::AckConfirmed { .. })
+    ));
+    assert_eq!(running.compact_resolved().unwrap(), 1);
+    let fence = running.schedule_revision().unwrap();
+
+    // The store goes back to a revision before the ack, same store_id.
+    drop(schedule);
+    schedule_disk.replace(&older_store);
+    let mut schedule = Engine::open(schedule_disk, "Etc/UTC", &now(2000), STORE).unwrap();
+    let again = pending(&mut schedule, acked, 2000);
+    let fresh = pending(&mut schedule, other, 2000);
+    assert_eq!(again.key(), first.key());
+    assert!(fresh.revision() < fence, "{} < {fence}", fresh.revision());
+    // Mid-run, an observation below the fence is still stale.
+    assert_eq!(
+        running.prepare(&fresh, correlation(2)).unwrap_err().code,
+        "stale_revision"
+    );
+
+    // The voice starts again.
+    drop(running);
+    let mut started = self::ledger(disk);
+    assert!(
+        started.prepare(&again, correlation(3)).is_err(),
+        "an item acknowledged at the newer revision was admitted again"
+    );
+    let prepared = started.prepare(&fresh, correlation(4));
+    assert!(
+        prepared.is_ok(),
+        "a fresh observation at start was not re-fenced: {prepared:?}"
+    );
+    assert_eq!(started.schedule_revision(), Some(fresh.revision()));
+    assert!(
+        started.prepare(&again, correlation(5)).is_err(),
+        "an item acknowledged at the newer revision was admitted after the re-fence"
+    );
+}
+
 #[test]
 fn identity_bound_but_equal_revision_absence_cannot_contradict_pending_evidence() {
     let (_, pending) = timer();
