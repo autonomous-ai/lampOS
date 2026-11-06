@@ -1581,6 +1581,24 @@ re-speech while the voice that made them runs. Such an oldest entry does
 not starve other due work: a bounded page scan may select another pending
 item.
 
+Nor does one that cannot be offered now (#5498). Until then a failed offer
+of an unknown oldest ended the tick before the scan, and a failed one in the
+scan ended it too, so one bad item silenced every later reminder, and the
+later ones journaled nothing (lamp-52e6, 6 Nov: oldest id 35 refused with
+`stale_revision` every tick). Now the failure is journaled as
+`not offered: <why>` once per item and reason, the item is passed over for
+that tick, and the scan goes on to the next due one; it is tried again on
+later ticks, at most one Get per item per tick, over one page of 8. A
+refusal that is the ledger's own and not the item's, a fence ahead of the
+store (`stale_revision`, same `store_id`) or `store_changed`, still refuses
+every item: each is then journaled, so the cause shows, but none is said.
+The consumer does not move the fence back itself: `DeliveryLedger` has no
+API to lower it, and accepting an older store revision as truth could
+re-speak a reminder already acknowledged at the newer one; that needs its
+own Schedule-side change. Test:
+`an_unofferable_oldest_does_not_silence_later_items_and_each_failure_is_journaled`
+(`reminders/consumer/tests.rs`).
+
 A voice started after them offers them again (the first builder, 2026-10-16:
 on lamp-4ace two reminders prepared by voices since restarted stayed pending
 for ever and were never said). When the consumer starts it holds the
