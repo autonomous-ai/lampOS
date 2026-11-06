@@ -3,7 +3,8 @@
 # writers, answers, and after a zone change restarts lamp-schedule once the lamp is quiet (45 s,
 # an update's rule) and no update is at work (holding lamp-update's lock), waiting at most 30 minutes;
 # after a new language (#4473) restarts lamp-voice once it rests between turns (5 s, at most 45 s),
-# holding the same lock. The app's restart and shutdown too (#2193, #3697):
+# holding the same lock. The owner's two yeses from the app (#5500): written or removed, and after a
+# new room sounds yes lamp-ears restarted once no update is at work. The app's restart and shutdown too (#2193, #3697):
 # answered first, then lampos.target restarted (this instance is not part of it) or lamp-setup
 # shutdown started.
 [Unit]
@@ -27,8 +28,10 @@ NoNewPrivileges=yes
 ProtectSystem=strict
 # /etc for the zone's link and /etc/timezone, written beside and renamed into place; the bus
 # for the voice's state, read to judge quiet; lamp-update's lock (0700), taken for the app's
-# restart and shutdown (#3697), which then run systemctl and systemd-run.
-ReadWritePaths=/etc /run/lampos-bus -/var/lib/lampos-update
+# restart and shutdown (#3697), which then run systemctl and systemd-run; the owner's face expressions
+# and room sounds yeses from the app (#5500, root:lampos 0640 in the 0750 folder lampos.conf makes),
+# and after a new room sounds yes lamp-ears' try-restart under the same lock.
+ReadWritePaths=/etc /run/lampos-bus -/var/lib/lampos-update -/var/lib/lampOS/consent
 ProtectHome=yes
 PrivateTmp=yes
 PrivateNetwork=yes

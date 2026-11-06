@@ -738,3 +738,115 @@ fn the_products_reset_wipes_the_lamps_name_and_the_unit_runs_the_helper() {
     assert!(socket.contains("SocketGroup=lampos\nSocketMode=0660\n"));
     assert!(socket.contains("Accept=yes\n"));
 }
+
+/// #5500: the owner's yeses from the app, kept as the voice's onboarding
+/// keeps them with `"by":"app"`, 0640 and the folder's group (0600 where it
+/// is root's); off removes the file; only a new room sounds yes asks for
+/// lamp-ears' restart; anything but one known key as true or false is
+/// refused with nothing written. The product's unit may write the folder,
+/// and the reset's plan wipes both files.
+#[test]
+fn the_owners_yeses_from_the_app_are_kept_as_the_voice_keeps_them() {
+    use std::os::unix::fs::MetadataExt;
+    let root = Root::new();
+    let config = root.config();
+    let folder = &config.consent;
+    fs::create_dir_all(folder).unwrap();
+    let face = folder.join("face-expressions.json");
+    let room = folder.join("room-sounds.json");
+
+    let (reply, done) = answer(r#"{"consent": {"face_expressions": true}}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"face_expressions": true}}));
+    let done = done.unwrap();
+    assert!(!done.restart_ears && !done.restart_voice && !done.restart_control);
+    assert_eq!(done.said, "the face expressions yes is on from the app");
+    let kept: Value = serde_json::from_str(&fs::read_to_string(&face).unwrap()).unwrap();
+    assert_eq!(kept["version"], 1);
+    assert_eq!(kept["face_expressions"], "yes");
+    assert_eq!(kept["by"], "app");
+    assert!(kept["at_unix_s"].as_u64().unwrap() > 1_700_000_000);
+    // The folder's group, when it is not root's; 0600 when it is.
+    let group = fs::metadata(folder).unwrap().gid();
+    assert_eq!(mode(&face), if group == 0 { 0o600 } else { 0o640 });
+    if group != 0 {
+        assert_eq!(fs::metadata(&face).unwrap().gid(), group);
+    }
+    assert!(!folder.join("face-expressions.change-next").exists());
+    // Again: nothing changes.
+    let (_, done) = answer(r#"{"consent": {"face_expressions": true}}"#, &config, true);
+    assert_eq!(
+        done.unwrap().said,
+        "the face expressions yes is on from the app already"
+    );
+    // A new room sounds yes restarts lamp-ears; the same one again doesn't.
+    let (reply, done) = answer(r#"{"consent": {"room_sounds": true}}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"room_sounds": true}}));
+    assert!(done.unwrap().restart_ears);
+    assert_eq!(
+        serde_json::from_str::<Value>(&fs::read_to_string(&room).unwrap()).unwrap()["room_sounds"],
+        "yes"
+    );
+    let (_, done) = answer(r#"{"consent": {"room_sounds": true}}"#, &config, true);
+    assert!(!done.unwrap().restart_ears);
+    // Off removes it, and needs no restart: the readers look every 2 s.
+    for key in ["face_expressions", "room_sounds"] {
+        let (reply, done) = answer(
+            &format!(r#"{{"consent": {{"{key}": false}}}}"#),
+            &config,
+            true,
+        );
+        assert_eq!(reply, json!({"done": {key: false}}));
+        assert!(!done.unwrap().restart_ears);
+    }
+    assert!(!face.exists() && !room.exists());
+    // Off again, with nothing there: no error.
+    let (reply, _) = answer(r#"{"consent": {"room_sounds": false}}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"room_sounds": false}}));
+    // A voice's yes already there is left as it is.
+    fs::write(
+        &face,
+        r#"{"version":1,"face_expressions":"yes","at_unix_s":5}"#,
+    )
+    .unwrap();
+    let (_, done) = answer(r#"{"consent": {"face_expressions": true}}"#, &config, true);
+    assert!(done.unwrap().said.ends_with("already"));
+    assert!(!fs::read_to_string(&face).unwrap().contains("app"));
+    fs::remove_file(&face).unwrap();
+    for refused in [
+        r#"{"consent": {}}"#,
+        r#"{"consent": {"camera": true}}"#,
+        r#"{"consent": {"face_expressions": "yes"}}"#,
+        r#"{"consent": {"face_expressions": true, "room_sounds": true}}"#,
+        r#"{"consent": true}"#,
+        r#"{"consent": {"face_expressions": true}, "control": true}"#,
+    ] {
+        let (reply, done) = answer(refused, &config, true);
+        assert!(reply["refused"].is_string() && done.is_none(), "{refused}");
+    }
+    assert_eq!(fs::read_dir(folder).unwrap().count(), 0);
+    // Off, refused as every change is.
+    let (reply, _) = answer(r#"{"consent": {"face_expressions": true}}"#, &config, false);
+    assert_eq!(reply, json!({"refused": "changes after setup are off"}));
+    assert!(!face.exists());
+    // Where the product keeps them, and the unit may write there.
+    let own: Config =
+        serde_json::from_str(include_str!("../../fixtures/serve-own-page.json")).unwrap();
+    assert_eq!(
+        own.consent,
+        std::path::Path::new(lamp_msgs::consent::FOLDER)
+    );
+    let unit = include_str!("../../../../deploy/product/lamp-setup-change@.service");
+    assert!(
+        unit.lines().any(|line| line.starts_with("ReadWritePaths=")
+            && line.contains(" -/var/lib/lampOS/consent"))
+    );
+    let plan: Value =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    for (_, name) in lamp_msgs::consent::FILES {
+        let path = format!("{}/{name}", lamp_msgs::consent::FOLDER);
+        assert!(
+            plan["wipe"].as_array().unwrap().iter().any(|w| *w == path),
+            "{path} is not wiped"
+        );
+    }
+}

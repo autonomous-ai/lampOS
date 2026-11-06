@@ -51,6 +51,7 @@ impl Root {
             "display_name": self.0.join("etc/display-name"),
             "language": self.0.join("etc/setup/language"),
             "control_dropin": self.0.join("etc/systemd/system/lamp-control.service.d/developer.conf"),
+            "consent": self.0.join("var/lib/lampOS/consent"),
         }))
         .unwrap()
     }

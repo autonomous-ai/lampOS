@@ -14863,11 +14863,20 @@ mod tests {
         );
         assert_eq!(told["forgotten"], false, "{told}");
         // The household's room sounds yes goes with it (#2110), and the
-        // face expressions yes beside it.
+        // face expressions yes beside it, the owner's from the app as well
+        // (`"by":"app"`, #5500): whoever gave it.
         let consent = socket.with_extension("room-sounds.json");
-        std::fs::write(&consent, b"{}").unwrap();
+        std::fs::write(
+            &consent,
+            lamp_msgs::consent::bytes("room_sounds", 9, lamp_msgs::consent::BY_APP),
+        )
+        .unwrap();
         let face = crate::onboarding::face_expressions_beside(&consent);
-        std::fs::write(&face, b"{}").unwrap();
+        std::fs::write(
+            &face,
+            lamp_msgs::consent::bytes("face_expressions", 9, lamp_msgs::consent::BY_APP),
+        )
+        .unwrap();
         let mut client = client;
         client.room_sounds = consent.clone();
         let (told, _) = client.run_at(

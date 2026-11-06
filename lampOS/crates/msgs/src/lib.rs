@@ -123,6 +123,10 @@ pub mod owner_place;
 /// `docs/chosen-voice.md`).
 pub mod chosen_voice;
 
+/// The face expressions and room sounds yeses, kept for the eyes and the
+/// ears, given by voice or in the app (#5500, `docs/onboarding.md`).
+pub mod consent;
+
 /// The safe shutdown's line (#3697, `docs/shutdown.md`): said by
 /// `lamp-setup shutdown-now` and rendered ahead into the voice's speech
 /// cache, which is keyed by these exact words, so both take them from here.

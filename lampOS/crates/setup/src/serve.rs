@@ -64,6 +64,9 @@ fn default_own_keys() -> PathBuf {
 fn default_control_dropin() -> PathBuf {
     crate::change::CONTROL_DROPIN.into()
 }
+fn default_consent() -> PathBuf {
+    lamp_msgs::consent::FOLDER.into()
+}
 
 /// The server's written configuration.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -140,6 +143,12 @@ pub struct Config {
     /// there, root's, 0644. The reset's plan removes it.
     #[serde(default = "default_control_dropin")]
     pub control_dropin: PathBuf,
+    /// The folder of the owner's face expressions and room sounds yeses
+    /// (`lamp_msgs::consent::FOLDER`, 0750 `root:lampos`), written from the
+    /// app's `consent.set` (`crate::change`, #5500) and by the voice's
+    /// onboarding. The reset's plan removes both files.
+    #[serde(default = "default_consent")]
+    pub consent: PathBuf,
     /// Run once the hotspot is up and once serving ends: V1's nginx, which
     /// serves V1's page and passes `/api/` here, is on only during setup.
     #[serde(default)]
@@ -161,7 +170,7 @@ pub struct Config {
 }
 
 /// The configuration's fields, as [`read`] knows them.
-pub const FIELDS: [&str; 23] = [
+pub const FIELDS: [&str; 24] = [
     "listen",
     "marker",
     "credential",
@@ -181,6 +190,7 @@ pub const FIELDS: [&str; 23] = [
     "language",
     "own_keys",
     "control_dropin",
+    "consent",
     "web_start",
     "web_stop",
     "free_port",
@@ -218,6 +228,7 @@ impl Config {
             &self.language,
             &self.own_keys,
             &self.control_dropin,
+            &self.consent,
         ] {
             if !path.is_absolute() {
                 return Err(format!("{} is not absolute", path.display()));
