@@ -347,11 +347,50 @@ pub(super) fn renamed_already(
     })
 }
 
+/// Whose a turn of the asked rename's session is, for [`asked_note`].
+#[derive(Debug, PartialEq)]
+enum Whose {
+    /// The asker's, by the yes's own test ([`spoke_it`]).
+    Theirs,
+    /// Not proven theirs, nor proven someone else's: no face seen speaking
+    /// it and not theirs alone in view (two faces, another voice, or
+    /// another known face alone in view, theirs perhaps missed), their face
+    /// seen speaking it beside another, or only faces the eyes don't know
+    /// seen speaking it, which may be theirs missed (Thirteen on #5614).
+    Unproven,
+    /// Proven someone else's, while faces were seen speaking it: the known
+    /// face seen speaking it is not the asker's, or the asker is the one
+    /// the eyes know in view and their face is not one seen speaking it.
+    SomeoneElse,
+}
+
+/// Whose `person`'s asked rename's turn is ([`Whose`]).
+fn whose(person: &str, seen: Option<&Seen>, one_face: Option<&str>) -> Whose {
+    if spoke_it(person, seen, one_face).is_ok() {
+        return Whose::Theirs;
+    }
+    let Some((speakers, Some((name, face)))) = seen else {
+        return Whose::Unproven;
+    };
+    let askers = crate::known_faces::memory_person(name) == person;
+    let speaking = speakers.contains(face);
+    if !speakers.is_empty() && askers != speaking {
+        Whose::SomeoneElse
+    } else {
+        Whose::Unproven
+    }
+}
+
 /// What a turn of the asked rename's session is told while it has not run,
 /// so the lamp never says the name changed when it did not (lamp-29e7, 6
 /// Nov: "That's what I'll use.", the face still under the old name). Only
-/// within [`ASKED_TOLD_FOR`]; a turn of another session ends it. Told only
-/// on the asker's own turn, by the yes's test ([`spoke_it`]).
+/// within [`ASKED_TOLD_FOR`]; a turn of another session ends it. Told in
+/// full only on the asker's own turn, by the yes's test ([`spoke_it`]); a
+/// turn not proven theirs is told no rename has run without the old name,
+/// which can't be shown to whoever is speaking (the Reviewer-lead on
+/// #5586); one proven someone else's is told nothing ([`whose`]): only a
+/// known face not the asker's seen speaking it, or the asker's known face
+/// in view and not seen speaking it (Thirteen on #5614).
 pub(super) fn asked_note(
     shared: &Shared,
     request: u64,
@@ -372,16 +411,28 @@ pub(super) fn asked_note(
     }
     // A turn with no scope is told nothing, and ends nothing.
     session?;
-    // Only the asker's turn, by the yes's own test: anyone else's is told
-    // nothing, so never the old name, and leaves it for the asker's next.
+    // The old name only on the asker's turn, by the yes's own test; a turn
+    // proven someone else's is told nothing and leaves it for the asker's
+    // next.
     let seen = renames
         .sight
         .as_ref()
         .filter(|(seen, _, _)| *seen == request)
         .map(|(_, speakers, known)| (speakers.as_slice(), known.clone()));
     let one_face = scope.and_then(crate::memory_scope::ScopeLease::kept_by_one_face);
-    spoke_it(&asked.person, seen.as_ref(), one_face.as_deref()).ok()?;
-    Some(not_renamed_note(&asked.to, asked.from.as_deref()))
+    match whose(&asked.person, seen.as_ref(), one_face.as_deref()) {
+        Whose::Theirs => Some(not_renamed_note(&asked.to, asked.from.as_deref())),
+        Whose::Unproven => Some(unproven_note(&asked.to)),
+        Whose::SomeoneElse => None,
+    }
+}
+
+/// The note [`asked_note`] tells a turn not proven the asker's: no rename
+/// has run, never the old name.
+fn unproven_note(to: &str) -> String {
+    format!(
+        "(For you to know, not to answer: no rename has run, and nothing was renamed. Never say the name was changed or that you will call anyone {to}. Only remember_my_face with replace true, answered ok, renames it.)"
+    )
 }
 
 /// The note [`asked_note`] tells.
@@ -576,6 +627,59 @@ mod tests {
                 turn.this
             );
         }
+    }
+
+    /// Whose an asked rename's turn is: the asker's by the yes's test;
+    /// someone else's only when a known face not the asker's is seen
+    /// speaking it, or the asker's known face is in view and not seen
+    /// speaking it; every other turn not proven.
+    #[test]
+    fn whose_an_asked_renames_turn_is() {
+        let person = crate::known_faces::memory_person("Tove");
+        let tove = Some(("Tove".to_owned(), "eyes/f1".to_owned()));
+        let kim = Some(("Kim".to_owned(), "eyes/f2".to_owned()));
+        let f1 = vec!["eyes/f1".to_owned()];
+        let f2 = vec!["eyes/f2".to_owned()];
+        let f3 = vec!["eyes/f3".to_owned()];
+        let both = vec!["eyes/f1".to_owned(), "eyes/f2".to_owned()];
+        let empty: Vec<String> = Vec::new();
+        for (seen, one_face, expected) in [
+            (Some((f1.as_slice(), tove.clone())), None, Whose::Theirs),
+            (None, Some(person.as_str()), Whose::Theirs),
+            (None, None, Whose::Unproven),
+            (
+                Some((empty.as_slice(), tove.clone())),
+                None,
+                Whose::Unproven,
+            ),
+            (Some((both.as_slice(), tove.clone())), None, Whose::Unproven),
+            (Some((f2.as_slice(), None)), None, Whose::Unproven),
+            (
+                Some((f2.as_slice(), tove.clone())),
+                None,
+                Whose::SomeoneElse,
+            ),
+            (Some((f2.as_slice(), kim.clone())), None, Whose::SomeoneElse),
+            // Thirteen on #5614: a face the eyes don't know seen speaking
+            // beside another known face may be the asker's, missed.
+            (Some((f3.as_slice(), kim.clone())), None, Whose::Unproven),
+            // Another known face alone in view, no face seen speaking: the
+            // asker's face may be missed too.
+            (None, Some("p-other"), Whose::Unproven),
+        ] {
+            assert_eq!(
+                whose(&person, seen.as_ref(), one_face),
+                expected,
+                "{seen:?} {one_face:?}"
+            );
+        }
+        let note = unproven_note("Marisol");
+        assert!(note.contains("no rename has run"), "{note}");
+        assert!(note.contains("Never say the name was changed"), "{note}");
+        assert!(
+            !note.contains("Tove") && !note.contains("saved as"),
+            "{note}"
+        );
     }
 
     /// No claim the lamp can't back: the note says the old name is still

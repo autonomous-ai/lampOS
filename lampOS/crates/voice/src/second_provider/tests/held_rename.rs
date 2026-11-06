@@ -44,6 +44,17 @@ struct Ran {
 /// `replace` is sent to the eyes only on a yes by its guards
 /// (`known_faces::rename_agreed`), else refused for want of it.
 async fn run(turns: &[Turn], on: bool) -> Ran {
+    run_seeing(turns, on, &[]).await
+}
+
+/// What the eyes know and see on a turn: the known person and their face,
+/// and the faces in view. Each turn past those given is Tove's f1, with f1
+/// and f2 in view.
+type Sees = (&'static str, &'static str, &'static [&'static str]);
+const TOVE_SEES: Sees = ("Tove", "f1", &["f1", "f2"]);
+
+/// [`run`], the eyes knowing and seeing `sees` on each turn.
+async fn run_seeing(turns: &[Turn], on: bool, sees: &[Sees]) -> Ran {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     // Request numbers of their own: lines seen are the process's.
     let first = 19_000 + 100 * NEXT.fetch_add(1, Ordering::Relaxed);
@@ -124,18 +135,19 @@ async fn run(turns: &[Turn], on: bool) -> Ran {
     let mut frame = 0u64;
     let mut before: Vec<(String, String)> = Vec::new();
     for (at, (said, lamp, speaking)) in turns.iter().enumerate() {
+        let (known, known_face, in_view) = sees.get(at).copied().unwrap_or(TOVE_SEES);
         let request = first + at as u64;
         *window.lock().unwrap() = Said {
             this: (*said).to_owned(),
             before: before[before.len().saturating_sub(2)..].to_vec(),
         };
-        std::fs::write(&path, "Tove").unwrap();
-        std::fs::write(known_face_of(&path), "f1\n").unwrap();
+        std::fs::write(&path, known).unwrap();
+        std::fs::write(known_face_of(&path), format!("{known_face}\n")).unwrap();
         cache.replace(
             cache.begin_refresh(),
             crate::known_faces::FaceObservation::read(&path),
         );
-        // The eyes while the line is said: f1 and f2 in view, those in
+        // The eyes while the line is said: `in_view` in view, those in
         // `speaking` read speaking.
         let done = Arc::new(AtomicBool::new(false));
         let feeder = {
@@ -144,8 +156,9 @@ async fn run(turns: &[Turn], on: bool) -> Ran {
             std::thread::spawn(move || {
                 while !done.load(Ordering::Acquire) {
                     let faces = lamp_msgs::Faces {
-                        faces: ["f1", "f2"]
-                            .map(|id| lamp_msgs::Face {
+                        faces: in_view
+                            .iter()
+                            .map(|&id| lamp_msgs::Face {
                                 id: id.to_owned(),
                                 xmin: 0.1,
                                 ymin: 0.1,
@@ -165,7 +178,7 @@ async fn run(turns: &[Turn], on: bool) -> Ran {
                                 }),
                                 follows: None,
                             })
-                            .into(),
+                            .collect(),
                     };
                     frame += 1;
                     eyes.look(Instant::now(), Some((("eyes", frame), &faces)));
@@ -399,4 +412,59 @@ async fn an_unrun_rename_is_told_only_to_its_asker() {
         "{:?}",
         last_notes(&ran)
     );
+}
+
+/// The Reviewer-lead on #5586: an asker's turn that can't be proven theirs
+/// (two faces in view and none seen speaking, or two seen speaking, theirs
+/// one of them) is still told no rename has run, so the lamp can't say
+/// "That's what I'll use." (lamp-29e7, 6 Nov), but without the old name,
+/// which can't be shown to whoever is speaking.
+#[tokio::test]
+async fn an_unproven_askers_turn_is_told_no_rename_ran_without_the_old_name() {
+    for (line, speaking) in [
+        ("Okay. Can you repeat my name again?", &[][..]),
+        ("Okay. Can you repeat my name again?", &["f1", "f2"][..]),
+        ("What's my name, Lamp?", &[][..]),
+    ] {
+        let turns: [Turn; 2] = [ASKS, (line, Lamp::Says("Sure."), speaking)];
+        let ran = run(&turns, true).await;
+        assert_eq!(ran.sent, Vec::<Value>::new(), "{line} {speaking:?}");
+        let notes = last_notes(&ran);
+        assert!(
+            notes.iter().any(|note| note.contains("no rename has run")
+                && note.contains("Marisol")
+                && note.contains("Never say the name was changed")),
+            "{line} {speaking:?}: {notes:?}"
+        );
+        assert!(
+            !notes.iter().any(|note| note.contains("Tove")),
+            "{line} {speaking:?}: {notes:?}"
+        );
+    }
+}
+
+/// Thirteen on #5614: a face the eyes don't know seen saying the turn,
+/// with another known face (Kim's f2) in view, may be the asker's own face
+/// missed, so it is not proven someone else's: the turn is told no rename
+/// has run, without the old name, and the lamp can't say "That's what
+/// I'll use." (lamp-29e7, 6 Nov).
+#[tokio::test]
+async fn an_unknown_speaker_beside_another_known_face_is_told_no_rename_ran() {
+    let turns: [Turn; 2] = [
+        ASKS,
+        (
+            "Okay. Can you repeat my name again?",
+            Lamp::Says("Sure."),
+            &["f3"],
+        ),
+    ];
+    let ran = run_seeing(&turns, true, &[TOVE_SEES, ("Kim", "f2", &["f2", "f3"])]).await;
+    assert_eq!(ran.sent, Vec::<Value>::new());
+    let notes = last_notes(&ran);
+    assert!(
+        notes.iter().any(|note| note.contains("no rename has run")
+            && note.contains("Never say the name was changed")),
+        "{notes:?}"
+    );
+    assert!(!notes.iter().any(|note| note.contains("Tove")), "{notes:?}");
 }

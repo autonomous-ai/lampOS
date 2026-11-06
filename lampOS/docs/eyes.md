@@ -1536,8 +1536,13 @@ With the switch:
     With the switch, `replace` takes `known_faces::rename_agreed` in place
     of the plain yes: the lamp said A in its last answer; a sentence of
     the turn that is no question agrees (`agrees`); nothing takes it back
-    (the no words, plus "but", "actually", "though", and a maybe:
-    "maybe", "perhaps", "có lẽ"); and the turn names no
+    (the no words, plus "but", "actually", "though", a maybe:
+    "maybe", "perhaps", "có lẽ", a hesitant yes: "wait", "hold on",
+    "hang on", "let me think", and the Vietnamese "nhưng" (but),
+    "khoan", "đợi đã", "chờ đã" (wait) and "để em/tôi/anh/chị nghĩ"
+    (let me think), each as whole words, so "Okay, wait.", "Yes, hold
+    on.", "Ừ, nhưng thôi.", "Khoan đã." and "Ừ, đợi đã." are asked once
+    more, as #5572 asks an unclear yes); and the turn names no
     one else: no name given once A's own words are taken out
     (`gives_a_name`), no spelled run but A's, and no word one letter from
     a word of A's of four letters or more ("Dạ, Kess ạ." to "Kesh"). No
@@ -1568,12 +1573,21 @@ With the switch:
     of its session by the asker, for as long as the thread remembers the
     conversation, is told the face is still B (the asker by the same test
     as the yes: their face seen saying it, or none seen and theirs alone
-    in view; anyone else's turn is told nothing, and the eyes read who
-    said each line while the note waits), nothing was renamed, and never to say it
-    changed. The only wait left on a yes is the eyes' own (`DEADLINE`, 6
+    in view), nothing was renamed, and never to say it changed. A turn
+    proven someone else's is told nothing: a known face not the asker's
+    seen saying it, or the asker's known face in view and not seen
+    saying it. Every other turn not proven the asker's (no face seen
+    saying it and not theirs alone in view, as with two faces, another
+    voice or another known face alone in view; their face seen saying
+    it beside another; or only faces the eyes don't know seen saying
+    it, which may be the asker's missed) is told only that no rename
+    has run and never to say it changed, without the old name, which
+    can't be shown to whoever is speaking. The eyes read who said
+    each line while the note waits. The only wait left on a yes is the eyes' own (`DEADLINE`, 6
     s; about 2 s on 29e7), under the wait sound. Off, everything is byte
     for byte as before. Tests: `known_faces::tests::the_29e7_yeses_to_a_rename_are_agreed_by_their_guards`,
     `every_1208_correction_is_still_refused_by_the_rename_guards`,
+    `a_hesitant_yes_to_a_rename_is_asked_again`,
     `the_rename_gate_takes_the_guards_only_with_the_switch`,
     `second_provider::held_rename::tests` and
     `second_provider::tests::held_rename`.
