@@ -994,7 +994,9 @@ impl ScopeLease {
     /// Whose scope this line's `remember` goes to by the one-face rule
     /// ([`Self::take_by_one_face`], [`Self::keep_for_one_face`]), while the
     /// lease is current and no narrow came after. Never a read, a forget or
-    /// a yes: only a keep reads it.
+    /// a yes: only a keep reads it. The one named exception is the held face
+    /// rename behind `LAMP_NAMES_RENAME_YES`, whose yes it may take, as a
+    /// written risk accepted (`second_provider::held_rename`, docs/eyes.md).
     pub fn kept_by_one_face(&self) -> Option<String> {
         if !self.is_current() {
             return None;

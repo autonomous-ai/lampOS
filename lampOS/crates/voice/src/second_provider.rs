@@ -62,6 +62,7 @@ use tokio::{
 };
 
 mod after_forget;
+mod held_rename;
 pub mod link;
 pub mod net;
 mod own_echo;
@@ -1718,6 +1719,12 @@ struct Shared {
     /// The save a held one ran: its request, name and answer, so a model
     /// call after the yes never saves twice.
     saved_by_hold: Mutex<Option<(u64, String, Value)>>,
+    /// A face rename's yes judged by its guards and a rename held for it
+    /// (`LAMP_NAMES_RENAME_YES`, #5485, [`Engine::holding_renames_for_yes`]).
+    rename_yes: bool,
+    /// The face rename the lamp asked about, held for the person's yes
+    /// ([`held_rename::HeldRename`]).
+    held_rename: Mutex<held_rename::HeldRenames>,
     /// Where a held save reads what was said; the thread's window when
     /// unset ([`said_window`]).
     said_window: Option<SaidWindow>,
@@ -3958,6 +3965,8 @@ impl Engine {
                 held_forget: Mutex::new(HeldForgets::default()),
                 held_save: Mutex::new(None),
                 saved_by_hold: Mutex::new(None),
+                rename_yes: false,
+                held_rename: Mutex::new(held_rename::HeldRenames::default()),
                 said_window: None,
                 forget_sight: None,
                 forget_through_spelling: false,
@@ -4402,6 +4411,17 @@ impl Engine {
     pub(crate) fn reading_said_from(mut self, window: SaidWindow) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.said_window = Some(window);
+        self
+    }
+
+    /// A `remember_my_face` the lamp answered by asking whether to know the
+    /// face by the new name instead is held for the asker's yes, which runs
+    /// it with no model round, and while it has not run each turn of its
+    /// session is told nothing was renamed (`LAMP_NAMES_RENAME_YES`, #5485,
+    /// [`held_rename::HeldRename`]). Off, as before.
+    pub fn holding_renames_for_yes(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.rename_yes = on;
         self
     }
 
@@ -7859,8 +7879,10 @@ async fn spoken(
             .held_forget
             .lock()
             .is_ok_and(|hold| hold.held.is_some());
+        // A face rename held for a yes reads it too (`LAMP_NAMES_RENAME_YES`).
+        let renaming = held_rename::waits(&shared);
         let asks = crate::remember::asks_to_forget(&text);
-        if held || asks {
+        if held || asks || renaming {
             // Each id with the eyes' boot, the known face's too: after the
             // eyes start again a passing id names someone else (#3037).
             let speakers = eyes.speakers_with_boot(begun, finishing);
@@ -7884,6 +7906,9 @@ async fn spoken(
                 } else {
                     crate::speaking_faces::saw_line(seen);
                 }
+            }
+            if renaming {
+                held_rename::keep_sight(&shared, (request, speakers.clone(), pair.clone()));
             }
             if held && let Ok(mut hold) = shared.held_forget.lock() {
                 hold.sight = Some((request, speakers, pair));
@@ -12001,6 +12026,15 @@ async fn answer(
             Some(Err(why)) => (None, Some(why)),
             None => (None, None),
         };
+    // A face rename held for their yes (`LAMP_NAMES_RENAME_YES`, #5485).
+    let (mut held_rename_runs, held_rename_dropped) =
+        match held_rename::take(shared, request, heard, scope.as_ref(), (shared.clock)()) {
+            held_rename::Taken::Runs(call) => (Some(call), None),
+            held_rename::Taken::Dropped(name, why) => (None, Some((name, why))),
+            held_rename::Taken::Nothing => (None, None),
+        };
+    // And, while one asked has not run, that nothing was renamed.
+    let rename_note = held_rename::asked_note(shared, request, scope.as_ref(), (shared.clock)());
     // Whom the line's own words ask by name (`LAMP_TASKS_NAMED_ASK`): told
     // once, after round 1 answers.
     let mut named_ask = shared
@@ -12081,6 +12115,9 @@ async fn answer(
                 && unseen_yes.is_none()
                 && held_save_runs.is_none()
                 && held_save_dropped.is_none()
+                && held_rename_runs.is_none()
+                && held_rename_dropped.is_none()
+                && rename_note.is_none()
         })
         .map(|prepared| (prepared, said.clone()));
     // Only a note for the model, no one's words (a wordless cut's ask to go
@@ -12334,6 +12371,55 @@ async fn answer(
             messages.push(Message::system(format!(
                 "(For you to know: they said yes to the name you said back, but their face could not be kept: {why}. Do not say you will know their face; you may ask them to look at you and try again.)"
             )));
+        }
+        // Their yes to the new name runs the face rename held for it
+        // ([`held_rename::HeldRename`]), before round 1, through the same
+        // runner and checks as a model call; the model is told the result.
+        let mut rename_told = rename_note;
+        if let Some(call) = held_rename_runs.take() {
+            let name = call
+                .args
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim()
+                .to_owned();
+            let by_rule = shared
+                .hold
+                .as_ref()
+                .is_some_and(|hold| hold(request, &call.name));
+            if by_rule {
+                eprintln!(
+                    "lamp-voice second: request {request}: dropped the held face rename: the line is held"
+                );
+            } else {
+                let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
+                if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+                    return Err(Stop::Gone);
+                }
+                if result["ok"] == true {
+                    ran_tool.store(true, Ordering::Relaxed);
+                    dispatched.store(true, Ordering::Relaxed);
+                    held_rename::ran(shared, request, &name);
+                    eprintln!("lamp-voice second: request {request}: ran the held face rename");
+                    messages.push(Message::system(held_rename::ran_note(&name, &result)));
+                    rename_told = None;
+                } else {
+                    eprintln!(
+                        "lamp-voice second: request {request}: the held face rename renamed nothing"
+                    );
+                    let why = result["error"]
+                        .as_str()
+                        .unwrap_or("the eyes renamed nothing");
+                    messages.push(Message::system(held_rename::not_ran_note(&name, why)));
+                }
+            }
+        }
+        if let Some((name, why)) = held_rename_dropped {
+            messages.push(Message::system(held_rename::dropped_note(&name, why)));
+        }
+        if let Some(note) = rename_told {
+            messages.push(Message::system(note));
         }
         // Their yes did not count (#2377): told once, beside the request.
         if let Some(told) = unseen_yes {
@@ -13804,6 +13890,16 @@ async fn answer(
                     messages.push(Message::tool(call.id.clone(), told.to_string()));
                     continue;
                 }
+                // A face rename their yes already ran
+                // ([`held_rename::HeldRename`]): never a second.
+                if let Some(told) = held_rename::renamed_already(shared, request, call) {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: the held rename ran already",
+                        call.name
+                    );
+                    messages.push(Message::tool(call.id.clone(), told.to_string()));
+                    continue;
+                }
                 // A face save their yes already ran ([`HeldSave`]): never a
                 // second.
                 if let Some(told) = saved_already(shared, request, call) {
@@ -13929,6 +14025,16 @@ async fn answer(
                     } else {
                         drop_held_save(shared, request, "a new save call");
                     }
+                    // A rename the answer asks about is held for their yes
+                    // (`LAMP_NAMES_RENAME_YES`); any other drops one held.
+                    held_rename::after_face_save(
+                        shared,
+                        request,
+                        heard,
+                        call,
+                        &answer.told,
+                        scope.as_ref(),
+                    );
                 }
                 call_statuses.push(after_forget::status(&call.name, &answer.told));
                 if after_forget::is_memory_forget(&call.name) {

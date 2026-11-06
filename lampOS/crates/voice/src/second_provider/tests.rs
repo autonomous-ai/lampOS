@@ -10,6 +10,7 @@ mod decline_silent;
 mod dont_know;
 mod held_consent;
 mod held_forget;
+mod held_rename;
 mod held_save;
 mod history_keeps_calls;
 mod music_current;
@@ -8263,6 +8264,7 @@ fn every_function_that_grants_or_keeps_for_someone_is_withheld_from_a_held_line(
                 remember_speaker: false,
                 at_setup: false,
                 record: false,
+                rename_yes: false,
             },
         ))
         .chain(crate::photo_faces::tools())
