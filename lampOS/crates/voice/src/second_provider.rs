@@ -7468,12 +7468,15 @@ async fn spoken(
     // Named by the one-face count rather than the mouth read
     // (`LAMP_SECOND_NAME_ONE_FACE`): its journal line says so.
     let mut named_by_one_face = false;
-    // Named by `speaking_faces::named_alone`: no face seen speaking it, their
-    // face alone in view with at least one look of it read speaking (never
-    // their mouth seen saying it), whether or not the one-face count named
-    // it too. Only this may open their conversation going on, for a keep
-    // only (Thirteen's P1 and Heron's P2 on #5448).
-    let mut named_alone_unseen = false;
+    // Named by `speaking_faces::named_alone` (no face seen speaking it, their
+    // face alone in view with at least one look of it read speaking, never
+    // their mouth seen saying it), or by the one-face count with their mouth
+    // read speaking in at least one look (lamp-06c1, stock 10538, S4
+    // request 291: read speaking in 1 of 9 looks, still in 7, so never
+    // `alone_in_view`). Only this may open their conversation going on, for
+    // a keep only; a face never read speaking, silent, never does
+    // (Thirteen's P1 and Heron's P2 on #5448).
+    let mut opens_conversation = false;
     // Carried by the rule a silent face doesn't count in
     // (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`): judged again by the voice
     // once the rule has heard it.
@@ -7540,7 +7543,7 @@ async fn spoken(
                 // (`worker::known_person_for`).
                 named = shared.scope_seen
                     && crate::speaking_faces::named_alone(&speakers, &person, pair.as_ref(), alone);
-                named_alone_unseen = named;
+                opens_conversation = named;
                 let known_face = pair.as_ref().map(|(_, face)| face.clone());
                 // No face seen speaking it, in their conversation going on,
                 // and no other face in view through it: carried as that
@@ -7627,6 +7630,8 @@ async fn spoken(
                 {
                     named = true;
                     named_by_one_face = true;
+                    opens_conversation |=
+                        own_face.is_some_and(|face| eyes.read_speaking_in(face, begun, finishing));
                 }
                 one_face = !carried
                     && shared.scope_seen
@@ -7694,10 +7699,11 @@ async fn spoken(
                 scope.name_for_reply();
             }
             // Its room's exchange opens their conversation going on for a
-            // keep-only carry when `named_alone` named it and the voice rule is
-            // there with no other voice known, failing closed (lamp-06c1,
-            // 5 Nov, S4; Thirteen's P1 on #5448).
-            if named_alone_unseen && no_other_voice_shown(&shared) {
+            // keep-only carry when `named_alone` named it, or the one-face
+            // count with their mouth read speaking once, and the voice rule
+            // is there with no other voice known, failing closed (lamp-06c1,
+            // 5 Nov and 6 Nov, S4; Thirteen's P1 on #5448).
+            if opens_conversation && no_other_voice_shown(&shared) {
                 scope.name_for_conversation();
             }
             // Only the one-face count tells a known face its name; the mouth
@@ -8278,9 +8284,9 @@ async fn spoken(
     // the narrow takes the fallback back (Heron's P2 on #5272).
     // And a line named by the one-face count (`LAMP_SECOND_NAME_ONE_FACE`):
     // the narrow takes the name back too.
-    // Another voice heard as it was judged: a line named by `named_alone`
-    // opens no conversation of theirs (Thirteen's P1 on #5448).
-    if named_alone_unseen
+    // Another voice heard as it was judged: a line named to open their
+    // conversation opens none (Thirteen's P1 on #5448).
+    if opens_conversation
         && !no_other_voice_shown(&shared)
         && let Some(scope) = scope.as_ref()
         && scope.named_for_conversation().is_some()
