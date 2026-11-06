@@ -12557,6 +12557,167 @@ async fn a_wordless_cut_with_no_kept_rest_asks_the_model_after_the_bridge() {
     );
 }
 
+/// A story's turn `request`, written whole by the model as `sentences`, its
+/// saying held at `held` (its speech never starting, as a long story's
+/// later pieces wait for the voice while the earlier ones play): read until
+/// that piece is taken by the saying half, then until the voice was asked
+/// for `last`, the newest piece the writing half could hand on.
+async fn a_story_held_at(
+    engine: &mut Engine,
+    script: &Script,
+    request: u64,
+    held: &str,
+    last: &str,
+) {
+    engine.submit(written(request, "Tell me a long story."));
+    let taken = format!(" {held}");
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let ProviderOutput::Transcript {
+                request: Some(_),
+                text,
+                finished: false,
+            } = engine.next().await
+                && text == taken
+            {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("the held piece is taken");
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while !script
+            .spoken
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|said| said == last)
+        {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("the last piece goes to the voice");
+    // The writing half reads the model's end, or stays blocked on a full
+    // queue: either way, done by now.
+    for _ in 0..50 {
+        tokio::task::yield_now().await;
+    }
+}
+
+/// Bug 2 of 06c1's FAIL on #5491 (request 28): the model's answer was
+/// written whole (its stream ended) while its pieces were still on their way
+/// to the voice (piece 14 went at 31.6 s, the cut came at 38.8 s), so it was
+/// never "sent whole", and every cut asked the model to go on ("the rest
+/// not kept"): the resumed story was short. Now the answer written whole is
+/// kept: the bridge, then the rest from the cut sentence, the piece taken
+/// but not yet sounding and the pieces not yet taken, the model not asked.
+#[tokio::test]
+async fn a_cut_after_the_answer_was_written_whole_says_its_unsent_rest() {
+    use crate::cut_in_wordless::BRIDGE;
+    let (_release, held) = tokio::sync::oneshot::channel();
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [vec![
+                text("Once upon a time. The keeper lit the lamp. Then a ship came."),
+                text(" Its sails were red. The keeper waved."),
+                Ok(ChatEvent::Done),
+            ]]
+            .into(),
+        ),
+        speech_hold: Mutex::new(Some(("Then a ship came.", held))),
+        ..Script::default()
+    });
+    let (built, _, _) = scripted(script.clone());
+    let mut engine = built
+        .announcing(false)
+        .resuming_after_wordless_cut_ins(true)
+        .judging_busy(Arc::new(|_| true));
+    a_story_held_at(
+        &mut engine,
+        &script,
+        1,
+        "Then a ship came.",
+        "The keeper waved.",
+    )
+    .await;
+    // Cut halfway through the second sentence, the third taken but silent,
+    // the last two still in the queue.
+    let out = wordless_cut_of(&mut engine, 2, 1, 1_500 + 750).await;
+    let said: Vec<&String> = out
+        .iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(
+        said,
+        [
+            &format!("said:{BRIDGE}"),
+            &"said: The keeper lit the lamp.".to_owned(),
+            &"said: Then a ship came.".to_owned(),
+            &"said: Its sails were red.".to_owned(),
+            &"said: The keeper waved.".to_owned(),
+        ],
+        "{out:?}"
+    );
+    assert_eq!(
+        script.asked.lock().unwrap().len(),
+        1,
+        "the model not asked again"
+    );
+}
+
+/// The answer not written whole at the cut (the model's stream not read to
+/// its end: the writing half waits on a full queue): its rest is not known,
+/// so the model goes on after the bridge, as before.
+#[tokio::test]
+async fn a_cut_before_the_answer_was_written_whole_asks_the_model() {
+    use crate::cut_in_wordless::BRIDGE;
+    let (_release, held) = tokio::sync::oneshot::channel();
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [
+                vec![
+                    text("Once upon a time. The keeper lit the lamp. Then a ship came."),
+                    text(" Its sails were red. The keeper waved. The ship sailed on."),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("And the ship was his."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        speech_hold: Mutex::new(Some(("The keeper lit the lamp.", held))),
+        ..Script::default()
+    });
+    let (built, _, _) = scripted(script.clone());
+    let mut engine = built
+        .announcing(false)
+        .resuming_after_wordless_cut_ins(true)
+        .judging_busy(Arc::new(|_| true));
+    a_story_held_at(
+        &mut engine,
+        &script,
+        1,
+        "The keeper lit the lamp.",
+        "The keeper waved.",
+    )
+    .await;
+    let out = wordless_cut_of(&mut engine, 2, 1, 750).await;
+    let said: Vec<&String> = out
+        .iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(
+        said,
+        [
+            &format!("said:{BRIDGE}"),
+            &"said:And the ship was his.".to_owned()
+        ],
+        "{out:?}"
+    );
+    assert_eq!(script.asked.lock().unwrap().len(), 2, "the model goes on");
+}
+
 /// The resume switch off: today's, exactly. A busy room's wordless cut
 /// stays quiet with a kept rest, and a quiet room's asks once a minute.
 #[tokio::test]

@@ -1527,6 +1527,10 @@ struct Shared {
     /// The request whose answer was last sent whole: all its pieces are in
     /// [`Shared::said`], so its unplayed rest can be said again.
     said_whole: Mutex<Option<u64>>,
+    /// The newest answer's pieces as written for the voice, and whether the
+    /// model's answer was written whole (`LAMP_CUT_IN_WORDLESS_RESUMES`,
+    /// [`Written`]).
+    written: Mutex<Written>,
     /// The fixed answers' clips, rendered ahead ([`FixedClips`]).
     fixed_clips: Arc<FixedClips>,
     /// A turn after a quiet spell opens with [`ANNOUNCEMENT`]: not when
@@ -3272,6 +3276,89 @@ async fn play_fixed(
     true
 }
 
+/// The newest answer's pieces as written for the voice, in order
+/// (`LAMP_CUT_IN_WORDLESS_RESUMES`): a long story is written whole long
+/// before its last piece goes to the voice (06c1's FAIL on #5491, bug 2:
+/// request 28's piece 14 went at 31.6 s, the cut came at 38.8 s), so a cut
+/// in it keeps the pieces not yet taken too, never asks the model.
+#[derive(Debug, Default)]
+struct Written {
+    /// Whose answer.
+    request: u64,
+    /// Each piece of its words handed to the saying half, as said.
+    pieces: Vec<String>,
+    /// How many of them the saying half has taken (each is then in
+    /// [`Shared::said`]).
+    taken: usize,
+    /// The model's answer ended (the writing half's end): all its pieces
+    /// are here.
+    whole: bool,
+}
+
+impl Shared {
+    /// A piece of `request`'s answer handed to the saying half; the first of
+    /// a newer request's starts the record afresh.
+    fn wrote_piece(&self, request: u64, words: &str) {
+        if !self.wordless_resumes {
+            return;
+        }
+        if let Ok(mut written) = self.written.lock() {
+            if written.request != request {
+                *written = Written {
+                    request,
+                    ..Written::default()
+                };
+            }
+            written.pieces.push(words.to_owned());
+        }
+    }
+
+    /// A piece of `request`'s answer taken by the saying half.
+    fn took_piece(&self, request: u64) {
+        if let Ok(mut written) = self.written.lock()
+            && written.request == request
+        {
+            written.taken += 1;
+        }
+    }
+
+    /// `request`'s answer written whole: the model's stream ended, or the
+    /// rest said again is all known before it plays (`pieces`).
+    fn wrote_whole(&self, request: u64, pieces: Option<Vec<String>>) {
+        if !self.wordless_resumes {
+            return;
+        }
+        if let Ok(mut written) = self.written.lock() {
+            if let Some(pieces) = pieces {
+                *written = Written {
+                    request,
+                    pieces,
+                    ..Written::default()
+                };
+            } else if written.request != request {
+                *written = Written {
+                    request,
+                    ..Written::default()
+                };
+            }
+            written.whole = true;
+        }
+    }
+
+    /// The pieces of `request`'s answer, written whole, not yet taken by the
+    /// saying half: `None` when it was not written whole.
+    fn untaken(&self, request: u64) -> Option<Vec<String>> {
+        let written = self.written.lock().ok()?;
+        (written.request == request && written.whole).then(|| {
+            written
+                .pieces
+                .get(written.taken..)
+                .unwrap_or_default()
+                .to_vec()
+        })
+    }
+}
+
 /// What is left of the answer a wordless cut ended, to go on with
 /// (`LAMP_CUT_IN_WORDLESS_RESUMES`).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -3281,7 +3368,8 @@ enum CutRest {
     Nothing,
     /// Its unplayed pieces, from the sentence that was cut.
     Rest(Vec<String>),
-    /// Not kept whole, or not told how much was played: the model goes on.
+    /// Neither sent nor written whole, or not told how much was played:
+    /// the model goes on.
     Model,
 }
 
@@ -3356,9 +3444,21 @@ impl Shared {
             .said_whole
             .lock()
             .is_ok_and(|whole| *whole == Some(said.0));
+        // Written whole though not all sent: the pieces not yet taken follow
+        // the unheard part of those taken (bug 2 of #5491).
+        let untaken = self.untaken(said.0);
         match cut {
-            Some(cut) if cut.request == said.0 && whole => {
-                let rest = crate::said_as_heard::unheard(&said.1, cut.samples);
+            Some(cut) if cut.request == said.0 && (whole || untaken.is_some()) => {
+                let mut rest = crate::said_as_heard::unheard(&said.1, cut.samples);
+                if let Some(untaken) = untaken.filter(|_| !whole) {
+                    eprintln!(
+                        "lamp-voice second: request {request}: request {}'s answer was written whole before it was all sent: {} pieces from the cut sentence, {} not yet taken for the voice (LAMP_CUT_IN_WORDLESS_RESUMES)",
+                        said.0,
+                        rest.len() + untaken.len(),
+                        untaken.len()
+                    );
+                    rest.extend(untaken);
+                }
                 if rest.is_empty() {
                     CutRest::Nothing
                 } else {
@@ -3510,6 +3610,9 @@ async fn say_wordless(
 async fn say_resumed(shared: &Shared, request: u64, english: &'static str, rest: Vec<String>) {
     const WHY: &str = "LAMP_CUT_IN_WORDLESS_RESUMES";
     let heard_at = Instant::now();
+    // All of it known before it plays: a cut in it keeps what it has not
+    // taken yet, as for the model's answer written whole.
+    shared.wrote_whole(request, Some(rest.clone()));
     let turn = net::Turn { request, heard_at };
     let mut speech = JoinSet::new();
     let mut pieces = rest.into_iter();
@@ -3537,6 +3640,7 @@ async fn say_resumed(shared: &Shared, request: u64, english: &'static str, rest:
             return;
         }
         shared.said_piece(request, Some(piece.as_str()));
+        shared.took_piece(request);
         while let Some(packet) = packets.recv().await {
             let Ok(packet) = packet else {
                 eprintln!(
@@ -4000,6 +4104,7 @@ impl Engine {
                 heard_of_cut: Mutex::new(None),
                 wordless_said: Mutex::new(None),
                 said_whole: Mutex::new(None),
+                written: Mutex::new(Written::default()),
                 fixed_clips: Arc::default(),
                 announce: true,
                 heard_last: Mutex::new(None),
@@ -14597,6 +14702,7 @@ async fn answer(
             // don't: they are never kept as the lamp's.
             shared.said_piece(request, answering.then_some(text.as_str()));
             if answering {
+                shared.took_piece(request);
                 words_out.fetch_add(text.split_whitespace().count(), Ordering::Relaxed);
                 whole.push(' ');
                 whole.push_str(&text);
@@ -14756,6 +14862,15 @@ async fn answer(
             }
         }
         Ok(whole)
+    };
+    // The model's answer ended: all its pieces are handed on, though not all
+    // are said yet (`LAMP_CUT_IN_WORDLESS_RESUMES`, [`Written`]).
+    let writing = async move {
+        let wrote = writing.await;
+        if wrote.is_ok() {
+            shared.wrote_whole(request, None);
+        }
+        wrote
     };
     let ended = tokio::try_join!(writing, saying);
     if shared.note_tools
@@ -15009,6 +15124,11 @@ impl Queue<'_> {
             );
         }
         self.started = true;
+        // As the saying half tells its pieces: the announcement's text is
+        // never one of them.
+        if text != ANNOUNCEMENT {
+            self.shared.wrote_piece(self.request, &text);
+        }
         if let Ok(mut said) = self.shared.lamp_said.lock() {
             if said.0 != self.request {
                 *said = (self.request, String::new());
