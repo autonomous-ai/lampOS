@@ -93,7 +93,8 @@ fn the_units_program_acts_on_the_rounds_fresh_request_while_the_round_holds_the_
             synced: true,
             at_unix_ms: NOW + 1_000,
             proven: false,
-            put_back: None
+            put_back: None,
+            for_good: false,
         }
     );
     assert_eq!(super::done(&lamp.records), Some(done));
@@ -280,4 +281,135 @@ fn nothing_is_unproven_before_a_refresh_or_when_the_writer_was_already_the_build
     let done = refresh(lamp.root.path(), &lamp.records, b"new", &|| NOW, &mut good).unwrap();
     assert_eq!(done.before, None);
     assert!(!unproven(lamp.root.path(), &lamp.records));
+}
+
+/// lamp-06c1's record (#5539), as a lamp-update from before #5539 wrote it
+/// when the first apply after a refresh failed: the copy before is the
+/// writer again, and the running build is named as put back, with no word
+/// on whether it was for good.
+fn put_back_before_5539(lamp: &Lamp) {
+    let record = serde_json::json!({
+        "build": sha256_hex(b"old"),
+        "before": sha256_hex(b"new"),
+        "synced": true,
+        "at_unix_ms": NOW,
+        "proven": true,
+        "put_back": sha256_hex(b"new"),
+    });
+    fs::write(lamp.records.join(DONE), record.to_string()).unwrap();
+}
+
+#[test]
+fn a_new_writer_whose_first_apply_failed_is_put_back_and_asked_again() {
+    let lamp = lamp();
+    refresh(lamp.root.path(), &lamp.records, b"new", &|| NOW, &mut good).unwrap();
+    let done = op(&lamp, Op::PutBackForApply, NOW + 1).unwrap();
+    assert_eq!(writer(&lamp), "old");
+    assert_eq!(prev(&lamp), None);
+    assert_eq!(done.build, sha256_hex(b"old"));
+    assert_eq!(done.before, Some(sha256_hex(b"new")));
+    assert_eq!(done.put_back, None);
+    assert!(!unproven(lamp.root.path(), &lamp.records));
+    let held = Records::new(lamp.records.clone()).lock().unwrap();
+    assert!(ask(lamp.root.path(), &held, b"new", NOW + 2).unwrap());
+}
+
+#[test]
+fn a_put_back_for_an_apply_carries_a_build_put_back_before_forward() {
+    let lamp = lamp();
+    refresh(lamp.root.path(), &lamp.records, b"new", &|| NOW, &mut good).unwrap();
+    let mut done = super::done(&lamp.records).unwrap();
+    done.put_back = Some(sha256_hex(b"older"));
+    done.for_good = true;
+    fs::write(lamp.records.join(DONE), serde_json::to_vec(&done).unwrap()).unwrap();
+    let done = op(&lamp, Op::PutBackForApply, NOW + 1).unwrap();
+    assert_eq!(done.put_back, Some(sha256_hex(b"older")));
+    assert!(done.for_good);
+}
+
+#[test]
+fn a_build_put_back_by_a_record_from_before_5539_is_asked_once_more_then_never_again() {
+    for again in [Op::PutBackForApply, Op::PutBack] {
+        let lamp = lamp();
+        put_back_before_5539(&lamp);
+        let held = Records::new(lamp.records.clone()).lock().unwrap();
+        // Offered once more.
+        assert!(ask(lamp.root.path(), &held, b"new", NOW + 1).unwrap());
+        drop(held);
+        let refreshed = op(&lamp, Op::Refresh, NOW + 2).unwrap();
+        assert_eq!(writer(&lamp), "new");
+        assert_eq!(prev(&lamp).as_deref(), Some("old"));
+        assert!(unproven(lamp.root.path(), &lamp.records));
+        assert_eq!(refreshed.put_back, Some(sha256_hex(b"new")));
+        assert!(refreshed.for_good);
+        // Put back again, whatever for: never asked again.
+        op(&lamp, again, NOW + 3).unwrap();
+        assert_eq!(writer(&lamp), "old");
+        let held = Records::new(lamp.records.clone()).lock().unwrap();
+        assert!(
+            !ask(lamp.root.path(), &held, b"new", NOW + 4).unwrap(),
+            "{again:?}"
+        );
+    }
+}
+
+/// lamp-52e6's state (#5539): a `.prev` no record pairs with, another copy
+/// than the writer in place, and no `writer-refresh.done` at all.
+fn prev_no_record_pairs_with(lamp: &Lamp) {
+    let path = on_root(lamp.root.path(), PREV);
+    fs::write(&path, "oldest").unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(super::done(&lamp.records).is_none());
+}
+
+#[test]
+fn a_prev_no_record_pairs_with_is_cleared_once_the_writer_in_place_has_proved_itself() {
+    let lamp = lamp();
+    prev_no_record_pairs_with(&lamp);
+    note_back(&lamp.records, b"old", NOW - 1_000).unwrap();
+    let done = op(&lamp, Op::Refresh, NOW).unwrap();
+    assert_eq!(writer(&lamp), "new");
+    assert_eq!(prev(&lamp).as_deref(), Some("old"));
+    assert_eq!(done.before, Some(sha256_hex(b"old")));
+    assert!(unproven(lamp.root.path(), &lamp.records));
+}
+
+#[test]
+fn a_prev_no_record_pairs_with_is_kept_while_the_writer_in_place_has_not_proved_itself() {
+    // No `back` noted, or one by another writer.
+    for noted in [None, Some(&b"oldest"[..]), Some(&b"new"[..])] {
+        let lamp = lamp();
+        prev_no_record_pairs_with(&lamp);
+        if let Some(own) = noted {
+            note_back(&lamp.records, own, NOW - 1_000).unwrap();
+        }
+        let why = op(&lamp, Op::Refresh, NOW).unwrap_err();
+        assert!(why.contains("no refresh in the records kept it"), "{why}");
+        assert!(why.contains("nothing was replaced"), "{why}");
+        assert_eq!(writer(&lamp), "old");
+        assert_eq!(prev(&lamp).as_deref(), Some("oldest"));
+    }
+}
+
+#[test]
+fn a_prev_an_unproven_refresh_kept_is_never_cleared() {
+    // A refresh not proved yet pairs with its `.prev`: even with the writer
+    // in place noted, that `.prev` may be the only good copy.
+    let lamp = lamp();
+    refresh(lamp.root.path(), &lamp.records, b"new", &|| NOW, &mut good).unwrap();
+    note_back(&lamp.records, b"new", NOW + 1).unwrap();
+    let held = Records::new(lamp.records.clone()).lock().unwrap();
+    request(&held, b"newer", Op::Refresh, NOW + 2).unwrap();
+    let why = refresh(
+        lamp.root.path(),
+        &lamp.records,
+        b"newer",
+        &|| NOW + 2,
+        &mut good,
+    )
+    .unwrap_err();
+    drop(held);
+    assert!(why.contains("holds another copy"), "{why}");
+    assert_eq!(writer(&lamp), "new");
+    assert_eq!(prev(&lamp).as_deref(), Some("old"));
 }

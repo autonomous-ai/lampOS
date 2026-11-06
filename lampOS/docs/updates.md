@@ -1294,6 +1294,7 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `lamp-update-writer.service ran, and the settings writer is not build …` | the unit ran, but the writer it left isn't this build's |
 | `the settings writer refreshed has proved itself (its back ended well): the copy before is removed` | a refreshed writer's first `back` ended well |
 | `the settings writer refreshed is put back (its back failed): the copy before is the writer again` | a refreshed writer's first `back` failed |
+| `the settings writer refreshed is put back (its first apply failed): the copy before is the writer again, and this lamp-update may be asked to be it again` | a refreshed writer's first `apply` failed: the build is refused, the writer is not (#5539) |
 | `the settings writer could not be put back or proved (…): …` | either of those two asked of the unit, and it failed |
 | `the settings writer's back failed in a run that began before it was refreshed: the next back judges it` | the failed `back` may be the copy before's, so nothing is put back for it |
 | **The journal** (`acting`, at the round's start) | |
@@ -2104,7 +2105,11 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   lamp-update that runs (its refresh, below, failed or was put back),
   waits and says so: `build N carries /etc/lampOS/skills/store.env, and
   this lamp's settings writer is older than this lamp-update: waiting for
-  it to be refreshed`. A dry round (`check`, a climbed updater's confirm)
+  it to be refreshed`. When the writer put back is this lamp-update, put
+  back for good after its own `back` failed ("Proved, or put back",
+  below), the round says so instead: `build N carries …, and this
+  lamp-update was put back as the settings writer for good: waiting for a
+  newer lamp-update`. A dry round (`check`, a climbed updater's confirm)
   writes nothing and never waits for it. The drop-in `store.conf` stays install's alone.
 - **The models switch file.** `/etc/lampOS/models.env`
   (`manifest::MODELS_ENV`, `deploy/product/settings/models.env`,
@@ -3321,13 +3326,43 @@ bound. Until the refreshed writer is proved:
   the round asks the unit to remove `lamp-update-back.prev`
   (`writer_swap::Op::Proven`). A later build of lamp-update may then refresh
   it again.
-- **Put back:** when `lamp-update-back.service` has failed, or this round's
-  first `apply` by the new writer failed, the round asks the unit to rename
-  `.prev` back over it (`Op::PutBack`). The apply's own undo runs first,
-  with the writer that made it, when it wrote anything; a writer that
-  failed before its first write is put back all the same. The build put
-  back is kept in `writer-refresh.done` and never asked to be the writer
-  again.
+- **Put back after its own `back` failed:** when `lamp-update-back.service`
+  has failed, the round asks the unit to rename `.prev` back over it
+  (`Op::PutBack`). The build put back is kept in `writer-refresh.done`
+  (`put_back`, with `for_good`) and never asked to be the writer again. A
+  round that would write `store.env` or `models.env` then refuses the build
+  and says why: `build N carries …, and this lamp-update was put back as
+  the settings writer for good: waiting for a newer lamp-update`.
+- **Put back after its first `apply` failed** (#5539): the round asks the
+  unit to rename `.prev` back over it (`Op::PutBackForApply`). The apply's
+  own undo runs first, with the writer that made it, when it wrote
+  anything; a writer that failed before its first write is put back all
+  the same. The failure is taken as the build's, not the writer's: the
+  build is refused for good as any build put back is, and the writer is
+  not. Any build put back before is carried forward, with its `for_good`.
+  So the next round asks for the writer again, and a later build with
+  settings to write is taken. A bad writer can't loop: each try costs a
+  build, which is refused for good. Before #5539 this put-back named the
+  writer's build as put back for good, so a lamp that climbed and then
+  had that round fail (lamp-06c1) refused every later build carrying
+  `store.env`, with only a waiting line.
+- **A record from before #5539** has no `for_good`, so it can't tell a
+  failed `back` from a failed first apply. Its `put_back`, when it names
+  the running lamp-update, is asked once more. The refresh that does so
+  keeps it as put back, now `for_good`, so a second put-back of it, for
+  either reason, is for good.
+- **A `.prev` no record pairs with** (lamp-52e6, #5539): the unit's
+  refresh finds a `lamp-update-back.prev` that differs from the writer, and
+  no `writer-refresh.done` names it as the copy before a refresh not
+  proved yet. `fixed_copy::place` refuses such a `.prev`, as it may be the
+  only good copy, so nothing ever removed it. The unit removes it only
+  when `writer-back.ok` names the writer now in place: that writer's own
+  `back` has ended well, so `.prev` isn't the only good copy. Then the
+  refresh goes on, and `.prev` holds the writer it replaced. Without that
+  note it still refuses: `… holds another copy than …, no refresh in the
+  records kept it, and the writer in place has no back noted as ended
+  well: it may be the only good copy, so nothing was replaced`. A `.prev`
+  an unproven refresh kept is never removed this way.
 - **A failed `back` that began before the refresh** is not the new
   writer's. The copy before's `back` may be mid-run when the refresh lands,
   and fail after the unit's `reset-failed`. So a `failed` counts only when
