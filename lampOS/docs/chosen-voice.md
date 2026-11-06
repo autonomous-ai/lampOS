@@ -70,6 +70,12 @@ is said once in the journal ("the chosen voice is not used …: the default
 voice", never the value) and left out: the default voice, or no words.
 Nothing is spoken about it and the voice starts as usual.
 
+Each start says the voice it speaks with, once, after the language's and the
+chosen voice are applied: `lamp-voice: the voice speaks as Rachel` (the
+chosen voice, the language's, or the default). A voice set in `second.json`
+by id is said as "a voice id from the configuration", never the id. This is
+how a tester tells the chosen voice from the default.
+
 ## Not built yet
 
 `tts.preview` and a preset list (`character.list`) are not in this piece
@@ -81,6 +87,6 @@ as `character.set`.
 Not run yet. With the switch on in both units: `voice.set {"voice": "Adam"}`
 from the app, then a spoken question is answered in Adam's voice (the
 journal's `the chosen voice is now Adam`, then `lamp-voice.service
-restarted`); `character.set {"text": "very short and dry, like a tired
-butler"}`, then the next answer reads that way; a 5 s reset, then the
+restarted`, then `lamp-voice: the voice speaks as Adam`); `character.set
+{"text": "very short and dry, like a tired butler"}`, then the next answer reads that way; a 5 s reset, then the
 default voice and no words.

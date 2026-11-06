@@ -1011,6 +1011,8 @@ pub fn services(
         config.tts_voice = None;
     }
     let fallback = config.tts_provider.name();
+    let speaks_as =
+        super::net::voice_told(config.tts_provider, config.tts_voice.as_deref()).to_owned();
     let configured_model = config
         .tts_model
         .clone()
@@ -1083,6 +1085,8 @@ pub fn services(
         eprintln!(
             "lamp-voice second: the voice is {fallback}, model {configured_model}, the lamp's one voice"
         );
+        // The voice in use, after the language's and the chosen one (#5394).
+        eprintln!("lamp-voice: the voice speaks as {speaks_as}");
     }
     if route.gemini_speech()
         && let Some(call) = call(&gemini.speech_model)
