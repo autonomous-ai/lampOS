@@ -365,19 +365,34 @@ class BodyAsks(unittest.TestCase):
                      "TWO READS"):
             self.assertEqual(self.ask(body), "short 1", body)
 
-    def test_bodies_that_only_name_the_rule(self):
+    def test_a_body_that_names_two_reads_anywhere_asks(self):
+        # 7 Nov (#5635, the PM): fail closed. #5572 and #5580 merged on one read with TWO READS in their bodies'
+        # prose; a false match only costs a second read.
         for body in ("Turning it on in homes is a separate default-on PR (TWO READS), later.",
                      "Per joining.md, privacy pull requests need TWO READS.",
                      "## Tests\n\n- TWO READS across a comment and a review;",
-                     "Today it is left out as TWO READS short, because its body names the phrase."):
+                     "This PR needs TWO READS (privacy).", "Readers: TWO READS (privacy and tests)",
+                     "Privacy, so **TWO  READS** on this one."):
+            self.assertEqual(self.ask(body), "short 1", body)
+
+    def test_an_opt_out_line_clears_a_body_that_only_names_it(self):
+        for body in ("Per joining.md, privacy pull requests need TWO READS.\n\nONE READ: names the rule, asks nothing.",
+                     "- TWO READS across a comment and a review;\n\n**ONE READ** (tests only)"):
+            self.assertEqual(self.ask(body), "none", body)
+        # An opt-out never clears a line that asks.
+        self.assertEqual(self.ask("TWO READS: Reviewer-lead, Tests.\n\nONE READ: a slip."), "short 1")
+        # "ONE READ" in prose is no opt-out.
+        self.assertEqual(self.ask("Needs TWO READS, not ONE READ."), "short 1")
+
+    def test_no_mention_asks_nothing(self):
+        for body in ("Nothing about reads.", "two reads, lowercase", "ONE READ: tests only."):
             self.assertEqual(self.ask(body), "none", body)
 
-    def test_names_without_asking_is_said(self):
-        # 4 Nov 23:4x (Thirteen's P3 on #5305): an ask in words the patterns don't take is said, once per head.
-        for body in ("This PR needs TWO READS (privacy).", "Readers: TWO READS (privacy and tests)",
-                     "Per joining.md, privacy pull requests need TWO READS."):
-            self.assertTrue(body_names_unasked(body), body)
-        for body in ("TWO READS: Reviewer-lead, Tests.", "## TWO READS\n\nSixth.", "no ask here", "two reads, lowercase"):
+    def test_opted_out_is_said(self):
+        # The bot's log says a body that names TWO READS and opts out, once per head.
+        self.assertTrue(body_names_unasked("Privacy needs TWO READS.\n\nONE READ: tests only."))
+        for body in ("TWO READS: Reviewer-lead, Tests.", "Per joining.md, privacy needs TWO READS.", "no ask here",
+                     "ONE READ: tests only."):
             self.assertFalse(body_names_unasked(body), body)
 
     def test_unasked_cli(self):
@@ -385,9 +400,36 @@ class BodyAsks(unittest.TestCase):
             line = json.dumps({"login": "", "body": body, "pr_body": True})
             return subprocess.run([sys.executable, "-I", os.path.join(HERE, "reads2.py"), "--unasked"], input=line + "\n",
                                   capture_output=True, text=True, check=True).stdout.strip()
-        self.assertEqual(run("This PR needs TWO READS (privacy)."), "unasked")
-        self.assertEqual(run("TWO READS: Fourth."), "")
+        self.assertEqual(run("This PR needs TWO READS (privacy).\nONE READ: tests only."), "unasked")
+        self.assertEqual(run("This PR needs TWO READS (privacy)."), "")
         self.assertEqual(run("Nothing about reads."), "")
+
+
+class ReadAskNamesTwoReads(unittest.TestCase):
+    # 7 Nov (#5635): a writer's READ ASK that names TWO READS anywhere asks, not only a comment opening with it.
+    def reads(self, *cs):
+        return two_reads([{"login": "", "body": "A body.", "pr_body": True}] + list(cs), HEAD, W)
+
+    def test_read_ask_with_two_reads_on_its_second_line(self):
+        ask = c("writer-b", "Twelve, 02:40, to **the Reviewer-lead**: READ ASK " + HEAD[:10] + "\n\nPrivacy: TWO READS, "
+                "the PM names the second.")
+        self.assertEqual(self.reads(ask, c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 15:00")), "short 1")
+        self.assertEqual(self.reads(ask, c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 15:00"),
+                                    c("writer-b", "READ-OK " + HEAD + "\n\nSixth, 15:20")), "met 2")
+
+    def test_read_ask_with_an_opt_out_line(self):
+        ask = c("writer-b", "READ ASK " + HEAD[:10] + " to the Reviewer-lead; the rule says TWO READS for privacy.\n"
+                "ONE READ: tests only.")
+        self.assertEqual(self.reads(ask, c("writer-a", "READ-OK " + HEAD)), "none")
+
+    def test_a_non_writer_read_ask_is_ignored(self):
+        self.assertEqual(self.reads(c("stranger", "READ ASK " + HEAD[:10] + "\n\nTWO READS"), c("writer-a", "READ-OK " + HEAD)),
+                         "none")
+
+    def test_other_comments_naming_two_reads_ask_nothing(self):
+        # Only a READ ASK or a first line asks: a reader's note naming the rule is not an ask.
+        self.assertEqual(self.reads(c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead: one read, not TWO READS.")),
+                         "none")
 
 
 class LiftedByCommit(unittest.TestCase):
