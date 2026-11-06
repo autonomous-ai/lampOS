@@ -394,8 +394,13 @@ trước nó trên mô hình thật ([second-voice.md](../second-voice.md)).
 `LAMP_MEMORY_DONT_KNOW_RECALLS=on` (nhiệm vụ C57; tắt nếu không đặt, đường
 voice thứ hai với Days) bật trong bản sản phẩm từ 5/11, theo quyết định của
 người phụ trách trí nhớ, sau khi sáng hôm đó lamp-06c1 nói «tôi không nhớ kế
-hoạch kỳ nghỉ nào» mà không gọi `recall` (C56). Khi câu trả lời mở đầu bằng
-một lời không biết về điều của chính người hỏi, những điều đã giữ của người đó
+hoạch kỳ nghỉ nào» mà không gọi `recall` (C56). Khi câu đầu của câu trả lời
+có một lời không biết ở bất kỳ chỗ nào («Cá vàng của bạn — mình không nhớ.»,
+«mình không có…», «bạn chưa nói…», «chưa có gì về…») về điều của chính người
+hỏi (không bao giờ với một câu được mang vào cuộc trò chuyện đang diễn ra,
+`LAMP_CONVERSATION_CARRIES`, vì một vị khách ngoài khung hình trông cũng như
+vậy; một số cụm như «I can't tell you», «nothing about» chỉ tính khi có từ phù
+hợp theo sau), những điều đã giữ của người đó
 được tìm ngay (tối đa 60 ms); có tìm thấy thì lời không biết không được nói và
 mô hình được hỏi lại một lần với chúng. Chỉ người của chính yêu cầu, không bao
 giờ của căn phòng hay của người khác. Chi tiết: [memory.md](../memory.md),
@@ -533,7 +538,9 @@ trong RAM, không ghi vào nhật ký, chờ lời «có» của chính người
 một lệnh quên được giữ (`hold_carried_keep`, `take_held_forget`). Mô hình được
 báo «Not kept yet» (`remember::held_keep_told`) và hỏi một lần, «Want me to
 keep that for you?»; việc giữ chỉ còn nếu câu trả lời nói trọn có hỏi
-(`remember::asks_about_keeping`). Lời «có» đơn giản của họ ở câu nói kế tiếp,
+(`remember::asks_about_keeping`: «Should I keep your lucky number as
+fifty-three?» và «Want me to keep Thursday book club for you?» đều tính; trên
+lamp-06c1 ngày 5/11, S14, cả hai bị bỏ sót và việc giữ bị bỏ). Lời «có» đơn giản của họ ở câu nói kế tiếp,
 trong vòng `HELD_FORGET_FOR` (60 giây), với chính khuôn mặt họ được thấy đang
 nói và không mặt nào khác (`LAMP_EYES_SPEAKING`,
 `speaking_faces::seen_saying`), mới ghi nó vào phạm vi của họ, và câu trả lời

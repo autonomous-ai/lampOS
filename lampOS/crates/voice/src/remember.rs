@@ -1164,12 +1164,26 @@ pub fn offers_a_keep(sentence: &str) -> bool {
             .windows(2)
             .any(|pair| ["should", "shall", "can", "may"].contains(&pair[0]) && pair[1] == "i");
     let keeps = words.windows(2).any(|pair| match pair[0] {
-        "keep" | "save" => ["that", "this", "it", "those", "them"].contains(&pair[1]),
+        "keep" | "save" => ["that", "this", "it", "those", "them", "your"].contains(&pair[1]),
         "remember" | "note" => {
             ["that", "this", "it", "those", "them", "your", "the", "my"].contains(&pair[1])
         }
         _ => false,
-    });
+    }) || words.windows(2).any(|pair| {
+        // A thing of theirs named for the keep: "Should I keep chess as your
+        // favorite board game?", "Want me to keep Thursday book club for
+        // you?" (lamp-06c1, 5 Nov, S14: each held keep was dropped as an
+        // answer that asked nothing about it). Never the lamp keeping
+        // something going: "Shall I keep the light on for you?", "Can I keep
+        // you company?".
+        ["keep", "save"].contains(&pair[0])
+            && ![
+                "the", "you", "going", "on", "off", "a", "an", "quiet", "it's",
+            ]
+            .contains(&pair[1])
+    }) && words
+        .windows(2)
+        .any(|pair| matches!(pair, ["for", "you"] | ["as", "your"]));
     if lamp_asks && keeps {
         return true;
     }
@@ -13157,6 +13171,14 @@ mod tests {
             "Shall I save it?",
             "Would you like me to note that?",
             "M\u{ec}nh nh\u{1edb} \u{111}i\u{1ec1}u \u{111}\u{f3} nh\u{e9}?",
+            // lamp-06c1, 5 Nov (S14, run 15:08, requests 17, 31, 35, 38 and
+            // 46): offers whose held keep was dropped.
+            "Should I keep your lucky number as fifty-three, Olivia?",
+            "Should I keep chess as your favorite board game, Olivia?",
+            "Want me to keep Thursday book club for you?",
+            // Thirteen's P3 on #5508.
+            "Want me to keep book club on Thursday for you?",
+            "Want me to keep your yoga class at seven in the morning?",
         ] {
             assert!(super::offers_a_keep(offer), "{offer}");
         }
@@ -13165,6 +13187,9 @@ mod tests {
             "Want me to keep that",
             "What should I call you?",
             "Shall I keep the light on?",
+            "Shall I keep the light on for you tonight?",
+            "Should I keep going for you?",
+            "Can I keep you company?",
             "Do you want me to remember to remind you?",
             "Do you remember that?",
             "How is it going?",

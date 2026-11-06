@@ -11858,7 +11858,9 @@ async fn answer(
     // (`LAMP_SECOND_SAY_WITH_CALL`, #2135).
     let heard_words = said.clone();
     // A line about the person, whose reply may recall before a don't-know
-    // (`LAMP_MEMORY_DONT_KNOW_RECALLS`).
+    // (`LAMP_MEMORY_DONT_KNOW_RECALLS`): never one held only by a face's
+    // gap or carried into a conversation going on, which may be someone
+    // else's (Heron's P2 on #5508).
     let dont_know_words = (heard
         && !quoted
         && shared.dont_know.is_some()

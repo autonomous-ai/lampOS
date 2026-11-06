@@ -3522,7 +3522,11 @@ after a take-over, but now for every turn:
   every turn of this route. A sentence that offers to keep
   (`remember::offers_a_keep`: a question asked by the lamp, "me", "should
   I", "shall I", "can I", "may I", with "keep/save that, this, it, those,
-  them" or "remember/note" and what it takes; and "mình/tôi/em … nhớ/lưu
+  them, your", "keep/save" a thing named "for you" or "as your" ("Should
+  I keep chess as your favorite board game?", "Want me to keep Thursday
+  book club for you?", lamp-06c1, 5 Nov, S14; never "keep the light on",
+  "keep you company" or "keep going"), or "remember/note" and what it
+  takes; and "mình/tôi/em … nhớ/lưu
   … nhé/không/có muốn") is held, with the sentences after it, to its
   round's end (`remember::OfferHold`). Beside a `remember` call, or after
   one of the same request ran, the offer is not said and the rest is, in
