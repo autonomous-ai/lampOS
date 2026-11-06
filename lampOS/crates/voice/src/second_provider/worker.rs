@@ -2451,6 +2451,9 @@ pub fn serve(
     // person (the onboarding forgets report, 30 Oct).
     let owner_faces = tools.who.clone();
     let owner_file = tools.onboarding.clone();
+    // Where the owner's voice enrolled at setup is kept, beside the walk's
+    // progress (`LAMP_SAME_VOICE_ENROLS_AT_SETUP`, `crate::setup_voice`).
+    let setup_file = tools.onboarding.clone();
     let by_default = crate::person::by_default_from_environment()
         .then(|| {
             let bus = files
@@ -3659,7 +3662,15 @@ pub fn serve(
         // decision of 4 Nov): no rule judges by voice, and the known
         // person's own voice only confirms their line.
         if let Some(bar) = files.same_voice_confirms.filter(|_| hears) {
-            engine = confirming_by_voice(engine, &heeding, bar);
+            engine = confirming_by_voice(engine, &heeding, bar, setup_file.as_deref());
+        } else if let Some(store) = setup_file
+            .as_deref()
+            .and_then(crate::setup_voice::store_beside)
+        {
+            // Off, prints an earlier start kept at setup go now, and a
+            // forget of everything still finds where they were
+            // (`LAMP_SAME_VOICE_ENROLS_AT_SETUP`).
+            crate::setup_voice::switched_off(store);
         }
         // The name heard only in the room's sound opens nothing alone
         // (`LAMP_NAME_SECOND_SIGN=on`, the first builder at 21:03 on
@@ -6227,7 +6238,12 @@ enum Printing {
 /// (`same_voice::Voices::confirming_only`), and the engine reads each
 /// line's print from them to confirm the known person's own line at `bar`
 /// (`Engine::confirming_by_voice`).
-fn confirming_by_voice(engine: Engine, heeding: &Arc<Mutex<Heeding>>, bar: f32) -> Engine {
+fn confirming_by_voice(
+    engine: Engine,
+    heeding: &Arc<Mutex<Heeding>>,
+    bar: f32,
+    onboarding: Option<&Path>,
+) -> Engine {
     if let Ok(mut heeding) = heeding.lock() {
         heeding.voices = heeding
             .voices
@@ -6238,8 +6254,13 @@ fn confirming_by_voice(engine: Engine, heeding: &Arc<Mutex<Heeding>>, bar: f32) 
         "lamp-voice second: the voice only confirms: a known person's line no face was seen speaking, their face the one face in view, is theirs at cosine {bar:.2} or over against their own voice; nothing ends, holds or splits a conversation by voice (LAMP_SAME_VOICE_CONFIRMS)"
     );
     let heeding = heeding.clone();
+    let owner = Arc::new(crate::same_voice::OwnerVoice::new(bar));
+    // `LAMP_SAME_VOICE_ENROLS_AT_SETUP`: the owner's prints kept at setup
+    // come back now; none, off.
+    let setup = crate::setup_voice::from_environment(onboarding, &owner);
     engine.confirming_by_voice(crate::second_provider::VoiceConfirms {
-        owner: Arc::new(crate::same_voice::OwnerVoice::new(bar)),
+        owner,
+        setup,
         print_of: Arc::new(move |request| {
             heeding
                 .lock()

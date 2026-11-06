@@ -582,6 +582,37 @@ lamp-06c1 on 28 Oct "redo the touch step" reached a redo with no step and
 reopened every step). Skipping one step is `setup_step … skipped`; skipping
 the rest is that for each step.
 
+### The owner's voice at setup (C115)
+
+With `LAMP_SAME_VOICE_ENROLS_AT_SETUP=on`, beside `LAMP_SAME_VOICE_CONFIRMS`
+on the second route (off unless set, off everywhere), "who you are" also
+gives the owner's voice ([same-voice.md](same-voice.md), "One way only").
+No step or line is added and the step waits for nothing: each line heard
+while the step is open is read in a thread of its own
+(`setup_voice::SetupVoice::heard`). A line one face alone was seen
+speaking, the one face in view, has its CAM++ print held in RAM; once the
+step ends with that face saved as the owner (`owner` in this file), up to
+4 of its prints are kept in `setup-voice.json` beside this file, prints
+only. A guest's face, a line no face was seen speaking, or a step that ends
+with no face saved keeps none. A whole reset wipes it with the folder; the
+owner's "forget everything" removes it too ([memory.md](memory.md)).
+It never outlives its owner's walk: the file is removed when "who you are"
+opens again (a redo's first line heard, or a start while it is open), when
+the step ends with nothing kept, at a start that finds another owner's or
+none named, when a face is forgotten (the `owner` mark goes), and at a start
+with the switch off where the voice runs its attention rules (`LAMP_ATTENTION`;
+a start without them leaves it). A redo and a step that keep nothing also
+empty the owner's prints in RAM, and a print that comes only after the step
+was settled is dropped, never replacing those kept. So a redo by someone whose lines are never seen alone
+leaves no former owner's prints that their "forget everything" could no
+longer reach.
+
+**Consent (open question for the onboarding owner).** The walk asks only
+"May I remember your face, so I know you next time?"; no line covers the
+voice, so this build adds no spoken step and keeps the enrolment behind the
+switch, off. Whether the face's yes may cover the voice, or the walk needs
+its own words for it, is the onboarding owner's to decide.
+
 ## Where it is kept
 
 `LAMP_ONBOARDING_FILE` (JSON, mode 0600, written whole and renamed): each

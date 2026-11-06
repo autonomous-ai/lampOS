@@ -107,6 +107,7 @@ pub mod photo_faces;
 pub mod remember_speaker;
 pub mod scoped_session;
 pub mod setup_journal;
+pub mod setup_voice;
 pub mod sign_in;
 pub mod spoken_stop;
 pub mod turned_away;
