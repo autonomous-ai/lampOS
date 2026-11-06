@@ -326,11 +326,13 @@ fn dechunk(mut body: &[u8]) -> Option<Vec<u8>> {
         if size == 0 {
             return Some(whole);
         }
-        if body.len() < size + 2 || &body[size..size + 2] != b"\r\n" {
+        // A size near usize::MAX is a cut chunk, not an overflow.
+        let past = size.checked_add(2)?;
+        if body.len() < past || &body[size..past] != b"\r\n" {
             return None;
         }
         whole.extend_from_slice(&body[..size]);
-        body = &body[size + 2..];
+        body = &body[past..];
     }
 }
 
@@ -555,6 +557,9 @@ mod tests {
         assert_eq!(read(cut), Health::Bad("not_json"));
         let bad = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nzz\r\n{}\r\n0\r\n\r\n";
         assert_eq!(read(bad), Health::Bad("not_json"));
+        // A size that would overflow is not json, never a panic.
+        let huge = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nffffffffffffffff\r\n{}\r\n0\r\n\r\n";
+        assert_eq!(read(huge), Health::Bad("not_json"));
     }
 
     /// A one-answer server on loopback, the request it was sent kept.
