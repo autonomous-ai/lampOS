@@ -199,8 +199,10 @@ pub struct SetUpLater {
 /// this many looks: every five minutes on a lamp.
 pub const MACHINES_EVERY_LOOKS: u32 = 5;
 /// The folder each written target names on the person's computer: today's
-/// on lamp-4ace (`docs/tasks.md`). Harness never makes it: a computer
-/// without it refuses the hand-over (`serve --folder-missing`, #2840).
+/// on lamp-4ace (`docs/tasks.md`). Harness makes it on the first hand-over
+/// to each computer, asked as `--new lamp-tasks` ([`HarnessSwitches::apply`],
+/// #5541); one Harness still refuses for it is said with `serve
+/// --folder-missing` (#2840).
 pub const MACHINES_PROJECT: &str = "~/harnesses/lamp-tasks";
 
 /// How often `serve --set-up-later` looks at the targets and the sign-in.
@@ -2435,6 +2437,25 @@ pub struct HarnessSwitches {
 /// `~/harnesses/<name>` folders seen on each computer.
 pub const NEW_FOLDER_FILE: &str = "folders-seen.json";
 
+impl HarnessSwitches {
+    /// Set `cli` as `serve` does: each switch its field, and the folders
+    /// seen kept in [`NEW_FOLDER_FILE`] of the tasks folder `dir`.
+    /// `from_machines` is whether `serve --targets-from-machines` is on: it
+    /// names [`MACHINES_PROJECT`], which nothing else makes, so it always
+    /// has that folder made on the first hand-over to each computer, as
+    /// `--new-folder` does, and only that one unless `--new-folder` is set
+    /// (#5541). The two cannot be split.
+    pub fn apply(&self, cli: &mut CliConfig, dir: &Path, from_machines: bool) {
+        cli.as_person = self.as_person;
+        cli.folder_missing = self.folder_missing;
+        cli.engines_ready = self.engines_ready;
+        cli.route = self.route;
+        cli.absolute_folder = self.absolute_folder;
+        cli.new_folder = (self.new_folder || from_machines).then(|| dir.join(NEW_FOLDER_FILE));
+        cli.new_folder_only = (!self.new_folder && from_machines).then(|| MACHINES_PROJECT.into());
+    }
+}
+
 /// Production adapter. CLI configuration and environment are inspected only
 /// after the default-off check. Harness owns account/session provisioning.
 pub fn serve<C: Clock>(
@@ -2445,9 +2466,11 @@ pub fn serve<C: Clock>(
     stop: Arc<AtomicBool>,
 ) -> io::Result<()> {
     let cancelled = stop.clone();
-    let new_folder = switches
-        .new_folder
-        .then(|| config.dir.join(NEW_FOLDER_FILE));
+    let dir = config.dir.clone();
+    let from_machines = config
+        .set_up_later
+        .as_ref()
+        .is_some_and(|later| later.from_machines.is_some());
     // Only a program that is not there at all: one there and not fit to
     // run is refused as before.
     let absent = config.set_up_later.is_some()
@@ -2465,12 +2488,7 @@ pub fn serve<C: Clock>(
         }
         let mut cli = CliConfig::new(executable);
         cli.cancel = Some(cancelled);
-        cli.as_person = switches.as_person;
-        cli.folder_missing = switches.folder_missing;
-        cli.engines_ready = switches.engines_ready;
-        cli.route = switches.route;
-        cli.absolute_folder = switches.absolute_folder;
-        cli.new_folder = new_folder;
+        switches.apply(&mut cli, &dir, from_machines);
         // Harness held at the version installed (#5229), off unless set.
         if crate::hold::on(std::env::var(crate::hold::SWITCH).ok().as_deref()) {
             match crate::hold::hold(&mut cli.environment) {
