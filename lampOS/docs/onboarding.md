@@ -744,8 +744,9 @@ the owner's own known face (`person::owner_ids`) was seen saying the line
 (`services::seen_saying_owner`, `LAMP_SECOND_SPEAKING_FACE` and
 `LAMP_EYES_SPEAKING` on), and always from a text in the app. Any other voice,
 or any voice on a lamp that knows no owner's face yet, reopens nothing, and
-the model is told to say neither why nor who, but that this part can be
-redone in the app and every other step by voice (`onboarding::REDO_WHO_IN_APP`,
+the model is told to say neither why nor who, but that a face can be added
+in the app (a photo, `faces.add_photo`; the app has no setup redo) and every
+other step redone by voice (`onboarding::REDO_WHO_IN_APP`,
 journal "redo_setup step who_you_are …: refused (…)"). Once "who you are" is
 open, a face kept under the owner's typed name is the owner's
 ([eyes.md](eyes.md)), so a guest's redo would hand them that name (the lead's
