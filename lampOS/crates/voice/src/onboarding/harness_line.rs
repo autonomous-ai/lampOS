@@ -7,7 +7,8 @@
 //! asks that on the tasks part's own request socket (`LAMP_TASKS_DIR`), off
 //! the voice's loop, and says the sentence only on a plain `no`: with no tasks
 //! part, no answer, or an older lamp-tasks that does not say, it is skipped
-//! rather than claim something untrue.
+//! rather than claim something untrue. Not knowing is not kept: the next
+//! closing reads again, and the read ends once the sentence is decided.
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
@@ -55,11 +56,19 @@ pub enum Kept {
     SignedIn,
     /// Skipped: this voice has no tasks part (`LAMP_TASKS_DIR`).
     NoTasks,
-    /// Skipped: the tasks part did not say whether Harness is signed in.
+    /// Not decided: the tasks part did not say whether Harness is signed
+    /// in. Never kept since the #5488 review (a file from the build before
+    /// may hold it): the next closing reads again.
     Unknown,
 }
 
 impl Kept {
+    /// Decided for good: everything but [`Self::Unknown`], which leaves the
+    /// next closing to read the sign-in again.
+    pub(crate) fn is_final(self) -> bool {
+        self != Self::Unknown
+    }
+
     pub(crate) fn name(self) -> &'static str {
         match self {
             Self::Said => "said",
@@ -96,19 +105,21 @@ pub(crate) fn linked_of(answer: Option<&Value>) -> Linked {
 /// The last read, shared with the thread that reads it.
 pub(crate) type Read = Arc<Mutex<Linked>>;
 
-/// With the switch on and an absolute `LAMP_TASKS_DIR`: a read kept fresh
-/// by a thread of its own, which ends once the walk lets it go. `None` with
-/// no tasks part.
-pub(crate) fn from_environment() -> Option<Read> {
+/// The tasks part's request socket, with an absolute `LAMP_TASKS_DIR`;
+/// `None` with no tasks part. Read only with the switch on.
+pub(crate) fn socket_from_environment() -> Option<PathBuf> {
     let directory = std::env::var(crate::agent_tasks::ENVIRONMENT).ok()?;
     let directory = Path::new(&directory);
     if !directory.is_absolute() {
         return None;
     }
-    Some(start(directory.join("request.sock")))
+    Some(directory.join("request.sock"))
 }
 
-fn start(socket: PathBuf) -> Read {
+/// A read kept fresh by a thread of its own, every [`EVERY`], until the
+/// walk lets the read go (the walk drops it once the sentence is decided,
+/// #5488 review): the thread then ends at its next wake.
+pub(crate) fn start(socket: PathBuf) -> Read {
     let read = Arc::new(Mutex::new(Linked::Unknown));
     let weak: Weak<Mutex<Linked>> = Arc::downgrade(&read);
     let spawned = std::thread::Builder::new()
@@ -165,6 +176,8 @@ mod tests {
         assert_eq!(decide(Some(Linked::Yes)), Kept::SignedIn);
         assert_eq!(decide(Some(Linked::Unknown)), Kept::Unknown);
         assert_eq!(decide(None), Kept::NoTasks);
+        assert!(!Kept::Unknown.is_final());
+        assert!(Kept::Said.is_final() && Kept::SignedIn.is_final() && Kept::NoTasks.is_final());
     }
 
     /// The thread reads the tasks part's own answer, and a socket nobody

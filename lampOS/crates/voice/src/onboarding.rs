@@ -956,8 +956,12 @@ pub struct Onboarding {
     first_tries: bool,
     /// [`harness_line::ENVIRONMENT`] (#5488).
     harness_line: bool,
-    /// Harness's sign-in as the tasks part last said it; `None` with no
-    /// tasks part (`LAMP_TASKS_DIR`), and always with the switch off.
+    /// The tasks part's request socket (`LAMP_TASKS_DIR`) the read below
+    /// asks; `None` with no tasks part, and always with the switch off.
+    harness_socket: Option<PathBuf>,
+    /// Harness's sign-in as the tasks part last said it, while the sentence
+    /// is not decided; let go once it is (#5488 review), which ends its
+    /// thread. `None` with the switch off.
     harness_read: Option<harness_line::Read>,
     /// The model service refusing turns (#4265, `LAMP_SECOND_REFUSED_HOLD`):
     /// a step that fails meanwhile is held as `later`.
@@ -1122,7 +1126,7 @@ impl Onboarding {
         walk.first_tries = std::env::var(FIRST_TRIES_ENVIRONMENT).as_deref() == Ok("on");
         walk.harness_line = std::env::var(harness_line::ENVIRONMENT).as_deref() == Ok("on");
         if walk.harness_line {
-            walk.harness_read = harness_line::from_environment();
+            walk.harness_socket = harness_line::socket_from_environment();
         }
         walk.face_kept =
             std::env::var(crate::known_faces::ENVIRONMENT).is_ok_and(|socket| !socket.is_empty());
@@ -1212,6 +1216,7 @@ impl Onboarding {
             nudge: false,
             first_tries: false,
             harness_line: false,
+            harness_socket: None,
             harness_read: None,
             model_refusing: false,
             model_held: false,
@@ -1372,6 +1377,7 @@ impl Onboarding {
             self.committed = progress;
             self.storage_epoch = snapshot.epoch;
             self.initialized = true;
+            self.keep_harness_read();
         }
         let completed_barrier = self
             .barrier
@@ -3622,13 +3628,24 @@ impl Onboarding {
     /// Whether the line about Harness is said, decided once and kept
     /// ([`Progress::harness_line`]), from the tasks part's last read, with
     /// its session record.
+    ///
+    /// Not known (the tasks part did not say) is not kept: the closing is
+    /// said without the sentence and the next closing reads again (#5488
+    /// review). Decided, the read is let go.
     fn decide_harness_line(&mut self) -> harness_line::Kept {
-        let linked = self.harness_read.as_ref().map(|read| {
-            read.lock()
-                .map_or(harness_line::Linked::Unknown, |read| *read)
-        });
+        let linked = match (&self.harness_read, &self.harness_socket) {
+            (Some(read), _) => Some(
+                read.lock()
+                    .map_or(harness_line::Linked::Unknown, |read| *read),
+            ),
+            (None, Some(_)) => Some(harness_line::Linked::Unknown),
+            (None, None) => None,
+        };
         let kept = harness_line::decide(linked);
-        self.desired.harness_line = Some(kept);
+        if kept.is_final() {
+            self.desired.harness_line = Some(kept);
+        }
+        self.keep_harness_read();
         eprintln!(
             "lamp-voice: onboarding: the line about Harness: {}",
             kept.name()
@@ -3638,6 +3655,30 @@ impl Onboarding {
                 "at_unix_ms":(self.unix_clock)()}),
         );
         kept
+    }
+
+    /// Whether the sentence is decided for good (a file from the build
+    /// before may keep `unknown`, which is read again).
+    fn harness_line_decided(&self) -> bool {
+        self.desired
+            .harness_line
+            .is_some_and(harness_line::Kept::is_final)
+    }
+
+    /// Keeps the read of Harness's sign-in only while it can still matter:
+    /// with the switch on and the sentence not decided, started on the
+    /// tasks part's socket if not yet; otherwise let go, so its thread ends
+    /// at its next wake rather than asking for the voice's whole life
+    /// (#5488 review). Run when the file loads (a restart on a decided file
+    /// starts nothing that lasts; a reset starts it again) and once decided.
+    fn keep_harness_read(&mut self) {
+        if !self.harness_line || self.harness_line_decided() {
+            self.harness_read = None;
+        } else if self.harness_read.is_none()
+            && let Some(socket) = &self.harness_socket
+        {
+            self.harness_read = Some(harness_line::start(socket.clone()));
+        }
     }
 
     /// "Preferences"' done line: with [`FIRST_TRIES_ENVIRONMENT`] on, the
@@ -3650,14 +3691,15 @@ impl Onboarding {
     /// Harness is not signed in: inside the same quoted line, one turn,
     /// never a second speech; signed in, it is dropped. It rides on the done
     /// line wherever that is said. Decided once
-    /// ([`Progress::harness_line`]), so no later done line says it.
+    /// ([`Progress::harness_line`]), so no later done line says it; not
+    /// known, decided at the next done line handed out.
     fn preferences_done(&mut self) -> &'static str {
         let tries = self.first_tries && !self.desired.tries_said;
         if tries {
             self.desired.tries_said = true;
         }
         let harness = self.harness_line
-            && self.desired.harness_line.is_none()
+            && !self.harness_line_decided()
             && self.decide_harness_line() == harness_line::Kept::Said;
         match (tries, harness) {
             (true, true) => skill::PREFERENCES_DONE_TRIES_HARNESS,
@@ -7729,9 +7771,9 @@ mod tests {
         assert_eq!(old.harness_line, None);
     }
 
-    /// #5488: signed in (or signed in and offline), with no tasks part, or
-    /// with a tasks part that does not say, the closing is the plain done
-    /// line, and the sentence is kept as skipped, so no later closing says it.
+    /// #5488: signed in (or signed in and offline), or with no tasks part,
+    /// the closing is the plain done line, and the sentence is kept as
+    /// skipped, so no later closing says it.
     #[test]
     fn the_sentence_about_harness_is_dropped_unless_harness_is_signed_out() {
         for (linked, kept) in [
@@ -7740,10 +7782,6 @@ mod tests {
                 harness_line::Kept::SignedIn,
             ),
             (None, harness_line::Kept::NoTasks),
-            (
-                Some(harness_line::Linked::Unknown),
-                harness_line::Kept::Unknown,
-            ),
         ] {
             let mut room = harness_room(&format!("harness-skip-{kept:?}"), true, linked);
             walk_to_the_done_line(&mut room);
@@ -7753,6 +7791,54 @@ mod tests {
             room.walk.harness_read =
                 Some(Arc::new(std::sync::Mutex::new(harness_line::Linked::No)));
             assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE);
+        }
+    }
+
+    /// #5488 review (P3 1): a tasks part that does not say at the closing
+    /// (lamp-tasks just restarted, its sign-in not read yet) leaves the
+    /// closing plain and keeps nothing, so the next closing reads again:
+    /// signed out by then, it carries the sentence, once.
+    #[test]
+    fn an_unknown_sign_in_is_read_again_at_the_next_closing() {
+        let mut room = harness_room("harness-unknown", true, Some(harness_line::Linked::Unknown));
+        walk_to_the_done_line(&mut room);
+        assert!(room.wait(60 * S, Some(NEAR_MIDDLE)).is_empty());
+        assert_eq!(room.walk.kept().harness_line, None);
+        assert!(room.walk.harness_read.is_some(), "still read");
+        let read = room.walk.harness_read.clone().unwrap();
+        *read.lock().unwrap() = harness_line::Linked::No;
+        assert_eq!(
+            room.walk.preferences_done(),
+            skill::PREFERENCES_DONE_HARNESS
+        );
+        assert_eq!(
+            room.walk.desired.harness_line,
+            Some(harness_line::Kept::Said)
+        );
+        assert!(room.walk.harness_read.is_none(), "let go once decided");
+        assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE);
+    }
+
+    /// #5488 review (P3 2): once the sentence is decided the walk lets its
+    /// read go, so the thread asking the tasks part every 20 s ends; a
+    /// voice started again on a decided file lets it go as the file loads.
+    #[test]
+    fn the_read_of_harness_is_let_go_once_the_sentence_is_decided() {
+        for (linked, done) in [
+            (harness_line::Linked::No, skill::PREFERENCES_DONE_HARNESS),
+            (harness_line::Linked::Yes, skill::PREFERENCES_DONE),
+        ] {
+            let mut room = harness_room(&format!("harness-let-go-{linked:?}"), true, Some(linked));
+            walk_to(&mut room, done);
+            assert!(room.walk.kept().harness_line.is_some(), "{linked:?}");
+            assert!(room.walk.harness_read.is_none(), "{linked:?}");
+            let mut again = restarted(&room);
+            // The fixture loads the file before the switch is set; a voice
+            // started with it on loads it with the switch on, as here.
+            again.walk.keep_harness_read();
+            assert!(again.walk.harness_read.is_none(), "{linked:?}");
+            assert!(again.wait(60 * S, Some(NEAR_MIDDLE)).is_empty());
+            assert!(again.walk.harness_read.is_none(), "{linked:?}");
         }
     }
 
