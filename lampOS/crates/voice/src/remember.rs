@@ -10262,7 +10262,7 @@ impl DaysClient {
         let until = Instant::now() + deadline.min(crate::tools::ASK_DEADLINE);
         let now = wall_ms();
         if crate::rules::forgets_light(call) {
-            return self.forget_light(person, until);
+            return self.forget_light(person, until, lease);
         }
         // A rule about the light is the room's, whoever says it (#1677):
         // kept in the room's scope and linked there.
@@ -10304,8 +10304,14 @@ impl DaysClient {
                 return (gone(), false);
             };
             // A rule kept already is not kept twice, even at the scope's
-            // most: it is told kept.
-            if let Some(told) = crate::rules::already(&kept, &line) {
+            // most: it is told kept, and linked as a kept one is, so what is
+            // said under it goes with it when it is forgotten.
+            if let Some((id, told)) = crate::rules::already(&kept, &line) {
+                let said = match self.context.lock() {
+                    Ok(mut context) => context.rule(owner, [id]),
+                    Err(poisoned) => poisoned.into_inner().inhibit(Stopped::Poisoned),
+                };
+                say(said);
                 return (told, true);
             }
             if let Err(told) = crate::rules::admit(&kept) {
@@ -10422,7 +10428,12 @@ impl DaysClient {
     /// "You can turn your light off again" (#1677): every rule of the
     /// room's that keeps the light on is forgotten, whoever is asking, as a
     /// forgotten rule is, before `until`.
-    fn forget_light(&self, person: Option<&str>, until: Instant) -> (Value, bool) {
+    fn forget_light(
+        &self,
+        person: Option<&str>,
+        until: Instant,
+        lease: Option<&crate::memory_scope::ScopeLease>,
+    ) -> (Value, bool) {
         let scope = crate::rules::scope(None);
         let left = || until.checked_duration_since(Instant::now());
         let Some(room) = left()
@@ -10440,23 +10451,39 @@ impl DaysClient {
             .collect();
         if ids.is_empty() {
             // The rules forget_rule acts on: theirs, or the room's when
-            // nobody is known, as the session's note numbers them.
-            let numbered = match person {
-                None => Some(room),
-                Some(person) => left()
-                    .and_then(|left| {
-                        bounded_exchange(
-                            &self.socket,
-                            &crate::rules::read_request(&crate::rules::scope(Some(person))),
-                            left,
-                        )
-                    })
-                    .and_then(|answer| crate::rules::rules(&answer)),
+            // nobody is known, as the session's note numbers them. Theirs
+            // are read and told only while the line is still theirs
+            // (Thirteen's P2 on #5477): a face lost or another voice during
+            // the call leaves the room's turn without them.
+            let told = match person {
+                None => crate::rules::no_light_rule(&room, &[]),
+                Some(person) => {
+                    let still = || lease.is_none_or(|lease| still_theirs(lease, person));
+                    if !still() {
+                        return (gone(), false);
+                    }
+                    let theirs = left()
+                        .and_then(|left| {
+                            bounded_exchange_scoped(
+                                &self.socket,
+                                &crate::rules::read_request(&crate::rules::scope(Some(person))),
+                                left,
+                                lease,
+                            )
+                        })
+                        .and_then(|answer| crate::rules::rules(&answer));
+                    match theirs {
+                        // Read again after their rules came: the line may
+                        // have become the room's meanwhile.
+                        Some(theirs) if still() => crate::rules::no_light_rule(&theirs, &room),
+                        _ => return (gone(), false),
+                    }
+                }
             };
-            return match numbered {
-                Some(numbered) => (crate::rules::no_light_rule(&numbered), true),
-                None => (gone(), false),
-            };
+            if !scope_current(lease) {
+                return (gone(), false);
+            }
+            return (told, true);
         }
         // As for any write: journalling waits until it is acknowledged.
         match self.context.try_lock() {
@@ -21408,19 +21435,100 @@ mod tests {
         assert!(read.iter().all(|line| !line.contains("\"forget\"")));
         drop(client);
         std::fs::remove_file(&socket).unwrap();
-        // A known person: theirs, which forget_rule's numbers name.
+        // A known person: theirs, which forget_rule's numbers name, and the
+        // room's copies told unnumbered beside them (Thirteen's P3).
         let (socket, served) = memory_lines("light-words-theirs", 2, |request| {
             match request["person"].as_str() {
-                Some("r-everyone") => json!({"ok":true,"entries":[]}),
+                Some("r-everyone") => {
+                    json!({"ok":true,"entries":[{"id":4,"at_unix_ms":1,"text":"Keep the light on until ten tonight."}]})
+                }
                 _ => {
-                    json!({"ok":true,"entries":[{"id":7,"at_unix_ms":1,"text":"Keep the light on until ten tonight."}]})
+                    json!({"ok":true,"entries":[{"id":7,"at_unix_ms":1,"text":"No news after ten."}]})
                 }
             }
         });
         let client = DaysClient::new(socket.clone()).unwrap();
         let (told, _) = client.rule_for(&forget, deadline, Some("p-be9688998f085098"));
-        assert_eq!(told["rules"][0]["number"], 7, "{told}");
+        let numbers: Vec<&Value> = told["rules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|rule| &rule["number"])
+            .collect();
+        assert_eq!(numbers, [&json!(7)], "{told}");
+        assert_eq!(
+            told["room_rules"],
+            json!(["Keep the light on until ten tonight."]),
+            "{told}"
+        );
         assert_eq!(served.join().unwrap().len(), 2);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+        // Their own read failing: gone, never the room's alone.
+        let (socket, served) =
+            memory_lines("light-words-fail", 2, |request| {
+                match request["person"].as_str() {
+                    Some("r-everyone") => json!({"ok":true,"entries":[]}),
+                    _ => json!({"ok":false,"error":"busy"}),
+                }
+            });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let (told, sent) = client.rule_for(&forget, deadline, Some("p-be9688998f085098"));
+        assert_eq!((told, sent), (gone(), false));
+        assert_eq!(served.join().unwrap().len(), 2);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+        // A repeat of a known person's own rule: one read of their scope, no
+        // write, told kept.
+        let (socket, served) = memory_lines("rule-repeat-theirs", 1, |request| {
+            assert_eq!(request["person"], "r-be9688998f085098");
+            json!({"ok":true,"entries":[{"id":7,"at_unix_ms":1,"text":"No news after ten."}]})
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let keep = call(KEEP_RULE, json!({"rule":"no news after ten"}));
+        let (told, _) = client.rule_for(&keep, deadline, Some("p-be9688998f085098"));
+        assert_eq!(told["kept_rule"], true, "{told}");
+        assert_eq!(served.join().unwrap().len(), 1);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// Thirteen's P2 on #5477: a known person's line narrowed to the room
+    /// while forgetting the light runs, after the room's read: their own
+    /// rules are not read, and nothing of them is told.
+    #[test]
+    fn forget_light_tells_no_rule_of_theirs_once_the_line_is_the_rooms() {
+        use crate::rules::FORGET_RULE;
+        static NARROW: std::sync::Mutex<Option<crate::memory_scope::ScopeLease>> =
+            std::sync::Mutex::new(None);
+        let _one = crate::provider_worker::tests::one_thread();
+        let ann = scoped_request(Some("Ann"), 3_558_477);
+        let lease = ann.lease();
+        *NARROW.lock().unwrap() = Some(lease.clone());
+        // The room's read narrows the line as it is answered. Their scope
+        // would be answered too, with a rule of theirs, if it were asked:
+        // it must not be, and nothing of theirs is told. The server is not
+        // joined, since the guarded read never comes.
+        let (socket, _served) = memory_lines("light-narrowed", 2, |request| {
+            if request["person"] == "r-everyone" {
+                if let Some(lease) = NARROW.lock().unwrap().take() {
+                    lease.narrow_to_room();
+                }
+                json!({"ok":true,"entries":[]})
+            } else {
+                json!({"ok":true,"entries":[{"id":7,"at_unix_ms":1,"text":"No news after ten."}]})
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let forget = ToolCall {
+            id: "c1".into(),
+            name: FORGET_RULE.into(),
+            args: json!({"about":"light"}),
+        };
+        let ann_id = crate::known_faces::memory_person("Ann");
+        let (told, sent) =
+            client.rule_for_guarded(&forget, Duration::from_secs(1), Some(&ann_id), Some(&lease));
+        assert_eq!((told.clone(), sent), (gone(), false), "{told}");
         drop(client);
         std::fs::remove_file(&socket).unwrap();
     }

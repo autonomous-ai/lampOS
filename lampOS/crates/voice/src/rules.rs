@@ -473,7 +473,7 @@ pub fn read_request(scope: &str) -> Value {
 /// light on until ten" often called `keep_rule` twice, and the copies
 /// filled the scope's six. Words are compared as their letters and digits,
 /// case and punctuation aside, never as a phrase list.
-pub fn already(kept: &[Rule], line: &Value) -> Option<Value> {
+pub fn already(kept: &[Rule], line: &Value) -> Option<(u64, Value)> {
     let text = line.get("text")?.as_str()?;
     let asked = rules(&json!({"ok": true, "entries": [{"id": 1, "at_unix_ms": 0, "text": text}]}))?
         .pop()?;
@@ -484,12 +484,12 @@ pub fn already(kept: &[Rule], line: &Value) -> Option<Value> {
             .collect()
     };
     kept.iter()
-        .any(|rule| {
+        .find(|rule| {
             words(&rule.text) == words(&asked.text)
                 && (rule.quiet, rule.quiet_mornings, rule.hello, rule.news, rule.keep_light_on)
                     == (asked.quiet, asked.quiet_mornings, asked.hello, asked.news, asked.keep_light_on)
         })
-        .then(|| json!({"kept_rule": true, "note": "That rule was already kept, word for word, so nothing new was written. Follow it from now on, with them, without being reminded."}))
+        .map(|rule| (rule.id, json!({"kept_rule": true, "note": "That rule was already kept, word for word, so nothing new was written. Follow it from now on, with them, without being reminded."})))
 }
 
 /// What to tell the model when "you can turn your light off again" finds
@@ -499,15 +499,30 @@ pub fn already(kept: &[Rule], line: &Value) -> Option<Value> {
 /// kept as words (a light rule takes `never` only), "forget every rule you
 /// have about the light" was told nobody had asked, and the lamp said the
 /// copies were gone while six stood (Fourteen's P2 on #5385).
-pub fn no_light_rule(rules: &[Rule]) -> Value {
-    if rules.is_empty() {
+///
+/// `room` is the room's rules beside a known person's `rules`: told
+/// unnumbered, since forget_rule's numbers name only theirs, so a copy kept
+/// in the room's scope (a light rule in words, whoever said it) is never
+/// said to be gone (Thirteen's P3 on #5477).
+pub fn no_light_rule(rules: &[Rule], room: &[Rule]) -> Value {
+    if rules.is_empty() && room.is_empty() {
         return json!({"forgotten": false, "note": "Nobody asked you to keep the light on: nothing to take back."});
     }
     let listed: Vec<Value> = rules
         .iter()
         .map(|rule| json!({"number": rule.id, "rule": rule.text}))
         .collect();
-    json!({"forgotten": false, "rules": listed, "note": "Nothing was removed: no rule here keeps the light on by itself. If one of these rules is the one they mean, call forget_rule with its number, once for each copy; if none is, tell them plainly that nothing was removed. The numbers are for forget_rule only: never say them."})
+    let mut told = json!({"forgotten": false, "rules": listed, "note": "Nothing was removed: no rule here keeps the light on by itself. If one of these rules is the one they mean, call forget_rule with its number, once for each copy; if none is, tell them plainly that nothing was removed. The numbers are for forget_rule only: never say them."});
+    if !room.is_empty() {
+        told["room_rules"] = room
+            .iter()
+            .map(|rule| Value::from(rule.text.clone()))
+            .collect();
+        told["room_note"] = Value::from(
+            "room_rules are the room's: they can't be forgotten in this conversation. If one of them is the one they mean, tell them plainly it is still kept.",
+        );
+    }
+    told
 }
 
 /// Whether one more rule may be kept beside these, or what to tell the
@@ -1173,15 +1188,25 @@ mod tests {
         ]}))
         .unwrap();
         let line = |text: &str| json!({"op": "remember", "text": text});
-        assert!(already(&kept, &line("keep the light ON until ten tonight")).is_some());
+        assert_eq!(
+            already(&kept, &line("keep the light ON until ten tonight")).map(|(id, _)| id),
+            Some(4)
+        );
         assert!(already(&kept, &line("[quiet] Don't speak first!")).is_some());
         assert!(already(&kept, &line("Don't speak first.")).is_none());
         assert!(already(&kept, &line("Keep the light on until eleven tonight.")).is_none());
         assert!(already(&[], &line("Keep the light on.")).is_none());
         // Nothing to forget about the light, beside rules in words: listed.
-        assert_eq!(no_light_rule(&[])["rules"], Value::Null);
-        let told = no_light_rule(&kept);
+        assert_eq!(no_light_rule(&[], &[])["rules"], Value::Null);
+        let told = no_light_rule(&kept, &[]);
         assert_eq!(told["forgotten"], false);
         assert_eq!(told["rules"].as_array().unwrap().len(), 2);
+        assert_eq!(told["room_rules"], Value::Null);
+        // A known person with none of their own, beside the room's copies:
+        // the room's are told unnumbered, never "nobody asked".
+        let told = no_light_rule(&[], &kept);
+        assert_eq!(told["rules"].as_array().unwrap().len(), 0);
+        assert_eq!(told["room_rules"].as_array().unwrap().len(), 2);
+        assert!(!told["note"].as_str().unwrap().contains("Nobody asked"));
     }
 }
