@@ -1126,8 +1126,7 @@ asked the lamp about it: the lamp said that was the app's job and it didn't
 know. The three functions were there, but nothing told the model what was
 linked, and the character says not to pretend to finish tasks it cannot
 reach. With `LAMP_SERVICES_TOLD=on` (passed to both routes' workers alone), on
-the second route a spoken line admitted as the owner's (`services::owner_of`: their
-known face, not held) is told, beside its words, the services linked now by
+the second route a spoken line admitted as the owner's (`services::owner_of`) is told, beside its words, the services linked now by
 name, each once, and that the lamp uses them itself: "(For you to know, not
 to answer: the lamp's owner linked these services to you in the app's
 Connectors: Notion, Gmail. They are yours to use for the owner: read from
@@ -1142,14 +1141,26 @@ note, so the note never waits; without the attention rule's line-begin ask,
 a link made since is told one line later. Another's line, the room's, a
 held one, a text, nothing linked or `lamp-services` not telling (its last
 ask answered with an error, busy or not at all, so a link just removed is
-never told; `services::names_after`, #5598): nothing is told, as before, so a guest never learns what the owner linked. The journal
-says how many, never which. The Live route is told the same note beside
-the owner's open line (its lease, `services::owner_of`), read twice a
-second while the line is open, once a session for each set of names
-(`services_told::LiveTold`): its session keeps what it was told, so it is
-told again only when a link is made or removed, or in a fresh session. A
-guest who speaks later in that session meets a model that was told, but
-every call of theirs is still refused (`OWNER_ONLY`).
+never told; `services::names_after`, #5598): nothing is told, as before.
+The journal says how many, never which.
+
+**Whose line is the owner's.** With `LAMP_PRIVATE_ROOM=on`, as in the
+product, every spoken line is the owner's (`person::private_room`, #5553),
+so every spoken line is told the names: a guest's, an unknown voice's, the
+TV's and a held line's too. That is the PM's ruling (a) on #5523. With it
+off, only a line whose own lease has the owner's known face, not held, is
+told; a guest's, the room's and a held line are not. A text is never told.
+
+The Live route is told the same note beside the owner's open line (its
+lease, `services::owner_of`), read twice a second while the line is open,
+once a session for each set of names (`services_told::LiveTold`), and only
+with `LAMP_PRIVATE_ROOM=on`: its session keeps what it was told, so with
+the private room off a guest later in the session would hear the names
+(#5598), and the Live route is told nothing there. It is told again when a
+link is made or removed, or in a fresh session; when everything it was told
+of is unlinked, it is told once that nothing is linked now
+(`services_told::UNLINKED_NOTE`). Every call from a line not the owner's is
+still refused (`OWNER_ONLY`).
 
 ## What is not done yet
 
