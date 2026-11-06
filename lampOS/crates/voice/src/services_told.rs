@@ -45,8 +45,8 @@ pub fn note(names: &[String]) -> String {
 /// the line is theirs, `crate::services::owner_of`), with `names` linked:
 /// none for another's line, and none with nothing linked.
 pub fn note_for(owner: Option<&str>, names: &[String]) -> Option<String> {
-    let _ = (owner, names);
-    None
+    owner?;
+    (!names.is_empty()).then(|| note(names))
 }
 
 #[cfg(test)]

@@ -109,6 +109,7 @@ connected apps.
 |---|---|---|
 | `LAMP_SERVICES=on` | `lamp-cloud` (with `LAMP_CLOUD=on`), `lamp-voice` and `lamp-services` | `lamp-cloud` answers the app's `connector.*` and `services.list` with V1's "not on this lamp: <kind>" and puts nothing in `can`; the voice declares none of the three functions and routes none; `lamp-services` opens no socket and exits |
 | `LAMP_SERVICES_WRITE=on` (on in the product's `lamp-services.service`) | `lamp-services` | `service_write` answers "writing to services is off on this lamp", and nothing is prepared or sent; reads are as before |
+| `LAMP_SERVICES_TOLD=on` (#5523) | `lamp-voice`'s second route, with `LAMP_SERVICES=on` | The owner's line is told nothing of what is linked: the model knows only the three functions and asks `services_connected` when it thinks to ("The voice is told what is linked", below) |
 | `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and a request to make a skill naming a service is answered `NOT_A_SERVICE` ("A made skill's read", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
@@ -1117,6 +1118,31 @@ service"), and its later words ask none, so the lamp never takes a picture
 of the room for a calendar read (lamp-9adf, 4 Nov 21:45: "Let me look.",
 `service_read`, then "I see a laptop screen…" unasked). A skill's look in
 the same turn stands.
+
+## The voice is told what is linked (`LAMP_SERVICES_TOLD`, #5523, off unless set)
+
+A marketing tester linked a service in the app's Connectors on 6 Nov and
+asked the lamp about it: the lamp said that was the app's job and it didn't
+know. The three functions were there, but nothing told the model what was
+linked, and the character says not to pretend to finish tasks it cannot
+reach. With `LAMP_SERVICES_TOLD=on` (passed to the second route's worker
+alone), a spoken line admitted as the owner's (`services::owner_of`: their
+known face, not held) is told, beside its words, the services linked now by
+name, each once, and that the lamp uses them itself: "(For you to know, not
+to answer: the lamp's owner linked these services to you in the app's
+Connectors: Notion, Gmail. They are yours to use for the owner: read from
+one with service_read, and send, post or create with service_write, when
+they ask. Asked about one, use it, or say plainly what you can do with it;
+never say it is the app's job or that you don't know it.)"
+(`services_told::note`). The names are what `lamp-services` last said on
+`services_connected` (its `name`, else its code; an expired link too, since
+a read renews it), asked off the line's path as each line begins
+(`services::Linked`, at most once a second, 500 ms at most) and after each
+note, so the note never waits; without the attention rule's line-begin ask,
+a link made since is told one line later. Another's line, the room's, a
+held one, a text, nothing linked or `lamp-services` not telling: nothing is
+told, as before, so a guest never learns what the owner linked. The journal
+says how many, never which. The Live route is not told.
 
 ## What is not done yet
 

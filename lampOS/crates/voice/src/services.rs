@@ -805,7 +805,7 @@ pub fn brief(told: &mut Value) {
 }
 
 /// The owner's memory id when `lease` is theirs ([`Turn::owner`]).
-fn owner_of(lease: Option<&crate::memory_scope::ScopeLease>) -> Option<String> {
+pub(crate) fn owner_of(lease: Option<&crate::memory_scope::ScopeLease>) -> Option<String> {
     // The private room (`person::private_room`): whoever speaks is the owner.
     if crate::person::private_room() {
         return Some(
@@ -1150,6 +1150,9 @@ const LINKED_DEADLINE: Duration = Duration::from_millis(500);
 pub struct Linked {
     folder: PathBuf,
     linked: std::sync::atomic::AtomicBool,
+    /// The services linked when `lamp-services` last said, by name
+    /// (`LAMP_SERVICES_TOLD`, `crate::services_told`).
+    names: std::sync::Mutex<Vec<String>>,
     /// When it was last asked, and whether that ask is still going.
     asked: std::sync::Mutex<(Option<Instant>, bool)>,
 }
@@ -1160,6 +1163,7 @@ impl Linked {
         let linked = std::sync::Arc::new(Self {
             folder,
             linked: std::sync::atomic::AtomicBool::new(false),
+            names: std::sync::Mutex::new(Vec::new()),
             asked: std::sync::Mutex::new((None, false)),
         });
         linked.check();
@@ -1169,6 +1173,15 @@ impl Linked {
     /// Whether a service was linked when `lamp-services` last said.
     pub fn now(&self) -> bool {
         self.linked.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// The services linked when `lamp-services` last said, by name, each
+    /// once; none until it first answers.
+    pub fn names(&self) -> Vec<String> {
+        self.names
+            .lock()
+            .map(|names| names.clone())
+            .unwrap_or_default()
     }
 
     /// Ask again, unless asked within [`LINKED_FRESH`] or still asking;
@@ -1196,6 +1209,11 @@ impl Linked {
                 );
                 if let Some(any) = told.as_ref().and_then(any_linked) {
                     linked.kept(any);
+                }
+                if let Some(names) = told.as_ref().and_then(names_in)
+                    && let Ok(mut kept) = linked.names.lock()
+                {
+                    *kept = names;
                 }
                 if let Ok(mut asked) = linked.asked.lock() {
                     asked.1 = false;
@@ -1232,6 +1250,7 @@ impl Linked {
         std::sync::Arc::new(Self {
             folder: PathBuf::new(),
             linked: std::sync::atomic::AtomicBool::new(linked),
+            names: std::sync::Mutex::new(Vec::new()),
             asked: std::sync::Mutex::new((Some(Instant::now() + LINKED_FRESH * 3_600), false)),
         })
     }
@@ -1256,6 +1275,30 @@ fn any_linked(told: &Value) -> Option<bool> {
             .iter()
             .any(|link| link.get("expired").and_then(Value::as_bool) != Some(true)),
     )
+}
+
+/// From [`CONNECTED`]'s answer: each service linked by its name as
+/// `lamp-services` gives it (its code when it gives none), each once, an
+/// expired link too (a read renews it); `None` without a list.
+fn names_in(told: &Value) -> Option<Vec<String>> {
+    if told.get("ok").and_then(Value::as_bool) != Some(true) {
+        return None;
+    }
+    let connected = told.get("result")?.get("connected")?.as_array()?;
+    let mut names: Vec<String> = Vec::new();
+    for link in connected {
+        let name = link
+            .get("name")
+            .and_then(Value::as_str)
+            .filter(|name| !name.trim().is_empty())
+            .or_else(|| link.get("service").and_then(Value::as_str));
+        if let Some(name) = name
+            && !names.iter().any(|kept| kept == name)
+        {
+            names.push(name.to_owned());
+        }
+    }
+    Some(names)
 }
 
 /// The codes of the services linked now, asked of `lamp-services`
@@ -1291,6 +1334,27 @@ fn codes_in(told: &Value) -> Option<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// What is linked, by name, each once, from `lamp-services`' own answer
+    /// (#5523): its code when it gives no name; none without a list.
+    #[test]
+    fn the_linked_names_are_read_from_the_connected_answer() {
+        let told = json!({"ok": true, "result": {"connected": [
+            {"service": "notion", "name": "Notion", "account": "a", "expired": false},
+            {"service": "figma-api", "name": "Figma", "account": "b", "expired": true},
+            {"service": "figma", "name": "Figma", "account": "c", "expired": false},
+            {"service": "github", "account": "d", "expired": false},
+        ]}});
+        assert_eq!(
+            names_in(&told),
+            Some(vec!["Notion".into(), "Figma".into(), "github".into()])
+        );
+        assert_eq!(
+            names_in(&json!({"ok": true, "result": {"connected": []}})),
+            Some(Vec::new())
+        );
+        assert_eq!(names_in(&json!({"ok": false, "error": "busy"})), None);
+    }
 
     /// What is linked, by code, from `lamp-services`' own answer; none
     /// told for anything else, or with nobody on the socket.
