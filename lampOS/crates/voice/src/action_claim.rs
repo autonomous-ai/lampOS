@@ -416,7 +416,7 @@ pub fn asked_as_a_question(said: &str) -> bool {
 /// After the run, the sentence it opens must not end in a '?'. Each run is
 /// tied to a family with a call behind it, and never a colour said ("My
 /// light is blue now." also answers a colour question).
-const WORDED: [(&str, Claim); 31] = [
+const WORDED: [(&str, Claim); 45] = [
     // "Timer set for one minute.", "Reminder set."
     ("timer|reminder|alarm set|started", Claim::Schedule),
     ("timer's|reminder's|alarm's set|started", Claim::Schedule),
@@ -535,6 +535,63 @@ const WORDED: [(&str, Claim); 31] = [
         "the|my|your light|lights|lamp is|are staying on|off for #",
         Claim::LightKept,
     ),
+    // Said as it is done (#5215's rest): "Turning it up.", "Setting a timer
+    // for one minute." Only at the sentence's end, or with "for" or "now"
+    // after a timer: "Turning it off and on again usually helps." and
+    // "Setting a timer needs a time." are talk.
+    (
+        "i'm turning|switching it|that up|down|on|off $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "turning|switching it|that up|down|on|off $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'm turning|switching the|my|your light|lights|volume up|down|on|off $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "turning|switching the|my|your light|lights|volume up|down|on|off $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'm turning|switching up|down|on|off the|my|your light|lights|volume $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "turning|switching up|down|on|off the|my|your light|lights|volume $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'm dimming|brightening|raising|lowering * light|lights|lamp|volume|sound $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "dimming|brightening|raising|lowering * light|lights|lamp|volume|sound $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'm making it|that louder|quieter|softer|brighter|dimmer|warmer|cooler $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "making it|that louder|quieter|softer|brighter|dimmer|warmer|cooler $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'm setting|starting * timer|reminder|alarm for|now",
+        Claim::Schedule,
+    ),
+    (
+        "setting|starting * timer|reminder|alarm for|now",
+        Claim::Schedule,
+    ),
+    (
+        "i'm setting|starting * timer|reminder|alarm $",
+        Claim::Schedule,
+    ),
+    ("setting|starting * timer|reminder|alarm $", Claim::Schedule),
 ];
 
 /// Words said before a worded claim, then a mark ("Okay, louder."). Never a
