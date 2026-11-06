@@ -4808,6 +4808,29 @@ to this reply"). The eyes' list is asked with up to 3 s to answer, off any
 reply's path; eyes reached but slow to answer take nothing back (the mark
 stands), and eyes that can't be reached at all name nobody, as before. Without a name, or off: nothing. `the owner is not named by default: WHY` in the journal when a
   sign holds.
+- **One owner status per reply** (`LAMP_OWNER_STATUS=on`, with
+  `LAMP_PERSON_NAME_BY_DEFAULT`; P4, after lamp-29e7 on 10226, where a
+  known face that isn't the owner's asked "who is my owner?" and "do you
+  know me?" and was told "I don't know who my owner is" and "I can't verify
+  who owns this lamp": the reply had been told only that a name was held
+  back). From the same signs as the owner named by default
+  (`person::owner_status`), each reply is one of four: the owner, told
+  `person::by_default` as before; a lone known face that isn't the owner's,
+  told to say "I know you as B, but you're not the person who set me up."
+  (B the eyes' own name for that face); a face the eyes don't know, "I
+  don't recognise you."; or no telling who is asking (another voice, more
+  than one face, a face not at the desk seen speaking), "I can't see who's
+  asking." (`person::owner_status_note`). With the three, the reply is also
+  told the lamp always has an owner, the person who set it up, never to say
+  it has none or doesn't know who, and never to say who the owner is or
+  their name; the held-back name's note loses its "don't take the person
+  speaking for anyone" (`person::HELD_BACK_MARKER_NOTE`), which the known
+  face's own name would contradict. No face in view is the owner, as the
+  owner named by default reads it, so "I can't see who's asking" is told
+  only with the signs above. The journal says which, naming nobody ("owner
+  status for this reply: …"). The status is kept for 30 s for a services
+  call refused in that reply ([services.md](services.md), "Who can use
+  them"). Off: as before.
 - **A line is a known person's only when their own face was seen speaking
   it** (`LAMP_PERSON_SCOPE_SEEN=on`; with `LAMP_SECOND_SPEAKING_FACE`). Off,
   a line admitted as the known person's is narrowed to the room only when

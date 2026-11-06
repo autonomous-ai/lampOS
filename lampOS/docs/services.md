@@ -47,7 +47,19 @@ speaking it). A guest's line, an unknown face's, the room's, a line held or
 narrowed, and a request with no scope are told `OWNER_ONLY`, "Not done: only
 the lamp's owner can use their linked services, and I can't tell it is them
 now. Say so plainly, in a few words, and ask them to look at the lamp so it
-can see who is asking.", and nothing is called, for reads and writes alike. A request not heard live (a scheduled run, a skill's or the
+can see who is asking.", and nothing is called, for reads and writes alike.
+With `LAMP_OWNER_STATUS=on` the refusal follows the reply's owner status
+([second-voice.md](second-voice.md), "One owner status per reply",
+`services::refused_not_owner`): a known face that isn't the owner's is told
+`OWNER_ONLY_KNOWN`, to say "That's only for the person who set me up.",
+never who that is and no advice to look at the lamp, whose camera matched
+them; a face the lamp doesn't recognise `OWNER_ONLY_UNKNOWN`, to say "I
+don't recognise you, so I can't do that."; no telling who is asking, the
+owner's own status (a line held, carried or narrowed), or no status within
+30 s, `OWNER_ONLY` as above. The status is the newest reply's, kept 30 s,
+not one carried by the call: older than that, the refusal falls back to
+`OWNER_ONLY`'s look-at-the-lamp line. It picks only a refusal's words and
+never lets a call through. A request not heard live (a scheduled run, a skill's or the
 lamp's own, a text) is told `NOT_HEARD` and nothing is called either, so
 under privacy, with the microphone off, no service is fetched.
 

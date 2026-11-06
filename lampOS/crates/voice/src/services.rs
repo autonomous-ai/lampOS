@@ -126,6 +126,29 @@ pub const NOT_HEARD: &str = "Not done: I use linked services only when the lamp'
 /// someone unknown, the room, or a line found to be someone else's.
 /// Nothing is called.
 pub const OWNER_ONLY: &str = "Not done: only the lamp's owner can use their linked services, and I can't tell it is them now. Say so plainly, in a few words, and ask them to look at the lamp so it can see who is asking.";
+/// [`OWNER_ONLY`] for a line the reply's owner status
+/// (`LAMP_OWNER_STATUS`) found to be a known face that isn't the
+/// owner's: the camera saw them fine, so no advice to look at it, and the
+/// owner is never named.
+pub const OWNER_ONLY_KNOWN: &str = "Not done: linked services are only for the person who set this lamp up, and the person asking isn't them. Say plainly, in a few words: “That's only for the person who set me up.” Never say who that is, and don't ask them to look at the lamp.";
+/// [`OWNER_ONLY`] for a line the reply's owner status found to be a face the
+/// lamp doesn't recognise.
+pub const OWNER_ONLY_UNKNOWN: &str = "Not done: linked services are only for the person who set this lamp up, and I don't recognise the person asking. Say plainly, in a few words: “I don't recognise you, so I can't do that.” Never say who set the lamp up.";
+
+/// What the model is told of a services call refused as not the owner's:
+/// by the reply's owner status ([`crate::person::status_lately`], with
+/// `LAMP_OWNER_STATUS`) a known face that isn't the owner's is
+/// [`OWNER_ONLY_KNOWN`] and an unknown face [`OWNER_ONLY_UNKNOWN`]; no
+/// telling who is asking, the owner's status (a line not the owner's by its
+/// scope: held, carried or narrowed), or no status is [`OWNER_ONLY`], with
+/// its advice to look at the lamp, as before.
+pub fn refused_not_owner(status: Option<&crate::person::OwnerStatus>) -> &'static str {
+    match status {
+        Some(crate::person::OwnerStatus::KnownNotOwner(_)) => OWNER_ONLY_KNOWN,
+        Some(crate::person::OwnerStatus::Unknown) => OWNER_ONLY_UNKNOWN,
+        _ => OWNER_ONLY,
+    }
+}
 /// What the model is told of a write on a route that never sends (the Live
 /// route): it has no voice prints, so it can't tell the voice saying "send"
 /// is the one that asked. Nothing is prepared or sent.
@@ -609,7 +632,9 @@ pub fn gate(
     }
     let Some(owner) = turn.owner else {
         *pending = None;
-        return Err(json!({ "error": OWNER_ONLY }));
+        return Err(json!({
+            "error": refused_not_owner(crate::person::status_lately().as_ref())
+        }));
     };
     if reads_only(&call.name) {
         return Ok(call.clone());
@@ -1690,6 +1715,54 @@ mod tests {
             assert_eq!(refused["error"], error, "{why}");
             assert_eq!(pending, None, "{why}: the id is forgotten");
         }
+    }
+
+    /// LAMP_OWNER_STATUS (lamp-29e7, 10226): a line not the owner's is
+    /// refused by the reply's owner status; a known face that isn't the
+    /// owner's is not told to look at the camera that saw it. Off, or no
+    /// telling who is asking: [`OWNER_ONLY`], as before.
+    #[test]
+    fn a_refusal_not_the_owners_says_why_by_the_replys_owner_status() {
+        use crate::person::{OwnerStatus, note_status, set_owner_status_for_test};
+        let known = OwnerStatus::KnownNotOwner("Bea Guest".to_owned());
+        assert_eq!(refused_not_owner(Some(&known)), OWNER_ONLY_KNOWN);
+        assert_eq!(
+            refused_not_owner(Some(&OwnerStatus::Unknown)),
+            OWNER_ONLY_UNKNOWN
+        );
+        assert_eq!(refused_not_owner(Some(&OwnerStatus::CantSee)), OWNER_ONLY);
+        assert_eq!(refused_not_owner(Some(&OwnerStatus::Owner)), OWNER_ONLY);
+        assert_eq!(refused_not_owner(None), OWNER_ONLY);
+        assert!(OWNER_ONLY_KNOWN.contains("“That's only for the person who set me up.”"));
+        assert!(!OWNER_ONLY_KNOWN.contains("look at the lamp so"));
+        assert!(OWNER_ONLY_UNKNOWN.contains("“I don't recognise you, so I can't do that.”"));
+        assert!(!OWNER_ONLY_KNOWN.contains("Bea"));
+        let now = Instant::now();
+        let turn = Turn {
+            owner: None,
+            ..heard("send it", 10)
+        };
+        let refused_with = |on: bool, status: OwnerStatus| {
+            set_owner_status_for_test(Some(on));
+            note_status(status);
+            let mut pending = waiting(now);
+            gate(&mut pending, &send("s1"), 11, &turn, at(now)).expect_err("not the owner")
+        };
+        assert_eq!(
+            refused_with(false, known.clone())["error"],
+            OWNER_ONLY,
+            "off"
+        );
+        assert_eq!(refused_with(true, known)["error"], OWNER_ONLY_KNOWN);
+        assert_eq!(
+            refused_with(true, OwnerStatus::Unknown)["error"],
+            OWNER_ONLY_UNKNOWN
+        );
+        assert_eq!(
+            refused_with(true, OwnerStatus::CantSee)["error"],
+            OWNER_ONLY
+        );
+        set_owner_status_for_test(None);
     }
 
     #[test]

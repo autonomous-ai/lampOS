@@ -705,6 +705,194 @@ pub fn by_default(name: &str) -> String {
     )
 }
 
+/// `on` exactly: a second-route reply with [`BY_DEFAULT_ENVIRONMENT`] is
+/// told one owner status ([`owner_status`], [`owner_status_note`]), and an
+/// owner-only services call that is refused says why by it
+/// (`services::refused_not_owner`). On lamp-29e7 (10226) a known face that
+/// isn't the owner's asked "who is my owner?" and "do you know me?" and was
+/// told "I don't know who my owner is" and "I can't verify who owns this
+/// lamp": the reply was told only that a name was held back. Off unless
+/// set: then every note and refusal is as before.
+pub const OWNER_STATUS_ENVIRONMENT: &str = "LAMP_OWNER_STATUS";
+
+#[cfg(test)]
+thread_local! {
+    static OWNER_STATUS_FOR_TEST: std::cell::Cell<Option<bool>> =
+        const { std::cell::Cell::new(None) };
+    static STATUS_LATELY_FOR_TEST: std::cell::RefCell<Option<(OwnerStatus, std::time::Instant)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Whether [`OWNER_STATUS_ENVIRONMENT`] is exactly `on`.
+pub fn owner_status_on() -> bool {
+    #[cfg(test)]
+    if let Some(on) = OWNER_STATUS_FOR_TEST.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(OWNER_STATUS_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// This thread's [`OWNER_STATUS_ENVIRONMENT`], for a test; `None` reads the
+/// environment again.
+#[cfg(test)]
+pub(crate) fn set_owner_status_for_test(on: Option<bool>) {
+    OWNER_STATUS_FOR_TEST.with(|cell| cell.set(on));
+}
+
+/// Who is speaking, as far as the owner goes, for one reply
+/// ([`OWNER_STATUS_ENVIRONMENT`]): one of exactly four.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum OwnerStatus {
+    /// The person who set the lamp up ([`someone_else_now`] finds no sign
+    /// of anyone else): told as [`by_default`], as before.
+    Owner,
+    /// One face the eyes know, by this name, that isn't the owner's.
+    KnownNotOwner(String),
+    /// One face the eyes don't know.
+    Unknown,
+    /// No telling who is asking: another voice, more than one face, or a
+    /// face not at the desk seen speaking.
+    CantSee,
+}
+
+impl OwnerStatus {
+    /// For the journal: names nobody.
+    pub fn told(&self) -> &'static str {
+        match self {
+            Self::Owner => "the owner",
+            Self::KnownNotOwner(_) => "a known face that isn't the owner's",
+            Self::Unknown => "a face the lamp doesn't recognise",
+            Self::CantSee => "the lamp can't see who is asking",
+        }
+    }
+}
+
+/// The reply's [`OwnerStatus`], from the same signs as [`someone_else_now`]:
+/// no sign of anyone else is the owner; another voice, a face not at the
+/// desk seen speaking, or more than one face is [`OwnerStatus::CantSee`];
+/// else the one face the eyes know that isn't the owner's is
+/// [`OwnerStatus::KnownNotOwner`] by its own name, and one they don't know
+/// [`OwnerStatus::Unknown`].
+pub fn owner_status(
+    owners: &[String],
+    faces: Option<usize>,
+    known_now: Option<&str>,
+    another_voice: bool,
+    speaking_not_at_desk: bool,
+    carried: Option<&str>,
+) -> OwnerStatus {
+    if someone_else_now(
+        owners,
+        faces,
+        known_now,
+        another_voice,
+        speaking_not_at_desk,
+        carried,
+    )
+    .is_none()
+    {
+        return OwnerStatus::Owner;
+    }
+    if another_voice || speaking_not_at_desk || faces.is_some_and(|faces| faces > 1) {
+        return OwnerStatus::CantSee;
+    }
+    match known_now {
+        Some(known) => OwnerStatus::KnownNotOwner(known.to_owned()),
+        None => OwnerStatus::Unknown,
+    }
+}
+
+/// Told with every status but the owner's: the lamp has an owner, and their
+/// name is never said.
+const ALWAYS_OWNED: &str = "This lamp always has an owner: the person who set it up. Never say it has no owner, or that you don't know or can't tell who owns it, and never say who the owner is or their name.";
+
+/// What the owner's name held back stands for, with [`OWNER_STATUS_ENVIRONMENT`]:
+/// [`HELD_BACK_NOTE`] without its "don't take the person speaking for
+/// anyone", which a known face's own name told in the status would
+/// contradict.
+pub const HELD_BACK_MARKER_NOTE: &str = "(For you to know, not to answer: “(their name)” in what you said before stands for a name held back, since someone else may be here now. Never say it.)";
+
+/// What a reply is told of its [`OwnerStatus`]: the owner's as
+/// [`by_default`] (`name` the owner's), and the other three with
+/// [`ALWAYS_OWNED`] and their own fixed words, never the owner's name.
+pub fn owner_status_note(status: &OwnerStatus, name: &str) -> String {
+    let (who, say) = match status {
+        OwnerStatus::Owner => return by_default(name),
+        OwnerStatus::KnownNotOwner(known) => (
+            "The person speaking is someone you know, but not the person who set you up.",
+            format!("I know you as {known}, but you're not the person who set me up."),
+        ),
+        OwnerStatus::Unknown => (
+            "The person speaking is someone you don't recognise.",
+            "I don't recognise you.".to_owned(),
+        ),
+        OwnerStatus::CantSee => (
+            "You can't tell who is speaking now.",
+            "I can't see who's asking.".to_owned(),
+        ),
+    };
+    format!(
+        "(For you to know: {ALWAYS_OWNED} {who} If they ask who owns you, who your owner is, whether you know them, or who they are, say: “{say}”)"
+    )
+}
+
+/// What a reply is told while the owner's name is held back
+/// ([`someone_else_now`]): with a status that isn't the owner's
+/// ([`OWNER_STATUS_ENVIRONMENT`]), [`HELD_BACK_MARKER_NOTE`] and that
+/// status's note; without one, [`HELD_BACK_NOTE`] as before.
+pub fn held_back_told(status: Option<&OwnerStatus>) -> String {
+    match status {
+        Some(
+            status @ (OwnerStatus::KnownNotOwner(_) | OwnerStatus::Unknown | OwnerStatus::CantSee),
+        ) => format!(
+            "{HELD_BACK_MARKER_NOTE}\n\n{}",
+            // Never the owner's: these three don't name them.
+            owner_status_note(status, "")
+        ),
+        _ => HELD_BACK_NOTE.to_owned(),
+    }
+}
+
+/// How long a reply's status stands for a services call refused in it
+/// ([`status_lately`]): a reply's calls come within seconds of it.
+pub const STATUS_STANDS_FOR: std::time::Duration = std::time::Duration::from_secs(30);
+
+#[cfg(not(test))]
+static STATUS_LATELY: std::sync::Mutex<Option<(OwnerStatus, std::time::Instant)>> =
+    std::sync::Mutex::new(None);
+
+/// The status the newest reply was told, kept for its services calls.
+pub fn note_status(status: OwnerStatus) {
+    let now = std::time::Instant::now();
+    #[cfg(test)]
+    {
+        STATUS_LATELY_FOR_TEST.with(|cell| *cell.borrow_mut() = Some((status, now)));
+    }
+    #[cfg(not(test))]
+    {
+        *STATUS_LATELY
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some((status, now));
+    }
+}
+
+/// The newest reply's status ([`note_status`]) while it stands
+/// ([`STATUS_STANDS_FOR`]); none before any, or with the switch off.
+pub fn status_lately() -> Option<OwnerStatus> {
+    if !owner_status_on() {
+        return None;
+    }
+    #[cfg(test)]
+    let kept = STATUS_LATELY_FOR_TEST.with(|cell| cell.borrow().clone());
+    #[cfg(not(test))]
+    let kept = STATUS_LATELY
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    kept.filter(|(_, at)| at.elapsed() < STATUS_STANDS_FOR)
+        .map(|(status, _)| status)
+}
+
 /// What a skill's note is told of someone who comes by often (#1670, Mood's
 /// `familiar`): one beat warmer.
 pub const OFTEN: &str = "(The person at the lamp comes by often: speak to them as you would someone you see most days, warmly and without fuss.)";
@@ -1592,5 +1780,110 @@ mod tests {
         assert_eq!(now(), None);
         set_for_test(None);
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// LAMP_OWNER_STATUS (lamp-29e7, 10226): the four statuses from the
+    /// by-default signs, each told its own fixed words.
+    #[test]
+    fn the_owner_status_is_one_of_four_from_the_by_default_signs() {
+        let owners = ["Ann Owner".to_owned()];
+        let status = |faces, known: Option<&str>, voice, far| {
+            owner_status(&owners, faces, known, voice, far, None)
+        };
+        assert_eq!(
+            status(Some(1), Some("Ann Owner"), false, false),
+            OwnerStatus::Owner
+        );
+        assert_eq!(
+            status(None, None, false, false),
+            OwnerStatus::Owner,
+            "no face: as today"
+        );
+        assert_eq!(status(Some(0), None, false, false), OwnerStatus::Owner);
+        assert_eq!(
+            status(Some(1), Some("Bea Guest"), false, false),
+            OwnerStatus::KnownNotOwner("Bea Guest".to_owned())
+        );
+        assert_eq!(status(Some(1), None, false, false), OwnerStatus::Unknown);
+        assert_eq!(
+            status(Some(2), Some("Bea Guest"), false, false),
+            OwnerStatus::CantSee
+        );
+        assert_eq!(
+            status(Some(2), Some("Ann Owner"), false, false),
+            OwnerStatus::CantSee
+        );
+        assert_eq!(
+            status(Some(1), Some("Ann Owner"), true, false),
+            OwnerStatus::CantSee
+        );
+        assert_eq!(status(Some(1), None, false, true), OwnerStatus::CantSee);
+        // A carried owner's line keeps an unnamed face the owner's.
+        assert_eq!(
+            owner_status(
+                &owners,
+                Some(1),
+                None,
+                false,
+                false,
+                Some(&known_faces_id("Ann Owner"))
+            ),
+            OwnerStatus::Owner
+        );
+    }
+
+    fn known_faces_id(name: &str) -> String {
+        crate::known_faces::memory_person(name)
+    }
+
+    #[test]
+    fn each_owner_status_is_told_its_exact_words_and_never_the_owners_name_but_to_them() {
+        let owner = "Ann Owner";
+        assert_eq!(
+            owner_status_note(&OwnerStatus::Owner, owner),
+            by_default(owner)
+        );
+        let always = "This lamp always has an owner: the person who set it up. Never say it has no owner, or that you don't know or can't tell who owns it, and never say who the owner is or their name.";
+        for (status, say) in [
+            (
+                OwnerStatus::KnownNotOwner("Bea Guest".to_owned()),
+                "“I know you as Bea Guest, but you're not the person who set me up.”",
+            ),
+            (OwnerStatus::Unknown, "“I don't recognise you.”"),
+            (OwnerStatus::CantSee, "“I can't see who's asking.”"),
+        ] {
+            let note = owner_status_note(&status, owner);
+            assert!(note.contains(always), "{note}");
+            assert!(note.contains(say), "{note}");
+            assert!(!note.contains("Ann") && !note.contains("Owner"), "{note}");
+            let held = held_back_told(Some(&status));
+            assert!(held.starts_with(HELD_BACK_MARKER_NOTE), "{held}");
+            assert!(held.contains(say), "{held}");
+            assert!(!held.contains("Ann"), "{held}");
+            assert!(!held.contains("don't take the person speaking"), "{held}");
+        }
+        assert_eq!(
+            owner_status_note(&OwnerStatus::KnownNotOwner("Bea Guest".to_owned()), owner),
+            "(For you to know: This lamp always has an owner: the person who set it up. Never say it has no owner, or that you don't know or can't tell who owns it, and never say who the owner is or their name. The person speaking is someone you know, but not the person who set you up. If they ask who owns you, who your owner is, whether you know them, or who they are, say: “I know you as Bea Guest, but you're not the person who set me up.”)"
+        );
+    }
+
+    /// Switch off: the held-back note and the refusal are as before.
+    #[test]
+    fn with_the_owner_status_off_the_notes_are_as_before() {
+        assert_eq!(held_back_told(None), HELD_BACK_NOTE);
+        assert_eq!(held_back_told(Some(&OwnerStatus::Owner)), HELD_BACK_NOTE);
+        set_owner_status_for_test(Some(false));
+        note_status(OwnerStatus::Unknown);
+        assert_eq!(status_lately(), None, "off: no status read");
+        set_owner_status_for_test(Some(true));
+        assert_eq!(status_lately(), Some(OwnerStatus::Unknown));
+        note_status(OwnerStatus::KnownNotOwner("Bea Guest".to_owned()));
+        assert_eq!(
+            status_lately(),
+            Some(OwnerStatus::KnownNotOwner("Bea Guest".to_owned()))
+        );
+        set_owner_status_for_test(None);
+        STATUS_LATELY_FOR_TEST.with(|cell| *cell.borrow_mut() = None);
     }
 }
