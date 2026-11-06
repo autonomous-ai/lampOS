@@ -344,8 +344,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
         ],
     ),
     // Before the rest of an answer a wordless cut ended, picked up again in a
-    // busy room (`LAMP_CUT_IN_WORDLESS_RESUMES`, off in the product until its
-    // lamp check passes, #5430).
+    // busy room (`LAMP_CUT_IN_WORDLESS_RESUMES`, on in the product, #5430).
     (
         crate::cut_in_wordless::BRIDGE,
         ["Dù sao thì,", "それでね、", "总之，", "아무튼,"],

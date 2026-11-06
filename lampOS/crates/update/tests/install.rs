@@ -1922,13 +1922,10 @@ fn the_product_answers_a_stop_and_asks_after_a_wordless_cut_in() {
         service.contains(&"Environment=LAMP_CUT_IN_WORDLESS_ASKS=on"),
         "the voice lacks LAMP_CUT_IN_WORDLESS_ASKS"
     );
-    // Off for the candidate (the PM, 6 Nov): its lamp check came back FAIL,
-    // partial (#5430), so a busy room's cut is asked, as on stable.
+    // On again by the memory owner's call, 6 Nov (#5430).
     assert!(
-        !service
-            .iter()
-            .any(|line| line.contains("LAMP_CUT_IN_WORDLESS_RESUMES")),
-        "the voice sets LAMP_CUT_IN_WORDLESS_RESUMES"
+        service.contains(&"Environment=LAMP_CUT_IN_WORDLESS_RESUMES=on"),
+        "the voice lacks LAMP_CUT_IN_WORDLESS_RESUMES"
     );
 }
 
