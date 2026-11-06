@@ -173,8 +173,9 @@ Environment=LAMP_CUT_IN_TOLD=on
 # answered "Okay, I'll stop there." and kept in the thread, never asked of the model (#3985, #4710).
 Environment=LAMP_SPOKEN_STOP_ENDS=on
 # A short stop over the answer reads as neither talk nor quiet, and the answer went on: on lamp-06c1 9 of 9 spoken
-# stops were lost (#5032). Only a yield's audio goes to the speech to text, the audio a commit sends anyway; its words
-# only judge a stop and are never kept (the first builder's yes on #5032). A stop commits the yield, as talk does.
+# stops were lost (#5032). Only a yield's audio goes to the speech to text, a yield that resumes as well as one that
+# commits; its words only judge a stop and are never kept (the first builder's yes on #5032). A stop commits the
+# yield, as talk does.
 Environment=LAMP_STOP_WORDS=heard
 # An answer cut by a line or a stop is kept as the words that were played, so "go on" picks up from the cut
 # (#3997): probe-cut-in on lamp-06c1 on 30 Oct, resume 19/20 to 20/20 with LAMP_CUT_IN_TOLD; two played demos, 2 of 2.
