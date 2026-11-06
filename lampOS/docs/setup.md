@@ -111,7 +111,10 @@ faces from photos not yet confirmed (`people.json.from-photos`, only with
 (`/var/lib/lampos-eyes/set-aside`, #1505), a labelled session's face reads
 (`seems.log`), the glance log (`glance.log`) and the owner's voice print for
 the linked services' sends (`owner-voice.json`, and `owner-voice.json.new`
-half written) in the same folder, tasks
+half written) in the same folder, the owner's voice prints kept at setup
+(`/var/lib/lampOS/voice/onboarding/setup-voice.json`, and `setup-voice.json.new`
+half written, `LAMP_SAME_VOICE_ENROLS_AT_SETUP`, C115; wiped with the
+onboarding folder below), tasks
 `/var/lib/lampos-tasks/store` and their targets (`targets.json` beside it), the
 skills' state `/var/lib/lampos-skills-state` (daily routine claims included),
 the pushed skills and the owner's yes to them `/var/lib/lampOS/skills-dev`, the
@@ -147,7 +150,13 @@ per-lamp facts (the servos' daily load and temperature peaks in
 `/var/lib/lampos-body/peaks`, #4501, among them), and physical privacy.
 
 Onboarding uses `/var/lib/lampOS/voice/onboarding/progress.json`; the privacy
-checkpoint and transient handoff files share its root-owned 0700 directory.
+checkpoint, transient handoff files and the owner's voice prints kept at setup
+(`setup-voice.json`, root's 0600, prints only, never sound;
+`LAMP_SAME_VOICE_ENROLS_AT_SETUP`, [same-voice.md](same-voice.md)) share its
+root-owned 0700 directory. Besides a reset, `setup-voice.json` goes with the
+owner's "forget everything", a face forgotten, a redo of "who you are", a walk
+that keeps no prints, a start that finds another owner's, and a start with the
+switch off.
 The room sounds yes (#1722 item 1) is `/var/lib/lampOS/consent/room-sounds.json`,
 0640 root:lampos so lamp-ears can read it, and the face expressions yes
 (`LAMP_FACE_EXPRESSIONS_ASK`) is `/var/lib/lampOS/consent/face-expressions.json`

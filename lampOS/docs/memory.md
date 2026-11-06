@@ -2936,6 +2936,22 @@ then use that person's scope:
   it, and a face saved once the step has any outcome (done, skipped,
   failed, `later`: the file stays after the walk) keeps no name, by anyone
   (the Reviewer-lead's P3 on #4530).
+- **The owner's voice prints from setup** (`LAMP_SAME_VOICE_ENROLS_AT_SETUP=on`,
+  beside `LAMP_SAME_VOICE_CONFIRMS`, the second route only; off unless set;
+  C115, `crates/voice/src/setup_voice.rs`). Not memory's store: the prints
+  of the owner's own lines in "who you are", their saved face alone seen
+  speaking, kept beside the walk's progress (`setup-voice.json`, prints
+  only) and given back to the known person's own prints at each voice
+  start ([same-voice.md](same-voice.md)). The owner's "forget everything"
+  removes them, file and RAM, on the same mark and rule as the services'
+  owner print and whatever the switch says; the answer then says
+  `voice_print: "forgotten too"`. Another person's forget, or one that
+  emptied nothing, leaves them. A reset wipes them with the onboarding
+  folder. A face forgotten (the walk's owner mark goes), a redo of "who you
+  are", a walk that ends keeping nothing, a start that finds another
+  owner's, and a start with the switch off remove them too. A forget made
+  while the step is open takes the prints still held for it, so the step's
+  end can't write them back.
 - **What the caller said before their face was known**
   (`LAMP_MEMORY_FOLLOWS_FACE=on`, with Days, the second route only; off
   unless set, on in the product by the memory owner's call on 4 Nov, where

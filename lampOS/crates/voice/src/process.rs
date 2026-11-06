@@ -1858,6 +1858,8 @@ fn second_route_worker_environment(
         crate::unfinished_words::ENVIRONMENT,
         // Read by the second route's same-voice check (#2602).
         crate::same_voice::CALLER_ONLY_ENVIRONMENT,
+        // The owner's voice enrolled at setup (C115).
+        crate::same_voice::ENROLS_AT_SETUP_ENVIRONMENT,
         crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
         crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT,
         crate::second_provider::TURNED_FACE_SPEAKS_ENVIRONMENT,
@@ -2054,6 +2056,7 @@ mod tests {
             crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
             crate::unfinished_words::ENVIRONMENT,
             crate::same_voice::CALLER_ONLY_ENVIRONMENT,
+            crate::same_voice::ENROLS_AT_SETUP_ENVIRONMENT,
             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
             crate::second_provider::CUE_AFTER_ENVIRONMENT,
             crate::pause_join::ENVIRONMENT,
@@ -2172,6 +2175,10 @@ mod tests {
             ),
             (
                 crate::same_voice::CALLER_ONLY_ENVIRONMENT,
+                ["second"].as_slice(),
+            ),
+            (
+                crate::same_voice::ENROLS_AT_SETUP_ENVIRONMENT,
                 ["second"].as_slice(),
             ),
             (
@@ -2804,6 +2811,7 @@ mod tests {
                     || name == crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT
                     || name == crate::unfinished_words::ENVIRONMENT
                     || name == crate::same_voice::CALLER_ONLY_ENVIRONMENT
+                    || name == crate::same_voice::ENROLS_AT_SETUP_ENVIRONMENT
                     || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
                     || name == crate::second_provider::CUE_AFTER_ENVIRONMENT
                     || name == crate::pause_join::ENVIRONMENT
@@ -3000,6 +3008,7 @@ mod tests {
                     "LAMP_REST_THROUGH_SOUNDS=on",
                     "LAMP_SAME_SPEAKER_CARRIES=on",
                     "LAMP_SAME_VOICE_CALLER_ONLY=on",
+                    "LAMP_SAME_VOICE_ENROLS_AT_SETUP=on",
                     "LAMP_SCHEDULE_ASKED=on",
                     "LAMP_SECOND_CHAT_KEPT=on",
                     "LAMP_SECOND_CHAT_SECOND_TRY=on",

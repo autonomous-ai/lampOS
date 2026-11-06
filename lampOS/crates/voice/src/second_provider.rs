@@ -1789,6 +1789,9 @@ pub type PrintOf = Arc<dyn Fn(u64) -> Option<Vec<f32>> + Send + Sync>;
 pub struct VoiceConfirms {
     pub owner: Arc<crate::same_voice::OwnerVoice>,
     pub print_of: PrintOf,
+    /// The owner's voice enrolled at setup
+    /// (`LAMP_SAME_VOICE_ENROLS_AT_SETUP`, [`crate::setup_voice`]); none, off.
+    pub setup: Option<Arc<crate::setup_voice::SetupVoice>>,
 }
 
 /// `LAMP_SAME_VOICE_CONFIRMS` (the memory owner's decision of 4 Nov: CAM++
@@ -7419,6 +7422,25 @@ async fn spoken(
     } else {
         None
     };
+    // `LAMP_SAME_VOICE_ENROLS_AT_SETUP`: while the walk leads "who you
+    // are", the line's print may be the owner's to keep; read in a thread of
+    // its own, so nothing here waits (`setup_voice::SetupVoice::heard`).
+    if let (Some(confirms), Some((eyes, known))) =
+        (shared.voice_confirms.as_ref(), shared.speaking.as_ref())
+        && let Some(setup) = confirms.setup.as_ref()
+    {
+        setup.heard(
+            request,
+            crate::setup_voice::Sight::of(
+                setup.onboarding().to_owned(),
+                eyes.clone(),
+                known.clone(),
+                begun,
+                finishing,
+            ),
+            confirms.print_of.clone(),
+        );
+    }
     if enrollment_allowed && let Some(lease) = scope.as_ref() {
         crate::speaking_faces::saw_line_scoped(
             crate::speaking_faces::LineSeen {
