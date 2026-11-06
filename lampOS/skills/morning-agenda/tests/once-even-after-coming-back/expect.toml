@@ -1,0 +1,8 @@
+# 08:00, at the desk 10 minutes, away 20, back an hour: one read, at 2 minutes.
+clock = "08:00"
+
+[[expect]]
+at = "2m"
+within = "1m"
+call = "read"
+args = { service = "google_calendar", what = "events", day = "today" }

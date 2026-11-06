@@ -907,7 +907,18 @@ publishes, every 250 ms:
 | No voice heard in the last minute | Each line on `voice/heard`, marked as it comes by a thread of `lamp-skills`' own (the topic is an event: the bus keeps no latest of it, so before this fix the row never held a read back; lamp-9adf, 5 Nov) | "a voice heard" |
 
 All must hold steadily for 5 s. Until then the run waits, at most 60
-minutes, and then skips the day with nothing said ("skipped: <why>"). A
+minutes, and then skips the day with nothing said ("skipped: <why>").
+**One read at a time** (`service_read::Turns`, #5618): a read begins only
+with the lamp's one turn, which it holds from its gate's opening to its
+last line. The turn is free when no other skill's read holds it and a
+minute (`AFTER_ANOTHER`) has passed since the last one ended; until then
+the gate counts as closed ("another read under way"). The read then still
+needs its own 5 s steady gate, and its wait counts under the same 60
+minutes from when it came due, so a read queued behind another skips the
+day when its hour runs out ("skipped: another read under way"), never
+starting a fresh hour. Without it, two skills' reads held at their gates
+together (Morning agenda and Morning mail behind a visitor) would say their
+lines in turn, one's between the other's. A
 read runs once a local day per skill (kept in `lamp-skills`' memory, so a
 restart forgets it). While its run waits for the gate, and after it came
 due until local midnight, the skill's trigger is not said triggered or asked
@@ -1276,7 +1287,9 @@ Linear's issues) and not `gmail-app`, a whole text or a free-form read (a
 query, `get`, `call`, or their keys),
 the schema and the loader agreeing; a Drive read said by name; the gate waiting for 5 s steady, skipping
 after 60 minutes, stopping before a word, stopping with "I'll tell you the
-rest later." when someone comes, and the lines said. `-p lamp-update` (the unit installed with `LAMP_SERVICES=on` in it, as in
+rest later." when someone comes, and the lines said; one read at a time
+(two due together said one after the other, a minute apart; one queued
+behind another skipping at its own hour). `-p lamp-update` (the unit installed with `LAMP_SERVICES=on` in it, as in
 `lamp-cloud.service` and `lamp-voice.service`, `LAMP_SERVICES_WRITE=on` in
 `lamp-services.service` alone, `LAMP_SAME_VOICE_FOR=services` beside the
 pinned model in `lamp-voice.service`, no `--enable`, the reset plan's hash) and `-p lamp-setup` (`tests/it/reset.rs`).

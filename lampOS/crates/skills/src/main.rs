@@ -4733,6 +4733,11 @@ impl lamp_skills::service_read::Room for LampRoom {
             eprintln!("lamp-skills: a read told not linked not kept: {error}");
         }
     }
+
+    // One read at a time on the lamp, every skill's (#5618).
+    fn turns(&self) -> Option<&'static lamp_skills::service_read::Turns> {
+        Some(&lamp_skills::service_read::TURNS)
+    }
 }
 
 /// Makes one call and says how it went. A gesture or a move says it is
