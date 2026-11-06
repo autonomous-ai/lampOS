@@ -1165,11 +1165,13 @@ Harness's own updates held (ADAPTER_UPDATE_DISABLE=true,
 HARNESS_ENV_FILE=…)`, or `not held: <why>` when the file can't be written.
 
 **Health, no credential.** With the same switch, after each `harness start`
-that succeeded (after a sign-in), a thread of its own asks `GET /api/health`
+that succeeded (after a sign-in, or at the part's own start), a thread of its own asks `GET /api/health`
 on `127.0.0.1` at `PORT` (18473 unless set, `config/env.ts:124`). It sends
 no token or cookie, and nothing waits on it. Harness answers 200
 `{"ok":true,"version":"x.y.z"}` once its server is up, signed in or not
-(`hookServer.ts:527`). It is asked every 0.5 s, each ask bounded to 2 s,
+(`hookServer.ts:527`). A chunked answer
+(`Transfer-Encoding: chunked`) is joined before it is read (#5379's
+follow-up: on lamp-c0a4 the line said `not_json` while the daemon was up). It is asked every 0.5 s, each ask bounded to 2 s,
 for at most 20 s, and one line is journaled:
 
 - `tasks: Harness health ok on 127.0.0.1:18473, version 0.5.39, <ms> ms after its start`
@@ -1250,7 +1252,7 @@ credential of its own.
   It's the next job on the lane, ahead of a hand-over already waiting,
   which would otherwise go to the stopped daemon. It's given 75 s
   (`DAEMON_START_TIMEOUT`), past Harness's own 60 s wait for the daemon,
-  and the part journals `Harness's daemon started after the sign-in` or why
+  and the part journals `Harness's daemon started` or why
   not. A sign-in that fails or is cancelled starts nothing.
 - **Started at the part's own start, when already signed in (#5379).**
   Harness put on by the onboarding install (`harness-install`, install.md)
