@@ -1245,6 +1245,23 @@ const NEAR_TO: &str = "You may have misheard their name. Do not say any name you
 /// nothing of who the lamp knows, and no yes changes it (the reviewer's P1
 /// and P2 on #2211).
 const NOT_LIKE_THEM: &str = "You cannot keep this face under that name. Do not say why, and do not say whether you know anyone by it. Ask them for another name they would like to be known by. The lamp's owner can remove an old face in the app.";
+
+/// A voice keep or rename under the owner's typed name, outside setup's own
+/// "who you are" (#5483, the first builder's interim rule): that name opens
+/// the owner's memory and linked services, so only the app gives it a face.
+pub(crate) const OWNERS_NAME_IN_APP: &str = "I cannot keep a face under that name by voice. Do not say why, and do not say whether you know anyone by it. Tell them a face can be added under that name in the app, and ask whether they want to be remembered by another name now.";
+
+/// Whether `name` is the owner's typed name ([`crate::person::now`]), as
+/// their memory id is made from it ([`lamp_msgs::known::person_id`]), with
+/// inner whitespace folded first as the eyes fold it before keeping a name
+/// (`plain_name` in lamp-eyes' who.rs): "Mai  Tran" or a tab between is
+/// kept as "Mai Tran" (the Reviewer-lead's P2 on #5519).
+fn owners_typed_name(name: &str) -> bool {
+    let id = |name: &str| {
+        lamp_msgs::known::person_id(&name.split_whitespace().collect::<Vec<_>>().join(" "))
+    };
+    crate::person::now().is_some_and(|typed| id(&typed) == id(name))
+}
 /// Remembering looks for up to four seconds.
 pub const DEADLINE: Duration = Duration::from_secs(6);
 /// The known file counts while it is this fresh: the eyes renew it every
@@ -1601,6 +1618,9 @@ fn run_speaker(
         && spelled_by_them(name, &said.this);
     // Kept without a Korean vocative ("민수야" is 민수), checked as said.
     let name = crate::language::without_vocative(name, crate::language::at_start());
+    if !(switches.checked && switches.at_setup) && owners_typed_name(name) {
+        return (json!({"error": OWNERS_NAME_IN_APP}), true);
+    }
     let line = json!({"remember_speaker": {
         "name": name,
         "face": proof.face,
@@ -1713,6 +1733,7 @@ pub fn refusal_reason(error: &str) -> &'static str {
         (NOT_AGREED, "not_agreed"),
         (NEAR_TO, "near_to"),
         (NOT_LIKE_THEM, "not_like_them"),
+        (OWNERS_NAME_IN_APP, "owners_name_in_app"),
         (NOT_THEIRS, "not_theirs"),
         (AUTHORITY_GONE, "authority_gone"),
         (NO_NAME, "no_name"),
@@ -1907,6 +1928,9 @@ fn run_switched(
     } else {
         name
     };
+    if call.name == REMEMBER && !setup && owners_typed_name(name) {
+        return (json!({"error": OWNERS_NAME_IN_APP}), true);
+    }
     let line = match call.name.as_str() {
         // `apart` only when true: eyes from before #2176 row 4 refuse a
         // field they don't know.
@@ -5691,6 +5715,95 @@ mod tests {
         std::fs::remove_dir_all(&directory).unwrap();
     }
 
+    /// #5483 (lamp-29e7): the owner's typed name, with no face kept under
+    /// it, was open to anyone who said it. Past setup, a voice keep under
+    /// that name, in any case, and a rename to it, are refused before the
+    /// eyes are asked, names checked or not; at setup the owner's own save
+    /// still goes, and another name goes as before.
+    #[test]
+    fn the_owners_typed_name_takes_a_face_only_at_setup() {
+        let directory =
+            std::env::temp_dir().join(format!("lamp-voice-5483-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let typed = directory.join("name");
+        std::fs::write(&typed, "Mai Tran\n").unwrap();
+        crate::person::set_for_test(Some(typed));
+        let call = |name: &str, replace: bool| ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({ "name": name, "replace": replace }),
+        };
+        let (socket, asked) = eyes(vec![
+            json!({"remembered": "Mai Tran"}),
+            json!({"remembered": "Lan"}),
+        ]);
+        let refused = |words: &Value| assert_eq!(words, &json!({"error": OWNERS_NAME_IN_APP}));
+        let (words, answered) = run_with(
+            &socket,
+            &call("Mai Tran", false),
+            true,
+            &Said::now("I'm Mai Tran."),
+        );
+        assert!(answered);
+        refused(&words);
+        let (words, _) = run_with(
+            &socket,
+            &call("mai tran", false),
+            true,
+            &Said::now("I'm mai tran."),
+        );
+        refused(&words);
+        // The eyes fold inner whitespace before keeping a name, so two
+        // spaces or a tab between are the owner's name too.
+        for name in ["Mai  Tran", "Mai\tTran"] {
+            let (words, _) = run_with(
+                &socket,
+                &call(name, false),
+                true,
+                &Said::now(&format!("I'm {name}.")),
+            );
+            refused(&words);
+        }
+        let agreed = Said {
+            this: "Yes.".into(),
+            before: vec![(
+                "Call me Mai Tran.".into(),
+                "Mai Tran, instead of Lan?".into(),
+            )],
+        };
+        let (words, _) = run_with(&socket, &call("Mai Tran", true), true, &agreed);
+        refused(&words);
+        let (words, _) = run_with(
+            &socket,
+            &call("Mai Tran", false),
+            false,
+            &Said::now("I'm Mai Tran."),
+        );
+        refused(&words);
+        let said_back = Said {
+            this: "Yes.".into(),
+            before: vec![(
+                "I'm Mai Tran.".into(),
+                "Mai Tran, did I get that right?".into(),
+            )],
+        };
+        let (words, _) = run_at_setup(&socket, &call("Mai Tran", false), &said_back);
+        assert_eq!(words, json!({"ok": true, "remembered": "Mai Tran"}));
+        let (words, _) = run_with(&socket, &call("Lan", false), true, &Said::now("I'm Lan."));
+        assert_eq!(words, json!({"ok": true, "remembered": "Lan"}));
+        assert_eq!(refusal_reason(OWNERS_NAME_IN_APP), "owners_name_in_app");
+        crate::person::set_for_test(None);
+        let asked = asked.join().unwrap();
+        assert_eq!(
+            asked,
+            vec![
+                json!({"remember": "Mai Tran", "one_face": true, "replace": false}),
+                json!({"remember": "Lan", "one_face": true, "replace": false}),
+            ]
+        );
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
     /// #5141 row 10: each refusal's words have a reason name for the
     /// journal, the eyes' by their own code, and the journal line says the
     /// function and that name only: no words, no name, no id.
@@ -5704,6 +5817,7 @@ mod tests {
             (NOT_AGREED, "not_agreed"),
             (NEAR_TO, "near_to"),
             (NOT_LIKE_THEM, "not_like_them"),
+            (OWNERS_NAME_IN_APP, "owners_name_in_app"),
             (NOT_THEIRS, "not_theirs"),
             (AUTHORITY_GONE, "authority_gone"),
             (NO_NAME, "no_name"),

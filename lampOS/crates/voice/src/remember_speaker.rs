@@ -195,6 +195,22 @@ mod tests {
         guarded: bool,
         reply: Value,
     ) -> (Value, Vec<Value>) {
+        let switched = if guarded {
+            switches()
+        } else {
+            known_faces::FaceSwitches::default()
+        };
+        exchange_switched(words, name, apart, switched, reply)
+    }
+
+    /// [`own_name_exchange`] with its switches given.
+    fn exchange_switched(
+        words: &str,
+        name: &str,
+        apart: bool,
+        switched: known_faces::FaceSwitches,
+        reply: Value,
+    ) -> (Value, Vec<Value>) {
         let home = crate::process::SessionDirectory::create().unwrap();
         let socket = home.path.join("eyes.sock");
         let listener = UnixListener::bind(&socket).unwrap();
@@ -231,11 +247,7 @@ mod tests {
         let answer = known_faces::run_scoped(
             &socket,
             &call(json!({"name": name, "apart": apart})),
-            if guarded {
-                switches()
-            } else {
-                known_faces::FaceSwitches::default()
-            },
+            switched,
             None,
             Some(&line),
             REQUEST,
@@ -244,6 +256,46 @@ mod tests {
         .0;
         done.send(()).unwrap();
         (answer, peer.join().unwrap())
+    }
+
+    /// #5519 (Heron's P3): the speaker's own enrollment refuses the owner's
+    /// typed name past setup before the eyes are asked, whitespace folded,
+    /// and takes it at setup.
+    #[test]
+    fn remember_speaker_takes_the_owners_typed_name_only_at_setup() {
+        let _serial = TESTS.lock().unwrap_or_else(|poison| poison.into_inner());
+        let home = crate::process::SessionDirectory::create().unwrap();
+        let typed = home.path.join("name");
+        std::fs::write(&typed, "Mai Tran\n").unwrap();
+        crate::person::set_for_test(Some(typed));
+        for name in ["Mai Tran", "Mai  Tran"] {
+            let (answer, requests) = own_name_exchange(
+                &format!("I'm {name}."),
+                name,
+                false,
+                true,
+                json!({"remembered": name}),
+            );
+            assert_eq!(
+                answer,
+                json!({"error": known_faces::OWNERS_NAME_IN_APP}),
+                "{name}"
+            );
+            assert!(requests.is_empty(), "{name} reached the eyes");
+        }
+        let (answer, requests) = exchange_switched(
+            "I'm Mai Tran.",
+            "Mai Tran",
+            false,
+            known_faces::FaceSwitches {
+                at_setup: true,
+                ..switches()
+            },
+            json!({"remembered": "Mai Tran"}),
+        );
+        crate::person::set_for_test(None);
+        assert_eq!(answer["remembered"], "Mai Tran", "{answer}");
+        assert_eq!(requests.len(), 1);
     }
 
     #[test]

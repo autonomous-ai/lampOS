@@ -579,8 +579,20 @@ tries) go, and every other step keeps what it ended with. Privacy is never
 redone alone; it goes with `all`. A call that names no step, or a step the
 walk doesn't know, reopens nothing and tells the model to ask which (on
 lamp-06c1 on 28 Oct "redo the touch step" reached a redo with no step and
-reopened every step). Skipping one step is `setup_step … skipped`; skipping
-the rest is that for each step.
+reopened every step). A redo that reopens "who you are" (`step:
+who_you_are`, or `all`) is the owner's only: by voice it is taken only when
+the owner's own known face (`person::owner_ids`) was seen saying the line
+(`services::seen_saying_owner`, `LAMP_SECOND_SPEAKING_FACE` and
+`LAMP_EYES_SPEAKING` on), and always from a text in the app. Any other voice,
+or any voice on a lamp that knows no owner's face yet, reopens nothing, and
+the model is told to say neither why nor who, but that a face can be added
+in the app (a photo, `faces.add_photo`; the app has no setup redo) and every
+other step redone by voice (`onboarding::REDO_WHO_IN_APP`,
+journal "redo_setup step who_you_are …: refused (…)"). Once "who you are" is
+open, a face kept under the owner's typed name is the owner's
+([eyes.md](eyes.md)), so a guest's redo would hand them that name (the lead's
+ruling on #5519). Other steps are redone by anyone, as before. Skipping one
+step is `setup_step … skipped`; skipping the rest is that for each step.
 
 ## Where it is kept
 
