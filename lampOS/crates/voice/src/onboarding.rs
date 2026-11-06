@@ -4369,13 +4369,17 @@ fn nearest(faces: &lamp_msgs::Faces) -> Option<Framing> {
 /// without [`FACE_EXPRESSIONS_ASK_ENVIRONMENT`]): on lamp-52e6 on 30 Oct
 /// (8811, #3769) the model, told of face_expressions, asked "whether you're
 /// smiling or frowning" itself while the step was off. The provider worker
-/// learns which it offers from its flags ([`offers_arguments`]).
-pub fn tools(no_slide: bool, face_ask: bool) -> Vec<Tool> {
-    let off = |name: &&str| match Step::named(name) {
-        Some(Step::GivingWay) => giving_way::PARKED,
-        Some(Step::RoomSounds) => !no_slide,
-        Some(Step::FaceExpressions) => !face_ask,
-        _ => false,
+/// learns which it offers from its flags ([`offers_arguments`]). Nor is a
+/// step out of the `walk` (#5499: [`lamp_msgs::ONBOARDING_WALK`]).
+pub fn tools(walk: &[&str], no_slide: bool, face_ask: bool) -> Vec<Tool> {
+    let off = |name: &&str| {
+        !walk.contains(name)
+            || match Step::named(name) {
+                Some(Step::GivingWay) => giving_way::PARKED,
+                Some(Step::RoomSounds) => !no_slide,
+                Some(Step::FaceExpressions) => !face_ask,
+                _ => false,
+            }
     };
     let names: Vec<&str> = Step::IDS
         .iter()
@@ -4395,17 +4399,27 @@ pub fn tools(no_slide: bool, face_ask: bool) -> Vec<Tool> {
         ),
     };
     let redo_names: Vec<&str> = names.iter().copied().chain([REDO_ALL]).collect();
-    let (measured, evidence) = if giving_way::PARKED {
-        (
-            "where_you_sit, how_you_sound, touch and privacy",
-            "seeing them, hearing their call, feeling their touch, the switch's receipt",
-        )
+    // The measured steps told, each with its evidence.
+    let (measured, evidence): (Vec<&str>, Vec<&str>) = [
+        ("where_you_sit", "seeing them"),
+        ("how_you_sound", "hearing their call"),
+        ("touch", "feeling their touch"),
+        ("privacy", "the switch's receipt"),
+        ("giving_way", "the body giving way"),
+    ]
+    .into_iter()
+    .filter(|(name, _)| names.contains(name))
+    .unzip();
+    let measured = match measured.split_last() {
+        Some((last, [])) => (*last).to_owned(),
+        Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+        None => String::new(),
+    };
+    let evidence = evidence.join(", ");
+    let preferences_lines = if names.contains(&"preferences") {
+        PREFERENCES_LINES
     } else {
-        (
-            "where_you_sit, how_you_sound, touch, privacy and giving_way",
-            "seeing them, hearing their call, feeling their touch, the switch's receipt, the body \
-             giving way",
-        )
+        ""
     };
     vec![
         Tool {
@@ -4418,7 +4432,7 @@ pub fn tools(no_slide: bool, face_ask: bool) -> Vec<Tool> {
                  can only be skipped; the runner requires physical evidence: {evidence}. \
                  {clear_yes}The runner asks each step in its own words and counts every try: never name, announce, \
                  explain or ask a step yourself, and never count calls or say how many are left. \
-                 {PREFERENCES_LINES}"
+                 {preferences_lines}"
             ),
             parameters: Some(json!({
                 "type": "object",
@@ -8861,7 +8875,7 @@ mod tests {
     /// model never to lead or count a step itself.
     #[test]
     fn a_parked_step_is_never_told_to_the_model() {
-        let told = tools(true, true);
+        let told = tools(&lamp_msgs::ONBOARDING_STEPS, true, true);
         let text = told_text(&told);
         // Put back (PARKED false), it is told again, with nothing else changed.
         let told_of = !giving_way::PARKED;
@@ -8877,6 +8891,29 @@ mod tests {
             told[0]
                 .description
                 .contains("never name, announce, explain or ask a step yourself"),
+            "{}",
+            told[0].description
+        );
+    }
+
+    /// #5499: the model is told only the walk's two steps, whatever the
+    /// lamp's flags: a step it is told of, it may ask in its own words.
+    #[test]
+    fn only_the_walks_steps_are_told_to_the_model() {
+        let told = tools(&lamp_msgs::ONBOARDING_WALK, true, true);
+        let text = told_text(&told);
+        for name in Step::IDS {
+            assert_eq!(
+                text.contains(name),
+                lamp_msgs::ONBOARDING_WALK.contains(&name),
+                "{name}: {text}"
+            );
+        }
+        assert!(!text.contains("preferences"), "{text}");
+        assert!(
+            told[0]
+                .description
+                .contains("now; where_you_sit can only be skipped; the runner requires physical evidence: seeing them."),
             "{}",
             told[0].description
         );
@@ -8900,7 +8937,7 @@ mod tests {
     /// as before. Room sounds likewise.
     #[test]
     fn a_step_this_lamp_never_offers_is_never_told_to_the_model() {
-        let off = told_text(&tools(false, false));
+        let off = told_text(&tools(&lamp_msgs::ONBOARDING_STEPS, false, false));
         for word in [
             "face",
             "smil",
@@ -8911,14 +8948,14 @@ mod tests {
         ] {
             assert!(!off.contains(word), "{word}: {off}");
         }
-        let face_only = tools(false, true);
+        let face_only = tools(&lamp_msgs::ONBOARDING_STEPS, false, true);
         assert!(
             face_only[0]
                 .description
                 .contains(" face_expressions is done only after a clear yes. The runner asks")
         );
         assert!(!told_text(&face_only).contains("room_sounds"));
-        let sounds_only = tools(true, false);
+        let sounds_only = tools(&lamp_msgs::ONBOARDING_STEPS, true, false);
         assert!(
             sounds_only[0]
                 .description
@@ -8926,7 +8963,7 @@ mod tests {
         );
         assert!(!told_text(&sounds_only).contains("face"));
         // Both offered: today's words and steps, unchanged.
-        let both = tools(true, true);
+        let both = tools(&lamp_msgs::ONBOARDING_STEPS, true, true);
         assert!(both[0].description.contains(
             "receipt. room_sounds and face_expressions are done only after a clear yes. The \
              runner asks"
@@ -8949,7 +8986,7 @@ mod tests {
     #[test]
     fn every_preferences_answer_is_told_five_words_and_no_question() {
         for (sounds, face) in [(false, false), (true, false), (false, true), (true, true)] {
-            let told = tools(sounds, face);
+            let told = tools(&lamp_msgs::ONBOARDING_STEPS, sounds, face);
             assert!(
                 told[0].description.ends_with(
                     "In the preferences step only, answer each line in at most five words and \
