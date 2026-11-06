@@ -205,6 +205,13 @@ these six tools never send `ack` or speak a due reminder themselves. See
 | `light_brighter`, `light_dimmer` | One level of five either way, keeping the colour. Brighter brings a light that is off back on; dimmer stops at the lowest and does not switch off. Dimmer is also "softer", "a touch softer", "gentler" or "lower": "softer" with nothing said of the voice or sound is the light, and `volume_down`'s description says so too (the first builder's light scene on lamp-4ace, 18 Oct, on #1367: "a touch softer, please" turned the volume down); brighter is not for "white" or "whiter". Neither is for "turn yourself down" or "up", which is the voice, and the volume's descriptions name it (#1712: on lamp-4ace on 19 Oct the second route took both for the light, where Live took them for the voice) | "My light is a step brighter, at level 4 of 5." / "My light is already at its dimmest. I can switch it off if you like." |
 | `light_warmer`, `light_cooler` | One step along the light's warmth, white, the amber warm, orange (`light::WARMTH`, each with less green and blue), keeping its level. A light in another colour becomes warm (warmer) or white (cooler), said as what it is now, not as a step. A step is said with its way and both ends, and `warm` is said as "warm white" in every answer (`light_on` and `light_colour` too, El on #1476): "a step cooler, warm now" came back as "Okay, warmed it up a step" (the same scene). Each stops at its end and switches a light on. For "warmer", "cosier", "more golden", "cooler", "whiter", "a cooler white", "more like daylight"; "softer" is `light_dimmer`'s, and a colour by name ("make it warm", "make it white") is `light_colour`'s (the first builder, 17 Oct 14:16: "Can you make your light a little warmer?" was answered "my light is a fixed color", since nothing stepped the colour) | "My light is a step cooler, from orange to warm white." / "My light is white now." (from blue) / "My light is already as cool as it goes, white." |
 
+**A new lamp's level (#5551).** lamp-actions sets no level when it starts:
+the volume is whatever the control holds. The softvol "Speaker" is made at
+100, so a new lamp's first words came at full volume and startled. Setup
+sets it to 70 just before its marker, so on a first setup and after the
+product reset (setup.md, "What setup writes"); a set-up lamp never passes
+there again, so a level the person chose is never overridden.
+
 A failure is said as one: "I could not read my speaker's volume.", "I
 could not confirm my speaker's volume changed.", "I asked for it but could
 not confirm my light changed.", and for anything not offered "I can't do
