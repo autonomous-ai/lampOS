@@ -21,6 +21,7 @@ fn label(arm: &str) -> &str {
         "none" => "no memory",
         "full_history" => "full history",
         "lampos_today_partial" => "partial current product",
+        "lampos_today_partial_next" => "partial current product, Tiers-ideas switches on",
         "tiers" => "ours (tiers)",
         "tiers_minus_episodes" => "without episodes",
         "tiers_minus_life_story" => "without life story (chapters and events)",
@@ -664,6 +665,8 @@ pub fn preliminary_report(
             if let Some(result) = entries.last().map(|e| &e.data) {
                 row["malformed_answers"] = result["malformed_answers"].clone();
                 row["malformed_judgments"] = result["malformed_judgments"].clone();
+                row["failed_answer_calls"] = result["failed_answer_calls"].clone();
+                row["failed_judge_calls"] = result["failed_judge_calls"].clone();
             }
             ledgers.insert(arm.clone(), entries);
         }

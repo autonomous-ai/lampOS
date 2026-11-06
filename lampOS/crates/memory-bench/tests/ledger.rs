@@ -71,3 +71,20 @@ fn modified_results_and_partial_writes_are_detected() {
     fs::write(&file, original.trim_end()).unwrap();
     assert!(verify(&path).is_err());
 }
+#[test]
+fn a_mean_that_parses_one_ulp_off_still_verifies() {
+    // Preliminary run 7 on lamp-06c1 (3 Nov): the partial setup's overall mean
+    // 0.9008333333333333 read back as ...332 without exact float parsing, so
+    // its finished ledger failed its own hash chain.
+    let scratch = Scratch::new();
+    let path = scratch.0.join("run");
+    let mut ledger = Ledger::create(&path, &manifest()).unwrap();
+    ledger
+        .append("completed", json!({"overall":0.9008333333333333}))
+        .unwrap();
+    drop(ledger);
+    assert_eq!(
+        verify(&path).unwrap().terminal.as_deref(),
+        Some("completed")
+    );
+}
