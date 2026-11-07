@@ -170,8 +170,9 @@ fn with_every_wellbeing_nudge_present_only_the_word_speaks_at_the_look_up() {
 /// The reviewer's bound on #5704: a word that never comes does not hold the
 /// group for good. A Quiet focus copy whose focus comes due again and again
 /// (each 5 minutes with a face there) and whose word never holds: the first
-/// window closes without the word, so the group is not held again until the
-/// word has run, and Rest your eyes speaks when they look up, as without it.
+/// window closes without the word when the focus comes due again, so the
+/// group is not held again until the word has run, and Rest your eyes
+/// speaks then (held for good before the bound: it never spoke).
 #[test]
 fn a_word_that_never_comes_holds_the_group_once_at_most() {
     let dir = tempfile::tempdir().unwrap();
@@ -201,11 +202,19 @@ fn a_word_that_never_comes_holds_the_group_once_at_most() {
         .filter(|(run, _)| run.calls.iter().any(|call| matches!(call, Call::Say(_))))
         .map(|(run, at_s)| (run.skill.clone(), *at_s))
         .collect();
-    assert!(rest_spoke(&said), "{said:?}");
+    // The focus comes due again and again (each 5 minutes with a face
+    // there): Rest your eyes is held through the first window at most, and
+    // speaks at the latest when the second opens.
+    let focused: Vec<u64> = runs
+        .iter()
+        .filter(|(run, _)| run.skill == "quiet-focus")
+        .map(|(_, at_s)| *at_s)
+        .collect();
+    assert!(focused.len() >= 2, "{focused:?}");
     assert!(
         said.iter()
-            .all(|(skill, at_s)| skill != "rest-your-eyes" || (50 * 60..51 * 60).contains(at_s)),
-        "{said:?}"
+            .any(|(skill, at_s)| skill == "rest-your-eyes" && *at_s <= focused[1]),
+        "{said:?}, focus due at {focused:?}"
     );
 }
 

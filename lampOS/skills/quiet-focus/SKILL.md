@@ -36,8 +36,11 @@ What it says and when:
   Wind down), and shares their hour: at most one of them an hour, or in the
   product two, never within 30 minutes of each other. Only its word takes a
   turn: the 45 minutes it waits through silently take none.
-- When Rest your eyes would be due as you look up, this word comes in its
-  place, not both: Rest your eyes waits for it, and counts it as its own.
+- When another wellbeing nudge (Rest your eyes, or a sip of water) would be
+  due as you look up, this word comes in its place, not both: the nudge
+  waits for it, and counts it as its own. If the word does not come (you
+  stayed head down, or left), the others are not held back for it again
+  until it has been said.
 - If it speaks twice and you neither look back down nor move nor say
   anything within five minutes, it rests until tomorrow morning.
 - "Not today" or "stop the nudges" to the lamp snoozes it until tomorrow
