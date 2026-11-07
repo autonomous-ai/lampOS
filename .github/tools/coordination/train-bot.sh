@@ -119,9 +119,15 @@ eligible() {
     coord_body $p $bf || { once body$p "#$p left out: its body can't be fetched"; continue; }
     fine body$p
     # 4 Nov 04:1x: reads on an earlier head with the same patch count too (coord_same_patch), as for one read above.
-    heads=(${(f)"$(coord_same_patch $head $cf)"})
+    # 7 Nov (El's HOLD on #5653): and heads a Queue READ ASK names, so an ask on a head a plain rebase moved past still
+    # asks. Into a file, not $(...), so lib.sh's patch cache holds across this round's PRs.
+    coord_same_patch $head $cf $qf > $SP/heads.txt
+    heads=(${(f)"$(<$SP/heads.txt)"})
+    # 7 Nov (the second reviewer's HOLD on #5653): the PR's commits, for a Queue ask at an older head of another patch
+    # (reads2.py uses them only for Queue asks). When they can't be listed, the head alone.
+    git rev-list origin/lamp-voice..$head > $SP/pr-commits.txt 2>/dev/null || print -r -- $head > $SP/pr-commits.txt
     # 7 Nov (the PM, after Twelve's table): a Queue READ ASK naming TWO READS asks too (#5647, #5650 merged on one read).
-    two=$(cat $bf $cf | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf --queue $qf --pr $p $heads)
+    two=$(cat $bf $cf | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf --queue $qf --pr $p --pr-commits $SP/pr-commits.txt $heads)
     if [[ $two == short* ]]; then
       grep -qx "$p short $head" $told || { say "#$p left out: TWO READS asked, $two on ${head:0:9}" >&2; tell "$p short $head"; }
       continue
