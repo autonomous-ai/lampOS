@@ -757,6 +757,14 @@ struct Led {
     face_only: bool,
     /// "Who you are": the latest name told, as [`told_ids`], never words.
     name_ids: Vec<String>,
+    /// "Who you are": the latest name told, as [`name_told`] reads it, only
+    /// to know whether the lamp said it back (#5669). Kept here only, never
+    /// recorded.
+    name_said: Option<String>,
+    /// "Who you are": the lamp's own words since the person's last line
+    /// ([`Onboarding::lamp_words`]), 4 KiB at most: whether they read the
+    /// name back. Kept here only, never recorded.
+    lamp_words: String,
     /// The face asked for once more: the ids of the name told at setup
     /// ([`Progress::face_again_names`]), the only names its save makes the
     /// owner under. Never changed by what is said in the ask.
@@ -764,6 +772,27 @@ struct Led {
 }
 
 impl Led {
+    /// "Who you are", with a face to keep (#5669): whether the lamp's words
+    /// since the person's last line read back the latest name told
+    /// (`known_faces::said_back`): the question their next line answers.
+    fn read_back_now(&self) -> bool {
+        self.lamp_words.contains('?')
+            && self
+                .name_said
+                .as_deref()
+                .is_some_and(|name| crate::known_faces::said_back(name, &self.lamp_words))
+    }
+
+    /// "Who you are" (#5669): the latest name told was read back and got no
+    /// yes, a no or a read-back still unanswered: no name is known, so the
+    /// step never ends done with it, and its ids are not kept.
+    fn name_unconfirmed(&self) -> bool {
+        match self.heard.read_back {
+            Some(yes) => !yes,
+            None => self.heard.name && self.read_back_now(),
+        }
+    }
+
     /// The name told in this step, as ids: what `heard` read, else the
     /// nudge's name heard alone.
     fn told(&self) -> Vec<String> {
@@ -805,6 +834,13 @@ struct Answers {
     /// the step ends done, the name only, once the hold is over unless the
     /// face is saved first.
     done_while_held: bool,
+    /// With a face to keep, the latest name told and the lamp's read-back
+    /// of it ("Walter, did I get that right?", #5669): `None` while it was
+    /// never read back, `Some(true)` once their next line was a yes to it,
+    /// `Some(false)` when it was anything else. Only a yes confirms a name
+    /// read back; one left unconfirmed ends the step `later`, never done
+    /// with the name only.
+    read_back: Option<bool>,
     quiet_hours: bool,
     hello: bool,
     /// "Preferences"' hello question has been handed out to be said: only
@@ -2375,13 +2411,28 @@ impl Onboarding {
         let read = reading(language, text);
         // The name told, as ids only (#5328): English words, as the name
         // read alone is ([`Self::heard_line`]).
-        let told = if language.is_none() && !led.face_only {
-            name_told(text).as_deref().map(told_ids).unwrap_or_default()
+        let told_name = if language.is_none() && !led.face_only {
+            name_told(text)
         } else {
-            Vec::new()
+            None
         };
+        let told = told_name.as_deref().map(told_ids).unwrap_or_default();
         let mut ask_hello = false;
         let mut face_answer = None;
+        // With a face to keep, the lamp's read-back of the name (#5669):
+        // only a yes to it confirms the name; any other answer leaves it
+        // unconfirmed, and a no takes it back below. The lamp's words are
+        // read once, for this line.
+        let read_back = face_kept
+            && !nudge
+            && led.step == Step::WhoYouAre
+            && led.heard.name
+            && led.heard.read_back != Some(true)
+            && text.chars().any(char::is_alphanumeric)
+            && led.read_back_now();
+        if text.chars().any(char::is_alphanumeric) {
+            led.lamp_words.clear();
+        }
         // A face to keep: the name's wait ([`NAME_WAIT_US`]) runs from the
         // name and every line after it.
         if face_kept && led.step == Step::WhoYouAre && (led.heard.name || read.names_someone) {
@@ -2406,7 +2457,24 @@ impl Onboarding {
                     && !read.asks
                     && !read.again
                     && !read.puts_off;
-                if led.heard.name && yes {
+                if read_back {
+                    led.heard.read_back = Some(yes);
+                }
+                if read_back && !yes && read.refuses && !read.names_someone {
+                    // A no to the read-back ("No. That's not right.",
+                    // #5669) takes the name back: the step no longer ends
+                    // done with it, nor keeps its ids. The face wait is let
+                    // go too: a yes before it was the name's, not the
+                    // face's. A new name told is read back afresh.
+                    eprintln!(
+                        "lamp-voice: onboarding: who_you_are heard a no to the read-back: the name is not known"
+                    );
+                    led.heard.name = false;
+                    led.heard.face_answered_us = None;
+                    led.name_ids.clear();
+                    led.name_said = None;
+                    false
+                } else if led.heard.name && yes {
                     // Every yes restarts the wait, so it runs from the
                     // latest: the first is often the name's ("Marie,
                     // right?"), and the face question, its yes, the model's
@@ -2430,6 +2498,8 @@ impl Onboarding {
                     led.heard.name = true;
                     if !told.is_empty() {
                         led.name_ids = told;
+                        led.name_said = told_name.clone();
+                        led.heard.read_back = None;
                     }
                     false
                 } else if face_kept && led.heard.name && read.refuses {
@@ -2696,6 +2766,20 @@ impl Onboarding {
         if let Some(led) = self.led.as_mut().filter(|led| led.asked_us.is_some()) {
             led.spoke = true;
             led.lamp_said_us = Some(now_us);
+        }
+    }
+
+    /// The lamp's own words, as they come (#5669): while "who you are" is
+    /// asked, kept until the person's next line ([`Self::heard`]) to read
+    /// whether the lamp said the name back. Never recorded.
+    pub fn lamp_words(&mut self, text: &str) {
+        if let Some(led) = self
+            .led
+            .as_mut()
+            .filter(|led| led.asked_us.is_some() && led.step == Step::WhoYouAre)
+            && led.lamp_words.len() + text.len() <= 4_096
+        {
+            led.lamp_words.push_str(text);
         }
     }
 
@@ -3030,6 +3114,11 @@ impl Onboarding {
                     now_us.saturating_sub(at.max(led.lamp_said_us.unwrap_or(0))) >= NAME_WAIT_US
                 }))
         {
+            if led.name_unconfirmed() {
+                self.nudge_record(false, now_us);
+                self.unconfirmed_later(now_us);
+                return None;
+            }
             eprintln!(
                 "lamp-voice: onboarding: who_you_are: no face saved after the yes: done, the name only"
             );
@@ -3050,15 +3139,22 @@ impl Onboarding {
                 && quiet_us >= TIMED_OUT_QUIET_US
                 && !save_held
             {
-                // A name heard and never taken back is known, call or not.
+                // A name heard and never taken back is known, call or not;
+                // one read back with no yes is not (#5669).
                 // The name's words are not kept: the record says so.
-                let named = step == Step::WhoYouAre && led.heard.name;
+                let unconfirmed =
+                    step == Step::WhoYouAre && self.face_kept && led.name_unconfirmed();
+                let named = step == Step::WhoYouAre && led.heard.name && !unconfirmed;
                 let (face_only, told) = (led.face_only, led.told());
                 let asked_again = led.asked_again;
                 if led.answers > 0 {
                     self.mark_tried(step);
                 }
                 self.nudge_record(false, now_us);
+                if unconfirmed {
+                    self.unconfirmed_later(now_us);
+                    return None;
+                }
                 if named {
                     self.records
                         .push(json!({"kind":"onboarding_heard","step":step.name(),
@@ -3549,6 +3645,24 @@ impl Onboarding {
         self.dirty = self.desired != self.committed || self.erase_on_commit;
     }
 
+    /// "Who you are" ended with a name read back and never said yes to, and
+    /// no face saved, on a lamp that keeps faces (#5669): no name is known,
+    /// so nothing is said about one and no id of it is kept. It ends
+    /// `later`, as a step with no attempt does: its later line now, and the
+    /// whole step ("Earlier we didn't get to your name") offered again after
+    /// the walk, as `next_step`'s `later` rules offer any.
+    fn unconfirmed_later(&mut self, now_us: u64) {
+        eprintln!(
+            "lamp-voice: onboarding: who_you_are: the name read back got no yes: later, no name kept"
+        );
+        self.records.push(
+            json!({"kind":"onboarding_heard","step":Step::WhoYouAre.name(),
+            "name_kept":false,"name_confirmed":false,"at_us":now_us}),
+        );
+        self.finish(Step::WhoYouAre, Outcome::Later, None, now_us);
+        self.owed = Some(self.later_line(Step::WhoYouAre));
+    }
+
     /// "Who you are" just ended done with no face saved, on a lamp that
     /// keeps faces (#5139): a conversation with nobody known in view keeps
     /// nothing, so the walk says that what it remembers waits for a face,
@@ -3939,6 +4053,23 @@ impl Onboarding {
                     "lamp-voice: onboarding: who_you_are: the model's done waits for the held face save"
                 );
                 held.heard.done_while_held = true;
+                continue;
+            }
+            // The model's done with the name read back and no yes to it, and
+            // no face saved, on a lamp that keeps faces (#5669): no name is
+            // known, so it ends `later`, as the walk's own wait does.
+            if led
+                && !by_face
+                && self.face_kept
+                && step == Step::WhoYouAre
+                && outcome == Outcome::Done
+                && self.led.as_ref().is_some_and(Led::name_unconfirmed)
+            {
+                eprintln!(
+                    "lamp-voice: onboarding: who_you_are: the model's done with the name unconfirmed"
+                );
+                self.nudge_record(true, now_us);
+                self.unconfirmed_later(now_us);
                 continue;
             }
             // The model's done after the name, with no face saved, on a lamp
@@ -7319,6 +7450,129 @@ mod tests {
         report(&room.walk, "who_you_are", "done");
         assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
         assert!(!room.walk.kept().face_again);
+    }
+
+    /// #5669: "who you are" on a lamp that keeps faces, the name told and
+    /// the lamp's read-back of it said, in two pieces as the voice gives them.
+    fn read_back_asked(name: &str) -> Room {
+        let mut room = Room::new(name);
+        room.walk.face_kept = true;
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        room.walk.heard("My name is Walter.", room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        room.walk.lamp_words("Walter, did I get ");
+        room.walk.lamp_words("that right?");
+        room.walk.lamp_said(room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        room
+    }
+
+    /// #5669, played on a lamp: a no to the read-back takes the name back.
+    /// The step never ends done with it: no "Got your name", none of its
+    /// ids kept for the face asked once more; it ends `later`, offered again
+    /// after the walk.
+    #[test]
+    fn a_no_to_the_read_back_takes_the_name_back() {
+        let mut room = read_back_asked("read-back-no");
+        room.walk.heard("No. That's not right.", room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        room.walk
+            .lamp_words("Sorry about that. What should I call you?");
+        room.walk.lamp_said(room.at);
+        let notes = room.wait(STEP_GIVE_UP_US + S, Some(NEAR_MIDDLE));
+        assert!(
+            !notes.iter().any(|note| note == skill::NAME_ONLY),
+            "{notes:?}"
+        );
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Later));
+        assert!(!room.walk.kept().face_again);
+        assert!(room.walk.kept().face_again_names.is_empty());
+        assert!(
+            notes.iter().any(|note| note == PREFERENCES_NOTE),
+            "{notes:?}"
+        );
+
+        // A corrected name, read back and said yes to, is the one kept.
+        let mut room = read_back_asked("read-back-corrected");
+        room.walk.heard("No, it's Mary.", room.at);
+        room.walk.lamp_words("Mary, did I get that right?");
+        room.walk.lamp_said(room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        room.walk.heard("Yes.", room.at);
+        let notes = room.wait(
+            FACE_SAVE_WAIT_US + START_QUIET_US + 2 * S,
+            Some(NEAR_MIDDLE),
+        );
+        assert_eq!(notes, [skill::NAME_ONLY, PREFERENCES_NOTE]);
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert_eq!(
+            room.walk.kept().face_again_names,
+            [lamp_msgs::known::person_id("mary")]
+        );
+    }
+
+    /// #5669, played on a lamp: the read-back never answered is no yes. By
+    /// the wait, the give-up or the model's done, the step ends `later`,
+    /// with nothing said about the name.
+    #[test]
+    fn a_read_back_never_answered_is_no_name_known() {
+        let mut room = read_back_asked("read-back-silence");
+        let notes = room.wait(STEP_GIVE_UP_US + S, Some(NEAR_MIDDLE));
+        assert!(
+            !notes.iter().any(|note| note == skill::NAME_ONLY),
+            "{notes:?}"
+        );
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Later));
+        assert!(!room.walk.kept().face_again);
+        assert!(room.walk.kept().face_again_names.is_empty());
+
+        let mut room = read_back_asked("read-back-silence-report");
+        report(&room.walk, "who_you_are", "done");
+        let notes = room.wait(4 * S, Some(NEAR_MIDDLE));
+        assert!(
+            !notes.iter().any(|note| note == skill::NAME_ONLY),
+            "{notes:?}"
+        );
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Later));
+        assert!(!room.walk.kept().face_again);
+    }
+
+    /// #5669: a yes to the read-back keeps the walk as it was: the face
+    /// saved ends it done and keeps the owner; no face saved ends it done
+    /// with the name only, said so.
+    #[test]
+    fn a_yes_to_the_read_back_keeps_the_name() {
+        let mut room = read_back_asked("read-back-yes-saved");
+        room.walk.heard("Yes. That's my name.", room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        face_saved(&room.walk.file, Some("Walter"));
+        let notes = room.wait(S, Some(NEAR_MIDDLE));
+        assert!(
+            !notes.iter().any(|note| note == skill::NAME_ONLY),
+            "{notes:?}"
+        );
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert_eq!(room.walk.kept().owner.as_deref(), Some("Walter"));
+        assert!(!room.walk.kept().face_again);
+
+        let mut room = read_back_asked("read-back-yes-unsaved");
+        room.walk.heard("Yes. That's my name.", room.at);
+        room.walk
+            .lamp_words("May I remember your face, so I know you next time?");
+        room.walk.lamp_said(room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        room.walk.heard("No thanks.", room.at);
+        let notes = room.wait(
+            FACE_SAVE_WAIT_US + START_QUIET_US + 2 * S,
+            Some(NEAR_MIDDLE),
+        );
+        assert_eq!(notes, [skill::NAME_ONLY, PREFERENCES_NOTE]);
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert_eq!(
+            room.walk.kept().face_again_names,
+            [lamp_msgs::known::person_id("walter")]
+        );
     }
 
     /// A walk on a lamp that keeps faces, "who you are" done with the name
