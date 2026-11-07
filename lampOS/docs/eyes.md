@@ -1477,6 +1477,9 @@ With the switch:
   spelled name back as a name only, never as letters nor as a choice
   between the name and its spelling (`SAY_IT_BACK`, `NOT_HEARD`,
   `NOT_HEARD_SPELLED`, `NEAR_TO`); `NOT_HEARD_SAY_AGAIN` says no name back.
+  At setup, with the onboarding nudge off, a person's line that spells
+  their name is told the read-back to say beside it, the name as a word
+  ([onboarding.md](onboarding.md), #5580 row 2).
 
   Why the turn in hand, from lamp-4ace on 16 October at 16:46 (the first
   builder on #1057, the records described without the words): a
