@@ -1948,6 +1948,9 @@ fn run_call_with_scope(
                                 eprintln!(
                                     "lamp-voice: request {request}: a forget naming what or which on a one-face line is not run: nothing saw the mouth say it (LAMP_PERSON_SCOPE_ONE_FACE)"
                                 );
+                                // Nothing was forgotten: a "forget it" after
+                                // it carries nothing (Jarvis's P3 on #5666).
+                                crate::remember::drop_carry(Some(lease));
                                 (
                                     json!({"forgotten": false, "note": ONE_FACE_NAMED_FORGET}),
                                     true,
@@ -6087,11 +6090,10 @@ mod tests {
             (vec![], vec![just()])
         );
         // A forget by what on the line ends the mark (Jarvis's P3). Last:
-        // its subject is carried to a bare forget in the same scope for a
-        // minute (#3113's `Carry`). A bare
-        // forget after it on the same line is that subject again (#3113's
-        // `Carry`), and never "the keep just made". The legacy memory answers both
-        // itself (`legacy_named`), so neither reaches it here.
+        // it is refused, with the mouth unseen (#5627), and carries nothing
+        // (Jarvis's P3 on #5666), so a bare forget after it on the same line
+        // is never that subject and never "the keep just made": it asks
+        // which. Neither reaches the memory.
         assert_eq!(
             run(
                 7,
@@ -6107,7 +6109,7 @@ mod tests {
                     (1, crate::remember::FORGET, json!({}), "", "Ann"),
                 ]
             ),
-            (vec![], vec![])
+            (vec![], vec![which()])
         );
         let marked = {
             let kept = ONE_FACE_KEPT.lock().unwrap();
@@ -6204,6 +6206,17 @@ mod tests {
                 told["note"],
                 json!(ONE_FACE_NAMED_FORGET),
                 "{line} {args}: {told}"
+            );
+            // And nothing is carried: a bare forget after it in the same
+            // scope is not turned into this one (Jarvis's P3 on #5666).
+            let bare = ToolCall {
+                id: "b5627".into(),
+                name: crate::remember::FORGET.into(),
+                args: json!({}),
+            };
+            assert!(
+                crate::remember::named_forget(&bare, None, Some(&lease)).is_none(),
+                "{line} {args}: the refused forget was carried"
             );
         }
     }

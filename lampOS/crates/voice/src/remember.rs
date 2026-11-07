@@ -3365,6 +3365,25 @@ pub fn named_forget_typed(name: &str, args: &Value, said: &str) -> Option<Value>
     named_forget_with(&call, Some(said), None, carry()).map(|call| call.args)
 }
 
+/// A forget [`named_forget`] carried, then refused before any memory was
+/// asked (#5627: a one-face line, the mouth unseen): nothing was
+/// forgotten, so a "forget it" after it, in the same scope, is not that
+/// subject (Jarvis's P3 on #5666).
+pub fn drop_carry(lease: Option<&crate::memory_scope::ScopeLease>) {
+    let person = match lease {
+        Some(lease) => match lease.scope() {
+            Some(scope) => scope.person().map(str::to_owned),
+            None => return,
+        },
+        None => person_now(),
+    };
+    if let Ok(mut last) = carry().0.lock()
+        && last.as_ref().is_some_and(|(whose, ..)| *whose == person)
+    {
+        *last = None;
+    }
+}
+
 /// What a `forget` removes: the one place that picks it (#3113). The
 /// memory turns the pick into ids: [`ForgetPick::Named`] by
 /// `DaysClient::forget_about`'s listing, [`ForgetPick::Last`] by
