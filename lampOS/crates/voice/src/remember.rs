@@ -3315,7 +3315,23 @@ fn about_same(one: &str, other: &str) -> bool {
 #[derive(Default)]
 pub struct Carry(Mutex<Option<(Option<String>, String, Instant)>>);
 
+#[cfg(not(test))]
 static CARRY: OnceLock<Carry> = OnceLock::new();
+
+/// The process's [`Carry`]. A test's is its own thread's: tests run side by
+/// side in one process, and one test's named forget in the room's scope
+/// would otherwise turn another's bare forget into it (#5627).
+fn carry() -> &'static Carry {
+    #[cfg(not(test))]
+    return CARRY.get_or_init(Carry::default);
+    #[cfg(test)]
+    {
+        thread_local! {
+            static CARRY: &'static Carry = Box::leak(Box::default());
+        }
+        CARRY.with(|carry| *carry)
+    }
+}
 
 /// [`named_forget_with`] for the asker's scope: the request's lease's
 /// person, else whoever is at the lamp now, the room's for nobody.
@@ -3331,12 +3347,7 @@ pub fn named_forget(
         Some(lease) => lease.scope()?.person().map(str::to_owned),
         None => person_now(),
     };
-    named_forget_with(
-        call,
-        said,
-        person.as_deref(),
-        CARRY.get_or_init(Carry::default),
-    )
+    named_forget_with(call, said, person.as_deref(), carry())
 }
 
 /// [`named_forget_with`] for a typed text from the app, whose memory is the
@@ -3351,8 +3362,7 @@ pub fn named_forget_typed(name: &str, args: &Value, said: &str) -> Option<Value>
         name: name.to_owned(),
         args: args.clone(),
     };
-    named_forget_with(&call, Some(said), None, CARRY.get_or_init(Carry::default))
-        .map(|call| call.args)
+    named_forget_with(&call, Some(said), None, carry()).map(|call| call.args)
 }
 
 /// What a `forget` removes: the one place that picks it (#3113). The
