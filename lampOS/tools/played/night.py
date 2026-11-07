@@ -221,13 +221,22 @@ def prepare(ids):
     if LEVEL == 'off':
         for i in ids:
             path = f'{WAV}/{i}.wav'; sha = level.sha256(path)
-            CLIPS[i] = {'path': path, 'source_sha256': sha, 'played_sha256': sha, 'gain_db': 0.0}
+            CLIPS[i] = {'path': path, 'source_sha256': sha, 'played_sha256': sha, 'gain_db': 0.0, 'capped': False, 'lufs_out': None,
+                        'unlevelled': True}
         return
     try: target = float(LEVEL)
     except ValueError: sys.exit(f'night.py: NIGHT_LEVEL is a loudness in LUFS (-20) or off, not {LEVEL!r}')
     into = f"{OUT}/{KIT}/level-{'m' if target < 0 else ''}{abs(target):g}"
     for i, r in level.level_dir(WAV, into, [f'{i}.wav' for i in ids], target=target).items():
-        CLIPS[i[:-4]] = {'path': f'{into}/{i}', **{k: r[k] for k in ('source_sha256', 'played_sha256', 'gain_db', 'capped')}}
+        CLIPS[i[:-4]] = {'path': f'{into}/{i}', **{k: r[k] for k in ROW_FIELDS}}
+
+
+# What each row keeps of its clip: unlevelled is a raw WAV (NIGHT_LEVEL=off) or a clip level.py could not level (silent).
+ROW_FIELDS = ('source_sha256', 'played_sha256', 'gain_db', 'capped', 'lufs_out', 'unlevelled')
+
+
+def row_fields(id_):
+    return {k: CLIPS[id_][k] for k in ROW_FIELDS}
 
 
 def play(id_):
@@ -254,9 +263,7 @@ def run_scene(name, steps, ev, played):
         elif when.startswith('g+'):
             time.sleep(float(when[2:]))
         start, end = play(id_)
-        clip = CLIPS[id_]
-        played.append({'scene': name, 'id': id_, 'when': when, 'start': start, 'end': end,
-                       'source_sha256': clip['source_sha256'], 'played_sha256': clip['played_sha256'], 'gain_db': clip['gain_db']}); prev_end = end
+        played.append({'scene': name, 'id': id_, 'when': when, 'start': start, 'end': end, **row_fields(id_)}); prev_end = end
     ev.wait_for('speech_final_sample_retired', prev_end, ANSWER_WAIT + ANSWER_LONGEST)
 
 
@@ -339,7 +346,8 @@ def main():
     prepare(ids)
     if check:
         capped = sum(c.get('capped', False) for c in CLIPS.values())
-        how = 'raw (NIGHT_LEVEL=off)' if LEVEL == 'off' else f'levelled to {level_summary()} LUFS ({capped} capped at -1 dBTP) in {os.path.dirname(CLIPS[ids[0]]["path"])}'
+        unlevelled = sum(c['unlevelled'] for c in CLIPS.values())
+        how = 'raw (NIGHT_LEVEL=off)' if LEVEL == 'off' else f'levelled to {level_summary()} LUFS ({capped} capped at -1 dBTP, {unlevelled} unlevelled) in {os.path.dirname(CLIPS[ids[0]]["path"])}'
         print(f'night.py: {len(names)} scenes, {len(ids)} lines, every one in {LINES} with its WAV in {WAV}, played {how}'); return
     hour, minute = time.localtime().tm_hour, time.localtime().tm_min
     if time.localtime().tm_wday < 5 and (12, 0) <= (hour, minute) < (14, 0) and os.environ.get('LAMP_PLAY_AT_LUNCH') != 'yes':
@@ -369,6 +377,7 @@ def main():
     firsts = sorted(r['first_ms'][0] for r in rows if r['first_ms'])
     summary = {
         'round': rnd, 'at': time.strftime('%Y-%m-%d %H:%M'), 'lines': len(rows), 'level': level_summary(),
+        'capped': sum(r['capped'] for r in rows), 'unlevelled': sum(r['unlevelled'] for r in rows),
         'answered_of_talk': f"{sum(r['answered'] for r in talk)}/{len(talk)}", 'held_of_desk': f"{sum(not r['answered'] for r in desk)}/{len(desk)}", 'held_of_desk_after_answer': f"{sum(not r['answered'] for r in after)}/{len(after)}",
         'split': sum(len(r['pieces']) > 1 for r in rows), 'pieces_total': sum(len(r['pieces']) for r in rows), 'let_go': sum(r['let_go'] for r in rows), 'joined': sum(r['joined'] for r in rows), 'not_joined': sum(r['not_joined'] for r in rows),
         'not_heard': sum(not r['requests'] for r in rows),
@@ -381,7 +390,8 @@ def main():
     for r in rows:
         txt.append(f"{r['scene']:9} {r['id']} {r['when']:6} {r['kind']:6} pieces={r['pieces']} req={r['requests']} wer={r['wer']:.2f} "
                    f"{'ANSWERED' if r['answered'] else 'held'}{'' if r['right'] else ' <-- WRONG'} first={r['first_ms']} letgo={r['let_go']} "
-                   f"joined={r['joined']} not_joined={r['not_joined']} names={r.get('name_scores')}\n    said:   {r['text']}\n    heard:  {r['heard']}\n    lamp:   {r['answer'][:300]}\n    why:    {r['verdicts']}")
+                   f"joined={r['joined']} not_joined={r['not_joined']} names={r.get('name_scores')} "
+                   f"lufs_out={r['lufs_out']}{' capped' if r['capped'] else ''}{' unlevelled' if r['unlevelled'] else ''}\n    said:   {r['text']}\n    heard:  {r['heard']}\n    lamp:   {r['answer'][:300]}\n    why:    {r['verdicts']}")
     open(f'{OUT}/night/{rnd}.txt', 'w').write('\n'.join(txt) + '\n')
     json.dump({'summary': summary, 'rows': rows}, open(f'{OUT}/night/{rnd}.json', 'w'), indent=1, default=str)
     print('\n'.join(txt[:1])); print(f'{OUT}/night/{rnd}.txt')
