@@ -975,7 +975,15 @@ otherwise cleared, and without it the switch was off there on lamp-9adf
 on 4 Nov),
 `made_skill::brief` lets a request through that names one linked service
 with a fixed read and no write word ("send", "reply", "add", "post", "schedule",
-...); two services, or a write, are still `NOT_A_SERVICE`. Asking for
+...). The rest are told their own limit, in the person's words (the testers'
+sheet, 6 Nov: "a skill is limited with no reason"), never `NOT_A_SERVICE`,
+which says no skill can use a service and is false with the switch on:
+a write is `NOT_A_WRITE` ("Not possible yet: a skill can read one linked
+service, but it can't send, write or change anything there."), two services
+are `ONE_SERVICE` ("... can read only one linked service, not two or more."),
+and a service with nothing a made skill reads, such as Notion, is
+`NOT_READABLE` ("... can read one linked service, but not that one."). Each
+ends "You can ask me for it yourself any time." Asking for
 the skill itself is no write: words before "skill" that only ask for it
 ("create me a new skill that ...", "add a skill to ...") are left out
 first, and "schedule" after "my", "the", "tomorrow's", "today's", "day"
