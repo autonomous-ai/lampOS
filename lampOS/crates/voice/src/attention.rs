@@ -395,7 +395,7 @@ const NOT_NAMES: &[&str] = &[
     "hello", "right", "sure", "thanks", "thank", "please", "sorry", "now", "then", "also",
     "actually", "look", "listen", "wait", "um", "uh", "hmm", "hm", "alright", "and", "but",
     "anyway", "honestly", "really", "fine", "great", "cool", "good", "wow", "huh", "first", "lamp",
-    "lamb",
+    "lamb", "ooh", "aw", "mm",
 ];
 
 /// Times and sentence words that open a request to the lamp, and are no

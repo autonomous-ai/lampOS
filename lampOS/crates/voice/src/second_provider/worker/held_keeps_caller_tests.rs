@@ -208,7 +208,12 @@ fn play_seen(switches: Switches, lines: &[Line]) -> Vec<bool> {
             },
         );
         let held_why = heeding.heed(request, said, line.heard, None);
-        if held_why.is_none() {
+        // A let-out line with no answer is one the model declined
+        // (`not_for_me`): nothing is said, and the thread keeps no words of
+        // the lamp's for it.
+        if held_why.is_none() && line.answer.is_empty() {
+            answered.push((request, line.heard, line.answer, line.at + line.long));
+        } else if held_why.is_none() {
             let ended = line.at + line.long;
             answered.push((request, line.heard, line.answer, ended));
             let end_us =
@@ -456,13 +461,15 @@ fn held_keeps_a_question_of_the_callers_own() {
     ];
     assert_eq!(run(false, &sis), [true; 3], "off: talk_sis-3");
     assert_eq!(run(true, &sis), [true; 3], "held: talk_sis-3");
-    for desk in [
-        "Nice. And what was your sister's name again?",
-        "Sam, what was my sister's name again?",
-    ] {
-        let lines = [SISTER, COOK, line(12_000, 2_400, desk, "Lan.")];
-        assert_eq!(run(true, &lines), [true, true, false], "held: {desk}");
-    }
+    // Set off to a name, it stays held. Without one, "your sister" is no
+    // longer told apart: the 01:23 ruling ties any question right after the
+    // answer but one of the addressee's own doings (Reviewer-lead's P2).
+    let desk = "Sam, what was my sister's name again?";
+    let lines = [SISTER, COOK, line(12_000, 2_400, desk, "Lan.")];
+    assert_eq!(run(true, &lines), [true, true, false], "held: {desk}");
+    let yours = "Nice. And what was your sister's name again?";
+    let lines = [SISTER, COOK, line(12_000, 2_400, yours, "Lan.")];
+    assert_eq!(run(true, &lines), [true; 3], "held: {yours}");
 }
 
 const LONDON: Line = line(
@@ -881,15 +888,21 @@ fn the_callers_face_speaking_takes_no_room_line() {
         ],
         vec![1, 2],
     ));
-    for desk in [
-        "Nice. And what was your sister's name again?",
-        "Sam, what was my sister's name again?",
-    ] {
-        quiet.push((
-            vec![SISTER, COOK, line(12_000, 2_400, desk, "Lan.")],
-            vec![2],
-        ));
-    }
+    // "And what was your sister's name again?" ties by the 01:23 ruling, a
+    // question right after the answer: no room line by its words alone.
+    quiet.push((
+        vec![
+            SISTER,
+            COOK,
+            line(
+                12_000,
+                2_400,
+                "Sam, what was my sister's name again?",
+                "Lan.",
+            ),
+        ],
+        vec![2],
+    ));
     for desk in [
         "Ma'am, did you send the slides to Sam yet?",
         "Look, did you send the slides to Sam yet?",
@@ -1048,4 +1061,136 @@ fn the_callers_face_speaking_trusts_only_a_face_seen_speaking_the_call() {
         [true, false, true],
         "the caller seen speaking the call"
     );
+}
+
+/// Seventh's 52e6 run of #5363's build (5 Nov 12:20, sw5008f):
+/// `talk_day-5` was answered under HELD, but journaled with no tie: tied
+/// by its words (a word of the lamp's last answer), it never reached the
+/// caller's-own reading, the only one that had a why. Every tie under
+/// `held` has its why, so each tied line is journaled as not held as
+/// untied.
+#[test]
+fn held_gives_every_tie_its_why() {
+    let _one = crate::provider_worker::tests::one_thread();
+    let _clock =
+        crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
+    let mut heeding = Heeding::new(true, true, None, None);
+    heeding.holding_untied();
+    heeding
+        .said_lately
+        .push_back((1, (10_000_000, 11_800_000), true, 10_000_000));
+    let seen = |heard: &str, lamp_asked| Seen {
+        room: crate::room_told::Room::Quiet,
+        going_on: true,
+        turned: None,
+        busy: false,
+        lamp_asked,
+        speakers: Vec::new(),
+        turned_speakers: Vec::new(),
+        heard: heard.to_owned(),
+        named_faced: false,
+        other_voice: false,
+        same_voice: false,
+        likeness: None,
+    };
+    let follow_up = "That's a good idea. Any tips to sleep better tonight?";
+    for (answer, why) in [
+        (
+            "Try going to sleep at the same time every night.",
+            TIED_BY_ITS_WORDS,
+        ),
+        (
+            TIRED.answer,
+            "said right after the lamp's answer, it replies to it",
+        ),
+    ] {
+        let mut thread = crate::thread::Thread::new();
+        let then = Instant::now() - Duration::from_secs(3);
+        thread.person(TIRED.heard, true, then);
+        thread.lamp(1, answer, then);
+        *crate::thread::THREAD.lock().unwrap() = thread;
+        assert_eq!(
+            heeding.held_tie(2, &seen(follow_up, false)),
+            Some(why),
+            "{answer}"
+        );
+    }
+    assert_eq!(
+        heeding.held_tie(2, &seen("Yes, please.", true)),
+        Some(REPLIES_TO_ITS_QUESTION)
+    );
+    assert_eq!(
+        heeding.held_tie(2, &seen("Did you send the slides to Sam yet?", false)),
+        None
+    );
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+}
+
+/// lamp-52e6, 5 Nov 21:10 (`talk_day-4`): a question asking the lamp's
+/// view, right after its answer and sharing no word with it, is the
+/// caller's own under `held`, in phrasings the kit never plays; a question
+/// of a colleague's doings stays held.
+#[test]
+fn held_keeps_a_question_asking_the_lamps_view() {
+    for asked in [
+        "Maybe. What would you do?",
+        "How about you?",
+        "What's your take?",
+        "Ooh, that sounds nice. How long does it take?",
+        "Is that enough?",
+        // Reviewer-lead's HOLD probes: only the ruling's seven openers hold,
+        // and "your" holds nothing.
+        "Do you know how long it takes?",
+        "Do you have a recipe for that?",
+        "That's your best one. How long does it take?",
+        "How long does your recipe take?",
+    ] {
+        let lines = [LONDON, line(6_800, 2_400, asked, "Okay.")];
+        assert_eq!(run(true, &lines), [true, true], "held: {asked}");
+    }
+    let desk = [
+        LONDON,
+        line(6_800, 2_400, "Did you send the slides to Sam yet?", "Okay."),
+    ];
+    assert_eq!(run(true, &desk), [true, false], "held: desk");
+}
+
+/// lamp-52e6, 7 Nov 00:51 (#5110's re-sitting, HELD `talk_cook`): the
+/// model declined `talk_cook-4` (`not_for_me`), so the lamp said nothing
+/// to it, and `talk_cook-5`, a question right after, was held as untied:
+/// the line judged before it was not the one the lamp answered last. A
+/// let-out line the lamp didn't answer holds nothing: the next line still
+/// comes right after the lamp's last answer. A held desk line between
+/// still breaks the chain (`held_keeps_a_follow_up_sharing_no_word_with_the_answer`).
+#[test]
+fn held_keeps_the_chain_past_a_line_the_lamp_did_not_answer() {
+    let cook = [
+        line(
+            0,
+            2_600,
+            "Lamp, I want to cook something new this weekend.",
+            "How about a chicken curry? It's easy and tasty.",
+        ),
+        line(
+            7_600,
+            2_400,
+            "Ooh, that sounds nice. How long does it take?",
+            "About forty minutes, start to finish.",
+        ),
+        line(15_000, 2_000, "And what do I need to buy for it?", ""),
+        line(
+            19_000,
+            3_200,
+            "Hmm, I don't have coconut milk. What can I use instead?",
+            "Plain yogurt works well instead.",
+        ),
+        line(
+            27_700,
+            2_000,
+            "Perfect. I'll try that on Saturday.",
+            "Enjoy it!",
+        ),
+    ];
+    assert_eq!(run(false, &cook), [true; 5], "off");
+    assert_eq!(run(true, &cook), [true; 5], "held");
 }

@@ -6165,6 +6165,10 @@ pub(crate) struct Heeding {
     /// `LAMP_WINDOW_FROM_START=on` ([`Self::measuring_windows_from_start`]).
     from_start: bool,
     said_lately: std::collections::VecDeque<(u64, (u64, u64), bool, u64)>,
+    /// The requests of [`Self::said_lately`] the rule let out, newest last:
+    /// a let-out line the lamp didn't answer (`not_for_me`) holds nothing
+    /// between the lamp's last answer and the next line (#5110).
+    let_out_lately: std::collections::VecDeque<u64>,
     /// The faces the eyes saw speaking each of the last lines judged, newest
     /// last, at most [`SPOKE_KEPT`] ([`Self::same_speaker`]).
     spoke: std::collections::VecDeque<(u64, crate::speaking_faces::Speakers)>,
@@ -7009,6 +7013,14 @@ pub(crate) struct Signs {
 /// (#5110).
 const SET_OFF_IS_THE_LAMPS: &str = "the word set off at its start is no one's name as the rule reads names, so the lamp's name written as another, and its words tie it";
 
+/// Why a line with `LAMP_UNTIED_GOING_ON=held` is not held as untied when it
+/// replies to the lamp's question.
+const REPLIES_TO_ITS_QUESTION: &str = "it replies to the lamp's question";
+
+/// Why a line with `LAMP_UNTIED_GOING_ON=held` is not held as untied when
+/// its words tie it ([`Heeding::tied_to_the_lamp`]).
+const TIED_BY_ITS_WORDS: &str = "its words tie it: they ask for the lamp's own work, refer back, share a word of its last answer or the line it answered, or ask the lamp";
+
 /// The lines judged lately whose sound a later-come hearing of the name is
 /// laid against (`LAMP_NAME_STAYS_IN_ITS_LINE`): a hearing counts for a
 /// line at most [`crate::attention::NAME_BEFORE_US`] before it begins, which
@@ -7162,6 +7174,7 @@ impl Heeding {
             name_stays: false,
             from_start: false,
             said_lately: std::collections::VecDeque::new(),
+            let_out_lately: std::collections::VecDeque::new(),
             spoke: std::collections::VecDeque::new(),
             near: None,
             turned_near_speaks: false,
@@ -7443,15 +7456,41 @@ impl Heeding {
         crate::untied_going_on::tied_read(heard, &said, no_name_set_off)
     }
 
+    /// With `LAMP_UNTIED_GOING_ON=held`, why a line is tied to the lamp, if
+    /// it is: a reply to the lamp's question, its words
+    /// ([`Self::tied_to_the_lamp`]), or the caller's own line (#5110). A
+    /// word set off at its start is someone else's name only as the rule
+    /// reads names (`attention::addresses_someone_else_on`): one it let out
+    /// as the conversation going on is the lamp's name written as another
+    /// ("Ma'am, tell me a joke."; lamp-52e6, 5 Nov 00:07: owner_b-2 and
+    /// owner_b-3 held as untied, let out with the switch off). Every tie
+    /// has its why, so each tied line is journaled as not held as untied
+    /// (lamp-52e6, 5 Nov 12:20: talk_day-5, tied by its words, was
+    /// journaled with no tie).
+    fn held_tie(&self, request: u64, seen: &Seen) -> Option<&'static str> {
+        if seen.lamp_asked {
+            return Some(REPLIES_TO_ITS_QUESTION);
+        }
+        if self.tied_to_the_lamp(request, &seen.heard, false) {
+            return Some(TIED_BY_ITS_WORDS);
+        }
+        let no_name_set_off = crate::untied_going_on::opens_with_a_set_off_name(&seen.heard)
+            && !crate::attention::addresses_someone_else_on(&seen.heard, true);
+        (no_name_set_off && self.tied_to_the_lamp(request, &seen.heard, true))
+            .then_some(SET_OFF_IS_THE_LAMPS)
+            .or_else(|| self.callers_own_line(request, seen, no_name_set_off))
+    }
+
     /// With `LAMP_UNTIED_GOING_ON=held` (#5110), why a line with no tie by
     /// [`Self::tied_to_the_lamp`] is still the caller's own, if it is: it
     /// asks what the lamp knows of the person's own ("And what was my
     /// sister's name again?", [`crate::untied_going_on::asks_of_their_own`]);
     /// or, said right after the lamp's own answer, with no held line
     /// between, it replies to it ("Thanks.", "That's a good idea.",
-    /// [`crate::untied_going_on::replies_to_the_lamp`]) or asks its advice
-    /// ("Any tips to sleep better tonight?",
-    /// [`crate::untied_going_on::asks_for_advice`]). Never in a sure other
+    /// [`crate::untied_going_on::replies_to_the_lamp`]) or asks a question
+    /// not of the addressee's own doings ("How long does it take?", "What
+    /// would you do?", [`crate::untied_going_on::asks_right_after`]). Never
+    /// in a sure other
     /// voice than the conversation's (`Seen::other_voice`), or with desk
     /// talk ([`crate::untied_going_on::desk_talk_read`], with
     /// `no_name_set_off`): a colleague's "Thanks" to the caller is not the
@@ -7504,7 +7543,11 @@ impl Heeding {
             return Some(crate::untied_going_on::CALLER_SPEAKING_KEPT);
         }
         // The line judged before this one is the one the lamp answered
-        // last: nothing was held between its answer and this line.
+        // last: nothing was held between its answer and this line. A line
+        // let out between that the lamp didn't answer (the model's
+        // `not_for_me`) holds nothing: lamp-52e6, 7 Nov 00:51, HELD
+        // `talk_cook-5` was held as untied after the model declined
+        // `talk_cook-4` (#5110).
         let answered = crate::thread::current(self.thread.as_deref(), |thread| {
             thread.answered_request_but(request)
         })
@@ -7514,14 +7557,15 @@ impl Heeding {
             .iter()
             .rev()
             .map(|(before, ..)| *before)
-            .find(|before| *before != request);
+            .filter(|before| *before != request)
+            .find(|before| Some(*before) == answered || !self.let_out_lately.contains(before));
         if answered.is_none() || before != answered {
             return None;
         }
         if crate::untied_going_on::replies_to_the_lamp(heard, no_name_set_off) {
             Some("said right after the lamp's answer, it replies to it")
-        } else if crate::untied_going_on::asks_for_advice(heard, no_name_set_off) {
-            Some("said right after the lamp's answer, it asks the lamp's advice")
+        } else if crate::untied_going_on::asks_right_after(heard, no_name_set_off) {
+            Some("said right after the lamp's answer, it asks a question")
         } else if self.answer_grace
             && self.began_in_grace == Some(request)
             && !another_face_speaking(&seen.speakers, &self.caller_faces)
@@ -9163,6 +9207,12 @@ impl Heeding {
         let start = self.attention.start_of(said.0, signs.soft_lead_us);
         self.said_lately
             .push_back((request, said, self.attention.called_in_its_words(), start));
+        if verdict.is_none() {
+            if self.let_out_lately.len() == SAID_KEPT {
+                self.let_out_lately.pop_front();
+            }
+            self.let_out_lately.push_back(request);
+        }
         if self.noted.is_none_or(|(judged, _)| judged != request) {
             self.note_the_name(request, said, &signs);
         }
@@ -10190,24 +10240,17 @@ impl Heeding {
         let after_remark = std::mem::take(&mut self.after_remark);
         // `LAMP_UNTIED_GOING_ON`: whether its words tie it to the lamp, read
         // before the rule's verdict; only with the switch.
-        let tied =
-            !self.untied || seen.lamp_asked || self.tied_to_the_lamp(request, &seen.heard, false);
-        // With `held`, the caller's own line is tied too (#5110). A word set
-        // off at its start is someone else's name only as the rule reads
-        // names (`attention::addresses_someone_else_on`): one it let out as
-        // the conversation going on is the lamp's name written as another
-        // ("Ma'am, tell me a joke."; lamp-52e6, 5 Nov 00:07: owner_b-2 and
-        // owner_b-3 held as untied, let out with the switch off).
-        let callers_own = if self.untied_held && !tied {
-            let no_name_set_off = crate::untied_going_on::opens_with_a_set_off_name(&seen.heard)
-                && !crate::attention::addresses_someone_else_on(&seen.heard, true);
-            (no_name_set_off && self.tied_to_the_lamp(request, &seen.heard, true))
-                .then_some(SET_OFF_IS_THE_LAMPS)
-                .or_else(|| self.callers_own_line(request, seen, no_name_set_off))
+        // With `held`, the caller's own line is tied too (#5110), and every
+        // tie has its why for the journal.
+        let held_tie = if self.untied_held {
+            self.held_tie(request, seen)
         } else {
             None
         };
-        let tied = tied || callers_own.is_some();
+        let tied = !self.untied
+            || held_tie.is_some()
+            || (!self.untied_held
+                && (seen.lamp_asked || self.tied_to_the_lamp(request, &seen.heard, false)));
         // #3945: whether only one person is at the lamp (no other voice, no
         // face speaking it but the caller's, at most one face in view), read
         // only for a line opening with a set-off name that is also a word
@@ -10253,7 +10296,7 @@ impl Heeding {
                 verdict = Some(crate::attention::Verdict::Hold(
                     crate::untied_going_on::HELD,
                 ));
-            } else if let Some(why) = callers_own {
+            } else if let Some(why) = held_tie {
                 eprintln!(
                     "lamp-voice second: request {request}: let out only as the conversation going on, and not held as untied: {why} (LAMP_UNTIED_GOING_ON=held, #5110)"
                 );

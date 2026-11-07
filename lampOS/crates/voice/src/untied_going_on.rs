@@ -43,8 +43,9 @@
 //! misses all held as untied. With `held` the worker also ties a line said
 //! right after the lamp's own answer, with nothing held between and in no
 //! sure other voice, that replies to it ([`replies_to_the_lamp`]:
-//! "Thanks.", "That's a good idea.") or an ask of its advice
-//! ([`asks_for_advice`]: "Any tips to sleep better tonight?"), and,
+//! "Thanks.", "That's a good idea.") or asks a question
+//! ([`asks_right_after`]: "How long does it take?", "Any tips to sleep
+//! better tonight?"), and,
 //! anywhere in the conversation, a question of what or who the speaker's
 //! own is or was ([`asks_of_their_own`]: "Nice. And what was my sister's
 //! name again?", held as untied on lamp-52e6 on 5 Nov 08:07). With `on`,
@@ -384,6 +385,9 @@ pub fn asks_the_lamp_read(heard: &str, no_name_set_off: bool) -> bool {
 const NOT_NAMES: &[&str] = &[
     "okay", "ok", "yes", "yeah", "no", "nope", "well", "so", "oh", "hey", "sorry", "wait",
     "please", "thanks", "lamp", "alright", "right", "hmm", "um", "uh", "and", "but", "now",
+    // Sounds, not names: "Ooh, that sounds nice. How long does it take?"
+    // (`talk_cook-3`, lamp-52e6, 6 Nov 00:09).
+    "ooh", "ah", "aw", "wow", "hm", "mm", "huh",
 ];
 
 /// Words after which a capitalised word is someone else's name: "Tell Sam
@@ -556,7 +560,9 @@ pub fn shares_a_word(heard: &str, said: &[&str]) -> bool {
 
 /// Words a line opens with in reply to what was just said to it: a thanks,
 /// or taking up the idea (#5110: `talk_day-5`'s "That's a good idea." and
-/// `talk_day-6`'s "Thanks. You're a good listener.", held on lamp-52e6).
+/// `talk_day-6`'s "Thanks. You're a good listener.", held on lamp-52e6;
+/// `talk_cook-6`'s "Perfect. I'll try that on Saturday.", held on
+/// lamp-52e6 on 5 Nov 12:21, answered with it off).
 const REPLIES: &[&str] = &[
     "thanks",
     "thank you",
@@ -582,6 +588,10 @@ const REPLIES: &[&str] = &[
     "that's good to know",
     "you're right",
     "got it",
+    "perfect",
+    "that's perfect",
+    "i'll try that",
+    "i will try that",
     "cảm ơn",
     "cám ơn",
     "ý hay",
@@ -593,25 +603,6 @@ const REPLIES: &[&str] = &[
 /// makes sense.".
 const REPLY_LEADS: &[&str] = &[
     "oh", "ah", "aw", "okay", "ok", "well", "yeah", "yes", "wow", "hmm", "alright", "lamp",
-];
-
-/// Words that open a question asking for advice of the one who knows: "Any
-/// tips to sleep better tonight?", "How can I stop waking up at night?".
-const ASKS_FOR_ADVICE: &[&str] = &[
-    "any tips",
-    "any tip",
-    "any advice",
-    "any ideas",
-    "any suggestions",
-    "what should i",
-    "what can i",
-    "how should i",
-    "how can i",
-    "how do i",
-    "what do you suggest",
-    "what would you suggest",
-    "what do you recommend",
-    "what would you recommend",
 ];
 
 /// Whether `heard` opens in reply to what was just said to it
@@ -669,26 +660,77 @@ fn reply_names_someone(heard: &str) -> Option<bool> {
     Some(names_someone)
 }
 
-/// Whether `heard` asks for advice ([`ASKS_FOR_ADVICE`] opening any part
-/// of a question, after any of [`ASK_LEADS`]) with no sign of desk talk
-/// ([`desk_talk`]). The worker asks it only of a line said right after
-/// the lamp's own answer. With `no_name_set_off`, desk talk as
-/// [`desk_talk_read`] reads it.
-pub fn asks_for_advice(heard: &str, no_name_set_off: bool) -> bool {
-    let asks = |part: &str| {
+/// Calls to more than one person: a question to them is not the caller's
+/// to the lamp ("What do you think, you guys?").
+const TO_MANY: &[&str] = &[
+    "you guys",
+    "you all",
+    "y'all",
+    "you two",
+    "both of you",
+    "everyone",
+];
+
+/// Words that open a question of the addressee's own doings when "you"
+/// and a verb follow: "Did you send …?", "Are you coming …?", "Can you
+/// pass me …?".
+const ASKS_ITS_DOINGS: &[&str] = &["did", "are", "can", "could", "will", "would", "have"];
+
+/// Verbs after those that ask the one addressed for a view, not of their
+/// doings: "Did you think about it?", "Would you suggest …?".
+const ASKS_A_VIEW: &[&str] = &[
+    "think",
+    "say",
+    "suggest",
+    "recommend",
+    "prefer",
+    "reckon",
+    "pick",
+];
+
+/// Words before a question's opening that leave it the same question:
+/// "So did you send it?", "Okay, how long does it take?".
+const QUESTION_LEADS: &[&str] = &[
+    "so", "and", "but", "then", "okay", "ok", "hey", "well", "oh", "um", "hmm", "lamp",
+];
+
+/// Whether `heard` is a question the worker may tie when it is said right
+/// after the lamp's own answer (the first builder's 01:23 ruling on #5400,
+/// 6 Nov): any question ("How long does it take?", "What would you do?",
+/// "Is that enough?", "Any tips to sleep better tonight?"), called to no
+/// more than one ([`TO_MANY`]), with no sign of desk talk
+/// ([`desk_talk_read`] with `no_name_set_off`), and no part asking of the
+/// addressee's own doings: [`ASKS_ITS_DOINGS`], "you", then a verb not in
+/// [`ASKS_A_VIEW`] ("Did you send the slides yet?", "Can you pass me the
+/// charger?"): the case `held` exists for. Only the call's seven openers:
+/// "Do you know how long it takes?" ties. lamp-52e6, 5 Nov 21:10 and 6 Nov
+/// 00:09: `talk_day-4` and `talk_cook-3` were held as untied, tied before
+/// only when they shared a word with the lamp's answer.
+pub fn asks_right_after(heard: &str, no_name_set_off: bool) -> bool {
+    let all = words_of(heard);
+    if !(heard.contains('?') || heard.contains('？'))
+        || TO_MANY
+            .iter()
+            .any(|call| all.contains(&format!(" {call} ")))
+        || desk_talk_read(heard, no_name_set_off)
+    {
+        return false;
+    }
+    let of_its_doings = |part: &str| {
         let words = words_of(part);
-        let rest = ASK_LEADS
-            .iter()
-            .filter(|lead| words.starts_with(&format!(" {lead} ")))
-            .max_by_key(|lead| lead.len())
-            .map_or(words.as_str(), |lead| &words[lead.len() + 1..]);
-        ASKS_FOR_ADVICE
-            .iter()
-            .any(|phrase| rest.starts_with(&format!(" {phrase} ")))
+        let mut words: Vec<&str> = words.split_whitespace().collect();
+        while words
+            .first()
+            .is_some_and(|word| QUESTION_LEADS.contains(word))
+        {
+            words.remove(0);
+        }
+        matches!(words.as_slice(), [aux, "you", verb, ..]
+            if ASKS_ITS_DOINGS.contains(aux) && !ASKS_A_VIEW.contains(verb))
     };
-    heard.contains('?')
-        && heard.split([',', '.', ';', '!', '?']).any(asks)
-        && !desk_talk_read(heard, no_name_set_off)
+    !heard
+        .split([',', '.', ';', '!', '?', '？'])
+        .any(of_its_doings)
 }
 
 /// Whether `heard` asks what or who the speaker's own is or was
@@ -996,6 +1038,8 @@ mod tests {
             "Thanks, I'll try that.",
             "Thanks Lamp.",
             "Cảm ơn nhé.",
+            "Perfect. I'll try that on Saturday.",
+            "Okay, I'll try that tonight.",
         ] {
             assert!(replies_to_the_lamp(line, false), "{line}");
         }
@@ -1008,32 +1052,59 @@ mod tests {
             "I'm thankful it's Friday.",
             "Did you send the slides to Sam yet?",
             "Not yet, I'll do it after lunch.",
+            "Perfect, Sam.",
+            "I'll try the new place on Saturday.",
         ] {
             assert!(!replies_to_the_lamp(line, false), "{line}");
         }
     }
 
-    /// #5110: `talk_day-5`'s "Any tips …?" asks advice of the one who
-    /// knows; a statement, or one asked of a colleague by name, does not.
+    /// The first builder's 01:23 ruling on #5400 (6 Nov): every talk_*
+    /// follow-up question ties right after the lamp's answer, and so do
+    /// phrasings the kit never plays; a question of the addressee's own
+    /// doings, to many, to a name, or no question at all does not.
     #[test]
-    fn advice_is_asked_in_a_question() {
+    fn a_question_right_after_the_answer() {
         for line in [
-            "Any tips to sleep better tonight?",
+            "Maybe. What would you do?",
             "That's a good idea. Any tips to sleep better tonight?",
-            "How can I stop waking up at night?",
-            "So what should I eat before a run?",
-            "What would you recommend?",
+            "Ooh, that sounds nice. How long does it take?",
+            "And what do I need to buy for it?",
+            "Hmm, I don't have coconut milk. What can I use instead?",
+            "She loves hiking. Any ideas for the two of us?",
+            "Nice. And what was my sister's name again?",
+            "Is that enough?",
+            "How about you?",
+            "Did you think about it?",
+            "Where do I get them?",
+            "Really? Even in winter?",
+            "What's your take?",
+            "So would you recommend it?",
+            "Is that enough？",
+            "Do you know how long it takes?",
+            "Do you have a recipe for that?",
+            "That's your best one. How long does it take?",
+            "How long does your recipe take?",
+            "Nice. And what was your sister's name again?",
         ] {
-            assert!(asks_for_advice(line, false), "{line}");
+            assert!(asks_right_after(line, false), "{line}");
         }
         for line in [
-            "Any tips are welcome.",
-            "Sam, how do I get to the meeting room?",
-            "How do I look, you guys?",
+            "Did you send the slides to Sam yet?",
             "Are you coming to the meeting at four?",
             "Can you pass me the charger? The white one.",
+            "Would you grab me a coffee?",
+            "Have you seen my keys?",
+            "So will you be at lunch?",
+            "Okay, could you close the door?",
+            "Sam, what do you think?",
+            "What do you think, you guys?",
+            "And you all?",
+            "Should I bring an umbrella, you guys?",
+            "I think you're right.",
+            "What would you do.",
         ] {
-            assert!(!asks_for_advice(line, false), "{line}");
+            assert!(!asks_right_after(line, false), "{line}");
         }
     }
 
