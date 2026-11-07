@@ -317,12 +317,26 @@ lampOS/tools/played/night_compare.py r1 r2      # two rounds side by side
 - **Level:** each clip is played at one loudness, -20 LUFS (BS.1770-4),
   by one linear gain under a -1 dBTP true-peak ceiling and never limited
   (`level.py`). A clip that cannot reach -20 under the ceiling is capped
-  and marked. The levelled copies are made once into
-  `$PLAYED_OUT/desk-kit-2/level-m20/` and listed in its `level.json`; the
-  tar's clips are never changed. Each row of `ROUND.json` keeps the clip's
-  `source_sha256`, `played_sha256` and `gain_db`, and the summary its
-  `level` (`-20`, or `off` with `NIGHT_LEVEL=off`, as every round before
-  #5540 was): compare `not_heard` across levels only saying so.
+  and marked. A clip with nothing above the -70 LUFS gate (silent or near
+  silent) is copied at 0 dB and marked `unlevelled`. A clip under 400 ms,
+  shorter than one gating block, has no integrated loudness in BS.1770-4:
+  `level.py` meters the whole clip as one block and levels it by that
+  (a 200 ms 1 kHz tone at -20 dBFS reads about -23 LUFS here, -70 in
+  ffmpeg's `ebur128`), so its level is a best guess, not the standard's.
+  The levelled copies are made once into
+  `$PLAYED_OUT/desk-kit-2/level-m20/` and listed in its `level.json`, with
+  the meter's version (`METER_VERSION` in `level.py`): a copy is made again
+  when its source, the target, the ceiling or the meter's version changes.
+  Each file is written through a temp file of its own, so two runs into one
+  `PLAYED_OUT` do not overwrite each other's. The tar's clips are never
+  changed. Each row of `ROUND.json` keeps the clip's `source_sha256`,
+  `played_sha256`, `gain_db`, `lufs_out`, `capped` and `unlevelled` (true
+  for a raw WAV with `NIGHT_LEVEL=off` and for a clip `level.py` could not
+  level), and the summary its `level` (`-20`, or `off` with
+  `NIGHT_LEVEL=off`, as every round before #5540 was) and its counts of
+  `capped` and `unlevelled` rows. `night_compare.py` shows both counts and
+  lists each line played levelled in one round and unlevelled in another:
+  compare `not_heard` across levels only saying so.
   `level.py DIR OUT [--target N]` levels a folder of WAVs by hand. Its
   test is `level-test.sh` (python3 only; ffmpeg's `ebur128` checks it too
   when ffmpeg is there).

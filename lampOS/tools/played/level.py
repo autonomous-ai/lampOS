@@ -8,10 +8,13 @@ absolute gate and a -10 LU relative gate. True peak is read 4x oversampled. A cl
 target gets the gain that puts its true peak at the ceiling instead, and is marked capped: it is never limited, so its
 onsets keep their shape. One gain moves every sample, so the length and a lead of zeros stay as they were; the ceiling
 is checked on the written 16-bit samples. Python's standard library only (README.md "Night rounds", #5540)."""
-import argparse, hashlib, json, math, os, struct, sys, wave
+import argparse, hashlib, json, math, os, struct, sys, tempfile, wave
 
 TARGET = -20.0    # LUFS integrated
 CEILING = -1.0    # dBTP
+# The meter's version, kept in level.json: a change to how clips are metered or levelled raises it, and the copies made
+# by an older meter are levelled again.
+METER_VERSION = 1
 
 
 def sha256(path):
@@ -109,9 +112,17 @@ def _scaled(chans, gain):
     return out, [[v / 32768.0 for v in c] for c in out]
 
 
+def _tmp(dst):
+    """A temp file of its own beside dst, so two runs into one folder never write the same file."""
+    d = os.path.dirname(os.path.abspath(dst)); os.makedirs(d, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix='.' + os.path.basename(dst) + '.', suffix='.tmp', dir=d); os.close(fd)
+    return tmp
+
+
 def level(src, dst, target=TARGET, ceiling=CEILING):
     """Writes src to dst with one linear gain to `target` LUFS, or to the true-peak `ceiling` when that is lower
-    (capped). The gain is taken down again if the written 16-bit samples read above the ceiling."""
+    (capped). The gain is taken down again if the written 16-bit samples read above the ceiling. A clip with nothing
+    above the -70 LUFS gate is copied at 0 dB and marked unlevelled."""
     chans, rate, params = read(src)
     lufs_in = loudness(chans, rate); tp_in = true_peak(chans)
     capped = False
@@ -128,23 +139,28 @@ def level(src, dst, target=TARGET, ceiling=CEILING):
     else:
         raise RuntimeError(f'{src}: could not hold {ceiling} dBTP')
     frames = [v for frame in zip(*ints) for v in frame]
-    os.makedirs(os.path.dirname(os.path.abspath(dst)), exist_ok=True)
-    with wave.open(dst, 'wb') as w:
-        w.setnchannels(params.nchannels); w.setsampwidth(2); w.setframerate(rate)
-        w.writeframes(struct.pack(f'<{len(frames)}h', *frames))
+    tmp = _tmp(dst)
+    try:
+        with wave.open(tmp, 'wb') as w:
+            w.setnchannels(params.nchannels); w.setsampwidth(2); w.setframerate(rate)
+            w.writeframes(struct.pack(f'<{len(frames)}h', *frames))
+        os.replace(tmp, dst)
+    finally:
+        if os.path.exists(tmp): os.remove(tmp)
     r2 = lambda v: None if v is None or v == -math.inf else round(v, 2)
     return {'source_sha256': sha256(src), 'played_sha256': sha256(dst), 'lufs_in': r2(lufs_in), 'gain_db': round(gain_db, 2),
-            'lufs_out': r2(loudness(floats, rate)), 'tp_out': r2(tp_out), 'capped': capped}
+            'lufs_out': r2(loudness(floats, rate)), 'tp_out': r2(tp_out), 'capped': capped,
+            'unlevelled': lufs_in is None}
 
 
 def level_dir(src_dir, out_dir, names=None, target=TARGET, ceiling=CEILING):
     """Levels the WAVs `names` (default: every *.wav) of src_dir into out_dir, listed in out_dir/level.json. A clip
-    already there is kept while its source's sha, its own sha, the target and the ceiling are unchanged."""
+    already there is kept while its source's sha, its own sha, the target, the ceiling and METER_VERSION are unchanged."""
     names = sorted(names if names is not None else (f for f in os.listdir(src_dir) if f.endswith('.wav')))
     at = os.path.join(out_dir, 'level.json')
     try:
         old = json.load(open(at))
-        if (old.get('target'), old.get('ceiling')) != (target, ceiling): old = {}
+        if (old.get('target'), old.get('ceiling'), old.get('meter')) != (target, ceiling, METER_VERSION): old = {}
     except (OSError, ValueError):
         old = {}
     clips = old.get('clips', {})
@@ -154,8 +170,13 @@ def level_dir(src_dir, out_dir, names=None, target=TARGET, ceiling=CEILING):
         if had and os.path.exists(dst) and had['source_sha256'] == sha256(src) and had['played_sha256'] == sha256(dst): continue
         clips[name] = level(src, dst, target, ceiling)
     os.makedirs(out_dir, exist_ok=True)
-    with open(at + '.tmp', 'w') as f: json.dump({'target': target, 'ceiling': ceiling, 'clips': clips}, f, indent=1, sort_keys=True)
-    os.replace(at + '.tmp', at)
+    tmp = _tmp(at)
+    try:
+        with open(tmp, 'w') as f:
+            json.dump({'target': target, 'ceiling': ceiling, 'meter': METER_VERSION, 'clips': clips}, f, indent=1, sort_keys=True)
+        os.replace(tmp, at)
+    finally:
+        if os.path.exists(tmp): os.remove(tmp)
     return {n: clips[n] for n in names}
 
 
@@ -166,7 +187,7 @@ def main():
     if not os.path.isdir(a.dir): sys.exit(f'level.py: no folder {a.dir}')
     got = level_dir(a.dir, a.out, target=a.target)
     for name, r in got.items():
-        print(f"{name:16} {r['lufs_in']} LUFS {r['gain_db']:+.2f} dB -> {r['lufs_out']} LUFS {r['tp_out']} dBTP{' capped' if r['capped'] else ''}")
+        print(f"{name:16} {r['lufs_in']} LUFS {r['gain_db']:+.2f} dB -> {r['lufs_out']} LUFS {r['tp_out']} dBTP{' capped' if r['capped'] else ''}{' unlevelled' if r['unlevelled'] else ''}")
     print(f'{a.out}/level.json: {len(got)} clips, {sum(r["capped"] for r in got.values())} capped')
 
 
