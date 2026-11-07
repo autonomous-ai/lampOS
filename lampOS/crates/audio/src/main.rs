@@ -81,6 +81,50 @@ fn run() -> Result<()> {
             let capability = Notices::load(Path::new(&directory), accept).capability();
             println!("{}", serde_json::to_string_pretty(&capability)?);
         }
+        Some("process-wav") => {
+            let input = args.next().ok_or_else(|| usage("missing input WAV"))?;
+            let output = args.next().ok_or_else(|| usage("missing output WAV"))?;
+            let mut noise_suppression = None;
+            let mut linear = false;
+            while let Some(flag) = args.next() {
+                match flag.as_str() {
+                    "--ns" if noise_suppression.is_none() => {
+                        noise_suppression = Some(match args.next().as_deref() {
+                            Some("on") => true,
+                            Some("off") => false,
+                            _ => return Err(usage("--ns takes on|off")),
+                        })
+                    }
+                    "--linear" if !linear => linear = true,
+                    _ => return Err(usage("unknown or repeated process-wav option")),
+                }
+            }
+            let noise_suppression =
+                noise_suppression.ok_or_else(|| usage("process-wav needs --ns on|off"))?;
+            let done = lamp_audio::process_wav::process(
+                Path::new(&input),
+                Path::new(&output),
+                noise_suppression,
+                linear,
+            )?;
+            println!(
+                "process-wav: blocks {} ({} samples), ns {}, {} output, input {:.1} dBFS, output {:.1} dBFS{}",
+                done.blocks,
+                done.samples,
+                if noise_suppression { "on" } else { "off" },
+                if linear { "linear" } else { "final" },
+                done.input_dbfs,
+                done.output_dbfs,
+                if done.linear_missing > 0 {
+                    format!(
+                        ", {} blocks without linear output written as silence",
+                        done.linear_missing
+                    )
+                } else {
+                    String::new()
+                }
+            );
+        }
         Some("bench-aec") => {
             let blocks = args
                 .next()
@@ -124,7 +168,7 @@ fn run() -> Result<()> {
         }
         _ => {
             return Err(usage(
-                "usage: lamp-audio replay-aec RUN NEW_OUT [--exploratory-prefix] [--linear-output] [--historical-processing on|off SOURCE_EVIDENCE.json] [--steady-reference | --as-given-reference] | notices DIR [--accept-test] | bench-aec [500..60000 blocks] | export-aec-fixture NEW_DIR [blocks] | bench-aec-fixture FIXTURE_DIR NEW_REPORT.json",
+                "usage: lamp-audio replay-aec RUN NEW_OUT [--exploratory-prefix] [--linear-output] [--historical-processing on|off SOURCE_EVIDENCE.json] [--steady-reference | --as-given-reference] | notices DIR [--accept-test] | bench-aec [500..60000 blocks] | export-aec-fixture NEW_DIR [blocks] | bench-aec-fixture FIXTURE_DIR NEW_REPORT.json | process-wav IN.wav OUT.wav --ns on|off [--linear]",
             ));
         }
     }
