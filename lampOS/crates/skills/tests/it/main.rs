@@ -12,6 +12,7 @@ mod pushed;
 mod routine_service;
 mod shared;
 mod skills;
+mod stands_in;
 mod store;
 mod welcome_stuck;
 
