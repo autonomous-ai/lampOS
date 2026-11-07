@@ -259,7 +259,9 @@ wait in `lamp-cloud`'s memory (`unasked::KEPT_OFFLINE`), and a restart of
 `lamp-cloud` loses them. `SKILL.md` says so in its own section, "What's
 kept", and in its answer when asked about it (the first builder's 08:49 on
 #1685, 7 Nov: the person turning it on should know). Asked by anyone but
-the owner, the answer is of the person who's out, not "while you're out"
+the owner, the answer is of the person who turned it on, not "while
+you're out", in `SKILL.md`'s description and `watch::WORDS_V2_DESCRIPTION`
+alike
 (the played row on #1685, 7 Nov, 15:36: a visitor was told "while you're
 out").
 
