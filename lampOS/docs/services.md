@@ -990,8 +990,10 @@ first. "Schedule", "post" and "book" after "my", "the", "tomorrow's",
 "today's", "day", "calendar", "latest", "last", "newest", "facebook" or
 "page" are the thing read (lamp-9adf, 4 Nov 23:51: "create a skill that
 reads my calendar" was refused so; El's P3 on #5679: "read me my latest
-Facebook post"), and "put" writes only with a service named after it ("put
-the count on the light" is the lamp's own). A write after them still counts. A calendar's
+Facebook post"), unless the next word is "a", "an", "to", "me", "that",
+"on", "it", "say" or "saying" ("tomorrow book a meeting", El's P3 on
+#5690). "Put" writes only with a service, or "drive", named after it
+("put the count on the light" is the lamp's own). A write after them still counts. A calendar's
 step is given whole (today, or tomorrow when it says "tomorrow"), as are
 mail's (`recent`) and Drive's (`files`, newest first, `query` only words
 to search); for any other service the brief lists its reads but the

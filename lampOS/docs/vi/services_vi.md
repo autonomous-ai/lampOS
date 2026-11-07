@@ -1012,8 +1012,10 @@ that ...", "add a skill to ...") được bỏ ra trước. "Schedule", "post" v
 đứng sau "my", "the", "tomorrow's", "today's", "day", "calendar", "latest",
 "last", "newest", "facebook" hay "page" là thứ được đọc (lamp-9adf, 4/11 23:51:
 "create a skill that reads my calendar" đã bị từ chối vì thế; P3 của El trên
-#5679: "read me my latest Facebook post"), và "put" chỉ là ghi khi có một dịch
-vụ được nêu sau nó ("put the count on the light" là việc của chính lamp). Một
+#5679: "read me my latest Facebook post"), trừ khi từ ngay sau là "a", "an",
+"to", "me", "that", "on", "it", "say" hay "saying" ("tomorrow book a meeting",
+P3 của El trên #5690). "Put" chỉ là ghi khi có một dịch vụ, hoặc "drive", được
+nêu sau nó ("put the count on the light" là việc của chính lamp). Một
 lần ghi đứng sau chúng vẫn tính. Bước của lịch được cho
 trọn (hôm nay, hoặc ngày mai khi yêu cầu nói "tomorrow"), bước của thư (`recent`)
 và của Drive (`files`, mới nhất trước, `query` chỉ là từ để tìm) cũng vậy; với dịch vụ khác, brief liệt kê các việc đọc của nó trừ việc đọc
