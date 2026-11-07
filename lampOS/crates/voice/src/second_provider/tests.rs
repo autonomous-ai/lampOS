@@ -7247,6 +7247,71 @@ async fn a_skills_note_for_its_picture_goes_once_with_its_look_turn() {
     );
 }
 
+/// #5694: asked to "look right", the model called `take_a_look` and then
+/// said it was "looking across it from the other side", though the head
+/// never moved. The route's own look's turn tells it the head did not move,
+/// once, after the look's question; the character's look note and the
+/// look's function say so too.
+#[tokio::test]
+async fn the_routes_own_look_tells_the_model_its_head_did_not_move() {
+    const STILL: &str = "\n\n(Your head did not move for this look: say only what is in front of you, and never say you turned or looked to a side.)";
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Lamp, look to your right.".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call("c1", LOOK_CALL, json!({}))])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("A laptop on the desk."), Ok(ChatEvent::Done)],
+                vec![text("Still the desk."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let mut engine = skill_looking(script.clone(), r#"{"ok":true}"#);
+    let look = |request| ProviderInput::Written {
+        search: false,
+        request,
+        session: 1,
+        privacy_generation: 1,
+        text: crate::speak_up::LOOK_FULL_NOTE.into(),
+        look: true,
+        quoted: false,
+    };
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(look_and_words(&mut engine).await.0, Some((1, 1, None)));
+    engine.submit(look(2));
+    look_and_words(&mut engine).await;
+    engine.submit(look(3));
+    look_and_words(&mut engine).await;
+    let asked = script.asked.lock().unwrap();
+    let jpeg = [0xFF, 0xD8, 0xFF];
+    assert_eq!(
+        asked[1].last(),
+        Some(&Message::user_seeing(
+            format!("{}{STILL}", crate::speak_up::LOOK_FULL_NOTE),
+            &jpeg
+        ))
+    );
+    assert_eq!(
+        asked[2].last(),
+        Some(&Message::user_seeing(
+            crate::speak_up::LOOK_FULL_NOTE,
+            &jpeg
+        )),
+        "once"
+    );
+    let told = super::worker::LOOK_CALL_NOTE;
+    assert!(told.contains("never moves your head"), "{told}");
+    assert!(told.contains("never say you turned"), "{told}");
+    let tool = super::worker::look_tool().description;
+    assert!(tool.contains("never moves your head"), "{tool}");
+}
+
 /// A skill's answer's note for its picture: the words after "When the
 /// picture comes:", bounded and cut at a character's end; none without them.
 #[test]
