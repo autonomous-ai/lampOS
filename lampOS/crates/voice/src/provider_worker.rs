@@ -6340,6 +6340,7 @@ impl InputHandoff {
                 over_the_lamps_voice,
                 after_stop,
                 follows_on,
+                heard_of_cut,
                 ..
             } => {
                 if self.submitted.is_some() {
@@ -6387,6 +6388,15 @@ impl InputHandoff {
                 }
                 if let Err(refusal) = input.start(expected, request) {
                     return self.refused_start(request, refusal);
+                }
+                // Begun over the lamp's audible answer, or cutting it: the
+                // lamp's line before it was not heard whole, so a one-yes
+                // read-back is not taken from it (the Reviewer-lead's P3 on
+                // #5609).
+                if (over_the_lamps_voice || heard_of_cut.is_some())
+                    && let Ok(mut thread) = crate::thread::THREAD.lock()
+                {
+                    thread.began_over_the_lamps_voice(request.get());
                 }
                 if continues {
                     self.continued = Some(request.get());

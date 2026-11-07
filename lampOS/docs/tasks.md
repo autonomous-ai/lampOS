@@ -2432,13 +2432,30 @@ tasks flags; it needs only the tasks part):
   - the person's words in it (`thread::heard_for`) are a plain yes: at most
     six words, only yes, yeah, yep, yup, sure, ok, okay, "go ahead", "do
     it" and "please do", with "please", "lamp" and "hey" beside them, and
-    no question mark. "Yes and also make it longer" is not a yes;
-  - the lamp's line just before it (`thread::answered_last_but`) was said
-    within `CONFIRM_WITHIN`, ends with a question, names who the task was
-    prepared for (the name, or a form the voice hears for it), and holds at
-    least half of the task's content words. Content words are lower case,
-    with common short words left out, and for a question task they come
-    from its question alone.
+    no question mark. "Yes and also make it longer" is not a yes. "Okay."
+    and "ok ok" count as a yes too: each is only yes words;
+  - the lamp's line just before it (`thread::answered_last_but_cut`) was
+    said within `CONFIRM_WITHIN`, ends with a question, names who the task
+    was prepared for (the name, or a form the voice hears for it), and
+    holds every one of the task's content words but at most one. Content
+    words are lower case, with common short words left out, and for a
+    question task they come from its question alone. A word matches with a
+    plural or verb "s", "es", "ing" or "ed" and a final "e" set aside, so
+    "files" matches "file" and "fixing" matches "fix". The one miss covers
+    a stem this misses. A read-back that drops a clause never starts it:
+    for "Delete all the files in my Downloads folder and empty the trash",
+    "Claude Code will delete the files in your Downloads folder. Shall I
+    start it?" misses "all", "empty" and "trash", so a "Yes." to it starts
+    nothing (the Reviewer-lead's P2 on #5609). Before, half the content
+    words were enough, and the unheard half started;
+  - that line was not cut: not kept as heard after a cut
+    (`thread::heard_only`, the second route with `LAMP_SAID_AS_HEARD=on`),
+    and the yes did not begin over the lamp's voice or cut its answer
+    (`thread::began_over_the_lamps_voice`, told by both routes' provider
+    workers as the yes's line starts). On the Live route the lamp's line is
+    never cut down to what was heard, so without this a yes said over a
+    read-back cut off was checked against the whole line, its question
+    included (the Reviewer-lead's P3 on #5609).
 - When those hold as `start_agent_task` prepares the task, its `next` says
   "The person has already said yes to this task as you said it back: call
   confirm_agent_task now, and do not ask again." The confirm checks the rule
@@ -2452,6 +2469,9 @@ recognizes a read-back said in words, before the call. Without the switch
 every description, answer and line is byte-for-byte as before
 (`the_one_yes_switch_changes_only_the_read_back_and_task_words`). Tests:
 `a_yes_in_the_turn_that_prepared_counts_only_after_its_read_back_in_words`,
+`one_yes_starts_only_a_task_read_back_whole`,
+`one_yes_never_counts_over_a_cut_read_back`,
+`thread::tests::answered_last_but_cut_says_a_read_back_was_cut`,
 `a_confirm_with_nothing_prepared_says_to_prepare_it_with_the_switch`,
 `the_one_yes_switch_is_on_only_with_the_tasks_part`. Not yet played: a
 count of 10 spoken hand-overs with a real yes on each side of the switch,
