@@ -654,11 +654,13 @@ marker (`serve::Save::first_volume`, `crates/setup/src/first_volume.rs`).
 The marker is what starts the voice, so its first line is already at 70 %,
 and the volume waits on nothing slow on the voice's side. Setup runs only
 on a lamp with no marker, a new one or one just reset, so this is once per
-setup. A V1 lamp moved to lampOS has no marker either
-(`crates/keeper/src/package.rs`), so it runs a full first setup and its
-level starts at 70 % too, not at its owner's old V1 level. A level the person chooses afterwards, by voice, a button or the
-app, is never changed by an update or anything else, and needs no mark of
-its own. Recovery's network-only run (`NetworkOnly`) never sets it. Both
+setup. A V1 lamp moved to lampOS gets its marker from `lamp-keeper
+prepare` (`crates/keeper/src/profile.rs`; it is already on its home's
+Wi-Fi), so it starts the lamp, not setup, and its level is not touched at
+the move. It starts at 70 % only once it is put back into setup. A level
+the person chooses afterwards, by voice, a button or the app, is never
+changed by an update or anything else, and needs no mark of its own.
+Recovery's network-only run (`NetworkOnly`) never sets it. Both
 commands are bounded (0.8 s and 2 s) and best effort: a control that is
 not there yet or a tool that fails is a line in setup's log, never a failed
 setup. The C-Media hardware level and `--volume-ceiling` are unchanged.
