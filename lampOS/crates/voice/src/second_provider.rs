@@ -12888,6 +12888,12 @@ async fn answer(
             || done_already
                 .as_ref()
                 .is_some_and(|(_, done)| *done != crate::remember::MemoryDone::Forgotten);
+        // Whether a `recall` of this request found something: then a reply
+        // to a line that is only a yes may say back that it is kept ("Yes,
+        // Pip is kept."), true of what was found; the opening claims stay
+        // (the first builder's P3 on #5607, as S13 req 339 answered a yes
+        // with a `recall`).
+        let mut recall_found = false;
         // A forget invalidates earlier memory-keep evidence, while completed
         // non-memory actions may still have their content-free confirmation.
         let mut confirmed_other_call = false;
@@ -13310,7 +13316,7 @@ async fn answer(
                                     held,
                                     false,
                                     shared.face_claims,
-                                    yes_line,
+                                    yes_line && !recall_found,
                                 ) {
                                     Some(false) => claim_held.take().unwrap_or_default(),
                                     // Undecided, or a claim: held.
@@ -13572,7 +13578,7 @@ async fn answer(
                                 claim,
                                 false,
                                 shared.face_claims,
-                                yes_line,
+                                yes_line && !recall_found,
                             ) {
                                 Some(false) => claim_held.take().unwrap_or_default(),
                                 // Undecided, or a claim: judged below.
@@ -13631,7 +13637,7 @@ async fn answer(
                                     claim,
                                     false,
                                     shared.face_claims,
-                                    yes_line,
+                                    yes_line && !recall_found,
                                 ) {
                                     Some(false) => claim_held.take().unwrap_or_default(),
                                     // Undecided, or a claim: judged below.
@@ -13662,7 +13668,11 @@ async fn answer(
             // again; a second such reply, or one in the last round, is said
             // as the plain line that it was not kept.
             if let Some(held) = claim_held.take().filter(|held| !held.is_empty()) {
-                let claim = crate::remember::keep_claim_said(&held, shared.face_claims, yes_line);
+                let claim = crate::remember::keep_claim_said(
+                    &held,
+                    shared.face_claims,
+                    yes_line && !recall_found,
+                );
                 // A face said saved (`LAMP_MEMORY_KEEP_ASKED`, #5141 row 8:
                 // lamp-0c4e, 3 Nov, "hold still while I take your face in"
                 // with no call) is kept by `remember_my_face`: one in this
@@ -14452,6 +14462,7 @@ async fn answer(
                     short_line = None;
                     answered_at_once = false;
                     kept_now = confirmed_other_call;
+                    recall_found = false;
                     remember_ran = false;
                     keep_claim_asked = false;
                     keep_claim_note = None;
@@ -14531,6 +14542,10 @@ async fn answer(
                         asker: forget_asker(scope.as_ref()),
                     });
                 }
+                recall_found |= call.name == crate::remember::RECALL
+                    && answer.told["found"]
+                        .as_array()
+                        .is_some_and(|found| !found.is_empty());
                 if call.name != crate::remember::RECALL && did {
                     kept_now = true;
                     remember_ran |= call.name == crate::remember::REMEMBER;

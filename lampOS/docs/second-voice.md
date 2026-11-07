@@ -3448,7 +3448,13 @@ after a take-over, but now for every turn:
   sentence names a reminder, alarm, timer or setting ("Okay, your
   reminder for seven is saved.", "Got it, your settings are saved.":
   the Reviewer-lead's P3 on #5607, so a `set_reminder` it set is never
-  said "not kept"); "I've saved that." still is a claim. The softer claims count too (K3: lamp-06c1,
+  said "not kept"); a preference saved is a kept thing, so "Your
+  preference for green tea is saved." stays a claim (Thirteen's P3 on
+  #5607). A `recall` of the same request that found something lifts the
+  said-back rule only: "Yes, please." answered with a `recall` that found
+  Pip, then "Yes, Pip is kept.", is said, true of what was found, while an
+  opening claim ("Kept: …") stays one (the first builder's P3 on #5607,
+  `a_found_recall_lets_a_yes_say_it_is_kept`). "I've saved that." still is a claim. The softer claims count too (K3: lamp-06c1,
   28 Oct night, "Noted — you work at a library now, not the bakery." and
   "All right, I'll keep it in mind." with no call): "Noted" with what was
   noted after a dash or colon, or "noted that"; "I'll keep it/that in
