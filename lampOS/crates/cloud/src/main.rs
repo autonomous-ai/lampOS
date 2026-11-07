@@ -233,7 +233,9 @@ fn main() -> ExitCode {
         build,
         wifi: Wifi::default(),
         ring: Ring::default(),
+        // Skills' lines alone (#1685): only with LAMP_SKILL_MESSAGES=on.
         texts: Texts::on(lamp_cloud::chat::on_from_environment())
+            .carrying_skill_lines(lamp_cloud::unasked::on_from_environment())
             .knowing(std::env::var_os(lamp_cloud::lamp::KNOWN_FILE_ENVIRONMENT).map(PathBuf::from)),
         reports: shared,
         // The app's skills page (#1722): only with LAMP_SKILLS_PAGE=on too.
