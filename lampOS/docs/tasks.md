@@ -2437,25 +2437,36 @@ tasks flags; it needs only the tasks part):
   - the lamp's line just before it (`thread::answered_last_but_cut`) was
     said within `CONFIRM_WITHIN`, ends with a question, names who the task
     was prepared for (the name, or a form the voice hears for it), and
-    holds every one of the task's content words but at most one. Content
-    words are lower case, with common short words left out, and for a
-    question task they come from its question alone. A word matches with a
-    plural or verb "s", "es", "ing" or "ed" and a final "e" set aside, so
-    "files" matches "file" and "fixing" matches "fix". The one miss covers
-    a stem this misses. A read-back that drops a clause never starts it:
-    for "Delete all the files in my Downloads folder and empty the trash",
-    "Claude Code will delete the files in your Downloads folder. Shall I
-    start it?" misses "all", "empty" and "trash", so a "Yes." to it starts
-    nothing (the Reviewer-lead's P2 on #5609). Before, half the content
-    words were enough, and the unheard half started;
-  - that line was not cut: not kept as heard after a cut
+    holds every one of the task's content words, none missing. Content
+    words are lower case, with common short words ("did" and "does" among
+    them) left out, and for a question task they come from its question
+    alone. A task word counts as read back when the read-back has the
+    same stem (a plural or verb "s", "es", "ing" or "ed" and a final "e"
+    set aside, so "files" matches "file" and "fixing" matches "fix"), or a
+    near form: one a prefix of the other with at least four letters
+    shared ("config" for "configuration"), or one letter apart in words of
+    five letters or more ("summarize" for "summarise"). A read-back that
+    drops any word never starts the task: for "Delete all the files in my
+    Downloads folder and empty the trash", "Claude Code will delete the
+    files in your Downloads folder. Shall I start it?" misses "all",
+    "empty" and "trash"; "Reboot" read back as "Claude Code will do it",
+    "delete Downloads" as "Claude Code will delete that", "Force push to
+    main" without "force", and "Empty the trash and delete Downloads"
+    without "trash" or without "downloads" are all refused (the
+    Reviewer-lead's P2s on #5609). Before, half the content words, and
+    then all but one, were enough, and the unheard part started;
+  - that line was not cut. It is marked cut on its own exchange, so a yes
+    in any later request reads it as cut too: kept as heard after a cut
     (`thread::heard_only`, the second route with `LAMP_SAID_AS_HEARD=on`),
-    and the yes did not begin over the lamp's voice or cut its answer
-    (`thread::began_over_the_lamps_voice`, told by both routes' provider
-    workers as the yes's line starts). On the Live route the lamp's line is
+    or the line after it began over the lamp's voice, came first after a
+    Stop, or cut its answer (`over_the_lamps_voice`, `after_stop` or
+    `heard_of_cut` on that line's Start, marked by
+    `thread::began_over_the_lamps_voice` from both routes' provider
+    workers, `mark_cut_read_back`). On the Live route the lamp's line is
     never cut down to what was heard, so without this a yes said over a
-    read-back cut off was checked against the whole line, its question
-    included (the Reviewer-lead's P3 on #5609).
+    read-back cut off, or after a Stop by hand or head with
+    `LAMP_SAID_AS_HEARD` off, was checked against the whole line, its
+    question included (the Reviewer-lead's P3s on #5609).
 - When those hold as `start_agent_task` prepares the task, its `next` says
   "The person has already said yes to this task as you said it back: call
   confirm_agent_task now, and do not ask again." The confirm checks the rule
@@ -2471,6 +2482,9 @@ every description, answer and line is byte-for-byte as before
 `a_yes_in_the_turn_that_prepared_counts_only_after_its_read_back_in_words`,
 `one_yes_starts_only_a_task_read_back_whole`,
 `one_yes_never_counts_over_a_cut_read_back`,
+`one_yes_needs_every_task_word_read_back`,
+`a_start_over_the_lamps_voice_or_after_a_stop_marks_the_read_back_cut`
+(in both `provider_worker` and `second_provider`),
 `thread::tests::answered_last_but_cut_says_a_read_back_was_cut`,
 `a_confirm_with_nothing_prepared_says_to_prepare_it_with_the_switch`,
 `the_one_yes_switch_is_on_only_with_the_tasks_part`. Not yet played: a
