@@ -54,6 +54,11 @@
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
+/// How far, in counts, a joint at rest may stop short of its goal and still
+/// count as resting on it. Here, not in `body`, so the crate builds off
+/// Linux, where `body` is not compiled.
+pub const REST_SLACK: u16 = 24;
+
 /// The longest one hold lasts: the holder renews what it keeps.
 pub const MOST_MS: u64 = 30_000;
 
@@ -250,6 +255,10 @@ pub const THERE_WITHIN: f32 = 6.0;
 pub const THERE_STEPS: u32 = 10;
 /// A look not there by then is cut short: something holds the head.
 pub const LONGEST_LOOK: Duration = Duration::from_secs(5);
+/// A look stopped short of its goal, though inside the slack a rest is let
+/// stop in ([`REST_SLACK`]), is there once still this many steps: a second,
+/// as long as the body waits before it counts a rest (`REST_STEPS`).
+pub const REST_STOPPED_STEPS: u32 = 50;
 
 /// How far a look may take the head from the pose's own direction, in
 /// counts: the base either way, and the head up and down. The body's own
@@ -295,6 +304,11 @@ struct Owed {
     clamped: bool,
     settled: u32,
     goals: Option<[u16; 3]>,
+    /// The joints' positions at the last step, to tell when they stopped.
+    positions: Option<[u16; 3]>,
+    /// How far the head's pitch and the base's yaw were from where the look
+    /// drove them at the last step, in counts: said when it is cut short.
+    short: [f32; 2],
     /// The look as the body last applied it, after the joints' own bounds
     /// (counts, yaw and pitch): what `there` says, when the body said it.
     applied: Option<[f32; 2]>,
@@ -374,6 +388,8 @@ impl Looking {
             clamped,
             settled: 0,
             goals: None,
+            positions: None,
+            short: [0.0; 2],
             applied: None,
         });
         before
@@ -421,39 +437,88 @@ impl Looking {
         }
         let asked = self.asked.as_mut()?;
         if let Some((goals, positions)) = seen {
-            let near = [0, 2].into_iter().all(|joint| {
-                (f32::from(goals[joint]) - f32::from(positions[joint])).abs() <= THERE_WITHIN
-            });
-            let still = asked.goals.is_some_and(|before| {
-                [0, 2]
-                    .into_iter()
-                    .all(|joint| before[joint].abs_diff(goals[joint]) <= 1)
-            });
+            let still = |before: Option<[u16; 3]>, now: [u16; 3]| {
+                before.is_some_and(|before| {
+                    [0, 2]
+                        .into_iter()
+                        .all(|joint| before[joint].abs_diff(now[joint]) <= 1)
+                })
+            };
+            let goals_still = still(asked.goals, goals);
+            let stopped = still(asked.positions, positions);
             asked.goals = Some(goals);
-            asked.settled = if near && still { asked.settled + 1 } else { 0 };
-            if asked.settled >= THERE_STEPS {
+            asked.positions = Some(positions);
+            // How far each of the head's pitch and the base's yaw stopped
+            // from where the look drove it, in counts.
+            let short = [0, 2].map(|joint| f32::from(positions[joint]) - f32::from(goals[joint]));
+            let near = short.iter().all(|short| short.abs() <= THERE_WITHIN);
+            // There, or stopped where a rest is let stop (`REST_SLACK`): a
+            // resting head stops short against its own friction or weight
+            // (lamp-75c9's pitch, 17 counts at load 80), and is not pushed on.
+            let rested = short
+                .iter()
+                .all(|short| short.abs() <= f32::from(REST_SLACK));
+            asked.settled = if goals_still && stopped {
+                asked.settled + 1
+            } else {
+                0
+            };
+            asked.short = short;
+            // Near, the look is there once still for `THERE_STEPS`; stopped
+            // short inside the slack, once still for as long as a rest takes
+            // to count (`REST_STOPPED_STEPS`), not before its servo starts.
+            let due = if near {
+                THERE_STEPS
+            } else {
+                REST_STOPPED_STEPS
+            };
+            if rested && asked.settled >= due {
                 let asked = self.asked.take()?;
+                // Where the joints stopped, in the look's own frame: the
+                // look as applied, and how short each joint stopped of it.
                 let aim = self.aim.unwrap_or_default();
-                return Some(match asked.applied {
+                let (applied, cut) = match asked.applied {
                     // As the body applied it: its own bounds may cut more
                     // than the reach did (lamp-a0ae on 29 Oct: a pitch of 5
                     // up kept 4, at its pitch window, said 5 and unclamped).
-                    Some(applied) => there(
-                        [
-                            applied[0] / COUNTS_PER_DEGREE,
-                            -applied[1] / COUNTS_PER_DEGREE,
-                        ],
-                        asked.clamped
-                            || (applied[0] - aim[0]).abs() > 0.5
-                            || (applied[1] - aim[1]).abs() > 0.5,
+                    Some(applied) => (
+                        applied,
+                        (applied[0] - aim[0]).abs() > 0.5 || (applied[1] - aim[1]).abs() > 0.5,
                     ),
-                    None => there(asked.degrees, asked.clamped),
-                });
+                    None => (
+                        [
+                            asked.degrees[0] * COUNTS_PER_DEGREE,
+                            -asked.degrees[1] * COUNTS_PER_DEGREE,
+                        ],
+                        false,
+                    ),
+                };
+                // Near, as applied (the look's own angles, to a servo's
+                // few counts); stopped further, where the joints are.
+                let off = if near { [0.0; 2] } else { short };
+                let reached = [
+                    (applied[0] + off[1]) / COUNTS_PER_DEGREE,
+                    -(applied[1] + off[0]) / COUNTS_PER_DEGREE,
+                ];
+                let stopped_off = off
+                    .iter()
+                    .any(|short| short.abs() > 0.5 * COUNTS_PER_DEGREE);
+                return Some(there(reached, asked.clamped || cut || stopped_off));
             }
         }
         if now.duration_since(asked.since) >= LONGEST_LOOK {
+            let short = asked.short;
             self.asked = None;
-            return Some(cut_short("not there in time: something holds the head"));
+            let worst = short
+                .iter()
+                .fold(0.0_f32, |worst, short| worst.max(short.abs()));
+            return Some(cut_short(&if worst > f32::from(REST_SLACK) {
+                format!(
+                    "not there in time: stopped {worst:.0} counts short of the look; something holds the head or base"
+                )
+            } else {
+                "not there in time: still moving".to_owned()
+            }));
         }
         None
     }
@@ -906,6 +971,60 @@ mod tests {
 
     /// `there` says the look as the body applied it, and `clamped` when a
     /// joint's own bound cut more than the reach did.
+    /// Lamp-75c9 on 7 Nov: a resting head stopped 17 counts short of a look
+    /// and the look was cut short after 5 s, "something holds the head".
+    /// Stopped inside the rest's slack, it is there once still a second (not
+    /// before: a servo may not have started), from where it stopped, and
+    /// `clamped`; still farther short at 5 s, it is cut short with how far.
+    #[test]
+    fn a_look_stopped_short_is_there_inside_the_slack_and_cut_short_beyond_it() {
+        let now = Instant::now();
+        let tick = Duration::from_millis(20);
+        let mut looking = Looking::default();
+        looking.ask(
+            br#"{"look":{"yaw":5,"pitch":5,"from":"home"}}"#,
+            true,
+            REACH,
+            now,
+        );
+        // Pitch 1943 wanted (57 up from 2000), stopped at 1960; base there.
+        let seen = Some(([1943, 2060, 2072], [1960, 2060, 2072]));
+        let mut at = now;
+        for step in 0..REST_STOPPED_STEPS {
+            at += tick;
+            assert_eq!(looking.step(Ok(()), seen, at), None, "step {step}");
+        }
+        at += tick;
+        let said = value(&looking.step(Ok(()), seen, at).expect("there"));
+        assert_eq!(said["look"], "there");
+        assert_eq!(said["clamped"], true);
+        assert_eq!(said["pitch"], 3.5);
+        assert_eq!(said["yaw"], 5.0);
+        // 40 counts short, past the slack: owed until 5 s, then cut short.
+        looking.ask(
+            br#"{"look":{"yaw":5,"pitch":5,"from":"home"}}"#,
+            true,
+            REACH,
+            now,
+        );
+        let seen = Some(([1943, 2060, 2072], [1983, 2060, 2072]));
+        let mut at = now;
+        while at < now + LONGEST_LOOK - tick {
+            at += tick;
+            assert_eq!(looking.step(Ok(()), seen, at), None);
+        }
+        let said = value(
+            &looking
+                .step(Ok(()), seen, now + LONGEST_LOOK)
+                .expect("cut short"),
+        );
+        assert_eq!(said["look"], "cut_short");
+        assert_eq!(
+            said["why"],
+            "not there in time: stopped 40 counts short of the look; something holds the head or base"
+        );
+    }
+
     #[test]
     fn there_says_the_look_as_the_body_applied_it() {
         let mut looking = Looking::default();

@@ -16990,3 +16990,124 @@ fn only_lamp_controls_replace_interrupts_and_any_other_askers_is_as_before() {
         }
     }
 }
+
+/// A computer's look from home at 5 up and 5 right on a resting folded lamp,
+/// held, with one servo stopping `short` counts short of any goal: what the
+/// look is answered, and when.
+fn a_held_look_at_rest_with(short: (usize, f32)) -> Vec<(Duration, String)> {
+    use crate::lease::{Looking, Reach};
+    let (mut lamp, mut clock) = folded(Duration::from_secs(20));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    lamp.short = Some(short);
+    let limits = Limits {
+        rest_glance: true,
+        ..Limits::folded_with(Tuning {
+            reach: [150, 15, 1, 250],
+            speed: 300,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let reach = Reach {
+        yaw: 480.0,
+        up: 150.0,
+        down: 15.0,
+    };
+    let start = std::time::Instant::now();
+    let looking = Rc::new(std::cell::RefCell::new(Looking::default()));
+    let said: Rc<std::cell::RefCell<Vec<(Duration, String)>>> = Default::default();
+    let (asking, stepping, kept) = (looking.clone(), looking.clone(), said.clone());
+    let (time, seen_at) = (clock.time.clone(), clock.time.clone());
+    let mut asked = false;
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        None,
+        None,
+        || Some((Mood::Resting, 0)),
+        move || {
+            let at = time.get();
+            let mut looking = asking.borrow_mut();
+            if !asked && at >= LOOK_ASKED_AT {
+                asked = true;
+                let line = br#"{"look":{"yaw":5,"pitch":5,"from":"home"}}"#;
+                assert_eq!(looking.ask(line, true, reach, start + at), None);
+            }
+            // Held, lamp-body passes nothing of Expression's.
+            Asked {
+                held: true,
+                aim: looking.aim(),
+                aim_from_home: looking.from_home(),
+                ..Asked::default()
+            }
+        },
+        move |glimpse| {
+            let at = seen_at.get();
+            let mut looking = stepping.borrow_mut();
+            looking.applied(glimpse.look_aimed);
+            // As lamp-body does: the goals the pose wants, and where the
+            // joints read.
+            if let Some(line) = looking.step(
+                Ok(()),
+                Some((glimpse.wanted, glimpse.positions)),
+                start + at,
+            ) {
+                kept.borrow_mut().push((at, line));
+            }
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    said.take()
+}
+
+const LOOK_ASKED_AT: Duration = Duration::from_secs(8);
+
+/// The one answer of [`a_held_look_at_rest_with`]: there, `clamped`, inside
+/// two seconds, at these angles to a tenth of a degree or two.
+fn answered_there_clamped_at(said: &[(Duration, String)], yaw: f64, pitch: f64) {
+    assert_eq!(said.len(), 1, "{said:?}");
+    let (at, line) = &said[0];
+    let value: serde_json::Value = serde_json::from_str(line).unwrap();
+    assert_eq!(value["look"], "there", "at {at:?}: {line}");
+    assert_eq!(value["clamped"], true, "{line}");
+    assert!(
+        *at < LOOK_ASKED_AT + Duration::from_secs(2),
+        "answered at {at:?}"
+    );
+    assert!(
+        (value["yaw"].as_f64().unwrap() - yaw).abs() <= 0.2,
+        "{line}"
+    );
+    assert!(
+        (value["pitch"].as_f64().unwrap() - pitch).abs() <= 0.2,
+        "{line}"
+    );
+}
+
+/// The local leader's check of #4580 on lamp-75c9 (stable 10579, 7 Nov, run
+/// twice, lamp-body restarted between): a computer's look from home on a
+/// resting lamp, no hand on it, ended `cut_short` ("not there in time:
+/// something holds the head") after 5 s. The head's pitch stopped 17 counts
+/// short of its goal (step 1501: goal 1743, position 1760, load 80), inside
+/// the slack a rest is let stop in but past the look's 6 counts. A look that
+/// has stopped moving that near is answered there, from where the head
+/// stopped, and said `clamped`; in the simulator, where a rest wrote the
+/// pitch's goal where it stopped, it had been said there at 5.0, unclamped.
+#[test]
+fn a_look_held_on_a_resting_lamp_whose_head_stops_short_is_answered_where_it_stopped() {
+    // 17 counts, 1.5 degrees, short of 5 up.
+    answered_there_clamped_at(&a_held_look_at_rest_with((PITCH, 17.0)), 5.0, 3.5);
+}
+
+/// The same with the base: on lamp-75c9 a look 57 counts right left the
+/// base 41 over, its goal written where it stopped, and said nothing of it
+/// (`clamped:false`). Stopped 16 short, it is said there where it stopped.
+#[test]
+fn a_look_held_on_a_resting_lamp_whose_base_stops_short_is_answered_where_it_stopped() {
+    // 16 counts, 1.4 degrees, short of 5 right.
+    answered_there_clamped_at(&a_held_look_at_rest_with((YAW, 16.0)), 3.6, 5.0);
+}
