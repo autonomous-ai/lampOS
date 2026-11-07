@@ -1282,6 +1282,7 @@ fn worker_command(
             role,
             var(crate::onboarding::ENVIRONMENT).as_deref(),
             var(crate::onboarding::FILE_ENVIRONMENT).as_deref(),
+            var(crate::onboarding::NUDGE_ENVIRONMENT).as_deref(),
         ))
         .envs(private_room_worker_environment(
             role,
@@ -1662,24 +1663,32 @@ fn ledger_refence_worker_environment(
     switch.into_iter().chain(directory).collect()
 }
 
+// With the walk's file above, the nudge (`LAMP_ONBOARDING_NUDGE`, the exact
+// `on`): with the nudge off, a line that spells the person's name is told
+// its read-back there (`onboarding::spelled_name_note_now`, #5580 row 2).
 fn onboarding_worker_environment(
     role: &str,
     switch: Option<&std::ffi::OsStr>,
     file: Option<&std::ffi::OsStr>,
+    nudge: Option<&std::ffi::OsStr>,
 ) -> Vec<(&'static str, std::ffi::OsString)> {
     if role != "second" {
         return Vec::new();
     }
-    let Some(file) = crate::onboarding::switched_on(
+    // The nudge on its own does nothing there: the read-back note also
+    // needs the walk's file below.
+    let mut environment = Vec::new();
+    if nudge == Some(std::ffi::OsStr::new("on")) {
+        environment.push((crate::onboarding::NUDGE_ENVIRONMENT, "on".into()));
+    }
+    if let Some(file) = crate::onboarding::switched_on(
         switch.and_then(std::ffi::OsStr::to_str),
         file.and_then(std::ffi::OsStr::to_str),
-    ) else {
-        return Vec::new();
-    };
-    vec![
-        (crate::onboarding::ENVIRONMENT, "on".into()),
-        (crate::onboarding::FILE_ENVIRONMENT, file.into_os_string()),
-    ]
+    ) {
+        environment.push((crate::onboarding::ENVIRONMENT, "on".into()));
+        environment.push((crate::onboarding::FILE_ENVIRONMENT, file.into_os_string()));
+    }
+    environment
 }
 
 // A correction replacing a kept thing (#2510), passed the same narrow way:
@@ -3654,7 +3663,11 @@ mod tests {
         std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
         let boot = new_boot().unwrap();
         let walk = "/var/lib/lamp-voice/onboarding.json";
-        let given = |role: &str, switch: &'static str, file: &'static str| -> Vec<String> {
+        let given = |role: &str,
+                     switch: &'static str,
+                     file: &'static str,
+                     nudge: Option<&'static str>|
+         -> Vec<String> {
             let status = status_of_fresh(&mut worker_command(
                 &script,
                 &home.path,
@@ -3666,6 +3679,8 @@ mod tests {
                         Some(switch.into())
                     } else if name == crate::onboarding::FILE_ENVIRONMENT {
                         Some(file.into())
+                    } else if name == crate::onboarding::NUDGE_ENVIRONMENT {
+                        nudge.map(Into::into)
                     } else {
                         None
                     }
@@ -3679,7 +3694,7 @@ mod tests {
                 .map(str::to_owned)
                 .collect()
         };
-        let mut got = given("second", "on", walk);
+        let mut got = given("second", "on", walk, None);
         got.sort_unstable();
         assert_eq!(
             got,
@@ -3689,14 +3704,35 @@ mod tests {
             ]
         );
         for role in ["provider", "privacy", "ring", "speaker"] {
-            assert!(given(role, "on", walk).is_empty(), "{role}");
+            assert!(given(role, "on", walk, None).is_empty(), "{role}");
         }
-        assert!(given("second", "off", walk).is_empty(), "off");
+        assert!(given("second", "off", walk, None).is_empty(), "off");
         assert!(
-            given("second", "on", "onboarding.json").is_empty(),
+            given("second", "on", "onboarding.json", None).is_empty(),
             "relative"
         );
-        assert!(given("second", "on", "").is_empty(), "empty");
+        assert!(given("second", "on", "", None).is_empty(), "empty");
+        // The nudge, the exact `on` only, and only with the walk (#5580 row 2).
+        let mut got = given("second", "on", walk, Some("on"));
+        got.sort_unstable();
+        assert_eq!(
+            got,
+            [
+                "LAMP_ONBOARDING=on".to_owned(),
+                format!("LAMP_ONBOARDING_FILE={walk}"),
+                "LAMP_ONBOARDING_NUDGE=on".to_owned(),
+            ]
+        );
+        assert_eq!(given("second", "on", walk, Some("yes")).len(), 2, "not on");
+        assert_eq!(
+            given("second", "off", walk, Some("on")),
+            ["LAMP_ONBOARDING_NUDGE=on".to_owned()],
+            "the nudge alone"
+        );
+        assert!(
+            given("provider", "on", walk, Some("on")).is_empty(),
+            "provider"
+        );
     }
 
     /// `LAMP_PRIVACY_CONTROLS=no-slide`: the privacy worker's environment is
