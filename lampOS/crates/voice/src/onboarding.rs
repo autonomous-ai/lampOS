@@ -4489,7 +4489,19 @@ const YES: [&str; 17] = [
     "yes", "yeah", "yep", "sure", "ok", "okay", "fine", "right", "correct", "please", "alright",
     "yup", "exactly", "perfect", "uh-huh", "mm-hmm", "mhm",
 ];
-const NO: [&str; 6] = ["no", "nope", "not", "don't", "never", "none"];
+/// "wrong" and "incorrect" too: with the read-back's yes phrases, "You got it
+/// wrong." must stay a no (the Reviewer-lead's P2 on #5677). "didn't" is no no
+/// of its own: "I didn't catch that." asks again.
+const NO: [&str; 8] = [
+    "no",
+    "nope",
+    "not",
+    "don't",
+    "never",
+    "none",
+    "wrong",
+    "incorrect",
+];
 
 /// Common ways of saying yes that hold a no word or none of [`YES`]: "No
 /// problem", "I don't mind", "Of course", "Go ahead". On lamp-29e7 on 27 Oct
@@ -4561,9 +4573,14 @@ fn refuses(words: &[String]) -> bool {
 /// a lamp is ever called something else.
 /// "that's", "you", "it", "did" and "got" too: "That's it." and "You did."
 /// to the read-back were kept as a name (the first builder's P2 on #5677).
-const NOT_A_NAME: [&str; 19] = [
+/// "That's" leads a name as "it's" does ("That's Walter.", the
+/// Reviewer-lead's P3 on #5677), so what follows it in an answer is no name
+/// either: "me", "my", "the", "what", "one", "great", "cool", "nice",
+/// "lovely" and "awesome".
+const NOT_A_NAME: [&str; 29] = [
     "fine", "good", "okay", "ok", "not", "sure", "here", "ready", "sorry", "just", "back", "busy",
-    "tired", "lamp", "that's", "you", "it", "did", "got",
+    "tired", "lamp", "that's", "you", "it", "did", "got", "me", "my", "the", "what", "one",
+    "great", "cool", "nice", "lovely", "awesome",
 ];
 /// What a line of only a word or two is when it is not a name.
 const NOT_A_NAME_ALONE: [&str; 8] = ["what", "huh", "hmm", "um", "uh", "hey", "hi", "hello"];
@@ -4581,7 +4598,7 @@ fn names_someone(text: &str, words: &[String]) -> bool {
         (Some("call"), Some("me")) | (Some("name"), Some("is")) | (Some("i"), Some("am")) => {
             Some(i + 2)
         }
-        (Some("i'm" | "it's"), _) => Some(i + 1),
+        (Some("i'm" | "it's" | "that's"), _) => Some(i + 1),
         _ => None,
     });
     match after {
@@ -4609,7 +4626,7 @@ fn name_told(text: &str) -> Option<String> {
         (Some("call"), Some("me")) | (Some("name"), Some("is")) | (Some("i"), Some("am")) => {
             Some(i + 2)
         }
-        (Some("i'm" | "it's"), _) => Some(i + 1),
+        (Some("i'm" | "it's" | "that's"), _) => Some(i + 1),
         _ => None,
     });
     let name: Vec<String> = match after {
@@ -7234,9 +7251,35 @@ mod tests {
         ] {
             assert!(!agrees(&words(statement)), "{statement}");
         }
-        for no in ["No", "Of course not", "No, don't", "Please don't"] {
+        for no in [
+            "No",
+            "Of course not",
+            "No, don't",
+            "Please don't",
+            // The read-back's yes phrases inside a no (#5677).
+            "You got it wrong.",
+            "That's wrong.",
+            "No, you didn't.",
+            "That's incorrect.",
+        ] {
             assert!(!agrees(&words(no)), "{no}");
             assert!(refuses(&words(no)), "{no}");
+        }
+        // Neither a yes nor a no: the read-back stays open.
+        for unclear in ["You didn't.", "That isn't it.", "I didn't catch that."] {
+            assert!(!agrees(&words(unclear)), "{unclear}");
+            assert!(!refuses(&words(unclear)), "{unclear}");
+        }
+        for yes in [
+            "You got it.",
+            "That's it.",
+            "You did.",
+            "That's me.",
+            "Yup.",
+            "Exactly.",
+        ] {
+            assert!(agrees(&words(yes)), "{yes}");
+            assert!(!refuses(&words(yes)), "{yes}");
         }
         assert_eq!(yes_or_no("of course not"), Some(false));
         // Fourth's P3 on #4469: a short line with a yes word and a "…n't"
@@ -8197,6 +8240,27 @@ mod tests {
         );
     }
 
+    /// #5669 (the first builder's P2 and the Reviewer-lead's P3 on #5677):
+    /// the answers to a read-back are never a name, and "That's Mary." is a
+    /// name told as "It's Mary." is.
+    #[test]
+    fn answers_to_the_read_back_are_no_name_and_thats_leads_one() {
+        for line in [
+            "That's it.",
+            "That's me.",
+            "That's my name.",
+            "That's great.",
+            "You did.",
+            "You got it.",
+            "Got it.",
+            "That's wrong.",
+        ] {
+            assert_eq!(name_told(line), None, "{line}");
+        }
+        assert_eq!(name_told("That's Mary."), Some("mary".into()));
+        assert_eq!(name_told("It's Mary."), Some("mary".into()));
+    }
+
     /// #5669 (the first builder's P2 on #5677): the common answers to the
     /// read-back are a yes to it, never a new name: each keeps Walter's
     /// ids and ends done with the name only after the face's no.
@@ -8386,6 +8450,9 @@ mod tests {
             "Got it, Walter, shall we get started right away?",
             "Got it, Walter, may I take a look at you, is that all right?",
             "Walter, let me get this right: do you want to sit there?",
+            // Only the asking sentence is read (the Reviewer-lead's P3 on
+            // #5677): its "got that right" is in the sentence before.
+            "I got that right, Walter. Is that short for anything?",
         ] {
             assert!(!is_read_back("walter", lamp), "{lamp}");
         }
@@ -8446,9 +8513,29 @@ mod tests {
     /// done then ends the step `later`, never done with the name.
     #[test]
     fn a_no_to_the_read_back_in_every_form_takes_the_name_back() {
-        for (name, read_back) in [
-            ("read-back-after", "Did I get that right, Walter?"),
-            ("read-back-own-sentence", "Walter? Did I get that right?"),
+        for (name, read_back, answer) in [
+            (
+                "read-back-after",
+                "Did I get that right, Walter?",
+                "No. That's not right.",
+            ),
+            (
+                "read-back-own-sentence",
+                "Walter? Did I get that right?",
+                "No. That's not right.",
+            ),
+            // The read-back's yes phrases inside a no (the Reviewer-lead's
+            // P2 on #5677).
+            (
+                "read-back-got-it-wrong",
+                "Walter, did I get that right?",
+                "You got it wrong.",
+            ),
+            (
+                "read-back-did-it-wrong",
+                "Walter, did I get that right?",
+                "You did it wrong.",
+            ),
         ] {
             let mut room = Room::new(name);
             room.walk.face_kept = true;
@@ -8459,7 +8546,7 @@ mod tests {
             room.walk.lamp_words(read_back);
             room.walk.lamp_said(room.at);
             room.wait(2 * S, Some(NEAR_MIDDLE));
-            room.walk.heard("No. That's not right.", room.at);
+            room.walk.heard(answer, room.at);
             room.wait(2 * S, Some(NEAR_MIDDLE));
             report(&room.walk, "who_you_are", "done");
             let notes = room.wait(4 * S, Some(NEAR_MIDDLE));
