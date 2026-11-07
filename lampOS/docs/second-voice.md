@@ -5363,7 +5363,16 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   The call asks the coordinator for the turn's full look (`LookAsked`, as a
   skill's look step does), the lamp says "Let me look." if the model said
   nothing, and the turn ends with no further round; the picture comes in
-  the look turn after it. In a turn the lamp wrote itself the look is
+  the look turn after it. The look never moves the head, and the model is
+  told so three times: the character's note ("It never moves your head, so
+  never say you turned or looked to a side."), the function's description,
+  and once in its look turn, after the question beside the picture
+  (`second_provider::HEAD_STILL_NOTE`: "Your head did not move for this
+  look: say only what is in front of you, and never say you turned or
+  looked to a side."). On lamp-c0a4 on 7 Nov, "look to your right" called
+  `take_a_look` and was answered "now I'm looking across it from the
+  other side" with the head still (#5694). A skill's look keeps its own
+  note instead. In a turn the lamp wrote itself the look is
   dropped (`LookAsked` with why). The journal says `request N called
   take_a_look: the look is asked of the coordinator`. The look by the
   words "Let me look." stays beside it (`speak_up::asks_to_look`); both

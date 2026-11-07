@@ -1703,8 +1703,9 @@ struct Shared {
     /// (`LAMP_SECOND_WAIT_CUE`): a line begun over it is begun in the clear
     /// ([`Shared::only_its_wait_sound`]).
     wait_sound_only: Mutex<Option<u64>>,
-    /// What a skill's answer said to do with the picture of the look it
-    /// asked ([`picture_note`]), with the session the look was asked for:
+    /// What goes after the look turn's question, with the session the look
+    /// was asked for: a skill's note for its picture ([`picture_note`]), or
+    /// [`HEAD_STILL_NOTE`] for the route's own look call. It is
     /// given once to that session's next look turn, after its question, and
     /// let go as any other turn begins.
     look_note: Mutex<Option<(u64, String)>>,
@@ -6512,10 +6513,11 @@ impl Engine {
                 quoted,
                 ..
             } => {
-                // A skill's note for the picture of the look it asked, kept
-                // for this session's look turn ([`picture_note`]): taken
+                // The note for the picture of the look asked (a skill's, by
+                // [`picture_note`], or [`HEAD_STILL_NOTE`]), kept for this
+                // session's look turn: taken
                 // here, once, as any other turn would let it go.
-                let skill_note = self
+                let picture_note_kept = self
                     .shared
                     .look_note
                     .lock()
@@ -6576,19 +6578,20 @@ impl Engine {
                 // look all the same, with its 5 s and its line (the reviewer
                 // on #1154).
                 let looking = look || text == crate::speak_up::NO_LOOK_NOTE;
-                // The skill's note goes after the question, in the same
-                // words beside the picture; with no picture it would ask
+                // The look's note (a skill's for its picture, or the route's
+                // own look's [`HEAD_STILL_NOTE`]) goes after the question,
+                // in the same words beside the picture; with no picture it would ask
                 // the model about one it was not given, so it is left out.
-                let text = match skill_note {
+                let text = match picture_note_kept {
                     Some(note) if picture.is_some() => {
                         eprintln!(
-                            "lamp-voice second: request {request}: the skill's note for the picture goes with it"
+                            "lamp-voice second: request {request}: the look's note for the picture goes with it"
                         );
-                        format!("{text}{PICTURE_NOTE_BEFORE}{note}{PICTURE_NOTE_AFTER}")
+                        format!("{text}{note}")
                     }
                     Some(_) => {
                         eprintln!(
-                            "lamp-voice second: request {request}: no picture, so the skill's note for it is left out"
+                            "lamp-voice second: request {request}: no picture, so the look's note for it is left out"
                         );
                         text
                     }
@@ -10898,6 +10901,12 @@ const PICTURE_NOTE_MAX: usize = 1024;
 pub(crate) const PICTURE_NOTE_BEFORE: &str =
     "\n\n(The skill you called for this look said what to do with the picture: ";
 pub(crate) const PICTURE_NOTE_AFTER: &str = ")";
+/// After the look turn's question when the look was the route's own
+/// [`LOOK_CALL`]: it takes a still picture where the head already points and
+/// never moves it. Asked to "look to your right", the model called it and
+/// said "now I'm looking across it from the other side" with the head still
+/// (lamp-c0a4, 7 Nov, #5694).
+pub(crate) const HEAD_STILL_NOTE: &str = "\n\n(Your head did not move for this look: say only what is in front of you, and never say you turned or looked to a side.)";
 
 /// What a skill's answer with a look says to do with its picture: the
 /// words of its `next` after [`PICTURE_COMES`], at most
@@ -10918,7 +10927,8 @@ pub(crate) fn picture_note(answer: &Value) -> Option<String> {
 /// call of `name`'s: dropped, and why, in a turn the lamp wrote itself
 /// (unless `heard` says it may look all the same: a skill's search's own
 /// turn) or one that is no longer the turn in hand. True when the look was
-/// asked; then `note`, a skill's for the picture, is kept for the look turn.
+/// asked; then `note`, a skill's for the picture, is kept for the look turn,
+/// or [`HEAD_STILL_NOTE`] for the route's own look call.
 /// A skill's call, `args` with it, goes with the ask, so the coordinator can
 /// walk its search on.
 async fn ask_look(
@@ -10959,6 +10969,13 @@ async fn ask_look(
         "lamp-voice second: request {request} called {name}: {}",
         dropped.unwrap_or("the look is asked of the coordinator")
     );
+    // What goes after the look turn's question: a skill's note for its
+    // picture, or, for the route's own look, that the head did not move.
+    let note = match note {
+        Some(note) => Some(format!("{PICTURE_NOTE_BEFORE}{note}{PICTURE_NOTE_AFTER}")),
+        None if !search => Some(HEAD_STILL_NOTE.to_owned()),
+        None => None,
+    };
     // Kept before the coordinator hears of the look, so its turn finds it.
     if dropped.is_none()
         && let Some(session) = session

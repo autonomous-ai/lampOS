@@ -1415,8 +1415,10 @@ fn lone_words(heard: &str) -> bool {
     (1..=2).contains(&words) && !heard.contains('?') && !crate::not_speech::short_word(heard)
 }
 
-/// Told after [`SPOKEN_NOTE`] when the model looks by a call (#1712).
-pub(crate) const LOOK_CALL_NOTE: &str = " When you would look, call take_a_look: it is how you look, and you will then be shown what you see.";
+/// Told after [`SPOKEN_NOTE`] when the model looks by a call (#1712). The
+/// look is a still picture where the head already points: no head motion
+/// goes with it, so the model must not say it turned (#5694).
+pub(crate) const LOOK_CALL_NOTE: &str = " When you would look, call take_a_look: it is how you look, and you will then be shown what you see. It never moves your head, so never say you turned or looked to a side.";
 
 /// Told after [`SPOKEN_NOTE`] when the voice has a memory (#1712, the first
 /// builder at 00:34 on #1722: on lamp-4ace, "remember my violet umbrella is
@@ -1503,7 +1505,7 @@ pub(crate) fn spoken_character(character: &str, look_by_call: bool, memory: bool
 pub(crate) fn look_tool() -> lamp_gemini::Tool {
     lamp_gemini::Tool {
         name: crate::second_provider::LOOK_CALL.into(),
-        description: "Look with your eye at what is in front of you: when someone asks what you see, shows you something, or asks how they or something looks. Call it instead of answering; you will then be shown what you see, and answer from that. Never for looking something up on the web.".into(),
+        description: "Look with your eye at what is in front of you: when someone asks what you see, shows you something, or asks how they or something looks. Call it instead of answering; you will then be shown what you see, and answer from that. Never for looking something up on the web. It never moves your head.".into(),
         parameters: None,
         silent: false,
     }
