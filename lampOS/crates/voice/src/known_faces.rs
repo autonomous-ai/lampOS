@@ -804,7 +804,7 @@ pub(crate) fn refused_for_the_read_back(told: &Value) -> bool {
 /// own: a line that also asks about their face ("Nice to meet you, Marie!
 /// May I remember your face?") is not one, since its yes may answer only
 /// the face (El's P3 on #5159).
-fn said_back(name: &str, lamp: &str) -> bool {
+pub(crate) fn said_back(name: &str, lamp: &str) -> bool {
     let words = lower_words(lamp);
     said_by_them(name, lamp)
         && !words.iter().any(|word| word == "face" || word == "faces")

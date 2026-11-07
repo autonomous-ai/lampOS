@@ -41,8 +41,10 @@ pub(crate) const PREFERENCES_DONE: &str = "(Say only this, nothing before or aft
 /// "Who you are" ended with the name only on a lamp that keeps faces
 /// (#5139): what is remembered waits for a face, so the person is told, and
 /// the face is asked for once more later ([`FACE_AGAIN`]). In code, not the
-/// file: an older build refuses a new key.
-pub(crate) const NAME_ONLY: &str = "(Say only this, nothing before or after it: \"Got your name. I'll remember things for you once I've seen your face.\")";
+/// file: an older build refuses a new key. It claims nothing kept: with no
+/// face saved no owner is set and the record says `"name_kept": false`, so
+/// "Got your name" was a claim not done (#5669, the PM's 11:28 ruling).
+pub(crate) const NAME_ONLY: &str = "(Say only this, nothing before or after it: \"Thanks. I'll remember your name, and things for you, once I've seen your face.\")";
 
 /// The face asked for once more, after the walk, when "who you are" ended
 /// with the name only (#5139). The name is known by then; a yes and the

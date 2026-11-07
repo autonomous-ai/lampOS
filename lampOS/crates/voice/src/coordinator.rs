@@ -9019,6 +9019,9 @@ fn conversation_with_gate_inner(
                         && let Some(walk) = onboarding.as_mut()
                     {
                         walk.lamp_said(monotonic_us());
+                        // Its words too, never recorded: whether it read the
+                        // name back for "who you are" (#5669).
+                        walk.lamp_words(&text);
                     }
                     // What the lamp says is its own, not a stop said over it
                     // (#828, `heard-always`), stamped with when it will be
