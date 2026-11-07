@@ -1861,9 +1861,10 @@ const ALREADY_YES: &str = "The person has already said yes to this task as you s
 ///   [`CONFIRM_WITHIN`];
 /// - the person's words in it are a plain yes ([`plain_yes`]);
 /// - the lamp's line just before it (`read_back`, with how long ago it was
-///   said) is within [`CONFIRM_WITHIN`], ends with a question, names who the
-///   task was prepared for, and shares at least half of the task's content
-///   words ([`reads_back`]).
+///   said and whether it was cut) is within [`CONFIRM_WITHIN`], was not cut
+///   (the Reviewer-lead's P3 on #5609), ends with a question, names who the
+///   task was prepared for, and holds every one of the task's content words
+///   but at most one ([`reads_back`]).
 ///
 /// The guard that a yes comes only after a read-back stays: this rule only
 /// recognizes a read-back said in words, before the call.
@@ -1872,7 +1873,7 @@ fn yes_in_the_same_turn(
     request: u64,
     heard: bool,
     words: Option<&str>,
-    read_back: Option<(&str, Duration)>,
+    read_back: Option<(&str, Duration, bool)>,
     now: Instant,
 ) -> bool {
     heard
@@ -1880,8 +1881,8 @@ fn yes_in_the_same_turn(
         && request == pending.request
         && now.duration_since(pending.at) <= CONFIRM_WITHIN
         && words.is_some_and(plain_yes)
-        && read_back.is_some_and(|(line, ago)| {
-            ago <= CONFIRM_WITHIN && asks(line) && reads_back(line, pending)
+        && read_back.is_some_and(|(line, ago, cut)| {
+            ago <= CONFIRM_WITHIN && !cut && asks(line) && reads_back(line, pending)
         })
 }
 
@@ -1897,14 +1898,16 @@ fn yes_in_the_same_turn_now(pending: &Pending, request: u64, heard: bool) -> boo
         return false;
     };
     let words = thread.heard_for(request, now);
-    let read_back = thread.answered_last_but(request, now);
+    let read_back = thread.answered_last_but_cut(request, now);
     drop(thread);
     yes_in_the_same_turn(
         pending,
         request,
         heard,
         words.as_deref(),
-        read_back.as_ref().map(|(line, ago)| (line.as_str(), *ago)),
+        read_back
+            .as_ref()
+            .map(|(line, ago, cut)| (line.as_str(), *ago, *cut)),
         now,
     )
 }
@@ -1984,16 +1987,35 @@ fn content_words(text: &str) -> Vec<String> {
     words
 }
 
-/// A word without a plural's or a verb's final "s" ("poems", "writes").
+/// A word without a plural's or a verb's ending ("files", "boxes",
+/// "fixing", "failed") and then a final "e", so "files" and "file", or
+/// "changed" and "change", are one word. Each cut leaves at least three
+/// letters. Kept simple: [`reads_back`] allows one word this misses.
 fn stem(word: &str) -> &str {
-    word.strip_suffix('s')
+    let mut word = word;
+    for ending in ["ing", "ed", "es", "s"] {
+        if let Some(rest) = word.strip_suffix(ending).filter(|rest| rest.len() > 2) {
+            word = rest;
+            break;
+        }
+    }
+    word.strip_suffix('e')
         .filter(|rest| rest.len() > 2)
         .unwrap_or(word)
 }
 
+/// How many of a task's content words its read-back may miss: one, for a
+/// stem [`stem`] gets wrong. Before, half of them could be missed, so with
+/// one yes up to half of the work started unheard: "Delete all the files
+/// in my Downloads folder and empty the trash" read back as "Claude Code
+/// will delete the files in your Downloads folder" started "empty the
+/// trash" too (the Reviewer-lead's P2 on #5609).
+const MAY_MISS: usize = 1;
+
 /// Whether the lamp's `line` says `pending` back: it names who the task was
 /// prepared for (the name, or a form the voice hears for it, spaces aside)
-/// and holds at least half of the task's content words.
+/// and holds every one of the task's content words but [`MAY_MISS`]. Only
+/// the one-yes rule ([`yes_in_the_same_turn`]) reads it.
 fn reads_back(line: &str, pending: &Pending) -> bool {
     let words = plain_words(line);
     let joined: String = words.concat();
@@ -2010,11 +2032,11 @@ fn reads_back(line: &str, pending: &Pending) -> bool {
         });
     let task = content_words(&pending.text);
     let said: Vec<&str> = words.iter().map(|word| stem(word)).collect();
-    let shared = task
+    let missed = task
         .iter()
-        .filter(|word| said.contains(&stem(word)))
+        .filter(|word| !said.contains(&stem(word)))
         .count();
-    named && !task.is_empty() && shared * 2 >= task.len()
+    named && !task.is_empty() && missed <= MAY_MISS
 }
 
 /// The note a request is given beside its words on a route that keeps only
@@ -3091,7 +3113,7 @@ pub(crate) mod tests {
         let at = Instant::now();
         let pending = moon(at);
         let now = at + Duration::from_secs(1);
-        let back = |line: &'static str, ago: u64| Some((line, Duration::from_secs(ago)));
+        let back = |line: &'static str, ago: u64| Some((line, Duration::from_secs(ago), false));
         // `may_confirm` alone refuses it, as ever.
         assert!(!may_confirm(&pending, 9, true, now));
         for yes in [
@@ -3237,6 +3259,78 @@ pub(crate) mod tests {
             true,
             Some("Yes."),
             back(MOON_BACK, 8),
+            now
+        ));
+    }
+
+    /// The Reviewer-lead's P2 on #5609: with one yes, a read-back that drops
+    /// a clause of the task never starts it, so no work starts unheard; one
+    /// that says every content word back does.
+    #[test]
+    fn one_yes_starts_only_a_task_read_back_whole() {
+        let at = Instant::now();
+        let pending = Pending {
+            text: "Delete all the files in my Downloads folder and empty the trash".into(),
+            ..moon(at)
+        };
+        let now = at + Duration::from_secs(1);
+        let back = |line: &'static str| Some((line, Duration::from_secs(8), false));
+        assert!(!yes_in_the_same_turn(
+            &pending,
+            9,
+            true,
+            Some("Yes."),
+            back("Claude Code will delete the files in your Downloads folder. Shall I start it?"),
+            now
+        ));
+        assert!(yes_in_the_same_turn(
+            &pending,
+            9,
+            true,
+            Some("Yes."),
+            back(
+                "Claude Code will delete all the files in your Downloads folder and empty the trash. Shall I start it?"
+            ),
+            now
+        ));
+        // A plural, an -ing or an -ed said back for the task's own word.
+        let fixing = Pending {
+            text: "Fix the failing login test".into(),
+            ..moon(at)
+        };
+        assert!(yes_in_the_same_turn(
+            &fixing,
+            9,
+            true,
+            Some("Yes."),
+            back("Claude Code will be fixing the failed login tests. Shall I start it?"),
+            now
+        ));
+    }
+
+    /// The Reviewer-lead's P3 on #5609: a yes said over the read-back, or
+    /// after one cut as heard, never starts the task, though the whole line
+    /// would read it back.
+    #[test]
+    fn one_yes_never_counts_over_a_cut_read_back() {
+        let at = Instant::now();
+        let pending = moon(at);
+        let now = at + Duration::from_secs(1);
+        let back = |cut| Some((MOON_BACK, Duration::from_secs(8), cut));
+        assert!(yes_in_the_same_turn(
+            &pending,
+            9,
+            true,
+            Some("Yes."),
+            back(false),
+            now
+        ));
+        assert!(!yes_in_the_same_turn(
+            &pending,
+            9,
+            true,
+            Some("Yes."),
+            back(true),
             now
         ));
     }

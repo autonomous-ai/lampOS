@@ -12551,6 +12551,20 @@ pub async fn run(
                 {
                     keep_heard(&mut thread, &engine, &command);
                 }
+                // Begun over the lamp's audible answer, or cutting it: the
+                // lamp's line before it was not heard whole (the
+                // Reviewer-lead's P3 on #5609).
+                if let ProviderInput::Start {
+                    request,
+                    over_the_lamps_voice,
+                    heard_of_cut,
+                    ..
+                } = &command
+                    && (*over_the_lamps_voice || heard_of_cut.is_some())
+                    && let Ok(mut thread) = crate::thread::THREAD.lock()
+                {
+                    thread.began_over_the_lamps_voice(*request);
+                }
                 // A new line or a written request begins: the answer before
                 // it is kept as heard, so its hand-on to memory goes now.
                 if matches!(
