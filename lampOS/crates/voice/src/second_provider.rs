@@ -1757,6 +1757,10 @@ struct Shared {
     /// Where a held save reads what was said; the thread's window when
     /// unset ([`said_window`]).
     said_window: Option<SaidWindow>,
+    /// Whether onboarding's "who you are" is open, for a yes to the
+    /// read-back with no save called ([`yes_save`]); the walk's file when
+    /// unset.
+    setup_open: Option<SetupOpen>,
     /// Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`): the eyes'
     /// looks and their known file, and a held forget's yes counts only
     /// from the held person's face seen saying it (#2377).
@@ -4182,6 +4186,7 @@ impl Engine {
                 rename_yes: false,
                 held_rename: Mutex::new(held_rename::HeldRenames::default()),
                 said_window: None,
+                setup_open: None,
                 forget_sight: None,
                 forget_through_spelling: false,
                 face_claims: false,
@@ -4639,6 +4644,16 @@ impl Engine {
     pub(crate) fn reading_said_from(mut self, window: SaidWindow) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.said_window = Some(window);
+        self
+    }
+
+    /// Where a yes to the read-back with no save called reads whether
+    /// onboarding's "who you are" is open ([`yes_save`]), in place of the
+    /// walk's file.
+    #[cfg(test)]
+    pub(crate) fn reading_setup_from(mut self, open: SetupOpen) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.setup_open = Some(open);
         self
     }
 
@@ -11504,6 +11519,10 @@ fn take_held_forget(
 
 /// What a held setup save reads of what was said.
 pub(crate) type SaidWindow = Arc<dyn Fn() -> crate::known_faces::Said + Send + Sync>;
+
+/// Whether onboarding's "who you are" is open, as a yes to the read-back
+/// with no save called reads it ([`yes_save`]).
+pub(crate) type SetupOpen = Arc<dyn Fn() -> bool + Send + Sync>;
 
 /// How long a held setup save waits for the yes.
 // One bound with the walk's: "who you are" stays open as long as a save is
