@@ -122,5 +122,72 @@ check "NIGHT_LEVEL=off plays the raw WAV [$path]" '[ "$path" = "$T/kit/a02.wav" 
 check "NIGHT_LEVEL=off's row: the raw sha twice, 0 dB; the summary's level off" \
   '[ "$src_sha" = "$raw_sha" ] && [ "$played_sha" = "$raw_sha" ] && [ "$gain" = 0.0 ] && [ "$lvl" = off ]'
 
+# #5685's P3s. Each row marks capped, lufs_out and unlevelled (a silent clip, or NIGHT_LEVEL=off), so a round's
+# readers and night_compare can tell the rows apart.
+make "$T/src/quiet.wav" 24000 <<'PY'
+N = rate
+def x(n): return 0.0
+PY
+python3 "$HERE/level.py" "$T/src" "$T/marks" >/dev/null 2>&1
+mark() { py 'import json, sys; print(json.load(open(sys.argv[1]))["clips"][sys.argv[2]].get(sys.argv[3]))' "$T/marks/level.json" "$1" "$2" 2>/dev/null; }
+check "a silent clip is copied at 0 dB and marked unlevelled" '[ "$(mark quiet.wav unlevelled)" = True ] && [ "$(mark quiet.wav gain_db)" = 0.0 ]'
+check "a levelled clip is marked not unlevelled" '[ "$(mark tone34.wav unlevelled)" = False ] && [ "$(mark clicks.wav unlevelled)" = False ]'
+rowmarks() { # rowmarks LEVEL: a02's row fields capped, lufs_out and unlevelled as night.py records them
+  env PLAYED_OUT="$T/night" NIGHT_WAV="$T/kit" NIGHT_LEVEL="$1" PYTHONPATH="$HERE" python3 -c '
+import night
+night.prepare(["a02"]); r = night.row_fields("a02")
+print(r["capped"], r["lufs_out"], r["unlevelled"], r["gain_db"])
+' 2>/dev/null
+}
+read -r capped lufs_out unlev _ <<<"$(rowmarks -20) - - - -"
+check "night.py's levelled row records capped False, lufs_out -20 +-0.5 and unlevelled False [$capped $lufs_out $unlev]" \
+  '[ "$capped" = False ] && near "$lufs_out" -20 0.5 2>/dev/null && [ "$unlev" = False ]'
+read -r capped lufs_out unlev _ <<<"$(rowmarks off) - - - -"
+check "night.py's NIGHT_LEVEL=off row records capped False, lufs_out None and unlevelled True [$capped $lufs_out $unlev]" \
+  '[ "$capped" = False ] && [ "$lufs_out" = None ] && [ "$unlev" = True ]'
+mkdir -p "$T/cmp/night"
+py '
+import json, sys
+row = lambda i, **k: {"scene": "s1", "id": i, "kind": "talk", "text": "t", "right": True, "answered": True, **k}
+json.dump({"summary": {"level": -20}, "rows": [row("a01", capped=True, unlevelled=False), row("a02", capped=False, unlevelled=True)]}, open(sys.argv[1] + "/rA.json", "w"))
+json.dump({"summary": {}, "rows": [row("a01"), row("a02")]}, open(sys.argv[1] + "/rOld.json", "w"))
+' "$T/cmp/night"
+PLAYED_OUT="$T/cmp" python3 "$HERE/night_compare.py" rA rOld >"$T/cmp/out" 2>&1
+check "night_compare counts each round's capped and unlevelled rows (an old round: every row unlevelled)" \
+  'grep -Eq "^capped +1 +-$" "$T/cmp/out" && grep -Eq "^unlevelled +1 +2$" "$T/cmp/out"'
+check "night_compare lists the lines played unlevelled in one round and levelled in another" \
+  'grep -Eq "^s1 +a01 .*levelled +unlevelled" "$T/cmp/out" && ! grep -Eq "^s1 +a02 .*levelled" "$T/cmp/out"'
+
+# Temp files have unique names: a stale or another run's fixed level.json.tmp cannot block or clobber this one, and
+# each WAV lands by os.replace from its own temp file.
+mkdir -p "$T/tmpname/level.json.tmp"
+py '
+import os, sys, level
+moved = []; real = os.replace
+os.replace = lambda a, b: (moved.append((a, b)), real(a, b))
+level.level_dir(sys.argv[1], sys.argv[2], ["tone34.wav"])
+os.replace = real
+dst = os.path.join(sys.argv[2], "tone34.wav"); at = os.path.join(sys.argv[2], "level.json")
+assert any(b == dst for a, b in moved), moved
+assert any(b == at and a != at + ".tmp" for a, b in moved), moved
+assert not [f for f in os.listdir(sys.argv[2]) if f not in ("tone34.wav", "level.json", "level.json.tmp")], os.listdir(sys.argv[2])
+' "$T/src" "$T/tmpname" >"$T/tmpname.err" 2>&1
+check "level.py writes level.json and each WAV through unique temp names, leaving none behind" '[ ! -s "$T/tmpname.err" ] && [ -s "$T/tmpname/level.json" ]'
+
+# The meter's version is part of the cache: level.json records it, and a different version levels every clip again.
+n=$(py '
+import sys, level
+level.level_dir(sys.argv[1], sys.argv[2], ["tone34.wav", "tone14.wav"])
+calls = []; real = level.level
+level.level = lambda *a, **k: (calls.append(a[0]), real(*a, **k))[1]
+level.level_dir(sys.argv[1], sys.argv[2], ["tone34.wav", "tone14.wav"]); same = len(calls)
+level.METER_VERSION = getattr(level, "METER_VERSION", 0) + 1
+level.level_dir(sys.argv[1], sys.argv[2], ["tone34.wav", "tone14.wav"])
+print(same, len(calls) - same)
+' "$T/src" "$T/meter" 2>/dev/null)
+check "the cache keeps clips at the same meter version and levels both again at a new one [$n]" '[ "$n" = "0 2" ]'
+check "level.json records the meter's version" \
+  'py "import json, sys, level; d = json.load(open(sys.argv[1])); assert d[\"meter\"] == level.METER_VERSION" "$T/marks/level.json" 2>/dev/null'
+
 echo "level-test: $failures failed"
 [ "$failures" -eq 0 ]
