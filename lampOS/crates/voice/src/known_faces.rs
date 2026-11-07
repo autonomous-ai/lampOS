@@ -1516,6 +1516,27 @@ pub fn asks_to_remember(said: &str) -> bool {
         })
 }
 
+/// Where the second route reads whether a known face giving another name
+/// must call [`REMEMBER`], so the lamp asks before renaming them (`on`
+/// only; [`gives_another_name`], #5485).
+pub const RENAME_ASKED_ENVIRONMENT: &str = "LAMP_NAMES_RENAME_ASKED";
+
+/// Whether [`RENAME_ASKED_ENVIRONMENT`] is exactly `on`.
+pub fn rename_asked_on() -> bool {
+    std::env::var(RENAME_ASKED_ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
+/// Whether what the person said gives a name ([`gives_a_name`]) that is not
+/// the one the eyes know them by, while they are the one face at the lamp:
+/// `known` is the known file's name, `faces` the faces in the eyes' newest
+/// fresh look. "Call me Tove." from the one face known as Kess does; their
+/// own name ("I'm Kess."), an unknown face, no fresh look or two faces don't.
+/// The call this forces asks first (the eyes' `known_as`, [`told_asking`]):
+/// nothing is renamed without their yes.
+pub fn gives_another_name(said: &str, known: Option<&str>, faces: Option<usize>) -> bool {
+    faces == Some(1) && known.is_some_and(|known| gives_a_name(said) && !said_by_them(known, said))
+}
+
 /// What the model is told beside a request in which the person gave their
 /// name, with names checked: a name told is a name kept (the first builder,
 /// #705, 13:43: on 15 October the lamp only said it would remember).
@@ -4008,6 +4029,32 @@ mod tests {
                 .description
                 .contains("tells you their name")
         );
+    }
+
+    /// `LAMP_NAMES_RENAME_ASKED` (#5485): another name from the one face at
+    /// the lamp, known by a different one, asks; their own name, an
+    /// unknown face, two faces, no fresh look or no name given don't.
+    #[test]
+    fn another_name_is_one_given_by_the_one_known_face_that_is_not_theirs() {
+        for said in [
+            "Call me Tove.",
+            "Actually, my name is Tove.",
+            "I'm Tove now.",
+        ] {
+            assert!(gives_another_name(said, Some("Kess"), Some(1)), "{said}");
+            assert!(!gives_another_name(said, None, Some(1)), "{said}");
+            assert!(!gives_another_name(said, Some("Kess"), Some(2)), "{said}");
+            assert!(!gives_another_name(said, Some("Kess"), Some(0)), "{said}");
+            assert!(!gives_another_name(said, Some("Kess"), None), "{said}");
+        }
+        for said in [
+            "I'm Kess.",
+            "Call me kess.",
+            "My name is Kess, remember?",
+            "Hello there.",
+        ] {
+            assert!(!gives_another_name(said, Some("Kess"), Some(1)), "{said}");
+        }
     }
 
     /// `LAMP_SECOND_REMEMBER_ASKED`: a plain ask to remember the speaker's
