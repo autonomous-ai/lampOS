@@ -998,8 +998,10 @@ again and again, saying nothing useful. `lamp-tasks serve --set-up-later`
 with `--targets-from-machines claude`, since 3 Nov) lets it run, and says why
 hand-overs are off. On lamp-c0a4 on 3 Nov, without it, `lamp-update
 harness-on` left the part failing at every start (`tasks: No such file or
-directory (os error 2)`) until systemd stopped restarting it. The product
-unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_machines`
+directory (os error 2)`) until systemd stopped restarting it. Every file
+error at start names its path, e.g. `tasks:
+/var/lib/lampos-tasks/targets.json: No such file or directory (os error 2)`.
+The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_machines`
 (`crates/update/tests/install.rs`):
 
 - **No targets file:** the part starts with no target. Every `prepare` is
@@ -2526,7 +2528,14 @@ bound. The contract the app builds on is in #5198.
   shows its code and never its email. `revision` is the sign-in's id times
   1000 plus its changes: every change moves it, a read never does. A done
   sign-in has `message`: Harness's own result `message` (bounded, never one
-  holding an `@`) or the lamp's words for its code; Harness's
+  holding an `@`, eight digits, or the sign-in's code, matched on the
+  message's digits alone whatever the spacing or separators ("1234 5678",
+  "1234-5678"), and still after the question was asked; spelled-out digits
+  are not matched: the privacy reader's P3 on #5236 and the reviewer-lead's
+  P2 on #5579; tests
+  `a_result_keeps_harness_message_and_already_signed_in_for_the_app` and
+  `a_sign_in_message_quoting_the_code_with_separators_is_dropped`) or the lamp's
+  words for its code; Harness's
   `alreadySignedIn:true` is `done` success with `already_signed_in:true`.
 - **The app's answer** (`Session::answer_from_app`): only for an app-started
   sign-in (`started_by_voice`), for its `id` (`not_this_sign_in`), once the
@@ -2667,7 +2676,9 @@ be taken are kept in the tasks part alone, each sign-in by its `id`
 (#2137's redesign, after its first version kept them per process and could
 never have asked or taken an answer on a lamp).
 
-- **`sign_in_computer`**, when the person asks to sign the lamp in: the code
+- **`sign_in_computer`**, when the person asks to sign the lamp in, to
+  connect the lamp to their computer or to Harness, or to set up hand-overs
+  to their computer (the first two since #5198's follow-up): the code
   is said digit by digit in two groups ("1 2 3 4, 5 6 7 8"), with where to
   type it (the Harness app under Machines ▸ Approve a device, or
   harness.autonomous.ai). A start refused says why: only the switch being
@@ -2744,6 +2755,20 @@ never have asked or taken an answer on a lamp).
   again`. Tests: `a_sign_ins_question_cut_short_is_offered_again_until_heard_whole`
   (the news thread against a stand-in tasks part) and
   `a_question_not_heard_whole_is_due_again_a_few_times_at_most`.
+- **A question talked over is asked at the next pause** (#5198): when the
+  question's turn ends not heard whole, cancelled (the person talks over
+  it: `cancel_reply`) or finished with its audio cut or unheard
+  (`heard_news`), the coordinator hands its news to `TaskNews::not_heard`.
+  A sign-in's question among it is offered again at once
+  (`AskAgain::cut`), not 30 s later, so it is told at the next pause. It
+  still counts toward `ASKED_MOST`: one talked over on its last telling is
+  let go. Other news is left as it was. A turn cancelled by
+  `privacy_muted`, `privacy_gap` or `service_stopped` was not talked over:
+  its question is not offered again at once. Tests:
+  `a_sign_ins_question_talked_over_is_offered_again_at_once`,
+  `a_question_talked_over_is_due_at_once`,
+  `news_a_turn_did_not_get_heard_is_told_not_heard` and
+  `a_sign_in_question_cut_by_privacy_or_a_stop_is_not_talked_over`.
 - **The question heard:** once the question's turn was heard whole
   (`TaskNews::heard`), the coordinator sends `sign_in_asked` with the
   sign-in's id and that turn's number, the same number the worker's tools

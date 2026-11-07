@@ -1283,6 +1283,10 @@ struct Reply {
     /// The news this turn tells (its key, and those told with it): handed
     /// to the tasks part only once the turn is heard whole (#1390).
     news: Vec<String>,
+    /// Where [`Self::news`] goes if this turn is not heard whole: a
+    /// sign-in's question talked over is asked again at the next pause
+    /// (#5198).
+    news_not_heard: Option<crate::task_news::NotHeard>,
     /// The second route said its down line for this turn
     /// (`ProviderOutput::DownLineSaid`, #4332): a failure then says no
     /// `turn_lost`. Not `had_audio`: an answer cut off mid-sentence still
@@ -1466,6 +1470,9 @@ impl Reply {
             news.join(", "),
             self.delivery_outcome()
         );
+        if let Some(not_heard) = &self.news_not_heard {
+            not_heard.not_heard(news);
+        }
         Vec::new()
     }
 
@@ -11664,7 +11671,14 @@ fn conversation_with_gate_inner(
                 if !heard.is_empty() {
                     news.heard(turn, heard);
                 } else if unheard && !told_news.is_empty() {
-                    news.not_heard(told_news);
+                    // A sign-in's question went by the turn's own
+                    // `news_not_heard` in `heard_news` already (#5198).
+                    news.not_heard(
+                        told_news
+                            .into_iter()
+                            .filter(|key| crate::sign_in::asked_of(key).is_none())
+                            .collect(),
+                    );
                 }
             }
             record(
@@ -13578,7 +13592,7 @@ fn conversation_with_gate_inner(
             )?;
             last_publish = monotonic_us();
             begun_for(ticket, reply);
-            news_on(told, reply);
+            news_on(told, news.not_heard_by(), reply);
         }
         service_optional_ring(rig, &mut choreography, owner, trace, &mut ring_trace)?;
         if clock.saturating_sub(last_health) >= 50_000 {
@@ -14740,9 +14754,15 @@ fn hold_from(held: &mut Option<(String, u64)>, key: &str, found_us: Option<u64>)
 
 /// The news this turn tells, its own key and those told with it, put on the
 /// turn: handed to the tasks part only once it is heard whole (#1390).
-fn news_on(told: crate::task_news::News, reply: &mut Option<Reply>) {
+/// Not heard whole, it goes to `not_heard` (#5198).
+fn news_on(
+    told: crate::task_news::News,
+    not_heard: crate::task_news::NotHeard,
+    reply: &mut Option<Reply>,
+) {
     if let Some(current) = reply.as_mut() {
         current.news = std::iter::once(told.key).chain(told.also).collect();
+        current.news_not_heard = Some(not_heard);
     }
 }
 
@@ -15377,6 +15397,7 @@ fn commit_written_turn(
         reminder: None,
         say: None,
         news: Vec::new(),
+        news_not_heard: None,
         down_line_said: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
@@ -15621,6 +15642,7 @@ fn commit_admitted_input(
         reminder: None,
         say: None,
         news: Vec::new(),
+        news_not_heard: None,
         down_line_said: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
@@ -15733,6 +15755,7 @@ fn commit_offline_input(
         reminder: None,
         say: None,
         news: Vec::new(),
+        news_not_heard: None,
         down_line_said: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
@@ -15910,6 +15933,7 @@ fn commit_own_line(
         reminder: None,
         say: None,
         news: Vec::new(),
+        news_not_heard: None,
         down_line_said: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
@@ -16023,6 +16047,7 @@ fn continue_after_early_end(
         reminder: None,
         say: None,
         news: Vec::new(),
+        news_not_heard: None,
         down_line_said: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
@@ -16871,8 +16896,23 @@ fn record_cancelled_reply(
             current.news.join(", ")
         );
         // Told once more at the next quiet pause, with
-        // `LAMP_TASK_NEWS_RETELL=on` (#4342).
-        crate::task_news::cut_short(&current.news);
+        // `LAMP_TASK_NEWS_RETELL=on` (#4342). A sign-in's question goes by
+        // the turn's own `news_not_heard` below, once (#5198).
+        let retold: Vec<String> = current
+            .news
+            .iter()
+            .filter(|key| crate::sign_in::asked_of(key).is_none())
+            .cloned()
+            .collect();
+        crate::task_news::cut_short(&retold);
+        // A privacy mute, a privacy gap or the service stopping is no
+        // talk-over: its question is not asked again at the next pause
+        // (Jarvis's P3 on #5579).
+        if let Some(not_heard) = current.news_not_heard.take()
+            && !matches!(reason, "privacy_muted" | "privacy_gap" | "service_stopped")
+        {
+            not_heard.not_heard(std::mem::take(&mut current.news));
+        }
     }
     finish_duplex_yield(trace, cancelled_at_us, reason, None, None)?;
     trace
@@ -18299,6 +18339,7 @@ mod tests {
                 reminder: None,
                 say: None,
                 news: Vec::new(),
+                news_not_heard: None,
                 down_line_said: false,
                 last_provider_audio_at_us: None,
                 start: StartGate::new(0),
@@ -19535,6 +19576,7 @@ mod tests {
             reminder: None,
             say: None,
             news: Vec::new(),
+            news_not_heard: None,
             down_line_said: false,
             last_provider_audio_at_us: None,
             start: StartGate::new(0),
@@ -19860,6 +19902,7 @@ mod tests {
             reminder: None,
             say: None,
             news: Vec::new(),
+            news_not_heard: None,
             down_line_said: false,
             last_provider_audio_at_us: None,
             start: StartGate::new(0),
