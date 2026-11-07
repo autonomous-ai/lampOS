@@ -773,22 +773,14 @@ struct Led {
 
 impl Led {
     /// "Who you are", with a face to keep (#5669): whether the lamp's words
-    /// since the person's last line are the read-back, in its own form
-    /// ([`read_back_name`]: the name, then "did I get that right?") and not
-    /// the face question (`known_faces::said_back`): the question their
-    /// next line answers. Its name is the latest told, or, once a no took
-    /// the name back, any name: the spelled one read back afresh.
+    /// since the person's last line read back the latest name they told
+    /// ([`is_read_back`]): the question their next line answers. The name
+    /// is only ever theirs, never read from the lamp's words (Jarvis's P2 on
+    /// #5677: "Sorry, did I get it right?" would have kept "Sorry").
     fn read_back_now(&self) -> bool {
-        read_back_name(&self.lamp_words).is_some_and(|said| {
-            crate::known_faces::said_back(&said, &self.lamp_words)
-                && match self.name_said.as_deref() {
-                    Some(name) => {
-                        crate::known_faces::said_by_them(name, &said)
-                            || crate::known_faces::said_by_them(&said, name)
-                    }
-                    None => self.heard.read_back == Some(false),
-                }
-        })
+        self.name_said
+            .as_deref()
+            .is_some_and(|name| is_read_back(name, &self.lamp_words))
     }
 
     /// "Who you are" (#5669): the latest name told was read back and got no
@@ -2419,8 +2411,19 @@ impl Onboarding {
         let read = reading(language, text);
         // The name told, as ids only (#5328): English words, as the name
         // read alone is ([`Self::heard_line`]).
+        // A name spelled ("W a l t e r.") is the word it spells (#5564), so
+        // after a no the spelled name is read back and confirmed as any
+        // name told (Jarvis's P2 on #5677).
+        let spelled = if language.is_none() && !led.face_only {
+            crate::known_faces::letters_as_word(text)
+        } else {
+            None
+        };
+        // A line of letters alone names someone as a name said does: the
+        // reading's own test knows no spelling.
+        let names_someone = read.names_someone || spelled.is_some();
         let told_name = if language.is_none() && !led.face_only {
-            name_told(text)
+            spelled.or_else(|| name_told(text))
         } else {
             None
         };
@@ -2431,22 +2434,19 @@ impl Onboarding {
         // only a yes to it confirms the name; any other answer leaves it
         // unconfirmed, and a no takes it back below. The lamp's words are
         // read once, for this line.
-        // A name a no took back (`read_back` `Some(false)`) is read back
-        // afresh too, as the spelled name is: a yes to that confirms it.
         let read_back = face_kept
             && !nudge
             && led.step == Step::WhoYouAre
-            && (led.heard.name || led.heard.read_back == Some(false))
+            && led.heard.name
             && led.heard.read_back != Some(true)
             && text.chars().any(char::is_alphanumeric)
             && led.read_back_now();
-        let read_back_said = read_back.then(|| read_back_name(&led.lamp_words)).flatten();
         if text.chars().any(char::is_alphanumeric) {
             led.lamp_words.clear();
         }
         // A face to keep: the name's wait ([`NAME_WAIT_US`]) runs from the
         // name and every line after it.
-        if face_kept && led.step == Step::WhoYouAre && (led.heard.name || read.names_someone) {
+        if face_kept && led.step == Step::WhoYouAre && (led.heard.name || names_someone) {
             led.heard.name_us = Some(now_us);
         }
         let done = match led.step {
@@ -2470,23 +2470,8 @@ impl Onboarding {
                     && !read.puts_off;
                 if read_back {
                     led.heard.read_back = Some(yes);
-                    // A yes to a name read back after a no took the name
-                    // back (the spelled name, the Reviewer's P2 on #5677):
-                    // the name read back is the one known, as a first yes
-                    // keeps it, and the yes below starts the face wait.
-                    if yes
-                        && led.name_said.is_none()
-                        && let Some(name) = read_back_said
-                    {
-                        eprintln!(
-                            "lamp-voice: onboarding: who_you_are heard a yes to a name read back afresh: the name is known"
-                        );
-                        led.heard.name = true;
-                        led.name_ids = told_ids(&name);
-                        led.name_said = Some(name);
-                    }
                 }
-                if read_back && !yes && read.refuses && !read.names_someone {
+                if read_back && !yes && read.refuses && !names_someone {
                     // A no to the read-back ("No. That's not right.",
                     // #5669) takes the name back: the step no longer ends
                     // done with it, nor keeps its ids. The face wait is let
@@ -2510,7 +2495,7 @@ impl Onboarding {
                         led.heard.face_answered_us = Some(now_us);
                     }
                     !face_kept
-                } else if read.names_someone {
+                } else if names_someone {
                     if !led.heard.name {
                         eprintln!(
                             "lamp-voice: onboarding: who_you_are heard a name; {}",
@@ -4346,37 +4331,34 @@ fn name_told(text: &str) -> Option<String> {
     (!name.is_empty()).then(|| name.join(" "))
 }
 
-/// The read-back's own form (#5669), as [`WHO_NOTE`] asks
-/// the model to say it: the name, then one of these. Lowercase; kept to
-/// these two on purpose, so no other question holding the name ("Walter,
-/// lovely! Is that short for anything?", the Reviewer's P2 on #5677) is
-/// taken as the read-back.
-const READ_BACK_ASKS: [&str; 2] = ["did i get that right", "did i get it right"];
+/// Words that make a question holding the name ask whether the name is
+/// right (#5669): "did I get that right?", "is that correct?", "is that
+/// the name you want…?". Lowercase words; "the name" and "your name" are
+/// matched as two words.
+const READ_BACK_CUES: [&str; 2] = ["right", "correct"];
 
-/// The name the lamp's words `lamp` read back in the read-back's own form
-/// ([`READ_BACK_ASKS`]), lowercase: the words said right before it in its
-/// sentence, after the last comma, dash, colon or quote there ("Oh, sure —
-/// Walter, did I get that right?" reads "walter"), as [`name_told`] reads
-/// them, else the last two. None without that form, or with no word before
-/// it.
-fn read_back_name(lamp: &str) -> Option<String> {
-    let lower = lamp.to_lowercase();
-    let at = READ_BACK_ASKS
+/// Whether the lamp's words `lamp` read back the person's `name` (#5669):
+/// a question holding the name, as said or spelled (`known_faces::said_back`,
+/// never the face question), that asks whether it is right: a word of
+/// [`READ_BACK_CUES`], "the name" or "your name", or "is it" before the
+/// name ("Is it Walter?"). Any wording the model uses counts (Jarvis's P2
+/// on #5677); a question about the name that asks something else ("Walter,
+/// lovely! Is that short for anything?") does not.
+fn is_read_back(name: &str, lamp: &str) -> bool {
+    if !lamp.contains('?') || !crate::known_faces::said_back(name, lamp) {
+        return false;
+    }
+    let words = words_of(lamp);
+    let name_words = words_of(name);
+    words
         .iter()
-        .filter_map(|ask| lower.find(ask))
-        .min()?;
-    let sentence = lower[..at].rsplit(['.', '!', '?']).next().unwrap_or("");
-    let part = sentence
-        .rsplit([
-            ',', ';', ':', '"', '\u{201c}', '\u{201d}', '\u{2014}', '\u{2013}',
-        ])
-        .map(str::trim)
-        .find(|part| part.chars().any(char::is_alphanumeric))?;
-    name_told(part).or_else(|| {
-        let words = words_of(part);
-        let name = words[words.len().saturating_sub(2)..].join(" ");
-        (!name.is_empty()).then_some(name)
-    })
+        .any(|word| READ_BACK_CUES.contains(&word.as_str()))
+        || words
+            .windows(2)
+            .any(|two| two[1] == "name" && (two[0] == "the" || two[0] == "your"))
+        || words
+            .windows(2 + name_words.len().max(1))
+            .any(|run| run[0] == "is" && run[1] == "it" && run[2..].iter().eq(name_words.iter()))
 }
 
 /// A name's ids, never its words: the whole name and its first word
@@ -7724,6 +7706,125 @@ mod tests {
                 [lamp_msgs::known::person_id("walter")],
                 "{name}"
             );
+        }
+    }
+
+    /// #5669 (the Reviewer-lead's and Jarvis's P2s on #5677): the
+    /// read-back is any question holding the person's name that asks if it
+    /// is right, in whatever words; another question holding the name, or
+    /// the face question, is not.
+    #[test]
+    fn the_read_back_is_any_question_asking_if_the_name_is_right() {
+        for lamp in [
+            "Walter, did I get that right?",
+            "Oh, sure — Walter, did I get that right?",
+            "Did I get that right, Walter?",
+            "Walter? Did I get that right?",
+            "Have I got that right, Walter?",
+            "Is it Walter?",
+            "Did I get Walter right?",
+            "Walter, is that right?",
+            "Walter, is that correct?",
+            "Before I look: Walter. Is that the name you want me to know you by?",
+            "Walter. Sorry, did I get it right this time?",
+            "W-A-L-T-E-R, did I get that right?",
+        ] {
+            assert!(is_read_back("walter", lamp), "{lamp}");
+        }
+        for lamp in [
+            "Walter, lovely! Is that short for anything?",
+            "Walter, may I remember your face, so I know you next time?",
+            "Did I get that right?",
+            "Mary, did I get that right?",
+            "Walter, is it okay if I take a look at you?",
+            "Got it, Walter.",
+        ] {
+            assert!(!is_read_back("walter", lamp), "{lamp}");
+        }
+    }
+
+    /// #5669 (Jarvis's P2s on #5677): after a no and a spelling, the yes to
+    /// the read-back confirms the person's own name in any of the model's
+    /// wordings, and the name kept is always the one they told, never a
+    /// word of the lamp's ("Sorry") nor the letters read back.
+    #[test]
+    fn a_spelled_name_read_back_in_any_words_is_the_one_kept() {
+        for (name, read_back) in [
+            ("any-form-have-i", "Have I got that right, Walter?"),
+            ("any-form-is-it", "Is it Walter?"),
+            (
+                "any-form-row-2",
+                "Before I look: Walter. Is that the name you want me to know you by?",
+            ),
+            (
+                "any-form-sorry",
+                "Walter. Sorry, did I get it right this time?",
+            ),
+            ("any-form-letters", "W-A-L-T-E-R, did I get that right?"),
+        ] {
+            let mut room = read_back_asked(name);
+            room.walk.heard("No. That's not right.", room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk.lamp_words("Sorry! Could you spell it for me?");
+            room.walk.lamp_said(room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk.heard("W a l t e r.", room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk.lamp_words(read_back);
+            room.walk.lamp_said(room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk.heard("Yes.", room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk
+                .lamp_words("May I remember your face, so I know you next time?");
+            room.walk.lamp_said(room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk.heard("No thanks.", room.at);
+            report(&room.walk, "who_you_are", "done");
+            let notes = room.wait(4 * S, Some(NEAR_MIDDLE));
+            assert_eq!(notes, [skill::NAME_ONLY, PREFERENCES_NOTE], "{name}");
+            assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done), "{name}");
+            assert_eq!(
+                room.walk.kept().face_again_names,
+                [lamp_msgs::known::person_id("walter")],
+                "{name}"
+            );
+        }
+    }
+
+    /// #5669 (the Reviewer-lead's P2 on #5677): a no to the read-back in
+    /// the skill's own `who_confirm` form, or with the ask as its own
+    /// sentence, takes the name back as the first form does: the model's
+    /// done then ends the step `later`, never done with the name.
+    #[test]
+    fn a_no_to_the_read_back_in_every_form_takes_the_name_back() {
+        for (name, read_back) in [
+            ("read-back-after", "Did I get that right, Walter?"),
+            ("read-back-own-sentence", "Walter? Did I get that right?"),
+        ] {
+            let mut room = Room::new(name);
+            room.walk.face_kept = true;
+            assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+            assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+            room.walk.heard("My name is Walter.", room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk.lamp_words(read_back);
+            room.walk.lamp_said(room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk.heard("No. That's not right.", room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            report(&room.walk, "who_you_are", "done");
+            let notes = room.wait(4 * S, Some(NEAR_MIDDLE));
+            assert!(
+                !notes.iter().any(|note| note == skill::NAME_ONLY),
+                "{name}: {notes:?}"
+            );
+            assert_eq!(
+                room.outcome(Step::WhoYouAre),
+                Some(Outcome::Later),
+                "{name}"
+            );
+            assert!(room.walk.kept().face_again_names.is_empty(), "{name}");
         }
     }
 
