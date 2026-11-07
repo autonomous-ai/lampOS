@@ -124,8 +124,11 @@ eligible() {
     coord_same_patch $head $cf $qf > $SP/heads.txt
     heads=(${(f)"$(<$SP/heads.txt)"})
     # 7 Nov (the second reviewer's HOLD on #5653): the PR's commits, for a Queue ask at an older head of another patch
-    # (reads2.py uses them only for Queue asks). When they can't be listed, the head alone.
-    git rev-list origin/lamp-voice..$head > $SP/pr-commits.txt 2>/dev/null || print -r -- $head > $SP/pr-commits.txt
+    # (reads2.py uses them only for Queue asks). 7 Nov (#5653's P3s): when they can't be listed, the PR sits out this
+    # round (fail closed): the head alone would miss a Queue ask at an older commit.
+    git rev-list origin/lamp-voice..$head > $SP/pr-commits.txt 2>/dev/null \
+      || { once commits$p "#$p left out: its commits can't be listed"; continue; }
+    fine commits$p
     # 7 Nov (the PM, after Twelve's table): a Queue READ ASK naming TWO READS asks too (#5647, #5650 merged on one read).
     two=$(cat $bf $cf | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf --queue $qf --pr $p --pr-commits $SP/pr-commits.txt $heads)
     if [[ $two == short* ]]; then
