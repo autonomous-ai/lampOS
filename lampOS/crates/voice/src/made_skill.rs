@@ -100,6 +100,19 @@ const REQUEST_MARK: &str = "Request: ";
 /// (`app_make::begin`'s `refused`); the voice tells the model to say them.
 pub const NOT_A_SERVICE: &str = "Not possible yet: a skill can't use your mail, calendar or \
      other services, even ones already linked. You can ask me for it yourself any time.";
+/// What a request to make a skill that would write to a linked service is
+/// told with a made skill's reads on ([`READS_ENVIRONMENT`]): a skill reads
+/// one service and never writes ([`NOT_A_SERVICE`] isn't true there; the
+/// testers' sheet, 6 Nov, "a skill is limited with no reason").
+pub const NOT_A_WRITE: &str = "Not possible yet: a skill can read one linked service, but \
+     it can't send, write or change anything there. You can ask me for it yourself any time.";
+/// What a request naming two linked services is told with reads on.
+pub const ONE_SERVICE: &str = "Not possible yet: a skill can read only one linked service, \
+     not two or more. You can ask me for it yourself any time.";
+/// What a request is told with reads on when the service it names has
+/// nothing a made skill reads (Notion, read only through its own tools).
+pub const NOT_READABLE: &str = "Not possible yet: a skill can read one linked service, but \
+     not that one. You can ask me for it yourself any time.";
 /// Words that name a linked service ([`crate::services`]) in a request, as
 /// a whole word: mail and a calendar, and the services' own names.
 const SERVICE_WORDS: [&str; 17] = [
@@ -209,9 +222,10 @@ fn asked_of_the_skill<'a>(words: &[&'a str]) -> Vec<&'a str> {
 /// code, and for a calendar or mail the one step `lamp-skills` takes (a
 /// calendar's events of a day, tomorrow when it says so, else today; the
 /// latest mail). Any other service's step the model writes from the
-/// service's reads. None when it names no service or two, one with nothing
-/// to read, or anything that would write.
-fn read_of(request: &str) -> Option<(&'static str, Option<&'static str>)> {
+/// service's reads. Its limit, in the person's words, when it would write
+/// ([`NOT_A_WRITE`]), names two services ([`ONE_SERVICE`]), or names one
+/// with nothing to read or none the lamp knows ([`NOT_READABLE`]).
+fn read_of(request: &str) -> Result<(&'static str, Option<&'static str>), &'static str> {
     let request = request.to_lowercase().replace("e-mail", "email");
     let words: Vec<&str> = request
         .split(|c: char| !c.is_alphanumeric())
@@ -223,7 +237,7 @@ fn read_of(request: &str) -> Option<(&'static str, Option<&'static str>)> {
             && !(*word == "schedule" && at > 0 && SCHEDULE_AS_A_THING.contains(&words[at - 1]))
     });
     if writes {
-        return None;
+        return Err(NOT_A_WRITE);
     }
     let joined = format!(" {} ", words.join(" "));
     let mut codes: Vec<&'static str> = SERVICE_CODES
@@ -239,11 +253,13 @@ fn read_of(request: &str) -> Option<(&'static str, Option<&'static str>)> {
         .collect();
     codes.sort_unstable();
     codes.dedup();
-    let [code] = codes.as_slice() else {
-        return None;
+    let code = match codes.as_slice() {
+        [code] => code,
+        [] => return Err(NOT_READABLE),
+        _ => return Err(ONE_SERVICE),
     };
     if lamp_services::spoken::not_readable(code).is_some() {
-        return None;
+        return Err(NOT_READABLE);
     }
     let step = match *code {
         "google_calendar" if words.contains(&"tomorrow") => {
@@ -256,7 +272,7 @@ fn read_of(request: &str) -> Option<(&'static str, Option<&'static str>)> {
         "google_drive" => Some(DRIVE_READ),
         _ => None,
     };
-    Some((code, step))
+    Ok((code, step))
 }
 
 /// Drive's step, given whole: its files come newest first, and `query` is
@@ -299,7 +315,8 @@ pub fn brief(request: &str) -> Result<String, &'static str> {
 /// skill whose one step reads it ([`read_of`]): a calendar's, mail's or
 /// Drive's step given whole, any other service's reads listed for the model to choose
 /// from (`lamp_services::spoken::whats`, never a whole text). A request
-/// that would write, or names two services, is still [`NOT_A_SERVICE`].
+/// that would write, names two services or one with nothing to read is
+/// told that limit ([`read_of`]); with reads off, any is [`NOT_A_SERVICE`].
 pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
     let request = request.split_whitespace().collect::<Vec<_>>().join(" ");
     if request.is_empty() {
@@ -309,7 +326,10 @@ pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
         return Err("That is too long to ask for as one skill: say it more shortly.");
     }
     if names_a_linked_service(&request) {
-        let (service, step) = read_of(&request).filter(|_| reads).ok_or(NOT_A_SERVICE)?;
+        if !reads {
+            return Err(NOT_A_SERVICE);
+        }
+        let (service, step) = read_of(&request)?;
         let step = match step {
             Some(step) => step.to_owned(),
             None => format!(
@@ -2389,8 +2409,9 @@ light = { dim = 1 }
 
     /// #5288: with a made skill's reads on, a request to be read a calendar
     /// or mail is briefed with its one read step, within [`MOST_BRIEF_BYTES`]
-    /// bytes; a write, another service or both are still [`NOT_A_SERVICE`],
-    /// and with the switch off every one is, as before.
+    /// bytes; a write, two services or one with nothing a skill reads are
+    /// told that limit (the testers' sheet, 6 Nov), and with the switch off
+    /// every one is [`NOT_A_SERVICE`], as before.
     #[test]
     fn with_reads_on_a_calendar_or_mail_read_is_briefed() {
         let calendar = "every evening at nine, read me tomorrow's calendar";
@@ -2413,7 +2434,7 @@ light = { dim = 1 }
         // a made skill can't read yet.
         assert_eq!(
             brief_with("each morning read me my Notion plans", true),
-            Err(NOT_A_SERVICE)
+            Err(NOT_READABLE)
         );
         let drive = brief_with("read me my Google Drive files at nine", true).unwrap();
         assert!(drive.contains("services = { google_drive = \"read\" }"));
@@ -2451,24 +2472,46 @@ light = { dim = 1 }
                 "{brief}"
             );
         }
-        for request in [
-            "glow red when Slack has a message",
-            "read me my Ahrefs numbers",
-            "read me my HubSpot deals",
-            "every friday draft my weekly mail to the team",
-            "when I say wrap up add tomorrow's first meeting to my calendar",
-            "send my calendar to the team",
-            "read my calendar and my mail",
-            "read my Notion page and my GitHub issues",
-            "post my Notion page to Slack",
+        // The testers' sheet, 6 Nov ("a skill is limited with no reason"):
+        // with reads on, "a skill can't use your mail" is false, so each is
+        // told its own limit: a read only, of one service that has one.
+        for (request, limit) in [
+            ("glow red when Slack has a message", NOT_READABLE),
+            ("read me my Ahrefs numbers", NOT_READABLE),
+            ("read me my HubSpot deals", NOT_READABLE),
+            ("every friday draft my weekly mail to the team", NOT_A_WRITE),
+            (
+                "when I say wrap up add tomorrow's first meeting to my calendar",
+                NOT_A_WRITE,
+            ),
+            ("send my calendar to the team", NOT_A_WRITE),
+            ("read my calendar and my mail", ONE_SERVICE),
+            ("read my Notion page and my GitHub issues", ONE_SERVICE),
+            ("post my Notion page to Slack", NOT_A_WRITE),
             // Asking for the skill is no write, but a write after it still is.
-            "create a skill that adds a meeting to my calendar",
-            "write me a skill to send my mail",
-            "schedule a meeting on my calendar",
+            (
+                "create a skill that adds a meeting to my calendar",
+                NOT_A_WRITE,
+            ),
+            ("write me a skill to send my mail", NOT_A_WRITE),
+            ("schedule a meeting on my calendar", NOT_A_WRITE),
             // Heron's P3: a write before "skill" is never dropped with the ask.
-            "send my mail with a skill that reads my calendar",
+            (
+                "send my mail with a skill that reads my calendar",
+                NOT_A_WRITE,
+            ),
         ] {
-            assert_eq!(brief_with(request, true), Err(NOT_A_SERVICE), "{request}");
+            assert_eq!(brief_with(request, true), Err(limit), "{request}");
+        }
+        // Each says what a skill can do, and none that it can't use a
+        // service at all.
+        for limit in [NOT_A_WRITE, ONE_SERVICE, NOT_READABLE] {
+            assert!(limit.contains("a skill can read"), "{limit}");
+            assert!(!limit.contains("can't use"), "{limit}");
+            assert!(
+                limit.ends_with("You can ask me for it yourself any time."),
+                "{limit}"
+            );
         }
         // How people ask for one (lamp-9adf, 4 Nov 23:51): "create a skill
         // that ..." and "my schedule" are no writes.
