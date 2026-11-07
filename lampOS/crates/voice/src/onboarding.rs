@@ -4205,8 +4205,12 @@ const ARRIVED_RADIANS: f64 = 6.0 * std::f64::consts::TAU / 4_096.0;
 /// Slower than this is not turning (the full look's line).
 const STILL_RADIANS_A_SECOND: f64 = 25.0 * std::f64::consts::TAU / 4_096.0;
 
-const YES: [&str; 11] = [
+/// "yup", "exactly", "perfect", "uh-huh", "mm-hmm" and "mhm" too: common
+/// answers to the name's read-back that were read as a new name (the
+/// first builder's P2 on #5677).
+const YES: [&str; 17] = [
     "yes", "yeah", "yep", "sure", "ok", "okay", "fine", "right", "correct", "please", "alright",
+    "yup", "exactly", "perfect", "uh-huh", "mm-hmm", "mhm",
 ];
 const NO: [&str; 6] = ["no", "nope", "not", "don't", "never", "none"];
 
@@ -4214,7 +4218,7 @@ const NO: [&str; 6] = ["no", "nope", "not", "don't", "never", "none"];
 /// problem", "I don't mind", "Of course", "Go ahead". On lamp-29e7 on 27 Oct
 /// "who you are" took 5 minutes (#3883); a "no problem" there also cleared
 /// the name heard.
-const YES_PHRASES: [&[&str]; 7] = [
+const YES_PHRASES: [&[&str]; 11] = [
     &["no", "problem"],
     &["don't", "mind"],
     &["do", "not", "mind"],
@@ -4223,6 +4227,11 @@ const YES_PHRASES: [&[&str]; 7] = [
     &["would", "not", "mind"],
     &["of", "course"],
     &["go", "ahead"],
+    // Answers to the name's read-back (the first builder's P2 on #5677).
+    &["you", "got", "it"],
+    &["that's", "it"],
+    &["you", "did"],
+    &["that's", "me"],
 ];
 
 /// Lines no longer than this are an answer as a whole: "Sure, go ahead."
@@ -4273,9 +4282,11 @@ fn refuses(words: &[String]) -> bool {
 /// builder's P2 on #2526). The lamp's own name too.
 /// ponytail: "lamp" stands for the lamp's name; read the configured name if
 /// a lamp is ever called something else.
-const NOT_A_NAME: [&str; 14] = [
+/// "that's", "you", "it", "did" and "got" too: "That's it." and "You did."
+/// to the read-back were kept as a name (the first builder's P2 on #5677).
+const NOT_A_NAME: [&str; 19] = [
     "fine", "good", "okay", "ok", "not", "sure", "here", "ready", "sorry", "just", "back", "busy",
-    "tired", "lamp",
+    "tired", "lamp", "that's", "you", "it", "did", "got",
 ];
 /// What a line of only a word or two is when it is not a name.
 const NOT_A_NAME_ALONE: [&str; 8] = ["what", "huh", "hmm", "um", "uh", "hey", "hi", "hello"];
@@ -4369,10 +4380,26 @@ fn questions(text: &str) -> impl Iterator<Item = &str> {
 /// "what's the correct way to say it?" ask something else.
 fn asks_if_right(words: &[String], name: &[String]) -> bool {
     let is = |at: usize, word: &str| words.get(at).is_some_and(|w| w == word);
-    let gets_right = words
-        .iter()
-        .position(|word| word == "get" || word == "got")
-        .is_some_and(|at| words[at + 1..].iter().any(|word| word == "right"));
+    // "hear" and "say" too: "Did I hear that right?", "Am I saying it
+    // right?", "Did I hear you correctly?" (the Reviewer-lead's P3 on #5677).
+    // The "right" comes straight after the verb, with only "that", "it", "you",
+    // "me", "the/my/your name" or the name between, so "Got it, Walter, are
+    // you sitting right in front of me?" and "let me get this right: …" ask
+    // something else (Jarvis's P2 at `d76f2960`).
+    let between = |word: &str| {
+        ["that", "it", "you", "me", "the", "my", "your", "name"].contains(&word)
+            || name.iter().any(|part| part == word)
+    };
+    let gets_right = (0..words.len()).any(|at| {
+        if !["get", "got", "hear", "heard", "say", "saying", "said"].contains(&words[at].as_str()) {
+            return false;
+        }
+        let cue = words[at + 1..]
+            .iter()
+            .take(4)
+            .find(|word| !between(word.as_str()));
+        cue.is_some_and(|word| word == "right" || word == "correctly")
+    });
     let is_that = (0..words.len()).any(|at| {
         is(at, "is") && is(at + 1, "that") && (is(at + 2, "right") || is(at + 2, "correct"))
     });
@@ -7643,6 +7670,51 @@ mod tests {
         );
     }
 
+    /// #5669 (the first builder's P2 on #5677): the common answers to the
+    /// read-back are a yes to it, never a new name: each keeps Walter's
+    /// ids and ends done with the name only after the face's no.
+    #[test]
+    fn the_common_answers_to_the_read_back_confirm_the_name() {
+        for (at, answer) in [
+            "Yes.",
+            "Yup.",
+            "Exactly.",
+            "Uh-huh.",
+            "Perfect.",
+            "That's it.",
+            "You did.",
+            "You got it.",
+            "That's me.",
+            "Mm-hmm.",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut room = read_back_asked(&format!("common-{at}"));
+            room.walk.heard(answer, room.at);
+            room.walk
+                .lamp_words("May I remember your face, so I know you next time?");
+            room.walk.lamp_said(room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk.heard("No thanks.", room.at);
+            let notes = room.wait(
+                FACE_SAVE_WAIT_US + START_QUIET_US + 2 * S,
+                Some(NEAR_MIDDLE),
+            );
+            assert_eq!(notes, [skill::NAME_ONLY, PREFERENCES_NOTE], "{answer}");
+            assert_eq!(
+                room.outcome(Step::WhoYouAre),
+                Some(Outcome::Done),
+                "{answer}"
+            );
+            assert_eq!(
+                room.walk.kept().face_again_names,
+                [lamp_msgs::known::person_id("walter")],
+                "{answer}"
+            );
+        }
+    }
+
     /// #5669 (Reviewer's P2 on #5677): a name spelled after a no to the
     /// read-back, read back again and said yes to, is known: the face saved
     /// ends the step done with the owner; no face saved, done with the name
@@ -7758,6 +7830,9 @@ mod tests {
             "Walter, right?",
             "So it's Walter, correct?",
             "Is it Walter? Is that right?",
+            "Did I hear that right, Walter?",
+            "Am I saying it right, Walter?",
+            "Did I hear you correctly, Walter?",
         ] {
             assert!(is_read_back("walter", lamp), "{lamp}");
         }
@@ -7776,6 +7851,14 @@ mod tests {
             "Walter. Is that the name of someone in your family?",
             "Walter. Is that your name or a nickname?",
             "Walter, what's the correct way to say it?",
+            // The sentence split (the Reviewer-lead's P3 on #5677): the
+            // first sentence's "got … right" is not the asking one's.
+            "Got it, all right. Is that short for anything, Walter?",
+            // Jarvis's P2 at d76f2960: "get"/"got" and a "right" further on.
+            "Got it, Walter, are you sitting right in front of me?",
+            "Got it, Walter, shall we get started right away?",
+            "Got it, Walter, may I take a look at you, is that all right?",
+            "Walter, let me get this right: do you want to sit there?",
         ] {
             assert!(!is_read_back("walter", lamp), "{lamp}");
         }
