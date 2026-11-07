@@ -10678,6 +10678,18 @@ fn guard_modes_new_words_come_only_with_their_switch() {
             .contains("\"I'm back, you can stop keeping an eye on things\"")
     );
     assert!(lamp_skills::watch::WORDS_V2_TURN.starts_with("off: "));
+    // A visitor who asks is told of the person who's out (#1685's played
+    // row, 7 Nov 15:36), with the new words and the old.
+    let visitor = "Asked about it by someone else, say it's on while the person who turned it on is out, never \"while you're out\".";
+    assert!(lamp_skills::watch::WORDS_V2_DESCRIPTION.ends_with(visitor));
+    assert!(
+        std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../skills/guard-mode/SKILL.md"
+        ))
+        .unwrap()
+        .contains(visitor)
+    );
     assert!(lamp_skills::watch::WORDS_V2_DESCRIPTION.len() <= 1_024);
     assert!(lamp_skills::watch::WORDS_V2_TURN.len() <= 256);
     // Every other tool is as it was.
