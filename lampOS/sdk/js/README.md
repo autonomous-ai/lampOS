@@ -338,6 +338,14 @@ resolves with its `done` instead, or with the answer where no `done` follows
 | `lamp.setListening(on)` | `false` holds this computer's mute: `{"mute": "held"}` (again: the same, nothing new). `true` lifts it: `{"mute": "lifted"}`, or `{"mute": "nothing_held"}`. The person wins: a hand on the head lifts it, said as a `done` `cut_short`, "a hand on the head", naming the `listen.set` that held it; and it ends when this computer's last connection closes or it is revoked. A `stop` doesn't lift it. Nothing the lamp hears reaches a computer either way | `hear` | no |
 | `lamp.request(op, fields)` | any op of the schema, checked against it first | the op's | |
 
+**A look's or a `joints`' `done` on a resting lamp:** a resting head or base
+can stop a little short of where it was sent, against its own friction or
+weight. Stopped within 24 counts (about 2 degrees), the `done` is `finished`
+with `yaw` and `pitch` where the joints stopped, and `clamped: true` when that
+is more than half a degree from what was asked; stopped farther short, it is
+`cut_short` after 5 s, saying how many counts short. Read the angles from the
+`done`, not from what you asked.
+
 A lamp has no rate limits, except two guards: refused actions, 20 a second (past it the connection closes), and changes of the phrases a connection listens for, 6 a minute. Hello's `limits` says `"rates": "off"` with those two as `refused` and `phrases`. `say`, `sound` and `turn.start` are still refused in quiet hours where this lamp sets them (off by default).
 
 **Refusals** reject with `byCode[code]`, a `LampError` with `code`, `why`
