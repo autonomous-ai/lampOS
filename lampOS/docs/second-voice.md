@@ -238,6 +238,7 @@ each line plays exactly as before.
 | The second route's line when a reply claims again an action no call made | `action_claim::NOT_DONE_LINE` ("Sorry, I didn't do that. Could you ask me again?") | said as the turn's text (`LAMP_ACTION_CLAIM_CHECKED`, on in the product, #5215) | the owner's words (`language::fixed_in`) |
 | The second route's line when an answer to the lamp's own question gets no words | `second_provider::ANSWER_AGAIN_LINE` ("Sorry, could you say that again?") | said as the turn's text (`LAMP_ANSWER_ASK_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
 | The second route's word when each sentence of a reply was an offer to keep left out | `keep_quietly::GOT_IT` ("Got it.") | said as the turn's text (`LAMP_KEEP_QUIETLY`, on in the product, a known person's own scope) | the owner's words (`language::fixed_in`) |
+| The second route's answer to a plain keep (`LAMP_KEEP_ANSWERS_AT_ONCE`, C59) | `keep_at_once::KEPT` ("Okay, I'll remember that.") | said as the turn's text, at once, with no second chat round | rendered ahead by this route's voice as the wordless cut-in lines are, played from that clip as the turn's piece; not rendered yet, the turn asks round 2 as without the switch |
 | The first stand's touch-only ask and its beat before moving | `first_stand::ASK_TOUCH_ONLY` ("I'd like to stretch for the first time. Rest your hand on my head when you're ready."), `GOING` ("Okay, here I go.") | asked of the say service as `text`, the model told to say the words | the model told the owner's words (the say service swaps a `text` that is a fixed line, `language::at_start`); in another language the first stand asks only this one, never the spoken yes (body.md, Fourth's finding on #4710) |
 
 The words are `language::FIXED_LINES`, one row per English line with its
@@ -968,8 +969,7 @@ order is kept. A written turn is the same from the chat on.
     "or" that starts another ask or a new clause ("… and let me know the
     weather"). "Remember that I like tea and coffee" is still a plain
     keep (the Reviewer-lead's P2 on #5594). A spoken
-    turn only; English only (with an owner's language chosen it waits as
-    before, as `LAMP_SECOND_SAY_WITH_CALL` does).
+    turn only.
   - **Round 1 called `remember` alone, with no words of its own,** and as
     its first calls, no held forget run before them.
   - **What the calls kept covers the whole line** (`keep_at_once::covers`,
@@ -996,11 +996,24 @@ order is kept. A written turn is the same from the chat on.
     the model folded into the kept text.
   - **Every keep came back kept plainly** (`keep_at_once::kept_plainly`):
     `"remembered": true` with nothing for the model to say (no `note`, no
-    `held`, no `not_replaced`, no `error`; `kept_for` only when the line
-    did not ask for everyone or the room). The lamp then says "Okay, I'll
-    remember that." (`keep_at_once::KEPT`), and the turn ends. The journal
-    says `N keep(s) kept plainly for a line that only asks to keep; "…"
-    said at once, and no round 2 is asked (LAMP_KEEP_ANSWERS_AT_ONCE)`.
+    `held`, no `replaced` or `not_replaced`, no `error`; `kept_for` only
+    when the line did not ask for everyone or the room). A correction that
+    `replaced` an older one goes to round 2, which says what changed. The
+    lamp then says "Okay, I'll remember that." (`keep_at_once::KEPT`), and
+    the turn ends. The journal says `N keep(s) kept plainly for a line that
+    only asks to keep; "…" said at once, and no round 2 is asked
+    (LAMP_KEEP_ANSWERS_AT_ONCE)`.
+  - **In the owner's language** the line is its row in
+    `language::FIXED_LINES` (Vietnamese "Được, mình sẽ nhớ điều đó."),
+    rendered ahead as the worker starts and at each line's start, as the
+    wordless cut-in lines are (`Engine::render_fixed_answers`,
+    `FixedClips`), and played from that clip as the turn's piece
+    (`Queue::push_clip`; journal `… said at once from its clip rendered
+    ahead`). Until the clip is kept (the voice slow or failed at start),
+    the turn asks round 2 as without the switch (journal `the keep's line
+    is not rendered ahead in the owner's language yet; round 2 answers`).
+    In English nothing is rendered ahead: the line goes to the voice as the
+    turn's piece, as before.
   - **Anything else goes on exactly as without the switch.** A keep that
     failed, kept nothing, was refused, held for a yes, doubted, or told
     with a note ("Already kept") goes to round 2, which is told what the
