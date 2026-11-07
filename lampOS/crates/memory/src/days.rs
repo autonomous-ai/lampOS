@@ -1529,6 +1529,48 @@ impl Days {
             .collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
+    /// The role `person` asked the lamp to play (the voice's
+    /// `LAMP_MEMORY_ROLE`): the name it answers to with them, kept until they
+    /// end it ([`Self::role_end`]) or forget everything. A known person's
+    /// alone (`p-` ids): the room, a rules scope or a guest has none. One a
+    /// person: a new one replaces theirs. At most [`ROLE_BYTES`], tidied.
+    pub fn role_set(&mut self, person: &Person, name: &str) -> Result<()> {
+        known_only(person)?;
+        let name = store::tidy(name, ROLE_BYTES);
+        if !name.chars().any(char::is_alphanumeric) {
+            return Err(Error::new("empty", "there is no name for the role"));
+        }
+        let tx = self.db.transaction()?;
+        ensure_person(&tx, person)?;
+        tx.execute(
+            "INSERT INTO roles(person,name,at_unix_ms) VALUES(?1,?2,?3) ON CONFLICT(person) DO UPDATE SET name=excluded.name,at_unix_ms=excluded.at_unix_ms",
+            params![person.as_str(), name, self.now],
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// `person`'s role ended: whether they had one.
+    pub fn role_end(&mut self, person: &Person) -> Result<bool> {
+        known_only(person)?;
+        Ok(self
+            .db
+            .execute("DELETE FROM roles WHERE person=?1", [person.as_str()])?
+            > 0)
+    }
+
+    /// `person`'s role, if they set one and have not ended it.
+    pub fn role(&self, person: &Person) -> Result<Option<String>> {
+        Ok(self
+            .db
+            .query_row(
+                "SELECT name FROM roles WHERE person=?1",
+                [person.as_str()],
+                |r| r.get(0),
+            )
+            .optional()?)
+    }
+
     pub fn session_open(
         &mut self,
         person: &Person,
@@ -2921,6 +2963,21 @@ fn legacy_files(dir: &Path) -> Result<Vec<PathBuf>> {
     files.sort();
     Ok(files)
 }
+/// The longest role name kept: a name, never a person's whole words.
+pub const ROLE_BYTES: usize = 60;
+
+/// Only a known person (`p-` ids) has a role.
+fn known_only(person: &Person) -> Result<()> {
+    if lamp_msgs::known::is_person_id(person.as_str()) {
+        Ok(())
+    } else {
+        Err(Error::new(
+            "bad_person",
+            "only a known person can have a role",
+        ))
+    }
+}
+
 pub(crate) fn ensure_person(db: &Connection, person: &Person) -> Result<()> {
     db.execute(
         "INSERT OR IGNORE INTO people(person) VALUES(?)",
@@ -3379,6 +3436,11 @@ fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
         [person.map(Person::as_str)],
     )?;
     crate::nightly::empty(tx, person)?;
+    // A role they asked the lamp to play goes with everything else of theirs.
+    tx.execute(
+        "DELETE FROM roles WHERE ?1 IS NULL OR person=?1",
+        [person.map(Person::as_str)],
+    )?;
     tx.execute(
         "UPDATE people SET skipped=0 WHERE ?1 IS NULL OR person=?1",
         [person.map(Person::as_str)],

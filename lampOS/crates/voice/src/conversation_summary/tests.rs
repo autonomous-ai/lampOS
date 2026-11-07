@@ -741,6 +741,10 @@ fn a_forget_from_the_app_drops_the_notes_and_any_in_the_making() {
         Some(&tom),
         now,
     );
+    // Their role (`LAMP_MEMORY_ROLE`), and another person's beside it.
+    let mai = crate::remember::person_id("Mai");
+    crate::remember::role::hold(&tom, Some("Harry Potter".into()));
+    crate::remember::role::hold(&mai, Some("Ron".into()));
     // Someone else's forget is not memory's: nothing goes.
     eyes.publish_json(1, &told(Some(&tom))).unwrap();
     assert_eq!(
@@ -748,6 +752,10 @@ fn a_forget_from_the_app_drops_the_notes_and_any_in_the_making() {
         0
     );
     assert!(told_from(summaries, Some(&tom), now, 64 * 1024).contains("Lima"));
+    assert_eq!(
+        crate::remember::role::cached(&tom).as_deref(),
+        Some("Harry Potter")
+    );
     // The app forgets Tom: the thread and the note go.
     memory.publish_json(2, &told(Some(&tom))).unwrap();
     assert_eq!(
@@ -762,6 +770,9 @@ fn a_forget_from_the_app_drops_the_notes_and_any_in_the_making() {
             .recall_for(Some(&tom), now, usize::MAX),
         None
     );
+    // The voice's held role went with it, and only Tom's.
+    assert_eq!(crate::remember::role::cached(&tom), None);
+    assert_eq!(crate::remember::role::cached(&mai).as_deref(), Some("Ron"));
     // A forget of everything while a note is being made: it is never kept.
     let (memory, forgot) = (Mutex::new(memory), Mutex::new(forgot));
     let forgetting = |input: &str| {
@@ -781,6 +792,8 @@ fn a_forget_from_the_app_drops_the_notes_and_any_in_the_making() {
         now,
     );
     assert_eq!(told_from(summaries, Some(&tom), now, 64 * 1024), "");
+    // Everyone's forget clears every held role.
+    assert_eq!(crate::remember::role::cached(&mai), None);
     let _ = std::fs::remove_dir_all(root);
 }
 
