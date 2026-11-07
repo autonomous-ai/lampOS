@@ -3,8 +3,11 @@
 //! lamp that installed Quiet focus its word stands in for Rest your eyes'.
 //! A lamp without it, or a sitting with no focus, is as before. Replayed
 //! from Quiet focus's own case, through the real loader and engine.
-use lamp_skills::{Call, Engine, Recorded, load_with, read_recordings};
+use lamp_skills::{
+    Call, Engine, Pushed, Recorded, Skill, load_each, load_each_with, load_with, read_recordings,
+};
 use serde_json::Value;
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 /// 1 January 2026, 10:00 UTC: the case's `clock = "10:00"`, as
@@ -30,12 +33,20 @@ fn case() -> Vec<Recorded> {
 fn says(skills: &[&str], messages: &[Recorded]) -> Vec<(String, u64)> {
     let skills = skills
         .iter()
-        .map(|name| {
-            let mut skill = load_with(&skills_root().join(name), false).unwrap();
-            skill.enabled = true;
-            skill
-        })
+        .map(|name| loaded(&skills_root().join(name)))
         .collect();
+    says_of(skills, messages)
+}
+
+/// The skill in `folder`, turned on, as a case loads it.
+fn loaded(folder: &Path) -> Skill {
+    let mut skill = load_with(folder, false).unwrap();
+    skill.enabled = true;
+    skill
+}
+
+/// [`says`], with these skills loaded.
+fn says_of(skills: Vec<Skill>, messages: &[Recorded]) -> Vec<(String, u64)> {
     let mut engine = Engine::new(skills, true);
     let first_us = messages.first().map_or(0, |message| message.header.at_us);
     engine.clock(0, first_us, TEN_O_CLOCK_MS);
@@ -149,5 +160,171 @@ fn stands_in_for_goes_with_follows_and_names_another_skill() {
         with(&unfollowed)
             .unwrap_err()
             .contains("stands_in_for goes with follows")
+    );
+}
+
+/// A copy of the skill `name` in `root`, its `skill.toml` with each
+/// `(from, to)` replaced (each must be there).
+fn copy(root: &Path, name: &str, edits: &[(&str, &str)]) -> PathBuf {
+    let from = skills_root().join(name);
+    let folder = root.join(name);
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::copy(from.join("SKILL.md"), folder.join("SKILL.md")).unwrap();
+    let mut toml = std::fs::read_to_string(from.join("skill.toml")).unwrap();
+    for (was, now) in edits {
+        assert!(toml.contains(was), "{name}: {was:?}");
+        toml = toml.replace(was, now);
+    }
+    std::fs::write(folder.join("skill.toml"), toml).unwrap();
+    folder
+}
+
+/// The reviewer's decoy (P1 on #5704): Quiet focus's `looked_up` naming
+/// `names`, in its own `[budget]` group or `group`.
+fn decoy(root: &Path, names: &str, group: &str) -> PathBuf {
+    copy(
+        root,
+        "quiet-focus",
+        &[
+            (
+                "stands_in_for = \"rest-your-eyes\"",
+                &format!("stands_in_for = \"{names}\""),
+            ),
+            ("group = \"wellbeing\"", &format!("group = \"{group}\"")),
+        ],
+    )
+}
+
+/// Whether Rest your eyes (or its copy) spoke in the sitting.
+fn rest_spoke(said: &[(String, u64)]) -> bool {
+    said.iter().any(|(skill, _)| skill == "rest-your-eyes")
+}
+
+/// A decoy in another `[budget]` group holds nothing back: Rest your eyes
+/// still speaks when they look up, and on a lamp with both the decoy is
+/// refused at load.
+#[test]
+fn a_word_in_another_group_holds_nothing_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let word = decoy(dir.path(), "rest-your-eyes", "focus");
+    let said = says_of(
+        vec![loaded(&word), loaded(&skills_root().join("rest-your-eyes"))],
+        &case(),
+    );
+    assert!(rest_spoke(&said), "{said:?}");
+    copy(dir.path(), "rest-your-eyes", &[]);
+    let decoy_loaded = load_each(dir.path())
+        .into_iter()
+        .find(|(folder, _)| folder.ends_with("quiet-focus"))
+        .unwrap()
+        .1;
+    assert!(
+        decoy_loaded
+            .as_ref()
+            .is_err_and(|why| why.contains("its own [budget] group")),
+        "{:?}",
+        decoy_loaded.map(|skill| skill.name)
+    );
+}
+
+/// A decoy naming a `warning` skill holds nothing back, even in its own
+/// group: a warning (Smoky air's policy) is never kept for another's word,
+/// and on a lamp with both the decoy is refused at load.
+#[test]
+fn a_word_for_a_warning_holds_nothing_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let word = decoy(dir.path(), "rest-your-eyes", "wellbeing");
+    let warning = copy(
+        dir.path(),
+        "rest-your-eyes",
+        &[("policy = \"nudge\"", "policy = \"warning\"")],
+    );
+    let said = says_of(vec![loaded(&word), loaded(&warning)], &case());
+    assert!(rest_spoke(&said), "{said:?}");
+    let decoy_loaded = load_each(dir.path())
+        .into_iter()
+        .find(|(folder, _)| folder.ends_with("quiet-focus"))
+        .unwrap()
+        .1;
+    assert!(
+        decoy_loaded
+            .as_ref()
+            .is_err_and(|why| why.contains("a warning")),
+        "{:?}",
+        decoy_loaded.map(|skill| skill.name)
+    );
+    // Smoky air itself, beside a decoy naming it.
+    let smoky = tempfile::tempdir().unwrap();
+    decoy(smoky.path(), "smoky-air", "wellbeing");
+    copy(smoky.path(), "smoky-air", &[]);
+    let decoy_loaded = load_each(smoky.path())
+        .into_iter()
+        .find(|(folder, _)| folder.ends_with("quiet-focus"))
+        .unwrap()
+        .1;
+    assert!(decoy_loaded.is_err(), "a decoy naming smoky-air loaded");
+}
+
+/// A decoy naming a skill that isn't loaded does nothing: Rest your eyes
+/// speaks as without it, and the decoy loads (the skill it names may be
+/// installed later, and is then held to its group and policy).
+#[test]
+fn a_word_for_a_skill_not_loaded_does_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let word = decoy(dir.path(), "no-such-skill", "wellbeing");
+    let said = says_of(
+        vec![loaded(&word), loaded(&skills_root().join("rest-your-eyes"))],
+        &case(),
+    );
+    assert!(rest_spoke(&said), "{said:?}");
+}
+
+/// A pushed skill may not use `stands_in_for`: a computer's skill never
+/// holds back a lamp skill's chance.
+#[test]
+fn a_pushed_skill_with_stands_in_for_is_refused() {
+    let toml = |key: &str| {
+        format!(
+            "kind = \"installable\"\n\
+             [permissions]\nspeak = true\ntopics = [\"humans/faces/tracked\"]\n\
+             [[trigger]]\nname = \"there\"\ntopic = \"humans/faces/tracked\"\nwhen = \"present\"\nfor = \"1m\"\n\
+             [[trigger]]\nname = \"word\"\ntopic = \"humans/faces/tracked\"\nwhen = \"present\"\nfor = \"2m\"\nrearm = \"leaves\"\n\
+             follows = {{ trigger = \"there\", within = \"10m\" }}\n{key}\
+             [ask]\npolicy = \"nudge\"\n\
+             [[do]]\non = \"word\"\nsay = \"Say hello.\"\n"
+        )
+    };
+    let result = |key: &str| {
+        let dir = tempfile::tempdir().unwrap();
+        let (root, dev) = (dir.path().join("skills"), dir.path().join("skills-dev"));
+        std::fs::create_dir_all(&root).unwrap();
+        let folder = dev.join("desk-decoy");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(
+            folder.join("SKILL.md"),
+            "---\nname: desk-decoy\ndescription: A test.\n---\n",
+        )
+        .unwrap();
+        std::fs::write(folder.join("skill.toml"), toml(key)).unwrap();
+        let yes = BTreeSet::new();
+        load_each_with(
+            &root,
+            Some(Pushed {
+                dir: &dev,
+                picture_yes: &yes,
+            }),
+        )
+        .pop()
+        .unwrap()
+        .1
+        .map(|skill| skill.name)
+    };
+    assert_eq!(result(""), Ok("desk-decoy".to_owned()));
+    let refused = result("stands_in_for = \"rest-your-eyes\"\n");
+    assert!(
+        refused
+            .as_ref()
+            .is_err_and(|why| why.contains("stands_in_for")),
+        "{refused:?}"
     );
 }
