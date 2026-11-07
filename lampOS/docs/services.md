@@ -37,7 +37,9 @@ at 14:11 on 3 Nov 2026):
 
 **In the product today, anyone who speaks to the lamp** (`LAMP_PRIVATE_ROOM=on`, the owner's call on 6 Nov). The lamp is a private room between it and its owner, so whoever speaks is the owner, and no ownership check runs: telling who is speaking wasn't reliable enough, and the lamp refused its own owner. A line must still be spoken (`NOT_HEARD`), and a write still needs its read-back and a plain "send" right after it, which catch a mishearing. Writes stay on the second route only.
 
-**The accepted cost (the owner, 6 Nov):** no face is asked for at all, with nobody in view too. So a TV, a video call or a recording that says "read my mail" can get it read aloud in full. The owner chose this over any face-in-view rule, so the lamp doesn't refuse.
+**The accepted cost (the project owner, 6 Nov, 18:08: "no more checking ownership"):** no face is asked for at all, with nobody in view too. So a TV, a video call or a recording that says "read my mail" can get it read aloud in full; a send still needs its read-back and a plain "send" after it. The owner chose this over any face-in-view rule, so the lamp doesn't refuse.
+
+With the switch on, no line is held to a voice: a read is said in full with no voice asked of the second route and no wait for a print (`services::run`), and the second route makes no services prints, so `LAMP_SAME_VOICE_FOR=services` starts no same-voice child there (`checking_the_voice_for`). On the Live route a read is said in full too, so its "never in full" below no longer holds with the switch on; it still never prepares or sends a write (`NO_SEND_HERE`), switch on or off. A made skill's read is in the private room as well: `lamp-skills.service` sets `LAMP_PRIVATE_ROOM=on`, and its gate then asks for no owner's name or known face, while two faces in view still hold it ("A made skill's read", below).
 
 The rules below are what applies with the switch off; they stay in the code for a later feature.
 
@@ -917,6 +919,17 @@ publishes, every 250 ms:
 | That face is the owner's known face | The eyes' known file (fresh within 2 s), its name the owner's, case aside | "not the owner" / "the owner not in view" |
 | No voice heard in the last minute | Each line on `voice/heard`, marked as it comes by a thread of `lamp-skills`' own (the topic is an event: the bus keeps no latest of it, so before this fix the row never held a read back; lamp-9adf, 5 Nov) | "a voice heard" |
 
+In the private room (`LAMP_PRIVATE_ROOM=on`, set in the product's
+`lamp-skills.service` and read as the voice reads it,
+`lamp_voice::person::private_room`, into `Seen::private_room`) no ownership
+check runs: the rows for an owner face enrolled and the owner's known face
+don't apply, so one face alone in view will do, known or not, with no name
+typed at setup. One face at most still holds ("not alone"): counting faces
+is not an ownership check, and a skill reads unasked, so a second person
+in view doesn't hear the owner's mail or calendar. Nobody in view still
+holds it ("the owner not in view"), and the other rows hold as above. The
+cost the owner accepted: one stranger alone in view hears it.
+
 All must hold steadily for 5 s. Until then the run waits, at most 60
 minutes, and then skips the day with nothing said ("skipped: <why>"). A
 read runs once a local day per skill (kept in `lamp-skills`' memory, so a
@@ -946,7 +959,9 @@ counted. A title, sender or subject is cut to 100 characters. The gate is
 judged again before every line. If someone comes (a second face, another
 face, a voice), the lamp stops after the line it is on and says only "I'll
 tell you the rest later."; if the gate closes for another reason (privacy,
-a pause, quiet hours, the owner gone), it stops with nothing said. The
+a pause, quiet hours, the owner gone), it stops with nothing said. In the
+private room a second face that comes and a voice heard stop it the same
+way, with the same line. The
 owner not told, or nobody in view, is looked at again for up to 5 s
 (`BLINK`) with nothing said meanwhile, as the eyes renew the known face's
 mark every 2 s and it is read fresh for 2 s: on lamp-9adf a renewal 2.1 s

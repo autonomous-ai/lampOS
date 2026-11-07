@@ -35,6 +35,11 @@ Environment=LAMP_BODY_POSE_ASK=on
 # A made skill reads a linked service to its owner alone (#5288, #5303): a skill's read step, said behind its
 # gate (the owner's face alone, no voice, not private), through lamp-services' tools socket. Played on lamp-9adf 5 Nov.
 Environment=LAMP_SKILL_READS=on
+# The private room (the owner's call, 6 Nov), as in lamp-voice.service: a made skill's read runs no ownership check,
+# so it needs no owner's name or known face, but still one face alone in view: two faces hold it, a second face
+# mid-read stops it. No voice heard, not private, not paused and not in quiet hours still hold it, and a voice heard
+# mid-read still stops it.
+Environment=LAMP_PRIVATE_ROOM=on
 # The owner's typed setup name, for a made skill's read (#5288). A blank fallback when there is none, so the read
 # is skipped ("no owner's face enrolled"), never the unit refused (SetCredential= is LoadCredential='s default,
 # systemd 252). One newline, never empty: an empty SetCredential= in a unit file fails the start at CREDENTIALS
