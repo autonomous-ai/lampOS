@@ -1734,6 +1734,22 @@ With the switch:
   The line that names one of the staff (`LAMP_TASKS_NAMED_ASK`) is forced
   first. A forced save, like the model's, checks the name and that one
   face is in view, but not that the face is the speaker's.
+- **On the second route, a known face giving another name asks first**
+  (`LAMP_NAMES_RENAME_ASKED=on`, off by default, #5485). Without it, "Call
+  me Tove." from a face known as Kess called nothing, since the ask above
+  needs "remember" said too. With the switch, names checked, the eyes'
+  who socket and the bus, a line that gives a name (`gives_a_name`) not
+  the one in the eyes' known file (`said_by_them`), while the eyes'
+  newest fresh look holds exactly one face, has its first round sent with
+  `tool_choice` naming `remember_my_face`
+  (`known_faces::gives_another_name`, `worker::rename_asks`; both read
+  when the round is asked). The eyes answer `known_as`, so the model says
+  the new name back and asks; only their yes (`LAMP_NAMES_RENAME_YES`, or
+  the model's call with `replace`) renames. Their own name, an unknown
+  face, two faces or none, no fresh look and a round after a call are
+  asked as before. The ask to remember is forced first; the journal says
+  once at start that it is on. A line that is no name but reads as one
+  ("I'm Irish.") is asked about, and nothing changes on a no.
 - The eyes take the plain `{"remember":"A"}` as before, so an older
   voice is unchanged. The other way round, a voice with the switch talking
   to older eyes gets `not_understood` for every remember (they take no
