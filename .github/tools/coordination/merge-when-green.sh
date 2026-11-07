@@ -23,22 +23,38 @@ done
 # DRY=1 (#5212): wait and decide as usual but change nothing: no lv-quiet wait, no merge; print what it would do. LV_AT
 # (dry only) stands in for lamp-voice's tip in the behind decision, to replay a past case.
 lvat=origin/lamp-voice; [[ ${DRY:-0} == 1 && -n $LV_AT ]] && lvat=$LV_AT
-# merge_once: the merge, pinned to the head. 6 Nov (the PM, train 662): GitHub answered a green train's merge with a 502
-# and the bot stopped. On GitHub's 5xx the PR is looked at first (a 5xx may come after the merge went through), then the
-# merge is tried again after MWG_RETRY_S (default 30; the tests set 0), at most 3 tries; `server` says the last was a 5xx.
+# merge_once: the merge, pinned to the head. 5 Nov (the PM, train 662): GitHub answered a green train's merge with a 502
+# and the bot stopped. On GitHub's 5xx the PR is looked at first (a 5xx may come after the merge went through, and the
+# next try's refusal too), then after MWG_RETRY_S (default 30; the tests set 0) merge_ready decides again, as lamp-voice
+# may have moved or a carried PR been held meanwhile, and the merge is tried again, at most 3 tries; `server` says the
+# last was a 5xx. A gh timeout or reset names no 5xx, so it is a refused merge, as before.
 server=0; tries=0
 merge_once() {
-  local out
+  local out five
   for tries in 1 2 3; do
     out=$(gh pr merge $P -R autonomous-ai/lampOS --rebase --match-head-commit $head 2>&1) && return 0
     [[ -n $out ]] && print -r -- "$out"
-    server=0; grep -qE 'HTTP 5[0-9][0-9]' <<< "$out" || return 1
-    server=1
-    [[ $(gh pr view $P -R autonomous-ai/lampOS --json state --jq .state 2>/dev/null) == MERGED ]] && { server=0; return 0; }
+    five=0; grep -qE 'HTTP 5[0-9][0-9]' <<< "$out" && five=1
+    (( five || server )) && [[ $(gh pr view $P -R autonomous-ai/lampOS --json state --jq .state 2>/dev/null) == MERGED ]] && { server=0; return 0; }
+    server=$five; (( server )) || return 1
     echo "$(date +%T) #$P merge answered with GitHub's 5xx (try $tries of 3)"
-    (( tries < 3 )) && sleep ${MWG_RETRY_S:-30}
+    (( tries < 3 )) && { sleep ${MWG_RETRY_S:-30}; merge_ready; }
   done
   return 1
+}
+# merge_ready: on the lamp-voice the merge will meet, the PR contains its tip, or may merge as it is; else exit 3
+# (rebuild). And every carried PR is still eligible; else exit 6. Before the first try and before each one after a 5xx
+# (the first read's P2 on this retry: lamp-voice has no branch protection, so GitHub refuses no merge onto a newer tip).
+merge_ready() {
+  git fetch -q origin lamp-voice "+refs/pull/$P/head:refs/remotes/pr/$P"
+  asis=0
+  if ! git merge-base --is-ancestor $lvat refs/remotes/pr/$P; then
+    # 4 Nov (#5212): train 597 (#5201) was green and thrown away for a factory script alone. Behind only by unrelated
+    # files, it merges as it is: by rebase, pinned to its head, after the same precheck.
+    if behind_ok; then asis=1
+    else echo "$(date +%T) #$P green but behind lamp-voice; not merged"; exit 3; fi
+  fi
+  if (( ${#pre} )) && ! $TOOLS_DIR/still-eligible.sh "${pre[@]}"; then echo "$(date +%T) #$P precheck failed: not merged"; exit 6; fi
 }
 # behind_ok: behind-unrelated.sh's decision on this PR's head, printed; true only with --behind-unrelated and "merge as is".
 behind_ok() { local d; (( unrelated )) || return 1; d=$($TOOLS_DIR/behind-unrelated.sh ${${nocrates:#0}:+--no-crates} refs/remotes/pr/$P $lvat); local rc=$?; echo "$(date +%T) #$P behind lamp-voice: $d"; return $rc; }
@@ -124,20 +140,12 @@ for i in {1..90}; do
     # 28 Oct 20:4x (first builder): never move lamp-voice under a build still to publish (#3906's 403); the
     # ancestry check below runs after the wait, on the lamp-voice the merge will meet.
     [[ ${DRY:-0} == 1 ]] || $TOOLS_DIR/lv-quiet.sh
-    git fetch -q origin lamp-voice "+refs/pull/$P/head:refs/remotes/pr/$P"
-    asis=0
-    if ! git merge-base --is-ancestor $lvat refs/remotes/pr/$P; then
-      # 4 Nov (#5212): train 597 (#5201) was green and thrown away for a factory script alone. Behind only by unrelated
-      # files, it merges as it is: by rebase, pinned to its head, after the same precheck.
-      if behind_ok; then asis=1
-      else echo "$(date +%T) #$P green but behind lamp-voice; not merged"; exit 3; fi
-    fi
-    if (( ${#pre} )) && ! $TOOLS_DIR/still-eligible.sh "${pre[@]}"; then echo "$(date +%T) #$P precheck failed: not merged"; exit 6; fi
+    merge_ready
     if [[ ${DRY:-0} == 1 ]]; then echo "$(date +%T) dry: #$P would merge by rebase at ${head:0:9}$( (( asis )) && echo ', as it is, behind lamp-voice')"; exit 0; fi
     merge_once && echo "$(date +%T) #$P merged at ${head:0:9}$( (( asis )) && echo ', as it is, behind lamp-voice')" && exit 0
-    # 6 Nov (the PM, train 662): a merge GitHub answered with 5xx three times is GitHub's, not the train's: the same PRs go
-    # again (exit 3, rebuild), never the failed-run path that stops the bot.
-    (( server )) && { echo "$(date +%T) #$P merge answered with GitHub's 5xx $tries times; rebuilding"; exit 3; }
+    # 5 Nov (the PM, train 662): a merge GitHub answered with 5xx three times is GitHub's, not the train's: exit 7, the same
+    # PRs go again, never the failed-run path that stops the bot at once.
+    (( server )) && { echo "$(date +%T) #$P merge answered with GitHub's 5xx $tries times; rebuilding"; exit 7; }
     # A refused merge as is goes back to the old path (exit 3, rebuild), never the failed-run path.
     (( asis )) && { echo "$(date +%T) #$P merge as is refused; rebuilding as behind lamp-voice"; exit 3; }
     # 4 Nov (#5212 part 3): with two lanes, the other lane can move lamp-voice between the check above and the merge.
