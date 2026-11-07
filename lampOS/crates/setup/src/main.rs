@@ -515,7 +515,11 @@ fn recover(config: lamp_setup::serve::Config) -> Result<bool, Box<dyn std::error
         let was = policy.recovering();
         let now_ms = u64::try_from(begun.elapsed().as_millis()).unwrap_or(u64::MAX);
         let act = policy.step(now_ms, seen);
-        let say_opened = policy.says_opened(act);
+        let say_line = policy.says_line(act, now_ms);
+        // Neither open nor retried from: its line no longer stands (#5550).
+        if !policy.recovering() {
+            let _ = std::fs::remove_file(lamp_setup::recover::TOLD_FILE);
+        }
         match act {
             Some(Act::OpenHotspot) => {
                 eprintln!(
@@ -526,9 +530,6 @@ fn recover(config: lamp_setup::serve::Config) -> Result<bool, Box<dyn std::error
                     open.close();
                 }
                 open = Some(Recovering::open(&config));
-                if say_opened {
-                    say_opened_line(&mut policy, now_ms);
-                }
             }
             Some(Act::Rejoin) => {
                 eprintln!("lamp-setup: recover: no phone on the hotspot: trying the saved network");
@@ -541,10 +542,17 @@ fn recover(config: lamp_setup::serve::Config) -> Result<bool, Box<dyn std::error
             }
             None => {}
         }
-        // A line not played is asked again at a later look (#5550): the
-        // hotspot is open already, and there is only the one line.
-        if policy.says_again(now_ms) {
-            say_opened_line(&mut policy, now_ms);
+        // After the hotspot opened: its first line, or one not played asked
+        // again at a later look (#5550).
+        if say_line {
+            lamp_setup::recover::say_line(
+                &mut policy,
+                now_ms,
+                Path::new(lamp_setup::recover::TOLD_FILE),
+                |recording| {
+                    lamp_setup::wifi_change::SayService::product().play_recording(recording)
+                },
+            );
         }
         if was && !policy.recovering() {
             if seen.online {
@@ -558,19 +566,6 @@ fn recover(config: lamp_setup::serve::Config) -> Result<bool, Box<dyn std::error
                 open.close();
             }
         }
-    }
-}
-
-/// `recover`'s line as its hotspot opens. No network, so the recording
-/// only, never words for the model (#3743). Not played: journalled, the
-/// hotspot stays open all the same, and it is asked again at a later look
-/// within its minute (`Recovery::not_played`, #5550).
-fn say_opened_line(policy: &mut lamp_setup::recover::Recovery, now_ms: u64) {
-    if let Some(why) = lamp_setup::wifi_change::SayService::product()
-        .play_recording(lamp_setup::recover::RECORDING_OPENED)
-    {
-        eprintln!("lamp-setup: recover: {why}");
-        policy.not_played(now_ms);
     }
 }
 
@@ -868,15 +863,17 @@ fn wifi_change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std:
     // Then the lamp says what happened, never the network's name.
     if let Some((changed, broker)) = &answered.changed {
         let mut mouth = wifi_change::SayService::product();
-        // Recovery on (its file, kept while `recover` runs with its switch
-        // on) and no kept old file to hold it busy: its hotspot opens and
-        // says its own line, so the lost line is left to it (#5550).
-        let recovering =
-            Path::new(lamp_setup::recover::ON_FILE).exists() && !host.previous.exists();
-        if recovering && matches!(changed, wifi_change::Changed::NotBack { .. }) {
-            eprintln!("lamp-setup: wifi: recovery is on: its hotspot says the no-Wi-Fi line");
+        let hotspot = wifi_change::left_to_hotspot(
+            Path::new(lamp_setup::recover::ON_FILE),
+            &host.previous,
+            Path::new(lamp_setup::recover::TOLD_FILE),
+        );
+        if hotspot.is_some() && matches!(changed, wifi_change::Changed::NotBack { .. }) {
+            eprintln!(
+                "lamp-setup: wifi: recovery is on: the no-Wi-Fi line waits for its hotspot's"
+            );
         }
-        let said = wifi_change::say_after(&mut host, &mut mouth, changed, broker, recovering);
+        let said = wifi_change::say_after(&mut host, &mut mouth, changed, broker, hotspot);
         eprintln!("lamp-setup: wifi: {said} line(s) asked of the voice");
     }
     Ok(true)
