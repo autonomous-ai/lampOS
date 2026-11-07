@@ -3981,7 +3981,58 @@ after a take-over, but now for every turn:
   sentence names a reminder, alarm, timer or setting ("Okay, your
   reminder for seven is saved.", "Got it, your settings are saved.":
   the Reviewer-lead's P3 on #5607, so a `set_reminder` it set is never
-  said "not kept"); "I've saved that." still is a claim. The softer claims count too (K3: lamp-06c1,
+  said "not kept"); a preference saved is a kept thing, so "Your
+  preference for green tea is saved." stays a claim (Thirteen's P3 on
+  #5607), except beside a light's, volume's or `keep_rule` call of the
+  same round, where "Done, your light preference is saved." is that
+  call's (`remember::said_saved_preference`, Thirteen's P3 on #5701,
+  `a_preference_said_saved_beside_a_light_call_is_that_calls`). A
+  `recall` of the same request lifts the said-back rule only for a keep
+  that names what it found and what the yes answers
+  (`remember::said_kept_found`: each word of the said-back sentence and
+  of the line the yes answers, `heard::yes_answers` with its lead-in
+  ("Keep in mind …") left out unless a negation comes before it ("I
+  never said remember that …" stays whole), past "kept", "name",
+  "called" and the like, is one found thing's), judged only on a finished
+  sentence (ended by `.`, `!` or `?`, or the reply's end), so a streaming
+  "Yes, Pip is kept" lets nothing out before it ends: "Yes, please." to
+  "My goldfish is called Pip." answered with a `recall` that found Pip,
+  then "Yes, Pip is kept.", is said, true of what was found; "Yes, that's
+  kept." after a recall that found the old red bike, "Yes, your bike is
+  kept." after one that found the goldfish, the same after "My bike is
+  blue now." with the old red bike found, and "Yes, Pip is kept, and your
+  bike is kept too." streamed in two pieces, stay claims; a negated line
+  answered ("My bike is not red.", "isn't", "never", "no") never matches a
+  plain found thing, and a negated found thing ("Their bike is not red",
+  "They don't like coffee") never matches a plain line: the negation must
+  be equal on both sides (`remember::negates`, Thirteen's P2s on #5701).
+  The keep's own sentence must say it the same way too: "Yes, your bike
+  is red, kept." never confirms "My bike is not red." with the not-red
+  bike found.
+  A number counts however short (`remember::said_kept_words`), so "Yes,
+  your daughter is 13, kept." after "My daughter is 13." with the old 12
+  found, or locker 51 for a found 15, stays a claim. A decimal is one
+  number ("1.5" is not "5.1"), and its `.` ends no sentence. Only what
+  was kept backs a keep: a found thing's `asked_to_remember`, an active
+  `recorded_observation` or a fact's `text`, never an exchange's `heard`
+  or `you_said` (`remember::recall_found_words`), so an old exchange that
+  heard "My goldfish is called Pip." with nothing kept leaves "Yes, Pip
+  is kept." a claim, even when the recall finds the offer's own
+  exchange. "cannot" negates, and a found thing also negates with
+  "nothing", "nobody", "none" or "without" (`remember::found_negates`):
+  "Yes, your daughter can eat peanuts, kept." after "My daughter can eat
+  peanuts now." with "Their daughter cannot eat peanuts" found stays a
+  claim (Heron's P2s at 8baef46c8f on #5701). Each finished keep
+  sentence is judged on its own: only the sentences up to the last keep
+  that names a found thing are said (`remember::said_kept_found_to`,
+  `second_provider::claim_released`), and what follows stays held and is
+  judged again, so "Yes, Pip is kept. Your bike is kept too." says
+  "Yes, Pip is kept." and holds the bike as a claim (Second's P2s at
+  c60b1a7b21 on #5701). An opening claim ("Kept: …") stays one (the first
+  builder's P3 on #5607, `a_found_recall_lets_a_yes_say_it_is_kept`). A
+  done keep or change backs the turn's keep (`kept_now`) even when a bare
+  "Okay." after it is not told to confirm, so "Great, Pip is kept." is
+  said there (Thirteen's P2 on #5701). "I've saved that." still is a claim. The softer claims count too (K3: lamp-06c1,
   28 Oct night, "Noted — you work at a library now, not the bakery." and
   "All right, I'll keep it in mind." with no call): "Noted" with what was
   noted after a dash or colon, or "noted that"; "I'll keep it/that in
