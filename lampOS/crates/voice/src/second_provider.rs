@@ -11689,16 +11689,19 @@ fn let_the_walk_go() {
 /// turn is a plain yes to the lamp's read-back. A turn the lamp wrote
 /// leaves it as it is; any other turn drops it. A plain yes whose save is
 /// dropped all the same (a second face, or the speaker not seen saying it)
-/// comes back as `Err` with why, for the model to be told: left untold, it
+/// comes back as [`SetupSave::Dropped`] with why, for the model to be told: left untold, it
 /// made up its own reason on lamp-52e6 (Fifth's run B on #5415, 5 Nov:
-/// "I need to know who you are first").
+/// "I need to know who you are first"). It runs only on a yes to their
+/// face (`known_faces::face_agreed`): a plain yes to the name said back
+/// keeps it held and has the face question asked first
+/// ([`SetupSave::AskFace`]).
 fn take_held_save(
     shared: &Shared,
     request: u64,
     heard: bool,
     scope: Option<&crate::memory_scope::ScopeLease>,
     now: Instant,
-) -> Option<Result<net::ToolCall, &'static str>> {
+) -> Option<SetupSave> {
     let mut hold = shared.held_save.lock().ok()?;
     let taken = hold.take();
     let (held, called) = match taken {
@@ -11710,11 +11713,20 @@ fn take_held_save(
             drop(hold);
             (held, true)
         }
-        // Nothing held: a plain yes to a read-back the model called no
-        // save for runs one all the same, at setup only ([`yes_save`]).
+        // Nothing held: a plain yes to the face question the model called
+        // no save for runs one all the same, at setup only, and a plain yes
+        // to the name said back has that question asked ([`yes_save`]).
         None => {
             drop(hold);
-            (yes_save(shared, request, heard, scope, now)?, false)
+            match yes_save(shared, request, heard, scope, now)? {
+                Ok(save) => (save, false),
+                Err(name) => {
+                    eprintln!(
+                        "lamp-voice second: request {request}: their yes to the read-back asks the face question before any setup face save"
+                    );
+                    return Some(SetupSave::AskFace(name));
+                }
+            }
         }
     };
     let seen_speaking = crate::speaking_faces::line_seen(request);
@@ -11725,7 +11737,8 @@ fn take_held_save(
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_owned();
-    let verdict = crate::known_faces::held_save_verdict(&name, &said_window(shared));
+    let said = said_window(shared);
+    let verdict = crate::known_faces::held_save_verdict(&name, &said);
     let plain_yes = verdict == crate::known_faces::HeldSaveVerdict::Runs;
     // Only these two drop a plain yes the model should hear about.
     let mut told = false;
@@ -11752,19 +11765,36 @@ fn take_held_save(
         "the speaker was not seen saying the yes"
     } else {
         match verdict {
-            crate::known_faces::HeldSaveVerdict::Runs => {
+            crate::known_faces::HeldSaveVerdict::Runs
+                if !called || crate::known_faces::face_agreed(&name, &said) =>
+            {
                 if called {
                     eprintln!(
-                        "lamp-voice second: request {request}: their yes to the read-back runs the setup face save held in request {}",
+                        "lamp-voice second: request {request}: their yes to the face runs the setup face save held in request {}",
                         held.request
                     );
                 } else {
                     eprintln!(
-                        "lamp-voice second: request {request}: their yes to the read-back runs the setup face save no call asked for"
+                        "lamp-voice second: request {request}: their yes to the face runs the setup face save no call asked for"
                     );
                 }
-                return Some(Ok(held.call));
+                return Some(SetupSave::Runs(held.call));
             }
+            // A yes to the name alone: the save waits on, for the yes to
+            // the face question the model is now told to ask.
+            crate::known_faces::HeldSaveVerdict::Runs
+                if crate::known_faces::yes_to_the_read_back(&name, &said) =>
+            {
+                eprintln!(
+                    "lamp-voice second: request {request}: their yes to the read-back asks the face question before the setup face save held in request {}",
+                    held.request
+                );
+                if let Ok(mut hold) = shared.held_save.lock() {
+                    *hold = Some(HeldSave { request, ..held });
+                }
+                return Some(SetupSave::AskFace(name));
+            }
+            crate::known_faces::HeldSaveVerdict::Runs => "not a plain yes to the face question",
             crate::known_faces::HeldSaveVerdict::Waits => "the lamp did not say the name back",
             crate::known_faces::HeldSaveVerdict::Drops => "not a plain yes to the read-back",
         }
@@ -11778,10 +11808,23 @@ fn take_held_save(
     } else {
         // Nothing was held, so the walk was never told to wait for it.
         eprintln!(
-            "lamp-voice second: request {request}: no setup face save on their yes to the read-back: {why}"
+            "lamp-voice second: request {request}: no setup face save on their yes to the face: {why}"
         );
     }
-    told.then_some(Err(why))
+    told.then_some(SetupSave::Dropped(why))
+}
+
+/// What becomes of a setup face save on a turn ([`take_held_save`]).
+enum SetupSave {
+    /// Their yes to the face runs it, with no model call.
+    Runs(net::ToolCall),
+    /// A plain yes whose save is dropped all the same, and why, for the
+    /// model to be told.
+    Dropped(&'static str),
+    /// Their plain yes to the name said back (the name here), before any
+    /// yes to their face: the model is told to ask the face question, and
+    /// the face waits for its yes (the first builder's HOLD on #5700).
+    AskFace(String),
 }
 
 /// Notes that a face save kept a face now ([`yes_save`]).
@@ -11791,28 +11834,37 @@ fn note_face_kept(shared: &Shared, now: Instant) {
     }
 }
 
-/// The setup face save a plain yes to the lamp's read-back runs when no
-/// save was called for it, so the face no longer waits on the model
-/// (#5684, the Walter trace: the model said "Now I'll take a quick look"
-/// with no call, the face wait ended "who you are" with the name only,
-/// and its call a request later kept nothing). Taken as a held one is,
-/// through the same gates, runner and check as a model call: only on a
-/// spoken turn, while onboarding's "who you are" is open, when the lamp's
-/// last answer said back the name the person gave and this turn is a
-/// plain yes to it (`known_faces::read_back_name`), and with no face kept
-/// within [`HELD_SAVE_FOR`] (a save's step commits some seconds after it).
-/// The text is read first: the walk's small file only on such a yes.
+/// The setup face save a plain yes to their face runs when no save was
+/// called for it, so the face no longer waits on the model (#5684, the
+/// Walter trace: the model said "Now I'll take a quick look" with no call,
+/// the face wait ended "who you are" with the name only, and its call a
+/// request later kept nothing). Taken as a held one is, through the same
+/// gates, runner and check as a model call: only on a spoken turn, while
+/// onboarding's "who you are" is open, when this turn agrees to the face
+/// kept under the name said back and agreed to (`known_faces::face_agreed`:
+/// a plain yes to the face question after it, or a yes to the name that
+/// asks for the face itself), and with no face kept within
+/// [`HELD_SAVE_FOR`] (a save's step commits some seconds after it). A
+/// plain yes to the name said back alone is no yes to the face (the first
+/// builder's HOLD on #5700: setup asks "May I remember your face, so I
+/// know you next time?" only after it): `Err` with the name, for the
+/// model to ask that. The text is read first: the walk's small file only
+/// on such a yes.
 fn yes_save(
     shared: &Shared,
     request: u64,
     heard: bool,
     scope: Option<&crate::memory_scope::ScopeLease>,
     now: Instant,
-) -> Option<HeldSave> {
+) -> Option<Result<HeldSave, String>> {
     if !heard {
         return None;
     }
-    let name = crate::known_faces::read_back_name(&said_window(shared))?;
+    let said = said_window(shared);
+    let (name, face) = match crate::known_faces::face_agreed_name(&said) {
+        Some(name) => (name, true),
+        None => (crate::known_faces::read_back_name(&said)?, false),
+    };
     let kept_lately = shared
         .face_kept_at
         .lock()
@@ -11830,7 +11882,10 @@ fn yes_save(
     if !open {
         return None;
     }
-    Some(HeldSave {
+    if !face {
+        return Some(Err(name));
+    }
+    Some(Ok(HeldSave {
         call: net::ToolCall {
             id: format!("yes-save-{request}"),
             name: crate::known_faces::REMEMBER.to_owned(),
@@ -11840,7 +11895,7 @@ fn yes_save(
         request,
         session: scope.map(|scope| scope.key().session),
         at: now,
-    })
+    }))
 }
 
 /// The answer of a save a held one already ran for `name` in `request`,
@@ -12563,11 +12618,12 @@ async fn answer(
         Taken::Unseen(name) => (None, Some(crate::remember::unseen_yes_told(&name))),
         Taken::AskAgain => (None, Some(crate::remember::KEEP_ASKED_AGAIN.to_owned())),
     };
-    let (mut held_save_runs, held_save_dropped) =
+    let (mut held_save_runs, held_save_dropped, face_to_ask) =
         match take_held_save(shared, request, heard, scope.as_ref(), (shared.clock)()) {
-            Some(Ok(call)) => (Some(call), None),
-            Some(Err(why)) => (None, Some(why)),
-            None => (None, None),
+            Some(SetupSave::Runs(call)) => (Some(call), None, None),
+            Some(SetupSave::Dropped(why)) => (None, Some(why), None),
+            Some(SetupSave::AskFace(name)) => (None, None, Some(name)),
+            None => (None, None, None),
         };
     // A face rename held for their yes (`LAMP_NAMES_RENAME_YES`, #5485).
     let (mut held_rename_runs, held_rename_dropped) =
@@ -12669,6 +12725,7 @@ async fn answer(
                 && unseen_yes.is_none()
                 && held_save_runs.is_none()
                 && held_save_dropped.is_none()
+                && face_to_ask.is_none()
                 && held_rename_runs.is_none()
                 && held_rename_dropped.is_none()
                 && rename_note.is_none()
@@ -12911,7 +12968,7 @@ async fn answer(
                     note_face_kept(shared, now);
                     eprintln!("lamp-voice second: request {request}: ran the held setup face save");
                     messages.push(Message::system(format!(
-                        "(For you to know: they said yes to the name you said back, so their face is kept now, with this result: {result}. Say in a few words that you will know them, and do not call remember_my_face again for it.)"
+                        "(For you to know: they said yes to keeping their face, so it is kept now, with this result: {result}. Say in a few words that you will know them, and do not call remember_my_face again for it.)"
                     )));
                 } else {
                     eprintln!(
@@ -12919,7 +12976,7 @@ async fn answer(
                     );
                     let why = result["error"].as_str().unwrap_or("the eyes kept nothing");
                     messages.push(Message::system(format!(
-                        "(For you to know: they said yes to the name you said back, but their face could not be kept: {why}. Do not say you will know their face; you may ask them to look at you and try again.)"
+                        "(For you to know: they said yes, but their face could not be kept: {why}. Do not say you will know their face; you may ask them to look at you and try again.)"
                     )));
                 }
             }
@@ -12929,7 +12986,15 @@ async fn answer(
         // nor makes up a reason.
         if let Some(why) = held_save_dropped {
             messages.push(Message::system(format!(
-                "(For you to know: they said yes to the name you said back, but their face could not be kept: {why}. Do not say you will know their face; you may ask them to look at you and try again.)"
+                "(For you to know: they said yes, but their face could not be kept: {why}. Do not say you will know their face; you may ask them to look at you and try again.)"
+            )));
+        }
+        // Their plain yes to the name said back, with no yes to their face
+        // yet: the model asks setup's face question, and the face waits for
+        // its yes ([`SetupSave::AskFace`]).
+        if let Some(name) = face_to_ask {
+            messages.push(Message::system(format!(
+                "(For you to know: they said yes to their name, {name}, and their face is not kept yet. Ask only this now, in the language you are speaking: \"May I remember your face, so I know you next time?\" Do not call remember_my_face, and do not say you will look at or know their face, until they say yes to it.)"
             )));
         }
         // Their yes to the new name runs the face rename held for it
