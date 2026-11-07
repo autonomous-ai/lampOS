@@ -6059,6 +6059,23 @@ fn near_call_words_back(onboarding: Option<&mut crate::onboarding::Onboarding>, 
     }
 }
 
+/// A call's line begun at `began_us` was answered by the second route's
+/// down line (#5563): its try, refused, is given back.
+fn near_provider_slow(onboarding: Option<&mut crate::onboarding::Onboarding>, began_us: u64) {
+    #[cfg(test)]
+    if TEST_NEAR.with(|near| {
+        near.borrow_mut()
+            .as_mut()
+            .map(|flow| flow.provider_slow(began_us))
+            .is_some()
+    }) {
+        return;
+    }
+    if let Some(walk) = onboarding {
+        walk.near_provider_slow(began_us);
+    }
+}
+
 /// A call's line begun at `began_us` ended (#3923): the step waits a moment
 /// for its words before judging its try.
 fn near_call_line_ended(onboarding: Option<&mut crate::onboarding::Onboarding>, began_us: u64) {
@@ -8576,9 +8593,17 @@ fn conversation_with_gate_inner(
                     )?;
                 }
                 // Put on its turn by `observe_provider_output`.
-                ProviderOutput::NewsAnswered { .. }
-                | ProviderOutput::OwnWordsSaid { .. }
-                | ProviderOutput::DownLineSaid { .. } => {}
+                ProviderOutput::NewsAnswered { .. } | ProviderOutput::OwnWordsSaid { .. } => {}
+                // Put on its turn by `observe_provider_output` too. A call's
+                // line the slow chat answered with its down line (#5563):
+                // its try is the provider's, never the person's miss.
+                ProviderOutput::DownLineSaid { request } => {
+                    if let Some(&(_, Some((began, _)))) =
+                        step_call_lines.iter().find(|(turn, _)| *turn == request)
+                    {
+                        near_provider_slow(onboarding.as_mut(), began);
+                    }
+                }
                 // The person's stop for a ring their line cut: held, not
                 // rung once more (the Reviewer-lead's P2 on #5351).
                 ProviderOutput::StopAnswered { request } => {
