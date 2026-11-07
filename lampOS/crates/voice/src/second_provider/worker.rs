@@ -2295,6 +2295,26 @@ pub fn serve(
             );
             remember_asks()
         });
+    // A known face, alone at the lamp, giving another name must call
+    // remember_my_face, so the lamp asks before renaming them (#5485).
+    let rename = (crate::known_faces::rename_asked_on() && tools.names_checked)
+        .then(|| tools.who.as_deref().map(crate::known_faces::known_file_of))
+        .flatten()
+        .zip(
+            files
+                .bus_root
+                .as_deref()
+                .and_then(|root| lamp_bus::Bus::new(root).ok()),
+        )
+        .map(|(known, bus)| {
+            eprintln!(
+                "lamp-voice second: a known face alone at the lamp giving another name must call {} in its first round, which asks before renaming ({})",
+                crate::known_faces::REMEMBER,
+                crate::known_faces::RENAME_ASKED_ENVIRONMENT
+            );
+            rename_asks(known, bus)
+        });
+    let remember = first_force(remember, rename);
     // A line that plainly asks the lamp to keep something must call
     // remember, so the lamp never says it kept what it didn't
     // (`LAMP_MEMORY_KEEP_ASKED`).
@@ -4867,6 +4887,33 @@ pub(crate) fn remember_asks() -> crate::second_provider::net::Force {
                 only: None,
             },
         )
+    })
+}
+
+/// What makes a spoken turn's first round call `remember_my_face` when a
+/// known face gives another name, with `LAMP_NAMES_RENAME_ASKED=on` and
+/// names checked (#5485): the last message is the person's, and
+/// [`crate::known_faces::gives_another_name`] holds for the eyes' known
+/// file (`known`) and their newest fresh look on `bus`, both read when the
+/// round is asked. Without it [`remember_asks`] needs "remember" said too,
+/// so "Call me Tove." from a face known as Kess called nothing. The eyes
+/// answer such a call with `known_as`, the model asks them first, and their
+/// yes (`LAMP_NAMES_RENAME_YES`) or a later call with `replace` renames.
+pub(crate) fn rename_asks(
+    known: std::path::PathBuf,
+    bus: lamp_bus::Bus,
+) -> crate::second_provider::net::Force {
+    Arc::new(move |messages: &[Message]| {
+        let last = messages.last().filter(|message| message.role == "user")?;
+        crate::known_faces::gives_another_name(
+            last.words()?,
+            crate::known_faces::known_now(&known).as_deref(),
+            crate::known_faces::faces_in_view(&bus),
+        )
+        .then_some(crate::second_provider::net::Forced {
+            name: crate::known_faces::REMEMBER,
+            only: None,
+        })
     })
 }
 
@@ -29348,6 +29395,85 @@ mod memory_observer {
             assert_eq!(choice(&forcing, &messages), None, "{messages:?}");
             assert_eq!(plain.wire(&messages).2, forcing.wire(&messages).2);
         }
+    }
+
+    /// `LAMP_NAMES_RENAME_ASKED` (#5485): "Call me Tove." from the one face
+    /// at the lamp, known as Kess, called nothing, as [`remember_asks`]
+    /// needs "remember" said too. Forced, its first round calls
+    /// remember_my_face, which asks before renaming. Their own name, an
+    /// unknown face, two faces and a round after a call are asked as before.
+    #[test]
+    fn a_known_face_giving_another_name_makes_the_first_round_call_remember_my_face() {
+        use super::super::net::{Chat, Message};
+        let root = std::env::temp_dir().join(format!("lvr-rename-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut eyes = bus
+            .publisher_declared(
+                lamp_msgs::Faces::TOPIC,
+                &lamp_msgs::Faces::declaration(),
+                "eyes",
+            )
+            .unwrap();
+        let mut look = |count: usize| {
+            let face = |n: usize| lamp_msgs::Face {
+                id: format!("f{n}"),
+                xmin: 0.4,
+                ymin: 0.0,
+                xmax: 0.7,
+                ymax: 0.3,
+                confidence: 0.9,
+                yaw: None,
+                facing: None,
+                speaking: None,
+                follows: None,
+            };
+            eyes.publish_json(
+                crate::scenario_clock::monotonic_us(),
+                &lamp_msgs::Faces {
+                    faces: (0..count).map(face).collect(),
+                },
+            )
+            .unwrap();
+        };
+        let known = crate::known_faces::known_file_of(&root.join("who.sock"));
+        let declared = crate::known_faces::tools_checked(true);
+        let declare: super::super::net::Declare = Arc::new(move || declared.clone());
+        let asks = Chat::deepseek("deepseek-chat", "k", declare.clone(), false).unwrap();
+        asks.forcing(crate::second_provider::worker::remember_asks());
+        let forcing = Chat::deepseek("deepseek-chat", "k", declare, false).unwrap();
+        forcing.forcing(
+            crate::second_provider::worker::first_force(
+                Some(crate::second_provider::worker::remember_asks()),
+                Some(crate::second_provider::worker::rename_asks(
+                    known.clone(),
+                    lamp_bus::Bus::new(&root).unwrap(),
+                )),
+            )
+            .unwrap(),
+        );
+        let turn = |words: &str| vec![Message::system("You are a lamp."), Message::user(words)];
+        let choice =
+            |chat: &Chat, messages: &[Message]| chat.wire(messages).2.get("tool_choice").cloned();
+        let remember =
+            Some(serde_json::json!({"type": "function", "function": {"name": "remember_my_face"}}));
+        let another = turn("Call me Tove.");
+        look(1);
+        std::fs::write(&known, "Kess\n").unwrap();
+        assert_eq!(choice(&forcing, &another), remember);
+        // As before the switch: nothing forced.
+        assert_eq!(choice(&asks, &another), None);
+        assert_eq!(choice(&forcing, &turn("I'm Kess.")), None);
+        let mut after_a_call = another.clone();
+        after_a_call.push(Message::tool("1", "{\"error\": \"known_as\"}"));
+        assert_eq!(choice(&forcing, &after_a_call), None);
+        look(2);
+        assert_eq!(choice(&forcing, &another), None);
+        look(1);
+        std::fs::remove_file(&known).unwrap();
+        assert_eq!(choice(&forcing, &another), None);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     /// Both forces at once: each line is forced to its own function, the
