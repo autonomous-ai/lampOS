@@ -651,17 +651,62 @@ pub(crate) fn yes_to_the_read_back(name: &str, said: &Said) -> bool {
     said_back_and_agreed(name, &last)
 }
 
-/// Whether the lamp's line asks to remember their face, setup's face
-/// question ("May I remember your face, so I know you next time?"), with
-/// or without the name in it.
+/// What asks leave to remember, just before "remember": "May I …", "Do
+/// you want me to …".
+const ASKS_LEAVE: &[&[&str]] = &[
+    &["may", "i"],
+    &["can", "i"],
+    &["could", "i"],
+    &["shall", "i"],
+    &["should", "i"],
+    &["do", "you", "want", "me", "to"],
+    &["would", "you", "like", "me", "to"],
+    &["is", "it", "okay", "if", "i"],
+    &["is", "it", "ok", "if", "i"],
+];
+
+/// Words that turn a face question round, so a yes to it keeps nothing:
+/// "Would you rather I didn't remember your face?", "Shall I not …?"
+const TURNS_IT_ROUND: &[&str] = &["not", "never", "forget", "rather", "unless", "instead"];
+
+/// The same in Vietnamese anywhere in the line ("Đừng nhớ …", "quên").
+const TURNS_IT_ROUND_VI: &[&str] = &["\u{111}\u{1eeb}ng", "qu\u{ea}n", "ch\u{1eb3}ng"];
+
+/// Whether the lamp's line is setup's face question ("May I remember your
+/// face, so I know you next time?"), with or without the name in it: it
+/// asks leave to remember their face, and nothing in it turns that round
+/// (Fourteen's HOLD on #5720: a yes to "Would you rather I didn't
+/// remember your face?" kept the face). In Vietnamese ("Mình nhớ khuôn
+/// mặt bạn được không?") the "không" that asks is after "nhớ"; one before
+/// it ("Mình không nhớ khuôn mặt bạn nhé?") turns it round.
 fn asks_for_the_face(lamp: &str) -> bool {
     let words = lower_words(lamp);
-    lamp.contains('?')
-        && (words.iter().any(|word| word == "remember") && words.iter().any(|word| word == "face")
-            || words.iter().any(|word| word == "nh\u{1edb}")
-                && words
-                    .windows(2)
-                    .any(|two| two == ["khu\u{f4}n", "m\u{1eb7}t"]))
+    if !lamp.contains('?') {
+        return false;
+    }
+    if let Some(at) = words.iter().position(|word| word == "nh\u{1edb}")
+        && words[at..]
+            .windows(2)
+            .any(|two| two == ["khu\u{f4}n", "m\u{1eb7}t"])
+    {
+        return !words
+            .iter()
+            .any(|word| TURNS_IT_ROUND_VI.contains(&word.as_str()))
+            && !words[..at]
+                .iter()
+                .any(|word| ["kh\u{f4}ng", "ch\u{1b0}a"].contains(&word.as_str()));
+    }
+    let turned = words
+        .iter()
+        .any(|word| TURNS_IT_ROUND.contains(&word.as_str()) || word.ends_with("n't"));
+    !turned
+        && words.iter().enumerate().any(|(at, word)| {
+            word == "remember"
+                && words[at + 1..].iter().any(|word| word == "face")
+                && ASKS_LEAVE
+                    .iter()
+                    .any(|leave| at >= leave.len() && words[at - leave.len()..at] == leave[..])
+        })
 }
 
 /// Whether the turn's own words ask for their face to be kept: "Yes.
@@ -6907,6 +6952,41 @@ mod tests {
             ),
         ] {
             assert_eq!(face_agreed_name(&window(exchanges, this)), None, "{this}");
+        }
+    }
+
+    /// Fourteen's HOLD on #5720: a yes to a line that asks NOT to keep the
+    /// face is no yes to the face, nor is a yes to a line that asks no leave.
+    #[test]
+    fn a_yes_to_a_face_question_turned_round_keeps_nothing() {
+        for face in [
+            "Would you rather I didn't remember your face?",
+            "I won't remember your face unless you want me to. Is that okay?",
+            "Shall I not remember your face?",
+            "Do you want me to forget your face, rather than remember it?",
+            "I can't remember your face yet. Should I just call you Walter?",
+            "May I remember your face, or would you rather I didn't?",
+            "M\u{ec}nh kh\u{f4}ng nh\u{1edb} khu\u{f4}n m\u{1eb7}t b\u{1ea1}n nh\u{e9}?",
+            "\u{110}\u{1eeb}ng nh\u{1edb} khu\u{f4}n m\u{1eb7}t m\u{ec}nh nh\u{e9}?",
+        ] {
+            let said = Said {
+                this: "Yes.".into(),
+                before: vec![
+                    (
+                        "Name is Walter.".into(),
+                        "Walter, did I get that right?".into(),
+                    ),
+                    ("Yes. That's my name.".into(), face.into()),
+                ],
+            };
+            assert_eq!(face_agreed_name(&said), None, "{face}");
+        }
+        for face in [
+            "One more thing: may I remember your face now, so I can remember things for you?",
+            "Do you want me to remember your face?",
+            "M\u{ec}nh c\u{f3} th\u{1ec3} nh\u{1edb} khu\u{f4}n m\u{1eb7}t b\u{1ea1}n kh\u{f4}ng?",
+        ] {
+            assert!(asks_for_the_face(face), "{face}");
         }
     }
 }
