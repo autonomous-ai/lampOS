@@ -39,13 +39,19 @@ pub const HAND_EVERY_US: u64 = 20_000;
 
 /// Whether the body feels the head pushed by hand now (#711): a fresh
 /// `body/hand` from the body that says so. Missing, expired or from anyone
-/// else is not pushed, so a stopped body never silences the head.
+/// else is not pushed, so a stopped body never silences the head. A hand
+/// the body says only pressed the head, which did not move (`moved:
+/// false`), is not a push here: it is a hand on the head, and its touch,
+/// stroke and hold count (#5566). A body that does not say `moved` is read
+/// as before.
 pub fn pushed_now(message: Option<&Message>, now_unix_ms: u64) -> bool {
     message.is_some_and(|message| {
         !message.expired
             && !message.header.expired_at(now_unix_ms)
             && message.header.source == "body"
-            && message.parse::<Hand>().is_ok_and(|hand| hand.pushed)
+            && message
+                .parse::<Hand>()
+                .is_ok_and(|hand| hand.pushed && hand.moved != Some(false))
     })
 }
 
