@@ -382,3 +382,117 @@ fn a_line_from_another_publisher_on_messages_out_is_not_sent() {
     assert_eq!(due.len(), 1, "{due:?}");
     assert_eq!(due[0].data["event"]["detail"]["message"], "From the skill.");
 }
+
+/// A lamp carrying skills' lines only (`LAMP_SKILL_MESSAGES=on`,
+/// `LAMP_MESSAGES` unset, #1685).
+fn lamp_skill_lines_only(name: &str) -> (Real, PathBuf) {
+    let (mut lamp, bus_root) = lamp(name, false);
+    lamp.texts = Texts::on(false).carrying_skill_lines(true);
+    (lamp, bus_root)
+}
+
+/// #1685: with skills' lines carried and texts not taken, `lamp-skills`'
+/// line on `messages/out` comes off the bus as with `LAMP_MESSAGES=on`, a
+/// `task_news` event with no run, and another publisher's is still not
+/// sent, the journal naming it once.
+#[test]
+fn with_only_skills_lines_carried_a_skills_line_comes_off_the_bus_and_no_other() {
+    let (mut lamp, bus_root) = lamp_skill_lines_only("skill-lines");
+    assert!(!lamp.texting());
+    assert!(lamp.skill_lines());
+    // Listening first, as from the start.
+    assert!(
+        lamp.unasked(lamp_cloud::chat::now_ms(), true)
+            .due
+            .is_empty()
+    );
+    let bus = Bus::new(&bus_root).unwrap();
+    let line = |text: &str| MessageOut {
+        from: "skill:guard-mode".into(),
+        text: text.into(),
+        unnamed: None,
+        named: Vec::new(),
+    };
+    let mut shell = bus
+        .publisher_declared(
+            MessageOut::TOPIC,
+            &MessageOut::declaration(),
+            "lamp_bus_cli",
+        )
+        .unwrap();
+    shell
+        .publish_json(lamp_ipc::monotonic_us(), &line("Someone was at your desk."))
+        .unwrap();
+    let mut skills = bus
+        .publisher_declared(MessageOut::TOPIC, &MessageOut::declaration(), "skills")
+        .unwrap();
+    let text = "Someone was at your desk at 14:31, for about 2 minutes.";
+    skills
+        .publish_json(lamp_ipc::monotonic_us(), &line(text))
+        .unwrap();
+    let until = Instant::now() + Duration::from_secs(5);
+    let mut journal = Vec::new();
+    let mut due = Vec::new();
+    while due.is_empty() {
+        assert!(Instant::now() < until, "the skill's line never came");
+        let heard = lamp.unasked(lamp_cloud::chat::now_ms(), true);
+        journal.extend(heard.lines);
+        due.extend(heard.due);
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert_eq!(journal.len(), 1, "{journal:?}");
+    assert!(journal[0].contains("lamp_bus_cli"), "{journal:?}");
+    assert_eq!(due.len(), 1, "{due:?}");
+    assert_eq!(due[0].skill, "guard-mode");
+    let data = &due[0].data;
+    assert!(data.get("run_id").is_none());
+    assert_eq!(data["event"]["type"], "task_news");
+    assert_eq!(data["event"]["summary"], text);
+    assert_eq!(data["event"]["detail"]["message"], text);
+}
+
+/// #1685: with skills' lines carried and texts not taken, nothing else of
+/// the texts' is: `chat.send` is refused as a kind this lamp lacks and
+/// nothing goes onto `chat/in`; the voice's task news on `chat/out` is not
+/// listened for, so none comes out.
+#[test]
+fn with_only_skills_lines_carried_no_text_goes_in_and_no_voice_news_comes_out() {
+    let (mut lamp, bus_root) = lamp_skill_lines_only("skill-lines-only");
+    let voice = Bus::new(&bus_root).unwrap();
+    let mut heard = voice
+        .subscribe_typed(ChatIn::TOPIC, "voice", ChatIn::TYPE)
+        .unwrap();
+    assert_eq!(
+        answer(&mut lamp, "chat.send", &json!({"message": "hi"})),
+        Err(lamp_cloud::wire::not_here("chat.send"))
+    );
+    assert!(
+        heard.recv(Duration::from_millis(100)).unwrap().is_none(),
+        "nothing on chat/in"
+    );
+    // A look as the session's tick would take, then the voice's news.
+    assert!(lamp.chat_events(lamp_cloud::chat::now_ms()).is_empty());
+    let mut says = voice
+        .publisher_declared(ChatOut::TOPIC, &ChatOut::declaration(), "voice")
+        .unwrap();
+    says.publish_json(
+        lamp_ipc::monotonic_us(),
+        &ChatOut {
+            run_id: None,
+            session_id: None,
+            part: ChatPart::TaskNews,
+            text: "Claude Code finished the report.".into(),
+        },
+    )
+    .unwrap();
+    let events = events_until(&mut lamp, 1);
+    assert!(events.is_empty(), "{events:?}");
+    assert!(
+        voice
+            .subscribers(ChatOut::TOPIC)
+            .unwrap()
+            .iter()
+            .all(|listener| !listener.socket.starts_with("cloud")),
+        "lamp-cloud never listens on chat/out"
+    );
+}
