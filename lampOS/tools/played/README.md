@@ -314,6 +314,18 @@ lampOS/tools/played/night_compare.py r1 r2      # two rounds side by side
   lines. The WAVs (16-bit mono, 24 kHz) were rendered once through a lamp's
   own speech route, so no key is ever on a computer. `NIGHT_WAV=<folder>`
   uses WAVs on this computer instead.
+- **Level:** each clip is played at one loudness, -20 LUFS (BS.1770-4),
+  by one linear gain under a -1 dBTP true-peak ceiling and never limited
+  (`level.py`). A clip that cannot reach -20 under the ceiling is capped
+  and marked. The levelled copies are made once into
+  `$PLAYED_OUT/desk-kit-2/level-m20/` and listed in its `level.json`; the
+  tar's clips are never changed. Each row of `ROUND.json` keeps the clip's
+  `source_sha256`, `played_sha256` and `gain_db`, and the summary its
+  `level` (`-20`, or `off` with `NIGHT_LEVEL=off`, as every round before
+  #5540 was): compare `not_heard` across levels only saying so.
+  `level.py DIR OUT [--target N]` levels a folder of WAVs by hand. Its
+  test is `level-test.sh` (python3 only; ffmpeg's `ebur128` checks it too
+  when ffmpeg is there).
 - **Results:** `$PLAYED_OUT/night/ROUND.txt` (a summary line, then each line
   with what was said, heard and answered) and `ROUND.json`.
 - **When:** run it in an empty room. It plays nothing between 12:00 and
@@ -344,6 +356,7 @@ lampOS/tools/played/night_compare.py r1 r2      # two rounds side by side
 | `NIGHT_KIT_TAR` | `desk-kit-2` | night.py's kit tar, fetched once into `$PLAYED_OUT`. |
 | `NIGHT_KIT_SHA256` | the kit's | The sha256 the fetched tar must have, or it is refused. |
 | `NIGHT_WAV` | the kit's `wav/` | A folder of the lines' WAVs on this computer, used instead of the tar. |
+| `NIGHT_LEVEL` | `-20` | The loudness in LUFS night.py plays every clip at (one gain, -1 dBTP ceiling), or `off` for the raw WAVs. |
 
 All ssh goes through `lamp_ssh`, which you can also use yourself:
 `lamp_ssh 'systemctl is-active lamp-voice' </dev/null`.
