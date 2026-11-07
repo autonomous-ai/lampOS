@@ -996,7 +996,10 @@ Facebook"). After "tomorrow", "today", "day", "calendar", "facebook" or
 the sale"), or at the request's end or before "from" or "of" ("my latest
 Facebook post"), else a verb ("tomorrow book the room", "my calendar book
 the room", "tomorrow book for me a table"; El's P3s on #5690 and P2s on
-#5696). With "say" or "saying", a word asking to be read anywhere in the
+#5696). There, "a", "an", "me" or "it" right after them makes them a verb
+even with a read asked for earlier ("check my calendar and tomorrow
+schedule a meeting"). The "s" of "let's" is no "'s" ("let's post a
+photo on Facebook"; the first builder's P3s on #5696). With "say" or "saying", a word asking to be read anywhere in the
 request keeps it a read ("the last post saying we are open, read it to
 me"); with none, it is a post to write. It began on lamp-9adf on 4 Nov at 23:51,
 where "create a skill that reads my calendar" was refused. "Put" writes only with
