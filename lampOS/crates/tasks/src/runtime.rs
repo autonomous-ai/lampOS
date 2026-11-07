@@ -958,8 +958,9 @@ fn owner<C: Clock>(
 ) -> io::Result<()> {
     let mut requests = 0u64;
     let mut busy = false;
-    // Dropped before `waits` and the engine: every `watch` child is killed
-    // and reaped when the owner ends, however it ends.
+    // Declared before `waits`, so dropped after it, but still before the
+    // engine: every `watch` child is killed and reaped when the owner ends,
+    // however it ends.
     let mut follows = Follows::new(watch_lane);
     let mut waits = Waits::new(lane);
     // Progress lives here, beside the engine, and only in memory: what an
