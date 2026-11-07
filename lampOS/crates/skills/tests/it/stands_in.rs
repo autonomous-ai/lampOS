@@ -47,32 +47,38 @@ fn loaded(folder: &Path) -> Skill {
 
 /// [`says`], with these skills loaded.
 fn says_of(skills: Vec<Skill>, messages: &[Recorded]) -> Vec<(String, u64)> {
+    runs_of(skills, messages)
+        .into_iter()
+        .filter(|(run, _)| run.calls.iter().any(|call| matches!(call, Call::Say(_))))
+        .map(|(run, at_s)| (run.skill, at_s))
+        .collect()
+}
+
+/// Each run made, with the second it was made from the case's first
+/// message, with these skills loaded.
+fn runs_of(skills: Vec<Skill>, messages: &[Recorded]) -> Vec<(lamp_skills::Run, u64)> {
     let mut engine = Engine::new(skills, true);
     let first_us = messages.first().map_or(0, |message| message.header.at_us);
     engine.clock(0, first_us, TEN_O_CLOCK_MS);
-    let mut said = Vec::new();
-    let mut keep = |runs: Vec<lamp_skills::Run>, at_us: u64| {
-        for run in runs {
-            if run.calls.iter().any(|call| matches!(call, Call::Say(_))) {
-                said.push((run.skill, (at_us - first_us) / 1_000_000));
-            }
-        }
-    };
+    let mut made = Vec::new();
     for message in messages {
         let at_us = message.header.at_us;
+        let at_s = (at_us - first_us) / 1_000_000;
         engine.clock(0, at_us, TEN_O_CLOCK_MS + (at_us - first_us) / 1_000);
-        keep(engine.tick(at_us), at_us);
-        keep(
-            engine.observe(
-                &message.header.topic,
-                at_us,
-                &message.payload,
-                message.header.expires_ms,
-            ),
-            at_us,
+        made.extend(engine.tick(at_us).into_iter().map(|run| (run, at_s)));
+        made.extend(
+            engine
+                .observe(
+                    &message.header.topic,
+                    at_us,
+                    &message.payload,
+                    message.header.expires_ms,
+                )
+                .into_iter()
+                .map(|run| (run, at_s)),
         );
     }
-    said
+    made
 }
 
 /// The same case with the eyes saying `at_desk` all along: never head down,
@@ -128,6 +134,40 @@ fn with_quiet_focus_and_no_focus_rest_your_eyes_still_speaks() {
     assert_eq!(said.len(), 1, "{said:?}");
     assert_eq!(said[0].0, "rest-your-eyes");
     assert!((45 * 60..46 * 60).contains(&said[0].1), "{said:?}");
+}
+
+/// The reviewer's P3 on #5704: the wait line is said only once the held
+/// skill's `[[while]]` holds. A Rest your eyes whose `[[while]]` never holds
+/// would not have spoken anyway, so the journal never says it waits for
+/// Quiet focus's word, and the word is still said.
+#[test]
+fn no_wait_line_while_the_held_skills_while_does_not_hold() {
+    let dir = tempfile::tempdir().unwrap();
+    let never = copy(
+        dir.path(),
+        "rest-your-eyes",
+        &[(
+            "[active]",
+            "[[while]]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"never\"\n\n[active]",
+        )],
+    );
+    let runs = runs_of(
+        vec![loaded(&skills_root().join("quiet-focus")), loaded(&never)],
+        &case(),
+    );
+    let waits: Vec<_> = runs
+        .iter()
+        .flat_map(|(run, at_s)| run.events.iter().map(move |event| (event, at_s)))
+        .filter(|(event, _)| event.why.starts_with("waits:"))
+        .map(|(event, at_s)| (event.skill.clone(), event.why.clone(), *at_s))
+        .collect();
+    assert!(waits.is_empty(), "{waits:?}");
+    let said: Vec<_> = runs
+        .iter()
+        .filter(|(run, _)| run.calls.iter().any(|call| matches!(call, Call::Say(_))))
+        .map(|(run, _)| run.skill.as_str())
+        .collect();
+    assert_eq!(said, ["quiet-focus"]);
 }
 
 /// `stands_in_for` is a `follows` word's, and names another skill.
