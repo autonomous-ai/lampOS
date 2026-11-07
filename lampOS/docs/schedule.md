@@ -1633,12 +1633,48 @@ later ticks, at most one Get per item per tick, over one page of 8. A
 refusal that is the ledger's own and not the item's, a fence ahead of the
 store (`stale_revision`, same `store_id`) or `store_changed`, still refuses
 every item: each is then journaled, so the cause shows, but none is said.
-The consumer does not move the fence back itself: `DeliveryLedger` has no
-API to lower it, and accepting an older store revision as truth could
-re-speak a reminder already acknowledged at the newer one; that needs its
-own Schedule-side change. Test:
+Test:
 `an_unofferable_oldest_does_not_silence_later_items_and_each_failure_is_journaled`
 (`reminders/consumer/tests.rs`).
+
+**A fence ahead of the store (#5560, `LAMP_LEDGER_REFENCE`, off unless
+exactly `on`).** Without the switch a ledger fenced ahead of its store (a
+store put back to an older revision under the same `store_id`) refuses
+every item as above, and a timer set then says "Timer set." and never
+rings. With it:
+
+- **Re-fence at start.** The consumer arms the ledger as it opens it
+  (`DeliveryLedger::refence_at_start`). The first observation below the
+  fence after that, and only that one, lowers the fence to the store's
+  revision, so new items are offered again; later in the same run an older
+  revision is still `stale_revision`. It is lowered only when every entry
+  still fits under the new revision, and the journal says
+  `schedule delivery: the ledger's fence (N) was ahead of the store's
+  revision (M); re-fenced to the store at start`, with no item text.
+- **An acknowledged item stays acknowledged.** Compaction keeps the keys of
+  acknowledged entries it removes (`acknowledged`, the newest 128, written
+  only when not empty, read by older builds as unknown metadata). Such a key,
+  pending again in the older store, is refused (`acknowledged`) after the
+  fence check, so an unarmed ledger refuses it as `stale_revision` exactly as
+  before, and an armed one keeps its re-fence for the next item.
+- **Fallback: no timer set to never ring.** Each tick the consumer judges
+  whether an item at the bus's store revision would be refused for the
+  ledger's own fence (`DeliveryLedger::refuses`: not re-fenced, an entry
+  that doesn't fit, or `store_changed`). While it would, it keeps
+  `cannot-ring` in the delivery directory and journals the change once each
+  way. `set_timer`, `set_reminder` and `repeat_reminder` are then refused
+  before they reach the schedule (`tools::ask_schedule_for`), told
+  `reminders::CANNOT_RING` ("Nothing was set … Say you couldn't set it"), so
+  `second_provider::timer_line` gives no "Timer set." line. Both voice routes'
+  workers get the switch and the directory (`process`,
+  `ledger_refence_worker_environment`).
+
+Tests: `a_voice_started_on_a_ledger_ahead_of_the_store_says_a_due_timer`,
+`with_the_refence_switch_off_a_ledger_ahead_of_the_store_still_refuses` and
+`a_ledger_that_cannot_ring_refuses_a_new_timer_and_says_it_is_not_set`
+(`reminders/consumer/tests.rs`);
+`a_reopened_ledger_ahead_of_its_store_refences_but_never_readmits_an_acknowledged_item`
+(`crates/schedule/tests/it/delivery_ledger.rs`). Not run on a lamp.
 
 A voice started after them offers them again (the first builder, 2026-10-16:
 on lamp-4ace two reminders prepared by voices since restarted stayed pending

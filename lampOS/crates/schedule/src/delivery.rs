@@ -430,6 +430,19 @@ struct State {
     #[serde(deserialize_with = "required_option")]
     schedule: Option<StoreFence>,
     entries: Vec<Entry>,
+    /// Keys acknowledged and then compacted, the newest [`MAX_ENTRIES`]
+    /// (#5560): an older store, put back under the same `store_id`, holds
+    /// them pending again, and a re-fenced ledger must not admit them.
+    /// Absent while empty, so a ledger with none is written as before.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    acknowledged: Vec<DeliveryKey>,
+    /// Armed by [`DeliveryLedger::refence_at_start`], in memory only: the
+    /// next observation below the fence lowers it, once.
+    #[serde(skip)]
+    refence: bool,
+    /// The fence a re-fence lowered, journaled once it is saved.
+    #[serde(skip)]
+    refenced: Option<u64>,
 }
 impl State {
     fn check(&self) -> Result<(), Error> {
@@ -440,17 +453,29 @@ impl State {
             || self.next_attempt == 0
             || self.next_attempt - 1 > self.revision
             || self.entries.len() > MAX_ENTRIES
+            || self.acknowledged.len() > MAX_ENTRIES
         {
             return Err(invalid());
         }
         let Some(fence) = &self.schedule else {
-            return if self.entries.is_empty() && self.next_attempt == 1 && self.revision == 0 {
+            return if self.entries.is_empty()
+                && self.acknowledged.is_empty()
+                && self.next_attempt == 1
+                && self.revision == 0
+            {
                 Ok(())
             } else {
                 Err(invalid())
             };
         };
-        if !identity(&fence.store_id) || self.next_attempt == 1 || self.revision == 0 {
+        if !identity(&fence.store_id)
+            || self.next_attempt == 1
+            || self.revision == 0
+            || self
+                .acknowledged
+                .iter()
+                .any(|key| key.validate().is_err() || key.store_id != fence.store_id)
+        {
             return Err(invalid());
         }
         let mut last_key = None;
@@ -543,12 +568,32 @@ impl State {
     fn observe(&mut self, store_id: &str, revision: u64) -> Result<(), Error> {
         match &mut self.schedule {
             Some(fence) if fence.store_id != store_id => Err(error("store_changed")),
-            Some(fence) if revision < fence.revision => Err(error("stale_revision")),
+            Some(fence) if revision < fence.revision => {
+                // Lowered only when armed, and only to a revision every entry
+                // still fits under; otherwise refused as before.
+                let fits = self.entries.iter().all(|entry| {
+                    entry.pending_revision <= revision
+                        && entry
+                            .view
+                            .resolution
+                            .as_ref()
+                            .is_none_or(|resolution| resolution.revision() <= revision)
+                });
+                if !self.refence || !fits {
+                    return Err(error("stale_revision"));
+                }
+                self.refenced = Some(fence.revision);
+                fence.revision = revision;
+                self.refence = false;
+                Ok(())
+            }
             Some(fence) => {
                 fence.revision = revision;
+                self.refence = false;
                 Ok(())
             }
             None => {
+                self.refence = false;
                 self.schedule = Some(StoreFence {
                     store_id: store_id.into(),
                     revision,
@@ -610,6 +655,9 @@ impl<P: Persistence> DeliveryLedger<P> {
                     next_attempt: 1,
                     schedule: None,
                     entries: Vec::new(),
+                    acknowledged: Vec::new(),
+                    refence: false,
+                    refenced: None,
                 };
                 state.check()?;
                 let bytes = bounded_json(&state, MAX_STATE_BYTES)?;
@@ -651,6 +699,20 @@ impl<P: Persistence> DeliveryLedger<P> {
     pub fn schedule_revision(&self) -> Option<u64> {
         self.state.schedule.as_ref().map(|fence| fence.revision)
     }
+    /// Lets the next observation of this ledger's store below its fence, the
+    /// first after a start, lower the fence to it (#5560): a store put back
+    /// to an older revision under the same `store_id` otherwise refuses every
+    /// item as `stale_revision`. Only while every entry fits under it; a key
+    /// acknowledged before, kept or compacted, is still never admitted.
+    pub fn refence_at_start(&mut self) {
+        self.state.refence = true;
+    }
+    /// Whether an item seen at this store revision would be refused for the
+    /// ledger's own fence (`stale_revision` or `store_changed`), so a timer
+    /// set now could never be said (#5560's fallback). Changes nothing.
+    pub fn refuses(&self, store_id: &str, revision: u64) -> bool {
+        self.state.clone().observe(store_id, revision).is_err()
+    }
     pub fn view(&self, key: &DeliveryKey) -> Result<Option<DeliveryView>, Error> {
         self.healthy()?;
         key.validate()?;
@@ -686,6 +748,11 @@ impl<P: Persistence> DeliveryLedger<P> {
         }
         let mut next = self.state.clone();
         next.observe(&key.store_id, pending.revision())?;
+        // After the fence: unarmed, such an item is `stale_revision` as
+        // before; armed, the refusal leaves the re-fence unspent.
+        if next.acknowledged.contains(key) {
+            return Err(error("acknowledged"));
+        }
         let prepared = allocate(&mut next, key, correlation)?;
         next.entries.push(Entry {
             view: DeliveryView {
@@ -917,6 +984,17 @@ impl<P: Persistence> DeliveryLedger<P> {
     pub fn compact_resolved(&mut self) -> Result<usize, Error> {
         self.healthy()?;
         let mut next = self.state.clone();
+        for entry in &self.state.entries {
+            if matches!(entry.view.resolution, Some(Resolution::AckConfirmed { .. }))
+                && !next.acknowledged.contains(&entry.view.prepared.key)
+            {
+                next.acknowledged.push(entry.view.prepared.key.clone());
+            }
+        }
+        // ponytail: the newest 128 only; an older acknowledged key put back
+        // pending by a restored store could be said again.
+        let over = next.acknowledged.len().saturating_sub(MAX_ENTRIES);
+        next.acknowledged.drain(..over);
         next.entries.retain(|entry| entry.view.resolution.is_none());
         let removed = self.state.entries.len() - next.entries.len();
         if removed > 0 {
@@ -967,6 +1045,12 @@ impl<P: Persistence> DeliveryLedger<P> {
         if self.persistence.commit(&bytes).is_err() {
             self.failed = true;
             return Err(error("storage"));
+        }
+        if let Some(from) = next.refenced.take() {
+            eprintln!(
+                "schedule delivery: the ledger's fence ({from}) was ahead of the store's revision ({}); re-fenced to the store at start",
+                next.schedule.as_ref().map_or(0, |fence| fence.revision)
+            );
         }
         self.state = next;
         Ok(())

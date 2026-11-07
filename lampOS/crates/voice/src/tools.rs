@@ -2342,6 +2342,11 @@ pub fn ask_schedule_for(
     if !is_schedule_tool(&call.name) {
         return (unavailable(), false);
     }
+    // A ring the voice's ledger would refuse is never set, so no line says
+    // it is (#5560's fallback, `LAMP_LEDGER_REFENCE`).
+    if let Some(told) = crate::reminders::cannot_ring(&call.name, |name| std::env::var_os(name)) {
+        return (told, false);
+    }
     let Some(until) = Instant::now().checked_add(deadline) else {
         return (unavailable(), false);
     };
