@@ -120,7 +120,8 @@ eligible() {
     fine body$p
     # 4 Nov 04:1x: reads on an earlier head with the same patch count too (coord_same_patch), as for one read above.
     heads=(${(f)"$(coord_same_patch $head $cf)"})
-    two=$(cat $bf $cf | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf $heads)
+    # 7 Nov (the PM, after Twelve's table): a Queue READ ASK naming TWO READS asks too (#5647, #5650 merged on one read).
+    two=$(cat $bf $cf | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf --queue $qf --pr $p $heads)
     if [[ $two == short* ]]; then
       grep -qx "$p short $head" $told || { say "#$p left out: TWO READS asked, $two on ${head:0:9}" >&2; tell "$p short $head"; }
       continue

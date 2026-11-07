@@ -1,5 +1,5 @@
 # reads2.py (31 Oct 03:1x, first builder): whether a PR asked for two reads is met, read from its comments as JSON lines
-# {login, body} on stdin. argv: [--writers FILE] HEAD [EARLIER_HEAD...]. A comment whose first line is "TWO READS" (bold allowed) asks
+# {login, body} on stdin. argv: [--writers FILE] [--queue QUEUE_JSONL --pr N] HEAD [EARLIER_HEAD...]. A comment whose first line is "TWO READS" (bold allowed) asks
 # for two, as does a body or a READ ASK that names TWO READS anywhere (7 Nov, #5635, below); then two different readers must each have a READ-OK marker for a commit the head starts with. Prints "none"
 # (not asked), "met N" or "short N". #4633 (23:37) and #4656 (02:58) went in trains on one READ-OK where two had been
 # named, since the train bot read only the newest READ-OK.
@@ -85,11 +85,36 @@ def body_names_unasked(body):
     return bool(NAMES.search(body)) and not body_asks(body)
 
 
-def two_reads(items, heads, writers):
+# 7 Nov (the PM, after Twelve's table of the PRs merged since 10579): #5647 and #5650 were asked TWO READS only on the
+# Queue ("READ ASK <sha>" then "TWO READS.") and each merged on one read. A writer's Queue comment asks for a PR when its
+# first line opens with READ ASK (or has it right after a signature's colon) and names the PR, by a commit its head (or a same-patch head) starts with, or by "#N", and
+# the comment names TWO READS as a body does (body_asks, with its opt-out). The bot passes the Queue (--queue, lib.sh's
+# coord_queue: every Queue issue's last 3 days) and the PR's number (--pr).
+QUEUE_SHA = re.compile(r"\b[0-9a-f]{7,40}\b")
+# The marker opens the line or follows a signature's colon ("El, 05:18, to **Faye**: **READ ASK (restate) [#5633]"), so
+# an hourly that mentions a READ ASK in its prose ("#5650 had a READ ASK naming …") asks nothing.
+QUEUE_ASK = re.compile(r"(?:^|:)[\s*_`]*READ ASK\b")
+
+
+def queue_asks(queue, heads, pr, writers):
+    """Whether a writer's Queue READ ASK names this PR (by head or number) and TWO READS."""
+    for q in queue or ():
+        first = q["body"].lstrip().split("\n", 1)[0]
+        if not is_writer(q, writers) or not QUEUE_ASK.search(first):
+            continue
+        by_head = any(h.startswith(m) for m in QUEUE_SHA.findall(first) for h in heads)
+        by_number = bool(pr) and re.search(r"#%s(?!\d)" % re.escape(str(pr)), first)
+        if (by_head or by_number) and body_asks(q["body"]):
+            return True
+    return False
+
+
+def two_reads(items, heads, writers, queue=None, pr=None):
     """items: dicts {login, body} in posting order, the PR body as {pr_body: true}. heads: the head sha, or a list of it
-    and earlier heads with the same patch. Returns "none", "met N" or "short N"."""
+    and earlier heads with the same patch. queue: the Queue's comments (queue_asks), pr: the PR's number. Returns "none",
+    "met N" or "short N"."""
     heads = [heads] if isinstance(heads, str) else list(heads)
-    asked = False; signed = {}; unsigned = set()
+    asked = queue_asks(queue, heads, pr, writers); signed = {}; unsigned = set()
     for c in items:
         body = c["body"].lstrip()
         # 3 Nov 14:1x: the PR body is read too (a line {"pr_body": true}). 14:5x: anywhere in the body: #5049 says
@@ -120,8 +145,19 @@ def main():
             print("unasked")
         return
     writers, args = writers_from_args(sys.argv[1:], "reads2")
+    queue, pr, heads = None, None, []
+    i = 0
+    while i < len(args):
+        if args[i] == "--queue" and i + 1 < len(args):
+            with open(args[i + 1]) as f:
+                queue = [json.loads(line) for line in f if line.strip()]
+            i += 2
+        elif args[i] == "--pr" and i + 1 < len(args):
+            pr = args[i + 1]; i += 2
+        else:
+            heads.append(args[i]); i += 1
     items = [json.loads(line) for line in sys.stdin if line.strip()]
-    print(two_reads(items, args, writers))
+    print(two_reads(items, heads, writers, queue, pr))
 
 
 if __name__ == "__main__":

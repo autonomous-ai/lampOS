@@ -21,7 +21,7 @@ for p in "$@"; do
   q=$($PYTHON -I $TOOLS_DIR/qholds.py --writers $wf $head $tmp/q < $tmp/c) || { echo "#$p: qholds.py failed"; exit 1; }
   [[ -z $q ]] || { echo "#$p is now held on the Queue ($q)"; exit 1; }
   heads=(${(f)"$(coord_same_patch $head $tmp/c)"})
-  two=$(cat $tmp/b $tmp/c | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf $heads)
+  two=$(cat $tmp/b $tmp/c | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf --queue $tmp/q --pr $p $heads)
   [[ $two == none || $two == met* ]] || { echo "#$p: TWO READS ${two:-unread}"; exit 1; }
 done
 exit 0
