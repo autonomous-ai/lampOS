@@ -1517,6 +1517,14 @@ With the switch:
     only adds, so the file keeps its version: a file from before it loads
     with none, and an older build reads past it and drops it on its next
     save. Nothing reads the aliases yet.
+  - **A forget reaches an alias** (#5570). Forgetting a name kept only as
+    an alias drops it from the alias list, in the people file and in a
+    set-aside record, and answers that it forgot; the person under their
+    live name stays. A forget that waits for a set-aside file drops it
+    there too once it can. A new record under a name another record holds
+    as an alias takes it from that record, so no two records hold one name.
+    Still to do in the reader's PR: a live name wins over an alias, and a
+    rename away from the owner's typed name is guarded with #5519's.
 - **A near face with a near name is asked to spell it** (#2176 row 4). On
   lamp-4ace on 20 Oct a person known since 16 Oct was saved again under
   their name misheard by one letter: the new prints came to at most 0.359
