@@ -10,8 +10,11 @@ the lamp's last sample of its answer, `d+S` S s after its first sample (cutting 
 ended. Then it scores each played line from the session's events and the voice's journal: words heard against the
 script, lines split, cut-short words let go, answered or held as its kind says (desk talk must be held, every other
 line answered), and the first answer sound. Words are read only from played made people's lines, in an empty office.
+Each clip is played levelled (level.py: one gain to -20 LUFS under a -1 dBTP ceiling), from a copy made once into
+$PLAYED_OUT; NIGHT_LEVEL=off plays the raw WAVs.
 Saves $PLAYED_OUT/night/<ROUND>.txt (the table) and <ROUND>.json; nothing on the lamp is changed."""
 import difflib, hashlib, json, os, re, shutil, subprocess, sys, time, statistics
+import level
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SSH = [HERE + '/lamp_ssh']   # LAMP_HOST, LAMP_SSH_KEY, LAMP_KNOWN_HOSTS (README.md)
@@ -21,6 +24,9 @@ LINES = HERE + '/desk-kit-2/lines.tsv'
 KIT = os.environ.get('NIGHT_KIT_TAR', 'desk-kit-2')
 KIT_SHA256 = os.environ.get('NIGHT_KIT_SHA256', '60128bcda66193ba118a2b442ff42c24c9b6e9e39f7818ce219e200190711729')
 WAV = os.environ.get('NIGHT_WAV') or f'{OUT}/{KIT}/wav'
+# Every clip at one loudness (#5540: the kit's renders lie 5-7 LU apart): NIGHT_LEVEL is the target in LUFS, or off.
+LEVEL = os.environ.get('NIGHT_LEVEL', '-20')
+CLIPS = {}   # line id -> the file played, its source's sha256, its own and the gain between them (prepare())
 # This run's name on the lamp: its bus taps subscribe under it and its events tail runs as it, so stop_on_lamp() ends
 # exactly this run's (a tap on a quiet topic would otherwise live until its next write fails, hours later).
 TAG = f'night{os.getpid()}'   # the bus's rule for a name: [a-z][a-z0-9_]{0,31}
@@ -203,8 +209,29 @@ def stop_on_lamp():
     lamp(f"pkill -f '[{TAG[0]}]{TAG[1:]}_names'; pkill -f '[{TAG[0]}]{TAG[1:]}_heard'; sudo -n pkill -f '[{TAG[0]}]{TAG[1:]}_events'; true")
 
 
+def level_summary():
+    """The round's level: the target in LUFS, or 'off'."""
+    if LEVEL == 'off': return 'off'
+    t = float(LEVEL); return int(t) if t == int(t) else t
+
+
+def prepare(ids):
+    """Each line's WAV as it is played: the levelled copy in $PLAYED_OUT/<kit>/level-m20/ (listed in level.json, made
+    once and kept while its source is unchanged), or with NIGHT_LEVEL=off the raw WAV."""
+    if LEVEL == 'off':
+        for i in ids:
+            path = f'{WAV}/{i}.wav'; sha = level.sha256(path)
+            CLIPS[i] = {'path': path, 'source_sha256': sha, 'played_sha256': sha, 'gain_db': 0.0}
+        return
+    try: target = float(LEVEL)
+    except ValueError: sys.exit(f'night.py: NIGHT_LEVEL is a loudness in LUFS (-20) or off, not {LEVEL!r}')
+    into = f"{OUT}/{KIT}/level-{'m' if target < 0 else ''}{abs(target):g}"
+    for i, r in level.level_dir(WAV, into, [f'{i}.wav' for i in ids], target=target).items():
+        CLIPS[i[:-4]] = {'path': f'{into}/{i}', **{k: r[k] for k in ('source_sha256', 'played_sha256', 'gain_db', 'capped')}}
+
+
 def play(id_):
-    path = f'{WAV}/{id_}.wav'
+    path = CLIPS[id_]['path']
     start = time.time(); subprocess.run(['/usr/bin/afplay', path], check=True); return start, time.time()
 
 
@@ -227,7 +254,9 @@ def run_scene(name, steps, ev, played):
         elif when.startswith('g+'):
             time.sleep(float(when[2:]))
         start, end = play(id_)
-        played.append({'scene': name, 'id': id_, 'when': when, 'start': start, 'end': end}); prev_end = end
+        clip = CLIPS[id_]
+        played.append({'scene': name, 'id': id_, 'when': when, 'start': start, 'end': end,
+                       'source_sha256': clip['source_sha256'], 'played_sha256': clip['played_sha256'], 'gain_db': clip['gain_db']}); prev_end = end
     ev.wait_for('speech_final_sample_retired', prev_end, ANSWER_WAIT + ANSWER_LONGEST)
 
 
@@ -307,8 +336,11 @@ def main():
     ids = sorted({i for n in names for i, _ in SCENES[n]})
     missing = [i for i in ids if i not in L or not os.path.exists(f'{WAV}/{i}.wav')]
     if missing: sys.exit('night.py: no line or WAV for ' + ', '.join(missing))
+    prepare(ids)
     if check:
-        print(f'night.py: {len(names)} scenes, {len(ids)} lines, every one in {LINES} with its WAV in {WAV}'); return
+        capped = sum(c.get('capped', False) for c in CLIPS.values())
+        how = 'raw (NIGHT_LEVEL=off)' if LEVEL == 'off' else f'levelled to {level_summary()} LUFS ({capped} capped at -1 dBTP) in {os.path.dirname(CLIPS[ids[0]]["path"])}'
+        print(f'night.py: {len(names)} scenes, {len(ids)} lines, every one in {LINES} with its WAV in {WAV}, played {how}'); return
     hour, minute = time.localtime().tm_hour, time.localtime().tm_min
     if time.localtime().tm_wday < 5 and (12, 0) <= (hour, minute) < (14, 0) and os.environ.get('LAMP_PLAY_AT_LUNCH') != 'yes':
         sys.exit('night.py: not playing between 12:00 and 14:00 local, when the office rests')
@@ -336,7 +368,7 @@ def main():
     after = [r for r in rows if r['kind'] == 'desk' and r['scene'].startswith('after')]
     firsts = sorted(r['first_ms'][0] for r in rows if r['first_ms'])
     summary = {
-        'round': rnd, 'at': time.strftime('%Y-%m-%d %H:%M'), 'lines': len(rows),
+        'round': rnd, 'at': time.strftime('%Y-%m-%d %H:%M'), 'lines': len(rows), 'level': level_summary(),
         'answered_of_talk': f"{sum(r['answered'] for r in talk)}/{len(talk)}", 'held_of_desk': f"{sum(not r['answered'] for r in desk)}/{len(desk)}", 'held_of_desk_after_answer': f"{sum(not r['answered'] for r in after)}/{len(after)}",
         'split': sum(len(r['pieces']) > 1 for r in rows), 'pieces_total': sum(len(r['pieces']) for r in rows), 'let_go': sum(r['let_go'] for r in rows), 'joined': sum(r['joined'] for r in rows), 'not_joined': sum(r['not_joined'] for r in rows),
         'not_heard': sum(not r['requests'] for r in rows),
