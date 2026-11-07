@@ -585,12 +585,12 @@ short-term. Now, on a line admitted as a known person's, no face seen
 speaking it, when the eyes' looks through it held their own known face in at
 least 3 and no other face in any (`SpeakingFaces::one_face_in_view`; a look
 with nobody in it is no other face), and the conversation has shown **no
-other voice**, **their keep is theirs, and so is a forget of it**: a
+other voice**, **their keep is theirs, but no forget runs on it**: a
 `remember` on the line is written in their scope (`ScopeLease::take_by_one_face`,
-`ScopeLease::kept_by_one_face`), and a single-item `forget` searches their
-scope, then the room's (`ScopeLease::reached_by_one_face`, the one decision
-the memory route in `tools.rs` reads for both, so a forget is never narrower
-than the keep). **Every read stays the room's**: the line is narrowed to the
+`ScopeLease::kept_by_one_face`), and a single-item `forget` is judged by the
+same decision (`ScopeLease::reached_by_one_face`, the one the memory route in
+`tools.rs` reads for both) and runs nowhere until the mouth is seen saying
+it (below; #5627). **Every read stays the room's**: the line is narrowed to the
 room, so no recall or hits from their scope, no memory note of theirs, no
 person's context, no thread or summary of theirs; the turn is told and read
 as without the rule. Why (reviewer-three's P1 on #4584, option 2, Friday's
@@ -620,9 +620,11 @@ seen speaking shows another person, and since only the keep goes to them
 the cost is words kept, never read. A second face in any look, an unknown
 face, no face in view, or another voice, and it is as before. A line
 admitted as the room's with nobody named is untouched, so an unplaced voice
-still reaches nobody's memory (#4196, #4207). **A forget follows the keep:**
-a single-item `forget` on such a line removes from their scope what the
-same rule kept there, and looks in the room's too only when theirs has
+still reaches nobody's memory (#4196, #4207). **How a forget would follow
+the keep** (`remember::run_one_face_forget`, which no live path calls since
+#5627; kept for when a forget there is allowed again): a single-item
+`forget` on such a line removes from their scope what the same rule kept
+there, and looks in the room's too only when theirs has
 nothing about it (Fourteen's lamp-9adf check on build 9699: "forget my
 coffee" searched only the room's while the coffee was kept as theirs, a fault
 already in 9610). That no-match is an outcome the forget sets itself
@@ -642,10 +644,16 @@ memory, a switch off), is the room's only, since after the room's recall
 on such a line it would take their last kept thing (Thirteen's P2 on
 #5022). **Forgetting needs the mouth seen speaking** (the memory owner, 16:49 on
 #5385: "tạm thời chưa cho xóa nếu ko detect đc mở miệng", no deleting while
-an open mouth is not detected), with no exception: a bare forget on such a
+an open mouth is not detected), with no exception: a forget on such a
 line, theirs by their face alone in view or named late on a line admitted
 as the room's (`ScopeLease::reached_by_one_face`), is asked of no memory,
-theirs or the room's (`tools::run_call_with_scope`). Right after their own
+theirs or the room's (`tools::run_call_with_scope`), with only
+`LAMP_PERSON_SCOPE_ONE_FACE` on. A forget naming what (`about`) or which
+(`source_id`) is told `ONE_FACE_NAMED_FORGET`, so the lamp says it will
+forget that when it sees them say it and asks them to look at it and say it
+again (#5627, from Thirteen's read of #5608: until then it deleted in their
+scope with the mouth unseen, so someone off camera could remove a kept thing
+of theirs by naming it). For a bare forget, right after their own
 plain new keep (the very next request of the same worker and session, the
 same person, no other memory call or forget by what on the line before it,
 within `HELD_FORGET_FOR`: `tools::one_face_just_kept`) the lamp says it will
