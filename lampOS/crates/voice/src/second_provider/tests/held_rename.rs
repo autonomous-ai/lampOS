@@ -429,3 +429,70 @@ async fn an_unproven_askers_turn_is_told_no_rename_ran_without_the_old_name() {
         );
     }
 }
+
+/// `LAMP_NAMES_RENAME_ASKED` into `LAMP_NAMES_RENAME_YES` (#5485): a line
+/// the face known as Tove says alone at the lamp, giving another name with
+/// no "remember", is forced to call the face save
+/// (`worker::rename_asks`); that call's `known_as` answer is held, and
+/// their yes renames once, while a no renames nothing.
+#[tokio::test]
+async fn a_rename_the_trigger_asks_is_held_and_a_yes_renames_and_a_no_does_not() {
+    const GIVES: &str = "Call me Marisol.";
+    let root = std::env::temp_dir().join(format!("lvr-asked-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let mut eyes = bus
+        .publisher_declared(
+            lamp_msgs::Faces::TOPIC,
+            &lamp_msgs::Faces::declaration(),
+            "eyes",
+        )
+        .unwrap();
+    let face = lamp_msgs::Face {
+        id: "f1".into(),
+        xmin: 0.4,
+        ymin: 0.0,
+        xmax: 0.7,
+        ymax: 0.3,
+        confidence: 0.9,
+        yaw: None,
+        facing: None,
+        speaking: None,
+        follows: None,
+    };
+    eyes.publish_json(
+        crate::scenario_clock::monotonic_us(),
+        &lamp_msgs::Faces { faces: vec![face] },
+    )
+    .unwrap();
+    let known = crate::known_faces::known_file_of(&root.join("who.sock"));
+    std::fs::write(&known, "Tove\n").unwrap();
+    let declared = crate::known_faces::tools_checked(true);
+    let chat = crate::second_provider::net::Chat::deepseek(
+        "deepseek-chat",
+        "k",
+        Arc::new(move || declared.clone()),
+        false,
+    )
+    .unwrap();
+    chat.forcing(crate::second_provider::worker::rename_asks(
+        known,
+        lamp_bus::Bus::new(&root).unwrap(),
+    ));
+    let line = [Message::system("You are a lamp."), Message::user(GIVES)];
+    assert_eq!(
+        chat.wire(&line).2.get("tool_choice").cloned(),
+        Some(json!({"type": "function", "function": {"name": REMEMBER}}))
+    );
+    std::fs::remove_dir_all(root).unwrap();
+    // The forced call, run through the held rename.
+    let asks: Turn = (GIVES, Lamp::Saves(Value::Null, ASKED), &["f1"]);
+    let yes: [Turn; 2] = [asks.clone(), ("Yes, please.", Lamp::Says("Okay."), &["f1"])];
+    assert_eq!(run(&yes, true).await.sent, renamed());
+    let no: [Turn; 2] = [
+        asks,
+        ("No, keep Tove.", Lamp::Says("Okay, Tove it is."), &["f1"]),
+    ];
+    assert_eq!(run(&no, true).await.sent, Vec::<Value>::new());
+}
