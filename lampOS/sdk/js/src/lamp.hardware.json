@@ -1,0 +1,80 @@
+{
+  "hardware": "Lamp_09102026",
+  "version": 1,
+  "about": "The lamp's parts as data, for a developer. Each part says where its facts come from: docs (robots/lamp/hardware/) or code (lampOS). No maker's figure is given that the repository does not hold, so a servo's torque and speed are not here yet. Where two docs differ, both are given.",
+  "board": {
+    "model": "OrangePi 4 Pro",
+    "soc": "Allwinner A733",
+    "ram_gb": [4, 6],
+    "source": "docs: components.md, wiring.md"
+  },
+  "joints": {
+    "count": 5,
+    "servo": "Feetech STS3215 (ST-3215-C018)",
+    "names": ["yaw", "shoulder", "elbow", "pitch", "roll"],
+    "counts_a_turn": 4096,
+    "middle_counts": 2048,
+    "bus": "TTL daisy chain through a Waveshare Bus Servo Adapter on USB (/dev/ttyACM0), Feetech SCS protocol",
+    "reads": "the body reads and writes every servo each 20 ms; body.state gives position, goal, load and temperature",
+    "power": "wiring.md says an external 5 V rail, not USB; power.md's rail tree has the 12 V adaptor and a 12 V to 5 V buck",
+    "model": "lamp.model.json: the chain, origins, axes and reach",
+    "source": "docs: components.md, wiring.md, power.md; code: lamp-body (bus_out.rs, 20 ms step)"
+  },
+  "camera": {
+    "model": "USB UVC camera: components.md names a ZV A016 V4 (78° field of view), wiring.md an IMX307",
+    "field_of_view_deg": 78,
+    "modes": [
+      { "width": 1920, "height": 1080, "fps": 30, "format": "MJPG", "source": "docs: wiring.md" },
+      { "width": 1280, "height": 960, "format": "MJPG", "source": "code: lamp-camera (types.rs), the mode the lamp uses" }
+    ],
+    "through_the_door": "never: camera frames and pictures aren't readable through lamp-control (docs/control.md)",
+    "source": "docs: components.md, wiring.md; code: crates/camera"
+  },
+  "microphones": [
+    { "role": "voice", "model": "Jieli USB composite mic (4c4a:4155), a dual-mic ENC module", "channels": 1, "rate_hz": 48000 },
+    { "role": "sensing", "model": "C-Media USB audio adapter, Unitek Y-247A (0d8c:0014)" }
+  ],
+  "microphones_note": "lampOS captures at 16 kHz (crates/audio CAPTURE_RATE); audio never leaves through lamp-control",
+  "speaker": {
+    "drivers": "2 × 3 W",
+    "amplifier": "PAM8610 v2 class-D, on the 12 V rail",
+    "source": "docs: components.md, power.md"
+  },
+  "light": {
+    "ring": "WS2812B, 32 LEDs",
+    "colours": ["yellow", "red", "green", "blue", "cyan", "purple", "orange", "pink", "white", "warm"],
+    "levels": [1, 2, 3, 4, 5],
+    "brightness_cap": "software-capped: full white on all 32 is 1.92 A and is not allowed",
+    "source": "docs: components.md, power.md; code: lamp_msgs::Light (COLOURS, BRIGHTEST)"
+  },
+  "touch": {
+    "base_strip": "MPR121, 12 electrodes, I²C 0x5A: tap, swipe, hold; thresholds calibrated per unit",
+    "head_pads": "TTP223 × 4 positions, 2 wired per unit (detected at start): petting",
+    "source": "docs: components.md, wiring.md"
+  },
+  "buttons": {
+    "user": "6 mm tactile, header pin 35",
+    "reset": "6 mm tactile, header pin 37: held 5 s or more and released is a factory reset",
+    "privacy": "slide switch, header pin 11: LOW mutes the microphones, turns the camera off and mutes the speaker",
+    "source": "docs: components.md"
+  },
+  "air": {
+    "sensor": "Sensirion SEN63C (optional; SEN55 or SCD41 also declared)",
+    "measures": ["particles (PM)", "temperature", "humidity", "CO2 (measured)"],
+    "state": "declared but off on the standard profile",
+    "source": "docs: components.md, robots/lamp/docs/environment-sensing.md"
+  },
+  "power": {
+    "input": "12 V, 5 A adaptor (LiteOn): 60 W, worked to about 42 W sustained",
+    "rails": "12 V to the amplifier; an MP2482 buck to 5 V (3 A) for the board, the ring and the fan; 3.3 V from the board for the touch sensors",
+    "typical_a_at_12v": 3.0,
+    "worst_a_at_12v": 4.0,
+    "source": "docs: power.md, components.md"
+  },
+  "other": {
+    "fan": "Nidec 5 V",
+    "ballast": "optional 5 mm steel disc, about 3 kg",
+    "body": "3D-printed shell, CNC aluminium servo carriers, decorative CNC wood; CAD in robots/lamp/hardware/cad",
+    "source": "docs: components.md, cad/README.md"
+  }
+}

@@ -37,6 +37,8 @@ export const SHOWN = new Set([
   'brightness', 'fade_ms', 'pixels', 'rgb', 'ring',
   // The `volume` op and `volume.changed`.
   'muted', 'step',
+  // Each joint of a `body.state`.
+  'counts', 'deg', 'goal_deg', 'load', 'moving', 'temp_c',
   'asleep', 'at', 'clamped', 'class', 'client', 'code', 'colour', 'confidence', 'count', 'elbow', 'error', 'ev', 'events',
   'express', 'facing', 'from', 'feeling', 'for_ms', 'frames', 'got', 'grants', 'hold_max_ms', 'how', 'id', 'lease_max_ms', 'say_max_bytes',
   'joints', 'kind', 'lamp', 'lamp_state', 'lease', 'level', 'light', 'limits', 'manage', 'mood',
