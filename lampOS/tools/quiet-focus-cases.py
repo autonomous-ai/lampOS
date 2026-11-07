@@ -1,7 +1,7 @@
 """Writes Quiet focus's test cases in the format `lamp-bus record` writes
-(see README.md beside it): not recorded on a lamp.
+(see skills/quiet-focus/tests/README.md): not recorded on a lamp.
 
-Usage, from lampOS/: python3 -I skills/quiet-focus/tests/write_cases.py skills/quiet-focus/tests
+Usage, from lampOS/: python3 -I tools/quiet-focus-cases.py skills/quiet-focus/tests
 """
 import base64
 import json
