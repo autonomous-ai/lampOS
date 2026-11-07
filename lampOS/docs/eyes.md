@@ -1447,7 +1447,15 @@ With the switch:
     plain yes dropped for the second face or the speaker not seen saying
     it is told to the model as a face not kept, and why, so it makes up no
     reason of its own (lamp-52e6, 5 Nov, Fifth's run B on #5415: "I need
-    to know who you are first"). While
+    to know who you are first"). With nothing held, while "who you are"
+    is still open, a plain yes to the name the lamp's last answer said
+    back, the name the person's line before gave
+    (`known_faces::read_back_name`), runs the same save with no model call
+    at all, through the same gates (`second_provider::yes_save`), unless a
+    face was kept in the last 45 s; a model save of that name within 45 s
+    after it gets `ALREADY_KEPT` (#5684: "Name is Walter.", "Walter, did I
+    get that right?", "Yes. That's my name." with no call ended the step
+    with the name only). While
     it is held, the onboarding walk keeps "who you are" open for it, up to
     45 s (`onboarding::face_save_held`, `FACE_SAVE_HELD_US`), instead of
     ending it done with the name only 15 s after the lamp's read-back
