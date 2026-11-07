@@ -1539,6 +1539,14 @@ With the switch:
     only adds, so the file keeps its version: a file from before it loads
     with none, and an older build reads past it and drops it on its next
     save. Nothing reads the aliases yet.
+  - **A forget reaches an alias** (#5570). Forgetting a name kept only as
+    an alias drops it from the alias list, in the people file and in a
+    set-aside record, and answers that it forgot; the person under their
+    live name stays. A forget that waits for a set-aside file drops it
+    there too once it can. A new record under a name another record holds
+    as an alias takes it from that record, so no two records hold one name.
+    Still to do in the reader's PR: a live name wins over an alias, and a
+    rename away from the owner's typed name is guarded with #5519's.
   - **A rename's yes by its guards** (`LAMP_NAMES_RENAME_YES=on`, off
     unless set; only with `LAMP_NAMES=checked`; the second route; #5485).
     On lamp-29e7 on 6 Nov a known face B asked to be called A, and every
