@@ -215,10 +215,18 @@ const A_THING_BEFORE: [&str; 2] = ["from", "of"];
 const ASKED_TO_READ: [&str; 6] = ["read", "reads", "tell", "what", "show", "check"];
 
 /// Words after one of [`ALSO_A_THING`] that make it a verb after one of
-/// [`MAYBE_A_THING_AFTER`], even with a read asked for earlier: "check my
-/// calendar and tomorrow schedule a meeting" (the first builder's P3 on
-/// #5696). Not "that": "read me the facebook post that I liked" reads.
-const AN_OBJECT: [&str; 4] = ["a", "an", "me", "it"];
+/// [`MAYBE_A_THING_AFTER`] in a new clause, even with a read asked for
+/// earlier: "check my calendar and tomorrow schedule a meeting" (the
+/// first builder's P3 on #5696). Not "that": "read me the facebook post
+/// that I liked" reads.
+const AN_OBJECT: [&str; 6] = ["a", "an", "me", "it", "the", "my"];
+
+/// Words that start a new clause after the read asked for, so that an
+/// object after the word makes it a verb: "check my calendar and tomorrow
+/// schedule the meeting". With none, the object says which one is read:
+/// "read me my facebook post a week ago" (the first builder's HOLD on
+/// #5719).
+const A_NEW_CLAUSE: [&str; 3] = ["and", "then", "also"];
 
 /// Whether `words[at]`, one of [`ALSO_A_THING`], is the thing read.
 fn a_thing(words: &[&str], at: usize) -> bool {
@@ -236,8 +244,16 @@ fn a_thing(words: &[&str], at: usize) -> bool {
         !says || asked(words)
     } else if MAYBE_A_THING_AFTER.contains(&before) {
         let next = words.get(at + 1);
-        !next.is_some_and(|next| AN_OBJECT.contains(next))
-            && (asked(&words[..at]) || next.is_none_or(|next| A_THING_BEFORE.contains(next)))
+        let read_at = words[..at]
+            .iter()
+            .rposition(|word| ASKED_TO_READ.contains(word));
+        let new_clause = read_at.is_none_or(|read_at| {
+            words[read_at + 1..at]
+                .iter()
+                .any(|word| A_NEW_CLAUSE.contains(word))
+        });
+        let verb = new_clause && next.is_some_and(|next| AN_OBJECT.contains(next));
+        !verb && (read_at.is_some() || next.is_none_or(|next| A_THING_BEFORE.contains(next)))
     } else {
         false
     }
@@ -2634,6 +2650,14 @@ light = { dim = 1 }
             "let's read my schedule from my calendar",
             "read me the facebook post that I liked",
             "check my calendar and read me tomorrow schedule",
+            // The first builder's HOLD on #5719: an object with no new
+            // clause after the read says which one is read.
+            "read me the facebook post a friend shared",
+            "read me my facebook post a week ago",
+            "read me the latest facebook post an hour ago",
+            "show me my calendar schedule a week ahead",
+            "read me the facebook post it showed me",
+            "read me today and tomorrow schedule on my calendar",
         ] {
             assert!(brief_with(request, true).is_ok(), "{request}");
         }
@@ -2701,6 +2725,8 @@ light = { dim = 1 }
             "check my calendar and tomorrow schedule a meeting",
             "read my mail and today post an update on Facebook",
             "what's on my calendar, then tomorrow book me a room",
+            "check my calendar and tomorrow schedule the meeting",
+            "check facebook and today post my photo",
         ] {
             assert_eq!(brief_with(request, true), Err(NOT_A_WRITE), "{request}");
         }
