@@ -978,6 +978,7 @@ fn a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route() {
         correct: false,
         questions: false,
         now: false,
+        one_yes: false,
         sign_in: false,
         sign_in_app: false,
     };
@@ -6330,6 +6331,7 @@ fn a_yes_after_a_hand_over_on_this_route_starts_it() {
         correct: false,
         questions: false,
         now: false,
+        one_yes: false,
         sign_in: false,
         sign_in_app: false,
     };
@@ -11631,6 +11633,27 @@ fn start_marked(
     }
 }
 
+/// The Reviewer-lead's P3s on #5609: a Start over the lamp's voice or
+/// after a Stop marks the read-back before it cut, and a yes in a later
+/// request reads it so; a plain Start marks nothing.
+#[test]
+fn a_start_over_the_lamps_voice_or_after_a_stop_marks_the_read_back_cut() {
+    let ask = "Claude Code will write a poem. Shall I start it?";
+    let now = Instant::now();
+    for (over, after_stop, cut) in [
+        (false, false, false),
+        (true, false, true),
+        (false, true, true),
+    ] {
+        let mut thread = crate::thread::Thread::new();
+        thread.person("Ask Claude Code for a poem", true, now);
+        thread.lamp(1, ask, now);
+        super::worker::mark_cut_read_back(&mut thread, &start_marked(2, over, after_stop, false));
+        thread.person("Yes.", true, now);
+        assert_eq!(thread.answered_last_but_cut(3, now).unwrap().2, cut);
+    }
+}
+
 /// One spoken line heard as `words` and its chat's messages, with `marks`
 /// sent as the coordinator sends them, before its audio and End.
 async fn asked_with(
@@ -15194,6 +15217,7 @@ async fn requested_audio_runner_preserves_news_until_engine_takes_out_its_key() 
                 correct: false,
                 questions: false,
                 now: false,
+                one_yes: false,
                 sign_in: false,
                 sign_in_app: false,
             }),

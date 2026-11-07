@@ -2391,6 +2391,110 @@ in Piper's voice, `LAMP_SPOKEN_TO=off` as lamp-name didn't take Piper's
     the declined task's note still stood beside them;
   - "yes, and also …" isn't shown cleanly yet.
 
+### One yes for a read-back said in words (#5169, off unless `LAMP_TASKS_ONE_YES=on`)
+
+On lamp-c0a4 on 4 November the product voice often said the task back in
+words ("Claude Code will write … Shall I start it?") without calling
+`start_agent_task`. Then the person's yes either prepared the task and
+confirmed it in the same turn, which `may_confirm` refuses (the request that
+prepares can't confirm), or confirmed with nothing prepared. Both times the
+lamp asked again, so the hand-over needed two yeses. With
+`LAMP_TASKS_ONE_YES=on` (the provider worker's `--tasks-one-yes`, last of the
+tasks flags; it needs only the tasks part):
+
+- `start_agent_task`'s description, with the lead-in or without it, asks for
+  the call first: "Call it first: say the task back only from its answer, in
+  one short sentence, and ask whether to start it." With the staff, it says
+  ", with who will do it," as before. Every description still fits in 1,024
+  bytes, with the switch on too (`every_description_fits_the_service_whatever_the_switches`).
+- `start_agent_task`'s `task` parameter reads "The work, in the person's
+  own words. A short ask is enough: the agent works out the details." in
+  place of "… complete enough to do without asking." (folded in from #5119).
+  With the old words the model asked what a short ask should have instead
+  of calling: on lamp-c0a4 on 3 November, "ask Claude Code to build a
+  website that promotes tourism in Vietnam" called it 1 time in 3, and the
+  same ask with its sections named was called at once. The 4 November count
+  (`docs/verification/p2-handover-wording-lamp-c0a4-20261104/`) found the
+  words alone changed little (0 of 9 before, 1 of 9 after), so they sit
+  under this switch beside the call-first read-back. The read-back still
+  guards a short ask: nothing starts before the yes
+  (`a_short_ask_is_enough_only_with_the_one_yes_switch`).
+- `confirm_agent_task` with nothing prepared answers "Nothing is prepared
+  yet: call start_agent_task now with the task you said back, then call
+  confirm_agent_task again." Without the switch it answers "There is no task
+  waiting to be started." as before.
+- A yes in the request that prepared the task may start it
+  (`agent_tasks::yes_in_the_same_turn`) only when all of these hold. If any
+  fails, `may_confirm`'s refusal stands:
+  - the request was heard, not typed in the app or written by the lamp;
+  - the task was prepared in this very request, within `CONFIRM_WITHIN`
+    (120 s);
+  - the person's words in it (`thread::heard_for`) are a plain yes: at most
+    six words, only yes, yeah, yep, yup, sure, ok, okay, "go ahead", "do
+    it" and "please do", with "please", "lamp" and "hey" beside them, and
+    no question mark. "Yes and also make it longer" is not a yes. "Okay."
+    and "ok ok" count as a yes too: each is only yes words;
+  - the lamp's line just before it (`thread::answered_last_but_cut`) was
+    said within `CONFIRM_WITHIN`, ends with a question, names who the task
+    was prepared for (the name, or a form the voice hears for it), and
+    holds every one of the task's content words, none missing. Content
+    words are lower case, with common short words ("did" and "does" among
+    them) left out, and for a question task they come from its question
+    alone. A task word counts as read back only when a spoken word of
+    the read-back has the same stem (a plural or verb "s", "es", "ing" or
+    "ed" and a final "e" set aside, so "files" matches "file" and "fixing"
+    matches "fix"), and each spoken word stands for one task word at most:
+    "Test the tests" read back as "Claude Code will test it" is refused.
+    No near form counts: "remote" never stands for "remove", "kill" for
+    "killall", "wrote" for "write" or "reverse" for "revert". A stem this
+    leaves apart costs a second yes, never work started unheard. A
+    read-back that drops any word never starts the task: for "Delete all
+    the files in my Downloads folder and empty the trash", "Claude Code
+    will delete the files in your Downloads folder. Shall I start it?"
+    misses "all", "empty" and "trash"; "Reboot" read back as "Claude Code
+    will do it", "delete Downloads" as "Claude Code will delete that",
+    "Force push to main" without "force", and "Empty the trash and delete
+    Downloads" without "trash" or without "downloads" are all refused
+    (the Reviewer-lead's P2s on #5609). Before, half the content words,
+    then all but one, and then near forms were enough, and the unheard
+    part started;
+  - that line was not cut. It is marked cut on its own exchange, so a yes
+    in any later request reads it as cut too: kept as heard after a cut
+    (`thread::heard_only`, the second route with `LAMP_SAID_AS_HEARD=on`),
+    or the line after it began over the lamp's voice, came first after a
+    Stop, or cut its answer (`over_the_lamps_voice`, `after_stop` or
+    `heard_of_cut` on that line's Start, marked by
+    `thread::began_over_the_lamps_voice` from both routes' provider
+    workers, `mark_cut_read_back`). On the Live route the lamp's line is
+    never cut down to what was heard, so without this a yes said over a
+    read-back cut off, or after a Stop by hand or head with
+    `LAMP_SAID_AS_HEARD` off, was checked against the whole line, its
+    question included (the Reviewer-lead's P3s on #5609).
+- When those hold as `start_agent_task` prepares the task, its `next` says
+  "The person has already said yes to this task as you said it back: call
+  confirm_agent_task now, and do not ask again." The confirm checks the rule
+  again on its own.
+- A task started this way is journalled as `lamp-voice: tasks: request N:
+  task <id> started on a yes in the turn that prepared it, after its
+  read-back in words`, with no task words or paths.
+
+The guard that a yes must come after a read-back stays. This rule only
+recognizes a read-back said in words, before the call. Without the switch
+every description, answer and line is byte-for-byte as before
+(`the_one_yes_switch_changes_only_the_read_back_and_task_words`). Tests:
+`a_yes_in_the_turn_that_prepared_counts_only_after_its_read_back_in_words`,
+`one_yes_starts_only_a_task_read_back_whole`,
+`one_yes_never_counts_over_a_cut_read_back`,
+`one_yes_needs_every_task_word_read_back`,
+`one_yes_matches_task_words_by_stem_one_for_one`,
+`a_start_over_the_lamps_voice_or_after_a_stop_marks_the_read_back_cut`
+(in both `provider_worker` and `second_provider`),
+`thread::tests::answered_last_but_cut_says_a_read_back_was_cut`,
+`a_confirm_with_nothing_prepared_says_to_prepare_it_with_the_switch`,
+`the_one_yes_switch_is_on_only_with_the_tasks_part`. Not yet played: a
+count of 10 spoken hand-overs with a real yes on each side of the switch,
+counting those that needed only one yes (#5169).
+
 ### A lead-in before a call (#799, `LAMP_TOOL_LEAD_IN=on`, on in the product)
 
 A turn in which the model calls `start_agent_task` or `confirm_agent_task`
@@ -2580,8 +2684,9 @@ switch both are as before. Test:
 
 `check_agent_task` tells only the newest work handed over. With
 `LAMP_TASKS_NOW=on` and the tasks part (`LAMP_TASKS_DIR`), the voice's
-`--tasks-now`, taken last, after `--tasks-questions` and
-`--tasks-sign-in-app`, the model also has `tasks_now`. It answers "how's it
+`--tasks-now`, taken after `--tasks-questions` and
+`--tasks-sign-in-app`, before `--tasks-one-yes`, the model also has
+`tasks_now`. It answers "how's it
 going?", "is it done?", "what is Claude doing?" and "did the poem one
 finish?" for any recent piece of work.
 

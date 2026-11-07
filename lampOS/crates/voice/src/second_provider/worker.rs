@@ -12160,6 +12160,25 @@ pub(crate) fn texts_system_message(character: &str, time: Option<&str>, memory: 
     }
 }
 
+/// A line begun over the lamp's audible answer, after a Stop, or cutting
+/// it (`over_the_lamps_voice`, `after_stop` or `heard_of_cut` on its
+/// Start): the lamp's line before it was not heard whole, and is marked cut,
+/// so a one-yes read-back is never taken from it (the Reviewer-lead's P3s
+/// on #5609).
+pub(super) fn mark_cut_read_back(thread: &mut crate::thread::Thread, command: &ProviderInput) {
+    if let ProviderInput::Start {
+        request,
+        over_the_lamps_voice,
+        after_stop,
+        heard_of_cut,
+        ..
+    } = command
+        && (*over_the_lamps_voice || *after_stop || heard_of_cut.is_some())
+    {
+        thread.began_over_the_lamps_voice(*request);
+    }
+}
+
 /// With `LAMP_SAID_AS_HEARD=on`, a line that cut the lamp's answer, or the
 /// first after a Stop that cut one, says how much of it was played: only
 /// those words of it are kept as the lamp's ([`crate::said_as_heard`],
@@ -12623,6 +12642,9 @@ pub async fn run(
                     && let Ok(mut thread) = crate::thread::THREAD.lock()
                 {
                     keep_heard(&mut thread, &engine, &command);
+                }
+                if let Ok(mut thread) = crate::thread::THREAD.lock() {
+                    mark_cut_read_back(&mut thread, &command);
                 }
                 // A new line or a written request begins: the answer before
                 // it is kept as heard, so its hand-on to memory goes now.
@@ -29226,6 +29248,7 @@ mod memory_observer {
             correct: false,
             questions: false,
             now: false,
+            one_yes: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -29414,6 +29437,7 @@ mod memory_observer {
             correct: false,
             questions: false,
             now: false,
+            one_yes: false,
             sign_in: false,
             sign_in_app: false,
         };

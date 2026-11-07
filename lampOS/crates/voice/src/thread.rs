@@ -1375,6 +1375,41 @@ impl Thread {
     /// was, so the words and their age come from one exchange (the
     /// Reviewer-lead's P3 on #4880).
     pub fn answered_last_but(&self, request: u64, now: Instant) -> Option<(String, Duration)> {
+        self.answered_last_but_cut(request, now)
+            .map(|(lamp, ago, _)| (lamp, ago))
+    }
+
+    /// The line `request` began over the lamp's audible answer, cut it, or
+    /// came first after a Stop (`over_the_lamps_voice`, `heard_of_cut` or
+    /// `after_stop` on its Start, either route's provider worker): the
+    /// lamp's line before it, the newest with the lamp's words but
+    /// `request`'s, was not heard whole, and is marked cut itself, so a yes
+    /// in any later request reads it as cut too
+    /// ([`Self::answered_last_but_cut`], the Reviewer-lead's P3s on #5609).
+    /// On the Live route the lamp's words are never cut down to what was
+    /// heard ([`Self::heard_only`]), so this is all it is told. The words
+    /// stay as they are.
+    pub fn began_over_the_lamps_voice(&mut self, request: u64) {
+        if let Some(exchange) = self
+            .exchanges
+            .iter_mut()
+            .rev()
+            .filter(|exchange| exchange.request != request)
+            .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))
+        {
+            exchange.cut = true;
+        }
+    }
+
+    /// [`Self::answered_last_but`], and whether that line was cut: kept as
+    /// heard after a cut ([`Self::heard_only`]), or a line began over it
+    /// ([`Self::began_over_the_lamps_voice`]). A yes to it is no
+    /// yes to all of it (`crate::agent_tasks`, #5169).
+    pub fn answered_last_but_cut(
+        &self,
+        request: u64,
+        now: Instant,
+    ) -> Option<(String, Duration, bool)> {
         let exchange = self
             .exchanges
             .iter()
@@ -1386,7 +1421,11 @@ impl Thread {
         } else {
             format!("{} {}", exchange.lamp, exchange.tail)
         };
-        Some((lamp, now.saturating_duration_since(exchange.at)))
+        Some((
+            lamp,
+            now.saturating_duration_since(exchange.at),
+            exchange.cut,
+        ))
     }
 
     /// The request of the newest exchange with the lamp's words, `request`'s
@@ -4610,6 +4649,41 @@ mod tests {
         assert!(lamp.contains("Shall I put it on the lamp?"), "{lamp}");
         assert_eq!(ago, Duration::from_secs(5));
         assert!(Thread::new().answered_last_but(1, now).is_none());
+    }
+
+    /// The Reviewer-lead's P3 on #5609: a read-back cut as heard, or one a
+    /// line began over, says it was cut; one heard whole does not.
+    #[test]
+    fn answered_last_but_cut_says_a_read_back_was_cut() {
+        let ask = "Claude Code will write a poem. Shall I start it?";
+        let now = Instant::now();
+        let mut thread = Thread::new();
+        thread.person("Ask Claude Code for a poem", true, now);
+        thread.lamp(1, ask, now);
+        thread.person("Yes.", true, now);
+        assert!(!thread.answered_last_but_cut(2, now).unwrap().2);
+        // A line that began over the lamp's voice marks the line before it.
+        thread.began_over_the_lamps_voice(2);
+        let (lamp, _, cut) = thread.answered_last_but_cut(2, now).unwrap();
+        assert!(cut && lamp.contains("Shall I start it?"), "{lamp}");
+        // The line that began over it got no spoken answer, and the yes
+        // came as the next request: still cut (the Reviewer-lead's second
+        // P3 on #5609).
+        let mut thread = Thread::new();
+        thread.person("Ask Claude Code for a poem", true, now);
+        thread.lamp(1, ask, now);
+        thread.began_over_the_lamps_voice(2);
+        thread.person("Wait, I mean", true, now);
+        thread.person("Yes.", true, now);
+        let (lamp, _, cut) = thread.answered_last_but_cut(3, now).unwrap();
+        assert!(cut && lamp.contains("Shall I start it?"), "{lamp}");
+        // Kept as heard after a cut (the second route).
+        let mut thread = Thread::new();
+        thread.person("Ask Claude Code for a poem", true, now);
+        thread.lamp(1, ask, now);
+        thread.heard_only(1, "Claude Code will write");
+        thread.person("Yes.", true, now);
+        assert!(thread.answered_last_but_cut(2, now).unwrap().2);
     }
 
     /// `LAMP_KEEP_QUIETLY`: the lamp's words of the conversation going on,
