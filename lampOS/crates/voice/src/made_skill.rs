@@ -195,6 +195,11 @@ const SCHEDULE_AS_A_THING: [&str; 12] = [
     "facebook", "page",
 ];
 
+/// Words after one of [`ALSO_A_THING`] that make it a verb again, whatever
+/// is before it: "tomorrow book a meeting", "facebook post that I'm out",
+/// "latest post: say hi on Facebook" (El's P3 on #5690).
+const A_VERB_AFTER: [&str; 9] = ["a", "an", "to", "me", "that", "on", "it", "say", "saying"];
+
 /// Words that only ask for the skill itself, before "skill" at a request's
 /// start: "create a skill that reads my calendar" asks for a skill that
 /// reads, and its "create" is no write (on lamp-9adf on 4 Nov, 23:51, a
@@ -243,10 +248,16 @@ fn read_of(request: &str) -> Result<(&'static str, Option<&'static str>), &'stat
         WRITE_WORDS.contains(word)
             && !(ALSO_A_THING.contains(word)
                 && at > 0
-                && SCHEDULE_AS_A_THING.contains(&words[at - 1]))
+                && SCHEDULE_AS_A_THING.contains(&words[at - 1])
+                && !words
+                    .get(at + 1)
+                    .is_some_and(|next| A_VERB_AFTER.contains(next)))
             // "put" writes to a service only when one is named after it:
-            // "put the count on the light" is the lamp's own.
-            && (*word != "put" || names_a_linked_service(&words[at + 1..].join(" ")))
+            // "put the count on the light" is the lamp's own. "Drive" alone
+            // is no service word, but after "put" it is Google Drive.
+            && (*word != "put"
+                || names_a_linked_service(&words[at + 1..].join(" "))
+                || words[at + 1..].contains(&"drive"))
     });
     if writes {
         return Err(NOT_A_WRITE);
@@ -2549,6 +2560,21 @@ light = { dim = 1 }
             "book a meeting on my calendar",
             "put a meeting on my calendar",
             "read my mail and post it on Facebook",
+            // El's P3 on #5690: a word that makes it the thing read, then
+            // what it writes.
+            "my calendar, book a meeting",
+            "my calendar schedule a meeting",
+            "tomorrow book a meeting on my calendar",
+            "today post a photo to Facebook",
+            "each day post a hello on Facebook",
+            "the calendar book me a dentist at nine",
+            "at the end of the day book a room on my calendar",
+            "facebook post that I'm out",
+            "on my Facebook page post that we are closed",
+            "latest post: say hi on Facebook",
+            "last post on facebook say we are open",
+            "newest post to facebook saying hi",
+            "read my mail then put it in my drive",
         ] {
             assert_eq!(brief_with(request, true), Err(NOT_A_WRITE), "{request}");
         }
