@@ -69,6 +69,33 @@ fn speaking(value: Result<&str, &std::env::VarError>) -> bool {
     speaks(value.ok())
 }
 pub const LEDGER_VARIABLE: &str = "LAMP_SCHEDULE_DELIVERY_DIR";
+/// `on` exactly (#5560): a delivery ledger fenced ahead of the store is
+/// re-fenced to it at the voice's start, and while one still can't be, a
+/// timer or reminder is not set and the model is told it couldn't be.
+pub const REFENCE_VARIABLE: &str = "LAMP_LEDGER_REFENCE";
+/// The file, in the delivery directory, the consumer keeps while its ledger
+/// refuses every item, with [`REFENCE_VARIABLE`] on.
+pub const CANNOT_RING_FILE: &str = "cannot-ring";
+/// What the model is told for a set refused while the ledger can't ring.
+pub const CANNOT_RING: &str = "Nothing was set: this lamp can't ring timers or reminders right now. Say you couldn't set it, and never that it is set.";
+
+pub(crate) fn refence_on(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// The refusal for a call that would set a ring (`set_timer`,
+/// `set_reminder`, `repeat_reminder`) while [`CANNOT_RING_FILE`] is kept,
+/// with [`REFENCE_VARIABLE`] on; `var` reads the environment.
+pub(crate) fn cannot_ring(
+    name: &str,
+    var: impl Fn(&str) -> Option<std::ffi::OsString>,
+) -> Option<serde_json::Value> {
+    let sets = matches!(name, "set_timer" | "set_reminder" | "repeat_reminder");
+    let on = refence_on(var(REFENCE_VARIABLE).as_deref().and_then(|v| v.to_str()));
+    let dir = var(LEDGER_VARIABLE).map(PathBuf::from)?;
+    (sets && on && dir.join(CANNOT_RING_FILE).exists())
+        .then(|| serde_json::json!({ "error": CANNOT_RING }))
+}
 pub const LEASE_US: u64 = 750_000;
 /// Due this long ago or more, a reminder is said only when someone is at the
 /// lamp, once and gently, as something asked for earlier, and is then

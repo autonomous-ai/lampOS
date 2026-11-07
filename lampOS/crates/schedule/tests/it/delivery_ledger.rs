@@ -765,7 +765,8 @@ fn store_switch_and_revision_rollback_preserve_all_existing_evidence() {
 /// revision, and compacted, is pending again in the older store; it must not
 /// be admitted again, so the ledger keeps the acknowledged keys.
 ///
-/// Needs fix 1 of the #5498 follow-up: re-fence at the voice's start.
+/// The voice arms the re-fence at its start with LAMP_LEDGER_REFENCE on
+/// (#5560); unarmed, the reopened ledger refuses as before.
 #[test]
 fn a_reopened_ledger_ahead_of_its_store_refences_but_never_readmits_an_acknowledged_item() {
     let schedule_disk = Disk::default();
@@ -802,9 +803,16 @@ fn a_reopened_ledger_ahead_of_its_store_refences_but_never_readmits_an_acknowled
         "stale_revision"
     );
 
-    // The voice starts again.
+    // The voice starts again, first with the switch off: refused as before.
     drop(running);
+    let mut unarmed = self::ledger(disk.clone());
+    assert_eq!(
+        unarmed.prepare(&fresh, correlation(3)).unwrap_err().code,
+        "stale_revision"
+    );
+    drop(unarmed);
     let mut started = self::ledger(disk);
+    started.refence_at_start();
     assert!(
         started.prepare(&again, correlation(3)).is_err(),
         "an item acknowledged at the newer revision was admitted again"
