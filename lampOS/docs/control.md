@@ -179,9 +179,14 @@ so it never outlives that lease, and only the holder's connection is read.
   goes back to the pose's own direction. A conversation cuts a look short at
   once (`cut_short`, why `conversation`) but keeps its aim: when the talk ends
   and the lease is held again, the head goes back to it, with no new `done`.
-- **Its end:** the body answers each look once, `there` when the head and
-  base are within 6 counts of goals that have stopped moving for 10 steps
-  (0.2 s), or `cut_short`. The door makes that the computer's `done`.
+- **Its end:** the body answers each look once: `there` when the head and
+  base are within 6 counts of where the look sent them and have stopped
+  moving for 10 steps (0.2 s); `there` too when they stopped within 24 counts
+  (`REST_SLACK`, a rest's own slack) and stayed still for 50 steps (1 s), with
+  the angles where they stopped and `clamped` when that is more than half a
+  degree from the look (a resting head stops short against its own friction
+  or weight: lamp-75c9 on 7 Nov, 17 counts); or `cut_short`, after 5 s with
+  how many counts short. The door makes that the computer's `done`.
 - **On a product lamp** lamp-control's product unit passes `--lease-socket`
   (`/run/lampos-body/lease.sock`, #4526) and the product lamp-body unit opens
   it (#4568). Until both are on the lamp, lamp-control retries the socket and
@@ -513,9 +518,12 @@ lamp lifts it ("Turns and listening").
 and why (`expired`, `refused: …`, `dropped: …`, or the voice not reached).
 `look`'s is `finished` once the head is there, with `yaw` and `pitch` as the
 body applied them, after its reach and its joints' own bounds (the pitch
-window), and `clamped` when any of those cut the look; or
+window), and `clamped` when any of those cut the look; on a resting lamp whose
+head or base stopped short inside a rest's slack (24 counts), `finished` with
+the angles where they stopped, `clamped` when more than half a degree off; or
 `cut_short` (a conversation, the lease ending, another look, a hand or
-anything else holding the head for 5 s, `reconnected` or `released`), or
+anything else holding the head for 5 s, then with how many counts short,
+`reconnected` or `released`), or
 `dropped` (the body not held, or its lease socket not reached). A look asked
 right after `lease.take`, before the door has taken the body's hold (its
 check runs every 250 ms), waits for that hold rather than being dropped; if
