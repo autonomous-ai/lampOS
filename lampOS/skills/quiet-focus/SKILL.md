@@ -20,8 +20,12 @@ What it says and when:
   stay head down past that, or get up and go, it says nothing.
 - A glance up shorter than two minutes before the 45 minutes doesn't end
   the focus; a longer one does, and the 45 minutes begin again.
-- Once a sitting at most, and twice a day, from 09:00 to 20:00: never in
-  the evening or at night. Only a word said counts toward the two.
+- At most once every three hours, so never twice a sitting, and twice a
+  day, from 09:00 to 20:00: never in the evening or at night. The three
+  hours run from when the 45 minutes came due, even if no word followed
+  (you stayed head down, or someone was with you), and they carry on past
+  a break: a focus that came due at 10:45 holds the next one until 13:45,
+  lunch or not. Only a word said counts toward the two.
 - Only when nobody else is in view: someone out of the camera's sight
   isn't seen, so it can still speak then. If someone is with you when you
   look up, it waits until they have been gone a minute, for up to five
