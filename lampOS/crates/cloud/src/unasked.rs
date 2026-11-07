@@ -1,7 +1,8 @@
 //! A skill's short line for the person's phone, which no text asked for
 //! (`messages/out`, `docs/messages.md`, "Unasked texts"): guard mode's
 //! "Someone was at your desk at 14:31, for about 2 minutes." With
-//! `LAMP_MESSAGES=on`, `lamp-cloud` takes each piece off the bus and sends
+//! `LAMP_MESSAGES=on`, or `LAMP_SKILL_MESSAGES=on` ([`ENVIRONMENT`], #1685)
+//! which carries these lines and nothing else of the texts', `lamp-cloud` takes each piece off the bus and sends
 //! it up as V1's `chat.event` with no run, a `task_news` event, as the
 //! voice's unasked task news goes (`crate::chat`): the skill's text only,
 //! nothing added. The backend keeps it for the owner and pushes it to their
@@ -35,6 +36,22 @@ use std::collections::{HashMap, HashSet, VecDeque};
 /// `lamp-skills`' publisher name (`lamp-skills`' `publisher_declared(..,
 /// "skills")`): anything else on `messages/out` is not a skill's.
 pub const SKILLS: &str = "skills";
+/// Where `lamp-cloud` reads whether skills' lines go up on their own
+/// (#1685): with `on`, only these lines, and not texts from the app, their
+/// answers or the voice's task news, which stay behind `LAMP_MESSAGES`
+/// (`crate::chat::ENVIRONMENT`).
+pub const ENVIRONMENT: &str = "LAMP_SKILL_MESSAGES";
+
+/// Whether the environment carries skills' lines on their own: `on` only.
+pub fn on_from_environment() -> bool {
+    on_from(std::env::var(ENVIRONMENT).ok().as_deref())
+}
+
+/// Whether `value`, the switch as set or not, carries skills' lines:
+/// exactly `on`, nothing else.
+pub fn on_from(value: Option<&str>) -> bool {
+    value == Some("on")
+}
 /// The most other publishers the journal names, once each.
 const REFUSED_NAMED: usize = 8;
 
@@ -490,5 +507,25 @@ mod tests {
         assert!(over.contains("guard-mode") && over.contains("6 in an hour"));
         assert_eq!(dropped_line("guard-mode", &Taken::Kept), None);
         assert_eq!(dropped_line("guard-mode", &Taken::Again), None);
+    }
+
+    /// #1685: only exactly `on` carries skills' lines on their own.
+    #[test]
+    fn only_on_carries_skills_lines() {
+        assert!(on_from(Some("on")));
+        for value in [
+            None,
+            Some(""),
+            Some("ON"),
+            Some("On"),
+            Some("1"),
+            Some("true"),
+            Some(" on"),
+            Some("on "),
+            Some("off"),
+        ] {
+            assert!(!on_from(value), "{value:?}");
+        }
+        assert_eq!(ENVIRONMENT, "LAMP_SKILL_MESSAGES");
     }
 }

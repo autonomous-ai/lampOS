@@ -84,6 +84,13 @@ pub trait Lamp {
     fn texting(&self) -> bool {
         false
     }
+    /// Whether the skills' lines on `messages/out` go up (`crate::unasked`):
+    /// with texts taken, or with `LAMP_SKILL_MESSAGES=on` alone (#1685),
+    /// which takes no text and carries nothing else. Off unless a lamp says
+    /// so.
+    fn skill_lines(&self) -> bool {
+        false
+    }
     /// A new run's name, at `now_ms`.
     fn new_run(&mut self, now_ms: u64) -> String {
         format!("run-{now_ms}")
@@ -99,7 +106,7 @@ pub trait Lamp {
         Vec::new()
     }
     /// The skills' lines for the phone (`messages/out`, `crate::unasked`),
-    /// with texts taken: those heard by `now_ms` are taken off the bus, and
+    /// while [`Lamp::skill_lines`]: those heard by `now_ms` are taken off the bus, and
     /// the pieces waiting are handed back to send when `give`, as the
     /// broker is there. With the journal's lines about those not sent.
     fn unasked(&mut self, _now_ms: u64, _give: bool) -> crate::unasked::Heard {
@@ -757,6 +764,8 @@ pub mod tests {
         /// Texts (#1673): taken when `texting`; those sent; and the
         /// `chat.event`s' `data` it gives once a text has been sent.
         pub texting: bool,
+        /// Skills' lines carried with texts not taken (`LAMP_SKILL_MESSAGES`).
+        pub skill_lines: bool,
         pub texts: Vec<lamp_msgs::ChatIn>,
         pub to_give: Vec<Value>,
         /// The skills' lines for the phone (`crate::unasked`): those to
@@ -864,6 +873,9 @@ pub mod tests {
         }
         fn texting(&self) -> bool {
             self.texting
+        }
+        fn skill_lines(&self) -> bool {
+            self.texting || self.skill_lines
         }
         fn reports(&self) -> Option<std::sync::Arc<crate::reports::Shared>> {
             self.reports.clone()
@@ -1446,6 +1458,27 @@ pub mod tests {
         assert!(can.contains(&"skills.make".to_owned()) && can.contains(&"skills.made".to_owned()));
     }
 
+    /// #1685: with only skills' lines carried (`LAMP_SKILL_MESSAGES=on`,
+    /// `LAMP_MESSAGES` unset), a text from the app is refused as with both
+    /// off, and nothing is put on `chat/in`.
+    #[test]
+    fn with_only_skills_lines_carried_a_text_is_refused_as_with_both_off() {
+        for (texting, skill_lines) in [(false, true), (false, false)] {
+            let mut lamp = Fake {
+                texting,
+                skill_lines,
+                ..lamp()
+            };
+            assert!(!lamp.texting());
+            assert_eq!(
+                answer(&mut lamp, "chat.send", &json!({"message": "hi"})),
+                Err(not_here("chat.send")),
+                "skill lines {skill_lines}"
+            );
+            assert!(lamp.texts.is_empty(), "skill lines {skill_lines}");
+        }
+    }
+
     /// #2864: `system.info`'s `can` holds each switch's kinds only while it
     /// is on, as [`answer`] takes them; the always-answered kinds are in it
     /// with every switch off.
@@ -1453,6 +1486,9 @@ pub mod tests {
     fn system_info_says_each_switchs_kinds_only_while_it_is_on() {
         let switches: Vec<Switch> = vec![
             ("texting", |f| f.texting = true, &["chat.send"]),
+            // Skills' lines alone (#1685) open no kind: `chat.send` stays
+            // refused.
+            ("skill lines", |f| f.skill_lines = true, &[]),
             (
                 "reports",
                 |f| {
