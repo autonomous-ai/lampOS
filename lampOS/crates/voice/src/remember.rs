@@ -3001,7 +3001,7 @@ fn search_text(text: &str) -> String {
 /// `text` as `forget {about}` matches it, folded as the memory's search
 /// finds it: [`search_text`] without accents, as its index's
 /// `remove_diacritics 2` (`crates/memory/src/search.rs`).
-fn about_fold(text: &str) -> String {
+pub(crate) fn about_fold(text: &str) -> String {
     use unicode_normalization::char::is_combining_mark;
     search_text(text)
         .nfd()
@@ -7810,7 +7810,7 @@ fn job_replacing(
 }
 
 /// A word as [`content_words`] gives it: a plural's `s` taken off.
-fn plural_off(word: &str) -> &str {
+pub(crate) fn plural_off(word: &str) -> &str {
     word.strip_suffix('s')
         .filter(|stem| stem.chars().count() >= 3)
         .unwrap_or(word)

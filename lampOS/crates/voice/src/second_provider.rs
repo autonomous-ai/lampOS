@@ -1460,6 +1460,8 @@ struct Shared {
     checking_line: bool,
     /// [`Engine::saying_at_once`] (#2135).
     say_at_once: bool,
+    /// [`Engine::keeping_at_once`] (C59).
+    keep_at_once: bool,
     /// [`Engine::checking_action_claims`] (#5215).
     action_claims: bool,
     /// [`Engine::checking_worded_claims`] (#5215).
@@ -4078,6 +4080,7 @@ impl Engine {
                 opens_further: false,
                 checking_line: false,
                 say_at_once: false,
+                keep_at_once: false,
                 action_claims: false,
                 worded_claims: false,
                 no_words_again: false,
@@ -5144,6 +5147,20 @@ impl Engine {
     pub fn saying_at_once(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.say_at_once = on;
+        }
+        self
+    }
+
+    /// `LAMP_KEEP_ANSWERS_AT_ONCE=on` ([`crate::keep_at_once`], C59): a
+    /// spoken line that only asks to keep something, whose first round
+    /// called `remember` alone with no words, is answered with
+    /// [`crate::keep_at_once::KEPT`] once every call came back kept plainly,
+    /// and the turn ends with no second round. A keep failed, refused, held,
+    /// doubted or told with a note, other calls, the model's own words, or
+    /// more asked go on as without the switch. Before any turn only.
+    pub fn keeping_at_once(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.keep_at_once = on;
         }
         self
     }
@@ -14073,6 +14090,29 @@ async fn answer(
                 && !crate::not_speech::names_a_function(&text);
             // What each call was told, while every one may be answered short.
             let mut short_told: Vec<Value> = Vec::new();
+            // A plain keep answered at once (`LAMP_KEEP_ANSWERS_AT_ONCE`,
+            // C59): a spoken line that only asks to keep, round 1's first
+            // calls all `remember`, no words beside them. What each was told.
+            let may_keep_at_once = shared.keep_at_once
+                && heard
+                && first_calls
+                && !held_forget_ran
+                && !text.chars().any(char::is_alphanumeric)
+                && calls
+                    .iter()
+                    .all(|call| call.name == crate::remember::REMEMBER)
+                && crate::keep_at_once::only_keeps(&heard_words)
+                // What the calls kept covers all the line asked to keep:
+                // a word they left out is a further ask for round 2 (the
+                // Reviewer-lead's 09:56 P2 on #5594).
+                && crate::keep_at_once::covers(
+                    &heard_words,
+                    &calls
+                        .iter()
+                        .filter_map(|call| call.args["text"].as_str())
+                        .collect::<Vec<_>>(),
+                );
+            let mut kept_told: Vec<Value> = Vec::new();
             // Its own words doubt what was heard: a keep in it is not run
             // (#3504 finding N5).
             let doubted = crate::remember::doubted::doubts_what_was_heard(&text);
@@ -14505,6 +14545,9 @@ async fn answer(
                 if may_answer_short || may_end_worded {
                     short_told.push(answer.told.clone());
                 }
+                if may_keep_at_once {
+                    kept_told.push(answer.told.clone());
+                }
                 // Any call of this request that ran and was not refused (a
                 // remember, a reminder set, a skill's add): its confirmation
                 // in a later round, "I've saved that for five", is no false
@@ -14587,6 +14630,28 @@ async fn answer(
             }
             if forgot_this_round {
                 continue;
+            }
+            // Every call a plain keep the memory made (C59): the lamp says
+            // so itself, and the turn ends with no second round. One held,
+            // refused or answered anything else counts short, and the turn
+            // goes on as without the switch: its round 2 says what happened.
+            if may_keep_at_once
+                && kept_told.len() == calls.len()
+                && kept_told
+                    .iter()
+                    .all(|told| crate::keep_at_once::kept_plainly(told, &heard_words))
+            {
+                let line = shared.fixed(crate::keep_at_once::KEPT);
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: {} keep(s) kept plainly for a line that only asks to keep; \"{line}\" said at once, and no round 2 is asked (LAMP_KEEP_ANSWERS_AT_ONCE)",
+                    calls.len()
+                );
+                queue.push(line.to_owned()).await?;
+                return Ok(());
+            } else if may_keep_at_once {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: a keep was not kept plainly; round 2 says what happened (LAMP_KEEP_ANSWERS_AT_ONCE)"
+                );
             }
             // A skill asked for a look (#941): as a look by its own call, the
             // coordinator takes the turn's full look once the lamp's words

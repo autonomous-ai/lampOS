@@ -13,6 +13,7 @@ mod held_forget;
 mod held_rename;
 mod held_save;
 mod history_keeps_calls;
+mod keep_at_once;
 mod music_current;
 mod music_policy;
 mod music_scope;
@@ -52,6 +53,11 @@ struct Script {
     hold_chat: bool,
     /// A chat's first event waits this long (on the test's clock).
     first_event_after: Option<Duration>,
+    /// Each chat's own first-event wait, in the order asked, before
+    /// `first_event_after` (C59's timing replay).
+    round_after: Mutex<VecDeque<Duration>>,
+    /// Every sentence's first audio waits this long (on the test's clock).
+    speech_after: Option<Duration>,
     /// Each of a chat's events waits this long (on the test's clock), as a
     /// streamed reply's pieces come apart.
     piece_gap: Option<Duration>,
@@ -218,7 +224,12 @@ impl Services for Script {
         }
         let events = self.chats.lock().unwrap().pop_front().unwrap();
         let token = self.token.clone();
-        let delay = self.first_event_after;
+        let delay = self
+            .round_after
+            .lock()
+            .unwrap()
+            .pop_front()
+            .or(self.first_event_after);
         let gap = self.piece_gap;
         let scripted = stream::once(async move {
             if let Some(delay) = delay {
@@ -304,11 +315,15 @@ impl Services for Script {
             }
         };
         let ready = self.speech_ready.clone();
+        let after = self.speech_after;
         stream::once(async move {
             if let Some(release) = hold {
                 let _ = release.await;
             }
             tokio::time::sleep(Duration::from_millis(delay)).await;
+            if let Some(after) = after {
+                tokio::time::sleep(after).await;
+            }
             if text.contains("FAIL") {
                 Err(net::Error::Status(503))
             } else {
