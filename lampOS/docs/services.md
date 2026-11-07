@@ -989,12 +989,16 @@ the skill itself is no write: words before "skill" that only ask for it
 first. "Schedule", "post" and "book" after "my", "the", "tomorrow's",
 "latest", "last" or "newest" are the thing read, whatever follows
 ("read me my schedule on my calendar"), unless "say" or "saying" follows
-with nothing asked to be read before ("latest post: say hi on
+with nothing asked to be read ("latest post: say hi on
 Facebook"). After "tomorrow", "today", "day", "calendar", "facebook" or
-"page" they are the thing read only at the request's end or before
-"from", "for" or "of" ("read me my latest Facebook post", "my calendar
-schedule for tomorrow"), else a verb ("tomorrow book the room"; El's P3s
-on #5690 and P2 on #5696). It began on lamp-9adf on 4 Nov at 23:51,
+"page" they are the thing read only after a word asking to be read
+("read", "tell", "what", "show", "check": "read me my Facebook post about
+the sale"), or at the request's end or before "from" or "of" ("my latest
+Facebook post"), else a verb ("tomorrow book the room", "my calendar book
+the room", "tomorrow book for me a table"; El's P3s on #5690 and P2s on
+#5696). With "say" or "saying", a word asking to be read anywhere in the
+request keeps it a read ("the last post saying we are open, read it to
+me"); with none, it is a post to write. It began on lamp-9adf on 4 Nov at 23:51,
 where "create a skill that reads my calendar" was refused. "Put" writes only with
 a service named after it, or "in", "on", "into" or "to" "my drive" ("put
 the count on the light" is the lamp's own). A write after them still counts. A calendar's
