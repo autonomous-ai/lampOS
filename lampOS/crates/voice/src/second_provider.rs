@@ -1295,6 +1295,10 @@ pub type NamedAsk = Arc<dyn Fn(&str) -> Vec<&'static str> + Send + Sync>;
 /// for the person's yes (`crate::agent_tasks::pending_note`): with its
 /// request, to the note or nothing.
 pub type TaskNote = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
+/// The note a spoken line gets from its own words: at setup, a line that
+/// spells the person's name is told the read-back to say, the name as a
+/// word (`crate::onboarding::spelled_name_note_now`, #5580 row 2).
+pub type WordsNote = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
 /// The note's section for a dated follow-up withheld now, to be cut from
 /// what a chat is told ([`Engine::asking_after_events`]).
 pub type EventWithheld = Arc<dyn Fn() -> Option<String> + Send + Sync>;
@@ -1607,6 +1611,9 @@ struct Shared {
     name_fired: Option<NameFired>,
     /// With the tasks part: the note that a prepared task waits for a yes.
     task_waiting: Option<TaskNote>,
+    /// With the setup walk: a line that spells the person's name, told how
+    /// to say it back ([`Engine::noting_a_spelled_name`]).
+    spelled_name: Option<WordsNote>,
     /// With `LAMP_AIR_FACTS=on`: the air's note, when it is due, and what
     /// is told once that request's answer begins to be heard.
     air: Option<(TaskNote, AirHeard)>,
@@ -4134,6 +4141,7 @@ impl Engine {
                 name_sounded: None,
                 name_fired: None,
                 task_waiting: None,
+                spelled_name: None,
                 air: None,
                 seems: None,
                 did: None,
@@ -5739,6 +5747,18 @@ impl Engine {
     pub fn noting_a_task_waiting(mut self, note: TaskNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.task_waiting = Some(note);
+        }
+        self
+    }
+
+    /// A spoken line whose own words spell the person's name at setup is
+    /// told `note`'s words beside them, the read-back to say with the name
+    /// as a word (#5580 row 2: with the nudge off, the model read "W a l t e
+    /// r." back as "W-A-L-T-E-R"). Asked with the line's final words, for
+    /// that turn only. Before any turn only.
+    pub fn noting_a_spelled_name(mut self, note: WordsNote) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.spelled_name = Some(note);
         }
         self
     }
@@ -9190,6 +9210,14 @@ async fn spoken(
     // words of its last exchanges, not its calls, so the model is told, or a
     // yes is taken as a new hand-over (#1712).
     let waiting = shared.task_waiting.as_ref().and_then(|note| note(request));
+    // At setup, a line that spells their name: the read-back to say, the
+    // name as a word, never its letters (#5580 row 2).
+    let spelled = shared.spelled_name.as_ref().and_then(|note| note(&text));
+    if spelled.is_some() {
+        eprintln!(
+            "lamp-voice second: request {request}: its words spell the person's name at setup: the model is told to say it back as the name"
+        );
+    }
     // Let out only as the conversation going on: it may be people's talk.
     let alone = shared
         .conversation_alone
@@ -9263,7 +9291,8 @@ async fn spoken(
             || called.is_some()
             || misheard.is_some()
             || waiting.is_some()
-            || pushed.is_some(),
+            || pushed.is_some()
+            || spelled.is_some(),
         true,
     );
     // Said by name: answer it; else it may not be for the lamp. The line let
@@ -9292,6 +9321,7 @@ async fn spoken(
         .chain(call)
         .chain(alone)
         .chain(waiting)
+        .chain(spelled)
         .chain(follows_on)
         .chain(called)
         .chain(air)

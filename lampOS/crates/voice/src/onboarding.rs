@@ -4520,6 +4520,164 @@ fn yes_or_no(text: &str) -> Option<bool> {
 /// A line that could be only a name: one or two words, after an "I'm",
 /// and no question, yes, no, greeting or thanks. English words only.
 fn name_in(text: &str) -> Option<String> {
+    let words = name_words(text)?;
+    if let Some(name) = spelled_in(&words) {
+        return Some(name);
+    }
+    (1..=2).contains(&words.len()).then(|| words.join(" "))
+}
+
+/// A line that spells a name ([`spelled_in`]), as the word it spells, read
+/// as [`name_in`] reads a line: "W a l t e r." is "Walter". A name said
+/// without its letters is none. English words only.
+fn spelled_name_in(text: &str) -> Option<String> {
+    let mut words = name_words(text)?;
+    // "My name is Walter, W-A-L-T-E-R." and "It's spelled W A L T E R." (the
+    // first builder's and the Reviewer-lead's P3s on #5695). "Sorry, it's
+    // W A L T E R." and "No, it's W A L T E R." too (a reviewer's P3 on #5695):
+    // each lead-in is taken off in turn.
+    let leads = [
+        &["sorry"][..],
+        &["no"],
+        &["it's"],
+        &["its"],
+        &["it", "is"],
+        &["my", "name", "is"],
+        &["spelled"],
+        &["that's", "spelled"],
+    ];
+    while let Some(lead) = leads.iter().find(|lead| {
+        words.len() > lead.len()
+            && words
+                .iter()
+                .zip(lead.iter())
+                .all(|(word, lead)| word.to_lowercase().replace('\u{2019}', "'") == *lead)
+    }) {
+        words.drain(..lead.len());
+    }
+    spelled_in(&words)
+}
+
+/// What the model is told beside the person's line at setup, with the
+/// nudge off, while "who you are" is open, when that line spells their
+/// name: the read-back to say, the name as a word, so the lamp never says
+/// it back as its letters (#5580 row 2, a real lamp with product settings:
+/// "W a l t e r." was read back "spelled out: W-A-L-T-E-R"). For that turn
+/// only, beside its words; the step's own note ([`WHO_NOTE`]), given once
+/// at the ask, says it too. `open` is read only for a line that spells a name (one
+/// read of the small onboarding file). With the nudge on, the walk asks the
+/// name back itself ([`Onboarding::heard_line`]); in another language no
+/// name is read from the line, as there.
+pub(crate) fn spelled_name_note(
+    text: &str,
+    nudge: bool,
+    language: Option<crate::language::Language>,
+    open: impl FnOnce() -> bool,
+) -> Option<String> {
+    if nudge || language.is_some() {
+        return None;
+    }
+    let name = spelled_name_in(text)?;
+    open().then(|| {
+        format!(
+            "(They spelled \"{name}\". Say it back as the name, only this: \"{name}, did I get that right?\" Never say its letters.)"
+        )
+    })
+}
+
+/// [`spelled_name_note`] as the voice's own settings have it: the walk's
+/// file (`LAMP_ONBOARDING`, `LAMP_ONBOARDING_FILE`), its nudge (`LAMP_ONBOARDING_NUDGE`) and
+/// the owner's language, for the second route's per-line notes.
+pub(crate) fn spelled_name_note_now(text: &str) -> Option<String> {
+    spelled_name_note(
+        text,
+        std::env::var(NUDGE_ENVIRONMENT).as_deref() == Ok("on"),
+        crate::language::at_start(),
+        || file_from_environment().is_some_and(|file| who_you_are_asked(&file, installed_order())),
+    )
+}
+
+/// A name spelled, alone or after the name said ("J-A-N-E.", "Jane, J A
+/// N E."), as the word it spells: nobody calls a person by the spelling of
+/// their name (lamp-3e83, #5564).
+fn spelled_in(words: &[&str]) -> Option<String> {
+    if let Some(name) = letters_spelled(&words.join(" ")) {
+        return Some(name);
+    }
+    // A name said and then spelled: the letters win, as the person's own
+    // spelling of it ("Jane, J A Y N E." is Jayne: speech-to-text wrote the
+    // word it knows; the first builder's P3 on #5695).
+    // Letters that spell the word said keep the word's own form ("José, J O
+    // S E." is José).
+    // The name said first is a word, never one letter: 21 letters spelled
+    // are not "A" and then 20 letters.
+    let (first, rest) = words.split_first()?;
+    if first.chars().filter(|c| !combining(*c)).count() < 2 {
+        return None;
+    }
+    let spelled = letters_spelled(&rest.join(" "))?;
+    if crate::known_faces::folded_words(&spelled) == crate::known_faces::folded_words(first) {
+        return Some((*first).to_owned());
+    }
+    Some(spelled)
+}
+
+/// The most letters a spelled name is read as: past it the line is no name
+/// (a reviewer's P2 on #5695: 54 letters were dictated as one word).
+const MOST_SPELLED_LETTERS: usize = 20;
+
+/// Whether `c` is a combining accent, kept with its letter.
+fn combining(c: char) -> bool {
+    ('\u{300}'..='\u{36f}').contains(&c)
+}
+
+/// Letters spelled one by one ([`crate::known_faces::letters_as_word`]
+/// decides whether they are), as the word they make with the letters as
+/// spoken: accents kept ("Z o ë" is Zoë), the first capitalised, the rest
+/// lower case. None for a digit among them ("1 2 3 4 5") or more than
+/// [`MOST_SPELLED_LETTERS`] (a reviewer's P2 and P3s on #5695).
+fn letters_spelled(text: &str) -> Option<String> {
+    crate::known_faces::letters_as_word(text)?;
+    let mut word = String::new();
+    let mut doubled = false;
+    for token in text
+        .split(|c: char| !(c.is_alphanumeric() || c == '\'' || combining(c)))
+        .map(|token| token.trim_matches('\''))
+        .filter(|token| !token.is_empty())
+    {
+        let token = token.to_lowercase();
+        if token == "double" {
+            doubled = true;
+            continue;
+        }
+        if !token
+            .chars()
+            .filter(|c| !combining(*c))
+            .all(char::is_alphabetic)
+        {
+            return None;
+        }
+        if doubled && token == "u" {
+            word.push('w');
+        } else {
+            word.push_str(&token);
+            if doubled {
+                word.push_str(&token);
+            }
+        }
+        doubled = false;
+    }
+    if word.chars().filter(|c| !combining(*c)).count() > MOST_SPELLED_LETTERS {
+        return None;
+    }
+    let mut chars = word.chars();
+    let first = chars.next()?;
+    Some(first.to_uppercase().chain(chars).collect())
+}
+
+/// A line's words as [`name_in`] reads them, without a leading "I'm" or
+/// "it's": none for a question, a yes or no, a greeting or thanks.
+fn name_words(text: &str) -> Option<Vec<&str>> {
     let greets = ["hello", "hi", "hey", "okay", "ok", "thanks", "thank"];
     if text.contains('?')
         || yes_or_no(text).is_some()
@@ -4531,7 +4689,7 @@ fn name_in(text: &str) -> Option<String> {
     }
     let mut words: Vec<&str> = text
         .split_whitespace()
-        .map(|word| word.trim_matches(|c: char| !c.is_alphanumeric()))
+        .map(|word| word.trim_matches(|c: char| !(c.is_alphanumeric() || combining(c))))
         .filter(|word| !word.is_empty())
         .collect();
     if words
@@ -4547,20 +4705,7 @@ fn name_in(text: &str) -> Option<String> {
     {
         return None;
     }
-    // A name spelled, alone or after the name said ("J-A-N-E.", "Jane, J A
-    // N E."), is asked back as the name, never its letters: nobody calls a
-    // person by the spelling of their name (lamp-3e83, #5564).
-    if let Some(name) = crate::known_faces::letters_as_word(&words.join(" ")) {
-        return Some(name);
-    }
-    if let Some((first, rest)) = words.split_first()
-        && crate::known_faces::letters_as_word(&rest.join(" ")).is_some_and(|spelled| {
-            crate::known_faces::folded_words(&spelled) == crate::known_faces::folded_words(first)
-        })
-    {
-        return Some((*first).to_owned());
-    }
-    (1..=2).contains(&words.len()).then(|| words.join(" "))
+    Some(words)
 }
 
 /// Whether eyes that give close receipts are on the bus now: their
@@ -4897,6 +5042,27 @@ pub fn who_you_are_open(file: &Path) -> bool {
         return false;
     };
     progress["steps"].is_object() && progress["steps"].get(Step::WhoYouAre.name()).is_none()
+}
+
+/// Whether the walk leads "who you are" now, as its file at `file` shows:
+/// the first step of `order` with no outcome, as the runner picks it
+/// ([`Onboarding::next_step`]). Narrower than [`who_you_are_open`], which is
+/// true through "where you sit" too (a reviewer's P3 on #5695). An order not
+/// read, no file or an unreadable one: no.
+pub(crate) fn who_you_are_asked(file: &Path, order: Option<&[Step]>) -> bool {
+    let Some(order) = order else {
+        return false;
+    };
+    let Ok(bytes) = std::fs::read(file) else {
+        return false;
+    };
+    let Ok(progress) = serde_json::from_slice::<Value>(&bytes) else {
+        return false;
+    };
+    let Some(steps) = progress["steps"].as_object() else {
+        return false;
+    };
+    order.iter().find(|step| !steps.contains_key(step.name())) == Some(&Step::WhoYouAre)
 }
 
 /// A setup face save refused for the read-back (`known_faces::SAY_IT_BACK`),
@@ -6132,8 +6298,178 @@ mod tests {
             assert_eq!(name_in(line), Some("Jane".into()), "{line}");
         }
         assert_eq!(name_in("José, J O S E."), Some("José".into()));
+        // The letters win over a different word (the first builder's P3 on
+        // #5695).
+        assert_eq!(name_in("Jane, J A Y N E."), Some("Jayne".into()));
         assert_eq!(name_in("A J"), Some("A J".into()));
         assert_eq!(name_in("Jane"), Some("Jane".into()));
+    }
+
+    /// #5580 row 2 (a real lamp, product settings, the nudge off): after
+    /// "Walter, did I get that right?", "That's not right." and "W a l t e
+    /// r.", the model said "spelled out: W-A-L-T-E-R". With the nudge off and
+    /// a face to keep, while "who you are" is open, a line that spells the
+    /// name is told the read-back to say, the name as a word and no letters;
+    /// a name said plainly, a line in another language, the nudge on or the
+    /// step over are told nothing.
+    #[test]
+    fn with_the_nudge_off_a_spelled_name_is_told_its_read_back_as_the_name() {
+        let mut room = Room::new("spelled-read-back");
+        room.walk.face_kept = true;
+        assert_eq!(room.wait(8 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        let file = room.walk.file.clone();
+        let note = |room: &Room, line: &str| {
+            spelled_name_note(line, room.walk.nudge, room.walk.language, || {
+                who_you_are_asked(&file, Some(&room.walk.definition.order))
+            })
+        };
+        room.walk.heard("My name is Walter.", room.at);
+        assert_eq!(note(&room, "My name is Walter."), None);
+        room.walk.lamp_said(room.at);
+        room.walk.heard("That's not right.", room.at);
+        room.walk.lamp_said(room.at);
+        let told = note(&room, "W a l t e r.").expect("a spelled name is told its read-back");
+        assert!(told.contains("\"Walter, did I get that right?\""), "{told}");
+        assert!(!told.contains("W-A") && !told.contains("W A"), "{told}");
+        for line in [
+            "W A L T E R.",
+            "W-A-L-T-E-R",
+            "It's W, A, L, T, E, R.",
+            "Walter, W A L T E R.",
+            "My name is Walter, W-A-L-T-E-R.",
+            "It's spelled W A L T E R.",
+            "That's spelled W, A, L, T, E, R.",
+        ] {
+            assert_eq!(note(&room, line), Some(told.clone()), "{line}");
+        }
+        // The letters win over the word speech-to-text wrote.
+        let jayne = note(&room, "Jane, J A Y N E.").expect("a spelling after a word");
+        assert!(
+            jayne.contains("\"Jayne, did I get that right?\""),
+            "{jayne}"
+        );
+        // A name said plainly, initials, a question: no note.
+        for line in [
+            "Walter.",
+            "It's Walter.",
+            "A J",
+            "Is it W A L T E R?",
+            "No.",
+        ] {
+            assert_eq!(note(&room, line), None, "{line}");
+        }
+        // Another language: no name is read from the line, as in
+        // `heard_line`; the nudge on asks the name back itself.
+        room.walk.language = Some(crate::language::Language::Vietnamese);
+        assert_eq!(note(&room, "W a l t e r."), None);
+        room.walk.language = None;
+        room.walk.nudge = true;
+        assert_eq!(note(&room, "W a l t e r."), None);
+        room.walk.nudge = false;
+        // The step over: nothing is told. A plain line never reads the file.
+        room.walk
+            .finish(Step::WhoYouAre, Outcome::Done, None, room.at);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(note(&room, "W a l t e r."), None);
+        assert_eq!(
+            spelled_name_note("Walter.", false, None, || unreachable!("read")),
+            None
+        );
+    }
+
+    /// A reviewer's P2 on #5695: 54 letters spelled were dictated as one
+    /// word. Past 20 letters a spelling is no name.
+    #[test]
+    fn a_spelled_name_past_twenty_letters_is_none() {
+        let twenty = "A B C D E F G H I J K L M N O P Q R S T";
+        assert_eq!(spelled_name_in(twenty), Some("Abcdefghijklmnopqrst".into()));
+        assert_eq!(spelled_name_in(&format!("{twenty} U")), None);
+        assert_eq!(spelled_name_in(&"W A L T E R ".repeat(9)), None);
+    }
+
+    /// A reviewer's P3 on #5695: digits are no letters ("1 2 3 4 5").
+    #[test]
+    fn digits_spell_no_name() {
+        for line in ["1 2 3 4 5", "W A L T E R 2", "J 0 E"] {
+            assert_eq!(spelled_name_in(line), None, "{line}");
+        }
+    }
+
+    /// A reviewer's P3 on #5695: "Z o ë" was read back "Zoe". The letters
+    /// are kept as spoken, accents too, the first capitalised; letters that
+    /// spell the word said keep the word ("José, J O S E.").
+    #[test]
+    fn a_spelled_name_keeps_its_accents() {
+        for (line, name) in [
+            ("Z o ë", "Zoë"),
+            ("N g u y ễ n", "Nguyễn"),
+            ("Z o e\u{308}.", "Zoe\u{308}"),
+            ("J O S É", "José"),
+            ("José, J O S E.", "José"),
+            ("w a l t e r", "Walter"),
+            ("A n n", "Ann"),
+            ("W A L T E E R.", "Walteer"),
+        ] {
+            assert_eq!(spelled_name_in(line).as_deref(), Some(name), "{line}");
+        }
+        for line in ["OK", "A J", "I T guy", "WALTER", "A l", "B o"] {
+            assert_eq!(spelled_name_in(line), None, "{line}");
+        }
+    }
+
+    /// A reviewer's P3 on #5695: "Sorry, it's W A L T E R." and "No, it's
+    /// W A L T E R." were told nothing.
+    #[test]
+    fn a_spelling_after_sorry_or_no_is_read() {
+        for line in [
+            "Sorry, it's W A L T E R.",
+            "No, it's W A L T E R.",
+            "No, sorry, it\u{2019}s W A L T E R.",
+            "Sorry, my name is W A L T E R.",
+            "No, it is spelled W A L T E R.",
+        ] {
+            assert_eq!(spelled_name_in(line).as_deref(), Some("Walter"), "{line}");
+        }
+        assert_eq!(spelled_name_in("Sorry."), None);
+        assert_eq!(spelled_name_in("No, it's Walter."), None);
+    }
+
+    /// A reviewer's P3 on #5695: the note was given whenever "who you are"
+    /// had no outcome, "where you sit" too. Only while it is the step led:
+    /// the first of the order with no outcome.
+    #[test]
+    fn a_spelled_name_is_told_only_while_who_you_are_is_led() {
+        let dir = std::env::temp_dir().join(format!("lamp-who-asked-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("progress.json");
+        let order = [Step::WhereYouSit, Step::Touch, Step::WhoYouAre];
+        assert!(!who_you_are_asked(&file, Some(&order)), "no file");
+        let done = json!({"outcome":"done","at_unix_s":1});
+        for (steps, asked) in [
+            (json!({}), false),
+            (json!({"where_you_sit": done}), false),
+            (json!({"where_you_sit": done, "touch": done}), true),
+            (
+                json!({"where_you_sit": done, "touch": done, "who_you_are": done}),
+                false,
+            ),
+        ] {
+            std::fs::write(&file, json!({"steps": steps}).to_string()).unwrap();
+            assert_eq!(who_you_are_asked(&file, Some(&order)), asked, "{steps}");
+            assert_eq!(
+                spelled_name_note("W a l t e r.", false, None, || {
+                    who_you_are_asked(&file, Some(&order))
+                })
+                .is_some(),
+                asked,
+                "{steps}"
+            );
+        }
+        // No order read: nothing on a guess.
+        assert!(!who_you_are_asked(&file, None));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
