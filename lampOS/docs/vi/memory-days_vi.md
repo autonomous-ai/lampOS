@@ -618,11 +618,12 @@ ai nói, khi các lần nhìn qua câu ấy thấy khuôn mặt quen của họ 
 lần và không thấy mặt nào khác trong bất kỳ lần nào
 (`SpeakingFaces::one_face_in_view`; một lần nhìn không có ai không tính là mặt
 khác), và cuộc trò chuyện **chưa có giọng nào khác**, thì **việc ghi nhớ**
-(`remember`) **và việc quên điều đã ghi** là của họ: điều đó được lưu vào phạm
-vi của họ (`ScopeLease::take_by_one_face`, `ScopeLease::kept_by_one_face`), và
-một `forget` một mục tìm trong phạm vi của họ rồi đến của căn phòng
-(`ScopeLease::reached_by_one_face`, quyết định duy nhất mà tuyến ký ức trong
-`tools.rs` đọc cho cả hai, nên việc quên không bao giờ hẹp hơn việc ghi). **Mọi việc
+(`remember`) là của họ, **nhưng không lệnh quên nào chạy trên câu ấy**: điều đó
+được lưu vào phạm vi của họ (`ScopeLease::take_by_one_face`,
+`ScopeLease::kept_by_one_face`), và một `forget` một mục được xét theo cùng
+quyết định ấy (`ScopeLease::reached_by_one_face`, quyết định mà tuyến ký ức
+trong `tools.rs` đọc cho cả hai) và không chạy ở đâu cho tới khi thấy miệng nói
+câu ấy (bên dưới; #5627). **Mọi việc
 đọc vẫn là của căn phòng**: không `recall` hay gợi ý từ ký ức của họ, không
 ghi chú ký ức của họ, không ngữ cảnh của người ấy, không chuỗi hội thoại hay
 bản tóm tắt của họ; câu được nói và đọc như của căn phòng, như khi không có
@@ -650,8 +651,9 @@ là giọng khác, chỉ thấy mặt thứ hai nói mới cho biết có ngư�
 ghi nhớ là của họ, cái giá là lời được lưu, không bao giờ bị đọc. Có mặt thứ hai, mặt lạ,
 không có mặt nào, hoặc có giọng khác, thì như trước. Một câu được nhận là của
 căn phòng vì không nhận ra ai thì không đổi, nên giọng chưa nhận ra vẫn không
-chạm được ký ức của ai (#4196, #4207). **Việc quên theo việc ghi:** một
-`forget` một mục trên câu như vậy xoá khỏi phạm vi của họ điều mà cùng quy tắc
+chạm được ký ức của ai (#4196, #4207). **Việc quên sẽ theo việc ghi
+như thế nào** (`remember::run_one_face_forget`, không đường chạy nào gọi tới từ
+#5627; giữ lại cho khi việc quên ở đó được cho phép lại): một `forget` một mục trên câu như vậy xoá khỏi phạm vi của họ điều mà cùng quy tắc
 đã lưu ở đó, và chỉ tìm thêm trong phạm vi của căn phòng khi của họ không có gì
 về điều ấy (lần kiểm tra của Fourteen trên lamp-9adf, bản 9699: «forget my
 coffee» chỉ tìm trong phạm vi căn phòng trong khi cà phê được lưu là của họ,
@@ -673,10 +675,16 @@ ký ức sẽ chạy như «điều được lưu gần nhất» (ký ức cũ, 
 căn phòng, vì sau lần `recall` của căn phòng trên câu như vậy nó sẽ lấy mất
 điều họ lưu gần nhất (P2 của Thirteen trên #5022). **Việc quên cần thấy miệng đang nói** (người phụ trách ký ức, 16:49 trên
 #5385: «tạm thời chưa cho xóa nếu ko detect đc mở miệng»), không có ngoại lệ:
-một câu «forget that» trống trên câu như vậy, của họ vì chỉ có mặt họ trong
+một lệnh quên trên câu như vậy, của họ vì chỉ có mặt họ trong
 khung hình hoặc được gọi tên muộn trên một câu nhận là của căn phòng
 (`ScopeLease::reached_by_one_face`), không được hỏi tới ký ức nào, của họ hay
-của căn phòng (`tools::run_call_with_scope`). Ngay sau một lần lưu mới thông
+của căn phòng (`tools::run_call_with_scope`), khi chỉ bật `LAMP_PERSON_SCOPE_ONE_FACE`. Lệnh
+quên nêu điều gì (`about`) hoặc điều nào (`source_id`) được trả lời
+`ONE_FACE_NAMED_FORGET`, nên đèn nói sẽ quên điều đó khi thấy họ nói, và nhờ
+họ nhìn vào đèn rồi nói lại (#5627, từ lần đọc #5608 của Thirteen: trước đó nó
+xoá trong phạm vi của họ khi không thấy miệng, nên một người ngoài khung hình
+có thể xoá điều họ đã lưu chỉ bằng cách nêu tên điều ấy). Với một câu «forget
+that» trống, ngay sau một lần lưu mới thông
 thường của chính họ (yêu cầu kế tiếp của cùng worker và phiên, cùng người,
 không có lệnh ký ức nào khác hay lệnh quên theo tên trước nó trong câu ấy,
 trong `HELD_FORGET_FOR`: `tools::one_face_just_kept`), đèn nói sẽ quên điều đó
