@@ -5517,21 +5517,27 @@ fn name_in(text: &str) -> Option<String> {
 fn spelled_name_in(text: &str) -> Option<String> {
     let mut words = name_words(text)?;
     // "My name is Walter, W-A-L-T-E-R." and "It's spelled W A L T E R." (the
-    // first builder's and the Reviewer-lead's P3s on #5695).
-    for lead in [
-        &["my", "name", "is"][..],
+    // first builder's and the Reviewer-lead's P3s on #5695). "Sorry, it's
+    // W A L T E R." and "No, it's W A L T E R." too (a reviewer's P3 on #5695):
+    // each lead-in is taken off in turn.
+    let leads = [
+        &["sorry"][..],
+        &["no"],
+        &["it's"],
+        &["its"],
+        &["it", "is"],
+        &["my", "name", "is"],
         &["spelled"],
         &["that's", "spelled"],
-    ] {
-        let leads = words.len() > lead.len()
+    ];
+    while let Some(lead) = leads.iter().find(|lead| {
+        words.len() > lead.len()
             && words
                 .iter()
-                .zip(lead)
-                .all(|(word, lead)| word.to_lowercase() == *lead);
-        if leads {
-            words.drain(..lead.len());
-            break;
-        }
+                .zip(lead.iter())
+                .all(|(word, lead)| word.to_lowercase().replace('\u{2019}', "'") == *lead)
+    }) {
+        words.drain(..lead.len());
     }
     spelled_in(&words)
 }
@@ -5571,7 +5577,7 @@ pub(crate) fn spelled_name_note_now(text: &str) -> Option<String> {
         text,
         std::env::var(NUDGE_ENVIRONMENT).as_deref() == Ok("on"),
         crate::language::at_start(),
-        || file_from_environment().is_some_and(|file| who_you_are_open(&file)),
+        || file_from_environment().is_some_and(|file| who_you_are_asked(&file, installed_order())),
     )
 }
 
@@ -5579,7 +5585,7 @@ pub(crate) fn spelled_name_note_now(text: &str) -> Option<String> {
 /// N E."), as the word it spells: nobody calls a person by the spelling of
 /// their name (lamp-3e83, #5564).
 fn spelled_in(words: &[&str]) -> Option<String> {
-    if let Some(name) = crate::known_faces::letters_as_word(&words.join(" ")) {
+    if let Some(name) = letters_spelled(&words.join(" ")) {
         return Some(name);
     }
     // A name said and then spelled: the letters win, as the person's own
@@ -5587,12 +5593,70 @@ fn spelled_in(words: &[&str]) -> Option<String> {
     // word it knows; the first builder's P3 on #5695).
     // Letters that spell the word said keep the word's own form ("José, J O
     // S E." is José).
+    // The name said first is a word, never one letter: 21 letters spelled
+    // are not "A" and then 20 letters.
     let (first, rest) = words.split_first()?;
-    let spelled = crate::known_faces::letters_as_word(&rest.join(" "))?;
+    if first.chars().filter(|c| !combining(*c)).count() < 2 {
+        return None;
+    }
+    let spelled = letters_spelled(&rest.join(" "))?;
     if crate::known_faces::folded_words(&spelled) == crate::known_faces::folded_words(first) {
         return Some((*first).to_owned());
     }
     Some(spelled)
+}
+
+/// The most letters a spelled name is read as: past it the line is no name
+/// (a reviewer's P2 on #5695: 54 letters were dictated as one word).
+const MOST_SPELLED_LETTERS: usize = 20;
+
+/// Whether `c` is a combining accent, kept with its letter.
+fn combining(c: char) -> bool {
+    ('\u{300}'..='\u{36f}').contains(&c)
+}
+
+/// Letters spelled one by one ([`crate::known_faces::letters_as_word`]
+/// decides whether they are), as the word they make with the letters as
+/// spoken: accents kept ("Z o ë" is Zoë), the first capitalised, the rest
+/// lower case. None for a digit among them ("1 2 3 4 5") or more than
+/// [`MOST_SPELLED_LETTERS`] (a reviewer's P2 and P3s on #5695).
+fn letters_spelled(text: &str) -> Option<String> {
+    crate::known_faces::letters_as_word(text)?;
+    let mut word = String::new();
+    let mut doubled = false;
+    for token in text
+        .split(|c: char| !(c.is_alphanumeric() || c == '\'' || combining(c)))
+        .map(|token| token.trim_matches('\''))
+        .filter(|token| !token.is_empty())
+    {
+        let token = token.to_lowercase();
+        if token == "double" {
+            doubled = true;
+            continue;
+        }
+        if !token
+            .chars()
+            .filter(|c| !combining(*c))
+            .all(char::is_alphabetic)
+        {
+            return None;
+        }
+        if doubled && token == "u" {
+            word.push('w');
+        } else {
+            word.push_str(&token);
+            if doubled {
+                word.push_str(&token);
+            }
+        }
+        doubled = false;
+    }
+    if word.chars().filter(|c| !combining(*c)).count() > MOST_SPELLED_LETTERS {
+        return None;
+    }
+    let mut chars = word.chars();
+    let first = chars.next()?;
+    Some(first.to_uppercase().chain(chars).collect())
 }
 
 /// A line's words as [`name_in`] reads them, without a leading "I'm" or
@@ -5609,7 +5673,7 @@ fn name_words(text: &str) -> Option<Vec<&str>> {
     }
     let mut words: Vec<&str> = text
         .split_whitespace()
-        .map(|word| word.trim_matches(|c: char| !c.is_alphanumeric()))
+        .map(|word| word.trim_matches(|c: char| !(c.is_alphanumeric() || combining(c))))
         .filter(|word| !word.is_empty())
         .collect();
     if words
@@ -5962,6 +6026,27 @@ pub fn who_you_are_open(file: &Path) -> bool {
         return false;
     };
     progress["steps"].is_object() && progress["steps"].get(Step::WhoYouAre.name()).is_none()
+}
+
+/// Whether the walk leads "who you are" now, as its file at `file` shows:
+/// the first step of `order` with no outcome, as the runner picks it
+/// ([`Onboarding::next_step`]). Narrower than [`who_you_are_open`], which is
+/// true through "where you sit" too (a reviewer's P3 on #5695). An order not
+/// read, no file or an unreadable one: no.
+pub(crate) fn who_you_are_asked(file: &Path, order: Option<&[Step]>) -> bool {
+    let Some(order) = order else {
+        return false;
+    };
+    let Ok(bytes) = std::fs::read(file) else {
+        return false;
+    };
+    let Ok(progress) = serde_json::from_slice::<Value>(&bytes) else {
+        return false;
+    };
+    let Some(steps) = progress["steps"].as_object() else {
+        return false;
+    };
+    order.iter().find(|step| !steps.contains_key(step.name())) == Some(&Step::WhoYouAre)
 }
 
 /// A setup face save refused for the read-back (`known_faces::SAY_IT_BACK`),
@@ -7234,7 +7319,7 @@ mod tests {
         let file = room.walk.file.clone();
         let note = |room: &Room, line: &str| {
             spelled_name_note(line, room.walk.nudge, room.walk.language, || {
-                who_you_are_open(&file)
+                who_you_are_asked(&file, Some(&room.walk.definition.order))
             })
         };
         room.walk.heard("My name is Walter.", room.at);
@@ -7289,6 +7374,100 @@ mod tests {
             spelled_name_note("Walter.", false, None, || unreachable!("read")),
             None
         );
+    }
+
+    /// A reviewer's P2 on #5695: 54 letters spelled were dictated as one
+    /// word. Past 20 letters a spelling is no name.
+    #[test]
+    fn a_spelled_name_past_twenty_letters_is_none() {
+        let twenty = "A B C D E F G H I J K L M N O P Q R S T";
+        assert_eq!(spelled_name_in(twenty), Some("Abcdefghijklmnopqrst".into()));
+        assert_eq!(spelled_name_in(&format!("{twenty} U")), None);
+        assert_eq!(spelled_name_in(&"W A L T E R ".repeat(9)), None);
+    }
+
+    /// A reviewer's P3 on #5695: digits are no letters ("1 2 3 4 5").
+    #[test]
+    fn digits_spell_no_name() {
+        for line in ["1 2 3 4 5", "W A L T E R 2", "J 0 E"] {
+            assert_eq!(spelled_name_in(line), None, "{line}");
+        }
+    }
+
+    /// A reviewer's P3 on #5695: "Z o ë" was read back "Zoe". The letters
+    /// are kept as spoken, accents too, the first capitalised; letters that
+    /// spell the word said keep the word ("José, J O S E.").
+    #[test]
+    fn a_spelled_name_keeps_its_accents() {
+        for (line, name) in [
+            ("Z o ë", "Zoë"),
+            ("N g u y ễ n", "Nguyễn"),
+            ("Z o e\u{308}.", "Zoe\u{308}"),
+            ("J O S É", "José"),
+            ("José, J O S E.", "José"),
+            ("w a l t e r", "Walter"),
+            ("A n n", "Ann"),
+            ("W A L T E E R.", "Walteer"),
+        ] {
+            assert_eq!(spelled_name_in(line).as_deref(), Some(name), "{line}");
+        }
+        for line in ["OK", "A J", "I T guy", "WALTER", "A l", "B o"] {
+            assert_eq!(spelled_name_in(line), None, "{line}");
+        }
+    }
+
+    /// A reviewer's P3 on #5695: "Sorry, it's W A L T E R." and "No, it's
+    /// W A L T E R." were told nothing.
+    #[test]
+    fn a_spelling_after_sorry_or_no_is_read() {
+        for line in [
+            "Sorry, it's W A L T E R.",
+            "No, it's W A L T E R.",
+            "No, sorry, it\u{2019}s W A L T E R.",
+            "Sorry, my name is W A L T E R.",
+            "No, it is spelled W A L T E R.",
+        ] {
+            assert_eq!(spelled_name_in(line).as_deref(), Some("Walter"), "{line}");
+        }
+        assert_eq!(spelled_name_in("Sorry."), None);
+        assert_eq!(spelled_name_in("No, it's Walter."), None);
+    }
+
+    /// A reviewer's P3 on #5695: the note was given whenever "who you are"
+    /// had no outcome, "where you sit" too. Only while it is the step led:
+    /// the first of the order with no outcome.
+    #[test]
+    fn a_spelled_name_is_told_only_while_who_you_are_is_led() {
+        let dir = std::env::temp_dir().join(format!("lamp-who-asked-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("progress.json");
+        let order = [Step::WhereYouSit, Step::Touch, Step::WhoYouAre];
+        assert!(!who_you_are_asked(&file, Some(&order)), "no file");
+        let done = json!({"outcome":"done","at_unix_s":1});
+        for (steps, asked) in [
+            (json!({}), false),
+            (json!({"where_you_sit": done}), false),
+            (json!({"where_you_sit": done, "touch": done}), true),
+            (
+                json!({"where_you_sit": done, "touch": done, "who_you_are": done}),
+                false,
+            ),
+        ] {
+            std::fs::write(&file, json!({"steps": steps}).to_string()).unwrap();
+            assert_eq!(who_you_are_asked(&file, Some(&order)), asked, "{steps}");
+            assert_eq!(
+                spelled_name_note("W a l t e r.", false, None, || {
+                    who_you_are_asked(&file, Some(&order))
+                })
+                .is_some(),
+                asked,
+                "{steps}"
+            );
+        }
+        // No order read: nothing on a guess.
+        assert!(!who_you_are_asked(&file, None));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
