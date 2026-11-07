@@ -25,11 +25,12 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// The kinds, in `can`'s order.
-pub const KINDS: [&str; 4] = [
+pub const KINDS: [&str; 5] = [
     "control.code",
     "control.clients",
     "control.revoke",
     "control.code_cancel",
+    "control.take_back",
 ];
 
 /// lamp-control's admin socket on a lamp (`lamp-control serve
@@ -104,6 +105,7 @@ pub fn answer_saying(
         "control.clients" => clients(door, say),
         "control.revoke" => revoke(door, data, say),
         "control.code_cancel" => code_cancel(door, say),
+        "control.take_back" => take_back(door, data, say),
         other => Err(crate::wire::not_here(other)),
     }
 }
@@ -285,6 +287,42 @@ fn code_cancel(door: &Door, say: &mut dyn FnMut(&str)) -> Result<Option<Value>, 
         "control.code_cancel from the app: the pairing code dropped ({dropped})"
     ));
     Ok(Some(json!({"dropped": dropped})))
+}
+
+/// `{}` or `{"client": "c_1"}` → `{"taken": N}`: the owner takes the lamp
+/// back from one computer, or from every computer, which keep their
+/// pairing. Their leases end as `taken_by_owner_app`.
+fn take_back(
+    door: &Door,
+    data: &Value,
+    say: &mut dyn FnMut(&str),
+) -> Result<Option<Value>, String> {
+    let asked = match data.get("client") {
+        None => json!({"take_back": true}),
+        Some(client) => {
+            let client = client
+                .as_str()
+                .filter(|id| {
+                    !id.is_empty() && id.len() <= 64 && id.bytes().all(|b| b.is_ascii_graphic())
+                })
+                .ok_or(BAD_CLIENT)?;
+            json!({"take_back": true, "client": client})
+        }
+    };
+    let answered = ask(&door.socket, &asked, "control.take_back", say)?;
+    let Some(taken) = answered.get("taken").and_then(Value::as_u64) else {
+        say("control.take_back from the app: lamp-control's answer can't be read");
+        return Err(UNREACHED.to_owned());
+    };
+    say(&format!(
+        "control.take_back from the app: {} lease(s) taken back from {}",
+        taken,
+        asked
+            .get("client")
+            .and_then(Value::as_str)
+            .unwrap_or("every computer")
+    ));
+    Ok(Some(json!({"taken": taken})))
 }
 
 /// The app's one-time X25519 public key: 32 bytes of base64url, padded or
@@ -643,6 +681,55 @@ mod tests {
         assert_eq!(
             answer_saying(&off, "control.code_cancel", &json!({}), &mut |_| {}),
             Err(OFF.to_owned())
+        );
+    }
+
+    /// The owner takes the lamp back: from every computer with `{}`, from
+    /// one with `{"client"}`; lamp-control says how many leases ended.
+    #[test]
+    fn a_take_back_ends_the_computers_leases() {
+        let dir = folder("takeback");
+        let (door, asked) = admin(
+            &dir,
+            |asked| json!({"taken": if asked.get("client").is_some() { 1 } else { 2 }}),
+        );
+        let mut lines = Vec::new();
+        let all = answer_saying(&door, "control.take_back", &json!({}), &mut |line| {
+            lines.push(line.to_owned())
+        })
+        .unwrap()
+        .unwrap();
+        assert_eq!(asked.recv().unwrap(), json!({"take_back": true}));
+        assert_eq!(all, json!({"taken": 2}));
+        let one = answer_saying(
+            &door,
+            "control.take_back",
+            &json!({"client": "c_1"}),
+            &mut |line| lines.push(line.to_owned()),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            asked.recv().unwrap(),
+            json!({"take_back": true, "client": "c_1"})
+        );
+        assert_eq!(one, json!({"taken": 1}));
+        assert_eq!(
+            lines,
+            [
+                "control.take_back from the app: 2 lease(s) taken back from every computer",
+                "control.take_back from the app: 1 lease(s) taken back from c_1",
+            ]
+        );
+        // A client that isn't an id is refused before lamp-control is asked.
+        assert_eq!(
+            answer_saying(
+                &door,
+                "control.take_back",
+                &json!({"client": 7}),
+                &mut |_| {}
+            ),
+            Err(BAD_CLIENT.to_owned())
         );
     }
 }
