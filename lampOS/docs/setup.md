@@ -869,13 +869,23 @@ router's restart (2-3 minutes) never hears it.
 
 **With recovery on, the hotspot speaks instead** (#5550, from #4141): when
 `recover` runs with `LAMP_WIFI_RECOVERY=on` (its `/run/lampos-setup-recover/on`
-is there) and no `.lamp-previous` is left to hold it busy, the helper says
-nothing after a change that left the lamp on no network, and journals
-`recovery is on: its hotspot says the no-Wi-Fi line`. `recover` opens its
-hotspot 90 s later and says its own line ("When the saved network is gone",
-below), so nobody is sent to erase a lamp that opens setup by itself. A
-`.lamp-previous` still there (the old file could not be put back) keeps
-`recover` busy, so the pinhole line is said as above.
+is there) and no `.lamp-previous` is left to hold it busy
+(`wifi_change::left_to_hotspot`), the helper holds its lost line after a
+change that left the lamp on no network, and journals `recovery is on: the
+no-Wi-Fi line waits for its hotspot's`. `recover` opens its hotspot 90 s
+later and says its own line ("When the saved network is gone", below); once
+the voice took it, `recover` keeps `/run/lampos-setup-recover/told`
+(`recover::TOLD_FILE`, removed whenever the hotspot is neither open nor
+retried from), and the helper then says nothing, so nobody is sent to erase
+a lamp that opens setup by itself. With no `told` within 160 s
+(`wifi_change::HOTSPOT_LINE_WAIT`: the 90 s, the line's minute of asks
+again, two 5 s looks) — its recording missing or refused throughout, or the
+radio held associated with no address, where the hotspot never opens — the
+helper journals `the hotspot's line did not come` and says the pinhole line
+as above, once a minute until a network is back, `told` appears, or 10
+minutes from the change's end. A `.lamp-previous` still there (the old file
+could not be put back) keeps `recover` busy, so the pinhole line is said at
+once as above.
 
 **The no-Wi-Fi line is a recording** (the first builder on #1722, 01:56): with
 no network the voice cannot reach its model, so this one line is never words
@@ -1185,7 +1195,11 @@ its only way back once its package carries the unit.
   (`recover::SAY_AGAIN_FIRST_MS`, the wait doubling), never past the ask's
   60 s `expires_in_ms` from the first (`SAY_AGAIN_WITHIN_MS`), and only while
   the hotspot is open: not during a try of the saved network, nor once the
-  lamp is online (`Recovery::not_played`, `Recovery::says_again`, #5550).
+  lamp is online, nor while a setup run on its page (or a Wi-Fi change) is
+  in progress, the person already setting the network; it stays due for the
+  next look that is not (`Recovery::not_played`, `Recovery::says_again`,
+  `Recovery::says_line`, `recover::say_line`, #5550). Played (begun, or
+  waiting to be), it keeps `told` for a Wi-Fi change's helper (above).
   The hotspot is never held for it: each ask waits at most the 2 s of the
   answer, after the hotspot opened. A missing recording is asked again too,
   three more journal lines.
