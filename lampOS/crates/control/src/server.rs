@@ -1053,6 +1053,10 @@ async fn connection<S>(
 ///   true` the lamp also says the first 8 characters of its pin aloud (the
 ///   spoken pin check, #5299), and the answer says `"pin_said"`: whether the
 ///   voice took the line;
+/// - `{"take_back": true}` (and `"client": "c_…"` for one computer) →
+///   `{"taken": N}`: every lease of that computer, or of every computer, is
+///   lost as `taken_by_owner_app` and its holder told; the computers stay
+///   paired;
 /// - `{"cancel_code": true}` → `{"dropped": true|false}`: the code out is
 ///   dropped, so nobody can pair with it (the app's answer to a spoken check
 ///   that doesn't match), and whether there was one;
@@ -1111,6 +1115,26 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
             Err(error) => json!({"error": format!("grants: {error}")}),
         };
     }
+    // The owner's app takes the lamp back (#4579's P3): leases end as
+    // `taken_by_owner_app`, the computers stay paired.
+    if asked.get("take_back") == Some(&json!(true)) {
+        let client = match asked.get("client") {
+            None => None,
+            Some(Value::String(client)) => Some(client.as_str()),
+            Some(_) => return json!({"error": "client: a computer's id"}),
+        };
+        let changes = shared.door.lock().expect("door").take_back(client, now);
+        let taken = changes
+            .iter()
+            .filter(|change| change.why == Some(crate::protocol::LeaseWhy::TakenByOwnerApp))
+            .count();
+        shared.tell(changes);
+        eprintln!(
+            "lamp-control: the owner's app took the lamp back from {}: {taken} lease(s)",
+            client.unwrap_or("every computer")
+        );
+        return json!({"taken": taken});
+    }
     if asked.get("cancel_code") == Some(&json!(true)) {
         let dropped = shared.door.lock().expect("door").cancel_code();
         eprintln!(
@@ -1160,7 +1184,7 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
             .collect();
         return json!({"clients": clients});
     }
-    json!({"error": "ask for code, cancel_code, revoke or clients"})
+    json!({"error": "ask for code, cancel_code, take_back, revoke or clients"})
 }
 
 /// Who says the spoken pin check, as the voice's say socket and a `stop`
