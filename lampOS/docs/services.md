@@ -986,9 +986,12 @@ and a service with nothing a made skill reads, such as Notion, is
 ends "You can ask me for it yourself any time." Asking for
 the skill itself is no write: words before "skill" that only ask for it
 ("create me a new skill that ...", "add a skill to ...") are left out
-first, and "schedule" after "my", "the", "tomorrow's", "today's", "day"
-or "calendar" is the thing read (lamp-9adf, 4 Nov 23:51: "create a skill
-that reads my calendar" was refused so). A write after them still counts. A calendar's
+first. "Schedule", "post" and "book" after "my", "the", "tomorrow's",
+"today's", "day", "calendar", "latest", "last", "newest", "facebook" or
+"page" are the thing read (lamp-9adf, 4 Nov 23:51: "create a skill that
+reads my calendar" was refused so; El's P3 on #5679: "read me my latest
+Facebook post"), and "put" writes only with a service named after it ("put
+the count on the light" is the lamp's own). A write after them still counts. A calendar's
 step is given whole (today, or tomorrow when it says "tomorrow"), as are
 mail's (`recent`) and Drive's (`files`, newest first, `query` only words
 to search); for any other service the brief lists its reads but the

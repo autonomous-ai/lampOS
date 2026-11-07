@@ -184,9 +184,16 @@ const WRITE_WORDS: [&str; 21] = [
     "schedule", "put",
 ];
 
-/// Words before "schedule" that make it the thing read ("my schedule"),
-/// not a write ("schedule a meeting").
-const SCHEDULE_AS_A_THING: [&str; 7] = ["my", "the", "tomorrow", "today", "s", "day", "calendar"];
+/// Write words that are also things read: "my schedule", "my latest
+/// Facebook post", "the book titles" (El's P3 on #5679).
+const ALSO_A_THING: [&str; 3] = ["schedule", "post", "book"];
+
+/// Words before one of [`ALSO_A_THING`] that make it the thing read ("my
+/// schedule"), not a write ("schedule a meeting").
+const SCHEDULE_AS_A_THING: [&str; 12] = [
+    "my", "the", "tomorrow", "today", "s", "day", "calendar", "latest", "last", "newest",
+    "facebook", "page",
+];
 
 /// Words that only ask for the skill itself, before "skill" at a request's
 /// start: "create a skill that reads my calendar" asks for a skill that
@@ -234,7 +241,12 @@ fn read_of(request: &str) -> Result<(&'static str, Option<&'static str>), &'stat
     let words = asked_of_the_skill(&words);
     let writes = words.iter().enumerate().any(|(at, word)| {
         WRITE_WORDS.contains(word)
-            && !(*word == "schedule" && at > 0 && SCHEDULE_AS_A_THING.contains(&words[at - 1]))
+            && !(ALSO_A_THING.contains(word)
+                && at > 0
+                && SCHEDULE_AS_A_THING.contains(&words[at - 1]))
+            // "put" writes to a service only when one is named after it:
+            // "put the count on the light" is the lamp's own.
+            && (*word != "put" || names_a_linked_service(&words[at + 1..].join(" ")))
     });
     if writes {
         return Err(NOT_A_WRITE);
@@ -255,6 +267,9 @@ fn read_of(request: &str) -> Result<(&'static str, Option<&'static str>), &'stat
     codes.dedup();
     let code = match codes.as_slice() {
         [code] => code,
+        // Not reached from `brief_with`, which asks this only of a request
+        // that names a service; were it reached, no service is one with
+        // nothing to read.
         [] => return Err(NOT_READABLE),
         _ => return Err(ONE_SERVICE),
     };
@@ -2520,8 +2535,22 @@ light = { dim = 1 }
             "Add a new skill to read me my mail each morning",
             "Lampy, make me a skill: read my calendar schedule for tomorrow at my desk",
             "when I sit down, read me tomorrow's schedule from my calendar",
+            // El's P3 on #5679: "post" and "book" said as the thing read, and
+            // "put" with no service after it, are no writes either.
+            "read me my latest Facebook post",
+            "read me the book titles in my Google Drive",
+            "read me my mail and put the count on the light",
         ] {
             assert!(brief_with(request, true).is_ok(), "{request}");
+        }
+        // As verbs, they still write.
+        for request in [
+            "post my mail to Facebook",
+            "book a meeting on my calendar",
+            "put a meeting on my calendar",
+            "read my mail and post it on Facebook",
+        ] {
+            assert_eq!(brief_with(request, true), Err(NOT_A_WRITE), "{request}");
         }
         for request in [
             calendar,
