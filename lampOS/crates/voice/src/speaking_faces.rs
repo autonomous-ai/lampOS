@@ -37,6 +37,23 @@ pub const EYES_EVERY: Duration = Duration::from_millis(500);
 /// ([`SpeakingFaces::in_view_at`]): two of the eyes' frames at their slowest.
 pub const IN_VIEW_BEFORE: Duration = Duration::from_millis(1200);
 
+/// `on` exactly: a line shorter than [`SHORT_LINE_WINDOW`] is judged
+/// ([`SpeakingFaces::speakers`], [`SpeakingFaces::speakers_with_boot`]) by
+/// the looks from [`SHORT_LINE_WINDOW`] before its end to its end, with the
+/// same half rule and [`FEWEST_LOOKS`], and a face counts only if it read
+/// `yes` in a look of the line itself and `no` in none of the window: a
+/// 0.5 s "yes" spans two of the eyes' looks, under the three a line needs,
+/// so it was always the room's (#5522). Off: as before.
+pub const SHORT_LINE_ENVIRONMENT: &str = "LAMP_VOICE_SHORT_LINE_SPEAKER";
+/// The eyes' own speaking window (`lamp-eyes` `speaking::WINDOW_US`): each
+/// look's `yes` already reads the mouth over the 2 s before it.
+pub const SHORT_LINE_WINDOW: Duration = Duration::from_secs(2);
+
+/// Whether [`SHORT_LINE_ENVIRONMENT`] is `on`, and nothing else.
+pub fn short_line_from_environment() -> bool {
+    std::env::var(SHORT_LINE_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
 /// Where the voice reads that the eyes judge whether a face is speaking at
 /// this lamp (`LAMP_EYES_SPEAKING=on`, the eyes' own switch, set in the
 /// voice's unit too): a held forget's yes then counts only from the held
@@ -444,9 +461,12 @@ impl SpeakingFaces {
     }
 
     /// The faces that read speaking in at least half of the looks from
-    /// `from` to `to`.
+    /// `from` to `to`; a short line's with [`SHORT_LINE_ENVIRONMENT`] as
+    /// [`Self::line_counted`] reads it.
     pub fn speakers(&self, from: Instant, to: Instant) -> Speakers {
-        self.counted(from, to, |look| look.speaking.clone())
+        self.line_counted(from, to, short_line_from_environment(), |_, ids| {
+            ids.to_vec()
+        })
     }
 
     /// As [`Self::speakers`], each id kept with the eyes' boot it was seen
@@ -460,9 +480,8 @@ impl SpeakingFaces {
             .lock()
             .map(|looks| looks.links_at(to))
             .unwrap_or_default();
-        self.counted(from, to, |look| {
-            let mut ids: Vec<String> = look
-                .speaking
+        self.line_counted(from, to, short_line_from_environment(), |look, ids| {
+            let mut ids: Vec<String> = ids
                 .iter()
                 .map(|id| one_face(format!("{}/{id}", look.boot), &links))
                 .collect();
@@ -878,6 +897,49 @@ impl SpeakingFaces {
             && !self
                 .counted(from, to, |look| look.turned_silent.clone())
                 .is_empty()
+    }
+
+    /// The faces `id` names among each look's speaking ones in at least
+    /// half of the looks from `from` to `to` ([`Self::counted`]). With
+    /// `padded` ([`SHORT_LINE_ENVIRONMENT`]) and the line shorter than
+    /// [`SHORT_LINE_WINDOW`], the looks from that long before `to` are
+    /// counted instead, and a face is kept only if it read `yes` in a look
+    /// from `from` to `to` and `no` in no look counted: a face never seen
+    /// speaking the line itself, or seen still, is never its speaker.
+    fn line_counted(
+        &self,
+        from: Instant,
+        to: Instant,
+        padded: bool,
+        id: impl Fn(&Look, &[String]) -> Vec<String>,
+    ) -> Speakers {
+        let wide = to
+            .checked_sub(SHORT_LINE_WINDOW)
+            .filter(|wide| padded && *wide < from);
+        let Some(wide) = wide else {
+            return self.counted(from, to, |look| id(look, &look.speaking));
+        };
+        let (in_line, still) = {
+            let Ok(looks) = self.looks.lock() else {
+                return Speakers::new();
+            };
+            let ids = |since: Instant, of: fn(&Look) -> &[String]| -> Vec<String> {
+                looks
+                    .kept
+                    .iter()
+                    .filter(|look| look.at >= since && look.at <= to)
+                    .flat_map(|look| id(look, of(look)))
+                    .collect()
+            };
+            (
+                ids(from, |look| &look.speaking),
+                ids(wide, |look| &look.still),
+            )
+        };
+        self.counted(wide, to, |look| id(look, &look.speaking))
+            .into_iter()
+            .filter(|face| in_line.contains(face) && !still.contains(face))
+            .collect()
     }
 
     /// The ids `of` each look gives in at least half of the looks from
@@ -2530,5 +2592,99 @@ mod tests {
         eyes.look(quiet, None);
         assert!(!eyes.in_view_at("b/f1", quiet), "an empty look");
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #5522: a 0.5 s "yes" spans two of the eyes' looks, under
+    /// [`FEWEST_LOOKS`], so it is nobody's. With the short-line switch it is
+    /// judged over the eyes' 2 s window ending at its end: a face reading
+    /// `yes` through it is the speaker; one reading `no` anywhere in it, or
+    /// never `yes` in the line itself, is not, and off is as before.
+    #[test]
+    fn a_short_line_is_judged_over_the_eyes_window_with_the_switch() {
+        let face = |state: SpeakingState| Face {
+            id: "f1".to_owned(),
+            xmin: 0.1,
+            ymin: 0.1,
+            xmax: 0.3,
+            ymax: 0.4,
+            confidence: 1.0,
+            yaw: None,
+            facing: Some(true),
+            speaking: Some(Speaking {
+                state,
+                score: 0.03,
+                from: None,
+            }),
+            follows: None,
+        };
+        let start = Instant::now();
+        // Looks every 250 ms from 0 to 2 s; the line is its last 0.4 s.
+        let seen = |state_at: &dyn Fn(u64) -> SpeakingState| {
+            let eyes = SpeakingFaces::default();
+            for (seq, ms) in (0..=2000u64).step_by(250).enumerate() {
+                let faces = Faces {
+                    faces: vec![face(state_at(ms))],
+                };
+                eyes.look(
+                    start + Duration::from_millis(ms),
+                    Some((("b", seq as u64 + 1), &faces)),
+                );
+            }
+            eyes
+        };
+        let (from, to) = (
+            start + Duration::from_millis(1600),
+            start + Duration::from_millis(2000),
+        );
+        let ids = |_: &Look, ids: &[String]| ids.to_vec();
+        let on = |eyes: &SpeakingFaces| eyes.line_counted(from, to, true, ids);
+
+        let talking = seen(&|_| SpeakingState::Yes);
+        assert_eq!(
+            talking.speakers(from, to),
+            Speakers::new(),
+            "off: two looks, the room's"
+        );
+        assert_eq!(
+            talking.line_counted(from, to, false, ids),
+            Speakers::new(),
+            "off: as before"
+        );
+        assert_eq!(on(&talking), vec!["f1".to_owned()], "on: theirs");
+
+        let still = seen(&|_| SpeakingState::No);
+        assert_eq!(on(&still), Speakers::new(), "a still face: the room's");
+
+        let once_still = seen(&|ms| {
+            if ms == 250 {
+                SpeakingState::No
+            } else {
+                SpeakingState::Yes
+            }
+        });
+        assert_eq!(
+            on(&once_still),
+            Speakers::new(),
+            "read `no` once in the window"
+        );
+
+        let before_only = seen(&|ms| {
+            if ms < 1600 {
+                SpeakingState::Yes
+            } else {
+                SpeakingState::Unknown
+            }
+        });
+        assert_eq!(
+            on(&before_only),
+            Speakers::new(),
+            "never `yes` in the line itself"
+        );
+
+        // A line as long as the window is judged on its own looks, as before.
+        assert_eq!(
+            talking.line_counted(start, to, true, ids),
+            talking.line_counted(start, to, false, ids)
+        );
     }
 }
