@@ -14,7 +14,8 @@ nobody is named.
 
 **Status:** built, with tests; not tried on a lamp, and out of the product's
 install until it is (`install::NOT_PRODUCT_SKILLS`). **Its texts reach the
-phone only with `LAMP_MESSAGES=on`** in `lamp-cloud`: they go on
+phone only with `LAMP_SKILL_MESSAGES=on`** (or `LAMP_MESSAGES=on`) in
+`lamp-cloud` (7 Nov, #1685: the first opens nothing else of texts): they go on
 `messages/out` on the lamp's bus, and `lamp-cloud` carries each up as the
 backend's unasked news, which it keeps for the owner and pushes to their
 phones ([messages.md](messages.md), "Unasked texts"). Off unless set; not
@@ -380,7 +381,8 @@ off guard" the voice's say service (`LAMP_SAY=on`).
 ## Not shown, and open
 
 - Nothing ran on a lamp: the cases are written, not recorded.
-- Delivery to a phone: built (`LAMP_MESSAGES=on`, [messages.md](messages.md)),
+- Delivery to a phone: built (`LAMP_SKILL_MESSAGES=on` or `LAMP_MESSAGES=on`,
+  [messages.md](messages.md)),
   not yet seen on a lamp and a phone.
 - How the mark and Light out when you leave share the ring when both are
   installed: both ask at skill priority, and which the ring shows is the

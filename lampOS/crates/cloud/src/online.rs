@@ -571,8 +571,11 @@ async fn session(
         // CONNECT, CONNACK) and flushes what it writes, so a `poll` dropped
         // part way loses a connection half made or a packet half written.
         // One `poll` is kept until it ends, and the tick runs beside it, only
-        // while texts are taken.
+        // while texts are taken or skills' lines carried.
         let texting = lamp.texting();
+        // Skills' lines (`crate::unasked`): with texts taken, or alone with
+        // `LAMP_SKILL_MESSAGES=on` (#1685), which carries nothing else.
+        let skill_lines = texting || lamp.skill_lines();
         // Changes after setup (#1959): their results are looked for on the
         // same tick, only with their switch.
         let changes = lamp.changes();
@@ -594,7 +597,7 @@ async fn session(
                             break None;
                         }
                     }
-                    _ = tick.tick(), if texting || changes.is_some() || services.is_some() || uploads.is_some() || harness_sign_in.is_some() => {
+                    _ = tick.tick(), if skill_lines || changes.is_some() || services.is_some() || uploads.is_some() || harness_sign_in.is_some() => {
                         let me = identity.borrow().clone();
                         // Only while connected: the app asks `state` on its
                         // screen's open for what it missed.
@@ -612,6 +615,8 @@ async fn session(
                                 let event = me.data(&now(), "chat.event", &Ok(Some(data))).to_string();
                                 handed.publish(&client, account.fd_channel.as_str(), event, None);
                             }
+                        }
+                        if skill_lines {
                             // A skill's lines for the phone (`crate::unasked`):
                             // taken off the bus always, sent only while
                             // connected, and kept until the broker's ack.
@@ -2290,6 +2295,41 @@ mod tests {
                 .iter()
                 .any(|(_, reply)| reply["type"] == "info")
         );
+    }
+
+    /// #1685: with `LAMP_SKILL_MESSAGES=on` and `LAMP_MESSAGES` unset, a
+    /// skill's line goes up through the test broker as it does with texts
+    /// taken, a `task_news` `chat.event` with no run; the voice's task news
+    /// the lamp would give from `chat/out` does not, nor does anything else
+    /// of the texts'.
+    #[tokio::test]
+    async fn with_only_skills_lines_carried_a_skills_line_goes_up_and_the_voices_news_does_not() {
+        let mut lamp = lamp_with_lines(false);
+        lamp.skill_lines = true;
+        // What `chat/out` would give: a text's answer and the voice's own
+        // task news. Never asked for here.
+        lamp.texts = vec![lamp_msgs::ChatIn {
+            run_id: "run-1".into(),
+            session_id: None,
+            text: "hi".into(),
+            speak: false,
+        }];
+        lamp.to_give = vec![serde_json::json!({
+            "event": {"type": "task_news", "summary": "Claude Code finished the report."},
+        })];
+        let sent = crate::unasked::sent_line("guard-mode", 2);
+        let (seen, lines) = lines_against(Broker::Takes, lamp, |lines| lines.contains(&sent)).await;
+        let events = chat_events(&seen);
+        let said: Vec<_> = events
+            .iter()
+            .map(|(_, reply)| reply["data"]["event"]["summary"].clone())
+            .collect();
+        assert_eq!(said, [VISIT, VISIT_TWO], "{events:?}");
+        for (_, reply) in &events {
+            assert_eq!(reply["data"]["event"]["type"], "task_news");
+            assert!(reply["data"].get("run_id").is_none());
+        }
+        assert!(lines.contains(&sent), "{lines:?}");
     }
 
     /// A line the connection takes before its ack goes again on the next,
