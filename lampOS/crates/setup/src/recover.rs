@@ -44,6 +44,17 @@ pub const SAY_OPENED: &str =
 /// [`SAY_OPENED`]'s recording, by the name the say service takes, the
 /// failure notice `wifi_recovering` (`docs/failure-notices.md`).
 pub const RECORDING_OPENED: &str = "wifi_recovering";
+/// A [`RECORDING_OPENED`] not played (refused: the lamp speaking, a higher
+/// say, the voice not up yet; or no say service) is asked again this long
+/// after, the wait doubling each time (#5550): at 5 s, 15 s and 35 s.
+pub const SAY_AGAIN_FIRST_MS: u64 = 5_000;
+/// Never past this from the first ask: its ask's `expires_in_ms`.
+pub const SAY_AGAIN_WITHIN_MS: u64 = 60_000;
+/// Kept once [`RECORDING_OPENED`] was taken by the voice for this opening
+/// (beside [`ON_FILE`]), and removed whenever the hotspot is neither open
+/// nor being retried from: a Wi-Fi change that left the lamp on no network
+/// leaves its own lost line to this one only once it is here (#5550).
+pub const TOLD_FILE: &str = "/run/lampos-setup-recover/told";
 
 /// Whether the switch's value turns recovery on.
 pub fn on(value: Option<&str>) -> bool {
@@ -102,6 +113,19 @@ pub struct Recovery {
     /// retry that went back to `Lost` (only slow, or busy) says it again
     /// (Second's P3 on #4157).
     told: bool,
+    /// [`SAY_OPENED`] not played and asked again: the first ask, the wait,
+    /// and when it is due (`u64::MAX` once asked).
+    again: Option<Again>,
+    /// The last look's `busy`: a line asked again waits while setup or a
+    /// Wi-Fi change runs, the person already setting the network (#5550).
+    busy: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Again {
+    first_ms: u64,
+    wait_ms: u64,
+    due_ms: u64,
 }
 
 impl Default for Recovery {
@@ -109,6 +133,8 @@ impl Default for Recovery {
         Self {
             state: State::Online,
             told: false,
+            again: None,
+            busy: false,
         }
     }
 }
@@ -130,11 +156,58 @@ impl Recovery {
     pub fn says_opened(&mut self, act: Option<Act>) -> bool {
         let first = act == Some(Act::OpenHotspot) && !self.told;
         self.told |= first;
+        if first {
+            self.again = None;
+        }
         first
+    }
+
+    /// [`SAY_OPENED`], asked at `now_ms`, was not played: asked again after
+    /// [`SAY_AGAIN_FIRST_MS`], then twice the wait each time, while that is
+    /// within [`SAY_AGAIN_WITHIN_MS`] of the first ask.
+    pub fn not_played(&mut self, now_ms: u64) {
+        let (first_ms, wait_ms) = match self.again {
+            Some(again) => (again.first_ms, again.wait_ms.saturating_mul(2)),
+            None => (now_ms, SAY_AGAIN_FIRST_MS),
+        };
+        let due_ms = now_ms.saturating_add(wait_ms);
+        self.again = (due_ms.saturating_sub(first_ms) <= SAY_AGAIN_WITHIN_MS).then_some(Again {
+            first_ms,
+            wait_ms,
+            due_ms,
+        });
+    }
+
+    /// Whether [`SAY_OPENED`] is to be asked again now: due, within its
+    /// minute, the hotspot open (not during a try of the saved network,
+    /// when it is closed, nor once the lamp is online), and the last look
+    /// not busy (a setup run on the hotspot's page: the person is already
+    /// setting the network; it stays due for a later look).
+    pub fn says_again(&mut self, now_ms: u64) -> bool {
+        let Some(again) = self.again.as_mut() else {
+            return false;
+        };
+        let due = now_ms >= again.due_ms
+            && now_ms.saturating_sub(again.first_ms) <= SAY_AGAIN_WITHIN_MS
+            && matches!(self.state, State::Hotspot { .. })
+            && !self.busy;
+        if due {
+            again.due_ms = u64::MAX;
+        }
+        due
+    }
+
+    /// Whether [`SAY_OPENED`] is to be asked at this look, after `act` (the
+    /// step's own) is done: the hotspot's first opening for this loss
+    /// ([`says_opened`](Self::says_opened)), or one not played that is due
+    /// again ([`says_again`](Self::says_again)). `recover`'s one ask.
+    pub fn says_line(&mut self, act: Option<Act>, now_ms: u64) -> bool {
+        self.says_opened(act) || self.says_again(now_ms)
     }
 
     /// What `seen` at `now_ms` asks for.
     pub fn step(&mut self, now_ms: u64, seen: Seen) -> Option<Act> {
+        self.busy = seen.busy;
         let (state, act) = match self.state {
             _ if seen.online => (State::Online, None),
             State::Online => (State::Lost { since_ms: now_ms }, None),
@@ -186,9 +259,36 @@ impl Recovery {
         };
         if state == State::Online {
             self.told = false;
+            self.again = None;
         }
         self.state = state;
         act
+    }
+}
+
+/// `recover`'s line as its hotspot opens, through `play` (the say
+/// service's recording ask: its journal line when not played). No network,
+/// so the recording only, never words for the model (#3743). Not played:
+/// journalled, the hotspot stays open all the same, and it is asked again
+/// at a later look within its minute ([`Recovery::not_played`], #5550).
+/// Played (begun, or waiting to be): `told` ([`TOLD_FILE`]) is kept, so a
+/// Wi-Fi change's helper leaves its lost line to this one.
+pub fn say_line(
+    policy: &mut Recovery,
+    now_ms: u64,
+    told: &std::path::Path,
+    play: impl FnOnce(&str) -> Option<String>,
+) {
+    match play(RECORDING_OPENED) {
+        Some(why) => {
+            eprintln!("lamp-setup: recover: {why}");
+            policy.not_played(now_ms);
+        }
+        None => {
+            if let Err(error) = std::fs::write(told, "") {
+                eprintln!("lamp-setup: recover: {}: {error}", told.display());
+            }
+        }
     }
 }
 

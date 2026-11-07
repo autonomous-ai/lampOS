@@ -31,7 +31,7 @@ use serde_json::{Value, json};
 use std::{
     fmt, io,
     net::{SocketAddr, TcpStream, ToSocketAddrs},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::mpsc,
     time::{Duration, Instant},
 };
@@ -588,15 +588,39 @@ fn say_lost(mouth: &mut impl Mouth) {
     }
 }
 
+/// How long a change that left the lamp on no network waits, with recovery
+/// on, for `recover`'s own line before its lost line (#5550): the hotspot's
+/// 90 s, the line's minute of asks again, and two of its 5 s looks.
+pub const HOTSPOT_LINE_WAIT: Duration = Duration::from_millis(
+    crate::recover::LOSS_GRACE_MS + crate::recover::SAY_AGAIN_WITHIN_MS + 10_000,
+);
+
+/// The file to wait on for `recover`'s line ([`say_after`]'s `hotspot`):
+/// `told` while recovery is on (`on_file`, kept while `recover` runs with
+/// its switch on) and no kept old file (`previous`) holds it busy; `None`
+/// otherwise, when the hotspot never opens for this loss (#5550).
+pub fn left_to_hotspot<'a>(on_file: &Path, previous: &Path, told: &'a Path) -> Option<&'a Path> {
+    (on_file.exists() && !previous.exists()).then_some(told)
+}
+
 /// After `changed`, the line once; and with neither network back, the lost
 /// line again at most once a minute until one is, [`LOST_MOST`] at most.
 /// The lost line is always the recording ([`RECORDING_LOST`]), never words
-/// for the model. Returns how many lines were asked for.
+/// for the model. With `hotspot` ([`left_to_hotspot`], #5550, #4141), the
+/// lost line waits first, [`HOTSPOT_LINE_WAIT`] at most, for `recover` to
+/// open its hotspot and have [`crate::recover::SAY_OPENED`] played (the
+/// file there), so nobody is sent to erase a lamp that opens setup by
+/// itself; once it is there, or a network is back, nothing more is said.
+/// Not there by then (its recording missing or refused, or the radio held
+/// associated with no address, where it never opens): the lost line, as
+/// without recovery, and no more of it once the hotspot's is played.
+/// Returns how many lines were asked for.
 pub fn say_after(
     host: &mut impl Rejoin,
     mouth: &mut impl Mouth,
     changed: &Changed,
     broker: &str,
+    hotspot: Option<&Path>,
 ) -> u32 {
     let Some(line) = line_for(changed) else {
         return 0;
@@ -605,9 +629,22 @@ pub fn say_after(
         mouth.say(line);
         return 1;
     }
-    say_lost(mouth);
+    let told = || hotspot.is_some_and(Path::exists);
     let started = host.now_ms();
-    let mut last = started;
+    if hotspot.is_some() {
+        loop {
+            if told() || (host.has_station_ip() && host.broker(broker)) {
+                return 0;
+            }
+            if host.now_ms().saturating_sub(started) >= HOTSPOT_LINE_WAIT.as_millis() as u64 {
+                eprintln!("lamp-setup: wifi: the hotspot's line did not come: the no-Wi-Fi line");
+                break;
+            }
+            host.sleep(Duration::from_secs(5));
+        }
+    }
+    say_lost(mouth);
+    let mut last = host.now_ms();
     let mut said = 1;
     loop {
         host.sleep(Duration::from_secs(5));
@@ -615,7 +652,7 @@ pub fn say_after(
         if now.saturating_sub(started) >= LOST_MOST.as_millis() as u64 {
             return said;
         }
-        if host.has_station_ip() && host.broker(broker) {
+        if told() || (host.has_station_ip() && host.broker(broker)) {
             return said;
         }
         if now.saturating_sub(last) >= LOST_EVERY.as_millis() as u64 {

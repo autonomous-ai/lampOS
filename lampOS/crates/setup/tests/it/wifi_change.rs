@@ -2,9 +2,9 @@
 //! the networks it can see, what each gives, and a clock of its own.
 use lamp_setup::wifi::Host;
 use lamp_setup::wifi_change::{
-    Asked, BACK_TRIES, BACK_WAIT, CONFIRM_WAIT, Changed, JOIN_WAIT, LOST_MOST, Mouth,
-    RECORDING_LOST, RESTORE_MOST, Rejoin, Restored, SAY_BACK, SAY_JOINED, SAY_LOST, SayService,
-    answer, change, line_for, parse, restore, say_after,
+    Asked, BACK_TRIES, BACK_WAIT, CONFIRM_WAIT, Changed, HOTSPOT_LINE_WAIT, JOIN_WAIT, LOST_MOST,
+    Mouth, RECORDING_LOST, RESTORE_MOST, Rejoin, Restored, SAY_BACK, SAY_JOINED, SAY_LOST,
+    SayService, answer, change, left_to_hotspot, line_for, parse, restore, say_after,
 };
 use serde_json::json;
 use std::{collections::HashMap, io, time::Duration};
@@ -758,7 +758,7 @@ fn the_lamp_says_what_happened_in_a_few_words_and_never_the_name() {
         let answered = answer(&request("New Home", FAKE_PASSWORD), "VN", true, &mut fake);
         let (changed, broker) = answered.changed.unwrap();
         let mut heard = Heard::default();
-        assert_eq!(say_after(&mut fake, &mut heard, &changed, &broker), 1);
+        assert_eq!(say_after(&mut fake, &mut heard, &changed, &broker, None), 1);
         assert_eq!(heard.0.len(), 1);
         assert_eq!(heard.0[0].1, want);
         for (_, line) in &heard.0 {
@@ -844,7 +844,7 @@ fn with_no_wifi_back_the_lost_line_is_said_at_most_once_a_minute_until_one_is() 
         clock: &clock,
     };
     let changed = Changed::NotBack { why: String::new() };
-    let said = say_after(&mut host, &mut mouth, &changed, BROKER);
+    let said = say_after(&mut host, &mut mouth, &changed, BROKER, None);
     let at: Vec<u64> = mouth.heard.iter().map(|(at, _)| *at - started).collect();
     assert_eq!(said, 3, "{at:?}");
     // Every time the recording, never the model's words (#1959).
@@ -861,7 +861,7 @@ fn with_no_wifi_back_the_lost_line_is_said_at_most_once_a_minute_until_one_is() 
     let mut fake = Fake::new(&[]);
     let started = fake.now_ms;
     let mut heard = Heard::default();
-    let said = say_after(&mut fake, &mut heard, &changed, BROKER);
+    let said = say_after(&mut fake, &mut heard, &changed, BROKER, None);
     assert_eq!(said as u64, LOST_MOST.as_secs() / 60);
     assert_eq!(heard.0.len() as u64, LOST_MOST.as_secs() / 60);
     assert!(heard.0.iter().all(|(_, line)| line == "played wifi_lost"));
@@ -888,7 +888,7 @@ fn a_router_restart_of_two_and_a_half_minutes_never_hears_the_lost_line() {
     let changed = change(&mut fake, "VN", &asked("New Home"));
     assert!(matches!(changed, Changed::Back { .. }), "{changed:?}");
     let mut heard = Heard::default();
-    assert_eq!(say_after(&mut fake, &mut heard, &changed, BROKER), 1);
+    assert_eq!(say_after(&mut fake, &mut heard, &changed, BROKER, None), 1);
     assert_eq!(heard.0.len(), 1);
     assert_eq!(heard.0[0].1, SAY_BACK);
 
@@ -904,7 +904,7 @@ fn a_router_restart_of_two_and_a_half_minutes_never_hears_the_lost_line() {
     let first = fake.now_ms - left;
     assert!(first >= 180_000, "first said {first} ms after the loss");
     let mut heard = Heard::default();
-    let said = say_after(&mut fake, &mut heard, &changed, BROKER);
+    let said = say_after(&mut fake, &mut heard, &changed, BROKER, None);
     assert!(said >= 1);
     assert_eq!(said as u64, LOST_MOST.as_secs() / 60);
 }
@@ -994,7 +994,7 @@ fn the_lost_line_is_the_recording_and_one_missing_is_journalled_not_said() {
     for changed in [Changed::Joined, Changed::Back { why: String::new() }] {
         let mut fake = Fake::new(&[("Old Home", OLD)]);
         let mut heard = Heard::default();
-        assert_eq!(say_after(&mut fake, &mut heard, &changed, BROKER), 1);
+        assert_eq!(say_after(&mut fake, &mut heard, &changed, BROKER, None), 1);
         assert_eq!(heard.0[0].1, line_for(&changed).unwrap());
         assert!(!heard.0[0].1.starts_with("played"));
     }
@@ -1391,7 +1391,7 @@ fn p1_a_lost_line_the_voice_lacks_is_said_in_plain_words() {
     let mut fake = Fake::new(&[]);
     let mut mouth = NoClip(Vec::new());
     let changed = Changed::NotBack { why: String::new() };
-    assert!(say_after(&mut fake, &mut mouth, &changed, BROKER) >= 1);
+    assert!(say_after(&mut fake, &mut mouth, &changed, BROKER, None) >= 1);
     assert_eq!(mouth.0[0], format!("asked {RECORDING_LOST}"));
     assert_eq!(mouth.0[1], SAY_LOST);
 }
@@ -1757,4 +1757,96 @@ fn p2_a_hold_that_fails_part_way_leaves_the_lamp_on_the_live_network() {
     assert!(matches!(changed, Changed::Back { .. }), "{changed:?}");
     assert_eq!(fake.holds, 2);
     assert_eq!(fake.current_ssid().as_deref(), Some("Old Home"));
+}
+
+/// A fresh folder of the test's own, for `recover`'s files.
+fn recover_dir(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("lamp-setup-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+/// #5550 (#4141): with recovery on, a change that left the lamp on no
+/// network never sends the person to erase it once `recover` has opened
+/// its hotspot and its line was played. The lines said while online are
+/// said as before.
+#[test]
+fn with_recovery_on_the_lost_line_is_left_to_a_hotspot_line_played() {
+    let dir = recover_dir("hotspot-told");
+    let (on, previous, told) = (dir.join("on"), dir.join("previous"), dir.join("told"));
+    // The decision: recovery on and no kept old file.
+    assert_eq!(left_to_hotspot(&on, &previous, &told), None);
+    std::fs::write(&on, "").unwrap();
+    assert_eq!(left_to_hotspot(&on, &previous, &told), Some(&*told));
+    std::fs::write(&previous, "kept").unwrap();
+    assert_eq!(left_to_hotspot(&on, &previous, &told), None);
+    std::fs::remove_file(&previous).unwrap();
+
+    // `recover` opened and its line was played: its file is kept.
+    let mut policy = lamp_setup::recover::Recovery::default();
+    lamp_setup::recover::say_line(&mut policy, 0, &told, |_| None);
+    assert!(told.exists());
+    let mut fake = Fake::new(&[]);
+    let started = fake.now_ms;
+    let mut heard = Heard::default();
+    let changed = Changed::NotBack { why: String::new() };
+    let hotspot = left_to_hotspot(&on, &previous, &told);
+    assert_eq!(
+        say_after(&mut fake, &mut heard, &changed, BROKER, hotspot),
+        0
+    );
+    assert!(heard.0.is_empty(), "{:?}", heard.0);
+    assert_eq!(fake.now_ms, started);
+    for changed in [Changed::Joined, Changed::Back { why: String::new() }] {
+        let mut fake = Fake::new(&[("Old Home", OLD)]);
+        let mut heard = Heard::default();
+        assert_eq!(
+            say_after(&mut fake, &mut heard, &changed, BROKER, hotspot),
+            1
+        );
+        assert_eq!(heard.0[0].1, line_for(&changed).unwrap());
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// #5550, the reviewer-lead's P2: recovery on, but `recover`'s line never
+/// played: its recording missing (`not_provisioned` until the notices
+/// release), or the radio held associated with no address, where the
+/// hotspot never opens (`recover`'s
+/// `a_lamp_associated_with_no_address_never_says_the_hotspot_line`). The
+/// lost line still comes after the hotspot's wait: never silence.
+#[test]
+fn with_recovery_on_a_hotspot_line_never_played_leaves_the_lost_line() {
+    let dir = recover_dir("hotspot-missing");
+    let (on, previous, told) = (dir.join("on"), dir.join("previous"), dir.join("told"));
+    std::fs::write(&on, "").unwrap();
+    // The recording missing: refused, journalled, and its file not kept.
+    let mut policy = lamp_setup::recover::Recovery::default();
+    lamp_setup::recover::say_line(&mut policy, 0, &told, |recording| {
+        Some(format!("{recording} was not played: not_provisioned"))
+    });
+    assert!(!told.exists());
+    let changed = Changed::NotBack { why: String::new() };
+    let hotspot = left_to_hotspot(&on, &previous, &told);
+    assert!(hotspot.is_some());
+    let mut fake = Fake::new(&[]);
+    let started = fake.now_ms;
+    let mut heard = Heard::default();
+    let said = say_after(&mut fake, &mut heard, &changed, BROKER, hotspot);
+    assert!(fake.now_ms - started >= LOST_MOST.as_millis() as u64);
+    assert!(
+        heard
+            .0
+            .iter()
+            .all(|(_, line)| *line == format!("played {RECORDING_LOST}"))
+    );
+    // First after the wait, then once a minute within the 10 minutes:
+    // fewer than without recovery, so the wait came first.
+    let wait = HOTSPOT_LINE_WAIT.as_millis() as u64;
+    let want = (LOST_MOST.as_millis() as u64 - wait).div_ceil(60_000);
+    assert_eq!(u64::from(said), want);
+    assert!(want < LOST_MOST.as_secs() / 60);
+    assert_eq!(heard.0.len() as u64, want);
+    let _ = std::fs::remove_dir_all(&dir);
 }
