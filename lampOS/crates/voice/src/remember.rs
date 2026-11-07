@@ -1021,7 +1021,9 @@ const SAID_KEPT_AFTER: &[&str] = &[
 
 /// What a said-back "saved" is about when it is no keep ([`said_kept_claim`],
 /// the Reviewer-lead's P3 on #5607): "Okay, your reminder for seven is
-/// saved." beside a `set_reminder`, "Got it, your settings are saved."
+/// saved." beside a `set_reminder`, "Got it, your settings are saved." A
+/// preference is a kept thing, so "Your preference for green tea is
+/// saved." stays a claim (Thirteen's P3 on #5607).
 const SAID_SAVED_NOT_KEPT: &[&str] = &[
     "reminder",
     "reminders",
@@ -1031,8 +1033,6 @@ const SAID_SAVED_NOT_KEPT: &[&str] = &[
     "timers",
     "setting",
     "settings",
-    "preference",
-    "preferences",
 ];
 
 /// The words that may end a said-back keep after its word, as one: "Pip is
@@ -13953,6 +13953,9 @@ mod tests {
             "Okay, Pip is kept in my memory now.",
             "Pip is remembered now.",
             "Your goldfish's name is remembered.",
+            // Thirteen's P3 on #5607: a preference is a kept thing.
+            "Your preference for green tea is saved.",
+            "Your preferences are saved.",
         ] {
             assert_eq!(
                 keep_claim_said(reply, false, true),

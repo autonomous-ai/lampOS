@@ -9746,6 +9746,93 @@ async fn a_keep_said_back_to_a_yes_with_no_remember_is_a_claim() {
     }
 }
 
+/// The first builder's P3 on #5607: "Yes, please." was answered with a
+/// `recall` that found the goldfish, then "Yes, Pip is kept." twice, and
+/// the lamp said it didn't keep that. A recall of this request that found
+/// something lifts the said-back rule: its "Pip is kept." is said. A recall
+/// that found nothing does not, and an opening claim ("Kept: ...") stays a
+/// claim after a found recall too.
+#[tokio::test]
+async fn a_found_recall_lets_a_yes_say_it_is_kept() {
+    let recall = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "r1",
+                crate::remember::RECALL,
+                json!({"about": "goldfish"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let reply = |said: &str| vec![text(said), Ok(ChatEvent::Done)];
+    let cases: Vec<(Value, &str, &str, bool)> = vec![
+        (
+            json!({"found": [{"text": "Their goldfish is called Pip"}]}),
+            "Yes, Pip is kept.",
+            "Yes, Pip is kept.",
+            false,
+        ),
+        (
+            json!({"found": [], "note": "Nothing about that in what I remember."}),
+            "Yes, Pip is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        (
+            json!({"found": [{"text": "Their goldfish is called Pip"}]}),
+            "Kept: your goldfish is Pip.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+    ];
+    for (found, said_back, first_said, claimed) in cases {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Yes, please.".into())].into()),
+            chats: Mutex::new(
+                vec![
+                    recall(),
+                    reply(said_back),
+                    reply(said_back),
+                    reply(said_back),
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let told = found.clone();
+        let runner: ToolRunner = Arc::new(move |_, _, _, _| {
+            let told = told.clone();
+            Box::pin(async move { told })
+        });
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            runner,
+            Arc::new(Instant::now),
+        )
+        .announcing(false);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: Vec<&String> = labels
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        assert!(
+            said.first()
+                .is_some_and(|said| said.starts_with(&format!("said:{first_said}"))),
+            "{found}: {said_back}: {labels:?}"
+        );
+        let told = script.asked.lock().unwrap().iter().any(|messages| {
+            messages
+                .iter()
+                .any(|message| *message == Message::system(crate::remember::KEEP_CLAIMED_UNKEPT))
+        });
+        assert_eq!(told, claimed, "{found}: {said_back}: {labels:?}");
+    }
+}
+
 /// Finding K2 on #3504 (lamp-06c1, 28 Oct, "Want me to keep that as the
 /// change? Kept — library now, not the bakery."): an offer to keep, beside
 /// the `remember` call that keeps it or after one, is not said; with no

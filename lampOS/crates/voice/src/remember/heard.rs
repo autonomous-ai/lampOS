@@ -454,7 +454,9 @@ pub(super) fn done_already_in(
                 only_a_yes(&rest.join(" "))
             })
     };
-    if !said.as_deref().is_some_and(yes)
+    if !said
+        .as_deref()
+        .is_some_and(|line| yes(line) && affirms(line))
         || thread.lamp_asked_by_its_end(request)
         || thread
             .offered_line(request, whose, now, offers_to_keep, only_a_yes)
@@ -469,6 +471,37 @@ pub(super) fn done_already_in(
     };
     eprintln!("{DONE_ALREADY_TOLD_LINE}");
     Some((format!("{DONE_ALREADY_TOLD} {note})"), done))
+}
+
+/// The words of a line that is only a yes that make it a real yes, or an
+/// ask to keep or forget, without accents ([`affirms`]): "Yes.", "Yeah.",
+/// "Please.", "Keep that.", "Go ahead.", "Vâng.", "Có.", "Ừ.".
+const AFFIRMS: &[&str] = &[
+    "yes",
+    "yeah",
+    "yep",
+    "yup",
+    "please",
+    "keep",
+    "go",
+    "do",
+    "absolutely",
+    "definitely",
+    "vang",
+    "co",
+    "da",
+    "u",
+    "giup",
+];
+
+/// Whether `line` says a real yes, or asks to keep or forget ([`AFFIRMS`]),
+/// for [`done_already_in`]: the first builder's P3 on #5607, after a done
+/// keep "Okay.", "Okay, thanks.", "Um.", "Right." and "Sure." only
+/// acknowledge or hesitate, and a person would not answer them that it is
+/// kept. [`only_a_yes`] stays as it is for [`yes_alone`], where the model
+/// has already called.
+fn affirms(line: &str) -> bool {
+    words(line).any(|word| AFFIRMS.contains(&bare(&word).as_str()) || asks_to_forget(&word))
 }
 
 /// What of `done`, the scope's last memory write done and the request it
@@ -1479,6 +1512,56 @@ mod tests {
                 ),
                 None,
                 "{lamp} / {person}"
+            );
+        }
+    }
+
+    /// The first builder's P3 on #5607: after a done keep, a line that only
+    /// acknowledges or hesitates ("Okay.", "Okay, thanks.", "Um.", "Right.",
+    /// "Sure.") is not told before it answers that it is kept; a real yes or
+    /// an ask to keep ("Yes.", "Yeah.", "Please.", "Keep that.", "Go
+    /// ahead.", "Vâng.") is. [`only_a_yes`] itself is unchanged, for
+    /// [`yes_alone`], where the model has already called.
+    #[test]
+    fn a_bare_okay_or_um_after_a_done_keep_is_not_told_it_is_kept() {
+        use super::super::MemoryDone;
+        use crate::thread::Thread;
+        let now = Instant::now();
+        let after = |person: &str| {
+            let mut thread = Thread::new();
+            thread.person("My goldfish is called Pip.", true, now);
+            thread.lamp(1, "Kept: your goldfish is Pip.", now);
+            thread.person(person, true, now);
+            thread
+        };
+        let kept = Some((MemoryDone::Kept, Some(1)));
+        for said in [
+            "Okay.",
+            "Okay, thanks.",
+            "Um.",
+            "Right.",
+            "Sure.",
+            "Alright.",
+        ] {
+            assert!(only_a_yes(said), "{said}");
+            assert_eq!(
+                done_already_in(&after(said), (2, None, now), kept),
+                None,
+                "{said}"
+            );
+        }
+        for said in [
+            "Yes.",
+            "Yeah.",
+            "Please.",
+            "Keep that.",
+            "Go ahead.",
+            "Okay, please.",
+            "Vâng.",
+        ] {
+            assert!(
+                done_already_in(&after(said), (2, None, now), kept).is_some(),
+                "{said}"
             );
         }
     }
