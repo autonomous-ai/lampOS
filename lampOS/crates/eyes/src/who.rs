@@ -1018,6 +1018,11 @@ impl People {
         }
         let mut next = self.people.clone();
         next.retain(|person| !same_name(&person.name, &name));
+        // The name is now this record's alone (#5485): it leaves any other
+        // record's aliases, so no two records hold it.
+        for other in &mut next {
+            other.aliases.retain(|alias| !same_name(alias, &name));
+        }
         if next.len() >= MOST_PEOPLE {
             return Err("the lamp already knows as many people as it keeps".into());
         }
@@ -1354,7 +1359,14 @@ impl People {
             .retain(|(counted, _)| !same_name(counted, name));
         let mut next = self.people.clone();
         next.retain(|person| !same_name(&person.name, name));
+        // Kept only as an alias (#5485): it leaves the alias, and the person
+        // under their live name stays.
         let mut forgot = next.len() != self.people.len();
+        for person in &mut next {
+            let before = person.aliases.len();
+            person.aliases.retain(|alias| !same_name(alias, name));
+            forgot |= person.aliases.len() != before;
+        }
         if forgot {
             self.save(&next)?;
             self.people = next;
@@ -1393,13 +1405,20 @@ impl People {
                 .iter()
                 .any(|wait| wait.hash == hash && added.is_none_or(|added| added < wait.at_unix_s))
         };
-        let next: Vec<Person> = self
+        let mut next: Vec<Person> = self
             .people
             .iter()
             .filter(|person| !is_waiting(&person.name, Some(person.added_unix_s)))
             .cloned()
             .collect();
-        if next.len() != self.people.len() {
+        let mut aliases_gone = false;
+        for person in &mut next {
+            let before = person.aliases.len();
+            let added = Some(person.added_unix_s);
+            person.aliases.retain(|alias| !is_waiting(alias, added));
+            aliases_gone |= person.aliases.len() != before;
+        }
+        if next.len() != self.people.len() || aliases_gone {
             self.save(&next)?;
             eprintln!(
                 "lamp-eyes: {} people asked to be forgotten were back in {}; forgotten again",
@@ -2529,7 +2548,23 @@ fn forget_set_aside(
                     )
                 })
         });
-        if list.len() == before {
+        // A name kept only as an alias leaves the alias (#5485).
+        let mut aliases_gone = false;
+        for person in list.iter_mut() {
+            let added = person
+                .get("added_unix_s")
+                .and_then(serde_json::Value::as_u64);
+            let Some(aliases) = person
+                .get_mut("aliases")
+                .and_then(serde_json::Value::as_array_mut)
+            else {
+                continue;
+            };
+            let had = aliases.len();
+            aliases.retain(|alias| !alias.as_str().is_some_and(|alias| matches(alias, added)));
+            aliases_gone |= aliases.len() != had;
+        }
+        if list.len() == before && !aliases_gone {
             continue;
         }
         forgot = true;
@@ -5294,6 +5329,86 @@ mod tests {
             .remember_one("BRAM", vec![print(0.31)], 5, true, false)
             .unwrap();
         assert_eq!(aliases(&people), vec!["odile".to_owned()]);
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    /// #5485, the reviewer's P2 on #5570: a forget of a name kept only as
+    /// an alias reaches it. The alias goes, the person under their live
+    /// name stays, the forget says it forgot, and the file holds no trace.
+    #[test]
+    fn forgetting_an_old_name_drops_the_alias() {
+        let path = file("alias-forget");
+        let mut people = People::open(path.clone()).unwrap().with_stable_ids(true);
+        people.remember("Odile", vec![print(0.3)], 1).unwrap();
+        people
+            .remember_one("Bram", vec![print(0.31)], 2, true, false)
+            .unwrap();
+        assert!(std::fs::read_to_string(&path).unwrap().contains("Odile"));
+        assert!(people.forget("odile").unwrap().forgot);
+        assert_eq!(people.names(), vec!["Bram".to_owned()]);
+        assert!(people.people[0].aliases.is_empty());
+        let bytes = std::fs::read(&path).unwrap();
+        assert!(
+            !String::from_utf8_lossy(&bytes)
+                .to_lowercase()
+                .contains("odile"),
+            "no trace"
+        );
+        assert!(!people.forget("Odile").unwrap().forgot, "not known now");
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    /// The same in a set-aside record: the alias leaves the file, the
+    /// record under its live name stays there.
+    #[test]
+    fn forgetting_an_old_name_drops_the_alias_set_aside() {
+        let path = file("alias-forget-aside");
+        let good = serde_json::to_string(&print(0.2)).unwrap();
+        std::fs::write(
+            &path,
+            format!(
+                r#"{{"version":1,"people":[{{"name":"Ann","prints":[{good}],"added_unix_s":1}},{{"name":"Bram","prints":"a newer shape","added_unix_s":1,"aliases":["Odile"]}}]}}"#
+            ),
+        )
+        .unwrap();
+        let mut people = People::open(path.clone()).unwrap();
+        assert_eq!(set_aside_count(&path), 1);
+        assert!(people.forget("ODILE").unwrap().forgot);
+        assert_eq!(set_aside_count(&path), 1, "Bram stays set aside");
+        let folder = path.parent().unwrap().join(SET_ASIDE);
+        for (name, _) in set_aside_files(&path) {
+            let kept = std::fs::read_to_string(folder.join(name)).unwrap();
+            assert!(kept.contains("\"Bram\""), "{kept}");
+            assert!(!kept.to_lowercase().contains("odile"), "{kept}");
+        }
+        assert!(!people.forget("Odile").unwrap().forgot, "not known now");
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    /// The reviewer's P3 on #5570: a new record under a name another holds
+    /// as an alias takes it from that record, so no two hold it.
+    #[test]
+    fn a_new_name_leaves_another_records_aliases() {
+        let path = file("alias-new-name");
+        let mut people = People::open(path.clone()).unwrap().with_stable_ids(true);
+        people.remember("Odile", vec![print(0.3)], 1).unwrap();
+        people
+            .remember_one("Bram", vec![print(0.31)], 2, true, false)
+            .unwrap();
+        people.remember("Odile", vec![print(0.9)], 3).unwrap();
+        let bram = people
+            .people
+            .iter()
+            .find(|person| person.name == "Bram")
+            .unwrap();
+        assert!(bram.aliases.is_empty());
+        let reopened = People::open(path.clone()).unwrap();
+        assert!(
+            reopened
+                .people
+                .iter()
+                .all(|person| person.aliases.is_empty())
+        );
         std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
 
