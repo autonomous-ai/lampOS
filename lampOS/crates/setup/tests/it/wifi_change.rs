@@ -1285,7 +1285,10 @@ fn p1_a_command_that_hangs_is_killed_at_its_bound() {
     let mut command = std::process::Command::new("sleep");
     command.arg("30");
     let ran = lamp_setup::wifi::within(&mut command, Duration::from_millis(300));
-    assert_eq!(ran.unwrap_err().kind(), io::ErrorKind::TimedOut);
+    let error = ran.unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+    // A sub-second bound is logged as itself, not as "0 s".
+    assert_eq!(error.to_string(), "\"sleep\" took longer than 300ms");
     assert!(started.elapsed() < Duration::from_secs(5));
     let mut command = std::process::Command::new("echo");
     command.arg("OK");
