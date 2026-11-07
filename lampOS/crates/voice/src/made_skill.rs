@@ -194,19 +194,24 @@ const ALSO_A_THING: [&str; 3] = ["schedule", "post", "book"];
 const A_THING_AFTER: [&str; 6] = ["my", "the", "s", "latest", "last", "newest"];
 
 /// Words before one of [`ALSO_A_THING`] that make it the thing read only
-/// at the request's end or before one of [`A_THING_BEFORE`]: "my latest
-/// Facebook post", "my calendar schedule for tomorrow"; else it is a verb,
-/// "tomorrow book the room", "facebook post that I'm out" (El's P3s on
-/// #5690 and #5696).
+/// when the request asks to be read before it ("read me my Facebook post
+/// about the sale", "what's my calendar schedule today"), or at its end or
+/// before one of [`A_THING_BEFORE`] ("my latest Facebook post"); else it
+/// is a verb, "tomorrow book the room", "my calendar book the room",
+/// "facebook post that I'm out" (El's P3s on #5690 and #5696, and P2s on
+/// #5696).
 const MAYBE_A_THING_AFTER: [&str; 6] = ["tomorrow", "today", "day", "calendar", "facebook", "page"];
 
 /// Words after one of [`ALSO_A_THING`] that keep it the thing read after
-/// one of [`MAYBE_A_THING_AFTER`].
-const A_THING_BEFORE: [&str; 3] = ["from", "for", "of"];
+/// one of [`MAYBE_A_THING_AFTER`]. Not "for": "tomorrow book for me a
+/// table" writes.
+const A_THING_BEFORE: [&str; 2] = ["from", "of"];
 
-/// Words a request asks to be read with: before a thing said with "say",
-/// the saying is what is read ("read me the last post saying sale"), not
-/// a post to write ("latest post: say hi on Facebook").
+/// Words a request asks to be read with: with one of them, a thing said
+/// with "say" is what is read ("read me the last post saying sale", "the
+/// last post saying we are open, read it to me"), not a post to write
+/// ("latest post: say hi on Facebook"). With none, "my latest post saying
+/// sale on Facebook" can't be told from that write, so it is one.
 const ASKED_TO_READ: [&str; 6] = ["read", "reads", "tell", "what", "show", "check"];
 
 /// Whether `words[at]`, one of [`ALSO_A_THING`], is the thing read.
@@ -214,15 +219,17 @@ fn a_thing(words: &[&str], at: usize) -> bool {
     let Some(before) = at.checked_sub(1).map(|before| words[before]) else {
         return false;
     };
+    let asked = |words: &[&str]| words.iter().any(|word| ASKED_TO_READ.contains(word));
     if A_THING_AFTER.contains(&before) {
         let says = words[at + 1..]
             .iter()
             .any(|word| ["say", "saying"].contains(word));
-        !says || words[..at].iter().any(|word| ASKED_TO_READ.contains(word))
+        !says || asked(words)
     } else if MAYBE_A_THING_AFTER.contains(&before) {
-        words
-            .get(at + 1)
-            .is_none_or(|next| A_THING_BEFORE.contains(next))
+        asked(&words[..at])
+            || words
+                .get(at + 1)
+                .is_none_or(|next| A_THING_BEFORE.contains(next))
     } else {
         false
     }
@@ -2601,6 +2608,19 @@ light = { dim = 1 }
             "read me my calendar schedule for tomorrow",
             "read me the files in my Google Drive and put the count on the light",
             "read me my mail and put the count on the light from my drive",
+            // El's P2s on #5696's restate: a read asked for before the
+            // service and the thing, and "read it to me" after a saying.
+            "read me my Facebook post about the sale",
+            "read me my Facebook page post about the sale",
+            "what's my calendar schedule today",
+            "read me my calendar schedule at nine",
+            "read me the facebook post on my page",
+            "read me the latest facebook post on my page",
+            "read me tomorrow schedule on my calendar",
+            "read me today schedule on my calendar",
+            "the last post saying we are open on Facebook, read it to me",
+            "show me my latest post saying sale on Facebook",
+            "tell me if my last post says hi on Facebook",
         ] {
             assert!(brief_with(request, true).is_ok(), "{request}");
         }
@@ -2652,6 +2672,13 @@ light = { dim = 1 }
             "tomorrow post an update on Facebook",
             "facebook post saying hi",
             "read my mail and put the file in Google Drive",
+            // El's P3 on #5696's restate: "for" after the verb.
+            "facebook post for the shop saying we are open",
+            "tomorrow book for me a table on my calendar",
+            // With nothing asked to be read, a saying is a post to write.
+            "when I sit down, my latest post saying sale on Facebook",
+            "latest post saying hi on Facebook",
+            "the newest post: saying we are closed, on Facebook",
         ] {
             assert_eq!(brief_with(request, true), Err(NOT_A_WRITE), "{request}");
         }

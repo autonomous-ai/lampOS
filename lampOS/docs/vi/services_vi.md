@@ -1011,12 +1011,16 @@ không phải là ghi: các từ trước "skill" chỉ để xin nó ("create m
 that ...", "add a skill to ...") được bỏ ra trước. "Schedule", "post" và "book"
 đứng sau "my", "the", "tomorrow's", "latest", "last" hay "newest" là thứ được
 đọc, dù sau đó là gì ("read me my schedule on my calendar"), trừ khi "say" hay
-"saying" theo sau mà trước đó không có lời xin đọc ("latest post: say hi on
+"saying" theo sau mà không có lời xin đọc nào ("latest post: say hi on
 Facebook"). Đứng sau "tomorrow", "today", "day", "calendar", "facebook" hay
-"page" thì chúng chỉ là thứ được đọc ở cuối yêu cầu hoặc trước "from", "for"
-hay "of" ("read me my latest Facebook post", "my calendar schedule for
-tomorrow"), còn lại là động từ ("tomorrow book the room"; các P3 của El trên
-#5690 và P2 trên #5696). Luật này bắt đầu từ lamp-9adf lúc 23:51 ngày 4/11, khi
+"page" thì chúng chỉ là thứ được đọc khi đứng sau một từ xin đọc ("read",
+"tell", "what", "show", "check": "read me my Facebook post about the sale"),
+hoặc ở cuối yêu cầu hay trước "from" hoặc "of" ("my latest Facebook post"),
+còn lại là động từ ("tomorrow book the room", "my calendar book the room",
+"tomorrow book for me a table"; các P3 của El trên #5690 và các P2 trên #5696).
+Với "say" hay "saying", một từ xin đọc ở bất kỳ đâu trong yêu cầu giữ nó là
+việc đọc ("the last post saying we are open, read it to me"); không có từ nào
+thì đó là một bài cần đăng. Luật này bắt đầu từ lamp-9adf lúc 23:51 ngày 4/11, khi
 "create a skill that reads my calendar" bị từ chối. "Put" chỉ là ghi khi có một
 dịch vụ được nêu sau nó, hoặc "in", "on", "into" hay "to" "my drive" ("put the
 count on the light" là việc của chính lamp). Một
