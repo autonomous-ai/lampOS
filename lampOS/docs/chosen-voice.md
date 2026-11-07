@@ -35,7 +35,10 @@ it reads the file). So the words stay one plain sentence and cannot open a
 new section, a role or a tag in the prompt. The voice tells them after the
 lamp's own character (and after the language's rule), in quotes, as a wish
 about its manner that never changes the rules above it
-(`lamp_msgs::chosen_voice::told`).
+(`lamp_msgs::chosen_voice::told`). Both built-in versions, with a camera
+and without, are told them the same way, so the words stay last and
+"You are Lamp" first, with the lamp's name, eye, voice and microphone in
+between (#5530, `a_chosen_character_follows_the_lamps_own_name_and_body`).
 
 ## Where they are kept, and when they take
 
