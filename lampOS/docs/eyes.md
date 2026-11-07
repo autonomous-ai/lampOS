@@ -1540,7 +1540,15 @@ With the switch:
     did I get that right?", "Yes. That's my name." with no call ended the
     step with the name only). The face question is known in English and
     Vietnamese; in another language its yes still waits on the model's
-    call. While
+    call. It is a line that asks leave to remember their face ("May I",
+    "Can I", "Shall I", "Do you want me to" … then "remember … face"),
+    with nothing in it that turns it round ("not", a "n't" word, "never",
+    "forget", "rather", "unless", "instead"; in Vietnamese "đừng",
+    "quên", "chẳng", or "không"/"chưa" before "nhớ"), so a yes to "Would
+    you rather I didn't remember your face?" keeps nothing (Fourteen's
+    HOLD on #5720). A read-back and the face question in one line
+    ("Walter, did I get that right? May I remember your face?" "Yes.")
+    is neither, so its face waits on the model's call. While
     it is held, the onboarding walk keeps "who you are" open for it, up to
     45 s (`onboarding::face_save_held`, `FACE_SAVE_HELD_US`), instead of
     ending it done with the name only 15 s after the lamp's read-back
