@@ -640,6 +640,9 @@ struct TriggerFile {
     /// A daily trigger whose run stands in for another of the skill's
     /// triggers, named, at the same moment (#5207: the day's first hello).
     instead_of: Option<String>,
+    /// A `follows` word that stands in for another skill's nudge (#5620):
+    /// while it is still to come, that skill's due chance waits for it.
+    stands_in_for: Option<String>,
 }
 
 /// `sooner = { topic = "room/activity", field = "yawns", above = 0, for = "30m" }`.
@@ -2316,6 +2319,10 @@ pub struct Trigger {
     /// Another trigger of the skill, by name, whose chance this one's run
     /// takes (#5207, `instead_of`): that trigger's cooldown begins with it.
     pub instead_of: Option<String>,
+    /// Another skill, by name, whose due chance waits while this `follows`
+    /// word is still to come, and whose cooldown begins with the word
+    /// (#5620, `stands_in_for`).
+    pub stands_in_for: Option<String>,
 }
 
 /// A trigger's `sooner` (#3709): while `test` holds on `topic`'s newest
@@ -3025,6 +3032,20 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
             Some(other)
         }
     };
+    // A word that stands in for another skill's nudge (#5620): a `follows`
+    // word only, so what it waits on is bounded by its `within`.
+    let stands_in_for = match file.stands_in_for {
+        None => None,
+        Some(_) if follows.is_none() => {
+            return Err("stands_in_for goes with follows".into());
+        }
+        Some(other) => {
+            if !plain_name(&other) || other.contains('_') {
+                return Err(format!("stands_in_for {other:?} is not a skill's name"));
+            }
+            Some(other)
+        }
+    };
     let each = match (file.each, file.key) {
         (None, None) => None,
         (Some(list), Some(key)) if !list.is_empty() && !key.is_empty() => {
@@ -3174,6 +3195,7 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         sooner,
         follows,
         instead_of,
+        stands_in_for,
     })
 }
 
@@ -3887,6 +3909,15 @@ fn manifest(
                 "follows.trigger {other:?} names none of the skill's other triggers"
             ));
         }
+    }
+    if let Some(other) = triggers
+        .iter()
+        .find_map(|trigger| trigger.stands_in_for.as_ref())
+        .filter(|other| **other == name)
+    {
+        return Err(format!(
+            "stands_in_for {other:?} is this skill: it names another"
+        ));
     }
     // Before the trigger it stands in for, so at one message it is judged
     // first, and on the same topic, so they hold at one message.
@@ -5445,6 +5476,9 @@ struct Watch {
     changes: Changes,
     /// With `yields_to`: when this time it holds first waited, and said so.
     yielded_us: Option<u64>,
+    /// Another skill's `stands_in_for` word is still to come (#5620): when
+    /// this chance first waited for it, and said so.
+    stood_in_us: Option<u64>,
     /// Each gate a due chance was said dropped by ([`dropped`], #2602): the
     /// hold it was said in and when. A run clears them.
     said: HashMap<&'static str, (Option<u64>, u64)>,
@@ -5886,6 +5920,58 @@ impl Engine {
     /// manager's [`routine::Manager::rested_day`]), or none.
     pub fn rested(&mut self, day: Option<i64>) {
         self.rested_day = day;
+    }
+
+    /// The loaded skill whose `stands_in_for` word for `name` is still to
+    /// come (#5620): the trigger it `follows` ran within its `within`, the
+    /// word has not run since, and nothing it can see would drop the word
+    /// (off, snoozed, its day's most run, resting). None on a lamp without
+    /// such a skill, so there nothing changes.
+    fn stood_in_by(&self, name: &str, now_us: u64) -> Option<&str> {
+        let ran = |skill: &str, index: usize| {
+            self.watches
+                .get(&(skill.to_owned(), index))
+                .and_then(|watch| watch.ran_us)
+        };
+        let day = day_of(self.clock, now_us);
+        self.skills.iter().find_map(|skill| {
+            if skill.name == name
+                || self.off.contains(&skill.name)
+                || self
+                    .snoozed
+                    .get(&skill.name)
+                    .is_some_and(|until| now_us < *until)
+                || skill.most_a_day.is_some_and(|most| {
+                    self.day_runs
+                        .get(&skill.name)
+                        .is_some_and(|(on, count)| *on == day && *count >= most)
+                })
+                || self
+                    .nudges
+                    .get(&skill.name)
+                    .is_some_and(|resting| now_us < resting.resting_until_us)
+            {
+                return None;
+            }
+            skill
+                .triggers
+                .iter()
+                .enumerate()
+                .find_map(|(index, trigger)| {
+                    let (other, within_us) = trigger.follows.as_ref()?;
+                    if trigger.stands_in_for.as_deref() != Some(name) {
+                        return None;
+                    }
+                    let at = skill
+                        .triggers
+                        .iter()
+                        .position(|named| named.name.as_ref() == Some(other))?;
+                    let focused = ran(&skill.name, at)?;
+                    (now_us.saturating_sub(focused) <= *within_us
+                        && ran(&skill.name, index).is_none_or(|word| word < focused))
+                    .then_some(skill.name.as_str())
+                })
+        })
     }
 
     /// Where a `yields_to` chance stands now ([`Yield`]).
@@ -7057,6 +7143,7 @@ impl Engine {
         }
         self.invalidate_changes(now_us);
         let mut runs = Vec::new();
+        let mut stood_in_for: Vec<(String, String)> = Vec::new();
         let minute = self.local_minute(now_us);
         let moment = self.local_moment(now_us);
         // What a run held until its trigger stops holding is given back
@@ -7107,6 +7194,7 @@ impl Engine {
                     .yields_to
                     .as_ref()
                     .map_or(Yield::No, |to| self.yield_state(to, now_us));
+                let stood_in = self.stood_in_by(&skill.name, now_us).map(str::to_owned);
                 // A word after another trigger's run (#3504): it holds only
                 // within `within` of that run, and only once for it.
                 let followed = trigger.follows.as_ref().is_none_or(|(other, within_us)| {
@@ -7298,6 +7386,7 @@ impl Engine {
                     watch.spent = false;
                     watch.waiting_us = None;
                     watch.yielded_us = None;
+                    watch.stood_in_us = None;
                 }
                 watch.last_held_us = Some(now_us);
                 let held_us = now_us - watch.since_us.unwrap_or(now_us);
@@ -7552,6 +7641,35 @@ impl Engine {
                     if greeted || waits {
                         continue;
                     }
+                }
+                // Another skill's word stands in for this nudge (#5620,
+                // Quiet focus for Rest your eyes): while it is still to
+                // come, the chance is kept, as the quiet hours keep one,
+                // said once; when it runs, this cooldown begins with it.
+                if let Some(by) = stood_in {
+                    if trigger.when != When::Appears {
+                        watch.spent = false;
+                        watch.disarmed = false;
+                        watch.waiting_us = None;
+                    }
+                    if watch.stood_in_us.is_none() {
+                        watch.stood_in_us = Some(now_us);
+                        runs.push(Run {
+                            generation: None,
+                            skill: skill.name.clone(),
+                            events: vec![event(
+                                &skill.name,
+                                SkillStage::Answered,
+                                format!("waits: {by}'s word comes first"),
+                                Some(false),
+                            )],
+                            calls: Vec::new(),
+                            ask: None,
+                            queue: false,
+                            from: None,
+                        });
+                    }
+                    continue;
                 }
                 let outside = skill
                     .active
@@ -7920,6 +8038,9 @@ impl Engine {
                     watch.ran_us = Some(now_us);
                     watch.said.clear();
                     instead = trigger.instead_of.as_ref();
+                    if let Some(other) = &trigger.stands_in_for {
+                        stood_in_for.push((skill.name.clone(), other.clone()));
+                    }
                     // Counted as the cooldown is: when the run is started,
                     // or asked of the Policy (#1685).
                     if nudge && skill.most_a_day.is_some() {
@@ -7987,6 +8108,43 @@ impl Engine {
             }
             item_runs.sort_by(|(a, _), (b, _)| item_order(a).cmp(&item_order(b)));
             runs.extend(item_runs.into_iter().map(|(_, run)| run));
+        }
+        // A word that stood in for another skill's waiting nudge (#5620):
+        // that nudge's chance was this word's, so its cooldown begins now.
+        for (by, other) in stood_in_for {
+            let Some(triggers) = self
+                .skills
+                .iter()
+                .find(|skill| skill.name == other)
+                .map(|skill| skill.triggers.len())
+            else {
+                continue;
+            };
+            let mut waited = false;
+            for index in 0..triggers {
+                if let Some(watch) = self.watches.get_mut(&(other.clone(), index))
+                    && watch.stood_in_us.take().is_some()
+                {
+                    watch.ran_us = Some(now_us);
+                    waited = true;
+                }
+            }
+            if waited {
+                runs.push(Run {
+                    generation: None,
+                    skill: other.clone(),
+                    events: vec![event(
+                        &other,
+                        SkillStage::Answered,
+                        format!("done: {by}'s word stood in for it"),
+                        Some(false),
+                    )],
+                    calls: Vec::new(),
+                    ask: None,
+                    queue: false,
+                    from: None,
+                });
+            }
         }
         runs
     }
