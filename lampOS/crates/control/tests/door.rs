@@ -861,6 +861,72 @@ async fn a_hand_on_the_bus_is_told_and_a_look_at_it_has_the_body_follow() {
     assert_eq!(line(&mut lines).await, r#"{"hold":{"for_ms":30000}}"#);
 }
 
+/// `get` `body` follows the body as it moves (the local leader's run on
+/// lamp-75c9, 4 Nov): `body/joint_states` as lamp-body publishes it, 12.5 a
+/// second with its declaration and a second's lifespan, each new position
+/// shown within a few of them, never held at an old one.
+#[tokio::test]
+async fn get_body_follows_the_joint_states_on_the_bus() {
+    let watch = Arc::new(std::sync::Mutex::new(lamp_control::watch::Watch::new()));
+    let events: lamp_control::parts::Events = Arc::new(|_: &str, _: Value| {});
+    let parts = lamp_control::parts::Lamp::new(None, None, None, "boot".into(), events)
+        .watching(watch.clone());
+    let lamp = lamp_with("joints", Box::new(parts)).await;
+    let bus = lamp_bus::Bus::new(lamp.dir.join("bus")).unwrap();
+    server::watch_bus(&bus, watch, lamp.shared.clone()).unwrap();
+    let mut limits = bus
+        .publisher_declared(
+            lamp_msgs::BodyLimits::TOPIC,
+            &lamp_msgs::BodyLimits::declaration(),
+            "body",
+        )
+        .unwrap();
+    let mut states = bus
+        .publisher_declared(
+            lamp_msgs::JointState::TOPIC,
+            &lamp_msgs::JointState::declaration(),
+            "body",
+        )
+        .unwrap();
+    states.expires_after(Some(Duration::from_secs(1)));
+    let limit = json!({"joints": [{"name": "base_yaw", "min": 1975, "max": 2055, "home": 2012}],
+                       "speed": 50.0, "acceleration": 400.0, "force": 600, "heat_stop": 62, "stands": true});
+    let radians = |counts: f64| (counts - 2_048.0) * std::f64::consts::TAU / 4_096.0;
+    let mut socket = paired(&lamp, json!(["body"]), 15).await;
+    let yaw = |body: &Value| body["state"]["body"]["joints"]["yaw"]["counts"].as_f64();
+    let started = std::time::Instant::now();
+    let mut at_us = 1;
+    for counts in [1_999.0, 2_021.0, 2_007.0, 1_998.0, 2_030.0] {
+        // 20 steps (1.6 s) at each position, as a body holding there says.
+        let mut seen = None;
+        for step in 0..20 {
+            if step % 10 == 0 {
+                limits.publish_json(at_us, &limit).unwrap();
+            }
+            let state = json!({"name": ["base_yaw"], "position": [radians(counts)],
+                               "velocity": [], "effort": [], "commanded": [radians(counts)]});
+            states.publish_json(at_us, &state).unwrap();
+            at_us += 80_000;
+            tokio::time::sleep(Duration::from_millis(80)).await;
+            let body = send(
+                &mut socket,
+                json!({"id": at_us, "op": "get", "state": ["body"]}),
+            )
+            .await;
+            seen = yaw(&body);
+            if step == 5 {
+                assert_eq!(
+                    seen,
+                    Some(counts),
+                    "at {counts} for 6 steps, {:?} in: {body}",
+                    started.elapsed()
+                );
+            }
+        }
+        assert_eq!(seen, Some(counts));
+    }
+}
+
 /// The local leader's P3: A follows the hand, A's lease ends, B takes the
 /// body; B's hold never says follow, whether the door let go between them
 /// or B took the body before a check saw it free.
