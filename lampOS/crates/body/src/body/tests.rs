@@ -127,6 +127,9 @@ struct Clock {
     time: Rc<Cell<Duration>>,
     cancel_at: Duration,
     inhibit_at: Option<Duration>,
+    /// Each `EXTEND_TIMEOUT_USEC` the body would tell systemd (#5693): when,
+    /// and by how much.
+    extends: Rc<std::cell::RefCell<Vec<(Duration, Duration)>>>,
 }
 impl Runtime for Clock {
     fn now(&self) -> Duration {
@@ -137,6 +140,9 @@ impl Runtime for Clock {
     }
     fn recovery_inhibited(&self) -> bool {
         self.inhibit_at.is_some_and(|at| self.time.get() >= at)
+    }
+    fn extend_start(&mut self, by: Duration) {
+        self.extends.borrow_mut().push((self.time.get(), by));
     }
 }
 
@@ -206,6 +212,7 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             time,
             cancel_at,
             inhibit_at: None,
+            extends: Rc::default(),
         },
     )
 }
@@ -5776,8 +5783,11 @@ fn a_joint_beyond_what_waking_brings_back_is_refused() {
     assert!(lamp.nothing_was_written());
 }
 
+/// The elbow's old overload flag (`folded`'s 0x20) stands against folding
+/// an arm found off its way (#5693): nothing is written to the arm, and the
+/// lamp runs folded and says why.
 #[test]
-fn an_arm_found_off_its_way_is_not_lowered_and_the_lamp_runs_folded() {
+fn an_arm_found_off_its_way_with_a_flagged_elbow_is_not_folded_and_the_lamp_runs_folded() {
     let (mut lamp, mut clock) = folded(Duration::from_secs(2));
     lamp.servos[1].position = 2_650.0;
     lamp.servos[1].goal = 2_650;
@@ -5796,7 +5806,7 @@ fn an_arm_found_off_its_way_is_not_lowered_and_the_lamp_runs_folded() {
         report
             .standing_refused
             .unwrap()
-            .ends_with("waking does not lower an arm found off its way")
+            .ends_with("; it is not folded: elbow_pitch status is 0x20")
     );
     // Not a goal to the arm, and nothing to wake.
     assert!(lamp.goals.iter().all(|write| write.len() == 3));
@@ -10298,6 +10308,7 @@ fn a_standing_lamp_whose_elbow_temperature_is_unreadable_folds_then_lets_go() {
         time: lamp.time.clone(),
         cancel_at: again + Duration::from_secs(20),
         inhibit_at: None,
+        extends: Rc::default(),
     };
     let report = run_standing(
         &mut lamp,
@@ -10701,6 +10712,7 @@ fn a_lamp_found_standing_whose_start_is_refused_folds_then_lets_go() {
             time: lamp.time.clone(),
             cancel_at: again + Duration::from_secs(20),
             inhibit_at: None,
+            extends: Rc::default(),
         };
         let report = run(&mut lamp, &mut clock);
         assert!(matches!(report.stop, Stop::Refused { .. }), "{report:?}");
@@ -17110,4 +17122,641 @@ fn a_look_held_on_a_resting_lamp_whose_head_stops_short_is_answered_where_it_sto
 fn a_look_held_on_a_resting_lamp_whose_base_stops_short_is_answered_where_it_stopped() {
     // 16 counts, 1.4 degrees, short of 5 right.
     answered_there_clamped_at(&a_held_look_at_rest_with((YAW, 16.0)), 3.6, 5.0);
+}
+
+// #5693: powered up away from its default pose, the lamp may never stand.
+
+/// lamp-52e6's poses with the product unit's options
+/// (`deploy/product/lamp-body.service`, `--torque on` from `BODY_POSES`,
+/// `--wake`, `--give-way`, `--limp`, `--refused-let-go`, `--rest-glance` and
+/// `--look-at-name` at their defaults, all on): powered up with every joint
+/// at `found` (yaw, shoulder, elbow, roll, pitch, by `Joint::index`), torque
+/// off and a goal register of 0 on all five, as lamp-52e6 was after a real
+/// unplug on 2026-10-14. Spoken to from 100 s to the end, cancelled at
+/// 160 s. The report, and whether some step stood at the stand pose.
+fn powered_up_at(found: [u16; 5]) -> (BodyReport, bool) {
+    let (report, stood_at_pose, _) = powered_up_with(found, |_| {});
+    (report, stood_at_pose)
+}
+
+/// [`powered_up_at`] with the simulated lamp `prepare`d first (a strain, a
+/// stuck servo), and the lamp as it was left.
+fn powered_up_with(found: [u16; 5], prepare: impl FnOnce(&mut Lamp)) -> (BodyReport, bool, Lamp) {
+    let powered = powered_up(found, prepare);
+    (powered.report, powered.stood_at_pose, powered.lamp)
+}
+
+/// What [`powered_up`] saw of a start.
+struct PoweredUp {
+    report: BodyReport,
+    stood_at_pose: bool,
+    lamp: Lamp,
+    /// Each `EXTEND_TIMEOUT_USEC` told systemd: when, and by how much.
+    extends: Vec<(Duration, Duration)>,
+    /// When the first step was watched: READY=1 (`step_said`).
+    ready_at: Option<Duration>,
+    /// What each watched step asked of a person (`Glimpse::waiting`).
+    said: Vec<Option<&'static str>>,
+}
+
+/// [`powered_up_with`], with what systemd would have heard.
+fn powered_up(found: [u16; 5], prepare: impl FnOnce(&mut Lamp)) -> PoweredUp {
+    let flags = &LAMP_52E6;
+    let (mut lamp, mut clock) = folded(Duration::from_secs(160));
+    lamp.may_take_hold = true;
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    for (servo, at) in lamp.servos.iter_mut().zip(found) {
+        (servo.position, servo.goal, servo.torque, servo.status) = (f32::from(at), 0, 0, 0);
+    }
+    prepare(&mut lamp);
+    let limits = Limits {
+        force: Some(600),
+        torque_on: true,
+        wake: true,
+        give_way: Some(GiveWay::Return),
+        limp: true,
+        refused_let_go: true,
+        rest_glance: true,
+        look_at_name: true,
+        ..Limits::folded_with(Tuning {
+            reach: [150, 15, 1, 250],
+            speed: 300,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let up = Standing::new(flags.folded, flags.stand, 100, 6, 90, flags.load)
+        .unwrap()
+        .idling(true);
+    let time = clock.time.clone();
+    let news = move || {
+        Some(if time.get() >= Duration::from_secs(100) {
+            (Mood::Listening, 120)
+        } else {
+            (Mood::Resting, 0)
+        })
+    };
+    let target = [flags.stand[3], flags.stand[4]];
+    let mut stood_at_pose = false;
+    let (mut ready_at, mut said) = (None, Vec::new());
+    let watched_time = clock.time.clone();
+    let report = run_standing(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(flags.home),
+        Some(up),
+        news,
+        |glimpse| {
+            ready_at.get_or_insert(watched_time.get());
+            said.push(glimpse.waiting);
+            stood_at_pose |= glimpse.stand >= 0.99
+                && glimpse
+                    .arm_positions
+                    .iter()
+                    .zip(target)
+                    .all(|(at, pose)| at.abs_diff(pose) <= 30);
+        },
+    );
+    // What the journal would say: the start line (`lamp-body: it may stand`,
+    // or `lamp-body: it will not stand this run: <why>` since #5693) and the
+    // exit report's stop and standing_refused.
+    eprintln!(
+        "#5693 found {found:?}: stop {:?}; standing_refused {:?}; lowered {:?}; woke {}; stood {}",
+        report.stop,
+        report.standing_refused,
+        report.lowered.as_ref().map(|l| (&l.from, &l.to)),
+        report.woke.is_some(),
+        report.stood
+    );
+    let extends = clock.extends.borrow().clone();
+    PoweredUp {
+        report,
+        stood_at_pose,
+        lamp,
+        extends,
+        ready_at,
+        said,
+    }
+}
+
+fn stands_from(found: [u16; 5]) {
+    let (report, stood_at_pose) = powered_up_at(found);
+    assert!(
+        report.stood && stood_at_pose,
+        "found {found:?}: stop {:?}, standing_refused {:?}",
+        report.stop,
+        report.standing_refused
+    );
+}
+
+// Controls: shapes that stand today.
+
+#[test]
+fn a_lamp_found_folded_at_home_stands() {
+    stands_from([2_035, 2_053, 2_069, 2_035, 1_771]);
+}
+
+#[test]
+fn a_lamp_found_with_its_head_pressed_on_the_base_stands() {
+    stands_from([2_035, 2_053, 2_069, 2_035, 2_095]);
+}
+
+#[test]
+fn a_lamp_found_with_its_shoulder_up_and_elbow_folded_stands() {
+    stands_from([1_979, 2_633, 2_074, 2_101, 2_029]);
+}
+
+#[test]
+fn a_lamp_found_part_way_up_on_its_way_stands() {
+    stands_from([2_035, 2_355, 2_335, 2_035, 1_771]);
+}
+
+#[test]
+fn a_lamp_found_turned_on_its_base_stands() {
+    stands_from([2_535, 2_053, 2_069, 2_035, 1_771]);
+}
+
+// The shapes #5693 is about: each inside every joint's window
+// (shoulder 1,633..3,077, elbow 1,649..3,022 on these poses), each
+// expected to stand.
+
+#[test]
+fn a_lamp_found_with_its_elbow_up_and_shoulder_folded_stands() {
+    stands_from([2_035, 2_053, 2_602, 2_035, 1_771]);
+}
+
+#[test]
+fn a_lamp_found_with_its_shoulder_up_and_elbow_half_up_stands() {
+    stands_from([2_035, 2_633, 2_300, 2_035, 1_771]);
+}
+
+#[test]
+fn a_lamp_found_with_its_elbow_past_its_stand_stands() {
+    stands_from([2_035, 2_657, 2_900, 2_035, 1_771]);
+}
+
+#[test]
+fn a_lamp_found_with_its_shoulder_a_little_up_and_elbow_well_up_stands() {
+    stands_from([2_035, 2_110, 2_400, 2_035, 1_771]);
+}
+
+#[test]
+fn a_lamp_found_with_its_shoulder_past_its_stand_and_elbow_folded_stands() {
+    stands_from([2_035, 2_950, 2_069, 2_035, 1_771]);
+}
+
+#[test]
+fn a_lamp_found_standing_with_its_head_drooped_far_down_stands() {
+    stands_from([2_035, 2_657, 2_602, 2_035, 2_250]);
+}
+
+#[test]
+fn a_lamp_found_part_way_up_with_its_head_pressed_down_stands() {
+    stands_from([2_035, 2_355, 2_335, 2_035, 2_095]);
+}
+
+// #5693's edges: every guard of the shoulder's lowering holds for the fold.
+
+/// The elbow folding from 2,900 is strained (700, over its 560 load) from
+/// 5 s for good, as by a hand or the desk: the fold stops there, holds all
+/// five where they are, ends the run on that load and lets go of the whole
+/// lamp, as the shoulder's lowering does.
+#[test]
+fn a_fold_whose_load_trips_mid_way_stops_and_lets_the_lamp_go() {
+    let (report, stood, lamp) = powered_up_with([2_035, 2_657, 2_900, 2_035, 1_771], |lamp| {
+        lamp.strains
+            .push((Duration::from_secs(5), Duration::from_secs(200), 2, 700));
+    });
+    assert!(
+        matches!(
+            report.stop,
+            Stop::Load {
+                joint: 3,
+                load: 700
+            }
+        ),
+        "{report:?}"
+    );
+    assert!(report.held_at.is_some(), "{report:?}");
+    assert!(!report.stood && !stood, "{report:?}");
+    let lowered = report.lowered.clone().unwrap();
+    assert_eq!(lowered.joints, vec!["elbow_pitch"], "{lowered:?}");
+    // Stopped part of the way down, a few seconds in.
+    assert!((2_400..2_900).contains(&lowered.settled[0]), "{lowered:?}");
+    assert!(let_go_of_the_whole_lamp(&lamp));
+}
+
+/// An elbow that cannot turn its output (#4390's shape): asked down it
+/// never moves, the fold stops on tracking, and with `--refused-let-go` the
+/// arm alone is let go, the head held, waiting for a hand to fold it; the
+/// shoulder is never asked to move.
+#[test]
+fn a_joint_that_fails_to_track_stops_the_fold() {
+    let (report, stood, lamp) = powered_up_with([2_035, 2_657, 2_900, 2_035, 1_771], |lamp| {
+        lamp.pinned = Some((2, 100));
+    });
+    assert!(!report.stood && !stood, "{report:?}");
+    assert_eq!(report.refused_let_go, Some(ARM_FOLD), "{report:?}");
+    let lowered = report.lowered.clone().unwrap();
+    assert_eq!(lowered.joints, vec!["elbow_pitch"], "{lowered:?}");
+    assert_eq!(lowered.settled, vec![2_900], "{lowered:?}");
+    assert!(
+        goals_of(&lamp, Joint::BasePitch)
+            .iter()
+            .all(|goal| *goal == 2_657)
+    );
+    assert_eq!(lamp.servos[1].torque, 0);
+    assert_eq!(lamp.servos[2].torque, 0);
+    assert_eq!(lamp.servos[PITCH].torque, 1);
+}
+
+/// An elbow found at 3,100, past its window (1,649..=3,022 on these
+/// poses): never folded, nor given that as a goal. The start ends refused
+/// on the window, as before #5693; and `fold_plan` itself, for an arm with
+/// its torque on, says it is outside.
+#[test]
+fn an_arm_found_outside_its_window_is_still_refused() {
+    let (report, stood, lamp) = powered_up_with([2_035, 2_657, 3_100, 2_035, 1_771], |_| {});
+    assert!(
+        matches!(
+            report.stop,
+            Stop::Window {
+                joint: 3,
+                goal: 3_100,
+                ..
+            }
+        ),
+        "{report:?}"
+    );
+    assert!(report.lowered.is_none(), "{report:?}");
+    assert!(!report.stood && !stood);
+    assert!(
+        lamp.goals
+            .iter()
+            .flatten()
+            .all(|(id, goal)| (*id, *goal) != (3, 3_100))
+    );
+
+    let flags = &LAMP_52E6;
+    let up = Standing::new(flags.folded, flags.stand, 100, 6, 90, flags.load).unwrap();
+    let found = [2_035, 2_657, 3_100, 2_035, 1_771].map(|position| Sample {
+        position,
+        load: 20,
+        temperature: 40,
+        status: 0,
+    });
+    let held = [(1, 60, 1_000, 0); 2];
+    let plan = fold_plan(up, &found, held, &Limits::FOLDED, false);
+    assert_eq!(
+        plan,
+        Some(Err(NoFold::Refused(
+            "elbow_pitch at 3100 is outside its window 1649..=3022".into()
+        )))
+    );
+    // Inside it, the same arm folds: the elbow first, then the shoulder.
+    let found = [2_035, 2_657, 2_900, 2_035, 1_771].map(|position| Sample {
+        position,
+        load: 20,
+        temperature: 40,
+        status: 0,
+    });
+    assert_eq!(
+        fold_plan(up, &found, held, &Limits::FOLDED, false),
+        Some(Ok(Fold {
+            head_to: None,
+            joints: vec![Joint::ElbowPitch, Joint::BasePitch],
+        }))
+    );
+}
+
+/// The fold of a lamp found standing with its head drooped to 2,250: the
+/// head lifted to its folded window's edge first, then the elbow, then the
+/// shoulder, and the head never asked lower than where it was found.
+#[test]
+fn a_drooped_head_is_lifted_clear_of_the_base_before_the_arm_folds() {
+    let (report, stood, lamp) = powered_up_with([2_035, 2_657, 2_602, 2_035, 2_250], |_| {});
+    assert!(report.stood && stood, "{report:?}");
+    let lowered = report.lowered.clone().unwrap();
+    assert_eq!(
+        lowered.joints,
+        vec!["wrist_pitch", "elbow_pitch", "base_pitch"],
+        "{lowered:?}"
+    );
+    assert_eq!(lowered.to, vec![2_030, 2_069, 2_053], "{lowered:?}");
+    let pitch = goals_of(&lamp, Joint::WristPitch);
+    let elbow = goals_of(&lamp, Joint::ElbowPitch);
+    // Every goal of the head lies at or above where it was found, and it is
+    // at its window's edge before the elbow is first asked to move.
+    assert!(pitch.iter().all(|goal| *goal <= 2_250));
+    let elbow_moves = elbow.iter().position(|goal| *goal != 2_602).unwrap();
+    assert!(pitch[elbow_moves] <= 2_030, "{}", pitch[elbow_moves]);
+    // The shoulder moves only once the elbow is folded.
+    let shoulder = goals_of(&lamp, Joint::BasePitch);
+    let shoulder_moves = shoulder.iter().position(|goal| *goal != 2_657).unwrap();
+    assert!(
+        elbow[shoulder_moves].abs_diff(2_069) <= 1,
+        "{}",
+        elbow[shoulder_moves]
+    );
+}
+
+// The two reads on #5703.
+
+/// Every arm goal a start wrote, (shoulder or elbow id, goal), in order.
+fn arm_goals_written(lamp: &Lamp) -> Vec<(u8, u16)> {
+    lamp.goals
+        .iter()
+        .flatten()
+        .copied()
+        .filter(|(id, _)| *id == Joint::BasePitch.id() || *id == Joint::ElbowPitch.id())
+        .collect()
+}
+
+/// lamp-52e6's poses, the arm's torque on, all five read at `found`.
+fn fold_plan_at(found: [u16; 5]) -> Option<Result<Fold, NoFold>> {
+    let flags = &LAMP_52E6;
+    let up = Standing::new(flags.folded, flags.stand, 100, 6, 90, flags.load).unwrap();
+    let found = found.map(|position| Sample {
+        position,
+        load: 20,
+        temperature: 40,
+        status: 0,
+    });
+    fold_plan(up, &found, [(1, 60, 1_000, 0); 2], &Limits::FOLDED, false)
+}
+
+/// El's P2: a lamp nudged at rest, shoulder 60 up and elbow 45 under
+/// folded, is 98 counts off its way, yet each joint is within 80 of its
+/// folded count. It folds both and stands; the plan is never empty, and
+/// the journal never says "it folds first: , before it wakes".
+#[test]
+fn a_nearly_folded_arm_off_its_way_folds_and_stands() {
+    let found = [2_035, 2_113, 2_024, 2_035, 1_771];
+    let (report, stood_at_pose) = powered_up_at(found);
+    assert!(report.stood && stood_at_pose, "{report:?}");
+    let lowered = report.lowered.clone().unwrap();
+    assert_eq!(
+        lowered.joints,
+        vec!["elbow_pitch", "base_pitch"],
+        "{lowered:?}"
+    );
+    let Some(Ok(fold)) = fold_plan_at(found) else {
+        panic!("{:?}", fold_plan_at(found));
+    };
+    assert_eq!(fold.joints, vec![Joint::ElbowPitch, Joint::BasePitch]);
+    assert_eq!(
+        fold_said(&fold),
+        "it folds first: its elbow, then its shoulder"
+    );
+}
+
+/// The anti-tip gate (both reads' P2): from shoulder 3,000 and elbow 3,000,
+/// folding the elbow first takes the centre of gravity past where it was
+/// found and where it rests folded. The plan is refused with why, and the
+/// start writes no arm goal but where the arm was found.
+#[test]
+fn a_fold_path_over_the_anti_tip_bound_is_refused_and_nothing_moves() {
+    let found = [2_035, 3_000, 3_000, 2_035, 1_771];
+    let plan = fold_plan_at(found);
+    assert!(
+        matches!(&plan, Some(Err(NoFold::Tips(why)))
+            if why.starts_with("folding it from here takes its centre of gravity")),
+        "{plan:?}"
+    );
+    let powered = powered_up(found, |_| {});
+    assert!(powered.report.lowered.is_none(), "{:?}", powered.report);
+    assert!(!powered.report.stood && !powered.stood_at_pose);
+    let written = arm_goals_written(&powered.lamp);
+    assert!(
+        written.iter().all(|(_, goal)| *goal == 3_000),
+        "{written:?}"
+    );
+}
+
+/// El's P2: a start the anti-tip gate refuses is not the stuck lamp. With
+/// `--refused-let-go` the arm alone is let go and the lamp asks for it to
+/// be folded (`ARM_FOLD`); a hand folds it at 20 s, and it stands. Elbow up
+/// with the head drooped, and shoulder and elbow both at 3,000. The drooped
+/// head (2,250, 479 from home, past what waking brings back) is then asked
+/// for as before #5693 (#2602), and a hand lifts it at 40 s.
+#[test]
+fn a_fold_that_would_tip_waits_for_a_hand_and_then_stands() {
+    let flags = &LAMP_52E6;
+    let up = Standing::new(flags.folded, flags.stand, 100, 6, 90, flags.load).unwrap();
+    for found in [
+        [2_035, 2_053, 2_602, 2_035, 2_250],
+        [2_035, 3_000, 3_000, 2_035, 1_771],
+    ] {
+        let samples = found.map(|position| Sample {
+            position,
+            load: 20,
+            temperature: 40,
+            status: 0,
+        });
+        let Some(Err(NoFold::Tips(why))) =
+            fold_plan(up, &samples, [(1, 60, 1_000, 0); 2], &Limits::FOLDED, false)
+        else {
+            panic!("{found:?}: {:?}", fold_plan_at(found));
+        };
+        assert_eq!(
+            tips_said(&samples, &why),
+            format!(
+                "found shoulder {} elbow {} head pitch {}: {why}: it lets its arm go and waits for a hand to fold it",
+                found[1], found[2], found[4]
+            )
+        );
+        let drooped = found[PITCH] > 2_030;
+        let powered = powered_up(found, |lamp| {
+            let (from, until) = (Duration::from_secs(20), Duration::from_secs(23));
+            lamp.hands.push((from, until, 1, 2_053.0));
+            lamp.hands.push((from, until, 2, 2_069.0));
+            if drooped {
+                let (from, until) = (Duration::from_secs(40), Duration::from_secs(43));
+                lamp.hands.push((from, until, PITCH, 1_771.0));
+            }
+        });
+        let report = &powered.report;
+        // The first thing it asks is for its arm to be folded.
+        let first = powered.said.iter().flatten().next();
+        assert_eq!(first, Some(&ARM_FOLD), "{found:?}: {report:?}");
+        assert!(
+            matches!(fold_plan_at(found), Some(Err(NoFold::Tips(_)))),
+            "{found:?}: {:?}",
+            fold_plan_at(found)
+        );
+        // Nothing moved the arm before the hand did.
+        let before_hand = powered
+            .lamp
+            .goals
+            .iter()
+            .zip(&powered.lamp.goal_times)
+            .filter(|(_, at)| **at < Duration::from_secs(20))
+            .flat_map(|(write, _)| write.iter().copied())
+            .filter(|(id, _)| *id == 2 || *id == 3)
+            .all(|(id, goal)| goal == found[usize::from(id) - 1]);
+        assert!(before_hand, "{found:?}");
+        assert!(
+            report.stood && powered.stood_at_pose,
+            "{found:?}: {report:?}"
+        );
+    }
+}
+
+/// The Reviewer-lead's P2 on 790f00f2: a body restarted with its arm held
+/// under torque at shoulder and elbow 3,000, a fold the anti-tip gate
+/// refuses, does not let the arm go even with `--refused-let-go`: let go,
+/// it would fall along the path that tips. Only what gravity already holds
+/// is let go (#2938). It keeps holding, never asks for the arm to be
+/// folded, and nothing moves the arm.
+#[test]
+fn a_held_arm_whose_fold_would_tip_keeps_holding_and_is_not_let_go() {
+    let found = [2_035, 3_000, 3_000, 2_035, 1_771];
+    assert!(
+        matches!(fold_plan_at(found), Some(Err(NoFold::Tips(_)))),
+        "{:?}",
+        fold_plan_at(found)
+    );
+    let powered = powered_up(found, |lamp| {
+        for joint in ARM {
+            let servo = &mut lamp.servos[joint.index()];
+            (servo.torque, servo.goal) = (1, found[joint.index()]);
+        }
+    });
+    let report = &powered.report;
+    assert!(
+        !powered.said.iter().flatten().any(|say| *say == ARM_FOLD),
+        "{report:?}"
+    );
+    assert!(
+        report
+            .pose_wait
+            .as_ref()
+            .is_none_or(|wait| wait.joints.iter().all(|joint| !ARM.contains(joint))),
+        "{report:?}"
+    );
+    // No torque off went to the shoulder or the elbow before the end.
+    let let_go = powered
+        .lamp
+        .registers
+        .iter()
+        .zip(&powered.lamp.register_times)
+        .filter(|(_, at)| **at < Duration::from_secs(160))
+        .any(|((id, address, bytes), _)| {
+            ARM.iter().any(|joint| joint.id() == *id) && *address == 40 && bytes == &vec![0]
+        });
+    assert!(!let_go, "{report:?}");
+    let written = arm_goals_written(&powered.lamp);
+    assert!(
+        written.iter().all(|(_, goal)| *goal == 3_000),
+        "{written:?}"
+    );
+    assert!(!report.stood && !powered.stood_at_pose, "{report:?}");
+}
+
+/// Both reads' P2: a start can pass systemd's 90 s. El's slowest found
+/// pose folds and wakes for about 108 s before READY=1; before each move
+/// it tells systemd how long that move takes, so at every write before
+/// READY the start's deadline (90 s, or the latest extension) is ahead.
+#[test]
+fn a_slow_fold_tells_systemd_to_wait_before_each_move() {
+    let powered = powered_up([2_035, 2_593, 2_899, 2_035, 2_420], |_| {});
+    assert!(
+        powered.report.stood && powered.stood_at_pose,
+        "{:?}",
+        powered.report
+    );
+    let ready_at = powered.ready_at.unwrap();
+    let deadline = |at: Duration| {
+        powered
+            .extends
+            .iter()
+            .filter(|(sent, _)| *sent <= at)
+            .map(|(sent, by)| *sent + *by)
+            .fold(Duration::from_secs(90), Duration::max)
+    };
+    for at in powered
+        .lamp
+        .goal_times
+        .iter()
+        .copied()
+        .filter(|at| *at <= ready_at)
+        .chain([ready_at])
+    {
+        assert!(
+            at <= deadline(at),
+            "at {at:?} past {:?}; ready {ready_at:?}, extends {:?}",
+            deadline(at),
+            powered.extends
+        );
+    }
+}
+
+/// El's P3 (Rule 8): the fold pauses about 0.3 s between one move and the
+/// next, not a second, so it reads less like a machine homing each axis:
+/// from the elbow's goal reaching folded to the shoulder's first goal.
+#[test]
+fn the_fold_pauses_briefly_between_its_moves() {
+    let (_, _, lamp) = powered_up_with([2_035, 2_657, 2_900, 2_035, 1_771], |_| {});
+    let arm: Vec<(Duration, u16, u16)> = lamp
+        .goals
+        .iter()
+        .zip(&lamp.goal_times)
+        .filter_map(|(write, at)| {
+            let of = |id: u8| write.iter().find(|(joint, _)| *joint == id).map(|w| w.1);
+            Some((*at, of(2)?, of(3)?))
+        })
+        .collect();
+    let shoulder_moves = arm
+        .iter()
+        .position(|(_, shoulder, _)| *shoulder != 2_657)
+        .unwrap();
+    // When the elbow's goal first reached where it ended, folded.
+    let folded = arm[shoulder_moves - 1].2;
+    let elbow_done = arm.iter().find(|(_, _, elbow)| *elbow == folded).unwrap().0;
+    // The eased end of one move and start of the next each spend about
+    // half a second under a count, so the goals stand still for about
+    // 1.1 s with the 0.3 s pause; with a second's it was 1.8 s.
+    let gap = arm[shoulder_moves].0.saturating_sub(elbow_done);
+    assert!(gap <= Duration::from_millis(1_400), "{gap:?}");
+}
+
+/// The Reviewer-lead's P3: found standing with its head drooped 328 counts
+/// (within what waking brings back) and the head's pitch, or the base,
+/// flagged by its own protection, that joint is left as it is: the head is
+/// woken around a flagged pitch and the lamp folds, but the start never
+/// writes the flagged joint a goal nor turns its torque on.
+#[test]
+fn a_lamp_found_standing_with_a_flagged_head_or_base_never_writes_that_joint() {
+    for flagged in [PITCH, YAW] {
+        let (report, _, lamp) = powered_up_with([2_035, 2_657, 2_602, 2_035, 2_100], |lamp| {
+            lamp.servos[flagged].status = 0x04;
+        });
+        // A flagged pitch: refused on it, the head's wake runs around it
+        // and the lamp folds. A flagged base ends at its force limit's
+        // read, before anything moves.
+        if flagged == PITCH {
+            assert!(
+                matches!(report.stop, Stop::Refused { .. }) && report.woke.is_some(),
+                "{report:?}"
+            );
+        }
+        let id = u8::try_from(flagged + 1).unwrap();
+        assert!(
+            lamp.goals.iter().flatten().all(|(joint, _)| *joint != id),
+            "{flagged}: {:?}",
+            lamp.goals
+        );
+        assert!(
+            lamp.registers
+                .iter()
+                .all(|(joint, address, data)| *joint != id
+                    || !(*address == 42 || (*address == 40 && data.first() == Some(&1)))),
+            "{flagged}: {:?}",
+            lamp.registers
+        );
+        assert_eq!(lamp.servos[flagged].torque, 0, "{flagged}");
+    }
 }

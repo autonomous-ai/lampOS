@@ -78,6 +78,13 @@ impl Notify {
         self.send("WATCHDOG=1");
     }
 
+    /// The part is still starting and needs `by` more before it says
+    /// ready: systemd's start timeout is pushed out to at least `by` from
+    /// now (`EXTEND_TIMEOUT_USEC`).
+    pub fn extend_timeout(&self, by: Duration) {
+        self.send(&format!("EXTEND_TIMEOUT_USEC={}", by.as_micros()));
+    }
+
     /// One line for `systemctl status` to show.
     pub fn status(&self, text: &str) {
         // A newline would start another assignment of the protocol.
@@ -167,6 +174,7 @@ mod tests {
         notify.ready();
         notify.alive();
         notify.status("holding\nstill");
+        notify.extend_timeout(Duration::from_millis(41_500));
         notify.stopping();
         assert_eq!(
             ear.heard(),
@@ -174,6 +182,7 @@ mod tests {
                 b"READY=1".to_vec(),
                 b"WATCHDOG=1".to_vec(),
                 b"STATUS=holding still".to_vec(),
+                b"EXTEND_TIMEOUT_USEC=41500000".to_vec(),
                 b"STOPPING=1".to_vec(),
             ]
         );

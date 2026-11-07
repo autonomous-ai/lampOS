@@ -18,6 +18,9 @@ StartLimitBurst=3
 Type=notify
 NotifyAccess=main
 WatchdogSec=5
+# READY=1 comes after a power-up fold and wake (#5693), up to ~109 s found in an odd pose; before each
+# move the body sends EXTEND_TIMEOUT_USEC sized to it. This is the backstop under that, not the budget.
+TimeoutStartSec=180
 # Never root: the servo port's owner refuses a process that could bypass its lock.
 User=lampos
 Group=lampos
