@@ -1,8 +1,8 @@
 # Quiet focus's tests
 
 **How they were made.** Not on a lamp, and not recorded: each case's
-`.jsonl` files were written by a script in the format `lamp-bus record`
-writes, as Sit back's were: the eyes' `room/activity` every 10 s while
+`.jsonl` files and its `expect.toml` were written by `write_cases.py`
+beside this file, in the format `lamp-bus record` writes, as Sit back's were: the eyes' `room/activity` every 10 s while
 someone sits (under the triggers' gaps, 2 minutes and 30 s; its
 declaration's 3 s lifespan as the eyes publish it), every 30 s while they
 are away, the baseline in from a sitting's second minute and `sitting_s`
