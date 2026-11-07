@@ -280,7 +280,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 64] = [
+pub const KINDS: [(&str, Switch); 65] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -359,6 +359,7 @@ pub const KINDS: [(&str, Switch); 64] = [
     (crate::control::KINDS[1], CONTROL),
     (crate::control::KINDS[2], CONTROL),
     (crate::control::KINDS[3], CONTROL),
+    (crate::control::KINDS[4], CONTROL),
 ];
 
 const CONSENT: Switch = |lamp| lamp.consent().is_some();

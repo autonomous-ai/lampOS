@@ -520,6 +520,18 @@ impl Door {
         self.codes.cancel()
     }
 
+    /// The owner's app takes the lamp back: every lease of `client`, or of
+    /// every computer for `None`, is lost as `taken_by_owner_app`, told to
+    /// its holder. The computers stay paired.
+    pub fn take_back(&mut self, client: Option<&str>, now_us: u64) -> Vec<Change> {
+        match client {
+            Some(client) => self
+                .leases
+                .client_gone(client, LeaseWhy::TakenByOwnerApp, now_us),
+            None => self.leases.lose(None, LeaseWhy::TakenByOwnerApp, now_us),
+        }
+    }
+
     /// The owner revokes `client`: its leases end, told. Whether it was
     /// paired. The server closes its connections at once; a frame that
     /// beats it is refused.
