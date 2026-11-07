@@ -654,7 +654,9 @@ marker (`serve::Save::first_volume`, `crates/setup/src/first_volume.rs`).
 The marker is what starts the voice, so its first line is already at 70 %,
 and the volume waits on nothing slow on the voice's side. Setup runs only
 on a lamp with no marker, a new one or one just reset, so this is once per
-setup: a level the person chooses afterwards, by voice, a button or the
+setup. A V1 lamp moved to lampOS has no marker either
+(`crates/keeper/src/package.rs`), so it runs a full first setup and its
+level starts at 70 % too, not at its owner's old V1 level. A level the person chooses afterwards, by voice, a button or the
 app, is never changed by an update or anything else, and needs no mark of
 its own. Recovery's network-only run (`NetworkOnly`) never sets it. Both
 commands are bounded (0.8 s and 2 s) and best effort: a control that is
