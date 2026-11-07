@@ -21,10 +21,11 @@ for p in "$@"; do
   q=$($PYTHON -I $TOOLS_DIR/qholds.py --writers $wf $head $tmp/q < $tmp/c) || { echo "#$p: qholds.py failed"; exit 1; }
   [[ -z $q ]] || { echo "#$p is now held on the Queue ($q)"; exit 1; }
   # 7 Nov (#5653's two HOLDs): heads a Queue READ ASK names too (into a file, so lib.sh's patch cache holds across PRs),
-  # and the PR's commits for Queue asks at an older head (the head alone when they can't be listed), as train-bot.sh.
+  # and the PR's commits for Queue asks at an older head, as train-bot.sh. 7 Nov (#5653's P3s): fails when they can't
+  # be listed, as every fetch here does.
   coord_same_patch $head $tmp/c $tmp/q > $tmp/heads
   heads=(${(f)"$(<$tmp/heads)"})
-  git rev-list origin/lamp-voice..$head > $tmp/commits 2>/dev/null || print -r -- $head > $tmp/commits
+  git rev-list origin/lamp-voice..$head > $tmp/commits 2>/dev/null || { echo "#$p: its commits can't be listed"; exit 1; }
   two=$(cat $tmp/b $tmp/c | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf --queue $tmp/q --pr $p --pr-commits $tmp/commits $heads)
   [[ $two == none || $two == met* ]] || { echo "#$p: TWO READS ${two:-unread}"; exit 1; }
 done

@@ -76,6 +76,9 @@ patch_of() { local b; b=$(git merge-base origin/lamp-voice $1 2>/dev/null) || re
 # the new head; reads2.py still decides which asks count. The Queue names many other PRs' heads, so each sha's patch
 # (or that it can't be resolved, after one fetch) is kept in coord_patch_cache, keyed by origin/lamp-voice and the sha:
 # call it with its output redirected to a file, not in $(...), so one bot round works each sha out once across PRs.
+# 7 Nov (#5653's P3s): the Queue's shas are those reads2.py --queue-shas prints (each sha on a first line its QUEUE_ASK
+# takes, signed asks like "Sixth, READ ASK to **El**: `<sha>`" too), so the candidates and queue_asks read one regex.
+# A short sha resolves only when the object is local (git can't fetch an abbreviated sha): see README.md.
 typeset -gA coord_patch_cache
 # coord_cached_patch SHA LV: sets REPLY to "<full sha> <patch>" from the cache (filling it), or fails when SHA can't be
 # resolved. Sets REPLY rather than printing, so the cache fills in the calling shell.
@@ -95,9 +98,8 @@ coord_same_patch() {
   lv=$(git rev-parse -q --verify origin/lamp-voice 2>/dev/null) || return 0
   coord_cached_patch $1 $lv && hp=${REPLY#* } || return 0
   seen=(${REPLY%% *})
-  for s in ${(u)${(f)"$( { grep -oE 'READ-OK[*]{0,2}[[:space:]]+`?[0-9a-f]{7,40}' $2 2>/dev/null
-                         [[ -n $3 ]] && grep -oE 'READ ASK[*]{0,2}[[:space:]]+`?[0-9a-f]{7,40}' $3 2>/dev/null } \
-                       | grep -oE '[0-9a-f]{7,40}$')"}}; do
+  for s in ${(u)${(f)"$( grep -oE 'READ-OK[*]{0,2}[[:space:]]+`?[0-9a-f]{7,40}' $2 2>/dev/null | grep -oE '[0-9a-f]{7,40}$'
+                       [[ -n $3 ]] && $PYTHON -I $TOOLS_DIR/reads2.py --queue-shas $3 2>/dev/null )"}}; do
     [[ $1 == $s* ]] && continue
     coord_cached_patch $s $lv || continue
     (( ${seen[(Ie)${REPLY%% *}]} )) && continue
