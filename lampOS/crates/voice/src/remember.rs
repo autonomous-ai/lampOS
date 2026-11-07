@@ -1032,7 +1032,9 @@ const SAID_KEPT_AFTER: &[&str] = &[
 
 /// What a said-back "saved" is about when it is no keep ([`said_kept_claim`],
 /// the Reviewer-lead's P3 on #5607): "Okay, your reminder for seven is
-/// saved." beside a `set_reminder`, "Got it, your settings are saved."
+/// saved." beside a `set_reminder`, "Got it, your settings are saved." A
+/// preference is a kept thing, so "Your preference for green tea is
+/// saved." stays a claim (Thirteen's P3 on #5607).
 const SAID_SAVED_NOT_KEPT: &[&str] = &[
     "reminder",
     "reminders",
@@ -1042,8 +1044,6 @@ const SAID_SAVED_NOT_KEPT: &[&str] = &[
     "timers",
     "setting",
     "settings",
-    "preference",
-    "preferences",
 ];
 
 /// The words that may end a said-back keep after its word, as one: "Pip is
@@ -1194,6 +1194,287 @@ fn kept_in_a_claims_shape(sentence: &str, words: &[(usize, &str)]) -> bool {
             next.len() >= 3 && matches!(next[0], "that" | "it") && next[1..3] == ["for", "you"];
         stated || as_yours || for_you
     })
+}
+
+/// Words of a said-back keep that name no kept thing ([`said_kept_found`]):
+/// the keep's own words and an opening's ("Great, Pip is kept."), and a
+/// name's framing ("Your goldfish's name, Pip, is kept.").
+const SAID_KEPT_FRAMING: &[&str] = &[
+    "kept",
+    "saved",
+    "remembered",
+    "memory",
+    "safe",
+    "already",
+    "great",
+    "sure",
+    "done",
+    "alright",
+    "name",
+    "names",
+    "called",
+];
+
+/// The words of each thing a `recall` found (its `found` items), folded
+/// ([`about_fold`]), for [`said_kept_found`]: what was kept, observed (a
+/// recall tells only an active observation), or a fact's text. What was
+/// only heard or said (an exchange's `heard` and `you_said`) was never
+/// kept, so it backs no said-back keep: an old exchange that heard "My
+/// goldfish is called Pip." gives "Yes, Pip is kept." nothing (Heron's P2
+/// at 8baef46c8f on #5701). That also covers a recall that finds the
+/// offer's own exchange. A found thing negates more widely than a line
+/// ([`found_negates`]).
+pub fn recall_found_words(told: &Value) -> Vec<Vec<String>> {
+    told["found"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|item| {
+            let text: Vec<&str> = ["asked_to_remember", "recorded_observation", "text"]
+                .iter()
+                .filter_map(|field| item[*field].as_str())
+                .collect();
+            let folded = about_fold(&text.join(" ").replace('\u{2019}', "'"));
+            let mut words = said_kept_words(&folded);
+            if !words.is_empty() && found_negates(&folded) {
+                words.push(NEGATED.to_owned());
+            }
+            words
+        })
+        .filter(|words| !words.is_empty())
+        .collect()
+}
+
+/// Whether `reply`'s said-back keeps (each sentence with "kept", "saved"
+/// or "remembered") name a thing this request's `recall` found (`found`,
+/// [`recall_found_words`]) that holds what the yes answers (`asked`, the
+/// line the lamp's offer was about or the person's line before): each word
+/// of the sentence and of `asked`, past the keep's framing
+/// ([`SAID_KEPT_FRAMING`]), is that one found thing's. "Yes, Pip is kept."
+/// beside a found "Their goldfish is called Pip", answering "My goldfish
+/// is called Pip.", is; "Yes, that's kept." names nothing, "Yes, your bike
+/// is kept." beside a found goldfish names what was not found, and beside
+/// a found "Their bike is red" answering "My bike is blue now." the found
+/// thing lacks the blue, so each stays a claim (Thirteen's P2s on #5701).
+/// Only finished sentences are judged (ended by `.`, `!` or `?`, or the
+/// reply's end with `whole`), and every keep among them must name a found
+/// thing: "Yes, Pip is kept. Your bike is kept too." does not (Second's
+/// P2 at c60b1a7b21; [`said_kept_found_to`] is how much of a streaming
+/// reply may be said). A negated `asked` ("My bike is not red.", "isn't",
+/// "never", "no") holds a word no found thing does, so the found old value
+/// never matches its correction (Thirteen's P2 at f3cccc815d). With no
+/// `asked` known, or no words in it, none is. The negation is equal on all
+/// three sides: a negated found thing ("Their bike is not red", "They
+/// don't like coffee") never matches a plain line ("My bike is red.", "I
+/// like coffee now."), Thirteen's P2 at aed324db5d; and the keep's own
+/// sentence says it the same way ([`negates`]): "Yes, your bike
+/// is red, kept." never confirms "My bike is not red.", nor "Pip isn't
+/// kept." "My goldfish is called Pip." (Second's P2). A number counts
+/// however short ([`said_kept_words`]): "Yes, your daughter is 13, kept."
+/// is not a found "Their daughter is 12" (Second's P2).
+pub fn said_kept_found(
+    reply: &str,
+    found: &[Vec<String>],
+    asked: Option<&str>,
+    whole: bool,
+) -> bool {
+    said_kept_found_judged(reply, found, asked, whole).is_some_and(|(_, all)| all)
+}
+
+/// How much of `reply` (a byte length, at a sentence's end) a found thing
+/// lets be said on a line that is only a yes ([`said_kept_found`]): its
+/// finished sentences up to the last said-back keep that names a found
+/// thing, while no keep before it fails to. `None` when the first keep
+/// does not, or none is finished yet. What follows stays held and is
+/// judged on its own, so a later "Your bike is kept too." never inherits
+/// "Yes, Pip is kept."'s found thing (Second's P2 at c60b1a7b21).
+pub fn said_kept_found_to(
+    reply: &str,
+    found: &[Vec<String>],
+    asked: Option<&str>,
+    whole: bool,
+) -> Option<usize> {
+    said_kept_found_judged(reply, found, asked, whole).map(|(end, _)| end)
+}
+
+/// [`said_kept_found_to`]'s end, and whether every finished keep in
+/// `reply` names a found thing ([`said_kept_found`]).
+fn said_kept_found_judged(
+    reply: &str,
+    found: &[Vec<String>],
+    asked: Option<&str>,
+    whole: bool,
+) -> Option<(usize, bool)> {
+    let named = |text: &str| -> Vec<String> {
+        said_kept_words(text)
+            .into_iter()
+            .filter(|word| !SAID_KEPT_FRAMING.contains(&word.as_str()))
+            .collect()
+    };
+    let asked = asked.map(|asked| {
+        let folded = about_fold(&asked.replace('\u{2019}', "'"));
+        let mut words = named(&folded);
+        if negates(&folded) {
+            words.push(NEGATED.to_owned());
+        }
+        words
+    })?;
+    if found.is_empty() || asked.is_empty() {
+        return None;
+    }
+    let negated = asked.iter().any(|word| word == NEGATED);
+    let mut at = 0;
+    let mut to = None;
+    for sentence in said_kept_sentences(reply) {
+        at += sentence.len();
+        // Unfinished while streaming: no end mark yet, or a "1." that may
+        // go on as "1.5".
+        let digit_stop = at == reply.len()
+            && sentence
+                .strip_suffix('.')
+                .is_some_and(|before| before.ends_with(|c: char| c.is_ascii_digit()));
+        if !whole && (!sentence.ends_with(['.', '!', '?']) || digit_stop) {
+            break;
+        }
+        let folded = about_fold(&sentence.replace('\u{2019}', "'"));
+        if !folded
+            .split(|c: char| !c.is_alphanumeric())
+            .any(|word| matches!(word, "kept" | "saved" | "remembered"))
+        {
+            continue;
+        }
+        let words = named(&folded);
+        let backed = !words.is_empty()
+            && negates(&folded) == negated
+            && found.iter().any(|item| {
+                item.iter().any(|word| word == NEGATED) == negated
+                    && words.iter().chain(&asked).all(|word| item.contains(word))
+            });
+        if !backed {
+            return to.map(|end| (end, false));
+        }
+        // The space after a said sentence goes with it, so what stays held
+        // opens on its own words.
+        let rest = &reply[at..];
+        to = Some(at + (rest.len() - rest.trim_start().len()));
+    }
+    to.map(|end| (end, true))
+}
+
+/// `reply`'s sentences for [`said_kept_found`], each with its end mark
+/// (`.`, `!` or `?`), as `split_inclusive` gives them, except that a `.`
+/// between two digits ("1.5") ends none.
+fn said_kept_sentences(reply: &str) -> Vec<&str> {
+    let mut sentences = vec![];
+    let mut start = 0;
+    let mut chars = reply.char_indices().peekable();
+    let mut before = None;
+    while let Some((at, c)) = chars.next() {
+        let decimal = c == '.'
+            && before.is_some_and(|b: char| b.is_ascii_digit())
+            && chars.peek().is_some_and(|(_, n)| n.is_ascii_digit());
+        if matches!(c, '.' | '!' | '?') && !decimal {
+            sentences.push(&reply[start..at + 1]);
+            start = at + 1;
+        }
+        before = Some(c);
+    }
+    if start < reply.len() {
+        sentences.push(&reply[start..]);
+    }
+    sentences
+}
+
+/// The words a said-back keep and what it is held against are matched on
+/// ([`said_kept_found`]): [`content_words`], and every number however
+/// short ("13", "5"), which that drops. "My daughter is 13." and a found
+/// "Their daughter is 12" keep their ages apart (Second's P2 at
+/// c60b1a7b21 on #5701). A number with a `.` or `,` between digits is one
+/// word ("1.5", "1,000"), so "1.5" and "5.1" stay apart (Heron's P3 at
+/// 8baef46c8f).
+fn said_kept_words(text: &str) -> Vec<String> {
+    let chars: Vec<char> = text.to_lowercase().chars().collect();
+    let mut tokens = vec![];
+    let mut word = String::new();
+    for (at, &c) in chars.iter().enumerate() {
+        let joins = matches!(c, '.' | ',')
+            && at > 0
+            && chars[at - 1].is_ascii_digit()
+            && chars.get(at + 1).is_some_and(char::is_ascii_digit);
+        if c.is_alphanumeric() || joins {
+            word.push(c);
+        } else {
+            tokens.push(std::mem::take(&mut word));
+        }
+    }
+    tokens.push(word);
+    let mut words = content_words(text);
+    words.extend(
+        tokens
+            .into_iter()
+            .filter(|word| word.chars().any(|c| c.is_ascii_digit())),
+    );
+    words.sort();
+    words.dedup();
+    words
+}
+
+/// What a negated text's words gain for [`said_kept_found`] ([`negates`]):
+/// not a word, so only another negated text holds it, and a match needs
+/// the same polarity on both sides (Thirteen's P2s at f3cccc815d and
+/// aed324db5d on #5701).
+const NEGATED: &str = " not";
+
+/// Whether `text` says "not", "no", "never", "cannot" or any "…n't" word:
+/// "My bike is not red.", "They don't like coffee", "I never said …",
+/// "Their daughter cannot eat peanuts" (Heron's P2 at 8baef46c8f).
+pub(crate) fn negates(text: &str) -> bool {
+    negates_with(text, &[])
+}
+
+/// [`negates`] for a found thing ([`recall_found_words`]), which also
+/// negates with "nothing", "nobody", "none" or "without": a found "Their
+/// daughter eats cake without peanuts" never backs "Yes, your daughter
+/// eats peanuts, kept." (Heron's P2 at 8baef46c8f on #5701). Only the
+/// strict side: a line or reply with these words matches no such found
+/// thing, and stays a claim.
+fn found_negates(text: &str) -> bool {
+    negates_with(text, &["nothing", "nobody", "none", "without"])
+}
+
+fn negates_with(text: &str, more: &[&str]) -> bool {
+    text.to_lowercase()
+        .replace('\u{2019}', "'")
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .any(|word| {
+            matches!(word, "not" | "no" | "never" | "cannot")
+                || word.ends_with("n't")
+                || more.contains(&word)
+        })
+}
+
+/// Whether `reply` says a preference is saved (its first sentence with
+/// "saved" names a "preference" or "preferences"): beside a light's,
+/// volume's or rule's call of the same round, "Done, your light preference
+/// is saved." confirms that call, so `second_provider` does not judge it a
+/// said-back keep there; on a lone yes, "Your preference for green tea is
+/// saved." still is one (Thirteen's P3 on #5607 and on #5701).
+pub fn said_saved_preference(reply: &str) -> bool {
+    let reply = reply.to_lowercase().replace('\u{2019}', "'");
+    reply
+        .split(['.', '!', '?'])
+        .map(|sentence| {
+            sentence
+                .split(|c: char| !c.is_alphanumeric())
+                .filter(|word| !word.is_empty())
+                .collect::<Vec<&str>>()
+        })
+        .find(|words| words.contains(&"saved"))
+        .is_some_and(|words| {
+            words
+                .iter()
+                .any(|word| matches!(*word, "preference" | "preferences"))
+        })
 }
 
 /// [`claims_a_keep`] with the kind of claim: `None` while undecided,
@@ -16049,6 +16330,329 @@ mod tests {
         }
     }
 
+    /// Thirteen's P2 on #5701: a said-back keep after a found `recall` is
+    /// said only when it names a found thing; and Thirteen's P3: a
+    /// preference said saved is told apart for a settings call's round.
+    #[test]
+    fn a_said_back_keep_must_name_what_recall_found() {
+        let pip = recall_found_words(&json!({"found": [{"text": "Their goldfish is called Pip"}]}));
+        let bike =
+            recall_found_words(&json!({"found": [{"asked_to_remember": "Their bike is red"}]}));
+        let goldfish = Some("My goldfish is called Pip.");
+        let blue = Some("My bike is blue now.");
+        let red = Some("My bike is red.");
+        assert!(said_kept_found("Yes, Pip is kept.", &pip, goldfish, true));
+        assert!(said_kept_found(
+            "Your goldfish's name, Pip, is kept.",
+            &pip,
+            goldfish,
+            true
+        ));
+        assert!(said_kept_found("Great, Pip is kept.", &pip, goldfish, true));
+        assert!(said_kept_found("Yes, Pip is kept", &pip, goldfish, true));
+        assert!(!said_kept_found(
+            "Yes, your bike is kept.",
+            &pip,
+            goldfish,
+            true
+        ));
+        assert!(!said_kept_found("Yes, that's kept.", &bike, blue, true));
+        assert!(!said_kept_found(
+            "Yes, your bike is blue now, kept.",
+            &bike,
+            blue,
+            true
+        ));
+        // Thirteen's restate on #5701: the found red bike holds no blue.
+        assert!(!said_kept_found(
+            "Yes, your bike is kept.",
+            &bike,
+            blue,
+            true
+        ));
+        assert!(!said_kept_found(
+            "Yes, your red bike is kept.",
+            &bike,
+            blue,
+            true
+        ));
+        assert!(said_kept_found(
+            "Yes, your red bike is kept.",
+            &bike,
+            red,
+            true
+        ));
+        // Thirteen's P2 at f3cccc815d: a negated line answered is never
+        // the found old value.
+        // "not" and "no" are small words, so only the negation rule holds
+        // these apart from the found red bike.
+        for asked in [
+            "My bike is not red.",
+            "No, my bike is red no more.",
+            "Not red, my bike.",
+        ] {
+            assert!(
+                !said_kept_found("Yes, your bike is kept.", &bike, Some(asked), true),
+                "{asked}"
+            );
+        }
+        // Guards only: "isn't" and "never" are content words, which no
+        // found red bike holds even without the negation rule.
+        for asked in ["My bike isn't red.", "My bike is never red."] {
+            assert!(
+                !said_kept_found("Yes, your bike is kept.", &bike, Some(asked), true),
+                "{asked}"
+            );
+        }
+        // Thirteen's P2 at aed324db5d: the negation is equal on both
+        // sides. A negated found thing never matches a plain line; a
+        // negated line may match it.
+        for found in [
+            "Their bike is not red",
+            "Their bike isn't red",
+            "Their bike is never red",
+            "No, their bike is not red",
+        ] {
+            let negated = recall_found_words(&json!({"found": [{"asked_to_remember": found}]}));
+            assert!(
+                !said_kept_found("Yes, your bike is kept.", &negated, red, true),
+                "{found}"
+            );
+            // Second's P2 at c60b1a7b21: the keep's sentence negates too,
+            // or it stays a claim.
+            assert!(
+                said_kept_found(
+                    "Yes, your bike is not red, kept.",
+                    &negated,
+                    Some("My bike is not red."),
+                    true
+                ),
+                "{found}"
+            );
+            for said in ["Yes, your bike is kept.", "Yes, your bike is red, kept."] {
+                assert!(
+                    !said_kept_found(said, &negated, Some("My bike is not red."), true),
+                    "{found}: {said}"
+                );
+            }
+        }
+        let coffee =
+            recall_found_words(&json!({"found": [{"text": "They don\u{2019}t like coffee"}]}));
+        assert!(!said_kept_found(
+            "Yes, coffee is kept.",
+            &coffee,
+            Some("I like coffee now."),
+            true
+        ));
+        // Nothing found, or nothing known that the yes answers: none.
+        assert!(!said_kept_found("Yes, Pip is kept.", &[], goldfish, true));
+        assert!(!said_kept_found("Yes, Pip is kept.", &pip, None, true));
+        // Thirteen's new P2 on #5701: a sentence still streaming is not
+        // judged until it ends.
+        assert!(!said_kept_found("Yes, Pip is kept", &pip, goldfish, false));
+        assert!(said_kept_found("Yes, Pip is kept.", &pip, goldfish, false));
+        assert!(!said_kept_found(
+            "Yes, Pip is kept, and your bike is kept too.",
+            &pip,
+            goldfish,
+            false
+        ));
+        assert!(recall_found_words(&json!({"found": []})).is_empty());
+        // Second's P2s at c60b1a7b21 on #5701. A number counts however
+        // short, so a changed one, or one with its digits swapped, is no
+        // found thing.
+        let twelve =
+            recall_found_words(&json!({"found": [{"asked_to_remember": "Their daughter is 12"}]}));
+        let thirteen = Some("My daughter is 13.");
+        assert!(!said_kept_found(
+            "Yes, your daughter is 13, kept.",
+            &twelve,
+            thirteen,
+            true
+        ));
+        let locker =
+            recall_found_words(&json!({"found": [{"asked_to_remember": "Their locker is 15"}]}));
+        let fifteen = Some("My locker is 15.");
+        assert!(said_kept_found(
+            "Yes, locker 15 is kept.",
+            &locker,
+            fifteen,
+            true
+        ));
+        assert!(!said_kept_found(
+            "Yes, locker 51 is kept.",
+            &locker,
+            fifteen,
+            true
+        ));
+        assert!(!said_kept_found(
+            "Yes, locker 15 is kept.",
+            &locker,
+            Some("My locker is 51."),
+            true
+        ));
+        // The reply's own polarity: a negated keep never confirms a plain
+        // line.
+        assert!(!said_kept_found("Pip isn't kept.", &pip, goldfish, true));
+        assert!(!said_kept_found(
+            "Yes, your goldfish is not called Pip, kept.",
+            &pip,
+            goldfish,
+            true
+        ));
+        // Every finished keep must name a found thing; how much may be said
+        // ends after the last one that does.
+        assert!(!said_kept_found(
+            "Yes, Pip is kept. Your bike is kept too.",
+            &pip,
+            goldfish,
+            true
+        ));
+        let two = "Yes, Pip is kept. Your bike is kept too.";
+        assert_eq!(
+            said_kept_found_to(two, &pip, goldfish, false),
+            Some("Yes, Pip is kept. ".len())
+        );
+        assert_eq!(
+            said_kept_found_to("Yes, Pip is kept. Your bi", &pip, goldfish, false),
+            Some("Yes, Pip is kept. ".len())
+        );
+        assert_eq!(
+            said_kept_found_to(
+                "Yes, your bike is kept. Pip is kept.",
+                &pip,
+                goldfish,
+                false
+            ),
+            None
+        );
+        assert!(said_kept_found(
+            "Yes, Pip is kept. Anything else?",
+            &pip,
+            goldfish,
+            true
+        ));
+        assert!(said_saved_preference(
+            "Done, your light preference is saved."
+        ));
+        assert!(said_saved_preference("Your preferences are saved!"));
+        assert!(!said_saved_preference("Done, your light is warmer."));
+        assert!(!said_saved_preference(
+            "Pip is saved. Your preference is tea."
+        ));
+    }
+
+    /// Heron's P2 1 at 8baef46c8f on #5701: what was only heard or said
+    /// (a `recall`'s exchange, `heard`/`you_said`) never backs a said-back
+    /// keep. An old exchange heard "My goldfish is called Pip." and nothing
+    /// was kept: "Yes, Pip is kept." stays a claim. A kept thing, a fact's
+    /// text and an active observation still back it.
+    #[test]
+    fn heard_or_said_alone_never_backs_a_said_back_keep() {
+        let goldfish = Some("My goldfish is called Pip.");
+        let exchange = recall_found_words(&json!({"found": [{
+            "heard": "My goldfish is called Pip.",
+            "you_said": "Lovely. Want me to keep that your goldfish is called Pip?"
+        }]}));
+        assert!(exchange.is_empty(), "{exchange:?}");
+        assert!(!said_kept_found(
+            "Yes, Pip is kept.",
+            &exchange,
+            goldfish,
+            true
+        ));
+        for field in ["asked_to_remember", "text", "recorded_observation"] {
+            let found =
+                recall_found_words(&json!({"found": [{field: "Their goldfish is called Pip"}]}));
+            assert!(
+                said_kept_found("Yes, Pip is kept.", &found, goldfish, true),
+                "{field}"
+            );
+        }
+    }
+
+    /// Heron's P2 2 at 8baef46c8f on #5701: a found "cannot" (and
+    /// "nothing", "nobody", "none", "without") negates, so "Their daughter
+    /// cannot eat peanuts" never backs "Yes, your daughter can eat peanuts,
+    /// kept." answering "My daughter can eat peanuts now.".
+    #[test]
+    fn a_found_cannot_never_backs_a_plain_keep() {
+        let can = Some("My daughter can eat peanuts now.");
+        let cannot = recall_found_words(
+            &json!({"found": [{"asked_to_remember": "Their daughter cannot eat peanuts"}]}),
+        );
+        assert!(!said_kept_found(
+            "Yes, your daughter can eat peanuts, kept.",
+            &cannot,
+            can,
+            true
+        ));
+        for found in [
+            "Their daughter eats nothing with peanuts",
+            "Nobody in their house eats peanuts",
+            "Their daughter eats none of the peanuts",
+            "Their daughter eats cake without peanuts",
+        ] {
+            let negated = recall_found_words(&json!({"found": [{"asked_to_remember": found}]}));
+            assert!(
+                !said_kept_found(
+                    "Yes, your daughter eats peanuts, kept.",
+                    &negated,
+                    Some("My daughter eats peanuts."),
+                    true
+                ),
+                "{found}"
+            );
+        }
+        // Said negated the same way on all three sides, it is backed.
+        assert!(said_kept_found(
+            "Yes, your daughter cannot eat peanuts, kept.",
+            &cannot,
+            Some("My daughter cannot eat peanuts."),
+            true
+        ));
+        // A plain found thing still backs a plain keep.
+        let plain = recall_found_words(
+            &json!({"found": [{"asked_to_remember": "Their daughter can eat peanuts"}]}),
+        );
+        assert!(said_kept_found(
+            "Yes, your daughter can eat peanuts, kept.",
+            &plain,
+            can,
+            true
+        ));
+    }
+
+    /// Heron's P3 at 8baef46c8f on #5701: a decimal is one number, so
+    /// "1.5" and "5.1" are not the same {1, 5}.
+    #[test]
+    fn a_decimal_is_one_number_in_a_said_back_keep() {
+        let dose =
+            recall_found_words(&json!({"found": [{"asked_to_remember": "Their dose is 1.5 mg"}]}));
+        assert!(!said_kept_found(
+            "Yes, your dose is 5.1 mg, kept.",
+            &dose,
+            Some("My dose is 5.1 mg."),
+            true
+        ));
+        assert!(said_kept_found(
+            "Yes, your dose is 1.5 mg, kept.",
+            &dose,
+            Some("My dose is 1.5 mg."),
+            true
+        ));
+        // Still streaming at "1.", the sentence has not ended.
+        assert_eq!(
+            said_kept_found_to(
+                "Yes, your dose is 1.",
+                &dose,
+                Some("My dose is 1.5 mg."),
+                false
+            ),
+            None
+        );
+    }
+
     /// lamp-06c1, build 10538, 6 Nov, S14 req 363: "Yes. Please keep that."
     /// answered "Your goldfish's name, Pip, is kept." with no `remember`
     /// call. On a line that is only a yes, a first sentence that ends by
@@ -16071,6 +16675,9 @@ mod tests {
             "Okay, Pip is kept in my memory now.",
             "Pip is remembered now.",
             "Your goldfish's name is remembered.",
+            // Thirteen's P3 on #5607: a preference is a kept thing.
+            "Your preference for green tea is saved.",
+            "Your preferences are saved.",
         ] {
             assert_eq!(
                 keep_claim_said(reply, false, true),
