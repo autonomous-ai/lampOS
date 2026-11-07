@@ -137,3 +137,43 @@ fn the_noise_suppression_flag_is_required() {
         assert!(!output.exists(), "{flags:?}");
     }
 }
+
+#[test]
+fn noise_suppression_lowers_a_steady_tone() {
+    let directory = TestDirectory::new();
+    let input = directory.0.join("tone.wav");
+    tone(&input, 16_000, 1, 32_000, -30.0);
+    let mut levels = Vec::new();
+    for ns in ["off", "on"] {
+        let output = directory.0.join(format!("ns-{ns}.wav"));
+        let result = run(&[&input, &output], &["--ns", ns]);
+        assert!(result.status.success(), "--ns {ns}: {result:?}");
+        let samples: Vec<i16> = hound::WavReader::open(&output)
+            .unwrap()
+            .samples::<i16>()
+            .map(Result::unwrap)
+            .collect();
+        // The steady part, past the canceller's start and the tail.
+        levels.push(rms_dbfs(&samples[8_000..30_000]));
+    }
+    let (off, on) = (levels[0], levels[1]);
+    assert!(
+        off - on >= 6.0,
+        "ns off {off:.1} dBFS, ns on {on:.1} dBFS: under 6 dB lower (12.0 dB measured when written)"
+    );
+}
+
+#[test]
+fn an_empty_wav_is_refused_as_no_samples_and_nothing_is_written() {
+    let directory = TestDirectory::new();
+    let input = directory.0.join("empty.wav");
+    let output = directory.0.join("out.wav");
+    tone(&input, 16_000, 1, 0, -30.0);
+    for ns in ["off", "on"] {
+        let result = run(&[&input, &output], &["--ns", ns]);
+        assert!(!result.status.success(), "--ns {ns}: {result:?}");
+        let said = String::from_utf8_lossy(&result.stderr);
+        assert!(said.contains("no samples"), "--ns {ns}: {said}");
+        assert!(!output.exists(), "--ns {ns}");
+    }
+}
