@@ -1981,9 +1981,15 @@ cut to `--reach`'s yaw (or `--gaze-reach`'s, if larger) and to `--reach`'s up
 and down, and said `clamped` when cut. The body eases the head there as the
 gaze's own look, in the gaze's place, and keeps it there while held: nothing
 of the head rests, relaxes or sleeps meanwhile, and every pose's bounds still
-hold. It is `there` once the head and base are within 6 counts (`THERE_WITHIN`)
-of goals that have not moved for 10 steps (`THERE_STEPS`, 0.2 s). A look not
-there in 5 s (`LONGEST_LOOK`, something holds the head), another look, a
+hold. It is judged against where the pose wants each joint (`Glimpse::wanted`),
+not the eased goal or one a rest wrote where a joint stopped: `there` once the
+head and base are within 6 counts (`THERE_WITHIN`) and have not moved for 10
+steps (`THERE_STEPS`, 0.2 s); `there` too, from where they stopped and
+`clamped` past half a degree, once stopped within `REST_SLACK` (24 counts) and
+still for 50 steps (`REST_STOPPED_STEPS`, 1 s), as a resting head stops short
+against its weight (lamp-75c9 on 7 Nov: 17 counts at load 80, cut short after
+5 s before this). A look not there in 5 s (`LONGEST_LOOK`; said with how many
+counts short when past the slack), another look, a
 conversation or the lease's end cuts it short. A conversation keeps the aim for
 when the lease is held again; any other end drops it, and the head goes back
 to the pose's own direction. The head is woken to move only when the look
