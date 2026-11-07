@@ -79,13 +79,18 @@ pub const CANNOT_RING_FILE: &str = "cannot-ring";
 /// What the model is told for a set refused while the ledger can't ring.
 pub const CANNOT_RING: &str = "Nothing was set: this lamp can't ring timers or reminders right now. Say you couldn't set it, and never that it is set.";
 
+/// Older than this, [`CANNOT_RING_FILE`] is as absent: the consumer renews
+/// it every tick (200 ms) while it holds, so one left by a consumer that
+/// stopped blocks sets for at most this long.
+pub const CANNOT_RING_FRESH: std::time::Duration = std::time::Duration::from_secs(2);
+
 pub(crate) fn refence_on(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
 /// The refusal for a call that would set a ring (`set_timer`,
-/// `set_reminder`, `repeat_reminder`) while [`CANNOT_RING_FILE`] is kept,
-/// with [`REFENCE_VARIABLE`] on; `var` reads the environment.
+/// `set_reminder`, `repeat_reminder`) while [`CANNOT_RING_FILE`] is kept and
+/// fresh, with [`REFENCE_VARIABLE`] on; `var` reads the environment.
 pub(crate) fn cannot_ring(
     name: &str,
     var: impl Fn(&str) -> Option<std::ffi::OsString>,
@@ -93,8 +98,17 @@ pub(crate) fn cannot_ring(
     let sets = matches!(name, "set_timer" | "set_reminder" | "repeat_reminder");
     let on = refence_on(var(REFENCE_VARIABLE).as_deref().and_then(|v| v.to_str()));
     let dir = var(LEDGER_VARIABLE).map(PathBuf::from)?;
-    (sets && on && dir.join(CANNOT_RING_FILE).exists())
-        .then(|| serde_json::json!({ "error": CANNOT_RING }))
+    let fresh = || {
+        std::fs::metadata(dir.join(CANNOT_RING_FILE))
+            .and_then(|meta| meta.modified())
+            .is_ok_and(|at| at.elapsed().is_ok_and(|age| age < CANNOT_RING_FRESH))
+    };
+    (sets && on && fresh()).then(|| serde_json::json!({ "error": CANNOT_RING }))
+}
+
+/// Whether a call was told [`cannot_ring`]'s refusal: nothing was set.
+pub(crate) fn is_cannot_ring(told: &serde_json::Value) -> bool {
+    told["error"] == CANNOT_RING
 }
 pub const LEASE_US: u64 = 750_000;
 /// Due this long ago or more, a reminder is said only when someone is at the

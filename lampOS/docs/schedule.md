@@ -1660,19 +1660,27 @@ rings. With it:
 - **Fallback: no timer set to never ring.** Each tick the consumer judges
   whether an item at the bus's store revision would be refused for the
   ledger's own fence (`DeliveryLedger::refuses`: not re-fenced, an entry
-  that doesn't fit, or `store_changed`). While it would, it keeps
-  `cannot-ring` in the delivery directory and journals the change once each
-  way. `set_timer`, `set_reminder` and `repeat_reminder` are then refused
-  before they reach the schedule (`tools::ask_schedule_for`), told
-  `reminders::CANNOT_RING` ("Nothing was set … Say you couldn't set it"), so
-  `second_provider::timer_line` gives no "Timer set." line. Both voice routes'
-  workers get the switch and the directory (`process`,
+  that doesn't fit, or `store_changed`). While it would, it rewrites
+  `cannot-ring` in the delivery directory each tick and journals the change
+  once each way; the consumer removes it at start, and a file older than
+  `reminders::CANNOT_RING_FRESH` (2 s) counts as absent, so one left by a
+  consumer that stopped blocks nothing for longer. `set_timer`,
+  `set_reminder` and `repeat_reminder` are then refused before they reach
+  the schedule (`tools::ask_schedule_for`), told `reminders::CANNOT_RING`
+  ("Nothing was set … Say you couldn't set it"), so
+  `second_provider::timer_line` gives no "Timer set." line. On the second
+  route such a refused call is no call of its kind for the claim check
+  (`LAMP_ACTION_CLAIM_CHECKED`), so a "Timer set." in the model's own words
+  after it is held and asked again, then said as the not-done line. Both
+  voice routes' workers get the switch and the directory (`process`,
   `ledger_refence_worker_environment`).
 
 Tests: `a_voice_started_on_a_ledger_ahead_of_the_store_says_a_due_timer`,
 `with_the_refence_switch_off_a_ledger_ahead_of_the_store_still_refuses` and
 `a_ledger_that_cannot_ring_refuses_a_new_timer_and_says_it_is_not_set`
 (`reminders/consumer/tests.rs`);
+`a_timer_claimed_after_a_set_the_ledger_refused_is_never_said`
+(`second_provider/tests/action_claim.rs`);
 `a_reopened_ledger_ahead_of_its_store_refences_but_never_readmits_an_acknowledged_item`
 (`crates/schedule/tests/it/delivery_ledger.rs`). Not run on a lamp.
 
