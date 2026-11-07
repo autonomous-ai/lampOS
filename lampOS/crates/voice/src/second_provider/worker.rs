@@ -3593,6 +3593,12 @@ pub fn serve(
             crate::agent_tasks::named_ask(&place, words)
         }));
     }
+    // With the setup walk: a line that spells the person's name while "who
+    // you are" is open is told the read-back to say, the name as a word
+    // (#5580 row 2). The walk's file is read only for such a line.
+    if crate::onboarding::file_from_environment().is_some() {
+        engine = engine.noting_a_spelled_name(Arc::new(crate::onboarding::spelled_name_note_now));
+    }
     // A hand-over waiting for its yes, with the tasks part (#1712). A made
     // skill waits for nothing: it goes on as soon as it is kept (the owner,
     // 10 Nov), so it is never noted.
