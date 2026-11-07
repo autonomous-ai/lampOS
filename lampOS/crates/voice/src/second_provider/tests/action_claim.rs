@@ -75,7 +75,12 @@ fn turn_with(
     let ran: Calls = Arc::default();
     let seen = ran.clone();
     let tools: ToolRunner = Arc::new(move |_, heard, name, args| {
-        let answer = told(&name);
+        // A set refused by a ledger that can't ring it (#5560).
+        let answer = if args["cannot_ring"] == true {
+            json!({"error": crate::reminders::CANNOT_RING})
+        } else {
+            told(&name)
+        };
         seen.lock().unwrap().push((name, args, heard));
         Box::pin(async move { answer })
     });
@@ -174,6 +179,56 @@ fn a_timer_claimed_with_no_call_is_held_and_asked_again() {
     assert_eq!(went.said, said(&["Timer set.", " It rings at 9:39 am."]));
     assert_eq!((went.asked, went.ran.len()), (1, 0));
     assert!(!told_claim(&went));
+}
+
+/// #5560: a `set_timer` refused because the delivery ledger can't ring it
+/// set nothing, so it is no call of its kind. "Timer set." after it is held
+/// as a claim with no call, then said as the line that it wasn't done; never
+/// as it came. A set that ran still lets its line stand.
+#[test]
+fn a_timer_claimed_after_a_set_the_ledger_refused_is_never_said() {
+    let heard = "Lamp, set a timer to one minute.";
+    let refused = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c0",
+                "set_timer",
+                json!({"cannot_ring": true}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    for product in [false, true] {
+        let went = turn_as(
+            true,
+            product,
+            heard,
+            refused(),
+            vec![saying("Timer set."), saying("Timer set.")],
+        );
+        assert!(
+            went.said.iter().all(|said| !said.contains("Timer set")),
+            "{product}: {went:?}"
+        );
+        assert_eq!(
+            went.said,
+            said(&[crate::action_claim::NOT_DONE_LINE]),
+            "{product}"
+        );
+        assert_eq!(went.ran, ["set_timer"], "{product}");
+    }
+    // The same words after a set that ran stand, untouched by the check.
+    let ran = |on| {
+        turn_as(
+            on,
+            false,
+            heard,
+            calling("set_timer"),
+            vec![saying("Timer set.")],
+        )
+    };
+    assert_eq!(ran(true), ran(false));
+    assert_eq!(ran(true).said, said(&["Timer set."]));
 }
 
 /// lamp-52e6, the earlier run: "Louder." and "Brighter." with no call. The

@@ -2004,6 +2004,22 @@ fn a_ledger_that_cannot_ring_refuses_a_new_timer_and_says_it_is_not_set() {
     assert!(crate::reminders::cannot_ring("set_timer", env("ON")).is_none());
     assert!(crate::reminders::cannot_ring("set_timer", |_| None).is_none());
 
+    // A file left by a consumer that stopped renewing it expires: older
+    // than `CANNOT_RING_FRESH`, sets go on. The next tick renews it.
+    std::fs::File::options()
+        .write(true)
+        .open(&file)
+        .unwrap()
+        .set_modified(
+            std::time::SystemTime::now()
+                - crate::reminders::CANNOT_RING_FRESH
+                - std::time::Duration::from_secs(1),
+        )
+        .unwrap();
+    assert!(crate::reminders::cannot_ring("set_timer", env("on")).is_none());
+    consumer.tick(&socket.path(), Some(&report), now).unwrap();
+    assert!(crate::reminders::cannot_ring("set_timer", env("on")).is_some());
+
     // A voice started with the switch on re-fences, so the file goes.
     let (engine, socket) = served(1);
     let mut consumer = ahead_of(&engine.lock().unwrap(), Some("on"));
