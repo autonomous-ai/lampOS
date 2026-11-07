@@ -7708,7 +7708,12 @@ impl Engine {
                 // Quiet focus for Rest your eyes): while it is still to
                 // come, the chance is kept, as the quiet hours keep one,
                 // said once; when it runs, this cooldown begins with it.
-                if let Some(by) = stood_in {
+                // Only once this skill's `[[while]]` holds (#5704's P3): a
+                // chance its own conditions hold back would not have spoken
+                // anyway, so it goes on as without the key.
+                if let Some(by) = stood_in
+                    && Self::conditions_hold(&self.latest, &self.holding, skill, now_us)
+                {
                     if trigger.when != When::Appears {
                         watch.spent = false;
                         watch.disarmed = false;
