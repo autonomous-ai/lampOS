@@ -271,15 +271,20 @@ switch on:
   before, or one already running more than 20 ms since its own top, as a page
   fault in running code holds it (`HELD_UP_PASS_US`; passes take 2-5 ms, and
   the reading is up to 20 ms old when a stall starts). It rides for at most
-  1.5 s from where the stall began: the answer is cut, nothing is played,
-  capture and the camera are given no authority, and a fresh, steady open
-  reading reopens it and the conversation goes on. Its trace's `privacy_gap`
-  `began` row then carries `"stall":true`.
+  1.5 s from where the stall began (`STALL_RIDE_US`): the answer is cut,
+  nothing is played, capture and the camera are given no authority, and a
+  fresh, steady open reading reopens it and the conversation goes on. The
+  reopen waits for the gate's 60 ms steady time (`REOPEN_STABLE_US`), and
+  that wait counts inside the 1.5 s, so a stall under about 1.44 s is
+  ridden; a longer one ends the voice as before, failing closed. Its
+  trace's `privacy_gap` `began` row then carries `"stall":true`.
 
-Past 1.5 s everything ends exactly as without the switch: the privacy worker
-on `privacy controller lease expired` (exit 1), the second worker on its
-heartbeat, the coordinator on the freshness lost, the cleanup as failed, and
-the voice exits for the restart guard to count. Not yet run on a lamp.
+Past that bound (a stall over about 1.44 s, whose open reading is not
+steady within 1.5 s of its start) everything ends exactly as without the
+switch: the privacy worker on `privacy controller lease expired` (exit 1),
+the second worker on its heartbeat, the coordinator on the freshness lost,
+the cleanup as failed, and the voice exits for the restart guard to count.
+Not yet run on a lamp.
 
 The coordinator keeps renewing every worker's authority through its startup
 prologue too, from its last start-up pulse to its loop's first publish, at

@@ -30,7 +30,9 @@
 //! noticed in a pass held up by the voice's own stall (more than
 //! [`HELD_UP_PASS_US`] since the pass before, or since its own top) is
 //! ridden the same way, with or without `LAMP_PRIVACY_GAP_RIDE`, for at most
-//! [`STALL_RIDE_US`] counted from where the stall began. On lamp-06c1 on 6 Nov a 120 ms stall of
+//! [`STALL_RIDE_US`] counted from where the stall began; the reopen's 60 ms
+//! steady time (`REOPEN_STABLE_US`) counts inside it, so a stall under about
+//! 1.44 s is ridden and a longer one still ends. On lamp-06c1 on 6 Nov a 120 ms stall of
 //! the whole voice during an SD log flush lapsed every lease, and the voice
 //! ended and came back muted by the restart guard. Off, nothing changes.
 
@@ -294,9 +296,10 @@ mod tests {
     }
 
     /// #5611: off, a held-up pass rides nothing, as before. On, a lapse seen
-    /// in a pass more than 50 ms after the last is ridden from that last
-    /// pass for at most 1.5 s, and only once the microphone was permitted;
-    /// one seen in an ordinary pass is not, and one past the bound ends.
+    /// in a pass more than [`HELD_UP_PASS_US`] (20 ms) after the last is
+    /// ridden from that last pass for at most 1.5 s, and only once the
+    /// microphone was permitted; one seen in an ordinary pass is not, and
+    /// one past the bound ends.
     #[test]
     fn a_lapse_after_a_held_up_pass_is_ridden_from_before_the_stall_for_1_5_s() {
         let mut off = GapRide::new(false);
