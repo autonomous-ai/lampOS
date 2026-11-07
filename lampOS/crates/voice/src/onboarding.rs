@@ -4331,34 +4331,61 @@ fn name_told(text: &str) -> Option<String> {
     (!name.is_empty()).then(|| name.join(" "))
 }
 
-/// Words that make a question holding the name ask whether the name is
-/// right (#5669): "did I get that right?", "is that correct?", "is that
-/// the name you want…?". Lowercase words; "the name" and "your name" are
-/// matched as two words.
-const READ_BACK_CUES: [&str; 2] = ["right", "correct"];
-
 /// Whether the lamp's words `lamp` read back the person's `name` (#5669):
-/// a question holding the name, as said or spelled (`known_faces::said_back`,
-/// never the face question), that asks whether it is right: a word of
-/// [`READ_BACK_CUES`], "the name" or "your name", or "is it" before the
-/// name ("Is it Walter?"). Any wording the model uses counts (Jarvis's P2
-/// on #5677); a question about the name that asks something else ("Walter,
+/// they hold the name, as said or spelled (`known_faces::said_back`, never
+/// the face question), and one of their questions asks whether it is right
+/// ([`asks_if_right`]). Any wording the model uses counts (Jarvis's P2 on
+/// #5677); a question about the name that asks something else ("Walter,
 /// lovely! Is that short for anything?") does not.
 fn is_read_back(name: &str, lamp: &str) -> bool {
-    if !lamp.contains('?') || !crate::known_faces::said_back(name, lamp) {
+    if !crate::known_faces::said_back(name, lamp) {
         return false;
     }
-    let words = words_of(lamp);
     let name_words = words_of(name);
-    words
+    questions(lamp).any(|question| asks_if_right(&words_of(question), &name_words))
+}
+
+/// The sentences of `text` that end in a question mark, each without it.
+fn questions(text: &str) -> impl Iterator<Item = &str> {
+    let mut from = 0;
+    text.char_indices().filter_map(move |(at, mark)| {
+        if !matches!(mark, '?' | '.' | '!') {
+            return None;
+        }
+        let sentence = &text[from..at];
+        from = at + mark.len_utf8();
+        (mark == '?').then_some(sentence)
+    })
+}
+
+/// Whether one question's own `words` ask if the name is right (Jarvis's
+/// P2 on #5677, at `651c9dba`): "get" or "got" then "right" ("did I get
+/// that right", "did I get Walter right"); "is that right" or "is that
+/// correct"; a last "right" or "correct" ("Walter, right?", "So it's
+/// Walter, correct?") but never "all right"; "the name you" ("Is that the
+/// name you want me to know you by?"); or "is it" and the name. "All
+/// right, Walter! Is that short for anything?", "are you sitting right in
+/// front of me?", "Is that the name of someone in your family?" and
+/// "what's the correct way to say it?" ask something else.
+fn asks_if_right(words: &[String], name: &[String]) -> bool {
+    let is = |at: usize, word: &str| words.get(at).is_some_and(|w| w == word);
+    let gets_right = words
         .iter()
-        .any(|word| READ_BACK_CUES.contains(&word.as_str()))
-        || words
-            .windows(2)
-            .any(|two| two[1] == "name" && (two[0] == "the" || two[0] == "your"))
-        || words
-            .windows(2 + name_words.len().max(1))
-            .any(|run| run[0] == "is" && run[1] == "it" && run[2..].iter().eq(name_words.iter()))
+        .position(|word| word == "get" || word == "got")
+        .is_some_and(|at| words[at + 1..].iter().any(|word| word == "right"));
+    let is_that = (0..words.len()).any(|at| {
+        is(at, "is") && is(at + 1, "that") && (is(at + 2, "right") || is(at + 2, "correct"))
+    });
+    let last = words.len().checked_sub(1);
+    let ends_on = last
+        .is_some_and(|at| (is(at, "right") || is(at, "correct")) && !(at > 0 && is(at - 1, "all")));
+    let the_name_you =
+        (0..words.len()).any(|at| is(at, "the") && is(at + 1, "name") && is(at + 2, "you"));
+    let is_it_name = !name.is_empty()
+        && words
+            .windows(2 + name.len())
+            .any(|run| run[0] == "is" && run[1] == "it" && run[2..] == *name);
+    gets_right || is_that || ends_on || the_name_you || is_it_name
 }
 
 /// A name's ids, never its words: the whole name and its first word
@@ -7728,6 +7755,9 @@ mod tests {
             "Before I look: Walter. Is that the name you want me to know you by?",
             "Walter. Sorry, did I get it right this time?",
             "W-A-L-T-E-R, did I get that right?",
+            "Walter, right?",
+            "So it's Walter, correct?",
+            "Is it Walter? Is that right?",
         ] {
             assert!(is_read_back("walter", lamp), "{lamp}");
         }
@@ -7738,6 +7768,14 @@ mod tests {
             "Mary, did I get that right?",
             "Walter, is it okay if I take a look at you?",
             "Got it, Walter.",
+            // Jarvis's P2 at 651c9dba: a cue word outside the asking.
+            "All right, Walter! Is that short for anything?",
+            "Right, Walter. Is that short for anything?",
+            "Walter, may I take a look at you? Is that all right?",
+            "Walter, are you sitting right in front of me?",
+            "Walter. Is that the name of someone in your family?",
+            "Walter. Is that your name or a nickname?",
+            "Walter, what's the correct way to say it?",
         ] {
             assert!(!is_read_back("walter", lamp), "{lamp}");
         }
