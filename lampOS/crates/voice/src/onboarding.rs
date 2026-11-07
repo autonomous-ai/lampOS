@@ -4214,8 +4214,9 @@ const YES: [&str; 17] = [
 ];
 /// "wrong" and "incorrect" too: with the read-back's yes phrases, "You got it
 /// wrong." must stay a no (the Reviewer-lead's P2 on #5677). "didn't" is no no
-/// of its own: "I didn't catch that." asks again.
-const NO: [&str; 8] = [
+/// of its own: "I didn't catch that." asks again. "uh-uh", "mm-mm" and
+/// "nuh-uh" too: they were kept as a name (Jarvis's P2 on #5677).
+const NO: [&str; 11] = [
     "no",
     "nope",
     "not",
@@ -4224,6 +4225,9 @@ const NO: [&str; 8] = [
     "none",
     "wrong",
     "incorrect",
+    "uh-uh",
+    "mm-mm",
+    "nuh-uh",
 ];
 
 /// Common ways of saying yes that hold a no word or none of [`YES`]: "No
@@ -4249,6 +4253,31 @@ const YES_PHRASES: [&[&str]; 11] = [
 /// Lines no longer than this are an answer as a whole: "Sure, go ahead."
 const SHORT_ANSWER_WORDS: usize = 4;
 
+/// Yes phrases that are a yes only as the whole answer, after yes words
+/// alone, or followed by "right" or "exactly": "You got it!", "Yep, you
+/// did.", "You got it right." but never "You got it backwards." nor "You
+/// did it backwards." (Jarvis's P2 on #5677).
+const WHOLE_YES_PHRASES: [&[&str]; 2] = [&["you", "got", "it"], &["you", "did"]];
+
+/// Where a [`YES_PHRASES`] phrase starting at `at` in `words` ends, when one
+/// counts there as an answer.
+fn yes_phrase_at(words: &[String], at: usize) -> Option<usize> {
+    YES_PHRASES.iter().find_map(|phrase| {
+        let end = at + phrase.len();
+        let said = end <= words.len()
+            && words[at..end]
+                .iter()
+                .zip(phrase.iter())
+                .all(|(w, p)| w == p);
+        let whole = !WHOLE_YES_PHRASES.contains(phrase)
+            || (words[..at].iter().all(|w| YES.contains(&w.as_str()))
+                && words
+                    .get(end)
+                    .is_none_or(|next| next == "right" || next == "exactly"));
+        (said && whole).then_some(end)
+    })
+}
+
 /// A line's words with its [`YES_PHRASES`] taken out, and whether it had one.
 /// A phrase counts only as an answer: leading the line, or in a short one. In
 /// a statement ("I'll go ahead and sit down", "There is no problem with the
@@ -4258,19 +4287,11 @@ fn without_yes_phrases(words: &[String]) -> (Vec<&str>, bool) {
     let mut found = false;
     let mut at = 0;
     let short = words.len() <= SHORT_ANSWER_WORDS;
-    'words: while at < words.len() {
-        for phrase in YES_PHRASES.iter().filter(|_| short || at == 0) {
-            let end = at + phrase.len();
-            if end <= words.len()
-                && words[at..end]
-                    .iter()
-                    .zip(phrase.iter())
-                    .all(|(w, p)| w == p)
-            {
-                found = true;
-                at = end;
-                continue 'words;
-            }
+    while at < words.len() {
+        if let Some(end) = yes_phrase_at(words, at).filter(|_| short || at == 0) {
+            found = true;
+            at = end;
+            continue;
         }
         rest.push(words[at].as_str());
         at += 1;
@@ -4312,19 +4333,42 @@ fn not_a_name(word: &str) -> bool {
     NOT_A_NAME.contains(&word) || YES.contains(&word) || NO.contains(&word)
 }
 
+/// Where a name starts in `words` (of `text`): after "call me", "name is",
+/// "I am", "I'm" or "it's"; after "that's" only when the next word is
+/// written with a capital and is no [`not_a_name`] word, so "That's Walter."
+/// names him and "That's awful.", "That's a shame." and "That's so wrong."
+/// name nobody, while "That's close, it's Wally." names him by its "it's"
+/// (Jarvis's P2 on #5677).
+fn name_from(text: &str, words: &[String]) -> Option<usize> {
+    let at = |i: usize| words.get(i).map(String::as_str);
+    // The words as written, one for each of `words` ([`words_of`]).
+    let written: Vec<&str> = text
+        .split_whitespace()
+        .map(|word| word.trim_matches(|c: char| !c.is_alphanumeric()))
+        .filter(|word| !word.is_empty())
+        .collect();
+    let capital = |i: usize| {
+        written
+            .get(i)
+            .and_then(|word| word.chars().next())
+            .is_some_and(char::is_uppercase)
+    };
+    (0..words.len()).find_map(|i| match (at(i), at(i + 1)) {
+        (Some("call"), Some("me")) | (Some("name"), Some("is")) | (Some("i"), Some("am")) => {
+            Some(i + 2)
+        }
+        (Some("i'm" | "it's"), _) => Some(i + 1),
+        (Some("that's"), Some(next)) if capital(i + 1) && !not_a_name(next) => Some(i + 1),
+        _ => None,
+    })
+}
+
 /// "Call me Marie", "my name is Marie", "I'm Marie", or the name alone,
 /// never a question.
 /// ponytail: English only, as the notes are; a word list, not a parser.
 fn names_someone(text: &str, words: &[String]) -> bool {
     let at = |i: usize| words.get(i).map(String::as_str);
-    let after = (0..words.len()).find_map(|i| match (at(i), at(i + 1)) {
-        (Some("call"), Some("me")) | (Some("name"), Some("is")) | (Some("i"), Some("am")) => {
-            Some(i + 2)
-        }
-        (Some("i'm" | "it's" | "that's"), _) => Some(i + 1),
-        _ => None,
-    });
-    match after {
+    match name_from(text, words) {
         Some(i) => at(i).is_some_and(|word| !not_a_name(word)),
         None => {
             (1..=2).contains(&words.len())
@@ -4344,15 +4388,7 @@ fn name_told(text: &str) -> Option<String> {
     if !names_someone(text, &words) {
         return None;
     }
-    let at = |i: usize| words.get(i).map(String::as_str);
-    let after = (0..words.len()).find_map(|i| match (at(i), at(i + 1)) {
-        (Some("call"), Some("me")) | (Some("name"), Some("is")) | (Some("i"), Some("am")) => {
-            Some(i + 2)
-        }
-        (Some("i'm" | "it's" | "that's"), _) => Some(i + 1),
-        _ => None,
-    });
-    let name: Vec<String> = match after {
+    let name: Vec<String> = match name_from(text, &words) {
         Some(i) => words[i..].iter().take(2).cloned().collect(),
         None => words,
     };
@@ -4373,11 +4409,13 @@ fn is_read_back(name: &str, lamp: &str) -> bool {
     questions(lamp).any(|question| asks_if_right(&words_of(question), &name_words))
 }
 
-/// The sentences of `text` that end in a question mark, each without it.
+/// The sentences of `text` that end in a question mark, each without it. A
+/// ':' or ';' ends one too: "Let me say it right away, Walter: is that short
+/// for anything?" asks only its last part (Jarvis's P3 on #5677).
 fn questions(text: &str) -> impl Iterator<Item = &str> {
     let mut from = 0;
     text.char_indices().filter_map(move |(at, mark)| {
-        if !matches!(mark, '?' | '.' | '!') {
+        if !matches!(mark, '?' | '.' | '!' | ':' | ';') {
             return None;
         }
         let sentence = &text[from..at];
@@ -4407,15 +4445,20 @@ fn asks_if_right(words: &[String], name: &[String]) -> bool {
         ["that", "it", "you", "me", "the", "my", "your", "name"].contains(&word)
             || name.iter().any(|part| part == word)
     };
+    // "right here", "right now", "right away", … is no "right": "Walter, I
+    // got you right here, shall we start?" (Jarvis's P3 on #5677).
     let gets_right = (0..words.len()).any(|at| {
         if !["get", "got", "hear", "heard", "say", "saying", "said"].contains(&words[at].as_str()) {
             return false;
         }
-        let cue = words[at + 1..]
-            .iter()
-            .take(4)
-            .find(|word| !between(word.as_str()));
-        cue.is_some_and(|word| word == "right" || word == "correctly")
+        let cue = (at + 1..words.len().min(at + 5)).find(|&cue| !between(words[cue].as_str()));
+        cue.is_some_and(|cue| {
+            words[cue] == "correctly"
+                || (words[cue] == "right"
+                    && !words.get(cue + 1).is_some_and(|next| {
+                        ["here", "there", "now", "away", "back"].contains(&next.as_str())
+                    }))
+        })
     });
     let is_that = (0..words.len()).any(|at| {
         is(at, "is") && is(at + 1, "that") && (is(at + 2, "right") || is(at + 2, "correct"))
@@ -4706,9 +4749,7 @@ fn reading(language: Option<crate::language::Language>, text: &str) -> in_langua
             word.as_str(),
             "yes" | "yeah" | "yep" | "yup" | "sure" | "no" | "nope" | "nah"
         )
-    }) || YES_PHRASES.iter().any(|phrase| {
-        phrase.len() <= words.len() && phrase.iter().zip(&words).all(|(said, word)| said == word)
-    });
+    }) || yes_phrase_at(&words, 0).is_some();
     in_language::Reading {
         agrees: agrees(&words),
         refuses: refuses(&words),
@@ -6977,15 +7018,27 @@ mod tests {
             assert!(!agrees(&words(no)), "{no}");
             assert!(refuses(&words(no)), "{no}");
         }
-        // Neither a yes nor a no: the read-back stays open.
-        for unclear in ["You didn't.", "That isn't it.", "I didn't catch that."] {
+        // Neither a yes nor a no: the read-back stays open. "you got it" and
+        // "you did" are a yes only as the whole answer (Jarvis's P2 on #5677).
+        for unclear in [
+            "You didn't.",
+            "That isn't it.",
+            "I didn't catch that.",
+            "You got it backwards.",
+            "You got it mixed up.",
+            "You did it backwards.",
+        ] {
             assert!(!agrees(&words(unclear)), "{unclear}");
             assert!(!refuses(&words(unclear)), "{unclear}");
         }
         for yes in [
             "You got it.",
+            "You got it!",
+            "Yes you got it",
+            "You got it right.",
             "That's it.",
             "You did.",
+            "Yep, you did.",
             "That's me.",
             "Yup.",
             "Exactly.",
@@ -7631,23 +7684,40 @@ mod tests {
             "{notes:?}"
         );
 
-        // A corrected name, read back and said yes to, is the one kept.
-        let mut room = read_back_asked("read-back-corrected");
-        room.walk.heard("No, it's Mary.", room.at);
-        room.walk.lamp_words("Mary, did I get that right?");
-        room.walk.lamp_said(room.at);
-        room.wait(2 * S, Some(NEAR_MIDDLE));
-        room.walk.heard("Yes.", room.at);
-        let notes = room.wait(
-            FACE_SAVE_WAIT_US + START_QUIET_US + 2 * S,
-            Some(NEAR_MIDDLE),
-        );
-        assert_eq!(notes, [skill::NAME_ONLY, PREFERENCES_NOTE]);
-        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
-        assert_eq!(
-            room.walk.kept().face_again_names,
-            [lamp_msgs::known::person_id("mary")]
-        );
+        // A corrected name, read back and said yes to, is the one kept
+        // ("Not perfect, it's Wally." and "That's Wally.": Jarvis's table
+        // on #5677).
+        for (at, (answer, name)) in [
+            ("No, it's Mary.", "Mary"),
+            ("Not perfect, it's Wally.", "Wally"),
+            ("That's Wally.", "Wally"),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut room = read_back_asked(&format!("read-back-corrected-{at}"));
+            room.walk.heard(answer, room.at);
+            room.walk
+                .lamp_words(&format!("{name}, did I get that right?"));
+            room.walk.lamp_said(room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk.heard("Yes.", room.at);
+            let notes = room.wait(
+                FACE_SAVE_WAIT_US + START_QUIET_US + 2 * S,
+                Some(NEAR_MIDDLE),
+            );
+            assert_eq!(notes, [skill::NAME_ONLY, PREFERENCES_NOTE], "{answer}");
+            assert_eq!(
+                room.outcome(Step::WhoYouAre),
+                Some(Outcome::Done),
+                "{answer}"
+            );
+            assert_eq!(
+                room.walk.kept().face_again_names,
+                [lamp_msgs::known::person_id(name)],
+                "{answer}"
+            );
+        }
     }
 
     /// #5669, played on a lamp: the read-back never answered is no yes. By
@@ -7727,11 +7797,29 @@ mod tests {
             "You got it.",
             "Got it.",
             "That's wrong.",
+            // Jarvis's P2s on #5677: "that's" leads a name only when a
+            // capital follows, and the no words are no name.
+            "That's awful.",
+            "That's a shame.",
+            "That's funny.",
+            "That's a good question.",
+            "That's so wrong.",
+            "Uh-uh.",
+            "Mm-mm.",
+            "Nuh-uh.",
         ] {
             assert_eq!(name_told(line), None, "{line}");
         }
         assert_eq!(name_told("That's Mary."), Some("mary".into()));
         assert_eq!(name_told("It's Mary."), Some("mary".into()));
+        assert_eq!(name_told("That's Walter."), Some("walter".into()));
+        assert_eq!(name_told("That's Wally."), Some("wally".into()));
+        assert_eq!(name_told("That's close, it's Wally."), Some("wally".into()));
+        assert!(refuses(&words_of("That's so wrong.")));
+        for no in ["Uh-uh.", "Mm-mm.", "Nuh-uh."] {
+            assert!(refuses(&words_of(no)), "{no}");
+            assert!(!agrees(&words_of(no)), "{no}");
+        }
     }
 
     /// #5669 (the first builder's P2 on #5677): the common answers to the
@@ -7750,6 +7838,13 @@ mod tests {
             "You got it.",
             "That's me.",
             "Mm-hmm.",
+            // Jarvis's table on #5677.
+            "That's right.",
+            "That's correct.",
+            "That's perfect.",
+            "You got it!",
+            "Yep, that's me.",
+            "Exactly right.",
         ]
         .into_iter()
         .enumerate()
@@ -7926,6 +8021,10 @@ mod tests {
             // Only the asking sentence is read (the Reviewer-lead's P3 on
             // #5677): its "got that right" is in the sentence before.
             "I got that right, Walter. Is that short for anything?",
+            // Jarvis's P3s on #5677: a ':' ends a sentence, and "right
+            // here", "right away", … is no "right".
+            "Let me say it right away, Walter: is that short for anything?",
+            "Walter, I got you right here, shall we start?",
         ] {
             assert!(!is_read_back("walter", lamp), "{lamp}");
         }
@@ -8009,7 +8108,32 @@ mod tests {
                 "Walter, did I get that right?",
                 "You did it wrong.",
             ),
-        ] {
+        ]
+        .into_iter()
+        .chain(
+            // Jarvis's table on #5677: no yes and no name, so never done
+            // with Walter, nor with a word of the answer kept as a name.
+            [
+                "You didn't.",
+                "That isn't it.",
+                "That's not it.",
+                "That's not me.",
+                "Not exactly.",
+                "You did not.",
+                "Nope.",
+                "Wrong.",
+                "Incorrect.",
+                "Uh-uh.",
+                "Mm-mm.",
+                "Nuh-uh.",
+                "That's awful.",
+                "That's a shame.",
+                "You got it backwards.",
+                "You got it mixed up.",
+            ]
+            .into_iter()
+            .map(|answer| (answer, "Walter, did I get that right?", answer)),
+        ) {
             let mut room = Room::new(name);
             room.walk.face_kept = true;
             assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
