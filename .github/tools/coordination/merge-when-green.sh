@@ -23,6 +23,23 @@ done
 # DRY=1 (#5212): wait and decide as usual but change nothing: no lv-quiet wait, no merge; print what it would do. LV_AT
 # (dry only) stands in for lamp-voice's tip in the behind decision, to replay a past case.
 lvat=origin/lamp-voice; [[ ${DRY:-0} == 1 && -n $LV_AT ]] && lvat=$LV_AT
+# merge_once: the merge, pinned to the head. 6 Nov (the PM, train 662): GitHub answered a green train's merge with a 502
+# and the bot stopped. On GitHub's 5xx the PR is looked at first (a 5xx may come after the merge went through), then the
+# merge is tried again after MWG_RETRY_S (default 30; the tests set 0), at most 3 tries; `server` says the last was a 5xx.
+server=0; tries=0
+merge_once() {
+  local out
+  for tries in 1 2 3; do
+    out=$(gh pr merge $P -R autonomous-ai/lampOS --rebase --match-head-commit $head 2>&1) && return 0
+    [[ -n $out ]] && print -r -- "$out"
+    server=0; grep -qE 'HTTP 5[0-9][0-9]' <<< "$out" || return 1
+    server=1
+    [[ $(gh pr view $P -R autonomous-ai/lampOS --json state --jq .state 2>/dev/null) == MERGED ]] && { server=0; return 0; }
+    echo "$(date +%T) #$P merge answered with GitHub's 5xx (try $tries of 3)"
+    (( tries < 3 )) && sleep ${MWG_RETRY_S:-30}
+  done
+  return 1
+}
 # behind_ok: behind-unrelated.sh's decision on this PR's head, printed; true only with --behind-unrelated and "merge as is".
 behind_ok() { local d; (( unrelated )) || return 1; d=$($TOOLS_DIR/behind-unrelated.sh ${${nocrates:#0}:+--no-crates} refs/remotes/pr/$P $lvat); local rc=$?; echo "$(date +%T) #$P behind lamp-voice: $d"; return $rc; }
 # A PR whose every file the lampOS workflows skip (the docs' Markdown no workflow takes back in, and lampOS/builders/**)
@@ -117,7 +134,10 @@ for i in {1..90}; do
     fi
     if (( ${#pre} )) && ! $TOOLS_DIR/still-eligible.sh "${pre[@]}"; then echo "$(date +%T) #$P precheck failed: not merged"; exit 6; fi
     if [[ ${DRY:-0} == 1 ]]; then echo "$(date +%T) dry: #$P would merge by rebase at ${head:0:9}$( (( asis )) && echo ', as it is, behind lamp-voice')"; exit 0; fi
-    gh pr merge $P -R autonomous-ai/lampOS --rebase --match-head-commit $head && echo "$(date +%T) #$P merged at ${head:0:9}$( (( asis )) && echo ', as it is, behind lamp-voice')" && exit 0
+    merge_once && echo "$(date +%T) #$P merged at ${head:0:9}$( (( asis )) && echo ', as it is, behind lamp-voice')" && exit 0
+    # 6 Nov (the PM, train 662): a merge GitHub answered with 5xx three times is GitHub's, not the train's: the same PRs go
+    # again (exit 3, rebuild), never the failed-run path that stops the bot.
+    (( server )) && { echo "$(date +%T) #$P merge answered with GitHub's 5xx $tries times; rebuilding"; exit 3; }
     # A refused merge as is goes back to the old path (exit 3, rebuild), never the failed-run path.
     (( asis )) && { echo "$(date +%T) #$P merge as is refused; rebuilding as behind lamp-voice"; exit 3; }
     # 4 Nov (#5212 part 3): with two lanes, the other lane can move lamp-voice between the check above and the merge.
