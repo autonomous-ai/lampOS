@@ -1243,6 +1243,11 @@ fn worker_command(
             role,
             var(crate::privacy_gap::STALL_SWITCH).as_deref(),
         ))
+        .envs(ledger_refence_worker_environment(
+            role,
+            var(crate::reminders::REFENCE_VARIABLE).as_deref(),
+            var(crate::reminders::LEDGER_VARIABLE).as_deref(),
+        ))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -1481,6 +1486,26 @@ fn private_room_worker_environment(
 // every other switch, it never reached the worker, so on lamp-52e6 the step
 // waited out the whole hold after a drop (Fifth's row 6 on 10441, #5139).
 // Only as the walk itself reads it: the exact `on` and an absolute path.
+// The ledger's re-fence (#5560): both routes run `set_timer`, which is not set
+// while the consumer keeps its cannot-ring file (`reminders::cannot_ring`).
+// The exact `on`, and the delivery directory, each as given; the worker
+// refuses a set only with both.
+fn ledger_refence_worker_environment(
+    role: &str,
+    switch: Option<&std::ffi::OsStr>,
+    directory: Option<&std::ffi::OsStr>,
+) -> Vec<(&'static str, std::ffi::OsString)> {
+    if !matches!(role, "provider" | "second") {
+        return Vec::new();
+    }
+    let switch = switch
+        .filter(|switch| *switch == "on")
+        .map(|_| (crate::reminders::REFENCE_VARIABLE, "on".into()));
+    let directory =
+        directory.map(|directory| (crate::reminders::LEDGER_VARIABLE, directory.to_owned()));
+    switch.into_iter().chain(directory).collect()
+}
+
 fn onboarding_worker_environment(
     role: &str,
     switch: Option<&std::ffi::OsStr>,
@@ -2017,6 +2042,34 @@ fn rest_through_sounds_worker_environment(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The ledger's re-fence (#5560) reaches both routes, the switch only as
+    /// the exact `on`, with the delivery directory; no other worker gets
+    /// either.
+    #[test]
+    fn the_ledger_refence_reaches_both_routes_with_its_directory_only_when_on() {
+        use std::ffi::OsStr;
+        let dir = Some(OsStr::new("/var/lib/lamp-voice/delivery"));
+        let given = (
+            "LAMP_SCHEDULE_DELIVERY_DIR",
+            "/var/lib/lamp-voice/delivery".into(),
+        );
+        for role in ["provider", "second"] {
+            assert_eq!(
+                ledger_refence_worker_environment(role, Some(OsStr::new("on")), dir),
+                vec![("LAMP_LEDGER_REFENCE", "on".into()), given.clone()]
+            );
+            for off in [None, Some("ON"), Some("1"), Some("")] {
+                assert_eq!(
+                    ledger_refence_worker_environment(role, off.map(OsStr::new), dir),
+                    vec![given.clone()]
+                );
+            }
+        }
+        assert!(
+            ledger_refence_worker_environment("capture", Some(OsStr::new("on")), dir).is_empty()
+        );
+    }
 
     /// lamp-52e6, 27 Oct 17:16:43 (#3697): Controls stopped under a running
     /// voice; the wait's new privacy worker ended at once, its sockets gone
@@ -2841,6 +2894,7 @@ mod tests {
                     lamp_msgs::known::ENVIRONMENT,
                     crate::early_words::ENVIRONMENT,
                     crate::follows_face::ENVIRONMENT,
+                    crate::reminders::REFENCE_VARIABLE,
                     crate::local_time::KERNEL_CLOCK_ENVIRONMENT,
                     crate::quiet_pace::EVIDENCE_ENVIRONMENT,
                     crate::second_provider::net::key_terms::ENVIRONMENT,
@@ -2860,6 +2914,8 @@ mod tests {
                 .contains(&name)
                 {
                     "on"
+                } else if name == crate::reminders::LEDGER_VARIABLE {
+                    "/var/lib/lampOS/voice/delivery"
                 } else if name == crate::activity::INPUT_ENVIRONMENT {
                     "linear"
                 } else if name == crate::capture_cores::ENVIRONMENT {
@@ -3024,6 +3080,7 @@ mod tests {
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_FACES_AT_DESK_ONLY=on",
                     "LAMP_KERNEL_CLOCK=on",
+                    "LAMP_LEDGER_REFENCE=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_EARLY_WORDS=on",
                     "LAMP_MEMORY_EVENTS=on",
@@ -3047,6 +3104,7 @@ mod tests {
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PERSON_NAME_OWNER_ONLY=on",
+                    "LAMP_SCHEDULE_DELIVERY_DIR=/var/lib/lampOS/voice/delivery",
                     "LAMP_SERVICES_TOLD=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
                 ],
@@ -3083,6 +3141,7 @@ mod tests {
                     "LAMP_KEEP_QUIETLY=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language",
+                    "LAMP_LEDGER_REFENCE=on",
                     "LAMP_LIGHT_TOLD=on",
                     "LAMP_MAKE_SKILL=on",
                     "LAMP_MEMORY_DAYS=on",
@@ -3144,6 +3203,7 @@ mod tests {
                     "LAMP_SAME_SPEAKER_CARRIES=on",
                     "LAMP_SAME_VOICE_CALLER_ONLY=on",
                     "LAMP_SCHEDULE_ASKED=on",
+                    "LAMP_SCHEDULE_DELIVERY_DIR=/var/lib/lampOS/voice/delivery",
                     "LAMP_SECOND_CHAT_KEPT=on",
                     "LAMP_SECOND_CHAT_SECOND_TRY=on",
                     "LAMP_SECOND_CHAT_WARM=on",

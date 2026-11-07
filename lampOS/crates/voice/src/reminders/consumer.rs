@@ -25,7 +25,7 @@ use serde_json::Value;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     io,
-    path::Path,
+    path::{Path, PathBuf},
     time::{Duration, Instant},
 };
 
@@ -281,6 +281,10 @@ struct Consumer<P: Persistence> {
     /// A line was heard after a reminder: Schedule is told once every
     /// completed one is acknowledged ([`Self::tell_noticed`]).
     notice_owed: bool,
+    /// With `LAMP_LEDGER_REFENCE` on, the file kept while the ledger refuses
+    /// every item, so a timer is not set to never ring (#5560's fallback),
+    /// and whether it was last kept (`None`: not yet judged).
+    cannot_ring: Option<(PathBuf, Option<bool>)>,
 }
 impl<P: Persistence> Consumer<P> {
     fn new(ledger: DeliveryLedger<P>, session: String) -> Self {
@@ -300,7 +304,36 @@ impl<P: Persistence> Consumer<P> {
             recovery: 0,
             outgoing: VecDeque::new(),
             notice_owed: false,
+            cannot_ring: None,
         }
+    }
+    /// Keeps [`Self::cannot_ring`]'s file exactly while an item at the
+    /// store's revision would be refused for the ledger's own fence.
+    fn judge_cannot_ring(&mut self, due: &ScheduleDue) -> io::Result<()> {
+        let Some((file, kept)) = &mut self.cannot_ring else {
+            return Ok(());
+        };
+        let refuses = self.ledger.refuses(&due.store_id, due.revision);
+        if *kept == Some(refuses) {
+            return Ok(());
+        }
+        if refuses {
+            std::fs::write(&*file, b"")?;
+        } else if let Err(error) = std::fs::remove_file(&*file)
+            && error.kind() != io::ErrorKind::NotFound
+        {
+            return Err(error);
+        }
+        *kept = Some(refuses);
+        self.journal.say(
+            if refuses {
+                "the ledger refuses every item (its fence is ahead of the store): new timers and reminders are refused"
+            } else {
+                "the ledger takes items: timers and reminders may be set"
+            }
+            .into(),
+        );
+        Ok(())
     }
     fn correlation(&mut self) -> io::Result<Correlation> {
         self.sequence = self
@@ -831,6 +864,7 @@ impl<P: Persistence> Consumer<P> {
         let Some(due) = due else {
             return self.withdraw();
         };
+        self.judge_cannot_ring(due)?;
         if let Some(current) = &self.current {
             let key = current.token.key.clone();
             if let Err(error) = self.offer(socket, due, &key, now, deadline) {
@@ -1050,8 +1084,15 @@ pub(super) fn run(ledger_dir: &Path, socket: &Path, root: &Path) -> io::Result<(
     let mut transport = WorkerTransport::from_stdin()?;
     let session = crate::process::boot_text(crate::process::new_boot()?);
     let clock = lamp_controls::runtime::clock_id(None)?;
-    let ledger = DeliveryLedger::open(Store::open(ledger_dir)?, &session).map_err(invalid)?;
+    let mut ledger = DeliveryLedger::open(Store::open(ledger_dir)?, &session).map_err(invalid)?;
+    let refence = super::refence_on(std::env::var(super::REFENCE_VARIABLE).ok().as_deref());
+    if refence {
+        ledger.refence_at_start();
+    }
     let mut consumer = Consumer::new(ledger, session);
+    if refence {
+        consumer.cannot_ring = Some((ledger_dir.join(super::CANNOT_RING_FILE), None));
+    }
     consumer.journal.say("started".into());
     // The claim taken above moved to the voice that started this consumer,
     // so every earlier voice has exited.

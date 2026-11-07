@@ -1877,33 +1877,39 @@ fn an_unofferable_oldest_does_not_silence_later_items_and_each_failure_is_journa
     }
 }
 
-/// A ledger whose fence is ahead of the store under the same `store_id`
-/// (lamp-52e6, 6 Nov: fence 96, store 92) refused every offer with
-/// `stale_revision`, so a timer the voice set was never said. A voice that
-/// starts on such a ledger says a timer due now.
-///
-/// Needs fix 1 of the #5498 follow-up: re-fence to the store's revision at
-/// the voice's start, on the start path this test reaches (`Consumer::new`,
-/// `retire_earlier_voices` or the first tick), not only in `run`.
-#[test]
-fn a_voice_started_on_a_ledger_ahead_of_the_store_says_a_due_timer() {
-    let (engine, socket) = served(1);
-    let store = engine.lock().unwrap().revision();
-    // A compacted ledger: no entries, its fence four revisions ahead.
+/// A compacted ledger fenced four revisions ahead of `engine`'s store, under
+/// the same `store_id`; with the switch on, armed as `run` arms it.
+fn ahead_of(engine: &Engine<Disk>, switch: Option<&str>) -> Consumer<Disk> {
     let ahead = json!({
         "kind": "lamp_schedule_delivery_ledger",
         "schema": 1,
         "ledger_id": LEDGER_ID,
         "revision": 1,
         "next_attempt": 2,
-        "schedule": { "store_id": STORE_ID, "revision": store + 4 },
+        "schedule": { "store_id": STORE_ID, "revision": engine.revision() + 4 },
         "entries": [],
     });
     let disk = Disk(Arc::new(Mutex::new(Data {
         bytes: Some(serde_json::to_vec(&ahead).unwrap()),
         ..Data::default()
     })));
-    let mut consumer = consumer(disk);
+    let mut ledger = DeliveryLedger::open(disk, LEDGER_ID).unwrap();
+    if crate::reminders::refence_on(switch) {
+        ledger.refence_at_start();
+    }
+    Consumer::new(ledger, SESSION.into())
+}
+
+/// A ledger whose fence is ahead of the store under the same `store_id`
+/// (lamp-52e6, 6 Nov: fence 96, store 92) refused every offer with
+/// `stale_revision`, so a timer the voice set was never said. With
+/// LAMP_LEDGER_REFENCE on, a voice that starts on such a ledger says a timer
+/// due now (#5560).
+#[test]
+fn a_voice_started_on_a_ledger_ahead_of_the_store_says_a_due_timer() {
+    let (engine, socket) = served(1);
+    let store = engine.lock().unwrap().revision();
+    let mut consumer = ahead_of(&engine.lock().unwrap(), Some("on"));
     assert_eq!(consumer.ledger.schedule_revision(), Some(store + 4));
     consumer.retire_earlier_voices().unwrap();
     let now = lamp_ipc::monotonic_us();
@@ -1918,6 +1924,95 @@ fn a_voice_started_on_a_ledger_ahead_of_the_store_says_a_due_timer() {
         consumer.journal.lines
     );
     assert_eq!(take_offer(&mut consumer).token.key, key(&report));
+    assert_eq!(consumer.ledger.schedule_revision(), Some(store));
+}
+
+/// With the switch off, or set to anything but `on`, a ledger ahead of the
+/// store refuses as before: nothing offered, `stale_revision` journaled, the
+/// fence unmoved.
+#[test]
+fn with_the_refence_switch_off_a_ledger_ahead_of_the_store_still_refuses() {
+    for switch in [None, Some("1"), Some("ON"), Some("")] {
+        let (engine, socket) = served(1);
+        let store = engine.lock().unwrap().revision();
+        let mut consumer = ahead_of(&engine.lock().unwrap(), switch);
+        consumer.retire_earlier_voices().unwrap();
+        let now = lamp_ipc::monotonic_us();
+        let report = due(&engine.lock().unwrap(), now);
+        consumer.tick(&socket.path(), Some(&report), now).unwrap();
+        no_offer(&consumer);
+        assert!(
+            consumer
+                .journal
+                .lines
+                .iter()
+                .any(|line| line.contains("not offered") && line.contains("stale_revision")),
+            "{switch:?}: {:?}",
+            consumer.journal.lines
+        );
+        assert_eq!(consumer.ledger.schedule_revision(), Some(store + 4));
+    }
+}
+
+/// #5560's fallback: while the ledger refuses every item and can't be
+/// re-fenced (here: not armed), the consumer keeps its cannot-ring file, and
+/// a `set_timer` is then refused before it reaches the schedule, told as not
+/// set, so no "Timer set." line can come of it. Once the ledger takes items
+/// (armed at a start with the switch on), the file is gone and sets go on.
+#[test]
+fn a_ledger_that_cannot_ring_refuses_a_new_timer_and_says_it_is_not_set() {
+    let dir = std::env::temp_dir().join(format!("lamp-cannot-ring-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join(crate::reminders::CANNOT_RING_FILE);
+    let _ = std::fs::remove_file(&file);
+    let env = |on: &'static str| {
+        let dir = dir.clone();
+        move |name: &str| match name {
+            crate::reminders::REFENCE_VARIABLE => Some(on.into()),
+            crate::reminders::LEDGER_VARIABLE => Some(dir.clone().into_os_string()),
+            _ => None,
+        }
+    };
+    let (engine, socket) = served(1);
+    let mut consumer = ahead_of(&engine.lock().unwrap(), None);
+    consumer.cannot_ring = Some((file.clone(), None));
+    let now = lamp_ipc::monotonic_us();
+    let report = due(&engine.lock().unwrap(), now);
+    consumer.tick(&socket.path(), Some(&report), now).unwrap();
+    no_offer(&consumer);
+    assert!(file.exists(), "{:?}", consumer.journal.lines);
+
+    let told = crate::reminders::cannot_ring("set_timer", env("on")).unwrap();
+    assert_eq!(told["error"], crate::reminders::CANNOT_RING);
+    let calls = [crate::second_provider::net::ToolCall {
+        id: "c0".into(),
+        name: "set_timer".into(),
+        args: json!({}),
+        extra: None,
+    }];
+    for reminded in [false, true] {
+        assert_eq!(
+            crate::second_provider::timer_line(&calls, std::slice::from_ref(&told), reminded),
+            None
+        );
+    }
+    assert!(crate::reminders::cannot_ring("set_reminder", env("on")).is_some());
+    assert!(crate::reminders::cannot_ring("repeat_reminder", env("on")).is_some());
+    // Reads and cancels go on; with the switch anything but `on`, so do sets.
+    assert!(crate::reminders::cannot_ring("list_reminders", env("on")).is_none());
+    assert!(crate::reminders::cannot_ring("cancel_reminder", env("on")).is_none());
+    assert!(crate::reminders::cannot_ring("set_timer", env("ON")).is_none());
+    assert!(crate::reminders::cannot_ring("set_timer", |_| None).is_none());
+
+    // A voice started with the switch on re-fences, so the file goes.
+    let (engine, socket) = served(1);
+    let mut consumer = ahead_of(&engine.lock().unwrap(), Some("on"));
+    consumer.cannot_ring = Some((file.clone(), None));
+    let report = due(&engine.lock().unwrap(), now);
+    consumer.tick(&socket.path(), Some(&report), now).unwrap();
+    assert!(!file.exists(), "{:?}", consumer.journal.lines);
+    assert!(crate::reminders::cannot_ring("set_timer", env("on")).is_none());
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]
