@@ -237,6 +237,39 @@ async fn a_no_to_the_face_question_drops_the_held_save() {
     }
 }
 
+/// Fourteen's HOLD on #5720: a plain yes to a face question the model
+/// turned round keeps nothing, held or with no call at setup.
+#[tokio::test]
+async fn a_yes_to_a_face_question_turned_round_keeps_nothing() {
+    for face in [
+        "Would you rather I didn't remember your face?",
+        "I won't remember your face unless you want me to. Is that okay?",
+        "M\u{ec}nh kh\u{f4}ng nh\u{1edb} khu\u{f4}n m\u{1eb7}t b\u{1ea1}n nh\u{e9}?",
+    ] {
+        let sent = run(
+            &[
+                NAME_LINE,
+                ("Yes, that's my name.", Lamp::Says(face)),
+                ("Yes.", Lamp::Says("Got it.")),
+            ],
+            None,
+        )
+        .await;
+        assert_eq!(sent, Vec::<Value>::new(), "held: {face}");
+        let sent = run_at_setup(
+            &[
+                NO_CALL_NAME_LINE,
+                ("Yes. That's my name.", Lamp::Says(face)),
+                ("Yes.", Lamp::Says("Okay.")),
+            ],
+            None,
+            true,
+        )
+        .await;
+        assert_eq!(sent, Vec::<Value>::new(), "at setup: {face}");
+    }
+}
+
 /// (c), (e) and a second face: a correction, a read-back folded into the
 /// face question, or a second face seen speaking the yes keeps nothing,
 /// and the hold is gone after it.
