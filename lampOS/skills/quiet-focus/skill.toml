@@ -57,11 +57,14 @@ gap = "30s"               # a moment back over the page (head_down is said after
 rearm = "leaves"
 wait = "5m"              # someone else in view, or a talk: once they go, while still looking up
 follows = { trigger = "focused", within = "10m" }
-# Its word stands in for Rest your eyes' (#5620, the PM's call (a)): that
-# nudge is due in any sitting this long and would speak the moment they look
-# up, taking the group's turn. While the word is still to come it waits, and
-# its cooldown begins with the word. A lamp without this skill is as before.
-stands_in_for = "rest-your-eyes"
+# Its word stands in for the wellbeing group's nudges (#5620, the PM's call
+# (a)): Rest your eyes, and in the product Sip of water too, are due in any
+# sitting this long and would speak the moment they look up, taking the
+# group's turn. While the word is still to come each waits, and its cooldown
+# begins with the word; a warning never waits. A window that closes without
+# the word (still head down, gone, or held past its `wait`) holds nothing
+# again until the word has been said. A lamp without this skill is as before.
+stands_in_for_group = true
 
 [[while]]                 # once a sitting: inside its first 3 hours, so a second focus in the
 topic = "room/activity"   # same sitting always falls in the cooldown of the first. A gap over

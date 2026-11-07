@@ -25,7 +25,8 @@ What it says and when:
 - At most one of the wellbeing nudges (this, A sip of water, Stand up and
   Wind down) an hour between them.
 - With Quiet focus on the lamp, when it is due as you look up after a long
-  focus, Quiet focus's word comes in its place, and it does not tilt too.
+  focus, Quiet focus's word comes in its place (for every wellbeing nudge
+  then, not only this one), and it does not tilt too.
 - If it does it twice and you neither look at it nor move nor say
   anything, it rests until tomorrow morning.
 - "Not today" or "stop the eye breaks" to the lamp (one function for the

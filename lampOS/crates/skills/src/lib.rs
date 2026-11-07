@@ -640,9 +640,10 @@ struct TriggerFile {
     /// A daily trigger whose run stands in for another of the skill's
     /// triggers, named, at the same moment (#5207: the day's first hello).
     instead_of: Option<String>,
-    /// A `follows` word that stands in for another skill's nudge (#5620):
-    /// while it is still to come, that skill's due chance waits for it.
-    stands_in_for: Option<String>,
+    /// A `follows` word that stands in for the nudges of its skill's own
+    /// `[budget]` group (#5620): while it is still to come, their due
+    /// chances wait for it.
+    stands_in_for_group: Option<bool>,
 }
 
 /// `sooner = { topic = "room/activity", field = "yawns", above = 0, for = "30m" }`.
@@ -2319,10 +2320,11 @@ pub struct Trigger {
     /// Another trigger of the skill, by name, whose chance this one's run
     /// takes (#5207, `instead_of`): that trigger's cooldown begins with it.
     pub instead_of: Option<String>,
-    /// Another skill, by name, whose due chance waits while this `follows`
-    /// word is still to come, and whose cooldown begins with the word
-    /// (#5620, `stands_in_for`).
-    pub stands_in_for: Option<String>,
+    /// The skills of this skill's own `[budget]` group (never a warning,
+    /// never one that itself stands in) whose due chances wait while this
+    /// `follows` word is still to come, and whose cooldowns begin with the
+    /// word (#5620, `stands_in_for_group`).
+    pub stands_in_for_group: bool,
 }
 
 /// A trigger's `sooner` (#3709): while `test` holds on `topic`'s newest
@@ -3032,20 +3034,12 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
             Some(other)
         }
     };
-    // A word that stands in for another skill's nudge (#5620): a `follows`
+    // A word that stands in for its group's nudges (#5620): a `follows`
     // word only, so what it waits on is bounded by its `within`.
-    let stands_in_for = match file.stands_in_for {
-        None => None,
-        Some(_) if follows.is_none() => {
-            return Err("stands_in_for goes with follows".into());
-        }
-        Some(other) => {
-            if !plain_name(&other) || other.contains('_') {
-                return Err(format!("stands_in_for {other:?} is not a skill's name"));
-            }
-            Some(other)
-        }
-    };
+    let stands_in_for_group = file.stands_in_for_group.unwrap_or(false);
+    if stands_in_for_group && follows.is_none() {
+        return Err("stands_in_for_group goes with follows".into());
+    }
     let each = match (file.each, file.key) {
         (None, None) => None,
         (Some(list), Some(key)) if !list.is_empty() && !key.is_empty() => {
@@ -3195,7 +3189,7 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         sooner,
         follows,
         instead_of,
-        stands_in_for,
+        stands_in_for_group,
     })
 }
 
@@ -3910,14 +3904,9 @@ fn manifest(
             ));
         }
     }
-    if let Some(other) = triggers
-        .iter()
-        .find_map(|trigger| trigger.stands_in_for.as_ref())
-        .filter(|other| **other == name)
-    {
-        return Err(format!(
-            "stands_in_for {other:?} is this skill: it names another"
-        ));
+    // The group it stands in for is its own (#5620, the PM's call (a)).
+    if budget.is_none() && triggers.iter().any(|trigger| trigger.stands_in_for_group) {
+        return Err("stands_in_for_group needs the skill's own [budget] group".into());
     }
     // Before the trigger it stands in for, so at one message it is judged
     // first, and on the same topic, so they hold at one message.
@@ -5141,30 +5130,24 @@ pub const PUSHED_TOPICS: [&str; 6] = [
     "controls/touch",
 ];
 
-/// Why `skill`'s `stands_in_for` word may not hold `held`'s chance (#5620,
-/// the reviewer's P1 on #5704); `None` if it may. Only a skill of its own
-/// `[budget]` group, never a `warning`, and never from a pushed skill: so a
-/// word that never comes holds back no smoke warning, reminder or nudge of
-/// another group. Checked at load ([`load_each_with`]) and again each time
-/// a chance is judged ([`Engine`]'s `stood_in_by`), since skills come and go
-/// in any order.
-fn stands_in_refuses(skill: &Skill, held: &Skill) -> Option<String> {
+/// Whether `skill`'s `stands_in_for_group` word may hold `held`'s chance
+/// (#5620, the PM's call (a), the reviewer's P1 on #5704): only another
+/// skill of its own `[budget]` group, never a `warning`, never one that
+/// itself stands in for the group, and never from a pushed skill. So a word
+/// that never comes holds back no smoke warning, reminder or nudge of
+/// another group. Judged each time a chance is ([`Engine`]'s
+/// `stood_in_by`), since skills come and go in any order.
+fn stands_in_holds(skill: &Skill, held: &Skill) -> bool {
     let group = |skill: &Skill| skill.budget.as_ref().map(|(group, _)| group.clone());
-    if held.policy == "warning" {
-        Some(format!(
-            "stands_in_for {:?} is a warning: a warning never waits for another's word",
-            held.name
-        ))
-    } else if group(skill).is_none() || group(skill) != group(held) {
-        Some(format!(
-            "stands_in_for {:?} is not in its own [budget] group",
-            held.name
-        ))
-    } else if skill.pushed_by.is_some() {
-        Some("a pushed skill may not use stands_in_for".into())
-    } else {
-        None
-    }
+    skill.name != held.name
+        && held.policy != "warning"
+        && group(skill).is_some()
+        && group(skill) == group(held)
+        && skill.pushed_by.is_none()
+        && !held
+            .triggers
+            .iter()
+            .any(|trigger| trigger.stands_in_for_group)
 }
 
 /// Why a pushed skill may not run, held to the protocol's grants
@@ -5199,10 +5182,11 @@ pub fn pushed_refuses(skill: &Skill) -> Option<String> {
     if skill
         .triggers
         .iter()
-        .any(|trigger| trigger.stands_in_for.is_some())
+        .any(|trigger| trigger.stands_in_for_group)
     {
         return Some(
-            "a pushed skill may not use stands_in_for: it never holds a lamp skill's chance".into(),
+            "a pushed skill may not use stands_in_for_group: it never holds a lamp skill's chance"
+                .into(),
         );
     }
     if let Some(topic) = permissions
@@ -5347,27 +5331,6 @@ pub fn load_each_with(
             };
             loaded.push((folder, skill));
         }
-    }
-    // A `stands_in_for` naming a skill loaded here (#5704's P1): only one of
-    // its own `[budget]` group, never a warning ([`stands_in_refuses`]).
-    // One naming a skill not here loads; held to the same each time a
-    // chance is judged, should that skill come later.
-    let refused: Vec<(usize, String)> = loaded
-        .iter()
-        .enumerate()
-        .filter_map(|(at, (_, result))| {
-            let skill = result.as_ref().ok()?;
-            skill.triggers.iter().find_map(|trigger| {
-                let other = trigger.stands_in_for.as_ref()?;
-                let held = loaded.iter().find_map(|(_, result)| {
-                    result.as_ref().ok().filter(|held| &held.name == other)
-                })?;
-                stands_in_refuses(skill, held).map(|why| (at, why))
-            })
-        })
-        .collect();
-    for (at, why) in refused {
-        loaded[at].1 = Err(why);
     }
     // Each tool's name, and the skill that has it.
     // With, for a `[stop]` function, the `[budget]` group of its skill: a
@@ -5534,7 +5497,7 @@ struct Watch {
     changes: Changes,
     /// With `yields_to`: when this time it holds first waited, and said so.
     yielded_us: Option<u64>,
-    /// Another skill's `stands_in_for` word is still to come (#5620): when
+    /// A `stands_in_for_group` word of its group is still to come (#5620): when
     /// this chance first waited for it, and said so.
     stood_in_us: Option<u64>,
     /// Each gate a due chance was said dropped by ([`dropped`], #2602): the
@@ -5691,6 +5654,13 @@ pub struct Engine {
     /// By group, each member waiting for its hour: since when, and when it
     /// was last held back for it.
     budget_waits: HashMap<String, HashMap<String, (u64, u64)>>,
+    /// By a skill with a `stands_in_for_group` word (#5620): how many
+    /// windows for the word opened since it last ran, 2 once one closed
+    /// without it (the trigger it `follows` ran again, or the word's chance
+    /// was let go past its `wait`). From 2 its group is not held again
+    /// until the word runs (the reviewer's bound on #5704): a word that
+    /// never comes holds the group for one window at most.
+    word_windows: HashMap<String, u8>,
     /// When each member of a group last started or was asked: of the
     /// skills sharing a `[stop]`, the latest is what a call without `all`
     /// stops.
@@ -5930,6 +5900,7 @@ impl Engine {
             day_runs: HashMap::new(),
             group_runs: HashMap::new(),
             budget_waits: HashMap::new(),
+            word_windows: HashMap::new(),
             group_ran: HashMap::new(),
             unsaid_from: HashMap::new(),
             nudges: HashMap::new(),
@@ -5980,13 +5951,15 @@ impl Engine {
         self.rested_day = day;
     }
 
-    /// The loaded skill whose `stands_in_for` word for `name` is still to
-    /// come (#5620): the trigger it `follows` ran within its `within`, the
-    /// word has not run since, and nothing it can see would drop the word
-    /// (off, snoozed, its day's most run, resting). Only a skill of `name`'s
-    /// own `[budget]` group, never for a warning, never a pushed one
-    /// ([`stands_in_refuses`]). None on a lamp without such a skill, so
-    /// there nothing changes.
+    /// The loaded skill whose `stands_in_for_group` word, standing in for
+    /// `name`'s group, is still to come (#5620): the trigger it `follows`
+    /// ran within its `within`, the word has not run since, no window for it
+    /// closed without it since it last ran ([`Engine`]'s `word_windows`),
+    /// and nothing it can see would drop the word (off, snoozed, its day's
+    /// most run, resting). Only for another skill of its own `[budget]`
+    /// group, never for a warning, never from a pushed one
+    /// ([`stands_in_holds`]). None on a lamp without such a skill, so there
+    /// nothing changes.
     fn stood_in_by(&self, name: &str, now_us: u64) -> Option<&str> {
         let ran = |skill: &str, index: usize| {
             self.watches
@@ -5996,8 +5969,11 @@ impl Engine {
         let day = day_of(self.clock, now_us);
         let held = self.skills.iter().find(|skill| skill.name == name)?;
         self.skills.iter().find_map(|skill| {
-            if skill.name == name
-                || stands_in_refuses(skill, held).is_some()
+            if !stands_in_holds(skill, held)
+                || self
+                    .word_windows
+                    .get(&skill.name)
+                    .is_some_and(|windows| *windows >= 2)
                 || self.off.contains(&skill.name)
                 || self
                     .snoozed
@@ -6021,7 +5997,7 @@ impl Engine {
                 .enumerate()
                 .find_map(|(index, trigger)| {
                     let (other, within_us) = trigger.follows.as_ref()?;
-                    if trigger.stands_in_for.as_deref() != Some(name) {
+                    if !trigger.stands_in_for_group {
                         return None;
                     }
                     let at = skill
@@ -7205,7 +7181,7 @@ impl Engine {
         }
         self.invalidate_changes(now_us);
         let mut runs = Vec::new();
-        let mut stood_in_for: Vec<(String, String)> = Vec::new();
+        let mut stood_in_for: Vec<String> = Vec::new();
         let minute = self.local_minute(now_us);
         let moment = self.local_moment(now_us);
         // What a run held until its trigger stops holding is given back
@@ -7708,7 +7684,12 @@ impl Engine {
                 // Quiet focus for Rest your eyes): while it is still to
                 // come, the chance is kept, as the quiet hours keep one,
                 // said once; when it runs, this cooldown begins with it.
-                if let Some(by) = stood_in {
+                // Only once this skill's `[[while]]` holds (#5704's P3): a
+                // chance its own conditions hold back would not have spoken
+                // anyway, so it goes on as without the key.
+                if let Some(by) = stood_in
+                    && Self::conditions_hold(&self.latest, &self.holding, skill, now_us)
+                {
                     if trigger.when != When::Appears {
                         watch.spent = false;
                         watch.disarmed = false;
@@ -7872,6 +7853,11 @@ impl Engine {
                         // drop says it too, with the condition that held it
                         // (#2861); a daily one's line is as it was. Without a
                         // `wait` a chance held back is spent, as before.
+                        // A word let go past its wait missed its window: its
+                        // group is not held again until it runs (#5620).
+                        if trigger.stands_in_for_group {
+                            self.word_windows.insert(skill.name.clone(), 2);
+                        }
                         let mut why = format!(
                             "{} chance dropped: it held, but the skill's conditions did not hold within its wait of {} s; it comes again only once the trigger ends and holds again",
                             trigger.name.as_deref().unwrap_or("trigger"),
@@ -8100,8 +8086,24 @@ impl Engine {
                     watch.ran_us = Some(now_us);
                     watch.said.clear();
                     instead = trigger.instead_of.as_ref();
-                    if let Some(other) = &trigger.stands_in_for {
-                        stood_in_for.push((skill.name.clone(), other.clone()));
+                    // Its own run is its own: no word's hand-over after it.
+                    watch.stood_in_us = None;
+                    if trigger.stands_in_for_group {
+                        stood_in_for.push(skill.name.clone());
+                        self.word_windows.remove(&skill.name);
+                    } else if trigger.name.as_ref().is_some_and(|name| {
+                        skill.triggers.iter().any(|word| {
+                            word.stands_in_for_group
+                                && word
+                                    .follows
+                                    .as_ref()
+                                    .is_some_and(|(other, _)| other == name)
+                        })
+                    }) {
+                        // A window for the word opens; a second since it
+                        // last ran means the first closed without it.
+                        let windows = self.word_windows.entry(skill.name.clone()).or_insert(0);
+                        *windows = windows.saturating_add(1).min(2);
                     }
                     // Counted as the cooldown is: when the run is started,
                     // or asked of the Policy (#1685).
@@ -8171,41 +8173,44 @@ impl Engine {
             item_runs.sort_by(|(a, _), (b, _)| item_order(a).cmp(&item_order(b)));
             runs.extend(item_runs.into_iter().map(|(_, run)| run));
         }
-        // A word that stood in for another skill's waiting nudge (#5620):
-        // that nudge's chance was this word's, so its cooldown begins now.
-        for (by, other) in stood_in_for {
-            let Some(triggers) = self
-                .skills
-                .iter()
-                .find(|skill| skill.name == other)
-                .map(|skill| skill.triggers.len())
-            else {
+        // A word that stood in for its group's waiting nudges (#5620): each
+        // nudge's chance was this word's, so its cooldown begins now.
+        for by in stood_in_for {
+            let Some(word) = self.skills.iter().find(|skill| skill.name == by) else {
                 continue;
             };
-            let mut waited = false;
-            for index in 0..triggers {
-                if let Some(watch) = self.watches.get_mut(&(other.clone(), index))
-                    && watch.stood_in_us.take().is_some()
-                {
-                    watch.ran_us = Some(now_us);
-                    waited = true;
+            let held: Vec<(String, usize)> = self
+                .skills
+                .iter()
+                .filter(|held| stands_in_holds(word, held))
+                .map(|held| (held.name.clone(), held.triggers.len()))
+                .collect();
+            for (other, triggers) in held {
+                let mut waited = false;
+                for index in 0..triggers {
+                    if let Some(watch) = self.watches.get_mut(&(other.clone(), index))
+                        && watch.stood_in_us.take().is_some()
+                    {
+                        watch.ran_us = Some(now_us);
+                        waited = true;
+                    }
                 }
-            }
-            if waited {
-                runs.push(Run {
-                    generation: None,
-                    skill: other.clone(),
-                    events: vec![event(
-                        &other,
-                        SkillStage::Answered,
-                        format!("done: {by}'s word stood in for it"),
-                        Some(false),
-                    )],
-                    calls: Vec::new(),
-                    ask: None,
-                    queue: false,
-                    from: None,
-                });
+                if waited {
+                    runs.push(Run {
+                        generation: None,
+                        skill: other.clone(),
+                        events: vec![event(
+                            &other,
+                            SkillStage::Answered,
+                            format!("done: {by}'s word stood in for it"),
+                            Some(false),
+                        )],
+                        calls: Vec::new(),
+                        ask: None,
+                        queue: false,
+                        from: None,
+                    });
+                }
             }
         }
         runs
