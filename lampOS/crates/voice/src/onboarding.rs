@@ -4531,7 +4531,25 @@ fn name_in(text: &str) -> Option<String> {
 /// as [`name_in`] reads a line: "W a l t e r." is "Walter". A name said
 /// without its letters is none. English words only.
 fn spelled_name_in(text: &str) -> Option<String> {
-    spelled_in(&name_words(text)?)
+    let mut words = name_words(text)?;
+    // "My name is Walter, W-A-L-T-E-R." and "It's spelled W A L T E R." (the
+    // first builder's and the Reviewer-lead's P3s on #5695).
+    for lead in [
+        &["my", "name", "is"][..],
+        &["spelled"],
+        &["that's", "spelled"],
+    ] {
+        let leads = words.len() > lead.len()
+            && words
+                .iter()
+                .zip(lead)
+                .all(|(word, lead)| word.to_lowercase() == *lead);
+        if leads {
+            words.drain(..lead.len());
+            break;
+        }
+    }
+    spelled_in(&words)
 }
 
 /// What the model is told beside the person's line at setup, with the
@@ -4580,12 +4598,17 @@ fn spelled_in(words: &[&str]) -> Option<String> {
     if let Some(name) = crate::known_faces::letters_as_word(&words.join(" ")) {
         return Some(name);
     }
+    // A name said and then spelled: the letters win, as the person's own
+    // spelling of it ("Jane, J A Y N E." is Jayne: speech-to-text wrote the
+    // word it knows; the first builder's P3 on #5695).
+    // Letters that spell the word said keep the word's own form ("José, J O
+    // S E." is José).
     let (first, rest) = words.split_first()?;
-    crate::known_faces::letters_as_word(&rest.join(" "))
-        .is_some_and(|spelled| {
-            crate::known_faces::folded_words(&spelled) == crate::known_faces::folded_words(first)
-        })
-        .then(|| (*first).to_owned())
+    let spelled = crate::known_faces::letters_as_word(&rest.join(" "))?;
+    if crate::known_faces::folded_words(&spelled) == crate::known_faces::folded_words(first) {
+        return Some((*first).to_owned());
+    }
+    Some(spelled)
 }
 
 /// A line's words as [`name_in`] reads them, without a leading "I'm" or
@@ -6190,6 +6213,9 @@ mod tests {
             assert_eq!(name_in(line), Some("Jane".into()), "{line}");
         }
         assert_eq!(name_in("José, J O S E."), Some("José".into()));
+        // The letters win over a different word (the first builder's P3 on
+        // #5695).
+        assert_eq!(name_in("Jane, J A Y N E."), Some("Jayne".into()));
         assert_eq!(name_in("A J"), Some("A J".into()));
         assert_eq!(name_in("Jane"), Some("Jane".into()));
     }
@@ -6226,9 +6252,18 @@ mod tests {
             "W-A-L-T-E-R",
             "It's W, A, L, T, E, R.",
             "Walter, W A L T E R.",
+            "My name is Walter, W-A-L-T-E-R.",
+            "It's spelled W A L T E R.",
+            "That's spelled W, A, L, T, E, R.",
         ] {
             assert_eq!(note(&room, line), Some(told.clone()), "{line}");
         }
+        // The letters win over the word speech-to-text wrote.
+        let jayne = note(&room, "Jane, J A Y N E.").expect("a spelling after a word");
+        assert!(
+            jayne.contains("\"Jayne, did I get that right?\""),
+            "{jayne}"
+        );
         // A name said plainly, initials, a question: no note.
         for line in [
             "Walter.",

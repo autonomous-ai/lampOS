@@ -407,7 +407,10 @@ J-A-N-E?"; nobody calls a person by the spelling of their name). With
 the nudge off (the product), the second route also tells the model this
 beside the person's own line, for that turn only, when the line spells their
 name ("W a l t e r.", "W-A-L-T-E-R", "It's W, A, L, T, E, R.", "Walter, W A
-L T E R.", read as the nudge's fallback reads a spelled name, below) while
+L T E R.", "My name is Walter, W-A-L-T-E-R.", "It's spelled W A L T E R.",
+read as the nudge's fallback reads a spelled name, below; after a word the
+letters win, so "Jane, J A Y N E." is told "Jayne", the person's own
+spelling) while
 "who you are" has no outcome in the onboarding file: `(They spelled
 "Walter". Say it back as the name, only this: "Walter, did I get that
 right?" Never say its letters.)` (`onboarding::spelled_name_note`,
