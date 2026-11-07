@@ -23,9 +23,12 @@ Each of these cost someone a run on a real lamp.
 
 ## Body
 
-- **One motion at a time.** A gesture, move or feeling's move asked while
-  one still plays is refused `busy` with `retry_ms` (whoever asked it).
-  Wait `retry_ms`, or don't ask so often: a gesture is 2 to 10 s.
+- **A new motion cuts the one playing short.** A gesture, move or
+  feeling's move asked while another plays (whoever asked it) replaces it,
+  eased out from where the body is under its own caps. While the person is
+  using the lamp (a conversation, a hand on it), the body drops the new one
+  ("the person is using the lamp"); the door has already answered
+  `{"to":"body"}`.
 - **`look`, `move`, `play` and `joints` need a `body` lease;** `gesture` and
   `express` don't. Hold the lease around a sequence of moves, not per move.
 - **The lamp takes the body back** when someone talks to it, touches its

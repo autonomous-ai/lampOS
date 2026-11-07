@@ -3106,6 +3106,7 @@ fn gesture_run(
                 aim_from_home: false,
                 asleep: false,
                 woken: false,
+                replace: false,
             }
         },
         |glimpse| {
@@ -3187,6 +3188,7 @@ fn expression_run_with(
             aim_from_home: false,
             asleep: false,
             woken: false,
+            replace: false,
         },
         |glimpse| seen.push((seen_at.get(), glimpse.goals)),
     );
@@ -3358,6 +3360,7 @@ fn speaking_run_with(
             aim_from_home: false,
             asleep: false,
             woken: false,
+            replace: false,
         },
         |glimpse| seen.push((seen_at.get(), *glimpse)),
     );
@@ -4072,6 +4075,7 @@ fn rest_glances_watched(
             aim_from_home: false,
             asleep: false,
             woken: false,
+            replace: false,
         },
         |glimpse| {
             let at = seen_at.get();
@@ -4497,6 +4501,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             aim_from_home: false,
             asleep: false,
             woken: false,
+            replace: false,
         },
         |glimpse| steps.push((glimpse.goals, glimpse.arm_goals, glimpse.stand)),
     );
@@ -4569,6 +4574,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             aim_from_home: false,
             asleep: false,
             woken: false,
+            replace: false,
         },
         |_| {},
     );
@@ -4659,6 +4665,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 aim_from_home: false,
                 asleep: false,
                 woken: false,
+                replace: false,
             }
         },
         |glimpse| {
@@ -5088,6 +5095,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     aim_from_home: false,
                     asleep: false,
                     woken: false,
+                    replace: false,
                 }
             },
             |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -5173,6 +5181,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 aim_from_home: false,
                 asleep: false,
                 woken: false,
+                replace: false,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -5263,6 +5272,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 night: false,
                 night_woke: false,
                 aim_from_home: false,
+                replace: false,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -8107,6 +8117,7 @@ fn called_run(
                 aim_from_home: false,
                 asleep: false,
                 woken: false,
+                replace: false,
             }
         },
         |glimpse| {
@@ -16627,4 +16638,355 @@ fn a_standing_lamp_held_looks_from_home_where_it_was_asked() {
     let (above, aimed) = run(200.0);
     assert!((at_pose - above - 100).abs() <= 3, "{at_pose} {above}");
     assert!((aimed[1] + 200.0).abs() < 1.0, "{aimed:?}");
+}
+
+/// An ask, and the source of a `"replace": true` when it says one (a
+/// paired computer's is `control:<client>`, through lamp-control).
+type ReplaceAsk = (Duration, &'static Clip, Priority, Option<&'static str>);
+
+/// Fates said, as `(name, why)`.
+type Fated = Vec<(&'static str, &'static str)>;
+
+/// As [`arbitrated_run`], each ask with its replace mark, and the
+/// hand-overs the glimpses said.
+fn replace_run(
+    arbitration: bool,
+    asks: Vec<ReplaceAsk>,
+    seconds: u64,
+) -> (BodyReport, Fated, Vec<Step>, Fated) {
+    replace_run_in(arbitration, false, |_| Mood::Reading, asks, seconds)
+}
+
+/// As [`replace_run`], with the lamp's mood at each moment and the gesture
+/// pause (#2602) on or off.
+fn replace_run_in(
+    arbitration: bool,
+    gesture_pause: bool,
+    mood_at: fn(Duration) -> Mood,
+    asks: Vec<ReplaceAsk>,
+    seconds: u64,
+) -> (BodyReport, Fated, Vec<Step>, Fated) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(seconds));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits {
+        arbitration,
+        gesture_pause,
+        ..gesture_limits()
+    };
+    let time = clock.time.clone();
+    let mood_time = clock.time.clone();
+    let seen_at = clock.time.clone();
+    let mut asks = VecDeque::from(asks);
+    let (mut fates, mut seen, mut handed) = (Vec::new(), Vec::new(), Vec::new());
+    let report = run_told(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        move || Some((mood_at(mood_time.get()), 60)),
+        move || match asks.front() {
+            Some((at, clip, by, replace)) if time.get() >= *at => {
+                let asked = Asked {
+                    gesture: Some(*clip),
+                    replace: replace.is_some(),
+                    ..Asked::default()
+                };
+                let told = (asked, *by, replace.and_then(Source::new));
+                asks.pop_front();
+                told
+            }
+            _ => (Asked::default(), Priority::Conversation, None),
+        },
+        |glimpse| {
+            fates.extend(glimpse.gesture_fates);
+            handed.extend(glimpse.handed_over);
+            seen.push((
+                seen_at.get(),
+                glimpse.gesture,
+                glimpse.goals,
+                glimpse.arm_goals,
+            ));
+        },
+    );
+    (report, fates, seen, handed)
+}
+
+/// A paired computer's new motion (`replace`, at `skill`) asked while a
+/// skill's stretch plays at its widest ends it at once, with or without
+/// arbitration: the stretch eases out from where it is under the gesture's
+/// step, never a jump, and the nod plays after. The hand-over is said once.
+#[test]
+fn a_replace_ends_a_skill_motion_playing_and_the_hand_over_is_rate_limited() {
+    let ms = Duration::from_millis;
+    for arbitration in [true, false] {
+        let asks = vec![
+            (ms(8_000), &crate::clips::STRETCHING, Priority::Skill, None),
+            (
+                ms(11_200),
+                &crate::clips::NOD,
+                Priority::Skill,
+                Some("control:c_1"),
+            ),
+        ];
+        let (report, fates, seen, handed) = replace_run(arbitration, asks, 16);
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        assert_eq!(report.gestures, 2, "{arbitration}");
+        assert_eq!(
+            fates,
+            [
+                ("stretching", "taken: it plays"),
+                ("stretching", crate::moves::REPLACED),
+                ("nod", "taken: it plays"),
+            ],
+            "{arbitration}"
+        );
+        assert_eq!(handed, [("stretching", "nod")]);
+        let ended = seen.iter().position(|step| step.0 >= ms(11_200)).unwrap();
+        let nod = seen.iter().position(|step| step.1 == Some("nod")).unwrap();
+        assert!(nod > ended, "{ended} {nod}");
+        assert!(seen[ended..nod].iter().all(|step| step.1.is_none()));
+        // Each step from before the hand-over to well into the nod: the
+        // head's roll and the base's turn carry the gesture alone and move
+        // no more than its step; the arm (the gesture under the speaking
+        // lean, which eases a count or two a step) two counts over it.
+        for pair in seen[ended - 1..nod + 25].windows(2) {
+            let (before, after) = (&pair[0], &pair[1]);
+            for joint in [1, 2] {
+                let by = f32::from(after.2[joint].abs_diff(before.2[joint]));
+                assert!(
+                    by <= GESTURE_STEP[joint].ceil() + 1.0,
+                    "{arbitration} {joint} {pair:?}"
+                );
+            }
+            assert!(after.2[0].abs_diff(before.2[0]) <= 50, "{pair:?}");
+            for joint in 0..2 {
+                let by = f32::from(after.3[joint].abs_diff(before.3[joint]));
+                assert!(
+                    by <= GESTURE_STEP[3 + joint].ceil() + 2.0,
+                    "{arbitration} arm {joint} {pair:?}"
+                );
+            }
+        }
+    }
+}
+
+/// A replace never ends the conversation's or the person's motion: it is
+/// refused with why "the person is using the lamp", with or without
+/// arbitration, and what plays plays on.
+#[test]
+fn a_replace_over_the_conversation_or_the_person_is_refused() {
+    let ms = Duration::from_millis;
+    for arbitration in [true, false] {
+        for holder in [Priority::Conversation, Priority::Safety, Priority::Person] {
+            let asks = vec![
+                (ms(8_000), &crate::clips::STRETCHING, holder, None),
+                (
+                    ms(10_000),
+                    &crate::clips::NOD,
+                    Priority::Skill,
+                    Some("control:c_1"),
+                ),
+            ];
+            let (report, fates, _, handed) = replace_run(arbitration, asks, 12);
+            assert_eq!(report.gestures, 1, "{arbitration} {holder:?}");
+            assert_eq!(
+                fates,
+                [
+                    ("stretching", "taken: it plays"),
+                    ("nod", crate::moves::PERSON_USING),
+                ],
+                "{arbitration} {holder:?}"
+            );
+            assert!(handed.is_empty());
+        }
+    }
+    assert_eq!(
+        crate::moves::PERSON_USING,
+        "dropped: the person is using the lamp"
+    );
+}
+
+/// The person always first (the Reviewer-lead's P2 on #4618): while
+/// someone talks with the lamp, a paired computer's motion is refused with
+/// why "the person is using the lamp", with or without arbitration, even
+/// over a skill's gesture and even with nothing playing.
+#[test]
+fn a_replace_while_the_person_talks_with_the_lamp_is_refused() {
+    let ms = Duration::from_millis;
+    for arbitration in [true, false] {
+        for mood in [Mood::Listening, Mood::Thinking, Mood::Speaking] {
+            let talk: fn(Duration) -> Mood = match mood {
+                Mood::Listening => |_| Mood::Listening,
+                Mood::Thinking => |_| Mood::Thinking,
+                _ => |_| Mood::Speaking,
+            };
+            // Over a skill's gesture playing.
+            let asks = vec![
+                (ms(8_000), &crate::clips::STRETCHING, Priority::Skill, None),
+                (
+                    ms(10_000),
+                    &crate::clips::NOD,
+                    Priority::Skill,
+                    Some("control:c_1"),
+                ),
+            ];
+            let (_, fates, seen, handed) = replace_run_in(arbitration, false, talk, asks, 12);
+            assert!(
+                fates.contains(&("nod", crate::moves::PERSON_USING)),
+                "{arbitration} {mood:?} {fates:?}"
+            );
+            assert!(handed.is_empty(), "{arbitration} {mood:?}");
+            assert!(seen.iter().all(|step| step.1 != Some("nod")));
+            // With nothing playing.
+            let asks = vec![(
+                ms(8_000),
+                &crate::clips::NOD,
+                Priority::Skill,
+                Some("control:c_1"),
+            )];
+            let (report, fates, ..) = replace_run_in(arbitration, false, talk, asks, 10);
+            assert_eq!(report.gestures, 0, "{arbitration} {mood:?}");
+            assert_eq!(fates, [("nod", crate::moves::PERSON_USING)]);
+        }
+    }
+}
+
+/// With the gesture pause on (#2602), a skill's gesture paused because the
+/// person is speaking to the lamp is not ended by a paired computer's
+/// motion: the replace is refused, and nothing new plays over the person.
+#[test]
+fn a_replace_over_a_gesture_paused_for_talk_is_refused() {
+    let ms = Duration::from_millis;
+    for arbitration in [true, false] {
+        let asks = vec![
+            (ms(8_000), &crate::clips::STRETCHING, Priority::Skill, None),
+            (
+                ms(10_500),
+                &crate::clips::NOD,
+                Priority::Skill,
+                Some("control:c_1"),
+            ),
+        ];
+        let listening_from_ten: fn(Duration) -> Mood = |at| {
+            if at >= Duration::from_secs(10) && at < Duration::from_secs(11) {
+                Mood::Listening
+            } else {
+                Mood::Resting
+            }
+        };
+        let (_, fates, seen, handed) =
+            replace_run_in(arbitration, true, listening_from_ten, asks, 14);
+        assert!(
+            fates.contains(&("nod", crate::moves::PERSON_USING)),
+            "{arbitration} {fates:?}"
+        );
+        assert!(!fates.contains(&("stretching", crate::moves::REPLACED)));
+        assert!(handed.is_empty());
+        assert!(seen.iter().all(|step| step.1 != Some("nod")));
+    }
+}
+
+/// Without the replace mark, a gesture asked over one playing is as before:
+/// dropped without arbitration, and as busy under it at the same priority.
+#[test]
+fn without_replace_a_gesture_asked_over_one_playing_is_dropped_as_before() {
+    let ms = Duration::from_millis;
+    for (arbitration, why) in [
+        (false, "dropped: another gesture plays"),
+        (true, "dropped: busy, skill"),
+    ] {
+        let asks = vec![
+            (ms(8_000), &crate::clips::STRETCHING, Priority::Skill, None),
+            (ms(10_000), &crate::clips::NOD, Priority::Skill, None),
+        ];
+        let (report, fates, _, handed) = replace_run(arbitration, asks, 12);
+        assert_eq!(report.gestures, 1);
+        assert_eq!(fates, [("stretching", "taken: it plays"), ("nod", why)]);
+        assert!(handed.is_empty());
+    }
+}
+
+/// A replace whose new frames would tip, laid over the pose the lamp is in
+/// when it begins, ends what played and is then refused whole by V1's
+/// anti-tip rule, as any gesture is.
+#[test]
+fn a_replace_that_would_tip_from_the_pose_it_begins_in_is_refused() {
+    let ms = Duration::from_millis;
+    let asks = vec![
+        (ms(8_000), &crate::clips::STRETCHING, Priority::Skill, None),
+        (
+            ms(10_000),
+            &PAST_THE_LINE,
+            Priority::Skill,
+            Some("control:c_1"),
+        ),
+    ];
+    let (report, fates, seen, _) = replace_run(true, asks, 14);
+    assert_eq!(report.tipping.refused, 1, "{:?}", report.tipping);
+    assert_eq!(report.tipping.last_refused.unwrap().0, "past_the_line");
+    assert_eq!(
+        fates,
+        [
+            ("stretching", "taken: it plays"),
+            ("stretching", crate::moves::REPLACED),
+            ("past_the_line", "dropped: it would tip"),
+        ]
+    );
+    assert!(seen.iter().all(|step| step.1 != Some("past_the_line")));
+}
+
+/// Only lamp-control's replace is honoured, with or without arbitration:
+/// one from `control:<client>` (or as `--caller-caps` names it,
+/// `lamp-control/control:<client>`) ends a skill's motion; the same mark
+/// from a skill or another part is taken as absent, dropped as today.
+#[test]
+fn only_lamp_controls_replace_interrupts_and_any_other_askers_is_as_before() {
+    let ms = Duration::from_millis;
+    for arbitration in [true, false] {
+        for source in ["control:c_1", "lamp-control/control:c_1"] {
+            let asks = vec![
+                (ms(8_000), &crate::clips::STRETCHING, Priority::Skill, None),
+                (
+                    ms(10_000),
+                    &crate::clips::NOD,
+                    Priority::Skill,
+                    Some(source),
+                ),
+            ];
+            let (report, fates, _, handed) = replace_run(arbitration, asks, 14);
+            assert_eq!(report.gestures, 2, "{arbitration} {source}");
+            assert!(
+                fates.contains(&("stretching", crate::moves::REPLACED)),
+                "{arbitration} {source} {fates:?}"
+            );
+            assert_eq!(handed, [("stretching", "nod")]);
+        }
+        let why = if arbitration {
+            "dropped: busy, skill"
+        } else {
+            "dropped: another gesture plays"
+        };
+        for source in ["skill:foo", "voice", "unknown/control:c_1"] {
+            let asks = vec![
+                (ms(8_000), &crate::clips::STRETCHING, Priority::Skill, None),
+                (
+                    ms(10_000),
+                    &crate::clips::NOD,
+                    Priority::Skill,
+                    Some(source),
+                ),
+            ];
+            let (report, fates, _, handed) = replace_run(arbitration, asks, 12);
+            assert_eq!(report.gestures, 1, "{arbitration} {source}");
+            assert_eq!(
+                fates,
+                [("stretching", "taken: it plays"), ("nod", why)],
+                "{arbitration} {source}"
+            );
+            assert!(handed.is_empty());
+        }
+    }
 }

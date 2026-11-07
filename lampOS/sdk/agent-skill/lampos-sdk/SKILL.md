@@ -114,8 +114,10 @@ elsewhere:
   closes, the lamp gives back its light and stops its waiting lines at once.
   A script that lights the ring and exits shows it for a moment only: stay
   connected for as long as it should show.
-- **One motion at a time:** a gesture, move or feeling's move asked while
-  another still plays is refused `busy` with `retry_ms`. Wait and ask again.
+- **A new motion cuts the one playing short:** a gesture, move or
+  feeling's move asked while another plays replaces it, eased out from where
+  the body is. While the person is using the lamp, the body drops the new
+  one ("the person is using the lamp").
 - **Quiet hours:** a lamp setting (`limits.quiet_hours`, by default 22:00 to
   07:00, or `off`). `say` and `sound` are refused `quiet_hours` then; the
   light still works.
