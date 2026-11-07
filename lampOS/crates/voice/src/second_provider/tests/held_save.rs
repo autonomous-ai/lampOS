@@ -23,12 +23,33 @@ async fn run(turns: &[(&'static str, Lamp)], two_faces_at: Option<usize>) -> Vec
     run_with(turns, two_faces_at, None).await.0
 }
 
+/// As [`run`], with onboarding's "who you are" open (`true`) or past
+/// (`false`), as the walk's file would say.
+async fn run_at_setup(
+    turns: &[(&'static str, Lamp)],
+    two_faces_at: Option<usize>,
+    open: bool,
+) -> Vec<Value> {
+    run_full(turns, two_faces_at, None, Some(open)).await.0
+}
+
 /// As [`run`], with the eyes refusing the save on the yes with `refused`,
 /// and what each chat was asked.
 async fn run_with(
     turns: &[(&'static str, Lamp)],
     two_faces_at: Option<usize>,
     refused: Option<&'static str>,
+) -> (Vec<Value>, Vec<Vec<Message>>) {
+    run_full(turns, two_faces_at, refused, None).await
+}
+
+/// As [`run_with`], with "who you are" open or not as `setup` says, else
+/// as the environment's walk file says (none here).
+async fn run_full(
+    turns: &[(&'static str, Lamp)],
+    two_faces_at: Option<usize>,
+    refused: Option<&'static str>,
+    setup: Option<bool>,
 ) -> (Vec<Value>, Vec<Vec<Message>>) {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     // Request numbers of their own: lines seen are the process's.
@@ -101,6 +122,9 @@ async fn run_with(
         )
         .announcing(false)
         .reading_said_from(Arc::new(move || reading.lock().unwrap().clone()));
+    if let Some(open) = setup {
+        engine = engine.reading_setup_from(Arc::new(move || open));
+    }
     engine.memory_camera(true, 1);
     let mut before: Vec<(String, String)> = Vec::new();
     for (at, (said, lamp)) in turns.iter().enumerate() {
@@ -242,4 +266,101 @@ async fn a_dropped_held_save_after_a_plain_yes_is_told_to_the_model() {
                 && note.contains("a second face seen at the yes")),
         "{last:?}"
     );
+}
+
+/// #5684 (the Walter trace): the model said the name back with no call
+/// at all, and made none on the yes either ("Now I'll take a quick look"
+/// and `calls=none`), so the face wait closed "who you are" with the name
+/// only. While the step is open, the voice runs the save on that yes
+/// itself: the face is kept once.
+const NO_CALL_NAME_LINE: (&str, Lamp) = ("Name is Walter.", Lamp::Says(READ_BACK));
+const NO_CALL_YES: (&str, Lamp) = (
+    "Yes. That's my name.",
+    Lamp::Says("Oh, good — Walter it is, then. Now I'll take a quick look so I know your face."),
+);
+
+/// (i) The yes to a read-back the model made with no call keeps the face,
+/// with the name said back at its start or its end.
+#[tokio::test]
+async fn at_setup_a_yes_to_the_read_back_with_no_call_keeps_the_face() {
+    let sent = run_at_setup(&[NO_CALL_NAME_LINE, NO_CALL_YES], None, true).await;
+    assert_eq!(sent, kept());
+    for read_back in [
+        "Walter, did I get that right?",
+        "Did I get that right, Walter?",
+    ] {
+        let sent = run_at_setup(
+            &[("Name is Walter.", Lamp::Says(read_back)), NO_CALL_YES],
+            None,
+            true,
+        )
+        .await;
+        assert_eq!(sent, kept(), "{read_back}");
+    }
+}
+
+/// (ii) A correction, a question, the face question with the name folded
+/// in, or a second face seen at the yes: nothing kept.
+#[tokio::test]
+async fn at_setup_no_yes_to_the_read_back_keeps_nothing_with_no_call() {
+    for answer in [
+        ("No, it's Walt.", Lamp::Says("Walt, right?")),
+        (
+            "Why do you need my name?",
+            Lamp::Says("So I can greet you."),
+        ),
+    ] {
+        let sent = run_at_setup(&[NO_CALL_NAME_LINE, answer], None, true).await;
+        assert_eq!(sent, Vec::<Value>::new(), "{}", answer.0);
+    }
+    let sent = run_at_setup(
+        &[
+            (
+                "Name is Walter.",
+                Lamp::Says("Nice to meet you, Walter! May I remember your face?"),
+            ),
+            ("Yes.", Lamp::Says("Got it.")),
+        ],
+        None,
+        true,
+    )
+    .await;
+    assert_eq!(sent, Vec::<Value>::new());
+    let sent = run_at_setup(&[NO_CALL_NAME_LINE, NO_CALL_YES], Some(1), true).await;
+    assert_eq!(sent, Vec::<Value>::new());
+}
+
+/// (iii) The model calls the save after all, on the yes or a turn later:
+/// kept exactly once.
+#[tokio::test]
+async fn at_setup_a_model_call_after_the_yes_keeps_it_once() {
+    let sent = run_at_setup(
+        &[
+            NO_CALL_NAME_LINE,
+            ("Yes. That's my name.", Lamp::Saves("Got it.")),
+        ],
+        None,
+        true,
+    )
+    .await;
+    assert_eq!(sent, kept());
+    let sent = run_at_setup(
+        &[
+            NO_CALL_NAME_LINE,
+            NO_CALL_YES,
+            ("Okay.", Lamp::Saves("All set.")),
+        ],
+        None,
+        true,
+    )
+    .await;
+    assert_eq!(sent, kept());
+}
+
+/// (iv) Past "who you are" (or with no walk), a yes to a name said back
+/// runs nothing the model did not call.
+#[tokio::test]
+async fn past_setup_a_yes_to_the_read_back_with_no_call_keeps_nothing() {
+    let sent = run_at_setup(&[NO_CALL_NAME_LINE, NO_CALL_YES], None, false).await;
+    assert_eq!(sent, Vec::<Value>::new());
 }
