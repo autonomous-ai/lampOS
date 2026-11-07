@@ -14528,6 +14528,14 @@ async fn answer(
                 // keep (reviewer-three and the reviewer-lead on #3628). A
                 // recall reads, and keeps nothing.
                 let did = answer.told["remembered"] != false && answer.told.get("error").is_none();
+                // A ring refused because the ledger can't ring it (#5560) was
+                // never set: not a call of its kind, so the claim check holds
+                // a "Timer set." after it (`LAMP_ACTION_CLAIM_CHECKED`).
+                if crate::reminders::is_cannot_ring(&answer.told)
+                    && let Some(at) = turn_called.iter().rposition(|name| *name == call.name)
+                {
+                    turn_called.remove(at);
+                }
                 // A carried line's keep held for their yes (#4508): its ask
                 // is the code's own, and is said (`LAMP_KEEP_QUIETLY`).
                 if call.name == crate::remember::REMEMBER && answer.told.get("held").is_some() {

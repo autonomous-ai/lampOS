@@ -308,18 +308,22 @@ impl<P: Persistence> Consumer<P> {
         }
     }
     /// Keeps [`Self::cannot_ring`]'s file exactly while an item at the
-    /// store's revision would be refused for the ledger's own fence.
+    /// store's revision would be refused for the ledger's own fence,
+    /// rewritten each tick so it stays fresh only while this consumer runs
+    /// ([`super::CANNOT_RING_FRESH`]).
     fn judge_cannot_ring(&mut self, due: &ScheduleDue) -> io::Result<()> {
         let Some((file, kept)) = &mut self.cannot_ring else {
             return Ok(());
         };
         let refuses = self.ledger.refuses(&due.store_id, due.revision);
+        if refuses {
+            std::fs::write(&*file, b"")?;
+        }
         if *kept == Some(refuses) {
             return Ok(());
         }
-        if refuses {
-            std::fs::write(&*file, b"")?;
-        } else if let Err(error) = std::fs::remove_file(&*file)
+        if !refuses
+            && let Err(error) = std::fs::remove_file(&*file)
             && error.kind() != io::ErrorKind::NotFound
         {
             return Err(error);
@@ -1089,6 +1093,8 @@ pub(super) fn run(ledger_dir: &Path, socket: &Path, root: &Path) -> io::Result<(
     if refence {
         ledger.refence_at_start();
     }
+    // One left by an earlier consumer is never this one's judgement.
+    let _ = std::fs::remove_file(ledger_dir.join(super::CANNOT_RING_FILE));
     let mut consumer = Consumer::new(ledger, session);
     if refence {
         consumer.cannot_ring = Some((ledger_dir.join(super::CANNOT_RING_FILE), None));
