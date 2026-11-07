@@ -1825,6 +1825,7 @@ fn a_sign_in_read_failing_three_times_in_a_row_is_let_go_by_the_part() {
         targets: s.root.path().join("targets.json"),
         every: Duration::from_millis(300),
         from_machines: None,
+        engines: false,
     });
     s.start();
     let signed_in = |s: &Running| s.status()["signed_in"].clone();
