@@ -188,17 +188,56 @@ const WRITE_WORDS: [&str; 21] = [
 /// Facebook post", "the book titles" (El's P3 on #5679).
 const ALSO_A_THING: [&str; 3] = ["schedule", "post", "book"];
 
-/// Words before one of [`ALSO_A_THING`] that make it the thing read ("my
-/// schedule"), not a write ("schedule a meeting").
-const SCHEDULE_AS_A_THING: [&str; 12] = [
-    "my", "the", "tomorrow", "today", "s", "day", "calendar", "latest", "last", "newest",
-    "facebook", "page",
-];
+/// Words before one of [`ALSO_A_THING`] that make it the thing read,
+/// whatever follows: "my schedule on my calendar", "the latest post on
+/// Facebook" (El's P2 on #5696).
+const A_THING_AFTER: [&str; 6] = ["my", "the", "s", "latest", "last", "newest"];
 
-/// Words after one of [`ALSO_A_THING`] that make it a verb again, whatever
-/// is before it: "tomorrow book a meeting", "facebook post that I'm out",
-/// "latest post: say hi on Facebook" (El's P3 on #5690).
-const A_VERB_AFTER: [&str; 9] = ["a", "an", "to", "me", "that", "on", "it", "say", "saying"];
+/// Words before one of [`ALSO_A_THING`] that make it the thing read only
+/// at the request's end or before one of [`A_THING_BEFORE`]: "my latest
+/// Facebook post", "my calendar schedule for tomorrow"; else it is a verb,
+/// "tomorrow book the room", "facebook post that I'm out" (El's P3s on
+/// #5690 and #5696).
+const MAYBE_A_THING_AFTER: [&str; 6] = ["tomorrow", "today", "day", "calendar", "facebook", "page"];
+
+/// Words after one of [`ALSO_A_THING`] that keep it the thing read after
+/// one of [`MAYBE_A_THING_AFTER`].
+const A_THING_BEFORE: [&str; 3] = ["from", "for", "of"];
+
+/// Words a request asks to be read with: before a thing said with "say",
+/// the saying is what is read ("read me the last post saying sale"), not
+/// a post to write ("latest post: say hi on Facebook").
+const ASKED_TO_READ: [&str; 6] = ["read", "reads", "tell", "what", "show", "check"];
+
+/// Whether `words[at]`, one of [`ALSO_A_THING`], is the thing read.
+fn a_thing(words: &[&str], at: usize) -> bool {
+    let Some(before) = at.checked_sub(1).map(|before| words[before]) else {
+        return false;
+    };
+    if A_THING_AFTER.contains(&before) {
+        let says = words[at + 1..]
+            .iter()
+            .any(|word| ["say", "saying"].contains(word));
+        !says || words[..at].iter().any(|word| ASKED_TO_READ.contains(word))
+    } else if MAYBE_A_THING_AFTER.contains(&before) {
+        words
+            .get(at + 1)
+            .is_none_or(|next| A_THING_BEFORE.contains(next))
+    } else {
+        false
+    }
+}
+
+/// Whether "put" at `words[at]` writes: with a service named after it, or
+/// put "in", "on", "into" or "to" "my drive" (El's P3 on #5696: "put the
+/// count on the light from my drive" is the lamp's own).
+fn puts_to_a_service(words: &[&str], at: usize) -> bool {
+    let after = &words[at + 1..];
+    names_a_linked_service(&after.join(" "))
+        || after.windows(3).any(|three| {
+            ["in", "on", "into", "to"].contains(&three[0]) && three[1..] == ["my", "drive"]
+        })
+}
 
 /// Words that only ask for the skill itself, before "skill" at a request's
 /// start: "create a skill that reads my calendar" asks for a skill that
@@ -246,18 +285,10 @@ fn read_of(request: &str) -> Result<(&'static str, Option<&'static str>), &'stat
     let words = asked_of_the_skill(&words);
     let writes = words.iter().enumerate().any(|(at, word)| {
         WRITE_WORDS.contains(word)
-            && !(ALSO_A_THING.contains(word)
-                && at > 0
-                && SCHEDULE_AS_A_THING.contains(&words[at - 1])
-                && !words
-                    .get(at + 1)
-                    .is_some_and(|next| A_VERB_AFTER.contains(next)))
+            && !(ALSO_A_THING.contains(word) && a_thing(&words, at))
             // "put" writes to a service only when one is named after it:
-            // "put the count on the light" is the lamp's own. "Drive" alone
-            // is no service word, but after "put" it is Google Drive.
-            && (*word != "put"
-                || names_a_linked_service(&words[at + 1..].join(" "))
-                || words[at + 1..].contains(&"drive"))
+            // "put the count on the light" is the lamp's own.
+            && (*word != "put" || puts_to_a_service(&words, at))
     });
     if writes {
         return Err(NOT_A_WRITE);
@@ -2551,6 +2582,25 @@ light = { dim = 1 }
             "read me my latest Facebook post",
             "read me the book titles in my Google Drive",
             "read me my mail and put the count on the light",
+            // El's P2 on #5696: a word after the thing doesn't make it a
+            // verb after "my", "the", "latest", "last" or "newest".
+            "read me my schedule on my calendar",
+            "read me the schedule on my calendar",
+            "read me my latest post on Facebook",
+            "what's the latest post on Facebook",
+            "read me the newest post on my Facebook page",
+            "read the post on my page on Facebook",
+            "read me the last post to my Facebook page",
+            "read me the latest post that my Facebook page has",
+            "read the post it got on Facebook",
+            "read me the post a friend left on Facebook",
+            "read me the last post saying sale on Facebook",
+            "read my schedule from my calendar",
+            "read me tomorrow's schedule from my calendar",
+            "what's on my schedule today in my calendar",
+            "read me my calendar schedule for tomorrow",
+            "read me the files in my Google Drive and put the count on the light",
+            "read me my mail and put the count on the light from my drive",
         ] {
             assert!(brief_with(request, true).is_ok(), "{request}");
         }
@@ -2575,6 +2625,33 @@ light = { dim = 1 }
             "last post on facebook say we are open",
             "newest post to facebook saying hi",
             "read my mail then put it in my drive",
+            // El's P3s on #5696: any object after "tomorrow", "today",
+            // "day", "calendar", "facebook" or "page" and the verb.
+            "today post my photo to Facebook",
+            "today post this on Facebook",
+            "today post them to Facebook",
+            "today post something on Facebook",
+            "facebook post this",
+            "facebook post them",
+            "facebook post something nice",
+            "facebook post hello world",
+            "page post we are open today on Facebook",
+            "tomorrow book my flight on my calendar",
+            "tomorrow book us a table on my calendar",
+            "my calendar book us a table",
+            "my calendar book the room",
+            "tomorrow book the room on my calendar",
+            "my calendar book dinner",
+            "the calendar book in a meeting",
+            "the calendar schedule my week",
+            "my calendar schedule my week",
+            "my calendar schedule lunch with Sam",
+            "tomorrow schedule lunch on my calendar",
+            "calendar schedule dinner at seven",
+            "post my photo to Facebook",
+            "tomorrow post an update on Facebook",
+            "facebook post saying hi",
+            "read my mail and put the file in Google Drive",
         ] {
             assert_eq!(brief_with(request, true), Err(NOT_A_WRITE), "{request}");
         }
