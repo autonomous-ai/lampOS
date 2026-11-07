@@ -9,6 +9,7 @@ mod notice;
 mod pcm_linux;
 mod playout_continuity;
 mod playout_current_arrivals;
+mod process_wav;
 mod queued_ownership;
 mod replay;
 mod steady_reference;
