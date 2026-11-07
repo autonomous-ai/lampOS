@@ -1008,9 +1008,12 @@ more."), và một dịch vụ không có gì cho kỹ năng tự tạo đọc, 
 `NOT_READABLE` ("... can read one linked service, but not that one."). Câu nào
 cũng kết thúc bằng "You can ask me for it yourself any time." Việc xin chính skill
 không phải là ghi: các từ trước "skill" chỉ để xin nó ("create me a new skill
-that ...", "add a skill to ...") được bỏ ra trước, và "schedule" đứng sau "my",
-"the", "tomorrow's", "today's", "day" hay "calendar" là thứ được đọc (lamp-9adf,
-4/11 23:51: "create a skill that reads my calendar" đã bị từ chối vì thế). Một
+that ...", "add a skill to ...") được bỏ ra trước. "Schedule", "post" và "book"
+đứng sau "my", "the", "tomorrow's", "today's", "day", "calendar", "latest",
+"last", "newest", "facebook" hay "page" là thứ được đọc (lamp-9adf, 4/11 23:51:
+"create a skill that reads my calendar" đã bị từ chối vì thế; P3 của El trên
+#5679: "read me my latest Facebook post"), và "put" chỉ là ghi khi có một dịch
+vụ được nêu sau nó ("put the count on the light" là việc của chính lamp). Một
 lần ghi đứng sau chúng vẫn tính. Bước của lịch được cho
 trọn (hôm nay, hoặc ngày mai khi yêu cầu nói "tomorrow"), bước của thư (`recent`)
 và của Drive (`files`, mới nhất trước, `query` chỉ là từ để tìm) cũng vậy; với dịch vụ khác, brief liệt kê các việc đọc của nó trừ việc đọc
