@@ -9746,6 +9746,286 @@ async fn a_keep_said_back_to_a_yes_with_no_remember_is_a_claim() {
     }
 }
 
+/// The first builder's P3 on #5607: "Yes, please." was answered with a
+/// `recall` that found the goldfish, then "Yes, Pip is kept." twice, and
+/// the lamp said it didn't keep that. A recall of this request that found
+/// something lifts the said-back rule: its "Pip is kept." is said. A recall
+/// that found nothing does not, and an opening claim ("Kept: ...") stays a
+/// claim after a found recall too. Only a keep that names a found thing,
+/// one that holds what the yes answers, judged on finished sentences, is
+/// lifted (Thirteen's P2s on #5701).
+#[tokio::test]
+async fn a_found_recall_lets_a_yes_say_it_is_kept() {
+    let _one = crate::provider_worker::tests::one_thread();
+    let recall = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "r1",
+                crate::remember::RECALL,
+                json!({"about": "goldfish"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    // A reply's pieces as it streams, split at "|".
+    let reply = |said: &str| {
+        let mut events: Vec<_> = said.split('|').map(text).collect();
+        events.push(Ok(ChatEvent::Done));
+        events
+    };
+    let pip = "My goldfish is called Pip.";
+    let blue = "My bike is blue now.";
+    // What the yes answers, the found, the reply, what is said first, and
+    // whether it is a claim.
+    let cases: Vec<(&str, Value, &str, &str, bool)> = vec![
+        (
+            pip,
+            json!({"found": [{"text": "Their goldfish is called Pip"}]}),
+            "Yes, Pip is kept.",
+            "Yes, Pip is kept.",
+            false,
+        ),
+        (
+            pip,
+            json!({"found": [], "note": "Nothing about that in what I remember."}),
+            "Yes, Pip is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        (
+            pip,
+            json!({"found": [{"text": "Their goldfish is called Pip"}]}),
+            "Kept: your goldfish is Pip.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // Thirteen's P2-a on #5701: what is said kept must be what was
+        // found. "My bike is blue now.", a recall that found the old red
+        // bike, then "that's kept" names nothing found: a claim.
+        (
+            blue,
+            json!({"found": [{"asked_to_remember": "Their bike is red"}]}),
+            "Yes, that's kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // The bike said kept beside a found goldfish: a claim.
+        (
+            pip,
+            json!({"found": [{"text": "Their goldfish is called Pip"}]}),
+            "Yes, your bike is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // The bike's new colour said kept beside the old one: a claim.
+        (
+            blue,
+            json!({"found": [{"asked_to_remember": "Their bike is red"}]}),
+            "Yes, your bike is blue now, kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // Thirteen's restate on #5701: blue asked, the old red found, and
+        // "your bike is kept" names only what was found, yet what the yes
+        // answers (blue) was not found: a claim.
+        (
+            blue,
+            json!({"found": [{"asked_to_remember": "Their bike is red"}]}),
+            "Yes, your bike is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // Thirteen's P2 at f3cccc815d: "not red" asked, the old red found:
+        // the negation is a word no found thing holds, so a claim.
+        (
+            "My bike is not red.",
+            json!({"found": [{"asked_to_remember": "Their bike is red"}]}),
+            "Yes, your bike is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // Thirteen's P2 at aed324db5d: the found thing is negated and the
+        // line answered is not ("not red", "isn't red", "don't like"): the
+        // polarity differs, so a claim.
+        (
+            "My bike is red.",
+            json!({"found": [{"asked_to_remember": "Their bike is not red"}]}),
+            "Yes, your bike is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        (
+            "My bike is red.",
+            json!({"found": [{"asked_to_remember": "Their bike isn't red"}]}),
+            "Yes, your bike is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        (
+            "I like coffee now.",
+            json!({"found": [{"text": "They don't like coffee"}]}),
+            "Yes, coffee is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // Thirteen's P3 at aed324db5d: a lead-in after a negation ("I never
+        // said remember that ...") keeps the line's polarity: a claim.
+        (
+            "I never said remember that my bike is red.",
+            json!({"found": [{"asked_to_remember": "Their bike is red"}]}),
+            "Yes, your bike is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // Thirteen's P3 at f3cccc815d: the line's "keep in mind" is no
+        // word of what was kept: the found Pip is said kept.
+        (
+            "Keep in mind my goldfish is called Pip.",
+            json!({"found": [{"text": "Their goldfish is called Pip"}]}),
+            "Yes, Pip is kept.",
+            "Yes, Pip is kept.",
+            false,
+        ),
+        // Thirteen's new P2 on #5701: the found Pip in a sentence still
+        // streaming ("Yes, Pip is kept") lets nothing out before it ends;
+        // whole, it says the bike is kept too: a claim.
+        (
+            pip,
+            json!({"found": [{"text": "Their goldfish is called Pip"}]}),
+            "Yes, Pip is kept|, and your bike is kept too.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+    ];
+    for (asked, found, said_back, first_said, claimed) in cases {
+        {
+            let now = Instant::now();
+            let mut thread = crate::thread::Thread::new();
+            thread.person(asked, true, now);
+            thread.lamp(0, "Lovely. Want me to keep that?", now);
+            *crate::thread::THREAD.lock().unwrap() = thread;
+        }
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Yes, please.".into())].into()),
+            chats: Mutex::new(
+                vec![
+                    recall(),
+                    reply(said_back),
+                    reply(said_back),
+                    reply(said_back),
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let told = found.clone();
+        let runner: ToolRunner = Arc::new(move |_, _, _, _| {
+            let told = told.clone();
+            Box::pin(async move { told })
+        });
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            runner,
+            Arc::new(Instant::now),
+        )
+        .announcing(false);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: Vec<&String> = labels
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        assert!(
+            said.first()
+                .is_some_and(|said| said.starts_with(&format!("said:{first_said}"))),
+            "{asked}: {found}: {said_back}: {labels:?}"
+        );
+        let told = script.asked.lock().unwrap().iter().any(|messages| {
+            messages
+                .iter()
+                .any(|message| *message == Message::system(crate::remember::KEEP_CLAIMED_UNKEPT))
+        });
+        assert_eq!(told, claimed, "{asked}: {found}: {said_back}: {labels:?}");
+    }
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+}
+
+/// Thirteen's P3 on #5701: "preference" is a kept thing on a lone yes
+/// ("Your preference for green tea is saved." is a claim), yet beside a
+/// light's or volume's call of the same round "Done, your light
+/// preference is saved." confirms that call: said, its call run, and the
+/// model never told nothing was kept. Alone it is still a claim.
+#[tokio::test]
+async fn a_preference_said_saved_beside_a_light_call_is_that_calls() {
+    type Chats = Vec<Vec<Result<ChatEvent, net::Error>>>;
+    let line = "Done, your light preference is saved.";
+    let cases: Vec<(Chats, String, bool)> = vec![
+        (
+            vec![
+                vec![
+                    text(line),
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        "light_on",
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![Ok(ChatEvent::Done)],
+            ],
+            format!("said:{line}"),
+            false,
+        ),
+        (
+            vec![
+                vec![
+                    text("Your preference for green tea is saved."),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Okay."), Ok(ChatEvent::Done)],
+            ],
+            "said:Okay.".to_owned(),
+            true,
+        ),
+    ];
+    for (chats, first_said, claimed) in cases {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Yes.".into())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let runner: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) }));
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            runner,
+            Arc::new(Instant::now),
+        )
+        .announcing(false);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: Vec<&String> = labels
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        assert!(
+            said.first().is_some_and(|said| **said == first_said),
+            "{first_said}: {labels:?}"
+        );
+        let told = script.asked.lock().unwrap().iter().any(|messages| {
+            messages
+                .iter()
+                .any(|message| *message == Message::system(crate::remember::KEEP_CLAIMED_UNKEPT))
+        });
+        assert_eq!(told, claimed, "{first_said}: {labels:?}");
+    }
+}
+
 /// Finding K2 on #3504 (lamp-06c1, 28 Oct, "Want me to keep that as the
 /// change? Kept — library now, not the bakery."): an offer to keep, beside
 /// the `remember` call that keeps it or after one, is not said; with no

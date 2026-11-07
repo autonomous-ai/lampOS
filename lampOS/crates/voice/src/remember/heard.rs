@@ -75,6 +75,9 @@ const LEAD_INS: &[&str] = &[
     "can you remember that",
     "could you remember that",
     "keep in mind that",
+    // Thirteen's P3 at f3cccc815d on #5701: "Keep in mind my goldfish is
+    // called Pip." is the goldfish's line.
+    "keep in mind",
     "remember that",
     "remember",
     "hãy nhớ giúp tôi là",
@@ -413,11 +416,15 @@ fn yes_alone_told(done: Option<super::MemoryDone>, forget: bool) -> Value {
 /// is done already, by what was done, and what was done. On lamp-06c1 at
 /// build 10538 (6 Nov, S13 req 339) "Yes. Please forget it." after a done
 /// forget was answered with a `recall`, not a `forget`, so [`yes_alone`]
-/// never saw it, and the lamp asked again what to forget. `None` else.
+/// never saw it, and the lamp asked again what to forget. The note is
+/// `None` for a line that only acknowledges or hesitates ([`affirms`]:
+/// "Okay.", "Um."), while the done write is still given: it backs that
+/// turn's "Pip is kept." all the same (Thirteen's P2 on #5701). `None`
+/// else.
 pub(crate) fn done_already(
     request: u64,
     lease: Option<&crate::memory_scope::ScopeLease>,
-) -> Option<(String, super::MemoryDone)> {
+) -> Option<(Option<String>, super::MemoryDone)> {
     if !on() || released(lease).is_some() {
         return None;
     }
@@ -437,7 +444,7 @@ pub(super) fn done_already_in(
     thread: &crate::thread::Thread,
     (request, whose, now): (u64, Option<&str>, Instant),
     done: Option<super::DoneWrite>,
-) -> Option<(String, super::MemoryDone)> {
+) -> Option<(Option<String>, super::MemoryDone)> {
     use super::MemoryDone;
     let done = done_last_turn(thread, request, done)?;
     // A lamp's answer that asked nothing offers nothing to keep
@@ -454,13 +461,20 @@ pub(super) fn done_already_in(
                 only_a_yes(&rest.join(" "))
             })
     };
-    if !said.as_deref().is_some_and(yes)
-        || thread.lamp_asked_by_its_end(request)
+    let said = said.filter(|line| yes(line))?;
+    if thread.lamp_asked_by_its_end(request)
         || thread
             .offered_line(request, whose, now, offers_to_keep, only_a_yes)
             .is_some()
     {
         return None;
+    }
+    // Only a real yes, or an ask to keep or forget, is told to confirm; a
+    // bare "Okay." still has the done write back its turn (Thirteen's P2
+    // on #5701: else "Great, Pip is kept." was held as a claim, and the
+    // lamp said it didn't keep what it had).
+    if !affirms(&said) {
+        return Some((None, done));
     }
     let note = match done {
         MemoryDone::Kept => DONE_ALREADY_KEPT,
@@ -468,7 +482,84 @@ pub(super) fn done_already_in(
         MemoryDone::Forgotten => DONE_ALREADY_FORGOTTEN,
     };
     eprintln!("{DONE_ALREADY_TOLD_LINE}");
-    Some((format!("{DONE_ALREADY_TOLD} {note})"), done))
+    Some((Some(format!("{DONE_ALREADY_TOLD} {note})")), done))
+}
+
+/// What heard line `request`, only a yes, answers: the line the lamp's
+/// offer before it was about ([`crate::thread::Thread::offered_line`]),
+/// else the person's line of the exchange just before it, when that says
+/// more than yes, its lead-in ([`LEAD_INS`]: "Keep in mind …") left out. A
+/// said-back keep after a found `recall` must name what this line holds
+/// (`remember::said_kept_found`, Thirteen's P2 and P3 on #5701).
+pub(crate) fn yes_answers(
+    request: u64,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Option<String> {
+    let thread = crate::thread::THREAD.lock().ok()?;
+    thread
+        .offered_line(
+            request,
+            writes_for(lease),
+            Instant::now(),
+            offers_to_keep,
+            only_a_yes,
+        )
+        .or_else(|| {
+            thread
+                .said_last_but(request, &[])
+                .map(|(person, _)| person)
+                .filter(|person| !only_a_yes(person))
+        })
+        .map(|line| yes_line(&line).to_owned())
+}
+
+/// [`yes_answers`]'s line without its lead-in ([`without_lead_in`]),
+/// unless a negation comes before the lead-in ([`super::negates`]): "I
+/// never said remember that my bike is red." stays whole, so its "never"
+/// is kept (Thirteen's P3 at aed324db5d on #5701).
+fn yes_line(line: &str) -> &str {
+    let rest = without_lead_in(line);
+    let before = &line[..line.len() - rest.len()];
+    if super::negates(before) { line } else { rest }
+}
+
+/// Whether [`done_already`]'s answer backs this turn's keep claim
+/// (`second_provider`'s `kept_now`): a done keep or change does, with its
+/// note or without ("Okay." after a done keep, Thirteen's P2 on #5701); a
+/// done forget does not.
+pub(crate) fn done_backs_a_keep(done: Option<&(Option<String>, super::MemoryDone)>) -> bool {
+    done.is_some_and(|(_, done)| *done != super::MemoryDone::Forgotten)
+}
+
+/// The words of a line that is only a yes that make it a real yes, or an
+/// ask to keep or forget, without accents ([`affirms`]): "Yes.", "Yeah.",
+/// "Please.", "Keep that.", "Go ahead.", "Vâng.", "Có.", "Ừ.".
+const AFFIRMS: &[&str] = &[
+    "yes",
+    "yeah",
+    "yep",
+    "yup",
+    "please",
+    "keep",
+    "go",
+    "do",
+    "absolutely",
+    "definitely",
+    "vang",
+    "co",
+    "da",
+    "u",
+    "giup",
+];
+
+/// Whether `line` says a real yes, or asks to keep or forget ([`AFFIRMS`]),
+/// for [`done_already_in`]: the first builder's P3 on #5607, after a done
+/// keep "Okay.", "Okay, thanks.", "Um.", "Right." and "Sure." only
+/// acknowledge or hesitate, and a person would not answer them that it is
+/// kept. [`only_a_yes`] stays as it is for [`yes_alone`], where the model
+/// has already called.
+fn affirms(line: &str) -> bool {
+    words(line).any(|word| AFFIRMS.contains(&bare(&word).as_str()) || asks_to_forget(&word))
 }
 
 /// What of `done`, the scope's last memory write done and the request it
@@ -1435,6 +1526,7 @@ mod tests {
                 Some((done, Some(1))),
             )
             .unwrap();
+            let told = told.unwrap();
             assert_eq!(was, done);
             assert!(told.starts_with(DONE_ALREADY_TOLD), "{told}");
             assert!(told.contains(note), "{told}");
@@ -1483,6 +1575,60 @@ mod tests {
         }
     }
 
+    /// The first builder's P3 on #5607: after a done keep, a line that only
+    /// acknowledges or hesitates ("Okay.", "Okay, thanks.", "Um.", "Right.",
+    /// "Sure.") is not told before it answers that it is kept; a real yes or
+    /// an ask to keep ("Yes.", "Yeah.", "Please.", "Keep that.", "Go
+    /// ahead.", "Vâng.") is. [`only_a_yes`] itself is unchanged, for
+    /// [`yes_alone`], where the model has already called. The done write is
+    /// still given for the bare one, so it backs that turn's "Pip is kept."
+    /// (Thirteen's P2 on #5701).
+    #[test]
+    fn a_bare_okay_or_um_after_a_done_keep_is_not_told_it_is_kept() {
+        use super::super::MemoryDone;
+        use crate::thread::Thread;
+        let now = Instant::now();
+        let after = |person: &str| {
+            let mut thread = Thread::new();
+            thread.person("My goldfish is called Pip.", true, now);
+            thread.lamp(1, "Kept: your goldfish is Pip.", now);
+            thread.person(person, true, now);
+            thread
+        };
+        let kept = Some((MemoryDone::Kept, Some(1)));
+        for said in [
+            "Okay.",
+            "Okay, thanks.",
+            "Um.",
+            "Right.",
+            "Sure.",
+            "Alright.",
+        ] {
+            assert!(only_a_yes(said), "{said}");
+            let told = done_already_in(&after(said), (2, None, now), kept);
+            assert_eq!(told, Some((None, MemoryDone::Kept)), "{said}");
+            // Thirteen's P2 on #5701: the done keep still backs "Great, Pip
+            // is kept.", so it is said, never "I didn't keep that".
+            assert!(done_backs_a_keep(told.as_ref()), "{said}");
+        }
+        for said in [
+            "Yes.",
+            "Yeah.",
+            "Please.",
+            "Keep that.",
+            "Go ahead.",
+            "Okay, please.",
+            "Vâng.",
+        ] {
+            let told = done_already_in(&after(said), (2, None, now), kept);
+            assert!(
+                told.as_ref().is_some_and(|(note, _)| note.is_some()),
+                "{said}"
+            );
+            assert!(done_backs_a_keep(told.as_ref()), "{said}");
+        }
+    }
+
     /// The Reviewer-lead's P2 on #5607: a done write is "your last turn"'s
     /// only for the yes just after the turn it was done in. "My bike is
     /// blue." was kept (request 1); "My goldfish is called Pip." was
@@ -1521,5 +1667,40 @@ mod tests {
         thread.lamp(1, "Kept: your bike is blue.", now);
         thread.person("Yes. Please keep that.", true, now);
         assert!(done_already_in(&thread, (2, None, now), bike).is_some());
+    }
+
+    /// Thirteen's P3 at f3cccc815d on #5701: "keep in mind" is a lead-in,
+    /// cut from the line a yes answers as "keep in mind that" is.
+    #[test]
+    fn keep_in_mind_is_a_lead_in() {
+        assert_eq!(
+            without_lead_in("Keep in mind my goldfish is called Pip."),
+            "my goldfish is called Pip."
+        );
+        assert_eq!(
+            without_lead_in("Keep in mind that my goldfish is called Pip."),
+            "my goldfish is called Pip."
+        );
+    }
+
+    /// Thirteen's P3 at aed324db5d on #5701: the line a yes answers loses
+    /// its lead-in only when nothing before it negates the line.
+    #[test]
+    fn a_yes_line_keeps_a_negation_before_its_lead_in() {
+        assert_eq!(
+            yes_line("Keep in mind my goldfish is called Pip."),
+            "my goldfish is called Pip."
+        );
+        assert_eq!(
+            yes_line("Hey Lamp, please remember that my tea is green."),
+            "my tea is green."
+        );
+        for line in [
+            "I never said remember that my bike is red.",
+            "I didn't say remember that my bike is red.",
+            "No, don't remember that my bike is red.",
+        ] {
+            assert_eq!(yes_line(line), line);
+        }
     }
 }
