@@ -1871,7 +1871,7 @@ const ALREADY_YES: &str = "The person has already said yes to this task as you s
 ///   said and whether it was cut) is within [`CONFIRM_WITHIN`], was not cut
 ///   (the Reviewer-lead's P3 on #5609), ends with a question, names who the
 ///   task was prepared for, and holds every one of the task's content
-///   words, or a near form of each ([`reads_back`]).
+///   words, each by a spoken word of the same stem ([`reads_back`]).
 ///
 /// The guard that a yes comes only after a read-back stays: this rule only
 /// recognizes a read-back said in words, before the call.
@@ -1997,7 +1997,9 @@ fn content_words(text: &str) -> Vec<String> {
 /// A word without a plural's or a verb's ending ("files", "boxes",
 /// "fixing", "failed") and then a final "e", so "files" and "file", or
 /// "changed" and "change", are one word. Each cut leaves at least three
-/// letters. Kept simple: [`reads_back`] allows one word this misses.
+/// letters. Kept simple: a word this leaves apart from the task's is not
+/// read back ([`stands_for`]), which costs a second yes, never work
+/// started unheard.
 fn stem(word: &str) -> &str {
     let mut word = word;
     for ending in ["ing", "ed", "es", "s"] {
@@ -2012,51 +2014,19 @@ fn stem(word: &str) -> &str {
 }
 
 /// Whether `said` stands for the task's word `word`: the same stem
-/// ([`stem`]), or a near form of it: one a prefix of the other with at
-/// least four letters shared ("config", "configuration"), or one letter
-/// apart in words of five letters or more ("summarise", "summarize"). No
-/// task word may go missing: a flat allowance of one let a short task go
-/// unread, "Reboot" read back as "Claude Code will do it", or "force" drop
-/// from "Force push to main" (the Reviewer-lead's second P2 on #5609).
+/// ([`stem`]), and nothing else. No near form: a prefix or one letter apart
+/// let another word stand in, "remote" for "remove" or "kill" for
+/// "killall" (the Reviewer-lead's third P2 on #5609).
 fn stands_for(said: &str, word: &str) -> bool {
-    stem(said) == stem(word) || near(said, word) || near(stem(said), stem(word))
-}
-
-/// [`stands_for`]'s near form.
-fn near(a: &str, b: &str) -> bool {
-    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
-    let (short, long) = if a.len() <= b.len() {
-        (&a, &b)
-    } else {
-        (&b, &a)
-    };
-    if short.len() >= 4 && long.starts_with(short) {
-        return true;
-    }
-    if short.len() < 5 || long.len() - short.len() > 1 {
-        return false;
-    }
-    // One letter apart: one changed, or one more in the longer word.
-    let first = short
-        .iter()
-        .zip(long.iter())
-        .take_while(|(x, y)| x == y)
-        .count();
-    if first >= short.len() {
-        return true;
-    }
-    if short.len() == long.len() {
-        short[first + 1..] == long[first + 1..]
-    } else {
-        short[first..] == long[first + 1..]
-    }
+    stem(said) == stem(word)
 }
 
 /// Whether the lamp's `line` says `pending` back: it names who the task was
 /// prepared for (the name, or a form the voice hears for it, spaces aside)
-/// and holds every one of the task's content words, or a near form of each
-/// ([`stands_for`]). Only the one-yes rule ([`yes_in_the_same_turn`]) reads
-/// it.
+/// and holds every one of the task's content words, each by a spoken word
+/// of its own with the same stem ([`stands_for`]): one spoken word stands
+/// for one task word at most. Only the one-yes rule
+/// ([`yes_in_the_same_turn`]) reads it.
 fn reads_back(line: &str, pending: &Pending) -> bool {
     let words = plain_words(line);
     let joined: String = words.concat();
@@ -2072,11 +2042,16 @@ fn reads_back(line: &str, pending: &Pending) -> bool {
             !name.is_empty() && joined.contains(&name)
         });
     let task = content_words(&pending.text);
+    let mut unused: Vec<&str> = words.iter().map(String::as_str).collect();
     named
         && !task.is_empty()
-        && task
-            .iter()
-            .all(|word| words.iter().any(|said| stands_for(said, word)))
+        && task.iter().all(|word| {
+            unused
+                .iter()
+                .position(|said| stands_for(said, word))
+                .map(|at| unused.swap_remove(at))
+                .is_some()
+        })
 }
 
 /// The note a request is given beside its words on a route that keeps only
@@ -3392,7 +3367,7 @@ pub(crate) mod tests {
     }
 
     /// The Reviewer-lead's second P2 on #5609: no task word may go missing,
-    /// whatever the task's length; only a near form of it stands for it.
+    /// whatever the task's length.
     #[test]
     fn one_yes_needs_every_task_word_read_back() {
         let at = Instant::now();
@@ -3439,15 +3414,53 @@ pub(crate) mod tests {
                 "Empty the trash and delete Downloads",
                 "Claude Code will empty the trash and delete your Downloads. Shall I start it?",
             ),
-            // A near form: a prefix of four letters or more, or one letter
-            // apart in a word of five or more.
+        ] {
+            assert!(reads_back(line, &task(text)), "{text} / {line}");
+        }
+    }
+
+    /// The Reviewer-lead's third P2 on #5609: a task word is read back only
+    /// by a spoken word of the same stem, never a near one, and each spoken
+    /// word stands for one task word at most.
+    #[test]
+    fn one_yes_matches_task_words_by_stem_one_for_one() {
+        let task = |text: &str| Pending {
+            text: text.into(),
+            ..moon(Instant::now())
+        };
+        for (text, line) in [
             (
-                "Refactor the configuration loader",
-                "Claude Code will refactor the config loader. Shall I start it?",
+                "Remove the remote origin",
+                "Claude Code will show the remote origin. Shall I start it?",
             ),
             (
-                "Summarise the meeting notes",
-                "Claude Code will summarize the meeting notes. Shall I start it?",
+                "killall node",
+                "Claude Code will kill node. Shall I start it?",
+            ),
+            (
+                "Write a note about the release",
+                "Claude Code wrote a note about the release. Shall I start it?",
+            ),
+            (
+                "Revert the last commit",
+                "Claude Code will reverse the last commit. Shall I start it?",
+            ),
+            // One spoken "test" for the task's "test" and "tests".
+            (
+                "Test the tests",
+                "Claude Code will test it. Shall I start it?",
+            ),
+        ] {
+            assert!(!reads_back(line, &task(text)), "{text} / {line}");
+        }
+        for (text, line) in [
+            (
+                "Remove the remote origin",
+                "Claude Code will remove the remote origin. Shall I start it?",
+            ),
+            (
+                "Test the tests",
+                "Claude Code will test the tests. Shall I start it?",
             ),
         ] {
             assert!(reads_back(line, &task(text)), "{text} / {line}");
