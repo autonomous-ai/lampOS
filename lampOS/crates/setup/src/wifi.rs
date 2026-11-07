@@ -625,11 +625,9 @@ pub fn within(
             let _ = child.wait();
             return Err(std::io::Error::new(
                 std::io::ErrorKind::TimedOut,
-                format!(
-                    "{:?} took longer than {} s",
-                    command.get_program(),
-                    most.as_secs()
-                ),
+                // `{:?}` keeps a sub-second bound readable: "800ms", not "0 s"
+                // (Jarvis's P3 1 on #5576).
+                format!("{:?} took longer than {most:?}", command.get_program()),
             ));
         }
         std::thread::sleep(Duration::from_millis(100));
