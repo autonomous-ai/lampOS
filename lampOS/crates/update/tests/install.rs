@@ -2238,6 +2238,22 @@ fn the_product_is_a_private_room_with_its_owner() {
     );
 }
 
+/// A lamp flashed with an older image takes stable's build between the join
+/// and the marker, for an app that asks, so its first walk runs stable's
+/// code (#5458, lamp-setup's `first_update`).
+#[test]
+fn the_product_setup_updates_before_the_walk() {
+    let setup = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-setup.service")
+        .unwrap()
+        .1;
+    assert!(
+        section(setup, "Service").contains(&"Environment=LAMP_SETUP_UPDATE_FIRST=on"),
+        "setup lacks its first update"
+    );
+}
+
 /// Only faces of people at the desk count as people at the lamp
 /// (`LAMP_FACES_AT_DESK_ONLY`): on lamp-a0ae on 2 Nov tiny, unsure faces
 /// beside the owner held their name back on 51 of 79 turns as "more than one
