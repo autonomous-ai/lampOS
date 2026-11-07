@@ -841,7 +841,8 @@ comment on the Queue holds that head too. A HOLD closed in words only is
 lifted by the PM with a line in `holds-lifted.tsv`, noted on the pull
 request. **TWO READS** (in capitals), said in a comment's first line,
 anywhere in a `READ ASK` or anywhere in the body, need two different
-readers on the head; an ask on the Queue is not read. A line opening
+readers on the head, as does a Queue `READ ASK` naming the pull request
+(its head or `#N` on the first line). A line opening
 `ONE READ` then `:`, a dash, `(` or the line's end, outside quotes, fences
 and indented code, opts out of a
 mere mention in its own text only; a later `ONE READ` doesn't undo an ask. A pull
