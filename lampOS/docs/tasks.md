@@ -2440,21 +2440,24 @@ tasks flags; it needs only the tasks part):
     holds every one of the task's content words, none missing. Content
     words are lower case, with common short words ("did" and "does" among
     them) left out, and for a question task they come from its question
-    alone. A task word counts as read back when the read-back has the
-    same stem (a plural or verb "s", "es", "ing" or "ed" and a final "e"
-    set aside, so "files" matches "file" and "fixing" matches "fix"), or a
-    near form: one a prefix of the other with at least four letters
-    shared ("config" for "configuration"), or one letter apart in words of
-    five letters or more ("summarize" for "summarise"). A read-back that
-    drops any word never starts the task: for "Delete all the files in my
-    Downloads folder and empty the trash", "Claude Code will delete the
-    files in your Downloads folder. Shall I start it?" misses "all",
-    "empty" and "trash"; "Reboot" read back as "Claude Code will do it",
-    "delete Downloads" as "Claude Code will delete that", "Force push to
-    main" without "force", and "Empty the trash and delete Downloads"
-    without "trash" or without "downloads" are all refused (the
-    Reviewer-lead's P2s on #5609). Before, half the content words, and
-    then all but one, were enough, and the unheard part started;
+    alone. A task word counts as read back only when a spoken word of
+    the read-back has the same stem (a plural or verb "s", "es", "ing" or
+    "ed" and a final "e" set aside, so "files" matches "file" and "fixing"
+    matches "fix"), and each spoken word stands for one task word at most:
+    "Test the tests" read back as "Claude Code will test it" is refused.
+    No near form counts: "remote" never stands for "remove", "kill" for
+    "killall", "wrote" for "write" or "reverse" for "revert". A stem this
+    leaves apart costs a second yes, never work started unheard. A
+    read-back that drops any word never starts the task: for "Delete all
+    the files in my Downloads folder and empty the trash", "Claude Code
+    will delete the files in your Downloads folder. Shall I start it?"
+    misses "all", "empty" and "trash"; "Reboot" read back as "Claude Code
+    will do it", "delete Downloads" as "Claude Code will delete that",
+    "Force push to main" without "force", and "Empty the trash and delete
+    Downloads" without "trash" or without "downloads" are all refused
+    (the Reviewer-lead's P2s on #5609). Before, half the content words,
+    then all but one, and then near forms were enough, and the unheard
+    part started;
   - that line was not cut. It is marked cut on its own exchange, so a yes
     in any later request reads it as cut too: kept as heard after a cut
     (`thread::heard_only`, the second route with `LAMP_SAID_AS_HEARD=on`),
@@ -2483,6 +2486,7 @@ every description, answer and line is byte-for-byte as before
 `one_yes_starts_only_a_task_read_back_whole`,
 `one_yes_never_counts_over_a_cut_read_back`,
 `one_yes_needs_every_task_word_read_back`,
+`one_yes_matches_task_words_by_stem_one_for_one`,
 `a_start_over_the_lamps_voice_or_after_a_stop_marks_the_read_back_cut`
 (in both `provider_worker` and `second_provider`),
 `thread::tests::answered_last_but_cut_says_a_read_back_was_cut`,
