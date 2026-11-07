@@ -179,9 +179,10 @@ It builds the processor as the capture worker does,
 writes the canceller's linear output (before the residual echo suppressor and
 noise suppression) in place of the final output. Software adds nothing else
 between ALSA and `mic2/audio`: no gain and no AGC. Any other format is refused
-and nothing is written. The tail is padded to a whole 10 ms block and the
-output trimmed back to the input's length. It prints one line: blocks
-processed and the input and output RMS in dBFS.
+and nothing is written; so is a WAV with no samples ("has no samples"). The
+tail is padded to a whole 10 ms block and the output trimmed back to the
+input's length. It prints one line: blocks processed and the input and output
+RMS in dBFS.
 
 What it does not model:
 

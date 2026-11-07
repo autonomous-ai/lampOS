@@ -67,6 +67,13 @@ pub fn process(
     let samples = reader
         .samples::<i16>()
         .collect::<std::result::Result<Vec<_>, _>>()?;
+    if samples.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("{} has no samples", input.display()),
+        )
+        .into());
+    }
 
     let mut echo = EchoProcessor::with_reference(noise_suppression, Reference::AsGiven);
     if linear {
