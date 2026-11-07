@@ -94,6 +94,22 @@ class SamePatch(unittest.TestCase):
         q = self.jsonl("q.jsonl", [self.ask("deadbeef0123456789"), self.ask(self.A)])
         self.assertEqual(self.same_patch(self.B, c, q), [self.B, self.A])
 
+    def test_a_signed_queue_ask_on_an_earlier_head_is_offered(self):
+        # 7 Nov (#5653's P3s): the Queue's shas come from reads2.py (--queue-shas), so a signed ask with words between
+        # READ ASK and its sha survives a plain rebase, as reads2.py's queue_asks reads it.
+        c = self.jsonl("c.jsonl", [])
+        for first in ("Sixth, READ ASK to **El**: `" + self.A[:10] + "`", "Twelve — READ ASK " + self.A):
+            q = self.jsonl("q.jsonl", [{"login": "writer-a", "body": first + "\nTWO READS."}])
+            self.assertEqual(self.same_patch(self.B, c, q), [self.B, self.A], first)
+
+    def test_a_queue_sha_off_an_asking_first_line_is_not_offered(self):
+        # A sha in prose that mentions a READ ASK, or on line two, is no candidate (reads2.py wouldn't count it).
+        c = self.jsonl("c.jsonl", [])
+        for body in ("the hour #5653 had a READ ASK " + self.A[:10] + " naming TWO READS",
+                     "READ ASK #5653\nREAD ASK " + self.A[:10] + ", TWO READS."):
+            q = self.jsonl("q.jsonl", [{"login": "writer-a", "body": body}])
+            self.assertEqual(self.same_patch(self.B, c, q), [self.B], body)
+
     def test_a_sha_in_both_files_is_printed_once(self):
         c = self.jsonl("c.jsonl", [{"login": "writer-b", "body": "READ-OK " + self.A}])
         q = self.jsonl("q.jsonl", [self.ask(self.A)])

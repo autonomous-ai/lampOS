@@ -453,6 +453,32 @@ class BotDryRound(Repo):
         self.assertIn("dry: no-crates lane: nothing eligible", lines)
         self.assertNothingChanged()
 
+    # 7 Nov (#5653's P3s): when the PR's commits can't be listed (git rev-list origin/lamp-voice..HEAD fails), the PR
+    # sits out the round, in the bot and in still-eligible.sh, instead of reading Queue asks against its head alone.
+    def unlisted(self, n):
+        bogus = "f" * 40
+        self.fakefile("head-%d.txt" % n, bogus + "\n")
+        self.fakefile("comments-%d.json" % n, json.dumps({"login": "w1", "body": "READ-OK " + bogus,
+                                                          "created_at": "2026-11-04T01:00:00Z"}) + "\n")
+
+    def test_a_pr_whose_commits_cant_be_listed_sits_out(self):
+        r, lines = self.bot(before=lambda: self.unlisted(7))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("#7 left out: its commits can't be listed", r.stderr)
+        self.assertIn("dry: crate lane: would carry 8 9 onto " + self.base[:9], lines)
+        self.assertIn("dry: no-crates lane: nothing eligible", lines)
+        self.assertNothingChanged()
+
+    def test_still_eligible_fails_when_commits_cant_be_listed(self):
+        self.pr(8, ["lampOS/crates/x/src/lib.rs"])
+        os.makedirs(self.state, exist_ok=True)
+        r = run(["zsh", os.path.join(HERE, "still-eligible.sh"), "8"], self.work, env=self.env, check=False)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.unlisted(8)
+        r = run(["zsh", os.path.join(HERE, "still-eligible.sh"), "8"], self.work, env=self.env, check=False)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("#8: its commits can't be listed", r.stdout)
+
     def test_either_queue_unread_makes_nothing_eligible(self):
         for issue in (4710, 5385):
             for f in os.listdir(self.fake):

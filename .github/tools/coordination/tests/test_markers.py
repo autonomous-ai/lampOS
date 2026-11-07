@@ -501,6 +501,33 @@ class QueueAsks(unittest.TestCase):
         # Prose naming a READ ASK after a comma but not as the marker still asks nothing.
         self.assertEqual(self.reads([c("writer-a", "Faye, 07:28, the hour: #5650's READ ASK was posted, TWO READS")]), "none")
 
+    def test_a_dash_signed_queue_read_ask(self):
+        # 7 Nov (#5653's P3s): signed with an em dash, an en dash or a spaced hyphen before READ ASK.
+        for first in ("Twelve — READ ASK #5650", "Twelve – READ ASK #5650", "Second - READ ASK #5650",
+                      "Second - **READ ASK** `" + HEAD[:10] + "`"):
+            self.assertEqual(self.reads([c("writer-a", first + "\nTWO READS.")]), "short 1", first)
+        # Prose mid-line, or a hyphen inside a word, still asks nothing.
+        for first in ("Faye, 07:28 the hour. #5650 had a READ ASK naming TWO READS", "the pre-READ ASK note for #5650"):
+            self.assertEqual(self.reads([c("writer-a", first + "\nTWO READS.")]), "none", first)
+
+    def test_queue_shas_takes_only_asking_first_lines(self):
+        # 7 Nov (#5653's P3s): `reads2.py --queue-shas FILE` gives lib.sh's coord_same_patch the shas on Queue first lines
+        # QUEUE_ASK takes, so both read one regex.
+        from reads2 import queue_shas
+        q = [c("writer-a", "Sixth, READ ASK to **El**: `" + HEAD[:10] + "`\nTWO READS."),
+             c("writer-a", "Twelve — READ ASK " + OTHER + "\nTWO READS."),
+             c("writer-a", "the hour #5650 had a READ ASK abcdef1234 naming TWO READS"),
+             c("writer-a", "READ ASK #5650\nat 1234567abc, TWO READS.")]
+        self.assertEqual(queue_shas(q), [HEAD[:10], OTHER])
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
+            f.write("".join(json.dumps(x) + "\n" for x in q)); qpath = f.name
+        try:
+            r = subprocess.run([sys.executable, "-I", os.path.join(HERE, "reads2.py"), "--queue-shas", qpath],
+                               capture_output=True, text=True, check=True)
+            self.assertEqual(r.stdout.split(), [HEAD[:10], OTHER])
+        finally:
+            os.unlink(qpath)
+
     def test_a_queue_read_ask_on_an_older_commit_of_the_pr(self):
         # 7 Nov (the second reviewer's HOLD on #5653): asked at OTHER, then a fix pushed on top (another patch). The ask
         # counts by the PR's commits, but a READ-OK on OTHER still does not count as a read on HEAD.
