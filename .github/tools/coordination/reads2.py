@@ -90,31 +90,36 @@ def body_names_unasked(body):
 # first line opens with READ ASK (or has it right after a signature's colon) and names the PR, by a commit its head (or a same-patch head) starts with, or by "#N", and
 # the comment names TWO READS as a body does (body_asks, with its opt-out). The bot passes the Queue (--queue, lib.sh's
 # coord_queue: every Queue issue's last 3 days) and the PR's number (--pr).
+# 7 Nov (the second reviewer's HOLD on #5653): a sha also asks when it names any commit of the PR (--pr-commits, one sha a
+# line: the bot's git rev-list origin/lamp-voice..HEAD), so an ask at a head a later fix moved past (another patch) still
+# asks. Those commits are used only to match Queue asks: which READ-OKs count is still decided by the heads alone.
 QUEUE_SHA = re.compile(r"\b[0-9a-f]{7,40}\b")
-# The marker opens the line or follows a signature's colon ("El, 05:18, to **Faye**: **READ ASK (restate) [#5633]"), so
+# The marker opens the line or follows a signature's colon ("El, 05:18, to **Faye**: **READ ASK (restate) [#5633]") or
+# comma (7 Nov, #5653: "Sixth, READ ASK to the **Reviewer-lead**: [#5570]", "Friday, 17:51, READ ASK to ..."), so
 # an hourly that mentions a READ ASK in its prose ("#5650 had a READ ASK naming …") asks nothing.
-QUEUE_ASK = re.compile(r"(?:^|:)[\s*_`]*READ ASK\b")
+QUEUE_ASK = re.compile(r"(?:^|[:,])[\s*_`]*READ ASK\b")
 
 
-def queue_asks(queue, heads, pr, writers):
-    """Whether a writer's Queue READ ASK names this PR (by head or number) and TWO READS."""
+def queue_asks(queue, heads, pr, writers, commits=()):
+    """Whether a writer's Queue READ ASK names this PR (by head, one of its commits, or number) and TWO READS."""
+    shas = list(heads) + list(commits or ())
     for q in queue or ():
         first = q["body"].lstrip().split("\n", 1)[0]
         if not is_writer(q, writers) or not QUEUE_ASK.search(first):
             continue
-        by_head = any(h.startswith(m) for m in QUEUE_SHA.findall(first) for h in heads)
+        by_head = any(h.startswith(m) for m in QUEUE_SHA.findall(first) for h in shas)
         by_number = bool(pr) and re.search(r"#%s(?!\d)" % re.escape(str(pr)), first)
         if (by_head or by_number) and body_asks(q["body"]):
             return True
     return False
 
 
-def two_reads(items, heads, writers, queue=None, pr=None):
+def two_reads(items, heads, writers, queue=None, pr=None, commits=()):
     """items: dicts {login, body} in posting order, the PR body as {pr_body: true}. heads: the head sha, or a list of it
-    and earlier heads with the same patch. queue: the Queue's comments (queue_asks), pr: the PR's number. Returns "none",
+    and earlier heads with the same patch. queue: the Queue's comments (queue_asks), pr: the PR's number, commits: the PR's commits (Queue asks only). Returns "none",
     "met N" or "short N"."""
     heads = [heads] if isinstance(heads, str) else list(heads)
-    asked = queue_asks(queue, heads, pr, writers); signed = {}; unsigned = set()
+    asked = queue_asks(queue, heads, pr, writers, commits); signed = {}; unsigned = set()
     for c in items:
         body = c["body"].lstrip()
         # 3 Nov 14:1x: the PR body is read too (a line {"pr_body": true}). 14:5x: anywhere in the body: #5049 says
@@ -145,19 +150,23 @@ def main():
             print("unasked")
         return
     writers, args = writers_from_args(sys.argv[1:], "reads2")
-    queue, pr, heads = None, None, []
+    queue, pr, heads, commits = None, None, [], []
     i = 0
     while i < len(args):
         if args[i] == "--queue" and i + 1 < len(args):
             with open(args[i + 1]) as f:
                 queue = [json.loads(line) for line in f if line.strip()]
             i += 2
+        elif args[i] == "--pr-commits" and i + 1 < len(args):
+            with open(args[i + 1]) as f:
+                commits = [line.strip() for line in f if line.strip()]
+            i += 2
         elif args[i] == "--pr" and i + 1 < len(args):
             pr = args[i + 1]; i += 2
         else:
             heads.append(args[i]); i += 1
     items = [json.loads(line) for line in sys.stdin if line.strip()]
-    print(two_reads(items, heads, writers, queue, pr))
+    print(two_reads(items, heads, writers, queue, pr, commits))
 
 
 if __name__ == "__main__":
