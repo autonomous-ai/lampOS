@@ -684,3 +684,99 @@ fn a_refused_hotspot_line_is_asked_again_within_its_minute() {
     );
     assert!(!policy.says_again(LOSS_GRACE_MS + RETRY_EVERY_MS));
 }
+
+/// #5550, the reviewer-lead's P2: a lamp held on its network's radio with
+/// no address never opens the hotspot, so `recover` never asks its line;
+/// the Wi-Fi change's helper then says its own lost line.
+#[test]
+fn a_lamp_associated_with_no_address_never_says_the_hotspot_line() {
+    let mut policy = Recovery::default();
+    let slow = Seen {
+        associated: true,
+        ..GONE
+    };
+    for at in (0..=10 * 60_000).step_by(5_000) {
+        let act = policy.step(at, slow);
+        assert_eq!(act, None);
+        assert!(!policy.says_line(act, at), "{at}");
+    }
+}
+
+/// #5550, P3: `recover`'s one ask at each look (`says_line`): the first
+/// opening for a loss, then a line not played asked again, and nothing
+/// once one was played or at a reopening for the same loss.
+#[test]
+fn recover_asks_its_line_at_the_opening_and_again_only_when_not_played() {
+    let mut policy = Recovery::default();
+    let mut asked = Vec::new();
+    for at in (0..=LOSS_GRACE_MS + 30_000).step_by(5_000) {
+        let act = policy.step(at, GONE);
+        if policy.says_line(act, at) {
+            asked.push(at);
+            // Refused the first time only.
+            if asked.len() == 1 {
+                policy.not_played(at);
+            }
+        }
+    }
+    assert_eq!(asked, [LOSS_GRACE_MS, LOSS_GRACE_MS + 5_000]);
+    // A reopening after a failed try of the saved network: not asked.
+    let rejoin = LOSS_GRACE_MS + RETRY_EVERY_MS;
+    assert_eq!(policy.step(rejoin, GONE), Some(Act::Rejoin));
+    let reopen = rejoin + JOIN_WAIT_MS;
+    let act = policy.step(reopen, GONE);
+    assert_eq!(act, Some(Act::OpenHotspot));
+    assert!(!policy.says_line(act, reopen));
+}
+
+/// #5550, P3: a line not played is not asked again while a setup run on
+/// the hotspot's page (or a Wi-Fi change) is in progress: the person is
+/// already setting the network. It stays due for the next look not busy.
+#[test]
+fn a_line_asked_again_waits_while_the_person_is_setting_the_network() {
+    let mut policy = Recovery::default();
+    looks(&mut policy, 0, LOSS_GRACE_MS, GONE);
+    assert!(policy.says_line(Some(Act::OpenHotspot), LOSS_GRACE_MS));
+    policy.not_played(LOSS_GRACE_MS);
+    let setting = Seen {
+        busy: true,
+        phones: Some(1),
+        ..GONE
+    };
+    for at in [LOSS_GRACE_MS + 5_000, LOSS_GRACE_MS + 10_000] {
+        let act = policy.step(at, setting);
+        assert_eq!(act, None);
+        assert!(!policy.says_line(act, at), "{at}");
+    }
+    let at = LOSS_GRACE_MS + 15_000;
+    let act = policy.step(at, GONE);
+    assert!(policy.says_line(act, at));
+}
+
+/// #5550: `say_line` keeps its file only for a line the voice took, and a
+/// refused one is asked again.
+#[test]
+fn the_hotspot_line_is_kept_as_told_only_once_played() {
+    let dir = std::env::temp_dir().join(format!("lamp-setup-told-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let told = dir.join("told");
+    let mut policy = Recovery::default();
+    looks(&mut policy, 0, LOSS_GRACE_MS, GONE);
+    assert!(policy.says_line(Some(Act::OpenHotspot), LOSS_GRACE_MS));
+    let mut names = Vec::new();
+    lamp_setup::recover::say_line(&mut policy, LOSS_GRACE_MS, &told, |name| {
+        names.push(name.to_owned());
+        Some("refused: speaking".into())
+    });
+    assert!(!told.exists());
+    assert!(policy.says_again(LOSS_GRACE_MS + 5_000));
+    lamp_setup::recover::say_line(&mut policy, LOSS_GRACE_MS + 5_000, &told, |name| {
+        names.push(name.to_owned());
+        None
+    });
+    assert!(told.exists());
+    assert_eq!(names, [RECORDING_OPENED, RECORDING_OPENED]);
+    assert!(!policy.says_again(LOSS_GRACE_MS + 60_000));
+    let _ = std::fs::remove_dir_all(&dir);
+}
