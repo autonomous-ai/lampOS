@@ -618,6 +618,29 @@ pub(crate) fn held_save_verdict(name: &str, said: &Said) -> HeldSaveVerdict {
     }
 }
 
+/// The name the lamp's last answer said back, when the turn in hand is a
+/// plain yes to it and no save was called for it (#5684, the Walter trace:
+/// "Name is Walter.", "Walter, did I get that right?", "Yes. That's my
+/// name.", and no call at all, so the face wait ended "who you are" with
+/// the name only). The name is the one the person's line before gave
+/// (`remember::named::name_in`), judged as a held save's is
+/// ([`held_save_verdict`]) on that last exchange only: an older read-back
+/// already had its answer. `None` for a correction, a question, the face
+/// question with the name folded in, or any other answer.
+pub(crate) fn read_back_name(said: &Said) -> Option<String> {
+    let (person, lamp) = said.before.last()?;
+    let name = crate::remember::named::name_in(person)?;
+    let name = name.trim();
+    if name.is_empty() {
+        return None;
+    }
+    let last = Said {
+        this: said.this.clone(),
+        before: vec![(person.clone(), lamp.clone())],
+    };
+    (held_save_verdict(name, &last) == HeldSaveVerdict::Runs).then(|| name.to_owned())
+}
+
 /// Whether a tool answer is one the name checks gave here, before the eyes
 /// were asked (`run_switched`): no name, a name not heard, the lamp's own
 /// name, no read-back's yes, or no yes to a new name. The voice's log says
