@@ -472,7 +472,20 @@ needs that read-back, #5140; a read-back folded into the face question was
 refused every time, #5415). It asks them to spell their name only if they
 say it is wrong or the model missed it, and only once, then says back the
 name the letters spell, never the letters (lamp-3e83, #5564: "Jane or
-J-A-N-E?"; nobody calls a person by the spelling of their name). Then it asks "May I remember your face, so I know you
+J-A-N-E?"; nobody calls a person by the spelling of their name). With
+the nudge off (the product), the second route also tells the model this
+beside the person's own line, for that turn only, when the line spells their
+name ("W a l t e r.", "W-A-L-T-E-R", "It's W, A, L, T, E, R.", "Walter, W A
+L T E R.", read as the nudge's fallback reads a spelled name, below) while
+"who you are" has no outcome in the onboarding file: `(They spelled
+"Walter". Say it back as the name, only this: "Walter, did I get that
+right?" Never say its letters.)` (`onboarding::spelled_name_note`,
+`second_provider::Engine::noting_a_spelled_name`; #5580 row 2: on a real
+lamp with product settings the model read "W a l t e r." back as "spelled
+out: W-A-L-T-E-R"). A name said plainly, two letters (initials), a line
+with "?", a line in another language (the owner's language, `LAMP_LANGUAGE_FILE`), or the nudge on is
+told nothing; the walk's file is read only for a line that spells a name.
+The Live route is not told it. Then it asks "May I remember your face, so I know you
 next time?". If the model has not asked it once a name and a yes are in,
 the walk asks it itself, once, after 3 s of quiet (`START_QUIET_US`): a
 fixed note the model says (`skill::FACE_ASK`, translated as the walk's other
