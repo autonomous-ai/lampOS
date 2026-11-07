@@ -5141,6 +5141,32 @@ pub const PUSHED_TOPICS: [&str; 6] = [
     "controls/touch",
 ];
 
+/// Why `skill`'s `stands_in_for` word may not hold `held`'s chance (#5620,
+/// the reviewer's P1 on #5704); `None` if it may. Only a skill of its own
+/// `[budget]` group, never a `warning`, and never from a pushed skill: so a
+/// word that never comes holds back no smoke warning, reminder or nudge of
+/// another group. Checked at load ([`load_each_with`]) and again each time
+/// a chance is judged ([`Engine`]'s `stood_in_by`), since skills come and go
+/// in any order.
+fn stands_in_refuses(skill: &Skill, held: &Skill) -> Option<String> {
+    let group = |skill: &Skill| skill.budget.as_ref().map(|(group, _)| group.clone());
+    if held.policy == "warning" {
+        Some(format!(
+            "stands_in_for {:?} is a warning: a warning never waits for another's word",
+            held.name
+        ))
+    } else if group(skill).is_none() || group(skill) != group(held) {
+        Some(format!(
+            "stands_in_for {:?} is not in its own [budget] group",
+            held.name
+        ))
+    } else if skill.pushed_by.is_some() {
+        Some("a pushed skill may not use stands_in_for".into())
+    } else {
+        None
+    }
+}
+
 /// Why a pushed skill may not run, held to the protocol's grants
 /// (`docs/control.md`, "Skills pushed from a computer"); `None` if it may.
 /// The manage helper checks the same at install, and this check holds a
@@ -5167,6 +5193,17 @@ pub fn pushed_refuses(skill: &Skill) -> Option<String> {
         return Some(format!(
             "a pushed skill may not ask {what}: only the protocol's grants"
         ));
+    }
+    // Never another skill's chance held for its word (#5620, the
+    // reviewer's P1 on #5704).
+    if skill
+        .triggers
+        .iter()
+        .any(|trigger| trigger.stands_in_for.is_some())
+    {
+        return Some(
+            "a pushed skill may not use stands_in_for: it never holds a lamp skill's chance".into(),
+        );
     }
     if let Some(topic) = permissions
         .topics
@@ -5310,6 +5347,27 @@ pub fn load_each_with(
             };
             loaded.push((folder, skill));
         }
+    }
+    // A `stands_in_for` naming a skill loaded here (#5704's P1): only one of
+    // its own `[budget]` group, never a warning ([`stands_in_refuses`]).
+    // One naming a skill not here loads; held to the same each time a
+    // chance is judged, should that skill come later.
+    let refused: Vec<(usize, String)> = loaded
+        .iter()
+        .enumerate()
+        .filter_map(|(at, (_, result))| {
+            let skill = result.as_ref().ok()?;
+            skill.triggers.iter().find_map(|trigger| {
+                let other = trigger.stands_in_for.as_ref()?;
+                let held = loaded.iter().find_map(|(_, result)| {
+                    result.as_ref().ok().filter(|held| &held.name == other)
+                })?;
+                stands_in_refuses(skill, held).map(|why| (at, why))
+            })
+        })
+        .collect();
+    for (at, why) in refused {
+        loaded[at].1 = Err(why);
     }
     // Each tool's name, and the skill that has it.
     // With, for a `[stop]` function, the `[budget]` group of its skill: a
@@ -5925,8 +5983,10 @@ impl Engine {
     /// The loaded skill whose `stands_in_for` word for `name` is still to
     /// come (#5620): the trigger it `follows` ran within its `within`, the
     /// word has not run since, and nothing it can see would drop the word
-    /// (off, snoozed, its day's most run, resting). None on a lamp without
-    /// such a skill, so there nothing changes.
+    /// (off, snoozed, its day's most run, resting). Only a skill of `name`'s
+    /// own `[budget]` group, never for a warning, never a pushed one
+    /// ([`stands_in_refuses`]). None on a lamp without such a skill, so
+    /// there nothing changes.
     fn stood_in_by(&self, name: &str, now_us: u64) -> Option<&str> {
         let ran = |skill: &str, index: usize| {
             self.watches
@@ -5934,8 +5994,10 @@ impl Engine {
                 .and_then(|watch| watch.ran_us)
         };
         let day = day_of(self.clock, now_us);
+        let held = self.skills.iter().find(|skill| skill.name == name)?;
         self.skills.iter().find_map(|skill| {
             if skill.name == name
+                || stands_in_refuses(skill, held).is_some()
                 || self.off.contains(&skill.name)
                 || self
                     .snoozed
