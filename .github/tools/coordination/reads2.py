@@ -87,7 +87,7 @@ def body_names_unasked(body):
 
 # 7 Nov (the PM, after Twelve's table of the PRs merged since 10579): #5647 and #5650 were asked TWO READS only on the
 # Queue ("READ ASK <sha>" then "TWO READS.") and each merged on one read. A writer's Queue comment asks for a PR when its
-# first line opens with READ ASK (or has it right after a signature's colon) and names the PR, by a commit its head (or a same-patch head) starts with, or by "#N", and
+# first line opens with READ ASK (or has it right after a signature's colon, comma or dash) and names the PR, by a commit its head (or a same-patch head) starts with, or by "#N", and
 # the comment names TWO READS as a body does (body_asks, with its opt-out). The bot passes the Queue (--queue, lib.sh's
 # coord_queue: every Queue issue's last 3 days) and the PR's number (--pr).
 # 7 Nov (the second reviewer's HOLD on #5653): a sha also asks when it names any commit of the PR (--pr-commits, one sha a
@@ -97,15 +97,34 @@ QUEUE_SHA = re.compile(r"\b[0-9a-f]{7,40}\b")
 # The marker opens the line or follows a signature's colon ("El, 05:18, to **Faye**: **READ ASK (restate) [#5633]") or
 # comma (7 Nov, #5653: "Sixth, READ ASK to the **Reviewer-lead**: [#5570]", "Friday, 17:51, READ ASK to ..."), so
 # an hourly that mentions a READ ASK in its prose ("#5650 had a READ ASK naming …") asks nothing.
-QUEUE_ASK = re.compile(r"(?:^|[:,])[\s*_`]*READ ASK\b")
+# 7 Nov (#5653's P3s): or a dash with spaces around it, em, en or hyphen ("Twelve — READ ASK #5653", "Second - READ ASK
+# #5653"); a hyphen inside a word ("pre-READ ASK") is no signature.
+QUEUE_ASK = re.compile(r"(?:^|[:,]|\s[\u2014\u2013-]\s)[\s*_`]*READ ASK\b")
+
+
+def asking_first_line(q):
+    """A Queue comment's first line when it opens with READ ASK (or has it after a signature), else None."""
+    first = q["body"].lstrip().split("\n", 1)[0]
+    return first if QUEUE_ASK.search(first) else None
+
+
+def queue_shas(queue):
+    """7 Nov (#5653's P3s): every sha on the Queue's asking first lines, in order, for lib.sh's coord_same_patch
+    (`--queue-shas FILE`), so its candidates come from this regex too. Writers aren't checked: these are only
+    candidates, and queue_asks still decides which asks count."""
+    out = []
+    for q in queue or ():
+        first = asking_first_line(q)
+        out += QUEUE_SHA.findall(first) if first else []
+    return out
 
 
 def queue_asks(queue, heads, pr, writers, commits=()):
     """Whether a writer's Queue READ ASK names this PR (by head, one of its commits, or number) and TWO READS."""
     shas = list(heads) + list(commits or ())
     for q in queue or ():
-        first = q["body"].lstrip().split("\n", 1)[0]
-        if not is_writer(q, writers) or not QUEUE_ASK.search(first):
+        first = asking_first_line(q)
+        if not is_writer(q, writers) or not first:
             continue
         by_head = any(h.startswith(m) for m in QUEUE_SHA.findall(first) for h in shas)
         by_number = bool(pr) and re.search(r"#%s(?!\d)" % re.escape(str(pr)), first)
@@ -148,6 +167,12 @@ def main():
         items = [json.loads(line) for line in sys.stdin if line.strip()]
         if any(c.get("pr_body") and body_names_unasked(c["body"]) for c in items):
             print("unasked")
+        return
+    if len(sys.argv) == 3 and sys.argv[1] == "--queue-shas":
+        # The Queue's JSON lines (lib.sh's coord_queue). Prints each sha on an asking first line, one a line.
+        with open(sys.argv[2]) as f:
+            for s in queue_shas([json.loads(line) for line in f if line.strip()]):
+                print(s)
         return
     writers, args = writers_from_args(sys.argv[1:], "reads2")
     queue, pr, heads, commits = None, None, [], []
