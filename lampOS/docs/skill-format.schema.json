@@ -968,6 +968,11 @@
           "description": "A later trigger of the same skill on the same topic, by name, whose chance this one's run takes: its cooldown begins then (#5207). Only with `once_per_day`.",
           "type": "string",
           "pattern": "^[a-z0-9_]{1,64}$"
+        },
+        "stands_in_for": {
+          "description": "Another skill, by name, whose due nudge this `follows` word stands in for (#5620): while the word is still to come that skill's chance waits, and its cooldown begins with the word. Only with `follows`, never the skill's own name.",
+          "type": "string",
+          "pattern": "^[a-z0-9-]{1,64}$"
         }
       }
     },

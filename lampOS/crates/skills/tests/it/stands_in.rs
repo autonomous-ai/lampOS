@@ -118,3 +118,36 @@ fn with_quiet_focus_and_no_focus_rest_your_eyes_still_speaks() {
     assert_eq!(said[0].0, "rest-your-eyes");
     assert!((45 * 60..46 * 60).contains(&said[0].1), "{said:?}");
 }
+
+/// `stands_in_for` is a `follows` word's, and names another skill.
+#[test]
+fn stands_in_for_goes_with_follows_and_names_another_skill() {
+    let dir = tempfile::tempdir().unwrap();
+    let from = skills_root().join("quiet-focus");
+    let toml = std::fs::read_to_string(from.join("skill.toml")).unwrap();
+    let with = |text: &str| {
+        let folder = dir.path().join("quiet-focus");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::copy(from.join("SKILL.md"), folder.join("SKILL.md")).unwrap();
+        std::fs::write(folder.join("skill.toml"), text).unwrap();
+        lamp_skills::load(&folder)
+    };
+    assert!(with(&toml).is_ok());
+    let own = toml.replace(
+        "stands_in_for = \"rest-your-eyes\"",
+        "stands_in_for = \"quiet-focus\"",
+    );
+    assert!(with(&own).unwrap_err().contains("is this skill"));
+    // On `focused`, which follows nothing.
+    let unfollowed = toml
+        .replace("stands_in_for = \"rest-your-eyes\"\n", "")
+        .replace(
+            "rearm = \"leaves\"          # once each time they settle in",
+            "rearm = \"leaves\"\nstands_in_for = \"rest-your-eyes\"",
+        );
+    assert!(
+        with(&unfollowed)
+            .unwrap_err()
+            .contains("stands_in_for goes with follows")
+    );
+}
