@@ -709,7 +709,8 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   lamp-06c1 at 21:30:02 on 6 Nov (capture, ring and the coordinator held
   120-132 ms during an SD log flush, #5611), is ridden as a closed privacy
   gap with `LAMP_PRIVACY_RIDES_STALL=on`, so no Stop is sent then; off, or
-  past 1.5 s, it ends as described here.
+  after a stall over about 1.44 s (the reopen's 60 ms steady time counts
+  inside the 1.5 s bound), it ends as described here.
   Boot 4's same freshness loss had a clean cleanup and the voice was back
   in the wait, ready 0.2 s later. Now, once `prepare()` returns, capture
   reads what the coordinator queued meanwhile (`peer_stop.rs`), keeps it in
