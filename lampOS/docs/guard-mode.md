@@ -250,6 +250,14 @@ thing leaves `lamp-skills`:
 No picture and no recording: it reads none, keeps none and sends none, of
 video or of audio. A stranger is never more than "someone I don't know".
 
+**What's kept, and where.** Only the texts: each, with when someone came,
+for how long and a name only where one was allowed, is kept by the
+backend for the owner alone, off the lamp, for 90 days, and shown in the
+lamp's chat ([messages.md](messages.md), "Unasked texts"). `SKILL.md`
+says so in its own section, "What's kept", and in its answer when asked
+about it (the first builder's 08:49 on #1685, 7 Nov: the person turning it
+on should know).
+
 **A picture in the text** (the owner's open question on #1685) is not built.
 It would leave the lamp, which loosens privacy. If wanted, it would be a
 separate setting the person turns on themselves, with the risk said plainly

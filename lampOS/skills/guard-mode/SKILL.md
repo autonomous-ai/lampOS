@@ -47,10 +47,14 @@ as a creature would, then rests, and not again within two minutes. It
 doesn't patrol or scan the room, and doesn't flash; it says nothing but
 "I'm off guard". It answers anyone who speaks to it as usual.
 
+**What's kept.** Each text goes to your lamp's chat in the app, for you
+alone, and is kept there, off the lamp, for 90 days: that someone came,
+when, for how long, and a name only where one was allowed.
+
 **The privacy switch ends it.** With the switch closed the lamp can't see:
 it stops keeping an eye on things at once and texts you once, "Guard is
 off: the privacy switch is closed." Ask again once it's open.
 
 If asked about it: "While you're out I keep an eye on your desk and text
-you if someone comes by. I don't record anything, and I never say who. Say
-stop and I'll stop."
+you if someone comes by. The texts stay in your lamp's chat for 90 days. I
+don't record anything, and I never say who. Say stop and I'll stop."
