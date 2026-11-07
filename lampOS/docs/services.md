@@ -987,13 +987,17 @@ ends "You can ask me for it yourself any time." Asking for
 the skill itself is no write: words before "skill" that only ask for it
 ("create me a new skill that ...", "add a skill to ...") are left out
 first. "Schedule", "post" and "book" after "my", "the", "tomorrow's",
-"today's", "day", "calendar", "latest", "last", "newest", "facebook" or
-"page" are the thing read (lamp-9adf, 4 Nov 23:51: "create a skill that
-reads my calendar" was refused so; El's P3 on #5679: "read me my latest
-Facebook post"), unless the next word is "a", "an", "to", "me", "that",
-"on", "it", "say" or "saying" ("tomorrow book a meeting", El's P3 on
-#5690). "Put" writes only with a service, or "drive", named after it
-("put the count on the light" is the lamp's own). A write after them still counts. A calendar's
+"latest", "last" or "newest" are the thing read, whatever follows
+("read me my schedule on my calendar"), unless "say" or "saying" follows
+with nothing asked to be read before ("latest post: say hi on
+Facebook"). After "tomorrow", "today", "day", "calendar", "facebook" or
+"page" they are the thing read only at the request's end or before
+"from", "for" or "of" ("read me my latest Facebook post", "my calendar
+schedule for tomorrow"), else a verb ("tomorrow book the room"; El's P3s
+on #5690 and P2 on #5696). It began on lamp-9adf on 4 Nov at 23:51,
+where "create a skill that reads my calendar" was refused. "Put" writes only with
+a service named after it, or "in", "on", "into" or "to" "my drive" ("put
+the count on the light" is the lamp's own). A write after them still counts. A calendar's
 step is given whole (today, or tomorrow when it says "tomorrow"), as are
 mail's (`recent`) and Drive's (`files`, newest first, `query` only words
 to search); for any other service the brief lists its reads but the
