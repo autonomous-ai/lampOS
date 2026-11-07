@@ -1947,7 +1947,9 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         lease_mood.set(glimpse.mood);
         lease_hand.set(glimpse.hand);
         lease_slumped.set(slumped_now(glimpse));
-        lease_seen.set(Some((glimpse.goals, glimpse.positions)));
+        // The goals the pose wants, not the eased or rested ones: a look is
+        // there, or stopped short, by where it was sent (lamp-75c9, 7 Nov).
+        lease_seen.set(Some((glimpse.wanted, glimpse.positions)));
         lease_aimed.set(glimpse.look_aimed);
         lease_posed.set(Some(lamp_body::lease::PoseSeen {
             posed: match (glimpse.posed, glimpse.unposed) {

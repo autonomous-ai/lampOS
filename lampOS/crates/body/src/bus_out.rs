@@ -1033,6 +1033,7 @@ mod tests {
             mood: Mood::Listening,
             // Pitch, roll, yaw.
             goals: [1_968, 2_069, 2_015],
+            wanted: [1_968, 2_069, 2_015],
             positions: [1_950, 2_043, 2_015],
             loads: [120, 0, 40],
             temperatures: [38, 36, 41],
