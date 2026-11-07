@@ -11750,6 +11750,53 @@ async fn asked_with(
     script.asked.lock().unwrap().clone()
 }
 
+/// #5580 row 2 (a real lamp, product settings, the onboarding nudge off):
+/// at "who you are", "W a l t e r." was read back "spelled out:
+/// W-A-L-T-E-R". A line whose words spell the person's name while the step
+/// is open is told the read-back to say beside them, the name as a word
+/// (`Engine::noting_a_spelled_name`); a name said plainly, or a line in
+/// another language, is told nothing.
+#[tokio::test]
+async fn a_spelled_name_at_setup_is_told_its_read_back_as_the_name() {
+    let asked = |words: &'static str, language: Option<crate::language::Language>| {
+        asked_with(
+            words,
+            move |engine| {
+                engine.noting_a_spelled_name(Arc::new(move |text| {
+                    crate::onboarding::spelled_name_note(text, false, language, || true)
+                }))
+            },
+            start(1),
+            false,
+            false,
+        )
+    };
+    let told = asked("W a l t e r.", None).await;
+    let note = told[0][told[0].len() - 2].clone();
+    assert_eq!(note.role, "system", "{:?}", told[0]);
+    let words = note.words().unwrap_or_default();
+    assert!(
+        words.contains("\"Walter, did I get that right?\""),
+        "{:?}",
+        told[0]
+    );
+    assert!(!words.contains("W-A") && !words.contains("W A"), "{words}");
+    assert_eq!(told[0].last(), Some(&Message::user("W a l t e r.")));
+    for (line, language) in [
+        ("My name is Walter.", None),
+        ("W a l t e r.", Some(crate::language::Language::Vietnamese)),
+    ] {
+        let plain = asked(line, language).await;
+        assert!(
+            !plain[0].iter().any(|message| message
+                .words()
+                .is_some_and(|words| words.contains("did I get that right"))),
+            "{line}: {:?}",
+            plain[0]
+        );
+    }
+}
+
 /// `LAMP_UNTIED_GOING_ON` (Sixth's P2 on #4562): a line let out only as the
 /// conversation going on and begun over the lamp's answer is told it may be
 /// people's talk and not that it cut in when it has no tie to the lamp

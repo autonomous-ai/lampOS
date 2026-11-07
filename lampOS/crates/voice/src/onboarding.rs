@@ -4520,6 +4520,77 @@ fn yes_or_no(text: &str) -> Option<bool> {
 /// A line that could be only a name: one or two words, after an "I'm",
 /// and no question, yes, no, greeting or thanks. English words only.
 fn name_in(text: &str) -> Option<String> {
+    let words = name_words(text)?;
+    if let Some(name) = spelled_in(&words) {
+        return Some(name);
+    }
+    (1..=2).contains(&words.len()).then(|| words.join(" "))
+}
+
+/// A line that spells a name ([`spelled_in`]), as the word it spells, read
+/// as [`name_in`] reads a line: "W a l t e r." is "Walter". A name said
+/// without its letters is none. English words only.
+fn spelled_name_in(text: &str) -> Option<String> {
+    spelled_in(&name_words(text)?)
+}
+
+/// What the model is told beside the person's line at setup, with the
+/// nudge off, while "who you are" is open, when that line spells their
+/// name: the read-back to say, the name as a word, so the lamp never says
+/// it back as its letters (#5580 row 2, a real lamp with product settings:
+/// "W a l t e r." was read back "spelled out: W-A-L-T-E-R"). For that turn
+/// only, beside its words; the step's own note ([`WHO_NOTE`]), given once
+/// at the ask, says it too. `open` is read only for a line that spells a name (one
+/// read of the small onboarding file). With the nudge on, the walk asks the
+/// name back itself ([`Onboarding::heard_line`]); in another language no
+/// name is read from the line, as there.
+pub(crate) fn spelled_name_note(
+    text: &str,
+    nudge: bool,
+    language: Option<crate::language::Language>,
+    open: impl FnOnce() -> bool,
+) -> Option<String> {
+    if nudge || language.is_some() {
+        return None;
+    }
+    let name = spelled_name_in(text)?;
+    open().then(|| {
+        format!(
+            "(They spelled \"{name}\". Say it back as the name, only this: \"{name}, did I get that right?\" Never say its letters.)"
+        )
+    })
+}
+
+/// [`spelled_name_note`] as the voice's own settings have it: the walk's
+/// file (`LAMP_ONBOARDING`, `LAMP_ONBOARDING_FILE`), its nudge (`LAMP_ONBOARDING_NUDGE`) and
+/// the owner's language, for the second route's per-line notes.
+pub(crate) fn spelled_name_note_now(text: &str) -> Option<String> {
+    spelled_name_note(
+        text,
+        std::env::var(NUDGE_ENVIRONMENT).as_deref() == Ok("on"),
+        crate::language::at_start(),
+        || file_from_environment().is_some_and(|file| who_you_are_open(&file)),
+    )
+}
+
+/// A name spelled, alone or after the name said ("J-A-N-E.", "Jane, J A
+/// N E."), as the word it spells: nobody calls a person by the spelling of
+/// their name (lamp-3e83, #5564).
+fn spelled_in(words: &[&str]) -> Option<String> {
+    if let Some(name) = crate::known_faces::letters_as_word(&words.join(" ")) {
+        return Some(name);
+    }
+    let (first, rest) = words.split_first()?;
+    crate::known_faces::letters_as_word(&rest.join(" "))
+        .is_some_and(|spelled| {
+            crate::known_faces::folded_words(&spelled) == crate::known_faces::folded_words(first)
+        })
+        .then(|| (*first).to_owned())
+}
+
+/// A line's words as [`name_in`] reads them, without a leading "I'm" or
+/// "it's": none for a question, a yes or no, a greeting or thanks.
+fn name_words(text: &str) -> Option<Vec<&str>> {
     let greets = ["hello", "hi", "hey", "okay", "ok", "thanks", "thank"];
     if text.contains('?')
         || yes_or_no(text).is_some()
@@ -4547,20 +4618,7 @@ fn name_in(text: &str) -> Option<String> {
     {
         return None;
     }
-    // A name spelled, alone or after the name said ("J-A-N-E.", "Jane, J A
-    // N E."), is asked back as the name, never its letters: nobody calls a
-    // person by the spelling of their name (lamp-3e83, #5564).
-    if let Some(name) = crate::known_faces::letters_as_word(&words.join(" ")) {
-        return Some(name);
-    }
-    if let Some((first, rest)) = words.split_first()
-        && crate::known_faces::letters_as_word(&rest.join(" ")).is_some_and(|spelled| {
-            crate::known_faces::folded_words(&spelled) == crate::known_faces::folded_words(first)
-        })
-    {
-        return Some((*first).to_owned());
-    }
-    (1..=2).contains(&words.len()).then(|| words.join(" "))
+    Some(words)
 }
 
 /// Whether eyes that give close receipts are on the bus now: their
@@ -6134,6 +6192,70 @@ mod tests {
         assert_eq!(name_in("José, J O S E."), Some("José".into()));
         assert_eq!(name_in("A J"), Some("A J".into()));
         assert_eq!(name_in("Jane"), Some("Jane".into()));
+    }
+
+    /// #5580 row 2 (a real lamp, product settings, the nudge off): after
+    /// "Walter, did I get that right?", "That's not right." and "W a l t e
+    /// r.", the model said "spelled out: W-A-L-T-E-R". With the nudge off and
+    /// a face to keep, while "who you are" is open, a line that spells the
+    /// name is told the read-back to say, the name as a word and no letters;
+    /// a name said plainly, a line in another language, the nudge on or the
+    /// step over are told nothing.
+    #[test]
+    fn with_the_nudge_off_a_spelled_name_is_told_its_read_back_as_the_name() {
+        let mut room = Room::new("spelled-read-back");
+        room.walk.face_kept = true;
+        assert_eq!(room.wait(8 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        let file = room.walk.file.clone();
+        let note = |room: &Room, line: &str| {
+            spelled_name_note(line, room.walk.nudge, room.walk.language, || {
+                who_you_are_open(&file)
+            })
+        };
+        room.walk.heard("My name is Walter.", room.at);
+        assert_eq!(note(&room, "My name is Walter."), None);
+        room.walk.lamp_said(room.at);
+        room.walk.heard("That's not right.", room.at);
+        room.walk.lamp_said(room.at);
+        let told = note(&room, "W a l t e r.").expect("a spelled name is told its read-back");
+        assert!(told.contains("\"Walter, did I get that right?\""), "{told}");
+        assert!(!told.contains("W-A") && !told.contains("W A"), "{told}");
+        for line in [
+            "W A L T E R.",
+            "W-A-L-T-E-R",
+            "It's W, A, L, T, E, R.",
+            "Walter, W A L T E R.",
+        ] {
+            assert_eq!(note(&room, line), Some(told.clone()), "{line}");
+        }
+        // A name said plainly, initials, a question: no note.
+        for line in [
+            "Walter.",
+            "It's Walter.",
+            "A J",
+            "Is it W A L T E R?",
+            "No.",
+        ] {
+            assert_eq!(note(&room, line), None, "{line}");
+        }
+        // Another language: no name is read from the line, as in
+        // `heard_line`; the nudge on asks the name back itself.
+        room.walk.language = Some(crate::language::Language::Vietnamese);
+        assert_eq!(note(&room, "W a l t e r."), None);
+        room.walk.language = None;
+        room.walk.nudge = true;
+        assert_eq!(note(&room, "W a l t e r."), None);
+        room.walk.nudge = false;
+        // The step over: nothing is told. A plain line never reads the file.
+        room.walk
+            .finish(Step::WhoYouAre, Outcome::Done, None, room.at);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(note(&room, "W a l t e r."), None);
+        assert_eq!(
+            spelled_name_note("Walter.", false, None, || unreachable!("read")),
+            None
+        );
     }
 
     #[test]
