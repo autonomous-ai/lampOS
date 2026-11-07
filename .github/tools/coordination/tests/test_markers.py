@@ -493,6 +493,40 @@ class QueueAsks(unittest.TestCase):
         q = [c("writer-a", "READ ASK " + OTHER[:10] + "\nTWO READS, security.")]
         self.assertEqual(self.reads(q, heads=[HEAD, OTHER]), "short 1")
 
+    def test_a_comma_signed_queue_read_ask(self):
+        # 7 Nov (the second reviewer's HOLD on #5653): signed with a comma, not a colon, before READ ASK.
+        for first in ("Sixth, READ ASK to the **Reviewer-lead**: [#5650](https://example.invalid/5650)",
+                      "Friday, 17:51, READ ASK to **Thirteen** and **Heron**: [#5650](https://example.invalid/5650)"):
+            self.assertEqual(self.reads([c("writer-a", first + "\nTWO READS.")]), "short 1", first)
+        # Prose naming a READ ASK after a comma but not as the marker still asks nothing.
+        self.assertEqual(self.reads([c("writer-a", "Faye, 07:28, the hour: #5650's READ ASK was posted, TWO READS")]), "none")
+
+    def test_a_queue_read_ask_on_an_older_commit_of_the_pr(self):
+        # 7 Nov (the second reviewer's HOLD on #5653): asked at OTHER, then a fix pushed on top (another patch). The ask
+        # counts by the PR's commits, but a READ-OK on OTHER still does not count as a read on HEAD.
+        q = [c("writer-a", "READ ASK " + OTHER[:10] + "\nTWO READS.")]
+        self.assertEqual(two_reads([self.BODY, self.ONE], [HEAD], W, queue=q, pr="5650", commits=[OTHER, HEAD]), "short 1")
+        self.assertEqual(two_reads([self.BODY, self.ONE], [HEAD], W, queue=q, pr="5650"), "none")
+        old = c("writer-a", "READ-OK " + OTHER + "\n\nReviewer-lead, 08:00")
+        self.assertEqual(two_reads([self.BODY, self.ONE, old], [HEAD], W, queue=q, pr="5650", commits=[OTHER, HEAD]), "short 1")
+
+    def test_the_cli_reads_the_pr_commits_file(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
+            f.write(json.dumps(c("writer-a", "READ ASK " + OTHER[:10] + "\nTWO READS.")) + "\n"); qpath = f.name
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+            f.write("writer-a\nwriter-b\n"); wpath = f.name
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+            f.write(HEAD + "\n" + OTHER + "\n"); cpath = f.name
+        try:
+            lines = "".join(json.dumps(x) + "\n" for x in (self.BODY, self.ONE))
+            def run(*extra):
+                return subprocess.run([sys.executable, "-I", os.path.join(HERE, "reads2.py"), "--writers", wpath, "--queue", qpath,
+                                       "--pr", "5650", *extra, HEAD], input=lines, capture_output=True, text=True, check=True).stdout.strip()
+            self.assertEqual(run("--pr-commits", cpath), "short 1")
+            self.assertEqual(run(), "none")
+        finally:
+            os.unlink(qpath); os.unlink(wpath); os.unlink(cpath)
+
     def test_queue_comments_that_do_not_ask_this_pr(self):
         for body in ("READ ASK " + OTHER[:10] + "\nTWO READS, for #5651.",           # another PR's head
                      "READ ASK [#5651](https://example.invalid) TWO READS",       # another PR's number
