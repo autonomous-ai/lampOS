@@ -41,7 +41,7 @@ equals = "head_down"
 for = "45m"
 gap = "2m"
 rearm = "leaves"          # once each time they settle in
-cooldown = "180m"         # with the sitting's 3 hours below: once a sitting, never twice
+cooldown = "180m"         # 3 hours from each focus come due, word or not, across sittings too; with the sitting's 3 hours below, never twice a sitting
 wait = "15m"              # someone else in view, or a talk: once they go, while still focused
 
 # They look up within 10 minutes of it: sat as they sat, 10 s (the eyes say
