@@ -52,8 +52,8 @@ use super::{
     STEP_GIVE_UP_US, Step, TIMED_OUT_QUIET_US, fresh_token, storage,
 };
 use lamp_near_call::{
-    Calibrated, Hearing, Level, MOST_PROMPTS, RISE_MS, SCORE, Said, Spoke, Try, WINDOW_MS,
-    asks_again, near_try_with_said,
+    Calibrated, Hearing, Level, MOST_PROMPTS, RISE_MS, Rejected, SCORE, Said, Spoke, Try,
+    WINDOW_MS, asks_again, near_try_with_said,
 };
 use lamp_turn_owner::BootId;
 use serde_json::json;
@@ -95,6 +95,14 @@ const OVER_PROMPT_MS: u64 = crate::activity::CALL_BEFORE_US / 1_000;
 /// over its last word ([`OVER_PROMPT_MS`]), is offered again with its own
 /// number, this many times in a step at most.
 const MOST_REOFFERS: u8 = 2;
+/// A call heard surely and still refused (answered over the prompt, the
+/// lamp speaking, no level) is asked for again this many times in a step at
+/// most; one more ends the name part (#5563, lamp-3e83: "Hey Lamp" heard
+/// and asked for again, more than five tries in all).
+const MOST_HEARD_ASKS: u8 = 2;
+/// Why a call try is given back when the second route said its down line
+/// for a line begun in its window (#5563).
+const SLOW: &str = "the provider was slow";
 
 /// Why a gapped prompt with nothing said after it is given back.
 const GAPPED: &str = "the prompt was played with a gap";
@@ -287,6 +295,12 @@ pub(crate) struct NearFlow {
     awaited: Option<u64>,
     /// A call try was just judged: its answer waits [`ANSWER_QUIET_US`].
     answers: bool,
+    /// A line begun in the open call try's window was answered by the
+    /// second route's down line (#5563): refused, the try is given back.
+    slow: bool,
+    /// Call tries heard surely and still refused ([`MOST_HEARD_ASKS`]).
+    /// Kept across an absence, as `reoffered` is.
+    heard_refused: u8,
 }
 
 impl NearFlow {
@@ -403,6 +417,17 @@ impl NearFlow {
             && (ended_ms..=ended_ms + WINDOW_MS).contains(&began_ms)
         {
             self.awaited = Some(began_ms);
+        }
+    }
+
+    /// A line begun at `began_us` was answered by the second route's down
+    /// line (#5563): begun from the history kept before the prompt's end to
+    /// the window's end, its try, refused, is given back at its judgement.
+    pub(crate) fn provider_slow(&mut self, began_us: u64) {
+        if let Some((began_ms, ended_ms)) = self.call_unix_ms(began_us)
+            && (ended_ms.saturating_sub(HISTORY_MS)..=ended_ms + WINDOW_MS).contains(&began_ms)
+        {
+            self.slow = true;
         }
     }
 
@@ -676,11 +701,17 @@ impl Onboarding {
         // prompts offered again stay counted, so absence can't renew them.
         // The last try is forgotten: after an absence, a pause or a mute the
         // next prompt names the phrase again, never "Got it" (#3702).
-        let (named, reoffered, unsaid) = (self.near.named, self.near.reoffered, self.near.unsaid);
+        let (named, reoffered, unsaid, heard_refused) = (
+            self.near.named,
+            self.near.reoffered,
+            self.near.unsaid,
+            self.near.heard_refused,
+        );
         self.forget_near();
         self.near.named = named;
         self.near.reoffered = reoffered;
         self.near.unsaid = unsaid;
+        self.near.heard_refused = heard_refused;
     }
 
     /// The committed-to-be prompt count of a part.
@@ -737,6 +768,8 @@ impl Onboarding {
         self.near.last = None;
         self.near.awaited = None;
         self.near.answers = false;
+        self.near.slow = false;
+        self.near.heard_refused = 0;
     }
 
     pub(super) fn near_pending(&self) -> Option<lamp_msgs::OnboardingInvitation> {
@@ -903,6 +936,7 @@ impl Onboarding {
         self.near.spoiled = None;
         self.near.line = None;
         self.near.awaited = None;
+        self.near.slow = false;
         // Whole, or said through with a gap (#4035): either way the person
         // heard it, so the try's window opens.
         self.near.listening = Some(Listening {
@@ -963,6 +997,14 @@ impl Onboarding {
             return Err("the step is not led");
         }
         self.near.text_call(began_us, ended_us)
+    }
+
+    /// A call's line begun at `began_us` was answered by the second route's
+    /// down line (#5563): its try is the provider's, not the person's.
+    pub(crate) fn near_provider_slow(&mut self, began_us: u64) {
+        if self.collecting() {
+            self.near.provider_slow(began_us);
+        }
     }
 
     /// [`NearFlow::call_words_back`].
@@ -1228,11 +1270,16 @@ impl Onboarding {
             ended_ms: Some(listening.ended_ms),
         });
         let expected_ms = listening.ended_ms + now_us.saturating_sub(listening.ended_us) / 1_000;
+        let slow = std::mem::take(&mut self.near.slow);
+        // Whether the call was heard surely and refused only for what the
+        // person can't help (#5563, `MOST_HEARD_ASKS`).
+        let mut heard_refused = false;
         let judged = if (self.unix_clock)().abs_diff(expected_ms) > CLOCK_SLACK_MS {
             Err("the clock jumped".to_owned())
         } else if let Some(why) = spoiled {
             Err(why.to_owned())
-        } else if early {
+        } else if early && !slow {
+            self.near.heard_refused = self.near.heard_refused.saturating_add(1);
             self.near.last = Some(false);
             let again = self.offer_again(false, listening.prompt);
             self.note_try(json!({"kind":"onboarding_near_try",
@@ -1240,9 +1287,26 @@ impl Onboarding {
                 "offered_again":again,"heard":heard,"said":said,"at_us":now_us}));
             return;
         } else {
-            near_try_with_said(listening.ended_ms, &hearings, &said_lines, &levels, &spoke)
-                .map_err(|why| why.to_string())
+            near_try_with_said(listening.ended_ms, &hearings, &said_lines, &levels, &spoke).map_err(
+                |why| {
+                    heard_refused = matches!(
+                        why,
+                        Rejected::TwoHearings | Rejected::LampSpoke | Rejected::NoLevel
+                    );
+                    why.to_string()
+                },
+            )
         };
+        // The chat's down line answered a line in this window (#5563): a
+        // refusal is the provider's, never a miss of the person's. Its
+        // prompt is given back, as one never said, under `MOST_UNSAID`.
+        if slow && judged.is_err() {
+            self.give_prompt_back(false, listening.prompt, SLOW, now_us);
+            return;
+        }
+        if heard_refused {
+            self.near.heard_refused = self.near.heard_refused.saturating_add(1);
+        }
         // When the lamp spoke, as ms from the prompt's end (none: still).
         let spoke: Vec<(i64, Option<i64>)> = spoke
             .iter()
@@ -1323,7 +1387,8 @@ impl Onboarding {
             }
         } else if self.near.offer.is_none()
             && self.near.finishing.is_none()
-            && !asks_again(usize::from(prompts), self.desired.near_call_tries.len())
+            && (!asks_again(usize::from(prompts), self.desired.near_call_tries.len())
+                || self.near.heard_refused > MOST_HEARD_ASKS)
         {
             let at_unix_s = (self.unix_clock)() / 1_000;
             self.near.finishing = Some(Calibrated::of(

@@ -674,8 +674,13 @@ fn a_name_begun_over_the_prompts_last_word_is_offered_again_not_measured() {
         assert!(judged.get("rise_db").is_none(), "{judged}");
     }
     assert!(walk.kept().near_call_tries.is_empty());
-    // The third counts.
+    // The third counts, and ends the name part: a call heard is asked for
+    // again twice at most (#5563).
     assert_eq!(walk.kept().near_call_prompts, 1);
+    settle(&mut walk, 70 * S);
+    assert_eq!(named(&walk), Some(Outcome::Failed));
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
     // Begun 501 ms before the end: talking over the prompt, not the call.
     let prompt = play(&mut walk, 80 * S, 1_760_000_080_000, 4);
     room(&mut walk, &prompt, 300, 20.0);
@@ -1790,6 +1795,8 @@ fn the_step_is_the_sentences_whatever_the_name_part_came_to() {
 /// and with no call accepted the sentence's bar is 6 dB: the seat's
 /// sentence passes, after an "okay" with no words that does not spend the
 /// try. Twice as far, or the lamp's own voice (no rise), it is still short.
+/// Since #5563 a third call heard and refused ends the name part: the
+/// fourth and fifth prompts are never asked.
 #[test]
 fn calls_answered_at_the_prompts_end_leave_no_bar_and_the_seats_sentence_still_passes() {
     for (rise_db, accepted) in [(Some(9.2), true), (Some(4.5), false), (None, false)] {
@@ -1800,7 +1807,6 @@ fn calls_answered_at_the_prompts_end_leave_no_bar_and_the_seats_sentence_still_p
             (1, 10 * S, 0.98, true),
             (2, 30 * S, 1.0, true),
             (3, 50 * S, 0.99, true),
-            (4, 70 * S, 0.99, false),
         ] {
             let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
             room(&mut walk, &prompt, 7_000, 2.0);
@@ -1822,18 +1828,9 @@ fn calls_answered_at_the_prompts_end_leave_no_bar_and_the_seats_sentence_still_p
         }
         assert_eq!(
             whys,
-            [
-                "answered_early",
-                "answered_early",
-                "answered_early",
-                "the lamp was speaking"
-            ]
+            ["answered_early", "answered_early", "answered_early",]
         );
-        // The last prompt's call was missed.
-        let prompt = play(&mut walk, 90 * S, 1_760_000_090_000, 5);
-        let judged = judge(&mut walk, &prompt);
-        assert_eq!(judged["why"], "the name wasn't heard");
-        assert_eq!(walk.kept().near_call_prompts, 3);
+        assert_eq!(walk.kept().near_call_prompts, 1);
         assert!(settle(&mut walk, 110 * S).is_empty());
         assert!(!store.near_file().exists());
         ask(&mut walk, 120 * S, 6);
@@ -2223,4 +2220,61 @@ fn a_prompt_whose_first_audio_played_stays_counted_across_a_restart() {
     assert_eq!(walk.kept().near_call_prompts, 2);
     offer(&mut walk, 80 * S);
     assert_eq!(walk.pending().invitations[0].attempt, 3);
+}
+
+/// lamp-3e83 (#5563): a call's line with more than the name went to the
+/// chat as a turn, and the chat's first round had not begun in time, so the
+/// lamp said its thoughts were slow. That try is the provider's, not the
+/// person's: its prompt is given back, none of the five is spent, and the
+/// next prompt is not "I didn't catch that".
+#[test]
+fn a_try_whose_line_the_slow_provider_answered_is_not_a_miss() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
+    room(&mut walk, &prompt, 2_400, 21.0);
+    walk.near_provider_slow(prompt.ended_us + 2 * S);
+    let judged = judge(&mut walk, &prompt);
+    assert_eq!(judged["accepted"], false, "{judged}");
+    assert_eq!(judged["why"], "the provider was slow", "{judged}");
+    assert_eq!(walk.kept().near_call_prompts, 0);
+    assert_eq!(next_words(&mut walk, 20 * S), NEAR_FIRST);
+    // A down line for a line begun after the try's window changes nothing.
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
+    room(&mut walk, &prompt, 7_000, 2.0);
+    walk.near_provider_slow(prompt.ended_us + 8 * S);
+    assert_eq!(judge(&mut walk, &prompt)["why"], "the name wasn't heard");
+    assert_eq!(walk.kept().near_call_prompts, 1);
+}
+
+/// lamp-3e83 (#5563): the lamp heard "Hey Lamp" and still asked for it
+/// again, more than five tries in all. A call heard surely but refused
+/// (answered over the prompt's last word, the lamp speaking, no level) is
+/// asked for again twice at most: a third ends the name part.
+#[test]
+fn a_heard_call_is_asked_for_again_twice_at_most() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    assert_eq!(call(&mut walk, 10 * S, 22.0, 1)["accepted"], true);
+    for (turn, at) in [(2, 30 * S), (3, 50 * S)] {
+        let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
+        room(&mut walk, &prompt, 300, 20.0);
+        over(&mut walk, &prompt, 300, 200, 0.98);
+        assert_eq!(judge(&mut walk, &prompt)["why"], "answered_early");
+    }
+    let prompt = play(&mut walk, 70 * S, 1_760_000_070_000, 4);
+    room(&mut walk, &prompt, 7_000, 2.0);
+    name(&mut walk, &prompt, 200, 0.99);
+    assert_eq!(judge(&mut walk, &prompt)["why"], "the lamp was speaking");
+    settle(&mut walk, 90 * S);
+    assert_eq!(named(&walk), Some(Outcome::Failed));
+    assert!(
+        walk.pending()
+            .invitations
+            .iter()
+            .all(|invitation| invitation.attempt > lamp_near_call::MOST_PROMPTS as u64),
+        "no call prompt after the third heard call refused"
+    );
 }
