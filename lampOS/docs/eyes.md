@@ -1505,10 +1505,17 @@ With the switch:
     nothing is sent and the model is told to say the name back and ask if
     it is right (`SAY_IT_BACK`). The voice keeps that refused save
     (`second_provider::HeldSave`, as a held forget is kept) and runs it
-    itself on the person's next turn when that turn is a plain yes to the
-    read-back (`known_faces::held_save_verdict`, which judges a name held
+    itself once the person agrees to their face being kept
+    (`known_faces::face_agreed`): a plain yes to the face question after
+    the name's yes, or a yes to the read-back whose own words ask for the
+    face ("Yes. That's right. Please remember my face."). A plain yes to
+    the read-back alone keeps it held and the model is told to ask "May I
+    remember your face, so I know you next time?" first; anything but a
+    plain yes to that drops it (the first builder's HOLD on #5700: the
+    walk keeps a face only after a clear yes to that question). The name
+    is judged as `known_faces::held_save_verdict` judges it (a name held
     as letters, "J-A-N-E", as the word they make, "Jane", as the run
-    does: Fifth's P2 on #5580), through the same runner
+    does: Fifth's P2 on #5580). It runs through the same runner
     and check as a model call, so it counts as the walk's face save; the
     model is told the face is kept, or, when the eyes keep nothing, that it
     was not kept and why, and a model call after it gets
@@ -1522,14 +1529,18 @@ With the switch:
     it is told to the model as a face not kept, and why, so it makes up no
     reason of its own (lamp-52e6, 5 Nov, Fifth's run B on #5415: "I need
     to know who you are first"). With nothing held, while "who you are"
-    is still open, a plain yes to the name the lamp's last answer said
-    back, the name the person's line before gave
-    (`known_faces::read_back_name`), runs the same save with no model call
-    at all, through the same gates (`second_provider::yes_save`), unless a
-    face was kept in the last 45 s; a model save of that name within 45 s
-    after it gets `ALREADY_KEPT` (#5684: "Name is Walter.", "Walter, did I
-    get that right?", "Yes. That's my name." with no call ended the step
-    with the name only). While
+    is still open and no face was kept in the last 45 s, a plain yes to
+    the name the lamp's last answer said back, the name the person's line
+    before gave (`known_faces::read_back_name`), has the model told to ask
+    the face question, and a plain yes to that question (or a yes to the
+    read-back that asks for the face itself) runs the same save with no
+    model call at all, through the same gates (`second_provider::yes_save`,
+    `known_faces::face_agreed_name`); a model save of that name within
+    45 s after it gets `ALREADY_KEPT` (#5684: "Name is Walter.", "Walter,
+    did I get that right?", "Yes. That's my name." with no call ended the
+    step with the name only). The face question is known in English and
+    Vietnamese; in another language its yes still waits on the model's
+    call. While
     it is held, the onboarding walk keeps "who you are" open for it, up to
     45 s (`onboarding::face_save_held`, `FACE_SAVE_HELD_US`), instead of
     ending it done with the name only 15 s after the lamp's read-back
