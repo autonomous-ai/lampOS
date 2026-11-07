@@ -159,6 +159,19 @@ fn follows_up_from(began_us: Option<u64>) -> bool {
         )
 }
 
+/// A line begun over the lamp's audible answer, after a Stop, or cutting
+/// it (`over_the_lamps_voice`, `after_stop` or `heard_of_cut` on its Start,
+/// `talked_over`): the lamp's line before it was not heard whole, and is
+/// marked cut, so a one-yes read-back is never taken from it, in this
+/// request or a later one (the Reviewer-lead's P3s on #5609). With
+/// `LAMP_SAID_AS_HEARD` off, a Stop by hand or head is all this route is
+/// told of a cut.
+fn mark_cut_read_back(thread: &mut crate::thread::Thread, request: u64, talked_over: bool) {
+    if talked_over {
+        thread.began_over_the_lamps_voice(request);
+    }
+}
+
 /// With [`name_or_follow_up`], two faces or more in the eyes' newest fresh
 /// look (`eyes`) are two people at the lamp, and the room is busy at once
 /// ([`crate::room_told::RoomTold::two_people`]); said when it turns so, for
@@ -6389,14 +6402,12 @@ impl InputHandoff {
                 if let Err(refusal) = input.start(expected, request) {
                     return self.refused_start(request, refusal);
                 }
-                // Begun over the lamp's audible answer, or cutting it: the
-                // lamp's line before it was not heard whole, so a one-yes
-                // read-back is not taken from it (the Reviewer-lead's P3 on
-                // #5609).
-                if (over_the_lamps_voice || heard_of_cut.is_some())
-                    && let Ok(mut thread) = crate::thread::THREAD.lock()
-                {
-                    thread.began_over_the_lamps_voice(request.get());
+                if let Ok(mut thread) = crate::thread::THREAD.lock() {
+                    mark_cut_read_back(
+                        &mut thread,
+                        request.get(),
+                        over_the_lamps_voice || after_stop || heard_of_cut.is_some(),
+                    );
                 }
                 if continues {
                     self.continued = Some(request.get());
@@ -8414,6 +8425,23 @@ pub(crate) mod tests {
                 ..
             }
         ));
+    }
+
+    /// The Reviewer-lead's P3s on #5609: a Start over the lamp's voice, after
+    /// a Stop, or cutting a reply marks the read-back before it cut, and a
+    /// yes in a later request reads it so; a plain Start marks nothing.
+    #[test]
+    fn a_start_over_the_lamps_voice_or_after_a_stop_marks_the_read_back_cut() {
+        let ask = "Claude Code will write a poem. Shall I start it?";
+        let now = Instant::now();
+        for talked_over in [false, true] {
+            let mut thread = crate::thread::Thread::new();
+            thread.person("Ask Claude Code for a poem", true, now);
+            thread.lamp(1, ask, now);
+            mark_cut_read_back(&mut thread, 2, talked_over);
+            thread.person("Yes.", true, now);
+            assert_eq!(thread.answered_last_but_cut(3, now).unwrap().2, talked_over);
+        }
     }
 
     /// `LAMP_SAID_AS_HEARD`: a Start that cut a reply says how much of it
