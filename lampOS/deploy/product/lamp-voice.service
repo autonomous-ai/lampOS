@@ -398,6 +398,10 @@ Environment=LAMP_SKILL_READS=on
 Environment=LAMP_SCHEDULE_SPEAK=skill
 Environment=LAMP_SCHEDULE_SOCKET=/run/lampos-schedule/call.sock
 Environment=LAMP_SCHEDULE_DELIVERY_DIR=/var/lib/lampOS/voice/schedule-delivery
+# A delivery ledger fenced ahead of its store (a store put back to an older revision) is re-fenced once at the
+# voice's start, so new timers ring; while it still refuses every item, a timer is not set and the model is told
+# so, never "Timer set." (#5560): on lamp-52e6 on 8 Nov (10749), off said "Timer set." and never rang, on rang.
+Environment=LAMP_LEDGER_REFENCE=on
 Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock
 Environment=LAMP_MEMORY_DAYS=on
 # Nothing about a person kept while nobody is known (the lead's decision 1, 23 Oct; docs/memory.md): a

@@ -1638,7 +1638,7 @@ Test:
 (`reminders/consumer/tests.rs`).
 
 **A fence ahead of the store (#5560, `LAMP_LEDGER_REFENCE`, off unless
-exactly `on`).** Without the switch a ledger fenced ahead of its store (a
+exactly `on`; on in the product unit since 9 Nov).** Without the switch a ledger fenced ahead of its store (a
 store put back to an older revision under the same `store_id`) refuses
 every item as above, and a timer set then says "Timer set." and never
 rings. With it:
