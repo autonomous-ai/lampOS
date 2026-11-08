@@ -2618,8 +2618,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             // while their passing id stays in every look,
                             // but for a short run of looks with no face
                             // (`who::Held::looked`, the HOLD on #5546).
+                            // Only a near face counts as someone there: a
+                            // far or flicker face never ends it (#5546).
                             if let Some(who) = who.as_mut() {
-                                who.held.looked(|id| bus.in_view(id), !faces.is_empty());
+                                let anyone =
+                                    lamp_eyes::who::any_near(&faces, picture.filled.1.max(1) as f32);
+                                who.held.looked(|id| bus.in_view(id), anyone);
                             }
                             if let Some(yes) = yawns_yes {
                                 bus.activity_yawns_allowed(yes);
