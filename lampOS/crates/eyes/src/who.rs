@@ -1836,12 +1836,25 @@ pub struct Held {
     /// print of it passes [`HOLD_LIKENESS`] ([`Held::carry`]).
     pending: Option<String>,
     /// Whether the match's passing id has been in every look since the
-    /// match or its carry ([`Held::looked`]): only then does a check with no
-    /// print keep them ([`Held::keeps_unprinted`]). A look without it, as
-    /// when they get up and someone sits into their place and inherits the
-    /// id from the box overlap, ends it (the Reviewer-lead's HOLD on #5546).
+    /// match or its carry, but for up to [`UNBROKEN_MISSES`] looks in a row
+    /// that found no face ([`Held::looked`]): only then does a check with no
+    /// print keep them ([`Held::keeps_unprinted`]). A longer gap, as when
+    /// they get up and someone sits into their place and inherits the id
+    /// from the box overlap, or a look with a face but not theirs, ends it
+    /// (the Reviewer-lead's HOLD on #5546).
     unbroken: bool,
+    /// Looks in a row without the match's id, none of them with a face.
+    missed: u8,
 }
+
+/// The looks in a row that may find no face at all while [`Held::unbroken`]
+/// lasts: a detector's flicker. On lamp-52e6 (#5546) the known person's
+/// face was found in 93% of looks, one look in about 14 missing it, and each
+/// such miss ended the hold, so it never covered a recognition miss. Two
+/// looks (0.2 s at a look every 0.1 s) is under the 5 looks (0.5 s) of
+/// nobody before someone sits into the known place in
+/// `swap_into_known_place`, which still ends it.
+pub const UNBROKEN_MISSES: u8 = 2;
 
 impl Held {
     pub fn new(on: bool) -> Self {
@@ -1852,6 +1865,7 @@ impl Held {
             follows: false,
             pending: None,
             unbroken: false,
+            missed: 0,
         }
     }
 
@@ -1894,6 +1908,7 @@ impl Held {
         if carried {
             self.matched_id = self.pending.take();
             self.unbroken = true;
+            self.missed = 0;
         }
         carried
     }
@@ -1906,16 +1921,22 @@ impl Held {
     pub fn matched(&mut self, now: Instant, id: Option<String>) {
         self.matched_at = Some(now);
         self.unbroken = id.is_some();
+        self.missed = 0;
         self.matched_id = id;
         self.pending = None;
     }
 
-    /// One look: whether each passing id is in it (`in_view`). A look
-    /// without the match's id ends [`Held::unbroken`] until the next match.
-    // One missed look ends it, even a detector's flicker: a tolerance of a
-    // look or two goes here if that lets go of people still in place.
-    pub fn looked(&mut self, in_view: impl FnOnce(&str) -> bool) {
-        if self.unbroken && !self.matched_id.as_deref().is_some_and(in_view) {
+    /// One look: whether each passing id is in it (`in_view`), and whether
+    /// it found any face (`anyone`). A look without the match's id ends
+    /// [`Held::unbroken`] until the next match if it found a face, or if it
+    /// is past [`UNBROKEN_MISSES`] looks in a row that found none.
+    pub fn looked(&mut self, in_view: impl FnOnce(&str) -> bool, anyone: bool) {
+        if self.matched_id.as_deref().is_some_and(in_view) {
+            self.missed = 0;
+            return;
+        }
+        self.missed = self.missed.saturating_add(1);
+        if anyone || self.missed > UNBROKEN_MISSES {
             self.unbroken = false;
         }
     }
@@ -1966,6 +1987,7 @@ impl Held {
     /// Let go at once: the camera closed, or the check let them go.
     pub fn let_go(&mut self) {
         self.unbroken = false;
+        self.missed = 0;
         self.matched_at = None;
         self.matched_id = None;
         self.pending = None;
@@ -3060,7 +3082,10 @@ mod tests {
                 .map(|id| format!("f{id}"))
                 .collect();
             let id = look.first().cloned();
-            held.looked(|matched| look.iter().any(|seen| seen == matched));
+            held.looked(
+                |matched| look.iter().any(|seen| seen == matched),
+                !look.is_empty(),
+            );
             if ms == 1000 {
                 assert_eq!(
                     id.as_deref(),
@@ -3119,6 +3144,66 @@ mod tests {
             (false, false)
         );
         assert_eq!(swap_into_known_place(true, 500, Some(0.35)), (false, false));
+    }
+
+    /// Lamp-52e6 on #5546: the known person stays in place, their box found
+    /// in about 13 looks of every 14 (one look in 14 finds no face, then
+    /// their box again, with the same passing id by the box overlap). Looks
+    /// every 0.1 s, matched at 0 s, unprinted (turned) checks every 2 s.
+    /// Whether they are still named at the 2 s check and at 3.9 s.
+    fn known_with_flicker(on: bool) -> (bool, bool) {
+        let start = Instant::now();
+        let mut ids = crate::bus_out::Ids::default();
+        let mut held = Held::new(on);
+        let mut named = false;
+        let mut at = Vec::new();
+        for ms in (0..=3900u64).step_by(100) {
+            let boxes: &[[f32; 4]] = if (ms / 100) % 14 == 7 {
+                &[]
+            } else {
+                &[[0.40, 0.30, 0.60, 0.60]]
+            };
+            let look: Vec<String> = ids
+                .of(boxes, ms * 1000)
+                .iter()
+                .map(|id| format!("f{id}"))
+                .collect();
+            let id = look.first().cloned();
+            held.looked(
+                |matched| look.iter().any(|seen| seen == matched),
+                !look.is_empty(),
+            );
+            if !boxes.is_empty() {
+                assert_eq!(id.as_deref(), Some("f1"), "their box keeps their id");
+            }
+            if ms % RECOGNISE_EVERY.as_millis() as u64 == 0 {
+                let now = start + Duration::from_millis(ms);
+                if ms == 0 {
+                    held.matched(now, id.clone());
+                    named = true;
+                } else if !(named && held.keeps_unprinted(now, id.is_some(), id.as_deref())) {
+                    held.let_go();
+                    named = false;
+                }
+            }
+            if ms == 2000 || ms == 3900 {
+                at.push(named);
+            }
+        }
+        (at[0], at[1])
+    }
+
+    #[test]
+    fn steady_known_one_with_detector_flicker_stays_held() {
+        // Before: the missed look at 0.7 s ended the hold, let go at 2 s.
+        assert_eq!(known_with_flicker(true), (true, true));
+        assert_eq!(known_with_flicker(false), (false, false));
+        // A look with another face and not theirs ends it at once.
+        let start = Instant::now();
+        let mut held = Held::new(true);
+        held.matched(start, Some("f1".into()));
+        held.looked(|_| false, true);
+        assert!(!held.keeps_unprinted(start, false, None));
     }
 
     /// The known person themself, printed at 0.35 (their flicker under

@@ -1083,19 +1083,27 @@ analysis on #3126). With the switch on:
   flicker sat at 0.34 to 0.36, strangers lower; to be tuned from the score
   line) and, while speaking is judged, has the passing id their face had
   at the match, and that id has been in every look since (`Held::looked`,
-  `Held::keeps_print`): a close family face, 0.30 alike or more, sitting
-  into their place after a gap inherits the id and is let go at the next
-  check, as with the hold off (the Reviewer-lead's HOLD at 180cc84ebb).
+  `Held::keeps_print`; "every look" here and below forgives up to two
+  looks in a row that find no face at all, `who::UNBROKEN_MISSES`): a
+  close family face, 0.30 alike or more, sitting into their place after a
+  gap inherits the id and is let go at the next check, as with the hold
+  off (the Reviewer-lead's HOLD at 180cc84ebb).
   Anything else lets them go at once,
   the known file with them, so a stranger sitting down is never named.
   A check with no print keeps the held name only while the passing id
   their face had at the match has been in every look since
   (`Held::looked`), and then if the near face seen but not printed
   (turned, too small) has that id, or no face is near
-  (`Held::keeps_unprinted`). A look without that id lets go at the next
-  check, as with the hold off: someone who sits into their place within
-  1.5 s inherits the id from the box overlap, and unprinted would carry
-  their name to the 4 s bound (the Reviewer-lead's HOLD on #5546). With
+  (`Held::keeps_unprinted`). A look with a face but without that id, or
+  more than two looks in a row with no face (`who::UNBROKEN_MISSES`), lets
+  go at the next check, as with the hold off: someone who sits into their
+  place within 1.5 s inherits the id from the box overlap, and unprinted
+  would carry their name to the 4 s bound (the Reviewer-lead's HOLD on
+  #5546). Up to two looks with no face (0.2 s at a look every 0.1 s, under
+  the 0.5 s gap of a swap) keep it: on lamp-52e6 the known face was found
+  in 93% of looks, one look in about 14 missing it, and with every missed
+  look ending the hold it never covered a recognition miss (OFF 30 / ON 30
+  cold-cache misses, #5546). With
   `LAMP_EYES_SPEAKING` off there is no passing id: a printed face relies
   on the 0.30 bar alone, and a check with no print lets go at once.
 - **The camera closed lets them go at once**: the name and the known file
