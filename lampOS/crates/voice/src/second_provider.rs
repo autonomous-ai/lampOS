@@ -13793,11 +13793,13 @@ async fn answer(
                         !crate::action_claim::stands(*kind, &held, read_asked, called())
                     });
                 // A worded claim beside calls is held only for a limit it
-                // said that none of them carried (the first builder's ruling
-                // on #5215): its note says so, never that nothing ran.
-                let limited = unmade.is_some()
-                    && called().next().is_some()
-                    && crate::action_claim::worded_limit(&held).is_some();
+                // said that none of them carried, a kept light's always (the
+                // first builder's ruling on #5215): its note says so, never
+                // that nothing ran.
+                let limited = unmade.is_some_and(|kind| {
+                    kind == crate::action_claim::Claim::LightKept
+                        || crate::action_claim::worded_limit(&held).is_some()
+                }) && called().next().is_some();
                 // Whether only the worded claims found it: the journal says so.
                 let worded = if limited {
                     ", in other words: LAMP_ACTION_CLAIM_WORDED, a said limit no call carried"

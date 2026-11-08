@@ -56,7 +56,13 @@
 //! length from now, never a kept light's; a reminder's time beside
 //! `list_reminders` only on a line worded as a question,
 //! [`worded_as_a_question`]; [`stands`]); held beside other calls,
-//! the next round is told [`LIMIT_NOTE`]. Only the reply's first limit is
+//! the next round is told [`LIMIT_NOTE`]. A kept light's claim
+//! ([`Claim::LightKept`]), whose every run says a limit, is never carried:
+//! no call keeps the light until a time, so it is held beside any call,
+//! whatever follows its hour ("until ten and then dim."). A known gap: "can
+//! you", "could you" or "would you remind me at ten" and "remind me at
+//! ten?" are worded as questions, so a set claim beside only
+//! `list_reminders` stands. Only the reply's first limit is
 //! judged, and while the reply streams only one said by its first
 //! sentence's end: a later one is not checked. The worded runs never judge a
 //! line the person asked as a question ([`asked_as_a_question`]), whose
@@ -372,7 +378,8 @@ pub fn claim_as(reply: &str, ended: bool, worded: bool) -> Option<Option<Claim>>
 /// acting part's own lines needs a call of its kind; a worded one any call,
 /// and with a limit said ([`worded_limit`]) a call of its kind that carried
 /// that limit (the first builder's ruling on #5215): "I'll keep my light on
-/// until ten." beside a `keep_rule`, which holds always, does not stand.
+/// until ten." beside a `keep_rule`, which holds always, does not stand,
+/// nor does any kept light's claim beside any call ([`Claim::LightKept`]).
 /// `read`: the person's line asks to read something back
 /// ([`worded_as_a_question`]), so a `list_reminders` may back a time said.
 pub fn stands<'a>(
@@ -384,6 +391,14 @@ pub fn stands<'a>(
     let mut calls = calls.into_iter().peekable();
     if matches!(claim(reply, true), Some(Some(_))) {
         return calls.any(|(name, _)| kind.made_by(name));
+    }
+    // A kept light's every run says a limit ("until", "till", "for" and a
+    // time), and no call keeps the light until a time: a light call or a
+    // kept rule carries none, and a Schedule call keeps no light. Held
+    // beside any call, whatever follows the hour ("until ten and then dim.";
+    // the Reviewer-lead's P2s on #5737 at 2dffedb30b).
+    if kind == Claim::LightKept {
+        return false;
     }
     match worded_limit(reply) {
         None => calls.peek().is_some(),
@@ -419,7 +434,8 @@ impl Limit {
     /// `list_reminders` reads back what is set: it backs a reminder's time
     /// only on a line that asked to read one (`read`), never after "Remind
     /// me at ten." (the Reviewer-lead's two P2s on #5737). A light call or a
-    /// kept rule (`keep_rule` holds always) carries none.
+    /// kept rule (`keep_rule` holds always) carries none, and a kept light's
+    /// claim is never carried ([`stands`]).
     fn carried_by(self, kind: Claim, read: bool, name: &str, args: &serde_json::Value) -> bool {
         let schedule = matches!(kind, Claim::Schedule | Claim::ReminderTime);
         match (self, name) {
@@ -1645,13 +1661,14 @@ mod tests {
             false,
             [("keep_rule", &kept)]
         ));
-        assert!(stands(
+        // A reminder at the same time keeps no light.
+        assert!(!stands(
             Claim::LightKept,
             ten,
             false,
             [("set_reminder", &at("22:00"))]
         ));
-        assert!(stands(
+        assert!(!stands(
             Claim::LightKept,
             ten,
             false,
@@ -1679,8 +1696,8 @@ mod tests {
         ));
         // No limit: any call, as before; the strict lines: a call of their kind.
         assert!(stands(
-            Claim::LightKept,
-            "I'll keep my light on.",
+            Claim::Schedule,
+            "Reminder set.",
             false,
             [("web_search", &kept)]
         ));
