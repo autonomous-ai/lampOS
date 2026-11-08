@@ -1863,6 +1863,12 @@ fn the_product_answers_a_stop_and_asks_after_a_wordless_cut_in() {
         service.contains(&"Environment=LAMP_SPOKEN_STOP_ENDS=on"),
         "the voice lacks LAMP_SPOKEN_STOP_ENDS"
     );
+    // The stop words asked for as key terms (#5111, the first builder's call
+    // on #1711, 8 Nov): on lamp-52e6 the stop line went from 3/8 to 6/8.
+    assert!(
+        service.contains(&"Environment=LAMP_STOP_WORDS_KEYTERM=on"),
+        "the voice lacks LAMP_STOP_WORDS_KEYTERM"
+    );
     assert!(
         service.contains(&"Environment=LAMP_CUT_IN_WORDLESS_ASKS=on"),
         "the voice lacks LAMP_CUT_IN_WORDLESS_ASKS"

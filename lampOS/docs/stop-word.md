@@ -1121,7 +1121,10 @@ It is to be decided again before home lamps ship.
   hears the cut-in's words, asks with the stop words too
   (`Net::asking_for_the_stop_words`, #5076): on lamp-52e6 on 5 Nov it
   heard a played "Stop, Lamp." over a story as "Start plan.", "Sam
-  Lamp." and "Talent plan.", the name a key term and "Stop" not. The wait words' stream (`RelayEars::for_waits`) is read
+  Lamp." and "Talent plan.", the name a key term and "Stop" not. The
+  switch is on in the product unit since #5111 (the first builder's call
+  on #1711, 8 Nov): on lamp-52e6 that day, 8 loud stops over a story an
+  arm, the stop line was said 3/8 off and 6/8 with it. The wait words' stream (`RelayEars::for_waits`) is read
   the same way. A `LAMP_SECOND_KEY_TERMS` the check refuses (more than 20
   terms, an empty one) is refused in the journal and the file's key terms
   are kept, so the stop and wait words are still heard (the second worker
