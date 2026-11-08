@@ -1082,7 +1082,11 @@ analysis on #3126). With the switch on:
   own prints (`who::HOLD_LIKENESS`, under `SAME_PERSON`'s 0.363: their
   flicker sat at 0.34 to 0.36, strangers lower; to be tuned from the score
   line) and, while speaking is judged, has the passing id their face had
-  at the match (`Held::keeps_print`). Anything else lets them go at once,
+  at the match, and that id has been in every look since (`Held::looked`,
+  `Held::keeps_print`): a close family face, 0.30 alike or more, sitting
+  into their place after a gap inherits the id and is let go at the next
+  check, as with the hold off (the Reviewer-lead's HOLD at 180cc84ebb).
+  Anything else lets them go at once,
   the known file with them, so a stranger sitting down is never named.
   A check with no print keeps the held name only while the passing id
   their face had at the match has been in every look since

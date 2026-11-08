@@ -1933,13 +1933,16 @@ impl Held {
     /// one known: within the hold, only while that face is still at least
     /// [`HOLD_LIKENESS`] to the held person's prints (`likeness`, `None` if
     /// they are no longer kept) and, when the match had a passing id, has
-    /// the same one, or the one that follows it ([`Held::follow`]). A
-    /// stranger sitting down is let go at once.
+    /// the same one while it has been in every look since ([`Held::looked`]:
+    /// a close family face sitting into their place after a gap inherits
+    /// it, the Reviewer-lead's HOLD at 180cc84ebb), or the one that follows
+    /// it ([`Held::follow`]). A stranger sitting down is let go at once.
     pub fn keeps_print(&self, now: Instant, likeness: Option<f32>, id: Option<&str>) -> bool {
         self.keeps(now)
             && likeness.is_some_and(|likeness| likeness >= HOLD_LIKENESS)
             && self.matched_id.as_deref().is_none_or(|matched| {
-                id == Some(matched) || (id.is_some() && id == self.pending.as_deref())
+                (id == Some(matched) && self.unbroken)
+                    || (id.is_some() && id == self.pending.as_deref())
             })
     }
 
@@ -3036,8 +3039,10 @@ mod tests {
     /// `away_ms` 0 it is the known person's own box going on. They match at
     /// the check at 0 s; checks follow every 2 s, as main.rs's unprinted
     /// branch takes them. Whether the known name is still out at 2.5 s and
-    /// 3.5 s.
-    fn swap_into_known_place(on: bool, away_ms: u64) -> (bool, bool) {
+    /// 3.5 s. With `print` the checks after 0 s print the near face at that
+    /// likeness to the known person, matching nobody, as main.rs's printed
+    /// branch takes them.
+    fn swap_into_known_place(on: bool, away_ms: u64, print: Option<f32>) -> (bool, bool) {
         let start = Instant::now();
         let mut ids = crate::bus_out::Ids::default();
         let mut held = Held::new(on);
@@ -3068,7 +3073,12 @@ mod tests {
                 if ms == 0 {
                     held.matched(now, id.clone());
                     named = true;
-                } else if !(named && held.keeps_unprinted(now, id.is_some(), id.as_deref())) {
+                } else if !(named
+                    && match print {
+                        Some(likeness) => held.keeps_print(now, Some(likeness), id.as_deref()),
+                        None => held.keeps_unprinted(now, id.is_some(), id.as_deref()),
+                    })
+                {
                     held.let_go();
                     named = false;
                 }
@@ -3083,18 +3093,40 @@ mod tests {
     #[test]
     fn swap_into_known_place_lets_go_at_the_base_time_with_the_hold_on() {
         // Off: the 2 s check lets go, so nobody is named at 2.5 s or 3.5 s.
-        assert_eq!(swap_into_known_place(false, 500), (false, false));
+        assert_eq!(swap_into_known_place(false, 500, None), (false, false));
         // On: the same. Before the fix the one who sat down kept the name
         // to the 4 s check, named at both.
-        assert_eq!(swap_into_known_place(true, 500), (false, false));
+        assert_eq!(swap_into_known_place(true, 500, None), (false, false));
     }
 
     /// The hold's purpose kept: the known person stays in place unprinted
     /// (turned) through the 2 s check; its 4 s bound is tested above.
     #[test]
     fn swap_into_known_place_none_the_known_one_stays_through_a_missed_check() {
-        assert_eq!(swap_into_known_place(true, 0), (true, true));
-        assert_eq!(swap_into_known_place(false, 0), (false, false));
+        assert_eq!(swap_into_known_place(true, 0, None), (true, true));
+        assert_eq!(swap_into_known_place(false, 0, None), (false, false));
+    }
+
+    /// The Reviewer-lead's HOLD at 180cc84ebb: the one who sits into the
+    /// known person's place after a gap prints 0.35 alike to them (a close
+    /// family face), above `HOLD_LIKENESS` and under `SAME_PERSON`. The id
+    /// inherited across a gap no longer keeps the name: let go at the 2 s
+    /// check, as with the hold off.
+    #[test]
+    fn printed_swap_into_known_place_lets_go_at_the_base_time_with_the_hold_on() {
+        assert_eq!(
+            swap_into_known_place(false, 500, Some(0.35)),
+            (false, false)
+        );
+        assert_eq!(swap_into_known_place(true, 500, Some(0.35)), (false, false));
+    }
+
+    /// The known person themself, printed at 0.35 (their flicker under
+    /// `SAME_PERSON`), staying in place with no gap: still held.
+    #[test]
+    fn printed_known_one_stays_through_a_missed_check() {
+        assert_eq!(swap_into_known_place(true, 0, Some(0.35)), (true, true));
+        assert_eq!(swap_into_known_place(false, 0, Some(0.35)), (false, false));
     }
 
     #[test]
