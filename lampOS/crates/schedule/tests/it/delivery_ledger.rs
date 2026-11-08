@@ -829,6 +829,126 @@ fn a_reopened_ledger_ahead_of_its_store_refences_but_never_readmits_an_acknowled
     );
 }
 
+/// A set under its own request id, as lamp-actions makes one (random).
+fn set_as(engine: &mut Engine<Disk>, at: u64, request_id: &str) -> u64 {
+    engine.tick(&now(at)).unwrap();
+    let response = engine
+        .answer(
+            Request::Set {
+                person: None,
+                guard: guard(engine, request_id),
+                text: PRIVATE_TEXT.into(),
+                when: When::After { seconds: 1 },
+            },
+            &now(at),
+        )
+        .unwrap();
+    response["id"].as_u64().unwrap()
+}
+
+/// The Reviewer-lead's probe on #5668: a timer set and acknowledged in the
+/// newer store; the store goes back, under the same `store_id`, to before
+/// it was set; a new timer then gets the same key, `{id: 1, delivery: 1}`.
+/// Keyed on the key alone it was refused as `acknowledged` while
+/// `refuses` said nothing, so "Timer set." was said and it never rang. The
+/// new set's request id is its own, so it is admitted; the acknowledged
+/// one, put back pending, is still refused.
+#[test]
+fn a_new_timer_given_an_acknowledged_items_key_after_a_restore_is_admitted() {
+    let schedule_disk = Disk::default();
+    let mut schedule = engine(schedule_disk.clone());
+    let before_any = schedule_disk.json();
+    let acked = set_as(&mut schedule, 0, "set-in-the-newer-store");
+    let first = pending(&mut schedule, acked, 1000);
+    let disk = Disk::default();
+    let mut running = ledger(disk.clone());
+    let (_, ack) = prepare_ack(&mut running, &first);
+    let response = schedule.answer(ack.request.clone(), &now(1000)).unwrap();
+    let evidence = AckEvidence::from_reply(&ack, &response).unwrap();
+    running
+        .reconcile(first.key(), &Evidence::Ack(evidence))
+        .unwrap();
+    assert_eq!(running.compact_resolved().unwrap(), 1);
+    let fence = running.schedule_revision().unwrap();
+    drop((running, schedule));
+
+    schedule_disk.replace(&before_any);
+    let mut schedule = Engine::open(schedule_disk, "Etc/UTC", &now(2000), STORE).unwrap();
+    let new = set_as(&mut schedule, 2000, "a-new-set-after-the-restore");
+    schedule.tick(&now(3000)).unwrap();
+    let fresh = pending(&mut schedule, new, 3000);
+    assert_eq!(fresh.key(), first.key(), "the restore reused the key");
+    assert!(fresh.revision() < fence, "{} < {fence}", fresh.revision());
+
+    let mut started = self::ledger(disk);
+    started.refence_at_start();
+    assert!(!started.refuses(&fresh.key().store_id, fresh.revision()));
+    let prepared = started.prepare(&fresh, correlation(2));
+    assert!(prepared.is_ok(), "the new timer was dropped: {prepared:?}");
+}
+
+/// The Reviewer-lead's second P2 on #5668: an entry observed at a revision
+/// the restored store never reached could never fit under it, so the
+/// re-fence never happened and the cannot-ring guard refused every set for
+/// good, across restarts. Armed, the re-fence lets that entry go: said
+/// (completed) it is kept as acknowledged and never said again; the fence
+/// comes down and a fresh item is admitted. Unarmed, refused as before.
+#[test]
+fn a_refence_lets_go_of_an_entry_the_restored_store_never_held() {
+    let schedule_disk = Disk::default();
+    let mut schedule = engine(schedule_disk.clone());
+    let said = set_as(&mut schedule, 0, "said-before-the-restore");
+    let other = set_as(&mut schedule, 0, "never-offered");
+    let older_store = schedule_disk.json();
+    let first = pending(&mut schedule, said, 1000);
+    let disk = Disk::default();
+    let mut running = ledger(disk.clone());
+    let prepared = running.prepare(&first, correlation(1)).unwrap();
+    running.complete(&prepared, &proof(&prepared)).unwrap();
+    // The newer store moves on, and the entry is seen there again.
+    set_as(&mut schedule, 1000, "more-work-one");
+    set_as(&mut schedule, 1000, "more-work-two");
+    let item = ItemEvidence::from_get(&Request::Get { id: said }, &get(&mut schedule, said, 1000))
+        .unwrap();
+    assert_eq!(
+        running
+            .reconcile(first.key(), &Evidence::Item(item))
+            .unwrap(),
+        Reconciled::Unresolved
+    );
+    drop((running, schedule));
+
+    schedule_disk.replace(&older_store);
+    let mut schedule = Engine::open(schedule_disk, "Etc/UTC", &now(2000), STORE).unwrap();
+    let again = pending(&mut schedule, said, 2000);
+    let fresh = pending(&mut schedule, other, 2000);
+    let store = schedule.revision();
+    let unarmed = self::ledger(disk.clone());
+    assert!(
+        unarmed.refuses(STORE, store),
+        "the entry must not fit unarmed"
+    );
+    drop(unarmed);
+
+    let mut started = self::ledger(disk.clone());
+    started.refence_at_start();
+    assert!(!started.refuses(STORE, store));
+    started.refence_to(STORE, store).unwrap();
+    assert_eq!(started.schedule_revision(), Some(store));
+    assert!(started.entries().unwrap().is_empty());
+    assert_eq!(
+        started.prepare(&again, correlation(2)).unwrap_err().code,
+        "acknowledged"
+    );
+    assert!(started.prepare(&fresh, correlation(3)).is_ok());
+    assert!(!started.refuses(STORE, store));
+    // Unarmed, `refence_to` writes nothing.
+    let bytes = disk.bytes();
+    let mut later = self::ledger(disk.clone());
+    later.refence_to(STORE, store).unwrap();
+    assert_eq!(disk.bytes(), bytes);
+}
+
 #[test]
 fn identity_bound_but_equal_revision_absence_cannot_contradict_pending_evidence() {
     let (_, pending) = timer();
