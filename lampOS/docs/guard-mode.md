@@ -14,7 +14,8 @@ nobody is named.
 
 **Status:** built, with tests; not tried on a lamp, and out of the product's
 install until it is (`install::NOT_PRODUCT_SKILLS`). **Its texts reach the
-phone only with `LAMP_MESSAGES=on`** in `lamp-cloud`: they go on
+phone only with `LAMP_SKILL_MESSAGES=on`** (or `LAMP_MESSAGES=on`) in
+`lamp-cloud` (7 Nov, #1685: the first opens nothing else of texts): they go on
 `messages/out` on the lamp's bus, and `lamp-cloud` carries each up as the
 backend's unasked news, which it keeps for the owner and pushes to their
 phones ([messages.md](messages.md), "Unasked texts"). Off unless set; not
@@ -249,6 +250,21 @@ thing leaves `lamp-skills`:
 No picture and no recording: it reads none, keeps none and sends none, of
 video or of audio. A stranger is never more than "someone I don't know".
 
+**What's kept, and where.** Only the texts: each, with when someone came,
+for how long and a name only where one was allowed, is kept by the
+backend for the owner alone, off the lamp, for 90 days, pushed to the
+owner's phones and shown in the lamp's chat ([messages.md](messages.md),
+"Unasked texts"). Until sent, while the backend can't be reached, up to 4
+wait in `lamp-cloud`'s memory (`unasked::KEPT_OFFLINE`), and a restart of
+`lamp-cloud` loses them. `SKILL.md` says so in its own section, "What's
+kept", and in its answer when asked about it (the first builder's 08:49 on
+#1685, 7 Nov: the person turning it on should know). Asked by anyone but
+the owner, the answer is of the person who turned it on, not "while
+you're out", in `SKILL.md`'s description and `watch::WORDS_V2_DESCRIPTION`
+alike
+(the played row on #1685, 7 Nov, 15:36: a visitor was told "while you're
+out").
+
 **A picture in the text** (the owner's open question on #1685) is not built.
 It would leave the lamp, which loosens privacy. If wanted, it would be a
 separate setting the person turns on themselves, with the risk said plainly
@@ -380,7 +396,8 @@ off guard" the voice's say service (`LAMP_SAY=on`).
 ## Not shown, and open
 
 - Nothing ran on a lamp: the cases are written, not recorded.
-- Delivery to a phone: built (`LAMP_MESSAGES=on`, [messages.md](messages.md)),
+- Delivery to a phone: built (`LAMP_SKILL_MESSAGES=on` or `LAMP_MESSAGES=on`,
+  [messages.md](messages.md)),
   not yet seen on a lamp and a phone.
 - How the mark and Light out when you leave share the ring when both are
   installed: both ask at skill priority, and which the ring shows is the

@@ -1274,6 +1274,7 @@ mod tests {
                     watch: false,
                     progress: false,
                     push_wait: false,
+                    push_watch: false,
                     close_told: false,
                     targets_newer: None,
                     set_up_later: None,
@@ -1618,6 +1619,7 @@ mod tests {
                 named_only: false,
                 correct: false,
                 questions: false,
+                now: false,
                 sign_in: true,
                 sign_in_app: false,
             }
@@ -2109,6 +2111,7 @@ mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            now: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -2259,6 +2262,7 @@ mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            now: false,
             sign_in: true,
             sign_in_app: false,
         };

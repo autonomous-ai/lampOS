@@ -270,6 +270,15 @@ struct Tracked {
     signs_seen: BTreeSet<Sign>,
 }
 
+/// One watched task as last read ([`Tracker::line`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Line<'a> {
+    pub state: AgentState,
+    pub last_active_unix_ms: Option<u64>,
+    /// The agent's own words: they stay in the tasks part.
+    pub about: Option<&'a str>,
+}
+
 /// What came of one `ps`, for the diagnostics.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Reads {
@@ -607,6 +616,18 @@ impl Tracker {
                 .copied()
                 .collect(),
             settled: self.settled.clone(),
+        })
+    }
+
+    /// The task as last read, for "tasks now" ([`crate::now`]): its state,
+    /// when Harness last saw its agent do anything, and its line. Kept in
+    /// memory there, as here.
+    pub fn line(&self, task: u64) -> Option<Line<'_>> {
+        let tracked = self.tasks.get(&task)?;
+        Some(Line {
+            state: tracked.state,
+            last_active_unix_ms: tracked.last_active_unix_ms,
+            about: tracked.about.as_deref(),
         })
     }
 

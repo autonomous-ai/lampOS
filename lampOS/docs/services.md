@@ -35,6 +35,12 @@ at 14:11 on 3 Nov 2026):
 
 ## Who can use them
 
+**In the product today, anyone who speaks to the lamp** (`LAMP_PRIVATE_ROOM=on`, the owner's call on 6 Nov). The lamp is a private room between it and its owner, so whoever speaks is the owner, and no ownership check runs: telling who is speaking wasn't reliable enough, and the lamp refused its own owner. A line must still be spoken (`NOT_HEARD`), and a write still needs its read-back and a plain "send" right after it, which catch a mishearing. Writes stay on the second route only.
+
+**The accepted cost (the owner, 6 Nov):** no face is asked for at all, with nobody in view too. So a TV, a video call or a recording that says "read my mail" can get it read aloud in full. The owner chose this over any face-in-view rule, so the lamp doesn't refuse.
+
+The rules below are what applies with the switch off; they stay in the code for a later feature.
+
 Only the lamp's owner: the person whose known face is kept under the name
 typed at setup (`LAMP_PERSON_NAME`) or under the name `who_you_are` saved
 with their face (`known_faces::owner_now`, kept fresh while services are on),
@@ -43,8 +49,12 @@ with their face (`known_faces::owner_now`, kept fresh while services are on),
 are held to (`memory_scope::ScopeLease::scope`): the line must be admitted as
 the owner's known face, not held by a face's gap or carried as a
 conversation going on, and not narrowed to the room (another face seen
-speaking it). A guest's line, an unknown face's, the room's, a line held or
-narrowed, and a request with no scope are told `OWNER_ONLY`, "Not done: only
+speaking it), nor the owner's only by their face alone in view
+(`LAMP_PERSON_SCOPE_ONE_FACE_READS`, `ScopeLease::forgets_need_mouth`: that
+counts for saving and recall, never for acting as them, so an off-camera
+guest's "read my mail" with the owner silent alone in view reads nothing). A
+guest's line, an unknown face's, the room's, a line held or narrowed, a
+one-face-read line, and a request with no scope are told `OWNER_ONLY`, "Not done: only
 the lamp's owner can use their linked services, and I can't tell it is them
 now. Say so plainly, in a few words, and ask them to look at the lamp so it
 can see who is asking.", and nothing is called, for reads and writes alike. A request not heard live (a scheduled run, a skill's or the
@@ -103,6 +113,7 @@ connected apps.
 |---|---|---|
 | `LAMP_SERVICES=on` | `lamp-cloud` (with `LAMP_CLOUD=on`), `lamp-voice` and `lamp-services` | `lamp-cloud` answers the app's `connector.*` and `services.list` with V1's "not on this lamp: <kind>" and puts nothing in `can`; the voice declares none of the three functions and routes none; `lamp-services` opens no socket and exits |
 | `LAMP_SERVICES_WRITE=on` (on in the product's `lamp-services.service`) | `lamp-services` | `service_write` answers "writing to services is off on this lamp", and nothing is prepared or sent; reads are as before |
+| `LAMP_SERVICES_TOLD=on` (#5523) | `lamp-voice`'s two routes, with `LAMP_SERVICES=on` | The owner's line is told nothing of what is linked: the model knows only the three functions and asks `services_connected` when it thinks to ("The voice is told what is linked", below) |
 | `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and a request to make a skill naming a service is answered `NOT_A_SERVICE` ("A made skill's read", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
@@ -659,7 +670,9 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   this one is that read-back's, and the lamp spoke in no other request
   since; the person's line is the very first begun since the write was
   prepared; it is the same owner who asked; at most 2 minutes since it was
-  prepared and 30 s (`SEND_WITHIN`) since the lamp last said a word of it;
+  prepared and 30 s (`SEND_WITHIN`, `send_by`) since the lamp last said a
+  word of it, or since the read-back could have finished playing at 600 ms a
+  word, if later (after the lamp asks once more, since that asking alone);
   and the person's words in this turn are a plain send. Otherwise the model
   is told `CANCELLED`, "Not sent, and cancelled: I send only on a plain
   "send" said to me right after I read the message back. Say it was not
@@ -736,14 +749,23 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   language."
 - **A plain send** (`says_send`): the words in lower case, everything but
   letters, digits and `'` as spaces, the fillers `yes`, `yeah`, `yep`, `ok`,
-  `okay`, `sure`, `please`, `now`, `lamp`, `lampy`, `vâng`, `dạ`, `ừ`, `có`
-  taken off both ends, and what is left exactly one of `send`, `send it`,
+  `okay`, `sure`, `please`, `now`, `lamp`, `lampy`, `hey`, `hi`, `hello`,
+  `oh`, `vâng`, `dạ`, `ừ`, `có` taken off both ends, and what is left exactly one of `send`, `send it`,
   `send that`, `send the message`, `send the email`, `go ahead and send it`,
   `gửi`, `gửi đi`, `gửi nó đi`, `gởi`, `gởi đi`, `gui`, `gui di`,
   `gửi đi giúp tôi`, `gui di giup toi`: each has "send", "gửi", "gởi" or
   "gui" in it. So "Yes, send it.", "Vâng, gửi đi" and "Ừ, gửi đi giúp tôi"
-  send; "do it", "don't send it", "send it to
-  Bo instead", "đừng gửi" and "no" don't.
+  send, and so does "Hey Lamp, yes, send it."; "do it", "don't send it",
+  "send it to Bo instead", "đừng gửi" and "no" don't.
+- **A plain send is heard as an answer** (`send_awaited`). While a write
+  waits, a plain send counts as answering the lamp, however the read-back's
+  last sentence reads. So it isn't held as a short sound or as the room's lone
+  words, even with nobody in view. This applies only to a line known to have
+  begun clear of the lamp's words. One begun over its voice, within 1.5 s
+  (`own_echo::TAIL_US`) of its words' end, or with no hearing hook to say when
+  it began may be the lamp's own "send it" heard back, which `own_echo` doesn't
+  hold in under 3 words. Such a line is judged as any other, and `gate` still
+  judges the send.
 
 ### After a read
 
@@ -953,12 +975,39 @@ otherwise cleared, and without it the switch was off there on lamp-9adf
 on 4 Nov),
 `made_skill::brief` lets a request through that names one linked service
 with a fixed read and no write word ("send", "reply", "add", "post", "schedule",
-...); two services, or a write, are still `NOT_A_SERVICE`. Asking for
+...). The rest are told their own limit, in the person's words (the testers'
+sheet, 6 Nov: "a skill is limited with no reason"), never `NOT_A_SERVICE`,
+which says no skill can use a service and is false with the switch on:
+a write is `NOT_A_WRITE` ("Not possible yet: a skill can read one linked
+service, but it can't send, write or change anything there."), two services
+are `ONE_SERVICE` ("... can read only one linked service, not two or more."),
+and a service with nothing a made skill reads, such as Notion, is
+`NOT_READABLE` ("... can read one linked service, but not that one."). Each
+ends "You can ask me for it yourself any time." Asking for
 the skill itself is no write: words before "skill" that only ask for it
 ("create me a new skill that ...", "add a skill to ...") are left out
-first, and "schedule" after "my", "the", "tomorrow's", "today's", "day"
-or "calendar" is the thing read (lamp-9adf, 4 Nov 23:51: "create a skill
-that reads my calendar" was refused so). A write after them still counts. A calendar's
+first. "Schedule", "post" and "book" after "my", "the", "tomorrow's",
+"latest", "last" or "newest" are the thing read, whatever follows
+("read me my schedule on my calendar"), unless "say" or "saying" follows
+with nothing asked to be read ("latest post: say hi on
+Facebook"). After "tomorrow", "today", "day", "calendar", "facebook" or
+"page" they are the thing read only after a word asking to be read
+("read", "tell", "what", "show", "check": "read me my Facebook post about
+the sale"), or at the request's end or before "from" or "of" ("my latest
+Facebook post"), else a verb ("tomorrow book the room", "my calendar book
+the room", "tomorrow book for me a table"; El's P3s on #5690 and P2s on
+#5696). There, "a", "an", "me", "it", "the" or "my" right after them
+makes them a verb even with a read asked for earlier, when "and", "then"
+or "also" comes between that read and them ("check my calendar and
+tomorrow schedule a meeting"); with none between, it says which one is
+read ("read me my Facebook post a week ago"; the first builder's HOLD on
+#5719). The "s" of "let's" is no "'s" ("let's post a
+photo on Facebook"; the first builder's P3s on #5696). With "say" or "saying", a word asking to be read anywhere in the
+request keeps it a read ("the last post saying we are open, read it to
+me"); with none, it is a post to write. It began on lamp-9adf on 4 Nov at 23:51,
+where "create a skill that reads my calendar" was refused. "Put" writes only with
+a service named after it, or "in", "on", "into" or "to" "my drive" ("put
+the count on the light" is the lamp's own). A write after them still counts. A calendar's
 step is given whole (today, or tomorrow when it says "tomorrow"), as are
 mail's (`recent`) and Drive's (`files`, newest first, `query` only words
 to search); for any other service the brief lists its reads but the
@@ -1111,6 +1160,49 @@ service"), and its later words ask none, so the lamp never takes a picture
 of the room for a calendar read (lamp-9adf, 4 Nov 21:45: "Let me look.",
 `service_read`, then "I see a laptop screen…" unasked). A skill's look in
 the same turn stands.
+
+## The voice is told what is linked (`LAMP_SERVICES_TOLD`, #5523, off unless set)
+
+A marketing tester linked a service in the app's Connectors on 6 Nov and
+asked the lamp about it: the lamp said that was the app's job and it didn't
+know. The three functions were there, but nothing told the model what was
+linked, and the character says not to pretend to finish tasks it cannot
+reach. With `LAMP_SERVICES_TOLD=on` (passed to both routes' workers alone), on
+the second route a spoken line admitted as the owner's (`services::owner_of`) is told, beside its words, the services linked now by
+name, each once, and that the lamp uses them itself: "(For you to know, not
+to answer: the lamp's owner linked these services to you in the app's
+Connectors: Notion, Gmail. They are yours to use for the owner: read from
+one with service_read, and send, post or create with service_write, when
+they ask. Asked about one, use it, or say plainly what you can do with it;
+never say it is the app's job or that you don't know it.)"
+(`services_told::note`). The names are what `lamp-services` last said on
+`services_connected` (its `name`, else its code; an expired link too, since
+a read renews it), asked off the line's path as each line begins
+(`services::Linked`, at most once a second, 500 ms at most) and after each
+note, so the note never waits; without the attention rule's line-begin ask,
+a link made since is told one line later. Another's line, the room's, a
+held one, a text, nothing linked or `lamp-services` not telling (its last
+ask answered with an error, busy or not at all, so a link just removed is
+never told; `services::names_after`, #5598): nothing is told, as before.
+The journal says how many, never which.
+
+**Whose line is the owner's.** With `LAMP_PRIVATE_ROOM=on`, as in the
+product, every spoken line is the owner's (`person::private_room`, #5553),
+so every spoken line is told the names: a guest's, an unknown voice's, the
+TV's and a held line's too. That is the PM's ruling (a) on #5523. With it
+off, only a line whose own lease has the owner's known face, not held, is
+told; a guest's, the room's and a held line are not. A text is never told.
+
+The Live route is told the same note beside the owner's open line (its
+lease, `services::owner_of`), read twice a second while the line is open,
+once a session for each set of names (`services_told::LiveTold`), and only
+with `LAMP_PRIVATE_ROOM=on`: its session keeps what it was told, so with
+the private room off a guest later in the session would hear the names
+(#5598), and the Live route is told nothing there. It is told again when a
+link is made or removed, or in a fresh session; when everything it was told
+of is unlinked, it is told once that nothing is linked now
+(`services_told::UNLINKED_NOTE`). Every call from a line not the owner's is
+still refused (`OWNER_ONLY`).
 
 ## What is not done yet
 

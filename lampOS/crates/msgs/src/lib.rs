@@ -123,6 +123,10 @@ pub mod owner_place;
 /// `docs/chosen-voice.md`).
 pub mod chosen_voice;
 
+/// The face expressions and room sounds yeses, kept for the eyes and the
+/// ears, given by voice or in the app (#5500, `docs/onboarding.md`).
+pub mod consent;
+
 /// The safe shutdown's line (#3697, `docs/shutdown.md`): said by
 /// `lamp-setup shutdown-now` and rendered ahead into the voice's speech
 /// cache, which is keyed by these exact words, so both take them from here.
@@ -1318,6 +1322,27 @@ pub struct UpdateStatus {
     /// Harness step. An older reader passes over it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub harness: Option<HarnessInstall>,
+    /// The round under way (#5473), for the app's Software update screen:
+    /// only while `now` is not `idle`, else absent. An older reader passes
+    /// over it, and a status without it reads as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub round: Option<UpdateRound>,
+}
+
+/// A round under way (#5473): when it began (its `checking`), when the step
+/// `now` names began, and the build it is going to, once the round has read
+/// it from the channel and found it newer (absent before, and in a round
+/// that ends before it does). A later check in `checking` may still refuse
+/// it, and the round's end clears it; from `fetching` on it is the build
+/// being installed, and in `restoring` still the build that was tried. Times are
+/// the lamp's clock in Unix milliseconds; the step's is never before the
+/// round's.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateRound {
+    pub started_at_unix_ms: u64,
+    pub step_started_at_unix_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<UpdateBuild>,
 }
 
 /// Where Harness's install on the lamp is (#5197), as lamp-update's
@@ -3251,6 +3276,54 @@ mod tests {
         assert_eq!(UpdateCheck::AGAIN_AFTER, Duration::from_secs(60));
     }
 
+    /// #5473: `round` is absent between rounds, so an idle status reads and
+    /// writes as before; during one it carries when the round and its step
+    /// began and, once read, the build it is going to. An older reader
+    /// passes over it.
+    #[test]
+    fn an_update_status_carries_the_round_under_way_only_when_set() {
+        let idle = UpdateStatus {
+            running: None,
+            now: "idle".into(),
+            last: None,
+            harness: None,
+            round: None,
+        };
+        round_trip(&idle, r#"{"running":null,"now":"idle","last":null}"#);
+        let fetching = UpdateStatus {
+            now: "fetching".into(),
+            round: Some(UpdateRound {
+                started_at_unix_ms: 1_000,
+                step_started_at_unix_ms: 4_000,
+                target: Some(UpdateBuild {
+                    sequence: 10_580,
+                    commit: "e3b6593873".into(),
+                }),
+            }),
+            ..idle.clone()
+        };
+        let text = r#"{"running":null,"now":"fetching","last":null,"round":{"started_at_unix_ms":1000,"step_started_at_unix_ms":4000,"target":{"sequence":10580,"commit":"e3b6593873"}}}"#;
+        round_trip(&fetching, text);
+        let checking = UpdateStatus {
+            now: "checking".into(),
+            round: Some(UpdateRound {
+                started_at_unix_ms: 1_000,
+                step_started_at_unix_ms: 1_000,
+                target: None,
+            }),
+            ..idle
+        };
+        round_trip(
+            &checking,
+            r#"{"running":null,"now":"checking","last":null,"round":{"started_at_unix_ms":1000,"step_started_at_unix_ms":1000}}"#,
+        );
+        #[derive(serde::Deserialize)]
+        struct Older {
+            now: String,
+        }
+        assert_eq!(serde_json::from_str::<Older>(text).unwrap().now, "fetching");
+    }
+
     /// #5197: `harness` is absent unless set, so a status without it reads
     /// and writes as before; with it, only what lamp-update could say passes.
     #[test]
@@ -3260,6 +3333,7 @@ mod tests {
             now: "idle".into(),
             last: None,
             harness: None,
+            round: None,
         };
         round_trip(&without, r#"{"running":null,"now":"idle","last":null}"#);
         let installed = HarnessInstall {

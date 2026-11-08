@@ -145,6 +145,11 @@ pub struct World<'a> {
     /// Where the round is, one of `lamp_msgs::UpdateStatus::NOW`, for
     /// `update/status` (#2194): said as each phase begins.
     pub phase: &'a mut dyn FnMut(&'static str),
+    /// The build the round goes to (#5473), for `update/status`: said once
+    /// the channel's build is read, its signature and channel checked, and
+    /// found newer than the lamp's and not one put back on it. Later checks
+    /// in `checking` can still refuse it; the round's end then clears it.
+    pub target: &'a mut dyn FnMut(&Build),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -685,6 +690,11 @@ impl Run<'_, '_> {
                     "the settings writer refreshed is put back ({why}): the copy before is the writer again"
                 )
             }
+            (crate::writer_swap::Op::PutBackForApply, Ok(())) => {
+                format!(
+                    "the settings writer refreshed is put back ({why}): the copy before is the writer again, and this lamp-update may be asked to be it again"
+                )
+            }
             (crate::writer_swap::Op::Proven, Ok(())) => {
                 format!(
                     "the settings writer refreshed has proved itself ({why}): the copy before is removed"
@@ -936,6 +946,12 @@ impl Run<'_, '_> {
                 "build {} was put back on this lamp ({}); waiting for a newer one",
                 manifest.sequence, refusal.why
             )));
+        }
+        if self.config.apply {
+            (self.world.target)(&Build {
+                sequence: manifest.sequence,
+                commit: manifest.commit.clone(),
+            });
         }
         let installed = installed_units(self.config)
             .map_err(|error| Outcome::Failed(format!("the units cannot be read: {error}")))?;
@@ -1386,6 +1402,18 @@ impl Run<'_, '_> {
                     && fs::read(self.config.on(crate::own::BACK))
                         .is_ok_and(|there| there != running.bytes())
                 {
+                    // Put back for good after its own `back` failed, this
+                    // lamp-update is never asked to be the writer again:
+                    // only a newer one ends the wait (#5539).
+                    if crate::writer_swap::put_back_for_good(
+                        self.records.folder(),
+                        &manifest::sha256_hex(running.bytes()),
+                    ) {
+                        return Err(Outcome::Refused(format!(
+                            "build {} carries {}, and this lamp-update was put back as the settings writer for good: waiting for a newer lamp-update",
+                            manifest.sequence, newer.path
+                        )));
+                    }
                     return Err(Outcome::Refused(format!(
                         "build {} carries {}, and this lamp's settings writer is older than this lamp-update: waiting for it to be refreshed",
                         manifest.sequence, newer.path
@@ -2201,9 +2229,14 @@ impl Run<'_, '_> {
             }
             // Undone above by the writer that made the apply, if it wrote
             // at all; only then is a new writer whose first apply failed
-            // put back itself, whether or not it wrote before failing.
+            // put back itself, whether or not it wrote before failing. The
+            // failure is the build's, refused for good: the writer is not
+            // put back for good, so a later round asks for it again (#5539).
             if self.apply_failed && crate::writer_swap::unproven(&self.config.root, &records) {
-                self.writer_op(crate::writer_swap::Op::PutBack, "its first apply failed");
+                self.writer_op(
+                    crate::writer_swap::Op::PutBackForApply,
+                    "its first apply failed",
+                );
             }
         }
         if troubles.is_empty() {
@@ -2548,7 +2581,17 @@ impl Run<'_, '_> {
                 let told = self.told(&unit);
                 return self.put_back(state, &build, &backs, Some(&unit), why, told);
             }
-            watches.push(Watch::new(&back.unit, &back.part, back.before.clone()));
+            // A skip by the unit's own condition counts as well only when
+            // this build left its conditions as they were (judge::Watch).
+            let unchanged = back.added.is_none()
+                && changes
+                    .iter()
+                    .find(|change| change.unit == back.unit)
+                    .is_none_or(|change| conditions(&change.after) == conditions(&back.text));
+            watches.push(
+                Watch::new(&back.unit, &back.part, back.before.clone())
+                    .conditions_unchanged(unchanged),
+            );
         }
         (self.world.phase)("watching");
         if let Err((unit, why, judged)) = self.watch(&mut watches) {
@@ -2811,7 +2854,12 @@ impl Run<'_, '_> {
                 }
             }
             match self.world.systemd.restart(&back.unit) {
-                Ok(()) => watches.push(Watch::new(&back.unit, &back.part, back.before.clone())),
+                // The build before's own unit, written back: its conditions
+                // are its own.
+                Ok(()) => watches.push(
+                    Watch::new(&back.unit, &back.part, back.before.clone())
+                        .conditions_unchanged(true),
+                ),
                 Err(why) => troubles.push(why),
             }
         }
@@ -4037,5 +4085,14 @@ fn to_fetch(config: &Config, changes: &[Change], placings: &[models::Placing]) -
         .filter(|model| !models::stored(config, &model.sha256))
         .filter(|model| seen.insert(model.sha256.clone()))
         .cloned()
+        .collect()
+}
+
+/// A unit's `Condition…=` lines, as written, in order: what decides whether
+/// systemd starts it at all.
+fn conditions(text: &str) -> Vec<&str> {
+    text.lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with("Condition"))
         .collect()
 }

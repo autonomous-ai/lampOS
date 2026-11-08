@@ -44,6 +44,13 @@ ExecStart=/opt/lampOS/voice/current/lamp-voice serve /etc/lampOS/voice/provider.
 # Microphone and speaker threads may not wait behind other work (lamp-4ace, 2026-10-13).
 CPUSchedulingPolicy=rr
 CPUSchedulingPriority=20
+# With LAMP_VOICE_LOCK_CODE=on (off here) the voice and each worker lock their code's file pages, the executable's
+# and its shared libraries' text, so an SD log flush can't evict them (#5611, serve-runtime.md). As root, CAP_IPC_LOCK
+# already lifts the limit, so this changes nothing today; it is there for a future non-root unit, or one without that
+# capability. Not a bound: the limit counts each process's locked bytes, the same shared text again in each, and no
+# lamp has measured them yet. What may be locked is bounded by the code instead: file text only, never the heap or
+# the models.
+LimitMEMLOCK=infinity
 Restart=on-failure
 RestartSec=4s
 KillMode=mixed
@@ -148,6 +155,10 @@ Environment=LAMP_FIRST_SECONDS_QUIET=on
 Environment=LAMP_SECOND_OPEN_NAME=on
 Environment=LAMP_NAME_NEAR=on
 Environment=LAMP_NAME_SECOND_SIGN=on
+# A line opened by "Ma'am," or "Sir," said to a person is no call of the lamp's on a start hearing alone (#3945,
+# #5233): on lamp-c0a4 on 6 Nov (10441), a person's own "Ma'am, could you pass me the salt, please?", turned away,
+# was heard as the name at the line's start and held; every "Ma'am/Sir" line held, every "Lamp, …" answered.
+Environment=LAMP_NAME_SAID_TO_A_PERSON=on
 # A line that begins with the lamp's name, said to a face turned to the lamp, is answered in a busy room (#2191): on
 # lamp-52e6 on 20 Oct, under two other voices' talk, a named line was held back with it off and none with it on, and
 # talk without the name went the same way. The face it needs is a second sign above, so every name it answers counts.
@@ -337,6 +348,10 @@ Environment=LAMP_ACTIONS_DIR=/run/lampos-actions
 # The skills' functions, in lamp-skills' own folder; the old one inside the actions part's is still
 # read after it for one release.
 Environment=LAMP_SKILLS_DIR=/run/lampos-skills
+# Every skill reached through one function, use_skill, instead of one function each (#2826, use_skill.rs):
+# installed skills no longer push the lamp's own past the chat route's 48 (lamp-9adf, 6 Nov, on 10441: the_time,
+# reports_state and fetch_page left out). Who was here and Guard mode answered through it there by drop-in (#1685).
+Environment=LAMP_USE_SKILL=on
 # "Stop sending reports" and asking whether they're sent (#2862, reports_stop.rs): the voice can only
 # turn them off, never on.
 Environment=LAMP_REPORTS=on
@@ -531,9 +546,12 @@ Environment=LAMP_MEMORY_FORGET_ABOUT=on
 # Recall's second version (#2176), with lamp-memory from the same build: on lamp-06c1 on 4 Nov (build 10012) "my"
 # alone found nothing (5 before), the drink order was found, and "last week" got a span answer (span=true).
 Environment=LAMP_MEMORY_RECALL_V2=on
-# Tiers' ideas in Days (LAMP_MEMORY_NEWER_FIRST, LAMP_MEMORY_STRENGTH, LAMP_MEMORY_PROFILE; docs/memory-days.md) are
-# off for the candidate (the PM, 6 Nov): they merged in train 664 with their played check written but never posted
-# (#5331). They come back on once a played check passes.
+# Tiers' ideas in Days (the memory owner's 3 Nov plan, P1 to P4; docs/memory-days.md). The session note keeps the
+# person's tastes and kept facts first (PROFILE): the memory owner's call on 5 Nov, off for the candidate on 6 Nov
+# (#5464), back on after its played check passed on lamp-06c1 with ElevenLabs voices on 6 Nov (PASS bd98421414,
+# #5331). It needs a lamp-memory from the same build, which a product install ships. LAMP_MEMORY_NEWER_FIRST and
+# LAMP_MEMORY_STRENGTH stay off until a played check reaches their own fields (earlier:true, strength:"maybe").
+Environment=LAMP_MEMORY_PROFILE=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
@@ -547,6 +565,10 @@ Environment=LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language
 # Never in the character: told only to the owner's own known face alone in view, and by default below
 # (LAMP_PERSON_NAME_OWNER_ONLY, #2602, the first builder's piece 2 on #1711; #4461).
 Environment=LAMP_PERSON_NAME_OWNER_ONLY=on
+# The private room (the owner's call, 6 Nov): the lamp is a private room between it and its owner, so whoever speaks
+# to it is the owner, and no ownership check runs, on the linked services, the typed name or reminders. Telling who is
+# speaking was not reliable enough, and the lamp refused its own owner. The checks stay in the code for a later feature.
+Environment=LAMP_PRIVATE_ROOM=on
 # A reply is told the person speaking is most likely the one who set the lamp up, unless someone else is
 # seen or heard now; the reply only, nothing personal kept on it (LAMP_PERSON_NAME_BY_DEFAULT, #3884).
 Environment=LAMP_PERSON_NAME_BY_DEFAULT=on

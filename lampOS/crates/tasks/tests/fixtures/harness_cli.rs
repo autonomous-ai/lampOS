@@ -70,6 +70,13 @@ pub fn main() -> io::Result<()> {
         Some(steps) if !steps.is_empty() => &steps[before.min(steps.len() - 1)],
         _ => &plan[operation],
     };
+    // `{"with_new": step}` beside a step: a call that asks for `--new NAME`
+    // takes it instead, so a plain folder and a made one can be answered
+    // apart (#5541).
+    let step = match &plan[operation]["with_new"] {
+        with_new if with_new.is_object() && args.iter().any(|arg| arg == "--new") => with_new,
+        _ => step,
+    };
     let environment = env::vars().collect::<std::collections::BTreeMap<_, _>>();
     let mut calls = fs::OpenOptions::new()
         .create(true)
@@ -156,6 +163,19 @@ pub fn main() -> io::Result<()> {
     }
     if let Some(ms) = step["delay_ms"].as_u64() {
         thread::sleep(Duration::from_millis(ms.min(5000)));
+    }
+    // `{"lines": [{"text": "...", "delay_ms": N}, …]}`: each line written
+    // and flushed on its own after its delay, as `harness watch --json`
+    // prints one event at a time.
+    if let Some(lines) = step["lines"].as_array() {
+        for line in lines {
+            if let Some(ms) = line["delay_ms"].as_u64() {
+                thread::sleep(Duration::from_millis(ms.min(5000)));
+            }
+            let mut out = io::stdout();
+            writeln!(out, "{}", line["text"].as_str().unwrap_or_default())?;
+            out.flush()?;
+        }
     }
     if let Some(count) = step["stderr_bytes"].as_u64() {
         io::stderr().write_all(&vec![b's'; count.min(128 * 1024) as usize])?;

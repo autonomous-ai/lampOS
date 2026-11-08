@@ -82,10 +82,12 @@ pub const SEND_WORDS: [&str; 15] = [
     "gửi đi giúp tôi",
     "gui di giup toi",
 ];
-/// Words around a "send" that change nothing.
-const FILLERS: [&str; 14] = [
-    "yes", "yeah", "yep", "ok", "okay", "sure", "please", "now", "lamp", "lampy", "vâng", "dạ",
-    "ừ", "có",
+/// Words around a "send" that change nothing. "hey", "hi", "hello" and "oh"
+/// open a call to the lamp: on lamp-9adf on 6 Nov "Hey Lamp, yes, send it."
+/// cancelled the write it was said to send (#5553).
+const FILLERS: [&str; 18] = [
+    "yes", "yeah", "yep", "ok", "okay", "sure", "please", "now", "lamp", "lampy", "hey", "hi",
+    "hello", "oh", "vâng", "dạ", "ừ", "có",
 ];
 
 /// What the model is told of every services function, before the
@@ -154,9 +156,13 @@ const READ_BACK_NEXT: &str = "Nothing is sent yet. Say read_back in full, word f
 pub const SENT_NEXT: &str = "Say only that it was sent, in the conversation's language.";
 /// What the model is told to say when the service did not send it.
 pub const NOT_SENT_NEXT: &str = "Say only that it was not sent, in the conversation's language.";
-/// How long after the lamp last said a word of the read-back its "send"
-/// may come: the very next line, said soon.
+/// How long after the read-back could have finished playing ([`send_by`]) its
+/// "send" may come: the very next line, said soon.
 pub const SEND_WITHIN: Duration = Duration::from_secs(30);
+/// The most each word of a read-back takes to play. Its words come as text
+/// well before they are heard: on lamp-9adf on 6 Nov 43 words played for
+/// about 23 s, which left about 7 s of [`SEND_WITHIN`] counted from the text.
+const WORD_PLAYS_AT_MOST: Duration = Duration::from_millis(600);
 /// The least time each word of a read-back takes to say: the lamp's voice
 /// says about 350 to 400 ms a word, so a line that begins sooner after the
 /// read-back began was said over it.
@@ -318,6 +324,10 @@ pub struct Pending {
     /// once more ([`SAY_IT_LONGER`]): its words are no other request's, and
     /// the next line may still send.
     pub asked_again: Option<u64>,
+    /// The latest line since began clear of the lamp's words: past their
+    /// tail, not over its voice ([`voice_began`]). False until told, so with
+    /// no hearing hook to tell it a plain send is held as before.
+    pub began_clear: bool,
 }
 
 impl Pending {
@@ -337,6 +347,7 @@ impl Pending {
             lines: 0,
             other: None,
             asked_again: None,
+            began_clear: false,
         }
     }
 }
@@ -517,6 +528,24 @@ pub fn says_send(words: &str) -> bool {
     SEND_WORDS.contains(&words.join(" ").as_str())
 }
 
+/// Whether `words` are the plain "send" a write waiting now asks for. The
+/// read-back asked for it, whether or not its last sentence reads as a
+/// question, so the line is an answer to the lamp and not a short sound or
+/// the room's lone words: on lamp-9adf on 6 Nov, with nobody in view, "Send."
+/// was held as a short sound (#5553). Only a line known to have begun clear
+/// of the lamp's words ([`voice_began`]): one over its voice, before its tail
+/// is over, or with no word of when it began may be the lamp's own "send it"
+/// heard back, which `own_echo` doesn't hold in so few words. Those are judged
+/// as any line, and [`gate`] still judges the send itself.
+pub fn send_awaited(words: &str) -> bool {
+    says_send(words)
+        && kept::pending(|pending| {
+            pending
+                .as_ref()
+                .is_some_and(|kept| !kept.cut && kept.began_clear)
+        })
+}
+
 /// What is known of the turn a call comes in.
 #[derive(Clone, Debug, Default)]
 pub struct Turn<'a> {
@@ -649,9 +678,7 @@ pub fn gate(
         && kept.lines <= 1
         && kept.person == owner
         && now.saturating_duration_since(kept.at) <= PENDING_FOR
-        && kept
-            .spoken_at
-            .is_some_and(|at| now.saturating_duration_since(at) <= SEND_WITHIN)
+        && send_by(&kept).is_some_and(|by| now <= by)
         && turn.words.is_some_and(says_send);
     if !timely {
         // Which of the checks above failed, for the journal: a "send"
@@ -675,7 +702,7 @@ pub fn gate(
             (kept.person != owner, "another person"),
             (late(Some(kept.at), PENDING_FOR), "prepared too long ago"),
             (
-                late(kept.spoken_at, SEND_WITHIN),
+                send_by(&kept).is_none_or(|by| now > by),
                 "the read-back not said, or said too long ago",
             ),
             (!turn.words.is_some_and(says_send), "not a plain send"),
@@ -805,15 +832,37 @@ pub fn brief(told: &mut Value) {
 }
 
 /// The owner's memory id when `lease` is theirs ([`Turn::owner`]).
-fn owner_of(lease: Option<&crate::memory_scope::ScopeLease>) -> Option<String> {
-    let person = lease?
+pub(crate) fn owner_of(lease: Option<&crate::memory_scope::ScopeLease>) -> Option<String> {
+    // The private room (`person::private_room`): whoever speaks is the owner.
+    if crate::person::private_room() {
+        return Some(
+            crate::person::owner_ids()
+                .into_iter()
+                .next()
+                .unwrap_or_else(|| "the-owner".to_owned()),
+        );
+    }
+    owner_among(lease, &crate::person::owner_ids())
+}
+
+/// [`owner_of`] outside the private room, with the owner's memory ids
+/// `owners`: the line's person when it is one of them, the line not held.
+/// Never a line that is theirs only by their face alone in view
+/// (`LAMP_PERSON_SCOPE_ONE_FACE_READS`, `ScopeLease::forgets_need_mouth`):
+/// that counts for saving and recall, never for acting as them, and an
+/// off-camera guest's "read my mail" with the owner silent alone in view
+/// must read nothing of theirs (the privacy read's P1 on #5592).
+fn owner_among(
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    owners: &[String],
+) -> Option<String> {
+    let lease = lease.filter(|lease| !lease.forgets_need_mouth())?;
+    let person = lease
         .scope()
         .filter(|scope| !scope.held())?
         .person()?
         .to_owned();
-    crate::person::owner_ids()
-        .contains(&person)
-        .then_some(person)
+    owners.contains(&person).then_some(person)
 }
 
 /// Whether the owner is the only face the eyes see now
@@ -885,6 +934,12 @@ pub fn judging_voices(judge: VoiceJudge) {
     JUDGE.with(|cell| *cell.borrow_mut() = Some(judge));
 }
 
+/// Sets the write waiting for its "send", for a test on this thread.
+#[cfg(test)]
+pub(crate) fn pending_for_test(pending: Option<Pending>) {
+    kept::pending(|kept| *kept = pending);
+}
+
 fn judge() -> Option<VoiceJudge> {
     #[cfg(not(test))]
     return JUDGE.get().cloned();
@@ -926,9 +981,15 @@ fn send_likeness(judge: &VoiceJudge, prepared: u64, request: u64, enrolled: bool
 /// A line began, as the second route hears it (`Heeding::hear`), at `now`:
 /// earlier than its words come. One begun over the lamp's own voice, or
 /// before the read-back could have been said whole, marks the waiting
-/// write's read-back as talked over.
-pub fn voice_began(over_the_lamps_voice: bool, now: Instant) {
-    kept::pending(|pending| voice_began_in(pending, over_the_lamps_voice, now));
+/// write's read-back as talked over; `in_tail` says it began within the tail
+/// of the lamp's words ([`send_awaited`]).
+pub fn voice_began(over_the_lamps_voice: bool, in_tail: bool, now: Instant) {
+    kept::pending(|pending| {
+        voice_began_in(pending, over_the_lamps_voice, now);
+        if let Some(kept) = pending.as_mut() {
+            kept.began_clear = !over_the_lamps_voice && !in_tail;
+        }
+    });
 }
 
 /// [`voice_began`] on `pending`.
@@ -939,6 +1000,20 @@ pub fn voice_began_in(pending: &mut Option<Pending>, over_the_lamps_voice: bool,
     if over_the_lamps_voice || !said_whole_by(kept, now) {
         kept.cut = true;
     }
+}
+
+/// The last moment `kept`'s "send" may come: [`SEND_WITHIN`] after the lamp's
+/// last word of it, or after the read-back could have finished playing, if
+/// later. After the lamp asked once more, from that asking alone. `None`: no
+/// word of it was said.
+fn send_by(kept: &Pending) -> Option<Instant> {
+    let said = kept.spoken_at?;
+    let words = u32::try_from(kept.spoken.split_whitespace().count()).unwrap_or(u32::MAX);
+    let played = kept
+        .spoken_from
+        .filter(|_| kept.asked_again.is_none())
+        .map(|from| from + WORD_PLAYS_AT_MOST.saturating_mul(words));
+    Some(played.map_or(said, |played| played.max(said)) + SEND_WITHIN)
 }
 
 /// Whether the read-back kept in `kept` could have been said whole by `now`.
@@ -961,6 +1036,7 @@ pub fn run(
     lease: Option<&crate::memory_scope::ScopeLease>,
 ) -> (Value, bool) {
     let now = Instant::now();
+    let private_room = crate::person::private_room();
     let owner = owner_of(lease);
     let (words, previous) = if heard && owner.is_some() {
         crate::thread::THREAD
@@ -986,10 +1062,16 @@ pub fn run(
     // With the owner's enrolled print (`LAMP_SAME_VOICE_FOR=services`,
     // `crate::owner_voice`), the "send" line is held to it; without one, to
     // the line that prepared the write, as before.
-    let enrolled = owner
-        .as_deref()
-        .is_some_and(|owner| crate::owner_voice::enrolled(owner).is_some());
+    let enrolled = private_room
+        || owner
+            .as_deref()
+            .is_some_and(|owner| crate::owner_voice::enrolled(owner).is_some());
     let alike = match (&judge, prepared) {
+        // No voice is held to the owner's in the private room, and no face is
+        // asked for: the owner accepted on 6 Nov that a TV, a call or a
+        // recording can be taken as them (docs/services.md). The read-back
+        // and the plain "send" right after it stay: they catch a mishearing.
+        _ if private_room => Some(1.0),
         (Some(judge), Some(prepared)) if send_id && owner.is_some() && heard => {
             send_likeness(judge, prepared, request, enrolled)
         }
@@ -1005,10 +1087,14 @@ pub fn run(
             )
         );
     }
-    let (seen_owner, other_seen) = owner
-        .as_deref()
-        .filter(|_| heard)
-        .map_or((false, false), |owner| seen_saying_owner(request, owner));
+    let (seen_owner, other_seen) = if private_room {
+        (heard, false)
+    } else {
+        owner
+            .as_deref()
+            .filter(|_| heard)
+            .map_or((false, false), |owner| seen_saying_owner(request, owner))
+    };
     let turn = Turn {
         heard,
         words: words.as_deref(),
@@ -1067,17 +1153,20 @@ pub fn run(
             // In full only to the owner alone in view, in the
             // conversation's voice; on the Live route, never.
             let alone = owner_alone();
-            let likeness = judge.as_ref().filter(|_| alone).and_then(|judge| {
-                judged(
-                    judge,
-                    if enrolled {
-                        VoiceAsk::Owner(request)
-                    } else {
-                        VoiceAsk::Conversation(request)
-                    },
-                )
-            });
-            if !read_in_full(alone, likeness, seen_owner) {
+            let likeness = judge
+                .as_ref()
+                .filter(|_| alone && !private_room)
+                .and_then(|judge| {
+                    judged(
+                        judge,
+                        if enrolled {
+                            VoiceAsk::Owner(request)
+                        } else {
+                            VoiceAsk::Conversation(request)
+                        },
+                    )
+                });
+            if !private_room && !read_in_full(alone, likeness, seen_owner) {
                 brief(&mut told);
             }
         }
@@ -1127,6 +1216,9 @@ const LINKED_DEADLINE: Duration = Duration::from_millis(500);
 pub struct Linked {
     folder: PathBuf,
     linked: std::sync::atomic::AtomicBool,
+    /// The services linked when `lamp-services` last said, by name
+    /// (`LAMP_SERVICES_TOLD`, `crate::services_told`).
+    names: std::sync::Mutex<Vec<String>>,
     /// When it was last asked, and whether that ask is still going.
     asked: std::sync::Mutex<(Option<Instant>, bool)>,
 }
@@ -1137,6 +1229,7 @@ impl Linked {
         let linked = std::sync::Arc::new(Self {
             folder,
             linked: std::sync::atomic::AtomicBool::new(false),
+            names: std::sync::Mutex::new(Vec::new()),
             asked: std::sync::Mutex::new((None, false)),
         });
         linked.check();
@@ -1146,6 +1239,16 @@ impl Linked {
     /// Whether a service was linked when `lamp-services` last said.
     pub fn now(&self) -> bool {
         self.linked.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// The services linked when `lamp-services` last said, by name, each
+    /// once; none until it first answers, and none after an ask it answered
+    /// with no list ([`names_after`]).
+    pub fn names(&self) -> Vec<String> {
+        self.names
+            .lock()
+            .map(|names| names.clone())
+            .unwrap_or_default()
     }
 
     /// Ask again, unless asked within [`LINKED_FRESH`] or still asking;
@@ -1173,6 +1276,9 @@ impl Linked {
                 );
                 if let Some(any) = told.as_ref().and_then(any_linked) {
                     linked.kept(any);
+                }
+                if let Ok(mut kept) = linked.names.lock() {
+                    *kept = names_after(told.as_ref());
                 }
                 if let Ok(mut asked) = linked.asked.lock() {
                     asked.1 = false;
@@ -1209,6 +1315,7 @@ impl Linked {
         std::sync::Arc::new(Self {
             folder: PathBuf::new(),
             linked: std::sync::atomic::AtomicBool::new(linked),
+            names: std::sync::Mutex::new(Vec::new()),
             asked: std::sync::Mutex::new((Some(Instant::now() + LINKED_FRESH * 3_600), false)),
         })
     }
@@ -1233,6 +1340,38 @@ fn any_linked(told: &Value) -> Option<bool> {
             .iter()
             .any(|link| link.get("expired").and_then(Value::as_bool) != Some(true)),
     )
+}
+
+/// The names told after an ask (`LAMP_SERVICES_TOLD`): the answer's list,
+/// [`names_in`], and none when it gives no list (an error, busy, no
+/// socket), so a link just removed is never told while `lamp-services`
+/// can't say (#5598).
+fn names_after(told: Option<&Value>) -> Vec<String> {
+    told.and_then(names_in).unwrap_or_default()
+}
+
+/// From [`CONNECTED`]'s answer: each service linked by its name as
+/// `lamp-services` gives it (its code when it gives none), each once, an
+/// expired link too (a read renews it); `None` without a list.
+fn names_in(told: &Value) -> Option<Vec<String>> {
+    if told.get("ok").and_then(Value::as_bool) != Some(true) {
+        return None;
+    }
+    let connected = told.get("result")?.get("connected")?.as_array()?;
+    let mut names: Vec<String> = Vec::new();
+    for link in connected {
+        let name = link
+            .get("name")
+            .and_then(Value::as_str)
+            .filter(|name| !name.trim().is_empty())
+            .or_else(|| link.get("service").and_then(Value::as_str));
+        if let Some(name) = name
+            && !names.iter().any(|kept| kept == name)
+        {
+            names.push(name.to_owned());
+        }
+    }
+    Some(names)
 }
 
 /// The codes of the services linked now, asked of `lamp-services`
@@ -1268,6 +1407,40 @@ fn codes_in(told: &Value) -> Option<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// What is linked, by name, each once, from `lamp-services`' own answer
+    /// (#5523): its code when it gives no name; none without a list.
+    #[test]
+    fn the_linked_names_are_read_from_the_connected_answer() {
+        let told = json!({"ok": true, "result": {"connected": [
+            {"service": "notion", "name": "Notion", "account": "a", "expired": false},
+            {"service": "figma-api", "name": "Figma", "account": "b", "expired": true},
+            {"service": "figma", "name": "Figma", "account": "c", "expired": false},
+            {"service": "github", "account": "d", "expired": false},
+        ]}});
+        assert_eq!(
+            names_in(&told),
+            Some(vec!["Notion".into(), "Figma".into(), "github".into()])
+        );
+        assert_eq!(
+            names_in(&json!({"ok": true, "result": {"connected": []}})),
+            Some(Vec::new())
+        );
+        assert_eq!(names_in(&json!({"ok": false, "error": "busy"})), None);
+    }
+
+    /// The Reviewer-lead's P3 on #5598: an error or no answer from
+    /// `lamp-services` tells no names, not the last ones told, so a link just
+    /// removed is never told while it can't say.
+    #[test]
+    fn no_names_are_told_while_lamp_services_cannot_say() {
+        let listed = json!({"ok": true, "result": {"connected": [
+            {"service": "figma", "name": "Figma", "account": "c", "expired": false},
+        ]}});
+        assert_eq!(names_after(Some(&listed)), vec!["Figma".to_owned()]);
+        assert!(names_after(Some(&json!({"ok": false, "error": "busy"}))).is_empty());
+        assert!(names_after(None).is_empty());
+    }
 
     /// What is linked, by code, from `lamp-services`' own answer; none
     /// told for anything else, or with nobody on the socket.
@@ -1606,6 +1779,38 @@ mod tests {
     }
 
     #[test]
+    fn only_a_plain_send_with_a_write_waiting_is_awaited() {
+        pending_for_test(None);
+        assert!(!send_awaited("Send."));
+        let waiting = || {
+            let mut kept = Pending::new("id", 10, Instant::now(), "Send an email.", "ann");
+            kept.spoken_from = Some(Instant::now() - Duration::from_secs(60));
+            kept
+        };
+        // With no word of when the line began: maybe an echo, so held.
+        pending_for_test(Some(waiting()));
+        assert!(!send_awaited("Send."));
+        voice_began(false, false, Instant::now());
+        for said in ["Send.", "send it", "Hey Lamp, send it."] {
+            assert!(send_awaited(said), "{said}");
+        }
+        for said in ["Do it.", "don't send it", "What a day."] {
+            assert!(!send_awaited(said), "{said}");
+        }
+        // Begun over the lamp's voice, or within its tail: maybe its echo.
+        for (over, in_tail, awaited) in [
+            (true, false, false),
+            (false, true, false),
+            (false, false, true),
+        ] {
+            pending_for_test(Some(waiting()));
+            voice_began(over, in_tail, Instant::now());
+            assert_eq!(send_awaited("Send."), awaited, "{over} {in_tail}");
+        }
+        pending_for_test(None);
+    }
+
+    #[test]
     fn a_plain_send_sends_and_nothing_else_does() {
         for said in [
             "send",
@@ -1623,6 +1828,10 @@ mod tests {
             "Go ahead and send it.",
             "Ừ, gửi đi giúp tôi",
             "gui di giup toi",
+            "Hey Lamp, yes, send it.",
+            "Hi lamp, send it",
+            "Oh, send it.",
+            "Hello Lamp, go ahead and send it.",
         ] {
             assert!(says_send(said), "{said}");
         }
@@ -1638,6 +1847,11 @@ mod tests {
             "wait",
             "what did it say?",
             "",
+            "hey",
+            "Hey Lamp",
+            "hey don't send it",
+            "oh no, don't send it",
+            "hey, send it to Bob instead",
         ] {
             assert!(!says_send(said), "{said}");
         }
@@ -1709,7 +1923,7 @@ mod tests {
                 send("s1"),
                 11,
                 heard("send it", 10),
-                now + SEND_WITHIN + Duration::from_secs(1),
+                send_by(waiting(now).as_ref().unwrap()).unwrap() + Duration::from_secs(1),
             ),
             (
                 "another known person",
@@ -1835,6 +2049,36 @@ mod tests {
         )
         .expect("timed from the asking");
         assert_eq!(passed.args["said"], "send");
+
+        // A long read-back's words come as text well before they play: its
+        // "send" is timed from when it could have finished, not from the text.
+        let long = ["word"; 43].join(" ");
+        let long_waiting = || {
+            let mut pending = Some(Pending::new("s1", 10, now, &long, "ann"));
+            said_in(&mut pending, 10, &long, now);
+            began_in(&mut pending, now + Duration::from_secs(40));
+            pending
+        };
+        let mut pending = long_waiting();
+        let passed = gate(
+            &mut pending,
+            &send("s1"),
+            11,
+            &heard("send it", 10),
+            now + Duration::from_secs(40),
+        )
+        .expect("heard soon after it played");
+        assert_eq!(passed.args["said"], "send");
+        let mut pending = long_waiting();
+        let refused = gate(
+            &mut pending,
+            &send("s1"),
+            11,
+            &heard("send it", 10),
+            now + WORD_PLAYS_AT_MOST.saturating_mul(43) + SEND_WITHIN + Duration::from_secs(1),
+        )
+        .expect_err("long after it played");
+        assert_eq!(refused["error"], CANCELLED);
 
         // Its own window: a second "send" long after the asking cancels.
         let mut pending = waiting(now);
@@ -2264,5 +2508,69 @@ mod tests {
         let nowhere = Linked::new(std::env::temp_dir().join("linked-none-at-all"));
         assert!(until(|| !nowhere.asked.lock().unwrap().1));
         assert!(!nowhere.now());
+    }
+
+    /// The private room (the owner's call, 6 Nov): no lease, no face and no
+    /// known person still make the line the owner's; with it off, not.
+    #[test]
+    fn the_private_room_makes_every_line_the_owners() {
+        crate::person::set_private_room_for_test(Some(false));
+        assert_eq!(owner_of(None), None);
+        crate::person::set_private_room_for_test(Some(true));
+        assert!(owner_of(None).is_some());
+        crate::person::set_private_room_for_test(None);
+    }
+
+    /// The privacy read's P1 on #5592: an off-camera guest says "read my
+    /// mail" while the owner A sits silent and alone in view, the line A's
+    /// only by the one-face rule with `LAMP_PERSON_SCOPE_ONE_FACE_READS`.
+    /// It has no owner, so no `service_read` runs: the gate refuses it as
+    /// not the owner's before anything is asked. The same line seen as A's
+    /// is A's, and the private room still gives every line its owner.
+    #[test]
+    fn an_off_camera_guests_read_my_mail_with_the_owner_silent_alone_in_view_runs_no_service_read()
+    {
+        use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+        let key = RequestKey {
+            worker: lamp_turn_owner::BootId::new([57; 16]).unwrap(),
+            session: 1,
+            request: 1,
+        };
+        let a = crate::remember::person_id("A");
+        let owners = [a.clone()];
+        let one_face = RequestScope::new(key, ScopeSnapshot::of("A"));
+        let lease = one_face.lease();
+        assert!(lease.read_by_one_face(), "the one-face rule takes the line");
+        assert_eq!(lease.scope().unwrap().person(), Some(a.as_str()));
+        assert_eq!(owner_among(Some(&lease), &owners), None, "no owner");
+        let read = call(READ, json!({"service": "gmail", "query": "today"}));
+        let owner = owner_among(Some(&lease), &owners);
+        let turn = Turn {
+            heard: true,
+            words: Some("Lamp, read my mail."),
+            previous: None,
+            owner: owner.as_deref(),
+            sends: true,
+            alike: None,
+            seen_owner: false,
+            other_seen: false,
+        };
+        let mut pending = None;
+        assert_eq!(
+            gate(&mut pending, &read, 1, &turn, Instant::now()),
+            Err(json!({ "error": OWNER_ONLY })),
+            "refused before any read"
+        );
+        crate::person::set_private_room_for_test(Some(false));
+        assert_eq!(owner_of(Some(&lease)), None);
+        crate::person::set_private_room_for_test(Some(true));
+        assert!(owner_of(Some(&lease)).is_some(), "the private room's owner");
+        crate::person::set_private_room_for_test(None);
+        let seen = RequestScope::new(key, ScopeSnapshot::of("A"));
+        assert_eq!(
+            owner_among(Some(&seen.lease()), &owners),
+            Some(a),
+            "A's own line: A's"
+        );
     }
 }

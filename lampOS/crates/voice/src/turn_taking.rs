@@ -22,6 +22,8 @@ use lamp_turn_owner::TurnOwner;
 use std::{collections::VecDeque, io};
 
 pub const TAIL_US: u64 = 100_000;
+/// Masked speech this far apart is two utterances in the journal.
+const MASKED_SPEECH_GAP_US: u64 = 300_000;
 /// How long a block's read is kept for a retained prefix's decision: one
 /// decided later is refused (`RetainedHistoryLoss::Expired`).
 pub(crate) const HISTORY_US: u64 = 600_000;
@@ -180,6 +182,18 @@ pub fn over_bed_switch(
             ),
         ),
     }
+}
+
+/// The voice's environment switch, with `on`, for a yield made late in a
+/// person's speech over the lamp to commit on stillness
+/// ([`Interruption::commit_late_yields`], `LATE_YIELD_OVER_BLOCKS`); off
+/// unless set.
+pub const CUT_IN_LATE_YIELD_ENVIRONMENT: &str = "LAMP_CUT_IN_LATE_YIELD";
+
+/// Whether the voice's environment says `on` for
+/// [`CUT_IN_LATE_YIELD_ENVIRONMENT`].
+pub fn cut_in_late_yield() -> bool {
+    std::env::var(CUT_IN_LATE_YIELD_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
 /// What one yield's evidence window held, with `LAMP_CUT_IN_COUNTS_REAL=on`.
@@ -420,6 +434,8 @@ pub(crate) struct PlaybackMask {
     last_dispatch: u64,
     last_now: u64,
     suppressed_blocks: u64,
+    /// When speech was last masked ([`Self::masked_speech`]).
+    last_masked_speech_us: std::cell::Cell<Option<u64>>,
     /// Listening gaps (#828, [`crate::listen_gaps`]): with the duplex mask
     /// only, off unless set.
     listen_gaps: Option<crate::listen_gaps::ListenGaps>,
@@ -442,6 +458,7 @@ impl PlaybackMask {
             last_dispatch: 0,
             last_now: 0,
             suppressed_blocks: 0,
+            last_masked_speech_us: std::cell::Cell::new(None),
             listen_gaps: None,
             onset_fade: None,
         }
@@ -572,6 +589,22 @@ impl PlaybackMask {
         if let Some(duplex) = self.duplex.as_mut() {
             duplex.near_asker = true;
         }
+    }
+    /// `LAMP_CUT_IN_LATE_YIELD=on`: a yield made late in a person's speech
+    /// over the lamp commits on stillness. See
+    /// `Interruption::commit_late_yields`. Only with ears.
+    pub fn cut_in_late_yield(&mut self) {
+        if let Some(duplex) = self.duplex.as_mut() {
+            duplex.interruption.commit_late_yields();
+        }
+    }
+    /// For the record of the latest yield's commit or resume: whether it
+    /// was made late in a person's speech over the lamp
+    /// (`Interruption::yield_was_late`).
+    pub fn yield_was_late(&self) -> bool {
+        self.duplex
+            .as_ref()
+            .is_some_and(|duplex| duplex.interruption.yield_was_late())
     }
     /// The level of the person the reply in hand answers, in dBFS before
     /// cancellation, or `None` when none is known: a line the lamp began
@@ -1062,12 +1095,21 @@ impl PlaybackMask {
         self.hearing()
             .is_some_and(|duplex| duplex.heard.iter().any(|(heard, _)| *heard == sequence))
     }
-    pub fn suppressed(&mut self) -> io::Result<()> {
+    /// Counts a masked block. True for the first speech block of a masked
+    /// utterance, as [`Self::masked_speech`].
+    pub fn suppressed(&mut self, speech: bool, read_us: u64) -> io::Result<bool> {
         self.suppressed_blocks = self
             .suppressed_blocks
             .checked_add(1)
             .ok_or_else(|| invalid("suppression counter overflow"))?;
-        Ok(())
+        Ok(speech && self.masked_speech(read_us))
+    }
+    /// Speech read at `read_us` was masked. True when it begins a masked
+    /// utterance: more than [`MASKED_SPEECH_GAP_US`] after the last, so the
+    /// journal tells each once (#5536: a drop was in the trace only).
+    pub fn masked_speech(&self, read_us: u64) -> bool {
+        let last = self.last_masked_speech_us.replace(Some(read_us));
+        last.is_none_or(|last| read_us.saturating_sub(last) > MASKED_SPEECH_GAP_US)
     }
     pub fn suppressed_blocks(&self) -> u64 {
         self.suppressed_blocks
@@ -1546,6 +1588,17 @@ mod tests {
     use crate::stop_words::Listen;
     /// A tie is not the lamp's own voice, and `Clear` is a person
     /// (the Reviewer-lead's minor on #2779).
+    /// #5536: masked speech is told once per utterance, not per block.
+    #[test]
+    fn masked_speech_is_told_once_per_utterance() {
+        let mut mask = PlaybackMask::new(TurnTaking::V1Baseline);
+        assert!(!mask.suppressed(false, 10_000).unwrap(), "no speech");
+        assert!(mask.suppressed(true, 20_000).unwrap(), "its first block");
+        assert!(!mask.suppressed(true, 30_000).unwrap());
+        assert!(!mask.masked_speech(320_000), "within 300 ms of the last");
+        assert!(mask.masked_speech(700_000), "another utterance");
+        assert_eq!(mask.suppressed_blocks(), 3);
+    }
     #[test]
     fn a_yield_window_tie_or_a_clear_block_is_not_the_lamps_own_voice() {
         let mut window = YieldEvidence::default();
@@ -2580,6 +2633,75 @@ mod tests {
             );
         }
         assert!(checked > 0);
+    }
+
+    /// `LAMP_CUT_IN_LATE_YIELD=on`: a question over the lamp heard mostly
+    /// as under it (lamp-c0a4, 31 Oct) makes the yield as it ends, 17 blocks
+    /// heard plainly over the lamp in the 150 before the onset run. With the
+    /// switch the stillness after it commits; without it the reply resumes.
+    /// The same blocks not plain, the render explaining 40% of them, are
+    /// the lamp's own voice misjudged (lamp-4ace, 1 Nov, #4705): no late
+    /// yield, and the reply resumes with the switch too.
+    #[test]
+    fn a_question_yielded_to_late_commits_with_the_switch() {
+        const PLAIN: Option<(u8, u8)> = Some((10, 0));
+        let cut_in = |switch: bool, over: Option<(u8, u8)>| {
+            let mut mask = PlaybackMask::duplex();
+            if switch {
+                mask.cut_in_late_yield();
+            }
+            mask.assume_matched();
+            let mut sequence = 1;
+            let mut steps = hear(&mut mask, &mut sequence, 14, 0.1, &evidence(0, over), true);
+            for _ in 0..17 {
+                steps.extend(hear(
+                    &mut mask,
+                    &mut sequence,
+                    1,
+                    0.9,
+                    &evidence(0, over),
+                    true,
+                ));
+                steps.extend(hear(
+                    &mut mask,
+                    &mut sequence,
+                    7,
+                    0.1,
+                    &evidence(0, over),
+                    true,
+                ));
+            }
+            let onset = u64::from(Confirmation::EVALUATED.onset_blocks);
+            steps.extend(hear(
+                &mut mask,
+                &mut sequence,
+                onset,
+                0.9,
+                &evidence(0, over),
+                true,
+            ));
+            steps.extend(hear(
+                &mut mask,
+                &mut sequence,
+                20,
+                0.1,
+                &evidence(10, None),
+                true,
+            ));
+            steps.extend(hear(
+                &mut mask,
+                &mut sequence,
+                44,
+                0.1,
+                &evidence(40, None),
+                true,
+            ));
+            assert_eq!(mask.yield_was_late(), over == PLAIN);
+            steps.into_iter().map(|(_, step)| step).collect::<Vec<_>>()
+        };
+        assert_eq!(cut_in(true, PLAIN), [Step::Yield, Step::Commit]);
+        assert_eq!(cut_in(false, PLAIN), [Step::Yield, Step::Resume]);
+        assert_eq!(cut_in(true, OVER), [Step::Yield, Step::Resume]);
     }
 
     #[test]

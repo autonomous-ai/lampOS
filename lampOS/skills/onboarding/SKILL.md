@@ -11,9 +11,11 @@ the description nor this card offers it. To put it back with
 The core onboarding skill invites; the system runner verifies physical evidence
 and keeps progress. It never changes microphone or camera permission.
 
-Its `skill.toml` contains the nine-step `order`, every first and re-offer
+Its `skill.toml` contains the walk's `order` (where you sit, then who you
+are, #5499; the walk follows it alone, and the model is told no step list),
+every first and re-offer
 note, the re-offer interval, optional nudge notes and answer counts, and the
-coaching and outcome notes under `[onboarding]`. The shipped notes and order
+coaching and outcome notes under `[onboarding]`. The shipped notes
 match the previous runner word for word. Voice checks and snapshots this data
 once before audio opens; mute/reopen and repeated walks reuse it. A later
 skill-only update or repair needs an operator-managed Voice restart. Missing

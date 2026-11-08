@@ -10,6 +10,7 @@ mod decline_silent;
 mod dont_know;
 mod held_consent;
 mod held_forget;
+mod held_rename;
 mod held_save;
 mod history_keeps_calls;
 mod music_current;
@@ -19,6 +20,7 @@ mod music_warm_name;
 mod name_carries;
 mod name_near;
 mod not_for_me_words;
+mod opens_further;
 mod pause_join;
 mod person_scope_seen;
 mod remember_speaker;
@@ -975,6 +977,7 @@ fn a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route() {
         named_only: false,
         correct: false,
         questions: false,
+        now: false,
         sign_in: false,
         sign_in_app: false,
     };
@@ -1135,6 +1138,70 @@ fn the_owners_place_is_told_beside_a_place_question_alone() {
         [Message::system("SYSTEM"), Message::user(question)]
     );
     let _ = std::fs::remove_dir_all(&directory);
+}
+
+/// #5523 on the second route: a tester linked a service in the app's
+/// Connectors, asked the lamp about it, and was told that was the app's job.
+/// With `LAMP_SERVICES_TOLD=on` the spoken line is asked with the note naming
+/// what is linked beside its words; without the switch (no note given to the
+/// engine), or with the note telling nothing (another's line, nothing
+/// linked), it is asked as before.
+#[test]
+fn what_the_owner_linked_is_told_beside_their_line() {
+    let linked = vec!["Notion".to_owned()];
+    let asked = |noted: Option<crate::second_provider::Remembered>| -> Vec<Message> {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("What can you do with my Notion?".to_owned())].into()),
+            chats: Mutex::new([vec![text("I can read it."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            worker::tool_runner(crate::tools::Settings::default(), None, None, false),
+            Arc::new(Instant::now),
+        )
+        .announcing(false);
+        if let Some(noted) = noted {
+            engine = engine.telling_what_is_linked(noted);
+        }
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                engine.submit(start(1));
+                engine.submit(audio(1, 1));
+                engine.submit(end(1));
+                turn(&mut engine).await
+            });
+        let asked_of = script.asked.lock().unwrap();
+        asked_of[0].clone()
+    };
+    let question = "What can you do with my Notion?";
+    let told = linked.clone();
+    assert_eq!(
+        asked(Some(Arc::new(
+            move |_: u64, _: &str, _: Option<&crate::memory_scope::ScopeLease>| {
+                crate::services_told::note_for(Some("owner"), &told)
+            }
+        ))),
+        [
+            Message::system("SYSTEM"),
+            Message::system(crate::services_told::note(&linked)),
+            Message::user(question),
+        ]
+    );
+    assert_eq!(
+        asked(Some(Arc::new(
+            |_: u64, _: &str, _: Option<&crate::memory_scope::ScopeLease>| None
+        ))),
+        [Message::system("SYSTEM"), Message::user(question)]
+    );
+    assert_eq!(
+        asked(None),
+        [Message::system("SYSTEM"), Message::user(question)]
+    );
 }
 
 /// #1390 on the second route (the first builder's 20:15 on #1722): news the
@@ -5018,6 +5085,28 @@ async fn a_short_sound_not_heard_as_a_short_word_is_held_when_sounds_are_checked
     }
 }
 
+/// #5553: on lamp-9adf on 6 Nov, with nobody in view, "Send." after a
+/// read-back was held as a short sound. While a write waits for it, a plain
+/// send is answered; with none waiting it is held, and so is any other word.
+#[tokio::test]
+async fn a_checked_sound_is_answered_only_as_the_send_a_waiting_write_asked_for() {
+    let waiting = || crate::services::Pending {
+        began_clear: true,
+        ..crate::services::Pending::new("id", 8, std::time::Instant::now(), "Send a mail.", "ann")
+    };
+    crate::services::pending_for_test(Some(waiting()));
+    let (labels, asked) = sound_turn(true, true, "Send.").await;
+    assert!(
+        labels.iter().any(|label| label.starts_with("audio:")),
+        "{labels:?}"
+    );
+    assert_eq!(asked, 1);
+    crate::services::pending_for_test(Some(waiting()));
+    assert_eq!(sound_turn(true, true, "Bien.").await.1, 0);
+    crate::services::pending_for_test(None);
+    assert_eq!(sound_turn(true, true, "Send.").await.1, 0);
+}
+
 /// The Live route's case of 17 October on this route: "Yes. Please start
 /// it." to the lamp's "Shall I start it?" ended after "Yes." as a short
 /// sound heard as "bien". Checked, with the lamp having just asked, it is
@@ -6240,6 +6329,7 @@ fn a_yes_after_a_hand_over_on_this_route_starts_it() {
         named_only: false,
         correct: false,
         questions: false,
+        now: false,
         sign_in: false,
         sign_in_app: false,
     };
@@ -7155,6 +7245,71 @@ async fn a_skills_note_for_its_picture_goes_once_with_its_look_turn() {
         Some(&plain),
         "let go as another turn began"
     );
+}
+
+/// #5694: asked to "look right", the model called `take_a_look` and then
+/// said it was "looking across it from the other side", though the head
+/// never moved. The route's own look's turn tells it the head did not move,
+/// once, after the look's question; the character's look note and the
+/// look's function say so too.
+#[tokio::test]
+async fn the_routes_own_look_tells_the_model_its_head_did_not_move() {
+    const STILL: &str = "\n\n(Your head did not move for this look: say only what is in front of you, and never say you turned or looked to a side.)";
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Lamp, look to your right.".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call("c1", LOOK_CALL, json!({}))])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("A laptop on the desk."), Ok(ChatEvent::Done)],
+                vec![text("Still the desk."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let mut engine = skill_looking(script.clone(), r#"{"ok":true}"#);
+    let look = |request| ProviderInput::Written {
+        search: false,
+        request,
+        session: 1,
+        privacy_generation: 1,
+        text: crate::speak_up::LOOK_FULL_NOTE.into(),
+        look: true,
+        quoted: false,
+    };
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(look_and_words(&mut engine).await.0, Some((1, 1, None)));
+    engine.submit(look(2));
+    look_and_words(&mut engine).await;
+    engine.submit(look(3));
+    look_and_words(&mut engine).await;
+    let asked = script.asked.lock().unwrap();
+    let jpeg = [0xFF, 0xD8, 0xFF];
+    assert_eq!(
+        asked[1].last(),
+        Some(&Message::user_seeing(
+            format!("{}{STILL}", crate::speak_up::LOOK_FULL_NOTE),
+            &jpeg
+        ))
+    );
+    assert_eq!(
+        asked[2].last(),
+        Some(&Message::user_seeing(
+            crate::speak_up::LOOK_FULL_NOTE,
+            &jpeg
+        )),
+        "once"
+    );
+    let told = super::worker::LOOK_CALL_NOTE;
+    assert!(told.contains("never moves your head"), "{told}");
+    assert!(told.contains("never say you turned"), "{told}");
+    let tool = super::worker::look_tool().description;
+    assert!(tool.contains("never moves your head"), "{tool}");
 }
 
 /// A skill's answer's note for its picture: the words after "When the
@@ -8262,6 +8417,7 @@ fn every_function_that_grants_or_keeps_for_someone_is_withheld_from_a_held_line(
                 remember_speaker: false,
                 at_setup: false,
                 record: false,
+                rename_yes: false,
             },
         ))
         .chain(crate::photo_faces::tools())
@@ -9567,6 +9723,91 @@ async fn a_soft_keep_claim_is_a_claim_only_in_a_round_with_no_calls() {
             "{labels:?}"
         );
         assert_eq!(script.asked.lock().unwrap().len(), rounds, "{labels:?}");
+    }
+}
+
+/// lamp-06c1, build 10538, 6 Nov, S14 req 363: "Yes. Please keep that."
+/// was answered "Your goldfish's name, Pip, " then "is kept." with no
+/// `remember` call (`calls=none`), and the goldfish was never kept. On a
+/// line that is only a yes, a reply whose first sentence says back that it
+/// is kept is a keep claim: held, asked again once, then the plain line.
+/// The same reply to a question is said as it comes.
+#[tokio::test]
+async fn a_keep_said_back_to_a_yes_with_no_remember_is_a_claim() {
+    type Chats = Vec<Vec<Result<ChatEvent, net::Error>>>;
+    let claimed = || {
+        vec![
+            text("Your goldfish's name, Pip, "),
+            text("is kept."),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let cases: Vec<(&str, Chats, &str, usize)> = vec![
+        // Claimed twice with no call: the plain line.
+        (
+            "Yes. Please keep that.",
+            vec![claimed(), claimed()],
+            crate::remember::NOT_KEPT_LINE,
+            2,
+        ),
+        // Claimed, then the truth when asked again.
+        (
+            "Yes. Please keep that.",
+            vec![
+                claimed(),
+                vec![text("Sorry, I didn't keep that."), Ok(ChatEvent::Done)],
+            ],
+            "Sorry, I didn't keep that.",
+            2,
+        ),
+        // A question's answer is no claim.
+        (
+            "Lamp, is my goldfish's name kept?",
+            vec![claimed()],
+            "Your goldfish's name, Pip,",
+            1,
+        ),
+    ];
+    for (heard, chats, first_said, rounds) in cases {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(heard.into())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let runner: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) }));
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            runner,
+            Arc::new(Instant::now),
+        )
+        .announcing(false);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: Vec<&String> = labels
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        assert!(
+            said.first()
+                .is_some_and(|said| said.starts_with(&format!("said:{first_said}"))),
+            "{heard}: {first_said}: {labels:?}"
+        );
+        assert_eq!(script.asked.lock().unwrap().len(), rounds, "{labels:?}");
+        let told = script.asked.lock().unwrap().iter().any(|messages| {
+            messages
+                .iter()
+                .any(|message| *message == Message::system(crate::remember::KEEP_CLAIMED_UNKEPT))
+        });
+        assert_eq!(told, rounds == 2, "{heard}: {labels:?}");
+        if rounds == 2 {
+            assert!(
+                !said.iter().any(|said| said.contains("is kept")),
+                "{labels:?}"
+            );
+        }
     }
 }
 
@@ -12124,8 +12365,10 @@ async fn wordless_cuts_resume_the_answer_then_pause() {
         .filter(|label| label.starts_with("said:"))
         .collect();
     assert_eq!(said, [&format!("said:{LINE}")], "{out:?}");
-    // A cut of that question, soon after: nothing of the lamp's own answer
-    // to go on with, so quiet.
+    // A cut of that question, seconds after it began (past the tail's
+    // `TAIL_WITHIN`): nothing of the lamp's own answer to go on with, so
+    // quiet.
+    *now.lock().unwrap() += Duration::from_secs(3);
     let out = wordless_cut_of(&mut engine, 9, 8, 3).await;
     assert!(
         !out.iter().any(|label| label.starts_with("said:")),
@@ -12147,6 +12390,7 @@ async fn a_spoken_go_on_after_the_pause_starts_the_run_again() {
                 Ok(String::new()),
                 Ok(String::new()),
                 Ok(String::new()),
+                Ok(String::new()),
                 Ok("Lamp, go on.".to_owned()),
             ]
             .into(),
@@ -12165,28 +12409,38 @@ async fn a_spoken_go_on_after_the_pause_starts_the_run_again() {
         .asking_after_wordless_cut_ins(true)
         .resuming_after_wordless_cut_ins(true)
         .judging_busy(Arc::new(|_| true));
+    // Three real coughs, 5 s apart: past the tail's `TAIL_WITHIN`, so
+    // each is counted (at one instant the second would be the first's
+    // tail, #5511).
     story_sent(&engine, 1, true);
     wordless_cut_of(&mut engine, 2, 1, 1_500).await;
+    *now.lock().unwrap() += Duration::from_secs(5);
     wordless_cut_of(&mut engine, 3, 2, 3).await;
+    *now.lock().unwrap() += Duration::from_secs(5);
     let out = wordless_cut_of(&mut engine, 4, 3, AGAIN_PLAYED).await;
     assert!(out.contains(&format!("said:{PAUSE}")), "{out:?}");
+    // The pause's own tail, 40 ms in: the pause said again, not counted,
+    // and the spoken "go on" still starts the run again.
+    *now.lock().unwrap() += Duration::from_millis(40);
+    let out = wordless_cut_of(&mut engine, 5, 4, TAIL_PLAYED).await;
+    assert!(out.contains(&format!("said:{PAUSE}")), "{out:?}");
     *now.lock().unwrap() += Duration::from_secs(20);
-    engine.submit(start(5));
-    engine.submit(audio(5, 1));
-    engine.submit(end(5));
+    engine.submit(start(6));
+    engine.submit(audio(6, 1));
+    engine.submit(end(6));
     let out = turn(&mut engine).await;
     assert!(out.contains(&"heard:Lamp, go on.".to_owned()), "{out:?}");
-    assert_eq!(*engine.shared.said_whole.lock().unwrap(), Some(5));
+    assert_eq!(*engine.shared.said_whole.lock().unwrap(), Some(6));
     // Cut in its last sentence: the bridge, then that sentence again.
     let (pieces, played) = {
         let said = engine.shared.said.lock().unwrap();
-        assert_eq!(said.0, 5);
+        assert_eq!(said.0, 6);
         let all: u64 = said.1.iter().map(|piece| piece.samples).sum();
         let last = said.1.last().unwrap();
         (last.words.clone().unwrap(), all - last.samples / 2)
     };
     *now.lock().unwrap() += Duration::from_secs(30);
-    let out = wordless_cut_of(&mut engine, 6, 5, played).await;
+    let out = wordless_cut_of(&mut engine, 7, 6, played).await;
     let said: Vec<&String> = out
         .iter()
         .filter(|label| label.starts_with("said:"))
@@ -12280,6 +12534,122 @@ async fn a_story_asked_again_after_the_question_keeps_the_run() {
 /// Samples of the "cut off again" line played, less than all of it.
 const AGAIN_PLAYED: u64 = 10;
 
+/// Samples of a fixed line played when the same cough's tail cut it on
+/// 06c1 (FAIL on #5491: "0 words were played, 40 ms of it").
+const TAIL_PLAYED: u64 = 40 * 24;
+
+/// 06c1's FAIL on #5491, round 1 and 2: the fixed line ("Oops, cut off
+/// again. Anyway," or the pause line) began, and 40 ms later the tail of
+/// the same cough opened a wordless line that cut it, judged Quiet: the
+/// lamp fell silent. The tail, begun within `TAIL_WITHIN` of the line's
+/// start, is the same sound: the line is said again with its rest, not
+/// counted, so a real cough seconds later is still the third (the pause).
+/// A tail of the line said again is not said a third time: no loop.
+#[tokio::test]
+async fn a_coughs_tail_40_ms_into_the_fixed_line_says_it_again() {
+    use crate::cut_in_wordless::{AGAIN, LINE, PAUSE};
+    let script = Arc::new(Script::default());
+    let (built, _, now) = scripted(script.clone());
+    let mut engine = built
+        .asking_after_wordless_cut_ins(true)
+        .resuming_after_wordless_cut_ins(true)
+        .judging_busy(Arc::new(|_| false));
+    let said_of = |out: &[String]| -> Vec<String> {
+        out.iter()
+            .filter(|label| label.starts_with("said:"))
+            .cloned()
+            .collect()
+    };
+    let rest = [
+        "said: The keeper lit the lamp.".to_owned(),
+        "said: Then a ship came.".to_owned(),
+    ];
+    // The first cough: asked.
+    story_sent(&engine, 1, true);
+    let out = wordless_cut_of(&mut engine, 2, 1, 1_500).await;
+    assert_eq!(said_of(&out), [format!("said:{LINE}")], "{out:?}");
+    // The story asked again, cut by a cough 20 s later: cut again.
+    *now.lock().unwrap() += Duration::from_secs(20);
+    story_sent(&engine, 3, true);
+    let out = wordless_cut_of(&mut engine, 4, 3, 1_500).await;
+    assert_eq!(
+        said_of(&out),
+        [format!("said:{AGAIN}"), rest[0].clone(), rest[1].clone()],
+        "{out:?}"
+    );
+    // The same cough's tail, 40 ms into that line: said again, the story
+    // goes on.
+    *now.lock().unwrap() += Duration::from_millis(40);
+    let out = wordless_cut_of(&mut engine, 5, 4, TAIL_PLAYED).await;
+    assert_eq!(
+        said_of(&out),
+        [format!("said:{AGAIN}"), rest[0].clone(), rest[1].clone()],
+        "{out:?}"
+    );
+    // A real cough 5 s later is the third: the pause.
+    *now.lock().unwrap() += Duration::from_secs(5);
+    let out = wordless_cut_of(&mut engine, 6, 5, AGAIN_PLAYED).await;
+    assert_eq!(said_of(&out), [format!("said:{PAUSE}")], "{out:?}");
+    // Its tail, 40 ms in: the pause said again, not a fourth cut.
+    *now.lock().unwrap() += Duration::from_millis(40);
+    let out = wordless_cut_of(&mut engine, 7, 6, TAIL_PLAYED).await;
+    assert_eq!(said_of(&out), [format!("said:{PAUSE}")], "{out:?}");
+    // A tail of the pause said again: quiet, never a loop.
+    *now.lock().unwrap() += Duration::from_millis(40);
+    let out = wordless_cut_of(&mut engine, 8, 7, TAIL_PLAYED).await;
+    assert!(said_of(&out).is_empty(), "{out:?}");
+    // A fourth real cough within the minute: quiet, as before.
+    *now.lock().unwrap() += Duration::from_secs(5);
+    story_sent(&engine, 9, true);
+    let out = wordless_cut_of(&mut engine, 10, 9, 1_500).await;
+    assert!(said_of(&out).is_empty(), "{out:?}");
+    assert!(script.asked.lock().unwrap().is_empty());
+}
+
+/// The same tail over the line when the rest is the model's (06c1's run:
+/// "the rest not kept: the model goes on" on every cut): the line is said
+/// again and the model asked to go on, as for the line it cut.
+#[tokio::test]
+async fn a_coughs_tail_over_the_line_before_the_models_rest_asks_it_again() {
+    use crate::cut_in_wordless::AGAIN;
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [
+                vec![text("And the ship was his."), Ok(ChatEvent::Done)],
+                vec![text("And the ship was his."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (built, _, now) = scripted(script.clone());
+    let mut engine = built
+        .resuming_after_wordless_cut_ins(true)
+        .judging_busy(Arc::new(|_| true));
+    story_sent(&engine, 1, true);
+    wordless_cut_of(&mut engine, 2, 1, 1_500).await;
+    *now.lock().unwrap() += Duration::from_secs(20);
+    story_sent(&engine, 3, false);
+    let out = wordless_cut_of(&mut engine, 4, 3, 1_500).await;
+    assert_eq!(
+        out.iter().find(|label| label.starts_with("said:")),
+        Some(&format!("said:{AGAIN}")),
+        "{out:?}"
+    );
+    *now.lock().unwrap() += Duration::from_millis(40);
+    let out = wordless_cut_of(&mut engine, 5, 4, TAIL_PLAYED).await;
+    assert_eq!(
+        out.iter().find(|label| label.starts_with("said:")),
+        Some(&format!("said:{AGAIN}")),
+        "{out:?}"
+    );
+    assert!(
+        out.contains(&"said:And the ship was his.".to_owned()),
+        "{out:?}"
+    );
+    assert_eq!(script.asked.lock().unwrap().len(), 2);
+}
+
 /// The rest not kept (the answer was cut before it was sent whole): the
 /// bridge is said at once, then the model is asked to go on from the cut,
 /// not from the start. All played: nothing to go on with, quiet.
@@ -12335,6 +12705,167 @@ async fn a_wordless_cut_with_no_kept_rest_asks_the_model_after_the_bridge() {
         !out.iter().any(|label| label.starts_with("said:")),
         "{out:?}"
     );
+}
+
+/// A story's turn `request`, written whole by the model as `sentences`, its
+/// saying held at `held` (its speech never starting, as a long story's
+/// later pieces wait for the voice while the earlier ones play): read until
+/// that piece is taken by the saying half, then until the voice was asked
+/// for `last`, the newest piece the writing half could hand on.
+async fn a_story_held_at(
+    engine: &mut Engine,
+    script: &Script,
+    request: u64,
+    held: &str,
+    last: &str,
+) {
+    engine.submit(written(request, "Tell me a long story."));
+    let taken = format!(" {held}");
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let ProviderOutput::Transcript {
+                request: Some(_),
+                text,
+                finished: false,
+            } = engine.next().await
+                && text == taken
+            {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("the held piece is taken");
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while !script
+            .spoken
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|said| said == last)
+        {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("the last piece goes to the voice");
+    // The writing half reads the model's end, or stays blocked on a full
+    // queue: either way, done by now.
+    for _ in 0..50 {
+        tokio::task::yield_now().await;
+    }
+}
+
+/// Bug 2 of 06c1's FAIL on #5491 (request 28): the model's answer was
+/// written whole (its stream ended) while its pieces were still on their way
+/// to the voice (piece 14 went at 31.6 s, the cut came at 38.8 s), so it was
+/// never "sent whole", and every cut asked the model to go on ("the rest
+/// not kept"): the resumed story was short. Now the answer written whole is
+/// kept: the bridge, then the rest from the cut sentence, the piece taken
+/// but not yet sounding and the pieces not yet taken, the model not asked.
+#[tokio::test]
+async fn a_cut_after_the_answer_was_written_whole_says_its_unsent_rest() {
+    use crate::cut_in_wordless::BRIDGE;
+    let (_release, held) = tokio::sync::oneshot::channel();
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [vec![
+                text("Once upon a time. The keeper lit the lamp. Then a ship came."),
+                text(" Its sails were red. The keeper waved."),
+                Ok(ChatEvent::Done),
+            ]]
+            .into(),
+        ),
+        speech_hold: Mutex::new(Some(("Then a ship came.", held))),
+        ..Script::default()
+    });
+    let (built, _, _) = scripted(script.clone());
+    let mut engine = built
+        .announcing(false)
+        .resuming_after_wordless_cut_ins(true)
+        .judging_busy(Arc::new(|_| true));
+    a_story_held_at(
+        &mut engine,
+        &script,
+        1,
+        "Then a ship came.",
+        "The keeper waved.",
+    )
+    .await;
+    // Cut halfway through the second sentence, the third taken but silent,
+    // the last two still in the queue.
+    let out = wordless_cut_of(&mut engine, 2, 1, 1_500 + 750).await;
+    let said: Vec<&String> = out
+        .iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(
+        said,
+        [
+            &format!("said:{BRIDGE}"),
+            &"said: The keeper lit the lamp.".to_owned(),
+            &"said: Then a ship came.".to_owned(),
+            &"said: Its sails were red.".to_owned(),
+            &"said: The keeper waved.".to_owned(),
+        ],
+        "{out:?}"
+    );
+    assert_eq!(
+        script.asked.lock().unwrap().len(),
+        1,
+        "the model not asked again"
+    );
+}
+
+/// The answer not written whole at the cut (the model's stream not read to
+/// its end: the writing half waits on a full queue): its rest is not known,
+/// so the model goes on after the bridge, as before.
+#[tokio::test]
+async fn a_cut_before_the_answer_was_written_whole_asks_the_model() {
+    use crate::cut_in_wordless::BRIDGE;
+    let (_release, held) = tokio::sync::oneshot::channel();
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [
+                vec![
+                    text("Once upon a time. The keeper lit the lamp. Then a ship came."),
+                    text(" Its sails were red. The keeper waved. The ship sailed on."),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("And the ship was his."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        speech_hold: Mutex::new(Some(("The keeper lit the lamp.", held))),
+        ..Script::default()
+    });
+    let (built, _, _) = scripted(script.clone());
+    let mut engine = built
+        .announcing(false)
+        .resuming_after_wordless_cut_ins(true)
+        .judging_busy(Arc::new(|_| true));
+    a_story_held_at(
+        &mut engine,
+        &script,
+        1,
+        "The keeper lit the lamp.",
+        "The keeper waved.",
+    )
+    .await;
+    let out = wordless_cut_of(&mut engine, 2, 1, 750).await;
+    let said: Vec<&String> = out
+        .iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(
+        said,
+        [
+            &format!("said:{BRIDGE}"),
+            &"said:And the ship was his.".to_owned()
+        ],
+        "{out:?}"
+    );
+    assert_eq!(script.asked.lock().unwrap().len(), 2, "the model goes on");
 }
 
 /// The resume switch off: today's, exactly. A busy room's wordless cut
@@ -14752,7 +15283,12 @@ async fn requested_music_through_the_installed_runner_keeps_its_offer_private() 
             asked[1].last(),
             Some(&Message::tool(
                 "music-original",
-                json!({"next":"Say one short confirmation. The recording has only been offered for preparation; playback has not started and may still be refused. Confirm only that you will try to play it. Do not say it is playing, has started, or is ready."}).to_string()
+                crate::use_skill::told_through(
+                    wrapped,
+                    "play_relaxing_music",
+                    json!({"next":"Say one short confirmation. The recording has only been offered for preparation; playback has not started and may still be refused. Confirm only that you will try to play it. Do not say it is playing, has started, or is ready."})
+                )
+                .to_string()
             ))
         );
         let model = serde_json::to_string(&*asked).unwrap();
@@ -14807,6 +15343,7 @@ async fn requested_audio_runner_preserves_news_until_engine_takes_out_its_key() 
                 named_only: false,
                 correct: false,
                 questions: false,
+                now: false,
                 sign_in: false,
                 sign_in_app: false,
             }),

@@ -127,6 +127,41 @@ thread_local! {
         const { std::cell::Cell::new(None) };
 }
 
+/// The private room (the owner's call, 6 Nov): the lamp is a private room
+/// between it and its owner, so whoever speaks to it is the owner, and no
+/// ownership check runs. Telling who is speaking was not reliable enough:
+/// the lamp refused its own owner. The checks stay here, parked, for a
+/// later feature, and come back with this off. It changes who may use the
+/// linked services and hear the typed name and every reminder, nothing of
+/// memory's scopes (`crate::memory_scope`). `on` only, off unless set.
+pub const PRIVATE_ROOM_ENVIRONMENT: &str = "LAMP_PRIVATE_ROOM";
+
+#[cfg(test)]
+thread_local! {
+    static PRIVATE_ROOM_FOR_TEST: std::cell::Cell<Option<bool>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// Whether [`PRIVATE_ROOM_ENVIRONMENT`] is exactly `on`.
+pub fn private_room() -> bool {
+    #[cfg(test)]
+    if let Some(on) = PRIVATE_ROOM_FOR_TEST.with(std::cell::Cell::get) {
+        return on;
+    }
+    private_room_for(std::env::var(PRIVATE_ROOM_ENVIRONMENT).ok().as_deref())
+}
+
+fn private_room_for(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// This thread's [`PRIVATE_ROOM_ENVIRONMENT`], for a test; `None` reads the
+/// environment again.
+#[cfg(test)]
+pub(crate) fn set_private_room_for_test(on: Option<bool>) {
+    PRIVATE_ROOM_FOR_TEST.with(|cell| cell.set(on));
+}
+
 /// Whether [`OWNER_ONLY_ENVIRONMENT`] is exactly `on`.
 pub fn owner_only() -> bool {
     #[cfg(test)]
@@ -183,6 +218,9 @@ pub struct InView<'a> {
 /// reviewer-lead's P2 on #3050). An unknown face, another known face, two
 /// faces, or no look at all: never.
 pub fn may_tell(name: &str, seen: InView<'_>) -> bool {
+    if private_room() {
+        return true;
+    }
     match (seen.person, seen.faces) {
         (Some(person), Some(0 | 1)) => person == crate::known_faces::memory_person(name),
         _ => false,
@@ -594,6 +632,9 @@ pub fn someone_else_now(
     speaking_not_at_desk: bool,
     carried: Option<&str>,
 ) -> Option<&'static str> {
+    if private_room() {
+        return None;
+    }
     let owner_id = |id: &str| {
         owners
             .iter()
@@ -1592,5 +1633,53 @@ mod tests {
         assert_eq!(now(), None);
         set_for_test(None);
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The private room (the owner's call, 6 Nov): whoever speaks is the
+    /// owner. An unknown face, another known face, two faces and another
+    /// voice each hold nothing back; with it off each still does.
+    #[test]
+    fn the_private_room_holds_nothing_back_from_whoever_speaks() {
+        let owners = vec!["Example Name".to_owned()];
+        let cases = [
+            (Some(1), None, false),
+            (Some(1), Some("Robin"), false),
+            (Some(2), None, false),
+            (Some(0), None, true),
+        ];
+        set_private_room_for_test(Some(false));
+        for (faces, known, voice) in cases {
+            assert!(someone_else_now(&owners, faces, known, voice, false, None).is_some());
+        }
+        assert!(!may_tell(
+            "Example Name",
+            InView {
+                person: None,
+                faces: Some(2)
+            }
+        ));
+        set_private_room_for_test(Some(true));
+        for (faces, known, voice) in cases {
+            assert_eq!(
+                someone_else_now(&owners, faces, known, voice, false, None),
+                None
+            );
+        }
+        assert!(may_tell(
+            "Example Name",
+            InView {
+                person: None,
+                faces: Some(2)
+            }
+        ));
+        set_private_room_for_test(None);
+    }
+
+    #[test]
+    fn the_private_room_is_on_only_for_exactly_on() {
+        assert!(private_room_for(Some("on")));
+        for value in [None, Some("off"), Some("ON"), Some(" on"), Some("1")] {
+            assert!(!private_room_for(value), "{value:?}");
+        }
     }
 }

@@ -133,6 +133,11 @@ ends, so a result is known within seconds rather than at the watch's next
 look: ["Watching"](#the-lamp-as-chief-of-staff-watching-and-telling-2026-10-15)
 below. It reads with the watch, so it refuses to go with `--no-watch`.
 
+`--push-watch` (off unless set; #5230) holds one Harness `watch --json` on
+each task the watch looks at, at most four, and reads a task as soon as
+its agent settles: ["Following by watch"](#following-by-watch-serve---push-watch-5230)
+below. It reads with the watch, so it refuses to go with `--no-watch`.
+
 `--bus-root ABS` selects an isolated bus for qualification. `--run-for-ms N`
 bounds an operator run to 1–86,400,000 ms; it does not cancel remote work.
 Linux reads its boot identity itself; development hosts require `--boot-id ID`.
@@ -227,12 +232,13 @@ inspection evidence, not a playback grant.
 
 | Operation | Fields besides `op` | Route / meaning |
 |---|---|---|
-| `status` | none | Counts, bounds, current identities, last receipt |
+| `status` | none | Counts, bounds, current identities, last receipt; with `serve --set-up-later` and the sign-in read, `signed_in` (`yes`, `offline` or `no`, #5488) |
 | `targets` | none | Each target's `alias` and `engine`, in alias order; never its machine or project (since task 41, for the voice) |
 | `list` | optional `after_id` (default 0), `limit` (1–8, default 8) | Metadata page; follow `next_after_id` |
 | `get_task` | `id` | Exact task, configured target, dispatch and observation metadata |
 | `get_observation` | `id`, `observation_id` | One stored observation plus its speech record |
 | `get_progress` | `id` | With `serve --progress` only: the agent's progress line as last read, and what was read with it (["Progress on the bus"](#progress-on-the-bus-serve---progress-732)) |
+| `tasks_now` | none | With `serve --progress` only: every task being worked on or lately settled, newest first, with its last step in the agent's words marked untrusted, in under 2 KiB (["Tasks now"](#tasks-now-4342-serve---progress)) |
 | `prepare` | `guard`, `text`, `target` alias | Immutable proposal; no CLI call |
 | `confirm` | `guard`, `id`, `prepared_digest`, `session_id` | Trusted person's spoken confirmation |
 | `cancel` | `guard`, `id` | Only before dispatch attempt |
@@ -259,7 +265,8 @@ for a mutation. It is not evidence that no commit or dispatch occurred.
 ## Harness adapter
 
 These argv forms are constructed, without a shell; `ps` only with
-`serve --progress` and `wait` only with `serve --push-wait`. The adapter
+`serve --progress`, `wait` only with `serve --push-wait` and `watch` only
+with `serve --push-watch`. The adapter
 also builds `route`, `machines engines`, `reply`, `auth status`, `start`
 and `login --code` (`crates/tasks/src/harness.rs`), each in its own
 section below:
@@ -270,6 +277,7 @@ harness new codex --machine <full-machine-id> <project> --name <unique-label> --
 harness show --machine <full-machine-id> <full-agent-id> --chars 4000 --json
 harness ps --machine <full-machine-id> --json
 harness wait --machine <full-machine-id> <agent-id>[,<agent-id>…] --any --timeout 600s --json
+harness watch --machine <full-machine-id> <full-agent-id> --chars 200 --timeout 10m --json
 harness close --machine <full-machine-id> <full-agent-id> --json
 ```
 
@@ -407,7 +415,9 @@ give such a target its folder. A folder target,
 any other refusal, a timeout or a second refusal is never asked again,
 so nothing can start twice, and a named target's hand-overs all start.
 
-**`serve --new-folder`** (subdarren-P3 part 1, off unless set): Claude Code
+**`serve --new-folder`** (subdarren-P3 part 1, off unless set;
+`--targets-from-machines` turns it on for the folder its targets name,
+`~/harnesses/lamp-tasks`, alone, #5541): Claude Code
 and Codex ask the person to trust a folder Harness didn't make ("Do you
 trust this folder?"), and Harness pre-trusts only a folder it made itself
 (`harness new --help`: "Claude Code and Codex ask the person to trust a
@@ -702,6 +712,14 @@ started once its answer is told:
   product unit and lamp-4ace run it), Harness doesn't check that, so the
   agent id the lamp kept from its own `new` is the only guard. The lamp never
   closes by name, and never anything `ps` lists that isn't one of its tasks.
+- **Not followed after:** once closed (`closed`), the watch's follow looks
+  (`WATCH_FOLLOW_MS`) stop for that task. Before, a look two minutes later
+  found the stop the lamp itself had made, kept it as a `stopped` answer,
+  and the voice told the task's news a second time (the #4342 lamp run on
+  lamp-c0a4, 3 Nov: news at 13:26:45, closed at 13:27:15, news again at
+  13:28:51). A close refused, left to the person or failed keeps the task
+  followed. Test: `a_harness_closed_after_its_news_is_not_followed_or_told_again`
+  (`engine.rs`).
 - **Recorded first:** the attempt is saved before the call, like a launch and
   a read.
 - **Exit codes:** Harness 0.4.18's `close` exits 0 (closed), 5 (refused:
@@ -805,6 +823,8 @@ started once its answer is told:
 | CLI | One worker, one job/result slot; preflight/read 10 s each, new 60 s (a name-taken retry included) |
 | CLI capture | 64 KiB stdout, 16 KiB stderr; individual poll waits capped at 10 ms |
 | Progress (`--progress`) | One `ps` per machine per watch period, 10 s each; 256 KiB stdout; 256 harnesses a reply; a progress line cut to 2 KiB; memory only, at most 16 tasks |
+| Tasks now (`tasks_now`, with `--progress`) | Memory only; at most 8 tasks, newest first; the reply under 2 KiB (body at most 1,900 bytes); a last step at most 160 characters, cut at a whole character, control characters removed; a settled task kept 30 min after it was told and at most 2 h after it settled; no Harness call of its own |
+| Follow (`--push-watch`) | One `watch` per watched task, at most 4 at once (`MOST_FOLLOWED`), each on its own thread and its own adapter beside the CLI worker, 600 s each (killed at 630 s) and started again at once; 64 KiB a line, each line dropped once read; killed on `done`/`failed`, when its task leaves the watch, and when the part stops (the owner joins every one before it ends); a failed one started again after 3, then 10 s, given up for its task after 3 in a row; a task settled by it not followed again for 3 s |
 | Push (`--push-wait`) | One `wait` held per machine with watched tasks, on at most 64 agents, 600 s each (killed at 630 s), beside the CLI worker; the next on a machine no sooner than 3 s after one came back with an end, 30 s after one failed; a pushed task left out until the watch reads it again; 64 KiB stdout |
 | Private persistence | 8 MiB snapshot, 32 MiB database, 40 MiB journal; 4,096-byte pages |
 | SQLite | DELETE journal, FULL sync, fullfsync requested, 2 MiB cache, 50 ms busy wait, no mmap/WAL |
@@ -812,7 +832,8 @@ started once its answer is told:
 
 There are seven service threads including main: four clients, the storage
 owner and the CLI worker; with `--push-wait` (the product's), one
-`tasks-wait` thread more for each machine, and sign-in's reader threads
+`tasks-wait` thread more for each machine; with `--push-watch`, one
+`tasks-follow` thread more for each followed task, four at most, and sign-in's reader threads
 while one runs. Clients never run Harness. The CLI worker never
 holds the ledger. Main publishes the standard `diagnostics` type as `tasks`,
 with readiness, CLI-busy, counts, queue refusals and publication failures.
@@ -1024,6 +1045,24 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
   keep their own warning. Being signed out doesn't refuse a `prepare`: the
   sign-in read is up to a minute old, and the hand-over then fails as
   before ("could not hand the last task over").
+- **The sign-in on `status`** (#5488): once read, the `status` answer
+  carries the same `signed_in` (`yes`, `offline` or `no`), on any route.
+  The voice's onboarding reads it for its one sentence about Harness in the
+  walk's closing (`LAMP_ONBOARDING_HARNESS_LINE`, [onboarding.md](onboarding.md)).
+  Not read yet, the answer has no `signed_in`, as before; every other
+  answer is unchanged (`runtime::tests::status_says_harness_signed_in_once_read`).
+  One failed read (`harness auth status` not answering) keeps the last
+  answer; three failed reads in a row (`SIGN_IN_FAILED_READS`, three looks,
+  about three minutes on a lamp) let it go, journal line "Harness's sign-in
+  not read 3 times in a row: not known until it is read again", so `status`,
+  the app's `app_sign_in_state` (#5524) and the report carry no `signed_in`
+  (not known) and the machines are not
+  asked, until a read answers again; before, a sign-out followed by failing
+  reads kept `yes` until a restart. Harness's daemon is still started only
+  after the first read of a run that answers (#5379)
+  (`runtime::tests::a_sign_in_that_cannot_be_read_for_three_looks_is_let_go`,
+  and through the part's own loop
+  `tests/runtime.rs`: `a_sign_in_read_failing_three_times_in_a_row_is_let_go_by_the_part`).
 - **Without the switch** nothing of this is said or read, and the part
   starts, stops and reports as before.
 
@@ -1045,11 +1084,16 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
     and `-2`, `-3` … where two would be the same;
   - **each target:** the machine's id, the folder `~/harnesses/lamp-tasks`
     (lamp-4ace's today; a folder, not the name `lamp-tasks`, which Harness
-    would refuse from the second hand-over on. Harness never makes it, so a
-    computer without it refuses each hand-over: see `--folder-missing`) and
+    would refuse from the second hand-over on. Nothing else makes it, so
+    the first hand-over to each computer asks Harness to make it, as
+    `--new lamp-tasks`, as `serve --new-folder` does but for this folder
+    alone unless `--new-folder` is set (#5541; before it, every first
+    hand-over to a fresh computer failed `CWD_NOT_FOUND`, lamp-a63e on 6
+    Nov). A refusal for it is said with `--folder-missing`) and
     `ENGINE`
-    (`claude`, `codex` or `opencode`), until Harness says which engines a
-    machine has (openharness#1410's question 2).
+    (`claude`, `codex` or `opencode`); with `--engines-from-machines`, one
+    that computer has (openharness#1888 answers #1410's question 2; see
+    "Which agents each computer has" below).
 
   **Never over someone else's file.** The part writes only where there's
   no file, or the file is one it wrote: `targets.json.from-machines`
@@ -1099,6 +1143,84 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
     (two computers, one with none, the switch off; a read-back that
     ignores the names fails it) and
     `agent_tasks::tests::the_machine_names_switch_is_taken_on_its_own`.
+- **Which agents each computer has** (`--engines-from-machines`, only with
+  `--targets-from-machines`; off unless set, #5199). Without it every
+  target written from the machines gets `ENGINE`, and a hand-over to an
+  agent the computer lacks, one not signed in there, or a computer that is
+  asleep fails only after the person's yes, on the computer.
+  - **Asked:** after each look at the machines, each computer listed (the
+    lamp left out, at most 8) and each a target names is asked `harness
+    machines engines <id> --json` (openharness#1888), which probes it live
+    over its link (Harness's own 30 s bound; the part allows 35 s). One
+    computer at a time, on a thread and a Harness lane of their own: a
+    computer that takes its 30 s never holds up a hand-over or a read.
+    Exit 1 is `unreachable`, 2 `usage` (an older Harness). One journal line
+    a look, each engine and what it said, never the computer's name.
+  - **Kept**, by machine: its `status` from `harness machines --json`
+    (`running`, which is online, `offline`, `unknown` or
+    `payment_pending`; any other word is unknown; its `engine` field is
+    legacy and never read), and each engine's `installed`, `installable` and
+    `signedIn`, each with when it was read. Harness's CLI turns the
+    computer's `installed: false` into `null` and passes `installable`
+    through (the computer's `!installed && command && recipe`); `signedIn`
+    is read for Claude Code and Codex only. A look that failed keeps what
+    was known. `null` is unknown, never missing: it forgets a value that
+    would refuse (that may no longer hold) and keeps one that wouldn't, so
+    one shell that timed out doesn't move a target to another engine. A
+    reading more than 15 minutes old is unknown.
+  - **Targets from what is there:** a target written from the machines
+    gets `ENGINE` where it is known installed on that computer, else the
+    first known installed of claude, codex and opencode, else `ENGINE` as
+    before. A file someone else wrote is still never written over.
+  - **Its own file,** `targets.engines.json` beside the targets:
+    `{"version":1,"computers":{ALIAS:{"status":{"value":WORD,"read_ms":MS},
+    "engines":{ENGINE:{"installed":{"value":BOOL,"read_ms":MS},
+    "installable":{…},"signed_in":{…}}}}}}`, each field only when known, for the targets the
+    file names now, whoever wrote it. An older build never reads it, as with
+    the names. Read at each look as strictly as the names (owned, 0600,
+    version 1, nothing else in it); a missing or bad file is nothing known,
+    and refuses nothing. A file there that isn't this part's is left as it
+    is. Nothing known: the file is removed.
+  - **Refused at `prepare`,** at once, with nothing made: the computer known
+    `offline` is `computer_offline`; the engine not found there
+    (`installed` null with `installable` true, as Harness prints an engine
+    a computer lacks) is `engine_missing`; known `signedIn: false` (Claude
+    Code and Codex only) is `engine_not_signed_in`, in that order. Unknown
+    always proceeds, as today: `installed` null with `installable` false
+    goes, and Harness's own `ENGINE_NOT_INSTALLED` decides. A computer
+    whose shell took over 5 s reads as not found too, so it is said as
+    "not found", never as "not installed". Devin Cloud, which works in
+    Devin's cloud, is never refused. A refusal has the machines and their
+    engines looked at again at once (at most once in 30 s), so a computer
+    woken or an agent signed in since is known by the next ask.
+  - **Said:** the voice tells the model one plain line a code, naming the
+    agent and the computer as the read-back does ("your MacBook" with
+    `LAMP_TASKS_MACHINE_NAMES`, else "the office computer"): "Codex wasn't
+    found on your MacBook.", "Your MacBook seems to be asleep or offline.",
+    "Claude Code isn't signed in on your MacBook.", each with "Nothing was
+    handed over." and what would let it go, never "just now".
+  - **The staff:** `{"op":"targets"}` gives `installed: false` beside a
+    target whose engine wasn't found on that computer, and the voice leaves
+    it out of the staff, so the descriptions and the staff's note name only
+    agents some computer has. With the engine chosen above, a target
+    written from the machines names one its computer has.
+  - **Without the switch** nothing is asked, kept, read or refused: an
+    engines file beside the targets is never read.
+  - **Tests:** `readiness::tests` (a null is unknown, each refusal and
+    unknown proceeds, the engine chosen, the file written, read back and
+    read strictly), `tests/harness.rs`:
+    `a_computers_engines_are_one_call_read_as_harness_gives_them`,
+    `runtime::tests::targets_from_machines_take_the_engine_each_computer_has`,
+    `tests/runtime.rs`: `engines_from_machines_choose_an_engine_there_and_refuse_early`
+    (a failed look keeps the old), `an_engine_known_not_there_is_refused_and_told_and_unknown_proceeds`,
+    `without_engines_from_machines_nothing_is_asked_or_refused`,
+    `targets_from_machines_needs_an_engine_and_set_up_later`, the voice's
+    `agent_tasks::tests::an_early_refusal_is_one_plain_line_a_code`,
+    `agent_tasks::tests::an_agent_no_computer_has_is_not_one_of_the_staff`
+    and `agent_tasks::tests::a_target_the_tasks_part_lacks_is_answered_from_who_is_there`.
+  - **Not yet shown on a lamp:** a played before/after count on lamp-c0a4,
+    hand-overs to a missing, a signed-out and an offline agent each refused
+    at once with a plain line, and a good one unchanged.
 
 Signing in a lamp with no screen is by a spoken code since Harness 0.4.23
 (openharness#1410; ["Signing in by a spoken code"](#signing-in-by-a-spoken-code---sign-in-by-code-1676)).
@@ -1163,6 +1285,65 @@ environment every Harness command gets (both are now on the client's
 environment list), `harness start` among them. Its journal says `tasks:
 Harness's own updates held (ADAPTER_UPDATE_DISABLE=true,
 HARNESS_ENV_FILE=…)`, or `not held: <why>` when the file can't be written.
+
+**The pinned launcher (#5493).** The environment above reaches only the
+Harness commands lamp-tasks runs. A `harness logout` run by hand over ssh,
+without them, restarted the held daemon from its own environment, and the
+daemon updated itself within 10 s (lamp-c0a4, 6 Nov). So with the same
+switch, Harness's launcher in its home's bin folder
+(`/var/lib/lampos-tasks/.local/bin/harness`, normally `#!/bin/sh` and one
+`exec … cli.js` line) is written in Harness's own pinned shape, the one its
+installer writes with `--no-updates`:
+
+```sh
+#!/bin/sh
+export ADAPTER_UPDATE_DISABLE=true
+export HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env
+exec … cli.js "$@"
+```
+
+Every `harness …` run through the launcher (or through `/usr/local/bin/harness`,
+its link) then holds the updates, whoever runs it. Harness's own updates
+rewrite only the `exec` line, so the preamble stays.
+
+- **Where:** lamp-tasks at its start (`hold::pin_at_start`), for lamps
+  installed before this; and `lamp-update harness-install` right after it
+  installs, before it starts lamp-tasks again
+  (`crates/update/src/harness_install/launcher.rs`). lamp-update reads the
+  switch from lamp-tasks' unit as systemd has it loaded (`systemctl show
+  lamp-tasks.service --property=Environment`), so both follow the one switch
+  (drop-ins included). A failed read is taken as off; either way it says one
+  line (`LAMP_HARNESS_HOLD_UPDATES is not on in lamp-tasks.service: …` or
+  `lamp-tasks.service's environment not read (<why>): … taken as off, …`).
+- **What is written:** any `export ADAPTER_UPDATE_DISABLE=…` or `export
+  HARNESS_ENV_FILE=…` line before the first `exec` line is taken out, and
+  the two lines above are put just before it. The `exec` line and every other
+  line are kept as they are. A launcher already in that shape is not written
+  (byte for byte the same, no second preamble). Otherwise it is written whole,
+  through `.harness.lampos-pin` beside it, with its own mode (executable) and
+  owner, then renamed over it. lamp-update (root) does this without following
+  links: `.local`, `bin` and the launcher are opened `O_NOFOLLOW`, the launcher
+  is checked, read and its mode and owner taken through that one open file, and
+  `.harness.lampos-pin` is unlinked, made new (`O_EXCL`) and renamed in that
+  same folder.
+- **Not written:** with the switch off; with no launcher (none is made, one
+  line said); with a launcher that is a link (`a link, left as it is`; its
+  target is not read or written), not a plain file, or has no `exec` line;
+  with one that has a second hard link (`hard-linked (N names), left as it
+  is`) or is owned by another uid than its `bin` folder's owner (`owned by
+  uid U, not the bin folder's owner B, left as it is`), both checked on the
+  one `O_NOFOLLOW` open file (two security reads' P3 on #5624).
+  Nor with one over 64 KiB (Harness's is a few hundred bytes): its size is
+  checked on that open file and the read stops past the cap, so a launcher
+  that grows meanwhile is still bounded (`N bytes, over the 64 KiB cap, left
+  as it is`; a P3 on #5647).
+- **Journal:** lamp-tasks says `tasks: Harness's launcher pinned (…): <path>`,
+  `tasks: Harness's launcher already pinned: <path>`, `tasks: no Harness
+  launcher at <path>: left alone` or `tasks: Harness's launcher not pinned:
+  <why>`; lamp-update says the same without `tasks: `.
+- lamp-tasks still gives both variables to each Harness command.
+- **Limits:** a direct `node …/cli.js` call skips any launcher; a Team
+  account ignores the hold.
 
 **Health, no credential.** With the same switch, after each `harness start`
 that succeeded (after a sign-in, or at the part's own start), a thread of its own asks `GET /api/health`
@@ -1839,6 +2020,50 @@ used only to say it.
   11.2 %, `lamp-tasks` about 4 % of one core, and the held `wait` one Node
   process of about 130 MB while a task is watched. One line in the journal
   for each `wait` that comes back or fails.
+- **Following by watch** (`serve --push-watch`, #5230,
+  `crates/tasks/src/follow.rs`). <a id="following-by-watch-serve---push-watch-5230"></a>
+  Each task the watch looks at gets its own `harness watch --machine M
+  <agent> --chars 200 --timeout 10m --json`, held on a lane of its own (a fresh
+  adapter per watch, so a child that can't be cleaned up stops only its
+  own), at most four at once, the tasks already followed first, then the
+  watch's order. `watch` prints one JSON line when the event or the turn
+  changes (Harness looks every 3 s); only `event` and `id` are read, never
+  the summary, ask or question, and a line for another id is passed over.
+  `started` and `working` read nothing. `done`, `failed`, `needs_person`,
+  `idle` and `stopped` read the task at once (`Engine::push`, the same read
+  as `--push-wait`'s, which keeps an idle answer on the spot: `done` comes
+  after Harness's two idle looks). `watch` exits by itself only on
+  `stopped` (exit 4); on `done` and `failed` the part kills it itself,
+  since a pane harness stays idle and its watch would go on. A watch is
+  also killed when its task leaves the watch (settled, closed with
+  `--close-told`, or let go), and every one is killed and joined when the
+  part stops. Exit 124 (its 10 minutes passed) starts it again at once; a start
+  again is safe, its first line being how the harness stands then. Exit 1
+  (`GONE`, `DISCONNECTED`, `MACHINE_UNAVAILABLE` …; only the code is
+  journaled) starts it again after 3, then 10 s, and after three failures
+  in a row the task is given up to the fallback. Exit 2, a usage error, is
+  taken for a Harness without `watch`: no watch is started again while the
+  part runs. A task settled by its watch is not followed again for 3 s,
+  and not while its latest read was a push (`Engine::pushed`), so a watch
+  started again on an agent still idle never reads it in a loop.
+  - **Fallback:** a task once heard from by its watch is left out of
+    `--push-wait`'s `wait`; one past the cap, given up, or under a Harness
+    without `watch` stays on `wait` when that is on. The watch's own looks
+    go on for every task whatever this does, so a result is never later
+    than without it.
+  - **Journal:** one call line for each `watch` (`tasks: harness watch:
+    machine=… agent=… exit=… ms=…`, `exit=ended` when killed on `done`),
+    and one line for each event (`tasks: watch of task N: done after N ms`).
+  - **Cost:** each `watch` is one Node process, about as big as the held
+    `wait` (~130 MB on lamp-75c9), hence the cap of four.
+  - **Listing:** Harness has no SDK `get tasks`; the list is `harness ps
+    --machine <id> --json` (`{you, machine, context, harnesses, next}`),
+    which `--progress` already reads ([Progress on the
+    bus](#progress-on-the-bus-serve---progress-732)). `ps` filters only by
+    `--machine` and `--all`, so the part keeps only its own tasks' rows.
+  - **Not yet shown:** any lamp run. The 5-minute played check on
+    lamp-c0a4 (a voice task that stays quiet while it works and says its
+    result once) is left for #5230.
 - **Telling** (`crates/voice/src/task_news.rs`). A thread of the voice reads
   `list`, `get_task` and `get_observation` every 10 s, and at once when
   `tasks/status` lists a task newly settled (#560: the tasks part publishes
@@ -1904,6 +2129,40 @@ used only to say it.
   (`LAMP_TASKS_TOLD`), read again on each pass. With `--close-told`,
   once its turn is heard whole, a task's observation is also marked `told`
   in the tasks part, so that its harness can be [closed](#closing-a-finished-harness-1390-serve---close-told-on-in-the-product-unit).
+- **Told once more when not heard** (#4342, off unless
+  `LAMP_TASK_NEWS_RETELL=on`). News is kept as told the moment it is taken
+  to tell (`TaskNews::tell`) or answered (`check_agent_task`), before
+  anyone hears it. On lamp-c0a4 on 3 November a task's done news rode on a
+  `check_agent_task` answer ("request 109 was answered the news (…); it
+  rides on the turn"), the person cut the answer short ("was cut short
+  (user_interrupted): its harness stays open"), the Task news skill's ask
+  expired, the tasks part's `told` stayed null, and the news was never said
+  again. With the switch, settled news (done, failed, stopped, or an agent
+  waiting for the person, and a hand-over that failed) whose turn was cut
+  short or ended not heard whole is told once more. That includes news
+  played through with gaps, whose harness stays open (#4035): on lamp-c0a4
+  on 3 November such a news, played under someone's words that made no
+  request (`audio_written_with_playback_gaps_unscored`), was otherwise
+  neither told again nor closed. It is told once more
+  (`TaskNews::not_heard`): the reader offers it again though it is kept as
+  told, with the note's words worked out afresh, and the voice tells it
+  itself, alone, at the next quiet pause: someone there and nothing said by
+  or to the lamp for 15 s (`QUIET_US`), whatever `LAMP_TASK_NEWS_AT_PAUSE`
+  says, so the person speaking always wins; it never waits for a skill's
+  ask, which is long gone. Only within 30 minutes of the work settling
+  (`RETELL_WITHIN_MS`, the note's `until`). Taken the second time
+  (`task_news` record `retold: true`), it is never told again unasked: not
+  heard whole again, it is let go, two tries in all, the first one
+  included. Heard whole in the meantime (asked and answered), it is not
+  told again. Heard whole, the tasks part is told as for any news, so its
+  `told` is set. Progress and a sign-in's question are never told again
+  this way (progress is the Policy's to time; a sign-in asks again its own
+  way). Off, news not heard whole stays as before: kept as told, said only
+  when asked.
+  A task waiting for the person (`needs-input`, as the push wait ends it) is
+  already told once by its own words above ("Claude Code is waiting for
+  you on your computer"), the same question never twice; the switch only
+  gives it its one more try when that telling was cut short.
 - **Asked** (`check_agent_task`). "How's it going?" or "what did Claude Code
   say?" is answered at once from what was last seen, with no new read; a
   finished answer heard this way is kept as told, so it is not told again
@@ -1918,6 +2177,10 @@ used only to say it.
   going from it, never word for word, and that the agent has been quiet
   when it was last active 3 or more minutes ago. With no line yet (not
   read, or no `--progress`) it says only that the agent is still working.
+- **Asked about any of them** (`tasks_now`, off unless `LAMP_TASKS_NOW=on`,
+  #4342): "how's it going?", "what is Claude doing?" or "did the poem one
+  finish?" answered for every recent piece of work, not only the latest
+  (["Every piece of work now"](#every-piece-of-work-now-4342-off-unless-lamp_tasks_nowon)).
 - **Progress** is #732: `show` is empty while an agent works (measured
   2026-10-15, 00:05), so the progress signal is `ps --machine`, put on the
   bus as typed state, with Jev deciding whether a step is worth telling
@@ -2176,7 +2439,7 @@ Tests: `agent_tasks::tests::with_accounts_the_persons_calendar_and_email_are_han
 
 ### A question for one of the staff is theirs (off unless `LAMP_TASKS_QUESTIONS=on`)
 
-Only with `LAMP_TASKS_ASKED=on` (the voice's `--tasks-questions`, taken last,
+Only with `LAMP_TASKS_ASKED=on` (the voice's `--tasks-questions`, taken
 after `--tasks-correct`). The person's rule (28 Oct, 18:1x): "just spawn a
 new agent of type <...> to ask". A question about or for a named agent
 ("what did Devin build last week?", "ask Hermes what it's working on") is
@@ -2270,6 +2533,17 @@ bound. The contract the app builds on is in #5198.
   app was given an `asking` view (`not_read`), within
   [`sign_in::ANSWER_WINDOW`](../crates/tasks/src/sign_in.rs) of that
   (`too_late`, which ends it), once.
+- **Whether Harness is signed in** (#5524, for the app's Harness row, app
+  #111): with `serve --set-up-later`, once the part has read Harness's own
+  sign-in (the same read as its journal's "Harness signed in: …", at start
+  and every `--set-up-later` look), `app_sign_in_state` carries
+  `signed_in` (`yes`, `offline` or `no`) beside the sign-in's view, as
+  `status` does ("The sign-in on `status`"). It comes from Harness, not
+  from the last sign-in this run saw, so after a restart, with no sign-in
+  open and the view `none`, it still says it. Not read yet, it is absent;
+  the app's other operations are unchanged. Tests:
+  `runtime::tests::the_apps_state_says_harness_signed_in_once_read` and the
+  service's `the_apps_state_says_harness_signed_in_across_a_restart`.
 - **The id only grows** (Backend2 on #5198: the backend tells an ended
   sign-in from one not put yet by it). Each new id is the larger of the
   clock in ms and the newest kept + 1; the newest is kept in the state
@@ -2301,6 +2575,76 @@ offer to say it again; "say the code again" is a new heard
 `sign_in_computer`, which gives the same code while it is alive. Without the
 switch both are as before. Test:
 `sign_in::tests::with_the_app_switch_the_code_is_said_slowly_and_again_and_an_app_sign_in_never`.
+
+### Every piece of work now (#4342, off unless `LAMP_TASKS_NOW=on`)
+
+`check_agent_task` tells only the newest work handed over. With
+`LAMP_TASKS_NOW=on` and the tasks part (`LAMP_TASKS_DIR`), the voice's
+`--tasks-now`, taken last, after `--tasks-questions` and
+`--tasks-sign-in-app`, the model also has `tasks_now`. It answers "how's it
+going?", "is it done?", "what is Claude doing?" and "did the poem one
+finish?" for any recent piece of work.
+
+- **Where it reads.** The tasks part's ["Tasks now"](#tasks-now-4342-serve---progress)
+  record (`{"op":"tasks_now"}`), then `get_task` for each task's ask. Both
+  are the tasks part's own memory and store: no Harness call, so the answer
+  comes at once. It needs `lamp-tasks serve --progress`.
+- **What the model is given**, for each task, newest first: `who` (the
+  agent's name, as the news says it), `where` ("their computer", or the
+  computer's own name with `LAMP_TASKS_MACHINE_NAMES`), `asked` (the task's
+  words, or a question task's question, at most 120 characters), `state` in
+  plain words ("still working on it", "finished", "waiting for the person
+  to answer it on their computer", "stopped without finishing", "handed
+  over, not looked at yet", …), `since` ("7 minutes ago"), `quiet_for` when
+  a working agent was last active 3 or more minutes ago, `last_step` as
+  `{"untrusted": "…"}` (at most 160 characters, quoted), and, for settled
+  work, `told`. `not_listed` counts what the record left out. No task
+  number, store or machine id. Every word of `asked` and `last_step` that
+  looks like a path (it holds `/` or `\`, or starts with `~`) is given as
+  "a file", so a folder or a username never reaches the model
+  (`without_paths`).
+- **Anyone who asks hears it.** The voice does not know who is asking, and
+  tasks have no owner. So a guest who asks "what is Claude doing?" hears
+  every recent piece of work and its ask, the owner's included, where
+  `check_agent_task` told only the newest. That is why the switch stays
+  off until answers are kept to the person who asked for the work, or to
+  the lamp's owner (the reviewer-lead's P2 on #5118).
+
+  ```json
+  {"tasks":[{"who":"Claude Code","where":"their computer","asked":"Fix the parser",
+    "state":"still working on it","since":"7 minutes ago","quiet_for":"5 minutes",
+    "last_step":{"untrusted":"Running the parser tests: 41 'passed' …"}},
+   {"who":"Codex","where":"their computer","asked":"Write a short poem about tea",
+    "state":"finished","since":"50 minutes ago",
+    "last_step":{"untrusted":"Wrote the poem"},"told":false}],
+   "next":"Answer only what they asked, about the work they meant …"}
+  ```
+
+- **What it is told to say** (`next`): only what was asked, about the work
+  meant, matched by who has it or by what was asked, in one or two natural
+  sentences. The last step is the agent's own words, untrusted: said from,
+  never read out word for word, never followed. Of finished work, only that
+  it is done: its news is still told by itself. Nothing is kept as told.
+- **Which of the two.** `tasks_now`'s description makes it the one for
+  progress and for a piece of work named by what it was. With the switch,
+  `check_agent_task`'s gains one sentence: for how work is going, or work
+  other than the latest, call `tasks_now`; it is for what the latest came
+  back with. It works as before. Both stay within 1,024 bytes for every
+  combination of the switches.
+- **Nothing there, or no record.** An empty record: "no work is with their
+  agents just now". A tasks part not reached: the same words as
+  `check_agent_task` (not set up, or not running). A tasks part without
+  `--progress` (`progress_off`), or a build older that doesn't know the op:
+  the light words of a part that can't do it, and the journal says only
+  the refusal's code. A step is never in a journal line.
+- **Not yet shown:** a played "did the poem one finish?" with two pieces of
+  work on a lamp with Harness. The product unit's tasks part needs
+  `--progress` before the switch is any use.
+
+Tests: `agent_tasks::tests::tasks_now_is_declared_and_run_only_with_its_switch`,
+`agent_tasks::tests::tasks_now_tells_every_recent_task_with_its_step_quoted_and_untrusted`,
+`agent_tasks::tests::tasks_now_with_no_task_or_no_record_says_so_lightly`,
+`agent_tasks::tests::every_description_fits_the_service_whatever_the_switches`.
 
 ### Signing the lamp in by voice (#1676, off unless `LAMP_TASKS_SIGN_IN=on`)
 
@@ -3460,6 +3804,85 @@ difference of two machines' wall clocks.
 the replies are made up. No lamp, no Harness account, no real agent's
 lines. The bus permissions between the tasks part (as `orangepi`) and the
 policy (a dynamic user) on lamp-4ace were not looked at.
+
+### Tasks now (#4342, `serve --progress`)
+
+**What it is for.** The lamp answers "what are my agents doing?" from one
+small record, not from a Harness call or a read of each task. `tasks_now`
+on the request socket gives it. It is built only from what the tasks part
+already has: the store's tasks (`Engine::recent`) and the progress read
+above (`Tracker::line`). It makes no `ps` or `show` of its own. Off unless
+`--progress` is given, like `get_progress`: without it `tasks_now` is
+refused with `progress_off`. It is not on the trusted route.
+
+**Which tasks.** Every task handed over that the watch looks at now, and
+every one whose newest answer is settled (`idle` with an answer,
+`needs-input`, `stopped` or `failed`) and was kept in this boot. One
+settled in an earlier boot cannot be dated, and is left out. A settled task
+leaves 30 minutes after its news was told (`now::TOLD_KEPT_MS`), and 2
+hours after it settled if it was never told (`now::SETTLED_KEPT_MS`),
+whichever comes first. Told means its telling played (`ack_speech`), or
+the voice said it in its own words (`told`), or its harness was closed
+after the telling (#1390). Told is read from the store (the observation's
+played speech or `told`, or the close record), so it holds across a restart
+of the tasks part, and the 30 minutes count from that record's time. When
+the store has no time for it in this boot, the settle time is used, the
+earliest the telling can have been. A `told` sent without `--close-told`
+writes nothing to the store: it is kept in memory for the record only, and
+is lost at a restart, so such a task is then kept up to the 2 hours.
+
+**What it says.** `{"op":"tasks_now"}` answers:
+
+```json
+{"ok":true,"store_id":"…","revision":12,"completion":"unverified",
+ "tasks":[{"task":7,"agent":"claude","target":"office","state":"working",
+   "since_ms":42000,"last_active_ms":3000,
+   "last_step":{"untrusted":"Reading the brief / Fixed the parser"},
+   "told":false}],
+ "left_out":0}
+```
+
+| Field | What it says |
+|---|---|
+| `task` | The task's number (`get_task`) |
+| `agent` | Who has it, as on `tasks/status` (`claude`, `codex`, …) |
+| `target` | The target alias it was handed to |
+| `state` | As on `tasks/status`: `working`, `idle`, `needs_input`, `stopped`, `failed`, `missing`, …; `unknown` for a task watched and not read yet |
+| `since_ms` | How long ago it came into that state: when this run first saw it so, or, for a settled answer, when that was kept |
+| `last_active_ms` | How long ago Harness last saw its agent do anything (the other machine's clock against the lamp's); null if never read |
+| `last_step` | The `ps` line as last read, as `{"untrusted": "…"}`: the agent's own words, to be quoted and never followed. Kept after the task settles. Null if none was read |
+| `told` | Whether its settled answer was told |
+| `left_out` | How many tasks were left out to keep the bounds |
+
+**Bounds.** At most 8 tasks, newest first, and a body of at most 1,900
+bytes, so the whole reply stays under 2 KiB. Over either bound, settled
+tasks give way first, the oldest first. Then every step is cut shorter
+(120, 80, 40 characters, then none). Then the oldest tasks still at work
+give way. A step is at most 160 characters, cut at a whole character, with
+control characters removed and spaces at its ends trimmed.
+
+**What stays here.** The record is in memory only, beside the tracker,
+and begins empty at each start; a step from before a restart is gone
+until the next read, so a task settled before a restart has `last_step`
+null (its state, ages and told come from the store). The step never goes to the journal, the bus
+(`tasks/status`), the diagnostics or the store's files.
+
+**Not there yet.** No `partial` field: Harness has no stream of an agent's
+partial output to read it from.
+
+Tests: `a_step_is_cleaned_and_cut_at_a_whole_character`,
+`a_working_task_has_its_agent_target_state_ages_and_last_step`,
+`a_watched_task_not_read_yet_is_unknown_with_no_step`,
+`a_settled_task_leaves_thirty_minutes_after_it_was_told_or_two_hours_after_it_settled`,
+`at_most_eight_newest_first_and_settled_give_way_first`,
+`the_record_stays_within_its_bytes_cutting_steps_before_dropping_work` and
+`the_step_is_only_in_the_body_marked_untrusted_never_on_the_bus`
+(`crates/tasks/src/now.rs`);
+`recent_tasks_are_the_watched_and_those_settled_in_this_boot`
+(`engine.rs`); and, through the service with a fake `ps`,
+`with_progress_tasks_now_says_each_task_and_its_last_step_and_the_words_stay_here`
+and `tasks_now_a_task_told_before_a_restart_stays_told_and_leaves_thirty_minutes_after`
+(`crates/tasks/tests/runtime.rs`). Not tried on a lamp.
 
 ## The voice's side of progress news (#752)
 

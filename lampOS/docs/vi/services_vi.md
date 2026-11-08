@@ -47,9 +47,14 @@ Chỉ chủ của đèn: người có khuôn mặt quen được giữ dưới t
 nhớ tuân theo (`memory_scope::ScopeLease::scope`): câu nói phải được nhận là
 của khuôn mặt quen của chủ đèn, không được giữ bởi khoảng trống của một khuôn
 mặt hay được mang theo như một cuộc trò chuyện đang tiếp diễn, và không bị thu
-hẹp về cả phòng (một khuôn mặt khác được thấy đang nói nó). Câu của một người
-khách, của một khuôn mặt lạ, của cả phòng, một câu bị giữ hay bị thu hẹp, và
-một yêu cầu không có phạm vi đều được báo `OWNER_ONLY`, "Not done: only the
+hẹp về cả phòng (một khuôn mặt khác được thấy đang nói nó), cũng không phải
+của chủ đèn chỉ vì mặt họ một mình trong khung (`LAMP_PERSON_SCOPE_ONE_FACE_READS`,
+`ScopeLease::forgets_need_mouth`: điều đó chỉ tính cho việc lưu và nhớ lại,
+không bao giờ cho việc làm thay họ, nên câu «read my mail» của một vị khách
+ngoài khung hình khi chủ đèn ngồi im một mình trong khung không đọc gì). Câu
+của một người khách, của một khuôn mặt lạ, của cả phòng, một câu bị giữ hay
+bị thu hẹp, một câu đọc theo một mặt, và một yêu cầu không có phạm vi đều được
+báo `OWNER_ONLY`, "Not done: only the
 lamp's owner can use their linked services, and I can't tell it is them now.
 Say so plainly, in a few words, and ask them to look at the lamp so it can
 see who is asking.", và không gì được gọi, cho cả đọc lẫn ghi.
@@ -111,6 +116,7 @@ dịch vụ.
 |---|---|---|
 | `LAMP_SERVICES=on` | `lamp-cloud` (với `LAMP_CLOUD=on`), `lamp-voice` và `lamp-services` | `lamp-cloud` trả lời `connector.*` và `services.list` của ứng dụng bằng câu của V1 "not on this lamp: <kind>" và không ghi gì vào `can`; giọng nói không khai báo hàm nào trong ba hàm và không định tuyến hàm nào; `lamp-services` không mở socket nào và thoát |
 | `LAMP_SERVICES_WRITE=on` (bật trong `lamp-services.service` của sản phẩm) | `lamp-services` | `service_write` trả lời "writing to services is off on this lamp", và không gì được chuẩn bị hay gửi; việc đọc vẫn như trước |
+| `LAMP_SERVICES_TOLD=on` (#5523) | hai tuyến của `lamp-voice`, với `LAMP_SERVICES=on` | Câu của chủ đèn không được báo gì về các dịch vụ đã liên kết: mô hình chỉ biết ba hàm và chỉ hỏi `services_connected` khi nó nghĩ tới ("Giọng nói được báo những gì đã liên kết", bên dưới) |
 | `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và một yêu cầu tạo kỹ năng nêu một dịch vụ được trả lời `NOT_A_SERVICE` ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
@@ -691,8 +697,9 @@ only reads …").
   lượt này là lượt của phần đọc lại đó, và từ đó đèn không nói trong yêu cầu
   nào khác; câu của người đó là câu đầu tiên được bắt đầu kể từ khi lần ghi
   được chuẩn bị; đó là cùng chủ đèn đã yêu cầu; tối đa 2 phút kể từ khi chuẩn
-  bị và 30 s (`SEND_WITHIN`) kể từ khi đèn nói lời cuối của nó; và lời của
-  người đó trong lượt này là một câu gửi thuần. Nếu không, mô hình được báo
+  bị và 30 s (`SEND_WITHIN`, `send_by`) kể từ khi đèn nói lời cuối của nó, hoặc
+  kể từ khi phần đọc lại có thể đã phát xong với 600 ms mỗi từ, nếu muộn hơn
+  (sau khi đèn hỏi lại, chỉ tính từ lần hỏi đó); và lời của người đó trong lượt này là một câu gửi thuần. Nếu không, mô hình được báo
   `CANCELLED`, "Not sent, and cancelled: I send only on a plain "send" said
   to me right after I read the message back. Say it was not sent." Journal
   ghi tên từng điều kiện không đạt ("a send cancelled: …"), và mỗi lần từ
@@ -766,14 +773,23 @@ only reads …").
   language." (nói bằng ngôn ngữ của cuộc trò chuyện).
 - **Một câu gửi thuần** (`says_send`): các từ viết thường, mọi thứ trừ chữ
   cái, chữ số và `'` thành dấu cách, các từ đệm `yes`, `yeah`, `yep`, `ok`,
-  `okay`, `sure`, `please`, `now`, `lamp`, `lampy`, `vâng`, `dạ`, `ừ`, `có`
-  được bỏ ở cả hai đầu, và phần còn lại đúng là một trong `send`, `send it`,
+  `okay`, `sure`, `please`, `now`, `lamp`, `lampy`, `hey`, `hi`, `hello`,
+  `oh`, `vâng`, `dạ`, `ừ`, `có` được bỏ ở cả hai đầu, và phần còn lại đúng là một trong `send`, `send it`,
   `send that`, `send the message`, `send the email`, `go ahead and send it`,
   `gửi`, `gửi đi`, `gửi nó đi`, `gởi`, `gởi đi`, `gui`, `gui di`,
   `gửi đi giúp tôi`, `gui di giup toi`: câu nào cũng có "send", "gửi", "gởi"
   hoặc "gui". Vì vậy "Yes, send it.", "Vâng, gửi đi" và "Ừ, gửi đi giúp tôi"
-  thì gửi; "do it", "don't send it", "send
-  it to Bo instead", "đừng gửi" và "no" thì không.
+  thì gửi, "Hey Lamp, yes, send it." cũng vậy; "do it", "don't send it",
+  "send it to Bo instead", "đừng gửi" và "no" thì không.
+- **Một câu gửi thuần được nghe là câu trả lời** (`send_awaited`). Khi một lệnh
+  ghi đang chờ, một câu gửi thuần được tính là trả lời đèn, bất kể câu cuối
+  của phần đọc lại ra sao. Vì vậy nó không bị giữ lại như một âm thanh ngắn hay
+  vài từ lẻ của căn phòng, kể cả khi không có ai trong tầm nhìn. Điều này chỉ áp
+  dụng cho câu được biết là bắt đầu tách khỏi lời của đèn. Câu bắt đầu đè lên
+  giọng của đèn, trong vòng 1,5 s (`own_echo::TAIL_US`) sau khi lời của đèn kết
+  thúc, hoặc khi không có hook nghe nào cho biết nó bắt đầu lúc nào, có thể là
+  chính "send it" của đèn vọng lại, mà `own_echo` không giữ khi dưới 3 từ. Câu
+  như vậy được xét như mọi câu khác, và `gate` vẫn xét lần gửi đó.
 
 ### Sau một lần đọc
 
@@ -982,11 +998,38 @@ soạn và kiểm tra skill: môi trường của chúng vốn bị xoá sạch,
 công tắc ở đó là tắt trên lamp-9adf ngày 4/11),
 `made_skill::brief` cho qua một yêu cầu nêu đúng một dịch vụ liên kết có việc
 đọc cố định và không có từ ghi nào ("send", "reply", "add", "post", "schedule", ...);
-hai dịch vụ, hoặc một lần ghi, vẫn là `NOT_A_SERVICE`. Việc xin chính skill
+những yêu cầu còn lại được báo đúng giới hạn của chúng, bằng lời nói với người
+dùng (bảng của tester, 6/11: "a skill is limited with no reason"), không bao giờ
+là `NOT_A_SERVICE`, vì câu đó nói không skill nào dùng được dịch vụ, điều sai
+khi công tắc bật: một lần ghi là `NOT_A_WRITE` ("Not possible yet: a skill can
+read one linked service, but it can't send, write or change anything there."),
+hai dịch vụ là `ONE_SERVICE` ("... can read only one linked service, not two or
+more."), và một dịch vụ không có gì cho kỹ năng tự tạo đọc, như Notion, là
+`NOT_READABLE` ("... can read one linked service, but not that one."). Câu nào
+cũng kết thúc bằng "You can ask me for it yourself any time." Việc xin chính skill
 không phải là ghi: các từ trước "skill" chỉ để xin nó ("create me a new skill
-that ...", "add a skill to ...") được bỏ ra trước, và "schedule" đứng sau "my",
-"the", "tomorrow's", "today's", "day" hay "calendar" là thứ được đọc (lamp-9adf,
-4/11 23:51: "create a skill that reads my calendar" đã bị từ chối vì thế). Một
+that ...", "add a skill to ...") được bỏ ra trước. "Schedule", "post" và "book"
+đứng sau "my", "the", "tomorrow's", "latest", "last" hay "newest" là thứ được
+đọc, dù sau đó là gì ("read me my schedule on my calendar"), trừ khi "say" hay
+"saying" theo sau mà không có lời xin đọc nào ("latest post: say hi on
+Facebook"). Đứng sau "tomorrow", "today", "day", "calendar", "facebook" hay
+"page" thì chúng chỉ là thứ được đọc khi đứng sau một từ xin đọc ("read",
+"tell", "what", "show", "check": "read me my Facebook post about the sale"),
+hoặc ở cuối yêu cầu hay trước "from" hoặc "of" ("my latest Facebook post"),
+còn lại là động từ ("tomorrow book the room", "my calendar book the room",
+"tomorrow book for me a table"; các P3 của El trên #5690 và các P2 trên #5696).
+Ở đó, "a", "an", "me", "it", "the" hay "my" ngay sau chúng biến chúng thành
+động từ, kể cả khi đã có lời xin đọc trước đó, nếu giữa lời xin đọc đó và chúng
+có "and", "then" hay "also" ("check my calendar and tomorrow schedule a
+meeting"); nếu không có, nó chỉ ra thứ nào được đọc ("read me my Facebook post
+a week ago"; HOLD của first builder trên #5719). Chữ "s" của "let's" không phải "'s" ("let's post a photo on
+Facebook"; các P3 của first builder trên #5696).
+Với "say" hay "saying", một từ xin đọc ở bất kỳ đâu trong yêu cầu giữ nó là
+việc đọc ("the last post saying we are open, read it to me"); không có từ nào
+thì đó là một bài cần đăng. Luật này bắt đầu từ lamp-9adf lúc 23:51 ngày 4/11, khi
+"create a skill that reads my calendar" bị từ chối. "Put" chỉ là ghi khi có một
+dịch vụ được nêu sau nó, hoặc "in", "on", "into" hay "to" "my drive" ("put the
+count on the light" là việc của chính lamp). Một
 lần ghi đứng sau chúng vẫn tính. Bước của lịch được cho
 trọn (hôm nay, hoặc ngày mai khi yêu cầu nói "tomorrow"), bước của thư (`recent`)
 và của Drive (`files`, mới nhất trước, `query` chỉ là từ để tìm) cũng vậy; với dịch vụ khác, brief liệt kê các việc đọc của nó trừ việc đọc
@@ -1135,6 +1178,49 @@ lời sau đó của lượt không xin cái nhìn nào nữa, nên đèn không
 căn phòng cho một lần đọc lịch (lamp-9adf, 4/11 21:45: "Let me look.",
 `service_read`, rồi "I see a laptop screen…" không ai hỏi). Cái nhìn của một
 kỹ năng trong cùng lượt vẫn giữ.
+
+## Giọng nói được báo những gì đã liên kết (`LAMP_SERVICES_TOLD`, #5523, tắt trừ khi bật)
+
+Ngày 6/11 một người thử của nhóm marketing liên kết một dịch vụ trong mục
+Connectors của ứng dụng rồi hỏi đèn về nó: đèn nói đó là việc của ứng dụng và
+nó không biết. Ba hàm vẫn có, nhưng không gì báo cho mô hình những gì đã liên
+kết, và phần tính cách dặn nó đừng giả vờ làm được việc nó không với tới. Với
+`LAMP_SERVICES_TOLD=on` (chỉ truyền cho worker của hai tuyến), ở tuyến thứ hai một câu nói
+được nhận là của chủ đèn (`services::owner_of`) được báo, cạnh lời của nó, các dịch vụ đang liên kết theo tên,
+mỗi cái một lần, và rằng đèn tự dùng chúng: "(For you to know, not to answer:
+the lamp's owner linked these services to you in the app's Connectors:
+Notion, Gmail. They are yours to use for the owner: read from one with
+service_read, and send, post or create with service_write, when they ask.
+Asked about one, use it, or say plainly what you can do with it; never say
+it is the app's job or that you don't know it.)" (`services_told::note`). Các
+tên là những gì `lamp-services` nói lần gần nhất qua `services_connected`
+(`name` của nó, không có thì mã; cả liên kết đã hết hạn, vì một lần đọc sẽ
+làm mới nó), được hỏi ngoài đường đi của câu khi mỗi câu bắt đầu
+(`services::Linked`, nhiều nhất mỗi giây một lần, tối đa 500 ms) và sau mỗi
+lần báo, nên lời báo không bao giờ phải chờ; không có lần hỏi lúc câu bắt đầu
+của quy tắc attention thì một liên kết mới được báo trễ một câu. Câu của người
+khác, của căn phòng, câu bị giữ, tin nhắn chữ, không có gì liên kết hoặc
+`lamp-services` không trả lời (lần hỏi gần nhất bị lỗi, bận hoặc không có trả
+lời, nên một liên kết vừa gỡ không bao giờ được báo; `services::names_after`,
+#5598): không báo gì, như trước. Nhật ký chỉ ghi số lượng, không ghi tên.
+
+**Câu nào là của chủ đèn.** Với `LAMP_PRIVATE_ROOM=on`, như trong sản phẩm,
+mọi câu nói đều là của chủ đèn (`person::private_room`, #5553), nên mọi câu
+nói đều được báo các tên: cả câu của khách, của một giọng lạ, của TV và câu
+bị giữ. Đó là quyết định (a) của PM trên #5523. Khi tắt, chỉ câu mà lease
+của chính nó có khuôn mặt đã biết của chủ đèn, không bị giữ, mới được báo;
+câu của khách, của căn phòng và câu bị giữ thì không. Tin nhắn chữ không bao
+giờ được báo.
+
+Tuyến Live được báo cùng lời đó cạnh câu đang mở của chủ đèn (lease của nó,
+`services::owner_of`), đọc hai lần mỗi giây khi câu còn mở, mỗi phiên một lần
+cho mỗi bộ tên (`services_told::LiveTold`), và chỉ khi `LAMP_PRIVATE_ROOM=on`:
+phiên của nó giữ những gì đã được báo, nên khi tắt căn phòng riêng, một người
+khách nói sau trong phiên sẽ nghe được các tên (#5598), vì vậy khi đó tuyến
+Live không được báo gì. Nó được báo lại khi có liên kết được thêm hay gỡ, hoặc
+ở một phiên mới; khi mọi thứ đã báo đều bị gỡ, nó được báo một lần rằng giờ
+không có gì liên kết (`services_told::UNLINKED_NOTE`). Mọi lời gọi từ một câu
+không phải của chủ đèn vẫn bị từ chối (`OWNER_ONLY`).
 
 ## Những gì chưa làm
 

@@ -60,6 +60,12 @@ struct Gate {
     /// Authority snapshots that lapsed in the queue while this worker was
     /// held up, since the last one installed.
     skipped_expired: u32,
+    /// `LAMP_PRIVACY_RIDES_STALL=on` (#5611): a lease lapsed by a stall of
+    /// the controller under [`STALLED_CONTROL_US`] holds the route closed
+    /// instead of ending it ([`Gate::holds`]).
+    rides_stall: bool,
+    /// Since when it holds closed, the last authority's install.
+    held_since: Option<u64>,
 }
 
 enum Drain {
@@ -77,6 +83,8 @@ impl Gate {
             highest_seen: 0,
             retired_through: 0,
             skipped_expired: 0,
+            rides_stall: false,
+            held_since: None,
         }
     }
 
@@ -115,6 +123,12 @@ impl Gate {
             state.microphone_permission() == lamp_turn_owner::Permission::Allowed,
             state.microphone_generation(),
         ));
+        if let Some(since) = self.held_since.take() {
+            eprintln!(
+                "lamp-voice second: held closed {} ms through a stall; a fresh authority came, going on",
+                now_us.saturating_sub(since) / 1_000
+            );
+        }
         self.last_control_us = now_us;
         if let Some(owner) = state.owner() {
             if owner.turn() <= self.retired_through || owner.turn() < self.highest_seen {
@@ -140,6 +154,46 @@ impl Gate {
             );
         }
         Ok(())
+    }
+
+    /// Whether the route holds closed at `now_us` (#5611,
+    /// `LAMP_PRIVACY_RIDES_STALL=on`): its authority lapsed by time alone,
+    /// valid when it was installed and not since, with the controller silent
+    /// under [`STALLED_CONTROL_US`]: a stall of the controller, or of the
+    /// whole board, as on lamp-06c1 during an SD log flush. Held, it takes no
+    /// input and sends nothing, and listening stops ([`Engine::listening`]);
+    /// the controller's next fresh authority ends the hold (`install`). Off,
+    /// or past the bound, never: `fresh` and the heartbeat end it as before.
+    fn holds(&mut self, now_us: u64, engine: &mut Engine) -> bool {
+        if !self.rides_stall {
+            return false;
+        }
+        let silent = now_us.saturating_sub(self.last_control_us);
+        let at = MonoTime::from_micros;
+        let lapsed = match self.guard.state() {
+            Some(state) => {
+                now_us >= state.expires_at().as_micros()
+                    || (state.owner().is_some()
+                        && !state.listening_ready(at(now_us))
+                        && state.listening_ready(at(self.last_control_us)))
+            }
+            None => silent >= CONTROL_LEASE_US,
+        };
+        if !lapsed || silent > STALLED_CONTROL_US {
+            return false;
+        }
+        if self.held_since.is_none() {
+            self.held_since = Some(self.last_control_us);
+            eprintln!(
+                "lamp-voice second: the controller has been silent {} ms and the lease lapsed: held closed, nothing taken or sent, up to {} ms",
+                silent / 1_000,
+                STALLED_CONTROL_US / 1_000
+            );
+            if let Some(state) = self.guard.state() {
+                engine.listening(false, state.microphone_generation());
+            }
+        }
+        true
     }
 
     /// As the fixture's `fresh`, less its finite-run clock rules: judged
@@ -326,9 +380,11 @@ impl Gate {
         // While a backlog left by a stall is still being read, the fresh
         // authority may be further down it: the heartbeat is judged once
         // the queue is empty, or after the longest stall a gap may be.
+        // With `LAMP_PRIVACY_RIDES_STALL=on` (#5611) a silence under the
+        // longest stall holds the route closed instead (`holds`).
         let silent = monotonic_us().saturating_sub(self.last_control_us);
         if silent > STALLED_CONTROL_US
-            || (matches!(drained, Drain::Empty) && silent >= CONTROL_LEASE_US)
+            || (matches!(drained, Drain::Empty) && silent >= CONTROL_LEASE_US && !self.rides_stall)
         {
             return Err(invalid("second route controller heartbeat expired"));
         }
@@ -1011,6 +1067,8 @@ pub fn services(
         config.tts_voice = None;
     }
     let fallback = config.tts_provider.name();
+    let speaks_as =
+        super::net::voice_told(config.tts_provider, config.tts_voice.as_deref()).to_owned();
     let configured_model = config
         .tts_model
         .clone()
@@ -1083,6 +1141,8 @@ pub fn services(
         eprintln!(
             "lamp-voice second: the voice is {fallback}, model {configured_model}, the lamp's one voice"
         );
+        // The voice in use, after the language's and the chosen one (#5394).
+        eprintln!("lamp-voice: the voice speaks as {speaks_as}");
     }
     if route.gemini_speech()
         && let Some(call) = call(&gemini.speech_model)
@@ -1355,8 +1415,10 @@ fn lone_words(heard: &str) -> bool {
     (1..=2).contains(&words) && !heard.contains('?') && !crate::not_speech::short_word(heard)
 }
 
-/// Told after [`SPOKEN_NOTE`] when the model looks by a call (#1712).
-pub(crate) const LOOK_CALL_NOTE: &str = " When you would look, call take_a_look: it is how you look, and you will then be shown what you see.";
+/// Told after [`SPOKEN_NOTE`] when the model looks by a call (#1712). The
+/// look is a still picture where the head already points: no head motion
+/// goes with it, so the model must not say it turned (#5694).
+pub(crate) const LOOK_CALL_NOTE: &str = " When you would look, call take_a_look: it is how you look, and you will then be shown what you see. It never moves your head, so never say you turned or looked to a side.";
 
 /// Told after [`SPOKEN_NOTE`] when the voice has a memory (#1712, the first
 /// builder at 00:34 on #1722: on lamp-4ace, "remember my violet umbrella is
@@ -1443,7 +1505,7 @@ pub(crate) fn spoken_character(character: &str, look_by_call: bool, memory: bool
 pub(crate) fn look_tool() -> lamp_gemini::Tool {
     lamp_gemini::Tool {
         name: crate::second_provider::LOOK_CALL.into(),
-        description: "Look with your eye at what is in front of you: when someone asks what you see, shows you something, or asks how they or something looks. Call it instead of answering; you will then be shown what you see, and answer from that. Never for looking something up on the web.".into(),
+        description: "Look with your eye at what is in front of you: when someone asks what you see, shows you something, or asks how they or something looks. Call it instead of answering; you will then be shown what you see, and answer from that. Never for looking something up on the web. It never moves your head.".into(),
         parameters: None,
         silent: false,
     }
@@ -2221,6 +2283,9 @@ pub fn serve(
     // A line that asks the lamp to remember the person's face, with their
     // name, must call remember_my_face: only with the eyes' faces and names
     // checked, so a name not in their words is still refused.
+    // Read here, before `tools` is handed on: a face rename held for its
+    // yes needs names checked and the eyes (`LAMP_NAMES_RENAME_YES`).
+    let renames_checked = tools.names_checked && tools.who.is_some();
     let remember = (crate::known_faces::asked_on() && tools.who.is_some() && tools.names_checked)
         .then(|| {
             eprintln!(
@@ -2707,6 +2772,18 @@ pub fn serve(
         );
         place_noting(std::path::PathBuf::from(lamp_msgs::owner_place::FILE))
     });
+    // What the owner linked in the app's Connectors, told beside the
+    // owner's own line, with LAMP_SERVICES_TOLD=on and the services' folder
+    // (#5523): known from `lamp-services` as each line begins, never waited.
+    let linked_told = services_folder
+        .clone()
+        .filter(|_| crate::services_told::on_from_environment())
+        .map(|folder| {
+            eprintln!(
+                "lamp-voice second: the owner's spoken line is told what is linked in the app's Connectors, when anything is; no other line is (LAMP_SERVICES_TOLD)"
+            );
+            crate::services::Linked::new(folder)
+        });
     let has_tasks = tools.tasks.is_some();
     // Whom a line's words ask by name, with `LAMP_TASKS_NAMED_ASK=on`: its
     // forced call goes to that one, and the journal says so (#1722).
@@ -2848,6 +2925,9 @@ pub fn serve(
     }
     if let Some(place) = owner_place {
         engine = engine.noting_the_place(place);
+    }
+    if let Some(linked) = linked_told.clone() {
+        engine = engine.telling_what_is_linked(linked_noting(linked));
     }
     // What memory holds that may fit a spoken turn's words (#2176 row 5c,
     // `LAMP_SECOND_MEMORY_HITS=on`, Days only, on in the product since the
@@ -3318,6 +3398,23 @@ pub fn serve(
         );
         engine = engine.holding_forgets_through_spelling(true);
     }
+    // A face rename's yes is judged by its guards, and a rename the lamp
+    // asked about is held for that yes and run by the voice
+    // (`LAMP_NAMES_RENAME_YES`, #5485): only with names checked.
+    if crate::known_faces::rename_yes_on() {
+        if renames_checked {
+            eprintln!(
+                "lamp-voice second: a face rename's yes is judged by its guards, and a rename asked about is held for it ({})",
+                crate::known_faces::RENAME_YES_ENVIRONMENT
+            );
+            engine = engine.holding_renames_for_yes(true);
+        } else {
+            eprintln!(
+                "lamp-voice second: {} is on but names are not checked or the eyes' socket is not known: renames are as before",
+                crate::known_faces::RENAME_YES_ENVIRONMENT
+            );
+        }
+    }
     // A reply that says it saved their face with no remember_my_face call
     // is judged as a keep claim with no keep (`LAMP_MEMORY_KEEP_ASKED`,
     // #5141 row 8).
@@ -3447,6 +3544,16 @@ pub fn serve(
         );
     }
     engine = engine.answering_short(short_done);
+    // After an answer the lamp may open the talk a little further, as a
+    // companion does, outside commands, stops and busy rooms
+    // (`LAMP_OPENS_FURTHER=on`, #5194).
+    let opens_further = crate::opens_further::on();
+    if opens_further {
+        eprintln!(
+            "lamp-voice second: a spoken line outside a command, a stop, a busy room, a close or another person's conversation is told its answer may end with one short opening (LAMP_OPENS_FURTHER)"
+        );
+    }
+    engine = engine.opening_further(opens_further);
     // A search begun with nothing said is begun with the lamp's own "Let me
     // check." (`LAMP_SECOND_CHECKING_LINE=on`, #4684).
     let checking_line = std::env::var(crate::second_provider::CHECKING_LINE_ENVIRONMENT)
@@ -3489,6 +3596,21 @@ pub fn serve(
         );
     }
     engine = engine.checking_action_claims(action_claims);
+    // The same for a claim in other words ("I've set a timer for one
+    // minute.", "I've kept the light on until ten.";
+    // `LAMP_ACTION_CLAIM_WORDED=on`, #5215), only beside the check above.
+    let worded_claims = crate::action_claim::worded_on();
+    if worded_claims {
+        eprintln!(
+            "{}",
+            if action_claims {
+                "lamp-voice second: a reply claiming a timer, light or volume action in other words, with no call, is held the same way (LAMP_ACTION_CLAIM_WORDED)"
+            } else {
+                "lamp-voice second: LAMP_ACTION_CLAIM_WORDED does nothing without LAMP_ACTION_CLAIM_CHECKED"
+            }
+        );
+    }
+    engine = engine.checking_worded_claims(action_claims && worded_claims);
     // A line said to the lamp by name never ends in silence from an empty
     // answer (`LAMP_NO_WORDS_AGAIN=on`, #3704).
     let no_words_again = std::env::var(crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT)
@@ -3650,7 +3772,18 @@ pub fn serve(
             && let Some(folder) = services_folder
             && let Ok(mut heeding) = heeding.lock()
         {
-            heeding.printing_only_while_linked(crate::services::Linked::new(folder));
+            heeding.printing_only_while_linked(
+                linked_told
+                    .clone()
+                    .unwrap_or_else(|| crate::services::Linked::new(folder)),
+            );
+        }
+        // What is linked, told to the owner's line, asked again as each line
+        // begins (#5523), with or without the services' prints.
+        if let Some(linked) = linked_told
+            && let Ok(mut heeding) = heeding.lock()
+        {
+            heeding.asking_what_is_linked(linked);
         }
         // Only prints for every rule are the voice heard; the services'
         // alone are heard by none of them.
@@ -4150,6 +4283,17 @@ pub fn serve(
                         "lamp-voice second: a known person's keep on a line no face was seen speaking is theirs, its reads the room's, when their known face was the one face in view and no other voice was heard in the conversation (LAMP_PERSON_SCOPE_ONE_FACE)"
                     );
                     engine = engine.scoping_by_one_face(another_voice.clone());
+                    // Read as theirs too, forgets refused (#5522).
+                    if std::env::var(
+                        crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
+                    )
+                    .is_ok_and(|value| value == "on")
+                    {
+                        eprintln!(
+                            "lamp-voice second: such a line is also told and read as theirs and journalled in their record; no forget or yes runs on it (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
+                        );
+                        engine = engine.reading_by_one_face(true);
+                    }
                 }
                 Some(why) => eprintln!(
                     "lamp-voice second: LAMP_PERSON_SCOPE_ONE_FACE is on, but not acted on: {why}"
@@ -5088,6 +5232,28 @@ pub(crate) fn staff_noting(place: crate::agent_tasks::Place) -> super::StaffNote
             who.join(" and ")
         );
         Some(crate::staff_note::note(&who))
+    })
+}
+
+/// The note for the owner's spoken line naming what is linked in the app's
+/// Connectors (`LAMP_SERVICES_TOLD=on`, `crate::services_told`, #5523): read
+/// from what `lamp-services` last said, journalled by count, never by name.
+pub(crate) fn linked_noting(
+    linked: Arc<crate::services::Linked>,
+) -> crate::second_provider::Remembered {
+    Arc::new(move |request, _words, lease| {
+        // Asked again for the next line too: without the attention rule's
+        // line-begin ask (`Heeding::asking_what_is_linked`), a link made
+        // since is told one line later. Never waits.
+        linked.check();
+        let owner = crate::services::owner_of(lease)?;
+        let names = linked.names();
+        let note = crate::services_told::note_for(Some(owner.as_str()), &names)?;
+        eprintln!(
+            "lamp-voice second: request {request}: the owner's line is told {} service(s) linked in the app",
+            names.len()
+        );
+        Some(note)
     })
 }
 
@@ -8068,6 +8234,15 @@ impl Heeding {
         }
     }
 
+    /// `linked` asked again as each line begins ([`Self::printing`]), for
+    /// what the owner's line is told is linked (`LAMP_SERVICES_TOLD`,
+    /// #5523), when the services' prints don't ask it already.
+    pub(crate) fn asking_what_is_linked(&mut self, linked: Arc<crate::services::Linked>) {
+        if self.services_linked.is_none() {
+            self.services_linked = Some(linked);
+        }
+    }
+
     /// The same-voice check that is fed each line's sound and verdict, the
     /// conversation rules' ([`Self::voices`]) or the services' alone
     /// ([`Self::for_services`]). Never read for a conversation decision.
@@ -8089,9 +8264,19 @@ impl Heeding {
             over_the_lamps_voice,
         } = heard
         {
-            crate::services::voice_began(over_the_lamps_voice, std::time::Instant::now());
+            self.tell_a_waiting_write(over_the_lamps_voice);
         }
         self.printing(request, heard);
+    }
+
+    /// A line began: a write waiting for its "send" is timed from here, not
+    /// from when its words come, and told if it began within the tail of the
+    /// lamp's words (`crate::services`).
+    fn tell_a_waiting_write(&self, over_the_lamps_voice: bool) {
+        let in_tail = self.said_until_us.is_some_and(|until_us| {
+            monotonic_us() <= until_us.saturating_add(super::own_echo::TAIL_US)
+        });
+        crate::services::voice_began(over_the_lamps_voice, in_tail, std::time::Instant::now());
     }
 
     /// A spoken line's sound, for the same-voice check: judged only if it
@@ -8116,9 +8301,7 @@ impl Heeding {
                     crate::untied_going_on::in_grace(monotonic_us(), until_us)
                 }))
             .then_some(request);
-            // A write waiting for its "send" is timed from when a line
-            // began, not when its words came (`crate::services`).
-            crate::services::voice_began(over_the_lamps_voice, std::time::Instant::now());
+            self.tell_a_waiting_write(over_the_lamps_voice);
         }
         if matches!(heard, Heard::BeganOverTheWaitSound) {
             self.began_over = None;
@@ -9498,8 +9681,11 @@ impl Heeding {
             attention.name_heard_scored(at_us, score);
         }
         attention.heard(heard);
-        attention.lamp_asked(signs.lamp_asked);
-        let (busy, lamp_asked) = (signs.room == crate::room_told::Room::Busy, signs.lamp_asked);
+        // A read-back asks for its "send", however its last sentence reads
+        // (`services::send_awaited`).
+        let lamp_asked = signs.lamp_asked || crate::services::send_awaited(heard);
+        attention.lamp_asked(lamp_asked);
+        let busy = signs.room == crate::room_told::Room::Busy;
         attention.set_near(signs.near);
         // `LAMP_BUSY_CALLED_STRICT=on`: in a busy room with nobody turned to
         // the lamp, a stand-in or "Lamp is broken, …" is no call in itself.
@@ -12350,6 +12536,9 @@ pub async fn run(
         .control
         .send(WorkerEvent::ProviderLink { link: ready })?;
     let mut gate = Gate::new(boot, monotonic_us());
+    // Riding a stall closed (#5611): in this worker's cleared environment
+    // only as `worker_command` passes it.
+    gate.rides_stall = crate::privacy_gap::rides_stall_from_environment();
     let mut ticker = tokio::time::interval(Duration::from_millis(2));
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     // At most one input read ahead of its authority, and one output waiting
@@ -12384,6 +12573,17 @@ pub async fn run(
             Drain::Deferred => continue,
             Drain::Empty => {}
         }
+        // Held closed through a stall (#5611): input queued under the lapsed
+        // authority is refused, dropped unread, and nothing is sent.
+        if gate.holds(monotonic_us(), &mut engine) {
+            retained = None;
+            for _ in 0..INPUT_SLICE {
+                if channels.data.receive::<ProviderInput>()?.is_none() {
+                    break;
+                }
+            }
+            continue;
+        }
         gate.fresh(monotonic_us())?;
         // As many inputs a tick as the Live worker takes: a line replayed
         // to this route arrives faster than it was spoken, and a packet
@@ -12401,6 +12601,9 @@ pub async fn run(
                 }
                 Drain::Deferred => continue 'tick,
                 Drain::Empty => {}
+            }
+            if gate.holds(monotonic_us(), &mut engine) {
+                continue 'tick;
             }
             let Some(command) = retained.take() else {
                 break;
@@ -12487,6 +12690,9 @@ pub async fn run(
             channels
                 .control
                 .send(WorkerEvent::ProviderLink { link: changed })?;
+        }
+        if gate.holds(monotonic_us(), &mut engine) {
+            continue;
         }
         if let Some(event) = pending.take()
             && !gate.send_or_discard(&engine, monotonic_us(), &event, |event| {
@@ -19479,7 +19685,11 @@ mod tests {
                 .unwrap();
             let authorized = matches!(mode, "direct" | "wrapped");
             let expected_told = if authorized {
-                serde_json::json!({"next":"Say one short confirmation. The recording has only been offered for preparation; playback has not started and may still be refused. Confirm only that you will try to play it. Do not say it is playing, has started, or is ready."})
+                crate::use_skill::told_through(
+                    mode == "wrapped",
+                    "play_relaxing_music",
+                    serde_json::json!({"next":"Say one short confirmation. The recording has only been offered for preparation; playback has not started and may still be refused. Confirm only that you will try to play it. Do not say it is playing, has started, or is ready."}),
+                )
             } else {
                 told
             };
@@ -20063,6 +20273,184 @@ mod tests {
         // Nothing sent since Ready, a lease ago.
         let error = ended(first_drain_after(CONTROL_LEASE_US + 10_000, &[]).0);
         assert!(error.contains("heartbeat expired"), "{error}");
+    }
+
+    /// A second worker holding an admitted turn's authority, its lease and
+    /// listening 100 ms as during playback, installed `stall_us` ago, with
+    /// `LAMP_PRIVACY_RIDES_STALL` `on`, and nothing sent since: the
+    /// controller stalled. Its channels, controller, engine and the turn.
+    fn stalled_controller(
+        stall_us: u64,
+        on: bool,
+    ) -> (
+        Gate,
+        Controller,
+        Engine,
+        WorkerChannels,
+        WorkerChannels,
+        crate::process::SessionDirectory,
+        u64,
+    ) {
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let boot = BootId::new([7; 16]).unwrap();
+        let worker_boot = BootId::new([8; 16]).unwrap();
+        let mut parent =
+            WorkerChannels::bind(&directory.path, "second", boot, worker_boot, false).unwrap();
+        let mut worker =
+            WorkerChannels::bind(&directory.path, "second", boot, worker_boot, true).unwrap();
+        parent.connect(&directory.path, "second", false).unwrap();
+        worker.connect(&directory.path, "second", true).unwrap();
+        let installed_us = monotonic_us() - stall_us;
+        let at = MonoTime::from_micros;
+        let mut owner = Controller::new(boot, at(installed_us));
+        owner
+            .set_microphone_permission(at(installed_us), Permission::Allowed)
+            .unwrap();
+        let until = at(installed_us + 100_000);
+        owner
+            .set_capture(at(installed_us), CaptureState::RetainingUntil(until))
+            .unwrap();
+        owner
+            .set_admission(at(installed_us), AdmissionState::OpenUntil(until))
+            .unwrap();
+        let turn = owner
+            .admit(at(installed_us), AdmittedInput::NewTurn)
+            .unwrap()
+            .turn();
+        let mut engine = Engine::new(
+            Arc::new(Silent),
+            Told::default,
+            Arc::new(|_, _, _, _| Box::pin(async { serde_json::Value::Null })),
+        );
+        let mut gate = Gate::new(boot, installed_us);
+        gate.rides_stall = on;
+        let state = owner.snapshot(at(installed_us)).unwrap();
+        gate.install(installed_us, state, &mut engine).unwrap();
+        assert!(gate.fresh(installed_us + 1_000).is_ok());
+        (gate, owner, engine, parent, worker, directory, turn)
+    }
+
+    /// A line's start for `request`, under `generation`.
+    fn line_start(request: u64, generation: u64) -> ProviderInput {
+        ProviderInput::Start {
+            request,
+            session: 1,
+            privacy_generation: generation,
+            continues: false,
+            continues_cut_off: false,
+            over_the_lamp: false,
+            after_stop: false,
+            follows_on: false,
+            over_the_lamps_voice: false,
+            heard_of_cut: None,
+            soft_lead_us: 0,
+        }
+    }
+
+    /// #5611, lamp-06c1 on 6 Nov: the voice's processes stalled together
+    /// during an SD log flush and the second route ended, exit 1. Both of
+    /// its exits: a 120 ms stall lapses the turn's 100 ms lease (`fresh`),
+    /// a 300 ms one is past the 250 ms heartbeat too (`drain`). Off, both
+    /// end the route as before. With `LAMP_PRIVACY_RIDES_STALL=on` it holds
+    /// closed: no input taken, nothing sent, listening stopped; the
+    /// controller's next renewal lets it go on, listening again at once.
+    #[tokio::test]
+    async fn a_300_ms_controller_silence_holds_the_route_closed_and_goes_on() {
+        for stall_us in [120_000, 300_000] {
+            // Off: as before the switch.
+            let (mut gate, _owner, mut engine, _parent, mut worker, _directory, _turn) =
+                stalled_controller(stall_us, false);
+            let ended = match gate.drain(&mut worker.control, &mut engine) {
+                Err(error) => error.to_string(),
+                Ok(_) => gate
+                    .fresh(monotonic_us())
+                    .map_or_else(|error| error.to_string(), |()| "went on".into()),
+            };
+            let expected = if stall_us >= CONTROL_LEASE_US {
+                "second route controller heartbeat expired"
+            } else {
+                "second route privacy or input lease expired"
+            };
+            assert_eq!(ended, expected, "off, {stall_us} us");
+            assert!(!gate.holds(monotonic_us(), &mut engine));
+
+            // On: held closed.
+            let (mut gate, mut owner, mut engine, mut parent, mut worker, _directory, turn) =
+                stalled_controller(stall_us, true);
+            assert!(matches!(
+                gate.drain(&mut worker.control, &mut engine),
+                Ok(Drain::Empty)
+            ));
+            assert!(gate.holds(monotonic_us(), &mut engine), "{stall_us} us");
+            assert!(gate.held_since.is_some());
+            let generation = gate.guard.state().unwrap().microphone_generation();
+            assert!(
+                gate.admits(monotonic_us(), &line_start(turn, generation))
+                    .is_err(),
+                "input taken while held"
+            );
+            assert!(
+                gate.may_send(
+                    monotonic_us(),
+                    &ProviderOutput::GenerationComplete { request: turn }
+                )
+                .is_err(),
+                "output sent while held"
+            );
+            // The renewal, and listening again within 300 ms of it.
+            let renewed_us = monotonic_us();
+            let at = MonoTime::from_micros(renewed_us);
+            let until = MonoTime::from_micros(renewed_us + 100_000);
+            owner
+                .set_capture(at, CaptureState::RetainingUntil(until))
+                .unwrap();
+            owner
+                .set_admission(at, AdmissionState::OpenUntil(until))
+                .unwrap();
+            // The stalled turn is over; the next line is a turn of its own.
+            let next = owner.admit(at, AdmittedInput::NewTurn).unwrap().turn();
+            let snapshot = owner.snapshot(at).unwrap();
+            parent
+                .control
+                .send(Control::Authority { snapshot })
+                .unwrap();
+            let renewed = Instant::now();
+            assert!(matches!(
+                gate.drain(&mut worker.control, &mut engine),
+                Ok(Drain::Empty)
+            ));
+            assert!(!gate.holds(monotonic_us(), &mut engine));
+            gate.fresh(monotonic_us()).unwrap();
+            assert!(
+                gate.guard
+                    .state()
+                    .unwrap()
+                    .listening_ready(MonoTime::from_micros(monotonic_us()))
+            );
+            assert!(
+                gate.admits(monotonic_us(), &line_start(next, generation))
+                    .unwrap()
+            );
+            let ready_ms = renewed.elapsed().as_millis();
+            assert!(
+                ready_ms < 300,
+                "listening again {ready_ms} ms after the renewal"
+            );
+            assert!(gate.held_since.is_none());
+        }
+    }
+
+    /// The bound holds with the switch on (#5611): a controller silent past
+    /// 1.5 s still ends the route at the heartbeat, as it would off.
+    #[tokio::test]
+    async fn silence_past_1_5_s_still_ends_the_route() {
+        for on in [false, true] {
+            let (mut gate, _owner, mut engine, _parent, mut worker, _directory, _turn) =
+                stalled_controller(STALLED_CONTROL_US + 100_000, on);
+            let error = ended(gate.drain(&mut worker.control, &mut engine));
+            assert!(error.contains("heartbeat expired"), "on {on}: {error}");
+            assert!(!gate.holds(monotonic_us(), &mut engine), "on {on}");
+        }
     }
 
     /// #2305's review: a camera close and a mute, as the worker installs
@@ -26654,6 +27042,48 @@ mod tests {
             assert_eq!(verdict, held.then_some(super::LONE_WORDS), "{heard}");
             assert_eq!(heeding.conversation_note_for(9).is_some(), !held, "{heard}");
         }
+        // #5553: the same lone words are the person's while a write waits
+        // for its "send", and a plain send alone.
+        for (heard, waiting, held) in [
+            ("Send it.", true, false),
+            ("Send it.", false, true),
+            ("Oh wow.", true, true),
+        ] {
+            crate::services::pending_for_test(waiting.then(|| crate::services::Pending {
+                began_clear: true,
+                ..crate::services::Pending::new("id", 8, Instant::now(), "Send an email.", "ann")
+            }));
+            let mut heeding = super::Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            let verdict = heeding.judge(9, line, heard, signs(true, false));
+            assert_eq!(
+                verdict,
+                held.then_some(super::LONE_WORDS),
+                "{heard} {waiting}"
+            );
+        }
+        // Through the real producer (`Heeding::hear`): begun within the tail
+        // of the lamp's words, the same words may be its echo, so the room's,
+        // as before; begun past it, the person's. A read-back long since said,
+        // so nothing but the tail decides.
+        for (ended_ago_us, held) in [(0, true), (10_000_000, false)] {
+            crate::services::pending_for_test(Some(crate::services::Pending {
+                spoken_from: Some(Instant::now() - Duration::from_secs(60)),
+                ..crate::services::Pending::new("id", 8, Instant::now(), "Send an email.", "ann")
+            }));
+            let mut heeding = super::Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.said_until_us = Some(super::monotonic_us().saturating_sub(ended_ago_us));
+            heeding.hear(
+                9,
+                crate::second_provider::Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            let verdict = heeding.judge(9, line, "Send it.", signs(true, false));
+            assert_eq!(verdict, held.then_some(super::LONE_WORDS), "{ended_ago_us}");
+        }
+        crate::services::pending_for_test(None);
         // #3985: "Stop them." over the lamp's answer is said to the lamp
         // with the spoken-stop switch; without it, or not over the lamp's
         // voice, it stays the room's.
@@ -28797,6 +29227,7 @@ mod memory_observer {
             named_only: false,
             correct: false,
             questions: false,
+            now: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -28984,6 +29415,7 @@ mod memory_observer {
             named_only: false,
             correct: false,
             questions: false,
+            now: false,
             sign_in: false,
             sign_in_app: false,
         };

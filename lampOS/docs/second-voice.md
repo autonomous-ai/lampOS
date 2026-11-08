@@ -2121,14 +2121,36 @@ order is kept. A written turn is the same from the chat on.
     with the cut answer's unplayed pieces as they were sent, from the start
     of the sentence playing at the cut (`said_as_heard::unheard`, with the
     line's `heard_of_cut`), the model not asked, when that answer was sent
-    whole; the first piece's speech begins before the line plays, so the
-    rest follows the line's clip with no wait. Otherwise (cut before it was
-    sent whole, or `LAMP_SAID_AS_HEARD` off) the line is played and the
+    whole or written whole: the model's stream ended (the writing half's
+    end), so all its pieces are known though not all are said
+    (`second_provider::Written`). Then the rest is the unheard part of the
+    pieces the saying half took (a piece taken whose speech has not begun,
+    at the end of what played, included) and every piece not yet taken; a
+    resumed rest is written whole as it starts, so a cut in it keeps what
+    it has not said too. The first piece's speech begins before the line
+    plays, so the rest follows the line's clip with no wait. Otherwise (cut
+    before the model's stream ended, or `LAMP_SAID_AS_HEARD` off) the line is played and the
     model asked, as a written turn whose only message is that note (no
     person's words), to go on from the cut, not from the start, with no
     apology (`cut_in_wordless::resume_ask`). A cut of one
     of its own fixed lines (the question, the pause, the stop line), or of
-    an answer played whole, has nothing to go on with and stays quiet. The
+    an answer played whole, has nothing to go on with and stays quiet. A
+    wordless line that cuts one of these fixed lines within
+    `cut_in_wordless::TAIL_WITHIN` (1.5 s) of its start is the same
+    sound's tail (the cough still going, or the line heard back), never a
+    new cut: the line is said again with its rest, once, and not counted;
+    a tail of the line said again stays quiet, so it never loops (06c1's
+    FAIL on #5491: a tail 40 ms in, 2 of 5 fixed lines, left the lamp
+    silent). The journal says "a cut-in with no words began N ms after
+    request M's line …: the same sound's tail, so that line is said again,
+    not counted". On 06c1 the rest was never kept before the written-whole
+    rule (bug 2 of #5491): a long story's pieces go to the voice as it plays
+    (piece 14 of request 28 at 31.6 s, cut at 38.8 s), and the answer was
+    marked sent whole only when its last piece was sent, so a cut mid-story
+    always asked the model, and once it gave 100 characters and stopped.
+    The journal then says "request M's answer was written whole before it
+    was all sent: N pieces from the cut sentence, K not yet taken for the
+    voice". The
     journal says "a cut-in with no words ended the lamp's answer, a busy
     (quiet) room: Resume, answered …, the rest kept, N pieces", then the
     line's "first answer audio … its fixed line" and "the cut answer's
@@ -3408,7 +3430,25 @@ after a take-over, but now for every turn:
   at its `.` or `!` (never a `?`), or at its first state word. "I'll keep
   the light on until ten.", "I'll keep the music going till six." and
   "I'll keep the timer at ten minutes." and "I'll keep the brightness at
-  40 percent." claim nothing. The softer claims count too (K3: lamp-06c1,
+  40 percent." claim nothing. On a line that is only a yes
+  (`remember::heard::only_a_yes`), a first sentence that says back that
+  it is kept is a hard claim too (`remember::claims_a_keep_said`,
+  lamp-06c1, build 10538, 6 Nov, S14 req 363: "Yes. Please keep that."
+  answered "Your goldfish's name, Pip, is kept." with no call, and the
+  goldfish was never kept): it ends, past only filler (now, for you, too,
+  safe, already) or "in (my) memory", with "kept", "saved" or
+  "remembered" ("Pip is kept in memory.", "Pip is remembered now.") after "is", "are", "now", "been",
+  "stays", "all", "safely", "already", a word ending "'s" ("it's kept",
+  "Pip's kept") or a mark (`,`, `:`, a dash: "Your bike stays red,
+  kept."), decided at its `.` or `!` (never a `?`). Only on such a line,
+  whose reply is short, so only there is the first sentence held to its
+  end; an answer to a question ("Is my goldfish's name kept?" "…, Pip, is
+  kept.") is said as it comes. "Pip is kept as your goldfish's name." and
+  "The light is kept on." claim nothing, nor does a "saved" whose
+  sentence names a reminder, alarm, timer or setting ("Okay, your
+  reminder for seven is saved.", "Got it, your settings are saved.":
+  the Reviewer-lead's P3 on #5607, so a `set_reminder` it set is never
+  said "not kept"); "I've saved that." still is a claim. The softer claims count too (K3: lamp-06c1,
   28 Oct night, "Noted — you work at a library now, not the bakery." and
   "All right, I'll keep it in mind." with no call): "Noted" with what was
   noted after a dash or colon, or "noted that"; "I'll keep it/that in
@@ -3430,7 +3470,9 @@ after a take-over, but now for every turn:
   unrefused, so a reminder set in round 1 may be confirmed in round 2,
   "Got it, I've saved that for five." (reviewer-three's and the
   reviewer-lead's P2 on #3628). Tests: `a reply never says it kept something with no remember
-  call`, `a turn offered no function is never held for a claim` and
+  call`, `a turn offered no function is never held for a claim`,
+  `a keep said back to a yes with no remember is a claim`,
+  `remember::tests::a_keep_said_back_on_a_yes_is_a_hard_claim` and
   `remember::tests::a_reply_that_says_it_kept_something_is_known_by_its_opening`.
   **A face said saved counts the same** (`LAMP_MEMORY_KEEP_ASKED=on`, its
   switch; #5141 row 8). On lamp-0c4e on 3 Nov the model said "hold still
@@ -3516,6 +3558,73 @@ after a take-over, but now for every turn:
   function. Only English replies can match: in another language the
   model's words are never the acting part's English lines. Tests:
   `second_provider::tests::action_claim::*` and `action_claim::tests::*`.
+- **With `LAMP_ACTION_CLAIM_WORDED=on` too, a claim the model words its own
+  way is held the same way** (off; #5215's open shape: on 10441, 5 Nov
+  04:24, "Hey Lamp, keep the light on until ten." got `calls=none` and
+  "I've kept the light on until ten.", and nothing held the light, so
+  claimed-not-done stayed at 1). `action_claim::claim_as` reads, beside the
+  strict lines above, a short run of words at the reply's start, bare or
+  after a lead-in and a mark ("Okay,", "Sure.", "All right,", "Got it,"),
+  each tied to one family with a call behind it (`action_claim::WORDED`):
+  a timer, reminder or alarm set ("Timer set for one minute.", "I've set a
+  timer for …", "Reminder set …", "I'll remind you in …", "Your
+  one-minute timer is set.", the last also standing beside
+  `list_reminders`); the light or volume changed ("Okay, louder.",
+  "Brighter now.", "I've turned the volume up.", "I turned off the light.",
+  "Turned it down.", "I've made it warmer.", "Lights off."); the same said
+  as it is done ("Turning it up.", "I'm turning off the light.", "Dimming
+  the light.", "Making it warmer.", "Setting a timer for one minute.",
+  "Starting a timer now."), each closing at the sentence's end, a timer's
+  "for" only with a time and its unit after it ("for five minutes", "for 6
+  pm", "for half an hour", "for tonight"), so "Turning it off and on again
+  usually helps.", "Setting a timer now would be smart.", "Setting an alarm
+  for six is a good idea." and "Starting a reminder now isn't possible." are
+  no claims, and "Raising the lamp." (the arm) is none either; and the light
+  kept on or off until a time ("I've kept the light on until ten.", "The
+  light stays on until …", "I'll keep my light on until …", or "for" with
+  a time after it: digits, a number word, "the night" or "tonight", so
+  "I'll keep my light on for ten minutes." is one and "I left a light on
+  for you." is not; `action_claim::Claim::LightKept`, which a light call, a
+  Schedule set or `keep_rule` makes). The sentence such a run opens must
+  not end in a '?', and a step word after a lead-in must be followed by its
+  end or a mark ("Okay, louder music it is." is no claim). Still no claim:
+  a colour said ("My light is blue now."), "I'll remind you at nine.", "I
+  can keep my light on until ten …", a status question or answer that
+  opens with another word. **The worded runs judge only a turn with no call
+  at all** (the first builder's P2 on #5588): any call in the turn, this
+  round's or an earlier one's, lets them stand, so work another tool did
+  ("I've added a reminder to your calendar." beside `service_write`, "I've
+  turned off the lights." after `use_skill` or a hand-over) is said as it
+  is. **Nor do they judge a status question**
+  (`action_claim::asked_as_a_question`: the heard line ends with a '?', or
+  its first word after "hey", "hi", "hello", "ok", "okay" or "lamp" is
+  how, is, are, do, does, did, what, when, will, can, has, have, was,
+  what's, how's, where, where's, who, who's, why or which (a contraction
+  kept whole, a curly apostrophe read as a straight one; #5604's P3);
+  and it is no request, which opens there with "can you", "could you",
+  "will you", "would you", "can I have", "please", "why don't you" or
+  "why not" (El's P2 on #5615), or says "please"
+  anywhere, case aside). "Lamp, can you set a timer for one minute?"
+  answered "Timer set for one minute." with no call is still held:
+  "Lamp, how long will the light stay on?" answered "The light stays on
+  until ten." and "Lamp, is my timer still set?" answered "Your timer is
+  set for one minute." are said as they are, while "Lamp, could you keep
+  the light on until ten?" answered "I've kept the light on until ten."
+  with no call is held. #5253's strict lines above
+  still judge every turn, questions and turns with other calls included.
+  Held, asked again and said not done exactly as above; when
+  only the worded runs found it, the held and asked-again lines end
+  `(LAMP_ACTION_CLAIM_CHECKED, in other words: LAMP_ACTION_CLAIM_WORDED)`
+  and the said-not-done line reads `(<kind>, in other words:
+  LAMP_ACTION_CLAIM_WORDED; N call(s) in the turn)`. A turn that
+  made its call, an answer that claims nothing and the switch off are byte
+  for byte as without it; it does nothing without
+  `LAMP_ACTION_CLAIM_CHECKED` (the worker's start line says so). Tests:
+  `second_provider::tests::action_claim::*worded*`, `*other_words*`,
+  `a_status_answer_to_a_question_is_untouched_by_the_worded_claims`,
+  `a_strict_claim_to_a_question_is_still_held_with_the_worded_claims`,
+  `a_request_asked_as_a_question_is_still_judged_by_the_worded_claims` and
+  `action_claim::tests::*`.
 - **A reply never offers to keep what its `remember` call keeps** (finding
   K2 on #3504: lamp-06c1, 28 Oct, "Want me to keep that as the change?
   Kept — library now, not the bakery." in one breath). On by default, on
@@ -4998,6 +5107,27 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   Known risk, accepted by the memory owner on 4 Nov: a voice not seen saying
   it, with the person's face alone in view, hears their reminders and may
   cancel or snooze them ([schedule.md](schedule.md), [switches.md](switches.md)).
+- **A one-face line is read as its person's; its forgets need the mouth**
+  (`LAMP_PERSON_SCOPE_ONE_FACE_READS=on`, off everywhere, #5522; with
+  `LAMP_PERSON_SCOPE_ONE_FACE` acted on, `Engine::reading_by_one_face`). A
+  line the one-face rule takes is not narrowed at admission
+  (`ScopeLease::read_by_one_face`): its chat is told their context, recall
+  and hits read their scope, and its exchange goes in their thread and their
+  record. Another voice heard as the line is judged still narrows it to the
+  room's, keeps and all, and drops a chat begun on its early words. Every
+  forget, and every yes granted as them, is refused by both runners
+  (`one_face_refused`, before any hold) and by the memory route
+  (`ScopeLease::forgets_need_mouth`, after the late look), and
+  `forget_asker` gives such a line no asker. So are a correction
+  (`remember` with `replaces`), `keep_rule`, `list_rules`, and
+  `cancel_reminder` / `snooze_reminder` unless `LAMP_ONE_FACE_REMINDERS` is
+  on, and the line has no services owner outside the private room
+  (`services::owner_of`). The memory owner, 16:49 on
+  #5385: "tạm thời chưa cho xóa nếu ko detect đc mở miệng" (no forgetting
+  for now unless the mouth is seen opening). Known risk: a guest off camera,
+  their face silent and alone in view, is told their memory, and its
+  words are filed in their record, which their day recall may take as theirs
+  ([memory.md](memory.md), [switches.md](switches.md)).
 - **A session's trust is the caller's** (with `LAMP_QUIET_GOING_ON_SAME_ONE=on`
   or `LAMP_GOING_ON_NOT_OWN=on` and `LAMP_SAME_VOICE_MODEL`, the first
   builder at 09:40 on #2428). Past its first two lines a session is trusted
@@ -5233,7 +5363,16 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   The call asks the coordinator for the turn's full look (`LookAsked`, as a
   skill's look step does), the lamp says "Let me look." if the model said
   nothing, and the turn ends with no further round; the picture comes in
-  the look turn after it. In a turn the lamp wrote itself the look is
+  the look turn after it. The look never moves the head, and the model is
+  told so three times: the character's note ("It never moves your head, so
+  never say you turned or looked to a side."), the function's description,
+  and once in its look turn, after the question beside the picture
+  (`second_provider::HEAD_STILL_NOTE`: "Your head did not move for this
+  look: say only what is in front of you, and never say you turned or
+  looked to a side."). On lamp-c0a4 on 7 Nov, "look to your right" called
+  `take_a_look` and was answered "now I'm looking across it from the
+  other side" with the head still (#5694). A skill's look keeps its own
+  note instead. In a turn the lamp wrote itself the look is
   dropped (`LookAsked` with why). The journal says `request N called
   take_a_look: the look is asked of the coordinator`. The look by the
   words "Let me look." stays beside it (`speak_up::asks_to_look`); both
@@ -5425,6 +5564,59 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   count (#2733). Nothing of the read is kept past the note: no person, no
   picture. The journal, at that first audio: `request N is told how the
   person seems`.
+- **An answer may leave a soft door** (`LAMP_OPENS_FURTHER=on`, #5194;
+  [`opens_further`](../crates/voice/src/opens_further.rs)). The lead's
+  testers, 4 Nov: "whatever you ask the lamp, it only answers that; it never
+  opens the conversation further." The character
+  ([`deploy/character/lamp.txt`](../deploy/character/lamp.txt)) tells it not
+  to end by offering more ("When you have said the thing, stop.") and to ask
+  back only when curious, as V1's Gemini realtime prompt forbade "extra
+  offers/follow-up questions". V1's own persona had the rule wanted here
+  (`robots/lamp/SOUL.md`, "Leave a soft door, not a questionnaire"; the PM
+  on #5194). With the switch, a spoken line the gates let through is told
+  `opens_further::NOTE` beside it: that rule, easing the character's "stop"
+  for that answer only. If a feeling, or something of the person's own day
+  or plans, sits under their words, the answer may end with one short line:
+  a small noticing, a quiet offer of something the lamp can do itself right
+  now, or a gentle thread back to what they said. Never an interview
+  question, never "want me to do that?" or "tell me more!" tacked onto a
+  complete answer, and none for a plain fact, after a request it carried
+  out, or when the answer already fills its two sentences. The character
+  file is unchanged. The gates are in code (`opens_further::note`): no note
+  for a command (a doing word first past a greeting, the name and "could
+  you", but not remember, play or light(s) followed by "when", "is",
+  "look" and the like: "Remember when…", "Lights look nice tonight" are
+  talk; or a short line naming a timer, alarm, reminder, the volume or the
+  light with on, off, up or down), a stop (`says_stop`, or the first line
+  after a hand's stop), a busy room (the rule's or the room's as it is now),
+  a person leaving, busy, on a call or only closing ("Okay, thanks.", also
+  past a greeting and the lamp's name: "Hey Lamp, okay, thanks."; busy, a
+  meeting, a call or leaving only of the speaker, "I'm busy", "I'm on a
+  call", or as the whole short line, "In a meeting.", so "I have a meeting
+  tomorrow and I'm nervous" still opens), a
+  conversation with two or more people in it (the known people with an
+  exchange in it, the person the line itself was admitted for, and anyone
+  known with a line admitted in the last 45 s; beside a known person, the
+  room's exchanges count as one more, since two known people taking turns
+  are answered in the room's scope), a line let out only
+  as the conversation going on (the ambient case), a line told something
+  else first (a cut-in, the name alone, a misheard line, a task waiting for
+  a yes, a search pushed), right after an answer that ended with a question
+  or an offer (at most one, then it waits), and after two in one
+  conversation (`Thread::conversation_so_far`: exchanges each within the
+  thread's 45 s of the next). A question back or an offer already made in
+  the conversation is told as made, so the next is of another kind. Written
+  turns (sensing, news, reminders) are never told it. The door is the
+  reply's own last sentence: no second request, and the first sentence
+  streams as before, so it adds 0 ms to the first sound (the note adds about
+  200 tokens to the request); a chat begun on the early words
+  (`LAMP_SECOND_PREPARED`) is begun with the same note, so it still fits the
+  final words. The journal says, for each spoken line, `may end with one
+  short opening` or `no opening further: <why>`. Without the switch nothing
+  is told. Tests (`opens_further.rs`, `second_provider/tests/opens_further.rs`);
+  off until the issue's played before/after on lamp-06c1: 20 everyday lines,
+  at least 8 with a fitting door, none on the command, stop and busy-room
+  lines.
 - **`voice/link`** (`LAMP_VOICE_LINK`) is this route's link, Ready from its
   start. As a standby it stays Ready: an outage shows only as failed turns.
   As the only voice it goes down and back with the network (below, "The

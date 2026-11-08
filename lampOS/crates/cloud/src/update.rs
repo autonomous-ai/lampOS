@@ -40,6 +40,11 @@ pub fn from_environment() -> bool {
 /// Before lamp-update has said anything, `now` is `unknown` and the rest
 /// null; a value lamp-update could not have said is refused. With
 /// `harness` said (#5197), it is given as `lamp_msgs::HarnessInstall`.
+/// While a round runs, `round` (#5473) gives `{"started_at_unix_ms",
+/// "step_started_at_unix_ms", "target"?: {"sequence", "commit"}}`
+/// (`lamp_msgs::UpdateRound`) as lamp-update said it, for the app's
+/// Software update screen: absent when idle, and left out, not the page
+/// refused, when its step began before its round.
 pub fn status(kept: Option<lamp_bus::Message>) -> Result<Option<Value>, String> {
     let Some(message) = kept else {
         return Ok(Some(json!({
@@ -66,6 +71,11 @@ pub fn status(kept: Option<lamp_bus::Message>) -> Result<Option<Value>, String> 
     // left out, not the whole page refused.
     if let Some(harness) = status.harness.filter(lamp_msgs::HarnessInstall::check) {
         reply["harness"] = json!(harness);
+    }
+    if let Some(round) = status.round.filter(|round| {
+        status.now != "idle" && round.step_started_at_unix_ms >= round.started_at_unix_ms
+    }) {
+        reply["round"] = json!(round);
     }
     Ok(Some(reply))
 }

@@ -161,16 +161,18 @@ pub fn words_in(pieces: &[Piece]) -> usize {
 /// (`LAMP_CUT_IN_WORDLESS_RESUMES`): from the start of the piece playing at
 /// the cut, a sentence, and every piece with words after it. A piece with
 /// no sound is no place in the time and is skipped before the cut; one
-/// with no words (a wait sound, a bridge) is never said again. Empty when
-/// all was played.
+/// with no sound yet once all that was played is counted (a piece taken
+/// whose speech has not begun, its answer written whole: bug 2 of #5491)
+/// is where the cut came, so said again. One with no words (a wait sound,
+/// a bridge) is never said again. Empty when all was played.
 pub fn unheard(pieces: &[Piece], samples: u64) -> Vec<String> {
     let mut left = samples;
     let mut from = pieces.len();
     for (at, piece) in pieces.iter().enumerate() {
-        if piece.samples == 0 {
+        if piece.samples == 0 && left > 0 {
             continue;
         }
-        if left >= piece.samples {
+        if left >= piece.samples && piece.samples > 0 {
             left -= piece.samples;
             continue;
         }
@@ -208,6 +210,33 @@ mod tests {
         assert_eq!(unheard(&pieces, 300).len(), 3, "cut in the wait sound");
         assert_eq!(unheard(&pieces, 3_000), ["Then a ship came."]);
         assert!(unheard(&pieces, 3_500).is_empty());
+    }
+
+    /// Bug 2 of #5491: a piece taken but not yet sounding when the cut came
+    /// at the end of what played is the cut sentence, never skipped; one
+    /// with no sound before the cut still is.
+    #[test]
+    fn a_piece_with_no_sound_yet_at_the_cut_is_said_again() {
+        let pieces = [
+            piece(Some("Once upon a time."), 1_000),
+            piece(Some(" The keeper lit the lamp."), 0),
+            piece(Some(" Then a ship came."), 1_000),
+            piece(Some(" Its sails were red."), 0),
+        ];
+        assert_eq!(
+            unheard(&pieces, 1_000),
+            [
+                "The keeper lit the lamp.",
+                "Then a ship came.",
+                "Its sails were red."
+            ]
+        );
+        assert_eq!(
+            unheard(&pieces, 1_500),
+            ["Then a ship came.", "Its sails were red."]
+        );
+        assert_eq!(unheard(&pieces, 2_000), ["Its sails were red."]);
+        assert!(unheard(&pieces[..3], 2_000).is_empty());
     }
 
     fn piece(words: Option<&str>, samples: u64) -> Piece {

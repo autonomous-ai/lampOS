@@ -1299,7 +1299,16 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        file.
      - **Held there:** Harness's own self-update is held by lamp-tasks'
        `LAMP_HARNESS_HOLD_UPDATES` (tasks.md, "Harness held at its pinned
-       version"). A Team account ignores it.
+       version"). A Team account ignores it. With that switch on in
+       lamp-tasks' unit, `harness-install` also writes Harness's launcher
+       in Harness's own pinned shape right after it installs, before it
+       starts lamp-tasks again, so a Harness command run by hand holds the
+       updates too (#5493; tasks.md, "The pinned launcher"). It runs as
+       root in a folder Harness's user owns, so it writes and reads the
+       launcher without following links, and leaves alone one with a
+       second hard link or owned by another uid than its `bin` folder's
+       owner (one line said; #5624), or over 64 KiB (Harness's is a few
+       hundred bytes; not read past the cap, one line said; #5647).
    - **Said to the app:** `harness-install.json` in the records,
      `{"install", "revision", "at_unix_ms", "version"?, "pinned"?,
      "error"?, "message"}` (`lamp_msgs::HarnessInstall`), on

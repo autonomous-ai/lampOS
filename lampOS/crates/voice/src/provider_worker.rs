@@ -1966,6 +1966,23 @@ async fn serve_with_visual<C: Connect>(
         .map(crate::known_faces::known_file_of);
     let mut known_read_at: Option<Instant> = None;
     let mut known_told: Option<(SessionId, String)> = None;
+    // What the owner linked in the app's Connectors, with LAMP_SERVICES_TOLD=on
+    // and the services' folder (#5523): told beside the owner's open line,
+    // once a session for each set of names, read from what `lamp-services`
+    // last said (`crate::services::Linked`), never waited on.
+    let services_linked = options
+        .tools
+        .services
+        .clone()
+        .filter(|_| crate::services_told::on_from_environment())
+        .map(|folder| {
+            eprintln!(
+                "lamp-voice provider: the owner's line is told what is linked in the app's Connectors, once a session, in the private room only; no other line is (LAMP_SERVICES_TOLD)"
+            );
+            crate::services::Linked::new(folder)
+        });
+    let mut services_told = crate::services_told::LiveTold::default();
+    let mut services_read_at: Option<Instant> = None;
     // The typed name, with LAMP_PERSON_NAME_OWNER_ONLY=on (#2602): out of
     // the instruction, and told a session once, only while its open line
     // is the owner's (`crate::person::may_tell`). A session that may hold
@@ -2686,6 +2703,38 @@ async fn serve_with_visual<C: Connect>(
                             "lamp-voice provider: request {}: told the session who is at the lamp",
                             open.request.get()
                         );
+                    }
+                }
+                // What is linked (#5523): judged on the open line's own lease,
+                // twice a second; `lamp-services` asked again each time, off
+                // this loop (`Linked::check` never waits).
+                if let Some(linked) = services_linked.as_ref()
+                    && services_read_at.is_none_or(|at| at.elapsed() >= Duration::from_millis(500))
+                    && let Some(live) = provider.live_session()
+                    && let Some(open) = intake.handoff.visual_turn()
+                    && open.session == live
+                {
+                    services_read_at = Some(Instant::now());
+                    linked.check();
+                    let names = linked.names();
+                    let lease = intake.handoff.line_lease(open.request);
+                    let owner = crate::services::owner_of(lease.as_ref());
+                    if let Some(note) = services_told.due(live.get(), owner.as_deref(), &names, crate::person::private_room())
+                        && add_note(&provider, &mut intake.handoff.noted, open.request, &note).is_ok()
+                    {
+                        if names.is_empty() {
+                            eprintln!(
+                                "lamp-voice provider: request {}: told the session nothing is linked in the app now",
+                                open.request.get()
+                            );
+                        } else {
+                            eprintln!(
+                                "lamp-voice provider: request {}: told the session {} service(s) linked in the app, the line being the owner's",
+                                open.request.get(),
+                                names.len()
+                            );
+                        }
+                        services_told.told(live.get(), names);
                     }
                 }
                 // The typed name (#2602): judged on the open line's own
@@ -5648,6 +5697,13 @@ impl InputHandoff {
     /// (#2602): `Some(None)` is the room's (every line's without a memory,
     /// whose face cache is never filled); `None` while the line has no
     /// current lease of its own.
+    /// The open line's own lease, for `request` alone and not retired: the
+    /// services' owner check (`crate::services::owner_of`, #5523).
+    fn line_lease(&self, request: RequestId) -> Option<crate::memory_scope::ScopeLease> {
+        let lease = self.memory_scope.as_ref()?.lease();
+        (lease.key().request == request.get() && !self.retired(request.get())).then_some(lease)
+    }
+
     fn line_person(&self, request: RequestId) -> Option<Option<String>> {
         let lease = self.memory_scope.as_ref()?.lease();
         if lease.key().request != request.get() || self.retired(request.get()) {
@@ -11086,6 +11142,7 @@ pub(crate) mod tests {
                 named_only: false,
                 correct: false,
                 questions: false,
+                now: false,
                 sign_in: false,
                 sign_in_app: false,
             }),
@@ -11235,6 +11292,7 @@ pub(crate) mod tests {
                 named_only: false,
                 correct: false,
                 questions: false,
+                now: false,
                 sign_in: false,
                 sign_in_app: false,
             }),
@@ -12101,7 +12159,11 @@ pub(crate) mod tests {
             assert_eq!(
                 rig.service_message(&mut dial).await,
                 json!({"toolResponse":{"functionResponses":[{
-                    "id":"music-original", "name":name, "response":{"next":"Confirm. The recording has only been offered for preparation; playback has not started and may still be refused. Confirm only that you will try to play it. Do not say it is playing, has started, or is ready."}
+                    "id":"music-original", "name":name, "response":crate::use_skill::told_through(
+                        wrapped,
+                        "play_relaxing_music",
+                        json!({"next":"Confirm. The recording has only been offered for preparation; playback has not started and may still be refused. Confirm only that you will try to play it. Do not say it is playing, has started, or is ready."}),
+                    )
                 }]}})
             );
             let offer = skill.join().unwrap();
@@ -12261,7 +12323,8 @@ pub(crate) mod tests {
         assert_eq!(
             rig.service_message(&mut dial).await,
             json!({"toolResponse":{"functionResponses":[
-                {"id":"c8","name":"use_skill","response":{"next":"Look.","look":true}}
+                {"id":"c8","name":"use_skill","response":{"next":"Look.","look":true,
+                    crate::use_skill::RAN: "This call has already run check_my_work. Do not call use_skill for check_my_work again in this turn."}}
             ]}})
         );
         assert_eq!(

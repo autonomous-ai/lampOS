@@ -1387,6 +1387,16 @@ With the switch:
   to spell it (`known_faces::said_by_them`). A "yes" alone never passes,
   so a name the model made up is asked for again.
 
+  A name the model gives as its letters only ("J-A-N-E", "J A N E"), of
+  three letters or more, is checked and kept as the word they make, the
+  first letter capital ("Jane"; `known_faces::letters_as_word`), so the
+  eyes keep, and the lamp says back and greets them by, a name, never its
+  letters (lamp-3e83, #5564: "Jane or J-A-N-E?"). Two letters ("A J",
+  "T.J.") may be initials and stay as given. The model's words say a
+  spelled name back as a name only, never as letters nor as a choice
+  between the name and its spelling (`SAY_IT_BACK`, `NOT_HEARD`,
+  `NOT_HEARD_SPELLED`, `NEAR_TO`); `NOT_HEARD_SAY_AGAIN` says no name back.
+
   Why the turn in hand, from lamp-4ace on 16 October at 16:46 (the first
   builder on #1057, the records described without the words): a
   three-letter name was kept after "Sure." and a lone digit, the turn
@@ -1422,7 +1432,9 @@ With the switch:
     it is right (`SAY_IT_BACK`). The voice keeps that refused save
     (`second_provider::HeldSave`, as a held forget is kept) and runs it
     itself on the person's next turn when that turn is a plain yes to the
-    read-back (`known_faces::held_save_verdict`), through the same runner
+    read-back (`known_faces::held_save_verdict`, which judges a name held
+    as letters, "J-A-N-E", as the word they make, "Jane", as the run
+    does: Fifth's P2 on #5580), through the same runner
     and check as a model call, so it counts as the walk's face save; the
     model is told the face is kept, or, when the eyes keep nothing, that it
     was not kept and why, and a model call after it gets
@@ -1457,7 +1469,17 @@ With the switch:
     second save call would (#5391's path has the same gap).
     `replace` still needs the read-back in the
     lamp's last answer (`known_faces::agreed_to`).
-  - **Spelled:** a name not heard is asked for spelled out (`NOT_HEARD`).
+  - **Spelled:** a name not heard is asked for spelled out (`NOT_HEARD`),
+    once: when the lamp already asked them to spell in an exchange the
+    check holds, a name still not heard never asks again
+    (`known_faces::not_heard`; lamp-3e83, #5564: the lamp asked for
+    spellings too often). If they spelled after that ask, it is told
+    `NOT_HEARD_SPELLED`, which has the model say back the name the letters
+    make, as a name only, and wait for a yes. If they gave no letters, it
+    is told `NOT_HEARD_SAY_AGAIN`, which has the model ask for the name
+    once more and say no name back: a name they never said or spelled
+    can't pass a read-back's yes, so "Lauren?" and "Yes." would only loop
+    (Jarvis's P2 on #5580).
     When the lamp's last answer asked them to spell
     (`known_faces::spelling_asked`) and the turn in hand spells a name
     letter by letter, the letters are the person's own words: the face is
@@ -1525,6 +1547,69 @@ With the switch:
     as an alias takes it from that record, so no two records hold one name.
     Still to do in the reader's PR: a live name wins over an alias, and a
     rename away from the owner's typed name is guarded with #5519's.
+  - **A rename's yes by its guards** (`LAMP_NAMES_RENAME_YES=on`, off
+    unless set; only with `LAMP_NAMES=checked`; the second route; #5485).
+    On lamp-29e7 on 6 Nov a known face B asked to be called A, and every
+    yes was refused: "Yes. Please forget the name B, and this is my face,
+    the face of A." held words outside the list, and "Okay. Can you repeat
+    my name again?" is a question, which the model also answered with no
+    call. The lamp then said it would use A, while the face was still B.
+    With the switch, `replace` takes `known_faces::rename_agreed` in place
+    of the plain yes: the lamp said A in its last answer; a sentence of
+    the turn that is no question agrees (`agrees`); nothing takes it back
+    (the no words, plus "but", "actually", "though", a maybe:
+    "maybe", "perhaps", "có lẽ", a hesitant yes: "wait", "hold on",
+    "hang on", "let me think", and the Vietnamese "nhưng" (but) and
+    "khoan" (wait), each as whole words, so "Okay, wait.", "Yes, hold
+    on.", "Ừ, nhưng thôi." and "Khoan đã." are asked once more, as #5572
+    asks an unclear yes); and the turn names no
+    one else: no name given once A's own words are taken out
+    (`gives_a_name`), no spelled run but A's, and no word one letter from
+    a word of A's of four letters or more ("Dạ, Kess ạ." to "Kesh"). No
+    word is judged by its capital letter, which is the transcript's. A
+    said in an exchange before and agreed to so is heard for the rename
+    (`heard_for_rename`). Every #1208 correction is still asked about
+    again. The voice also holds the rename (`second_provider::held_rename`,
+    as the held setup save): when a `remember_my_face` answer asks about
+    it (the eyes' `known_as`, or a `replace` refused before the yes), it
+    keeps `{"name":A,"replace":true}` with the asker (the line's own known
+    person, or theirs by the one-face rule; never a gap-held or carried
+    line). The same session's next spoken turn, within 60 s, runs it with
+    no model round when that turn is a yes by the guards above and either
+    their face is the one seen saying it, or no face was seen saying it
+    and theirs is alone in view with no other voice heard
+    (`ScopeLease::by_one_face`). That last way is a risk accepted, and
+    the one place the one-face rule counts for a yes: with no face seen
+    saying it, a yes is taken from the known face alone in view when no
+    other voice is heard, so a voice off camera could rename that face.
+    It is kept because on lamp-a63e on 6 Nov the mouth read came back
+    unread in 96% of looks at a known face, so "seen saying it" alone
+    would almost never pass. The risk is accepted only while the switch
+    is off, and is to be confirmed before it is turned on. It runs through the same runner as a
+    model call, so every name and owner check still applies, and the
+    model is told the result. Any other turn drops it: a no, another name,
+    another face seen saying the yes (told), a carried line, another
+    session, a new save call. While a rename asked has not run, each turn
+    of its session by the asker, for as long as the thread remembers the
+    conversation, is told the face is still B (the asker by the same test
+    as the yes: their face seen saying it, or none seen and theirs alone
+    in view), nothing was renamed, and never to say it changed. A turn
+    not proven the asker's (no face seen saying it and not theirs alone
+    in view, as with two faces or another voice; their face seen saying
+    it beside another; or faces seen saying it while the eyes know no
+    one in view) is told only that no rename has run and never to say
+    it changed, without the old name, which can't be shown to whoever
+    is speaking. A turn proven someone else's (faces seen saying it while
+    the eyes know who is in view and none is the asker's, or another
+    known face alone in view) is told nothing. The eyes read who said
+    each line while the note waits. The only wait left on a yes is the eyes' own (`DEADLINE`, 6
+    s; about 2 s on 29e7), under the wait sound. Off, everything is byte
+    for byte as before. Tests: `known_faces::tests::the_29e7_yeses_to_a_rename_are_agreed_by_their_guards`,
+    `every_1208_correction_is_still_refused_by_the_rename_guards`,
+    `a_hesitant_yes_to_a_rename_is_asked_again`,
+    `the_rename_gate_takes_the_guards_only_with_the_switch`,
+    `second_provider::held_rename::tests` and
+    `second_provider::tests::held_rename`.
 - **A near face with a near name is asked to spell it** (#2176 row 4). On
   lamp-4ace on 20 Oct a person known since 16 Oct was saved again under
   their name misheard by one letter: the new prints came to at most 0.359
@@ -1627,8 +1712,10 @@ With the switch:
   remember it, "Could you call me Jim?" or "Do you remember my name is
   Jim?"; `known_faces::gives_a_name`), the worker puts one note beside
   that request (`known_faces::NAME_TOLD_NOTE`): if they have just told
-  their own name, call `remember_my_face` now, or say the name back and
-  ask for its spelling, and never only say it will be remembered. It is a
+  their own name, call `remember_my_face` now, as they said it or as the
+  name their letters make; if not sure of it, say it back as a name and
+  ask if it is right, asking for its spelling only if they say it is
+  wrong, and only once (#5564); and never only say it will be remembered. It is a
   condition, so that a match that is no name ("I'm Irish.") costs
   nothing. The journal says "they gave their
   name, and the model is told to keep it".
@@ -2697,6 +2784,29 @@ with the known face's id the eyes keep beside the known file
   moving; no reading within 160 ms either side unknown and taken as moving;
   the history held to about a second; and a window with
   one held pair `few_steady_pairs`. Off, nothing is read and nothing changes.
+- **One look's eye jump at the desk (`LAMP_EYES_SPEAKING_SKIP_JUMP=on`, with
+  `LAMP_EYES_SPEAKING_STEADY=on`; off unless set, off in the product,
+  #5522).** With the steady read alone, a talking face at the desk is mostly
+  `unknown`: its own landmarks step its eye distance past 5% on 61 to 71% of
+  steps (lamp-52e6, 2 Nov, 17 to 28 px between the eyes, median 1.5 to 3
+  px), mostly one look away from two neighbours that agree, and each such
+  look drops both its pairs, so the window has under two steady pairs
+  (`few_steady_pairs`, 84 of 117 unread looks of a talking face at about
+  19 px). A lone known face then reads speaking in too few of a line's looks
+  for the voice's half (`speaking_faces::speakers`), and the line goes to
+  the room. On, a still look that jumps past `MOST_EYES_STEP` from both its
+  neighbours, they agreeing within it, is skipped and its neighbours are
+  paired across it; every other step past 5% still drops its pair, and a
+  window with a look skipped is held to `LEAST_HELD_PAIRS_YES` for `yes`. A
+  box that flips for one look on a still face then pairs its fit with
+  itself. In an offline replay of the lamp-52e6 `--mouth-diagnostics` lines
+  (PR #4984, matching the lamp on every fully logged look) talking at about
+  19 px read `yes` in 102 of 145 looks instead of 70, at about 27 px 45 of
+  71 instead of 31, and still faces stayed at no `yes`. Host tests only: a
+  real 8-look talking window from that run `unknown` off and `yes` on; the
+  #4585 still face whose box flips for one look, the flipping box, and a
+  still face with the desk window's eye jumps never `yes`. Not played on a
+  lamp.
 - **The pace:** the eyes look every 250 ms while they follow a face, up to
   350 ms on the 10 fps camera (`main.rs`), so 2 s holds 5 to 8 looks. With
   `--steady-rate` a still face is looked at 500 to 600 ms apart, 4 looks a

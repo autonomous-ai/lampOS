@@ -585,12 +585,12 @@ short-term. Now, on a line admitted as a known person's, no face seen
 speaking it, when the eyes' looks through it held their own known face in at
 least 3 and no other face in any (`SpeakingFaces::one_face_in_view`; a look
 with nobody in it is no other face), and the conversation has shown **no
-other voice**, **their keep is theirs, and so is a forget of it**: a
+other voice**, **their keep is theirs, but no forget runs on it**: a
 `remember` on the line is written in their scope (`ScopeLease::take_by_one_face`,
-`ScopeLease::kept_by_one_face`), and a single-item `forget` searches their
-scope, then the room's (`ScopeLease::reached_by_one_face`, the one decision
-the memory route in `tools.rs` reads for both, so a forget is never narrower
-than the keep). **Every read stays the room's**: the line is narrowed to the
+`ScopeLease::kept_by_one_face`), and a single-item `forget` is judged by the
+same decision (`ScopeLease::reached_by_one_face`, the one the memory route in
+`tools.rs` reads for both) and runs nowhere until the mouth is seen saying
+it (below; #5627). **Every read stays the room's**: the line is narrowed to the
 room, so no recall or hits from their scope, no memory note of theirs, no
 person's context, no thread or summary of theirs; the turn is told and read
 as without the rule. Why (reviewer-three's P1 on #4584, option 2, Friday's
@@ -620,9 +620,11 @@ seen speaking shows another person, and since only the keep goes to them
 the cost is words kept, never read. A second face in any look, an unknown
 face, no face in view, or another voice, and it is as before. A line
 admitted as the room's with nobody named is untouched, so an unplaced voice
-still reaches nobody's memory (#4196, #4207). **A forget follows the keep:**
-a single-item `forget` on such a line removes from their scope what the
-same rule kept there, and looks in the room's too only when theirs has
+still reaches nobody's memory (#4196, #4207). **How a forget would follow
+the keep** (`remember::run_one_face_forget`, which no live path calls since
+#5627; kept for when a forget there is allowed again): a single-item
+`forget` on such a line removes from their scope what the same rule kept
+there, and looks in the room's too only when theirs has
 nothing about it (Fourteen's lamp-9adf check on build 9699: "forget my
 coffee" searched only the room's while the coffee was kept as theirs, a fault
 already in 9610). That no-match is an outcome the forget sets itself
@@ -640,7 +642,29 @@ about or by the id recall gave reaches their scope: a bare "forget that",
 or any forget the memory would run as "the last kept thing" (the legacy
 memory, a switch off), is the room's only, since after the room's recall
 on such a line it would take their last kept thing (Thirteen's P2 on
-#5022). Ids are counted per person, so their 3 and the room's 3 are two
+#5022). **Forgetting needs the mouth seen speaking** (the memory owner, 16:49 on
+#5385: "tạm thời chưa cho xóa nếu ko detect đc mở miệng", no deleting while
+an open mouth is not detected), with no exception: a forget on such a
+line, theirs by their face alone in view or named late on a line admitted
+as the room's (`ScopeLease::reached_by_one_face`), is asked of no memory,
+theirs or the room's (`tools::run_call_with_scope`), with only
+`LAMP_PERSON_SCOPE_ONE_FACE` on. A forget naming what (`about`) or which
+(`source_id`) is told `ONE_FACE_NAMED_FORGET`, so the lamp says it will
+forget that when it sees them say it and asks them to look at it and say it
+again (#5627, from Thirteen's read of #5608: until then it deleted in their
+scope with the mouth unseen, so someone off camera could remove a kept thing
+of theirs by naming it). For a bare forget, right after their own
+plain new keep (the very next request of the same worker and session, the
+same person, no other memory call or forget by what on the line before it,
+within `HELD_FORGET_FOR`: `tools::one_face_just_kept`) the lamp says it will
+forget that when it sees them say it (`ONE_FACE_JUST_KEPT`); otherwise it
+asks which thing (`ONE_FACE_BARE_FORGET`), never the room's `forget_last` on
+a guess. C88 on stock 10538, lamp-06c1, 6 Nov: "remember that my umbrella
+is yellow" was kept as Olivia's, her next line "forget that" ran as the
+room's `forget_last`, and the room's Wi-Fi name went (#5608, Jarvis's P2s).
+A guest off camera or a TV saying "forget that" beside her silent face
+forgets nothing. Said with their mouth read speaking, the line is theirs and
+the forget runs in their scope as any of theirs. Ids are counted per person, so their 3 and the room's 3 are two
 kept things: a forget by id goes only to the scope whose listing showed
 that id this session, and an id shown of both forgets nothing and the
 model asks which one (`remember::by_where_shown`; Thirteen's second P2 on
@@ -677,6 +701,68 @@ apart, may be kept in their memory, and its single-item forget may remove
 from it up to eight things that match (a `forget {about}` forgets at most
 eight, and none when more match), never all; nothing is read back to that
 voice.
+
+**Reads, too, with their own switch; forgets need the mouth**
+(`LAMP_PERSON_SCOPE_ONE_FACE_READS=on`, off everywhere, #5522; the memory
+owner's 16:43 "apply it" on #5385, read by the PM as saving and recall, not
+forgetting, and the memory owner's 16:49: "tạm thời chưa cho xóa nếu ko
+detect đc mở miệng", for now no forgetting unless the mouth is seen
+opening). With `LAMP_PERSON_SCOPE_ONE_FACE` acted on, a line its rule takes
+as above is **not narrowed**: it is told and read as theirs
+(`ScopeLease::read_by_one_face`): recall, memory's hits, the memory note,
+their context, their thread and the carry it opens. Its exchange is
+journalled in their record by both journal backends
+(`memory_scope::one_face_record`, `remember::filed_by_one_face`, before
+`hand_on` and `hand_on_days`); a line whose face the late look names by
+the same rule keeps its reads the room's, as they were told, but its record
+is theirs too (`ScopeLease::keep_for_one_face_recorded`). **No forget runs on
+such a line** (`ScopeLease::forgets_need_mouth`): not `forget_everything`,
+`forget_my_face`, `forget_rule`, a yes said as them, nor the single-item
+`forget` the keep's rule alone lets reach their scope
+(`ScopeLease::reached_by_one_face`); the model is told nothing was
+forgotten and to ask them to say it again looking at the lamp. It holds no
+forget for a yes and its ask is no ask just before (`forget_asker`). **Nor
+anything destructive, or acting for them beyond saving and recall** (the
+privacy read on #5592): a `remember` that corrects a kept thing by id
+(`replaces`, `remember::corrects`) is refused like a forget, and without an
+id the plain correction matcher is skipped, so the keep is kept plainly and
+nothing is replaced; `keep_rule`, `list_rules` and `forget_rule` are refused;
+`cancel_reminder` and `snooze_reminder` are refused unless
+`LAMP_ONE_FACE_REMINDERS` is on (the 4 Nov acceptance); and the line has no
+services owner (`services::owner_of`), so no `service_read` runs for it,
+unless the private room (`LAMP_PRIVATE_ROOM`) already gives every line one.
+The after-conversation observation pass never retires a kept thing for a
+conversation one such exchange was filed in: with `LAMP_MEMORY_REPLACES`,
+its proposals reach `tidy_apply` without `"replaces"`, kept plainly
+(`Conversation::filed`, `remember::job_replacing`; Thirteen's P2 on #5592).
+A plain new keep still writes. A line their face was seen saying is as
+before. The privacy limits hold: a second
+face, an unknown face, no face, another voice before the line or heard as
+it is judged (`another voice in the conversation`), and it is the room's,
+keeps and all; a carried line is never read (#5508). **Known risk, accepted
+with the switch:** a guest speaking off camera while their face sits silent
+and alone in view, with no other voice heard, is told their recall, hits
+and thread. **Writes happen too:** filing the exchange in their record is
+the owner's "saving counts", so a guest's words can be filed as theirs, and
+their day recall and the nightly extraction (if it is ever on) may take
+them as theirs. `LAMP_SAME_VOICE_CONFIRMS`, when on, makes the guest's voice a
+second voice only once the conversation has a print to tell it from; with
+the guest the conversation's first voice, nothing tells them apart. The
+lead's ruling on #5522 said a lone face never counts for reads; this rests
+on the memory owner's 16:43 word and the PM's 16:46 reading, so the lead
+confirms before the switch goes on. Off,
+the one-face rule is as above, byte for byte. Tests:
+`second_provider::tests::person_scope_seen::a_lone_known_face_never_read_speaking_writes_its_words_in_their_memory_and_record`,
+`with_reads_a_second_face_an_unknown_face_or_another_voice_is_the_rooms`,
+`with_reads_a_forget_the_mouth_was_not_read_saying_never_runs`,
+`with_reads_a_forget_their_mouth_was_read_saying_runs_as_before`,
+`with_reads_a_correction_is_refused_and_a_plain_keep_still_writes`,
+`with_reads_rules_are_never_kept_listed_or_forgotten`,
+`with_reads_a_reminders_cancel_or_snooze_is_refused_unless_one_face_reminders`,
+`services::tests::an_off_camera_guests_read_my_mail_with_the_owner_silent_alone_in_view_runs_no_service_read`,
+`remember::tests::a_one_face_lines_exchange_is_journalled_in_their_record_with_the_switch`,
+`remember::tests::room_speaker::with_reads_a_one_face_conversations_observation_never_retires_a_kept_thing`,
+`memory_scope::tests::a_one_face_line_with_reads_is_read_as_its_persons_and_forgets_need_the_mouth`.
 A line kept as yours while you were the only face in view can include words
 someone else said out of view.
 
@@ -756,7 +842,24 @@ fifty-three?" and "Want me to keep Thursday book club for you?" do; on
 lamp-06c1 on 5 Nov, S14, both were missed and the keep dropped). Their plain yes on the next spoken line,
 within `HELD_FORGET_FOR` (60 s), with their own face seen saying it and no
 other (`LAMP_EYES_SPEAKING`, `speaking_faces::seen_saying`), writes it in
-their scope, and the reply says it is kept. What is written is the carried
+their scope, and the reply says it is kept. The yes may say the keep back
+(`known_faces::plain_agreement_to_keep`): "Yes, please keep that.", "Keep
+it." alone, or "keep off" beside a yes, which is how speech to text heard
+"keep that" on lamp-06c1 (5 Nov, S14 run 14:21, request 424: "Yes. Please
+keep off.", and the brother fact was never kept). "Off" counts only right
+after "keep" and with a yes word. A keep said back with no yes word may
+have only "please", "lamp", "for", "me" or a thanks around it, so a
+question whose "?" was lost ("Do you keep that", "I'd keep it") is not a
+yes and is asked about once more (#5572's privacy read). Any no ("No, keep
+off.", "Don't keep it.") refuses. An answer from them, in time, that is neither a yes nor a no
+(`known_faces::unclear_answer_to_keep`: at most 6 words, a yes word or
+"keep"/"save" among them, no word of a no, such as "Yes. Please key that."
+or "Keep off." alone) is not dropped unsaid: the hold stays for that turn,
+the model is told to ask once more, "Should I keep that?"
+(`remember::KEEP_ASKED_AGAIN`), and the hold stands if that reply asks it.
+It is asked again once only; a second unclear answer drops it. The ask
+runs and reads nothing, so it needs no face seen saying it; the yes after
+it still does. What is written is the carried
 line's own heard words, held with the call: the yes is taken as a yes to the
 lamp's offer about that line (`ScopeLease::release_held_keep`), since the
 offer itself was told as the room's and no offer of theirs is in the thread
@@ -815,7 +918,10 @@ The base `remember` may also name the person's own exchanges it came from,
 them, one step back. The legacy store ignores them.
 With `"once":true` (#2176, the voice's `LAMP_MEMORY_REMEMBER_ONCE`), a text
 the same person already keeps, active and the same words, ignoring case,
-spacing and a final punctuation mark, is answered
+spacing and a final punctuation mark (and, in a person's own scope, a leading
+"my" or "the": C81, stock 10538 on lamp-06c1, 6 Nov, "The gym locker code is
+441." kept and "My gym locker code is 441." kept again; never in the room's,
+where "my" is whoever said it, `days::own_text`), is answered
 `{"ok":true,"id":24,"existing":true}` with that kept thing's id, and no
 entry is written; it gains this conversation's `source_ids`, so forgetting
 it with `LAMP_MEMORY_FORGET_ALL` removes both conversations' exchanges
@@ -859,7 +965,10 @@ item checked alone, a bad one dropped and counted: Tiers' kinds and rules
 No health, money or other person's private matter is kept unless the
 person asked the lamp to remember it. Profile lines join the session
 note's preferences; the rest are found by `search` and `recall` with
-`nightly:true`. Nothing is spoken or shown. Any forget a person asks
+`nightly:true`. Episodes, feelings and patterns fade after 90 days
+unused (found by a search or recall, or a pattern seen again, is use), and
+at the 512-item cap the least used of them gives way to a new item, never
+one resting on a kept thing. Nothing is spoken or shown. Any forget a person asks
 (`forget`, `forget_last`, `forget {about}` found or not) marks the day, and
 the night passes over their exchanges of that day said before it and the
 forget's own turn, so a line said, never kept and asked to be forgotten is
@@ -1359,7 +1468,29 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     After a lone no, or with nothing done, a `forget` runs as before.
     Nothing is written either way (lamp-06c1, 5 Nov: a lone yes after
     "Mondays now, not Fridays.", after a done keep and after a done forget
-    was told to ask, and the lamp asked again). The `on` check and the REPLACES journal line use the same words.
+    was told to ask, and the lamp asked again). The done write outlives a
+    new session for the same scope (`replace_session`): each line's note
+    read opens one, and a done write asks the note again (#2540), so on
+    build 10538 (6 Nov, S1 req 271, S6 311, S13 339) every such yes found
+    none and asked again; a session for another scope, or one closing, lets
+    it go. The done write is the yes's "last turn" only when it was done
+    for the request just before the yes (no exchange of the thread's
+    between them: `heard::done_last_turn`, `Thread::answered_between`); a
+    write done two turns back, or for no known request, is none (the
+    Reviewer-lead's P2 on #5607: "My bike is blue." kept, "My goldfish is
+    called Pip." answered with no `remember`, then "Yes. Please keep that."
+    must not be told Pip is kept). And before round 1 of a line that is only a yes, with no offer
+    waiting and nothing asked in the lamp's answer before it, the model is
+    told the same, whatever it then calls (after a done forget, "Yes.
+    Please forget it." counts as that yes: only a yes once its forget
+    words are left out; `heard::done_already`,
+    `DONE_ALREADY_TOLD`): on 10538 the yes after a done forget was answered
+    with a `recall`, never a `forget`, so the call's check never saw it. A
+    done keep or change then backs that turn's "Kept." as a held keep's
+    does; a done forget does not (tests:
+    `a_done_write_outlives_a_new_session_for_the_same_scope`,
+    `a_yes_after_a_done_write_is_told_it_is_done_before_it_answers`,
+    `a_done_write_two_turns_back_is_not_the_yes_last_turn`). The `on` check and the REPLACES journal line use the same words.
     A line that says more than yes ("Yes, my dog is called Moe") is its own,
     as ever. No extra round: one thread lookup in the call.
   - **A yes after a second offer.** On lamp-06c1 on 4 Nov (build 10012),
@@ -1873,9 +2004,11 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   - `LAMP_MEMORY_PROFILE`: the session note keeps a band for tastes and kept
     facts before promises and threads (`profile`).
   An older lamp-memory refuses the fields, so upgrade both together. All
-  three were turned on in the product by the memory owner's call on 5 Nov,
-  and are off for the candidate since 6 Nov until a played check passes
-  (#5331, #5464).
+  three were turned on in the product by the memory owner's call on 5 Nov
+  and off for the candidate on 6 Nov (#5464). `LAMP_MEMORY_PROFILE` is back
+  on after its played check passed on lamp-06c1 on 6 Nov (PASS bd98421414,
+  #5331); the other two stay off until a played check reaches their own
+  fields.
 
 - **Kept once** (#2176, `LAMP_MEMORY_REMEMBER_ONCE=on`, with the Days
   client only; off unless set; both voice routes; on in the product unit
@@ -1884,7 +2017,8 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   time called `remember` again with the same text (lamp-06c1, the second
   route, build 4142: kept ids 24 and 25). Now a text the person already
   keeps (the same words, ignoring case, spacing and a final punctuation
-  mark) is that kept thing, no entry is written, it gains this
+  mark, and in their own scope a leading "my" or "the", C81) is that kept
+  thing, no entry is written, it gains this
   conversation's exchanges as sources (so forgetting it with
   `LAMP_MEMORY_FORGET_ALL` removes both conversations'), and the model is told
   `{"remembered":true,"note":"Already kept: tell them you already knew
@@ -3033,7 +3167,21 @@ then use that person's scope:
   it reads `yes` in at least half of the looks between the line's start and
   end (at least three looks). Each of the eyes' frames counts once, however
   often it is read, and their silence one empty look each 500 ms, so a short
-  line never passes on one frame.
+  line never passes on one frame. A line under 2 s (a 0.5 s "yes" spans two
+  looks) is so always the room's; with `LAMP_VOICE_SHORT_LINE_SPEAKER=on`
+  (off in the product, #5522) a face is its speaker only when its `yes`
+  began in it (`SpeakingFaces::line_counted`): `yes` in at least half of
+  the line's own looks and `no` in none, at least three looks in the 2 s
+  window ending at its end (`SHORT_LINE_WINDOW`), one of the eyes' own
+  looks in that window before the line, and no face reading `yes` in any
+  look before it. The eyes score `yes` over their own sliding 2 s window,
+  so a face that stopped talking up to 2 s before still reads `yes`, and
+  that `yes` cannot be told from a speaker's: a listener's short "yes"
+  right after someone else talked would come back as theirs (the
+  Reviewer-lead's P2 on #5660). So any `yes` before the line leaves it
+  the room's. The cost: a short line said right after anyone in view
+  talked, the speaker included, stays the room's as it is without the
+  switch.
   - **Only the known person's face** (its passing id is the eyes'
     `known-face`, and the known name is still the admitted person's): the
     line stays theirs.
@@ -3162,6 +3310,33 @@ then use that person's scope:
   before. Tests:
   `known_faces::tests::with_the_record_switch_a_face_refusal_says_the_record_as_it_stands`
   and `known_faces::tests::each_face_refusal_has_a_reason_name_and_the_journal_says_only_it`.
+  **A rename asked about is held for the yes** (`LAMP_NAMES_RENAME_YES=on`,
+  off unless set; only with `LAMP_NAMES=checked`; the second route;
+  #5485). On lamp-29e7 on 6 Nov a known face B asked to be called A six
+  times; each yes was refused by the yes word list, answered with no call,
+  or answered with `remember` in place of `remember_my_face`, and the lamp
+  then said it would use A. With the switch, a `remember_my_face` answer
+  that asks about the rename holds `{"name":A,"replace":true}` for the
+  asker (the line's own known person, or theirs by the one-face rule;
+  never a gap-held or carried line). Their next spoken turn of the same
+  session, within 60 s, runs it through `run_tool` with no model round,
+  when it is a yes by its guards (`known_faces::rename_agreed`,
+  [eyes.md](eyes.md)) and their face is the one seen saying it, or no face
+  was seen saying it and theirs is alone in view with no other voice
+  heard. That last way is a risk accepted: with no face seen saying it, a
+  yes is taken from the known face alone in view when no other voice is
+  heard, so a voice off camera could rename that face. It is kept because
+  on lamp-a63e on 6 Nov the mouth read came back unread in 96% of looks at
+  a known face; the risk is accepted only while the switch is off, and is
+  to be confirmed before it is turned on. Carried lines stay refused. Any other turn drops it; a yes
+  dropped for another face is told so. While the rename has not run,
+  each turn of its session by the asker (by the same test as the yes) is
+  told the face is still B and nothing was renamed; a turn not proven
+  theirs (two faces, another voice) is told only that no rename has run,
+  without B; one proven someone else's is told nothing. So the lamp never
+  says it changed. The memory's own side of a
+  rename (`LAMP_MEMORY_STABLE_ID`) is unchanged. Off, everything is as
+  before.
 - **With nobody known**, or without eyes, every line to the memory is
   exactly what it was: no `person` field, the same limits, the same note
   (`remember::tests::with_nobody_known_every_line_to_the_memory_is_as_before`

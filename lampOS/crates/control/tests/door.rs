@@ -1763,3 +1763,51 @@ async fn the_lamp_says_its_pin_check_and_a_cancelled_code_pairs_nobody() {
             .is_empty()
     );
 }
+
+/// Heron's and the Reviewer-lead's P3 on #4579: the owner's app takes the
+/// lamp back. Every lease of the computer is lost as `taken_by_owner_app`,
+/// told to it, and the computer stays paired; for one computer, only its
+/// leases end.
+#[tokio::test]
+async fn the_owner_takes_the_lamp_back_and_the_computers_stay_paired() {
+    let lamp = lamp("takeback").await;
+    let mut first = paired(&lamp, json!(["light"]), 21).await;
+    let held = send(
+        &mut first,
+        json!({"id": 3, "op": "lease.take", "parts": ["light"], "for_ms": 30000}),
+    )
+    .await;
+    let lease = held["lease"].as_str().unwrap().to_owned();
+    // One computer by id: its lease ends, and it is told why.
+    let clients = admin(&lamp, json!({"clients": true})).await;
+    let client = clients["clients"][0]["id"].as_str().unwrap().to_owned();
+    assert_eq!(
+        admin(&lamp, json!({"take_back": true, "client": client})).await,
+        json!({"taken": 1})
+    );
+    assert_eq!(
+        next(&mut first).await,
+        json!({"ev": "lease", "lease": lease, "state": "lost", "why": "taken_by_owner_app"})
+    );
+    // Nothing held now: a second take back ends nothing.
+    assert_eq!(
+        admin(&lamp, json!({"take_back": true})).await,
+        json!({"taken": 0})
+    );
+    // Still paired: listed, and a new lease is given.
+    assert_eq!(
+        admin(&lamp, json!({"clients": true})).await["clients"][0]["id"],
+        client
+    );
+    let again = send(
+        &mut first,
+        json!({"id": 4, "op": "lease.take", "parts": ["light"], "for_ms": 30000}),
+    )
+    .await;
+    assert!(again["lease"].is_string(), "{again}");
+    // A client that isn't an id string is refused.
+    assert_eq!(
+        admin(&lamp, json!({"take_back": true, "client": 7})).await,
+        json!({"error": "client: a computer's id"})
+    );
+}

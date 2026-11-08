@@ -54,6 +54,19 @@ fn turn_as(
     first: Vec<net::Result<ChatEvent>>,
     later: Vec<Vec<net::Result<ChatEvent>>>,
 ) -> Went {
+    turn_with(on, false, product, heard, first, later)
+}
+
+/// [`turn_as`], with the worded claims (`LAMP_ACTION_CLAIM_WORDED`) as
+/// `worded_on`.
+fn turn_with(
+    on: bool,
+    worded_on: bool,
+    product: bool,
+    heard: &str,
+    first: Vec<net::Result<ChatEvent>>,
+    later: Vec<Vec<net::Result<ChatEvent>>>,
+) -> Went {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new(std::iter::once(first).chain(later).collect()),
@@ -75,7 +88,8 @@ fn turn_as(
     .announcing(false)
     .answering_short(product)
     .saying_at_once(product)
-    .checking_action_claims(on);
+    .checking_action_claims(on)
+    .checking_worded_claims(worded_on);
     let labels = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -300,4 +314,289 @@ fn a_claim_beside_another_kind_of_call_is_not_said() {
     let beside = crate::action_claim::beside_calls_note(crate::action_claim::Claim::Schedule);
     assert!(went.notes.contains(&beside), "{:?}", went.notes);
     assert!(!told_claim(&went), "{:?}", went.notes);
+}
+
+/// One turn with the claim check on and the worded claims too
+/// (`LAMP_ACTION_CLAIM_WORDED`, #5215's open shapes).
+fn worded(
+    heard: &str,
+    first: Vec<net::Result<ChatEvent>>,
+    later: Vec<Vec<net::Result<ChatEvent>>>,
+) -> Went {
+    turn_with(true, true, true, heard, first, later)
+}
+
+/// #5215, what still counts as claimed-not-done after the acting part's own
+/// lines are checked: the model words a timer it never set in its own way
+/// ("I've set a timer for one minute.", "Timer set for one minute."). The
+/// reply is held and the model asked once more; the retry's call is answered
+/// by the timer's own line.
+#[test]
+fn a_timer_claimed_in_other_words_with_no_call_is_held_and_asked_again() {
+    for claim in [
+        "I've set a timer for one minute. It rings at 9:39 am.",
+        "Timer set for one minute, it rings at 9:39 am.",
+        "Okay, your one-minute timer is set.",
+    ] {
+        let went = worded(
+            "Lamp, set a timer to one minute.",
+            saying(claim),
+            vec![calling("set_timer")],
+        );
+        assert_eq!(
+            went.said,
+            said(&["Timer set. It rings at 7:52 am."]),
+            "{claim}"
+        );
+        assert_eq!(
+            (went.asked, went.ran.as_slice()),
+            (2, ["set_timer".to_owned()].as_slice()),
+            "{claim}"
+        );
+        assert!(told_claim(&went), "{claim}: {:?}", went.notes);
+    }
+}
+
+/// #5215: a light or volume change claimed in other words, twice, with no
+/// call ("I've kept the light on until ten." on 10441, 5 Nov 04:24, with
+/// `calls=none`; "Okay, louder."; "Brighter now."): said as the plain line
+/// that it wasn't done.
+#[test]
+fn a_device_change_claimed_in_other_words_twice_with_no_call_says_it_was_not_done() {
+    for (heard, claim) in [
+        (
+            "Hey Lamp, keep the light on until ten.",
+            "I've kept the light on until ten.",
+        ),
+        ("Louder.", "Okay, louder."),
+        ("Brighter.", "Brighter now."),
+        ("Louder.", "I've turned the volume up."),
+    ] {
+        let went = worded(heard, saying(claim), vec![saying(claim)]);
+        assert_eq!(
+            went.said,
+            said(&[crate::action_claim::NOT_DONE_LINE]),
+            "{claim}"
+        );
+        assert_eq!((went.asked, went.ran.len()), (2, 0), "{claim}");
+        assert!(told_claim(&went), "{claim}: {:?}", went.notes);
+    }
+}
+
+/// A turn that made its call is untouched by the worded claims, byte for
+/// byte: the words beside the call, and after it.
+#[test]
+fn a_claim_in_other_words_beside_its_call_is_untouched() {
+    for (heard, words, name) in [
+        (
+            "Lamp, set a timer to one minute.",
+            "I've set a timer for one minute.",
+            "set_timer",
+        ),
+        ("Louder.", "I've turned the volume up.", "volume_up"),
+        ("Brighter.", "Okay, brighter.", "light_brighter"),
+    ] {
+        let mut beside = vec![text(words)];
+        beside.extend(calling(name));
+        let went = |worded_on: bool| {
+            turn_with(
+                true,
+                worded_on,
+                true,
+                heard,
+                beside.clone(),
+                vec![saying("Anything else?")],
+            )
+        };
+        assert_eq!(went(true), went(false), "{words}");
+        assert_eq!(went(true).ran, [name], "{words}");
+        // The call first, its words after.
+        let after = |worded_on: bool| {
+            turn_with(
+                true,
+                worded_on,
+                true,
+                heard,
+                calling(name),
+                vec![saying(words)],
+            )
+        };
+        assert_eq!(after(true), after(false), "{words}");
+    }
+}
+
+/// An answer that claims nothing in other words either is untouched, byte
+/// for byte; and without the worded switch a worded claim is said as
+/// before, as on the lamp.
+#[test]
+fn talk_and_the_switch_off_are_untouched_by_the_worded_claims() {
+    for (heard, answer) in [
+        ("Is my timer set?", "Is your timer set? Let me look."),
+        (
+            "Can you keep the light on until ten?",
+            "I can keep my light on until ten, with a reminder. Want one?",
+        ),
+        ("What did you do today?", "I've set my heart on tea."),
+        ("Put on some music.", "Okay, louder music it is."),
+        ("What colour is the light?", "My light is blue now."),
+    ] {
+        let on = worded(heard, saying(answer), vec![]);
+        assert_eq!(on, claimed(true, heard, saying(answer), vec![]), "{heard}");
+        assert_eq!(on.asked, 1, "{heard}");
+        assert!(!told_claim(&on), "{heard}");
+    }
+    let went = claimed(
+        true,
+        "Hey Lamp, keep the light on until ten.",
+        saying("I've kept the light on until ten."),
+        vec![],
+    );
+    assert_eq!(went.said, said(&["I've kept the light on until ten."]));
+    assert_eq!((went.asked, went.ran.len()), (1, 0));
+}
+
+/// The first builder's P2 on #5588: a true status answer to a question the
+/// person asked, with no call ("How long will the light stay on?" after a
+/// kept rule, "Is my timer still set?" after a timer), is no claim on the
+/// worded runs: said as it is, byte for byte as with them off, and never
+/// asked again. Heard with or without its '?'.
+#[test]
+fn a_status_answer_to_a_question_is_untouched_by_the_worded_claims() {
+    for (heard, answer) in [
+        (
+            "Lamp, how long will the light stay on?",
+            "The light stays on until ten.",
+        ),
+        (
+            "Lamp how long will the light stay on",
+            "I'll keep my light on until ten, as you asked.",
+        ),
+        (
+            "Lamp, is my timer still set?",
+            "Your timer is set for one minute.",
+        ),
+        (
+            "Hey Lamp, did you set my timer",
+            "I've set a timer for 9:39 am.",
+        ),
+        (
+            "Is the light staying on?",
+            "The light is staying on until ten.",
+        ),
+    ] {
+        let on = worded(heard, saying(answer), vec![]);
+        // Said whole, though lamp-voice may speak it in pieces at a comma.
+        let words: String = on
+            .said
+            .iter()
+            .map(|piece| piece.strip_prefix("said:").unwrap_or(piece))
+            .collect();
+        assert_eq!(words, answer, "{heard}");
+        assert_eq!((on.asked, on.ran.len()), (1, 0), "{heard}");
+        assert!(!told_claim(&on), "{heard}: {:?}", on.notes);
+        assert_eq!(on, claimed(true, heard, saying(answer), vec![]), "{heard}");
+    }
+}
+
+/// #5253's strict runs are unchanged on a question: the acting part's own
+/// line with no call is still held, asked again and said not done.
+#[test]
+fn a_strict_claim_to_a_question_is_still_held_with_the_worded_claims() {
+    let heard = "Lamp, is my timer still set?";
+    let went = worded(heard, saying("Timer set."), vec![saying("Timer set.")]);
+    assert_eq!(went.said, said(&[crate::action_claim::NOT_DONE_LINE]));
+    assert_eq!((went.asked, went.ran.len()), (2, 0));
+    assert!(told_claim(&went), "{:?}", went.notes);
+}
+
+/// The first builder's P2 on #5588: work done by another tool ("I've added
+/// a reminder to your calendar." beside `service_write`, "I've turned off
+/// the lights." after `use_skill` or a hand-over) stands: the worded runs
+/// judge only a turn with no calls at all. Byte for byte as with them off.
+#[test]
+fn a_worded_claim_in_a_turn_with_any_call_stands() {
+    for (heard, words, name) in [
+        (
+            "Lamp, add a reminder to my calendar.",
+            "I've added a reminder to your calendar.",
+            crate::services::WRITE,
+        ),
+        (
+            "Lamp, turn off the lights.",
+            "I've turned off the lights.",
+            crate::use_skill::NAME,
+        ),
+        (
+            "Lamp, turn off the lights.",
+            "I've turned off the lights.",
+            crate::agent_tasks::START,
+        ),
+    ] {
+        // The words beside the call.
+        let mut beside = vec![text(words)];
+        beside.extend(calling(name));
+        let went = |worded_on: bool| {
+            turn_with(
+                true,
+                worded_on,
+                true,
+                heard,
+                beside.clone(),
+                vec![saying("Anything else?")],
+            )
+        };
+        assert_eq!(went(true), went(false), "{words} beside {name}");
+        assert!(!told_claim(&went(true)), "{words} beside {name}");
+        // The call first, its words after.
+        let after = |worded_on: bool| {
+            turn_with(
+                true,
+                worded_on,
+                true,
+                heard,
+                calling(name),
+                vec![saying(words)],
+            )
+        };
+        assert_eq!(after(true), after(false), "{words} after {name}");
+        assert!(!told_claim(&after(true)), "{words} after {name}");
+    }
+    // A skill or a linked service, with the words said.
+    for name in [crate::services::WRITE, crate::use_skill::NAME] {
+        let words = "I've turned off the lights.";
+        let went = worded(
+            "Lamp, turn off the lights.",
+            calling(name),
+            vec![saying(words)],
+        );
+        assert_eq!(went.said, said(&[words]), "{name}");
+        assert_eq!(went.asked, 2, "{name}");
+    }
+}
+
+/// Twelve's refinement of the first builder's P2 on #5588: a request asked
+/// as a question ("Can you set a timer for one minute?") is still judged by
+/// the worded runs, since a claim with no call there is #5215's own bug.
+#[test]
+fn a_request_asked_as_a_question_is_still_judged_by_the_worded_claims() {
+    let went = worded(
+        "Lamp, can you set a timer for one minute?",
+        saying("Timer set for one minute."),
+        vec![calling("set_timer")],
+    );
+    assert_eq!(went.said, said(&["Timer set. It rings at 7:52 am."]));
+    assert_eq!(
+        (went.asked, went.ran.as_slice()),
+        (2, ["set_timer".to_owned()].as_slice())
+    );
+    assert!(told_claim(&went), "{:?}", went.notes);
+    let claim = "I've kept the light on until ten.";
+    let went = worded(
+        "Lamp, could you keep the light on until ten?",
+        saying(claim),
+        vec![saying(claim)],
+    );
+    assert_eq!(went.said, said(&[crate::action_claim::NOT_DONE_LINE]));
+    assert_eq!((went.asked, went.ran.len()), (2, 0));
+    assert!(told_claim(&went), "{:?}", went.notes);
 }

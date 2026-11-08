@@ -39,7 +39,19 @@
 //!   root's, 0644, checked by [`lamp_msgs::chosen_voice`]'s rules; an empty
 //!   one removes the file. The voice reads them at start, so it restarts as
 //!   for a new language. The reset's plan wipes both. `lamp-cloud` sends
-//!   them only with `LAMP_CHOSEN_VOICE=on`.
+//!   them only with `LAMP_CHOSEN_VOICE=on`;
+//! - the owner's two yeses from the app (`consent`, #5500,
+//!   `docs/onboarding.md`): face expressions for lamp-eyes and room sounds
+//!   for lamp-ears, each a file in [`Config::consent`] as the voice's
+//!   onboarding keeps it, with `"by":"app"` ([`lamp_msgs::consent`]),
+//!   `root:lampos` 0640 (the folder's group; 0600 with none). Off removes
+//!   it. lamp-eyes reads its yes every 2 s, so nothing restarts; lamp-ears
+//!   reads room sounds' only at start, so a new yes there restarts it once
+//!   no update is at work ([`restart_ears_when_unlocked`]); an off is
+//!   followed within 2 s as it is. `lamp-cloud` sends them only with
+//!   `LAMP_APP_CONSENT=on`, room sounds only on a lamp with no slide. The
+//!   reset's plan, a forget of everything and a redo of setup remove both,
+//!   whoever gave them.
 use crate::serve::{Config, Files, Save, write_private};
 use lamp_update::quiet::{Heard, QUIET, Quiet};
 use serde_json::{Value, json};
@@ -58,6 +70,8 @@ pub const LINE_MOST: usize = 4_096;
 pub const QUIET_MOST: Duration = Duration::from_secs(30 * 60);
 /// The unit restarted after a zone change.
 pub const SCHEDULE_UNIT: &str = "lamp-schedule.service";
+/// The unit restarted after a new room sounds yes from the app.
+pub const EARS_UNIT: &str = "lamp-ears.service";
 /// The unit restarted after the owner's developer setting changed.
 pub const CONTROL_UNIT: &str = "lamp-control.service";
 /// lamp-control's drop-in while developer access is on.
@@ -84,6 +98,9 @@ pub enum Change {
     Voice(Option<String>),
     /// The owner's words for the character; `None` clears them.
     Character(Option<String>),
+    /// One of the owner's yeses from the app (a key of
+    /// [`lamp_msgs::consent::FILES`]): kept, or removed.
+    Consent(&'static str, bool),
 }
 
 /// Where the chosen voice and the character words are kept: beside the
@@ -115,7 +132,8 @@ pub fn fit_name(name: &str) -> Result<String, &'static str> {
 /// `{"person_name": s}`, `{"display_name": s}`, `{"timezone": s}`,
 /// `{"language": s}`, `{"voice": s}`, `{"character": s}` (`""` clears
 /// either), or `{"owner_place": {"name", "lat", "lon", "set_at"}}`
-/// (`null` clears it), or `{"control": bool}`.
+/// (`null` clears it), or `{"control": bool}`, or `{"consent": {KEY: bool}}`
+/// with exactly one key of [`lamp_msgs::consent::FILES`].
 pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
     if line.len() > LINE_MOST {
         return Err("the request is too long".into());
@@ -171,6 +189,21 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
         "control" => Ok(Change::Control(
             given.as_bool().ok_or("control must be true or false")?,
         )),
+        // Checked again here, whatever lamp-cloud sent (#5500).
+        "consent" => {
+            let why = "consent holds one of face_expressions or room_sounds, true or false";
+            let asked = given
+                .as_object()
+                .filter(|asked| asked.len() == 1)
+                .ok_or(why)?;
+            let (key, yes) = asked.iter().next().ok_or(why)?;
+            let key = lamp_msgs::consent::FILES
+                .iter()
+                .map(|(known, _)| *known)
+                .find(|known| known == key)
+                .ok_or(why)?;
+            Ok(Change::Consent(key, yes.as_bool().ok_or(why)?))
+        }
         _ => Err("the request names no change this lamp makes".into()),
     }
 }
@@ -186,6 +219,8 @@ pub struct Done {
     pub restart_voice: bool,
     /// lamp-control must follow its drop-in: it was written or removed.
     pub restart_control: bool,
+    /// lamp-ears must take a new room sounds yes, read only at its start.
+    pub restart_ears: bool,
     /// The journal's line: what changed, never a name.
     pub said: String,
 }
@@ -214,6 +249,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_schedule: false,
                 restart_voice: false,
                 restart_control: false,
+                restart_ears: false,
                 said: format!(
                     "the person's name was changed ({} characters)",
                     name.chars().count()
@@ -227,6 +263,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_schedule: false,
                 restart_voice: false,
                 restart_control: false,
+                restart_ears: false,
                 said: "the person's name was removed".into(),
             })
         }
@@ -237,6 +274,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_schedule: false,
                 restart_voice: false,
                 restart_control: false,
+                restart_ears: false,
                 said: format!(
                     "the lamp's name in the app was changed ({} characters)",
                     name.chars().count()
@@ -252,6 +290,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_schedule: before != after,
                 restart_voice: false,
                 restart_control: false,
+                restart_ears: false,
                 // A zone is no one's name: said, as setup's own line says it.
                 said: format!("the time zone is now {zone}"),
             })
@@ -267,6 +306,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_schedule: false,
                 restart_voice: false,
                 restart_control: false,
+                restart_ears: false,
                 said: "the owner's place was set".into(),
             })
         }
@@ -279,6 +319,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_schedule: false,
                 restart_voice: before != after,
                 restart_control: false,
+                restart_ears: false,
                 said: format!("the language is now {code}"),
             })
         }
@@ -305,6 +346,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_schedule: false,
                 restart_voice: false,
                 restart_control: changed,
+                restart_ears: false,
                 said: format!(
                     "developer access is {}{}",
                     if *on { "on" } else { "off" },
@@ -320,6 +362,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_schedule: false,
                 restart_voice: changed,
                 restart_control: false,
+                restart_ears: false,
                 // A voice's name is no one's: said, as the language is.
                 said: format!(
                     "the chosen voice is now {}",
@@ -336,6 +379,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_schedule: false,
                 restart_voice: changed,
                 restart_control: false,
+                restart_ears: false,
                 said: match text {
                     Some(text) => format!(
                         "the character's words were set ({} characters)",
@@ -345,6 +389,33 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 },
             })
         }
+        Change::Consent(key, yes) => {
+            let path = lamp_msgs::consent::file_in(&config.consent, key)
+                .ok_or_else(|| io::Error::other("no such yes"))?;
+            let before = lamp_msgs::consent::read(&path, key).yes;
+            if *yes && !before {
+                keep_yes(&path, key)?;
+            } else if !*yes {
+                remove(&path)?;
+            }
+            let words = if *key == lamp_msgs::consent::ROOM_SOUNDS {
+                "room sounds"
+            } else {
+                "face expressions"
+            };
+            Ok(Done {
+                data: json!({ key.to_string(): *yes }),
+                restart_schedule: false,
+                restart_voice: false,
+                restart_control: false,
+                restart_ears: *yes && !before && *key == lamp_msgs::consent::ROOM_SOUNDS,
+                said: format!(
+                    "the {words} yes is {} from the app{}",
+                    if *yes { "on" } else { "off" },
+                    if *yes == before { " already" } else { "" }
+                ),
+            })
+        }
         Change::OwnerPlace(None) => {
             remove(&lamp_msgs::owner_place::beside_name(&config.name))?;
             Ok(Done {
@@ -352,6 +423,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_schedule: false,
                 restart_voice: false,
                 restart_control: false,
+                restart_ears: false,
                 said: "the owner's place was cleared".into(),
             })
         }
@@ -373,6 +445,43 @@ fn keep_line(path: &Path, line: Option<&str>) -> io::Result<bool> {
         None => remove(path)?,
     }
     Ok(before != fs::read(path).ok())
+}
+
+/// A yes from the app kept at `path`, whole and in place at once:
+/// `{"version":1,KEY:"yes","at_unix_s":N,"by":"app"}`, 0640 and the
+/// folder's group (`lampos` on a lamp, which the eyes and the ears are in),
+/// or 0600 where the folder's group is root's, as the voice keeps its own.
+fn keep_yes(path: &Path, key: &str) -> io::Result<()> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let folder = path
+        .parent()
+        .ok_or_else(|| io::Error::other("a yes has no folder"))?;
+    let group = Some(fs::metadata(folder)?.gid()).filter(|group| *group != 0);
+    let at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs());
+    let bytes = lamp_msgs::consent::bytes(key, at, lamp_msgs::consent::BY_APP);
+    let next = path.with_extension("change-next");
+    let _ = fs::remove_file(&next);
+    let result = (|| {
+        let mut file = fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&next)?;
+        let mode = if group.is_some() { 0o640 } else { 0o600 };
+        file.set_permissions(fs::Permissions::from_mode(mode))?;
+        if group.is_some() {
+            std::os::unix::fs::fchown(&file, None, group)?;
+        }
+        io::Write::write_all(&mut file, &bytes)?;
+        file.sync_all()?;
+        fs::rename(&next, path)?;
+        fs::File::open(folder)?.sync_all()
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&next);
+    }
+    result
 }
 
 /// The refusal of every request without `--enable`.
@@ -686,6 +795,7 @@ pub fn close_before_answer(
         restart_schedule: false,
         restart_voice: false,
         restart_control: false,
+        restart_ears: false,
         said,
     };
     Some((json!({ "done": data }), Some(done)))
@@ -715,6 +825,32 @@ pub fn restart_control_when_unlocked(
     {
         Ok(()) => "lamp-control restarted on the developer setting".into(),
         Err(why) => format!("lamp-control's restart failed: {why}"),
+    }
+}
+
+/// After a new room sounds yes from the app was kept and answered: lamp-ears
+/// starts its classifier only at its start, so it is restarted, holding
+/// lamp-update's lock alone ([`unlocked`], every [`UPDATE_LOOK_EVERY`], at
+/// most [`QUIET_MOST`]), as lamp-control is: its restart makes no sound, but
+/// a round's watch must never see it. `try-restart`: an ears not running
+/// reads the yes when it next starts. What happened, for the journal.
+pub fn restart_ears_when_unlocked(
+    ears: &mut impl Ears,
+    records: &lamp_update::records::Records,
+    systemd: &mut impl Systemd,
+) -> String {
+    let _held = match unlocked(ears, records, UPDATE_LOOK_EVERY, QUIET_MOST) {
+        Ok(lock) => lock,
+        Err(why) => {
+            return format!(
+                "no lock within {} min ({why}); lamp-ears takes the room sounds yes when it next starts",
+                QUIET_MOST.as_secs() / 60
+            );
+        }
+    };
+    match systemd.systemctl(&["try-restart", EARS_UNIT]) {
+        Ok(()) => "lamp-ears restarted on the room sounds yes".into(),
+        Err(why) => format!("lamp-ears' restart failed: {why}"),
     }
 }
 

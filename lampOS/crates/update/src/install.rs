@@ -394,7 +394,7 @@ pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
     (
         "light-scenes",
         "not yet tried on a lamp (#1679), and its function would put a product session past its \
-         32 without `LAMP_USE_SKILL=on`, which the product doesn't run",
+         32 without `LAMP_USE_SKILL=on`, on in the product since #2826",
     ),
     (
         "point-light",
@@ -405,7 +405,7 @@ pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
     (
         "light-show",
         "not yet tried on a lamp (#1679), and its function would put a product session past its \
-         32 without `LAMP_USE_SKILL=on`, which the product doesn't run",
+         32 without `LAMP_USE_SKILL=on`, on in the product since #2826",
     ),
     // #1684's two core skills, merged off (the first builder, #1722): a
     // trial puts them on by hand. Each comes with the product once the four
@@ -460,8 +460,9 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
     (
         "guard-mode",
         "an installable skill (#1685), not yet tried on a lamp: it needs `room/presence` \
-         (`LAMP_PRESENCE=on`), and its texts reach the phone only with `LAMP_MESSAGES=on` in \
-         `lamp-cloud`, which carries `messages/out` up as unasked news",
+         (`LAMP_PRESENCE=on`), and its texts reach the phone only with `LAMP_SKILL_MESSAGES=on` \
+         (skills' lines alone) or `LAMP_MESSAGES=on` in `lamp-cloud`, either of which carries \
+         `messages/out` up as unasked news",
     ),
     (
         "laugh-glance",
@@ -480,6 +481,11 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "meal-check",
         "an installable skill, not yet tried on a lamp (#3504): V1's meal reminder, which its \
          owner chooses; a played check on a lamp comes first",
+    ),
+    (
+        "quiet-focus",
+        "an installable skill, not yet tried on a lamp: one warm word when they look up after 45 \
+         minutes head down (the eyes' `room/activity`), which its owner chooses; a played check on a lamp comes first",
     ),
     (
         "who-was-here",
@@ -1956,7 +1962,24 @@ fn before_units(
         let placed = format!("{}{}", unit::folder(&part.folder, build), part.binary);
         let from = config.on(&placed);
         let bytes = fs::read(&from).map_err(|error| format!("{}: {error}", from.display()))?;
+        // A writer whose bytes this changes (missing or unreadable counts)
+        // leaves a refresh's `.prev`, request and record describing a
+        // writer that is gone: cleared once it is in place, the record
+        // last (crate::writer_swap::forget_writer, #5539).
+        let writer_changed = fs::read(config.on(crate::own::BACK)).map_or(true, |now| now != bytes);
         put(config, crate::own::BACK, &bytes, 0o755, &mut changed)?;
+        if crate::writer_swap::forget_writer(
+            &config.root,
+            records.folder(),
+            &manifest::sha256_hex(&bytes),
+            writer_changed,
+            crate::records::unix_ms(),
+        )? {
+            changed.push(
+                "cleared the settings writer's refresh (.prev, request and record) it replaced"
+                    .to_owned(),
+            );
+        }
         own = Some(placed);
     }
 

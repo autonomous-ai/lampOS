@@ -51,6 +51,10 @@ pub struct FaceSwitches {
     /// face record as it stands, and the journal the refusal's reason name
     /// ([`RECORD_TOLD_ENVIRONMENT`], #5141 rows 9 and 10).
     pub record: bool,
+    /// With names checked, a rename's yes is judged by its guards
+    /// ([`rename_agreed`]), not by [`agreed_to`]'s word list
+    /// ([`RENAME_YES_ENVIRONMENT`], #5485).
+    pub rename_yes: bool,
 }
 
 /// A refused face request tells the model the face record as it stands
@@ -64,6 +68,19 @@ pub const RECORD_TOLD_ENVIRONMENT: &str = "LAMP_NAMES_RECORD_TOLD";
 /// Whether [`RECORD_TOLD_ENVIRONMENT`] is on.
 pub fn record_told_on() -> bool {
     std::env::var(RECORD_TOLD_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// A rename's yes is judged by its guards ([`rename_agreed`]), not by a
+/// word list, and the voice runs a rename held for that yes itself
+/// (`second_provider::HeldRename`): lamp-29e7, 6 Nov (#5485), where every
+/// yes to "Do you want me to know you as A instead?" was refused for a
+/// word outside [`BESIDE_A_YES`]. Only with `LAMP_NAMES=checked`; the
+/// second route only; `on` only, off unless set.
+pub const RENAME_YES_ENVIRONMENT: &str = "LAMP_NAMES_RENAME_YES";
+
+/// Whether [`RENAME_YES_ENVIRONMENT`] is on.
+pub fn rename_yes_on() -> bool {
+    std::env::var(RENAME_YES_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
 /// The exchanges before the turn in hand that a name may have been said
@@ -207,20 +224,40 @@ fn letters_counted(said: &str) -> Option<usize> {
 /// before them; and seven letters were put together from four spelled
 /// letters, a first name said twice between them, and "three letters".
 pub fn name_heard(name: &str, said: &Said) -> bool {
-    let letters = name.chars().filter(|c| c.is_alphabetic()).count();
-    let counted_otherwise =
-        |turn: &str| letters_counted(turn).is_some_and(|counted| counted != letters);
-    if counted_otherwise(&said.this) {
+    if counted_otherwise(name, &said.this) {
         return false;
     }
     if said_by_them(name, &said.this) {
         return true;
     }
-    agreed_to(name, said)
-        && said
-            .before
-            .iter()
-            .any(|(person, _)| said_by_them(name, person) && !counted_otherwise(person))
+    agreed_to(name, said) && said_before(name, said)
+}
+
+/// Whether the person counted `name`'s letters otherwise in `turn`.
+fn counted_otherwise(name: &str, turn: &str) -> bool {
+    let letters = name.chars().filter(|c| c.is_alphabetic()).count();
+    letters_counted(turn).is_some_and(|counted| counted != letters)
+}
+
+/// Whether the person said `name` in an exchange before the turn in hand,
+/// with no count of its letters otherwise there.
+fn said_before(name: &str, said: &Said) -> bool {
+    said.before
+        .iter()
+        .any(|(person, _)| said_by_them(name, person) && !counted_otherwise(name, person))
+}
+
+/// [`name_heard`] for a rename with `LAMP_NAMES_RENAME_YES` (#5485): as
+/// heard, or said by them in an exchange before and agreed to now by
+/// [`rename_agreed`] in place of [`agreed_to`]. So "Can you call me A
+/// instead?", "A instead of B, is that right?", "Okay. Can you repeat my
+/// name again?" (lamp-29e7, 6 Nov) hears A. Never with their letters
+/// counted otherwise.
+fn heard_for_rename(name: &str, said: &Said) -> bool {
+    name_heard(name, said)
+        || (!counted_otherwise(name, &said.this)
+            && rename_agreed(name, said)
+            && said_before(name, said))
 }
 
 /// Words that may stand beside a yes to the lamp's read-back without
@@ -254,13 +291,8 @@ const BESIDE_THE_SAVE: &[&str] = &[
     "remember", "face", "save", "keep", "and", "now", "go", "ahead", "can", "you",
 ];
 
-/// [`plain_yes`], with `beside` also standing beside the yes.
-fn plain_yes_beside(name: &str, turn: &str, beside: &[&str]) -> bool {
-    if turn.trim_end().ends_with('?') {
-        return false;
-    }
-    let words = lower_words(turn);
-    let name = folded_words(name);
+/// Which of `words` are a yes's own ([`AGREE`], [`AGREE_WITH_A_NO`]).
+fn agreeing_words(words: &[String]) -> Vec<bool> {
     let phrase_at = |at: usize, phrase: &[&str]| {
         phrase
             .iter()
@@ -275,6 +307,17 @@ fn plain_yes_beside(name: &str, turn: &str, beside: &[&str]) -> bool {
             }
         }
     }
+    covered
+}
+
+/// [`plain_yes`], with `beside` also standing beside the yes.
+fn plain_yes_beside(name: &str, turn: &str, beside: &[&str]) -> bool {
+    if turn.trim_end().ends_with('?') {
+        return false;
+    }
+    let words = lower_words(turn);
+    let name = folded_words(name);
+    let covered = agreeing_words(&words);
     agrees(turn)
         && words.iter().zip(&covered).all(|(word, covered)| {
             *covered
@@ -291,16 +334,84 @@ pub(crate) fn plain_agreement(turn: &str) -> bool {
     plain_yes("", turn)
 }
 
-/// Beside a yes to a held keep only ([`plain_agreement_to_keep`]).
-const BESIDE_A_KEEP: &[&str] = &["keep"];
+/// What a yes to a held keep may say it keeps, right after "keep"
+/// ([`plain_agreement_to_keep`]): "keep that", "keep it".
+const KEEP_WHAT: &[&str] = &["that", "it", "this", "those", "them"];
 
 /// [`plain_agreement`], or a plain yes that also says to keep it: "Yes,
 /// please keep that.", "Yes, keep it." (lamp-06c1, 5 Nov, S4: the held
-/// keep was dropped as not a plain yes). Only for a keep held for the
-/// person's yes; a held forget, and every other ask, takes
-/// [`plain_agreement`].
+/// keep was dropped as not a plain yes). Also, with no yes word, the keep
+/// said back alone, "Please keep that.", "Keep it.", and, beside a yes,
+/// "keep off", which is how speech to text heard "keep that" on lamp-06c1
+/// (5 Nov, S14 run 14:21, request 424: "Yes. Please keep off.", and the
+/// brother fact was never kept). "Off" only right after "keep", and never
+/// without a yes word: "Keep off." alone, or "Yes, keep it off.", is not
+/// one ([`unclear_answer_to_keep`]). Any no ([`DISAGREE`]) refuses. Only
+/// for a keep held for the person's yes; a held forget, and every other
+/// ask, takes [`plain_agreement`].
 pub(crate) fn plain_agreement_to_keep(turn: &str) -> bool {
-    plain_yes_beside("", turn, BESIDE_A_KEEP)
+    if turn.trim_end().ends_with('?') {
+        return false;
+    }
+    let words = lower_words(turn);
+    let after_keep = |at: usize, these: &[&str]| {
+        at > 0 && words[at - 1] == "keep" && these.contains(&words[at].as_str())
+    };
+    let agreeing = agrees(turn);
+    let keeps_it = (1..words.len()).any(|at| after_keep(at, KEEP_WHAT))
+        && !words.iter().any(|word| DISAGREE.contains(&word.as_str()));
+    if !agreeing {
+        // The keep said back with no yes word: only "please", "lamp", "for",
+        // "me" and a thanks may stand around it, never a word that makes it a
+        // question whose "?" was lost ("Do you keep that", "I'd keep it";
+        // #5572's privacy read, Jarvis, 18:41).
+        return keeps_it
+            && (0..words.len()).all(|at| {
+                words[at] == "keep"
+                    || after_keep(at, KEEP_WHAT)
+                    || BESIDE_A_KEEP_ALONE.contains(&words[at].as_str())
+                    || (words[at] == "you" && at > 0 && words[at - 1] == "thank")
+            });
+    }
+    let covered = agreeing_words(&words);
+    (0..words.len()).all(|at| {
+        covered[at]
+            || BESIDE_A_YES.contains(&words[at].as_str())
+            || words[at] == "keep"
+            || after_keep(at, KEEP_WHAT)
+            || after_keep(at, &["off"])
+    })
+}
+
+/// What may stand around a keep said back with no yes word
+/// ([`plain_agreement_to_keep`]): "Please keep that for me, thanks.", "Lamp,
+/// keep it.". Not [`BESIDE_A_YES`]'s "do", "would", "i", "i'd" or a "you" of
+/// its own, which make the keep a question: "Do you keep that" is asked about
+/// once more ([`unclear_answer_to_keep`]).
+const BESIDE_A_KEEP_ALONE: &[&str] = &["please", "lamp", "for", "me", "thanks", "thank"];
+
+/// The most words an answer to a held keep is asked about again in
+/// ([`unclear_answer_to_keep`]): a line that says more says something else.
+const UNCLEAR_MOST: usize = 6;
+
+/// Whether `turn`, the person's answer to the lamp's offer to keep a held
+/// keep, is neither a yes to it ([`plain_agreement_to_keep`]) nor a no: a
+/// yes or a keep with a word misheard ("Yes. Please key that.", "Please
+/// keep of."), "Keep off." with no yes, or a yes asked back ("Yes?"). At
+/// most [`UNCLEAR_MOST`] words, a yes word or "keep"/"save" among them,
+/// and no word of a no ([`DISAGREE`]). The lamp asks once more, "Should I
+/// keep that?", rather than dropping the keep unsaid
+/// (`second_provider::take_held_forget`).
+pub(crate) fn unclear_answer_to_keep(turn: &str) -> bool {
+    let words = lower_words(turn);
+    !words.is_empty()
+        && words.len() <= UNCLEAR_MOST
+        && !plain_agreement_to_keep(turn)
+        && !words.iter().any(|word| DISAGREE.contains(&word.as_str()))
+        && (agrees(turn)
+            || words
+                .iter()
+                .any(|word| matches!(word.as_str(), "keep" | "save")))
 }
 
 /// Whether the lamp said `name` back in the exchange just before the turn
@@ -312,6 +423,136 @@ pub(crate) fn agreed_to(name: &str, said: &Said) -> bool {
             .before
             .last()
             .is_some_and(|(_, lamp)| said_by_them(name, lamp))
+}
+
+/// Words that take a rename's yes back besides [`DISAGREE`]: "Yes, but
+/// it's Kess.", "Okay, actually it's Kess.", "Sure, it's Kess though." (the
+/// reviewer on #1208), and a maybe: "Có lẽ." ("maybe", whose "có" is a
+/// yes word), "Yes, maybe.", "Perhaps."; a hesitant yes, asked once more
+/// as #5572 asks an unclear one: "Okay, wait.", "Yes, hold on.", "Okay,
+/// let me think."; and the Vietnamese "nhưng" (but) and "khoan" (wait):
+/// "Ừ, nhưng thôi.", "Khoan đã." (Thirteen on #5586). Whole words or
+/// phrases of them in a row ([`lower_words`], accents kept, so "nhưng" is
+/// not "nhung"), never part of a word: "holding" or "think" alone take
+/// nothing back.
+const TAKE_BACK: &[&[&str]] = &[
+    &["but"],
+    &["actually"],
+    &["though"],
+    &["maybe"],
+    &["perhaps"],
+    &["lẽ"],
+    &["wait"],
+    &["hold", "on"],
+    &["hang", "on"],
+    &["let", "me", "think"],
+    &["nhưng"],
+    &["khoan"],
+];
+
+/// Whether the lamp said `name` back in its last answer and the turn in
+/// hand agrees to it, judged by its guards, not by a word list
+/// (`LAMP_NAMES_RENAME_YES`, #5485): some sentence of it that is no
+/// question agrees ([`agrees`]), so "Okay. Can you repeat my name again?"
+/// is a yes and a lone "Yes?" is not; nothing in it takes the yes back
+/// ([`DISAGREE`], [`TAKE_BACK`]); and it names no one else
+/// ([`names_someone_else`]). What `replace` needs with the switch on, in
+/// place of [`agreed_to`].
+///
+/// Why, from lamp-29e7 on 6 Nov: the person said "Yes. Please forget the
+/// name B, and this is my face, the face of A." and later "Okay. Can you
+/// repeat my name again?", and each was refused for words outside
+/// [`BESIDE_A_YES`] or for the question; the face kept the old name.
+pub(crate) fn rename_agreed(name: &str, said: &Said) -> bool {
+    let said_back = said
+        .before
+        .last()
+        .is_some_and(|(_, lamp)| said_by_them(name, lamp));
+    let turn = said.this.as_str();
+    let a_statement_agrees = turn
+        .split_inclusive(['.', '!', '?'])
+        .filter(|sentence| !sentence.trim_end().ends_with('?'))
+        .any(agrees);
+    let words = lower_words(turn);
+    let taken_back = (0..words.len()).any(|at| {
+        TAKE_BACK.iter().any(|phrase| {
+            phrase
+                .iter()
+                .enumerate()
+                .all(|(next, word)| words.get(at + next).is_some_and(|said| said == word))
+        })
+    });
+    said_back
+        && agrees(turn)
+        && a_statement_agrees
+        && !taken_back
+        && !names_someone_else(name, turn)
+}
+
+/// Whether `turn` names someone other than `name`: it gives a name
+/// ([`gives_a_name`]) once `name`'s own words are taken out ("Yes, my name
+/// is Kess."); it spells a run of letters that is not `name` or one of its
+/// words ("Yes, K, E, S, S."); or it holds a word one letter from one of
+/// `name`'s, as a misheard name corrected is ("Dạ, Kess ạ." to "Kesh",
+/// the reviewer on #1208). Only names of four letters or more have such
+/// near words: "and" is one letter from "Ann". No word is judged by its
+/// capital letter, which is the transcript's, not the person's.
+fn names_someone_else(name: &str, turn: &str) -> bool {
+    let name_words = folded_words(name);
+    let without_name: String = turn
+        .split_whitespace()
+        .map(|token| match folded_words(token).as_slice() {
+            [word] if name_words.contains(word) => token
+                .chars()
+                .filter(|c| !c.is_alphanumeric())
+                .collect::<String>(),
+            _ => token.to_owned(),
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    let gives_another = gives_a_name(&without_name);
+    let whole = name_words.concat();
+    let spells_another = spelled_runs(&folded_words(turn))
+        .iter()
+        .filter(|letters| letters.chars().count() >= 2)
+        .any(|letters| *letters != whole && !name_words.contains(letters));
+    let near_another = folded_words(turn).iter().any(|word| {
+        !name_words.contains(word)
+            && name_words
+                .iter()
+                .filter(|own| own.chars().count() >= 4)
+                .any(|own| one_letter_apart(own, word))
+    });
+    gives_another || spells_another || near_another
+}
+
+/// Whether `a` and `b` differ by exactly one letter changed, added or
+/// taken out.
+fn one_letter_apart(a: &str, b: &str) -> bool {
+    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
+    let (short, long) = if a.len() <= b.len() {
+        (&a, &b)
+    } else {
+        (&b, &a)
+    };
+    match long.len() - short.len() {
+        0 => {
+            short
+                .iter()
+                .zip(long.iter())
+                .filter(|(x, y)| x != y)
+                .count()
+                == 1
+        }
+        1 => (0..long.len()).any(|skip| {
+            long.iter()
+                .enumerate()
+                .filter(|(at, _)| *at != skip)
+                .map(|(_, c)| c)
+                .eq(short.iter())
+        }),
+        _ => false,
+    }
 }
 
 /// Whether, in the exchanges `said` holds, the person said `name`, the lamp
@@ -357,6 +598,11 @@ pub(crate) enum HeldSaveVerdict {
 /// right?" and "Yes, that's my name." the model made no call, and no face
 /// was kept).
 pub(crate) fn held_save_verdict(name: &str, said: &Said) -> HeldSaveVerdict {
+    // The held call keeps the model's raw name; it is judged as the word
+    // its letters make, as `run_switched` judges it: "J-A-N-E" read back
+    // as "Jane" and said yes to runs (Fifth's P2 on #5580).
+    let joined = letters_as_word(name);
+    let name = joined.as_deref().unwrap_or(name);
     if said_back_and_agreed(name, said) {
         return HeldSaveVerdict::Runs;
     }
@@ -379,7 +625,16 @@ pub(crate) fn held_save_verdict(name: &str, said: &Said) -> HeldSaveVerdict {
 /// Reviewer-lead's P3 on #5415).
 pub(crate) fn refused_here(told: &Value) -> bool {
     told["error"].as_str().is_some_and(|error| {
-        [NO_NAME, NOT_HEARD, ONLY_THE_CALL, SAY_IT_BACK, NOT_AGREED].contains(&error)
+        [
+            NO_NAME,
+            NOT_HEARD,
+            NOT_HEARD_SPELLED,
+            NOT_HEARD_SAY_AGAIN,
+            ONLY_THE_CALL,
+            SAY_IT_BACK,
+            NOT_AGREED,
+        ]
+        .contains(&error)
     })
 }
 
@@ -429,6 +684,37 @@ fn spelling_asked(said: &Said) -> bool {
     said.before
         .last()
         .is_some_and(|(_, lamp)| asks_to_spell(lamp))
+}
+
+/// What a name not heard is told: [`NOT_HEARD`], which asks for a
+/// spelling, or, once the lamp asked them to spell in any exchange the
+/// check holds, never a second ask (lamp-3e83, #5564):
+/// [`NOT_HEARD_SPELLED`] when they spelled after that ask, so the name
+/// their letters make is said back, and [`NOT_HEARD_SAY_AGAIN`] when they
+/// didn't, since no name of theirs could pass a read-back's yes then
+/// (Jarvis's P2 on #5580: "Lord in." again, "Lauren?", "Yes." looped).
+fn not_heard(said: &Said) -> &'static str {
+    match said.before.iter().position(|(_, lamp)| asks_to_spell(lamp)) {
+        None => NOT_HEARD,
+        Some(at) if spelled_after(said, at) => NOT_HEARD_SPELLED,
+        Some(_) => NOT_HEARD_SAY_AGAIN,
+    }
+}
+
+/// Whether any of their lines after the lamp's line `before[at]` (its
+/// answer, and the turn in hand) spells letter by letter: a run of two
+/// letters or more ([`spelled_runs`]), whether or not it agrees with a
+/// count they gave ("four letters", five spelled is still a spelling).
+fn spelled_after(said: &Said, at: usize) -> bool {
+    said.before[at + 1..]
+        .iter()
+        .map(|(person, _)| person.as_str())
+        .chain([said.this.as_str()])
+        .any(|person| {
+            spelled_runs(&folded_words(person))
+                .iter()
+                .any(|letters| letters.chars().count() >= 2)
+        })
 }
 
 /// The provider worker's argument for the names switch.
@@ -552,6 +838,26 @@ fn spelled_name(said: &str) -> Option<String> {
             .unwrap_or_default()
     });
     Some(capitalised.collect::<Vec<_>>().join(" "))
+}
+
+/// A name written as its letters ("J-A-N-E", "J A N E", "j.a.n.e."), as
+/// the word they make ([`spelled_name`]): "Jane". None for a name that is
+/// not only letters, or of fewer than three, which may be initials ("A J",
+/// "T.J."). Nobody calls a person by the spelling of their name: on
+/// lamp-3e83 a spelled name came back as "Jane or J-A-N-E?" (#5564).
+pub(crate) fn letters_as_word(name: &str) -> Option<String> {
+    let words = folded_words(name);
+    let only_letters = !words.is_empty()
+        && words
+            .iter()
+            .all(|word| word.chars().count() == 1 || word == "double");
+    let letters: usize = spelled_runs(&words)
+        .iter()
+        .map(|run| run.chars().count())
+        .sum();
+    (only_letters && letters >= 3)
+        .then(|| spelled_name(name))
+        .flatten()
 }
 
 /// Whether a name of more than one word is spelled as one run of letters
@@ -1215,13 +1521,24 @@ pub fn asks_to_remember(said: &str) -> bool {
 /// #705, 13:43: on 15 October the lamp only said it would remember).
 /// A condition, so that a match that was no name ("I'm Irish.") costs
 /// nothing (the reviewer on #1057).
-pub const NAME_TOLD_NOTE: &str = "If they have just told you their own name, call remember_my_face with it now, as they said or spelled it, or if you are not sure of it, say it back and ask them to spell it. Never only say that you will remember it. If what they said was not their name, do nothing about it.";
+pub const NAME_TOLD_NOTE: &str = "If they have just told you their own name, call remember_my_face with it now, as they said it, or if they spelled it, as the name the letters make, written as a word. If you are not sure of it, say it back as a name and ask if you have it right; ask them to spell it only if they say it is wrong, and only once. Never only say that you will remember it. If what they said was not their name, do nothing about it.";
 
-/// What the model is told when the name is not in what they said.
-const NOT_HEARD: &str = "You did not hear that name in what they said. Say the name back to them and ask them to spell it, then call this again with the name as they said or spelled it.";
+/// What the model is told when the name is not in what they said: a
+/// spelling is asked for once ([`not_heard`]).
+const NOT_HEARD: &str = "You did not hear that name in what they said. Say the name back to them and ask them to spell it, then call this again with the name as they said it, or as the name their letters make, written as a word, never as letters.";
+/// What the model is told when the name is not in what they said after
+/// they were asked to spell it ([`not_heard`]): never asked again
+/// (lamp-3e83, #5564: the lamp asked for spellings too often).
+const NOT_HEARD_SPELLED: &str = "You did not hear that name in what they said, and they were already asked to spell it, so do not ask them to spell it again. Say back the name their letters make, as a name only, never its letters and never as a choice between the name and its spelling, and ask if you have it right. Only if they say yes, call this again with that name.";
+/// What the model is told when the name is not in what they said, they
+/// were asked to spell it, and gave no letters ([`not_heard`]): a name
+/// they never said or spelled can't pass a read-back's yes, so it asks for
+/// the name once more, never a spelling again and never a name read back
+/// (Jarvis's P2 on #5580).
+const NOT_HEARD_SAY_AGAIN: &str = "You did not hear that name in what they said, and they were already asked to spell it, so do not ask them to spell it again, and do not say a name back to them. Ask them to say their name once more, then call this again with the name as they say it.";
 /// What the model is told at setup, before the first save, when the name
 /// was not said back and agreed to (#5140 row 5).
-pub(crate) const SAY_IT_BACK: &str = "I have not kept their face yet. First say the name back to them and ask if you have it right. Only if they say yes, call this again with that name; if they correct it, say the new one back the same way.";
+pub(crate) const SAY_IT_BACK: &str = "I have not kept their face yet. First say the name back to them and ask if you have it right, the name as a word only, never its letters and never as a choice between the name and its spelling. Only if they say yes, call this again with that name; if they correct it, say the new one back the same way.";
 /// What the model is told when the name was only the word that called the
 /// lamp ([`only_the_call`]).
 const ONLY_THE_CALL: &str = "That word was them calling you, not their name, so I have not remembered anyone. Ask them what their name is, then call this again with the name they give.";
@@ -1229,7 +1546,7 @@ const NOT_OWN_NAME: &str = "I could not confirm that this was their own name, so
 const NAME_UNCHANGED: &str = "I cannot safely replace a saved name from this request, so I have not changed anyone's saved face.";
 /// What the model is told when it would replace a name before the person
 /// agreed to the new one.
-const NOT_AGREED: &str = "They have not said yes to that name yet. Say the new name back and ask whether they want to be known by it instead. Only if they say yes, call this again with the new name and replace true.";
+pub(crate) const NOT_AGREED: &str = "They have not said yes to that name yet. Say the new name back and ask whether they want to be known by it instead. Only if they say yes, call this again with the new name and replace true.";
 /// What the model is told when the face is near someone known by a name one
 /// letter from the one heard (#2176 row 4): the name may be misheard, so
 /// they spell it, and no known name is said back. The spelled name goes with
@@ -1239,7 +1556,7 @@ const NOT_AGREED: &str = "They have not said yes to that name yet. Say the new n
 /// turn in hand spells the name ([`spelled_by_them`]): a name said again, or
 /// a yes, goes without it and is asked about again (both reviewers' P2 on
 /// #2269).
-const NEAR_TO: &str = "You may have misheard their name. Do not say any name you know. Ask them to spell their name, letter by letter, then call this again with the name as they spelled it and apart true.";
+const NEAR_TO: &str = "You may have misheard their name. Do not say any name you know. Ask them to spell their name, letter by letter, then call this again with the name their letters make, written as a word, never as letters, and apart true.";
 /// What the model is told when the face can't be kept under that name (it
 /// is someone's the lamp knows, and this face isn't near theirs). It says
 /// nothing of who the lamp knows, and no yes changes it (the reviewer's P1
@@ -1267,6 +1584,7 @@ pub fn tools_checked(checked: bool) -> Vec<Tool> {
         remember_speaker: false,
         at_setup: false,
         record: false,
+        rename_yes: false,
     })
 }
 
@@ -1379,6 +1697,7 @@ pub fn run(socket: &Path, call: &ToolCall, checked: bool) -> (Value, bool) {
             remember_speaker: false,
             at_setup: false,
             record: false,
+            rename_yes: false,
         },
         None,
         None,
@@ -1707,6 +2026,8 @@ pub fn record_now(
 pub fn refusal_reason(error: &str) -> &'static str {
     const REASONS: &[(&str, &str)] = &[
         (NOT_HEARD, "not_heard"),
+        (NOT_HEARD_SPELLED, "not_heard_spelled"),
+        (NOT_HEARD_SAY_AGAIN, "not_heard_say_again"),
         (ONLY_THE_CALL, "only_the_call"),
         (NOT_OWN_NAME, "not_own_name"),
         (NAME_UNCHANGED, "name_unchanged"),
@@ -1806,6 +2127,7 @@ fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Valu
             remember_speaker: false,
             at_setup: false,
             record: false,
+            rename_yes: false,
         },
         said,
         None,
@@ -1851,12 +2173,24 @@ fn run_switched(
             true,
         );
     };
+    // A name written as its letters is kept, and so said back, as the word
+    // they make: nobody calls a person by the spelling of their name
+    // (lamp-3e83, #5564: "Jane or J-A-N-E?").
+    let joined = (checked && call.name == REMEMBER)
+        .then(|| letters_as_word(name))
+        .flatten();
+    let name = joined.as_deref().unwrap_or(name);
     let setup = checked && switches.at_setup && call.name == REMEMBER;
     // At setup, a name not heard is taken as they spelled it in the turn in
     // hand: the letters are their own words, not the model's guess (#5140
     // row 6, lamp-0c4e: a misheard name never passed this check).
     let spelled;
-    let heard = name_heard(name, said) || (setup && said_back_and_agreed(name, said));
+    let replacing = call.args.get("replace").and_then(Value::as_bool) == Some(true);
+    let heard = if checked && switches.rename_yes && replacing {
+        heard_for_rename(name, said)
+    } else {
+        name_heard(name, said)
+    } || (setup && said_back_and_agreed(name, said));
     let name = if checked && call.name == REMEMBER && !heard {
         // Only after the lamp asked them to spell, and as many spelled runs
         // as the model's name has words: "L O R E N, and I'm at I B M" is
@@ -1871,7 +2205,7 @@ fn run_switched(
                 spelled = letters;
                 spelled.as_str()
             }
-            None => return (json!({"error": NOT_HEARD}), true),
+            None => return (json!({"error": not_heard(said)}), true),
         }
     } else {
         name
@@ -1892,7 +2226,14 @@ fn run_switched(
     // A name replaces another only once the lamp said it back and they
     // said yes (the first builder on #1057: a misheard name was kept while
     // the person was still correcting it).
-    if checked && call.name == REMEMBER && replace && !agreed_to(name, said) {
+    // With `LAMP_NAMES_RENAME_YES` the yes is judged by its guards, not a
+    // word list (#5485, lamp-29e7).
+    let agreed = if switches.rename_yes {
+        rename_agreed(name, said)
+    } else {
+        agreed_to(name, said)
+    };
+    if checked && call.name == REMEMBER && replace && !agreed {
         return (json!({"error": NOT_AGREED}), true);
     }
     // `apart` only on a name spelled in the turn in hand: one said again may
@@ -2069,6 +2410,32 @@ fn told(answer: &Value) -> Value {
 
 /// [`told`], and with Who was here's names on (`visits`), a person just
 /// remembered is asked once whether they may be named ([`ASK_TO_NAME`]).
+/// How the model is told the face is known by another name, around that
+/// name ([`told_asking`], read back by [`rename_asked`]).
+const KNOWN_AS_OPENS: &str = "You already know this face as ";
+const KNOWN_AS_ENDS: &str = ". Say the new name back and ask whether they want to be known by it instead. Only if they say yes, call this again with the new name and replace true.";
+
+/// What the model is told when the eyes know the face as `known`.
+pub(crate) fn told_known_as(known: &str) -> Value {
+    json!({"error": format!("{KNOWN_AS_OPENS}{known}{KNOWN_AS_ENDS}")})
+}
+
+/// Whether a `remember_my_face` answer, as the model is told it, has the
+/// lamp ask the person whether to be known by the new name instead: the
+/// face is known by another name (the eyes' `known_as`), given here, or a
+/// `replace` came before their yes ([`NOT_AGREED`]), with no old name
+/// known. What a rename is held for (`second_provider::HeldRename`).
+pub(crate) fn rename_asked(told: &Value) -> Option<Option<String>> {
+    let error = told["error"].as_str()?;
+    if error == NOT_AGREED {
+        return Some(None);
+    }
+    error
+        .strip_prefix(KNOWN_AS_OPENS)?
+        .strip_suffix(KNOWN_AS_ENDS)
+        .map(|known| Some(known.to_owned()))
+}
+
 fn told_asking(answer: &Value, visits: bool) -> Value {
     if let Some(name) = answer.get("remembered").and_then(Value::as_str) {
         // With visits counted (`lamp-eyes --visits on`), the person is told so
@@ -2114,9 +2481,7 @@ fn told_asking(answer: &Value, visits: bool) -> Value {
     if answer.get("error").and_then(Value::as_str) == Some("known_as")
         && let Some(known) = answer.get("known_as").and_then(Value::as_str)
     {
-        return json!({"error": format!(
-            "You already know this face as {known}. Say the new name back and ask whether they want to be known by it instead. Only if they say yes, call this again with the new name and replace true."
-        )});
+        return told_known_as(known);
     }
     let words = match answer.get("error").and_then(Value::as_str) {
         Some("no_face") => "I could not see a face. They should look at me and ask again.",
@@ -3191,6 +3556,106 @@ mod tests {
         }
     }
 
+    /// lamp-06c1, 5 Nov, S14 run 14:21, request 424: "Yes, please keep
+    /// that." to "Want me to keep that for you?" was heard as "Yes. Please
+    /// keep off.", and the brother fact was never kept. A keep said back
+    /// ("keep that", "keep it"), or "keep off" beside a yes, is a yes to a
+    /// held keep; any no still refuses, and to nothing but a keep is it a
+    /// yes.
+    /// #5572's privacy read (Jarvis, 18:41): with no yes word, the keep said
+    /// back alone let every word that stands beside a yes sit around it, so a
+    /// question whose "?" speech to text dropped ("Do you keep that", to
+    /// "Want me to keep that for you?") kept the fact. Only "please", "lamp",
+    /// "for", "me" and a thanks may stand around a keep said with no yes; a
+    /// line that asks back is asked about once more, never a yes.
+    #[test]
+    fn a_question_that_lost_its_mark_is_not_a_yes_to_a_held_keep() {
+        for asked_back in [
+            "Do you keep that",
+            "Would you keep it",
+            "You keep that",
+            "I would keep it",
+            "I'd keep that",
+            "Do you keep it, lamp",
+        ] {
+            assert!(!plain_agreement_to_keep(asked_back), "{asked_back}");
+            assert!(unclear_answer_to_keep(asked_back), "{asked_back}");
+        }
+        for keep in [
+            "Please keep that.",
+            "Keep it.",
+            "Keep that, please.",
+            "Keep it for me, thanks.",
+            "Thank you, keep that.",
+            "Lamp, keep it.",
+            "Please keep that for me, thank you.",
+        ] {
+            assert!(plain_agreement_to_keep(keep), "{keep}");
+        }
+        // With a yes word, the yes's own company is unchanged.
+        for yes in ["Yes, I'd like that, keep it.", "Yes please, do keep it."] {
+            assert!(plain_agreement_to_keep(yes), "{yes}");
+        }
+    }
+
+    #[test]
+    fn a_near_yes_to_a_held_keep_is_one() {
+        for yes in [
+            "Yes. Please keep off.",
+            "Yes, keep off.",
+            "Please keep that.",
+            "Keep it.",
+            "Keep that, please.",
+            "Yes, keep this.",
+        ] {
+            assert!(plain_agreement_to_keep(yes), "{yes}");
+            assert!(!plain_agreement(yes), "{yes}");
+            assert!(!unclear_answer_to_keep(yes), "{yes}");
+        }
+        for not in [
+            "Keep off.",
+            "No, keep off.",
+            "Don't keep it.",
+            "No, don't keep that.",
+            "Please don't keep that.",
+            "Yes, keep it off.",
+            "Keep it?",
+            "Keep my face.",
+        ] {
+            assert!(!plain_agreement_to_keep(not), "{not}");
+        }
+    }
+
+    /// An answer to a held keep that is neither a yes nor a no (a yes with a
+    /// word misheard, a cut "keep", a yes asked back) is asked about once
+    /// more; a no, any line that says more, or another ask is not.
+    #[test]
+    fn an_unclear_answer_to_a_held_keep_is_asked_again() {
+        for unclear in [
+            "Yes. Please key that.",
+            "Yes, please kee.",
+            "Yes?",
+            "Yeah, keep it off.",
+            "Keep off.",
+            "Please keep of.",
+        ] {
+            assert!(!plain_agreement_to_keep(unclear), "{unclear}");
+            assert!(unclear_answer_to_keep(unclear), "{unclear}");
+        }
+        for not in [
+            "No.",
+            "No, don't keep it.",
+            "Not now.",
+            "Yes. Please keep that.",
+            "",
+            "Lamp, what's the tallest mountain in Africa?",
+            "Lamp, please remember that my goldfish is called Pip.",
+            "Yes, and my sister lives in Boston too.",
+        ] {
+            assert!(!unclear_answer_to_keep(not), "{not}");
+        }
+    }
+
     #[test]
     fn observations_expire_from_source_age_without_renewal_on_reread() {
         let monotonic = Instant::now();
@@ -3312,6 +3777,7 @@ mod tests {
                 remember_speaker: false,
                 at_setup: false,
                 record: false,
+                rename_yes: false,
             })
             .into_iter()
             .map(|tool| tool.name)
@@ -3883,6 +4349,233 @@ mod tests {
         }
     }
 
+    /// The lamp-29e7 rename of 6 Nov (#5485), with made-up names: B known,
+    /// asking to be called A. Each yes the person said, refused by the word
+    /// list then ([`agreed_to`]), is a yes by its guards ([`rename_agreed`]),
+    /// and the name is heard for the rename ([`heard_for_rename`]).
+    #[test]
+    fn the_29e7_yeses_to_a_rename_are_agreed_by_their_guards() {
+        let cases = [
+            // 14:02:31, request 18, as heard.
+            (
+                "Can you call me Marisol?",
+                "I know this face as Tove. Do you want me to know you as Marisol instead?",
+                "Yes. please forgot the name Tove and Marisol, and this is my faith the face of Marisol.",
+            ),
+            // 14:03:28: the name and its spelling again.
+            (
+                "Yes. please forgot the name Tove and Marisol, and this is my faith the face of Marisol.",
+                "This face is known to me as Tove. You want to be known as Marisol instead, is that right?",
+                "Okay. One more time. I'm Marisol. M a r i s o l, and this is my face.",
+            ),
+            // 14:28:00, request 61: no call at all then.
+            (
+                "Okay. I want to change my name Can you call me Marisol instead?",
+                "Marisol instead of Tove, is that right?",
+                "Okay. Can you repeat my name again?",
+            ),
+            (
+                "Can you call me Marisol instead?",
+                "Marisol instead of Tove, is that right?",
+                "Sure, go ahead, forget Tove.",
+            ),
+        ];
+        for (asked, lamp, yes) in cases {
+            let said = Said {
+                this: yes.into(),
+                before: vec![(asked.into(), lamp.into())],
+            };
+            assert!(!agreed_to("Marisol", &said), "{yes}");
+            assert!(rename_agreed("Marisol", &said), "{yes}");
+            assert!(heard_for_rename("Marisol", &said), "{yes}");
+        }
+        // The lamp's last answer must say the new name.
+        let not_said_back = Said {
+            this: "Okay.".into(),
+            before: vec![(
+                "Can you call me Marisol instead?".into(),
+                "Sure, what should I do?".into(),
+            )],
+        };
+        assert!(!rename_agreed("Marisol", &not_said_back));
+        assert!(!heard_for_rename("Marisol", &not_said_back));
+    }
+
+    /// Every turn the reviewer on #1208 had asked about again stays refused
+    /// by [`rename_agreed`], and every yes there stays a yes.
+    #[test]
+    fn every_1208_correction_is_still_refused_by_the_rename_guards() {
+        let to = |this: &str| Said {
+            this: this.into(),
+            before: vec![(
+                "Hey, I'm Kesh.".into(),
+                "I know you as A. Shall I call you Kesh instead?".into(),
+            )],
+        };
+        for yes in [
+            "Yes.",
+            "Yes, please.",
+            "Sure, that's fine.",
+            "Yeah, call me Kesh.",
+            "Yes, my name is Kesh.",
+            "Dạ.",
+            "Vâng ạ.",
+            "Yes, I don't mind.",
+            "Of course.",
+            "Sure, no problem!",
+            "Sure, why not.",
+            "Yes, I do.",
+            "Yes, do it.",
+            "Sure, go for it.",
+            "Yes, I'd like that.",
+            "Yes, that would be great.",
+            "Ừ, gọi tôi là Kesh.",
+            "Đúng rồi, tên tôi là Kesh.",
+            "Yes, K, E, S, H.",
+        ] {
+            assert!(rename_agreed("Kesh", &to(yes)), "{yes}");
+        }
+        for not in [
+            "Yes, but it's Kess.",
+            "Okay, actually it's Kess.",
+            "Sure, it's Kess though.",
+            "No worries, it's actually Kess.",
+            "No problem, but my name is Kess.",
+            "Sure, why not Kess?",
+            "Dạ, Kess ạ.",
+            "Có lẽ.",
+            "Yes, K, E, S, S.",
+            "Yes?",
+            "Okay?",
+            "Right?",
+            "Dạ?",
+            "Sure, why not?",
+            "No, Kess. K, E, S, S.",
+            "Not quite. Yes, K, E, S, S.",
+            "Yeah, no, it's Kim.",
+            "Okay, no, it's Kess.",
+            "Yes, my name is Kim.",
+            "Yes, I'm Kim.",
+            "Yes, Kess.",
+        ] {
+            assert!(!rename_agreed("Kesh", &to(not)), "{not}");
+            assert!(!heard_for_rename("Kesh", &to(not)), "{not}");
+        }
+        // A name of three letters has no near words: "and" is not "Ann".
+        let ann = Said {
+            this: "Yes, and thanks.".into(),
+            before: vec![(
+                "Call me Ann.".into(),
+                "I know you as A. Shall I call you Ann instead?".into(),
+            )],
+        };
+        assert!(rename_agreed("Ann", &ann));
+    }
+
+    /// Thirteen's reads on #5586: a hesitant yes ("wait", "hold on", "hang
+    /// on", "let me think") and the Vietnamese "nhưng" (but) and "khoan"
+    /// (wait) take a rename's yes back, so it is asked once more (#5572:
+    /// unclear means ask again). Whole words and phrases only: "holding",
+    /// "on" alone or "think" alone take nothing back.
+    #[test]
+    fn a_hesitant_yes_to_a_rename_is_asked_again() {
+        let to = |name: &str, this: &str| Said {
+            this: this.into(),
+            before: vec![(
+                format!("Can you call me {name} instead?"),
+                format!("I know you as A. Shall I call you {name} instead?"),
+            )],
+        };
+        for not in [
+            "Okay, wait.",
+            "Okay, let me think.",
+            "Yes, hold on.",
+            "Sure, hang on.",
+            "Ừ, nhưng thôi.",
+            "Ừ, khoan đã.",
+            "Khoan đã.",
+        ] {
+            assert!(!rename_agreed("Kess", &to("Kess", not)), "{not}");
+            assert!(!heard_for_rename("Kess", &to("Kess", not)), "{not}");
+        }
+        for yes in [
+            "Yes, call me Kess.",
+            "Yes, go on.",
+            "Yes, I think so.",
+            "Yes, holding my breath, call me Kess.",
+        ] {
+            assert!(rename_agreed("Kess", &to("Kess", yes)), "{yes}");
+        }
+        // Near words still err safe: "like" is one letter from "Mike" and
+        // "Luke", so this yes is asked again for them.
+        for name in ["Mike", "Luke"] {
+            assert!(
+                !rename_agreed(name, &to(name, "Yes, I'd like that.")),
+                "{name}"
+            );
+        }
+    }
+
+    /// The rename gate with the switch on and off, on the eyes: on, the
+    /// 29e7 yes sends `replace`; off, it is refused here as today
+    /// ([`plain_yes`]), and the eyes are never asked.
+    #[test]
+    fn the_rename_gate_takes_the_guards_only_with_the_switch() {
+        let call = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({"name": "Marisol", "replace": true}),
+        };
+        let said = Said {
+            this: "Okay. Can you repeat my name again?".into(),
+            before: vec![(
+                "Okay. I want to change my name Can you call me Marisol instead?".into(),
+                "Marisol instead of Tove, is that right?".into(),
+            )],
+        };
+        let switches = |rename_yes: bool| FaceSwitches {
+            checked: true,
+            rename_yes,
+            ..FaceSwitches::default()
+        };
+        let (socket, asked) = eyes(vec![json!({"remembered": "Marisol", "replaced": ["Tove"]})]);
+        let (off, _) = run_switched(&socket, &call, switches(false), &said, None, &mut None);
+        assert!(refused_here(&off), "{off}");
+        let mut replaced = None;
+        let (on, _) = run_switched(&socket, &call, switches(true), &said, None, &mut replaced);
+        assert_eq!(on, json!({"ok": true, "remembered": "Marisol"}));
+        assert_eq!(replaced, Some(vec!["Tove".to_owned()]));
+        // A correction is still refused here, switch on.
+        let corrected = Said {
+            this: "Yes, but it's Marisa.".into(),
+            ..said.clone()
+        };
+        let (still, _) = run_switched(&socket, &call, switches(true), &corrected, None, &mut None);
+        assert!(refused_here(&still), "{still}");
+        assert_eq!(
+            asked.join().unwrap(),
+            [json!({"remember": "Marisol", "one_face": true, "replace": true})]
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// What a held rename is held on: the eyes' `known_as` as the model is
+    /// told it, with the old name, or a `replace` before their yes, with
+    /// none; nothing else.
+    #[test]
+    fn a_rename_is_asked_by_known_as_or_a_replace_before_the_yes() {
+        let known_as = told_asking(&json!({"error": "known_as", "known_as": "Tove"}), false);
+        assert_eq!(rename_asked(&known_as), Some(Some("Tove".to_owned())));
+        assert_eq!(rename_asked(&json!({"error": NOT_AGREED})), Some(None));
+        for not in [
+            json!({"ok": true, "remembered": "Marisol"}),
+            json!({"error": NOT_HEARD}),
+            told_asking(&json!({"error": "no_face"}), false),
+        ] {
+            assert_eq!(rename_asked(&not), None, "{not}");
+        }
+    }
+
     /// lamp-29e7 (29 Oct): the owner kept at setup is named by default only
     /// while the eyes still know them, asked each time; no eyes is no.
     #[test]
@@ -4141,6 +4834,7 @@ mod tests {
             remember_speaker: false,
             at_setup: false,
             record: false,
+            rename_yes: false,
         };
         let (told, _) = run_switched(
             &socket,
@@ -4766,6 +5460,240 @@ mod tests {
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
     }
 
+    /// #5564 (lamp-3e83, 6 Nov): a spelled name came back to the person as
+    /// letters, "Jane or J-A-N-E?". A name written as its letters is the
+    /// word they make, properly cased; a name that is not only letters, and
+    /// initials of two, stay as they are.
+    #[test]
+    fn a_name_written_as_its_letters_is_the_word_they_make() {
+        for (name, word) in [
+            ("J-A-N-E", "Jane"),
+            ("J A N E.", "Jane"),
+            ("j.a.n.e.", "Jane"),
+            ("L, O, R, E, N", "Loren"),
+            ("A double N", "Ann"),
+        ] {
+            assert_eq!(letters_as_word(name).as_deref(), Some(word), "{name}");
+        }
+        for name in [
+            "Jane",
+            "Mary Ann",
+            "A J",
+            "T.J.",
+            "Q Q Q",
+            "Jane J-A-N-E",
+            "",
+        ] {
+            assert_eq!(letters_as_word(name), None, "{name}");
+        }
+    }
+
+    /// #5564: with names checked, a name the model gives as its letters is
+    /// kept as the word they make, at setup and past it, so the lamp says it
+    /// back and greets them by it, never by its letters. Before the first
+    /// save at setup it is still said back for a yes (#5140 row 5), and the
+    /// yes to "Jane, did I get that right?" keeps "Jane". Names unchecked,
+    /// as before.
+    #[test]
+    fn a_name_given_as_its_letters_is_kept_as_the_word() {
+        let call = |name: &str| ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({ "name": name }),
+        };
+        let (socket, asked) = eyes(vec![
+            json!({"remembered": "Jane"}),
+            json!({"remembered": "Jane"}),
+            json!({"remembered": "Jane"}),
+            json!({"remembered": "J-A-N-E"}),
+        ]);
+        // Spelled after the lamp asked: kept as the word, with no yes.
+        let asked_to_spell = Said {
+            this: "J A N E.".into(),
+            before: vec![(
+                "I'm Jain.".into(),
+                "Sorry, could you spell your name for me?".into(),
+            )],
+        };
+        let (words, _) = run_at_setup(&socket, &call("J-A-N-E"), &asked_to_spell);
+        assert_eq!(words, json!({"ok": true, "remembered": "Jane"}));
+        // Spelled unasked: said back first, as the word only.
+        let (words, _) = run_at_setup(&socket, &call("J-A-N-E"), &Said::now("I'm J A N E."));
+        assert_eq!(words, json!({"error": SAY_IT_BACK}));
+        let said_back = Said {
+            this: "Yes.".into(),
+            before: vec![("I'm J A N E.".into(), "Jane, did I get that right?".into())],
+        };
+        let (words, _) = run_at_setup(&socket, &call("J-A-N-E"), &said_back);
+        assert_eq!(words, json!({"ok": true, "remembered": "Jane"}));
+        // Past setup, as the word too.
+        let (words, _) = run_with(
+            &socket,
+            &call("J-A-N-E"),
+            true,
+            &Said::now("My name is J-A-N-E."),
+        );
+        assert_eq!(words, json!({"ok": true, "remembered": "Jane"}));
+        // Names unchecked: the name goes as the model gave it, as before.
+        let (words, _) = run_with(&socket, &call("J-A-N-E"), false, &Said::default());
+        assert_eq!(words, json!({"ok": true, "remembered": "J-A-N-E"}));
+        assert_eq!(
+            asked.join().unwrap(),
+            [
+                json!({"remember": "Jane", "one_face": true, "replace": false}),
+                json!({"remember": "Jane", "one_face": true, "replace": false}),
+                json!({"remember": "Jane", "one_face": true, "replace": false}),
+                json!({"remember": "J-A-N-E"}),
+            ]
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// #5564 (lamp-3e83): the lamp asked people to spell their name too
+    /// often. A name not heard asks for a spelling once ([`NOT_HEARD`]);
+    /// once the lamp asked them to spell in an exchange the check holds, a
+    /// name still not heard is told [`NOT_HEARD_SPELLED`], which never asks
+    /// again and says the name back as a name, at setup and past it.
+    /// #5140 row 6 still holds: their letters after the ask are kept.
+    #[test]
+    fn a_spelling_is_asked_for_once_and_never_again() {
+        let call = |name: &str| ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({ "name": name }),
+        };
+        let (socket, asked) = eyes(vec![json!({"remembered": "Loren"})]);
+        let ask = "Sorry, could you spell your name for me?";
+        let (words, _) = run_at_setup(&socket, &call("Lauren"), &Said::now("I'm Lord in."));
+        assert_eq!(words, json!({"error": NOT_HEARD}));
+        let (words, _) = run_with(&socket, &call("Lauren"), true, &Said::now("I'm Lord in."));
+        assert_eq!(words, json!({"error": NOT_HEARD}));
+        for said in [
+            // The spelling just asked for, and not the model's name.
+            Said {
+                this: "Four letters. L O R E N.".into(),
+                before: vec![("I'm Lord in.".into(), ask.into())],
+            },
+            // Asked an exchange earlier, then said back and corrected.
+            Said {
+                this: "No.".into(),
+                before: vec![
+                    ("I'm Lord in.".into(), ask.into()),
+                    ("L O R E N.".into(), "Lauren, did I get that right?".into()),
+                ],
+            },
+        ] {
+            let (words, _) = run_at_setup(&socket, &call("Lauren"), &said);
+            assert_eq!(words, json!({"error": NOT_HEARD_SPELLED}), "{said:?}");
+            let (words, _) = run_with(&socket, &call("Lauren"), true, &said);
+            assert_eq!(words, json!({"error": NOT_HEARD_SPELLED}), "{said:?}");
+        }
+        assert!(refused_here(&json!({"error": NOT_HEARD_SPELLED})));
+        assert_eq!(refusal_reason(NOT_HEARD_SPELLED), "not_heard_spelled");
+        // Jarvis's P2 on #5580: asked to spell, they gave no letters. No
+        // name of theirs can pass a read-back's yes then, so the lamp asks
+        // for the name once more: never a second spelling, never a name
+        // read back, so no "Lauren?", "Yes." loop.
+        for said in [
+            // Their name again, no letters.
+            Said {
+                this: "Lord in.".into(),
+                before: vec![("I'm Lord in.".into(), ask.into())],
+            },
+            // The loop itself: said back without letters, and a yes.
+            Said {
+                this: "Yes.".into(),
+                before: vec![
+                    ("I'm Lord in.".into(), ask.into()),
+                    ("Lord in.".into(), "Lauren, did I get that right?".into()),
+                ],
+            },
+        ] {
+            let (words, _) = run_at_setup(&socket, &call("Lauren"), &said);
+            assert_eq!(words, json!({"error": NOT_HEARD_SAY_AGAIN}), "{said:?}");
+            let (words, _) = run_with(&socket, &call("Lauren"), true, &said);
+            assert_eq!(words, json!({"error": NOT_HEARD_SAY_AGAIN}), "{said:?}");
+        }
+        assert!(refused_here(&json!({"error": NOT_HEARD_SAY_AGAIN})));
+        assert_eq!(refusal_reason(NOT_HEARD_SAY_AGAIN), "not_heard_say_again");
+        // Said once more, and heard: the name is theirs, so at setup it
+        // goes on to the read-back and its yes, as any heard name does.
+        let again = Said {
+            this: "Lauren.".into(),
+            before: vec![
+                ("I'm Lord in.".into(), ask.into()),
+                (
+                    "Lord in.".into(),
+                    "Could you say your name once more?".into(),
+                ),
+            ],
+        };
+        let (words, _) = run_at_setup(&socket, &call("Lauren"), &again);
+        assert_eq!(words, json!({"error": SAY_IT_BACK}));
+        // Their letters after the ask are still their name (#5140 row 6).
+        let spelled = Said {
+            this: "L, O, R, E, N.".into(),
+            before: vec![("I'm Lord in.".into(), ask.into())],
+        };
+        let (words, _) = run_at_setup(&socket, &call("Lauren"), &spelled);
+        assert_eq!(words, json!({"ok": true, "remembered": "Loren"}));
+        assert_eq!(
+            asked.join().unwrap(),
+            [json!({"remember": "Loren", "one_face": true, "replace": false})]
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// #5564: where the model decides, its words ask for a spelling only
+    /// when the name was not understood or was said to be wrong, at most
+    /// once, and say a spelled name back as the word it makes, never its
+    /// letters nor a choice between the two. Pinned on the exact text.
+    #[test]
+    fn the_names_words_ask_for_a_spelling_once_and_say_a_name_back_as_a_word() {
+        assert_eq!(
+            NAME_TOLD_NOTE,
+            "If they have just told you their own name, call remember_my_face with it now, as they said it, or if they spelled it, as the name the letters make, written as a word. If you are not sure of it, say it back as a name and ask if you have it right; ask them to spell it only if they say it is wrong, and only once. Never only say that you will remember it. If what they said was not their name, do nothing about it."
+        );
+        assert_eq!(
+            NOT_HEARD,
+            "You did not hear that name in what they said. Say the name back to them and ask them to spell it, then call this again with the name as they said it, or as the name their letters make, written as a word, never as letters."
+        );
+        assert_eq!(
+            NOT_HEARD_SPELLED,
+            "You did not hear that name in what they said, and they were already asked to spell it, so do not ask them to spell it again. Say back the name their letters make, as a name only, never its letters and never as a choice between the name and its spelling, and ask if you have it right. Only if they say yes, call this again with that name."
+        );
+        assert_eq!(
+            NOT_HEARD_SAY_AGAIN,
+            "You did not hear that name in what they said, and they were already asked to spell it, so do not ask them to spell it again, and do not say a name back to them. Ask them to say their name once more, then call this again with the name as they say it."
+        );
+        assert_eq!(
+            SAY_IT_BACK,
+            "I have not kept their face yet. First say the name back to them and ask if you have it right, the name as a word only, never its letters and never as a choice between the name and its spelling. Only if they say yes, call this again with that name; if they correct it, say the new one back the same way."
+        );
+        assert_eq!(
+            NEAR_TO,
+            "You may have misheard their name. Do not say any name you know. Ask them to spell their name, letter by letter, then call this again with the name their letters make, written as a word, never as letters, and apart true."
+        );
+        // The walk's own script (`skills/onboarding/skill.toml`): after its
+        // read-back (#5532), a spelling only when the name was missed or
+        // said to be wrong, once, and the name it spells said back.
+        const SCRIPT: &str = include_str!("../../../skills/onboarding/skill.toml");
+        let who = SCRIPT
+            .split("[onboarding.steps.who_you_are]")
+            .nth(1)
+            .and_then(|step| step.split("\n[").next())
+            .expect("who_you_are");
+        const ONCE: &str = " and wait for their answer. Ask to spell it only if it's wrong or missed, once; then say the name it spells, as a word. Only after a clear yes to their name";
+        for mode in ["first = ", "reoffer = "] {
+            let note = who
+                .lines()
+                .find(|line| line.starts_with(mode))
+                .expect("who_you_are's note");
+            assert!(note.contains(ONCE), "{note}");
+        }
+        assert!(crate::onboarding::WHO_NOTE.contains(ONCE));
+    }
+
     /// Stable 10226, lamp-52e6, 5 Nov 11:28 (the core-verifier's R1, and the
     /// walk's face step the same way): the name said back alone and
     /// "Yes. That's right. Please remember my face." kept no face, the yes
@@ -4846,8 +5774,14 @@ mod tests {
         let face = quoted[1];
         assert!(face.contains("face"), "{face}");
         let back = who
-            .find("say their name back as a question on its own")
+            .find("say their name back as one clear yes-or-no question on its own")
             .expect("the script says the name back");
+        // A clear yes-or-no question, never the bare name: on lamp-52e6
+        // (build 10507) the read-back was "Leo? Leo.", no question to answer.
+        assert!(
+            who.contains("their name and then did I get that right, never their name alone"),
+            "{who}"
+        );
         assert!(back < who.find(face).unwrap(), "read-back before the face");
         let call = ToolCall {
             id: "1".into(),
@@ -4946,6 +5880,27 @@ mod tests {
                 verdict,
                 "{lamp} / {this}"
             );
+        }
+        // A name the model gave as letters is held raw and judged as the
+        // word: "Jane, did I get that right?" and a yes runs it (Fifth's
+        // P2 on #5580), and a no still drops it.
+        for heard in ["My name is Jane.", "J A N E."] {
+            for (name, this, verdict) in [
+                ("J-A-N-E", "Yes.", Runs),
+                ("J A N E", "Yes, that's right.", Runs),
+                ("j.a.n.e.", "Yes.", Runs),
+                ("J-A-N-E", "No.", Drops),
+            ] {
+                let said = Said {
+                    this: this.into(),
+                    before: vec![(heard.into(), "Jane, did I get that right?".into())],
+                };
+                assert_eq!(
+                    held_save_verdict(name, &said),
+                    verdict,
+                    "{heard} / {name} / {this}"
+                );
+            }
         }
         // The held save run on the yes is the call's own eyes request.
         for this in [
@@ -5698,6 +6653,8 @@ mod tests {
     fn each_face_refusal_has_a_reason_name_and_the_journal_says_only_it() {
         for (error, reason) in [
             (NOT_HEARD, "not_heard"),
+            (NOT_HEARD_SPELLED, "not_heard_spelled"),
+            (NOT_HEARD_SAY_AGAIN, "not_heard_say_again"),
             (ONLY_THE_CALL, "only_the_call"),
             (NOT_OWN_NAME, "not_own_name"),
             (NAME_UNCHANGED, "name_unchanged"),

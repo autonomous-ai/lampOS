@@ -235,7 +235,14 @@ advertisement, confirmation retirement, immutable asset checks and terminal
 cancellation. This does not extend autonomous three-second sound cues.
 
 **Many skills: `use_skill`** (#1668, `LAMP_USE_SKILL=on`, the worker's
-`--use-skill`; off unless set). A Live session may be given 32 functions,
+`--use-skill`; off unless set, on in the product's `lamp-voice.service`
+since #2826). On lamp-9adf (stable 10441, 6 Nov) installable skills put the
+product's chat request past its 48 with the switch off, and the cut left out
+`the_time`, `reports_state` and `fetch_page`. With it on, the skills are one
+function however many are installed, so none of the lamp's own is left out
+for them (`with_use_skill_many_skills_leave_none_of_the_lamps_own_out`). A
+lamp's drop-in with `LAMP_USE_SKILL=off` gives each skill its own function
+again. A Live session may be given 32 functions,
 and on a product lamp the voice's own 21 and the executive's 17 are already
 past that (`crates/update/tests/functions.rs`; the product's chat route
 allows 48), so there a skill's function is cut without a word to the model:
@@ -266,7 +273,18 @@ and none of the skills' own (`crate::use_skill`):
   as well (`{"skill":"dance","style":"jazz"}`), as its line says them. Only
   the skills' socket is ever asked. So the skill's socket sees the
   same line as when it is called itself, and its answer goes to the model
-  under `use_skill`.
+  under `use_skill`, with `ran`: "This call has already run dance. Do not
+  call use_skill for dance again in this turn." (`use_skill::ran`; not on a
+  refusal, which lamp-skills sends as `error`, "I'm still doing that."
+  among them). On lamp-9adf on 6 Nov, without it, "Dance with me." called
+  `use_skill` for `dance` twice, the second refused as under way, and said a
+  stray line; by its own name `dance` was called once (#2826). A skill whose
+  tools file gives it a search (`searches`, as the second route's note and
+  walk read it: look-for-things' `[search]`) gets no `ran`, since a search
+  is several calls in one turn, each look told to call again with the next
+  place (`a_search_skill_through_use_skill_is_not_told_it_already_ran`,
+  #5505). The function's description says: the call runs the skill, and it
+  is not called again for the same ask unless its answer says to.
   - **Told instead, never dropped** (the reviewer on #1696):
     - a skill that isn't installed ("There is no skill named juggle. Your
       skills are …");
@@ -443,7 +461,10 @@ weather, then the search (`chat_cut`). A Live session's bound is 32
 (`lamp_gemini::MAX_TOOLS`); the second route's chat requests have their
 own, 48 (`second_provider::MAX_TOOLS`, 22 Oct: Live's bound had left out
 the time, the light scenes and the search on lamp-4ace). On the product's
-chat route nothing is left out. In a Live session, a per-lamp drop-in, the
+chat route nothing is left out: its skills are one function, `use_skill`
+(`LAMP_USE_SKILL=on` since #2826), however many are installed. With the
+switch off and installable skills added it was past 48 (lamp-9adf, 6 Nov:
+`the_time`, `reports_state` and `fetch_page` left out). In a Live session, a per-lamp drop-in, the
 voice's own come first and the actions part's catalog fills only the room
 left, so its last are left out, and the cut then takes `reports_state`;
 `reports_stop` and `dance` stay in both. With `LAMP_USE_SKILL=on`, `use_skill` carries every

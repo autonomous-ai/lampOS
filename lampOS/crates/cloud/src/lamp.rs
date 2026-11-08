@@ -130,6 +130,9 @@ pub struct Real {
     /// lamp-control's admin socket, for the developer door from the owner's
     /// app, with `--control-admin-socket` (#5299, `crate::control`).
     pub control: Option<crate::control::Door>,
+    /// The owner's face expressions and room sounds yeses from the app,
+    /// with `LAMP_APP_CONSENT=on` (#5500, `crate::consent`).
+    pub consent: Option<crate::consent::Place>,
 }
 
 /// `on` takes the app's `system.reboot` (#2193), with `LAMP_CLOUD=on`.
@@ -183,6 +186,9 @@ pub const RESTART_WAIT: Duration = Duration::from_secs(2);
 #[derive(Default)]
 pub struct Texts {
     pub on: bool,
+    /// Skills' lines only (`LAMP_SKILL_MESSAGES=on`, #1685): `messages/out`
+    /// goes up with `on` off, and nothing else of the texts does.
+    pub skill_lines: bool,
     input: Option<Publisher>,
     output: Option<Subscriber>,
     stream: crate::chat::Stream,
@@ -201,12 +207,19 @@ pub struct Texts {
 pub const KNOWN_FILE_ENVIRONMENT: &str = "LAMP_CLOUD_KNOWN_FILE";
 
 impl Texts {
-    /// Taken, or not, as `LAMP_MESSAGES` says.
+    /// Taken, or not, as `LAMP_MESSAGES` says (skills' lines with them).
     pub fn on(on: bool) -> Self {
         Self {
             on,
             ..Self::default()
         }
+    }
+
+    /// Skills' lines carried, or not, as `LAMP_SKILL_MESSAGES` says: with
+    /// texts not taken, only these go up.
+    pub fn carrying_skill_lines(mut self, skill_lines: bool) -> Self {
+        self.skill_lines = skill_lines;
+        self
     }
 
     /// The eyes' known file, beside which their `tellable` is read as a
@@ -700,6 +713,10 @@ impl Lamp for Real {
         self.texts.on && self.bus.is_some()
     }
 
+    fn skill_lines(&self) -> bool {
+        (self.texts.on || self.texts.skill_lines) && self.bus.is_some()
+    }
+
     fn offline_will(&self) -> bool {
         std::env::var(crate::online::OFFLINE_WILL_ENVIRONMENT).is_ok_and(|value| value == "on")
     }
@@ -776,6 +793,10 @@ impl Lamp for Real {
         self.control.clone()
     }
 
+    fn consent(&self) -> Option<crate::consent::Place> {
+        self.consent.clone()
+    }
+
     fn update_status(&self) -> Option<lamp_bus::Message> {
         self.latest(lamp_msgs::UpdateStatus::TOPIC)
     }
@@ -812,6 +833,10 @@ impl Lamp for Real {
     }
 
     fn send_text(&mut self, text: &ChatIn, now_ms: u64) -> Result<(), String> {
+        // Skills' lines alone (#1685) take no text: as `answer`'s switch says.
+        if !self.texts.on {
+            return Err(crate::wire::not_here("chat.send"));
+        }
         let bus = self.bus.as_ref().ok_or(crate::chat::NOBODY)?;
         // Listened for before the text goes, so no piece of its answer is
         // missed.
@@ -840,7 +865,7 @@ impl Lamp for Real {
     }
 
     fn unasked(&mut self, now_ms: u64, give: bool) -> crate::unasked::Heard {
-        if !self.texts.on {
+        if !self.texts.on && !self.texts.skill_lines {
             return crate::unasked::Heard::default();
         }
         if self.texts.unasked.is_none()
@@ -897,6 +922,11 @@ impl Lamp for Real {
     }
 
     fn chat_events(&mut self, now_ms: u64) -> Vec<Value> {
+        // Skills' lines alone (#1685): `chat/out`, the answers and the
+        // voice's task news, is never listened for.
+        if !self.texts.on {
+            return Vec::new();
+        }
         // Task news comes with no text asked first: listened for from the
         // start.
         if self.texts.output.is_none()
@@ -996,6 +1026,7 @@ mod tests {
             share: None,
             services: None,
             control: None,
+            consent: None,
             upload: None,
             shutdown: None,
         };
@@ -1080,6 +1111,7 @@ mod tests {
             share: None,
             services: None,
             control: None,
+            consent: None,
             upload: None,
             shutdown: None,
         };
@@ -1173,6 +1205,7 @@ mod tests {
             share: None,
             services: None,
             control: None,
+            consent: None,
             upload: None,
             shutdown: None,
         };
@@ -1279,6 +1312,7 @@ mod tests {
             share: None,
             services: None,
             control: None,
+            consent: None,
             upload: None,
             shutdown: None,
         };

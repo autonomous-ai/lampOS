@@ -5,7 +5,7 @@ the onboarding switch. Device qualification is outstanding; local evidence
 and rollout limitations are recorded with each PR.
 
 
-> **PARKED (#3702), 28 Oct:** giving way is out of the onboarding walk by the owner's call. While `onboarding::giving_way::PARKED` is true, lamp-voice sets the step unavailable (`set_giving_way_available` in coordinator.rs), so it is kept `not_available` and never offered; touch is followed by room sounds. The model is told nothing of it either: `setup_step` and `redo_setup` leave `giving_way` out of their steps and their words, and the skill's `SKILL.md` description no longer names it (lamp-29e7's re-test, 29 Oct 09:39: told of "the body giving way" by `setup_step`'s words, the model asked "push gently against my arm or head, and I'll give way" itself and reported the step skipped; test `a_parked_step_is_never_told_to_the_model`). Its code, words and tests stay, and `skill.toml` keeps it in `order` (an installed lamp-skills reads the same keys); to put it back, set `PARKED` to false and restore the `SKILL.md` description as its PARKED note says.
+> **PARKED (#3702), 28 Oct:** giving way is out of the onboarding walk by the owner's call. While `onboarding::giving_way::PARKED` is true, lamp-voice sets the step unavailable (`set_giving_way_available` in coordinator.rs), so it is kept `not_available` and never offered; touch is followed by room sounds. The model is told nothing of it either: `setup_step` and `redo_setup` leave `giving_way` out of their steps and their words, and the skill's `SKILL.md` description no longer names it (lamp-29e7's re-test, 29 Oct 09:39: told of "the body giving way" by `setup_step`'s words, the model asked "push gently against my arm or head, and I'll give way" itself and reported the step skipped; since #5499 neither function names any step, test `the_model_is_told_no_step_and_no_count`). Its code, words and tests stay, and `skill.toml` keeps it in `order` (an installed lamp-skills reads the same keys); to put it back, set `PARKED` to false and restore the `SKILL.md` description as its PARKED note says.
 
 ## What it is for
 
@@ -28,7 +28,7 @@ ready, not paused) and a face is in front of it.
 | # | Step | The lamp | Ends when | Kept |
 |---|---|---|---|---|
 | 1 | `where_you_sit` | first says this is a short setup to follow, with other questions after it, then asks them to sit where they usually sit and look at it; that intro is said once a walk, and every later ask of the step (nobody there for 30 s, the pause, a restart mid-step) says only the step's short `reoffer` line. The intro counts as said only when its turn was heard: the coordinator reports how it played, as it does an invitation's, and only whole (or played through with a gap) keeps `opened`; cut, or never said, the next ask says the intro again, and after three such asks it is kept as said anyway, so it is never repeated forever (`onboarding_opener` record, the Reviewer-lead's P3 on #4095). Never said (none of it played), the step is asked again at once, with the intro, while it goes on, as how you sound and giving way offer an unsaid invitation again; cut (someone spoke over it, or a touch stopped it), it is not: the step goes on from what the eyes see, and the intro waits for the step's next ask (`"asked_again"` in the record, jarvis's P3 on #4120). A redo of the whole setup is a new walk, so it opens with the intro again; a redo of this step alone says the short line | the eyes' largest fresh face (`humans/faces/tracked`) is at least 0.14 of the picture's height with its centre within 0.35 of the middle (the lead's chair at about 1 m, row 10 on lamp-52e6 on 21 October, gave size 0.15, x 0.05, y -0.26: a seated person is a little high in a lamp's picture), held 3 s while the head is still and no hand is on the lamp (every head joint, `base_yaw`, `head_pitch`, `head_roll` on `body/joint_states`, within 6 counts of its goal and slower than 25 counts a second, or trailing the body's own move of those goals (within a second of the goal's last change, between where the move began and the goal give or take 6 counts, and not turning away from it): its own gaze ramps the goals while it listens and speaks, and that is the lamp looking, not someone moving it; a joint past the goal, behind where the move began or turning away is moved by something else (8080 on lamp-52e6 failed the step at 60 s in 2 of 5 walks with a good face held, #4034); `body/hand` not pushed; each reading fresh, within 0.7 s; any motion, or a reading stale or missing once there is any sign of a body, starts the 3 s again, and a hand not freshly released counts as still there. Any sign stays: either topic present at all (fresh, stale, unparseable, or a read that failed) or any `body/` topic or declaration on the bus. Only a lamp with no body at all goes without that gate): done, and the lamp says so. While the step is led the voice tells the body it listens between turns (`Onboarding::looking`), so the body's gaze turns the head to the face in small corrections, as a creature looks at someone, before anything is asked of the person. Short of that, after 8 s of quiet, one note (only one, ever) says what is missing: no face, or "move me closer to you" / "turn my head toward you until I'm facing you", each with "or stay as you are". "Turn me" waits until a face big enough has been in view, looked at, for 5 s: the lamp asks to be moved only when its own look still has the person off the middle. After that note any face held 3 s the same way is done where it is, its framing kept: a person sitting beside the lamp (row 10 on lamp-52e6, the face at x 0.12, y -0.63) would just say "there's fine". After 60 s: failed, and the lamp says they can turn it toward their seat later or redo the setup | the framing (size, centre) |
-| 2 | `who_you_are` | asks what to call them; after a clear yes, `remember_my_face` ([eyes.md](eyes.md)) when the voice has it (`LAMP_EYES_WHO_SOCKET`, and eyes that recognise); without it, the name only, never `remember` | a name heard ("call me …", "my name is …", "I'm …", "I am …", "it's …", or a name alone, one or two words and no question) and then a yes ("yes", "that's fine", …, and "no problem", "I don't mind", "of course", "go ahead", whose no word is no no, when the phrase leads the line or the line is four words or fewer, so "I'll go ahead and sit down" is no yes; #3883, a tester's 7071 lamp took 5 minutes on 27 October) heard after it, a yes being only a short, firm answer that asks nothing, as the hello's is (four words at most, or led by a firm "yes", "yeah", "yep", "yup", "sure" or a yes phrase; never a line with "?", one asking to hear it again, or one that puts it off: on a tester's lamp-0c4e on 3 November "okay" in a question was taken as the face's yes and no face was kept, #5139; test `with_a_face_to_keep_a_question_is_no_yes_to_the_face`): the walk ends the step itself, but only on a lamp that keeps no face (no `LAMP_EYES_WHO_SOCKET`); with a face to keep, that yes is most often the face question's, and the step ends when the face is saved (below), by the model's report, or 15 s after the latest yes with no face saved, once the room has been quiet 3 s (`FACE_SAVE_WAIT_US`, timed from the latest yes since the first is often the name's "Marie, right?", or from the lamp's own latest words when they came after it, so its "Shall I?" is never cut off before it is answered: on lamp-0c4e on 3 November the wait ran out while it was, #5139, test `with_a_face_to_keep_the_wait_runs_from_the_lamps_latest_words`; `START_QUIET_US`: a refused save, the eyes away), done with the name only; with a face to keep, a no after the name never ends the step or takes the name back: like a yes it restarts that 15 s wait, so a no to "Marie, right?" waits for the new name (a line that names someone, "No, it's Mary.", corrects it), and the face's no, of any length, ends it done with the name only once the wait and the quiet are over (lamp-29e7, 28 Oct, ended on the yes with no face kept; the Reviewer-lead's P2s on #3992) (`onboarding_heard`; row 10 on lamp-52e6, 21 October: named and agreed, never reported). On a lamp that keeps faces, an end done with the name only (that wait, the 90 s give-up with a name heard, or the model's `done` with no face saved) says one line of the walk's own at once, before the next step: "Got your name. I'll remember things for you once I've seen your face." (`skill::NAME_ONLY`), since a conversation with nobody known in view keeps nothing, and the face is asked for once more after the walk ("The face asked for once more", below; #5139). The word after "I'm" and the others is no name when it is fine, good, okay, ok, not, sure, here, ready, sorry, just, back, busy, tired, the lamp's name ("lamp") or a yes or no word; a name alone also never is what, huh, hmm, um, uh, hey, hi or hello. Without a face to keep, a no after a name takes it back. The model's `setup_step` call is a second way in, as soon as the name (and the face, if asked) is settled. Each `setup_step` call is a journal line with its step, outcome and answer ("lamp-voice: onboarding: setup_step step … outcome …: noted" or "refused (…)"), and a report the walk does not take says which step is led; a name heard and a no that takes it back are journal lines too, without the name (#3883). A face `remember_my_face` saves while this step is led is a third: the eyes' `ok` ends it as done through the same mailbox, so a chat that saves the face never leaves the step without an outcome (#3740, a tester's 7071 lamp on 27 October); a refused save changes nothing. With names checked, the first save in this step needs the name said back and a plain yes to it, or the name spelled after the lamp asked them to spell it, and a name not heard is kept as they spell it then ([eyes.md](eyes.md), #5140); a save refused for that changes nothing either. A face saved before this step is asked (while an earlier step is led, as on that 7071 lamp, where the name was told and the face kept while `where_you_sit` was asked) ends it as done when it comes up, without asking it, and the record says `"before_asked": true` (#3640). That is the evidence the HOLDs on #3640 asked for: no heard words do it, so a short answer to an earlier step ("Like this", "My desk", "I'm sitting") never counts as a name. The walk keeps only a flag, in memory, never the name; a face `forget_my_face` forgets, or a "forget everything" that forgot the face too, a redo of the walk or of this step, or a voice restart lets it go, and the step is then asked as before. Nobody is known yet in this step, so every save there is the room's: a visitor's "remember my face" during it ends the step too, which the scope can't tell apart (the Reviewer-lead on #3746). The walk's record names it (`onboarding_face_saved`), and with the nudge on its `onboarding_nudge` line says `"reported": false`, since the model made no `setup_step` call. A name heard with no yes is done, not failed, at the 90 s give-up. The walk keeps no name itself: its record says `"name_kept": false`, as the model's own call keeps none. A face saved while the walk has not yet ended this step (it has no outcome in the onboarding file) keeps the name it was saved under in that person's own memory, "Their name is X." (`remember::keep_name_with_face`, [memory.md](memory.md); the onboarding forgets report, 30 Oct), forgotten as any kept thing of theirs. Once the step has any outcome (done, skipped, failed, `later`, not available), the file stays but the walk is past it, so a `remember_my_face` after that, by anyone, keeps no name (the Reviewer-lead's P3 on #4530); a `later` step offered again after the walk keeps none either. A lamp that keeps no face keeps no name. This reading is for the nudge off: with the nudge on (`LAMP_ONBOARDING_NUDGE`), the step ends only through the nudge's own path, where the name is asked back and kept on a yes (`onboarding_nudge`, `"name_confirmed": true`). The two never both end it (the first builder on #2526) | the face in the eyes' people file, when asked and agreed; and the name saved with the face that ended this step, as `owner` in the onboarding file (#4118: who set the lamp up, named by default with `LAMP_PERSON_NAME_BY_DEFAULT` on a lamp with no typed name), gone on any face forgotten by voice, within 10 s once the eyes no longer know them (the app's face removal too), a whole redo or a reset, and moved to the new name when the person renames that face by voice (`replace`, `onboarding::owner_renamed`, [second-voice.md](second-voice.md)), only when the eyes answer that the face they replaced was exactly the owner's (`"replaced"`, [eyes.md](eyes.md); eyes without it move nothing); and, with a face saved, "Their name is X." kept in that person's own memory until they forget it; otherwise nothing |
+| 2 | `who_you_are` | asks what to call them; after a clear yes, `remember_my_face` ([eyes.md](eyes.md)) when the voice has it (`LAMP_EYES_WHO_SOCKET`, and eyes that recognise); without it, the name only, never `remember` | a name heard ("call me …", "my name is …", "I'm …", "I am …", "it's …", or a name alone, one or two words and no question) and then a yes ("yes", "that's fine", …, and "no problem", "I don't mind", "of course", "go ahead", whose no word is no no, when the phrase leads the line or the line is four words or fewer, so "I'll go ahead and sit down" is no yes; #3883, a tester's 7071 lamp took 5 minutes on 27 October) heard after it, a yes being only a short, firm answer that asks nothing, as the hello's is (four words at most, or led by a firm "yes", "yeah", "yep", "yup", "sure" or a yes phrase; never a line with "?", one asking to hear it again, or one that puts it off: on a tester's lamp-0c4e on 3 November "okay" in a question was taken as the face's yes and no face was kept, #5139; test `with_a_face_to_keep_a_question_is_no_yes_to_the_face`): the walk ends the step itself, but only on a lamp that keeps no face (no `LAMP_EYES_WHO_SOCKET`); with a face to keep, that yes is most often the face question's, and the step ends when the face is saved (below), by the model's report, or with no yes at all 30 s after the name or the latest words either side said since (`NAME_WAIT_US`: a face already known is never asked or saved, so no save comes; lamp-52e6 on 6 Nov 13:45, a redo, waited silent; test `a_redo_with_a_face_already_known_ends_on_the_name_and_says_the_last_line`), or 15 s after the latest yes with no face saved, once the room has been quiet 3 s (`FACE_SAVE_WAIT_US`, timed from the latest yes since the first is often the name's "Marie, right?", or from the lamp's own latest words when they came after it, so its "Shall I?" is never cut off before it is answered: on lamp-0c4e on 3 November the wait ran out while it was, #5139, test `with_a_face_to_keep_the_wait_runs_from_the_lamps_latest_words`; `START_QUIET_US`: a refused save, the eyes away), done with the name only; with a face to keep, a no after the name never ends the step or takes the name back: like a yes it restarts that 15 s wait, so a no to "Marie, right?" waits for the new name (a line that names someone, "No, it's Mary.", corrects it), and the face's no, of any length, ends it done with the name only once the wait and the quiet are over (lamp-29e7, 28 Oct, ended on the yes with no face kept; the Reviewer-lead's P2s on #3992) (`onboarding_heard`; row 10 on lamp-52e6, 21 October: named and agreed, never reported). On a lamp that keeps faces, an end done with the name only (that wait, the 90 s give-up with a name heard, or the model's `done` with no face saved) says one line of the walk's own at once, before the next step: "Got your name. I'll remember things for you once I've seen your face." (`skill::NAME_ONLY`), since a conversation with nobody known in view keeps nothing, and the face is asked for once more after the walk ("The face asked for once more", below; #5139). The word after "I'm" and the others is no name when it is fine, good, okay, ok, not, sure, here, ready, sorry, just, back, busy, tired, the lamp's name ("lamp") or a yes or no word; a name alone also never is what, huh, hmm, um, uh, hey, hi or hello. Without a face to keep, a no after a name takes it back. The model's `setup_step` call is a second way in, as soon as the name (and the face, if asked) is settled. Each `setup_step` call is a journal line with its step, outcome and answer ("lamp-voice: onboarding: setup_step step … outcome …: noted" or "refused (…)"), and a report the walk does not take says which step is led; a name heard and a no that takes it back are journal lines too, without the name (#3883). A face `remember_my_face` saves while this step is led is a third: the eyes' `ok` ends it as done through the same mailbox, so a chat that saves the face never leaves the step without an outcome (#3740, a tester's 7071 lamp on 27 October); a refused save changes nothing. With names checked, the first save in this step needs the name said back and a plain yes to it, or the name spelled after the lamp asked them to spell it, and a name not heard is kept as they spell it then ([eyes.md](eyes.md), #5140); a save refused for that changes nothing either. A face saved before this step is asked (while an earlier step is led, as on that 7071 lamp, where the name was told and the face kept while `where_you_sit` was asked) ends it as done when it comes up, without asking it, and the record says `"before_asked": true` (#3640). That is the evidence the HOLDs on #3640 asked for: no heard words do it, so a short answer to an earlier step ("Like this", "My desk", "I'm sitting") never counts as a name. The walk keeps only a flag, in memory, never the name; a face `forget_my_face` forgets, or a "forget everything" that forgot the face too, a redo of the walk or of this step, or a voice restart lets it go, and the step is then asked as before. Nobody is known yet in this step, so every save there is the room's: a visitor's "remember my face" during it ends the step too, which the scope can't tell apart (the Reviewer-lead on #3746). The walk's record names it (`onboarding_face_saved`), and with the nudge on its `onboarding_nudge` line says `"reported": false`, since the model made no `setup_step` call. A name heard with no yes is done, not failed, at the 90 s give-up. The walk keeps no name itself: its record says `"name_kept": false`, as the model's own call keeps none. A face saved while the walk has not yet ended this step (it has no outcome in the onboarding file) keeps the name it was saved under in that person's own memory, "Their name is X." (`remember::keep_name_with_face`, [memory.md](memory.md); the onboarding forgets report, 30 Oct), forgotten as any kept thing of theirs. Once the step has any outcome (done, skipped, failed, `later`, not available), the file stays but the walk is past it, so a `remember_my_face` after that, by anyone, keeps no name (the Reviewer-lead's P3 on #4530); a `later` step offered again after the walk keeps none either. A lamp that keeps no face keeps no name. This reading is for the nudge off: with the nudge on (`LAMP_ONBOARDING_NUDGE`), the step ends only through the nudge's own path, where the name is asked back and kept on a yes (`onboarding_nudge`, `"name_confirmed": true`). The two never both end it (the first builder on #2526) | the face in the eyes' people file, when asked and agreed; and the name saved with the face that ended this step, as `owner` in the onboarding file (#4118: who set the lamp up, named by default with `LAMP_PERSON_NAME_BY_DEFAULT` on a lamp with no typed name), gone on any face forgotten by voice, within 10 s once the eyes no longer know them (the app's face removal too), a whole redo or a reset, and moved to the new name when the person renames that face by voice (`replace`, `onboarding::owner_renamed`, [second-voice.md](second-voice.md)), only when the eyes answer that the face they replaced was exactly the owner's (`"replaced"`, [eyes.md](eyes.md); eyes without it move nothing); and, with a face saved, "Their name is X." kept in that person's own memory until they forget it; otherwise nothing |
 | 3 | `how_you_sound` | the core onboarding skill requests a short prompt: from their usual seat, say "Hey Lamp" the way they'd get its attention, a few times, each later prompt answering the last call (#1803, #3702, below); then one to say a sentence from there in their own words | the name part: three accepted calls (each heard by lamp-name at 0.95 or more, or by speech to text as the name alone, #3923) make a bar and its file is written; five prompts can't reach three, or the calls spread over 10 dB: no bar. Then the sentence part, whose outcome is the step's: a line heard with words, said close, its words covering it: done; short of that, coached once ("a little louder" or "a little closer"), then done or failed | the prompts and accepted tries (`rise_db`, `score` when lamp-name heard it, `heard_by`: `name` or `text`); the bar in `/var/lib/lampOS/voice/near-call.json`; the sentence's prompt count only |
 | 4 | `touch` | says exactly "OK, next step. Tap the top of my head once, then let go." (see "Exact lines" below), then stays quiet | a head-pad touch from Controls (`controls/touch`, `lamp_msgs/TouchEvent` from `controls`, `source: head`, enabled; `lamp-controls --touch`) after the ask: done. Short of that, after 8 s of quiet, one reminder, "I didn't feel that. Touch the very top of my head with your fingertip, once."; 60 s after the ask with no touch felt: `later`, said with the `later` line (#3996). Either end is said (`touch_done`, or the `later` line) before the next step is asked. The model may only skip it. Not available without the voice's bus (`LAMP_BUS=on`) or the subscription to `controls/touch`; the base strip stays off (#1891) | the outcome only |
 | 5 | `privacy` | led first, before step 1, whenever it is available (see "Physical privacy step" below); the core onboarding skill requests a short invitation naming the verified switch location | an invitation begun, a fresh physical close (even while it is said), the voice's verified microphone cleanup, then a fresh same-source open and normal readiness; with eyes that give receipts on the bus, also their receipt that the camera closed for this close (#1802) | bounded attempt evidence and completion identity |
@@ -44,35 +44,35 @@ sound like a machine. Each is marked `PLACEHOLDER (#841)` in the code.
 
 A step the model leads ends with `setup_step {step, outcome}`, outcome
 `done`, `skipped` (they asked to skip it) or `failed` (it could not be
-done; the model then tells them what to try later). Only the step being
-led is taken; a report of any other is refused and recorded
-(`onboarding_report_refused`). `where_you_sit` is done only by what the
+done; the model then tells them what to try later). `step` is optional:
+left out, the report is for the step led now. Only the step being led is
+taken, and only a step in the skill's `order` is ever led, so a report of
+any other is refused and recorded (`onboarding_report_refused`), and
+`redo_setup` of a step out of the `order` changes nothing and tells the
+model so (#5499); the order it answers by is the installed skill's, read
+once as the provider worker starts (`installed_order`), never on each redo.
+`where_you_sit` is done only by what the
 eyes measure, `touch` only by what Controls feels, and `how_you_sound`,
 `privacy` and `giving_way` only by their measured evidence: the model may
 only skip them, and the worker refuses any other
-outcome with words it can say. `setup_step`'s words also tell the model
-that the runner asks each step in its own words and counts every try: it
-never names, announces, explains or asks a step itself, and never counts
-calls (lamp-29e7's re-test, 29 Oct: with the runner's calls unheard, the
-model said "That's twice now", "that's three", and led a "touch" step of
-its own while how you sound was still led). A step this lamp never offers
-is never told to the model: `setup_step` and `redo_setup` name `room_sounds`
-only with `--onboarding-room-sounds` and `face_expressions` only with
-`--onboarding-face-expressions`, flags the coordinator passes after
-`--onboarding-file` from the same switches the walk reads
-(`LAMP_PRIVACY_CONTROLS=no-slide`, `LAMP_FACE_EXPRESSIONS_ASK=on`), and
-their words name a step's "clear yes" only for a step offered (#3769:
-on lamp-52e6 on 30 Oct, 8811, with face expressions off, the model, told
-of `face_expressions` by `setup_step`, followed the hello's yes with "Do
-you mind if I notice whether you're smiling or frowning", which went
-unanswered and unkept; tests
-`tools::tests::a_face_expressions_step_that_is_off_is_never_told_to_the_model`,
-`onboarding::tests::a_step_this_lamp_never_offers_is_never_told_to_the_model`).
+outcome with words it can say. Neither function names a step or a number
+of steps, in its words or in an enum (#5499: on lamp-52e6 on 6 Nov, told
+the walk's steps, the model asked two steps out of the walk at 13:12 and
+said "Step one is done: I know where you sit. Now the second step" at
+13:26). The model learns a step only from the line the runner gives it
+for the step led now; a step whose note calls `setup_step` names itself
+there. `setup_step`'s words tell the model that the runner says each line
+itself and counts every try: it never names, numbers, announces, explains
+or asks a step itself, never says what is done or what comes next, and
+never counts calls (lamp-29e7's re-test, 29 Oct: with the runner's calls
+unheard, the model said "That's twice now", "that's three", and led a
+"touch" step of its own while how you sound was still led; test
+`onboarding::tests::the_model_is_told_no_step_and_no_count`,
+`tools::tests::the_worker_tells_the_model_of_no_step`).
 `setup_step` for `preferences` answers the model that it was the last
 question: at most five words, never a question, since the walk says the
-done line (`preferences_reported_tells_the_model_no_more_questions`).
-`setup_step`'s words also hold every answer in `preferences`, the quiet hours' too, and only there (other steps still ask again), to at most five words and no question (#3769: on lamp-52e6 on 30 Oct 13:27 the quiet hours' answer ran to 17 words and the hello came 13.1 s after the line; `every_preferences_answer_is_told_five_words_and_no_question`).
-Privacy, whose availability changes while the voice runs, is still named.
+done line (`preferences_reported_tells_the_model_no_more_questions`); the
+five-word cap on every preferences answer is in that step's own note.
 Never reported, a step is failed after 90 s once the room has been quiet
 for 20 s, and the walk goes on.
 
@@ -154,6 +154,18 @@ owed line, and not once the walk has moved on: a step's own line only while
 that step is still led as it was, a line between asks only while nothing
 has been asked since (`Onboarding::still_owed`).
 
+**A step's first note never said is asked again at once.** Every step's
+first note (its ask: "What should I call you?" and the rest, not only
+`where_you_sit`'s intro) is bound to its turn the same way. Ended `Unsaid`
+(lamp-52e6, build 10507, 14:57:20: `who_you_are` asked, its turn retired by
+a room line heard as no words, and the walk waited the 90 s give-up in
+silence before asking again; stable 10467 did too), the step is asked again
+as soon as the lamp may speak and the room has been quiet `START_QUIET_US`,
+`MOST_UNSAID` (2) times at most, only while that same ask is led and
+nothing has been answered (`Onboarding::first_note_finished`,
+`onboarding_note_unsaid` with `"first": true`). Any of it played, it is
+not; the step gate and the 90 s give-up of a heard ask are as before.
+
 ## Installed walk data
 
 Voice reads `/var/lib/lampOS/skills/onboarding/skill.toml` once when its service
@@ -175,8 +187,19 @@ run. Existing `setup_step` and `redo_setup` provider tools still follow
 `LAMP_ONBOARDING` and its file setting; they are not removed by this failure.
 Repair the file and restart Voice to recover the automatic walk.
 
-`order` names each of the nine stable step IDs exactly once; `steps` provides
-`first` and `reoffer` notes for every ID. `reoffer_after_s` is 1 to 31,536,000
+`order` names the walk's steps, each a stable step ID at most once, and must
+hold `where_you_sit` and `who_you_are` (the shipped order is just those two,
+#5499); `steps` provides `first` and `reoffer` notes for all nine IDs. The
+walk follows `order` alone: adding a step back means adding it there. When
+the last step in `order` ends, each step out of it with no outcome yet is
+kept `not_available` (journal `"why":"parked"`), so lamp-update's and
+the journal keep's (`lamp-journal-keep`) check of all nine, not just the
+`order`, sees the walk over, old updaters too. The same is done as the
+progress is loaded, so a lamp that ended every step in `order` on a build
+without it is filled at the next start (test
+`a_two_step_walk_ended_before_parking_is_filled_at_load`). Re-offers search
+only `order`, so none is offered again (test
+`a_two_step_walk_ended_keeps_all_nine_and_offers_no_parked_step`). `reoffer_after_s` is 1 to 31,536,000
 (the shipped value is 86,400), and so is `later_after_s` (shipped 1,800). Only `who_you_are` and `preferences` may have a
 `nudge`, with `words` and `after_answers` from 1 to 8. `where_you_sit`,
 `how_you_sound`, `touch` and `giving_way`, and no other step, may have a
@@ -212,8 +235,8 @@ the first invitation again on a second try; Reviewer-two's P2 on #3781).
 Skills uses the same validator when loading or packaging this core skill.
 Changing order or words cannot add a mechanism, grant physical authority,
 remove privacy's priority or change proof, timeout and cancellation rules.
-The shipped data reproduces the previous order and notes byte for byte,
-except the measured steps' lines, which are exact sentences since #3769
+The shipped data reproduces the previous notes byte for byte (the order is
+the two-step walk since #5499), except the measured steps' lines, which are exact sentences since #3769
 ("Exact lines" below); `onboarding/legacy_words.rs` is a test-only oracle,
 absent from production.
 
@@ -245,6 +268,12 @@ said before the next step's invitation:
 
 Giving way's lines never mention sleep: the step never puts the lamp to
 sleep (#3747).
+
+The done line (`PREFERENCES_DONE`, and `PREFERENCES_DONE_TRIES` with first
+tries on) is the walk's last line: said when `preferences` ends done, or
+when the last step in `order` ends done, skipped or failed (#5499, Thirteen's
+P2 on #5504: with `who_you_are` last, a no to the name or the face still
+hears it). After a name-only end it follows `NAME_ONLY`.
 
 **A fixed line is said even when the chat is late.** These lines still go to
 the model as a written turn, and on the second route a turn whose chat has
@@ -312,11 +341,69 @@ a reset wipes it with the file. An older voice reads past the field. Tests:
 `the_things_to_try_are_said_once_per_setup`, and
 `in_language::tests::the_done_line_with_tries_is_the_done_line_then_the_tries`.
 
+**One sentence about Harness in the closing** (#5488), with
+`LAMP_ONBOARDING_HARNESS_LINE=on` exactly (off unless set; not in the
+product unit, the PM's call after its lamp check and once the app's Harness
+section, where the sentence sends the owner, is in the app build a home
+has). The walk's closing (the
+done line above) ends with one more sentence, inside the same quoted line,
+so it is one turn and a new owner never hears two speeches at the end: "If
+you work on a computer, I can take on tasks for you: open Harness in the
+app to connect." (`harness_line::SENTENCE`; `skill::PREFERENCES_DONE_HARNESS`,
+and `skill::PREFERENCES_DONE_TRIES_HARNESS` when
+`LAMP_ONBOARDING_FIRST_TRIES` is on too, the tries' words unchanged with the
+sentence after them; the four other languages in `in_language::LINES`). It
+asks nothing and is never said again or as a reminder. It rides on the
+done note itself: whatever chooses the done line (`preferences_done`, the
+first done line handed out) chooses the variant with the sentence, so it is
+said wherever the done line is said, and when the done line moves to the
+walk's last step (#5499's two-step walk: said when "who you are" ends)
+the sentence moves with it. A walk that ends
+without a done line (its "preferences" skipped or failed) says no sentence
+and decides nothing.
+
+It is said only when lamp-tasks says Harness is not signed in: the walk
+reads `{"op":"status"}` on `LAMP_TASKS_DIR`'s `request.sock` every 20 s, off
+the voice's loop, while the sentence is not decided (from when the
+onboarding file loads; the read is let go once it is decided, and a voice
+started on a decided file lets it go as the file loads, so the thread ends
+at its next wake; a read whose thread cannot be started logs "Harness's
+sign-in not read: …" once and is not kept, so the next closing handed out
+starts it again, one try each time), and takes its `signed_in` ([tasks.md](tasks.md), "The
+sign-in on `status`"). `yes` or `offline` drops it, and so does no tasks part
+(`LAMP_TASKS_DIR` unset). No answer, or a lamp-tasks that does not say (an
+older build, or one restarted just before the closing that has not read
+the sign-in yet), drops it from that closing too, rather than claim
+something untrue, but decides nothing: the session record says `unknown`
+and the next closing handed out (a redo of "preferences" or of the whole
+walk) reads again. Decided once, when a closing is handed out, and kept
+(`Progress::harness_line`: `said`, `signed_in` or `no_tasks`; an `unknown`
+kept by the build before #5488's review is read again), so a restart, a redo of the whole
+walk (`Progress::redone` keeps it) or a later closing never says it again; a
+reset wipes it with the file. An older voice reads past the field. Session
+record: `onboarding_harness_line` with its `outcome`. Tests:
+`onboarding::tests::the_sentence_about_harness_ends_the_closing_once`,
+`the_sentence_about_harness_is_dropped_unless_harness_is_signed_out`,
+`an_unknown_sign_in_is_read_again_at_the_next_closing`,
+`the_read_of_harness_is_let_go_once_the_sentence_is_decided`,
+`a_read_that_could_not_be_started_is_started_again_at_the_next_closing`,
+`with_the_first_tries_the_sentence_about_harness_is_in_the_one_closing`,
+`the_done_note_carries_the_sentence_once_for_each_switch`,
+`the_two_step_walks_one_closing_carries_the_sentence`,
+`without_the_harness_line_switch_the_walk_ends_as_before`,
+`in_language::tests::a_closing_with_harness_is_the_closing_then_the_sentence`,
+and `harness_line::tests`.
+
 The conversational steps keep their tool calls and consent clauses, but say
 their questions exactly: `who_you_are` asks "What should I call you?", says the
-name back as a question on its own and waits for its yes (the setup face save
+name back as one clear yes-or-no question on its own, the name and then "did
+I get that right?", never the name alone (lamp-52e6, build 10507: "Leo?
+Leo." asked nothing), and waits for its yes (the setup face save
 needs that read-back, #5140; a read-back folded into the face question was
-refused every time, #5415), then asks "May I remember your face, so I know you
+refused every time, #5415). It asks them to spell their name only if they
+say it is wrong or the model missed it, and only once, then says back the
+name the letters spell, never the letters (lamp-3e83, #5564: "Jane or
+J-A-N-E?"; nobody calls a person by the spelling of their name). Then it asks "May I remember your face, so I know you
 next time?". A face save refused for the read-back is held by the voice, and
 the step stays open for it up to 45 s (`FACE_SAVE_HELD_US`) instead of ending
 15 s after the lamp's last words (`FACE_SAVE_WAIT_US`). Neither the step's give-up nor
@@ -388,21 +475,61 @@ The record, for lamp-ears (`onboarding/storage.rs`, `room_sounds`):
   no, the safe side. A write that fails is said once and leaves no file
   (no again); the progress stands.
 - Written only by the progress write that first keeps the yes; removed by
-  any progress write or start whose `room_sounds` outcome is not `done`.
+  any progress write or start whose `room_sounds` outcome is not `done`,
+  unless it is the owner's yes from the app that still stands (below).
   It is never written back from the progress, so once removed it stays
   gone until a new yes.
-- Shape: `{"version":1,"room_sounds":"yes","at_unix_s":<when the yes was kept>}`.
+- Shape: `{"version":1,"room_sounds":"yes","at_unix_s":<when the yes was kept>,"by":"voice"}`
+  (keys in that file sorted, as `lamp_msgs::consent::bytes` writes them;
+  files from before `by` have none and are the voice's).
 - Read rule: yes only when the file is a JSON object whose `room_sounds`
   is exactly `"yes"`. Missing, unreadable, unparseable, over 4096 bytes,
-  or anything else is no. Read one version ahead: `version` and any other
-  field are ignored.
+  or anything else is no. Read one version ahead: `version`, `by` and any
+  other field are ignored.
 
 Taking the yes back: it is withdrawn by `redo_setup` (the progress
 emptied, the file removed on that write), by a forget of everything
 (`forget_everything`, `remember.rs`: whoever asks, the household's yes
 goes with their memory, with a journal line naming the file only), and by
-the factory reset (the reset plan wipes the file). There is no separate
-"stop noticing music" yet.
+the factory reset (the reset plan wipes the file). With
+`LAMP_APP_CONSENT=on` on `lamp-cloud` the owner can also turn it off, or
+on, in the app (next section).
+
+## The two yeses from the app (#5500)
+
+With `LAMP_APP_CONSENT=on` on `lamp-cloud` (off unless set, off in the
+product unit for now), the app reads and switches the same two records
+(`consent.get`, `consent.set`, [cloud.md](cloud.md), "The two yeses from
+the app"): face expressions on every lamp, room sounds only on a lamp with
+no slide (`lamp-cloud`'s own `LAMP_PRIVACY_CONTROLS=no-slide`). Both stay
+off until a yes, spoken or in the app.
+
+- **Written by root's helper**, `lamp-setup change`: `lamp-cloud` can't
+  write the folder. The file is the voice's shape with `"by":"app"`
+  (`{"at_unix_s":N,"by":"app","face_expressions":"yes","version":1}`),
+  0640 and the folder's group (`lampos`), 0600 where that group is root's;
+  off removes it. A yes already there, the voice's or the app's, is left
+  as it is. The readers ignore `by`.
+- **It survives the voice.** The voice's start and its progress writes
+  remove a record whose step is not `done`, but not one with `"by":"app"`
+  that still stands: given after the step's last redo
+  (`yes_redone_at_unix_s` in the progress file, set by `redo_setup` for
+  the whole walk or for that step) and after any "no" (`skipped`) at the
+  lamp. So a redo, or a later "no" at the lamp, takes the app's yes back
+  at the next write, as it takes back a spoken one; an app yes given in
+  the same second as a redo is taken back too, the safe side. An app yes
+  with no `at_unix_s` never stands. A yes said at the lamp afterwards is
+  written as the voice's, over the app's.
+- **Always removed** by a forget of everything, and by the factory reset's
+  plan, whoever gave it.
+- **Followed live**: lamp-eyes reads its yes every 2 s, so nothing
+  restarts. lamp-ears starts its classifier only at its start, so a new
+  room sounds yes restarts lamp-ears (`try-restart`, once no update holds
+  lamp-update's lock, as lamp-control's restart); an off is followed
+  within 2 s, as a forget is.
+- **The ask still runs**: an app yes doesn't end the walk's step. With the
+  ask on, the walk still asks once; a yes keeps the voice's record, a no
+  takes the app's back.
 
 ## Face expressions (#2872)
 
@@ -420,10 +547,11 @@ in `skills/onboarding/skill.toml`), with the same code-checked
 
 Everything else is the room sounds step's, above: asked once, any kept
 outcome ends it, only a yes writes a record, and `redo_setup`, a forget of
-everything and the factory reset remove it. The record is
+everything and the factory reset remove it; the app may set it too ("The
+two yeses from the app", above). The record is
 `/var/lib/lampOS/consent/face-expressions.json` (`FACE_EXPRESSIONS_PATH`,
 beside `room-sounds.json`, written the same way and with the same mode and
-group), shaped `{"version":1,"face_expressions":"yes","at_unix_s":<when>}`,
+group), shaped `{"version":1,"face_expressions":"yes","at_unix_s":<when>,"by":"voice"}`,
 and read by lamp-eyes' `seems::face_expressions_yes` with the same rule:
 yes only when `face_expressions` is exactly `"yes"`.
 
@@ -577,7 +705,8 @@ next rest, a new walk that opens with the setup intro again. "Can we redo the to
 outcome and its own counts (how you sound's prompts and tries, giving way's
 tries) go, and every other step keeps what it ended with. Privacy is never
 redone alone; it goes with `all`. A call that names no step, or a step the
-walk doesn't know, reopens nothing and tells the model to ask which (on
+walk doesn't know, reopens nothing and tells the model to ask which,
+naming the step IDs in the `order` (on
 lamp-06c1 on 28 Oct "redo the touch step" reached a redo with no step and
 reopened every step). Skipping one step is `setup_step … skipped`; skipping
 the rest is that for each step.
@@ -588,7 +717,8 @@ the rest is that for each step.
 step's outcome, when, step 1's framing, `opened` once "where you sit"
 has said its intro this setup/redo and it was heard, and `face_again` with
 `face_again_names` (ids of the name told, never words) while the face is
-still to be asked for once more (#5139). Only the coordinator writes it.
+still to be asked for once more (#5139), `tries_said` (#5316), and
+`harness_line`, what became of the sentence about Harness (#5488). Only the coordinator writes it.
 The provider worker, which runs the model's functions, appends what the
 model reported to a mailbox beside it (`FILE.told`), and the coordinator
 takes that in twice a second. Once lamp-settings (#808) is merged this
@@ -599,7 +729,8 @@ is not refused, and the walk goes on with the steps it knows (#2110).
 Each step is also in the session record: `onboarding_step` (asked, or its
 outcome and framing), `onboarding_guide` (a word on where to move it, with
 the face), `onboarding_stopped` (paused or nobody there),
-`onboarding_redo` and `onboarding_finished`.
+`onboarding_redo`, `onboarding_finished` and, with
+`LAMP_ONBOARDING_HARNESS_LINE`, `onboarding_harness_line`.
 
 ## The switch
 
@@ -630,7 +761,9 @@ second route, DeepSeek) found two things it changes:
   quiet moment at least 10 s after that note (so an answer on the face can
   come first), and the first line after the lamp spoke its question was one
   or two words (after an "I'm") with no question, yes, no, greeting or
-  thanks: the walk has the model ask "Did I get that right, NAME?", unless
+  thanks, or a name spelled, alone or after the name said ("J-A-N-E.",
+  "Jane, J A N E."), which is the name it spells ("Jane"; two letters stay
+  as said, as initials; #5564): the walk has the model ask "Did I get that right, NAME?", unless
   its face question is still unanswered. The yes, no and greeting words
   are English only. A short yes line keeps
   the step done, as the model's `done` would (the face is kept only by
@@ -671,7 +804,7 @@ and `ko` (`crates/voice/src/onboarding/in_language.rs`).
 said in the language, from the voice's own table (`LINES`): the skill's
 lines in `skills/onboarding/skill.toml` and the code's own
 (`PREFERENCES_HELLO`, `PREFERENCES_DONE`, `FACE_EXPRESSIONS_YES`/`_NO`,
-`LATER`, `LAST_LATER`). A line is translated as the walk hands it out (its
+`LATER`, `LAST_LATER`, and the closings with `harness_line::SENTENCE`). A line is translated as the walk hands it out (its
 `tick` and its invitations), so the walk itself still keeps and compares
 the English notes. A `{location}` or `{name}` filled in stays as it was
 given (the privacy switch's location is the hardware profile's words). The
@@ -1247,8 +1380,34 @@ how_you_sound prompt N played whole (call)`, or `cut`, or `with a gap`, or
 moment its playback is known whole or cut. A test driven from outside times
 its answer by it.
 
+**A slow provider is not the person's miss** (#5563, lamp-3e83, 7 Nov: a
+call's line went to the chat as a turn, its first round had not begun in
+time, the lamp said "Sorry, my thoughts are slow just now." and then "I
+didn't catch that."). When the second route says its down line
+(`ProviderOutput::DownLineSaid`, `LAMP_SECOND_DOWN_LINE=on`) for a call's
+line (one told `StepCall`, its start known) begun from 1.5 s before the
+prompt's end to the window's end, a refused try is given back at its
+judgement as a prompt never said: none of the five is spent, the next
+prompt is not `near_missed`, it counts under `MOST_UNSAID` like any prompt
+given back, and its record says `"why": "the provider was slow"`
+(`NearFlow::provider_slow`, coordinator `near_provider_slow`). An accepted
+try stands. Test:
+`near_flow_tests::a_try_whose_line_the_slow_provider_answered_is_not_a_miss`.
+
+**A heard call is asked for again twice at most** (#5563). A try whose call
+was heard surely and still refused, answered over the prompt's last word or
+refused as the lamp speaking, the name heard twice or no level known,
+counts in memory (`heard_refused`, kept across an absence as the re-offers
+are); a third such try ends the name part as five spent prompts do
+(`MOST_HEARD_ASKS`). A name unheard or heard under 0.95 does not count.
+Before it, the re-offers of a call over the prompt and the prompts given
+back spent none of the five, so a person heard every time could be asked
+more than five times. Test:
+`near_flow_tests::a_heard_call_is_asked_for_again_twice_at_most`.
+
 **The name part's end.** At most five prompts, and the part stops asking
-once five can't reach three accepted (`asks_again`). Three accepted calls make
+once five can't reach three accepted (`asks_again`), or after a third heard
+call refused (above). Three accepted calls make
 the bar (`near_rise`: the quietest less 3 dB, held to 16–24 dB); the bar and
 its tries are written to `/var/lib/lampOS/voice/near-call.json` (0600, whole),
 and only after that write completes is the name part done

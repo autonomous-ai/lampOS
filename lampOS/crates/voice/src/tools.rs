@@ -112,6 +112,74 @@ pub const ASK_DEADLINE: Duration = Duration::from_millis(1_500);
 const MAX_CATALOG_BYTES: u64 = 65_536;
 const MAX_ANSWER_BYTES: u64 = 8_192;
 
+/// The last `remember` kept in a person's scope by the one-face rule
+/// (`LAMP_PERSON_SCOPE_ONE_FACE`), one per worker and session (at most
+/// [`ONE_FACE_KEPT_SESSIONS`]): its request and whose it is. A bare
+/// "forget that" on that person's very next line, with no other memory
+/// call before it on that line, is about that keep, so it is never run as
+/// the room's `forget_last` ([`one_face_just_kept`]). Stock 10538 on
+/// lamp-06c1 (6 Nov, S1 req 261/262, C88): the umbrella kept as Olivia's,
+/// "forget that" run as the room's `forget_last`, which took the room's
+/// Wi-Fi name instead. Nor is it run in their scope: forgetting needs the
+/// mouth seen speaking (the memory owner, 16:49 on #5385: "tạm thời chưa
+/// cho xóa nếu ko detect đc mở miệng"), so nothing is forgotten and the
+/// lamp asks them to look at it ([`ONE_FACE_JUST_KEPT`]).
+static ONE_FACE_KEPT: std::sync::Mutex<Vec<(crate::memory_scope::RequestKey, String, Instant)>> =
+    std::sync::Mutex::new(Vec::new());
+const ONE_FACE_KEPT_SESSIONS: usize = 4;
+
+/// What the model is told for a bare forget right after a one-face keep
+/// ([`ONE_FACE_KEPT`]): nothing forgotten, theirs or the room's, as
+/// forgetting needs the mouth seen speaking (the memory owner, 16:49 on
+/// #5385).
+const ONE_FACE_JUST_KEPT: &str = "Nothing was forgotten: I couldn't see who was asking. Tell them, in the language they spoke, \"I'll forget that when I can see you say it.\"";
+
+/// What the model is told for any other bare forget on a one-face line:
+/// nothing forgotten, never the room's last kept thing on a guess (Jarvis's
+/// P2 2 on #5608: the room's Wi-Fi name), and it asks which.
+const ONE_FACE_BARE_FORGET: &str = "Nothing was forgotten yet: I couldn't tell which thing \"that\" is. Ask them once which thing to forget, in a few words.";
+
+/// What the model is told for a forget naming what or which on a one-face
+/// line (#5627): nothing forgotten, theirs or the room's, as one known face
+/// counts for saving and recall, never for forgetting, until the mouth is
+/// seen (the memory owner, 16:49 on #5385). It asks them to say it again
+/// where the lamp can see them.
+const ONE_FACE_NAMED_FORGET: &str = "Nothing was forgotten: I couldn't see who was asking, and I only forget something when I can see the person say it. Tell them, in the language they spoke, \"I'll forget that when I can see you say it. Look at me and say it again.\"";
+
+/// Whether `a` and `b` are requests of the same worker and session.
+fn same_session(a: &crate::memory_scope::RequestKey, b: &crate::memory_scope::RequestKey) -> bool {
+    a.worker == b.worker && a.session == b.session
+}
+
+/// Marks request `key`'s keep as `person`'s by the one-face rule
+/// ([`ONE_FACE_KEPT`]), in place of its session's earlier one.
+fn one_face_kept(key: crate::memory_scope::RequestKey, person: String) {
+    if let Ok(mut kept) = ONE_FACE_KEPT.lock() {
+        kept.retain(|(at, ..)| !same_session(at, &key));
+        if kept.len() == ONE_FACE_KEPT_SESSIONS {
+            kept.remove(0);
+        }
+        kept.push((key, person, Instant::now()));
+    }
+}
+
+/// Whether a bare forget in request `key`, on a line `person`'s by the
+/// one-face rule, is the keep their previous line just made
+/// ([`ONE_FACE_KEPT`]): the same worker and session, the request right
+/// after it, within [`crate::remember::HELD_FORGET_FOR`]. Taken once.
+fn one_face_just_kept(key: crate::memory_scope::RequestKey, person: &str) -> bool {
+    let Ok(mut kept) = ONE_FACE_KEPT.lock() else {
+        return false;
+    };
+    let Some(at) = kept.iter().position(|(at, ..)| same_session(at, &key)) else {
+        return false;
+    };
+    let (at, whose, when) = kept.remove(at);
+    at.request.checked_add(1) == Some(key.request)
+        && whose == person
+        && when.elapsed() <= crate::remember::HELD_FORGET_FOR
+}
+
 /// What the worker was told by its flags.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Settings {
@@ -160,10 +228,6 @@ pub struct Settings {
     /// The onboarding file, whose mailbox the model's reports go to
     /// ([`crate::onboarding`]).
     pub onboarding: Option<PathBuf>,
-    /// This lamp's walk offers room sounds / face expressions: only then
-    /// does `setup_step` name them (#3769).
-    pub onboarding_room_sounds: bool,
-    pub onboarding_face_expressions: bool,
     /// The skills are reached through one function, `use_skill`
     /// ([`crate::use_skill`], `LAMP_USE_SKILL=on`), not one each.
     pub use_skill: bool,
@@ -238,14 +302,6 @@ pub fn arguments_from_environment() -> Vec<String> {
     ) {
         flags.push(crate::onboarding::FLAG.to_owned());
         flags.push(file.display().to_string());
-        flags.extend(crate::onboarding::offers_arguments(
-            std::env::var(crate::privacy_bus::ENVIRONMENT)
-                .ok()
-                .as_deref(),
-            std::env::var(crate::onboarding::FACE_EXPRESSIONS_ASK_ENVIRONMENT)
-                .ok()
-                .as_deref(),
-        ));
     }
     flags.extend(crate::use_skill::arguments(
         std::env::var(crate::use_skill::ENVIRONMENT).ok().as_deref(),
@@ -451,19 +507,10 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
             return Err(std::io::Error::other("--onboarding-file must be absolute"));
         }
         settings.onboarding = Some(PathBuf::from(file));
+        // The walk's order, read as the worker starts (the Reviewer-lead's
+        // P3 on #5521).
+        crate::onboarding::installed_order();
         flags = rest;
-        if let [flag, rest @ ..] = flags
-            && flag == crate::onboarding::ROOM_SOUNDS_FLAG
-        {
-            settings.onboarding_room_sounds = true;
-            flags = rest;
-        }
-        if let [flag, rest @ ..] = flags
-            && flag == crate::onboarding::FACE_EXPRESSIONS_FLAG
-        {
-            settings.onboarding_face_expressions = true;
-            flags = rest;
-        }
     }
     if let [flag, rest @ ..] = flags
         && flag == crate::use_skill::FLAG
@@ -823,11 +870,7 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
         tools.push(crate::marked::tool());
     }
     if settings.onboarding.is_some() {
-        tools.extend(crate::onboarding::tools(
-            &lamp_msgs::ONBOARDING_WALK,
-            settings.onboarding_room_sounds,
-            settings.onboarding_face_expressions,
-        ));
+        tools.extend(crate::onboarding::tools());
     }
     // A system function, never a skill (#1683): before the executive's and
     // the skills', so it is never the one cut past 32; a skill cut for it is
@@ -1070,6 +1113,9 @@ fn face_switches(settings: &Settings) -> crate::known_faces::FaceSwitches {
         record: crate::known_faces::record_told_on(),
         visits: settings.who_visits && settings.memory.is_some(),
         at_setup: false,
+        // A rename's yes judged by its guards (`LAMP_NAMES_RENAME_YES`,
+        // #5485): only with names checked.
+        rename_yes: settings.names_checked && crate::known_faces::rename_yes_on(),
     }
 }
 
@@ -1474,6 +1520,18 @@ fn named_beside(settings: &Settings, key: &str) -> BTreeSet<String> {
     named
 }
 
+/// `use_skill`'s note that this call already ran `skill`
+/// ([`crate::use_skill::ran`]), but none for a skill whose tools file gives
+/// it a search ([`search_walk`], as the second route's note and walk read
+/// it): a search is several calls of its skill in one turn, each look's
+/// answer telling the model to call again with the next place
+/// (look-for-things' `[search]`, a reader's P2 on #5505).
+fn told_ran(settings: &Settings, skill: &str, told: &mut Value) {
+    if search_walk(settings, skill).is_none() {
+        crate::use_skill::ran(skill, told);
+    }
+}
+
 /// Each skills folder's tools file that can be read, in order.
 fn tools_files(settings: &Settings) -> Vec<Value> {
     let mut files = Vec::new();
@@ -1547,7 +1605,13 @@ fn run_spoken_call_inner(
         match crate::use_skill::translate(call, crate::use_skill::offered(&skills)) {
             Ok(skill) => match self::route(settings, &skill.name) {
                 found @ Route::Executive(_) if is_skills(settings, &found) => {
-                    run_spoken_call_inner(settings, &found, &skill, request, heard, context, lease)
+                    let (whom, mut answer, answered) = run_spoken_call_inner(
+                        settings, &found, &skill, request, heard, context, lease,
+                    );
+                    if answered {
+                        told_ran(settings, &skill.name, &mut answer.told);
+                    }
+                    (whom, answer, answered)
                 }
                 _ => ("nobody", ToolAnswer::plain(unavailable()), false),
             },
@@ -1695,6 +1759,15 @@ fn run_call_with_scope(
             if crate::remember::is_forget(&call.name) {
                 crate::remember_speaker::forget();
             }
+            // Any memory call but a forget ends what a bare forget could
+            // take as the one-face keep just made ([`ONE_FACE_KEPT`]): after
+            // a recall on its line, "that" may be what it read (Thirteen's
+            // P2 on #5022); a `remember` that keeps by one face sets it anew.
+            if call.name != crate::remember::FORGET
+                && let Ok(mut kept) = ONE_FACE_KEPT.lock()
+            {
+                kept.retain(|(at, ..)| lease.is_some_and(|lease| !same_session(at, &lease.key())));
+            }
             // A `forget` whose heard line names what to forget is that
             // thing's, of the asker's own scope, never the last kept thing's
             // (#3113), on every switch.
@@ -1768,6 +1841,41 @@ fn run_call_with_scope(
                         // reviewer-three's P1 on #4584; Fourteen's forget
                         // FAIL on lamp-9adf, build 9699).
                         let late = lease.keeper_within(crate::memory_scope::KEEPER_WAIT);
+                        // With `LAMP_PERSON_SCOPE_ONE_FACE_READS`, a forget
+                        // on a line someone's by the one-face rule never runs,
+                        // the single-item one its keep reaches among them:
+                        // nothing saw the mouth say it (the memory owner,
+                        // 16:49 on #5385). Read after the late look, which
+                        // may take the line by the rule as it ends.
+                        if model.name == crate::remember::FORGET && lease.forgets_need_mouth() {
+                            eprintln!(
+                                "lamp-voice: request {request}: a forget on a line whose keep is the one known face's is not run: nothing saw the mouth say it (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
+                            );
+                            return (
+                                serde_json::json!({
+                                    "forgotten": false,
+                                    "note": crate::second_provider::ONE_FACE_FORGET,
+                                }),
+                                true,
+                            );
+                        }
+                        // Nor a correction of a kept thing (`replaces`): it
+                        // retires the old fact, as a forget would (the
+                        // privacy read's P2 on #5592). A plain keep runs.
+                        if crate::remember::corrects(&model.name, &call.args)
+                            && lease.forgets_need_mouth()
+                        {
+                            eprintln!(
+                                "lamp-voice: request {request}: a correction on a line whose keep is the one known face's is not run: nothing saw the mouth say it (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
+                            );
+                            return (
+                                serde_json::json!({
+                                    "kept": false,
+                                    "note": crate::second_provider::ONE_FACE_FORGET,
+                                }),
+                                true,
+                            );
+                        }
                         // Only a forget naming what (`about`) or which
                         // (`source_id`) reaches their scope: a bare "forget
                         // that" is `forget_last`, and after the room's
@@ -1775,45 +1883,102 @@ fn run_call_with_scope(
                         // thing, so it stays the room's (Thirteen's P2 on
                         // #5022).
                         let named = |key: &str| call.args.get(key).is_some_and(|v| !v.is_null());
-                        let one_face = late
+                        let reached = late
                             .is_none()
                             .then(|| lease.reached_by_one_face(&model.name))
-                            .flatten()
-                            .filter(|_| {
-                                model.name != crate::remember::FORGET
-                                    || named("about")
-                                    || named("source_id")
-                            });
+                            .flatten();
+                        // Except the keep their previous line just made: a
+                        // bare "forget that" on the very next line, nothing
+                        // asked of the memory before it, is about that keep,
+                        // so the room's `forget_last` would take another
+                        // thing (C88, lamp-06c1, 6 Nov: the Wi-Fi name). It
+                        // is not run in theirs either, as nothing saw the
+                        // mouth say it (the memory owner, 16:49 on #5385):
+                        // nothing is forgotten, and the lamp asks them to
+                        // look at it.
+                        let bare = model.name == crate::remember::FORGET
+                            && !named("about")
+                            && !named("source_id");
+                        // A forget by what or which ends the mark too (Jarvis's
+                        // P3 on #5608): a bare forget after it on the same
+                        // line would be about something else.
+                        if model.name == crate::remember::FORGET
+                            && !bare
+                            && let Ok(mut kept) = ONE_FACE_KEPT.lock()
+                        {
+                            kept.retain(|(at, ..)| !same_session(at, &lease.key()));
+                        }
+                        // Any bare forget on a one-face line runs nowhere: not
+                        // in theirs, as nothing saw the mouth say it, and not
+                        // as the room's `forget_last`, which takes another
+                        // thing. Right after their plain new keep, the lamp
+                        // says it will forget it when it sees them say it;
+                        // otherwise it asks which.
+                        if bare && let Some(person) = reached.as_deref() {
+                            let just = one_face_just_kept(lease.key(), person);
+                            eprintln!(
+                                "lamp-voice: request {request}: a bare forget on a one-face line is not run{}: nothing saw the mouth say it (LAMP_PERSON_SCOPE_ONE_FACE)",
+                                if just { ", right after their keep" } else { "" }
+                            );
+                            let note = if just {
+                                ONE_FACE_JUST_KEPT
+                            } else {
+                                ONE_FACE_BARE_FORGET
+                            };
+                            return (json!({"forgotten": false, "note": note}), true);
+                        }
+                        let one_face = reached.filter(|_| {
+                            model.name != crate::remember::FORGET
+                                || named("about")
+                                || named("source_id")
+                        });
                         match (late, one_face) {
-                            // Their scope, then the room's only on a real
-                            // no-match in theirs, never when theirs found
-                            // some and declined (the Reviewer-lead's P2 on
-                            // #5022). The room's run is for a forget named
-                            // in what was heard: an unnamed `forget {about}`
-                            // already looks in the room's itself when they
-                            // have nothing of their own, and is not run
-                            // there twice. Re-checked right before each run
-                            // (P3): a line another voice narrowed since is
-                            // the room's only.
-                            (None, Some(person)) if model.name == crate::remember::FORGET => {
+                            // A forget naming what or which on a line theirs
+                            // only by the one-face rule runs nowhere, theirs
+                            // or the room's: one known face counts for saving
+                            // and recall, never for forgetting, until the
+                            // mouth is seen (the memory owner, 16:49 on
+                            // #5385). It deleted in their scope while the
+                            // mouth was unseen, so someone off camera could
+                            // remove their kept thing by naming it (#5627).
+                            // The lamp asks them to say it where it can see
+                            // them. A line the mouth was seen saying is
+                            // theirs by scope and never reaches here.
+                            (None, Some(_)) if model.name == crate::remember::FORGET => {
                                 eprintln!(
-                                    "lamp-voice: request {request}: a forget on a line whose keep is the one known face's searches their scope, then the room's on no match (LAMP_PERSON_SCOPE_ONE_FACE)"
+                                    "lamp-voice: request {request}: a forget naming what or which on a one-face line is not run: nothing saw the mouth say it (LAMP_PERSON_SCOPE_ONE_FACE)"
                                 );
-                                crate::remember::run_one_face_forget(
+                                // Nothing was forgotten: a "forget it" after
+                                // it carries nothing (Jarvis's P3 on #5666).
+                                crate::remember::drop_carry(Some(lease));
+                                (
+                                    json!({"forgotten": false, "note": ONE_FACE_NAMED_FORGET}),
+                                    true,
+                                )
+                            }
+                            (None, Some(person)) => {
+                                let kept = crate::remember::run_one_face_keep(
                                     socket,
                                     call,
                                     deadline.saturating_sub(started.elapsed()),
                                     lease,
                                     &person,
-                                )
+                                );
+                                // Only a plain new keep, so it is their newest
+                                // kept thing: one the store had already
+                                // (`existing`, told with a note) or a
+                                // correction (`replaced`) is not, and their
+                                // `forget_last` would take another, older one
+                                // (Thirteen's P2 on #5608).
+                                if kept.0["remembered"] == true
+                                    && kept.0.get("note").is_none()
+                                    && kept.0.get("replaced").is_none()
+                                    && lease.kept_by_one_face().as_deref() == Some(person.as_str())
+                                {
+                                    one_face_kept(lease.key(), person);
+                                }
+                                kept
                             }
-                            (None, Some(person)) => crate::remember::run_one_face_keep(
-                                socket,
-                                call,
-                                deadline.saturating_sub(started.elapsed()),
-                                lease,
-                                &person,
-                            ),
                             (Some(person), _) => {
                                 eprintln!(
                                     "lamp-voice: request {request}: a memory write in a line admitted as the room's goes to the known face the eyes named by its end ({} ms)",
@@ -2067,7 +2232,12 @@ fn run_call_with_scope(
                 // on #1696, #1656).
                 Ok(skill) => match crate::tools::route(settings, &skill.name) {
                     found @ Route::Executive(_) if is_skills(settings, &found) => {
-                        run_call_with_scope(&found, &skill, request, heard, lease)
+                        let (whom, (mut told, answered)) =
+                            run_call_with_scope(&found, &skill, request, heard, lease);
+                        if answered {
+                            told_ran(settings, &skill.name, &mut told);
+                        }
+                        (whom, (told, answered))
                     }
                     _ => ("nobody", (unavailable(), false)),
                 },
@@ -2642,6 +2812,7 @@ mod tests {
             remember_speaker: false,
             at_setup: false,
             record: false,
+            rename_yes: false,
         };
         let route = Route::Faces(socket.clone(), on, None);
         let call = |name: &str| ToolCall {
@@ -2858,6 +3029,7 @@ mod tests {
                 named_only: false,
                 correct: false,
                 questions: false,
+                now: false,
                 sign_in: false,
                 sign_in_app: false,
             }),
@@ -2872,8 +3044,6 @@ mod tests {
             photo_faces: false,
             mark: Some("/var/lib/lampos-voice/session".into()),
             onboarding: Some("/var/lib/lampos-voice/onboarding.json".into()),
-            onboarding_room_sounds: false,
-            onboarding_face_expressions: false,
             reports_stop: true,
         };
         let mut tools = declared(&settings);
@@ -3021,35 +3191,30 @@ mod tests {
     /// lamp-52e6 on 30 Oct (8811, #3769): `LAMP_FACE_EXPRESSIONS_ASK`
     /// unset, the model was still told of face_expressions by `setup_step`
     /// and, after the hello, asked "Do you mind if I notice whether you're
-    /// smiling or frowning". The worker's functions name the step only with
-    /// its flag.
+    /// smiling or frowning". The worker's functions name no step at all
+    /// (#5499): the walk's order is the runner's, not the model's.
     #[test]
-    fn a_face_expressions_step_that_is_off_is_never_told_to_the_model() {
-        let told = |extra: &[&str]| {
-            let mut flags: Vec<String> = vec![
-                crate::onboarding::FLAG.into(),
-                "/var/lib/onboarding.json".into(),
-            ];
-            flags.extend(extra.iter().map(|flag| flag.to_string()));
-            let (settings, rest) = take(&flags).unwrap();
-            assert!(rest.is_empty(), "{rest:?}");
-            serde_json::to_string(
-                &declared(&settings)
-                    .into_iter()
-                    .map(|tool| json!([tool.name, tool.description, tool.parameters]))
-                    .collect::<Vec<_>>(),
-            )
-            .unwrap()
-        };
-        let off = told(&[]);
-        assert!(off.contains(crate::onboarding::STEP), "{off}");
-        for word in ["face", "smil", "frown", "express"] {
-            assert!(!off.contains(word), "{word}: {off}");
+    fn the_worker_tells_the_model_of_no_step() {
+        let flags: Vec<String> = vec![
+            crate::onboarding::FLAG.into(),
+            "/var/lib/onboarding.json".into(),
+        ];
+        let (settings, rest) = take(&flags).unwrap();
+        assert!(rest.is_empty(), "{rest:?}");
+        let told = serde_json::to_string(
+            &declared(&settings)
+                .into_iter()
+                .map(|tool| json!([tool.name, tool.description, tool.parameters]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        assert!(told.contains(crate::onboarding::STEP), "{told}");
+        for word in lamp_msgs::ONBOARDING_STEPS
+            .into_iter()
+            .chain(["face", "smil", "frown", "express"])
+        {
+            assert!(!told.contains(word), "{word}: {told}");
         }
-        // #5499: face_expressions is out of the two-step walk, so even
-        // switched on it is not told.
-        let on = told(&["--onboarding-face-expressions"]);
-        assert!(!on.contains("face_expressions"), "{on}");
     }
 
     #[test]
@@ -3182,6 +3347,7 @@ mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            now: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -3210,8 +3376,6 @@ mod tests {
                 photo_faces: false,
                 mark: None,
                 onboarding: None,
-                onboarding_room_sounds: false,
-                onboarding_face_expressions: false,
                 reports_stop: false,
             }
         );
@@ -3662,7 +3826,12 @@ mod tests {
                     assert!(note.contains("playback has not started and may still be refused"));
                     assert!(note.contains("Confirm only that you will try to play it."));
                     assert!(note.contains("Do not say it is playing, has started, or is ready."));
-                    assert_eq!(answer.told.as_object().unwrap().len(), 1);
+                    // Through `use_skill`, told it already ran (#2826).
+                    assert_eq!(
+                        answer.told.as_object().unwrap().len(),
+                        1 + usize::from(wrapped)
+                    );
+                    assert_eq!(answer.told.get(crate::use_skill::RAN).is_some(), wrapped);
                     assert!(!note.contains("relaxing.wav"));
                     assert_eq!(answer.requested_audio, Some(offer));
                     assert!(lease.is_current());
@@ -3823,7 +3992,12 @@ mod tests {
             assert!(note.contains("playback has not started and may still be refused"));
             assert!(note.contains("Confirm only that you will try to play it."));
             assert!(note.contains("Do not say it is playing, has started, or is ready."));
-            assert_eq!(answer.told.as_object().unwrap().len(), 1);
+            // Through `use_skill`, told it already ran (#2826).
+            assert_eq!(
+                answer.told.as_object().unwrap().len(),
+                1 + usize::from(wrapped)
+            );
+            assert_eq!(answer.told.get(crate::use_skill::RAN).is_some(), wrapped);
             assert!(!note.contains("relaxing.wav"));
             assert_eq!(
                 server.join().unwrap(),
@@ -3896,7 +4070,11 @@ mod tests {
                 _ => answer_spoken(&settings, &call, &context),
             };
             assert!(answer.requested_audio.is_none(), "{mode}");
-            assert_eq!(answer.told, json!({"next":"Say one short confirmation."}));
+            let mut told = answer.told;
+            // Through `use_skill`, told it already ran (#2826).
+            let ran = told.as_object_mut().unwrap().remove(crate::use_skill::RAN);
+            assert_eq!(ran.is_some(), mode == "typed-wrapped", "{mode}");
+            assert_eq!(told, json!({"next":"Say one short confirmation."}));
             assert!(
                 server
                     .join()
@@ -4235,6 +4413,7 @@ mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            now: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -4683,6 +4862,99 @@ mod tests {
         assert!(chat.len() <= crate::second_provider::MAX_TOOLS);
     }
 
+    /// #2826: on lamp-9adf (stable 10441), with installable skills added,
+    /// the chat route was past its 48 and left out `the_time`,
+    /// `reports_state` and `fetch_page`. With `LAMP_USE_SKILL=on` the skills
+    /// are one function however many are installed, so the chat request
+    /// keeps every one of the lamp's own and the route's, under its bound,
+    /// and `use_skill` still names every skill.
+    #[test]
+    fn with_use_skill_many_skills_leave_none_of_the_lamps_own_out() {
+        let (dir, mut settings) = many_skills("use-skill-many");
+        let skills = dir.join(SKILLS_DIR).join(CATALOG_FILE);
+        let mut catalog: Value =
+            serde_json::from_str(&std::fs::read_to_string(&skills).unwrap()).unwrap();
+        let installed = catalog["tools"].as_array_mut().unwrap();
+        installed.extend((0..40).map(
+            |n| json!({"name": format!("installed_{n}"), "description": "An installed skill."}),
+        ));
+        let every_skill: Vec<String> = installed
+            .iter()
+            .map(|tool| tool["name"].as_str().unwrap().to_owned())
+            .collect();
+        std::fs::write(&skills, catalog.to_string()).unwrap();
+        settings.reports_stop = true;
+        settings.places = true;
+        let tool = |name: &str| Tool {
+            name: name.into(),
+            description: String::new(),
+            parameters: None,
+            silent: false,
+        };
+        let search = [
+            tool(crate::second_provider::net::search::NAME),
+            tool(crate::second_provider::net::search::FETCH),
+        ];
+        let names = |tools: &[Tool]| -> Vec<String> {
+            tools.iter().map(|tool| tool.name.clone()).collect()
+        };
+        let own: Vec<String> = core_tools_within(&settings, crate::second_provider::MAX_TOOLS)
+            .iter()
+            .map(|tool| tool.name.clone())
+            .chain(search.iter().map(|tool| tool.name.clone()))
+            .collect();
+        for name in [
+            THE_TIME,
+            crate::reports_stop::NAME,
+            crate::reports_stop::STATE_NAME,
+            crate::second_provider::net::search::FETCH,
+        ] {
+            assert!(own.iter().any(|told| told == name), "{name}: {own:?}");
+        }
+        // Off: the skills' own functions put the request past 48, and the
+        // cut takes the route's fetch, the time elsewhere and
+        // `reports_state` first, as on lamp-9adf.
+        let off = names(&crate::second_provider::worker::chat_tools(
+            &settings, &search, true,
+        ));
+        assert_eq!(off.len(), crate::second_provider::MAX_TOOLS, "{off:?}");
+        for cut in [
+            crate::second_provider::net::search::FETCH,
+            THE_TIME,
+            crate::reports_stop::STATE_NAME,
+        ] {
+            assert!(!off.iter().any(|told| told == cut), "{cut}: {off:?}");
+        }
+        // On: one function for all 43 skills, and none of the lamp's own
+        // nor the route's left out.
+        settings.use_skill = true;
+        let on = crate::second_provider::worker::chat_tools(&settings, &search, true);
+        let told = names(&on);
+        assert!(told.len() <= crate::second_provider::MAX_TOOLS, "{told:?}");
+        assert_eq!(told.len(), own.len() + 2, "{told:?}");
+        for name in own
+            .iter()
+            .map(String::as_str)
+            .chain([crate::use_skill::NAME, crate::second_provider::LOOK_CALL])
+        {
+            assert!(told.iter().any(|told| told == name), "{name}: {told:?}");
+        }
+        assert!(
+            told.iter().all(|name| !every_skill.contains(name)),
+            "{told:?}"
+        );
+        let use_skill = on
+            .iter()
+            .find(|tool| tool.name == crate::use_skill::NAME)
+            .unwrap();
+        let reached: Vec<String> = every_skill
+            .iter()
+            .map(|skill| format!("{}:{skill}", crate::use_skill::NAME))
+            .collect();
+        assert_eq!(crate::use_skill::reached(use_skill), reached);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     /// The reviewer's P3 on #1906: `LAMP_REPORTS=on` declares two more,
     /// `reports_stop` and `reports_state`, before the executive's and the
     /// skills'; past 32 the cut is `reports_state`, then the last skills'
@@ -4878,7 +5150,12 @@ mod tests {
             name: crate::use_skill::NAME.into(),
             args: json!({"skill":"dance","choice":"jazz","flag":true}),
         };
-        assert_eq!(answer(&settings, &call, 7, true), json!({"next":"Dance."}));
+        // Told the call already ran it (#2826).
+        assert_eq!(
+            answer(&settings, &call, 7, true),
+            json!({"next":"Dance.", crate::use_skill::RAN:
+                "This call has already run dance. Do not call use_skill for dance again in this turn."})
+        );
         assert_eq!(
             served.join().unwrap(),
             json!({"op":"call","name":"dance","args":{"style":"jazz","long":true}})
@@ -4914,6 +5191,95 @@ mod tests {
         // answered, not the skills (the reviewer on #1706).
         let (whom, (_, answered)) = run_call(&route(&settings, &juggle.name), &juggle, 7, true);
         assert_eq!((whom, answered), (crate::use_skill::NAME, true));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A reader's P2 on #5505: a search skill (look-for-things' `[search]`,
+    /// its tools file's `searches`) is several calls in one turn, each look
+    /// told to call again with the next place, so its answer through
+    /// `use_skill` carries no "already ran" note, and a second look in the
+    /// same request runs: on the cascade's path ([`answer`]) as on the Live
+    /// worker's ([`run_call`]). `dance`, with no search, is still told it
+    /// ran; lamp-skills' refusal of a run under way is not.
+    #[test]
+    fn a_search_skill_through_use_skill_is_not_told_it_already_ran() {
+        let dir = schedule_directory("ls");
+        std::fs::write(
+            dir.join(CATALOG_FILE),
+            json!({"tools":[
+                {"name":"look_for","description":"Look for a thing.",
+                 "parameters":{"type":"object","properties":{
+                    "place":{"type":"string","enum":["desk","left","right","far_left","far_right","found"],"description":"Where to look."}}}},
+                {"name":"dance","description":"Dance."}],
+              "searches":{"look_for":{"note":"Not found yet? Call look_for with the next place.",
+                "walk":["left","right","far_left","far_right","desk"],
+                "looked":{"desk":"at the desk","left":"to the left"},"default":"desk"}}})
+            .to_string(),
+        )
+        .unwrap();
+        let settings = Settings {
+            skills: Some(dir.clone()),
+            use_skill: true,
+            ..Default::default()
+        };
+        let look = |place: &str| ToolCall {
+            id: "c1".into(),
+            name: crate::use_skill::NAME.into(),
+            args: json!({"skill":"look_for","choice":place}),
+        };
+        let next: &'static [u8] = b"{\"ok\":true,\"result\":{\"look\":true,\"next\":\"If not, call look_for once more with the next place.\"}}\n";
+        // The first look, at the desk: no note.
+        let served = executive(&dir, next, Duration::ZERO);
+        let told = answer(&settings, &look("desk"), 7, true);
+        assert_eq!(
+            told["next"],
+            "If not, call look_for once more with the next place."
+        );
+        assert!(told.get(crate::use_skill::RAN).is_none(), "{told}");
+        assert_eq!(
+            served.join().unwrap(),
+            json!({"op":"call","name":"look_for","args":{"place":"desk"}})
+        );
+        std::fs::remove_file(dir.join(CALL_SOCKET)).unwrap();
+        // The second, to the left, in the same request: it runs, no note.
+        let served = executive(&dir, next, Duration::ZERO);
+        let left = look("left");
+        let (whom, (told, answered)) = run_call(&route(&settings, &left.name), &left, 7, true);
+        assert_eq!((whom, answered), ("the executive", true));
+        assert!(told.get(crate::use_skill::RAN).is_none(), "{told}");
+        assert_eq!(
+            served.join().unwrap(),
+            json!({"op":"call","name":"look_for","args":{"place":"left"}})
+        );
+        std::fs::remove_file(dir.join(CALL_SOCKET)).unwrap();
+        // Dance has no search: still told it ran.
+        let dance = ToolCall {
+            args: json!({"skill":"dance"}),
+            ..look("desk")
+        };
+        let served = executive(
+            &dir,
+            b"{\"ok\":true,\"result\":{\"next\":\"Dance.\"}}\n",
+            Duration::ZERO,
+        );
+        assert_eq!(
+            answer(&settings, &dance, 7, true),
+            json!({"next":"Dance.", crate::use_skill::RAN:
+                "This call has already run dance. Do not call use_skill for dance again in this turn."})
+        );
+        served.join().unwrap();
+        std::fs::remove_file(dir.join(CALL_SOCKET)).unwrap();
+        // lamp-skills' refusal while its run is under way, as its socket
+        // writes it: no note on it.
+        let served = executive(
+            &dir,
+            b"{\"ok\":false,\"error\":\"I'm still doing that.\"}\n",
+            Duration::ZERO,
+        );
+        let (_, (told, answered)) = run_call(&route(&settings, &dance.name), &dance, 7, true);
+        assert!(answered);
+        assert_eq!(told, json!({"error": "I'm still doing that."}));
+        served.join().unwrap();
         std::fs::remove_dir_all(dir).unwrap();
     }
 
@@ -5052,15 +5418,15 @@ mod tests {
             assert_eq!(answer_typed(&settings, &through, text), refused);
             let mut context = audio_context();
             context.call_id = through.id.clone();
+            // Told the call already ran it (#2826).
+            let done = json!({"next":"Done.", crate::use_skill::RAN:
+                "This call has already run dance. Do not call use_skill for dance again in this turn."});
             if requested_audio {
                 let answer = answer_spoken(&settings, &through, &context);
-                assert_eq!(answer.told, json!({"next":"Done."}));
+                assert_eq!(answer.told, done);
                 assert!(answer.requested_audio.is_none());
             } else {
-                assert_eq!(
-                    answer(&settings, &through, 9, true),
-                    json!({"next":"Done."})
-                );
+                assert_eq!(answer(&settings, &through, 9, true), done);
             }
             let asked = served.join().unwrap();
             assert_eq!(asked["name"], "dance");
@@ -5107,7 +5473,7 @@ mod tests {
             name: crate::use_skill::NAME.into(),
             args: json!({"skill":"dance"}),
         };
-        assert_eq!(answer(&settings, &call, 7, true), json!({"next":"Dance."}));
+        assert_eq!(answer(&settings, &call, 7, true)["next"], "Dance.");
         assert_eq!(
             served.join().unwrap(),
             json!({"op":"call","name":"dance","args":{}})
@@ -5401,9 +5767,8 @@ mod tests {
     /// `LAMP_PERSON_SCOPE_ONE_FACE` (option 2 of reviewer-three's P1 on
     /// #4584): on a line Ann's only by her face the one face in view, her
     /// `remember` is asked in her scope; a recall is asked in the room's,
-    /// never hers. With the legacy memory, which forgets only the last kept
-    /// thing, a forget is the room's too: only a forget by what or which
-    /// reaches hers (the days memory, Thirteen's P2 on #5022).
+    /// never hers. A forget is asked of no memory, hers or the room's
+    /// (#5627; `a_named_forget_on_a_one_face_line_forgets_nothing`).
     #[test]
     fn a_one_face_lines_keep_is_theirs_and_its_recall_and_last_forget_the_rooms() {
         let ann = crate::remember::person_id("Ann");
@@ -5418,12 +5783,6 @@ mod tests {
                 crate::remember::RECALL,
                 json!({"query":"doctor"}),
                 "{\"ok\":true,\"items\":[]}\n",
-                None,
-            ),
-            (
-                crate::remember::FORGET,
-                json!({"source_id": 3}),
-                "{\"ok\":true,\"removed\":1}\n",
                 None,
             ),
         ]
@@ -5477,10 +5836,9 @@ mod tests {
     /// Thirteen's P2 on #5022: a forget that would run as `forget_last` (a
     /// bare "forget that", or any forget on the legacy memory) takes the
     /// scope's last kept thing; after the room's recall on a one-face line
-    /// that would be Ann's while the lamp meant the room's. So it is asked
-    /// in the room's only, as with no known face taken or the line narrowed
-    /// after. Her scope is reached only by a days memory's forget by what
-    /// or which (`remember`'s one-face tests, through the days client).
+    /// that would be Ann's while the lamp meant the room's. On her one-face
+    /// line no forget runs at all, bare or by which (#5608, #5627); with no
+    /// known face taken, or the line narrowed after, it is the room's.
     #[test]
     fn a_one_face_last_forget_is_the_rooms_and_never_hers() {
         let forget_with =
@@ -5538,11 +5896,21 @@ mod tests {
                 (asked, told)
             };
         const ONE: &str = "{\"ok\":true,\"removed\":1}\n";
+        // A bare "forget that" on her one-face line is asked of no memory,
+        // hers or the room's: nothing saw the mouth say it, and the room's
+        // `forget_last` would take another thing (#5608). It asks which.
+        let (asked, told) = forget_with(0, json!({}), &[], true, false);
+        assert!(asked.is_empty(), "{told}");
+        assert_eq!(told["forgotten"], json!(false), "{told}");
+        assert_eq!(told["note"], json!(ONE_FACE_BARE_FORGET), "{told}");
+        // By which on her one-face line: asked of no memory either. On the
+        // legacy memory it ran as the room's `forget_last`, taking the
+        // room's newest kept thing (#5627).
+        let (asked, told) = forget_with(2, json!({"source_id": 3}), &[], true, false);
+        assert!(asked.is_empty(), "{told}");
+        assert_eq!(told["forgotten"], json!(false), "{told}");
+        assert_eq!(told["note"], json!(ONE_FACE_NAMED_FORGET), "{told}");
         for (at, args, take, narrow) in [
-            // A bare "forget that" on her one-face line.
-            (0, json!({}), true, false),
-            // By which, on the legacy memory: still `forget_last`.
-            (2, json!({"source_id": 3}), true, false),
             // No known face taken (a second face, or nobody known).
             (3, json!({"source_id": 3}), false, false),
             // Another voice narrowed it after.
@@ -5550,6 +5918,306 @@ mod tests {
         ] {
             let (asked, told) = forget_with(at, args, &[ONE], take, narrow);
             assert_eq!(asked, [None], "{at}: {told}");
+        }
+    }
+
+    /// Stock 10538 on lamp-06c1 (6 Nov, S1 req 261/262, C88): Olivia's face
+    /// the one face in view, "remember that my umbrella is yellow" kept in
+    /// her scope by the one-face rule, then her next line "forget that" ran
+    /// as the room's `forget_last`: the umbrella stayed, and the room's
+    /// newest kept thing (the Wi-Fi name) was removed instead. Forgetting
+    /// needs the mouth seen speaking (the memory owner, 16:49 on #5385), so
+    /// a bare forget on a one-face line is asked of no memory, hers or the
+    /// room's: right after her plain new keep the lamp says it will forget
+    /// it when it sees her say it, and otherwise it asks which (Jarvis's P2 2
+    /// on #5608). A line admitted as the room's and named late is the same
+    /// (Jarvis's P2 1), and a forget by what ends the mark (his P3).
+    #[test]
+    fn a_bare_forget_on_a_one_face_line_forgets_nothing() {
+        let ann = crate::remember::person_id("Ann");
+        let key = |at: u64, offset: u64| crate::memory_scope::RequestKey {
+            worker: lamp_turn_owner::BootId::new([0x88; 16]).unwrap(),
+            session: 1,
+            request: 10_538_000 + at * 10 + offset,
+        };
+        // `kept`: the keep at offset 0 is run (the 06c1 case), or, to leave
+        // the shared thread's few kept-for marks to the other tests, only
+        // its mark is set as a one-face keep sets it. A step's `who` is the
+        // one face its line was taken for; "late:" a line admitted as the
+        // room's whose face was named late. An empty reply: that step must
+        // never reach the memory. Gives whose scope each call that reached
+        // the memory was asked in, and each forget's note.
+        let run =
+            |at: u64,
+             kept: bool,
+             steps: &[(u64, &'static str, Value, &'static str, &'static str)]| {
+                let socket = std::env::temp_dir()
+                    .join(format!("one-face-just-{at}-{}.sock", std::process::id()));
+                let _ = std::fs::remove_file(&socket);
+                let listener = UnixListener::bind(&socket).unwrap();
+                let replies: Vec<&'static str> = steps
+                    .iter()
+                    .map(|step| step.3)
+                    .filter(|reply| !reply.is_empty())
+                    .collect();
+                let served = std::thread::spawn(move || {
+                    replies
+                        .into_iter()
+                        .map(|reply| {
+                            let (mut stream, _) = listener.accept().unwrap();
+                            let mut line = String::new();
+                            BufReader::new(stream.try_clone().unwrap())
+                                .read_line(&mut line)
+                                .unwrap();
+                            stream.write_all(reply.as_bytes()).unwrap();
+                            serde_json::from_str::<Value>(&line).unwrap()
+                        })
+                        .collect::<Vec<_>>()
+                });
+                let settings = Settings {
+                    memory: Some(socket.clone()),
+                    ..Default::default()
+                };
+                if !kept {
+                    one_face_kept(key(at, 0), ann.clone());
+                }
+                let mut notes = Vec::new();
+                for (offset, name, args, _, who) in steps {
+                    let request = key(at, *offset);
+                    let late = who.strip_prefix("late:");
+                    let owner = crate::memory_scope::RequestScope::new(
+                        request,
+                        match late {
+                            Some(_) => crate::memory_scope::ScopeSnapshot::room(),
+                            None => crate::memory_scope::ScopeSnapshot::of(who),
+                        },
+                    );
+                    let lease = owner.lease();
+                    match late {
+                        Some(late) => {
+                            assert!(lease.keep_for_one_face(&crate::remember::person_id(late)))
+                        }
+                        None => assert!(lease.take_by_one_face()),
+                    }
+                    let call = ToolCall {
+                        id: "j1".into(),
+                        name: (*name).into(),
+                        args: args.clone(),
+                    };
+                    let told = answer_scoped(&settings, &call, request.request, false, &lease);
+                    if let Some(note) = told["note"]
+                        .as_str()
+                        .filter(|note| [ONE_FACE_JUST_KEPT, ONE_FACE_BARE_FORGET].contains(note))
+                    {
+                        assert_eq!(told["forgotten"], json!(false), "{told}");
+                        notes.push(note.to_owned());
+                    }
+                }
+                let asked = served.join().unwrap();
+                std::fs::remove_file(socket).unwrap();
+                let asked = asked
+                    .iter()
+                    .map(|asked| {
+                        asked
+                            .get("person")
+                            .and_then(Value::as_str)
+                            .map(str::to_owned)
+                    })
+                    .collect::<Vec<_>>();
+                (asked, notes)
+            };
+        const KEPT: &str = "{\"ok\":true,\"id\":9}\n";
+        const NONE: &str = "{\"ok\":true,\"items\":[]}\n";
+        let keep = |reply| {
+            (
+                0,
+                crate::remember::REMEMBER,
+                json!({"text":"my umbrella is yellow"}),
+                reply,
+                "Ann",
+            )
+        };
+        let bare = |offset, who| (offset, crate::remember::FORGET, json!({}), "", who);
+        let just = || ONE_FACE_JUST_KEPT.to_owned();
+        let which = || ONE_FACE_BARE_FORGET.to_owned();
+        // The 06c1 case: keep, then "forget that" on the next line.
+        assert_eq!(
+            run(0, true, &[keep(KEPT), bare(1, "Ann")]),
+            (vec![Some(ann.clone())], vec![just()]),
+            "nothing forgotten, theirs or the room's"
+        );
+        // Taken once: a second bare forget asks which.
+        assert_eq!(
+            run(1, false, &[bare(1, "Ann"), bare(2, "Ann")]),
+            (vec![], vec![just(), which()])
+        );
+        // A line between, another person, or a recall first: it asks which.
+        assert_eq!(run(2, false, &[bare(2, "Ann")]), (vec![], vec![which()]));
+        assert_eq!(run(3, false, &[bare(1, "Bob")]), (vec![], vec![which()]));
+        assert_eq!(
+            run(
+                4,
+                false,
+                &[
+                    (
+                        1,
+                        crate::remember::RECALL,
+                        json!({"query":"wifi"}),
+                        NONE,
+                        "Ann"
+                    ),
+                    bare(1, "Ann"),
+                ]
+            ),
+            (vec![None], vec![which()])
+        );
+        // A keep the store had (`existing`) or a correction (`replaced`) is
+        // not marked (Thirteen's P2 on #5608): it asks which.
+        for (at, reply) in [
+            (5, "{\"ok\":true,\"id\":9,\"existing\":true}\n"),
+            (6, "{\"ok\":true,\"id\":9,\"replaced\":3}\n"),
+        ] {
+            assert_eq!(
+                run(at, true, &[keep(reply), bare(1, "Ann")]),
+                (vec![Some(ann.clone())], vec![which()]),
+                "{reply}"
+            );
+        }
+        // An unrecognised voice, its line the room's and her face named late
+        // (Jarvis's P2 1): "forget that" forgets nothing.
+        assert_eq!(
+            run(8, false, &[bare(1, "late:Ann")]),
+            (vec![], vec![just()])
+        );
+        // A forget by what on the line ends the mark (Jarvis's P3). Last:
+        // it is refused, with the mouth unseen (#5627), and carries nothing
+        // (Jarvis's P3 on #5666), so a bare forget after it on the same line
+        // is never that subject and never "the keep just made": it asks
+        // which. Neither reaches the memory.
+        assert_eq!(
+            run(
+                7,
+                false,
+                &[
+                    (
+                        1,
+                        crate::remember::FORGET,
+                        json!({"about":"umbrella"}),
+                        "",
+                        "Ann"
+                    ),
+                    (1, crate::remember::FORGET, json!({}), "", "Ann"),
+                ]
+            ),
+            (vec![], vec![which()])
+        );
+        let marked = {
+            let kept = ONE_FACE_KEPT.lock().unwrap();
+            kept.iter().any(|(at, ..)| same_session(at, &key(7, 1)))
+        };
+        assert!(!marked, "the mark is gone");
+    }
+
+    /// #5627 (from Thirteen's read of #5608): a forget that names what
+    /// (`about`) or which (`source_id`) on a line someone's only by the
+    /// one-face rule, mouth unseen, is asked of no memory with only
+    /// `LAMP_PERSON_SCOPE_ONE_FACE` on: one known face counts for saving
+    /// and recall, never for forgetting, until the mouth is seen (the memory
+    /// owner, 16:49 on #5385). The same for a room's line whose face was
+    /// named late by the rule. A person's own line, the mouth seen, still
+    /// forgets in their scope.
+    #[test]
+    fn a_named_forget_on_a_one_face_line_forgets_nothing() {
+        // Her own name: a forget by what carries its subject to a bare
+        // forget in the same scope for a minute (#3113's `Carry`), which
+        // Ann's tests running beside this one would read.
+        let ann = crate::remember::person_id("Nell");
+        for (at, args, line) in [
+            (0u64, json!({"about": "my umbrella"}), "one face"),
+            (1, json!({"source_id": 3}), "one face"),
+            (2, json!({"about": "my umbrella"}), "late"),
+            (3, json!({"source_id": 3}), "late"),
+            // Her own line, the mouth seen: by which, it reaches her scope
+            // (the legacy memory answers a forget by what itself).
+            (4, json!({"source_id": 3}), "seen"),
+        ] {
+            let socket = std::env::temp_dir().join(format!(
+                "one-face-named-forget-{at}-{}.sock",
+                std::process::id()
+            ));
+            let _ = std::fs::remove_file(&socket);
+            let listener = UnixListener::bind(&socket).unwrap();
+            let seen = line == "seen";
+            listener.set_nonblocking(!seen).unwrap();
+            let unasked = listener.try_clone().unwrap();
+            let served = seen.then(|| {
+                std::thread::spawn(move || {
+                    let (mut stream, _) = listener.accept().unwrap();
+                    let mut asked = String::new();
+                    BufReader::new(stream.try_clone().unwrap())
+                        .read_line(&mut asked)
+                        .unwrap();
+                    stream.write_all(b"{\"ok\":true,\"removed\":1}\n").unwrap();
+                    serde_json::from_str::<Value>(&asked).unwrap()
+                })
+            });
+            let owner = crate::memory_scope::RequestScope::new(
+                crate::memory_scope::RequestKey {
+                    worker: lamp_turn_owner::BootId::new([0x56; 16]).unwrap(),
+                    session: 1,
+                    request: 5_627_000 + at,
+                },
+                if line == "late" {
+                    crate::memory_scope::ScopeSnapshot::room()
+                } else {
+                    crate::memory_scope::ScopeSnapshot::of("Nell")
+                },
+            );
+            let lease = owner.lease();
+            match line {
+                "one face" => assert!(lease.take_by_one_face()),
+                "late" => assert!(lease.keep_for_one_face(&ann)),
+                _ => {}
+            }
+            let settings = Settings {
+                memory: Some(socket.clone()),
+                ..Default::default()
+            };
+            let call = ToolCall {
+                id: "n5627".into(),
+                name: crate::remember::FORGET.into(),
+                args: args.clone(),
+            };
+            let told = answer_scoped(&settings, &call, 5_627_000 + at, false, &lease);
+            if let Some(served) = served {
+                let asked = served.join().unwrap();
+                assert_eq!(asked["person"], json!(ann), "{line} {args}: {told}");
+                std::fs::remove_file(socket).unwrap();
+                continue;
+            }
+            // Nothing reached the memory.
+            assert!(
+                unasked.accept().is_err(),
+                "{line} {args}: the memory was asked: {told}"
+            );
+            std::fs::remove_file(socket).unwrap();
+            assert_eq!(told["forgotten"], json!(false), "{line} {args}: {told}");
+            assert_eq!(
+                told["note"],
+                json!(ONE_FACE_NAMED_FORGET),
+                "{line} {args}: {told}"
+            );
+            // And nothing is carried: a bare forget after it in the same
+            // scope is not turned into this one (Jarvis's P3 on #5666).
+            let bare = ToolCall {
+                id: "b5627".into(),
+                name: crate::remember::FORGET.into(),
+                args: json!({}),
+            };
+            assert!(
+                crate::remember::named_forget(&bare, None, Some(&lease)).is_none(),
+                "{line} {args}: the refused forget was carried"
+            );
         }
     }
 

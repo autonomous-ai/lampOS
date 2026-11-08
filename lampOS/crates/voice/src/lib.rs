@@ -61,6 +61,7 @@ pub mod camera_worker;
 pub mod capture_cores;
 pub mod choreography;
 pub mod chosen_voice;
+pub mod code_lock;
 pub mod config;
 pub mod control_mute;
 pub mod control_turn;
@@ -116,6 +117,7 @@ pub mod head_cue;
 pub mod name_or_follow_up;
 pub mod not_speech;
 pub mod onboarding;
+pub mod opens_further;
 // Used by the Linux audio workers, and by tests anywhere.
 #[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
 pub(crate) mod open_at_start;
@@ -172,6 +174,7 @@ pub mod second_look;
 pub mod second_provider;
 pub mod seems_told;
 pub mod services;
+pub mod services_told;
 pub mod session_fact;
 pub mod session_tools;
 pub mod short_turns;

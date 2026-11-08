@@ -1,6 +1,6 @@
 # reads2.py (31 Oct 03:1x, first builder): whether a PR asked for two reads is met, read from its comments as JSON lines
-# {login, body} on stdin. argv: [--writers FILE] HEAD [EARLIER_HEAD...]. A comment whose first line is "TWO READS" (bold allowed) asks
-# for two; then two different readers must each have a READ-OK marker for a commit the head starts with. Prints "none"
+# {login, body} on stdin. argv: [--writers FILE] [--queue QUEUE_JSONL --pr N] HEAD [EARLIER_HEAD...]. A comment whose first line is "TWO READS" (bold allowed) asks
+# for two, as does a body or a READ ASK that names TWO READS anywhere (7 Nov, #5635, below); then two different readers must each have a READ-OK marker for a commit the head starts with. Prints "none"
 # (not asked), "met N" or "short N". #4633 (23:37) and #4656 (02:58) went in trains on one READ-OK where two had been
 # named, since the train bot read only the newest READ-OK.
 #
@@ -34,25 +34,111 @@ ASK_LINE = re.compile(r"^[ \t]*(?:#+[ \t]*|[-*+][ \t]+|>[ \t]*)?\**[ \t]*TWO REA
 ASK_READERS = re.compile(r"\bTWO READS\**[ \t]*:\**[ \t]*\S")
 
 
+# 7 Nov (#5635, the PM): fail closed. The patterns above failed open: #5580 merged on one read, and #5606, #5579 and
+# #5633 were stopped by hand, each with TWO READS in its body's prose or on a READ ASK's second line. (#5572 merged on
+# one read too, but its second reader was asked on the Queue, which reads2.py doesn't read.) Now a body (or a writer's
+# READ ASK) that names TWO READS, in capitals, anywhere asks; a false match only costs a second read. A line that opens
+# with ONE READ (after an optional heading, list or bold mark, not a quote mark), followed by ":", a dash, "(" or the
+# line's end, opts out of a mere mention in its own text ("ONE READ: the body names the rule only"); it never clears a
+# line that asks (ASK_LINE, ASK_READERS). El's P3 on #5636: an opt-out line in a quote or a fence (``` or ~~~) is
+# someone else's text, so it opts nothing out.
+NAMES = re.compile(r"\bTWO\s+READS\b")
+# The Reviewer-lead's P2 on #5636: a dash followed by a letter is no separator, so "- ONE READ-OK covers the docs half"
+# opts nothing out.
+# El's P3 on #5643: at most three spaces before it, as four spaces or a tab make an indented code block.
+OPT_OUT = re.compile(r"^ {0,3}(?:#+[ \t]*|[-*+][ \t]+)?(?:\*+[ \t]*)?ONE READ\**[ \t]*"
+                     r"(?::|[-\u2013\u2014](?![A-Za-z])|\(|$)", re.M)
+# The Reviewer-lead's P3 on #5636: a READ ASK is a comment whose first line asks with a commit ("READ ASK <sha>", after
+# a signature or not), as joining.md's markers say; a READ-OK or a note that mentions "the READ ASK" asks nothing.
+READ_ASK = re.compile(r"\bREAD ASK\**[ \t]+`?[0-9a-f]{7,40}\b")
+
+
 def body_asks(body):
-    """Whether a PR body asks this PR for two reads (ASK_LINE or ASK_READERS), not merely names the rule."""
-    return bool(ASK_LINE.search(body) or ASK_READERS.search(body))
+    """Whether a PR body (or a writer's READ ASK) asks for two reads: a line that asks, or TWO READS named anywhere
+    without an opt-out line."""
+    if ASK_LINE.search(body) or ASK_READERS.search(body):
+        return True
+    return bool(NAMES.search(body)) and not OPT_OUT.search(unfenced(body))
 
 
-# 4 Nov 23:4x (Thirteen's P3 on #5305): the patterns fail open. A body that does ask, in words they don't take
-# ("This PR needs TWO READS (privacy).", "Readers: TWO READS (privacy and tests)"), asks nothing, and a privacy PR could
-# go on one read. A body that names TWO READS without asking is said in the bot's log, once per head
-# (`reads2.py --unasked`), so an ask that wasn't taken is seen before the merge, not after.
+def unfenced(body):
+    """The body without its fenced blocks (``` or ~~~); an unclosed fence runs to the end. El's P3 on #5643: as in
+    CommonMark, a fence closes only on a line of its own character, at least as long as the opener, with nothing but
+    spaces after it, so "```" inside a "````" fence, or "```python" inside a "```" one, closes nothing."""
+    out, fence = [], None
+    for line in body.split("\n"):
+        if fence is None:
+            m = re.match(r" {0,3}(`{3,}|~{3,})", line)
+            if m:
+                fence = m.group(1)
+            else:
+                out.append(line)
+        elif re.fullmatch(r" {0,3}" + re.escape(fence[0]) + "{%d,}[ \t]*\r?" % len(fence), line):
+            fence = None
+    return "\n".join(out)
+
+
+# 4 Nov 23:4x (Thirteen's P3 on #5305); 7 Nov (#5635): the bot's log says, once per head (`reads2.py --unasked`), a
+# body that names TWO READS and opts out with a ONE READ line, so an opt-out is seen before a train takes it on one read.
 def body_names_unasked(body):
-    """Whether a PR body names TWO READS but doesn't ask for them by body_asks."""
-    return "TWO READS" in body and not body_asks(body)
+    """Whether a PR body names TWO READS but opts out (so body_asks is False)."""
+    return bool(NAMES.search(body)) and not body_asks(body)
 
 
-def two_reads(items, heads, writers):
+# 7 Nov (the PM, after Twelve's table of the PRs merged since 10579): #5647 and #5650 were asked TWO READS only on the
+# Queue ("READ ASK <sha>" then "TWO READS.") and each merged on one read. A writer's Queue comment asks for a PR when its
+# first line opens with READ ASK (or has it right after a signature's colon, comma or dash) and names the PR, by a commit its head (or a same-patch head) starts with, or by "#N", and
+# the comment names TWO READS as a body does (body_asks, with its opt-out). The bot passes the Queue (--queue, lib.sh's
+# coord_queue: every Queue issue's last 3 days) and the PR's number (--pr).
+# 7 Nov (the second reviewer's HOLD on #5653): a sha also asks when it names any commit of the PR (--pr-commits, one sha a
+# line: the bot's git rev-list origin/lamp-voice..HEAD), so an ask at a head a later fix moved past (another patch) still
+# asks. Those commits are used only to match Queue asks: which READ-OKs count is still decided by the heads alone.
+QUEUE_SHA = re.compile(r"\b[0-9a-f]{7,40}\b")
+# The marker opens the line or follows a signature's colon ("El, 05:18, to **Faye**: **READ ASK (restate) [#5633]") or
+# comma (7 Nov, #5653: "Sixth, READ ASK to the **Reviewer-lead**: [#5570]", "Friday, 17:51, READ ASK to ..."), so
+# an hourly that mentions a READ ASK in its prose ("#5650 had a READ ASK naming …") asks nothing.
+# 7 Nov (#5653's P3s): or a dash with spaces around it, em, en or hyphen ("Twelve — READ ASK #5653", "Second - READ ASK
+# #5653"); a hyphen inside a word ("pre-READ ASK") is no signature.
+QUEUE_ASK = re.compile(r"(?:^|[:,]|\s[\u2014\u2013-]\s)[\s*_`]*READ ASK\b")
+
+
+def asking_first_line(q):
+    """A Queue comment's first line when it opens with READ ASK (or has it after a signature), else None."""
+    first = q["body"].lstrip().split("\n", 1)[0]
+    return first if QUEUE_ASK.search(first) else None
+
+
+def queue_shas(queue):
+    """7 Nov (#5653's P3s): every sha on the Queue's asking first lines, in order, for lib.sh's coord_same_patch
+    (`--queue-shas FILE`), so its candidates come from this regex too. Writers aren't checked: these are only
+    candidates, and queue_asks still decides which asks count."""
+    out = []
+    for q in queue or ():
+        first = asking_first_line(q)
+        out += QUEUE_SHA.findall(first) if first else []
+    return out
+
+
+def queue_asks(queue, heads, pr, writers, commits=()):
+    """Whether a writer's Queue READ ASK names this PR (by head, one of its commits, or number) and TWO READS."""
+    shas = list(heads) + list(commits or ())
+    for q in queue or ():
+        first = asking_first_line(q)
+        if not is_writer(q, writers) or not first:
+            continue
+        by_head = any(h.startswith(m) for m in QUEUE_SHA.findall(first) for h in shas)
+        by_number = bool(pr) and re.search(r"#%s(?!\d)" % re.escape(str(pr)), first)
+        if (by_head or by_number) and body_asks(q["body"]):
+            return True
+    return False
+
+
+def two_reads(items, heads, writers, queue=None, pr=None, commits=()):
     """items: dicts {login, body} in posting order, the PR body as {pr_body: true}. heads: the head sha, or a list of it
-    and earlier heads with the same patch. Returns "none", "met N" or "short N"."""
+    and earlier heads with the same patch. queue: the Queue's comments (queue_asks), pr: the PR's number, commits: the PR's commits (Queue asks only). Returns "none",
+    "met N" or "short N"."""
     heads = [heads] if isinstance(heads, str) else list(heads)
-    asked = False; signed = {}; unsigned = set()
+    asked = queue_asks(queue, heads, pr, writers, commits); signed = {}; unsigned = set()
     for c in items:
         body = c["body"].lstrip()
         # 3 Nov 14:1x: the PR body is read too (a line {"pr_body": true}). 14:5x: anywhere in the body: #5049 says
@@ -62,7 +148,8 @@ def two_reads(items, heads, writers):
             continue
         if not is_writer(c, writers):
             continue
-        if re.match(r"\**TWO READS\b", body):
+        # 7 Nov (#5635): or a READ ASK that names TWO READS anywhere, as a body does.
+        if re.match(r"\**TWO READS\b", body) or (READ_ASK.search(body.split("\n", 1)[0]) and body_asks(body)):
             asked = True
         mk = parse_marker(body)
         if not mk or mk[0] != "READ-OK" or not mk[1] or not any(h.startswith(mk[1]) for h in heads):
@@ -81,9 +168,30 @@ def main():
         if any(c.get("pr_body") and body_names_unasked(c["body"]) for c in items):
             print("unasked")
         return
+    if len(sys.argv) == 3 and sys.argv[1] == "--queue-shas":
+        # The Queue's JSON lines (lib.sh's coord_queue). Prints each sha on an asking first line, one a line.
+        with open(sys.argv[2]) as f:
+            for s in queue_shas([json.loads(line) for line in f if line.strip()]):
+                print(s)
+        return
     writers, args = writers_from_args(sys.argv[1:], "reads2")
+    queue, pr, heads, commits = None, None, [], []
+    i = 0
+    while i < len(args):
+        if args[i] == "--queue" and i + 1 < len(args):
+            with open(args[i + 1]) as f:
+                queue = [json.loads(line) for line in f if line.strip()]
+            i += 2
+        elif args[i] == "--pr-commits" and i + 1 < len(args):
+            with open(args[i + 1]) as f:
+                commits = [line.strip() for line in f if line.strip()]
+            i += 2
+        elif args[i] == "--pr" and i + 1 < len(args):
+            pr = args[i + 1]; i += 2
+        else:
+            heads.append(args[i]); i += 1
     items = [json.loads(line) for line in sys.stdin if line.strip()]
-    print(two_reads(items, args, writers))
+    print(two_reads(items, heads, writers, queue, pr, commits))
 
 
 if __name__ == "__main__":

@@ -176,6 +176,11 @@ pub struct Caller {
     /// when nobody is sure.
     #[serde(default)]
     pub setter: Option<String>,
+    /// The line sees and changes every item, as the app's own calls do, and
+    /// what it sets is everyone's: the voice's private room
+    /// (`LAMP_PRIVATE_ROOM`, the owner's call on 6 Nov).
+    #[serde(default)]
+    pub everyone: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -257,7 +262,7 @@ impl Adapter {
     /// [`Self::call`] for a voice line: only `caller`'s reminders are
     /// listed, cancelled or snoozed, and one it sets is kept as its setter's.
     pub fn call_for(&self, name: &str, args: &Value, caller: &Caller) -> Value {
-        self.call_with(name, args, true, Some(caller))
+        self.call_with(name, args, true, (!caller.everyone).then_some(caller))
     }
 
     /// Every reminder and timer `person` (a memory person id) set,

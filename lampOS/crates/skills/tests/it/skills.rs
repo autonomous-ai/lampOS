@@ -540,6 +540,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "guard-mode",
             "look-for-things",
             "meal-check",
+            "quiet-focus",
             "who-was-here"
         ]
     );
@@ -3312,6 +3313,81 @@ fn sit_back_says_nothing_of_a_body_and_takes_no_picture() {
     assert_eq!(skill.rest.map(|rest| rest.after_ignored), Some(2));
     // Core, in the product, since its played check with a person (#5208).
     assert_eq!(skill.kind, SkillKind::Core);
+}
+
+/// Quiet focus: one warm word when they look up after 45 minutes head down,
+/// never while still head down: its one step is the `looked_up` word's,
+/// which `follows` the silent `focused` trigger. The voice is told to ask
+/// nothing and suggest nothing, and to say nothing of a body or looks: what
+/// it is told, and its description, name no break, no stretch and no body.
+/// It reads no picture and nothing heard. It has no function of its own: it
+/// is in the wellbeing group, so "stop the nudges" (`wellbeing_nudges`)
+/// stops it too.
+#[test]
+fn quiet_focus_says_nothing_of_a_body_or_a_break_and_takes_no_picture() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/quiet-focus");
+    let skill = load(&folder).unwrap();
+    let markdown = fs::read_to_string(folder.join("SKILL.md")).unwrap();
+    let description = markdown
+        .lines()
+        .find_map(|line| line.strip_prefix("description: "))
+        .unwrap()
+        .to_owned();
+    let toml: toml::Value =
+        toml::from_str(&fs::read_to_string(folder.join("skill.toml")).unwrap()).unwrap();
+    let steps = toml["do"].as_array().unwrap();
+    assert_eq!(steps.len(), 1);
+    // The word is the look up's alone, and it follows the focus.
+    assert_eq!(steps[0]["on"].as_str(), Some("looked_up"));
+    let triggers = toml["trigger"].as_array().unwrap();
+    assert_eq!(triggers.len(), 2);
+    assert_eq!(triggers[0]["name"].as_str(), Some("focused"));
+    assert_eq!(triggers[0]["equals"].as_str(), Some("head_down"));
+    assert_eq!(triggers[1]["name"].as_str(), Some("looked_up"));
+    assert_eq!(triggers[1]["equals"].as_str(), Some("at_desk"));
+    assert_eq!(triggers[1]["follows"]["trigger"].as_str(), Some("focused"));
+    let say = steps[0]["say"].as_str().unwrap();
+    assert!(
+        say.contains("ask nothing of them and suggest nothing to do"),
+        "{say}"
+    );
+    assert!(
+        say.contains("say nothing about their body or looks"),
+        "{say}"
+    );
+    assert!(steps[0].get("look").is_none(), "{:?}", steps[0]);
+    for text in [say, description.as_str()] {
+        let lower = text.to_lowercase();
+        for word in [
+            "break", "stretch", "stand", "rest", "water", "drink", "eyes", "neck", "back",
+            "posture", "spine", "slouch", "tired", "should", "lecture", "lazy",
+        ] {
+            assert!(
+                !lower
+                    .split(|c: char| !c.is_alphanumeric())
+                    .any(|token| token == word),
+                "{word} in {text:?}"
+            );
+        }
+    }
+    assert_eq!(
+        toml["permissions"]["topics"].as_array().unwrap(),
+        &["room/activity", "humans/faces/tracked", "voice/state"]
+            .map(|topic| toml::Value::String(topic.to_owned()))
+    );
+    assert!(toml["permissions"].get("camera").is_none());
+    assert!(toml["permissions"].get("look").is_none());
+    // No function of its own, so a session's count is unchanged: only the
+    // wellbeing group's one `wellbeing_nudges`, shared within its group.
+    assert!(skill.tool.is_none());
+    assert_eq!(
+        skill.stop.as_ref().map(|stop| stop.tool.as_str()),
+        Some("wellbeing_nudges")
+    );
+    assert_eq!(skill.budget, Some(("wellbeing".to_owned(), 1)));
+    assert_eq!(skill.rest.map(|rest| rest.after_ignored), Some(2));
+    assert_eq!(skill.most_a_day, Some(2));
+    assert_eq!(skill.kind, SkillKind::Installable);
 }
 
 #[test]
@@ -9773,6 +9849,64 @@ fn a_shared_budget_gives_its_group_its_runs_an_hour_between_them() {
     assert!(stuffy(&mut engine, 60_000).is_empty());
 }
 
+/// Quiet focus's shape: a trigger no step names makes nothing, so it takes
+/// none of its group's hour and is not held back by it; the word that
+/// `follows` it is the nudge, counted and held back as one. A word after a
+/// trigger that has steps (Sit back's warm word) is still not counted
+/// (`sit-back`'s cases).
+#[test]
+fn a_silent_trigger_spends_no_hour_and_the_word_after_it_is_the_nudge() {
+    let dir = tempfile::tempdir().unwrap();
+    let focus = || {
+        load(&skill_with(
+            dir.path(),
+            "focus",
+            "[budget]\ngroup = \"nudges\"\nper_hour = 1\n\
+             [[trigger]]\nname = \"mark\"\ntopic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1000\nrearm = \"ends\"\n\
+             [[trigger]]\nname = \"word\"\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n\
+             rearm = \"ends\"\nfollows = { trigger = \"mark\", within = \"10m\" }\n\
+             [ask]\npolicy = \"nudge\"\n[[do]]\non = \"word\"\nlight = { colour = \"warm\", for = \"5s\" }\n",
+        ))
+        .unwrap()
+    };
+    let sip = || {
+        nudge_skill(
+            dir.path(),
+            "sip",
+            "[budget]\ngroup = \"nudges\"\nper_hour = 1",
+            ONCE,
+        )
+    };
+    let mark = |engine: &mut Engine, at_ms: u64| {
+        engine.observe("air/state", at_ms * 1_000, br#"{"co2_ppm":1200}"#, None)
+    };
+    let word = |engine: &mut Engine, at_ms: u64| -> Vec<String> {
+        engine
+            .observe(
+                "voice/state",
+                at_ms * 1_000,
+                br#"{"state":"resting"}"#,
+                None,
+            )
+            .into_iter()
+            .filter(|run| !run.calls.is_empty())
+            .map(|run| run.skill)
+            .collect()
+    };
+    // The silent mark runs, making nothing, and Sip still has the hour;
+    // then the word is held back by Sip's hour.
+    let mut engine = Engine::new(vec![focus(), sip()], true);
+    let marked = mark(&mut engine, 0);
+    assert!(marked.iter().all(|run| run.calls.is_empty()), "{marked:?}");
+    assert_eq!(stuffy(&mut engine, 1_000), ["sip"]);
+    assert!(word(&mut engine, 2_000).is_empty());
+    // The word spends the hour: Sip waits for it.
+    let mut engine = Engine::new(vec![focus(), sip()], true);
+    mark(&mut engine, 0);
+    assert_eq!(word(&mut engine, 1_000), ["focus"]);
+    assert!(stuffy(&mut engine, 2_000).is_empty());
+}
+
 /// A face at the desk, a fifth of the picture wide, its box from `left`
 /// and `top` and `tall` of the picture, turned to the lamp or not.
 fn desk_face(left: f32, top: f32, tall: f32, facing: bool) -> String {
@@ -10544,6 +10678,18 @@ fn guard_modes_new_words_come_only_with_their_switch() {
             .contains("\"I'm back, you can stop keeping an eye on things\"")
     );
     assert!(lamp_skills::watch::WORDS_V2_TURN.starts_with("off: "));
+    // A visitor who asks is told of the person who's out (#1685's played
+    // row, 7 Nov 15:36), with the new words and the old.
+    let visitor = "Asked about it by someone else, say it's on while the person who turned it on is out, never \"while you're out\".";
+    assert!(lamp_skills::watch::WORDS_V2_DESCRIPTION.ends_with(visitor));
+    assert!(
+        std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../skills/guard-mode/SKILL.md"
+        ))
+        .unwrap()
+        .contains(visitor)
+    );
     assert!(lamp_skills::watch::WORDS_V2_DESCRIPTION.len() <= 1_024);
     assert!(lamp_skills::watch::WORDS_V2_TURN.len() <= 256);
     // Every other tool is as it was.
@@ -11933,6 +12079,7 @@ fn with_the_switch_the_wellbeing_skills_share_two_an_hour_never_within_30_minute
     let names = [
         "comfort-break",
         "meal-check",
+        "quiet-focus",
         "rest-your-eyes",
         "sip-of-water",
         "sit-back",

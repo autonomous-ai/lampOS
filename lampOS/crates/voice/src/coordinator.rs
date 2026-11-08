@@ -5630,6 +5630,12 @@ thread_local! {
     static TEST_UNCLEAR_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_PRIVACY_GAP_RIDE=on` (#2602), as `TEST_FULL_LOOK`.
     static TEST_PRIVACY_GAP_RIDE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's `LAMP_PRIVACY_RIDES_STALL=on` (#5611), as `TEST_FULL_LOOK`.
+    static TEST_PRIVACY_RIDES_STALL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's stall inside a pass (#5633): at the first time, on the
+    /// scenario clock, the pass after its top is held this many
+    /// microseconds with nothing read, as a page fault in running code is.
+    static TEST_STALL_IN_PASS: std::cell::Cell<Option<(u64, u64)>> = const { std::cell::Cell::new(None) };
     /// A loop test's `LAMP_MISHEARD_HUM=on` (#828), as `TEST_FULL_LOOK`.
     static TEST_MISHEARD_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_HOLDING_ANSWER=on`, without changing process-wide flags.
@@ -6053,6 +6059,23 @@ fn near_call_words_back(onboarding: Option<&mut crate::onboarding::Onboarding>, 
     }
 }
 
+/// A call's line begun at `began_us` was answered by the second route's
+/// down line (#5563): its try, refused, is given back.
+fn near_provider_slow(onboarding: Option<&mut crate::onboarding::Onboarding>, began_us: u64) {
+    #[cfg(test)]
+    if TEST_NEAR.with(|near| {
+        near.borrow_mut()
+            .as_mut()
+            .map(|flow| flow.provider_slow(began_us))
+            .is_some()
+    }) {
+        return;
+    }
+    if let Some(walk) = onboarding {
+        walk.near_provider_slow(began_us);
+    }
+}
+
 /// A call's line begun at `began_us` ended (#3923): the step waits a moment
 /// for its words before judging its try.
 fn near_call_line_ended(onboarding: Option<&mut crate::onboarding::Onboarding>, began_us: u64) {
@@ -6209,9 +6232,17 @@ fn conversation_with_gate_inner(
         || TEST_PRIVACY_GAP_RIDE.with(std::cell::Cell::get);
     #[cfg(not(test))]
     let gap_ride_on = crate::privacy_gap::enabled_from_environment();
+    // And a lapse seen after the voice's own stall, with
+    // `LAMP_PRIVACY_RIDES_STALL=on` (#5611), on the same route only.
+    #[cfg(test)]
+    let rides_stall_on = crate::privacy_gap::rides_stall_from_environment()
+        || TEST_PRIVACY_RIDES_STALL.with(std::cell::Cell::get);
+    #[cfg(not(test))]
+    let rides_stall_on = crate::privacy_gap::rides_stall_from_environment();
     let mut gap_ride = crate::privacy_gap::GapRide::new(
         gap_ride_on && rig.privacy_controls && lifetime.continuous(),
-    );
+    )
+    .riding_stalls(rides_stall_on && rig.privacy_controls && lifetime.continuous());
     let mut frames_from_us = 0u64;
     // A privacy observation read stale before the microphone was first
     // allowed: said once (lamp-4ace, 19 Oct 01:19).
@@ -7000,6 +7031,18 @@ fn conversation_with_gate_inner(
             }
         );
     }
+    // A yield made late in a person's speech over the lamp commits on
+    // stillness instead of resuming (`LAMP_CUT_IN_LATE_YIELD=on`): a
+    // question mostly heard as under the lamp yields only as it ends
+    // (lamp-c0a4, 31 Oct). Off unless set.
+    let late_yield = duplex && crate::turn_taking::cut_in_late_yield();
+    if late_yield {
+        eprintln!(
+            "lamp-voice: late yields commit: a yield with {} blocks heard plainly over the lamp in the {} before it commits on stillness instead of resuming the answer",
+            lamp_audio::duplex::LATE_YIELD_OVER_BLOCKS,
+            lamp_audio::duplex::LATE_YIELD_WINDOW_BLOCKS,
+        );
+    }
     detector.keep_first_words(first_words);
     // A line that begins softly keeps its first word (`LAMP_SOFT_START=on`):
     // an ordinary start, the lamp silent, may begin at it. Off unless set;
@@ -7239,6 +7282,9 @@ fn conversation_with_gate_inner(
         if near_asker {
             mask.cut_in_near_asker();
         }
+        if late_yield {
+            mask.cut_in_late_yield();
+        }
         if backchannel_holds {
             mask.hold_backchannels();
         }
@@ -7329,6 +7375,16 @@ fn conversation_with_gate_inner(
         }
         termination.check()?;
         let clock = monotonic_us();
+        // A pass long after the last followed the voice's own stall: with
+        // `LAMP_PRIVACY_RIDES_STALL=on` a lapse seen in it is ridden (#5611).
+        gap_ride.pass(clock);
+        #[cfg(test)]
+        if let Some((at_us, stall_us)) = TEST_STALL_IN_PASS.with(std::cell::Cell::get)
+            && clock >= at_us
+        {
+            TEST_STALL_IN_PASS.with(|stall| stall.set(None));
+            crate::scenario_clock::elapse_in_pass(Duration::from_micros(stall_us))?;
+        }
         signed_out.read(clock);
         if cloud.available() {
             if link_down_since.take().is_some() {
@@ -8125,7 +8181,7 @@ fn conversation_with_gate_inner(
                 // The readings are back and open but not yet steady: a gap
                 // ridden waits for the gate's 60 ms, as the first grant does.
                 PrivacyState::Stabilizing => {
-                    gap_ride.lasted(monotonic_us()).is_some()
+                    (gap_ride.lasted(monotonic_us()).is_some() || gap_ride.held_up(monotonic_us()))
                         && gap_ride.rides(permitted, monotonic_us())
                 }
                 _ => false,
@@ -8144,8 +8200,14 @@ fn conversation_with_gate_inner(
                 tell_eyes_no(eyes_link.as_mut(), "privacy gap");
                 // The reply is cut here whatever `gap_cancelled` says: the
                 // next pass's cancel (admission's reset) is skipped only when
-                // a capture gap still open has already run it.
-                cancel_reply(owner, reply, trace, "privacy_gap")?;
+                // a capture gap still open has already run it. After a stall
+                // (#5611) its turn's input leases may have lapsed in it, and
+                // the controller revoked it already: that is the cut too.
+                if gap_ride.after_a_stall() {
+                    cancel_lapsed_reply(owner, reply, trace, "privacy_gap")?;
+                } else {
+                    cancel_reply(owner, reply, trace, "privacy_gap")?;
+                }
                 provider_queue.clear();
                 speaker_pending = None;
                 gap_cut_utterance = true;
@@ -8154,14 +8216,25 @@ fn conversation_with_gate_inner(
                 snapshot = owner.snapshot(now())?;
                 rig.publish(snapshot)?;
                 last_publish = monotonic_us();
-                eprintln!(
-                    "lamp-voice: the privacy switch's readings lapsed: nothing is heard, and the conversation waits up to {} ms for a fresh one",
-                    crate::privacy_gap::RIDE_US / 1_000
-                );
-                record(
-                    trace,
-                    json!({"kind":"privacy_gap","state":"began","at_us":monotonic_us()}),
-                )?;
+                let stall = gap_ride.after_a_stall();
+                if stall {
+                    eprintln!(
+                        "lamp-voice: the voice was held up {} ms and the privacy readings lapsed in it: nothing is heard, and the conversation waits up to {} ms from before the stall for a fresh one",
+                        gap_ride.lasted(monotonic_us()).unwrap_or(0) / 1_000,
+                        gap_ride.most_us() / 1_000
+                    );
+                } else {
+                    eprintln!(
+                        "lamp-voice: the privacy switch's readings lapsed: nothing is heard, and the conversation waits up to {} ms for a fresh one",
+                        gap_ride.most_us() / 1_000
+                    );
+                }
+                let mut began =
+                    json!({"kind":"privacy_gap","state":"began","at_us":monotonic_us()});
+                if stall {
+                    began["stall"] = json!(true);
+                }
+                record(trace, began)?;
             }
         }
         // The gap ridden is over: a fresh reading said open (#2602). The
@@ -8520,9 +8593,17 @@ fn conversation_with_gate_inner(
                     )?;
                 }
                 // Put on its turn by `observe_provider_output`.
-                ProviderOutput::NewsAnswered { .. }
-                | ProviderOutput::OwnWordsSaid { .. }
-                | ProviderOutput::DownLineSaid { .. } => {}
+                ProviderOutput::NewsAnswered { .. } | ProviderOutput::OwnWordsSaid { .. } => {}
+                // Put on its turn by `observe_provider_output` too. A call's
+                // line the slow chat answered with its down line (#5563):
+                // its try is the provider's, never the person's miss.
+                ProviderOutput::DownLineSaid { request } => {
+                    if let Some(&(_, Some((began, _)))) =
+                        step_call_lines.iter().find(|(turn, _)| *turn == request)
+                    {
+                        near_provider_slow(onboarding.as_mut(), began);
+                    }
+                }
                 // The person's stop for a ring their line cut: held, not
                 // rung once more (the Reviewer-lead's P2 on #5351).
                 ProviderOutput::StopAnswered { request } => {
@@ -11571,11 +11652,20 @@ fn conversation_with_gate_inner(
                 }
                 onboarding_invitation_turn = None;
             }
+            let told_news = current.news.clone();
             let heard = current.heard_news(&speaker_pending, snapshot);
-            if !heard.is_empty()
-                && let Some(news) = task_news.as_ref()
-            {
-                news.heard(turn, heard);
+            // Not heard whole, played through with gaps included (its harness
+            // stays open, #4035): told once more at the next quiet pause, with
+            // `LAMP_TASK_NEWS_RETELL=on` (#4342). On lamp-c0a4 on 3 Nov a news
+            // played through with gaps under someone's words was otherwise
+            // neither told again nor closed.
+            let unheard = heard.is_empty();
+            if let Some(news) = task_news.as_mut() {
+                if !heard.is_empty() {
+                    news.heard(turn, heard);
+                } else if unheard && !told_news.is_empty() {
+                    news.not_heard(told_news);
+                }
             }
             record(
                 trace,
@@ -13399,11 +13489,23 @@ fn conversation_with_gate_inner(
         // and its question has a deadline. Put first before the switch is
         // looked at, so it goes ahead with the switch on too (the
         // reviewer-lead's P2 on #2642).
+        // News whose turn was cut short since the last tick: with
+        // `LAMP_TASK_NEWS_RETELL=on`, told once more at the next quiet
+        // pause (#4342).
+        let cut = crate::task_news::take_cut_short();
+        if !cut.is_empty()
+            && let Some(news) = task_news.as_mut()
+        {
+            news.not_heard(cut);
+        }
+        // News told once more waits for no conversation going on (15 s with
+        // nothing said by or to the lamp), whatever the pause switch says:
+        // the person speaking always wins (#4342).
         if let Some(news) = task_news.as_mut()
             && !reminder_waiting
             && news.waiting().is_some()
             && crate::task_news::quiet_for_news(
-                news.sign_in_first() || news_at_pause,
+                (news.sign_in_first() || news_at_pause) && !news.retelling_first(),
                 clock,
                 last_turn_us,
                 last_spoke_us,
@@ -13438,6 +13540,7 @@ fn conversation_with_gate_inner(
             && let Some(told) = if news_at_pause
                 && !news_by_skill
                 && ticket.is_none()
+                && !news.retelling_first()
                 && !says.as_ref().is_some_and(|says| {
                     says.asks_for(crate::say::Source::Tasks, monotonic_us())
                 }) {
@@ -13458,6 +13561,7 @@ fn conversation_with_gate_inner(
             record(
                 trace,
                 json!({"kind":"task_news","at_us":clock,"key":told.key,"also":told.also,"provider_session":provider_session,
+                    "retold":news.retold(&told.key),
                     "at_pause":news_at_pause || crate::sign_in::is_news(&told.key),"since_turn_ms":clock.saturating_sub(last_turn_us) / 1_000}),
             )?;
             snapshot = commit_written_turn(
@@ -13726,6 +13830,11 @@ fn hear_capture_block(
         }
         event["held_ms"] = json!(held_ms);
         event["backchannel"] = json!(backchannel);
+    }
+    // Whether the yield was made late in a person's speech over the lamp
+    // (`LAMP_CUT_IN_LATE_YIELD`), with the switch or without it.
+    if listened.step == DuplexStep::Commit {
+        event["late_yield"] = json!(mask.yield_was_late());
     }
     record(trace, event)?;
     match listened.step {
@@ -14006,10 +14115,17 @@ fn observe_prospective_heard(
     )?;
     if !admission.owns_stream() && !admission.draining() && mask.frame() == Disposition::Suppress {
         let rejection = admission.suppress_prospective(context, at_us)?;
+        let captured_at_us = observation.captured_at_us;
         detector
             .suppress(&observation, probability)
             .map_err(io::Error::other)?;
-        mask.suppressed()?;
+        // In the journal once per utterance, not only the trace (#5536).
+        if mask.suppressed(probability >= 0.5, captured_at_us)? {
+            eprintln!(
+                "lamp-voice: turn-taking: speech heard during the lamp's own sound or its {} ms tail was masked: not a turn",
+                crate::turn_taking::TAIL_US / 1_000
+            );
+        }
         return Ok((
             AdmissionUpdate {
                 rejection,
@@ -14044,6 +14160,11 @@ fn decide_prospective_input(
     match mask.candidate(candidate)? {
         Disposition::AwaitWriteEvidence => return Ok(None),
         Disposition::Suppress => {
+            if mask.masked_speech(candidate.trigger_read_at_us) {
+                eprintln!(
+                    "lamp-voice: turn-taking: a sound whose start was heard as the lamp's own was masked: not a turn"
+                );
+            }
             if let Some(rejection) = admission.suppress_prospective(context, at_us)? {
                 record_input_rejection(trace, rejection)?;
             }
@@ -14097,6 +14218,12 @@ fn decide_prospective_input(
                 .checked_sub(u64::from(crate::activity::START_BLOCKS) - 1)
                 .ok_or_else(|| io::Error::other("candidate has no complete onset"))?;
             if through_sequence >= first_onset {
+                if mask.masked_speech(candidate.trigger_read_at_us) {
+                    eprintln!(
+                        "lamp-voice: turn-taking: a sound whose start fell in the lamp's own sound or its {} ms tail was masked: not a turn",
+                        crate::turn_taking::TAIL_US / 1_000
+                    );
+                }
                 if let Some(rejection) = admission.suppress_prospective(context, at_us)? {
                     record_input_rejection(trace, rejection)?;
                 }
@@ -14575,6 +14702,9 @@ fn news_for_skill(
     let (key, progress, task) = news
         .waiting()
         .map(|front| (front.key.clone(), front.progress.is_some(), front.task()))?;
+    // News told once more is the voice's own: its skill's ask is long gone
+    // (#4342; on lamp-c0a4 it expired while the news rode on an answer).
+    let retelling = news.retelling_first();
     let now_us = monotonic_us();
     let found_us = news.found_at(&key).map(|found| {
         now_us.saturating_sub(u64::try_from(found.elapsed().as_micros()).unwrap_or(u64::MAX))
@@ -14583,7 +14713,7 @@ fn news_for_skill(
     for_skill(
         says,
         crate::say::Source::Tasks,
-        by_skill && !progress,
+        by_skill && !progress && !retelling,
         &key,
         task,
         held,
@@ -16610,6 +16740,27 @@ fn cancel_reply(
     Ok(())
 }
 
+/// As [`cancel_reply`], for a reply whose turn the controller may have
+/// revoked already, its input leases lapsed in a stall of the voice
+/// (#5611): that turn is over either way, so its stale owner is not an
+/// error here. Any other refusal still is.
+fn cancel_lapsed_reply(
+    owner: &mut Controller,
+    reply: &mut Option<Reply>,
+    trace: &mut SessionState,
+    reason: &str,
+) -> Result<()> {
+    if let Some(current) = reply.take() {
+        let cancel = owner.cancel_turn(now(), current.owner);
+        record_cancelled_reply(current, trace, reason, monotonic_us())?;
+        match cancel {
+            Ok(_) | Err(lamp_turn_owner::Error::StaleOwner) => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(())
+}
+
 /// What a physical mute revoked ([`revoke_for_mute`]): the reply it
 /// cancelled and when, and the publish's error, if any.
 struct MuteRevocation {
@@ -16719,6 +16870,9 @@ fn record_cancelled_reply(
             "lamp-voice: the news ({}) was cut short ({reason}): its harness stays open",
             current.news.join(", ")
         );
+        // Told once more at the next quiet pause, with
+        // `LAMP_TASK_NEWS_RETELL=on` (#4342).
+        crate::task_news::cut_short(&current.news);
     }
     finish_duplex_yield(trace, cancelled_at_us, reason, None, None)?;
     trace
@@ -18454,6 +18608,22 @@ mod tests {
             owner.complete_turn(now(), current.owner).unwrap();
             assert!(owner.snapshot(now()).unwrap().owner().is_none());
         }
+    }
+
+    /// #4342 (b), lamp-c0a4: a turn telling news, cut short by the person
+    /// (`user_interrupted`), hands its news on to be told once more at the
+    /// next quiet pause (`LAMP_TASK_NEWS_RETELL=on`): the coordinator's
+    /// next tick takes it, once.
+    #[test]
+    fn news_a_turn_was_telling_when_cut_short_is_handed_on_once() {
+        let _ = crate::task_news::take_cut_short();
+        let (mut owner, mut current, _permit) = active_reply();
+        current.news = vec!["s1:2:4".into()];
+        let mut reply = Some(current);
+        let mut trace = SessionState::default();
+        cancel_reply(&mut owner, &mut reply, &mut trace, "user_interrupted").unwrap();
+        assert_eq!(crate::task_news::take_cut_short(), ["s1:2:4"]);
+        assert!(crate::task_news::take_cut_short().is_empty());
     }
 
     #[test]

@@ -69,18 +69,44 @@ coord_body() {
 # the same patch by range-diff.
 patch_of() { local b; b=$(git merge-base origin/lamp-voice $1 2>/dev/null) || return 1; git diff -U0 $b $1 -- . | git patch-id --stable | cut -d' ' -f1; }
 
-# coord_same_patch HEAD COMMENTS: prints HEAD, then each commit a READ-OK in the COMMENTS file names whose patch is
-# HEAD's (a plain rebase), one a line, for reads2.py. reads2.py still decides which READ-OKs count (writers, markers).
+# coord_same_patch HEAD COMMENTS [QUEUE]: prints HEAD, then each commit a READ-OK in the COMMENTS file names whose patch
+# is HEAD's (a plain rebase), one a line, for reads2.py. reads2.py still decides which READ-OKs count (writers, markers).
+# 7 Nov (El's HOLD on #5653): with QUEUE (the Queue's JSON lines, coord_queue), the shas Queue READ ASKs name are
+# candidates too, so a Queue "READ ASK <old head>" naming TWO READS still asks after a plain rebase and one READ-OK on
+# the new head; reads2.py still decides which asks count. The Queue names many other PRs' heads, so each sha's patch
+# (or that it can't be resolved, after one fetch) is kept in coord_patch_cache, keyed by origin/lamp-voice and the sha:
+# call it with its output redirected to a file, not in $(...), so one bot round works each sha out once across PRs.
+# 7 Nov (#5653's P3s): the Queue's shas are those reads2.py --queue-shas prints (each sha on a first line its QUEUE_ASK
+# takes, signed asks like "Sixth, READ ASK to **El**: `<sha>`" too), so the candidates and queue_asks read one regex.
+# A short sha resolves only when the object is local (git can't fetch an abbreviated sha): see README.md.
+typeset -gA coord_patch_cache
+# coord_cached_patch SHA LV: sets REPLY to "<full sha> <patch>" from the cache (filling it), or fails when SHA can't be
+# resolved. Sets REPLY rather than printing, so the cache fills in the calling shell.
+coord_cached_patch() {
+  local k="$2:$1" full p
+  if (( ! ${+coord_patch_cache[$k]} )); then
+    git cat-file -e "$1^{commit}" 2>/dev/null || git fetch -q origin $1 2>/dev/null
+    full=$(git rev-parse -q --verify "$1^{commit}" 2>/dev/null) && p=$(patch_of $full) && [[ -n $p ]] \
+      && coord_patch_cache[$k]="$full $p" || coord_patch_cache[$k]=-
+  fi
+  REPLY=${coord_patch_cache[$k]}
+  [[ $REPLY != - ]]
+}
 coord_same_patch() {
-  local hp s full
+  local hp s lv; local -a seen
   print -r -- $1
-  hp=$(patch_of $1) && [[ -n $hp ]] || return 0
-  for s in ${(u)${(f)"$(grep -oE 'READ-OK[*]{0,2}[[:space:]]+`?[0-9a-f]{7,40}' $2 2>/dev/null | grep -oE '[0-9a-f]{7,40}$')"}}; do
+  lv=$(git rev-parse -q --verify origin/lamp-voice 2>/dev/null) || return 0
+  coord_cached_patch $1 $lv && hp=${REPLY#* } || return 0
+  seen=(${REPLY%% *})
+  for s in ${(u)${(f)"$( grep -oE 'READ-OK[*]{0,2}[[:space:]]+`?[0-9a-f]{7,40}' $2 2>/dev/null | grep -oE '[0-9a-f]{7,40}$'
+                       [[ -n $3 ]] && $PYTHON -I $TOOLS_DIR/reads2.py --queue-shas $3 2>/dev/null )"}}; do
     [[ $1 == $s* ]] && continue
-    git cat-file -e "$s^{commit}" 2>/dev/null || git fetch -q origin $s 2>/dev/null
-    full=$(git rev-parse -q --verify "$s^{commit}" 2>/dev/null) || continue
-    [[ "$(patch_of $full)" == $hp ]] && print -r -- $full
+    coord_cached_patch $s $lv || continue
+    (( ${seen[(Ie)${REPLY%% *}]} )) && continue
+    seen+=(${REPLY%% *})
+    [[ ${REPLY#* } == $hp ]] && print -r -- ${REPLY%% *}
   done
+  return 0
 }
 
 # coord_head PR: prints the PR's head sha, or fails when it can't be read or its head is in another repository

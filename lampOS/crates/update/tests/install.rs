@@ -1183,6 +1183,153 @@ fn a_newer_build_moves_each_link_and_keeps_the_old_folders() {
     );
 }
 
+/// The same lamp, given build `sequence` of the channel.
+fn newer(lamp: &Lamp, sequence: u64) -> Lamp {
+    let mut newer = Lamp::new(sequence, &[]);
+    newer.root = lamp.root.clone();
+    newer.config.root = lamp.root.clone();
+    newer.host.root = lamp.root.clone();
+    newer
+}
+
+/// What build `sequence`'s lamp-update holds (Lamp::new).
+fn writer_of(sequence: u64) -> Vec<u8> {
+    format!("lamp-update of build {sequence}\n").into_bytes()
+}
+
+fn records_of(lamp: &Lamp) -> PathBuf {
+    lamp.on("/var/lib/lampos-update")
+}
+
+/// A round's refresh of the settings writer to `build`, not proved yet: the
+/// copy before kept at PREV, a request still standing, and the record.
+fn refreshed(lamp: &Lamp, build: &str) {
+    use lamp_update::writer_swap::{DONE, Done, PREV, REQUEST};
+    fs::write(lamp.on(PREV), b"the copy before\n").unwrap();
+    let records = records_of(lamp);
+    fs::write(
+        records.join(REQUEST),
+        serde_json::json!({"build": build, "at_unix_ms": 1, "op": "proven"}).to_string(),
+    )
+    .unwrap();
+    let done = Done {
+        build: build.to_owned(),
+        before: Some(sha256_hex(b"the copy before\n")),
+        synced: true,
+        at_unix_ms: 1,
+        proven: false,
+        put_back: None,
+        for_good: false,
+    };
+    fs::write(records.join(DONE), serde_json::to_vec(&done).unwrap()).unwrap();
+}
+
+/// Whether PREV, the request and the record are there, in that order.
+fn writer_records(lamp: &Lamp) -> [bool; 3] {
+    use lamp_update::writer_swap::{DONE, PREV, REQUEST};
+    let records = records_of(lamp);
+    [
+        fs::symlink_metadata(lamp.on(PREV)).is_ok(),
+        records.join(REQUEST).exists(),
+        records.join(DONE).exists(),
+    ]
+}
+
+#[test]
+fn an_install_that_changes_the_writer_clears_its_prev_and_refresh_record() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    refreshed(&lamp, &sha256_hex(&writer_of(188)));
+    let mut newer = newer(&lamp, 189);
+    newer.install().unwrap();
+    assert_eq!(
+        fs::read(newer.on(lamp_update::own::BACK)).unwrap(),
+        writer_of(189)
+    );
+    assert_eq!(writer_records(&newer), [false, false, false]);
+    assert!(!lamp_update::writer_swap::unproven(
+        &newer.root,
+        &records_of(&newer)
+    ));
+}
+
+#[test]
+fn an_install_that_leaves_the_writer_as_it_is_keeps_its_prev_and_refresh_record() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    refreshed(&lamp, &sha256_hex(&writer_of(188)));
+    lamp.install().unwrap();
+    assert_eq!(writer_records(&lamp), [true, true, true]);
+    assert!(lamp_update::writer_swap::unproven(
+        &lamp.root,
+        &records_of(&lamp)
+    ));
+}
+
+#[test]
+fn an_install_cut_before_the_record_went_clears_it_on_the_next_run() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    refreshed(&lamp, &sha256_hex(&writer_of(188)));
+    // The run of build 189 that wrote the writer was cut before it cleared.
+    fs::write(lamp.on(lamp_update::own::BACK), writer_of(189)).unwrap();
+    let mut newer = newer(&lamp, 189);
+    newer.install().unwrap();
+    assert_eq!(writer_records(&newer), [false, false, false]);
+}
+
+#[test]
+fn an_install_that_cannot_remove_the_prev_says_so_and_keeps_the_record() {
+    use lamp_update::writer_swap::PREV;
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    refreshed(&lamp, &sha256_hex(&writer_of(188)));
+    fs::remove_file(lamp.on(PREV)).unwrap();
+    fs::create_dir_all(lamp.on(PREV).join("inside")).unwrap();
+    let mut newer = newer(&lamp, 189);
+    let why = newer.install().unwrap_err();
+    assert!(why.contains("lamp-update-back.prev"), "{why}");
+    assert_eq!(writer_records(&newer), [true, true, true]);
+}
+
+#[test]
+fn an_install_over_a_record_with_a_build_put_back_keeps_it_and_that_build_is_still_not_asked() {
+    use lamp_update::writer_swap::{self, DONE, Done};
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    let failed = b"a lamp-update whose back failed\n";
+    let record = Done {
+        build: sha256_hex(&writer_of(188)),
+        before: Some(sha256_hex(failed)),
+        synced: true,
+        at_unix_ms: 1,
+        proven: true,
+        put_back: Some(sha256_hex(failed)),
+        for_good: true,
+    };
+    let records = records_of(&lamp);
+    fs::write(records.join(DONE), serde_json::to_vec(&record).unwrap()).unwrap();
+    let mut newer = newer(&lamp, 189);
+    newer.install().unwrap();
+    let done = writer_swap::done(&records).expect("the record is kept");
+    assert_eq!(
+        done,
+        Done {
+            build: sha256_hex(&writer_of(189)),
+            before: None,
+            synced: true,
+            at_unix_ms: done.at_unix_ms,
+            proven: true,
+            put_back: Some(sha256_hex(failed)),
+            for_good: true,
+        }
+    );
+    assert!(!writer_swap::unproven(&newer.root, &records));
+    let held = Records::new(records.clone()).lock().unwrap();
+    assert!(!writer_swap::ask(&newer.root, &held, failed, 1).unwrap());
+    assert!(!records.join(writer_swap::REQUEST).exists());
+}
+
 /// Every component of the brain with a process of its own has a product
 /// unit (docs/brain-build.md, "Components, processes and owners").
 #[test]
@@ -2076,6 +2223,21 @@ fn the_product_names_a_lone_known_face_by_the_one_face_count() {
     }
 }
 
+/// The lamp is a private room between it and its owner, with no ownership
+/// check (`LAMP_PRIVATE_ROOM`, the owner's call on 6 Nov).
+#[test]
+fn the_product_is_a_private_room_with_its_owner() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    assert!(
+        section(voice, "Service").contains(&"Environment=LAMP_PRIVATE_ROOM=on"),
+        "the voice lacks LAMP_PRIVATE_ROOM"
+    );
+}
+
 /// Only faces of people at the desk count as people at the lamp
 /// (`LAMP_FACES_AT_DESK_ONLY`): on lamp-a0ae on 2 Nov tiny, unsure faces
 /// beside the owner held their name back on 51 of 79 turns as "more than one
@@ -2135,28 +2297,28 @@ fn the_product_sleeps_and_wakes_with_the_privacy_slide() {
     }
 }
 
-/// Tiers' ideas in Days, a newer correction first (`LAMP_MEMORY_NEWER_FIRST`),
-/// a maybe or a plan marked (`LAMP_MEMORY_STRENGTH`) and tastes first in the
-/// session note (`LAMP_MEMORY_PROFILE`), are off for the candidate (the PM,
-/// 6 Nov): they merged with their played check never posted (#5331). Days
-/// itself stays on.
+/// Tastes first in the session note (`LAMP_MEMORY_PROFILE`), one of Tiers'
+/// ideas in Days, is on in the product (the memory owner's call on 5 Nov, off
+/// for the candidate on 6 Nov, #5464, and back on after its played check
+/// passed on lamp-06c1 on 6 Nov, #5331). A newer correction first
+/// (`LAMP_MEMORY_NEWER_FIRST`) and a maybe or a plan marked
+/// (`LAMP_MEMORY_STRENGTH`) stay off until a played check reaches their own
+/// fields. Each sends its field only with Days on.
 #[test]
-fn the_product_leaves_tiers_ideas_off_until_their_played_check() {
+fn the_product_keeps_tastes_first_and_leaves_newer_first_and_strength_off() {
     let voice = install::PRODUCT
         .iter()
         .find(|(unit, _)| *unit == "lamp-voice.service")
         .unwrap()
         .1;
     let service = section(voice, "Service");
-    assert!(
-        service.contains(&"Environment=LAMP_MEMORY_DAYS=on"),
-        "the voice lacks LAMP_MEMORY_DAYS=on"
-    );
-    for switch in [
-        "LAMP_MEMORY_NEWER_FIRST",
-        "LAMP_MEMORY_STRENGTH",
-        "LAMP_MEMORY_PROFILE",
+    for line in [
+        "Environment=LAMP_MEMORY_PROFILE=on",
+        "Environment=LAMP_MEMORY_DAYS=on",
     ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+    for switch in ["LAMP_MEMORY_NEWER_FIRST", "LAMP_MEMORY_STRENGTH"] {
         assert!(
             !service.iter().any(|line| line.contains(switch)),
             "the voice sets {switch}"

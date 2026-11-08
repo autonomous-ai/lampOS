@@ -195,6 +195,19 @@ pub(crate) fn elapse_for_fault(by: Duration) -> io::Result<()> {
     })
 }
 
+/// A stall of the code under test itself, between steps (#5633): the clock
+/// moves on with no peer read, as a page fault holds a running pass.
+pub(crate) fn elapse_in_pass(by: Duration) -> io::Result<()> {
+    ACTIVE.with(|active| {
+        let mut active = active.borrow_mut();
+        let state = active
+            .as_mut()
+            .filter(|state| state.pumping.is_none())
+            .ok_or_else(|| io::Error::other("a stall in a pass needs a scope, not in a step"))?;
+        advance(state, by)
+    })
+}
+
 /// Pump one complete bounded peer step, then advance exactly two milliseconds.
 /// Cleanup pumps retain the current logical instant and the real shared budget.
 /// Returns false for an ordinary unscoped test. A callback panic invalidates its

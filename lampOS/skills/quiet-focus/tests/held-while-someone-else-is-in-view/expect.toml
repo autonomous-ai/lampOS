@@ -1,0 +1,14 @@
+# 10:00, due at 48, looks up at 50 with a second face in view from 49 to 52: held, said at 53 once they have been gone a minute.
+clock = "10:00"
+
+[[expect]]
+at = "53m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "53m"
+within = "1m"
+call = "say"
+args = { note = "They have just looked up after being quietly focused on their work for a good while. In one short, warm line of a few words, the way a friend would, say you noticed and it's nicely done. Only that: ask nothing of them and suggest nothing to do, and say nothing about their body or looks, the time, or health." }

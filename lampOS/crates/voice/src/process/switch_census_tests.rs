@@ -81,15 +81,6 @@ const NOT_PASSED: &[(&str, &str)] = &[
         "LAMP_SERVICES",
         "the coordinator's, given as --services-dir",
     ),
-    // The onboarding steps this lamp offers (#3769), as `setup_step` names them.
-    (
-        "LAMP_PRIVACY_CONTROLS",
-        "the coordinator's, given as an argument",
-    ),
-    (
-        "LAMP_FACE_EXPRESSIONS_ASK",
-        "the coordinator's, given as an argument",
-    ),
     (
         "LAMP_TIME_PLACES",
         "the coordinator's, given as an argument",
@@ -659,9 +650,16 @@ const THROUGH_HELPERS: &[(&str, &str)] = &[
 
 /// Whether `worker_command` gives the switch to some role with some value.
 /// The stall switches it gives from the voice's own environment
-/// (`stalls::passed_on`), which the census's `var` cannot set.
+/// (`stalls::passed_on`), and the code lock's (`code_lock::passed_on`),
+/// which the census's `var` cannot set.
 fn passed(name: &str) -> bool {
-    if [crate::stalls::ENVIRONMENT, crate::stalls::DIR_ENVIRONMENT].contains(&name) {
+    if [
+        crate::stalls::ENVIRONMENT,
+        crate::stalls::DIR_ENVIRONMENT,
+        crate::code_lock::ENVIRONMENT,
+    ]
+    .contains(&name)
+    {
         return true;
     }
     let boot = super::new_boot().unwrap();

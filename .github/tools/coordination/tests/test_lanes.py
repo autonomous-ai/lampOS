@@ -57,7 +57,11 @@ case "$*" in
   *headRefOid*) cat "$FAKE_DIR/head.txt" ;;
   *statusCheckRollup*) cat "$FAKE_DIR/checks.json" ;;
   "run list"*) echo 0 ;;
-  "pr merge"*) [ -n "$FAKE_ON_MERGE" ] && git push -q origin "$(git commit-tree -p origin/lamp-voice -m moved origin/lamp-voice^{tree})":refs/heads/lamp-voice; exit "${FAKE_MERGE_RC:-0}" ;;
+  "pr merge"*) if [ -n "$FAKE_MERGE_5XX" ]; then n=$(cat "$FAKE_DIR/5xx" 2>/dev/null || echo 0); n=$((n+1)); echo $n > "$FAKE_DIR/5xx"
+                 [ "$n" -le "$FAKE_MERGE_5XX" ] && { [ -n "$FAKE_ON_5XX" ] && sh -c "$FAKE_ON_5XX"; echo "HTTP 502: Bad Gateway (https://api.github.com/graphql)" >&2; exit 1; }
+                 [ -n "$FAKE_RETRY_WAS_MERGED" ] && echo MERGED > "$FAKE_DIR/state.txt"; fi
+               [ -n "$FAKE_ON_MERGE" ] && git push -q origin "$(git commit-tree -p origin/lamp-voice -m moved origin/lamp-voice^{tree})":refs/heads/lamp-voice; exit "${FAKE_MERGE_RC:-0}" ;;
+  *"--json state"*) cat "$FAKE_DIR/state.txt" 2>/dev/null || echo OPEN ;;
 esac
 """
 ARM_CHECKS = [{"__typename": "CheckRun", "name": "build and test", "status": "COMPLETED", "conclusion": "SUCCESS"},
@@ -355,6 +359,52 @@ class MergeNoArm64(Repo):
         _, r = self.mwg([TOOL], CI_CHECKS, "--behind-unrelated", env=dict(self.env, FAKE_MERGE_RC="1"))
         self.assertEqual(r.returncode, 4, r.stdout)
 
+    # 5 Nov (the PM, train 662): GitHub answered a green train's merge with a 502 and the bot stopped.
+    def merges(self):
+        return [c for c in self.calls().splitlines() if c.startswith("pr merge")]
+
+    def test_a_5xx_on_the_merge_is_tried_again(self):
+        _, r = self.mwg([TOOL], CI_CHECKS, env=dict(self.env, FAKE_MERGE_5XX="2", MWG_RETRY_S="0"))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(len(self.merges()), 3)
+        self.assertIn("merge answered with GitHub's 5xx (try 2 of 3)", r.stdout)
+        self.assertIn("merged at", r.stdout)
+
+    def test_a_5xx_after_the_merge_went_through_is_a_merge(self):
+        self.fakefile("state.txt", "MERGED\n")
+        _, r = self.mwg([TOOL], CI_CHECKS, env=dict(self.env, FAKE_MERGE_5XX="9", MWG_RETRY_S="0"))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(len(self.merges()), 1)
+
+    def test_three_5xx_rebuild_and_never_stop_the_bot(self):
+        _, r = self.mwg([TOOL], CI_CHECKS, env=dict(self.env, FAKE_MERGE_5XX="9", MWG_RETRY_S="0"))
+        self.assertEqual(r.returncode, 7, r.stdout + r.stderr)
+        self.assertEqual(len(self.merges()), 3)
+        self.assertIn("5xx 3 times; rebuilding", r.stdout)
+
+    def test_a_5xx_then_a_moved_lamp_voice_rebuilds_and_never_merges_on_it(self):
+        # The first read's P2: lamp-voice has no branch protection, so nothing else refuses a retry onto a newer tip.
+        moved = 'git push -q origin "$(git commit-tree -p origin/lamp-voice -m moved origin/lamp-voice^{tree})":refs/heads/lamp-voice'
+        _, r = self.mwg([TOOL], CI_CHECKS, env=dict(self.env, FAKE_MERGE_5XX="1", FAKE_ON_5XX=moved, MWG_RETRY_S="0"))
+        self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
+        self.assertEqual(len(self.merges()), 1)
+        self.assertIn("green but behind lamp-voice; not merged", r.stdout)
+
+    def test_a_5xx_then_a_hold_on_a_carried_pr_does_not_merge(self):
+        hold = ('printf \'{"login":"w1","body":"HOLD %s","created_at":"2099-01-01T00:00:00Z"}\\n\' '
+                '"$(cat "$FAKE_DIR/head.txt")" >> "$FAKE_DIR/comments-7.json"')
+        _, r = self.mwg([TOOL], CI_CHECKS, "--precheck", "7",
+                        env=dict(self.env, FAKE_MERGE_5XX="1", FAKE_ON_5XX=hold, MWG_RETRY_S="0"))
+        self.assertEqual(r.returncode, 6, r.stdout + r.stderr)
+        self.assertEqual(len(self.merges()), 1)
+
+    def test_a_retry_refused_as_already_merged_is_a_merge(self):
+        # The first read's P3: GitHub had merged but still said OPEN just after the 5xx.
+        _, r = self.mwg([TOOL], CI_CHECKS, env=dict(self.env, FAKE_MERGE_5XX="1", FAKE_RETRY_WAS_MERGED="1",
+                                                     FAKE_MERGE_RC="1", MWG_RETRY_S="0"))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(len(self.merges()), 2)
+
 
 class BotDryRound(Repo):
     def bot(self, before=None, **extra):
@@ -452,6 +502,32 @@ class BotDryRound(Repo):
         self.assertIn("dry: crate lane: would carry 8 9 onto " + self.base[:9], lines)
         self.assertIn("dry: no-crates lane: nothing eligible", lines)
         self.assertNothingChanged()
+
+    # 7 Nov (#5653's P3s): when the PR's commits can't be listed (git rev-list origin/lamp-voice..HEAD fails), the PR
+    # sits out the round, in the bot and in still-eligible.sh, instead of reading Queue asks against its head alone.
+    def unlisted(self, n):
+        bogus = "f" * 40
+        self.fakefile("head-%d.txt" % n, bogus + "\n")
+        self.fakefile("comments-%d.json" % n, json.dumps({"login": "w1", "body": "READ-OK " + bogus,
+                                                          "created_at": "2026-11-04T01:00:00Z"}) + "\n")
+
+    def test_a_pr_whose_commits_cant_be_listed_sits_out(self):
+        r, lines = self.bot(before=lambda: self.unlisted(7))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("#7 left out: its commits can't be listed", r.stderr)
+        self.assertIn("dry: crate lane: would carry 8 9 onto " + self.base[:9], lines)
+        self.assertIn("dry: no-crates lane: nothing eligible", lines)
+        self.assertNothingChanged()
+
+    def test_still_eligible_fails_when_commits_cant_be_listed(self):
+        self.pr(8, ["lampOS/crates/x/src/lib.rs"])
+        os.makedirs(self.state, exist_ok=True)
+        r = run(["zsh", os.path.join(HERE, "still-eligible.sh"), "8"], self.work, env=self.env, check=False)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.unlisted(8)
+        r = run(["zsh", os.path.join(HERE, "still-eligible.sh"), "8"], self.work, env=self.env, check=False)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("#8: its commits can't be listed", r.stdout)
 
     def test_either_queue_unread_makes_nothing_eligible(self):
         for issue in (4710, 5385):

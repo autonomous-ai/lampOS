@@ -277,6 +277,64 @@ fn a_new_writer_whose_first_apply_fails_is_put_back_after_that_apply() {
     );
     assert!(refreshed.is_some() && put_back.is_some(), "{:?}", lamp.said);
     assert!(refreshed < put_back);
+    // lamp-06c1's state (#5539): the copy before is the writer again, and
+    // this lamp-update runs. The failure was the build's, not the writer's:
+    // a later build with settings to write, `store.env` among them, has the
+    // writer refreshed again and is taken.
+    let done = writer_swap::done(&lamp.records()).unwrap();
+    assert_eq!(done.build, sha("old writer"));
+    assert_ne!(done.put_back, Some(sha("lamp-update 1")), "{done:?}");
+    let (root, records, key) = (lamp.root.clone(), lamp.records(), lamp.config.key);
+    lamp.systemd.applier = Some(Box::new(move || {
+        apply::run(&root, &records, &key, &mut |_| Ok(()), &mut |_| {})
+    }));
+    let on = "LAMP_SKILLS_STORE=on\n";
+    publish_settings(
+        &mut lamp,
+        3,
+        vec![
+            Setting::new(CONTROLS_JSON, "controls 3"),
+            Setting::new(manifest::STORE_ENV, on),
+        ],
+    );
+    let outcome = lamp.round();
+    assert_eq!(outcome, Outcome::Switched(3), "{:?}", lamp.said);
+    assert_eq!(lamp.read(BACK), "lamp-update 1");
+    assert_eq!(lamp.read(PREV), "old writer");
+    assert_eq!(lamp.read(CONTROLS_JSON), "controls 3");
+    assert_eq!(lamp.read(manifest::STORE_ENV), on);
+}
+
+/// A writer put back after its own `back` failed stays put back: a build
+/// with `store.env` to write waits for a newer lamp-update, and says why
+/// (#5539).
+#[test]
+fn a_build_waiting_on_a_writer_put_back_for_good_says_it_waits_for_a_newer_lamp_update() {
+    let mut lamp = refreshed();
+    lamp.systemd.units.insert(
+        writer_swap::BACK_UNIT.into(),
+        Running {
+            active: "failed".into(),
+            sub: "failed".into(),
+            ..Running::default()
+        },
+    );
+    lamp.round();
+    assert_eq!(lamp.read(BACK), "old writer");
+    lamp.systemd.calls.borrow_mut().clear();
+    lamp.config.settings = true;
+    publish_settings(
+        &mut lamp,
+        2,
+        vec![Setting::new(manifest::STORE_ENV, "LAMP_SKILLS_STORE=on\n")],
+    );
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::Refused(why) if why.contains("put back as the settings writer for good")
+            && why.contains("waiting for a newer lamp-update")),
+        "{outcome:?}"
+    );
+    assert!(!started_writer(&lamp), "{:?}", lamp.calls());
 }
 
 /// A far jump (#3689's climb meeting the Store's switch file): a lamp on an

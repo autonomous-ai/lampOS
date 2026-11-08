@@ -14,14 +14,51 @@
 # one a line (# lines ignored): `--writers FILE`, else $LAMP_COORD_WRITERS. With neither, or an unreadable file, no login
 # is allowed and nothing is printed (fail closed). The train bot builds the file (lib.sh, coord_writers).
 #
-# The parsing below (parse_marker, signer, LIFT_RE, load_writers) is imported by reads2.py and qholds.py, so the
+# The parsing below (parse_marker, signer, lifted_commits, load_writers) is imported by reads2.py and qholds.py, so the
 # three read a marker the same way.
 import json, os, re, sys
 
 # A READ-OK saying an unsigned HOLD (or a Queue HOLD) is lifted.
 # 3 Nov 10:1x: "This clears my HOLD on `37b16e9d6f`" (Fifth on #4967) didn't match, and #4967 sat out trains
 # 539-547 with both READ-OKs; "clears/cleared my … HOLD" counts too.
-LIFT_RE = re.compile(r"(?i)\bHOLD\b[^.\n]{0,24}\b(lifted|cleared)\b|\b(?:lift|clear)(?:ed|s|ing)? my (?:[0-9:x]+ )?HOLD")
+# 6 Nov (#5534): "My HOLD on 1d3d9711f8ce871e21483fd840f57b3a5570d174 is lifted" (the Reviewer-lead on #5521, also #5476
+# and #5486) didn't match: a full commit is 40 characters and the window was 24. A commit (7 to 40 hex, not all
+# digits) is read as one short word here, so the window fits it, and the commits the lifting words name are returned.
+COMMIT_RE = re.compile(r"`?\b(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b`?")
+LIFT_RE = re.compile(r"(?i)\bHOLD\b[^.\n]{0,24}\b(lifted|cleared)\b|\b(?:lift|clear)(?:ed|s|ing)? my (?:[0-9:x]+ )?HOLD(?: (?:on|at) \S+)?")
+
+
+def lifted_commits(text):
+    """The lifting words in `text`: None when it says no HOLD is lifted, else the commits they name (an empty list:
+    no commit named, as before #5534)."""
+    commits = []
+    def short(m):
+        commits.append(m.group(0).strip("`"))
+        return "\x00%d\x00" % (len(commits) - 1)
+    plain = COMMIT_RE.sub(short, text)
+    found = None
+    for m in LIFT_RE.finditer(plain):
+        if negated(plain, m):
+            continue
+        found = found or []
+        found += [commits[int(i)] for i in re.findall(r"\x00(\d+)\x00", m.group(0))]
+    return found
+
+
+# 6 Nov (the reviewer's P3 on #5542): "my HOLD on <A> is not lifted", "isn't lifted", "is not yet cleared", "won't lift my
+# HOLD", "not lifting my HOLD" matched LIFT_RE and lifted A. Lifting words with "not", "n't" or "never" inside them, or
+# in the same clause right before them, lift nothing.
+NEG_RE = re.compile(r"(?i)\b(?:not|never)\b|n['’]t\b")
+
+
+def negated(plain, m):
+    clause = re.split(r"[.;:!?\n]", plain[max(0, m.start() - 16):m.start()])[-1]
+    return bool(NEG_RE.search(clause + m.group(0)))
+
+
+def names_commit(sha, commits):
+    """Whether a HOLD on `sha` is one of `commits` (either may be a prefix of the other). A HOLD with no commit is none."""
+    return bool(sha) and any(sha.startswith(x) or x.startswith(sha) for x in commits)
 
 
 # 3 Nov 16:4x (Thirteen's HOLD on #5068): the opening `\W*` skipped "> " and a code fence, so an author's
@@ -146,6 +183,12 @@ def is_writer(c, writers):
 
 def read_markers(comments, writers, pr=None, lifted_path=None):
     """comments: dicts {login, body} in posting order. Returns "HELD", "READ-OK <sha>" or ""."""
+    holds, ok = standing_holds(comments, writers, pr, lifted_path)
+    return "HELD" if holds else ("READ-OK " + ok if ok else "")
+
+
+def standing_holds(comments, writers, pr=None, lifted_path=None):
+    """The HOLDs still standing ({key: commit}) and the newest READ-OK's commit ("" if none)."""
     holds = {}; ok = ""; n = -1
     for c in comments:
         # The index n counts every comment, a skipped one too, so holds-lifted.tsv's "unsigned#N" keys stay put.
@@ -173,8 +216,15 @@ def read_markers(comments, writers, pr=None, lifted_path=None):
             # bracketed or possessive READ-OK never parses as a marker above.
             if sha: holds.pop("bot", None)
             # An account's unsigned HOLD clears only on that account's READ-OK saying so ("my P2 is fixed; HOLD lifted", #3138).
-            if LIFT_RE.search(body[:400]):
-                for k in [k for k in holds if k.startswith((c["login"] + "/unsigned#", c["login"] + "/unsigned-review#"))]: holds.pop(k)
+            # 6 Nov (#5534): lifting words that name a commit clear only that account's HOLDs on it.
+            lift = lifted_commits(body[:400])
+            if lift is not None:
+                unsigned = (c["login"] + "/unsigned#", c["login"] + "/unsigned-review#")
+                for k in [k for k in holds if k.startswith(unsigned) and (not lift or names_commit(holds[k], lift))]:
+                    holds.pop(k)
+                # 6 Nov (the reviewer's P3 on #5542): an unsigned READ-OK never lifts a signed HOLD, even the only one on
+                # the commit: on a shared account it may be another reader's ("my HOLD on <A> is lifted" from reader Y
+                # cleared reader X's). A signed HOLD is lifted only by its own signer's READ-OK (holds.pop(who) above).
     # 29 Oct 18:0x: "HOLD b9bb97e67a, Third, 16:45" (a comma after the commit) read as unsigned, and "this lifts my 16:45 HOLD"
     # didn't clear it, so #4353 sat out trains 363 and 364 with three READ-OKs. Both read now.
     # 25 Oct 20:0x: a HOLD its own reader closed in writing but never cleared with a READ-OK (Second's on #3437, closed in
@@ -191,7 +241,30 @@ def read_markers(comments, writers, pr=None, lifted_path=None):
                     f = row.rstrip("\n").split("\t")
                     if len(f) >= 4 and f[0] == str(pr) and holds.get(f[1], "").startswith(f[2]): holds.pop(f[1])
         except FileNotFoundError: pass
-    return "HELD" if holds else ("READ-OK " + ok if ok else "")
+    return holds, ok
+
+
+def held_note(comments, writers, pr=None, lifted_path=None):
+    """6 Nov (#5534): for a held PR, "<READ-OK commit> <key>=<commit> ..." (the newest READ-OK, then each standing
+    HOLD), so the train bot can say why a PR with a READ-OK sits out; "" when nothing is held or there is no READ-OK."""
+    holds, ok = standing_holds(comments, writers, pr, lifted_path)
+    if not holds or not ok:
+        return ""
+    return " ".join([ok] + ["%s=%s" % (k, v[:10] or "-") for k, v in sorted(holds.items())])
+
+
+def ignored_reads(comments, writers):
+    """6 Nov (the PM's ask on #5542): the READ-OK markers skipped because their login is not a writer, which was silent,
+    as lines "READ-OK <sha7> by <login> ignored: not a writer" (oldest first, one per login and commit)."""
+    out = []
+    for c in comments:
+        if is_writer(c, writers):
+            continue
+        mk = parse_marker(c.get("body") or "")
+        if mk and mk[0] == "READ-OK" and mk[1]:
+            line = "READ-OK %s by %s ignored: not a writer" % (mk[1][:7], c.get("login") or "?")
+            if line not in out: out.append(line)
+    return out
 
 
 def merge_reviews(comments, reviews):
@@ -217,10 +290,17 @@ def main():
         for c in merge_reviews(*lists):
             print(json.dumps(c))
         return
-    # markers.py [--writers FILE] [PR]
-    writers, args = writers_from_args(sys.argv[1:])
+    # markers.py [--writers FILE] [--held|--ignored] [PR]; --held prints held_note's line instead (#5534), --ignored
+    # ignored_reads' lines, one a line.
+    held = "--held" in sys.argv[1:]
+    ignored = "--ignored" in sys.argv[1:]
+    writers, args = writers_from_args([a for a in sys.argv[1:] if a not in ("--held", "--ignored")])
     comments = [json.loads(line) for line in sys.stdin if line.strip()]
-    print(read_markers(comments, writers, pr=args[0] if args else None))
+    pr = args[0] if args else None
+    if ignored:
+        for line in ignored_reads(comments, writers): print(line)
+        return
+    print(held_note(comments, writers, pr=pr) if held else read_markers(comments, writers, pr=pr))
 
 
 if __name__ == "__main__":

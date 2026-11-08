@@ -2,9 +2,12 @@
 //! remote agent, credentials or provider is invoked by these tests.
 use lamp_tasks::harness::{
     AccountMachine, CLOSE_BUDGET, CLOSE_READ_TIMEOUT, Cli, CliConfig, Closed, Ended, EngineKind,
-    Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED, PS_STDOUT_LIMIT,
-    SignIn, Target, iso_unix_ms, parse_auth_status, parse_machines, parse_ps, parse_wait,
+    EngineRow, Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED,
+    PS_STDOUT_LIMIT, SignIn, Target, WATCH_LINE_LIMIT, WatchEnd, WatchEvent, WatchLine,
+    iso_unix_ms, parse_auth_status, parse_engines, parse_machines, parse_ps, parse_wait,
+    parse_watch_line,
 };
+use lamp_tasks::runtime::{HarnessSwitches, NEW_FOLDER_FILE, targets_from_machines};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
@@ -106,6 +109,7 @@ impl Rig {
             route: false,
             absolute_folder: false,
             new_folder: None,
+            new_folder_only: None,
             journal: None,
             calls: None,
             health_after_start: false,
@@ -1320,6 +1324,99 @@ fn a_known_no_from_the_computer_is_not_sent_and_anything_else_hands_over() {
             "machines", "engines", MACHINE, "--engine", "codex", "--json"
         ])
     );
+}
+
+/// #5199: `harness machines engines <id> --json` read whole, one call, as
+/// Harness gives it: each engine's `installed` and `signedIn` `true`,
+/// `false` or `null` (unknown, never missing), other machines' rows and
+/// other fields passed over. Exit 1 is `unreachable`, 2 `usage`; a reply
+/// that isn't one, or has no row of this computer, is no answer.
+#[test]
+fn a_computers_engines_are_one_call_read_as_harness_gives_them() {
+    let rows = [
+        json!({"machineId":MACHINE,"engine":"claude","installed":true,"signedIn":false,"installable":true,"firstPrompt":true}),
+        json!({"machineId":MACHINE,"engine":"hermes","installed":null,"signedIn":null,"installable":null,"firstPrompt":null}),
+        json!({"machineId":MACHINE.to_uppercase(),"engine":"opencode","installed":false}),
+        // A computer without Codex, as Harness prints it.
+        json!({"machineId":MACHINE,"engine":"codex","installed":null,"signedIn":null,"installable":true,"firstPrompt":null}),
+        json!({"machineId":"fedcba9876543210fedcba9876543210","engine":"cursor","installed":true}),
+    ];
+    let stdout: String = rows.iter().map(|row| format!("{row}\n")).collect();
+    let rig = Rig::new();
+    rig.plan(json!({"engines":{"stdout":stdout}}));
+    assert_eq!(
+        rig.cli().engines(MACHINE).unwrap(),
+        [
+            EngineRow {
+                engine: "claude".into(),
+                installed: Some(true),
+                installable: Some(true),
+                signed_in: Some(false),
+            },
+            EngineRow {
+                engine: "hermes".into(),
+                installed: None,
+                installable: None,
+                signed_in: None,
+            },
+            EngineRow {
+                engine: "opencode".into(),
+                installed: Some(false),
+                installable: None,
+                signed_in: None,
+            },
+            EngineRow {
+                engine: "codex".into(),
+                installed: None,
+                installable: Some(true),
+                signed_in: None,
+            },
+        ]
+    );
+    let calls = rig.calls();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(
+        calls[0]["args"],
+        json!(["machines", "engines", MACHINE, "--json"])
+    );
+    for (plan, code) in [
+        (
+            json!({"exit":1,"stderr":"machine unreachable\n"}),
+            "unreachable",
+        ),
+        (
+            json!({"exit":2,"stderr":"Usage: harness machines\n"}),
+            "usage",
+        ),
+        (json!({"exit":3}), "engines_failed"),
+        (json!({"stdout":"not json\n"}), "engines_invalid_reply"),
+        // An older Harness's machine list.
+        (
+            json!({"stdout":format!("{}\n", json!({"machineId":MACHINE,"current":false}))}),
+            "engines_invalid_reply",
+        ),
+        (json!({"stdout":""}), "engines_none"),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({"engines":plan}));
+        assert_eq!(rig.cli().engines(MACHINE), Err(code.into()), "{plan}");
+    }
+    assert_eq!(
+        Rig::new().cli().engines("not a machine"),
+        Err("invalid_machine".into())
+    );
+    // Strict past those: an engine twice, or a name Harness doesn't give.
+    for bad in [
+        json!({"machineId":MACHINE,"engine":"claude","installed":"yes"}),
+        json!({"machineId":MACHINE,"engine":"Claude Code","installed":true}),
+    ] {
+        assert!(
+            parse_engines(format!("{bad}\n").as_bytes(), MACHINE).is_err(),
+            "{bad}"
+        );
+    }
+    let twice = format!("{}\n{}\n", rows[0], rows[0]);
+    assert!(parse_engines(twice.as_bytes(), MACHINE).is_err());
 }
 
 /// One computer's answer for one engine that refuses nothing is kept
@@ -2705,17 +2802,21 @@ fn the_machines_are_one_call_read_as_harness_lists_them() {
             AccountMachine {
                 machine_id: MACHINE.into(),
                 label: "Office iMac".into(),
-                current: false
+                current: false,
+                // A word Harness doesn't give (#5199): unknown.
+                status: None,
             },
             AccountMachine {
                 machine_id: other.into(),
                 label: "lamp".into(),
-                current: true
+                current: true,
+                status: None,
             },
             AccountMachine {
                 machine_id: "0123456789abcdef0123456789abcdee".into(),
                 label: "".into(),
-                current: false
+                current: false,
+                status: Some("offline".into()),
             },
         ]
     );
@@ -3158,6 +3259,115 @@ fn with_new_folder_another_failure_marks_nothing() {
         assert_eq!(news[0][4], "--new");
         assert_eq!(news[1][4], "--new");
     }
+}
+
+/// A fixture Harness that refuses a plain `new` in the folder the machines'
+/// targets name, as a computer without it does (`CWD_NOT_FOUND`, lamp-a63e
+/// on 6 Nov), and makes it on `--new lamp-tasks`.
+fn folder_not_there_rig() -> Rig {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines": {"default": true},
+        "new": {
+            "exit": 1,
+            "stdout": "{\"ok\":false,\"error\":\"CWD_NOT_FOUND\"}\n",
+            "with_new": {"default": true}
+        }
+    }));
+    rig
+}
+
+/// The launch of a target written from the person's machines (`serve
+/// --targets-from-machines`), on the rig's computer.
+fn from_the_machines() -> Launch {
+    let machines = [AccountMachine {
+        machine_id: MACHINE.into(),
+        label: "Office Mac".into(),
+        current: false,
+        status: None,
+    }];
+    let targets = targets_from_machines(&machines, EngineKind::Claude);
+    Launch {
+        name: "lamp-task-001".into(),
+        prompt: "Inspect the authored fixture".into(),
+        target: targets["office"].clone(),
+    }
+}
+
+/// #5541: a target written by `--targets-from-machines` names
+/// `~/harnesses/lamp-tasks`, which nothing else makes. With that switch on,
+/// and `--new-folder` off as in the product, the first hand-over asks
+/// Harness to make the folder (`--new lamp-tasks`) and starts; later ones
+/// name it.
+#[test]
+fn a_target_from_the_machines_has_its_folder_made_on_the_first_hand_over() {
+    let mut rig = folder_not_there_rig();
+    let root = rig.root.path().to_owned();
+    HarnessSwitches::default().apply(&mut rig.config, &root, true);
+    let cli = rig.cli();
+    assert_eq!(
+        cli.launch(&from_the_machines()),
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    let news = new_args(&rig);
+    assert_eq!(news.len(), 1);
+    assert_eq!(news[0][4], "--new");
+    assert_eq!(news[0][5], "lamp-tasks");
+    // Made: the next hand-over names the folder, as before.
+    rig.plan(json!({"machines":{"default":true},"new":{"default":true}}));
+    assert!(matches!(
+        cli.launch(&from_the_machines()),
+        LaunchOutcome::Created { .. }
+    ));
+    assert_eq!(new_args(&rig)[1][4], "~/harnesses/lamp-tasks");
+    assert!(root.join(NEW_FOLDER_FILE).exists());
+}
+
+/// Hand-written targets keep today's behaviour unless `--new-folder` is
+/// set: with `--targets-from-machines` on, another `~/harnesses/<name>`
+/// folder is sent as it is; and with neither switch, the machines' folder
+/// is sent as it is too, so a refusal is the same as before.
+#[test]
+fn only_the_machines_folder_is_made_unless_new_folder_is_set() {
+    let mut rig = Rig::new();
+    let root = rig.root.path().to_owned();
+    HarnessSwitches::default().apply(&mut rig.config, &root, true);
+    rig.plan(json!({"machines":{"default":true},"new":{"default":true}}));
+    let mut by_hand = from_the_machines();
+    by_hand.target.project = "~/harnesses/my-project".into();
+    assert!(matches!(
+        rig.cli().launch(&by_hand),
+        LaunchOutcome::Created { .. }
+    ));
+    assert_eq!(new_args(&rig)[0][4], "~/harnesses/my-project");
+
+    let mut rig = folder_not_there_rig();
+    let root = rig.root.path().to_owned();
+    HarnessSwitches::default().apply(&mut rig.config, &root, false);
+    assert_eq!(
+        rig.cli().launch(&from_the_machines()),
+        uncertain("new_failed")
+    );
+    assert_eq!(new_args(&rig)[0][4], "~/harnesses/lamp-tasks");
+    assert!(!root.join(NEW_FOLDER_FILE).exists());
+
+    // `--new-folder` set: every made folder, as #5121 has it.
+    let mut rig = Rig::new();
+    let root = rig.root.path().to_owned();
+    let switches = HarnessSwitches {
+        new_folder: true,
+        ..Default::default()
+    };
+    switches.apply(&mut rig.config, &root, true);
+    rig.plan(json!({"machines":{"default":true},"new":{"default":true}}));
+    assert!(matches!(
+        rig.cli().launch(&by_hand),
+        LaunchOutcome::Created { .. }
+    ));
+    assert_eq!(new_args(&rig)[0][4], "--new");
+    assert_eq!(new_args(&rig)[0][5], "my-project");
 }
 
 /// Only `~/harnesses/<name>` with a name Harness keeps as it is is asked
@@ -3631,4 +3841,165 @@ fn a_runtime_folder_made_after_the_start_reaches_the_next_harness_call() {
     address.push(folder.join("bus").as_os_str());
     assert_eq!(after["DBUS_SESSION_BUS_ADDRESS"], address);
     assert_eq!(after["HOME"], before["HOME"]);
+}
+
+/// One `harness watch --json` line as openharness prints it.
+fn watched_line(event: &str, id: &str) -> String {
+    json!({"event":event,"at":"2026-11-04T09:00:00.000Z","name":"lamp-task-1","id":id,"agent":"claude","state":"idle"}).to_string()
+}
+
+/// #5230: `watch` hands on each event as it comes, and on `done` kills the
+/// watch itself, which would otherwise stay held on an idle pane harness.
+#[test]
+fn watch_hands_on_each_event_and_ends_itself_on_done() {
+    let rig = Rig::new();
+    rig.plan(json!({"watch":{"lines":[
+        {"text":watched_line("working", AGENT)},
+        {"text":"not json"},
+        {"text":watched_line("needs_person", AGENT),"delay_ms":50},
+        {"text":watched_line("done", AGENT),"delay_ms":50},
+    ],"after_output_ms":5000}}));
+    let cancel = AtomicBool::new(false);
+    let mut events = Vec::new();
+    let began = Instant::now();
+    let end = rig
+        .cli()
+        .watch(MACHINE, AGENT, &cancel, &mut |event| events.push(event));
+    assert_eq!(end, WatchEnd::Settled);
+    assert_eq!(
+        events,
+        vec![
+            WatchEvent::Working,
+            WatchEvent::NeedsPerson,
+            WatchEvent::Done
+        ]
+    );
+    // Killed at `done`, not held for the fixture's five seconds.
+    assert!(
+        began.elapsed() < Duration::from_secs(4),
+        "{:?}",
+        began.elapsed()
+    );
+    let call = rig
+        .calls()
+        .into_iter()
+        .find(|call| call["args"][0] == "watch")
+        .unwrap();
+    assert_eq!(
+        call["args"],
+        json!([
+            "watch",
+            "--machine",
+            MACHINE,
+            AGENT,
+            "--chars",
+            "200",
+            "--timeout",
+            "10m",
+            "--json"
+        ])
+    );
+}
+
+/// #5230: each way `watch` ends, by its exit.
+#[test]
+fn watch_reads_each_exit() {
+    let rig = Rig::new();
+    let cancel = AtomicBool::new(false);
+    let run = |plan: Value| {
+        rig.plan(json!({ "watch": plan }));
+        let mut events = Vec::new();
+        let end = rig
+            .cli()
+            .watch(MACHINE, AGENT, &cancel, &mut |event| events.push(event));
+        (end, events)
+    };
+    assert_eq!(
+        run(json!({"stdout":format!("{}\n", watched_line("stopped", AGENT)),"exit":4})),
+        (WatchEnd::Stopped, vec![WatchEvent::Stopped])
+    );
+    assert_eq!(
+        run(json!({"stdout":format!("{}\n", watched_line("working", AGENT)),"exit":124})),
+        (WatchEnd::Timeout, vec![WatchEvent::Working])
+    );
+    // An older Harness: a usage error.
+    assert_eq!(run(json!({"stdout":"","exit":2})).0, WatchEnd::Missing);
+    // An error ends it with Harness's code; its detail is never kept.
+    assert_eq!(
+        run(
+            json!({"stdout":"{\"error\":\"DISCONNECTED\",\"detail\":\"/home/someone\"}\n","exit":1})
+        )
+        .0,
+        WatchEnd::Failed("DISCONNECTED".into())
+    );
+    assert_eq!(
+        run(json!({"stdout":"","exit":1})).0,
+        WatchEnd::Failed("watch_failed".into())
+    );
+    // A line for another agent is passed over.
+    assert_eq!(
+        run(json!({"stdout":format!("{}\n", watched_line("done", OTHER)),"exit":124})),
+        (WatchEnd::Timeout, vec![])
+    );
+    // `failed` ends it, as `done` does.
+    assert_eq!(
+        run(json!({"lines":[{"text":watched_line("failed", AGENT)}],"after_output_ms":5000})),
+        (WatchEnd::Settled, vec![WatchEvent::Failed])
+    );
+}
+
+/// #5230: a cancel ends a held `watch`, and its process is killed with it.
+#[test]
+fn watch_is_cancelled_and_its_process_killed() {
+    let rig = Rig::new();
+    rig.plan(json!({"watch":{"lines":[{"text":watched_line("working", AGENT)}],"held_descendant":true,"after_output_ms":5000}}));
+    let cli = Arc::new(rig.cli());
+    let cancel = Arc::new(AtomicBool::new(false));
+    let (lane, flag) = (cli.clone(), cancel.clone());
+    let held = thread::spawn(move || lane.watch(MACHINE, AGENT, &flag, &mut |_| {}));
+    rig.wait_operation("watch");
+    thread::sleep(Duration::from_millis(100));
+    cancel.store(true, Ordering::Release);
+    assert_eq!(held.join().unwrap(), WatchEnd::Cancelled);
+    rig.assert_descendant_killed();
+}
+
+/// #5230: a watch line is read for its event and id only, and one longer
+/// than the bound is refused.
+#[test]
+fn a_watch_line_is_read_for_its_event_only() {
+    assert_eq!(
+        parse_watch_line(watched_line("working", AGENT).as_bytes(), AGENT),
+        Ok(WatchLine::Event(WatchEvent::Working))
+    );
+    assert_eq!(
+        parse_watch_line(watched_line("working", AGENT).as_bytes(), OTHER),
+        Err("watch_agent_mismatch")
+    );
+    assert_eq!(
+        parse_watch_line(watched_line("exploded", AGENT).as_bytes(), AGENT),
+        Err("watch_invalid_line")
+    );
+    assert_eq!(
+        parse_watch_line(br#"{"error":"lowercase words"}"#, AGENT),
+        Ok(WatchLine::Error("?".into()))
+    );
+    let long = vec![b' '; WATCH_LINE_LIMIT + 1];
+    assert_eq!(parse_watch_line(&long, AGENT), Err("watch_invalid_line"));
+    for event in [
+        "started",
+        "working",
+        "needs_person",
+        "done",
+        "idle",
+        "failed",
+        "stopped",
+    ] {
+        let read = parse_watch_line(watched_line(event, AGENT).as_bytes(), AGENT).unwrap();
+        let WatchLine::Event(read) = read else {
+            panic!()
+        };
+        assert_eq!(read.name(), event);
+        assert_eq!(read.settled(), !matches!(event, "started" | "working"));
+    }
 }

@@ -238,6 +238,54 @@ gone or late, ends the worker as before. A worker that ended abnormally
 still ends the wait with an error that is not an unreadable switch, so the
 voice exits and the restart guard counts it.
 
+With `LAMP_PRIVACY_RIDES_STALL=on` (#5611; off by default, only exactly `on`,
+passed to the privacy worker and the second worker in their cleared
+environments) a lapse of a lease that grants the microphones or the camera is
+ridden the same way, so the voice stays up and unmuted through a short stall
+of its own. On lamp-06c1 at 21:30:02 on 6 Nov the voice's capture, ring and
+coordinator stalled 120-132 ms together during an SD log flush, one major
+page fault each, past the 100 ms a held turn's lease lasts during playback;
+the voice ended on `service privacy freshness lost`, its workers with exit 1,
+the cleanup failed, and the restart guard muted the next start. With the
+switch on:
+
+- The privacy worker skips a granting authority that lapsed in its queue and
+  rides a granting lease that lapsed while it held it, at both looks of a
+  pass, publishing nothing until a fresh authority comes, for at most 1.5 s
+  from the expiry (`DENIED_LAPSE_MOST_US`). Ears and capture expire what they
+  hold on their own monotonic clocks meanwhile: every `voice/privacy` lease
+  ends 50 ms after its stamp at the latest, capture closes on
+  `AuthorityExpired`, and the speaker goes silent on its own lapse. The
+  journal says `lamp-voice: privacy worker re-armed its lease after <N> ms
+  lapsed in a stall (nothing was published meanwhile; microphones and camera
+  stayed closed)`. The re-armed lease is judged on the switch and the mute as
+  they are then: a slide closed or a software mute in the stall grants
+  nothing after it.
+- The second worker holds closed while its lease lapsed by time and the
+  controller has been silent under 1.5 s (`STALLED_CONTROL_US`): it takes no
+  input, drops what was queued under the lapsed authority, sends nothing and
+  stops listening. The controller's next fresh authority ends the hold.
+- The coordinator treats a freshness loss seen in a pass held up by its own
+  stall as a ridden privacy gap (`privacy_gap::GapRide`, as
+  `LAMP_PRIVACY_GAP_RIDE` rides one): a pass more than 20 ms after the one
+  before, or one already running more than 20 ms since its own top, as a page
+  fault in running code holds it (`HELD_UP_PASS_US`; passes take 2-5 ms, and
+  the reading is up to 20 ms old when a stall starts). It rides for at most
+  1.5 s from where the stall began (`STALL_RIDE_US`): the answer is cut,
+  nothing is played, capture and the camera are given no authority, and a
+  fresh, steady open reading reopens it and the conversation goes on. The
+  reopen waits for the gate's 60 ms steady time (`REOPEN_STABLE_US`), and
+  that wait counts inside the 1.5 s, so a stall under about 1.44 s is
+  ridden; a longer one ends the voice as before, failing closed. Its
+  trace's `privacy_gap` `began` row then carries `"stall":true`.
+
+Past that bound (a stall over about 1.44 s, whose open reading is not
+steady within 1.5 s of its start) everything ends exactly as without the
+switch: the privacy worker on `privacy controller lease expired` (exit 1),
+the second worker on its heartbeat, the coordinator on the freshness lost,
+the cleanup as failed, and the voice exits for the restart guard to count.
+Not yet run on a lamp.
+
 The coordinator keeps renewing every worker's authority through its startup
 prologue too, from its last start-up pulse to its loop's first publish, at
 least every 50 ms between its setup steps (#4332); the lease and its expiry
@@ -377,13 +425,15 @@ Controls word stale, still counts as closed.
 
 **Classes stay off without a yes.** lamp-ears' room sound classes (#1923,
 `LAMP_EARS_CLASSES=on`) start on `on`, a lamp with a slide, as built. With
-`no-slide` they start only with the person's stored yes from setup (the
+`no-slide` they start only with the person's stored yes from setup, or
+from the app with `LAMP_APP_CONSENT=on` (#5500) (the
 lead's decision, #1711, 07:33 on #1722): `classes::start` reads
 `/var/lib/lampOS/consent/room-sounds.json` (Seventh's #2110, `root:lampos`
 0640) as lamp-ears starts, and only a JSON object whose `room_sounds` is
-exactly `"yes"` counts. Missing, unreadable, over 4096 bytes or anything else
+exactly `"yes"` counts (`by`, who gave it, is not read). Missing, unreadable, over 4096 bytes or anything else
 is no; then no classifier runs, whatever the switch says, and the journal
-says so once. While it runs, the classifier reads the yes again every 2 s
+says so once. A yes from the app restarts lamp-ears through root's change
+helper, since the classifier starts only with lamp-ears. While it runs, the classifier reads the yes again every 2 s
 (`YES_EVERY_US`): once a forget or a redo of setup has removed it, the
 window is dropped, `ears/classes` says `privacy`, the journal says so once
 and the classifier stays stopped until lamp-ears starts again.
@@ -408,10 +458,14 @@ answer more warmly (never said aloud, no picture of a face kept), and keeps
 only a yes: a yes for this lamp, covering everyone it sees, not the yes of
 the one who answered; a no or silence leaves no file, as never asked does. `redo_setup`, a
 forget of everything and the reset plan remove it, as `room-sounds.json`
-([onboarding.md](onboarding.md), "Face expressions"). Those are the only
-ways to take it back: a forget of everything, a redo of the step, or the
-reset. There is no separate "stop noticing my face" yet. Without the ask (the
-product's unit doesn't set it yet), a test lamp's yes is written by hand, as
+([onboarding.md](onboarding.md), "Face expressions"), whoever gave it. With
+`LAMP_APP_CONSENT=on` on `lamp-cloud` (#5500, off in the product for now) the
+owner also turns it on and off in the app (`consent.set`, [cloud.md](cloud.md),
+"The two yeses from the app"): root's change helper writes the same file
+with `"by":"app"`, which the eyes ignore, and removes it for an off; the
+voice's starts and writes keep that yes until a redo or a "no" at the lamp
+after it. Without the ask or the app (the
+product's units set neither yet), a test lamp's yes is written by hand, as
 root:
 `printf '{"face_expressions":"yes"}' > /var/lib/lampOS/consent/face-expressions.json`,
 `chown root:lampos` and `chmod 0640` it, and remove it after.

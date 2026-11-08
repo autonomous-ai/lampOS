@@ -120,7 +120,7 @@ pub enum EngineKind {
 }
 
 impl EngineKind {
-    fn argument(self) -> &'static str {
+    pub(crate) fn argument(self) -> &'static str {
         match self {
             Self::Codex => "codex",
             Self::Claude => "claude",
@@ -263,10 +263,98 @@ pub const CLOSE_READ_TIMEOUT: Duration = Duration::from_secs(45);
 pub const CLOSE_BUDGET: Duration = Duration::from_secs(60);
 /// No more agents than this are waited on in one `wait`.
 pub const MOST_WAITED: usize = 64;
+/// How long one `harness watch` is held (its own `--timeout`, exit 124)
+/// before it is started again, and how much longer the adapter allows it
+/// before it is killed (`serve --push-watch`). A start again is safe: its
+/// first line is how the harness stands then.
+pub const WATCH_HELD: Duration = Duration::from_secs(600);
+const WATCH_SLACK: Duration = Duration::from_secs(30);
+/// The longest one line of `harness watch --json` may be: a `done` line
+/// carries the last turn's summary.
+pub const WATCH_LINE_LIMIT: usize = 64 * 1024;
+/// `watch --chars`: how much of a summary each `done` line carries. None of
+/// it is read.
+pub const WATCH_CHARS: usize = 200;
+
+/// Takes each whole stdout line as it comes (`watch`); `true` ends the run.
+type LineSink<'a> = dyn FnMut(&[u8]) -> bool + 'a;
+
+/// One event `harness watch --json` prints (openharness `watch`): a line
+/// only when the event or the turn changes, Harness looking every 3 s.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WatchEvent {
+    Started,
+    Working,
+    /// Waits for the person (`needs_person`).
+    NeedsPerson,
+    /// The turn ended, after two idle looks. `watch` goes on: a pane
+    /// harness stays idle, so the caller ends it.
+    Done,
+    /// Idle, never seen working with a turn unanswered.
+    Idle,
+    Failed,
+    /// Stopped; `watch` exits 4 after it.
+    Stopped,
+}
+
+impl WatchEvent {
+    fn of(event: &str) -> Option<Self> {
+        Some(match event {
+            "started" => Self::Started,
+            "working" => Self::Working,
+            "needs_person" => Self::NeedsPerson,
+            "done" => Self::Done,
+            "idle" => Self::Idle,
+            "failed" => Self::Failed,
+            "stopped" => Self::Stopped,
+            _ => return None,
+        })
+    }
+    /// The word a journal line says.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Started => "started",
+            Self::Working => "working",
+            Self::NeedsPerson => "needs_person",
+            Self::Done => "done",
+            Self::Idle => "idle",
+            Self::Failed => "failed",
+            Self::Stopped => "stopped",
+        }
+    }
+    /// Whether the agent has settled, for now or for good: its task is read
+    /// at once.
+    pub fn settled(self) -> bool {
+        !matches!(self, Self::Started | Self::Working)
+    }
+}
+
+/// How one `harness watch` ended ([`Cli::watch`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WatchEnd {
+    /// `done` or `failed` came, and the caller's watch was killed then.
+    Settled,
+    /// The harness stopped (exit 4).
+    Stopped,
+    /// Its own `--timeout` passed (exit 124): started again at once.
+    Timeout,
+    /// Cancelled by the caller: the task left the watch, or the part stops.
+    Cancelled,
+    /// A usage error (exit 2): taken for a Harness without `watch`.
+    Missing,
+    /// Any other end: Harness's code when it gave one (`GONE`,
+    /// `DISCONNECTED` …), else the adapter's (`watch_failed`, `timeout` …).
+    Failed(String),
+}
 /// How long `harness machines engines` is given (`serve --engines-ready`):
 /// the computer's Harness reads the one engine in its login shell, 5 s at
 /// most there (openharness `engineProbe.ts`), over the machine link.
 pub const ENGINES_PROBE_TIMEOUT: Duration = Duration::from_secs(8);
+/// How long one look at a computer's engines may take (`serve
+/// --engines-from-machines`, #5199): Harness's own probe waits 30 s over
+/// the machine link (`engines_probe`), and the CLI a little more. Asked on
+/// a lane of its own, never the one hand-overs take.
+pub const ENGINES_LOOK_TIMEOUT: Duration = Duration::from_secs(35);
 /// How long one computer's answer for one engine is kept when it refuses
 /// nothing: a second hand-over within it asks nothing. A refusal is never
 /// kept: the person may sign in at once and ask again.
@@ -451,6 +539,13 @@ pub struct CliConfig {
     /// trust this folder?" with nobody at the computer (lamp-c0a4, 3 Nov).
     /// `None`: the folder, as before.
     pub new_folder: Option<PathBuf>,
+    /// With [`Self::new_folder`] set, only a target naming this folder has
+    /// it made; `None`: every `~/harnesses/<name>` folder. `serve
+    /// --targets-from-machines` sets it to the folder its targets name
+    /// ([`crate::runtime::MACHINES_PROJECT`]) when `--new-folder` is off, so
+    /// a target it wrote always gets its folder (#5541) and a hand-written
+    /// one goes as before.
+    pub new_folder_only: Option<String>,
     /// Each dispatch's journal line ([`dispatch_line`]) is also kept here,
     /// for a test to read; it always goes to stderr, the unit's journal.
     pub journal: Option<Arc<Mutex<Vec<String>>>>,
@@ -521,6 +616,7 @@ impl CliConfig {
             route: false,
             absolute_folder: false,
             new_folder: None,
+            new_folder_only: None,
             journal: None,
             calls: None,
             health_after_start: false,
@@ -771,6 +867,12 @@ impl Cli {
         // Harness makes it and trusts it ([`NewFolder`]).
         let new_name = project_at
             .filter(|_| self.config.new_folder.is_some())
+            .filter(|_| {
+                self.config
+                    .new_folder_only
+                    .as_ref()
+                    .is_none_or(|only| *only == launch.target.project)
+            })
             .and_then(|at| Some((at, made_name(&launch.target.project)?)))
             .filter(|_| !self.folder_seen(&launch.target));
         if let Some((at, name)) = new_name {
@@ -1162,6 +1264,40 @@ impl Cli {
         refused
     }
 
+    /// Every engine on `machine`, as that computer says now (`harness
+    /// machines engines <machine> --json`, openharness#1888; `serve
+    /// --engines-from-machines`, #5199), within [`ENGINES_LOOK_TIMEOUT`].
+    /// Never takes the operation lock: it is asked on a lane of its own
+    /// ([`Cli::lane`]), so a hand-over never waits behind it. Exit 1 is
+    /// `unreachable` (the computer, or the probe), 2 `usage` (an older
+    /// Harness); a reply that isn't one is [`parse_engines`]'s code. A read
+    /// only: it installs and signs in nothing.
+    pub fn engines(&self, machine: &str) -> Result<Vec<EngineRow>, String> {
+        if !machine_id(machine) {
+            return Err("invalid_machine".into());
+        }
+        let reply = self
+            .run(
+                &[
+                    "machines".into(),
+                    "engines".into(),
+                    machine.into(),
+                    "--json".into(),
+                ],
+                ENGINES_LOOK_TIMEOUT.min(self.config.launch_timeout),
+            )
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err(match reply.code {
+                Some(1) => "unreachable",
+                Some(2) => "usage",
+                _ => "engines_failed",
+            }
+            .into());
+        }
+        parse_engines(&reply.stdout, machine).map_err(str::to_string)
+    }
+
     /// The agent's last turn, read on the machine it was started on.
     pub fn observe(&self, machine: &str, agent_id: &str) -> Result<Observation, String> {
         self.observe_within(machine, agent_id, self.config.read_timeout)
@@ -1457,6 +1593,91 @@ impl Cli {
         parse_wait(reply.code, &reply.stdout, agents).map_err(str::to_string)
     }
 
+    /// Harness's own `watch` on one agent (`serve --push-watch`, #5230),
+    /// held until it ends or [`WATCH_HELD`] passes. Each event is handed to
+    /// `on_event` as it comes; on `done` or `failed` the watch is killed
+    /// here, since `watch` only exits by itself on `stopped`. Never takes
+    /// the operation lock: launches and reads go on beside it. `cancel`
+    /// ends it early. A read only: it starts, stops and answers nothing.
+    /// Every child is killed and reaped before this returns.
+    pub fn watch(
+        &self,
+        machine: &str,
+        agent: &str,
+        cancel: &AtomicBool,
+        on_event: &mut dyn FnMut(WatchEvent),
+    ) -> WatchEnd {
+        if !machine_id(machine) {
+            return WatchEnd::Failed("invalid_machine".into());
+        }
+        if !self::agent_id(agent) {
+            return WatchEnd::Failed("invalid_agent_id".into());
+        }
+        let mut error: Option<String> = None;
+        let mut sink = |line: &[u8]| match parse_watch_line(line, agent) {
+            Ok(WatchLine::Event(event)) => {
+                on_event(event);
+                matches!(event, WatchEvent::Done | WatchEvent::Failed)
+            }
+            Ok(WatchLine::Error(code)) => {
+                error = Some(code);
+                false
+            }
+            // A line this does not read is passed over; the next is read.
+            Err(_) => false,
+        };
+        let result = self.run_once_said(
+            &[
+                "watch".into(),
+                "--machine".into(),
+                machine.into(),
+                agent.into(),
+                // The summary is never read (the task's own `show` takes the
+                // answer): kept short, so a line stays small.
+                "--chars".into(),
+                WATCH_CHARS.to_string().into(),
+                "--timeout".into(),
+                format!("{}m", WATCH_HELD.as_secs() / 60).into(),
+                "--json".into(),
+            ],
+            WATCH_HELD + WATCH_SLACK,
+            WATCH_LINE_LIMIT,
+            Some(cancel),
+            &mut sink,
+        );
+        match result {
+            Err(failure) if failure.code == "ended" => WatchEnd::Settled,
+            Err(failure) if failure.code == "cancelled" => WatchEnd::Cancelled,
+            Err(failure) => WatchEnd::Failed(failure.code.into()),
+            Ok(reply) => match reply.code {
+                Some(4) => WatchEnd::Stopped,
+                Some(124) => WatchEnd::Timeout,
+                Some(2) => WatchEnd::Missing,
+                _ => WatchEnd::Failed(error.unwrap_or_else(|| "watch_failed".into())),
+            },
+        }
+    }
+
+    /// [`Cli::run_cancellable`] with a line sink: one call line, whatever
+    /// the outcome.
+    fn run_once_said(
+        &self,
+        args: &[OsString],
+        timeout: Duration,
+        line_limit: usize,
+        also: Option<&AtomicBool>,
+        sink: &mut LineSink<'_>,
+    ) -> Result<Reply, RunError> {
+        let began = Instant::now();
+        let result = self.run_once(args, timeout, line_limit, also, Some(sink));
+        let line = call_line(args, &result, began.elapsed());
+        eprintln!("{line}");
+        if let Some(calls) = &self.config.calls {
+            calls.lock().unwrap_or_else(|e| e.into_inner()).push(line);
+        }
+        result
+    }
+
     fn run(&self, args: &[OsString], timeout: Duration) -> Result<Reply, RunError> {
         self.run_bounded(args, timeout, STDOUT_LIMIT)
     }
@@ -1480,7 +1701,7 @@ impl Cli {
         also: Option<&AtomicBool>,
     ) -> Result<Reply, RunError> {
         let began = Instant::now();
-        let result = self.run_once(args, timeout, stdout_limit, also);
+        let result = self.run_once(args, timeout, stdout_limit, also, None);
         let line = call_line(args, &result, began.elapsed());
         eprintln!("{line}");
         if let Some(calls) = &self.config.calls {
@@ -1495,6 +1716,7 @@ impl Cli {
         timeout: Duration,
         stdout_limit: usize,
         also: Option<&AtomicBool>,
+        sink: Option<&mut LineSink<'_>>,
     ) -> Result<Reply, RunError> {
         let error = |code, spawned| RunError { code, spawned };
         if self.poisoned.load(Ordering::Acquire) {
@@ -1530,7 +1752,7 @@ impl Cli {
         }
         let child = command.spawn().map_err(|_| error("spawn_failed", false))?;
         let mut owned = OwnedChild::new(child);
-        let result = self.capture(&mut owned, deadline, stdout_limit, also);
+        let result = self.capture(&mut owned, deadline, stdout_limit, also, sink);
         if !owned.finish() {
             self.poisoned.store(true, Ordering::Release);
             return Err(error("cleanup_incomplete", true));
@@ -1544,6 +1766,7 @@ impl Cli {
         deadline: Instant,
         stdout_limit: usize,
         also: Option<&AtomicBool>,
+        mut sink: Option<&mut LineSink<'_>>,
     ) -> Result<Reply, &'static str> {
         let mut stdout = owned.child.stdout.take().ok_or("pipe_failed")?;
         let mut stderr = owned.child.stderr.take().ok_or("pipe_failed")?;
@@ -1554,6 +1777,11 @@ impl Cli {
         let mut stdout_done = false;
         let mut stderr_done = false;
         let mut exit = None;
+        // With a sink (`watch`), each whole line is handed on as it comes
+        // and dropped, so `stdout_limit` bounds one line, not the run; the
+        // last line is kept for the call line. The sink saying `true` ends
+        // the run (`ended`), and the child is killed and reaped as any.
+        let mut last_line: Vec<u8> = Vec::new();
         let result = (|| loop {
             let now = Instant::now();
             if self.cancelled(also) {
@@ -1564,6 +1792,21 @@ impl Cli {
             }
             if !stdout_done {
                 stdout_done = drain(&mut stdout, &mut output, stdout_limit, "stdout_limit")?;
+                if let Some(sink) = sink.as_mut() {
+                    while let Some(end) = output.iter().position(|byte| *byte == b'\n') {
+                        last_line = output.drain(..=end).collect();
+                        last_line.pop();
+                        if sink(&last_line) {
+                            return Err("ended");
+                        }
+                    }
+                    if stdout_done && !output.is_empty() {
+                        last_line = std::mem::take(&mut output);
+                        if sink(&last_line) {
+                            return Err("ended");
+                        }
+                    }
+                }
             }
             if !stderr_done {
                 stderr_done = drain(&mut stderr, &mut errors, STDERR_LIMIT, "stderr_limit")?;
@@ -1582,10 +1825,15 @@ impl Cli {
             if let Some((at, code)) = exit {
                 if stdout_done && stderr_done {
                     owned.exited_with_closed_pipes = true;
+                    let stdout = if sink.is_some() {
+                        std::mem::take(&mut last_line)
+                    } else {
+                        std::mem::take(&mut output)
+                    };
                     return Ok(Reply {
                         success: code == Some(0),
                         code,
-                        stdout: output,
+                        stdout,
                         stderr: errors,
                     });
                 }
@@ -1885,7 +2133,15 @@ struct Machine {
     name: Option<String>,
     #[serde(default)]
     hostname: Option<String>,
+    /// From relay presence (openharness#1888 era): `running`, `offline`,
+    /// `unknown` or `payment_pending`. Anything else, or none, is unknown.
+    #[serde(default)]
+    status: Option<Value>,
 }
+
+/// The presence words `harness machines --json` gives a machine, as kept
+/// ([`AccountMachine::status`]): any other is unknown.
+pub const MACHINE_STATUSES: [&str; 4] = ["running", "offline", "unknown", "payment_pending"];
 
 /// One machine on the person's account, as `harness machines --json` lists
 /// it (openharness `cli.ts` `machinesListCommand`).
@@ -1897,6 +2153,10 @@ pub struct AccountMachine {
     pub label: String,
     /// The machine this CLI runs as: the lamp itself.
     pub current: bool,
+    /// Its presence, one of [`MACHINE_STATUSES`], as Harness's relay saw
+    /// it; `None` when Harness gave none or another word. Read only with
+    /// `serve --engines-from-machines` (#5199).
+    pub status: Option<String>,
 }
 
 /// What `harness machines --json` says: one object a line, newest first,
@@ -1926,10 +2186,17 @@ pub fn parse_machines(bytes: &[u8]) -> Result<Vec<AccountMachine>, &'static str>
             .map(|value| value.trim().to_owned())
             .find(|value| !value.is_empty())
             .unwrap_or_default();
+        let status = machine
+            .status
+            .as_ref()
+            .and_then(Value::as_str)
+            .filter(|word| MACHINE_STATUSES.contains(word))
+            .map(str::to_owned);
         listed.push(AccountMachine {
             machine_id: machine.machine_id,
             label,
             current: machine.current,
+            status,
         });
     }
     Ok(listed)
@@ -2051,6 +2318,80 @@ fn engine_refused(bytes: &[u8], machine: &str, engine: &str) -> Option<&'static 
         (_, Some(false)) => Some("engine_signed_out"),
         _ => None,
     }
+}
+
+/// What one computer says of one engine (`harness machines engines --json`,
+/// openharness#1888; `serve --engines-from-machines`, #5199). `None` is
+/// unknown, never missing: a login shell that timed out reads `null` too.
+/// Harness reads `signedIn` for Claude Code and Codex only.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EngineRow {
+    pub engine: String,
+    /// Harness's CLI gives `true` or `null`: the computer's `false` comes
+    /// out as `null` (openharness `machineEngines.ts`).
+    pub installed: Option<bool>,
+    /// The computer's own `!installed && command && recipe`, passed
+    /// through: with `installed` null, `true` is an engine not found there.
+    pub installable: Option<bool>,
+    pub signed_in: Option<bool>,
+}
+
+/// The most rows one look at a computer's engines may give.
+pub const MOST_ENGINE_ROWS: usize = 64;
+
+/// What `harness machines engines <machine> --json` says of `machine`: one
+/// object a line, `{machineId, engine, installed, signedIn, …}`, each
+/// readiness field `true`, `false` or `null`. Rows of another machine are
+/// passed over (the id compared without case, as Harness may print it);
+/// other fields are too. A line that isn't such a row, an engine twice, more
+/// than [`MOST_ENGINE_ROWS`] rows, or no row of this machine at all is no
+/// answer: an older Harness's machine list included.
+pub fn parse_engines(bytes: &[u8], machine: &str) -> Result<Vec<EngineRow>, &'static str> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Row {
+        machine_id: String,
+        engine: String,
+        #[serde(default)]
+        installed: Option<bool>,
+        #[serde(default)]
+        installable: Option<bool>,
+        #[serde(default)]
+        signed_in: Option<bool>,
+    }
+    let invalid = "engines_invalid_reply";
+    let text = std::str::from_utf8(bytes).map_err(|_| invalid)?;
+    let mut rows: Vec<EngineRow> = Vec::new();
+    let mut count = 0usize;
+    for line in text.lines().filter(|line| !line.trim().is_empty()) {
+        count += 1;
+        if count > MOST_ENGINE_ROWS {
+            return Err(invalid);
+        }
+        let row: Row = serde_json::from_str(line).map_err(|_| invalid)?;
+        if !row.machine_id.eq_ignore_ascii_case(machine) {
+            continue;
+        }
+        let plain = !row.engine.is_empty()
+            && row.engine.len() <= 32
+            && row
+                .engine
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+        if !plain || rows.iter().any(|kept| kept.engine == row.engine) {
+            return Err(invalid);
+        }
+        rows.push(EngineRow {
+            engine: row.engine,
+            installed: row.installed,
+            installable: row.installable,
+            signed_in: row.signed_in,
+        });
+    }
+    if rows.is_empty() {
+        return Err("engines_none");
+    }
+    Ok(rows)
 }
 
 /// Whether a failed `new` says the target's folder isn't on the computer
@@ -2459,8 +2800,8 @@ fn libc_nofollow() -> i32 {
 const ID_CHARS: usize = 8;
 
 /// The Harness verbs a call line names by name; any other is `other`.
-const VERBS: [&str; 9] = [
-    "new", "show", "ps", "wait", "reply", "close", "route", "machines", "start",
+const VERBS: [&str; 10] = [
+    "new", "show", "ps", "wait", "reply", "close", "route", "machines", "start", "watch",
 ];
 
 /// The first [`ID_CHARS`] of an id; a cloud agent's keeps its `cloud_`
@@ -2540,7 +2881,7 @@ fn call_line(args: &[OsString], result: &Result<Reply, RunError>, took: Duration
             line.push_str(&format!(" machine={}", short_id(machine)));
         }
         match verb {
-            "show" | "reply" | "close" => {
+            "show" | "reply" | "close" | "watch" => {
                 if let Some(agent) = arg(at + 1).filter(|agent| agent_id(agent)) {
                     line.push_str(&format!(" agent={}", short_id(agent)));
                 }
@@ -3096,6 +3437,46 @@ pub fn parse_wait(
         return Err("wait_invalid_reply");
     }
     Ok(ended)
+}
+
+/// One line of `harness watch --json`: an event, or the error it ended on.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WatchLine {
+    Event(WatchEvent),
+    /// `{"error":"CODE","detail":"..."}`: only the code is kept.
+    Error(String),
+}
+
+#[derive(Deserialize)]
+struct WatchRow {
+    #[serde(default)]
+    event: Option<String>,
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    error: Option<String>,
+}
+
+/// One line of `harness watch --json` for `agent` (openharness `watch`):
+/// every event line names the harness's `id`, and one for another id is
+/// refused. Only the event is read: the summary, ask and question stay
+/// with Harness, and the task's own read (`show`) takes the answer.
+pub fn parse_watch_line(line: &[u8], agent: &str) -> Result<WatchLine, &'static str> {
+    if line.len() > WATCH_LINE_LIMIT {
+        return Err("watch_invalid_line");
+    }
+    let row: WatchRow = serde_json::from_slice(line).map_err(|_| "watch_invalid_line")?;
+    if let Some(code) = row.error {
+        return Ok(WatchLine::Error(error_code(&code).to_owned()));
+    }
+    if row.id.as_deref() != Some(agent) {
+        return Err("watch_agent_mismatch");
+    }
+    row.event
+        .as_deref()
+        .and_then(WatchEvent::of)
+        .map(WatchLine::Event)
+        .ok_or("watch_invalid_line")
 }
 
 /// At most `most` bytes of `text`, ended at a whole character, without

@@ -231,6 +231,8 @@ struct Running {
     pid: u32,
     restarts: u32,
     result: String,
+    /// `ConditionResult`: "no" for a start its condition skipped.
+    condition: String,
 }
 
 struct FakeSystemd {
@@ -308,9 +310,13 @@ impl FakeSystemd {
         .unwrap_or_default();
         self.next_pid += 1;
         let running = if self.condition_skipped.iter().any(|name| name == unit) {
+            // As systemd says it: inactive, its last run a success, and
+            // its condition not met.
             Running {
                 active: "inactive".into(),
                 sub: "dead".into(),
+                result: "success".into(),
+                condition: "no".into(),
                 ..Running::default()
             }
         } else if binary.contains("crash") || self.crashing.iter().any(|name| name == unit) {
@@ -372,6 +378,7 @@ impl Systemd for FakeSystemd {
                     pid: running.pid,
                     restarts: running.restarts,
                     result: running.result,
+                    condition: running.condition,
                 }
             })
             .collect())
@@ -541,6 +548,8 @@ struct Lamp {
     said: Vec<String>,
     /// The phases the round said, for `update/status` (#2194).
     phases: Vec<&'static str>,
+    /// The builds the round said it goes to, by sequence (#5473).
+    targets: Vec<u64>,
     config: Config,
 }
 
@@ -666,6 +675,7 @@ impl Lamp {
             free: 10_000_000_000,
             said: Vec::new(),
             phases: Vec::new(),
+            targets: Vec::new(),
             config,
         }
     }
@@ -758,6 +768,8 @@ impl Lamp {
         };
         let phases = &mut self.phases;
         let mut phase = |now: &'static str| phases.push(now);
+        let targets = &mut self.targets;
+        let mut target = |build: &lamp_update::records::Build| targets.push(build.sequence);
         let mut world = World {
             channel: &mut self.channel,
             systemd: &mut self.systemd,
@@ -766,6 +778,7 @@ impl Lamp {
             clock: &clock,
             say: &mut say,
             phase: &mut phase,
+            target: &mut target,
         };
         let outcome = round(&self.config, &mut world);
         self.talking = Some(ears.talking);
@@ -892,6 +905,8 @@ fn a_new_build_is_installed_beside_the_old_and_switched() {
         lamp.phases,
         ["checking", "fetching", "switching", "watching"]
     );
+    // The build it goes to, said once it is read (#5473).
+    assert_eq!(lamp.targets, [2]);
 
     let (old, new) = (sha("voice 1"), sha("voice 2"));
     // The new folder beside the old one: the new voice and worker, and the
@@ -948,19 +963,23 @@ fn a_new_build_is_installed_beside_the_old_and_switched() {
 }
 
 /// #2194: a round with nothing to change says only that it checked, and a
-/// round without `apply` says no phase at all.
+/// round without `apply` says no phase at all. #5473: neither says a build
+/// it goes to.
 #[test]
 fn a_round_with_nothing_to_change_only_checks() {
     let mut lamp = Lamp::new();
     build_two(&mut lamp);
     assert_eq!(lamp.round(), Outcome::Switched(2));
     lamp.phases.clear();
+    lamp.targets.clear();
     assert_eq!(lamp.round(), Outcome::UpToDate(2));
     assert_eq!(lamp.phases, ["checking"]);
+    assert!(lamp.targets.is_empty(), "{:?}", lamp.targets);
     lamp.phases.clear();
     lamp.config.apply = false;
     lamp.round();
     assert!(lamp.phases.is_empty(), "{:?}", lamp.phases);
+    assert!(lamp.targets.is_empty(), "{:?}", lamp.targets);
 }
 
 #[test]
@@ -1889,6 +1908,60 @@ fn a_folder_made_two_builds_ago_is_removed_and_one_never_made_is_kept() {
     assert!(lamp.exists(&folder("voice 1")));
     let made: Vec<String> = serde_json::from_value(lamp.state()["made"].clone()).unwrap();
     assert_eq!(made, [folder("voice 3"), folder("voice 4")]);
+}
+
+/// lamp-52e6, 6 Nov (Fifth's P2 on #5385): a running part whose restart
+/// its own `Condition…=` skipped (lamp-tasks, with Harness gone under it)
+/// was counted as stopped, so 10441 was put back, and every later build
+/// would be. It is not this lamp's now, as at boot: the build is kept, and
+/// it is never put back for it.
+#[test]
+fn a_part_its_own_condition_skips_at_the_restart_keeps_the_build() {
+    let mut lamp = Lamp::new();
+    assert!(lamp.systemd.units["lamp-body.service"].active == "active");
+    lamp.systemd
+        .condition_skipped
+        .push("lamp-body.service".into());
+    lamp.publish(2, &[("lamp-body", "body 2")], &[]);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.systemd.units["lamp-body.service"].active, "inactive");
+    assert!(lamp.state()["refused"].as_array().is_none_or(Vec::is_empty));
+    // A part that fails at the same restart still puts the build back.
+    let mut lamp = Lamp::new();
+    lamp.systemd.crashing.push("lamp-body.service".into());
+    lamp.publish(2, &[("lamp-body", "body 2")], &[]);
+    assert!(matches!(lamp.round(), Outcome::RolledBack { .. }));
+}
+
+/// The Reviewer-lead's P2 on #5476: a build whose only change is a
+/// condition added to a running part's unit, which then skips its restart,
+/// did that itself: it is put back, never kept with the part not running.
+#[test]
+fn a_condition_the_new_build_adds_still_puts_it_back() {
+    let mut lamp = Lamp::new();
+    let conditioned = body_unit(&"0".repeat(64), "").replacen(
+        "[Unit]\n",
+        "[Unit]\nConditionPathExists=/etc/lampOS/nowhere\n",
+        1,
+    );
+    lamp.systemd
+        .condition_skipped
+        .push("lamp-body.service".into());
+    lamp.publish(
+        2,
+        &[
+            ("lamp-voice", "voice 1"),
+            ("lamp-turn-end", "turn-end 1"),
+            ("lamp-body", "body 1"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[("lamp-body.service", &conditioned)],
+    );
+    assert!(
+        matches!(lamp.round(), Outcome::RolledBack { .. }),
+        "{:?}",
+        lamp.said
+    );
 }
 
 #[test]
@@ -3187,6 +3260,7 @@ fn update_unit(active: &str, sub: &str) -> UnitState {
         pid: 0,
         restarts: 0,
         result: String::new(),
+        condition: String::new(),
     }
 }
 
@@ -3236,6 +3310,7 @@ impl Lamp {
             clock: &clock,
             say: &mut say,
             phase: &mut |_| {},
+            target: &mut |_| {},
         };
         own::confirm(&self.config, &mut world, Some(running)).unwrap()
     }

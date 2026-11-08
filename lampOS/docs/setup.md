@@ -621,6 +621,53 @@ setup the app changes them through root's keys helper,
 `lamp-setup keys` on `lamp-setup-keys.socket`. All of it is in
 [own-keys.md](own-keys.md).
 
+## A new lamp's first volume (#5551, built, off unless set)
+
+The speaker's volume is the softvol control "Speaker" on the HDMI card
+(`allwinnerhdmi`, `device_speaker` in `/etc/asound.conf`, -30 to 0 dB over
+0 to 100), the one `lamp-actions` changes for "louder", "quieter" and the
+app's slider. Read from the code on 6 Nov, before this switch:
+
+- Nothing in lampOS sets or stores it. alsa-lib makes the control at the
+  first open of `device_speaker` (`lamp-cmedia-speaker.service`'s `aplay`)
+  at its loudest, 100 %, and `lamp-actions` keeps no level of its own
+  (`crates/actions/src/sound.rs`). The only level kept across a boot is
+  the image's ALSA state: `alsa-utils`' own `alsa-restore.service` stores
+  every control at a clean shutdown and restores it at boot. So a level
+  survives a clean reboot, and a power cut brings back the level of the
+  last clean shutdown (or of a hand-run `alsactl store`), or 100 % if
+  none was stored. That service comes from the Debian package, not from
+  this repository, and is not shown on a lamp here.
+- The reset touches neither the control nor `/var/lib/alsa/asound.state`
+  (`crates/setup/fixtures/reset-plan-product.json`): a reset in place
+  keeps the level as it was, and one that reboots brings it back from the
+  store, so the next owner hears the last owner's level.
+- `factory-run.sh`'s 75 % is the C-Media hardware "Speaker"
+  (`lamp-cmedia-speaker.service`'s drop-in), a different control,
+  re-pinned at every boot.
+
+With `LAMP_FIRST_VOLUME=on` in `lamp-setup.service`, a setup run that has
+joined the Wi-Fi and saved the settings sets that control to 70 % (about
+9 dB below full) and stores that card alone (`alsactl store allwinnerhdmi`,
+so a power cut before the first clean shutdown keeps it), just before the
+marker (`serve::Save::first_volume`, `crates/setup/src/first_volume.rs`).
+The marker is what starts the voice, so its first line is already at 70 %,
+and the volume waits on nothing slow on the voice's side. Setup runs only
+on a lamp with no marker, a new one or one just reset, so this is once per
+setup. A V1 lamp moved to lampOS gets its marker from `lamp-keeper
+prepare` (`crates/keeper/src/profile.rs`; it is already on its home's
+Wi-Fi), so it starts the lamp, not setup, and its level is not touched at
+the move. It starts at 70 % only once it is put back into setup. A level
+the person chooses afterwards, by voice, a button or the app, is never
+changed by an update or anything else, and needs no mark of its own.
+Recovery's network-only run (`NetworkOnly`) never sets it. Both
+commands are bounded (0.8 s and 2 s) and best effort: a control that is
+not there yet or a tool that fails is a line in setup's log, never a failed
+setup. The C-Media hardware level and `--volume-ceiling` are unchanged.
+
+Not shown on a lamp: the hello at 70 % after a reset and setup, and the
+person's level after a reboot and after a power cut.
+
 ## Changed after setup (#1959, on for the product)
 
 The person changes their name, the lamp's name in the app, the time zone or
@@ -676,6 +723,7 @@ own switches' (`LAMP_APP_RESTART`, `LAMP_SHUTDOWN`; cloud.md).
 | The owner's place (#4333, [owner-place.md](owner-place.md); a set sent by `lamp-cloud` only with `LAMP_OWNER_PLACE=on`, a clear whatever it is, #4356) | `{"owner_place": {"name", "lat", "lon", "set_at"}}`: rounded again here to about a kilometre (`lamp_msgs::owner_place::fit`), the name as the person's name's rule, `set_at` ISO 8601 UTC; `{"owner_place": null}` clears it | `/etc/lampOS/person/place`, beside the name, 600 root, one JSON line; removed for `null`, and a clear with none kept is no error. The journal says only that it was set or cleared | the voice reads it again for each line that needs a place: nothing restarts |
 | The owner's developer setting (`control.set`, [control.md](control.md)) | `{"control": bool}`, a boolean only | on: `/etc/systemd/system/lamp-control.service.d/developer.conf` (`control_dropin` in the settings), 644 root, exactly `[Service]` and `Environment=LAMP_CONTROL=on`, written beside and renamed into place, its folder made; off: removed, and none there is no error. Only a change asks for a restart; the journal says "developer access is on" or "off" (with "already" when nothing changed) | never waits for quiet (lamp-control's restart makes no sound), only for lamp-update's lock (`change::unlocked`). **On:** written and answered, then the lock (looked for every 10 s, at most 30 minutes, else lamp-control follows at its next start) held through `systemctl daemon-reload` and `systemctl restart lamp-control.service` (restart, so an enabled unit that exited off starts): the door opens within moments after `success`, or once an update finishes (`change::restart_control_when_unlocked`). **Off with the drop-in there:** closed before the answer (`change::close_before_answer`): the lock first (every 1 s, at most 8 s, under lamp-cloud's 10 s wait; else refused, "an update is installing: try again in a few minutes", the drop-in kept), then, holding it, the drop-in removed, `systemctl daemon-reload` and `systemctl stop lamp-control.service`, and only then `{"done": {"on": false, "closed": true}}`; a stop that fails answers `"closed": false` with a note that the door may stay open until the lamp next restarts. **Off with none there:** a plain `{"done": {"on": false}}`, no systemctl. A reset wipes the drop-in |
 | The owner's chosen voice and character words (#5394, [chosen-voice.md](chosen-voice.md); sent by `lamp-cloud` only with `LAMP_CHOSEN_VOICE=on`) | `{"voice": s}`: a name of `lamp_msgs::chosen_voice::ELEVENLABS_VOICES`; `{"character": s}`: plain text on one line, at most 200 characters, no `<`, `>`, `[`, `]`, `{`, `}` or backticks (`lamp_msgs::chosen_voice::fit_character`); `""` clears either. Anything else is refused with nothing written | `/etc/lampOS/setup/voice` and `/etc/lampOS/setup/character`, beside the language, 644 root, one line each, removed for `""`. The journal names the voice, and only the length of the words | the voice reads both at start: after a change that altered the file, restarted as for a new language (rested, under lamp-update's lock); the same value again restarts nothing |
+| The owner's two yeses from the app (#5500, [onboarding.md](onboarding.md) "The two yeses from the app"; sent by `lamp-cloud` only with `LAMP_APP_CONSENT=on`, room sounds only on a lamp with no slide) | `{"consent": {"face_expressions": bool}}` or `{"consent": {"room_sounds": bool}}`, exactly one key, a boolean only; anything else refused with nothing written | `/var/lib/lampOS/consent/face-expressions.json` and `room-sounds.json` (`consent` in the settings, the folder 0750 root:lampos), `{"version":1,KEY:"yes","at_unix_s":N,"by":"app"}` written whole beside and renamed into place, 0640 and the folder's group (0600 where it is root's); off removes it, none there is no error; a yes already there is left as it is. The journal says "the face expressions yes is on from the app" or "off" (with "already" when nothing changed) | lamp-eyes reads its yes every 2 s: nothing restarts. A new room sounds yes is answered, then lamp-ears is restarted (`systemctl try-restart lamp-ears.service`) holding lamp-update's lock alone, looked for every 10 s, at most 30 minutes (`change::restart_ears_when_unlocked`); an off is followed by lamp-ears within 2 s. A reset wipes both |
 
 Tests (`crates/setup/tests/it/change.rs`): each change's files, modes and reply;
 a name removed; a rename to nothing refused; each language written and a

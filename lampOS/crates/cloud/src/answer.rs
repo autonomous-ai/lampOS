@@ -84,6 +84,13 @@ pub trait Lamp {
     fn texting(&self) -> bool {
         false
     }
+    /// Whether the skills' lines on `messages/out` go up (`crate::unasked`):
+    /// with texts taken, or with `LAMP_SKILL_MESSAGES=on` alone (#1685),
+    /// which takes no text and carries nothing else. Off unless a lamp says
+    /// so.
+    fn skill_lines(&self) -> bool {
+        false
+    }
     /// A new run's name, at `now_ms`.
     fn new_run(&mut self, now_ms: u64) -> String {
         format!("run-{now_ms}")
@@ -99,7 +106,7 @@ pub trait Lamp {
         Vec::new()
     }
     /// The skills' lines for the phone (`messages/out`, `crate::unasked`),
-    /// with texts taken: those heard by `now_ms` are taken off the bus, and
+    /// while [`Lamp::skill_lines`]: those heard by `now_ms` are taken off the bus, and
     /// the pieces waiting are handed back to send when `give`, as the
     /// broker is there. With the journal's lines about those not sent.
     fn unasked(&mut self, _now_ms: u64, _give: bool) -> crate::unasked::Heard {
@@ -199,6 +206,13 @@ pub trait Lamp {
         None
     }
 
+    /// The owner's face expressions and room sounds yeses from the app
+    /// (`LAMP_APP_CONSENT=on`, #5500, `crate::consent`): there only with the
+    /// switch.
+    fn consent(&self) -> Option<crate::consent::Place> {
+        None
+    }
+
     /// The person's own services linked from the app (`LAMP_SERVICES=on`,
     /// Queue #4710, `crate::services`): there only with the switch.
     fn services(&self) -> Option<std::sync::Arc<crate::services::Services>> {
@@ -266,7 +280,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 62] = [
+pub const KINDS: [(&str, Switch); 65] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -280,6 +294,10 @@ pub const KINDS: [(&str, Switch); 62] = [
     ("chat.send", |lamp| lamp.texting()),
     ("reports.get", |lamp| lamp.reports().is_some()),
     ("reports.set", |lamp| lamp.reports().is_some()),
+    // The owner's face expressions and room sounds yeses (#5500), as the
+    // reports' choice: both kinds with the switch.
+    (crate::consent::KINDS[0], CONSENT),
+    (crate::consent::KINDS[1], CONSENT),
     ("skills.list", |lamp| lamp.skills().is_some()),
     ("skills.remove", |lamp| lamp.skills().is_some()),
     // Off, on and the camera's yes with the page (#4099), so `can` tells an
@@ -341,8 +359,10 @@ pub const KINDS: [(&str, Switch); 62] = [
     (crate::control::KINDS[1], CONTROL),
     (crate::control::KINDS[2], CONTROL),
     (crate::control::KINDS[3], CONTROL),
+    (crate::control::KINDS[4], CONTROL),
 ];
 
+const CONSENT: Switch = |lamp| lamp.consent().is_some();
 const HARNESS_SIGN_IN: Switch = |lamp| lamp.harness_sign_in().is_some();
 
 const WIFI: Switch = |lamp| lamp.changes().is_some_and(|c| c.wifi_on());
@@ -485,6 +505,18 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 shared.wake.notify_one();
             }
             some(shared.with(|reports| reports.answer()))
+        }
+        // The owner's two yeses from the app (#5500): read where they are
+        // kept, and set through root's helper, which answers at once; the
+        // reply is what the files say after it. Room sounds only on a lamp
+        // with no slide, where lamp-ears reads it.
+        kind if crate::consent::KINDS.contains(&kind) && on(lamp, kind) => {
+            let place = lamp.consent().ok_or_else(|| not_here(kind))?;
+            if kind == crate::consent::KINDS[0] {
+                some(crate::consent::get(&place))
+            } else {
+                crate::consent::set(&place, data).map(Some)
+            }
         }
         // The app's skills page (#1722): every skill on the lamp, its group,
         // whether it can be removed or turned off and what it may use. Read
@@ -733,6 +765,8 @@ pub mod tests {
         /// Texts (#1673): taken when `texting`; those sent; and the
         /// `chat.event`s' `data` it gives once a text has been sent.
         pub texting: bool,
+        /// Skills' lines carried with texts not taken (`LAMP_SKILL_MESSAGES`).
+        pub skill_lines: bool,
         pub texts: Vec<lamp_msgs::ChatIn>,
         pub to_give: Vec<Value>,
         /// The skills' lines for the phone (`crate::unasked`): those to
@@ -777,6 +811,8 @@ pub mod tests {
         pub services: Option<std::sync::Arc<crate::services::Services>>,
         /// lamp-control's admin socket (#5299).
         pub control: Option<crate::control::Door>,
+        /// The owner's two yeses from the app (#5500), with their switch.
+        pub consent: Option<crate::consent::Place>,
     }
 
     impl Lamp for Fake {
@@ -839,6 +875,9 @@ pub mod tests {
         fn texting(&self) -> bool {
             self.texting
         }
+        fn skill_lines(&self) -> bool {
+            self.texting || self.skill_lines
+        }
         fn reports(&self) -> Option<std::sync::Arc<crate::reports::Shared>> {
             self.reports.clone()
         }
@@ -890,6 +929,9 @@ pub mod tests {
         fn control(&self) -> Option<crate::control::Door> {
             self.control.clone()
         }
+        fn consent(&self) -> Option<crate::consent::Place> {
+            self.consent.clone()
+        }
         fn update_status(&self) -> Option<lamp_bus::Message> {
             self.update_bus
                 .as_ref()?
@@ -938,6 +980,141 @@ pub mod tests {
                 std::mem::take(&mut self.to_give)
             }
         }
+    }
+
+    /// A stand-in for root's change helper on `socket`: each line's
+    /// `consent` made in `folder` as `lamp-setup change` makes it, and the
+    /// lines kept; `{"refused": ..}` for anything else.
+    fn consent_helper(
+        socket: &std::path::Path,
+        folder: &std::path::Path,
+    ) -> std::sync::Arc<std::sync::Mutex<Vec<String>>> {
+        use std::io::{BufRead, Write};
+        let listener = std::os::unix::net::UnixListener::bind(socket).unwrap();
+        let lines = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let (kept, folder) = (lines.clone(), folder.to_path_buf());
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let mut line = String::new();
+                let _ = std::io::BufReader::new(&stream).read_line(&mut line);
+                kept.lock().unwrap().push(line.trim().to_owned());
+                let asked: Value = serde_json::from_str(&line).unwrap_or_default();
+                let reply = match asked["consent"].as_object().and_then(|c| c.iter().next()) {
+                    Some((key, yes)) => {
+                        let file = lamp_msgs::consent::file_in(&folder, key).unwrap();
+                        if yes.as_bool() == Some(true) {
+                            std::fs::write(&file, lamp_msgs::consent::bytes(key, 9, "app"))
+                                .unwrap();
+                        } else {
+                            let _ = std::fs::remove_file(&file);
+                        }
+                        json!({"done": {key.as_str(): yes}})
+                    }
+                    None => json!({"refused": "the request names no change this lamp makes"}),
+                };
+                let _ = writeln!(stream, "{reply}");
+            }
+        });
+        lines
+    }
+
+    /// #5500: the owner's two yeses, with `LAMP_APP_CONSENT=on` only.
+    /// Off: neither kind in `can`, each "not on this lamp". On a lamp with a
+    /// slide: face expressions alone, read from its file and set through
+    /// the helper, the reply what the files then say; room sounds refused
+    /// and never sent. With no slide, room sounds too. Anything but one
+    /// key this lamp has as true or false is refused before the helper.
+    #[test]
+    fn the_owners_yeses_are_read_and_set_through_the_helper_with_their_switch() {
+        let folder = std::path::PathBuf::from(format!("/tmp/lcc-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let socket = folder.join("change.sock");
+        let lines = consent_helper(&socket, &folder);
+        let kinds = ["consent.get", "consent.set"];
+
+        let mut off = lamp();
+        let can = can(&off);
+        assert!(kinds.iter().all(|kind| !can.contains(kind)));
+        for kind in kinds {
+            assert_eq!(
+                answer(&mut off, kind, &json!({"face_expressions": true})),
+                Err(format!("not on this lamp: {kind}"))
+            );
+        }
+
+        let mut slide = Fake {
+            consent: Some(crate::consent::place_in(&folder, &socket, false)),
+            ..lamp()
+        };
+        let can = super::can(&slide);
+        assert!(kinds.iter().all(|kind| can.contains(kind)));
+        let get = |lamp: &mut Fake| answer(lamp, "consent.get", &json!({})).unwrap().unwrap();
+        assert_eq!(get(&mut slide), json!({"face_expressions": false}));
+        let set = |lamp: &mut Fake, data: Value| answer(lamp, "consent.set", &data);
+        assert_eq!(
+            set(&mut slide, json!({"face_expressions": true})),
+            Ok(Some(json!({"face_expressions": true})))
+        );
+        assert_eq!(get(&mut slide), json!({"face_expressions": true}));
+        assert!(
+            set(&mut slide, json!({"room_sounds": true}))
+                .unwrap_err()
+                .contains("privacy slide")
+        );
+        assert!(!folder.join("room-sounds.json").exists());
+        for data in [
+            json!({}),
+            json!({"face_expressions": "yes"}),
+            json!({"face_expressions": true, "room_sounds": true}),
+            json!({"camera": false}),
+        ] {
+            assert!(set(&mut slide, data.clone()).is_err(), "{data}");
+        }
+        assert_eq!(
+            set(&mut slide, json!({"face_expressions": false})),
+            Ok(Some(json!({"face_expressions": false})))
+        );
+        assert!(!folder.join("face-expressions.json").exists());
+
+        let mut no_slide = Fake {
+            consent: Some(crate::consent::place_in(&folder, &socket, true)),
+            ..lamp()
+        };
+        assert_eq!(
+            get(&mut no_slide),
+            json!({"face_expressions": false, "room_sounds": false})
+        );
+        assert_eq!(
+            set(&mut no_slide, json!({"room_sounds": true})),
+            Ok(Some(
+                json!({"face_expressions": false, "room_sounds": true})
+            ))
+        );
+        // Only what passed the checks reached the helper.
+        assert_eq!(
+            *lines.lock().unwrap(),
+            [
+                r#"{"consent":{"face_expressions":true}}"#,
+                r#"{"consent":{"face_expressions":false}}"#,
+                r#"{"consent":{"room_sounds":true}}"#,
+            ]
+        );
+        // The helper not there: said, nothing claimed.
+        let mut gone = Fake {
+            consent: Some(crate::consent::place_in(
+                &folder,
+                &folder.join("none.sock"),
+                true,
+            )),
+            ..lamp()
+        };
+        assert_eq!(
+            set(&mut gone, json!({"room_sounds": false})),
+            Err("the lamp's settings are not running".to_owned())
+        );
+        let _ = std::fs::remove_dir_all(&folder);
     }
 
     fn lamp() -> Fake {
@@ -1282,6 +1459,27 @@ pub mod tests {
         assert!(can.contains(&"skills.make".to_owned()) && can.contains(&"skills.made".to_owned()));
     }
 
+    /// #1685: with only skills' lines carried (`LAMP_SKILL_MESSAGES=on`,
+    /// `LAMP_MESSAGES` unset), a text from the app is refused as with both
+    /// off, and nothing is put on `chat/in`.
+    #[test]
+    fn with_only_skills_lines_carried_a_text_is_refused_as_with_both_off() {
+        for (texting, skill_lines) in [(false, true), (false, false)] {
+            let mut lamp = Fake {
+                texting,
+                skill_lines,
+                ..lamp()
+            };
+            assert!(!lamp.texting());
+            assert_eq!(
+                answer(&mut lamp, "chat.send", &json!({"message": "hi"})),
+                Err(not_here("chat.send")),
+                "skill lines {skill_lines}"
+            );
+            assert!(lamp.texts.is_empty(), "skill lines {skill_lines}");
+        }
+    }
+
     /// #2864: `system.info`'s `can` holds each switch's kinds only while it
     /// is on, as [`answer`] takes them; the always-answered kinds are in it
     /// with every switch off.
@@ -1289,6 +1487,9 @@ pub mod tests {
     fn system_info_says_each_switchs_kinds_only_while_it_is_on() {
         let switches: Vec<Switch> = vec![
             ("texting", |f| f.texting = true, &["chat.send"]),
+            // Skills' lines alone (#1685) open no kind: `chat.send` stays
+            // refused.
+            ("skill lines", |f| f.skill_lines = true, &[]),
             (
                 "reports",
                 |f| {
@@ -1630,6 +1831,7 @@ pub mod tests {
                 now: "switching".into(),
                 last: None,
                 harness: None,
+                round: None,
             },
         )
         .unwrap();

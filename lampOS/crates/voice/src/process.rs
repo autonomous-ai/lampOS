@@ -1028,6 +1028,7 @@ fn worker_command(
         .args(extra)
         .env_clear()
         .envs(crate::stalls::passed_on())
+        .envs(crate::code_lock::passed_on())
         .envs(memory_days_worker_environment(
             role,
             var("LAMP_MEMORY_DAYS").as_deref(),
@@ -1188,6 +1189,10 @@ fn worker_command(
             role,
             var(crate::known_faces::AT_DESK_ENVIRONMENT).as_deref(),
         ))
+        .envs(services_told_worker_environment(
+            role,
+            var(crate::services_told::ENVIRONMENT).as_deref(),
+        ))
         .envs(tasks_told_worker_environment(
             role,
             var(crate::task_news::TOLD_ENVIRONMENT).as_deref(),
@@ -1230,6 +1235,14 @@ fn worker_command(
             var(crate::onboarding::ENVIRONMENT).as_deref(),
             var(crate::onboarding::FILE_ENVIRONMENT).as_deref(),
         ))
+        .envs(private_room_worker_environment(
+            role,
+            var(crate::person::PRIVATE_ROOM_ENVIRONMENT).as_deref(),
+        ))
+        .envs(rides_stall_worker_environment(
+            role,
+            var(crate::privacy_gap::STALL_SWITCH).as_deref(),
+        ))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -1245,6 +1258,17 @@ fn memory_days_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some(("LAMP_MEMORY_DAYS", "on"))
+}
+
+// Riding the voice's own stall closed (#5611, `LAMP_PRIVACY_RIDES_STALL`):
+// the exact `on`, to the two workers whose lease lapse it rides, the privacy
+// worker and the second route. Each reads it itself; no other gets it.
+fn rides_stall_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "privacy" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::privacy_gap::STALL_SWITCH, "on"))
 }
 
 // Each worker's own scheduling (#1608, `LAMP_WORKER_SCHEDULING`): the exact
@@ -1438,6 +1462,17 @@ fn keep_quietly_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::keep_quietly::ENVIRONMENT, "on"))
+}
+
+// The private room (`person::private_room`), to the two routes that run the
+// linked services, the name and the reminders. Cleared like every other
+// switch, it would not reach them.
+fn private_room_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::person::PRIVATE_ROOM_ENVIRONMENT, "on"))
 }
 
 // The setup walk's file (`LAMP_ONBOARDING`, `LAMP_ONBOARDING_FILE`), to the
@@ -1730,6 +1765,18 @@ fn faces_at_desk_worker_environment(
         .map(|_| (crate::known_faces::AT_DESK_ENVIRONMENT, "on"))
 }
 
+// The owner's line told what the app's Connectors linked (#5523), to both
+// routes' workers, which tell it beside the owner's line. Only the exact
+// value `on`.
+fn services_told_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    value
+        .filter(|value| matches!(role, "provider" | "second") && *value == "on")
+        .map(|_| (crate::services_told::ENVIRONMENT, "on"))
+}
+
 // The file of task news already told (#2762), to the two workers that read
 // it as the coordinator does: the second route's text news
 // (`task_news::ForTexts::for_tasks`) and both routes' task tools
@@ -1820,6 +1867,8 @@ fn second_route_worker_environment(
         crate::second_provider::SAY_WITH_CALL_ENVIRONMENT,
         // A claimed action no call made is never said as it is (#5215).
         crate::action_claim::ENVIRONMENT,
+        // And one worded its own way (#5215).
+        crate::action_claim::WORDED_ENVIRONMENT,
         crate::second_provider::CHECKING_LINE_ENVIRONMENT,
         crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
         // A light or volume turn answered with the call's own line (#2877).
@@ -1852,6 +1901,8 @@ fn second_route_worker_environment(
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         // A remark about the lamp held in a busy room (#4175).
         crate::remark_about_it::ENVIRONMENT,
+        // An answer that may open the talk further (#5194).
+        crate::opens_further::ENVIRONMENT,
         crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
         crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
         // Read by the second worker, which tells the coordinator (#3026).
@@ -1871,6 +1922,8 @@ fn second_route_worker_environment(
         // An earlier turn's calls told with its words (lamp build 9699).
         crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
         crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
+        // A one-face line read as its person's, forgets refused (#5522).
+        crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
         // A narrowed line named for its reply by the one-face count (5 Nov).
         crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
         // A one-face line's reminder reads are its person's (lamp-29e7).
@@ -1895,6 +1948,8 @@ fn second_route_worker_environment(
         // A refused face request is told the face record as it stands, and a
         // held face forget lasts through a spelling question (#5141).
         crate::known_faces::RECORD_TOLD_ENVIRONMENT,
+        // A face rename's yes judged by its guards, and held for (#5485).
+        crate::known_faces::RENAME_YES_ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_config::OWN_KEYS_ENV,
         // The owner's place for a question that needs one, and cleared
@@ -2032,6 +2087,7 @@ mod tests {
             crate::second_provider::SAID_ONCE_ENVIRONMENT,
             crate::second_provider::SAY_WITH_CALL_ENVIRONMENT,
             crate::action_claim::ENVIRONMENT,
+            crate::action_claim::WORDED_ENVIRONMENT,
             crate::second_provider::CHECKING_LINE_ENVIRONMENT,
             crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
             crate::second_provider::SHORT_DONE_ENVIRONMENT,
@@ -2050,6 +2106,7 @@ mod tests {
             crate::made_skill::ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::remark_about_it::ENVIRONMENT,
+            crate::opens_further::ENVIRONMENT,
             crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
             crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
             crate::unfinished_words::ENVIRONMENT,
@@ -2076,6 +2133,7 @@ mod tests {
             crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT,
             crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
+            crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
             crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
             crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT,
             crate::person::BY_DEFAULT_ENVIRONMENT,
@@ -2088,6 +2146,7 @@ mod tests {
             crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
             crate::known_faces::ASKED_ENVIRONMENT,
             crate::known_faces::RECORD_TOLD_ENVIRONMENT,
+            crate::known_faces::RENAME_YES_ENVIRONMENT,
             crate::light_told::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
@@ -2277,6 +2336,45 @@ mod tests {
             Some(std::ffi::OsStr::new("")),
         ] {
             assert_eq!(near_calibrated_worker_environment("provider", off), None);
+        }
+    }
+
+    /// #5611: the stall ride reaches the privacy worker and the second route
+    /// only, and only as the exact `on`, in a real child's cleared
+    /// environment.
+    #[test]
+    fn the_stall_ride_reaches_only_the_privacy_worker_and_the_second_route() {
+        use std::ffi::OsStr;
+        for role in [
+            "privacy", "second", "provider", "capture", "speaker", "ring", "camera", "unknown",
+        ] {
+            for value in [
+                None,
+                Some(OsStr::new("on")),
+                Some(OsStr::new("ON")),
+                Some(OsStr::new("on ")),
+                Some(OsStr::new("1")),
+                Some(OsStr::new("")),
+            ] {
+                let output = Command::new("/usr/bin/env")
+                    .env("LAMP_TEST_UNRELATED", "synthetic")
+                    .env_clear()
+                    .envs(rides_stall_worker_environment(role, value))
+                    .output()
+                    .unwrap();
+                assert!(output.status.success());
+                let expected =
+                    if matches!(role, "privacy" | "second") && value == Some(OsStr::new("on")) {
+                        "LAMP_PRIVACY_RIDES_STALL=on\n"
+                    } else {
+                        ""
+                    };
+                assert_eq!(
+                    output.stdout,
+                    expected.as_bytes(),
+                    "role {role}, value {value:?}"
+                );
+            }
         }
     }
 
@@ -2631,6 +2729,34 @@ mod tests {
         }
     }
 
+    /// #5523: what the app linked is told by both routes' workers, so the
+    /// switch goes to the provider and second workers only, and only as `on`.
+    #[test]
+    fn the_services_told_switch_reaches_both_routes_alone() {
+        let on = std::ffi::OsStr::new("on");
+        for role in ["provider", "second"] {
+            assert_eq!(
+                services_told_worker_environment(role, Some(on)),
+                Some((crate::services_told::ENVIRONMENT, "on"))
+            );
+            assert_eq!(services_told_worker_environment(role, None), None);
+            for unfit in ["off", "", "ON", "on "] {
+                assert_eq!(
+                    services_told_worker_environment(role, Some(std::ffi::OsStr::new(unfit))),
+                    None,
+                    "{unfit:?}"
+                );
+            }
+        }
+        for role in ["capture", "speaker", "ring", "camera", "privacy"] {
+            assert_eq!(
+                services_told_worker_environment(role, Some(on)),
+                None,
+                "{role}"
+            );
+        }
+    }
+
     /// The a0ae name-forget report (2 Nov): the at-desk switch goes to the
     /// provider and second workers only, and only as `on`.
     #[test]
@@ -2716,6 +2842,7 @@ mod tests {
                     crate::second_provider::net::key_terms::ENVIRONMENT,
                     crate::second_config::FLUX_ENV,
                     crate::light_told::ENVIRONMENT,
+                    crate::services_told::ENVIRONMENT,
                     crate::attention::NEAR_CALIBRATED_ENVIRONMENT,
                     crate::memory_scope::GAP_ENVIRONMENT,
                     crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
@@ -2781,6 +2908,7 @@ mod tests {
                     || name == crate::second_provider::SAID_ONCE_ENVIRONMENT
                     || name == crate::second_provider::SAY_WITH_CALL_ENVIRONMENT
                     || name == crate::action_claim::ENVIRONMENT
+                    || name == crate::action_claim::WORDED_ENVIRONMENT
                     || name == crate::second_provider::CHECKING_LINE_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
                     || name == crate::second_provider::SHORT_DONE_ENVIRONMENT
@@ -2800,6 +2928,7 @@ mod tests {
                     || name == crate::made_skill::ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::remark_about_it::ENVIRONMENT
+                    || name == crate::opens_further::ENVIRONMENT
                     || name == crate::second_provider::TURNED_SPEAKING_ENVIRONMENT
                     || name == crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT
                     || name == crate::unfinished_words::ENVIRONMENT
@@ -2826,6 +2955,7 @@ mod tests {
                     || name == crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT
                     || name == crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT
+                    || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT
                     || name == crate::second_provider::NAME_ONE_FACE_ENVIRONMENT
                     || name == crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT
                     || name == crate::person::BY_DEFAULT_ENVIRONMENT
@@ -2838,6 +2968,7 @@ mod tests {
                     || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
                     || name == crate::known_faces::ASKED_ENVIRONMENT
                     || name == crate::known_faces::RECORD_TOLD_ENVIRONMENT
+                    || name == crate::known_faces::RENAME_YES_ENVIRONMENT
                     || name == crate::second_config::OWN_KEYS_ENV
                     || name == crate::owner_place::ENVIRONMENT
                     || name == lamp_msgs::chosen_voice::ENVIRONMENT
@@ -2853,9 +2984,10 @@ mod tests {
             ))
         };
         // What the child has that the command did not give it: the shell's
-        // own, and the stall switches this test process may have.
+        // own, and the stall and code-lock switches this test process may have.
         let stalls: Vec<String> = crate::stalls::passed_on()
             .into_iter()
+            .chain(crate::code_lock::passed_on())
             .map(|(name, value)| format!("{name}={}", value.to_string_lossy()))
             .collect();
         // A failure says only the names it got, never their values: a
@@ -2910,6 +3042,7 @@ mod tests {
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PERSON_NAME_OWNER_ONLY=on",
+                    "LAMP_SERVICES_TOLD=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
                 ],
             ),
@@ -2918,6 +3051,7 @@ mod tests {
                 vec![
                     "CREDENTIALS_DIRECTORY=/run/credentials/lamp-voice.service",
                     "LAMP_ACTION_CLAIM_CHECKED=on",
+                    "LAMP_ACTION_CLAIM_WORDED=on",
                     "LAMP_ANSWER_ASK_AGAIN=on",
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_BUSY_CALLED_STRICT=on",
@@ -2975,6 +3109,7 @@ mod tests {
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_NAMED_ALWAYS=on",
                     "LAMP_NAMES_RECORD_TOLD=on",
+                    "LAMP_NAMES_RENAME_YES=on",
                     "LAMP_NAME_AS_A_SENTENCE=on",
                     "LAMP_NAME_NEAR=on",
                     "LAMP_NAME_REPEAT_NOT_A_CALL=on",
@@ -2986,12 +3121,14 @@ mod tests {
                     "LAMP_NO_WORDS_AGAIN=on",
                     "LAMP_ONE_AS_LAMP=on",
                     "LAMP_ONE_FACE_REMINDERS=on",
+                    "LAMP_OPENS_FURTHER=on",
                     "LAMP_OWNER_PLACE=on",
                     "LAMP_OWN_KEYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PERSON_NAME_BY_DEFAULT=on",
                     "LAMP_PERSON_NAME_OWNER_ONLY=on",
                     "LAMP_PERSON_SCOPE_ONE_FACE=on",
+                    "LAMP_PERSON_SCOPE_ONE_FACE_READS=on",
                     "LAMP_PERSON_SCOPE_SEEN=on",
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
@@ -3041,6 +3178,7 @@ mod tests {
                     "LAMP_SECOND_UNFINISHED_WAIT=on",
                     "LAMP_SECOND_WEATHER=on",
                     "LAMP_SECOND_WRITTEN_WAIT=on",
+                    "LAMP_SERVICES_TOLD=on",
                     "LAMP_SHORT_DONE=on",
                     "LAMP_STOP_WORDS_KEYTERM=on",
                     "LAMP_TASKS_NAMED_ASK=on",
@@ -3098,6 +3236,37 @@ mod tests {
         let written = std::fs::read_to_string(home.path.join("env-provider.txt")).unwrap();
         let got = given(&written);
         assert!(got.is_empty(), "the child got {:?}", names(&got));
+    }
+
+    /// The private room reaches the workers that act on it, and only as `on`:
+    /// a switch set in the unit and cleared on the way would change nothing.
+    #[test]
+    fn the_routes_are_given_the_private_room() {
+        use std::os::unix::fs::PermissionsExt;
+        let home = SessionDirectory::create().unwrap();
+        let script = home.path.join("worker.sh");
+        std::fs::write(&script, "#!/bin/sh\n/usr/bin/env > \"$3/env-$2.txt\"\n").unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let boot = new_boot().unwrap();
+        let given = |role: &str, value: &'static str| -> bool {
+            let status = status_of_fresh(&mut worker_command(
+                &script,
+                &home.path,
+                role,
+                (boot, boot),
+                &[],
+                |name| (name == crate::person::PRIVATE_ROOM_ENVIRONMENT).then(|| value.into()),
+            ));
+            assert!(status.success(), "{role}");
+            std::fs::read_to_string(home.path.join(format!("env-{role}.txt")))
+                .unwrap()
+                .lines()
+                .any(|line| line == "LAMP_PRIVATE_ROOM=on")
+        };
+        assert!(given("second", "on"));
+        assert!(given("provider", "on"));
+        assert!(!given("ring", "on"));
+        assert!(!given("second", "off"));
     }
 
     /// The setup walk's file reaches the second worker, and only it: a held

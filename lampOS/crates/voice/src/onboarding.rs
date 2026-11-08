@@ -17,6 +17,7 @@
 //! file is read or written.
 pub(crate) mod giving_way;
 pub(crate) mod hardware;
+pub(crate) mod harness_line;
 mod in_language;
 #[cfg(test)]
 pub(crate) mod legacy_words;
@@ -55,6 +56,13 @@ pub const FILE_ENVIRONMENT: &str = "LAMP_ONBOARDING_FILE";
 /// never done before a face that is being saved is kept (the lead's merge
 /// condition on #1711).
 const FACE_SAVE_WAIT_US: u64 = 15_000_000;
+/// How long "who you are" waits, after the name and the latest words
+/// either side said since, for a yes or a save when none comes: a face
+/// already known is never asked or saved (lamp-52e6, 6 Nov 13:45, a redo:
+/// the model said "I know you now" and the walk was silent). Then it ends
+/// done with the name only, once [`START_QUIET_US`] has been quiet. Twice
+/// the face wait, so a question about the face still gets its answer.
+const NAME_WAIT_US: u64 = 2 * FACE_SAVE_WAIT_US;
 
 /// How long "who you are" stays open for a setup face save the voice holds
 /// for the yes to its read-back ([`face_save_held`], #5415): as long as the
@@ -70,23 +78,6 @@ pub const NUDGE_ENVIRONMENT: &str = "LAMP_ONBOARDING_NUDGE";
 pub const FIRST_TRIES_ENVIRONMENT: &str = "LAMP_ONBOARDING_FIRST_TRIES";
 /// The provider worker's flag: the onboarding file, whose mailbox it writes.
 pub const FLAG: &str = "--onboarding-file";
-/// The provider worker's flags after [`FLAG`]: this lamp offers room sounds
-/// (`no-slide`) or face expressions, so `setup_step` may name them (#3769).
-pub const ROOM_SOUNDS_FLAG: &str = "--onboarding-room-sounds";
-pub const FACE_EXPRESSIONS_FLAG: &str = "--onboarding-face-expressions";
-
-/// [`ROOM_SOUNDS_FLAG`] and [`FACE_EXPRESSIONS_FLAG`] for the steps this
-/// voice's walk offers, from the same switches it reads.
-pub fn offers_arguments(privacy_controls: Option<&str>, face_ask: Option<&str>) -> Vec<String> {
-    let mut flags = Vec::new();
-    if no_slide(privacy_controls) {
-        flags.push(ROOM_SOUNDS_FLAG.to_owned());
-    }
-    if face_ask == Some("on") {
-        flags.push(FACE_EXPRESSIONS_FLAG.to_owned());
-    }
-    flags
-}
 pub const STEP: &str = "setup_step";
 pub const REDO: &str = "redo_setup";
 /// `redo_setup`'s step for the whole walk again: the person asked for all of it.
@@ -459,16 +450,51 @@ pub struct Progress {
     /// line. A reset wipes it with the file. An older build reads past it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub tries_said: bool,
+    /// What became of the one line about Harness after the walk's last
+    /// step ([`harness_line::ENVIRONMENT`], #5488): said, or why it was
+    /// skipped. Decided once, so a later walk, a redo of it or a restart
+    /// never says it again. A reset wipes it with the file. An older build
+    /// reads past it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub harness_line: Option<harness_line::Kept>,
+    /// When each yes another part reads ([`ROOM_SOUNDS`],
+    /// [`FACE_EXPRESSIONS`]) was last redone, in Unix seconds: a redo of the
+    /// step or of the whole walk (#5500). A yes the owner gave in the app
+    /// (`"by":"app"`, `lamp_msgs::consent`) is kept by the voice's starts and
+    /// writes, unlike one with no `done` behind it, but only while it is
+    /// newer than this and than a later "no" at the lamp, so a redo takes it
+    /// back as it takes back a spoken one. Kept through a redo of the whole
+    /// walk; a reset wipes it with the file. An older build reads past it.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub yes_redone_at_unix_s: BTreeMap<String, u64>,
 }
 
 impl Progress {
     /// What a redo of the whole walk starts from: nothing kept but whether
     /// the things to try were said ([`Self::tries_said`]), so they are
-    /// never said twice to the same owner.
+    /// never said twice to the same owner, nor the line about Harness
+    /// ([`Self::harness_line`]).
     fn redone(&self) -> Self {
-        Self {
+        let mut redone = Self {
             tries_said: self.tries_said,
+            harness_line: self.harness_line,
             ..Self::default()
+        };
+        for step in [ROOM_SOUNDS, FACE_EXPRESSIONS] {
+            redone.yes_redone(step);
+        }
+        redone
+    }
+
+    /// `step`'s yes, if it is one another part reads, redone now: one the
+    /// owner gave in the app before this goes at the next write
+    /// ([`Self::yes_redone_at_unix_s`]).
+    fn yes_redone(&mut self, step: &str) {
+        if [ROOM_SOUNDS, FACE_EXPRESSIONS].contains(&step) {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_secs());
+            self.yes_redone_at_unix_s.insert(step.to_owned(), now);
         }
     }
 }
@@ -476,6 +502,10 @@ impl Progress {
 /// [`Progress::face_again_names`]' bound: a name whole and its first word,
 /// as [`told_ids`] gives them.
 const MOST_TOLD_IDS: usize = 2;
+
+/// [`Progress::yes_redone_at_unix_s`]' bound: the two yeses, and room for a
+/// later build's.
+const MOST_YES_REDONE: usize = 8;
 
 fn is_zero(value: &u8) -> bool {
     *value == 0
@@ -609,6 +639,7 @@ impl Progress {
             return Err(invalid());
         }
         if self.face_again_names.len() > MOST_TOLD_IDS
+            || self.yes_redone_at_unix_s.len() > MOST_YES_REDONE
             || !self
                 .face_again_names
                 .iter()
@@ -711,6 +742,9 @@ struct Led {
     touched: bool,
     /// Asked again after its conversation ended unanswered ([`MOST_UNSAID`]).
     asked_again: u8,
+    /// Its first note's turns that played none of it, each asked again at
+    /// once ([`Onboarding::first_note_finished`], [`MOST_UNSAID`]).
+    first_unsaid: u8,
     /// A `later` re-offer: the step's count before this offer was counted,
     /// given back if the offer is dropped with nothing tried ([`Onboarding::drop_led`]).
     counted_from: Option<u8>,
@@ -760,6 +794,9 @@ struct Answers {
     /// (the face question's, as a rule), so the step ends done at [`FACE_SAVE_WAIT_US`] if no face
     /// is saved by then.
     face_answered_us: Option<u64>,
+    /// With a face to keep: when the name, or a line after it, was last
+    /// heard ([`NAME_WAIT_US`]).
+    name_us: Option<u64>,
     /// When the voice last held a setup face save for the yes to its
     /// read-back ([`face_save_held`]): the face wait does not end the step
     /// within [`FACE_SAVE_HELD_US`] of it.
@@ -874,12 +911,16 @@ pub struct Onboarding {
     /// A second word owed once [`Self::owed`] is said: how_you_sound's
     /// `near_failed`, after its sentence's line.
     owed_after: Option<String>,
-    /// "Where you sit"'s intro was handed out by this tick, for the caller
-    /// to bind to its turn ([`Self::bind_opener`]).
+    /// A step's first note ("where you sit"'s intro among them) was handed
+    /// out by this tick, for the caller to bind to its turn
+    /// ([`Self::bind_opener`]).
     opener_said: bool,
-    /// The turn the intro is said in: `opened` is kept only when it is
-    /// heard (the Reviewer-lead's P3 on #4095).
+    /// The turn that note is said in: the intro's `opened` is kept only
+    /// when it is heard (the Reviewer-lead's P3 on #4095); any step's
+    /// first note never said is asked again at once.
     opener_turn: Option<(BootId, u64)>,
+    /// What was being asked when [`Self::opener_turn`] was bound.
+    opener_asking: Asking,
     /// Intro turns not heard this walk: past [`MOST_UNSAID`] the intro is
     /// kept as said anyway, so it is not repeated forever.
     opener_unsaid: u8,
@@ -913,6 +954,18 @@ pub struct Onboarding {
     nudge: bool,
     /// [`FIRST_TRIES_ENVIRONMENT`].
     first_tries: bool,
+    /// [`harness_line::ENVIRONMENT`] (#5488).
+    harness_line: bool,
+    /// The tasks part's request socket (`LAMP_TASKS_DIR`) the read below
+    /// asks; `None` with no tasks part, and always with the switch off.
+    harness_socket: Option<PathBuf>,
+    /// Harness's sign-in as the tasks part last said it, while the sentence
+    /// is not decided; let go once it is (#5488 review), which ends its
+    /// thread. `None` with the switch off.
+    harness_read: Option<harness_line::Read>,
+    /// What starts the read's thread: [`harness_line::spawn`]; a fake in
+    /// tests.
+    harness_spawn: harness_line::Spawn,
     /// The model service refusing turns (#4265, `LAMP_SECOND_REFUSED_HOLD`):
     /// a step that fails meanwhile is held as `later`.
     model_refusing: bool,
@@ -1074,6 +1127,10 @@ impl Onboarding {
         walk.eyes = lamp_bus::Bus::from_environment().ok();
         walk.nudge = std::env::var(NUDGE_ENVIRONMENT).as_deref() == Ok("on");
         walk.first_tries = std::env::var(FIRST_TRIES_ENVIRONMENT).as_deref() == Ok("on");
+        walk.harness_line = std::env::var(harness_line::ENVIRONMENT).as_deref() == Ok("on");
+        if walk.harness_line {
+            walk.harness_socket = harness_line::socket_from_environment();
+        }
         walk.face_kept =
             std::env::var(crate::known_faces::ENVIRONMENT).is_ok_and(|socket| !socket.is_empty());
         // The head pads' touches, from `--touch` Controls, only with the
@@ -1133,6 +1190,7 @@ impl Onboarding {
             owed_after: None,
             opener_said: false,
             opener_turn: None,
+            opener_asking: None,
             opener_unsaid: 0,
             seen_us: None,
             read_us: None,
@@ -1160,6 +1218,10 @@ impl Onboarding {
             body_heard: false,
             nudge: false,
             first_tries: false,
+            harness_line: false,
+            harness_socket: None,
+            harness_read: None,
+            harness_spawn: harness_line::spawn,
             model_refusing: false,
             model_held: false,
             face_kept: false,
@@ -1309,10 +1371,17 @@ impl Onboarding {
             if !std::mem::replace(&mut self.started, true) {
                 self.desired.give_unheard_back();
             }
+            self.park_out_of_order(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |since| since.as_secs()),
+                now_us,
+            );
             self.dirty = self.desired != progress;
             self.committed = progress;
             self.storage_epoch = snapshot.epoch;
             self.initialized = true;
+            self.keep_harness_read();
         }
         let completed_barrier = self
             .barrier
@@ -2081,8 +2150,9 @@ impl Onboarding {
             .or(self.owed_note.turn)
     }
 
-    /// Binds "where you sit"'s intro, handed out by this loop's tick, to the
-    /// turn it is said in; false for any other note.
+    /// Binds a step's first note ("where you sit"'s intro among them),
+    /// handed out by this loop's tick, to the turn it is said in; false for
+    /// any other note.
     /// An owed line handed out by this loop's tick is bound the same way
     /// ([`OwedNote`]).
     pub(crate) fn bind_opener(&mut self, voice_boot: BootId, turn: u64) -> bool {
@@ -2094,6 +2164,7 @@ impl Onboarding {
             return false;
         }
         self.opener_turn = Some((voice_boot, turn));
+        self.opener_asking = self.asking();
         true
     }
 
@@ -2110,6 +2181,12 @@ impl Onboarding {
             return;
         }
         self.opener_turn = None;
+        let then = self.opener_asking.take();
+        let intro = then.is_some_and(|(step, _)| step == Step::WhereYouSit) && !self.desired.opened;
+        if !intro {
+            self.first_note_finished(then, delivery, now_us);
+            return;
+        }
         let heard = matches!(delivery, Delivery::Whole | Delivery::Gapped);
         if !heard {
             self.opener_unsaid = self.opener_unsaid.saturating_add(1);
@@ -2134,6 +2211,36 @@ impl Onboarding {
             self.desired.opened = true;
             self.save();
         }
+    }
+
+    /// A step's first note whose turn played none of it (lamp-52e6, build
+    /// 10507: who_you_are's "What should I call you?" retired by a room
+    /// line heard as no words) was never heard: the step is asked again as
+    /// soon as the lamp may speak and the room is quiet, [`MOST_UNSAID`]
+    /// times at most, not left waiting [`STEP_GIVE_UP_US`] in silence.
+    /// Only while that same ask is led and nothing has been answered; one
+    /// partly played is not said again.
+    fn first_note_finished(&mut self, then: Asking, delivery: Delivery, now_us: u64) {
+        if delivery != Delivery::Unsaid {
+            return;
+        }
+        let Some(led) = self
+            .led
+            .as_mut()
+            .filter(|led| led.asked_us.is_some() && then == Some((led.step, led.asked_us)))
+        else {
+            return;
+        };
+        let again = led.answers == 0 && led.first_unsaid < MOST_UNSAID;
+        if again {
+            led.asked_us = None;
+            led.guided_us = None;
+            led.first_unsaid += 1;
+        }
+        let step = led.step.name();
+        self.records
+            .push(json!({"kind":"onboarding_note_unsaid","step":step,
+            "first":true,"said_again":again,"at_us":now_us}));
     }
 
     /// The bound invitation's first audio reached the speaker
@@ -2275,6 +2382,11 @@ impl Onboarding {
         };
         let mut ask_hello = false;
         let mut face_answer = None;
+        // A face to keep: the name's wait ([`NAME_WAIT_US`]) runs from the
+        // name and every line after it.
+        if face_kept && led.step == Step::WhoYouAre && (led.heard.name || read.names_someone) {
+            led.heard.name_us = Some(now_us);
+        }
         let done = match led.step {
             Step::WhoYouAre if nudge => false,
             Step::WhoYouAre => {
@@ -2856,7 +2968,9 @@ impl Onboarding {
                     return None;
                 }
                 let opened = step == Step::WhereYouSit && self.desired.opened;
-                self.opener_said = step == Step::WhereYouSit && !opened;
+                // Bound to its turn, so one never said is asked again at
+                // once ([`Self::first_note_finished`]).
+                self.opener_said = true;
                 return Some(self.definition.note(step, opened).into());
             }
             return None;
@@ -2911,6 +3025,9 @@ impl Onboarding {
                 || led.heard.face_answered_us.is_some_and(|at| {
                     now_us.saturating_sub(at.max(led.lamp_said_us.unwrap_or(0)))
                         >= FACE_SAVE_WAIT_US
+                })
+                || led.heard.name_us.is_some_and(|at| {
+                    now_us.saturating_sub(at.max(led.lamp_said_us.unwrap_or(0))) >= NAME_WAIT_US
                 }))
         {
             eprintln!(
@@ -3332,6 +3449,14 @@ impl Onboarding {
         // `not_available` (an invitation left unsaid), so the cap is never
         // escaped (the Reviewer-lead's P3 on #4012).
         let kept = self.desired.steps.get(step.name());
+        // The step had already ended with an answer this walk: led again
+        // only by the face asked for once more, which says nothing more.
+        let ended_before = kept.is_some_and(|kept| {
+            matches!(
+                kept.outcome,
+                Outcome::Done | Outcome::Skipped | Outcome::Failed
+            )
+        });
         let later_offers = kept
             .filter(|kept| {
                 matches!(outcome, Outcome::Later | Outcome::NotAvailable) && kept.later_offers > 0
@@ -3363,9 +3488,15 @@ impl Onboarding {
         // "Preferences" done, by its answers heard or by the model's report:
         // the walk says its done line as soon as the lamp may speak, never
         // waiting for the person's next line (lamp-29e7, 29 Oct, 8545).
-        // Also the last step in the skill's order (#5499: the two-step walk).
-        if outcome == Outcome::Done
-            && (step == Step::Preferences || self.definition.order.last() == Some(&step))
+        // Also the last step in the skill's order, however it ended (#5499:
+        // the two-step walk), once per walk: not when an ask made after the
+        // walk (the face asked for once more) ends it again; a redo removes
+        // the step's outcome, so its new end says it again.
+        if (outcome == Outcome::Done && step == Step::Preferences)
+            || (step != Step::Preferences
+                && !ended_before
+                && self.definition.order.last() == Some(&step)
+                && matches!(outcome, Outcome::Done | Outcome::Skipped | Outcome::Failed))
         {
             self.owed = Some(self.preferences_done().to_owned());
         }
@@ -3376,7 +3507,42 @@ impl Onboarding {
             json!({"kind":"onboarding_step","step":step.name(),"outcome":outcome,
             "framing":framing,"at_us":now_us}),
         );
+        self.park_out_of_order(at_unix_s, now_us);
         self.save();
+    }
+
+    /// Every step in the order ended: each step out of it is kept
+    /// `not_available` (#5499), so any lamp-update, which waits for all
+    /// nine, sees the walk over. Never offered again: re-offers follow
+    /// the order. Run when a step ends and at load, so a lamp that ended
+    /// the walk on a build without it is filled too (El's P3 on #5521).
+    fn park_out_of_order(&mut self, at_unix_s: u64, now_us: u64) {
+        if self
+            .definition
+            .order
+            .iter()
+            .all(|step| self.desired.steps.contains_key(step.name()))
+        {
+            for parked in Step::IDS {
+                if !self.desired.steps.contains_key(parked)
+                    && Step::named(parked).is_some_and(|s| !self.definition.order.contains(&s))
+                {
+                    self.desired.steps.insert(
+                        parked.to_owned(),
+                        Kept {
+                            outcome: Outcome::NotAvailable,
+                            at_unix_s,
+                            framing: None,
+                            offered_at_unix_s: None,
+                            later_offers: 0,
+                        },
+                    );
+                    self.pending_records
+                        .push(json!({"kind":"onboarding_step","step":parked,
+                        "outcome":Outcome::NotAvailable,"why":"parked","at_us":now_us}));
+                }
+            }
+        }
     }
 
     fn save(&mut self) {
@@ -3463,16 +3629,89 @@ impl Onboarding {
         Some(skill::FACE_AGAIN.to_owned())
     }
 
+    /// Whether the line about Harness is said, decided once and kept
+    /// ([`Progress::harness_line`]), from the tasks part's last read, with
+    /// its session record.
+    ///
+    /// Not known (the tasks part did not say) is not kept: the closing is
+    /// said without the sentence and the next closing reads again (#5488
+    /// review). Decided, the read is let go.
+    fn decide_harness_line(&mut self) -> harness_line::Kept {
+        let linked = match (&self.harness_read, &self.harness_socket) {
+            (Some(read), _) => Some(
+                read.lock()
+                    .map_or(harness_line::Linked::Unknown, |read| *read),
+            ),
+            (None, Some(_)) => Some(harness_line::Linked::Unknown),
+            (None, None) => None,
+        };
+        let kept = harness_line::decide(linked);
+        if kept.is_final() {
+            self.desired.harness_line = Some(kept);
+        }
+        self.keep_harness_read();
+        eprintln!(
+            "lamp-voice: onboarding: the line about Harness: {}",
+            kept.name()
+        );
+        self.pending_records.push(
+            json!({"kind":"onboarding_harness_line","outcome":kept.name(),
+                "at_unix_ms":(self.unix_clock)()}),
+        );
+        kept
+    }
+
+    /// Whether the sentence is decided for good (a file from the build
+    /// before may keep `unknown`, which is read again).
+    fn harness_line_decided(&self) -> bool {
+        self.desired
+            .harness_line
+            .is_some_and(harness_line::Kept::is_final)
+    }
+
+    /// Keeps the read of Harness's sign-in only while it can still matter:
+    /// with the switch on and the sentence not decided, started on the
+    /// tasks part's socket if not yet; otherwise let go, so its thread ends
+    /// at its next wake rather than asking for the voice's whole life
+    /// (#5488 review). Run when the file loads (a restart on a decided file
+    /// starts nothing that lasts; a reset starts it again) and at each
+    /// closing handed out; a read whose thread could not be started is
+    /// kept as none, so the next of these starts it again.
+    fn keep_harness_read(&mut self) {
+        if !self.harness_line || self.harness_line_decided() {
+            self.harness_read = None;
+        } else if self.harness_read.is_none()
+            && let Some(socket) = &self.harness_socket
+        {
+            self.harness_read = harness_line::start(socket.clone(), self.harness_spawn);
+        }
+    }
+
     /// "Preferences"' done line: with [`FIRST_TRIES_ENVIRONMENT`] on, the
     /// first time only, the one that also names a few things to try first
     /// (#5316); kept as said once handed to [`Self::owed`], so a cut line
     /// offered again is the same line, and nothing later says it again.
+    ///
+    /// With [`harness_line::ENVIRONMENT`] on, the first done line handed
+    /// out also ends with the one sentence about Harness (#5488) when
+    /// Harness is not signed in: inside the same quoted line, one turn,
+    /// never a second speech; signed in, it is dropped. It rides on the done
+    /// line wherever that is said. Decided once
+    /// ([`Progress::harness_line`]), so no later done line says it; not
+    /// known, decided at the next done line handed out.
     fn preferences_done(&mut self) -> &'static str {
-        if self.first_tries && !self.desired.tries_said {
+        let tries = self.first_tries && !self.desired.tries_said;
+        if tries {
             self.desired.tries_said = true;
-            skill::PREFERENCES_DONE_TRIES
-        } else {
-            skill::PREFERENCES_DONE
+        }
+        let harness = self.harness_line
+            && !self.harness_line_decided()
+            && self.decide_harness_line() == harness_line::Kept::Said;
+        match (tries, harness) {
+            (true, true) => skill::PREFERENCES_DONE_TRIES_HARNESS,
+            (true, false) => skill::PREFERENCES_DONE_TRIES,
+            (false, true) => skill::PREFERENCES_DONE_HARNESS,
+            (false, false) => skill::PREFERENCES_DONE,
         }
     }
 
@@ -3481,6 +3720,7 @@ impl Onboarding {
     fn redo_step(&mut self, step: Step, now_us: u64) {
         self.storage_failed = false;
         self.desired.steps.remove(step.name());
+        self.desired.yes_redone(step.name());
         match step {
             Step::HowYouSound => {
                 self.forget_near();
@@ -3625,13 +3865,24 @@ impl Onboarding {
                 .and_then(Step::named)
                 .filter(|step| *step != Step::Privacy)
             {
-                self.redo_step(step, now_us);
+                // A step out of the order keeps its outcome (#5499): the walk
+                // never leads it, and lamp-update reads it as over.
+                if self.definition.order.contains(&step) {
+                    self.redo_step(step, now_us);
+                } else {
+                    eprintln!(
+                        "lamp-voice: onboarding: redo of {} refused: not in the walk's order",
+                        step.name()
+                    );
+                }
                 continue;
             }
-            let step = told
-                .get("step")
-                .and_then(Value::as_str)
-                .and_then(Step::named);
+            // A report naming no step is for the step led now (#5499): the
+            // model is told no step's name but in that step's own words.
+            let step = match told.get("step") {
+                Some(name) => name.as_str().and_then(Step::named),
+                None => self.led.as_ref().map(|led| led.step),
+            };
             let outcome = told
                 .get("outcome")
                 .and_then(Value::as_str)
@@ -4296,6 +4547,19 @@ fn name_in(text: &str) -> Option<String> {
     {
         return None;
     }
+    // A name spelled, alone or after the name said ("J-A-N-E.", "Jane, J A
+    // N E."), is asked back as the name, never its letters: nobody calls a
+    // person by the spelling of their name (lamp-3e83, #5564).
+    if let Some(name) = crate::known_faces::letters_as_word(&words.join(" ")) {
+        return Some(name);
+    }
+    if let Some((first, rest)) = words.split_first()
+        && crate::known_faces::letters_as_word(&rest.join(" ")).is_some_and(|spelled| {
+            crate::known_faces::folded_words(&spelled) == crate::known_faces::folded_words(first)
+        })
+    {
+        return Some((*first).to_owned());
+    }
     (1..=2).contains(&words.len()).then(|| words.join(" "))
 }
 
@@ -4362,99 +4626,49 @@ fn nearest(faces: &lamp_msgs::Faces) -> Option<Framing> {
 }
 
 /// The two functions the model is told of when the walk is switched on.
-/// A parked step ([`giving_way::PARKED`]) is in neither, nor in their
-/// words: the model only knows a step from them, and on lamp-29e7 (29 Oct,
-/// #3702) one it was told of was asked in its own words. Nor is a step this
-/// lamp never offers (room sounds without `no-slide`, face expressions
-/// without [`FACE_EXPRESSIONS_ASK_ENVIRONMENT`]): on lamp-52e6 on 30 Oct
-/// (8811, #3769) the model, told of face_expressions, asked "whether you're
-/// smiling or frowning" itself while the step was off. The provider worker
-/// learns which it offers from its flags ([`offers_arguments`]). Nor is a
-/// step out of the `walk` (#5499: [`lamp_msgs::ONBOARDING_WALK`]).
-pub fn tools(walk: &[&str], no_slide: bool, face_ask: bool) -> Vec<Tool> {
-    let off = |name: &&str| {
-        !walk.contains(name)
-            || match Step::named(name) {
-                Some(Step::GivingWay) => giving_way::PARKED,
-                Some(Step::RoomSounds) => !no_slide,
-                Some(Step::FaceExpressions) => !face_ask,
-                _ => false,
-            }
-    };
-    let names: Vec<&str> = Step::IDS
-        .iter()
-        .copied()
-        .filter(|name| !off(name))
-        .collect();
-    let yes_steps: Vec<&str> = [ROOM_SOUNDS, FACE_EXPRESSIONS]
-        .into_iter()
-        .filter(|name| !off(name))
-        .collect();
-    let clear_yes = match yes_steps.len() {
-        0 => String::new(),
-        1 => format!("{} is done only after a clear yes. ", yes_steps[0]),
-        _ => format!(
-            "{} are done only after a clear yes. ",
-            yes_steps.join(" and ")
-        ),
-    };
-    let redo_names: Vec<&str> = names.iter().copied().chain([REDO_ALL]).collect();
-    // The measured steps told, each with its evidence.
-    let (measured, evidence): (Vec<&str>, Vec<&str>) = [
-        ("where_you_sit", "seeing them"),
-        ("how_you_sound", "hearing their call"),
-        ("touch", "feeling their touch"),
-        ("privacy", "the switch's receipt"),
-        ("giving_way", "the body giving way"),
-    ]
-    .into_iter()
-    .filter(|(name, _)| names.contains(name))
-    .unzip();
-    let measured = match measured.split_last() {
-        Some((last, [])) => (*last).to_owned(),
-        Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
-        None => String::new(),
-    };
-    let evidence = evidence.join(", ");
-    let preferences_lines = if names.contains(&"preferences") {
-        PREFERENCES_LINES
-    } else {
-        ""
-    };
+/// They name no step and no number of steps (#5499): the walk follows the
+/// installed skill's `order`, the runner gives the model only the line of
+/// the step it leads now, and takes a report only for that step. On
+/// lamp-29e7 (29 Oct, #3702) a step the model was told of was asked in its
+/// own words; on lamp-52e6 (6 Nov, 13:12 and 13:26) told of the walk's
+/// steps, it asked two steps out of the walk and said "Step one is done ...
+/// Now the second step". A step whose words call `setup_step` name
+/// themselves; any other is the step led now, with `step` left out.
+pub fn tools() -> Vec<Tool> {
     vec![
         Tool {
             name: STEP.into(),
-            description: format!(
-                "Call this during your first meeting with someone, when a step you were asked \
-                 to lead has ended: done, skipped because they asked to skip it, or failed. If \
-                 they want to skip the rest, call it skipped for the step you are on. Then go on \
-                 talking as the step asked. Only for the step you are leading now; {measured} \
-                 can only be skipped; the runner requires physical evidence: {evidence}. \
-                 {clear_yes}The runner asks each step in its own words and counts every try: never name, announce, \
-                 explain or ask a step yourself, and never count calls or say how many are left. \
-                 {preferences_lines}"
-            ),
+            description: "Call this during your first meeting with someone, when what you were \
+                          asked to lead has ended: done, skipped because they asked to skip it, \
+                          or failed. If they want to skip the rest, call it skipped. Then go on \
+                          talking as you were asked. Give step only as your words name it; \
+                          otherwise leave it out. What the lamp checks itself, such as seeing or \
+                          feeling them, ends by itself: you can only skip it. The runner says \
+                          each line itself and counts every try: never name, number, announce, \
+                          explain or ask a step yourself, never say what is done or what comes \
+                          next, and never count calls or say how many are left."
+                .into(),
             parameters: Some(json!({
                 "type": "object",
                 "properties": {
-                    "step": {"type": "string", "enum": names},
+                    "step": {"type": "string"},
                     "outcome": {"type": "string", "enum": ["done", "skipped", "failed"]}
                 },
-                "required": ["step", "outcome"]
+                "required": ["outcome"]
             })),
             silent: false,
         },
         Tool {
             name: REDO.into(),
-            description: "Call this when someone asks you to redo a step of your first meeting, or the \
-                          whole of it. Name the one step they asked for, or `all` only when they asked \
-                          to go through the whole setup again. If you are not sure which, ask them \
-                          first. Then say in a few words that you will do it again."
+            description: "Call this when someone asks you to redo a part of your first meeting, or \
+                          the whole of it. Give `all` only when they asked to go through the whole \
+                          setup again. If you are not sure which, ask them first. Then say in a few \
+                          words that you will do it again."
                 .into(),
             parameters: Some(json!({
                 "type": "object",
                 "properties": {
-                    "step": {"type": "string", "enum": redo_names}
+                    "step": {"type": "string"}
                 },
                 "required": ["step"]
             })),
@@ -4472,23 +4686,36 @@ pub fn is_tool(name: &str) -> bool {
 const PREFERENCES_ANSWER: &str = "That was the last question. Answer in at most five words, \
      never with a question: there are no more questions, and I say the last line myself.";
 
-/// What `setup_step`'s description tells the model of every answer it
-/// gives in "preferences", and only there, since the tools are declared once
-/// for the whole walk and other steps ask again ("Sorry, what should I call
-/// you?"): the skill's own words say so too, but on lamp-52e6 on 30
-/// Oct (#4520 over 8811, #3769) "Quiet from ten until I wake up again." got
-/// 17 words, and the walk's hello, which waits for them, came 13.1 s after
-/// the line against its 8 s.
-const PREFERENCES_LINES: &str = "In the preferences step only, answer each line in at most five \
-     words and never with a question: the runner asks the rest itself.";
-
 /// The provider worker's side: put what the model reported in the mailbox
 /// for the runner, and say what to tell the model. Each call's step,
 /// outcome and answer go in the journal: on lamp-29e7 on 27 Oct three
 /// setup_step calls left "the onboarding answered" and nothing more, so
 /// what held "who you are" for 5 minutes could not be read (#3883).
 pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
-    let (told, answered) = answer(file, call);
+    run_in(file, call, installed_order())
+}
+
+/// The installed skill's `order`, read once per worker as it starts
+/// ([`crate::tools::take`]) and kept, never re-read on each redo (the
+/// Reviewer-lead's P3 on #5521): Voice reads its skill once per start too.
+/// ponytail: a worker started after a skill-only install reads the new file
+/// while the runner keeps the order it loaded; pass the runner's order to the
+/// worker if that drift matters.
+pub(crate) fn installed_order() -> Option<&'static [Step]> {
+    static ORDER: std::sync::OnceLock<Option<Vec<Step>>> = std::sync::OnceLock::new();
+    ORDER
+        .get_or_init(|| {
+            skill::read_installed(Path::new(crate::skill_words::INSTALLED))
+                .ok()
+                .map(|definition| definition.order)
+        })
+        .as_deref()
+}
+
+/// [`run`], with the walk's `order` given (`None`: unread, the runner refuses
+/// a step out of it on its own).
+fn run_in(file: &Path, call: &ToolCall, order: Option<&[Step]>) -> (Value, bool) {
+    let (told, answered) = answer(file, call, order);
     let said = |key: &str| call.args.get(key).and_then(Value::as_str).unwrap_or("none");
     eprintln!(
         "lamp-voice: onboarding: {} step {} outcome {}: {}",
@@ -4502,7 +4729,7 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
     (told, answered)
 }
 
-fn answer(file: &Path, call: &ToolCall) -> (Value, bool) {
+fn answer(file: &Path, call: &ToolCall, order: Option<&[Step]>) -> (Value, bool) {
     let line = match call.name.as_str() {
         // One step, or the whole walk only when it was asked for by name:
         // on lamp-06c1 on 28 Oct "redo the touch step" reached a redo with no
@@ -4515,17 +4742,48 @@ fn answer(file: &Path, call: &ToolCall) -> (Value, bool) {
                     true,
                 );
             }
-            Some(name) if Step::named(name).is_some() => json!({"redo_step": name}),
-            _ => {
+            // A step out of the walk's order, which the runner refuses
+            // (#5499): said refused, so the lamp never says it will redo
+            // and then says nothing (the Reviewer-lead's P3 on #5521). The
+            // order is the one read as this worker started ([`installed_order`]).
+            Some(name)
+                if Step::named(name)
+                    .is_some_and(|step| order.is_some_and(|order| !order.contains(&step))) =>
+            {
                 return (
-                    json!({"error":"Nothing was redone. Ask them which step to redo, or whether to go through the whole setup again, then call this again with it."}),
+                    json!({"error":"That part is not in my setup now, so nothing was redone. Tell them so, and offer to go through the whole setup again."}),
                     true,
                 );
+            }
+            Some(name) if Step::named(name).is_some() => json!({"redo_step": name}),
+            // The step ids in the order named, so a one-step redo needs no
+            // guess (El's P3 on #5521).
+            _ => {
+                let mut error = "Nothing was redone. Ask them which step to redo, or whether to go through the whole setup again, then call this again with it.".to_owned();
+                if let Some(order) = order {
+                    let ids: Vec<&str> = order.iter().map(|step| step.name()).collect();
+                    error.push_str(&format!(" The steps are: {}.", ids.join(", ")));
+                }
+                return (json!({ "error": error }), true);
             }
         },
         STEP => {
             let step = call.args.get("step").and_then(Value::as_str);
             let outcome = call.args.get("outcome").and_then(Value::as_str);
+            // No step named: the step the runner leads now, which only it
+            // knows (#5499). It takes it only for that step, as it may end.
+            if step.is_none_or(str::is_empty) && outcome.and_then(Outcome::named).is_some() {
+                if post(file, &json!({"outcome": outcome})).is_err() {
+                    return (
+                        json!({"error": "I could not note that just now. Go on all the same."}),
+                        false,
+                    );
+                }
+                return (
+                    json!({"ok": true, "note": "I say what comes next myself. Say nothing about it, and nothing more until I do."}),
+                    true,
+                );
+            }
             match (step.and_then(Step::named), outcome.and_then(Outcome::named)) {
                 (Some(step), Some(Outcome::Skipped)) if step.says_its_skip() => {
                     if post(file, &json!({"step": step.name(), "outcome": outcome})).is_err() {
@@ -5859,6 +6117,25 @@ mod tests {
         assert_eq!(name_in("Tovi Ama"), Some("Tovi Ama".into()));
     }
 
+    /// #5564 (lamp-3e83): a spelled name is asked back as the name it
+    /// spells, never as its letters nor as the name and its letters, "Did
+    /// I get that right, Jane?", not "…, J-A-N-E?". Initials stay as said.
+    #[test]
+    fn a_spelled_name_is_asked_back_as_the_name() {
+        for line in [
+            "J-A-N-E.",
+            "J A N E.",
+            "It's J, A, N, E.",
+            "Jane, J-A-N-E.",
+            "Jane. J A N E.",
+        ] {
+            assert_eq!(name_in(line), Some("Jane".into()), "{line}");
+        }
+        assert_eq!(name_in("José, J O S E."), Some("José".into()));
+        assert_eq!(name_in("A J"), Some("A J".into()));
+        assert_eq!(name_in("Jane"), Some("Jane".into()));
+    }
+
     #[test]
     fn the_head_is_still_at_its_goal_or_while_the_body_moves_its_own_goals() {
         let joints = |off: f64, velocity: f64, goal: f64| lamp_msgs::JointState {
@@ -6541,6 +6818,106 @@ mod tests {
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
     }
 
+    /// #5499: once the two-step walk ends, its progress holds all nine
+    /// steps, the seven out of its order `not_available`, so any
+    /// lamp-update sees it over; none of them is ever offered again.
+    #[test]
+    fn a_two_step_walk_ended_keeps_all_nine_and_offers_no_parked_step() {
+        let mut room = Room::new("two-steps-parked");
+        room.walk.definition =
+            Arc::new(skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap());
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
+        report(&room.walk, "where_you_sit", "skipped");
+        assert_eq!(room.wait(S, None), [WHERE_YOU_SIT_SKIPPED]);
+        assert_eq!(room.walk.kept().steps.len(), 1, "not before the end");
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "skipped");
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [skill::PREFERENCES_DONE]);
+        assert_eq!(room.walk.kept().steps.len(), Step::IDS.len());
+        for name in Step::IDS.iter().skip(2) {
+            assert_eq!(
+                room.walk.kept().steps[*name].outcome,
+                Outcome::NotAvailable,
+                "{name}"
+            );
+        }
+        // A day on, as the re-offers count it: nothing is offered.
+        for kept in room.walk.desired.steps.values_mut() {
+            kept.at_unix_s = 0;
+            kept.offered_at_unix_s = Some(0);
+        }
+        assert_eq!(room.walk.next_step(), None);
+        // Nor redone or reported by the model: a step out of the order is
+        // refused, its outcome kept. With the skill installed, the model is
+        // told so, never "ok" (the Reviewer-lead's P3 on #5521); unread, the
+        // runner still refuses it.
+        let redo = ToolCall {
+            id: "r".into(),
+            name: REDO.into(),
+            args: json!({"step": "touch"}),
+        };
+        let order = room.walk.definition.order.clone();
+        let (told, answered) = run_in(&room.walk.file, &redo, Some(&order));
+        assert!(answered);
+        assert!(told["error"].is_string(), "{told}");
+        assert!(told.get("ok").is_none(), "{told}");
+        assert!(run_in(&room.walk.file, &redo, None).1);
+        let unnamed = ToolCall {
+            args: json!({}),
+            ..redo.clone()
+        };
+        let told = run_in(&room.walk.file, &unnamed, Some(&order)).0;
+        assert!(
+            told["error"]
+                .as_str()
+                .is_some_and(|error| error.ends_with("The steps are: where_you_sit, who_you_are.")),
+            "{told}"
+        );
+        report(&room.walk, "touch", "skipped");
+        assert_eq!(room.wait(10 * S, Some(SIDE)), NONE);
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::NotAvailable));
+        assert_eq!(room.walk.kept().steps.len(), Step::IDS.len());
+    }
+
+    /// El's P3 on #5521: a lamp that ended both steps of the order on a
+    /// build that kept only those two gets the seven parked at load, so
+    /// lamp-update's wait for all nine sees the walk over without another
+    /// step ending.
+    #[test]
+    fn a_two_step_walk_ended_before_parking_is_filled_at_load() {
+        let mut room = Room::new("two-steps-parked-at-load");
+        room.walk
+            .finish(Step::WhereYouSit, Outcome::Done, None, room.at);
+        room.walk
+            .finish(Step::WhoYouAre, Outcome::Skipped, None, room.at);
+        room.walk.drain_storage_for_test(room.at);
+        assert_eq!(
+            room.walk.kept().steps.len(),
+            2,
+            "the nine-step fixture parks nothing"
+        );
+        let mut again = Onboarding::at(room.walk.file.clone());
+        again.definition =
+            Arc::new(skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap());
+        // Loaded again under the two-step order, as a restart on this build.
+        again.initialized = false;
+        again.drain_storage_for_test(0);
+        assert_eq!(again.kept().steps.len(), Step::IDS.len());
+        for name in Step::IDS.iter().skip(2) {
+            assert_eq!(
+                again.kept().steps[*name].outcome,
+                Outcome::NotAvailable,
+                "{name}"
+            );
+        }
+        assert_eq!(again.kept().steps["who_you_are"].outcome, Outcome::Skipped);
+        // Written, so the next load reads all nine from the file.
+        assert_eq!(
+            Onboarding::at(room.walk.file.clone()).kept().steps.len(),
+            Step::IDS.len()
+        );
+    }
+
     /// #5499: in the two-step walk, "who you are" ended with the name only
     /// still says the walk's last line, after its own.
     #[test]
@@ -6558,6 +6935,76 @@ mod tests {
             room.wait(4 * S, Some(NEAR_MIDDLE)),
             [skill::NAME_ONLY, skill::PREFERENCES_DONE]
         );
+    }
+
+    /// The Reviewer-lead's P2 on #5521: the walk's last line is said once
+    /// per walk. The face asked for once more leads "who you are" again;
+    /// its end, a no or a face saved, says nothing more.
+    #[test]
+    fn the_two_step_walk_says_its_last_line_once_after_the_face_asked_again() {
+        for saved in [false, true] {
+            let mut room = Room::new("two-steps-last-line-once");
+            room.walk.definition = Arc::new(
+                skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap(),
+            );
+            room.walk.face_kept = true;
+            room.walk
+                .finish(Step::WhereYouSit, Outcome::Done, None, room.at);
+            room.walk
+                .finish(Step::WhoYouAre, Outcome::Done, None, room.at);
+            room.walk.name_only(false, Vec::new());
+            assert_eq!(
+                room.wait(4 * S, Some(NEAR_MIDDLE)),
+                [skill::NAME_ONLY, skill::PREFERENCES_DONE]
+            );
+            back_date(&mut room, 1_801);
+            assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [skill::FACE_AGAIN]);
+            if saved {
+                face_saved(&room.walk.file, Some("Marie"));
+            } else {
+                room.walk.heard("No thanks.", room.at);
+            }
+            assert_eq!(
+                room.wait(
+                    FACE_SAVE_WAIT_US + START_QUIET_US + 2 * S,
+                    Some(NEAR_MIDDLE)
+                ),
+                NONE,
+                "saved: {saved}"
+            );
+            assert!(!room.walk.leading(), "saved: {saved}");
+            assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        }
+    }
+
+    /// lamp-52e6 on 6 Nov 13:45 (stable 10467, a redo): the name heard, the
+    /// face already known, so the model asked no face and none was saved;
+    /// the walk waited on a save that never came. The face wait runs from
+    /// the name: done, the name only, then the walk's last line.
+    #[test]
+    fn a_redo_with_a_face_already_known_ends_on_the_name_and_says_the_last_line() {
+        let mut room = Room::new("redo-face-known");
+        room.walk.definition =
+            Arc::new(skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap());
+        room.walk.face_kept = true;
+        room.wait(S, Some(NEAR_MIDDLE));
+        let redo = ToolCall {
+            id: "r".into(),
+            name: REDO.into(),
+            args: json!({"step": REDO_ALL}),
+        };
+        assert!(run(&room.walk.file, &redo).1);
+        let said = room.wait(7 * S, Some(NEAR_MIDDLE));
+        assert_eq!(said.last().map(String::as_str), Some(SIT_DONE), "{said:?}");
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        room.walk.heard("You can call me, Marie.", room.at);
+        room.walk.lamp_said(room.at);
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
+        assert_eq!(
+            room.wait(NAME_WAIT_US + START_QUIET_US + 2 * S, Some(NEAR_MIDDLE)),
+            [skill::NAME_ONLY, skill::PREFERENCES_DONE]
+        );
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
     }
 
     /// The Reviewer-lead's P2 on #3992: "No, it's Mary." after a name
@@ -7251,8 +7698,10 @@ mod tests {
         room.walk.first_tries = true;
         assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE_TRIES);
         assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE);
-        let redone = room.walk.desired.redone();
+        let mut redone = room.walk.desired.redone();
         assert!(redone.tries_said);
+        // The yeses' redo time aside (#5500, its own test below).
+        redone.yes_redone_at_unix_s.clear();
         assert_eq!(
             redone,
             Progress {
@@ -7267,6 +7716,377 @@ mod tests {
         let kept: Progress =
             serde_json::from_str(&serde_json::to_string(&room.walk.desired).unwrap()).unwrap();
         assert!(kept.tries_said);
+    }
+
+    /// The walk from its first step to "preferences"' done line, with
+    /// someone sitting in the middle.
+    fn walk_to_the_done_line(room: &mut Room) {
+        walk_to(room, skill::PREFERENCES_DONE);
+    }
+
+    /// As [`walk_to_the_done_line`], the walk's last line being `done`.
+    fn walk_to(room: &mut Room, done: &str) {
+        assert_eq!(
+            room.wait(27 * S, Some(NEAR_MIDDLE)),
+            [SIT_NOTE, SIT_DONE, WHO_NOTE]
+        );
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        room.walk.heard("Quiet from 10PM, please.", room.at);
+        room.walk.lamp_said(room.at);
+        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
+        room.walk.heard("Yes, that's fine.", room.at);
+        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [done]);
+    }
+
+    /// A walk with [`harness_line::ENVIRONMENT`] as `switch`, the tasks part
+    /// saying `linked` (`None`: no tasks part).
+    fn harness_room(name: &str, switch: bool, linked: Option<harness_line::Linked>) -> Room {
+        let mut room = Room::new(name);
+        room.walk.harness_line = switch;
+        room.walk.harness_read = linked.map(|linked| Arc::new(std::sync::Mutex::new(linked)));
+        room
+    }
+
+    /// The same file read by a voice started again, with the switch on and
+    /// Harness signed out.
+    fn restarted(room: &Room) -> Room {
+        let mut again = Room {
+            walk: Onboarding::at(room.walk.file.clone()),
+            at: room.at,
+            said: room.said,
+            still: true,
+            body_on_bus: false,
+        };
+        again.walk.harness_line = true;
+        again.walk.harness_read = Some(Arc::new(std::sync::Mutex::new(harness_line::Linked::No)));
+        again
+    }
+
+    fn fixed(note: &str) -> String {
+        fixed_words(note).unwrap().to_owned()
+    }
+
+    /// #5488: with the switch on and Harness not signed in, the walk's
+    /// closing ends with the one sentence about Harness, inside the same
+    /// quoted line (one turn); nothing follows it. A restart, and a redo of
+    /// the whole walk to its end, never say it again: the plain done line.
+    #[test]
+    fn the_sentence_about_harness_ends_the_closing_once() {
+        let mut room = harness_room("harness-line", true, Some(harness_line::Linked::No));
+        walk_to(&mut room, skill::PREFERENCES_DONE_HARNESS);
+        assert_eq!(
+            fixed(skill::PREFERENCES_DONE_HARNESS),
+            format!(
+                "{} {}",
+                fixed(skill::PREFERENCES_DONE),
+                harness_line::SENTENCE
+            )
+        );
+        assert_eq!(
+            room.walk.kept().harness_line,
+            Some(harness_line::Kept::Said)
+        );
+        assert!(room.wait(60 * S, Some(NEAR_MIDDLE)).is_empty());
+        // The voice restarts: the walk is over and the sentence was said.
+        let mut again = restarted(&room);
+        assert!(again.wait(60 * S, Some(NEAR_MIDDLE)).is_empty());
+        // "Lamp, let's redo the setup": walked again to its end, plain.
+        let redo = ToolCall {
+            id: "c".into(),
+            name: REDO.into(),
+            args: json!({"step": "all"}),
+        };
+        assert!(run(&again.walk.file, &redo).1);
+        walk_to_the_done_line(&mut again);
+        assert!(again.wait(60 * S, Some(NEAR_MIDDLE)).is_empty());
+        assert_eq!(
+            again.walk.kept().harness_line,
+            Some(harness_line::Kept::Said)
+        );
+        // An older file without the field reads as not yet decided.
+        let old: Progress = serde_json::from_str(r#"{"steps":{}}"#).unwrap();
+        assert_eq!(old.harness_line, None);
+    }
+
+    /// #5488: signed in (or signed in and offline), or with no tasks part,
+    /// the closing is the plain done line, and the sentence is kept as
+    /// skipped, so no later closing says it.
+    #[test]
+    fn the_sentence_about_harness_is_dropped_unless_harness_is_signed_out() {
+        for (linked, kept) in [
+            (
+                Some(harness_line::Linked::Yes),
+                harness_line::Kept::SignedIn,
+            ),
+            (None, harness_line::Kept::NoTasks),
+        ] {
+            let mut room = harness_room(&format!("harness-skip-{kept:?}"), true, linked);
+            walk_to_the_done_line(&mut room);
+            assert!(room.wait(60 * S, Some(NEAR_MIDDLE)).is_empty(), "{kept:?}");
+            assert_eq!(room.walk.kept().harness_line, Some(kept));
+            // Signed out later: a later closing is still the plain one.
+            room.walk.harness_read =
+                Some(Arc::new(std::sync::Mutex::new(harness_line::Linked::No)));
+            assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE);
+        }
+    }
+
+    /// #5488 review (P3 1): a tasks part that does not say at the closing
+    /// (lamp-tasks just restarted, its sign-in not read yet) leaves the
+    /// closing plain and keeps nothing, so the next closing reads again:
+    /// signed out by then, it carries the sentence, once.
+    #[test]
+    fn an_unknown_sign_in_is_read_again_at_the_next_closing() {
+        let mut room = harness_room("harness-unknown", true, Some(harness_line::Linked::Unknown));
+        walk_to_the_done_line(&mut room);
+        assert!(room.wait(60 * S, Some(NEAR_MIDDLE)).is_empty());
+        assert_eq!(room.walk.kept().harness_line, None);
+        assert!(room.walk.harness_read.is_some(), "still read");
+        let read = room.walk.harness_read.clone().unwrap();
+        *read.lock().unwrap() = harness_line::Linked::No;
+        assert_eq!(
+            room.walk.preferences_done(),
+            skill::PREFERENCES_DONE_HARNESS
+        );
+        assert_eq!(
+            room.walk.desired.harness_line,
+            Some(harness_line::Kept::Said)
+        );
+        assert!(room.walk.harness_read.is_none(), "let go once decided");
+        assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE);
+    }
+
+    /// The reviewer-lead's P3 on #5583: a read whose thread could not be
+    /// started is not kept as a read that stays unknown for good: the
+    /// closing is plain, nothing is decided, and the next closing starts the
+    /// read again, once each time (no loop of tries).
+    #[test]
+    fn a_read_that_could_not_be_started_is_started_again_at_the_next_closing() {
+        let mut room = harness_room("harness-not-started", true, None);
+        room.walk.harness_socket = Some(PathBuf::from("/nonexistent/request.sock"));
+        room.walk.harness_spawn = |_| Err(std::io::Error::other("no threads left"));
+        room.walk.keep_harness_read();
+        assert!(room.walk.harness_read.is_none(), "not started");
+        assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE);
+        assert_eq!(room.walk.kept().harness_line, None, "not decided");
+        assert!(room.walk.harness_read.is_none(), "still not started");
+        room.walk.harness_spawn = |_| Ok(());
+        assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE);
+        assert!(room.walk.harness_read.is_some(), "started again");
+    }
+
+    /// #5488 review (P3 2): once the sentence is decided the walk lets its
+    /// read go, so the thread asking the tasks part every 20 s ends; a
+    /// voice started again on a decided file lets it go as the file loads.
+    #[test]
+    fn the_read_of_harness_is_let_go_once_the_sentence_is_decided() {
+        for (linked, done) in [
+            (harness_line::Linked::No, skill::PREFERENCES_DONE_HARNESS),
+            (harness_line::Linked::Yes, skill::PREFERENCES_DONE),
+        ] {
+            let mut room = harness_room(&format!("harness-let-go-{linked:?}"), true, Some(linked));
+            walk_to(&mut room, done);
+            assert!(room.walk.kept().harness_line.is_some(), "{linked:?}");
+            assert!(room.walk.harness_read.is_none(), "{linked:?}");
+            let mut again = restarted(&room);
+            // The fixture loads the file before the switch is set; a voice
+            // started with it on loads it with the switch on, as here.
+            again.walk.keep_harness_read();
+            assert!(again.walk.harness_read.is_none(), "{linked:?}");
+            assert!(again.wait(60 * S, Some(NEAR_MIDDLE)).is_empty());
+            assert!(again.walk.harness_read.is_none(), "{linked:?}");
+        }
+    }
+
+    /// #5488, the PM's condition: with `LAMP_ONBOARDING_FIRST_TRIES` on
+    /// too, a new owner hears one closing, not two: the sentence ends the
+    /// done line with the tries, one note and one turn, and nothing follows
+    /// it. Signed in, it is dropped: the done line with the tries alone.
+    /// Either way it is kept as decided, as alone.
+    #[test]
+    fn with_the_first_tries_the_sentence_about_harness_is_in_the_one_closing() {
+        for (linked, done, kept) in [
+            (
+                harness_line::Linked::No,
+                skill::PREFERENCES_DONE_TRIES_HARNESS,
+                harness_line::Kept::Said,
+            ),
+            (
+                harness_line::Linked::Yes,
+                skill::PREFERENCES_DONE_TRIES,
+                harness_line::Kept::SignedIn,
+            ),
+        ] {
+            let mut room = harness_room(&format!("harness-tries-{kept:?}"), true, Some(linked));
+            room.walk.first_tries = true;
+            walk_to(&mut room, done);
+            assert!(room.wait(60 * S, Some(NEAR_MIDDLE)).is_empty(), "{kept:?}");
+            assert_eq!(room.walk.kept().harness_line, Some(kept));
+            assert!(room.walk.kept().tries_said);
+        }
+        assert_eq!(
+            fixed(skill::PREFERENCES_DONE_TRIES_HARNESS),
+            format!(
+                "{} {}",
+                fixed(skill::PREFERENCES_DONE_TRIES),
+                harness_line::SENTENCE
+            )
+        );
+    }
+
+    /// #5488 on #5499's two-step walk: its done line, now said when "who you
+    /// are" ends, carries the sentence as it does after "preferences": one
+    /// closing turn, said once (a restart says nothing more). With the
+    /// tries on too, that one closing has both.
+    #[test]
+    fn the_two_step_walks_one_closing_carries_the_sentence() {
+        for (tries, done) in [
+            (false, skill::PREFERENCES_DONE_HARNESS),
+            (true, skill::PREFERENCES_DONE_TRIES_HARNESS),
+        ] {
+            let mut room = harness_room(
+                &format!("harness-two-steps-{tries}"),
+                true,
+                Some(harness_line::Linked::No),
+            );
+            room.walk.first_tries = tries;
+            let mut definition = (*room.walk.definition).clone();
+            definition.order = vec![Step::WhereYouSit, Step::WhoYouAre];
+            room.walk.definition = Arc::new(definition.checked().unwrap());
+            assert_eq!(
+                room.wait(27 * S, Some(NEAR_MIDDLE)),
+                [SIT_NOTE, SIT_DONE, WHO_NOTE]
+            );
+            report(&room.walk, "who_you_are", "done");
+            assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [done], "{tries}");
+            assert!(room.wait(60 * S, Some(NEAR_MIDDLE)).is_empty(), "{tries}");
+            assert_eq!(
+                room.walk.kept().harness_line,
+                Some(harness_line::Kept::Said)
+            );
+            let mut again = restarted(&room);
+            again.walk.definition = room.walk.definition.clone();
+            assert!(again.wait(60 * S, Some(NEAR_MIDDLE)).is_empty(), "{tries}");
+        }
+    }
+
+    /// #5488: the done note itself carries the sentence, so it goes
+    /// wherever the done line is said: chosen by [`Onboarding::preferences_done`]
+    /// for each switch combination, appended once, dropped when Harness is
+    /// signed in.
+    #[test]
+    fn the_done_note_carries_the_sentence_once_for_each_switch() {
+        for (harness, tries, linked, first) in [
+            (
+                true,
+                false,
+                harness_line::Linked::No,
+                skill::PREFERENCES_DONE_HARNESS,
+            ),
+            (
+                true,
+                true,
+                harness_line::Linked::No,
+                skill::PREFERENCES_DONE_TRIES_HARNESS,
+            ),
+            (
+                true,
+                false,
+                harness_line::Linked::Yes,
+                skill::PREFERENCES_DONE,
+            ),
+            (
+                true,
+                true,
+                harness_line::Linked::Yes,
+                skill::PREFERENCES_DONE_TRIES,
+            ),
+            (
+                false,
+                false,
+                harness_line::Linked::No,
+                skill::PREFERENCES_DONE,
+            ),
+            (
+                false,
+                true,
+                harness_line::Linked::No,
+                skill::PREFERENCES_DONE_TRIES,
+            ),
+        ] {
+            let mut room = harness_room(
+                &format!("harness-done-{harness}-{tries}-{linked:?}"),
+                harness,
+                Some(linked),
+            );
+            room.walk.first_tries = tries;
+            let case = format!("{harness} {tries} {linked:?}");
+            assert_eq!(room.walk.preferences_done(), first, "{case}");
+            assert_eq!(
+                room.walk.preferences_done(),
+                skill::PREFERENCES_DONE,
+                "{case}: once"
+            );
+            assert_eq!(room.walk.desired.harness_line.is_some(), harness, "{case}");
+        }
+    }
+
+    /// #5488: the switch off, nothing changes: the plain done line, no
+    /// sentence, nothing kept.
+    #[test]
+    fn without_the_harness_line_switch_the_walk_ends_as_before() {
+        let mut room = harness_room("harness-off", false, Some(harness_line::Linked::No));
+        walk_to_the_done_line(&mut room);
+        assert!(room.wait(60 * S, Some(NEAR_MIDDLE)).is_empty());
+        assert_eq!(room.walk.kept().harness_line, None);
+        assert!(
+            !serde_json::to_string(room.walk.kept())
+                .unwrap()
+                .contains("harness")
+        );
+    }
+
+    /// #5500: a redo of the whole walk, and a redo of either yes step, say
+    /// when, so a yes the owner gave in the app before it is taken back at
+    /// the next write (`storage::app_yes_stands`); a redo of another step
+    /// leaves the time as it was. Kept across a save and a read; an older
+    /// file has none.
+    #[test]
+    fn a_redo_says_when_the_yeses_were_redone() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let redone = Progress::default().redone();
+        for step in [ROOM_SOUNDS, FACE_EXPRESSIONS] {
+            assert!(redone.yes_redone_at_unix_s[step] >= now, "{step}");
+        }
+        let mut room = Room::new("yes-redone");
+        room.walk.redo_step(Step::WhoYouAre, room.at);
+        assert!(room.walk.desired.yes_redone_at_unix_s.is_empty());
+        room.walk.redo_step(Step::FaceExpressions, room.at);
+        assert_eq!(
+            room.walk
+                .desired
+                .yes_redone_at_unix_s
+                .keys()
+                .collect::<Vec<_>>(),
+            [FACE_EXPRESSIONS]
+        );
+        let kept: Progress =
+            serde_json::from_str(&serde_json::to_string(&room.walk.desired).unwrap()).unwrap();
+        assert_eq!(
+            kept.yes_redone_at_unix_s,
+            room.walk.desired.yes_redone_at_unix_s
+        );
+        let old: Progress = serde_json::from_str(r#"{"steps":{}}"#).unwrap();
+        assert!(old.yes_redone_at_unix_s.is_empty());
+        assert!(
+            !serde_json::to_string(&Progress::default())
+                .unwrap()
+                .contains("yes_redone")
+        );
     }
 
     /// Reviewer-two's P2 on #4326: the hello is owed after the first answer
@@ -8380,7 +9200,17 @@ mod tests {
         let (mut room, _says, root) = at_touch("owed-unsaid");
         assert_eq!(
             room.wait_played(90 * S, Some(NEAR_MIDDLE), Delivery::Unsaid),
-            [TOUCH_REMIND, later, later, later, PREFERENCES_NOTE]
+            // The next step's first note, never said either, is asked again
+            // at once too.
+            [
+                TOUCH_REMIND,
+                later,
+                later,
+                later,
+                PREFERENCES_NOTE,
+                PREFERENCES_NOTE,
+                PREFERENCES_NOTE
+            ]
         );
         std::fs::remove_dir_all(root).unwrap();
         let (mut room, _says, root) = at_touch("owed-cut");
@@ -8389,6 +9219,52 @@ mod tests {
             [TOUCH_REMIND, later, PREFERENCES_NOTE]
         );
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// Who you are, asked: [`WHO_NOTE`] handed out, its turn played as
+    /// `delivery` says.
+    fn who_asked(name: &str, delivery: Delivery) -> Room {
+        let mut room = Room::new(name);
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        let mut notes = Vec::new();
+        while notes.is_empty() && room.at < 60 * S {
+            notes = room.wait_played(S / 4, Some(NEAR_MIDDLE), delivery);
+        }
+        assert_eq!(notes, [WHO_NOTE]);
+        room
+    }
+
+    /// lamp-52e6, build 10507: who_you_are's first note committed, its turn
+    /// retired by a room line heard as no words before any audio. Never
+    /// heard, it is asked again once the room is quiet, not after
+    /// [`STEP_GIVE_UP_US`] of silence.
+    #[test]
+    fn a_first_note_never_said_is_asked_again_at_once() {
+        let mut room = who_asked("first-note-unsaid", Delivery::Unsaid);
+        let lost = room.at;
+        assert_eq!(room.wait(START_QUIET_US + S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        assert!(room.at - lost < STEP_GIVE_UP_US);
+        let records = room.walk.take_records();
+        assert!(
+            records
+                .iter()
+                .any(|line| line["kind"] == "onboarding_note_unsaid"
+                    && line["step"] == "who_you_are"
+                    && line["said_again"] == true),
+            "{records:?}"
+        );
+        // Heard this time: not said again.
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), NONE);
+    }
+
+    /// A first note any of which played (whole, or cut by someone speaking)
+    /// is not said again while the step waits for its answer.
+    #[test]
+    fn a_first_note_played_is_not_asked_again() {
+        for delivery in [Delivery::Whole, Delivery::Cut] {
+            let mut room = who_asked(&format!("first-note-{delivery:?}"), delivery);
+            assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), NONE, "{delivery:?}");
+        }
     }
 
     /// The Reviewer-lead's P3s on #4012: an offer that ends unsaid keeps
@@ -8559,7 +9435,7 @@ mod tests {
         let at = room.walk.kept().steps["room_sounds"].at_unix_s;
         assert_eq!(
             kept,
-            json!({"version":1,"room_sounds":"yes","at_unix_s":at})
+            json!({"version":1,"room_sounds":"yes","at_unix_s":at,"by":"voice"})
         );
         assert_eq!(
             std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
@@ -8693,7 +9569,8 @@ mod tests {
         // Exactly what lamp-eyes' `face_expressions_yes` reads as a yes.
         assert_eq!(
             std::fs::read(&path).unwrap(),
-            format!(r#"{{"at_unix_s":{at},"face_expressions":"yes","version":1}}"#).as_bytes()
+            format!(r#"{{"at_unix_s":{at},"by":"voice","face_expressions":"yes","version":1}}"#)
+                .as_bytes()
         );
         assert!(!room_sounds_file(&room).exists());
         report(&room.walk, "preferences", "done");
@@ -8781,7 +9658,8 @@ mod tests {
         let at = room.walk.kept().steps["face_expressions"].at_unix_s;
         assert_eq!(
             std::fs::read(face_expressions_file(&room)).unwrap(),
-            format!(r#"{{"at_unix_s":{at},"face_expressions":"yes","version":1}}"#).as_bytes()
+            format!(r#"{{"at_unix_s":{at},"by":"voice","face_expressions":"yes","version":1}}"#)
+                .as_bytes()
         );
         // The model's late report changes nothing.
         report(&room.walk, "face_expressions", "skipped");
@@ -8867,142 +9745,56 @@ mod tests {
         assert_eq!(nearest(&lamp_msgs::Faces { faces: vec![] }), None);
     }
 
-    /// lamp-29e7's re-test, 29 Oct 09:39 (#3702): with giving way parked,
-    /// the model was still told of it (`setup_step`'s steps and "the body
-    /// giving way"), asked for it in its own words ("push gently against my
-    /// arm or head, and I'll give way") and reported it skipped. Parked, the
-    /// functions name no such step and say nothing of it, and they tell the
-    /// model never to lead or count a step itself.
+    /// lamp-29e7's re-test, 29 Oct 09:39 (#3702), a parked step told was
+    /// asked in the model's own words; lamp-52e6, 6 Nov 13:26 (#5499), told
+    /// the walk's two steps, it said "Step one is done: I know where you
+    /// sit. Now the second step". The functions name no step and no count,
+    /// and a report needs no step: it is the one led now.
     #[test]
-    fn a_parked_step_is_never_told_to_the_model() {
-        let told = tools(&lamp_msgs::ONBOARDING_STEPS, true, true);
-        let text = told_text(&told);
-        // Put back (PARKED false), it is told again, with nothing else changed.
-        let told_of = !giving_way::PARKED;
-        assert_eq!(text.contains("giving_way"), told_of, "{text}");
-        assert_eq!(text.contains("giving way"), told_of, "{text}");
-        for name in Step::IDS
-            .iter()
-            .filter(|name| told_of || **name != Step::GivingWay.name())
-        {
-            assert!(text.contains(name), "{name} is told");
-        }
-        assert!(
-            told[0]
-                .description
-                .contains("never name, announce, explain or ask a step yourself"),
-            "{}",
-            told[0].description
-        );
-    }
-
-    /// #5499: the model is told only the walk's two steps, whatever the
-    /// lamp's flags: a step it is told of, it may ask in its own words.
-    #[test]
-    fn only_the_walks_steps_are_told_to_the_model() {
-        let told = tools(&lamp_msgs::ONBOARDING_WALK, true, true);
-        let text = told_text(&told);
-        for name in Step::IDS {
-            assert_eq!(
-                text.contains(name),
-                lamp_msgs::ONBOARDING_WALK.contains(&name),
-                "{name}: {text}"
-            );
-        }
-        assert!(!text.contains("preferences"), "{text}");
-        assert!(
-            told[0]
-                .description
-                .contains("now; where_you_sit can only be skipped; the runner requires physical evidence: seeing them."),
-            "{}",
-            told[0].description
-        );
-    }
-
-    fn told_text(told: &[Tool]) -> String {
-        serde_json::to_string(
+    fn the_model_is_told_no_step_and_no_count() {
+        let told = tools();
+        let text = serde_json::to_string(
             &told
                 .iter()
                 .map(|tool| json!([tool.name, tool.description, tool.parameters]))
                 .collect::<Vec<_>>(),
         )
-        .unwrap()
+        .unwrap();
+        for name in Step::IDS {
+            assert!(!text.contains(name), "{name}: {text}");
+        }
+        for word in ["second", "two", "nine", "giving way", "touch"] {
+            assert!(!text.contains(word), "{word}: {text}");
+        }
+        assert!(
+            told[0].description.contains(
+                "never name, number, announce, explain or ask a step yourself, never say what \
+                 is done or what comes next"
+            ),
+            "{}",
+            told[0].description
+        );
+        assert_eq!(
+            told[0].parameters.as_ref().unwrap()["required"],
+            json!(["outcome"])
+        );
     }
 
-    /// lamp-52e6 on 30 Oct (8811, #3769): face expressions off
-    /// (`LAMP_FACE_EXPRESSIONS_ASK` unset), the model, told of
-    /// face_expressions by `setup_step`, asked "Do you mind if I notice
-    /// whether you're smiling or frowning" after the hello. A step this lamp
-    /// never offers is in no function's steps or words; offered, it is told
-    /// as before. Room sounds likewise.
+    /// A report naming no step is the led step's (#5499): "where you sit"
+    /// skipped with no step named says its skip, as one named would.
     #[test]
-    fn a_step_this_lamp_never_offers_is_never_told_to_the_model() {
-        let off = told_text(&tools(&lamp_msgs::ONBOARDING_STEPS, false, false));
-        for word in [
-            "face",
-            "smil",
-            "frown",
-            "express",
-            "room_sounds",
-            "clear yes",
-        ] {
-            assert!(!off.contains(word), "{word}: {off}");
-        }
-        let face_only = tools(&lamp_msgs::ONBOARDING_STEPS, false, true);
-        assert!(
-            face_only[0]
-                .description
-                .contains(" face_expressions is done only after a clear yes. The runner asks")
-        );
-        assert!(!told_text(&face_only).contains("room_sounds"));
-        let sounds_only = tools(&lamp_msgs::ONBOARDING_STEPS, true, false);
-        assert!(
-            sounds_only[0]
-                .description
-                .contains(" room_sounds is done only after a clear yes. The runner asks")
-        );
-        assert!(!told_text(&sounds_only).contains("face"));
-        // Both offered: today's words and steps, unchanged.
-        let both = tools(&lamp_msgs::ONBOARDING_STEPS, true, true);
-        assert!(both[0].description.contains(
-            "receipt. room_sounds and face_expressions are done only after a clear yes. The \
-             runner asks"
-        ));
-        for tool in &both {
-            let steps = tool.parameters.as_ref().unwrap()["properties"]["step"]["enum"]
-                .as_array()
-                .unwrap()
-                .clone();
-            for name in [ROOM_SOUNDS, FACE_EXPRESSIONS] {
-                assert!(steps.iter().any(|step| step == name), "{name}");
-            }
-        }
-    }
-
-    /// lamp-52e6 on 30 Oct 13:27 (#3769): the quiet hours' answer ran to 17
-    /// words and held the hello 13.1 s. Every answer turn in "preferences",
-    /// the quiet hours' too, is told five words and no question, whichever
-    /// steps the lamp offers; no other step is.
-    #[test]
-    fn every_preferences_answer_is_told_five_words_and_no_question() {
-        for (sounds, face) in [(false, false), (true, false), (false, true), (true, true)] {
-            let told = tools(&lamp_msgs::ONBOARDING_STEPS, sounds, face);
-            assert!(
-                told[0].description.ends_with(
-                    "In the preferences step only, answer each line in at most five words and \
-                     never with a question: the runner asks the rest itself."
-                ),
-                "{}",
-                told[0].description
-            );
-            // Other steps still ask again ("Sorry, what should I call
-            // you?"): the cap is said once, scoped to preferences, and no
-            // other function carries it.
-            let text = told_text(&told);
-            assert_eq!(text.matches("five words").count(), 1, "{text}");
-            assert_eq!(text.matches("never with a question").count(), 1, "{text}");
-            assert!(!told[1].description.contains("five words"));
-        }
+    fn a_report_naming_no_step_is_the_led_steps() {
+        let mut room = Room::new("no-step-named");
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
+        let call = ToolCall {
+            id: "c".into(),
+            name: STEP.into(),
+            args: json!({"outcome": "skipped"}),
+        };
+        let (told, ok) = run(&room.walk.file, &call);
+        assert!(ok && told["ok"] == true, "{told}");
+        assert_eq!(room.wait(S, None), [WHERE_YOU_SIT_SKIPPED]);
+        assert_eq!(room.outcome(Step::WhereYouSit), Some(Outcome::Skipped));
     }
 
     /// The hello answered, `setup_step` for "preferences" tells the model

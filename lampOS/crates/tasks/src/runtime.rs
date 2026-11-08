@@ -4,12 +4,15 @@ use crate::{
         CLOSE_TRIES, Clock as ClockSample, CloseJob, Engine, Error as EngineError, LaunchJob,
         ObservationJob, Watched,
     },
+    follow::{CliWatch, Follows, WatchLane},
     harness::{
-        AccountMachine, CLOSE_BUDGET, Cli, CliConfig, Closed, Ended, EngineKind, Launch,
+        AccountMachine, CLOSE_BUDGET, Cli, CliConfig, Closed, Ended, EngineKind, EngineRow, Launch,
         LaunchOutcome, Listed, MOST_WAITED, Observation, SignIn, Target,
     },
+    now::Now as TasksNow,
     progress::{Reads, Tracker},
     protocol::{Answer, MAX_LINE_BYTES, MAX_REPLY_BYTES, Request},
+    readiness::{EARLY_REFUSALS, Known, engines_path, probe_line, read_engines, write_engines},
     sign_in::{By as SignInBy, Method as SignInMethod, Session as SignInSession, Starter},
     store::Store,
 };
@@ -143,6 +146,12 @@ pub struct Config {
     /// --push-wait`, #560). The watch's looks stay, as the backstop. Off
     /// unless set.
     pub push_wait: bool,
+    /// Hold Harness's own `watch` on each task the watch looks at, one a
+    /// task and at most `follow::MOST_FOLLOWED`, and read a task at once
+    /// when its agent settles (`serve --push-watch`, #5230). The watch's
+    /// looks stay, as the backstop, and `--push-wait` keeps the tasks no
+    /// watch follows. Off unless set.
+    pub push_watch: bool,
     /// Close the harness each task started once its answer is told and a
     /// read just before finds it idle on that turn (`serve --close-told`,
     /// #1390). Off unless set.
@@ -193,14 +202,24 @@ pub struct SetUpLater {
     /// [`MACHINES_EVERY_LOOKS`] looks, with this engine. Never over a file
     /// someone else wrote ([`write_targets_from_machines`]).
     pub from_machines: Option<EngineKind>,
+    /// `serve --engines-from-machines` (#5199), only with
+    /// `from_machines`: after each look at the machines, each computer a
+    /// target names is asked which engines it has (`harness machines
+    /// engines`), on a lane of its own; a target written from the machines
+    /// gets one it has, and a `prepare` is refused at once when its
+    /// computer is known offline, or its engine not found there or known not
+    /// signed in ([`crate::readiness`]). Off unless set.
+    pub engines: bool,
 }
 
 /// `serve --targets-from-machines` asks Harness for the machines once in
 /// this many looks: every five minutes on a lamp.
 pub const MACHINES_EVERY_LOOKS: u32 = 5;
 /// The folder each written target names on the person's computer: today's
-/// on lamp-4ace (`docs/tasks.md`). Harness never makes it: a computer
-/// without it refuses the hand-over (`serve --folder-missing`, #2840).
+/// on lamp-4ace (`docs/tasks.md`). Harness makes it on the first hand-over
+/// to each computer, asked as `--new lamp-tasks` ([`HarnessSwitches::apply`],
+/// #5541); one Harness still refuses for it is said with `serve
+/// --folder-missing` (#2840).
 pub const MACHINES_PROJECT: &str = "~/harnesses/lamp-tasks";
 
 /// How often `serve --set-up-later` looks at the targets and the sign-in.
@@ -330,6 +349,19 @@ pub fn read_targets_or_newer(path: &Path) -> io::Result<Result<BTreeMap<String, 
     Ok(Ok(document.targets))
 }
 
+/// Harness's `machines engines`, asked beside the adapter's one lane
+/// (`serve --engines-from-machines`, #5199): one computer at a time, never
+/// on a hand-over's way.
+pub trait EnginesLane: Send + Sync + 'static {
+    /// Every engine `machine_id` says it has, as it says now.
+    fn engines(&self, machine_id: &str) -> Result<Vec<EngineRow>, String>;
+}
+impl EnginesLane for Cli {
+    fn engines(&self, machine_id: &str) -> Result<Vec<EngineRow>, String> {
+        Cli::engines(self, machine_id)
+    }
+}
+
 /// Harness's own `wait`, held beside the adapter's one lane (`serve
 /// --push-wait`): several may run at once, one a machine.
 pub trait WaitLane: Send + Sync + 'static {
@@ -365,6 +397,16 @@ pub trait Adapter: Send + 'static {
     /// A lane for `wait`, apart from this adapter's own (`serve
     /// --push-wait`); none when the adapter has no such thing.
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
+        None
+    }
+    /// A lane for `watch`, apart from this adapter's own (`serve
+    /// --push-watch`); none when the adapter has no such thing.
+    fn watch_lane(&self) -> Option<Arc<dyn WatchLane>> {
+        None
+    }
+    /// A lane for `machines engines`, apart from this adapter's own
+    /// (`serve --engines-from-machines`); none when it has no such thing.
+    fn engines_lane(&self) -> Option<Arc<dyn EnginesLane>> {
         None
     }
     /// Close a harness this lamp started, its result told (#1390). An
@@ -429,6 +471,24 @@ impl Adapter for Cli {
             }
         }
     }
+    fn watch_lane(&self) -> Option<Arc<dyn WatchLane>> {
+        match self.lane() {
+            Ok(lane) => Some(Arc::new(CliWatch(lane))),
+            Err(error) => {
+                eprintln!("tasks: no lane for watch: {error}");
+                None
+            }
+        }
+    }
+    fn engines_lane(&self) -> Option<Arc<dyn EnginesLane>> {
+        match self.lane() {
+            Ok(lane) => Some(Arc::new(lane)),
+            Err(error) => {
+                eprintln!("tasks: no lane for the computers' engines: {error}");
+                None
+            }
+        }
+    }
     fn launch(&self, launch: &Launch) -> LaunchOutcome {
         Cli::launch(self, launch)
     }
@@ -483,6 +543,18 @@ impl Adapter for Production {
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
         match self {
             Self::Cli(cli) => Adapter::wait_lane(&**cli),
+            Self::Absent => None,
+        }
+    }
+    fn watch_lane(&self) -> Option<Arc<dyn WatchLane>> {
+        match self {
+            Self::Cli(cli) => Adapter::watch_lane(&**cli),
+            Self::Absent => None,
+        }
+    }
+    fn engines_lane(&self) -> Option<Arc<dyn EnginesLane>> {
+        match self {
+            Self::Cli(cli) => Adapter::engines_lane(&**cli),
             Self::Absent => None,
         }
     }
@@ -679,8 +751,39 @@ struct SetUp {
     /// The targets file changed and is not valid: the targets before it
     /// are kept.
     targets_invalid: bool,
-    /// Harness's sign-in, once read.
+    /// Harness's sign-in, as last read; let go after
+    /// [`SIGN_IN_FAILED_READS`] failed reads in a row.
     sign_in: Option<SignIn>,
+    /// A read of the sign-in has answered in this run (whether its daemon
+    /// was started at this start, #5379, is decided once).
+    sign_in_answered: bool,
+    /// Failed reads of the sign-in since the last that answered.
+    sign_in_failures: u32,
+}
+
+/// Failed reads of Harness's sign-in in a row after which what was last read
+/// is let go: three looks, about three minutes on a lamp. Before, a sign-out
+/// followed by failing reads kept `yes` on `status` until a restart (#5488
+/// follow-up); one failed read still says nothing about the account.
+const SIGN_IN_FAILED_READS: u32 = 3;
+
+impl SetUp {
+    /// A read of Harness's sign-in that answered: kept, and the failures
+    /// counted from naught again.
+    fn sign_in_read(&mut self, sign_in: SignIn) {
+        self.sign_in = Some(sign_in);
+        self.sign_in_answered = true;
+        self.sign_in_failures = 0;
+    }
+
+    /// A read of Harness's sign-in that failed: what was last read is kept
+    /// until [`SIGN_IN_FAILED_READS`] fail in a row, then let go, so
+    /// `status` says no `signed_in` (not known) until a read answers again.
+    /// True when it is let go.
+    fn sign_in_not_read(&mut self) -> bool {
+        self.sign_in_failures = self.sign_in_failures.saturating_add(1);
+        self.sign_in_failures >= SIGN_IN_FAILED_READS && self.sign_in.take().is_some()
+    }
 }
 enum Job {
     Launch(LaunchJob),
@@ -818,16 +921,19 @@ const LOOK_ASIDE_EVERY: Duration = Duration::from_secs(60);
 
 /// The owner's switches: `serve --watch`, `--progress`, the `wait` lane
 /// (`--push-wait`), `--close-told`, `--set-up-later` and what starts a
-/// sign-in (`--sign-in-by-code`).
+/// sign-in (`--sign-in-by-code`), and the `watch` lane (`--push-watch`).
 type Switches = (
     bool,
     bool,
     Option<Arc<dyn WaitLane>>,
+    Option<Arc<dyn WatchLane>>,
     bool,
     Option<SetUpLater>,
     Option<Starter>,
     // [`Config::daemon_retry_after`].
     Duration,
+    // The lane for the computers' engines (`--engines-from-machines`).
+    Option<Arc<dyn EnginesLane>>,
 );
 
 fn owner<C: Clock>(
@@ -838,15 +944,32 @@ fn owner<C: Clock>(
     current: Arc<Mutex<Report>>,
     // When to stop, and the file keeping the newest sign-in id (#5198).
     (stop, sign_in_ids): (Arc<AtomicBool>, PathBuf),
-    (watch, progress, lane, close_told, set_up_later, mut sign_in_starter, daemon_retry_after): Switches,
+    (
+        watch,
+        progress,
+        lane,
+        watch_lane,
+        close_told,
+        set_up_later,
+        mut sign_in_starter,
+        daemon_retry_after,
+        engines_lane,
+    ): Switches,
 ) -> io::Result<()> {
     let mut requests = 0u64;
     let mut busy = false;
+    // Dropped before `waits` and the engine: every `watch` child is killed
+    // and reaped when the owner ends, however it ends.
+    let mut follows = Follows::new(watch_lane);
     let mut waits = Waits::new(lane);
     // Progress lives here, beside the engine, and only in memory: what an
     // agent says while it works is not part of the durable record.
     // Each run counts changes afresh, and says which run it is.
     let mut tracker = progress.then(|| Tracker::started(unix_ms()));
+    // "Tasks now" (#4342), beside it and in memory only too: each task's
+    // last step outlives the tracker's line, which goes when the watch
+    // lets the task go.
+    let mut tasks_now = progress.then(TasksNow::new);
     let mut status: Option<(u64, Arc<TaskStatus>)> = None;
     let mut status_began = Instant::now();
     // A store kept aside is looked for again once a minute (#1505).
@@ -862,6 +985,18 @@ fn owner<C: Clock>(
     // What the last write from the machines said, so the journal has one
     // line a change, not one a look.
     let mut machines_said = String::new();
+    // `serve --engines-from-machines` (#5199): what is known of each
+    // computer, the machines as last listed, the looks at their engines,
+    // and when a refusal last made the part look again.
+    let engines_on = set_up_later
+        .as_ref()
+        .is_some_and(|later| later.engines && later.from_machines.is_some());
+    let mut known = Known::default();
+    let mut probes = Probes::new(engines_lane.filter(|_| engines_on));
+    let mut last_listed: Option<Vec<AccountMachine>> = None;
+    let mut engines_said = String::new();
+    let mut engines_read_said = String::new();
+    let mut relooked: Option<Instant> = None;
     // `serve --sign-in-by-code`: the sign-in open, or the last one, done.
     let mut sign_in: Option<SignInSession> = None;
     // A sign-in by code succeeded: Harness's daemon is started, and when a
@@ -915,12 +1050,45 @@ fn owner<C: Clock>(
             targets_due = Instant::now() + later.every;
             look_at_targets(&mut engine, &later.targets, &mut targets_seen, found);
             look_at_names(&mut engine, &later.targets, &mut names_said);
+            if engines_on {
+                look_at_engines(&mut engine, &later.targets, &mut engines_read_said);
+            }
+        }
+        // Each computer's engines, as each look comes back: kept, then the
+        // targets written from the machines and the engines file again.
+        let looked = probes.tend();
+        if let (false, Some(later)) = (looked.is_empty(), set_up_later.as_ref()) {
+            for (machine, rows, took) in looked {
+                eprintln!("tasks: {}", probe_line(&rows, took));
+                if let Ok(rows) = rows {
+                    known.probed(&machine, &rows, unix_ms());
+                }
+            }
+            if let (Some(wanted), Some(listed)) = (later.from_machines, last_listed.as_ref()) {
+                let chosen = known.choices(listed, wanted, unix_ms());
+                let said =
+                    machines_written(&later.targets, listed, wanted, &chosen, &mut targets_due);
+                if said != machines_said {
+                    eprintln!("tasks: {said}");
+                    machines_said = said;
+                }
+            }
+            keep_engines(&later.targets, &known, &mut engines_said, &mut targets_due);
         }
         // Something that may have changed which tasks are watched.
         let mut moved = false;
+        if follows.on() {
+            let now = clock.sample()?;
+            follows.tend(&engine.watched(&now), &engine.pushed(), Instant::now());
+        }
         if waits.lane.is_some() {
             let now = clock.sample()?;
-            waits.tend(&engine.watched(&now), &engine.pushed(), Instant::now());
+            waits.tend(
+                &engine.watched(&now),
+                &engine.pushed(),
+                &follows.followed(),
+                Instant::now(),
+            );
         }
         if let Ok(outcome) = outcomes.try_recv() {
             moved = true;
@@ -937,24 +1105,49 @@ fn owner<C: Clock>(
                 }
                 Outcome::Machines(read) => {
                     if let Some(later) = set_up_later.as_ref()
-                        && let Some(engine) = later.from_machines
+                        && let Some(wanted) = later.from_machines
                     {
                         let said = match read {
                             Ok(listed) => {
-                                match write_targets_from_machines(&later.targets, &listed, engine) {
-                                    Ok(written) => {
-                                        if written.changed {
-                                            // Read at once, not a minute later.
-                                            targets_due = Instant::now();
-                                        }
-                                        written.said
-                                    }
-                                    Err(error) => {
-                                        format!(
-                                            "task targets not written from the machines: {error}"
-                                        )
-                                    }
+                                let chosen = if engines_on {
+                                    known.listed(&listed, unix_ms());
+                                    known.choices(&listed, wanted, unix_ms())
+                                } else {
+                                    BTreeMap::new()
+                                };
+                                let said = machines_written(
+                                    &later.targets,
+                                    &listed,
+                                    wanted,
+                                    &chosen,
+                                    &mut targets_due,
+                                );
+                                if engines_on {
+                                    // Each computer listed and each a
+                                    // target names, the lamp left out.
+                                    let mut looked: BTreeSet<String> = listed
+                                        .iter()
+                                        .filter(|machine| !machine.current)
+                                        .take(8)
+                                        .map(|machine| machine.machine_id.clone())
+                                        .collect();
+                                    looked.extend(
+                                        read_targets(&later.targets)
+                                            .unwrap_or_default()
+                                            .into_values()
+                                            .map(|target| target.machine_id),
+                                    );
+                                    known.keep_only(&looked);
+                                    probes.ask(looked);
+                                    keep_engines(
+                                        &later.targets,
+                                        &known,
+                                        &mut engines_said,
+                                        &mut targets_due,
+                                    );
+                                    last_listed = Some(listed);
                                 }
+                                said
                             }
                             Err(code) => format!("Harness's machines not read: {code}"),
                         };
@@ -1000,7 +1193,7 @@ fn owner<C: Clock>(
                                 // install puts Harness on with no daemon at
                                 // boot, so a signed-in lamp had none after a
                                 // reboot (lamp-c0a4, 5 Nov, #5379).
-                                if found.sign_in.is_none()
+                                if !found.sign_in_answered
                                     && sign_in_starter.is_some()
                                     && start_daemon_due.is_none()
                                     && matches!(sign_in, SignIn::In | SignIn::Offline)
@@ -1011,11 +1204,20 @@ fn owner<C: Clock>(
                                     start_daemon_due = Some(Instant::now());
                                     daemon_tries = 0;
                                 }
-                                found.sign_in = Some(sign_in);
+                                found.sign_in_read(sign_in);
                             }
                             // Kept as it was: one failed read says nothing
-                            // about the account.
-                            Err(code) => eprintln!("tasks: Harness's sign-in not read: {code}"),
+                            // about the account; failing for
+                            // `SIGN_IN_FAILED_READS` looks in a row, it is
+                            // let go as not known.
+                            Err(code) => {
+                                eprintln!("tasks: Harness's sign-in not read: {code}");
+                                if found.sign_in_not_read() {
+                                    eprintln!(
+                                        "tasks: Harness's sign-in not read {SIGN_IN_FAILED_READS} times in a row: not known until it is read again"
+                                    );
+                                }
+                            }
                         }
                     }
                     Ok(())
@@ -1080,6 +1282,11 @@ fn owner<C: Clock>(
                         body["instance_id"] = instance_id.as_str().into();
                         body
                     });
+                    let answer = with_sign_in(
+                        &work.request,
+                        answer,
+                        set_up.and_then(|found| found.sign_in),
+                    );
                     requests = requests.saturating_add(1);
                     let _ = work.response.try_send(answer);
                 } else if let (Some(starter), true) = (
@@ -1131,10 +1338,43 @@ fn owner<C: Clock>(
                     };
                     requests = requests.saturating_add(1);
                     let _ = work.response.try_send(answer);
+                } else if let (Request::TasksNow {}, Some(tracker), Some(record)) =
+                    (&work.request, tracker.as_ref(), tasks_now.as_mut())
+                {
+                    record.refresh(&engine.recent(&clock.sample()?), tracker, unix_ms());
+                    let answer = engine.identified(record.body(unix_ms()));
+                    requests = requests.saturating_add(1);
+                    let _ = work.response.try_send(answer);
                 } else {
                     moved = true;
                     let answer =
                         engine.handle(&work.request, &clock.sample()?, work.route == Route::Voice);
+                    let answer = with_sign_in(
+                        &work.request,
+                        answer,
+                        set_up.and_then(|found| found.sign_in),
+                    );
+                    // The voice told this task's news: kept for "tasks now",
+                    // also when nothing is written (without `--close-told`).
+                    if let (Request::Told { id, .. }, Ok(_), Some(record)) =
+                        (&work.request, &answer, tasks_now.as_mut())
+                    {
+                        record.told(*id, unix_ms());
+                    }
+                    // Refused early from what is known (#5199): the machines
+                    // and their engines are looked at again at once, so a
+                    // computer woken or an agent signed in since is known
+                    // by the next ask; at most once in [`RELOOK_AFTER`].
+                    if engines_on
+                        && matches!(work.request, Request::Prepare { .. })
+                        && answer
+                            .as_ref()
+                            .is_err_and(|error| EARLY_REFUSALS.contains(&error.code))
+                        && relooked.is_none_or(|at| at.elapsed() >= RELOOK_AFTER)
+                    {
+                        relooked = Some(Instant::now());
+                        machines_due = Instant::now();
+                    }
                     requests = requests.saturating_add(1);
                     let _ = work.response.try_send(answer);
                     if engine.failed() {
@@ -1144,6 +1384,11 @@ fn owner<C: Clock>(
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
+        }
+        // "Tasks now" takes each task's line before the watch can let the
+        // task go, below.
+        if let (Some(record), Some(tracker)) = (tasks_now.as_mut(), tracker.as_ref()) {
+            record.refresh(&engine.recent(&clock.sample()?), tracker, unix_ms());
         }
         if !busy && !stop.load(Ordering::Acquire) {
             let now = clock.sample()?;
@@ -1171,8 +1416,9 @@ fn owner<C: Clock>(
             let next = match launch {
                 Some(job) => Some(job),
                 None => {
-                    // An agent Harness's `wait` says ended is read first,
-                    // and its idle answer kept at once.
+                    // An agent Harness's `watch` or `wait` says ended is
+                    // read first, and its idle answer kept at once.
+                    follows.push(&mut engine, &now).map_err(io::Error::other)?;
                     waits.push(&mut engine, &now).map_err(io::Error::other)?;
                     if watch {
                         engine.watch(&now).map_err(io::Error::other)?;
@@ -1594,7 +1840,7 @@ pub fn targets_from_machines(
     machines: &[AccountMachine],
     engine: EngineKind,
 ) -> BTreeMap<String, Target> {
-    from_machines(machines, engine).0
+    from_machines(machines, engine, &BTreeMap::new()).0
 }
 
 /// Each computer's own name by its alias, as [`targets_from_machines`]
@@ -1602,7 +1848,7 @@ pub fn targets_from_machines(
 /// [`MOST_NAME_BYTES`] with no control characters; none where nothing is
 /// left (#1676).
 pub fn names_from_machines(machines: &[AccountMachine]) -> BTreeMap<String, String> {
-    from_machines(machines, EngineKind::Claude).1
+    from_machines(machines, EngineKind::Claude, &BTreeMap::new()).1
 }
 
 /// A machine's name as said to the person: control characters out, spaces
@@ -1620,9 +1866,13 @@ fn label_of(label: &str) -> Option<String> {
     (!name.is_empty()).then_some(name)
 }
 
+/// `chosen` gives a machine, by id, another engine than `engine`: the one
+/// that computer is known to have (`serve --engines-from-machines`, #5199,
+/// [`crate::readiness::Known::chosen`]). Empty without it.
 fn from_machines(
     machines: &[AccountMachine],
     engine: EngineKind,
+    chosen: &BTreeMap<String, EngineKind>,
 ) -> (BTreeMap<String, Target>, BTreeMap<String, String>) {
     let mut targets = BTreeMap::new();
     let mut names = BTreeMap::new();
@@ -1646,7 +1896,7 @@ fn from_machines(
             Target {
                 machine_id: machine.machine_id.clone(),
                 project: MACHINES_PROJECT.into(),
-                engine,
+                engine: chosen.get(&machine.machine_id).copied().unwrap_or(engine),
             },
         );
     }
@@ -1827,7 +2077,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 /// Written beside and renamed over, 0600, synced: a reader sees the old
 /// file or the new one, never half of one.
-fn write_atomically(path: &Path, bytes: &[u8]) -> io::Result<()> {
+pub(crate) fn write_atomically(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let mut name = path.as_os_str().to_owned();
     name.push(format!(".next-{}", std::process::id()));
     let next = PathBuf::from(name);
@@ -1850,10 +2100,12 @@ fn write_atomically(path: &Path, bytes: &[u8]) -> io::Result<()> {
 /// removed: there is no computer any more. The mark is written before the
 /// file, naming both the file there and the new one, so a stop between
 /// the two never leaves a file of its own looking like someone else's.
+/// `chosen` gives a machine another engine than `engine` ([`from_machines`]).
 pub fn write_targets_from_machines(
     path: &Path,
     machines: &[AccountMachine],
     engine: EngineKind,
+    chosen: &BTreeMap<String, EngineKind>,
 ) -> io::Result<Written> {
     let said = |changed: bool, said: String| Ok(Written { changed, said });
     let mark = written_mark(path);
@@ -1875,7 +2127,7 @@ pub fn write_targets_from_machines(
             "the targets file was not written from the machines; it is left as it is".into(),
         );
     }
-    let (targets, names) = from_machines(machines, engine);
+    let (targets, names) = from_machines(machines, engine, chosen);
     let names_file = names_path(path);
     if targets.is_empty() {
         if present.is_some() {
@@ -1940,6 +2192,153 @@ fn keep_names(path: &Path, names: &BTreeMap<String, String>) -> io::Result<bool>
     }
     write_atomically(path, &bytes)?;
     Ok(true)
+}
+
+/// The targets written from the machines ([`write_targets_from_machines`]),
+/// and what the journal says of it: a change reads the file at once.
+fn machines_written(
+    path: &Path,
+    listed: &[AccountMachine],
+    wanted: EngineKind,
+    chosen: &BTreeMap<String, EngineKind>,
+    targets_due: &mut Instant,
+) -> String {
+    match write_targets_from_machines(path, listed, wanted, chosen) {
+        Ok(written) => {
+            if written.changed {
+                // Read at once, not a minute later.
+                *targets_due = Instant::now();
+            }
+            written.said
+        }
+        Err(error) => format!("task targets not written from the machines: {error}"),
+    }
+}
+
+/// How soon after one early refusal another may make the part look at the
+/// machines again (`serve --engines-from-machines`, #5199).
+pub const RELOOK_AFTER: Duration = Duration::from_secs(30);
+
+/// The engines file written again from what is known, for the targets the
+/// file names now ([`write_engines`]): a change reads it at once. One
+/// journal line a change.
+fn keep_engines(targets: &Path, known: &Known, said: &mut String, targets_due: &mut Instant) {
+    let now = match read_targets(targets) {
+        Ok(current) => match write_engines(targets, &current, known, unix_ms()) {
+            Ok(written) => {
+                if written.changed {
+                    *targets_due = Instant::now();
+                }
+                written.said
+            }
+            Err(error) => format!("the engines file not written: {error}"),
+        },
+        // No targets, or not valid: nothing is said of their computers.
+        Err(_) => match write_engines(targets, &BTreeMap::new(), known, unix_ms()) {
+            Ok(written) => written.said,
+            Err(error) => format!("the engines file not written: {error}"),
+        },
+    };
+    if now != *said {
+        eprintln!("tasks: {now}");
+        *said = now;
+    }
+}
+
+/// The engines file read again (`serve --engines-from-machines`, #5199):
+/// what is known of each target's computer, fresh now. A missing or bad
+/// file is nothing known, and nothing is refused from it.
+fn look_at_engines(engine: &mut Engine<Store>, targets: &Path, said: &mut String) {
+    let (known, now) = match read_engines(&engines_path(targets)) {
+        Ok(read) => {
+            let at = unix_ms();
+            let count = read.len();
+            let fresh = read
+                .into_iter()
+                .map(|(alias, computer)| (alias, computer.fresh(at)))
+                .collect();
+            (fresh, format!("engines known for {count} computers read"))
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            (BTreeMap::new(), "no engines file".to_owned())
+        }
+        Err(error) => (
+            BTreeMap::new(),
+            format!("the engines file is not valid ({error}); nothing is refused from it"),
+        ),
+    };
+    engine.set_readiness(known);
+    if now != *said {
+        eprintln!("tasks: {now}");
+        *said = now;
+    }
+}
+
+/// The looks at the computers' engines (`serve --engines-from-machines`):
+/// one at a time, on a thread of their own over the engines lane, so a
+/// computer that takes its 30 s never holds up a hand-over or a read.
+struct Probes {
+    lane: Option<Arc<dyn EnginesLane>>,
+    queue: std::collections::VecDeque<String>,
+    busy: bool,
+    done: (mpsc::Sender<Probed>, Receiver<Probed>),
+}
+/// One look: the machine, what it said or why not, and how long it took.
+type Probed = (String, Result<Vec<EngineRow>, String>, u128);
+/// The most machines waiting for a look: the targets' and the listed ones.
+const MOST_PROBES_QUEUED: usize = 16;
+
+impl Probes {
+    fn new(lane: Option<Arc<dyn EnginesLane>>) -> Self {
+        Self {
+            lane,
+            queue: Default::default(),
+            busy: false,
+            done: mpsc::channel(),
+        }
+    }
+
+    /// Each of `machines` is looked at once more, in turn; one already
+    /// waiting isn't added twice.
+    fn ask(&mut self, machines: impl IntoIterator<Item = String>) {
+        if self.lane.is_none() {
+            return;
+        }
+        for machine in machines {
+            if !self.queue.contains(&machine) && self.queue.len() < MOST_PROBES_QUEUED {
+                self.queue.push_back(machine);
+            }
+        }
+    }
+
+    /// The looks that came back; and the next one started, if none is out.
+    fn tend(&mut self) -> Vec<Probed> {
+        let mut back = Vec::new();
+        while let Ok(one) = self.done.1.try_recv() {
+            self.busy = false;
+            back.push(one);
+        }
+        if self.busy {
+            return back;
+        }
+        let (Some(lane), Some(machine)) = (self.lane.clone(), self.queue.pop_front()) else {
+            return back;
+        };
+        let sender = self.done.0.clone();
+        let on = machine.clone();
+        let started = thread::Builder::new()
+            .name("tasks-engines".into())
+            .spawn(move || {
+                let began = Instant::now();
+                let rows = lane.engines(&on);
+                let _ = sender.send((on, rows, began.elapsed().as_millis()));
+            });
+        match started {
+            Ok(_) => self.busy = true,
+            Err(_) => back.push((machine, Err("spawn_failed".into()), 0)),
+        }
+        back
+    }
 }
 
 /// The computers' names read again (`serve --set-up-later`): a missing
@@ -2081,8 +2480,15 @@ impl Waits {
     /// yet read, or whose latest read was a push (`pushed`), is left out
     /// until the watch's own next read of it: one agent Harness keeps
     /// calling done never holds up the others on its machine (the reviewer
-    /// on #1157).
-    fn tend(&mut self, watched: &[Watched], pushed: &BTreeSet<u64>, now: Instant) {
+    /// on #1157). A task a held `watch` follows (`followed`, `serve
+    /// --push-watch`) is left out too.
+    fn tend(
+        &mut self,
+        watched: &[Watched],
+        pushed: &BTreeSet<u64>,
+        followed: &BTreeSet<u64>,
+        now: Instant,
+    ) {
         let Some(lane) = self.lane.clone() else {
             return;
         };
@@ -2125,10 +2531,11 @@ impl Waits {
             }
         }
         let mut wanted: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
-        for task in watched
-            .iter()
-            .filter(|task| !pushed.contains(&task.task_id) && !self.pushes.contains(&task.task_id))
-        {
+        for task in watched.iter().filter(|task| {
+            !pushed.contains(&task.task_id)
+                && !self.pushes.contains(&task.task_id)
+                && !followed.contains(&task.task_id)
+        }) {
             wanted
                 .entry(task.machine_id.as_str())
                 .or_default()
@@ -2435,6 +2842,25 @@ pub struct HarnessSwitches {
 /// `~/harnesses/<name>` folders seen on each computer.
 pub const NEW_FOLDER_FILE: &str = "folders-seen.json";
 
+impl HarnessSwitches {
+    /// Set `cli` as `serve` does: each switch its field, and the folders
+    /// seen kept in [`NEW_FOLDER_FILE`] of the tasks folder `dir`.
+    /// `from_machines` is whether `serve --targets-from-machines` is on: it
+    /// names [`MACHINES_PROJECT`], which nothing else makes, so it always
+    /// has that folder made on the first hand-over to each computer, as
+    /// `--new-folder` does, and only that one unless `--new-folder` is set
+    /// (#5541). The two cannot be split.
+    pub fn apply(&self, cli: &mut CliConfig, dir: &Path, from_machines: bool) {
+        cli.as_person = self.as_person;
+        cli.folder_missing = self.folder_missing;
+        cli.engines_ready = self.engines_ready;
+        cli.route = self.route;
+        cli.absolute_folder = self.absolute_folder;
+        cli.new_folder = (self.new_folder || from_machines).then(|| dir.join(NEW_FOLDER_FILE));
+        cli.new_folder_only = (!self.new_folder && from_machines).then(|| MACHINES_PROJECT.into());
+    }
+}
+
 /// Production adapter. CLI configuration and environment are inspected only
 /// after the default-off check. Harness owns account/session provisioning.
 pub fn serve<C: Clock>(
@@ -2445,9 +2871,11 @@ pub fn serve<C: Clock>(
     stop: Arc<AtomicBool>,
 ) -> io::Result<()> {
     let cancelled = stop.clone();
-    let new_folder = switches
-        .new_folder
-        .then(|| config.dir.join(NEW_FOLDER_FILE));
+    let dir = config.dir.clone();
+    let from_machines = config
+        .set_up_later
+        .as_ref()
+        .is_some_and(|later| later.from_machines.is_some());
     // Only a program that is not there at all: one there and not fit to
     // run is refused as before.
     let absent = config.set_up_later.is_some()
@@ -2460,17 +2888,21 @@ pub fn serve<C: Clock>(
         );
     }
     serve_with_adapter(config, clock, stop, move |session| {
+        // Harness's launcher in its pinned shape with the update hold
+        // (#5493), so a Harness command run by hand holds it too; a
+        // missing launcher is only said. Off unless set.
+        if let Some(line) = crate::hold::pin_at_start(
+            std::env::var(crate::hold::SWITCH).ok().as_deref(),
+            std::env::var_os("HOME").as_deref().map(Path::new),
+        ) {
+            eprintln!("{line}");
+        }
         if absent {
             return Ok(Production::Absent);
         }
         let mut cli = CliConfig::new(executable);
         cli.cancel = Some(cancelled);
-        cli.as_person = switches.as_person;
-        cli.folder_missing = switches.folder_missing;
-        cli.engines_ready = switches.engines_ready;
-        cli.route = switches.route;
-        cli.absolute_folder = switches.absolute_folder;
-        cli.new_folder = new_folder;
+        switches.apply(&mut cli, &dir, from_machines);
         // Harness held at the version installed (#5229), off unless set.
         if crate::hold::on(std::env::var(crate::hold::SWITCH).ok().as_deref()) {
             match crate::hold::hold(&mut cli.environment) {
@@ -2545,6 +2977,32 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         if lane.is_none() {
             eprintln!(
                 "tasks: --push-wait asked, but this adapter has no wait; the watch looks as before"
+            );
+        }
+        lane
+    } else {
+        None
+    };
+    let watch_lane = if config.push_watch {
+        let lane = adapter.watch_lane();
+        if lane.is_none() {
+            eprintln!(
+                "tasks: --push-watch asked, but this adapter has no watch; the watch looks as before"
+            );
+        }
+        lane
+    } else {
+        None
+    };
+    let engines_lane = if config
+        .set_up_later
+        .as_ref()
+        .is_some_and(|later| later.engines && later.from_machines.is_some())
+    {
+        let lane = adapter.engines_lane();
+        if lane.is_none() {
+            eprintln!(
+                "tasks: --engines-from-machines asked, but this adapter has no engines lane; nothing is refused early"
             );
         }
         lane
@@ -2649,10 +3107,12 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                     switches.0,
                     switches.1,
                     lane,
+                    watch_lane,
                     switches.2,
                     set_up_later,
                     sign_in_starter,
                     daemon_retry_after,
+                    engines_lane,
                 ),
             )
         })?;
@@ -2907,9 +3367,115 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     }
 }
 
+/// `status` and the app's `app_sign_in_state` answered with Harness's
+/// sign-in as `serve --set-up-later` last read it from Harness itself
+/// (`signed_in`: `yes`, `offline` or `no`, its journal's "Harness signed in:
+/// …"): for the voice's sentence about Harness at the end of onboarding
+/// (#5488), and for the app's Harness row (#5524), which is right after a
+/// restart too, when no sign-in is open and the view says `none`. Not read
+/// yet, or without `--set-up-later`, the answer is as it was; so is every
+/// other answer.
+fn with_sign_in(
+    request: &Request,
+    answer: Result<Value, EngineError>,
+    sign_in: Option<SignIn>,
+) -> Result<Value, EngineError> {
+    let (Request::Status {} | Request::AppSignInState {}, Some(sign_in)) = (request, sign_in)
+    else {
+        return answer;
+    };
+    answer.map(|mut body| {
+        if body.is_object() {
+            body["signed_in"] = sign_in.name().into();
+        }
+        body
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::code_handed;
+
+    /// #5488: `status` says Harness's sign-in once it was read, and nothing
+    /// else changes.
+    #[test]
+    fn status_says_harness_signed_in_once_read() {
+        use super::{Request, SignIn, with_sign_in};
+        let body = || Ok(serde_json::json!({"summary": {}}));
+        for (sign_in, said) in [
+            (SignIn::In, "yes"),
+            (SignIn::Offline, "offline"),
+            (SignIn::Out, "no"),
+        ] {
+            let answer = with_sign_in(&Request::Status {}, body(), Some(sign_in)).unwrap();
+            assert_eq!(answer["signed_in"], said);
+        }
+        let unread = with_sign_in(&Request::Status {}, body(), None).unwrap();
+        assert_eq!(unread, serde_json::json!({"summary": {}}));
+        let targets = with_sign_in(&Request::Targets {}, body(), Some(SignIn::Out)).unwrap();
+        assert_eq!(targets, serde_json::json!({"summary": {}}));
+    }
+
+    /// #5524: the app's state says Harness's sign-in once it was read,
+    /// beside the sign-in's own view; the app's other operations, and the
+    /// state before the first read, are as they were.
+    #[test]
+    fn the_apps_state_says_harness_signed_in_once_read() {
+        use super::{Request, SignIn, with_sign_in};
+        let view = || Ok(serde_json::json!({"sign_in": "none", "revision": 0}));
+        for (sign_in, said) in [
+            (SignIn::In, "yes"),
+            (SignIn::Offline, "offline"),
+            (SignIn::Out, "no"),
+        ] {
+            let answer = with_sign_in(&Request::AppSignInState {}, view(), Some(sign_in)).unwrap();
+            assert_eq!(answer["signed_in"], said);
+            assert_eq!(answer["sign_in"], "none");
+        }
+        let unread = with_sign_in(&Request::AppSignInState {}, view(), None).unwrap();
+        assert_eq!(unread, view().unwrap());
+        let started = with_sign_in(
+            &Request::AppSignInStart {
+                method: Default::default(),
+            },
+            view(),
+            Some(SignIn::Out),
+        )
+        .unwrap();
+        assert_eq!(started, view().unwrap());
+    }
+
+    /// #5488 follow-up: a sign-in read that keeps failing (after a sign-out,
+    /// say) does not keep the last answer for good: after
+    /// `SIGN_IN_FAILED_READS` failed reads in a row (three looks, about
+    /// three minutes on a lamp) it is let go, and `status` says no
+    /// `signed_in` until a read answers again. Fewer failures keep it, and
+    /// a read that answers starts the count again.
+    #[test]
+    fn a_sign_in_that_cannot_be_read_for_three_looks_is_let_go() {
+        use super::{Request, SetUp, SignIn, with_sign_in};
+        let mut found = SetUp::default();
+        found.sign_in_read(SignIn::In);
+        assert!(!found.sign_in_not_read());
+        assert!(!found.sign_in_not_read());
+        assert_eq!(found.sign_in, Some(SignIn::In), "two failures keep it");
+        found.sign_in_read(SignIn::In);
+        assert!(!found.sign_in_not_read());
+        assert!(!found.sign_in_not_read());
+        assert_eq!(found.sign_in, Some(SignIn::In), "an answer counts again");
+        assert!(found.sign_in_not_read(), "the third in a row lets it go");
+        assert_eq!(found.sign_in, None);
+        let status = with_sign_in(
+            &Request::Status {},
+            Ok(serde_json::json!({"summary": {}})),
+            found.sign_in,
+        )
+        .unwrap();
+        assert_eq!(status, serde_json::json!({"summary": {}}));
+        assert!(!found.sign_in_not_read(), "let go once");
+        found.sign_in_read(SignIn::Out);
+        assert_eq!(found.sign_in, Some(SignIn::Out));
+    }
 
     #[test]
     fn a_code_handed_to_the_voice_is_one_line_without_its_digits() {
@@ -3138,16 +3704,36 @@ mod tests {
     fn a_cancelled_waits_late_answer_never_untracks_the_wait_that_replaced_it() {
         let lane = Arc::new(SlowLane::default());
         let mut waits = Waits::new(Some(lane.clone()));
-        waits.tend(&watched(&["a"]), &BTreeSet::new(), Instant::now());
+        waits.tend(
+            &watched(&["a"]),
+            &BTreeSet::new(),
+            &BTreeSet::new(),
+            Instant::now(),
+        );
         settle(&lane, 1);
-        waits.tend(&watched(&["a", "b"]), &BTreeSet::new(), Instant::now());
+        waits.tend(
+            &watched(&["a", "b"]),
+            &BTreeSet::new(),
+            &BTreeSet::new(),
+            Instant::now(),
+        );
         settle(&lane, 2);
-        waits.tend(&watched(&["a"]), &BTreeSet::new(), Instant::now());
+        waits.tend(
+            &watched(&["a"]),
+            &BTreeSet::new(),
+            &BTreeSet::new(),
+            Instant::now(),
+        );
         settle(&lane, 3);
         // Long enough for the first to answer, tending all the while.
         let until = Instant::now() + Duration::from_millis(600);
         while Instant::now() < until {
-            waits.tend(&watched(&["a"]), &BTreeSet::new(), Instant::now());
+            waits.tend(
+                &watched(&["a"]),
+                &BTreeSet::new(),
+                &BTreeSet::new(),
+                Instant::now(),
+            );
             thread::sleep(Duration::from_millis(5));
         }
         assert_eq!(
@@ -3222,7 +3808,7 @@ mod tests {
                     "asked: {:?}",
                     lane.asked.lock().unwrap()
                 );
-                waits.tend(&both, pushed, at);
+                waits.tend(&both, pushed, &BTreeSet::new(), at);
                 thread::sleep(Duration::from_millis(2));
             }
         };
@@ -3435,6 +4021,7 @@ mod tests {
             watch: false,
             progress: false,
             push_wait: false,
+            push_watch: false,
             close_told: false,
             targets_newer: None,
             set_up_later: None,
@@ -3542,6 +4129,7 @@ mod tests {
             machine_id: id.to_string().repeat(32),
             label: label.into(),
             current,
+            status: None,
         }
     }
 
@@ -3597,6 +4185,35 @@ mod tests {
     /// there, or one it wrote. What it writes is read back as strictly as a
     /// file a person wrote. A file someone else wrote is left as it is, and
     /// with no machine but the lamp, its own file is removed.
+    /// #5199: a machine's target gets the engine chosen for it, and the
+    /// targets file stays what a build one release back reads: version 1,
+    /// with nothing of the engines in it (they go in their own file).
+    #[test]
+    fn targets_from_machines_take_the_engine_each_computer_has() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("targets.json");
+        let listed = [
+            machine('a', "lamp", true),
+            machine('b', "Office iMac", false),
+            machine('c', "MacBook Air", false),
+        ];
+        let chosen = BTreeMap::from([("b".repeat(32), EngineKind::Codex)]);
+        assert!(
+            write_targets_from_machines(&path, &listed, EngineKind::Claude, &chosen)
+                .unwrap()
+                .changed
+        );
+        let read = read_targets(&path).unwrap();
+        assert_eq!(read["office"].engine, EngineKind::Codex);
+        assert_eq!(read["macbook-air"].engine, EngineKind::Claude);
+        let written: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        assert_eq!(
+            written["targets"]["office"],
+            json!({"machine_id":"b".repeat(32),"project":MACHINES_PROJECT,"engine":"codex"})
+        );
+        assert_eq!(written.as_object().unwrap().len(), 2, "{written}");
+    }
+
     #[test]
     fn targets_are_written_from_machines_only_where_the_file_is_the_parts_own() {
         let dir = tempfile::tempdir().unwrap();
@@ -3611,7 +4228,8 @@ mod tests {
             machine('c', "MacBook Air", false),
         ];
         let write = |listed: &[AccountMachine]| {
-            write_targets_from_machines(&path, listed, EngineKind::Claude).unwrap()
+            write_targets_from_machines(&path, listed, EngineKind::Claude, &BTreeMap::new())
+                .unwrap()
         };
         assert!(write(&one).changed);
         let read = read_targets(&path).unwrap();
@@ -3711,7 +4329,8 @@ mod tests {
         let path = dir.path().join("targets.json");
         let names = names_path(&path);
         let write = |listed: &[AccountMachine]| {
-            write_targets_from_machines(&path, listed, EngineKind::Claude).unwrap()
+            write_targets_from_machines(&path, listed, EngineKind::Claude, &BTreeMap::new())
+                .unwrap()
         };
         assert!(
             write(&[

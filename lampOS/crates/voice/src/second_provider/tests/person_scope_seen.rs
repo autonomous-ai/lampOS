@@ -34,6 +34,9 @@ thread_local! {
     /// [`lines_known`] on this thread is given, once.
     static DONT_KNOW_FOUND: std::cell::RefCell<Option<crate::second_provider::Remembered>> =
         const { std::cell::RefCell::new(None) };
+    /// `LAMP_PERSON_SCOPE_ONE_FACE_READS` ([`Engine::reading_by_one_face`])
+    /// for the next [`lines_known`] on this thread, once.
+    static ONE_FACE_READS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// The worker's own setup (`worker::see_who_speaks`) with
@@ -538,7 +541,9 @@ async fn lines_known(
     } else {
         failed_reader(engine, &path, seen)
     };
-    let engine = engine.naming_by_one_face(name_one_face);
+    let engine = engine
+        .naming_by_one_face(name_one_face)
+        .reading_by_one_face(ONE_FACE_READS.with(|reads| reads.replace(false)));
     let engine = if voice == Voice::Off {
         engine
     } else {
@@ -2236,6 +2241,99 @@ async fn yes_please_keep_that_writes_a_held_keep_and_runs_no_held_forget() {
     }
 }
 
+/// A near yes's case: its name, its lines, whether each line after the
+/// held one is told to ask again, and the scopes the keep is written in.
+type AskedAgainCase = (&'static str, Vec<Line>, Vec<bool>, Vec<Option<String>>);
+
+/// lamp-06c1, 5 Nov, S14 run 14:21 (requests 422 and 424): A's carried
+/// "my brother lives in Denver" was held and the lamp asked "Want me to keep
+/// that for you?"; her "Yes, please keep that." was heard as "Yes. Please
+/// keep off.", dropped as not a plain yes, and the fact was never kept. A
+/// near yes, seen on her face, writes it in her scope. An answer neither a
+/// yes nor a no holds it on, the model is told to ask once more, and her
+/// next plain yes writes it; asked once only, so a second unclear answer
+/// drops it. A no, however said, drops it, and her yes after runs nothing.
+#[tokio::test]
+async fn a_near_yes_to_a_held_keep_writes_it_and_an_unclear_one_is_asked_again() {
+    let a = crate::remember::person_id("A");
+    let hotel = || (THE_HOTEL.to_owned(), vec![("f1", false)], 0);
+    let seen = |said: &str| (said.to_owned(), vec![("f1", true)], 5);
+    let okay = || vec![text("Okay."), Ok(ChatEvent::Done)];
+    let again = || vec![text("Should I keep that?"), Ok(ChatEvent::Done)];
+    let told_again = Message::system(crate::remember::KEEP_ASKED_AGAIN.to_owned());
+    let cases: Vec<AskedAgainCase> = vec![
+        (
+            "keep-off",
+            vec![hotel(), seen("Yes. Please keep off.")],
+            vec![false],
+            vec![Some(a.clone())],
+        ),
+        (
+            "keep-it-alone",
+            vec![hotel(), seen("Keep it.")],
+            vec![false],
+            vec![Some(a.clone())],
+        ),
+        (
+            "unclear-then-yes",
+            vec![hotel(), seen("Yes. Please key that."), seen("Yes.")],
+            vec![true, false],
+            vec![Some(a.clone())],
+        ),
+        (
+            "unclear-twice",
+            vec![
+                hotel(),
+                seen("Yes. Please key that."),
+                seen("Yes, keep it off."),
+                seen("Yes."),
+            ],
+            vec![true, false, false],
+            vec![],
+        ),
+        (
+            "no-then-yes",
+            vec![hotel(), seen("No, don't keep it."), seen("Yes.")],
+            vec![false, false],
+            vec![],
+        ),
+        (
+            "keep-off-no",
+            vec![hotel(), seen("No, keep off."), seen("Yes.")],
+            vec![false, false],
+            vec![],
+        ),
+    ];
+    for (what, lines, asked_again, expected) in cases {
+        let mut chats = keep_the_hotel_asking();
+        for asks in &asked_again {
+            chats.push(if *asks { again() } else { okay() });
+        }
+        let got = lines_saving(
+            what,
+            lines,
+            chats,
+            BOOT,
+            true,
+            true,
+            None,
+            Some(true),
+            true,
+            true,
+            Voice::Off,
+        )
+        .await;
+        assert_eq!(got.calls, expected, "{what}");
+        // Round 1 and its tool round are the held line's; one round a line
+        // after it.
+        let told: Vec<bool> = got.rounds[2..]
+            .iter()
+            .map(|round| round.contains(&told_again))
+            .collect();
+        assert_eq!(told, asked_again, "{what}: who was told to ask again");
+    }
+}
+
 /// #4339 with `LAMP_CONVERSATION_CARRIED_SAVES`: a carried line still
 /// cannot forget, one thing or everything; only `remember` runs.
 #[tokio::test]
@@ -2487,8 +2585,38 @@ async fn without_the_same_voice_check_a_one_face_keep_is_theirs_and_its_reads_th
 /// voice is heard) and asks about A's memory. Nothing of A's is read or
 /// told: the recall runs in the room's scope, the turn is told the room's
 /// context and no A note; with the switch off, the same.
+/// With `LAMP_PERSON_SCOPE_ONE_FACE_READS` (#5522) the guest is told A's
+/// recall: the risk the memory owner accepted with it, asserted here so it
+/// is never taken silently
+/// ([`a_lone_known_face_never_read_speaking_writes_its_words_in_their_memory_and_record`]).
 #[tokio::test]
 async fn a_guest_off_camera_asking_about_a_silent_one_face_reads_nothing_of_theirs() {
+    let a = crate::remember::person_id("A");
+    let got = one_face_reading(
+        "guest-asks-reads",
+        "Lamp, what did she say about her doctor?",
+        vec![
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "r1",
+                    crate::remember::RECALL,
+                    json!({"query": "doctor"}),
+                )])),
+                Ok(ChatEvent::Done),
+            ],
+            vec![text("I don't have anything on that."), Ok(ChatEvent::Done)],
+        ],
+        vec![("f1", false)],
+        None,
+        Voice::One,
+    )
+    .await;
+    assert_eq!(
+        got.calls,
+        [Some(a.clone())],
+        "reads: the accepted guest risk"
+    );
+    assert_eq!(got.lease, Some(a));
     for voice in [Voice::One, Voice::Off] {
         let got = one_face_line(
             "guest-asks",
@@ -2803,6 +2931,18 @@ async fn a_one_face_forget_reaches_what_its_keep_kept_and_nobody_elses() {
     assert_eq!(got.calls, [Some(a.clone())], "the forget reaches A's scope");
     assert_eq!(got.lease, None, "told and read as the room's");
     assert_eq!(got.told, Message::system("for None"), "no A context");
+    // With `LAMP_PERSON_SCOPE_ONE_FACE_READS` (#5522): the mouth not read
+    // saying it, the forget reaches nobody's scope (the memory owner, 16:49).
+    let got = one_face_reading(
+        "one-face-forget-one-reads",
+        FORGET_COFFEE,
+        forget_coffee(),
+        vec![("f1", false)],
+        None,
+        Voice::One,
+    )
+    .await;
+    assert!(got.calls.is_empty(), "reads: never run: {:?}", got.calls);
     for (what, in_view, voice) in [
         (
             "forget-second-face",
@@ -2851,6 +2991,17 @@ async fn forget_everything_on_a_one_face_line_never_runs_in_their_scope() {
         got.calls
     );
     assert_eq!(got.lease, None, "the room's");
+    // With `LAMP_PERSON_SCOPE_ONE_FACE_READS`: read as A's, but never run.
+    let got = one_face_reading(
+        "one-face-forget-reads",
+        FORGET_ME,
+        forget_everything(),
+        vec![("f1", false)],
+        None,
+        Voice::One,
+    )
+    .await;
+    assert!(got.calls.is_empty(), "never run: {:?}", got.calls);
 }
 
 /// A held forget's yes on a line theirs only by their face alone in view
@@ -2874,6 +3025,7 @@ async fn a_yes_on_a_line_theirs_by_one_face_alone_runs_no_held_forget() {
                 spelling: false,
                 carried: false,
                 line: None,
+                asked_again: false,
             });
         }
         let taken = take_held_forget(
@@ -2888,9 +3040,301 @@ async fn a_yes_on_a_line_theirs_by_one_face_alone_runs_no_held_forget() {
         match taken {
             Taken::Runs(..) => assert!(runs, "by one face: no yes"),
             Taken::Unseen(_) => assert!(!runs, "not by one face: runs"),
-            Taken::Nothing => panic!("dropped for another reason"),
+            Taken::Nothing | Taken::AskAgain => panic!("dropped for another reason"),
         }
     }
+}
+
+/// [`one_face_line`] with `LAMP_PERSON_SCOPE_ONE_FACE_READS` on (#5522).
+async fn one_face_reading(
+    what: &str,
+    words: &str,
+    chats: Vec<Vec<net::Result<ChatEvent>>>,
+    in_view: Vec<(&'static str, bool)>,
+    going_on: Option<bool>,
+    voice: Voice,
+) -> Outcome {
+    ONE_FACE_READS.with(|reads| reads.set(true));
+    one_face_line(what, words, chats, in_view, going_on, voice).await
+}
+
+/// Whether any chat round was told a memory call refused by the one-face
+/// rule's reads (`second_provider::ONE_FACE_FORGET`).
+fn refused_by_one_face(got: &Outcome) -> bool {
+    got.rounds
+        .iter()
+        .flatten()
+        .any(|message| format!("{message:?}").contains("say it again"))
+        && got
+            .rounds
+            .iter()
+            .flatten()
+            .any(|message| format!("{message:?}").contains("can't forget anything"))
+}
+
+/// #5522 with `LAMP_PERSON_SCOPE_ONE_FACE_READS` (the memory owner's 16:43
+/// "apply it", read for saving and recall): A's known face the one face in
+/// every look, never read speaking (lamp-220c, 29e7: 0 of 17), no other
+/// voice. The line is told, read and kept as A's: A's context and note,
+/// their hits, their keep. Its exchange's record is theirs too
+/// (`remember::filed_by_one_face`, the remember test of that name).
+#[tokio::test]
+async fn a_lone_known_face_never_read_speaking_writes_its_words_in_their_memory_and_record() {
+    let a = crate::remember::person_id("A");
+    let got = one_face_reading(
+        "one-face-reads",
+        TOKYO,
+        remember_tokyo(),
+        vec![("f1", false)],
+        None,
+        Voice::One,
+    )
+    .await;
+    assert_eq!(got.lease, Some(a.clone()), "told and read as A's");
+    assert!(!got.held);
+    assert_eq!(got.calls, [Some(a.clone())], "the keep lands in A's scope");
+    assert_eq!(
+        got.told,
+        Message::system(format!("for {:?}", Some(a.as_str()))),
+        "A's context"
+    );
+    assert!(
+        !got.noted.is_empty()
+            && got
+                .noted
+                .iter()
+                .all(|(person, _)| person.as_ref() == Some(&a)),
+        "A's note: {:?}",
+        got.noted
+    );
+    assert!(
+        got.hits.iter().all(|hits| hits
+            .as_ref()
+            .is_some_and(|(person, _)| person.as_ref() == Some(&a))),
+        "A's hits: {:?}",
+        got.hits
+    );
+    // Recall too: the guest risk, accepted with the switch (a voice off
+    // camera while A sits silent alone in view reads A's memory).
+    let got = one_face_reading(
+        "one-face-reads-recall",
+        "Lamp, what did I say about my doctor?",
+        vec![
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "r1",
+                    crate::remember::RECALL,
+                    json!({"query": "doctor"}),
+                )])),
+                Ok(ChatEvent::Done),
+            ],
+            vec![text("You said Tuesday."), Ok(ChatEvent::Done)],
+        ],
+        vec![("f1", false)],
+        None,
+        Voice::One,
+    )
+    .await;
+    assert_eq!(got.calls, [Some(a.clone())], "the recall is A's");
+    assert_eq!(got.lease, Some(a));
+}
+
+/// With `LAMP_PERSON_SCOPE_ONE_FACE_READS` on, every privacy limit holds:
+/// a second face, an unknown face, no face, another voice before the line
+/// or heard as it is judged, or the one-face rule off, and the line is the
+/// room's, its keep and reads alike; in A's conversation going on it is
+/// carried, held, never read.
+#[tokio::test]
+async fn with_reads_a_second_face_an_unknown_face_or_another_voice_is_the_rooms() {
+    for (what, in_view, voice) in [
+        (
+            "reads-second-face",
+            vec![("f1", false), ("f2", false)],
+            Voice::One,
+        ),
+        ("reads-unknown-face", vec![("f2", false)], Voice::One),
+        ("reads-no-face", vec![], Voice::One),
+        (
+            "reads-voice-before",
+            vec![("f1", false)],
+            Voice::AnotherBefore,
+        ),
+        ("reads-voice-in-it", vec![("f1", false)], Voice::AnotherInIt),
+        ("reads-rule-off", vec![("f1", false)], Voice::Off),
+    ] {
+        let got = one_face_reading(what, TOKYO, remember_tokyo(), in_view, None, voice).await;
+        assert_eq!(got.lease, None, "{what}: the room's");
+        assert!(!got.held, "{what}");
+        assert_eq!(got.calls, [None], "{what}: the keep is the room's");
+        assert_eq!(got.told, Message::system("for None"), "{what}");
+    }
+    let a = crate::remember::person_id("A");
+    let got = one_face_reading(
+        "reads-carried",
+        TOKYO,
+        vec![vec![text("Okay."), Ok(ChatEvent::Done)]],
+        vec![("f1", false)],
+        Some(true),
+        Voice::One,
+    )
+    .await;
+    assert_eq!(got.lease, Some(a));
+    assert!(got.held, "carried: held, no reads (#5508)");
+}
+
+/// With `LAMP_PERSON_SCOPE_ONE_FACE_READS` on, a forget on a line A's only
+/// by their face alone in view never runs: not "forget my coffee", which
+/// the keep's rule alone lets reach A's scope (`reached_by_one_face`), not
+/// "forget everything", in A's scope or the room's. Forgetting still needs
+/// the mouth seen speaking (the memory owner, 16:49 on #5385: "tạm thời
+/// chưa cho xóa nếu ko detect đc mở miệng").
+#[tokio::test]
+async fn with_reads_a_forget_the_mouth_was_not_read_saying_never_runs() {
+    for (what, words, chats) in [
+        ("reads-forget-one", FORGET_COFFEE, forget_coffee()),
+        ("reads-forget-all", FORGET_ME, forget_everything()),
+    ] {
+        let got = one_face_reading(what, words, chats, vec![("f1", false)], None, Voice::One).await;
+        assert!(got.calls.is_empty(), "{what}: never run: {:?}", got.calls);
+        assert!(refused_by_one_face(&got), "{what}: told why");
+    }
+}
+
+/// With `LAMP_PERSON_SCOPE_ONE_FACE_READS` on, A's own face seen speaking
+/// the forget is as before: the line is A's by sight, not by the one-face
+/// rule, and "forget my coffee" runs in A's scope.
+#[tokio::test]
+async fn with_reads_a_forget_their_mouth_was_read_saying_runs_as_before() {
+    let a = crate::remember::person_id("A");
+    let got = one_face_reading(
+        "reads-forget-seen",
+        FORGET_COFFEE,
+        forget_coffee(),
+        vec![("f1", true)],
+        None,
+        Voice::One,
+    )
+    .await;
+    assert_eq!(got.calls, [Some(a.clone())], "runs in A's scope");
+    assert_eq!(got.lease, Some(a));
+    assert!(!refused_by_one_face(&got));
+}
+
+/// One chat that makes the call `name` with `args`, then answers.
+fn one_call(name: &str, args: Value) -> Vec<Vec<net::Result<ChatEvent>>> {
+    vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call("c1", name, args)])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![text("Okay."), Ok(ChatEvent::Done)],
+    ]
+}
+
+/// The privacy read's P2 on #5592, with `LAMP_PERSON_SCOPE_ONE_FACE_READS`:
+/// A's face silent and alone in view. A `remember` that corrects a kept
+/// thing by id (`replaces`) is refused like a forget, since it retires the
+/// old fact; a plain new keep still lands in A's scope.
+#[tokio::test]
+async fn with_reads_a_correction_is_refused_and_a_plain_keep_still_writes() {
+    let got = one_face_reading(
+        "reads-replaces",
+        "Lamp, my class is on Thursday now.",
+        one_call(
+            crate::remember::REMEMBER,
+            json!({"text": "Class is on Thursday.", "replaces": 3}),
+        ),
+        vec![("f1", false)],
+        None,
+        Voice::One,
+    )
+    .await;
+    assert!(got.calls.is_empty(), "never run: {:?}", got.calls);
+    assert!(refused_by_one_face(&got), "told why");
+    let a = crate::remember::person_id("A");
+    let got = one_face_reading(
+        "reads-plain-keep",
+        TOKYO,
+        remember_tokyo(),
+        vec![("f1", false)],
+        None,
+        Voice::One,
+    )
+    .await;
+    assert_eq!(got.calls, [Some(a)], "a plain keep: A's");
+    assert!(!refused_by_one_face(&got));
+    assert!(!one_face_refuses(
+        crate::remember::REMEMBER,
+        &json!({"text": "x", "replaces": 0}),
+        false
+    ));
+}
+
+/// The privacy read's P2 on #5592: on a one-face-read line no standing rule
+/// is kept, listed or forgotten. A rule is told to every later session of
+/// theirs, which acts for them beyond saving and recall.
+#[tokio::test]
+async fn with_reads_rules_are_never_kept_listed_or_forgotten() {
+    for (what, name, args) in [
+        (
+            "reads-keep-rule",
+            crate::rules::KEEP_RULE,
+            json!({"rule": "Always call me Captain."}),
+        ),
+        ("reads-list-rules", crate::rules::LIST_RULES, json!({})),
+        (
+            "reads-forget-rule",
+            crate::rules::FORGET_RULE,
+            json!({"id": 1}),
+        ),
+    ] {
+        let got = one_face_reading(
+            what,
+            "Lamp, about my rules.",
+            one_call(name, args),
+            vec![("f1", false)],
+            None,
+            Voice::One,
+        )
+        .await;
+        assert!(got.calls.is_empty(), "{what}: never run: {:?}", got.calls);
+        assert!(refused_by_one_face(&got), "{what}: told why");
+    }
+}
+
+/// The privacy read's P2 on #5592: a reminder's cancel or snooze on a
+/// one-face-read line is refused, unless `LAMP_ONE_FACE_REMINDERS` is on
+/// (its cancel risk accepted by the memory owner on 4 Nov). Listing stays.
+#[tokio::test]
+async fn with_reads_a_reminders_cancel_or_snooze_is_refused_unless_one_face_reminders() {
+    for (what, name) in [
+        ("reads-cancel-reminder", "cancel_reminder"),
+        ("reads-snooze-reminder", "snooze_reminder"),
+    ] {
+        assert!(
+            one_face_refuses(name, &json!({"id": 1}), false),
+            "{what}: off"
+        );
+        assert!(
+            !one_face_refuses(name, &json!({"id": 1}), true),
+            "{what}: on"
+        );
+        if crate::tools::schedule_whose::one_face_on() {
+            continue;
+        }
+        let got = one_face_reading(
+            what,
+            "Lamp, cancel my reminder.",
+            one_call(name, json!({"id": 1})),
+            vec![("f1", false)],
+            None,
+            Voice::One,
+        )
+        .await;
+        assert!(got.calls.is_empty(), "{what}: never run: {:?}", got.calls);
+        assert!(refused_by_one_face(&got), "{what}: told why");
+    }
+    assert!(!one_face_refuses("list_reminders", &json!({}), false));
 }
 
 /// One line by A, their face `f1` seen speaking it, with

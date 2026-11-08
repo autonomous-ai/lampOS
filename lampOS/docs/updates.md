@@ -919,6 +919,17 @@ each under the quiet rule. A round
    is well, not stopped; one that failed, crashed or is started again by
    systemd is still not well. Before this, an awake lamp put the build back:
    lamp-9adf, 1 Nov, 9276 and 9424, "lamp-waking.service stopped".
+   A unit whose restart its own `Condition…=` skipped (`ConditionResult=no`,
+   inactive with `Result=success`) is not this lamp's now, as at boot, and is
+   well too, when the build left that unit's `Condition…=` lines as the build
+   before had them: putting the build back can't make a condition hold that
+   neither build owns. One the new build added or changed is its own doing,
+   and still puts it back, as does a skip of a unit the build added. This holds
+   on every lamp, with no switch, as `ENDS_BY_DESIGN` does. Before this, lamp-52e6 on 6 Nov put 10441 back for
+   "lamp-tasks.service stopped" (its Harness gone under it), and so would
+   every later build. `lamp-setup.service` keeps its own rules
+   (`setup_lifecycle`): a completed setup restarted and skipped by its marker
+   is still not well.
 10. **Back.** A part not well: the journal's validated old startup order is
     used without rereading the installed dependency graph. Later changes or
     read failures in that graph cannot veto the saved restart order. Every
@@ -1283,6 +1294,7 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `lamp-update-writer.service ran, and the settings writer is not build …` | the unit ran, but the writer it left isn't this build's |
 | `the settings writer refreshed has proved itself (its back ended well): the copy before is removed` | a refreshed writer's first `back` ended well |
 | `the settings writer refreshed is put back (its back failed): the copy before is the writer again` | a refreshed writer's first `back` failed |
+| `the settings writer refreshed is put back (its first apply failed): the copy before is the writer again, and this lamp-update may be asked to be it again` | a refreshed writer's first `apply` failed: the build is refused, the writer is not (#5539) |
 | `the settings writer could not be put back or proved (…): …` | either of those two asked of the unit, and it failed |
 | `the settings writer's back failed in a run that began before it was refreshed: the next back judges it` | the failed `back` may be the copy before's, so nothing is put back for it |
 | **The journal** (`acting`, at the round's start) | |
@@ -1390,7 +1402,9 @@ build could carry it units or settings.
    `lamp-update.service`'s `ReadWritePaths`, so no round writes it itself.
    `install` writes it, and so does the writer's one-shot unit, which a round
    starts to refresh it from a confirmed lamp-update ("The settings writer
-   refreshed", #4178). `lamp-update-back.service` runs it as
+   refreshed", #4178). An `install` that changes its bytes clears the
+   refresh's `.prev`, request and record (#5539, same section).
+   `lamp-update-back.service` runs it as
    `lamp-update-back back`. It is started by `lamp-update.service`'s
    `OnFailure=` and every 2 min by `lamp-update-back.timer`. When
    `self.json` is there and lamp-update is not `active`/`running`, or 10 min
@@ -2093,7 +2107,11 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   lamp-update that runs (its refresh, below, failed or was put back),
   waits and says so: `build N carries /etc/lampOS/skills/store.env, and
   this lamp's settings writer is older than this lamp-update: waiting for
-  it to be refreshed`. A dry round (`check`, a climbed updater's confirm)
+  it to be refreshed`. When the writer put back is this lamp-update, put
+  back for good after its own `back` failed ("Proved, or put back",
+  below), the round says so instead: `build N carries …, and this
+  lamp-update was put back as the settings writer for good: waiting for a
+  newer lamp-update`. A dry round (`check`, a climbed updater's confirm)
   writes nothing and never waits for it. The drop-in `store.conf` stays install's alone.
 - **The models switch file.** `/etc/lampOS/models.env`
   (`manifest::MODELS_ENV`, `deploy/product/settings/models.env`,
@@ -2839,7 +2857,7 @@ the file is never read back.
 | voice | second route's settings, `/etc/lampOS/voice/second.json` | JSON | none | read past and named, as `provider.json` (`second_config.rs:79`, `319`; line `lamp-voice second: …`), a key's field refused by name | `tts_provider` is a string checked against a list (`second_config.rs:338-347`), still refused | as `provider.json`: unreadable or a bad known value refuses to start, naming the file (`second_config.rs:310-336`) |
 | voice | conversation thread, `/run/lampos-voice/thread.json` (kept across a restart) | JSON | none | refused (`thread.rs:153`) | n/a | set aside as `.unreadable-<ms>` with a line (`thread.rs:368-372`, `917-940`) |
 | voice | news told, tasks typed, `/var/lib/lampOS/voice/tasks-told`, `tasks-typed` | text lines | none | n/a | n/a | read as empty, no line (`task_news.rs:419-423`): news may be told again |
-| voice | room sounds yes, `/var/lib/lampOS/consent/room-sounds.json` (`LAMP_ONBOARDING`, no-slide lamps only) | JSON | `version` 1, ignored | ignored | only `"yes"` is yes | lamp-ears reads anything else, or no file, as no; the voice removes it at start when its progress holds no yes, never writes it back (`onboarding/storage.rs`) |
+| voice | room sounds yes, `/var/lib/lampOS/consent/room-sounds.json` (`LAMP_ONBOARDING`, no-slide lamps only) | JSON | `version` 1, ignored | ignored | only `"yes"` is yes | lamp-ears reads anything else, or no file, as no; the voice removes it at start when its progress holds no yes, unless it is the owner's yes from the app (`"by":"app"`, #5500) given after the step's last redo and any later "no"; never writes it back (`onboarding/storage.rs`). `by` is read by the voice only; a build before it reads an app yes as its own and removes it at start when no `done` is behind it |
 | voice | onboarding progress, `/var/lib/lampOS/voice/onboarding/progress.json` | JSON | none | ignored | a step name this build doesn't know is read past and kept, the walk goes on with the steps it knows (#2110); an outcome it doesn't know is refused | an unreadable file stops the walk with `onboarding_storage_failed` (`onboarding.rs`, `Progress::check`) |
 | voice | relay key `/etc/lampOS/voice/credential`; person's name `/etc/lampOS/person/name` | text | n/a | n/a | n/a | key read raw (`config.rs:400`); an unfit name is no name, with a line (`person.rs`) |
 | voice | sessions and first output, `/var/lib/lampOS/voice/sessions/…`, `first-output/*.jsonl` | JSONL | first output `schema` 1 | — | — | written only, never read back at start |
@@ -3310,13 +3328,43 @@ bound. Until the refreshed writer is proved:
   the round asks the unit to remove `lamp-update-back.prev`
   (`writer_swap::Op::Proven`). A later build of lamp-update may then refresh
   it again.
-- **Put back:** when `lamp-update-back.service` has failed, or this round's
-  first `apply` by the new writer failed, the round asks the unit to rename
-  `.prev` back over it (`Op::PutBack`). The apply's own undo runs first,
-  with the writer that made it, when it wrote anything; a writer that
-  failed before its first write is put back all the same. The build put
-  back is kept in `writer-refresh.done` and never asked to be the writer
-  again.
+- **Put back after its own `back` failed:** when `lamp-update-back.service`
+  has failed, the round asks the unit to rename `.prev` back over it
+  (`Op::PutBack`). The build put back is kept in `writer-refresh.done`
+  (`put_back`, with `for_good`) and never asked to be the writer again. A
+  round that would write `store.env` or `models.env` then refuses the build
+  and says why: `build N carries …, and this lamp-update was put back as
+  the settings writer for good: waiting for a newer lamp-update`.
+- **Put back after its first `apply` failed** (#5539): the round asks the
+  unit to rename `.prev` back over it (`Op::PutBackForApply`). The apply's
+  own undo runs first, with the writer that made it, when it wrote
+  anything; a writer that failed before its first write is put back all
+  the same. The failure is taken as the build's, not the writer's: the
+  build is refused for good as any build put back is, and the writer is
+  not. Any build put back before is carried forward, with its `for_good`.
+  So the next round asks for the writer again, and a later build with
+  settings to write is taken. A bad writer can't loop: each try costs a
+  build, which is refused for good. Before #5539 this put-back named the
+  writer's build as put back for good, so a lamp that climbed and then
+  had that round fail (lamp-06c1) refused every later build carrying
+  `store.env`, with only a waiting line.
+- **A record from before #5539** has no `for_good`, so it can't tell a
+  failed `back` from a failed first apply. Its `put_back`, when it names
+  the running lamp-update, is asked once more. The refresh that does so
+  keeps it as put back, now `for_good`, so a second put-back of it, for
+  either reason, is for good.
+- **A `.prev` no record pairs with** (lamp-52e6, #5539): the unit's
+  refresh finds a `lamp-update-back.prev` that differs from the writer, and
+  no `writer-refresh.done` names it as the copy before a refresh not
+  proved yet. `fixed_copy::place` refuses such a `.prev`, as it may be the
+  only good copy, so nothing ever removed it. The unit removes it only
+  when `writer-back.ok` names the writer now in place: that writer's own
+  `back` has ended well, so `.prev` isn't the only good copy. Then the
+  refresh goes on, and `.prev` holds the writer it replaced. Without that
+  note it still refuses: `… holds another copy than …, no refresh in the
+  records kept it, and the writer in place has no back noted as ended
+  well: it may be the only good copy, so nothing was replaced`. A `.prev`
+  an unproven refresh kept is never removed this way.
 - **A failed `back` that began before the refresh** is not the new
   writer's. The copy before's `back` may be mid-run when the refresh lands,
   and fail after the unit's `reset-failed`. So a `failed` counts only when
@@ -3333,6 +3381,38 @@ bound. Until the refreshed writer is proved:
   the next `back`, about 2 minutes on, and said (`… back failed in a run
   that began before it was refreshed: the next back judges it`). When
   systemd can't say, it counts (El's P3 on #4178).
+
+**An install that changes the writer** (#5539). `install` writes the
+writer from the build it installs, under the records' lock. A refresh's
+`lamp-update-back.prev`, `writer-refresh.request` and
+`writer-refresh.done` then describe a writer that is gone: a `.prev` left
+behind is one `fixed_copy::place` may refuse, and an unproven record would
+hold every switch of lamp-update's own waiting. So `writer_swap::forget_writer`
+clears them, right after the writer is written (`write_whole`: fsync, rename,
+folder synced). It acts only when the install changed the writer's bytes
+(missing or unreadable counts as changed), or when `writer-refresh.done`
+names another build than the one installed. That second trigger covers an
+install cut after it wrote the writer and before it cleared: the next run
+finds equal bytes and would otherwise skip. With equal bytes and a record
+naming this build, nothing is touched, and a bare `.prev` with no record is
+left to the refresh's own check (above). The order:
+
+1. `.prev` removed (missing is fine), its folder synced.
+2. The request removed (missing is fine).
+3. The record last, its folder synced. It is removed, unless it names a
+   build put back: then a fresh record replaces it, for the installed build,
+   proven, with no build before, and `put_back` and `for_good` carried as
+   they are (a record from before #5539, with `for_good` unset, stays so).
+   That build is still never asked, and nothing is left unproven.
+
+Because the record goes last, a cut anywhere leaves it naming the old
+build, so the next install clears again; a rerun after the clear changes
+nothing. A remove or sync that fails stops install with the path and the
+error. `writer-back.ok` is left: it names the old build, and nothing
+matches it to the new one. A `back` holds the records' lock while it works,
+so it can't be mid-run here (install then says another lamp-update is
+running); an unproven writer is replaced as install has always replaced it
+since #1680, and its `.prev` with it.
 
 `installed_units` leaves out the writer's unit, as it leaves out
 lamp-update's own. It starts `update/current` too, and taken for a part it

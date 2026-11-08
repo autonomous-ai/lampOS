@@ -137,8 +137,11 @@ is kept, said or read, and no model is asked. They need a lamp-memory from the
 same build: an older memory refuses an unknown field (`deny_unknown_fields`),
 so a recall with one answers nothing and a session note is unavailable until
 both are updated. All three were turned on in the product's voice unit by
-the memory owner's call on 5 Nov, and are off for the candidate since 6 Nov
-until a played check passes (#5331, #5464); a product install ships the
+the memory owner's call on 5 Nov and off for the candidate on 6 Nov (#5464).
+`LAMP_MEMORY_PROFILE` is back on after its played check passed on lamp-06c1
+on 6 Nov (PASS bd98421414, #5331); `LAMP_MEMORY_NEWER_FIRST` and
+`LAMP_MEMORY_STRENGTH` stay off until a played check reaches their own
+fields (`earlier:true`, `strength:"maybe"`). A product install ships the
 voice and the memory from one build.
 
 With `LAMP_MEMORY_NEWER_FIRST=on` (the memory owner's Tiers-ideas plan, 3
@@ -1240,7 +1243,8 @@ pattern on one day), `date` (an end day not real, before its newest source's
 day or more than 60 days after it), `supersede` (nothing current of that
 kind and person, newer than the evidence, or already superseded),
 `profile_cap`, `off`, `too_many`, `full` (2,048 observations or 512 live
-nightly items; superseded or expired items are history and not counted).
+nightly items, and no fading item left to give way, below; superseded or
+expired items are history and not counted).
 An exchange said before a forget mark of its day (below) is dropped
 `forgotten` too. Days keeps no other forget fingerprints.
 
@@ -1311,12 +1315,28 @@ older build reading an item sees an observation of an unknown category,
 kept as stored, shown as a plain fact; #1680). No row exists until a pass
 runs, so with the switch off nothing changes.
 
-**Lifetimes.** An item never expires by disuse or with its source
-exchanges' 30 days, unlike an observation. `maintain` closes it after its
-`expires` day: an `ahead` item after its `until`, or 14 days after its
-newest source without one; a `plan` fact 14 days after its newest source; a
-fact with `valid_until` after that day; an item citing one that closes
-goes with it. Others live until forgotten or superseded. A superseded item is inactive history, found only with
+**Lifetimes.** An item never expires with its source exchanges' 30 days,
+unlike an observation. `maintain` closes it after its `expires` day: an
+`ahead` item after its `until`, or 14 days after its newest source without
+one; a `plan` fact 14 days after its newest source; a fact with
+`valid_until` after that day; an item citing one that closes goes with it.
+Facts and profile lines otherwise live until forgotten or superseded.
+Episodes, feelings and patterns fade (`nightly::FADING`, the
+Reviewer-lead's P2 on #5097: without it a person reached 512 within months
+and every later night was `full`). One unused for 90 days (`FADE_DAYS`,
+Tiers' 90 days without a recall before an episode's detail fades,
+memory-tiers.md) is erased by `maintain`. Use is its writing, a `search`
+or `recall` returning it (with `nightly:true` or as a plain search's
+observation), or, for a pattern, the night proposing it again: a pattern
+dropped `restates` re-confirms the live one it restates. Importance does
+not change it (hand-set forgetting curves are not taken, memory.md). At
+either cap, a new item first erases the person's least used fading item
+(oldest `used_unix_ms`) of an earlier night that the job did not give, and
+only with none left is it `full`. Never faded or given way: an item a live
+entry cites (a profile line resting on an episode keeps it), and one
+resting on a kept thing, directly or through an item: the person asked
+for that. Kept things are never nightly items and never touched. With
+`LAMP_MEMORY_NIGHTLY` off there are no items and nothing changes. A superseded item is inactive history, found only with
 `history:true`.
 
 **Profile.** At most 60 current lines and 2 KiB of their text. A night (one
@@ -1339,7 +1359,7 @@ before a forget mark made since; the rest apply. `forget_all` and
 Tests: `nightly::tests` (each kind accepted, every drop reason, the
 privacy rule in English and Vietnamese, a known person's own records only,
 forget cascades, a forget during a pass, the quarter cap, plan and event
-expiry, supersession history and search/recall, patterns needing two days
+expiry, fading and giving way at the cap (a kept thing's never), supersession history and search/recall, patterns needing two days
 and the off switches, the input bounds, answers without `nightly`
 unchanged, and forget marks: El's scene, a line after the forget, another
 person and a day past the window, a mark during a pass, every forget's

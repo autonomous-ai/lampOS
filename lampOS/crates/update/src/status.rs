@@ -8,9 +8,12 @@
 //! the new build in its place) never says it as none. The value is said
 //! again every minute and is stale after three: a lamp-update that died
 //! mid-round is not taken as still fetching.
-use crate::{records::Records, round::Outcome};
+use crate::{
+    records::{Build, Records},
+    round::Outcome,
+};
 use lamp_bus::{Bus, Publisher};
-use lamp_msgs::{UpdateBuild, UpdateResult, UpdateStatus};
+use lamp_msgs::{UpdateBuild, UpdateResult, UpdateRound, UpdateStatus};
 use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
@@ -31,9 +34,14 @@ fn look_every(every: Duration, harness: bool) -> Duration {
     }
 }
 
-/// The status now: the build the records say the lamp runs, the phase, and
-/// the last round's end.
-pub fn status(records: &Path, now: &'static str, last: Option<&UpdateResult>) -> UpdateStatus {
+/// The status now: the build the records say the lamp runs, the phase, the
+/// last round's end, and the round under way, if any (#5473).
+pub fn status(
+    records: &Path,
+    now: &'static str,
+    last: Option<&UpdateResult>,
+    round: Option<UpdateRound>,
+) -> UpdateStatus {
     let running = Records::new(records.to_owned())
         .peek_state()
         .installed
@@ -46,6 +54,7 @@ pub fn status(records: &Path, now: &'static str, last: Option<&UpdateResult>) ->
         now: now.to_owned(),
         last: last.cloned(),
         harness: crate::harness_install::record(records),
+        round,
     }
 }
 
@@ -110,9 +119,12 @@ pub struct Telling {
     records: PathBuf,
     last: Option<UpdateResult>,
     said: Option<Arc<Mutex<(Publisher, UpdateStatus)>>>,
-    /// The round under way: the last phase it said, and when it began.
+    /// The round under way: the last phase it said, when it began, when
+    /// that phase began, and the build it goes to once read (#5473).
     phase: Option<&'static str>,
     began_unix_ms: Option<u64>,
+    step_began_unix_ms: u64,
+    target: Option<UpdateBuild>,
 }
 
 impl Telling {
@@ -136,7 +148,7 @@ impl Telling {
         say: &mut dyn FnMut(&str),
     ) -> Self {
         let last = last_in_records(records);
-        let first = status(records, "idle", last.as_ref());
+        let first = status(records, "idle", last.as_ref(), None);
         let publisher = Bus::new(bus_root).and_then(|bus| {
             bus.publisher_declared(
                 UpdateStatus::TOPIC,
@@ -192,14 +204,49 @@ impl Telling {
             said,
             phase: None,
             began_unix_ms: None,
+            step_began_unix_ms: 0,
+            target: None,
         }
     }
 
     /// A phase of a round begins; the first is when the round began.
     pub fn phase(&mut self, now: &'static str) {
+        self.phase_at(now, unix_ms());
+    }
+
+    /// [`Telling::phase`], begun at `at_unix_ms`.
+    pub fn phase_at(&mut self, now: &'static str, at_unix_ms: u64) {
         self.phase = Some(now);
-        self.began_unix_ms.get_or_insert_with(unix_ms);
-        let status = status(&self.records, now, self.last.as_ref());
+        self.began_unix_ms.get_or_insert(at_unix_ms);
+        self.step_began_unix_ms = at_unix_ms;
+        self.tell_round();
+    }
+
+    /// The round read the build it goes to (#5473): said at once, in the
+    /// phase it is in. Outside a round it is neither said nor kept.
+    pub fn target(&mut self, build: &Build) {
+        if self.phase.is_none() {
+            return;
+        }
+        self.target = Some(UpdateBuild {
+            sequence: build.sequence,
+            commit: build.commit.clone(),
+        });
+        self.tell_round();
+    }
+
+    /// Where the round is now, with when it and its phase began and its
+    /// target.
+    fn tell_round(&mut self) {
+        let (Some(now), Some(began)) = (self.phase, self.began_unix_ms) else {
+            return;
+        };
+        let round = UpdateRound {
+            started_at_unix_ms: began,
+            step_started_at_unix_ms: self.step_began_unix_ms.max(began),
+            target: self.target.clone(),
+        };
+        let status = status(&self.records, now, self.last.as_ref(), Some(round));
         self.tell(status);
     }
 
@@ -211,7 +258,8 @@ impl Telling {
             self.phase.take(),
             self.began_unix_ms.take(),
         ));
-        let status = status(&self.records, "idle", self.last.as_ref());
+        self.target = None;
+        let status = status(&self.records, "idle", self.last.as_ref(), None);
         self.tell(status);
     }
 
@@ -240,7 +288,7 @@ mod tests {
     fn the_status_is_the_records_build_the_phase_and_the_last_end_without_its_reason() {
         let folder = tempfile::tempdir().unwrap();
         let records = Records::new(folder.path().to_owned());
-        let empty = status(folder.path(), "idle", None);
+        let empty = status(folder.path(), "idle", None, None);
         assert_eq!(
             empty,
             UpdateStatus {
@@ -248,6 +296,7 @@ mod tests {
                 now: "idle".into(),
                 last: None,
                 harness: None,
+                round: None,
             }
         );
         records
@@ -265,7 +314,7 @@ mod tests {
         );
         assert_eq!(ended.outcome, "refused");
         assert_eq!(ended.sequence, None);
-        let told = status(folder.path(), "fetching", Some(&ended));
+        let told = status(folder.path(), "fetching", Some(&ended), None);
         assert_eq!(
             told.running,
             Some(UpdateBuild {
@@ -278,7 +327,7 @@ mod tests {
         assert!(!text.contains("/etc/lampOS"), "no reason text: {text}");
         assert_eq!(result(&Outcome::Switched(3310), 1).sequence, Some(3310));
         for now in UpdateStatus::NOW {
-            assert_eq!(status(folder.path(), now, None).now, now);
+            assert_eq!(status(folder.path(), now, None, None).now, now);
         }
     }
 
@@ -440,6 +489,89 @@ mod tests {
         std::thread::sleep(Duration::from_millis(250));
         let again = bus.latest(UpdateStatus::TOPIC).unwrap().unwrap().header.seq;
         assert!(again > first, "said again: {first} then {again}");
+    }
+
+    /// #5473, for the app's Software update screen: while a round runs, the
+    /// status says when the round and its step began and, once read, the
+    /// build it goes to; between rounds it says none of them, and the next
+    /// round starts with no target of the last. Read off a real bus.
+    #[test]
+    fn a_round_says_its_target_and_when_it_and_its_step_began() {
+        let records = tempfile::tempdir().unwrap();
+        let bus_root = tempfile::tempdir().unwrap();
+        let bus = Bus::new(bus_root.path()).unwrap();
+        let kept = || {
+            bus.latest(UpdateStatus::TOPIC)
+                .unwrap()
+                .unwrap()
+                .parse::<UpdateStatus>()
+                .unwrap()
+        };
+        let mut telling = Telling::start_every(
+            bus_root.path(),
+            records.path(),
+            Duration::from_secs(600),
+            false,
+            &mut |_| {},
+        );
+        assert_eq!(kept().round, None, "idle at start");
+        let two = Build {
+            sequence: 10_580,
+            commit: "e3b6593873".into(),
+        };
+        telling.phase_at("checking", 1_000);
+        assert_eq!(
+            kept().round,
+            Some(UpdateRound {
+                started_at_unix_ms: 1_000,
+                step_started_at_unix_ms: 1_000,
+                target: None,
+            })
+        );
+        telling.target(&two);
+        let read = kept();
+        assert_eq!(read.now, "checking");
+        assert_eq!(
+            read.round.as_ref().and_then(|round| round.target.clone()),
+            Some(UpdateBuild {
+                sequence: 10_580,
+                commit: "e3b6593873".into(),
+            })
+        );
+        telling.phase_at("fetching", 4_000);
+        telling.phase_at("switching", 9_000);
+        let switching = kept();
+        assert_eq!(switching.now, "switching");
+        let round = switching.round.unwrap();
+        assert_eq!(
+            (round.started_at_unix_ms, round.step_started_at_unix_ms),
+            (1_000, 9_000)
+        );
+        assert_eq!(round.target.map(|build| build.sequence), Some(10_580));
+        // Ended: idle, with none of it.
+        telling.ended(&Outcome::Switched(10_580), 12_000);
+        let ended = kept();
+        assert_eq!((ended.now.as_str(), ended.round.clone()), ("idle", None));
+        let text = serde_json::to_string(&ended).unwrap();
+        assert!(!text.contains("round"), "{text}");
+        // The next round has its own start and no target until it reads one.
+        telling.phase_at("checking", 20_000);
+        assert_eq!(
+            kept().round,
+            Some(UpdateRound {
+                started_at_unix_ms: 20_000,
+                step_started_at_unix_ms: 20_000,
+                target: None,
+            })
+        );
+        telling.ended(&Outcome::UpToDate(10_580), 21_000);
+        // A target with no round under way is neither said nor kept.
+        let before = bus.latest(UpdateStatus::TOPIC).unwrap().unwrap().header.seq;
+        telling.target(&two);
+        let after = bus.latest(UpdateStatus::TOPIC).unwrap().unwrap().header.seq;
+        assert_eq!((before, kept().round), (after, None));
+        telling.phase_at("checking", 30_000);
+        assert_eq!(kept().round.and_then(|round| round.target), None);
     }
 
     /// #5197: Harness's record, written between rounds by its one-shot, is

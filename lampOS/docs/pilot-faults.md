@@ -705,6 +705,12 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   Capture ended with that fault, the cleanup failed (`verified cleanup
   failed: capture WorkerFault: … capture WorkerExit: … exit status: 1`),
   and a failed cleanup is never waited out, so the voice exited 1 (#4332).
+  The same freshness loss after a stall of the voice itself, as on
+  lamp-06c1 at 21:30:02 on 6 Nov (capture, ring and the coordinator held
+  120-132 ms during an SD log flush, #5611), is ridden as a closed privacy
+  gap with `LAMP_PRIVACY_RIDES_STALL=on`, so no Stop is sent then; off, or
+  after a stall over about 1.44 s (the reopen's 60 ms steady time counts
+  inside the 1.5 s bound), it ends as described here.
   Boot 4's same freshness loss had a clean cleanup and the voice was back
   in the wait, ready 0.2 s later. Now, once `prepare()` returns, capture
   reads what the coordinator queued meanwhile (`peer_stop.rs`), keeps it in
@@ -752,7 +758,11 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   stopped being kept about 0.29 s before the end of the failed turn, so
   the clipped expiry froze and every lease lapsed before the lapsed
   capture lease cut the turn; the privacy worker ending on a lapsed
-  granting lease is by design (fail-closed). The coordinator now cuts a
+  granting lease is by design (fail-closed). With
+  `LAMP_PRIVACY_RIDES_STALL=on` (#5611, off by default) a granting lease's
+  lapse is ridden closed for at most 1.5 s instead, publishing nothing
+  (`privacy-switch.md`), so a lapse of that kind no longer ends the worker
+  unless it outlasts that bound. The coordinator now cuts a
   held turn as a capture gap once its lease ends within 40 ms
   (`HELD_TURN_LEASE_MARGIN_US`), judged on the frames its last capture
   drain kept, so a pass held up while frames keep coming cuts nothing,
@@ -771,6 +781,26 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   drain while frames come 30 ms late, on time, cuts nothing (before: the
   next pass cut it as `capture_gap`); the margin check is true only
   for a held turn whose lease ends within 40 ms. Not yet tried on a lamp.
+
+- **The voice's processes stalled together on a page read back from the
+  card.** On lamp-06c1 at 21:30:02 on 6 Nov, during an SD log flush,
+  capture, the ring and the coordinator stalled 120-132 ms together, each
+  on exactly one major fault, with 606 dirty pages and nothing blocked
+  (`stalls-*.log`, #5611). 120 ms is past a held turn's 100 ms lease, so
+  the leases lapsed. Inferred: the page was `lamp-voice`'s own shared text,
+  evicted by the flush. With `LAMP_VOICE_LOCK_CODE=on` (off by default) the
+  voice and each worker `mlock` their executable file mappings, the
+  executable's and its shared libraries' text, and say the bytes locked in
+  one line; a failed lock is that line and the voice runs on. The lock's
+  thread takes the ordinary policy first, not the inherited RR 20. The
+  writable segment stays unlocked and a fault served from zram is not
+  removed; the lamp row's major-fault check is the gate for both, and it
+  also times the start to `listening_ready`, cold and warm, on and off
+  (`serve-runtime.md`, "The voice's code kept in memory"). Unit tests: the
+  maps parser picks only `r-xp` file mappings; a failing `mlock` is counted
+  and the rest still locked, one line, no panic; switched off nothing is
+  read or locked; the thread lowers itself before any lock, and a refused
+  lowering is a line and the lock goes on. Not yet run on a lamp.
 
 - **A slide closed during a held turn ended the voice as a fault.** On
   lamp-e82d on 4 Nov 11:44 the slide closed just after a question, while

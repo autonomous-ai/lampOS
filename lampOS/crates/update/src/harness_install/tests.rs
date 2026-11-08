@@ -1,6 +1,11 @@
 use super::*;
 use crate::judge::UnitState;
-use std::{cell::RefCell, os::unix::fs::symlink, path::PathBuf, rc::Rc};
+use std::{
+    cell::RefCell,
+    os::unix::fs::{MetadataExt, symlink},
+    path::PathBuf,
+    rc::Rc,
+};
 
 /// What a round asked systemd, in order.
 #[derive(Default)]
@@ -102,6 +107,8 @@ struct Runs {
     installer: Result<String, String>,
     manifest: Result<String, String>,
     id: Result<String, String>,
+    /// lamp-tasks' unit's `Environment`, as `systemctl show` says it.
+    tasks_environment: String,
 }
 
 impl Runs {
@@ -111,6 +118,7 @@ impl Runs {
             installer: Ok(String::new()),
             manifest: Ok(String::new()),
             id: Ok("990\n".into()),
+            tasks_environment: String::new(),
         }
     }
     fn runner(&self) -> impl FnMut(&[String]) -> Result<String, String> + '_ {
@@ -123,6 +131,8 @@ impl Runs {
                 self.manifest.clone()
             } else if install::runs_installer(argv) {
                 self.installer.clone()
+            } else if line.starts_with("systemctl show lamp-tasks.service") {
+                Ok(self.tasks_environment.clone())
             } else if line.ends_with("harness version") {
                 Ok("harness 0.4.25\n".into())
             } else {
@@ -168,7 +178,7 @@ fn the_switch_off_changes_nothing_and_says_no_harness() {
     assert_eq!(lamp.said(), None);
     assert_eq!(fs::read_dir(lamp.records()).unwrap().count(), 0);
     assert_eq!(
-        crate::status::status(&lamp.records(), "idle", None).harness,
+        crate::status::status(&lamp.records(), "idle", None, None).harness,
         None
     );
 }
@@ -183,7 +193,7 @@ fn the_switch_on_installs_harness_when_missing_and_never_starts_its_daemon() {
     at_start(lamp.root(), &lamp.records(), true, 1);
     assert_eq!(lamp.said().unwrap().install, "absent");
     assert_eq!(
-        crate::status::status(&lamp.records(), "idle", None)
+        crate::status::status(&lamp.records(), "idle", None, None)
             .harness
             .unwrap()
             .install,
@@ -208,7 +218,7 @@ fn the_switch_on_installs_harness_when_missing_and_never_starts_its_daemon() {
     // Each change one revision on; a read never bumps it.
     assert_eq!(said.revision, 2);
     for _ in 0..2 {
-        let read = crate::status::status(&lamp.records(), "idle", None);
+        let read = crate::status::status(&lamp.records(), "idle", None, None);
         assert_eq!(read.harness.unwrap().revision, 2);
     }
     assert!(lamp.unit_written());
@@ -346,7 +356,7 @@ fn a_failed_install_is_recorded_without_blocking_and_tried_again() {
     assert!(!runs.ran("lamp-tasks.service"));
     let text = fs::read_to_string(lamp.records().join(RECORD)).unwrap();
     assert!(!text.contains("/var/lib/x"), "{text}");
-    let status = crate::status::status(&lamp.records(), "idle", None);
+    let status = crate::status::status(&lamp.records(), "idle", None, None);
     assert_eq!(status.harness.unwrap().error.as_deref(), Some("installer"));
 
     // The retry: the first round past the backoff starts the one-shot
@@ -1099,4 +1109,389 @@ fn a_pinned_install_reporting_another_version_records_version() {
         &mut quiet(),
     );
     assert_eq!(install(&lamp, &Runs::new(), 2).install, "installed");
+}
+
+/// Harness's launcher as its installer writes it without `--no-updates`.
+const UNPINNED: &str = "#!/bin/sh\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
+/// The same in Harness's pinned shape (#5493).
+const PINNED: &str = "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
+const HOLD_ON: &str =
+    "HOME=/var/lib/lampos-tasks PATH=/usr/local/bin:/usr/bin:/bin LAMP_HARNESS_HOLD_UPDATES=on";
+
+/// The launcher the (fake) installer left, with no link at Harness's
+/// place yet, so the one-shot installs.
+fn launcher_left(lamp: &Lamp, text: &str) -> PathBuf {
+    let bin = lamp.root().join("var/lib/lampos-tasks/.local/bin");
+    fs::create_dir_all(&bin).unwrap();
+    let launcher = bin.join("harness");
+    fs::write(&launcher, text).unwrap();
+    fs::set_permissions(&launcher, fs::Permissions::from_mode(0o755)).unwrap();
+    launcher
+}
+
+fn asked_for_install(lamp: &Lamp) {
+    write_whole(
+        &lamp.records().join(ASK),
+        &serde_json::to_vec(&Ask {
+            version: 1,
+            pin: None,
+        })
+        .unwrap(),
+        0o600,
+    )
+    .unwrap();
+}
+
+/// With lamp-tasks holding Harness's updates, the install writes Harness's
+/// launcher in its pinned shape before lamp-tasks starts, keeping its exec
+/// line and its mode; a second install keeps it byte for byte.
+#[test]
+fn with_the_hold_on_the_install_pins_harnesss_launcher_once() {
+    let lamp = Lamp::new();
+    let launcher = launcher_left(&lamp, UNPINNED);
+    asked_for_install(&lamp);
+    let mut runs = Runs::new();
+    runs.tasks_environment = HOLD_ON.into();
+    let mut lines = Vec::new();
+    let said = {
+        let mut run = runs.runner();
+        install_now(
+            lamp.root(),
+            &lamp.records(),
+            &mut run,
+            &mut || 3,
+            &mut |line: &str| lines.push(line.to_owned()),
+        )
+        .unwrap()
+    };
+    assert_eq!(said.install, "installed");
+    assert_eq!(fs::read_to_string(&launcher).unwrap(), PINNED);
+    assert_eq!(
+        fs::metadata(&launcher).unwrap().permissions().mode() & 0o777,
+        0o755
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.starts_with("Harness's launcher pinned (")),
+        "{lines:?}"
+    );
+    let log = runs.log.borrow().clone();
+    let shown = log
+        .iter()
+        .position(|line| line.starts_with("systemctl show lamp-tasks.service"))
+        .unwrap();
+    assert!(shown < log.len() - 1, "before lamp-tasks starts: {log:?}");
+    assert_eq!(log.last().unwrap(), "systemctl restart lamp-tasks.service");
+
+    // Pinned already: the same bytes, no second preamble.
+    assert_eq!(
+        launcher::pin(&launcher, "/var/lib/lampos-tasks/harness-hold.env"),
+        Ok(launcher::Pinned::Kept)
+    );
+    let mut run = runs.runner();
+    let mut kept = Vec::new();
+    launcher::after_install(lamp.root(), &mut run, &mut |line: &str| {
+        kept.push(line.to_owned())
+    });
+    assert_eq!(kept, ["Harness's launcher already pinned"]);
+    assert_eq!(fs::read_to_string(&launcher).unwrap(), PINNED);
+    assert!(!launcher.with_file_name(".harness.lampos-pin").exists());
+}
+
+/// An exec line Harness's own update rewrote is kept as it is.
+#[test]
+fn the_launchers_own_exec_line_is_kept() {
+    let updated = UNPINNED.replace("0.5.39", "0.5.57");
+    let pinned =
+        launcher::pinned_launcher(&updated, "/var/lib/lampos-tasks/harness-hold.env").unwrap();
+    assert_eq!(pinned, PINNED.replace("0.5.39", "0.5.57"));
+    assert_eq!(pinned.lines().last(), updated.lines().last());
+    assert_eq!(
+        launcher::pinned_launcher("#!/bin/sh\necho no exec\n", "/x"),
+        None
+    );
+}
+
+/// With the hold off (unset, or anything but `on`), the install leaves the
+/// launcher as it is.
+#[test]
+fn with_the_hold_off_the_install_leaves_the_launcher_alone() {
+    for environment in [
+        "",
+        "HOME=/var/lib/lampos-tasks",
+        "LAMP_HARNESS_HOLD_UPDATES=off",
+        "LAMP_HARNESS_HOLD_UPDATES=ON",
+    ] {
+        let lamp = Lamp::new();
+        let launcher = launcher_left(&lamp, UNPINNED);
+        asked_for_install(&lamp);
+        let mut runs = Runs::new();
+        runs.tasks_environment = environment.into();
+        let mut lines = Vec::new();
+        let mut run = runs.runner();
+        install_now(
+            lamp.root(),
+            &lamp.records(),
+            &mut run,
+            &mut || 3,
+            &mut |line: &str| lines.push(line.to_owned()),
+        )
+        .unwrap();
+        assert_eq!(
+            fs::read_to_string(&launcher).unwrap(),
+            UNPINNED,
+            "{environment}"
+        );
+        let said: Vec<_> = lines
+            .iter()
+            .filter(|line| line.contains("launcher"))
+            .collect();
+        assert_eq!(
+            said,
+            [
+                "LAMP_HARNESS_HOLD_UPDATES is not on in lamp-tasks.service: Harness's launcher left as it is"
+            ],
+            "{environment}"
+        );
+    }
+}
+
+/// With the hold on and no launcher, none is made, and that is said.
+#[test]
+fn a_missing_launcher_is_not_made() {
+    let lamp = Lamp::new();
+    asked_for_install(&lamp);
+    let mut runs = Runs::new();
+    runs.tasks_environment = HOLD_ON.into();
+    let mut lines = Vec::new();
+    {
+        let mut run = runs.runner();
+        install_now(
+            lamp.root(),
+            &lamp.records(),
+            &mut run,
+            &mut || 3,
+            &mut |line: &str| lines.push(line.to_owned()),
+        )
+        .unwrap();
+    }
+    assert!(
+        lines.iter().any(|line| line
+            == "no Harness launcher at /var/lib/lampos-tasks/.local/bin/harness: left alone"),
+        "{lines:?}"
+    );
+    assert!(!lamp.root().join("var/lib/lampos-tasks/.local").exists());
+}
+
+/// lamp-tasks' unit not read (systemctl failed): taken as off, the launcher
+/// left as it is, one line said.
+#[test]
+fn an_unread_tasks_unit_is_taken_as_off() {
+    let lamp = Lamp::new();
+    let launcher = launcher_left(&lamp, UNPINNED);
+    let mut lines = Vec::new();
+    let mut run = |argv: &[String]| -> Result<String, String> {
+        assert_eq!(argv[0], "systemctl");
+        Err("Failed to connect to bus".to_owned())
+    };
+    launcher::after_install(lamp.root(), &mut run, &mut |line: &str| {
+        lines.push(line.to_owned())
+    });
+    assert_eq!(
+        lines,
+        [
+            "lamp-tasks.service's environment not read (Failed to connect to bus): LAMP_HARNESS_HOLD_UPDATES taken as off, Harness's launcher left as it is"
+        ]
+    );
+    assert_eq!(fs::read_to_string(&launcher).unwrap(), UNPINNED);
+}
+
+/// A link planted at the temporary name (the tasks user owns the bin
+/// folder): the root-run pin never opens through it, so the file it points
+/// at is not truncated, written, chowned or chmodded; the launcher is still
+/// pinned, and a second run changes nothing.
+#[test]
+fn a_link_at_the_temporary_name_is_not_followed() {
+    let lamp = Lamp::new();
+    let launcher = launcher_left(&lamp, UNPINNED);
+    let victim = lamp.root().join("victim");
+    fs::write(&victim, "root's own\n").unwrap();
+    fs::set_permissions(&victim, fs::Permissions::from_mode(0o640)).unwrap();
+    let next = launcher.with_file_name(".harness.lampos-pin");
+    symlink(&victim, &next).unwrap();
+    let env_file = "/var/lib/lampos-tasks/harness-hold.env";
+
+    assert_eq!(
+        launcher::pin(&launcher, env_file),
+        Ok(launcher::Pinned::Written)
+    );
+    assert_eq!(fs::read_to_string(&victim).unwrap(), "root's own\n");
+    assert_eq!(
+        fs::metadata(&victim).unwrap().permissions().mode() & 0o777,
+        0o640
+    );
+    assert_eq!(fs::read_to_string(&launcher).unwrap(), PINNED);
+    assert!(
+        !fs::symlink_metadata(&launcher)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert!(
+        fs::symlink_metadata(&next).is_err(),
+        "the planted name is gone"
+    );
+
+    assert_eq!(
+        launcher::pin(&launcher, env_file),
+        Ok(launcher::Pinned::Kept)
+    );
+    assert_eq!(fs::read_to_string(&launcher).unwrap(), PINNED);
+    assert_eq!(fs::read_to_string(&victim).unwrap(), "root's own\n");
+}
+
+/// A launcher that is itself a link: left as it is and said; its target is
+/// neither read nor written.
+#[test]
+fn a_launcher_that_is_a_link_is_left_alone() {
+    let lamp = Lamp::new();
+    let bin = lamp.root().join("var/lib/lampos-tasks/.local/bin");
+    fs::create_dir_all(&bin).unwrap();
+    let target = lamp.root().join("elsewhere");
+    fs::write(&target, UNPINNED).unwrap();
+    fs::set_permissions(&target, fs::Permissions::from_mode(0o755)).unwrap();
+    let launcher = bin.join("harness");
+    symlink(&target, &launcher).unwrap();
+    let mut runs = Runs::new();
+    runs.tasks_environment = HOLD_ON.into();
+    let mut lines = Vec::new();
+    let mut run = runs.runner();
+    launcher::after_install(lamp.root(), &mut run, &mut |line: &str| {
+        lines.push(line.to_owned())
+    });
+    assert_eq!(
+        lines,
+        [format!(
+            "Harness's launcher not pinned: {}: a link, left as it is (its target not read or written)",
+            launcher.display()
+        )]
+    );
+    assert_eq!(fs::read_to_string(&target).unwrap(), UNPINNED);
+    assert!(
+        fs::symlink_metadata(&launcher)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert!(!bin.join(".harness.lampos-pin").exists());
+}
+
+/// A link in place of the bin folder: not followed either.
+#[test]
+fn a_link_in_place_of_the_bin_folder_is_not_followed() {
+    let lamp = Lamp::new();
+    let elsewhere = lamp.root().join("elsewhere-bin");
+    fs::create_dir_all(&elsewhere).unwrap();
+    fs::write(elsewhere.join("harness"), UNPINNED).unwrap();
+    let local = lamp.root().join("var/lib/lampos-tasks/.local");
+    fs::create_dir_all(&local).unwrap();
+    symlink(&elsewhere, local.join("bin")).unwrap();
+    let launcher = local.join("bin/harness");
+    assert!(launcher::pin(&launcher, "/x").is_err());
+    assert_eq!(
+        fs::read_to_string(elsewhere.join("harness")).unwrap(),
+        UNPINNED
+    );
+    assert!(!elsewhere.join(".harness.lampos-pin").exists());
+}
+
+/// A launcher with a second hard link (a name elsewhere for the same file):
+/// left as it is, one line said, the other name unchanged (two security
+/// reads' P3 on #5624).
+#[test]
+fn a_hard_linked_launcher_is_left_alone() {
+    let lamp = Lamp::new();
+    let launcher = launcher_left(&lamp, UNPINNED);
+    let other = lamp.root().join("elsewhere");
+    fs::hard_link(&launcher, &other).unwrap();
+    let mut runs = Runs::new();
+    runs.tasks_environment = HOLD_ON.into();
+    let mut lines = Vec::new();
+    let mut run = runs.runner();
+    launcher::after_install(lamp.root(), &mut run, &mut |line: &str| {
+        lines.push(line.to_owned())
+    });
+    assert_eq!(
+        lines,
+        [format!(
+            "Harness's launcher not pinned: {}: hard-linked (2 names), left as it is",
+            launcher.display()
+        )]
+    );
+    assert_eq!(fs::read_to_string(&launcher).unwrap(), UNPINNED);
+    assert_eq!(fs::read_to_string(&other).unwrap(), UNPINNED);
+    assert!(!launcher.with_file_name(".harness.lampos-pin").exists());
+}
+
+/// A launcher over the 64 KiB cap (Harness's is a few hundred bytes): not
+/// read or pinned, left byte for byte as it is, one line said (a security read's P3
+/// on #5647).
+#[test]
+fn a_launcher_over_the_size_cap_is_left_alone() {
+    let lamp = Lamp::new();
+    let big = format!("#!/bin/sh\n{}{}", "#\n".repeat(64 * 1024), &UNPINNED[10..]);
+    let launcher = launcher_left(&lamp, &big);
+    let mut runs = Runs::new();
+    runs.tasks_environment = HOLD_ON.into();
+    let mut lines = Vec::new();
+    let mut run = runs.runner();
+    launcher::after_install(lamp.root(), &mut run, &mut |line: &str| {
+        lines.push(line.to_owned())
+    });
+    assert_eq!(
+        lines,
+        [format!(
+            "Harness's launcher not pinned: {}: {} bytes, over the 64 KiB cap, left as it is",
+            launcher.display(),
+            big.len()
+        )]
+    );
+    assert_eq!(fs::read_to_string(&launcher).unwrap(), big);
+    assert!(!launcher.with_file_name(".harness.lampos-pin").exists());
+}
+
+/// A launcher owned by another uid than its bin folder's owner is not
+/// pinned; one with one name and the folder's owner is.
+#[test]
+fn a_launcher_owned_by_another_uid_is_not_pinned() {
+    assert_eq!(launcher::refused(1, 1000, 1000), None);
+    assert_eq!(
+        launcher::refused(1, 0, 1000).as_deref(),
+        Some("owned by uid 0, not the bin folder's owner 1000, left as it is")
+    );
+    assert_eq!(
+        launcher::refused(3, 1000, 1000).as_deref(),
+        Some("hard-linked (3 names), left as it is")
+    );
+}
+
+/// The same through `pin`, where the test can give the launcher another
+/// owner: only as root (skipped otherwise, e.g. on a builder's Mac).
+#[test]
+fn a_foreign_owned_launcher_is_left_alone_when_run_as_root() {
+    let lamp = Lamp::new();
+    if fs::metadata(lamp.root()).unwrap().uid() != 0 {
+        return;
+    }
+    let launcher = launcher_left(&lamp, UNPINNED);
+    std::os::unix::fs::chown(&launcher, Some(4242), None).unwrap();
+    assert_eq!(
+        launcher::pin(&launcher, "/x"),
+        Err(format!(
+            "{}: owned by uid 4242, not the bin folder's owner 0, left as it is",
+            launcher.display()
+        ))
+    );
+    assert_eq!(fs::read_to_string(&launcher).unwrap(), UNPINNED);
 }

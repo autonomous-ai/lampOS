@@ -114,7 +114,11 @@ lượt quan sát của nó. Vẫn còn nợ một lần kiểm tra trên lamp.
 
 Khi bật `LAMP_MEMORY_REMEMBER_ONCE` (#2176), `remember` gửi `once` cho bộ nhớ:
 một câu mà chính người đó đã giữ, còn hiệu lực và cùng chữ (không phân biệt
-hoa thường, khoảng trắng và dấu câu cuối), là chính điều đã giữ đó, không ghi
+hoa thường, khoảng trắng và dấu câu cuối; trong phạm vi riêng của một người,
+cả chữ «my» hay «the» ở đầu: C81, bản 10538 trên lamp-06c1, 6/11, «The gym
+locker code is 441.» đã giữ và «My gym locker code is 441.» bị giữ lần nữa;
+không bao giờ trong phạm vi căn phòng, nơi «my» là của bất kỳ ai nói,
+`days::own_text`), là chính điều đã giữ đó, không ghi
 thêm dòng nào. Lời sửa (`replaces`) luôn ghi bản mới; câu của người khác, hoặc
 điều đã quên hay đã bị thay, không tính là cùng một điều. Unit sản phẩm bật công
 tắc này từ 28/10: trên lamp-06c1, khi không có nó, một câu nói lại đã được giữ
@@ -349,13 +353,16 @@ phòng:
   Long today.») được xét như trước. Nhật ký chỉ đếm, không có lời nào. Test:
   `remember::named::tests`.
 
-## Ý tưởng của Tiers trong Days, tắt cho bản ứng viên
+## Ý tưởng của Tiers trong Days: PROFILE bật trong bản sản phẩm
 
 `LAMP_MEMORY_NEWER_FIRST`, `LAMP_MEMORY_STRENGTH` và `LAMP_MEMORY_PROFILE`
 (kế hoạch ý tưởng Tiers của người phụ trách trí nhớ, 3/11; mỗi công tắc chỉ
 nhận `on`, chỉ với Days) được bật trong unit voice của bản sản phẩm từ 5/11
-theo quyết định của người phụ trách trí nhớ, và tắt cho bản ứng viên từ 6/11
-cho đến khi một bài kiểm tra phát thử đạt (#5331, #5464). Khi bật, một lời
+theo quyết định của người phụ trách trí nhớ, và tắt cho bản ứng viên ngày 6/11
+(#5464). `LAMP_MEMORY_PROFILE` bật lại sau khi bài kiểm tra phát thử của nó đạt
+trên lamp-06c1 ngày 6/11 (PASS bd98421414, #5331); `LAMP_MEMORY_NEWER_FIRST`
+và `LAMP_MEMORY_STRENGTH` vẫn tắt cho đến khi một bài phát thử chạm tới chính
+trường của chúng (`earlier:true`, `strength:"maybe"`). Khi bật, một lời
 sửa nói trong lúc trò chuyện
 ("thật ra bây giờ là trà xanh") được trả về trước câu cũ mà nó sửa, và câu cũ
 mang `earlier`; một điều nói như "có lẽ" hay một dự định được đánh dấu
@@ -544,7 +551,25 @@ lamp-06c1 ngày 5/11, S14, cả hai bị bỏ sót và việc giữ bị bỏ). 
 trong vòng `HELD_FORGET_FOR` (60 giây), với chính khuôn mặt họ được thấy đang
 nói và không mặt nào khác (`LAMP_EYES_SPEAKING`,
 `speaking_faces::seen_saying`), mới ghi nó vào phạm vi của họ, và câu trả lời
-nói đã lưu. Khuôn mặt họ chỉ ở trong khung hình là chưa đủ: nó vẫn ở đó khi một
+nói đã lưu. Lời «có» có thể nhắc lại việc lưu
+(`known_faces::plain_agreement_to_keep`): «Yes, please keep that.», «Keep it.»
+một mình, hay «keep off» đi cùng một lời «có», vì chuyển giọng nói thành chữ đã
+nghe «keep that» thành như vậy trên lamp-06c1 (5/11, S14 lượt chạy 14:21, yêu
+cầu 424: «Yes. Please keep off.», và điều về người anh không bao giờ được lưu).
+«Off» chỉ tính khi đứng ngay sau «keep» và có một từ «có». Một lời nhắc lại
+việc lưu mà không có từ «có» chỉ được đi cùng «please», «lamp», «for», «me»
+hay một lời cảm ơn, nên một câu hỏi bị mất dấu «?» («Do you keep that», «I'd
+keep it») không phải lời «có» và được hỏi lại một lần (lượt đọc quyền riêng
+tư của #5572). Mọi lời «không»
+(«No, keep off.», «Don't keep it.») đều từ chối. Một câu trả lời của họ, trong
+thời hạn, không phải «có» cũng không phải «không»
+(`known_faces::unclear_answer_to_keep`: tối đa 6 từ, có một từ «có» hoặc
+«keep»/«save», không có từ nào của lời «không», như «Yes. Please key that.» hay
+«Keep off.» một mình) không bị bỏ lặng lẽ: việc giữ còn cho lượt đó, mô hình
+được báo hỏi lại một lần, «Should I keep that?» (`remember::KEEP_ASKED_AGAIN`),
+và việc giữ còn nếu câu trả lời đó có hỏi. Chỉ hỏi lại một lần; câu trả lời
+không rõ thứ hai sẽ bỏ nó. Việc hỏi lại không chạy và không đọc gì, nên không
+cần thấy mặt họ nói; lời «có» sau đó thì vẫn cần. Khuôn mặt họ chỉ ở trong khung hình là chưa đủ: nó vẫn ở đó khi một
 vị khách nói từ ngoài khung hình (Reviewer-three, 14:46). Mọi trường hợp khác
 đều bỏ nó, không ghi gì ở đâu cả: không có «có», «có» không được thấy (mô hình
 được báo là không tính), một mặt khác được thấy nói, một lệnh quên, cuộc trò
@@ -593,11 +618,12 @@ ai nói, khi các lần nhìn qua câu ấy thấy khuôn mặt quen của họ 
 lần và không thấy mặt nào khác trong bất kỳ lần nào
 (`SpeakingFaces::one_face_in_view`; một lần nhìn không có ai không tính là mặt
 khác), và cuộc trò chuyện **chưa có giọng nào khác**, thì **việc ghi nhớ**
-(`remember`) **và việc quên điều đã ghi** là của họ: điều đó được lưu vào phạm
-vi của họ (`ScopeLease::take_by_one_face`, `ScopeLease::kept_by_one_face`), và
-một `forget` một mục tìm trong phạm vi của họ rồi đến của căn phòng
-(`ScopeLease::reached_by_one_face`, quyết định duy nhất mà tuyến ký ức trong
-`tools.rs` đọc cho cả hai, nên việc quên không bao giờ hẹp hơn việc ghi). **Mọi việc
+(`remember`) là của họ, **nhưng không lệnh quên nào chạy trên câu ấy**: điều đó
+được lưu vào phạm vi của họ (`ScopeLease::take_by_one_face`,
+`ScopeLease::kept_by_one_face`), và một `forget` một mục được xét theo cùng
+quyết định ấy (`ScopeLease::reached_by_one_face`, quyết định mà tuyến ký ức
+trong `tools.rs` đọc cho cả hai) và không chạy ở đâu cho tới khi thấy miệng nói
+câu ấy (bên dưới; #5627). **Mọi việc
 đọc vẫn là của căn phòng**: không `recall` hay gợi ý từ ký ức của họ, không
 ghi chú ký ức của họ, không ngữ cảnh của người ấy, không chuỗi hội thoại hay
 bản tóm tắt của họ; câu được nói và đọc như của căn phòng, như khi không có
@@ -625,8 +651,9 @@ là giọng khác, chỉ thấy mặt thứ hai nói mới cho biết có ngư�
 ghi nhớ là của họ, cái giá là lời được lưu, không bao giờ bị đọc. Có mặt thứ hai, mặt lạ,
 không có mặt nào, hoặc có giọng khác, thì như trước. Một câu được nhận là của
 căn phòng vì không nhận ra ai thì không đổi, nên giọng chưa nhận ra vẫn không
-chạm được ký ức của ai (#4196, #4207). **Việc quên theo việc ghi:** một
-`forget` một mục trên câu như vậy xoá khỏi phạm vi của họ điều mà cùng quy tắc
+chạm được ký ức của ai (#4196, #4207). **Việc quên sẽ theo việc ghi
+như thế nào** (`remember::run_one_face_forget`, không đường chạy nào gọi tới từ
+#5627; giữ lại cho khi việc quên ở đó được cho phép lại): một `forget` một mục trên câu như vậy xoá khỏi phạm vi của họ điều mà cùng quy tắc
 đã lưu ở đó, và chỉ tìm thêm trong phạm vi của căn phòng khi của họ không có gì
 về điều ấy (lần kiểm tra của Fourteen trên lamp-9adf, bản 9699: «forget my
 coffee» chỉ tìm trong phạm vi căn phòng trong khi cà phê được lưu là của họ,
@@ -646,7 +673,29 @@ căn phòng. Chỉ lệnh quên theo điều nó nói tới hoặc theo id mà `
 tới phạm vi của họ: một câu «forget that» trống, hoặc bất kỳ lệnh quên nào mà
 ký ức sẽ chạy như «điều được lưu gần nhất» (ký ức cũ, công tắc tắt), chỉ là của
 căn phòng, vì sau lần `recall` của căn phòng trên câu như vậy nó sẽ lấy mất
-điều họ lưu gần nhất (P2 của Thirteen trên #5022). Id được đếm theo từng
+điều họ lưu gần nhất (P2 của Thirteen trên #5022). **Việc quên cần thấy miệng đang nói** (người phụ trách ký ức, 16:49 trên
+#5385: «tạm thời chưa cho xóa nếu ko detect đc mở miệng»), không có ngoại lệ:
+một lệnh quên trên câu như vậy, của họ vì chỉ có mặt họ trong
+khung hình hoặc được gọi tên muộn trên một câu nhận là của căn phòng
+(`ScopeLease::reached_by_one_face`), không được hỏi tới ký ức nào, của họ hay
+của căn phòng (`tools::run_call_with_scope`), khi chỉ bật `LAMP_PERSON_SCOPE_ONE_FACE`. Lệnh
+quên nêu điều gì (`about`) hoặc điều nào (`source_id`) được trả lời
+`ONE_FACE_NAMED_FORGET`, nên đèn nói sẽ quên điều đó khi thấy họ nói, và nhờ
+họ nhìn vào đèn rồi nói lại (#5627, từ lần đọc #5608 của Thirteen: trước đó nó
+xoá trong phạm vi của họ khi không thấy miệng, nên một người ngoài khung hình
+có thể xoá điều họ đã lưu chỉ bằng cách nêu tên điều ấy). Với một câu «forget
+that» trống, ngay sau một lần lưu mới thông
+thường của chính họ (yêu cầu kế tiếp của cùng worker và phiên, cùng người,
+không có lệnh ký ức nào khác hay lệnh quên theo tên trước nó trong câu ấy,
+trong `HELD_FORGET_FOR`: `tools::one_face_just_kept`), đèn nói sẽ quên điều đó
+khi thấy họ nói (`ONE_FACE_JUST_KEPT`); nếu không thì hỏi là điều nào
+(`ONE_FACE_BARE_FORGET`), không bao giờ đoán bằng `forget_last` của căn phòng.
+C88 trên bản 10538, lamp-06c1, 6/11: «remember that my umbrella is yellow»
+được lưu là của Olivia, câu kế tiếp «forget that» chạy như `forget_last` của
+căn phòng và tên Wi-Fi của căn phòng bị xoá (#5608, các P2 của Jarvis). Một
+vị khách ngoài khung hình hay TV nói «forget that» bên cạnh khuôn mặt im lặng
+của họ không làm quên gì. Nói khi thấy miệng họ đang nói thì câu là của họ và
+lệnh quên chạy trong phạm vi của họ như mọi lệnh khác. Id được đếm theo từng
 người, nên số 3 của họ và số 3 của căn phòng là hai điều khác nhau: một lệnh
 quên theo id chỉ đi tới phạm vi mà danh sách của nó đã cho thấy id ấy trong
 phiên này, và một id đã hiện ở cả hai thì không quên gì và mô hình hỏi là
@@ -659,6 +708,56 @@ giọng ấy có thể xoá trong đó tối đa tám điều khớp (một `for
 nhiều nhất tám điều, và không quên gì khi có nhiều hơn), không bao giờ tất cả
 (không gì được đọc lại cho giọng ấy). Một câu được lưu là của bạn khi bạn là khuôn mặt duy nhất trong khung
 hình có thể chứa lời người khác nói ngoài khung hình.
+
+**Cả việc đọc, với công tắc riêng; việc quên cần thấy miệng nói**
+(`LAMP_PERSON_SCOPE_ONE_FACE_READS=on`, tắt ở mọi nơi, #5522; lời «áp dụng
+luôn đi» của người phụ trách ký ức lúc 16:43 trên #5385, PM hiểu là cho việc
+lưu và việc nhớ lại, không cho việc quên, và lời của người phụ trách ký ức lúc
+16:49: «tạm thời chưa cho xóa nếu ko detect đc mở miệng»). Khi
+`LAMP_PERSON_SCOPE_ONE_FACE` có tác dụng, một câu mà quy tắc ấy nhận như trên
+**không bị thu hẹp**: câu được nói và đọc như của họ
+(`ScopeLease::read_by_one_face`): `recall`, gợi ý ký ức, ghi chú ký ức, ngữ
+cảnh, chuỗi hội thoại của họ và việc giữ cuộc trò chuyện mà nó mở ra. Lượt trao
+đổi của câu được ghi vào hồ sơ của họ ở cả hai kiểu nhật ký
+(`memory_scope::one_face_record`, `remember::filed_by_one_face`, trước
+`hand_on` và `hand_on_days`); một câu mà lần nhìn muộn gọi tên họ theo cùng
+quy tắc giữ việc đọc là của căn phòng, như đã nói, nhưng hồ sơ cũng là của họ
+(`ScopeLease::keep_for_one_face_recorded`). **Không lệnh quên nào chạy trên
+câu như vậy** (`ScopeLease::forgets_need_mouth`): không `forget_everything`,
+`forget_my_face`, `forget_rule`, lời «có» thay họ, cũng không `forget` một mục
+mà riêng quy tắc ghi nhớ cho chạm tới phạm vi của họ
+(`ScopeLease::reached_by_one_face`); mô hình được báo là không quên gì và hãy
+nhờ họ nhìn vào đèn nói lại. Câu ấy không giữ lệnh quên nào chờ lời «có», và
+lời yêu cầu của nó không tính là yêu cầu ngay trước (`forget_asker`).
+**Cũng không gì mang tính xoá bỏ, hay làm thay họ ngoài việc lưu và nhớ lại**
+(lần đọc riêng tư trên #5592): một `remember` sửa một điều đã giữ theo id
+(`replaces`, `remember::corrects`) bị từ chối như lệnh quên, và khi không có
+id thì bộ so khớp lời sửa bị bỏ qua, nên điều mới được giữ như thường và không
+gì bị thay; `keep_rule`, `list_rules` và `forget_rule` bị từ chối;
+`cancel_reminder` và `snooze_reminder` bị từ chối trừ khi
+`LAMP_ONE_FACE_REMINDERS` bật (điều chấp nhận ngày 4/11); và câu ấy không có
+chủ dịch vụ (`services::owner_of`), nên không `service_read` nào chạy cho nó,
+trừ khi phòng riêng (`LAMP_PRIVATE_ROOM`) đã cho mọi câu một chủ. Lượt quan
+sát sau cuộc trò chuyện không bao giờ cho nghỉ một điều đã giữ của cuộc trò
+chuyện có một lượt trao đổi như vậy được ghi vào: với `LAMP_MEMORY_REPLACES`,
+các đề xuất của nó tới `tidy_apply` không có `"replaces"`, được giữ như thường
+(`Conversation::filed`, `remember::job_replacing`; P2 của Thirteen trên #5592). Một điều mới
+được giữ như thường vẫn được ghi. Câu mà thấy mặt họ nói thì như trước. Các giới hạn riêng tư vẫn giữ: có mặt thứ hai,
+mặt lạ, không có mặt, giọng khác trước câu hoặc nghe thấy khi câu được xét
+(`another voice in the conversation`), thì là của căn phòng, cả việc ghi; câu
+được giữ theo cuộc trò chuyện không bao giờ được đọc (#5508). **Rủi ro đã biết,
+chấp nhận cùng công tắc:** một vị khách nói ngoài khung hình khi mặt họ ngồi im
+một mình trong khung, không nghe thấy giọng khác, sẽ được nghe `recall`, gợi ý
+và chuỗi hội thoại của họ. **Việc ghi cũng xảy ra:** ghi lượt trao đổi vào hồ
+sơ của họ là phần «việc lưu được tính» của chủ đèn, nên lời của khách có thể
+được ghi như của họ, và việc nhớ lại theo ngày cùng việc trích xuất ban đêm
+(nếu có lúc được bật) có thể coi đó là lời của họ. `LAMP_SAME_VOICE_CONFIRMS`,
+khi bật, chỉ coi giọng khách là giọng thứ hai khi cuộc trò chuyện đã có dấu
+giọng để so; nếu khách là giọng đầu tiên thì không gì phân biệt được. Phán
+quyết của trưởng nhóm trên #5522 nói một mặt một mình không bao giờ tính cho
+việc đọc; điều này dựa trên lời của người phụ trách ký ức lúc 16:43 và cách
+hiểu của PM lúc 16:46, nên trưởng nhóm xác nhận trước khi bật công tắc. Tắt công tắc thì quy tắc một mặt
+như trên, giống hệt từng byte.
 
 **Lệnh quên tới cả dòng của căn phòng nói lại điều họ giữ** (GATE 23 FAIL
 của Core-verifier trên lamp-52e6, bản ổn định 9980, ngày 4/11): câu «remember
@@ -782,10 +881,22 @@ Lưu trữ: mỗi mục là một hàng `entries` (`kind='observation'`, `catego
 loại của nó), nên tìm kiếm, nguồn, thay thế, quên và xoá an toàn như các
 quan sát; trường riêng nằm trong `nightly_items`, công việc trong
 `nightly_jobs`, hạn mức của đêm trong `nightly_nights`, tạo `IF NOT EXISTS`,
-`user_version` vẫn là 1. Mục không hết hạn vì không dùng hay theo 30 ngày của
-lượt trao đổi; chỉ theo ngày kết thúc của nó (ahead, plan, `valid_until`).
-Mỗi người giữ tối đa 512 mục còn hiệu lực (`full`); mục đã bị thay thế hay đã
-hết hạn là lịch sử và không được tính.
+`user_version` vẫn là 1. Mục không hết hạn theo 30 ngày của lượt trao đổi;
+fact và dòng hồ sơ chỉ hết hạn theo ngày kết thúc của nó (ahead, plan,
+`valid_until`). Episode, feeling và pattern thì phai (`nightly::FADING`, P2
+của Reviewer-lead trên #5097): không được dùng trong 90 ngày (`FADE_DAYS`,
+90 ngày không được nhắc lại của Tiers, memory-tiers.md) thì `maintain` xoá.
+Được dùng là: lúc ghi, khi `search` hay `recall` trả về nó, hoặc với pattern,
+khi đêm đề xuất lại nó (bị bỏ `restates` thì pattern còn hiệu lực mà nó lặp
+lại được xác nhận lại). Độ quan trọng không đổi điều này.
+Mỗi người giữ tối đa 512 mục còn hiệu lực; ở giới hạn (512 mục hay 2.048 quan
+sát), mục mới trước hết xoá mục phai ít dùng nhất (`used_unix_ms` cũ nhất) của
+một đêm trước mà job không đưa ra, và chỉ khi không còn mục nào như thế mới là
+`full`. Không bao giờ phai hay nhường chỗ: mục được một mục còn hiệu lực dẫn
+tới (dòng hồ sơ dựa trên một episode giữ nó lại), và mục dựa trên điều người
+đó đã nhờ giữ, trực tiếp hay qua một mục. Điều đã giữ không bao giờ là mục đêm
+và không bị đụng tới. Tắt `LAMP_MEMORY_NIGHTLY` thì không có mục nào và không
+gì thay đổi. Mục đã bị thay thế hay đã hết hạn là lịch sử và không được tính.
 Một lệnh quên xoá mọi mục dẫn tới thứ bị quên, lan tiếp (dòng hồ sơ dẫn một
 fact bị quên); quên trong lúc lượt đang chạy thì khi áp dụng, các mục dẫn tới
 thứ đã mất bị bỏ `forgotten`, phần còn lại vẫn ghi.

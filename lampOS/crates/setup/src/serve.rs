@@ -64,6 +64,9 @@ fn default_own_keys() -> PathBuf {
 fn default_control_dropin() -> PathBuf {
     crate::change::CONTROL_DROPIN.into()
 }
+fn default_consent() -> PathBuf {
+    lamp_msgs::consent::FOLDER.into()
+}
 
 /// The server's written configuration.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -140,6 +143,12 @@ pub struct Config {
     /// there, root's, 0644. The reset's plan removes it.
     #[serde(default = "default_control_dropin")]
     pub control_dropin: PathBuf,
+    /// The folder of the owner's face expressions and room sounds yeses
+    /// (`lamp_msgs::consent::FOLDER`, 0750 `root:lampos`), written from the
+    /// app's `consent.set` (`crate::change`, #5500) and by the voice's
+    /// onboarding. The reset's plan removes both files.
+    #[serde(default = "default_consent")]
+    pub consent: PathBuf,
     /// Run once the hotspot is up and once serving ends: V1's nginx, which
     /// serves V1's page and passes `/api/` here, is on only during setup.
     #[serde(default)]
@@ -161,7 +170,7 @@ pub struct Config {
 }
 
 /// The configuration's fields, as [`read`] knows them.
-pub const FIELDS: [&str; 23] = [
+pub const FIELDS: [&str; 24] = [
     "listen",
     "marker",
     "credential",
@@ -181,6 +190,7 @@ pub const FIELDS: [&str; 23] = [
     "language",
     "own_keys",
     "control_dropin",
+    "consent",
     "web_start",
     "web_stop",
     "free_port",
@@ -218,6 +228,7 @@ impl Config {
             &self.language,
             &self.own_keys,
             &self.control_dropin,
+            &self.consent,
         ] {
             if !path.is_absolute() {
                 return Err(format!("{} is not absolute", path.display()));
@@ -683,6 +694,10 @@ pub trait Save {
         Ok(())
     }
     fn marker(&mut self) -> io::Result<()>;
+    /// A new lamp's first speaker volume (#5551, `LAMP_FIRST_VOLUME=on`),
+    /// just before the marker: best effort, it never fails setup. Nothing
+    /// by default: only [`Files`] sets it, and [`NetworkOnly`] never does.
+    fn first_volume(&mut self) {}
     /// Whether a person's own keys are taken (#2094, `LAMP_OWN_KEYS=on`).
     /// Off by default: nothing is checked, kept or said.
     fn own_keys_on(&self) -> bool {
@@ -972,6 +987,14 @@ impl Save for Files<'_> {
     fn marker(&mut self) -> io::Result<()> {
         write_private(&self.0.marker, b"")
     }
+    fn first_volume(&mut self) {
+        use crate::first_volume;
+        if first_volume::on(std::env::var(first_volume::ENVIRONMENT).ok().as_deref()) {
+            first_volume::apply(crate::reset::run_within, |line| {
+                eprintln!("lamp-setup: {line}");
+            });
+        }
+    }
     fn own_keys_on(&self) -> bool {
         crate::keys::on(std::env::var(crate::keys::ENVIRONMENT).ok().as_deref())
     }
@@ -1151,6 +1174,9 @@ pub fn run(
                     own_answers.insert(service.id(), json!({"code": code, "answer": words}));
                 }
             })
+            // The volume before the marker, which starts the voice, so its
+            // first line is already at it (#5551).
+            .map(|()| save.first_volume())
             .and_then(|()| save.marker());
             if save.keeps_settings() {
                 let mut status = status.lock().unwrap();
