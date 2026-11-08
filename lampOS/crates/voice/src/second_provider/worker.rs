@@ -3624,7 +3624,7 @@ pub fn serve(
         eprintln!(
             "{}",
             if action_claims {
-                "lamp-voice second: a reply claiming a timer, light or volume action in other words, with no call, is held the same way (LAMP_ACTION_CLAIM_WORDED)"
+                "lamp-voice second: a reply claiming a timer, light or volume action in other words, with no call or with a limit no call carried, is held the same way (LAMP_ACTION_CLAIM_WORDED)"
             } else {
                 "lamp-voice second: LAMP_ACTION_CLAIM_WORDED does nothing without LAMP_ACTION_CLAIM_CHECKED"
             }

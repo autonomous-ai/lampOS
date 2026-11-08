@@ -43,12 +43,19 @@
 //! louder."), or the light kept on or off until a time
 //! ([`Claim::LightKept`]; "for" only with a time after it). A colour said
 //! ("My light is blue now.") is still no claim, nor is any sentence the run
-//! opens that ends in a '?'. The worded runs judge only a turn with no call
-//! at all, so work another tool did stands ("I've added a reminder to your
-//! calendar." beside `service_write`), and never a line the person asked as
-//! a question ([`asked_as_a_question`]), whose reply may tell a true state
-//! ("The light stays on until ten."); the strict lines judge every turn
-//! (the first builder's read of #5588).
+//! opens that ends in a '?'. Beside any call a worded claim stands, so work
+//! another tool did stands ("I've added a reminder to your calendar."
+//! beside `service_write`), unless it says a limit: a clock after "until",
+//! "till" or "at", or a length after "for" or "in" ([`worded_limit`]). A
+//! claimed time the call can't hold counts as unbacked (the first builder's
+//! ruling on #5215): on lamp-52e6 "keep the light on until ten." got a
+//! `keep_rule`, which holds always, and "I'll keep my light on until ten.".
+//! Such a claim stands only beside a call of its kind that carried the
+//! limit (a `seconds` or a `time`, [`stands`]); held beside other calls,
+//! the next round is told [`LIMIT_NOTE`]. The worded runs never judge a
+//! line the person asked as a question ([`asked_as_a_question`]), whose
+//! reply may tell a true state ("The light stays on until ten."); the
+//! strict lines judge every turn (the first builder's read of #5588).
 
 /// Where the second worker reads the switch. `on` only.
 pub const ENVIRONMENT: &str = "LAMP_ACTION_CLAIM_CHECKED";
@@ -120,6 +127,11 @@ pub fn beside_calls_note(kind: Claim) -> String {
         kind.what()
     )
 }
+
+/// What the next round is told when a worded claim said a limit no call of
+/// the turn carried ([`worded_limit`], the first builder's ruling on
+/// #5215): the calls that ran did run, and are not to be made again.
+pub const LIMIT_NOTE: &str = "(For you to know: your last reply said something would hold until a time or for a length of time, but no function called in this turn carries that time, so it will not, and those words were not said. The functions that did run: do not call them again. If a function can do it at that time, call it now; the lamp says the result itself. If not, say plainly what was done, without that time.)";
 
 /// Said when the round asked again claims again with no call.
 pub const NOT_DONE_LINE: &str = "Sorry, I didn't do that. Could you ask me again?";
@@ -347,6 +359,180 @@ pub fn claim_as(reply: &str, ended: bool, worded: bool) -> Option<Option<Claim>>
         (Some(None), Some(None)) => Some(None),
         _ => None,
     }
+}
+
+/// Whether `kind`, which `reply` claims as [`claim_as`] found it, stands
+/// beside the turn's `calls`, each a name and its arguments. A claim in the
+/// acting part's own lines needs a call of its kind; a worded one any call,
+/// and with a limit said ([`worded_limit`]) a call of its kind that carried
+/// that limit (the first builder's ruling on #5215): "I'll keep my light on
+/// until ten." beside a `keep_rule`, which holds always, does not stand.
+pub fn stands<'a>(
+    kind: Claim,
+    reply: &str,
+    calls: impl IntoIterator<Item = (&'a str, &'a serde_json::Value)>,
+) -> bool {
+    let mut calls = calls.into_iter().peekable();
+    if matches!(claim(reply, true), Some(Some(_))) {
+        return calls.any(|(name, _)| kind.made_by(name));
+    }
+    match worded_limit(reply) {
+        None => calls.peek().is_some(),
+        Some(limit) => calls.any(|(name, args)| kind.made_by(name) && limit.carried_by(args)),
+    }
+}
+
+/// A limit a worded claim says ([`worded_limit`]).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Limit {
+    /// A clock after "until", "till" or "at": its hour on a 12-hour face
+    /// (twelve is 0), its minute, and whether pm was said (`None`: neither
+    /// am nor pm, so either holds it).
+    Clock {
+        hour: u32,
+        minute: u32,
+        pm: Option<bool>,
+    },
+    /// A length after "for" or "in", in seconds.
+    Length(u64),
+}
+
+impl Limit {
+    /// Whether a call with `args` carries this limit: `seconds` of the same
+    /// length (`set_timer`, `snooze_reminder`), or a `time` ("HH:MM") on
+    /// the same clock (`set_reminder`, `repeat_reminder`). A light call or
+    /// a kept rule (`keep_rule` holds always) carries none.
+    fn carried_by(self, args: &serde_json::Value) -> bool {
+        match self {
+            Self::Length(seconds) => args["seconds"].as_u64() == Some(seconds),
+            Self::Clock { hour, minute, pm } => args["time"]
+                .as_str()
+                .and_then(|time| time.split_once(':'))
+                .and_then(|(h, m)| Some((h.parse::<u32>().ok()?, m.parse::<u32>().ok()?)))
+                .is_some_and(|(h, m)| {
+                    h % 12 == hour && m == minute && pm.is_none_or(|pm| pm == (h >= 12))
+                }),
+        }
+    }
+}
+
+/// The limit a worded claim says: the first clock after "until", "till" or
+/// "at" ("ten", "10:30 pm", "noon"), or length after "for" or "in" ("one
+/// minute", "half an hour"), in the whole reply. None for a claim in the
+/// acting part's own lines, whose times are a call's own result ("Timer
+/// set. It rings at 9:39 am."), and none for words read as neither
+/// ("until you're back", "for nine"), which keep the worded runs' rule.
+pub fn worded_limit(reply: &str) -> Option<Limit> {
+    if matches!(claim(reply, true), Some(Some(_))) {
+        return None;
+    }
+    let text = normalised(reply);
+    let tokens = tokens(&text, true);
+    (0..tokens.len()).find_map(|at| match tokens[at] {
+        Token::Word("until" | "till" | "at") => said_clock(&tokens[at + 1..]),
+        Token::Word("for" | "in") => said_length(&tokens[at + 1..]),
+        _ => None,
+    })
+}
+
+/// A number said as digits or as a word ("ten", "forty-five").
+fn said_number(word: &str) -> Option<u32> {
+    word.parse().ok().or_else(|| {
+        [
+            ("one", 1),
+            ("two", 2),
+            ("three", 3),
+            ("four", 4),
+            ("five", 5),
+            ("six", 6),
+            ("seven", 7),
+            ("eight", 8),
+            ("nine", 9),
+            ("ten", 10),
+            ("eleven", 11),
+            ("twelve", 12),
+            ("fifteen", 15),
+            ("twenty", 20),
+            ("thirty", 30),
+            ("forty", 40),
+            ("forty-five", 45),
+            ("sixty", 60),
+            ("ninety", 90),
+        ]
+        .into_iter()
+        .find_map(|(said, number)| (said == word).then_some(number))
+    })
+}
+
+/// `word` without an "am" or "pm" it ends in, and which ("10pm").
+fn meridiem(word: &str) -> (&str, Option<bool>) {
+    if let Some(number) = word.strip_suffix("am") {
+        (number, Some(false))
+    } else if let Some(number) = word.strip_suffix("pm") {
+        (number, Some(true))
+    } else {
+        (word, None)
+    }
+}
+
+/// The clock `after` opens with ([`Limit::Clock`]).
+fn said_clock(after: &[Token<'_>]) -> Option<Limit> {
+    let word = |at: usize| match after.get(at) {
+        Some(Token::Word(word)) => Some(*word),
+        _ => None,
+    };
+    let (hour, mut pm) = match word(0)? {
+        "noon" => (0, Some(true)),
+        "midnight" => (0, Some(false)),
+        said => {
+            let (number, pm) = meridiem(said);
+            (said_number(number).filter(|hour| *hour <= 23)?, pm)
+        }
+    };
+    let (mut minute, mut next) = (0, 1);
+    if pm.is_none() && after.get(1) == Some(&Token::Mark(':')) {
+        let (number, said_pm) = meridiem(word(2)?);
+        minute = number.parse().ok().filter(|minute| *minute < 60)?;
+        (pm, next) = (said_pm, 3);
+    } else if let Some(said) =
+        word(1).filter(|said| matches!(*said, "fifteen" | "thirty" | "forty-five"))
+    {
+        (minute, next) = (said_number(said)?, 2);
+    }
+    if pm.is_none() {
+        pm = match word(next) {
+            Some("am") => Some(false),
+            Some("pm") => Some(true),
+            _ => (hour > 12).then_some(true),
+        };
+    }
+    Some(Limit::Clock {
+        hour: hour % 12,
+        minute,
+        pm,
+    })
+}
+
+/// The length `after` opens with ([`Limit::Length`]).
+fn said_length(after: &[Token<'_>]) -> Option<Limit> {
+    let word = |at: usize| match after.get(at) {
+        Some(Token::Word(word)) => Some(*word),
+        _ => None,
+    };
+    if word(0)? == "half" && matches!(word(1), Some("a" | "an")) && word(2) == Some("hour") {
+        return Some(Limit::Length(1800));
+    }
+    let count = match word(0)? {
+        "a" | "an" => 1,
+        said => said_number(said)?,
+    };
+    let unit = match word(1)? {
+        "second" | "seconds" => 1,
+        "minute" | "minutes" => 60,
+        "hour" | "hours" => 3600,
+        _ => return None,
+    };
+    Some(Limit::Length(u64::from(count) * unit))
 }
 
 /// The words a line the person asked as a question opens with
@@ -1237,5 +1423,80 @@ mod tests {
         for name in ["list_reminders", "forget_rule", "web_search"] {
             assert!(!Claim::LightKept.made_by(name), "{name}");
         }
+    }
+
+    /// The first builder's ruling on #5215: a limit a worded claim says is
+    /// read as a clock or a length, and stands only beside a call that
+    /// carried it; a kept rule carries none.
+    #[test]
+    fn a_worded_claims_limit_stands_only_beside_a_call_that_carried_it() {
+        let clock = |hour, minute, pm| Some(Limit::Clock { hour, minute, pm });
+        for (reply, limit) in [
+            ("I'll keep my light on until ten.", clock(10, 0, None)),
+            (
+                "I've kept the light on till 10:30 pm.",
+                clock(10, 30, Some(true)),
+            ),
+            (
+                "I'll keep the light on until 22:00.",
+                clock(10, 0, Some(true)),
+            ),
+            ("I'll keep my light on until noon.", clock(0, 0, Some(true))),
+            ("Timer set for one minute.", Some(Limit::Length(60))),
+            (
+                "I'll remind you in half an hour.",
+                Some(Limit::Length(1800)),
+            ),
+            ("I left a light on for you until nine.", clock(9, 0, None)),
+            ("I'll keep my light on.", None),
+            ("I'll keep my light on until you're back.", None),
+            ("Timer set. It rings at 9:39 am.", None),
+        ] {
+            assert_eq!(worded_limit(reply), limit, "{reply:?}");
+        }
+        let kept =
+            serde_json::json!({"rule": "Keep the light on.", "about": "light", "never": true});
+        let at = |time: &str| serde_json::json!({"text": "Lights", "time": time});
+        let ten = "I'll keep my light on until ten.";
+        assert!(!stands(Claim::LightKept, ten, [("keep_rule", &kept)]));
+        assert!(stands(
+            Claim::LightKept,
+            ten,
+            [("set_reminder", &at("22:00"))]
+        ));
+        assert!(stands(
+            Claim::LightKept,
+            ten,
+            [("set_reminder", &at("10:00"))]
+        ));
+        assert!(!stands(
+            Claim::LightKept,
+            ten,
+            [("set_reminder", &at("21:00"))]
+        ));
+        let minute = "Timer set for one minute.";
+        let seconds = |seconds: u64| serde_json::json!({"text": "Tea", "seconds": seconds});
+        assert!(stands(
+            Claim::Schedule,
+            minute,
+            [("set_timer", &seconds(60))]
+        ));
+        assert!(!stands(
+            Claim::Schedule,
+            minute,
+            [("set_timer", &seconds(300))]
+        ));
+        // No limit: any call, as before; the strict lines: a call of their kind.
+        assert!(stands(
+            Claim::LightKept,
+            "I'll keep my light on.",
+            [("web_search", &kept)]
+        ));
+        assert!(!stands(Claim::LightKept, ten, []));
+        assert!(stands(
+            Claim::Schedule,
+            "Timer set. It rings at 9:39 am.",
+            [("set_timer", &seconds(1))]
+        ));
     }
 }

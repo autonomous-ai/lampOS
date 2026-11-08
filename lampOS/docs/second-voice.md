@@ -3590,12 +3590,34 @@ after a take-over, but now for every turn:
   end or a mark ("Okay, louder music it is." is no claim). Still no claim:
   a colour said ("My light is blue now."), "I'll remind you at nine.", "I
   can keep my light on until ten …", a status question or answer that
-  opens with another word. **The worded runs judge only a turn with no call
-  at all** (the first builder's P2 on #5588): any call in the turn, this
-  round's or an earlier one's, lets them stand, so work another tool did
-  ("I've added a reminder to your calendar." beside `service_write`, "I've
-  turned off the lights." after `use_skill` or a hand-over) is said as it
-  is. **Nor do they judge a status question**
+  opens with another word. **Beside any call a worded claim stands** (the
+  first builder's P2 on #5588): any call in the turn, this round's or an
+  earlier one's, lets it stand, so work another tool did ("I've added a
+  reminder to your calendar." beside `service_write`, "I've turned off the
+  lights." after `use_skill` or a hand-over) is said as it is. **Unless it
+  says a limit no call carried** (the first builder's ruling on #5215: a
+  claimed time the call can't hold counts as unbacked; on lamp-52e6 "Hey
+  Lamp, keep the light on until ten." got a `keep_rule`, which keeps the
+  light on always, and "I'll keep my light on until ten."). The limit is
+  the reply's first clock after "until", "till" or "at" ("ten", "10:30
+  pm", "22:00", "noon", "midnight") or length after "for" or "in" ("one
+  minute", "a minute", "90 seconds", "half an hour"), read by
+  `action_claim::worded_limit`; words read as neither ("until you're
+  back", "for nine") are no limit. Such a claim stands only beside a call
+  of its kind that carried it (`action_claim::stands`): `seconds` of the
+  same length (`set_timer`, `snooze_reminder`) or a `time` on the same
+  clock (`set_reminder`, `repeat_reminder`; a clock said without am or pm
+  takes either). A light call and `keep_rule` carry none. Otherwise it is
+  held as a claim with no call: alone, asked again once, the note
+  `action_claim::LIMIT_NOTE` saying the calls that ran did run and are
+  not to be made again, and a second such claim said not done; beside
+  this round's calls, not said, the calls run and the next round is told
+  the same note. Its held lines end `(LAMP_ACTION_CLAIM_CHECKED, in other
+  words: LAMP_ACTION_CLAIM_WORDED, a said limit no call carried)`. A
+  limited claim beside a call that carried it ("Timer set for one
+  minute." beside a 60-second set), a worded claim with no limit beside
+  any call, and the lines in the acting part's own words (their times are
+  a call's own result) are as before. **Nor do they judge a status question**
   (`action_claim::asked_as_a_question`: the heard line ends with a '?', or
   its first word after "hey", "hi", "hello", "ok", "okay" or "lamp" is
   how, is, are, do, does, did, what, when, will, can, has, have, was,
@@ -3623,7 +3645,11 @@ after a take-over, but now for every turn:
   `second_provider::tests::action_claim::*worded*`, `*other_words*`,
   `a_status_answer_to_a_question_is_untouched_by_the_worded_claims`,
   `a_strict_claim_to_a_question_is_still_held_with_the_worded_claims`,
-  `a_request_asked_as_a_question_is_still_judged_by_the_worded_claims` and
+  `a_request_asked_as_a_question_is_still_judged_by_the_worded_claims`,
+  `a_worded_claims_limit_no_call_carried_is_held`,
+  `a_worded_claim_with_no_limit_beside_a_kept_rule_stands`,
+  `a_timers_length_said_stands_only_beside_a_set_that_carried_it`,
+  `a_said_limit_no_call_carried_is_said_with_the_worded_claims_off` and
   `action_claim::tests::*`.
 - **A reply never offers to keep what its `remember` call keeps** (finding
   K2 on #3504: lamp-06c1, 28 Oct, "Want me to keep that as the change?
