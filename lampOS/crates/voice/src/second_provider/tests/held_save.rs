@@ -244,6 +244,7 @@ async fn a_yes_to_a_face_question_turned_round_keeps_nothing() {
     for face in [
         "Would you rather I didn't remember your face?",
         "I won't remember your face unless you want me to. Is that okay?",
+        "May I remember just your name, without your face?",
         "M\u{ec}nh kh\u{f4}ng nh\u{1edb} khu\u{f4}n m\u{1eb7}t b\u{1ea1}n nh\u{e9}?",
     ] {
         let sent = run(

@@ -665,29 +665,42 @@ const ASKS_LEAVE: &[&[&str]] = &[
     &["is", "it", "ok", "if", "i"],
 ];
 
-/// Words that turn a face question round, so a yes to it keeps nothing:
-/// "Would you rather I didn't remember your face?", "Shall I not …?"
-const TURNS_IT_ROUND: &[&str] = &["not", "never", "forget", "rather", "unless", "instead"];
+/// Words that turn a face question round, or make it a choice, so a yes
+/// to it keeps nothing: "Would you rather I didn't remember your face?",
+/// "Shall I not …?", "Should I remember your name or your face?", "…
+/// without your face?" (Fourteen's HOLDs on #5720).
+const TURNS_IT_ROUND: &[&str] = &[
+    "not", "never", "forget", "rather", "unless", "instead", "or", "without", "skip", "no",
+];
 
-/// The same in Vietnamese anywhere in the line ("Đừng nhớ …", "quên").
-const TURNS_IT_ROUND_VI: &[&str] = &["\u{111}\u{1eeb}ng", "qu\u{ea}n", "ch\u{1eb3}ng"];
+/// The same in Vietnamese anywhere in the line ("Đừng nhớ …", "quên",
+/// "hay"/"hoặc" for a choice).
+const TURNS_IT_ROUND_VI: &[&str] = &[
+    "\u{111}\u{1eeb}ng",
+    "qu\u{ea}n",
+    "ch\u{1eb3}ng",
+    "hay",
+    "ho\u{1eb7}c",
+];
 
 /// Whether the lamp's line is setup's face question ("May I remember your
 /// face, so I know you next time?"), with or without the name in it: it
-/// asks leave to remember their face, and nothing in it turns that round
-/// (Fourteen's HOLD on #5720: a yes to "Would you rather I didn't
-/// remember your face?" kept the face). In Vietnamese ("Mình nhớ khuôn
-/// mặt bạn được không?") the "không" that asks is after "nhớ"; one before
-/// it ("Mình không nhớ khuôn mặt bạn nhé?") turns it round.
+/// asks leave to remember their face, the face right after "remember"
+/// ("your face", "the face"), and nothing in it turns that round
+/// (Fourteen's HOLDs on #5720: a yes to "Would you rather I didn't
+/// remember your face?" or "May I remember just your name, without your
+/// face?" kept the face). In Vietnamese ("Mình nhớ khuôn mặt bạn được
+/// không?") it is the "nhớ" right before "khuôn mặt", and the "không"
+/// that asks is after it; a "không" or "chưa" before it ("Mình nhớ tên
+/// thôi, không nhớ khuôn mặt nhé?") turns it round.
 fn asks_for_the_face(lamp: &str) -> bool {
     let words = lower_words(lamp);
     if !lamp.contains('?') {
         return false;
     }
-    if let Some(at) = words.iter().position(|word| word == "nh\u{1edb}")
-        && words[at..]
-            .windows(2)
-            .any(|two| two == ["khu\u{f4}n", "m\u{1eb7}t"])
+    if let Some(at) = words
+        .windows(3)
+        .position(|three| three == ["nh\u{1edb}", "khu\u{f4}n", "m\u{1eb7}t"])
     {
         return !words
             .iter()
@@ -702,7 +715,10 @@ fn asks_for_the_face(lamp: &str) -> bool {
     !turned
         && words.iter().enumerate().any(|(at, word)| {
             word == "remember"
-                && words[at + 1..].iter().any(|word| word == "face")
+                && matches!(
+                    words.get(at + 1..at + 3),
+                    Some([whose, face]) if (whose == "your" || whose == "the") && face == "face"
+                )
                 && ASKS_LEAVE
                     .iter()
                     .any(|leave| at >= leave.len() && words[at - leave.len()..at] == leave[..])
@@ -7015,6 +7031,15 @@ mod tests {
             "May I remember your face, or would you rather I didn't?",
             "M\u{ec}nh kh\u{f4}ng nh\u{1edb} khu\u{f4}n m\u{1eb7}t b\u{1ea1}n nh\u{e9}?",
             "\u{110}\u{1eeb}ng nh\u{1edb} khu\u{f4}n m\u{1eb7}t m\u{ec}nh nh\u{e9}?",
+            // Fourteen's second HOLD: "remember" with something else
+            // than the face, or a choice.
+            "May I remember just your name, without your face?",
+            "May I remember your name, but skip your face?",
+            "Can I remember your voice only, no face?",
+            "Should I remember your name or your face?",
+            "Should I remember your face or your name?",
+            "M\u{ec}nh nh\u{1edb} t\u{ea}n th\u{f4}i, kh\u{f4}ng nh\u{1edb} khu\u{f4}n m\u{1eb7}t nh\u{e9}?",
+            "M\u{ec}nh nh\u{1edb} khu\u{f4}n m\u{1eb7}t hay t\u{ea}n b\u{1ea1}n?",
         ] {
             let said = Said {
                 this: "Yes.".into(),
@@ -7032,6 +7057,9 @@ mod tests {
             "One more thing: may I remember your face now, so I can remember things for you?",
             "Do you want me to remember your face?",
             "M\u{ec}nh c\u{f3} th\u{1ec3} nh\u{1edb} khu\u{f4}n m\u{1eb7}t b\u{1ea1}n kh\u{f4}ng?",
+            "M\u{ec}nh nh\u{1edb} khu\u{f4}n m\u{1eb7}t b\u{1ea1}n \u{111}\u{1b0}\u{1ee3}c kh\u{f4}ng, \u{111}\u{1ec3} l\u{1ea7}n sau nh\u{1ead}n ra b\u{1ea1}n?",
+            "May I remember your face, so I know you next time?",
+            "Nice to meet you, Henry! May I remember your face?",
         ] {
             assert!(asks_for_the_face(face), "{face}");
         }
