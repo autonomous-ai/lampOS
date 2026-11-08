@@ -1,5 +1,10 @@
 //! Leave the completed product Setup's phone grace period alone. This is
 //! restart selection, never permission for a watched persistent part to stop.
+//!
+//! The same for a Setup waiting for the lamp's first update before its
+//! marker (#5458, lamp-setup's `first_update`): a restart would end its wait
+//! mid-round and bring its hotspot back. It runs its old build to the
+//! marker, then ends as a completed one does.
 use crate::{install, unit};
 use std::{
     fs,
@@ -76,7 +81,7 @@ pub(crate) fn completed(root: &Path, units: &Path, name: &str, before: &str, aft
     {
         return false;
     }
-    if !done(root)
+    if !settled(root)
         || !read(root, &Path::new(UNIT_DIR).join(SETUP))
             .is_some_and(|text| unit::same(&text, PRODUCT))
     {
@@ -135,12 +140,31 @@ pub(crate) fn completed(root: &Path, units: &Path, name: &str, before: &str, aft
     }
     // A reset can remove completion while the override directories are read.
     // Observe it again at the restart decision; this is not a reset lock.
-    done(root)
+    settled(root)
 }
 
 pub(crate) fn done(root: &Path) -> bool {
-    let marker = Path::new("var/lib/lampos-setup/done");
-    plain(root, marker) && fs::symlink_metadata(root.join(marker)).is_ok_and(|meta| meta.is_file())
+    file(root, Path::new("var/lib/lampos-setup/done"))
+}
+
+/// Setup waits for the lamp's first update before its marker (#5458): its
+/// file is there only while it waits, and is removed at its next start.
+pub(crate) fn waiting(root: &Path) -> bool {
+    !done(root) && file(root, Path::new(WAITING))
+}
+
+/// Done, or waiting for its first update: either way not to be restarted.
+pub(crate) fn settled(root: &Path) -> bool {
+    done(root) || waiting(root)
+}
+
+/// lamp-setup's file while it waits (`lamp_setup::first_update::WAITING`
+/// under its state folder).
+pub const WAITING: &str = "var/lib/lampos-setup/first-update";
+
+fn file(root: &Path, relative: &Path) -> bool {
+    plain(root, relative)
+        && fs::symlink_metadata(root.join(relative)).is_ok_and(|meta| meta.is_file())
 }
 
 /// A fixed-property query, not a systemd unit parser. Loaded aliases may

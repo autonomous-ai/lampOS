@@ -112,6 +112,8 @@ fn a_request_is_checked_before_anything_is_touched() {
             backend: None,
             share_reports: false,
             own_keys: vec![],
+            // None asked: setup as before, with no first update (#5458).
+            update_first: false,
         }
     );
     // The key is the user's (the owner, #806, 16:13). Without one, a lamp
@@ -260,6 +262,8 @@ impl Host for Lamp {
 struct Saved {
     calls: Vec<String>,
     fail_on: Option<&'static str>,
+    /// Its switch on, and the status to look at during the first update.
+    watched: Option<Arc<Mutex<Status>>>,
 }
 impl Save for Saved {
     fn credential(&mut self, key: &str) -> io::Result<()> {
@@ -285,6 +289,20 @@ impl Save for Saved {
     }
     fn marker(&mut self) -> io::Result<()> {
         self.record("marker", "")
+    }
+    fn update_first(
+        &mut self,
+        phase: &mut dyn FnMut(&str),
+    ) -> Option<lamp_setup::first_update::Ended> {
+        let status = self.watched.as_ref()?;
+        // What the app reads while the update runs.
+        phase("fetching");
+        let seen = status.lock().unwrap().clone();
+        self.calls.push(format!(
+            "update_first updating={} phase={} lan_ip={} set_up={}",
+            seen.updating, seen.update_phase, seen.lan_ip, seen.set_up_completed
+        ));
+        Some(lamp_setup::first_update::Ended::TooLong)
     }
 }
 impl Saved {
@@ -332,6 +350,68 @@ fn a_joined_lamp_saves_the_settings_then_the_marker_and_says_it_is_set_up() {
             "marker="
         ]
     );
+}
+
+/// #5458: an app that asks for the first update gets it after the saves
+/// and before the marker, with `updating` and its phase on the status and
+/// the lamp not yet set up; however it ends, the marker follows. Without
+/// the ask the wait is never looked at, its switch on or not.
+#[test]
+fn the_first_update_comes_between_the_saves_and_the_marker_only_when_asked() {
+    let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
+    let mut saved = Saved {
+        watched: Some(Arc::clone(&status)),
+        ..Saved::default()
+    };
+    let mut asked = good();
+    asked["update_first"] = json!(true);
+    let accepted = check(&request(asked), &Root::new().config(false)).unwrap();
+    let mut lamp = Lamp::new(true);
+    run(&status, &accepted, "VN", &mut lamp, &mut saved, || {
+        Some("192.168.1.23".into())
+    });
+    assert_eq!(
+        saved.calls,
+        [
+            "name=Lan",
+            "timezone=Asia/Ho_Chi_Minh",
+            "credential=AIza-key_1",
+            "update_first updating=true phase=fetching lan_ip=192.168.1.23 set_up=false",
+            "marker="
+        ]
+    );
+    let status = status.lock().unwrap().clone();
+    assert!(status.set_up_completed);
+    assert!(!status.updating);
+    assert_eq!(status.update_phase, "");
+
+    for update_first in [json!(false), json!("true"), json!(1), Value::Null] {
+        let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
+        let mut saved = Saved {
+            watched: Some(Arc::clone(&status)),
+            ..Saved::default()
+        };
+        let mut request_value = good();
+        request_value["update_first"] = update_first.clone();
+        let accepted = check(&request(request_value), &Root::new().config(false)).unwrap();
+        run(
+            &status,
+            &accepted,
+            "VN",
+            &mut Lamp::new(true),
+            &mut saved,
+            || None,
+        );
+        assert!(
+            !saved
+                .calls
+                .iter()
+                .any(|call| call.starts_with("update_first")),
+            "{update_first}: {:?}",
+            saved.calls
+        );
+        assert_eq!(saved.calls.last().unwrap(), "marker=");
+    }
 }
 
 /// #4473: setup's optional `language`, checked as `language.set` checks
@@ -1134,7 +1214,10 @@ async fn v1s_routes_answer_in_v1s_shapes() {
                "share_reports": false,
                // Not V1's: off by default, so the app hides its own-keys
                // question (#2094).
-               "takes_own_keys": false}})
+               "takes_own_keys": false,
+               // Not V1's: the first update before the marker, for an app
+               // that asks for it (#5458).
+               "updating": false, "update_phase": ""}})
     );
     let before = SCANS.load(Ordering::Relaxed);
     let (code, body) = call(&app, "GET", "/api/network", Value::Null).await;

@@ -24,6 +24,9 @@ ExecStopPost=/usr/bin/systemctl stop nginx
 Restart=on-failure
 # Each start raises the hotspot again, which drops a phone on it: not often.
 RestartSec=20
+# The lamp's first update between the join and the marker, so its first walk runs stable's code
+# and not the image's: only for an app that asks for it (update_first), lampOS/docs/setup.md (#5458).
+Environment=LAMP_SETUP_UPDATE_FIRST=on
 
 [Install]
 WantedBy=multi-user.target
