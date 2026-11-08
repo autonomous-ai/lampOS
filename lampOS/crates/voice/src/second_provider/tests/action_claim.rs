@@ -817,3 +817,55 @@ fn a_limit_after_the_first_sentence_is_judged_only_in_its_piece() {
     );
     assert_eq!(went.notes, [crate::action_claim::LIMIT_NOTE]);
 }
+
+/// The Reviewer-lead's P2 on #5737 at 09483c9afa: a timer set beside the
+/// kept rule backs no kept light's clock: the rule still holds always.
+#[test]
+fn a_kept_lights_clock_beside_a_rule_and_a_timer_is_held() {
+    let claim = "I'll keep my light on until ten.";
+    let went = turn_with(
+        true,
+        true,
+        false,
+        "Keep the light on until ten and set a tea timer for five minutes.",
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![
+                call(
+                    "c0",
+                    crate::rules::KEEP_RULE,
+                    json!({"rule": "Keep the light on.", "about": "light", "never": true}),
+                ),
+                call("c1", "set_timer", json!({"text": "Tea", "seconds": 300})),
+            ])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![saying(claim), saying(claim)],
+    );
+    assert_eq!(
+        went.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{went:?}"
+    );
+    assert_eq!(went.notes, [crate::action_claim::LIMIT_NOTE]);
+}
+
+/// The same P2: a listing backs a time said only when the line asked to
+/// read one; after "remind me at ten" it set nothing.
+#[test]
+fn a_reminders_time_beside_only_a_listing_after_a_set_ask_is_held() {
+    let claim = "Your reminder is set for ten.";
+    let went = turn_with(
+        true,
+        true,
+        false,
+        "Lamp, remind me at ten.",
+        calling("list_reminders"),
+        vec![saying(claim), saying(claim)],
+    );
+    assert_eq!(
+        went.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{went:?}"
+    );
+    assert_eq!(went.notes, [crate::action_claim::LIMIT_NOTE]);
+}

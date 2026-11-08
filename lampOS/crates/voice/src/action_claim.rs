@@ -51,9 +51,11 @@
 //! ruling on #5215): on lamp-52e6 "keep the light on until ten." got a
 //! `keep_rule`, which holds always, and "I'll keep my light on until ten.".
 //! Such a claim stands only beside a call of its kind that carried the
-//! limit (a `seconds`, or a `time`, `from` or `to`; a clock beside
-//! `set_timer` or `snooze_reminder`, whose ring is a length from now, and
-//! any limit beside `list_reminders`; [`stands`]); held beside other calls,
+//! limit (a `seconds`, or a `time`, `from` or `to`; for a timer or reminder
+//! claim, a clock beside `set_timer` or `snooze_reminder`, whose ring is a
+//! length from now, never a kept light's; a reminder's time beside
+//! `list_reminders` only on a line worded as a question,
+//! [`worded_as_a_question`]; [`stands`]); held beside other calls,
 //! the next round is told [`LIMIT_NOTE`]. Only the reply's first limit is
 //! judged, and while the reply streams only one said by its first
 //! sentence's end: a later one is not checked. The worded runs never judge a
@@ -371,9 +373,12 @@ pub fn claim_as(reply: &str, ended: bool, worded: bool) -> Option<Option<Claim>>
 /// and with a limit said ([`worded_limit`]) a call of its kind that carried
 /// that limit (the first builder's ruling on #5215): "I'll keep my light on
 /// until ten." beside a `keep_rule`, which holds always, does not stand.
+/// `read`: the person's line asks to read something back
+/// ([`worded_as_a_question`]), so a `list_reminders` may back a time said.
 pub fn stands<'a>(
     kind: Claim,
     reply: &str,
+    read: bool,
     calls: impl IntoIterator<Item = (&'a str, &'a serde_json::Value)>,
 ) -> bool {
     let mut calls = calls.into_iter().peekable();
@@ -382,7 +387,9 @@ pub fn stands<'a>(
     }
     match worded_limit(reply) {
         None => calls.peek().is_some(),
-        Some(limit) => calls.any(|(name, args)| kind.made_by(name) && limit.carried_by(name, args)),
+        Some(limit) => {
+            calls.any(|(name, args)| kind.made_by(name) && limit.carried_by(kind, read, name, args))
+        }
     }
 }
 
@@ -402,43 +409,50 @@ pub enum Limit {
 }
 
 impl Limit {
-    /// Whether a call of `name` with `args` carries this limit: `seconds`
-    /// of the same length (`set_timer`, `snooze_reminder`), or a `time`,
-    /// `from` or `to` ("HH:MM") on the same clock (`set_reminder`,
-    /// `repeat_reminder`). A clock beside a call whose ring is a length from
-    /// now (`set_timer`, `snooze_reminder`: "Your timer will ring at 9:39.")
-    /// stands, and any limit beside `list_reminders`, which read back what is
-    /// set (the Reviewer-lead's P2 on #5737). A light call or a kept rule
-    /// (`keep_rule` holds always) carries none.
-    fn carried_by(self, name: &str, args: &serde_json::Value) -> bool {
-        if name == "list_reminders" {
-            return true;
-        }
-        match self {
-            Self::Length(seconds) => args["seconds"].as_u64() == Some(seconds),
-            Self::Clock { .. } if matches!(name, "set_timer" | "snooze_reminder") => true,
-            Self::Clock { hour, minute, pm } => ["time", "from", "to"].into_iter().any(|key| {
-                args[key]
-                    .as_str()
-                    .and_then(|time| time.split_once(':'))
-                    .and_then(|(h, m)| Some((h.parse::<u32>().ok()?, m.parse::<u32>().ok()?)))
-                    .is_some_and(|(h, m)| {
-                        h % 12 == hour && m == minute && pm.is_none_or(|pm| pm == (h >= 12))
-                    })
-            }),
+    /// Whether a call of `name` with `args` carries this limit, claimed as
+    /// `kind`: `seconds` of the same length (`set_timer`,
+    /// `snooze_reminder`), or a `time`, `from` or `to` ("HH:MM") on the same
+    /// clock (`set_reminder`, `repeat_reminder`). A timer's or a snooze's
+    /// ring is a length from now, so a clock said beside one stands ("Your
+    /// timer will ring at 9:39."), but only for a Schedule claim: never a
+    /// kept light's, which a timer beside its rule does not keep. A
+    /// `list_reminders` reads back what is set: it backs a reminder's time
+    /// only on a line that asked to read one (`read`), never after "Remind
+    /// me at ten." (the Reviewer-lead's two P2s on #5737). A light call or a
+    /// kept rule (`keep_rule` holds always) carries none.
+    fn carried_by(self, kind: Claim, read: bool, name: &str, args: &serde_json::Value) -> bool {
+        let schedule = matches!(kind, Claim::Schedule | Claim::ReminderTime);
+        match (self, name) {
+            (_, "list_reminders") => kind == Claim::ReminderTime && read,
+            (Self::Length(seconds), _) => args["seconds"].as_u64() == Some(seconds),
+            (Self::Clock { .. }, "set_timer" | "snooze_reminder") => schedule,
+            (Self::Clock { hour, minute, pm }, _) => {
+                ["time", "from", "to"].into_iter().any(|key| {
+                    args[key]
+                        .as_str()
+                        .and_then(|time| time.split_once(':'))
+                        .and_then(|(h, m)| Some((h.parse::<u32>().ok()?, m.parse::<u32>().ok()?)))
+                        .is_some_and(|(h, m)| {
+                            h % 12 == hour && m == minute && pm.is_none_or(|pm| pm == (h >= 12))
+                        })
+                })
+            }
         }
     }
 }
 
-/// The limit a worded claim says: the first clock after "until", "till" or
-/// "at" ("ten", "10:30 pm", "ten thirty-five", "a quarter past ten",
-/// "noon"), or length after "for" or "in" ("one minute", "5 mins",
-/// "twenty-five minutes", "half an hour", "an hour and a half"), in the
-/// whole reply. Only the first: a second limit in the reply is not judged.
-/// None for a claim in the acting part's own lines, whose times are a
-/// call's own result ("Timer set. It rings at 9:39 am."), and none for
-/// words read as neither ("until you're back", "for nine", "at ten
-/// percent", "at one point"), which keep the worded runs' rule.
+/// The limit a worded claim says: the first clock after "until", "till",
+/// "at" or "for" ("ten", "10:30 pm", "10.30", "ten thirty-five", "a quarter
+/// past ten", "ten to ten", "noon"), or length after "for" or "in" ("one
+/// minute", "5 mins", "twenty-five minutes", "an hour and a half", "one
+/// hour and thirty minutes"), in the whole reply. Only the first: a second
+/// limit in the reply is not judged. A bare hour is a clock only before the
+/// end, a mark, "am", "pm", "o'clock" or a day word ("until ten.", "for ten
+/// tonight"), so "at 20", "at 10 brightness", "at ten percent" and "at one
+/// point" are none. None for a claim in the acting part's own lines, whose
+/// times are a call's own result ("Timer set. It rings at 9:39 am."), and
+/// none for words read as neither ("until you're back"), which keep the
+/// worded runs' rule.
 pub fn worded_limit(reply: &str) -> Option<Limit> {
     if matches!(claim(reply, true), Some(Some(_))) {
         return None;
@@ -447,7 +461,10 @@ pub fn worded_limit(reply: &str) -> Option<Limit> {
     let tokens = tokens(&text, true);
     (0..tokens.len()).find_map(|at| match tokens[at] {
         Token::Word("until" | "till" | "at") => said_clock(&tokens[at + 1..]),
-        Token::Word("for" | "in") => said_length(&tokens[at + 1..]),
+        Token::Word("for") => {
+            said_length(&tokens[at + 1..]).or_else(|| said_clock(&tokens[at + 1..]))
+        }
+        Token::Word("in") => said_length(&tokens[at + 1..]),
         _ => None,
     })
 }
@@ -534,41 +551,52 @@ fn meridiem(word: &str) -> (&str, Option<bool>) {
     }
 }
 
+/// The words after a bare hour that make it a clock ("ten tonight"), beside
+/// the end, a mark, "am", "pm" and "o'clock".
+const DAY_WORDS: [&str; 6] = ["tonight", "today", "tomorrow", "this", "in", "on"];
+
 /// The clock `after` opens with ([`Limit::Clock`]).
 fn said_clock(after: &[Token<'_>]) -> Option<Limit> {
     let words = words_of(after);
     let word = |at: usize| words.get(at).copied().flatten();
-    // "A quarter past ten", "half past ten", "quarter to ten".
+    // "A quarter past ten", "half past ten", "ten to ten", "five past nine".
     let lead = usize::from(word(0) == Some("a"));
-    if let (Some(part @ ("quarter" | "half")), Some(way @ ("past" | "to"))) =
-        (word(lead), word(lead + 1))
-    {
-        let Limit::Clock {
-            hour,
-            minute: 0,
-            pm,
-        } = said_clock(&after[lead + 2..])?
-        else {
-            return None;
-        };
-        return match (part, way) {
-            ("quarter", "past") => Some(Limit::Clock {
+    let part = match word(lead) {
+        Some("quarter") => Some((15, 1)),
+        Some("half") => Some((30, 1)),
+        _ => said_count(words.get(lead..).unwrap_or(&[]))
+            .filter(|(minutes, _)| (1..30).contains(minutes)),
+    };
+    if let Some((minutes, took)) = part {
+        let mut at = lead + took;
+        if matches!(word(at), Some("minute" | "minutes")) {
+            at += 1;
+        }
+        if let Some(way @ ("past" | "to")) = word(at) {
+            let Limit::Clock {
                 hour,
-                minute: 15,
+                minute: 0,
                 pm,
-            }),
-            ("half", "past") => Some(Limit::Clock {
-                hour,
-                minute: 30,
-                pm,
-            }),
-            ("quarter", _) => Some(Limit::Clock {
-                hour: (hour + 11) % 12,
-                minute: 45,
-                pm,
-            }),
-            _ => None,
-        };
+            } = said_clock(&after[at + 1..])?
+            else {
+                return None;
+            };
+            return match way {
+                "past" => Some(Limit::Clock {
+                    hour,
+                    minute: minutes,
+                    pm,
+                }),
+                _ if minutes == 30 => None,
+                // Back across twelve, am and pm swap: "a quarter to
+                // midnight" is 11:45 pm.
+                _ => Some(Limit::Clock {
+                    hour: (hour + 11) % 12,
+                    minute: 60 - minutes,
+                    pm: if hour == 0 { pm.map(|pm| !pm) } else { pm },
+                }),
+            };
+        }
     }
     let (hour, mut pm) = match word(0)? {
         "noon" => (0, Some(true)),
@@ -578,23 +606,30 @@ fn said_clock(after: &[Token<'_>]) -> Option<Limit> {
             (said_number(number).filter(|hour| *hour <= 23)?, pm)
         }
     };
-    // "At ten percent", "at 20%", "at one point": no clock.
-    if matches!(word(1), Some("percent" | "per" | "point"))
-        || after.get(1) == Some(&Token::Mark('%'))
-    {
-        return None;
-    }
+    let two_digits = |at: usize| {
+        word(at)
+            .map(meridiem)
+            .filter(|(number, _)| number.len() == 2)
+            .and_then(|(number, pm)| Some((number.parse::<u32>().ok().filter(|m| *m < 60)?, pm)))
+    };
     let (mut minute, mut next) = (0, 1);
+    let mut timed = pm.is_some();
     if pm.is_none() && after.get(1) == Some(&Token::Mark(':')) {
-        let (number, said_pm) = meridiem(word(2)?);
-        minute = number.parse().ok().filter(|minute| *minute < 60)?;
-        (pm, next) = (said_pm, 3);
+        (minute, pm) = two_digits(2)?;
+        (next, timed) = (3, true);
+    } else if pm.is_none()
+        && after.get(1) == Some(&Token::Mark('.'))
+        && let Some(said) = two_digits(2)
+    {
+        // "10.30".
+        (minute, pm) = said;
+        (next, timed) = (3, true);
     } else if pm.is_none()
         && let Some((said, took)) =
             said_count(words.get(1..).unwrap_or(&[])).filter(|(said, _)| (10..60).contains(said))
     {
         // "Ten thirty-five", "ten fifteen".
-        (minute, next) = (said, 1 + took);
+        (minute, next, timed) = (said, 1 + took, true);
     }
     if pm.is_none() {
         pm = match word(next) {
@@ -603,6 +638,18 @@ fn said_clock(after: &[Token<'_>]) -> Option<Limit> {
             _ => (hour > 12).then_some(true),
         };
     }
+    // A bare hour: a clock only before the end, a mark that is not a '%',
+    // "am", "pm", "o'clock" or a day word, and never past twelve.
+    let bare = match after.get(next) {
+        None => true,
+        Some(Token::Mark(mark)) => *mark != '%',
+        Some(Token::Word(word) | Token::Part(word)) => {
+            matches!(*word, "am" | "pm" | "o'clock") || DAY_WORDS.contains(word)
+        }
+    };
+    if !(timed || (bare && hour <= 12)) {
+        return None;
+    }
     Some(Limit::Clock {
         hour: hour % 12,
         minute,
@@ -610,7 +657,9 @@ fn said_clock(after: &[Token<'_>]) -> Option<Limit> {
     })
 }
 
-/// The length `after` opens with ([`Limit::Length`]).
+/// The length `after` opens with ([`Limit::Length`]): a count and its unit,
+/// "and a half" before or after the unit, and "and" another such length
+/// ("one hour and thirty minutes").
 fn said_length(after: &[Token<'_>]) -> Option<Limit> {
     let words = words_of(after);
     let word = |at: usize| words.get(at).copied().flatten();
@@ -637,9 +686,15 @@ fn said_length(after: &[Token<'_>]) -> Option<Limit> {
     };
     // "An hour and a half".
     half |= and_a_half(next + 1);
-    Some(Limit::Length(
-        u64::from(count) * unit + if half { unit / 2 } else { 0 },
-    ))
+    let mut seconds = u64::from(count) * unit + if half { unit / 2 } else { 0 };
+    // "One hour and thirty minutes".
+    if !half
+        && word(next + 1) == Some("and")
+        && let Some(Limit::Length(more)) = said_length(&after[(next + 2).min(after.len())..])
+    {
+        seconds += more;
+    }
+    Some(Limit::Length(seconds))
 }
 
 /// The words a line the person asked as a question opens with
@@ -681,29 +736,48 @@ const REQUEST_OPENINGS: [&[&str]; 8] = [
 /// no call at all, so work done by another tool ("I've added a reminder to
 /// your calendar." beside `service_write`) stands.
 pub fn asked_as_a_question(said: &str) -> bool {
+    let (request, question, _) = read_as_asked(said);
+    !request && question
+}
+
+/// Whether the person's `said` asks to read something back: worded as a
+/// question, a request asked as one included ("Lamp, can you tell me when
+/// my timer rings?"). Its turn's `list_reminders` may back a time said
+/// ([`stands`]); "Remind me at ten." asks for a set, not a read.
+pub fn worded_as_a_question(said: &str) -> bool {
+    let (_, question, could) = read_as_asked(said);
+    question || could
+}
+
+/// `said` as [`asked_as_a_question`] reads it: whether it is a request,
+/// whether it is worded as a question (a '?' at its end, or its first word
+/// after any [`ADDRESS`] one of [`QUESTION_WORDS`]), and whether that word
+/// is "could" or "would".
+fn read_as_asked(said: &str) -> (bool, bool, bool) {
     let text = normalised(said);
     let words: Vec<&str> = text
         .split(|c: char| !(c.is_alphanumeric() || c == '\''))
         .filter(|word| !word.is_empty())
         .collect();
-    if words.contains(&"please") {
-        return false;
-    }
     let own = words
         .iter()
         .position(|word| !ADDRESS.contains(word))
         .map_or(&[][..], |at| &words[at..]);
-    if REQUEST_OPENINGS
-        .iter()
-        .any(|opening| own.starts_with(opening))
-    {
-        return false;
-    }
-    text.trim_end_matches(|c: char| c.is_whitespace() || matches!(c, '"' | '\'' | ')'))
+    let request = words.contains(&"please")
+        || REQUEST_OPENINGS
+            .iter()
+            .any(|opening| own.starts_with(opening));
+    let question = text
+        .trim_end_matches(|c: char| c.is_whitespace() || matches!(c, '"' | '\'' | ')'))
         .ends_with('?')
         || own
             .first()
-            .is_some_and(|word| QUESTION_WORDS.contains(word))
+            .is_some_and(|word| QUESTION_WORDS.contains(word));
+    (
+        request,
+        question,
+        matches!(own.first(), Some(&"could" | &"would")),
+    )
 }
 
 /// The worded claims (`LAMP_ACTION_CLAIM_WORDED`, #5215): a reply that opens
@@ -1565,20 +1639,28 @@ mod tests {
             serde_json::json!({"rule": "Keep the light on.", "about": "light", "never": true});
         let at = |time: &str| serde_json::json!({"text": "Lights", "time": time});
         let ten = "I'll keep my light on until ten.";
-        assert!(!stands(Claim::LightKept, ten, [("keep_rule", &kept)]));
+        assert!(!stands(
+            Claim::LightKept,
+            ten,
+            false,
+            [("keep_rule", &kept)]
+        ));
         assert!(stands(
             Claim::LightKept,
             ten,
+            false,
             [("set_reminder", &at("22:00"))]
         ));
         assert!(stands(
             Claim::LightKept,
             ten,
+            false,
             [("set_reminder", &at("10:00"))]
         ));
         assert!(!stands(
             Claim::LightKept,
             ten,
+            false,
             [("set_reminder", &at("21:00"))]
         ));
         let minute = "Timer set for one minute.";
@@ -1586,23 +1668,27 @@ mod tests {
         assert!(stands(
             Claim::Schedule,
             minute,
+            false,
             [("set_timer", &seconds(60))]
         ));
         assert!(!stands(
             Claim::Schedule,
             minute,
+            false,
             [("set_timer", &seconds(300))]
         ));
         // No limit: any call, as before; the strict lines: a call of their kind.
         assert!(stands(
             Claim::LightKept,
             "I'll keep my light on.",
+            false,
             [("web_search", &kept)]
         ));
-        assert!(!stands(Claim::LightKept, ten, []));
+        assert!(!stands(Claim::LightKept, ten, false, []));
         assert!(stands(
             Claim::Schedule,
             "Timer set. It rings at 9:39 am.",
+            false,
             [("set_timer", &seconds(1))]
         ));
     }
@@ -1638,7 +1724,7 @@ mod tests {
         ] {
             assert_eq!(claim_as(reply, true, true), Some(Some(kind)), "{reply:?}");
             assert!(worded_limit(reply).is_some(), "{reply:?}");
-            if !stands(kind, reply, [(name, args)]) {
+            if !stands(kind, reply, true, [(name, args)]) {
                 held.push(reply);
             }
         }
@@ -1681,6 +1767,36 @@ mod tests {
                 "I'll keep my light on until quarter to ten.",
                 clock(9, 45, None),
             ),
+            // At 09483c9afa (the Reviewer-lead's P3s).
+            (
+                "I'll keep my light on until ten to ten.",
+                clock(9, 50, None),
+            ),
+            (
+                "I'll keep my light on until five past nine.",
+                clock(9, 5, None),
+            ),
+            (
+                "I'll keep my light on until a quarter to midnight.",
+                clock(11, 45, Some(true)),
+            ),
+            (
+                "I'll keep my light on until quarter to noon.",
+                clock(11, 45, Some(false)),
+            ),
+            ("I'll keep my light on until 10.30.", clock(10, 30, None)),
+            (
+                "I'll keep my light on until ten o'clock.",
+                clock(10, 0, None),
+            ),
+            (
+                "I'll keep my light on until ten tonight.",
+                clock(10, 0, None),
+            ),
+            ("Timer set for one hour and thirty minutes.", length(5400)),
+            ("Your reminder is set for ten.", clock(10, 0, None)),
+            ("I've set the volume at 20.", None),
+            ("I've set the light at 10 brightness.", None),
         ] {
             assert_eq!(worded_limit(reply), limit, "{reply:?}");
         }
@@ -1698,7 +1814,44 @@ mod tests {
         assert!(stands(
             Claim::Schedule,
             reply,
+            false,
             [("set_timer", &timer), ("keep_rule", &kept)]
         ));
+    }
+
+    /// The Reviewer-lead's P2 on #5737 at 09483c9afa: a timer's clock
+    /// shortcut is a Schedule claim's only, and a listing backs a time only
+    /// on a line asked as a read.
+    #[test]
+    fn a_timer_or_a_listing_backs_a_clock_only_for_its_own_claims() {
+        let timer = serde_json::json!({"text": "Tea", "seconds": 300});
+        let kept =
+            serde_json::json!({"rule": "Keep the light on.", "about": "light", "never": true});
+        let ten = "I'll keep my light on until ten.";
+        assert!(!stands(
+            Claim::LightKept,
+            ten,
+            false,
+            [("keep_rule", &kept), ("set_timer", &timer)]
+        ));
+        let listed = serde_json::json!({});
+        let set = "Your reminder is set for ten.";
+        assert!(!stands(
+            Claim::ReminderTime,
+            set,
+            false,
+            [("list_reminders", &listed)]
+        ));
+        assert!(stands(
+            Claim::ReminderTime,
+            set,
+            true,
+            [("list_reminders", &listed)]
+        ));
+        assert!(worded_as_a_question(
+            "Lamp, can you tell me when my timer rings?"
+        ));
+        assert!(worded_as_a_question("Could you check my reminders"));
+        assert!(!worded_as_a_question("Lamp, remind me at ten."));
     }
 }
