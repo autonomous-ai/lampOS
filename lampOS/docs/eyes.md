@@ -1467,12 +1467,15 @@ With the switch:
     step with the name only). The face question is known in English and
     Vietnamese; in another language its yes still waits on the model's
     call. It is a line that asks leave to remember their face ("May I",
-    "Can I", "Shall I", "Do you want me to" … then "remember … face"),
-    with nothing in it that turns it round ("not", a "n't" word, "never",
-    "forget", "rather", "unless", "instead"; in Vietnamese "đừng",
-    "quên", "chẳng", or "không"/"chưa" before "nhớ"), so a yes to "Would
-    you rather I didn't remember your face?" keeps nothing (Fourteen's
-    HOLD on #5720). A read-back and the face question in one line
+    "Can I", "Shall I", "Do you want me to" … then "remember your face"
+    or "remember the face"), with nothing in it that turns it round or
+    makes it a choice ("not", a "n't" word, "never", "forget", "rather",
+    "unless", "instead", "or", "without", "skip", "no"; in Vietnamese
+    "nhớ khuôn mặt" with "đừng", "quên", "chẳng", "hay" or "hoặc"
+    anywhere, or "không"/"chưa" before that "nhớ"), so a yes to "Would
+    you rather I didn't remember your face?" or "May I remember just
+    your name, without your face?" keeps nothing (Fourteen's HOLDs on
+    #5720). A read-back and the face question in one line
     ("Walter, did I get that right? May I remember your face?" "Yes.")
     is neither, so its face waits on the model's call. While
     it is held, the onboarding walk keeps "who you are" open for it, up to
