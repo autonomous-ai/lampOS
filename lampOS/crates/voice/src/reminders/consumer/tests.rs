@@ -2031,6 +2031,65 @@ fn a_ledger_that_cannot_ring_refuses_a_new_timer_and_says_it_is_not_set() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// The Reviewer-lead's second P2 on #5668: a store put back while the
+/// voice runs left the ledger unarmed, refusing every item, with the
+/// cannot-ring file kept for good. After a minute of refusing, the re-fence
+/// is armed again: the next tick re-fences, the file goes and the due timer
+/// is offered.
+#[test]
+fn a_ledger_refusing_for_a_minute_is_rearmed_and_rings_again() {
+    let dir = std::env::temp_dir().join(format!("lamp-rearm-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join(crate::reminders::CANNOT_RING_FILE);
+    let _ = std::fs::remove_file(&file);
+    let (engine, socket) = served(1);
+    let store = engine.lock().unwrap().revision();
+    let mut consumer = ahead_of(&engine.lock().unwrap(), None);
+    consumer.cannot_ring = Some((file.clone(), None));
+    let now = lamp_ipc::monotonic_us();
+    let report = due(&engine.lock().unwrap(), now);
+    consumer.tick(&socket.path(), Some(&report), now).unwrap();
+    no_offer(&consumer);
+    assert!(file.exists());
+    let later = now + super::REARM_US - 1;
+    let report = due(&engine.lock().unwrap(), later);
+    consumer.tick(&socket.path(), Some(&report), later).unwrap();
+    no_offer(&consumer);
+    assert!(file.exists(), "re-armed too soon");
+    let minute = now + super::REARM_US;
+    let report = due(&engine.lock().unwrap(), minute);
+    consumer
+        .tick(&socket.path(), Some(&report), minute)
+        .unwrap();
+    let after = minute + 1;
+    let report = due(&engine.lock().unwrap(), after);
+    consumer.tick(&socket.path(), Some(&report), after).unwrap();
+    assert!(!file.exists(), "{:?}", consumer.journal.lines);
+    assert_eq!(consumer.ledger.schedule_revision(), Some(store));
+    // The item is offered again (its notice, stamped a minute ahead here,
+    // is then withdrawn as aged: a fresh one is said, as in
+    // `a_voice_started_on_a_ledger_ahead_of_the_store_says_a_due_timer`).
+    assert!(
+        consumer
+            .journal
+            .lines
+            .iter()
+            .any(|line| line.contains("re-fence is armed again")),
+        "{:?}",
+        consumer.journal.lines
+    );
+    assert!(
+        !consumer
+            .journal
+            .lines
+            .last()
+            .is_some_and(|line| line.contains("stale_revision")),
+        "{:?}",
+        consumer.journal.lines
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn full_ledger_refuses_new_admission_without_evicting_any_uncertain_delivery() {
     let mut engine = prepared_engine(Disk::default(), 1);

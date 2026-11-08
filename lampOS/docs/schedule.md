@@ -1644,19 +1644,32 @@ every item as above, and a timer set then says "Timer set." and never
 rings. With it:
 
 - **Re-fence at start.** The consumer arms the ledger as it opens it
-  (`DeliveryLedger::refence_at_start`). The first observation below the
-  fence after that, and only that one, lowers the fence to the store's
-  revision, so new items are offered again; later in the same run an older
-  revision is still `stale_revision`. It is lowered only when every entry
-  still fits under the new revision, and the journal says
-  `schedule delivery: the ledger's fence (N) was ahead of the store's
-  revision (M); re-fenced to the store at start`, with no item text.
-- **An acknowledged item stays acknowledged.** Compaction keeps the keys of
-  acknowledged entries it removes (`acknowledged`, the newest 128, written
-  only when not empty, read by older builds as unknown metadata). Such a key,
-  pending again in the older store, is refused (`acknowledged`) after the
-  fence check, so an unarmed ledger refuses it as `stale_revision` exactly as
-  before, and an armed one keeps its re-fence for the next item.
+  (`DeliveryLedger::refence_at_start`) and spends it on its first tick with
+  the bus's store revision (`refence_to`), or on the first item observed
+  below the fence (`prepare`), once; later in the same run an older revision
+  is `stale_revision` again. An entry observed at a revision the older store
+  never reached can never fit under it, so the re-fence lets it go
+  (`let_go_unfit`): one said (completed) is kept as acknowledged and never
+  said again; one never said may be offered again, as after a restart, and
+  leaves the consumer's retry. The journal says `schedule delivery: the
+  ledger's fence (N) was ahead of the store's revision (M); re-fenced to the
+  store, letting go of K entries it never held`, with no item text.
+- **An acknowledged item stays acknowledged.** Compaction (and a let-go of a
+  said entry) keeps the item as `acknowledged`: its key and its set's
+  request id, the newest 128, written only when not empty, read by older
+  builds as unknown metadata. The entry keeps the request id from the item's
+  Get (`request_id`, absent in entries from before). An acknowledged item put
+  back pending by the older store, same key and request id, is refused
+  (`acknowledged`) after the fence check, so an unarmed ledger refuses it as
+  `stale_revision` exactly as before. A new set the older store gives the
+  same key (it reuses ids after a restore) has its own random request id and
+  is admitted (the Reviewer-lead's probe on #5668); an entry from before,
+  with no request id, matches on the key alone.
+- **How it recovers.** At a start with the switch on, the re-fence always
+  happens (entries that don't fit are let go). A store put back while the
+  voice runs leaves the ledger unarmed; after a minute of refusing every
+  item (`REARM_US`) the consumer arms it again, and the next tick re-fences.
+  Until then the fallback below holds.
 - **Fallback: no timer set to never ring.** Each tick the consumer judges
   whether an item at the bus's store revision would be refused for the
   ledger's own fence (`DeliveryLedger::refuses`: not re-fenced, an entry
@@ -1671,17 +1684,21 @@ rings. With it:
   `second_provider::timer_line` gives no "Timer set." line. On the second
   route such a refused call is no call of its kind for the claim check
   (`LAMP_ACTION_CLAIM_CHECKED`), so a "Timer set." in the model's own words
-  after it is held and asked again, then said as the not-done line. Both
+  after it is held and asked again, then said as the not-done line. The Live
+  route has no such check: there it rests on the refusal's words. Both
   voice routes' workers get the switch and the directory (`process`,
   `ledger_refence_worker_environment`).
 
 Tests: `a_voice_started_on_a_ledger_ahead_of_the_store_says_a_due_timer`,
 `with_the_refence_switch_off_a_ledger_ahead_of_the_store_still_refuses` and
-`a_ledger_that_cannot_ring_refuses_a_new_timer_and_says_it_is_not_set`
+`a_ledger_that_cannot_ring_refuses_a_new_timer_and_says_it_is_not_set` and
+`a_ledger_refusing_for_a_minute_is_rearmed_and_rings_again`
 (`reminders/consumer/tests.rs`);
 `a_timer_claimed_after_a_set_the_ledger_refused_is_never_said`
 (`second_provider/tests/action_claim.rs`);
-`a_reopened_ledger_ahead_of_its_store_refences_but_never_readmits_an_acknowledged_item`
+`a_reopened_ledger_ahead_of_its_store_refences_but_never_readmits_an_acknowledged_item`,
+`a_new_timer_given_an_acknowledged_items_key_after_a_restore_is_admitted` and
+`a_refence_lets_go_of_an_entry_the_restored_store_never_held`
 (`crates/schedule/tests/it/delivery_ledger.rs`). Not run on a lamp.
 
 A voice started after them offers them again (the first builder, 2026-10-16:
