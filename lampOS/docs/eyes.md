@@ -1088,7 +1088,10 @@ analysis on #3126). With the switch on:
   at the match, and that id has been in every look since (`Held::looked`,
   `Held::keeps_print`), but for up to two looks in a row with no face at
   all (`who::UNBROKEN_MISSES`, a detector's flicker: on lamp-52e6 one look
-  in about 14 missed the face). After a look without that id, a face but
+  in about 14 missed the face). Only a near face counts as a face here
+  (`who::any_near`, `NEAR_ENOUGH`): a far face or a small flicker in a
+  look that misses theirs is a look with no face, not someone else
+  (#5546). After a look without that id, a near face but
   not theirs or a longer run of none, the face alone decides, never its
   box or id (`Held::printed`): the next print is theirs only if it is at
   least `SAME_PERSON` (0.363) alike to the eyes' own print of the held
@@ -1106,16 +1109,19 @@ analysis on #3126). With the switch on:
   check, as with the hold off (the Reviewer-lead's HOLD at 180cc84ebb).
   Anything else lets them go at once,
   the known file with them, so a stranger sitting down is never named.
-  A check with no print keeps the held name only while the passing id
-  their face had at the match has been in every look since, flickers
-  aside (`Held::looked`), and then if the near face seen but not printed
-  (turned, too small) has that id, or no face is near
-  (`Held::keeps_unprinted`). A face that cannot be read lets go at the
+  A check with no print and no face near keeps the held name to the 4 s
+  bound alone, however long the looks before it found no face: on
+  lamp-52e6 on 9 Nov the kit's 1.5 to 3 s screen blanks (15 to 30
+  face-less looks) let the hold go there, and the voice's cold face cache
+  lines were not reduced (#5546). A check whose near face was seen but not
+  printed (turned, too small) keeps it only if that face has the passing
+  id their face had at the match, and that id has been in every look
+  since, flickers aside (`Held::looked`, `Held::keeps_unprinted`). A face that cannot be read lets go at the
   next check, as with the hold off: someone who sits into their place
   within 1.5 s inherits the id from the box overlap, and unprinted would
   carry their name to the 4 s bound (the Reviewer-lead's HOLD on #5546). With
   `LAMP_EYES_SPEAKING` off there is no passing id: a printed face relies
-  on the 0.30 bar alone, and a check with no print lets go at once.
+  on the 0.30 bar alone, and an unprinted near face lets go at once.
 - **The camera closed lets them go at once**: the name and the known file
   go as it closes, held or not.
 
