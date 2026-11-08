@@ -2332,6 +2332,23 @@ fn the_product_keeps_tastes_first_and_leaves_newer_first_and_strength_off() {
     }
 }
 
+/// A delivery ledger fenced ahead of its store is re-fenced at the voice's
+/// start in the product (#5560, its played row on lamp-52e6 on 8 Nov), so a
+/// lamp whose store was put back rings its new timers again.
+#[test]
+fn the_product_refences_a_ledger_ahead_of_its_store() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_LEDGER_REFENCE=on"),
+        "the voice lacks LAMP_LEDGER_REFENCE=on"
+    );
+}
+
 /// #2860: the product sees who speaks, the eyes reading each face's speaking
 /// and the voice reading it, so a full update gives one lamp what the
 /// real-face run had.
