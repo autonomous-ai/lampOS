@@ -5169,8 +5169,10 @@ impl Engine {
     /// claims a timer, light or volume action in other words ("I've set a
     /// timer for one minute.", "I've kept the light on until ten.", "Okay,
     /// louder.") is held and judged as one in the acting part's own words,
-    /// only in a turn with no call at all and never on a line the person
-    /// asked as a question ([`crate::action_claim::asked_as_a_question`]).
+    /// in a turn with no call at all, or beside calls when it says a limit
+    /// ("until ten", "for one minute") none of its kind carried
+    /// ([`crate::action_claim::stands`]); never on a line the person asked
+    /// as a question ([`crate::action_claim::asked_as_a_question`]).
     /// Nothing without the claim check. Before any turn only.
     pub fn checking_worded_claims(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
@@ -12456,9 +12458,11 @@ async fn answer(
     let reminded = said.to_lowercase().contains("remind");
     // Whether the worded claims judge this turn (`LAMP_ACTION_CLAIM_WORDED`,
     // #5215): never a line the person asked as a question, whose reply may
-    // tell the state ("The light stays on until ten."), and only while the
-    // turn has made no call at all, so work another tool did stands (the
-    // first builder's two P2s on #5588). The strict lines judge every turn.
+    // tell the state ("The light stays on until ten."). Beside any call one
+    // stands, so work another tool did stands (the first builder's two P2s
+    // on #5588), unless it says a limit no call of its kind carried (his
+    // ruling on #5215, [`crate::action_claim::stands`]). The strict lines
+    // judge every turn.
     let worded_turn = shared.worded_claims && !crate::action_claim::asked_as_a_question(&said);
     let words = Message::user(said.clone());
     let event_words = said.clone();
@@ -12830,20 +12834,27 @@ async fn answer(
         } else {
             carried_rounds(shared, request)
         };
-        // The functions the turn called, by name: a claim in the acting
-        // part's own words stands only beside one of its kind
-        // (`LAMP_ACTION_CLAIM_CHECKED`, #5215). A cut answer's finished
-        // rounds carried here are the turn's own.
-        let mut turn_called: Vec<String> = rounds
+        // The functions the turn called, by name and with their arguments: a
+        // claim in the acting part's own words stands only beside one of its
+        // kind, and a limit a worded claim says only beside a call that
+        // carried it (`LAMP_ACTION_CLAIM_CHECKED`, #5215). A cut answer's
+        // finished rounds carried here are the turn's own.
+        let mut turn_called: Vec<(String, Value)> = rounds
             .iter()
             .flat_map(|message| &message.tool_calls)
-            .filter_map(|call| call["function"]["name"].as_str().map(str::to_owned))
+            .filter_map(|call| {
+                let args = call["function"]["arguments"]
+                    .as_str()
+                    .and_then(|args| serde_json::from_str(args).ok())
+                    .unwrap_or_default();
+                Some((call["function"]["name"].as_str()?.to_owned(), args))
+            })
             .collect();
         // Whether a claim with no call (or a step word alone, with the
         // switch) was asked again once already, and whether the next round
         // is told one went unsaid beside other calls.
         let mut action_claim_asked = false;
-        let mut action_claim_note: Option<crate::action_claim::Claim> = None;
+        let mut action_claim_note: Option<String> = None;
         // `LAMP_SECOND_CHAT_SECOND_TRY`: not for a look, nor once a held forget
         // ran or rounds were carried from a cut answer.
         let may_go_twice = second_try::may_go_twice(
@@ -12934,10 +12945,8 @@ async fn answer(
             if let Some(note) = doubt_note.take() {
                 messages.push(Message::system(note));
             }
-            if let Some(kind) = action_claim_note.take() {
-                messages.push(Message::system(crate::action_claim::beside_calls_note(
-                    kind,
-                )));
+            if let Some(note) = action_claim_note.take() {
+                messages.push(Message::system(note));
             }
             if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                 return Err(Stop::Gone);
@@ -13053,7 +13062,7 @@ async fn answer(
                 && round < MAX_ROUNDS
                 && !turn_called
                     .iter()
-                    .any(|name| name == crate::remember::RECALL))
+                    .any(|(name, _)| name == crate::remember::RECALL))
             .then(String::new);
             let mut recalled: Option<String> = None;
             loop {
@@ -13339,14 +13348,16 @@ async fn answer(
                             None => piece,
                             Some(held) => {
                                 held.push_str(&piece);
-                                match crate::action_claim::claim_as(
-                                    held,
-                                    false,
-                                    worded_turn && turn_called.is_empty(),
-                                ) {
+                                match crate::action_claim::claim_as(held, false, worded_turn) {
                                     Some(None) => action_held.take().unwrap_or_default(),
                                     Some(Some(kind))
-                                        if turn_called.iter().any(|name| kind.made_by(name)) =>
+                                        if crate::action_claim::stands(
+                                            kind,
+                                            held,
+                                            turn_called
+                                                .iter()
+                                                .map(|(name, args)| (name.as_str(), args)),
+                                        ) =>
                                     {
                                         action_held.take().unwrap_or_default()
                                     }
@@ -13766,23 +13777,30 @@ async fn answer(
             // reply, or one in the last round, is said as the plain line that
             // it wasn't done.
             if let Some(held) = action_held.take().filter(|held| !held.is_empty()) {
-                let worded_now = worded_turn && turn_called.is_empty() && calls.is_empty();
-                let unmade = crate::action_claim::claim_as(&held, true, worded_now)
+                let called = || {
+                    turn_called
+                        .iter()
+                        .map(|(name, args)| (name.as_str(), args))
+                        .chain(calls.iter().map(|call| (call.name.as_str(), &call.args)))
+                };
+                let unmade = crate::action_claim::claim_as(&held, true, worded_turn)
                     .flatten()
-                    .filter(|kind| {
-                        !turn_called
-                            .iter()
-                            .map(String::as_str)
-                            .chain(calls.iter().map(|call| call.name.as_str()))
-                            .any(|name| kind.made_by(name))
-                    });
+                    .filter(|kind| !crate::action_claim::stands(*kind, &held, called()));
+                // A worded claim beside calls is held only for a limit it
+                // said that none of them carried (the first builder's ruling
+                // on #5215): its note says so, never that nothing ran.
+                let limited = unmade.is_some()
+                    && called().next().is_some()
+                    && crate::action_claim::worded_limit(&held).is_some();
                 // Whether only the worded claims found it: the journal says so.
-                let worded =
-                    if worded_now && crate::action_claim::claim(&held, true).flatten().is_none() {
-                        ", in other words: LAMP_ACTION_CLAIM_WORDED"
-                    } else {
-                        ""
-                    };
+                let worded = if limited {
+                    ", in other words: LAMP_ACTION_CLAIM_WORDED, a said limit no call carried"
+                } else if worded_turn && crate::action_claim::claim(&held, true).flatten().is_none()
+                {
+                    ", in other words: LAMP_ACTION_CLAIM_WORDED"
+                } else {
+                    ""
+                };
                 match unmade {
                     None => {
                         for sentence in split.push(&held) {
@@ -13798,7 +13816,11 @@ async fn answer(
                             calls.len()
                         );
                         action_claim_asked = true;
-                        action_claim_note = Some(kind);
+                        action_claim_note = Some(if limited {
+                            crate::action_claim::LIMIT_NOTE.to_owned()
+                        } else {
+                            crate::action_claim::beside_calls_note(kind)
+                        });
                         text.clear();
                     }
                     Some(kind)
@@ -13810,7 +13832,11 @@ async fn answer(
                             kind.label(),
                             turn_called.len()
                         );
-                        messages.push(Message::system(crate::action_claim::NOTE));
+                        messages.push(Message::system(if limited {
+                            crate::action_claim::LIMIT_NOTE
+                        } else {
+                            crate::action_claim::NOTE
+                        }));
                         continue;
                     }
                     Some(kind) => {
@@ -13896,7 +13922,11 @@ async fn answer(
             }
             let first_calls = !called_earlier;
             called_earlier |= !calls.is_empty();
-            turn_called.extend(calls.iter().map(|call| call.name.clone()));
+            turn_called.extend(
+                calls
+                    .iter()
+                    .map(|call| (call.name.clone(), call.args.clone())),
+            );
             if calls.iter().any(|call| call.name == NOT_FOR_ME) {
                 let named = heard
                     && shared
@@ -14532,7 +14562,7 @@ async fn answer(
                 // never set: not a call of its kind, so the claim check holds
                 // a "Timer set." after it (`LAMP_ACTION_CLAIM_CHECKED`).
                 if crate::reminders::is_cannot_ring(&answer.told)
-                    && let Some(at) = turn_called.iter().rposition(|name| *name == call.name)
+                    && let Some(at) = turn_called.iter().rposition(|(name, _)| *name == call.name)
                 {
                     turn_called.remove(at);
                 }
