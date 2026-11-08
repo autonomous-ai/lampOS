@@ -975,12 +975,33 @@ otherwise cleared, and without it the switch was off there on lamp-9adf
 on 4 Nov),
 `made_skill::brief` lets a request through that names one linked service
 with a fixed read and no write word ("send", "reply", "add", "post", "schedule",
-...); two services, or a write, are still `NOT_A_SERVICE`. Asking for
+...). The rest are told their own limit, in the person's words (the testers'
+sheet, 6 Nov: "a skill is limited with no reason"), never `NOT_A_SERVICE`,
+which says no skill can use a service and is false with the switch on:
+a write is `NOT_A_WRITE` ("Not possible yet: a skill can read one linked
+service, but it can't send, write or change anything there."), two services
+are `ONE_SERVICE` ("... can read only one linked service, not two or more."),
+and a service with nothing a made skill reads, such as Notion, is
+`NOT_READABLE` ("... can read one linked service, but not that one."). Each
+ends "You can ask me for it yourself any time." Asking for
 the skill itself is no write: words before "skill" that only ask for it
 ("create me a new skill that ...", "add a skill to ...") are left out
-first, and "schedule" after "my", "the", "tomorrow's", "today's", "day"
-or "calendar" is the thing read (lamp-9adf, 4 Nov 23:51: "create a skill
-that reads my calendar" was refused so). A write after them still counts. A calendar's
+first. "Schedule", "post" and "book" after "my", "the", "tomorrow's",
+"latest", "last" or "newest" are the thing read, whatever follows
+("read me my schedule on my calendar"), unless "say" or "saying" follows
+with nothing asked to be read ("latest post: say hi on
+Facebook"). After "tomorrow", "today", "day", "calendar", "facebook" or
+"page" they are the thing read only after a word asking to be read
+("read", "tell", "what", "show", "check": "read me my Facebook post about
+the sale"), or at the request's end or before "from" or "of" ("my latest
+Facebook post"), else a verb ("tomorrow book the room", "my calendar book
+the room", "tomorrow book for me a table"; El's P3s on #5690 and P2s on
+#5696). With "say" or "saying", a word asking to be read anywhere in the
+request keeps it a read ("the last post saying we are open, read it to
+me"); with none, it is a post to write. It began on lamp-9adf on 4 Nov at 23:51,
+where "create a skill that reads my calendar" was refused. "Put" writes only with
+a service named after it, or "in", "on", "into" or "to" "my drive" ("put
+the count on the light" is the lamp's own). A write after them still counts. A calendar's
 step is given whole (today, or tomorrow when it says "tomorrow"), as are
 mail's (`recent`) and Drive's (`files`, newest first, `query` only words
 to search); for any other service the brief lists its reads but the

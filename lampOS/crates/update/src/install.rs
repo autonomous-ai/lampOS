@@ -460,8 +460,9 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
     (
         "guard-mode",
         "an installable skill (#1685), not yet tried on a lamp: it needs `room/presence` \
-         (`LAMP_PRESENCE=on`), and its texts reach the phone only with `LAMP_MESSAGES=on` in \
-         `lamp-cloud`, which carries `messages/out` up as unasked news",
+         (`LAMP_PRESENCE=on`), and its texts reach the phone only with `LAMP_SKILL_MESSAGES=on` \
+         (skills' lines alone) or `LAMP_MESSAGES=on` in `lamp-cloud`, either of which carries \
+         `messages/out` up as unasked news",
     ),
     (
         "laugh-glance",
@@ -480,6 +481,11 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "meal-check",
         "an installable skill, not yet tried on a lamp (#3504): V1's meal reminder, which its \
          owner chooses; a played check on a lamp comes first",
+    ),
+    (
+        "quiet-focus",
+        "an installable skill, not yet tried on a lamp: one warm word when they look up after 45 \
+         minutes head down (the eyes' `room/activity`), which its owner chooses; a played check on a lamp comes first",
     ),
     (
         "who-was-here",

@@ -998,11 +998,32 @@ soạn và kiểm tra skill: môi trường của chúng vốn bị xoá sạch,
 công tắc ở đó là tắt trên lamp-9adf ngày 4/11),
 `made_skill::brief` cho qua một yêu cầu nêu đúng một dịch vụ liên kết có việc
 đọc cố định và không có từ ghi nào ("send", "reply", "add", "post", "schedule", ...);
-hai dịch vụ, hoặc một lần ghi, vẫn là `NOT_A_SERVICE`. Việc xin chính skill
+những yêu cầu còn lại được báo đúng giới hạn của chúng, bằng lời nói với người
+dùng (bảng của tester, 6/11: "a skill is limited with no reason"), không bao giờ
+là `NOT_A_SERVICE`, vì câu đó nói không skill nào dùng được dịch vụ, điều sai
+khi công tắc bật: một lần ghi là `NOT_A_WRITE` ("Not possible yet: a skill can
+read one linked service, but it can't send, write or change anything there."),
+hai dịch vụ là `ONE_SERVICE` ("... can read only one linked service, not two or
+more."), và một dịch vụ không có gì cho kỹ năng tự tạo đọc, như Notion, là
+`NOT_READABLE` ("... can read one linked service, but not that one."). Câu nào
+cũng kết thúc bằng "You can ask me for it yourself any time." Việc xin chính skill
 không phải là ghi: các từ trước "skill" chỉ để xin nó ("create me a new skill
-that ...", "add a skill to ...") được bỏ ra trước, và "schedule" đứng sau "my",
-"the", "tomorrow's", "today's", "day" hay "calendar" là thứ được đọc (lamp-9adf,
-4/11 23:51: "create a skill that reads my calendar" đã bị từ chối vì thế). Một
+that ...", "add a skill to ...") được bỏ ra trước. "Schedule", "post" và "book"
+đứng sau "my", "the", "tomorrow's", "latest", "last" hay "newest" là thứ được
+đọc, dù sau đó là gì ("read me my schedule on my calendar"), trừ khi "say" hay
+"saying" theo sau mà không có lời xin đọc nào ("latest post: say hi on
+Facebook"). Đứng sau "tomorrow", "today", "day", "calendar", "facebook" hay
+"page" thì chúng chỉ là thứ được đọc khi đứng sau một từ xin đọc ("read",
+"tell", "what", "show", "check": "read me my Facebook post about the sale"),
+hoặc ở cuối yêu cầu hay trước "from" hoặc "of" ("my latest Facebook post"),
+còn lại là động từ ("tomorrow book the room", "my calendar book the room",
+"tomorrow book for me a table"; các P3 của El trên #5690 và các P2 trên #5696).
+Với "say" hay "saying", một từ xin đọc ở bất kỳ đâu trong yêu cầu giữ nó là
+việc đọc ("the last post saying we are open, read it to me"); không có từ nào
+thì đó là một bài cần đăng. Luật này bắt đầu từ lamp-9adf lúc 23:51 ngày 4/11, khi
+"create a skill that reads my calendar" bị từ chối. "Put" chỉ là ghi khi có một
+dịch vụ được nêu sau nó, hoặc "in", "on", "into" hay "to" "my drive" ("put the
+count on the light" là việc của chính lamp). Một
 lần ghi đứng sau chúng vẫn tính. Bước của lịch được cho
 trọn (hôm nay, hoặc ngày mai khi yêu cầu nói "tomorrow"), bước của thư (`recent`)
 và của Drive (`files`, mới nhất trước, `query` chỉ là từ để tìm) cũng vậy; với dịch vụ khác, brief liệt kê các việc đọc của nó trừ việc đọc

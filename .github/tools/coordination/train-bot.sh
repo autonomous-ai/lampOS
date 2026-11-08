@@ -119,8 +119,18 @@ eligible() {
     coord_body $p $bf || { once body$p "#$p left out: its body can't be fetched"; continue; }
     fine body$p
     # 4 Nov 04:1x: reads on an earlier head with the same patch count too (coord_same_patch), as for one read above.
-    heads=(${(f)"$(coord_same_patch $head $cf)"})
-    two=$(cat $bf $cf | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf $heads)
+    # 7 Nov (El's HOLD on #5653): and heads a Queue READ ASK names, so an ask on a head a plain rebase moved past still
+    # asks. Into a file, not $(...), so lib.sh's patch cache holds across this round's PRs.
+    coord_same_patch $head $cf $qf > $SP/heads.txt
+    heads=(${(f)"$(<$SP/heads.txt)"})
+    # 7 Nov (the second reviewer's HOLD on #5653): the PR's commits, for a Queue ask at an older head of another patch
+    # (reads2.py uses them only for Queue asks). 7 Nov (#5653's P3s): when they can't be listed, the PR sits out this
+    # round (fail closed): the head alone would miss a Queue ask at an older commit.
+    git rev-list origin/lamp-voice..$head > $SP/pr-commits.txt 2>/dev/null \
+      || { once commits$p "#$p left out: its commits can't be listed"; continue; }
+    fine commits$p
+    # 7 Nov (the PM, after Twelve's table): a Queue READ ASK naming TWO READS asks too (#5647, #5650 merged on one read).
+    two=$(cat $bf $cf | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf --queue $qf --pr $p --pr-commits $SP/pr-commits.txt $heads)
     if [[ $two == short* ]]; then
       grep -qx "$p short $head" $told || { say "#$p left out: TWO READS asked, $two on ${head:0:9}" >&2; tell "$p short $head"; }
       continue
@@ -258,7 +268,7 @@ build_train() {
 # run_train LANE: wait for the train built last (tn, tp, carried, refs, h) and merge it, or close it and say why. With
 # two lanes it runs in the background, one per lane.
 run_train() {
-  local lane=$1 rc slow slowf=$SP/train-bot.slow-$1 p left added c run fails errfiles heldany hit d deps t names dd NV
+  local lane=$1 rc slow slowf=$SP/train-bot.slow-$1 five fivef=$SP/train-bot.5xx-$1 p left added c run fails errfiles heldany hit d deps t names dd NV
   # 3 Nov 15:4x: the PRs to recheck go as arguments; merge-when-green.sh runs still-eligible.sh on them (no eval).
   # 4 Nov (#5212 part 2): --behind-unrelated, so a green train behind lamp-voice only by files it doesn't touch, and no
   # build input (behind-unrelated.sh), merges as it is instead of being rebuilt. Part 3: a no-crates train passes
@@ -280,6 +290,15 @@ run_train() {
     say "train $tn (#$tp) checks unfinished in 45 min: rebuilding"; return
   fi
   echo 0 > $slowf
+  if [[ $rc == 7 ]]; then
+    # GitHub answered the green train's merge with 5xx three times (train 662, 5 Nov): GitHub's, so the same PRs go again.
+    # Twice in a row is GitHub down, and each go costs a full run: stop for the first builder, as for rc 5 above.
+    five=$(( $(cat $fivef 2>/dev/null || echo 0) + 1 )); echo $five > $fivef
+    gh pr close $tp -R $REPO -c "Train bot: closed, GitHub answered its merge with 5xx three times; the same PRs go again." >/dev/null
+    if [[ $five -ge 2 ]]; then say "train $tn (#$tp): GitHub's 5xx on two trains' merges in a row: stopping for the first builder"; queue_post "Train bot, $(date +%H:%M): GitHub answered two trains' merges in a row with 5xx; stopped for the first builder$([[ $lane == nc ]] && print ' (the no-crates lane only)')."; echo 0 > $fivef; halt $lane; return; fi
+    say "train $tn (#$tp) merge answered with GitHub's 5xx: rebuilding"; return
+  fi
+  echo 0 > $fivef
   # 29 Oct 16:0x (train 359): a train failed in a non-cargo check (the SDK schema copies) after a reader held one of
   # its PRs; no failing test was named, so the bot used to stop. A carried PR held since the train began sits out first.
   if [[ $rc != 0 ]] && ! $TOOLS_DIR/still-eligible.sh ${carried[*]} >/dev/null 2>&1; then

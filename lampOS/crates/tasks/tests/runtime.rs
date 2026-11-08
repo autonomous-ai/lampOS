@@ -2,12 +2,16 @@ use lamp_bus::Bus;
 use lamp_msgs::{AgentState, Diagnostic, Level, Sign, TaskStatus};
 use lamp_tasks::{
     engine::{CLOSE_RETRY_MS, CLOSE_TRIES, Clock as Sample, WATCH_EARLY_MS},
+    follow::WatchLane,
     harness::{
-        AccountMachine, Closed, Ended, EngineKind, Launch, LaunchOutcome, Listed, Observation,
-        SignIn, Target,
+        AccountMachine, Closed, Ended, EngineKind, EngineRow, Launch, LaunchOutcome, Listed,
+        Observation, SignIn, Target, WatchEnd, WatchEvent,
     },
     progress::SETTLED_FOR_MS,
-    runtime::{Adapter, Clock, Config, SetUpLater, WaitLane, request, serve_with_adapter},
+    readiness::{Computer, engines_path, read_engines},
+    runtime::{
+        Adapter, Clock, Config, EnginesLane, SetUpLater, WaitLane, request, serve_with_adapter,
+    },
     store::Store,
 };
 use serde_json::{Value, json};
@@ -87,6 +91,13 @@ struct Counts {
     waits: Mutex<Vec<Vec<String>>>,
     /// What the held `wait` comes back with, once set.
     wait_ends: Mutex<Option<Vec<Ended>>>,
+    /// Each `watch` held, with the agent it named (`--push-watch`).
+    watches: Mutex<Vec<String>>,
+    /// The `watch`es held now.
+    watching: AtomicUsize,
+    /// What the held `watch` says next, once set; `done` and `failed` end
+    /// it, as `Cli::watch` does.
+    watch_says: Mutex<Option<WatchEvent>>,
     /// `show` finds the agent idle with this answer while set, as Harness
     /// gives it: its `ask` is the task's own text.
     plain: Mutex<Option<String>>,
@@ -107,6 +118,9 @@ struct Counts {
     /// signed in was asked.
     signed_out: AtomicBool,
     sign_in_reads: AtomicUsize,
+    /// Reading whether Harness is signed in fails while set (#5488
+    /// follow-up), as `harness auth status` that cannot be read.
+    sign_in_fails: AtomicBool,
     /// What `harness machines` lists, and how often it was asked (#1676).
     machines: Mutex<Vec<AccountMachine>>,
     machine_reads: AtomicUsize,
@@ -125,6 +139,10 @@ struct Counts {
     /// held on the job lane while set (the reviewer-lead's P2 on #2309).
     order: Mutex<Vec<&'static str>>,
     hold_launch: AtomicBool,
+    /// What `harness machines engines` says of each machine, by id, and
+    /// how many looks were made (#5199). A machine with none is unreachable.
+    engines: Mutex<BTreeMap<String, Result<Vec<EngineRow>, String>>>,
+    engine_looks: AtomicUsize,
 }
 type SignInRead = Result<lamp_tasks::sign_in::Event, &'static str>;
 /// A sign-in that reads the script's lines and keeps its answers.
@@ -160,6 +178,49 @@ impl WaitLane for ScriptLane {
             }
             thread::sleep(Duration::from_millis(5));
         }
+    }
+}
+struct ScriptWatch(Arc<Counts>);
+impl WatchLane for ScriptWatch {
+    fn watch(
+        &self,
+        machine: &str,
+        agent: &str,
+        cancel: &AtomicBool,
+        on_event: &mut dyn FnMut(WatchEvent),
+    ) -> WatchEnd {
+        assert_eq!(machine, "0123456789abcdef0123456789abcdef");
+        self.0.watches.lock().unwrap().push(agent.to_owned());
+        self.0.watching.fetch_add(1, Ordering::SeqCst);
+        // The first line is how the harness stands now.
+        on_event(WatchEvent::Working);
+        let end = loop {
+            if cancel.load(Ordering::Acquire) {
+                break WatchEnd::Cancelled;
+            }
+            if let Some(event) = self.0.watch_says.lock().unwrap().take() {
+                on_event(event);
+                if matches!(event, WatchEvent::Done | WatchEvent::Failed) {
+                    break WatchEnd::Settled;
+                }
+            }
+            thread::sleep(Duration::from_millis(5));
+        };
+        self.0.watching.fetch_sub(1, Ordering::SeqCst);
+        end
+    }
+}
+struct ScriptEngines(Arc<Counts>);
+impl EnginesLane for ScriptEngines {
+    fn engines(&self, machine: &str) -> Result<Vec<EngineRow>, String> {
+        self.0.engine_looks.fetch_add(1, Ordering::SeqCst);
+        self.0
+            .engines
+            .lock()
+            .unwrap()
+            .get(machine)
+            .cloned()
+            .unwrap_or_else(|| Err("unreachable".into()))
     }
 }
 struct Script {
@@ -206,6 +267,12 @@ impl Script {
 impl Adapter for Script {
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
         Some(Arc::new(ScriptLane(self.counts.clone())))
+    }
+    fn watch_lane(&self) -> Option<Arc<dyn WatchLane>> {
+        Some(Arc::new(ScriptWatch(self.counts.clone())))
+    }
+    fn engines_lane(&self) -> Option<Arc<dyn EnginesLane>> {
+        Some(Arc::new(ScriptEngines(self.counts.clone())))
     }
     fn launch(&self, _: &Launch) -> LaunchOutcome {
         self.counts.launches.fetch_add(1, Ordering::SeqCst);
@@ -280,6 +347,9 @@ impl Adapter for Script {
     }
     fn signed_in(&self) -> Result<SignIn, String> {
         self.counts.sign_in_reads.fetch_add(1, Ordering::SeqCst);
+        if self.counts.sign_in_fails.load(Ordering::SeqCst) {
+            return Err("timeout".into());
+        }
         Ok(if self.counts.signed_out.load(Ordering::SeqCst) {
             SignIn::Out
         } else {
@@ -364,6 +434,7 @@ impl Running {
             watch,
             progress,
             push_wait: false,
+            push_watch: false,
             close_told,
             targets_newer: None,
             set_up_later: None,
@@ -1493,6 +1564,76 @@ fn a_held_wait_that_comes_back_reads_the_agent_at_once_and_keeps_its_idle_answer
     assert_eq!(s.counts.reads.load(Ordering::SeqCst), 1);
 }
 
+/// #5230: with `--push-watch`, one Harness `watch` is held on the task's
+/// agent, a `working` line reads nothing, and `done` reads the agent at
+/// once and keeps its idle answer; the watch is then let go. With
+/// `--push-wait` too, the followed task is never also waited on. The
+/// injected clock never moves, so only the push reads.
+#[test]
+fn a_held_watch_reads_the_agent_at_once_on_done_and_is_let_go() {
+    let mut s = Running::unstarted(false, false, true, false);
+    s.config.push_watch = true;
+    s.config.push_wait = true;
+    s.start();
+    let prepared = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    s.wait(&prepared["id"], |v| {
+        v["task"]["dispatch"]["state"] == "accepted"
+    });
+    let start = Instant::now();
+    while s.counts.watches.lock().unwrap().is_empty() {
+        assert!(start.elapsed() < Duration::from_secs(5), "no watch held");
+        thread::sleep(Duration::from_millis(5));
+    }
+    assert_eq!(*s.counts.watches.lock().unwrap(), vec![AGENT.to_owned()]);
+    // `working`: nothing read, and once heard from, no `wait` beside it.
+    thread::sleep(Duration::from_millis(100));
+    assert_eq!(s.counts.reads.load(Ordering::SeqCst), 0);
+    let waited = s.counts.waits.lock().unwrap().len();
+    thread::sleep(Duration::from_millis(100));
+    assert_eq!(s.counts.waits.lock().unwrap().len(), waited);
+    assert!(waited <= 1, "a wait held beside the watch: {waited}");
+    // Done: read at once, its idle answer kept, the watch let go.
+    s.counts.idle.store(true, Ordering::SeqCst);
+    *s.counts.watch_says.lock().unwrap() = Some(WatchEvent::Done);
+    let kept = s.wait(&prepared["id"], |v| v["task"]["observations"] == json!(1));
+    assert_eq!(s.counts.reads.load(Ordering::SeqCst), 1, "{kept}");
+    thread::sleep(Duration::from_millis(100));
+    assert_eq!(s.counts.watching.load(Ordering::SeqCst), 0);
+    assert_eq!(s.counts.watches.lock().unwrap().len(), 1);
+    assert_eq!(s.counts.reads.load(Ordering::SeqCst), 1);
+}
+
+/// #5230: a watch held when the part stops is ended with it.
+#[test]
+fn every_held_watch_ends_when_the_part_stops() {
+    let mut s = Running::unstarted(false, false, true, false);
+    s.config.push_watch = true;
+    s.start();
+    let prepared = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    let start = Instant::now();
+    while s.counts.watching.load(Ordering::SeqCst) == 0 {
+        assert!(start.elapsed() < Duration::from_secs(5), "no watch held");
+        thread::sleep(Duration::from_millis(5));
+    }
+    s.stop();
+    assert_eq!(s.counts.watching.load(Ordering::SeqCst), 0);
+}
+
+/// Without `--push-watch` no watch is ever held, whatever the adapter has.
+#[test]
+fn without_push_watch_no_watch_is_held() {
+    let s = Running::configured(false, false, true);
+    let prepared = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    s.wait(&prepared["id"], |v| {
+        v["task"]["dispatch"]["state"] == "accepted"
+    });
+    thread::sleep(Duration::from_millis(100));
+    assert!(s.counts.watches.lock().unwrap().is_empty());
+}
+
 /// Without `--push-wait` no wait is ever held, whatever the adapter has.
 #[test]
 fn without_push_wait_no_wait_is_held() {
@@ -1611,6 +1752,7 @@ fn set_up_later_reads_the_targets_again_and_says_why_hand_overs_are_off() {
         targets: path.clone(),
         every: Duration::from_millis(50),
         from_machines: None,
+        engines: false,
     });
     s.start();
     let report = tasks_diagnostic_until(&s, |d| said(d, "handovers_off").is_some());
@@ -1672,6 +1814,47 @@ fn set_up_later_reads_the_targets_again_and_says_why_hand_overs_are_off() {
     assert_eq!(told_targets(&s), 0);
 }
 
+/// #5488 follow-up (the reviewer-lead's P3 on #5583): a sign-in read that
+/// fails, through the part's own loop, keeps what was last read for two
+/// failed reads, lets it go at the third, so `status` says no `signed_in`,
+/// and says it again once a read answers.
+#[test]
+fn a_sign_in_read_failing_three_times_in_a_row_is_let_go_by_the_part() {
+    let mut s = Running::unstarted(false, false, false, false);
+    s.config.set_up_later = Some(SetUpLater {
+        targets: s.root.path().join("targets.json"),
+        every: Duration::from_millis(300),
+        from_machines: None,
+        engines: false,
+    });
+    s.start();
+    let signed_in = |s: &Running| s.status()["signed_in"].clone();
+    let until = |s: &Running, wanted: Value| {
+        let start = Instant::now();
+        while signed_in(s) != wanted {
+            assert!(start.elapsed() < Duration::from_secs(5), "never {wanted}");
+            thread::sleep(Duration::from_millis(10));
+        }
+    };
+    until(&s, json!("yes"));
+    let base = s.counts.sign_in_reads.load(Ordering::SeqCst);
+    s.counts.sign_in_fails.store(true, Ordering::SeqCst);
+    let start = Instant::now();
+    while s.counts.sign_in_reads.load(Ordering::SeqCst) < base + 2 {
+        assert!(start.elapsed() < Duration::from_secs(5), "no failed reads");
+        thread::sleep(Duration::from_millis(5));
+    }
+    thread::sleep(Duration::from_millis(60));
+    assert_eq!(signed_in(&s), json!("yes"), "two failed reads keep it");
+    until(&s, Value::Null);
+    assert!(
+        s.counts.sign_in_reads.load(Ordering::SeqCst) >= base + 3,
+        "let go only after three failed reads"
+    );
+    s.counts.sign_in_fails.store(false, Ordering::SeqCst);
+    until(&s, json!("yes"));
+}
+
 /// #1676: with `--targets-from-machines`, a lamp signed in to Harness writes
 /// its targets from the person's machines and uses them with no restart: the
 /// first is `office`, the voice's own default. A machine added is added; the
@@ -1686,11 +1869,13 @@ fn targets_from_machines_are_written_and_used_while_signed_in() {
         targets: path.clone(),
         every: Duration::from_millis(20),
         from_machines: Some(EngineKind::Claude),
+        engines: false,
     });
     let machine = |id: char, label: &str, current: bool| AccountMachine {
         machine_id: id.to_string().repeat(32),
         label: label.into(),
         current,
+        status: None,
     };
     *s.counts.machines.lock().unwrap() = vec![
         machine('a', "lamp", true),
@@ -1788,6 +1973,217 @@ fn targets_from_machines_are_written_and_used_while_signed_in() {
         s.ask(json!({"op":"targets"}))["targets"][1]["alias"],
         "office"
     );
+}
+
+/// A service with `--targets-from-machines claude` and, as asked,
+/// `--engines-from-machines` (#5199): the lamp and one computer, `Office
+/// iMac`, running; a look every 20 ms, the machines' every 100.
+fn engines_running(engines: bool) -> (Running, std::path::PathBuf) {
+    let mut s = Running::unstarted(false, false, false, false);
+    let path = s.root.path().join("targets.json");
+    s.config.targets = BTreeMap::new();
+    s.config.set_up_later = Some(SetUpLater {
+        targets: path.clone(),
+        every: Duration::from_millis(20),
+        from_machines: Some(EngineKind::Claude),
+        engines,
+    });
+    let machine = |id: char, label: &str, current: bool| AccountMachine {
+        machine_id: id.to_string().repeat(32),
+        label: label.into(),
+        current,
+        status: Some("running".into()),
+    };
+    *s.counts.machines.lock().unwrap() = vec![
+        machine('a', "lamp", true),
+        machine('b', "Office iMac", false),
+    ];
+    (s, path)
+}
+
+fn office_engines(s: &Running, rows: Result<Vec<EngineRow>, String>) {
+    s.counts
+        .engines
+        .lock()
+        .unwrap()
+        .insert("b".repeat(32), rows);
+}
+
+fn row(engine: &str, installed: Option<bool>, signed_in: Option<bool>) -> EngineRow {
+    EngineRow {
+        engine: engine.into(),
+        installed,
+        installable: None,
+        signed_in,
+    }
+}
+
+fn prepare_office(s: &Running) -> Value {
+    s.ask(
+        json!({"op":"prepare","guard":s.guard(),"text":"Private scripted task","target":"office"}),
+    )
+}
+
+/// Prepares to `office` until the answer's `error` is `code` (`None`: until
+/// one is prepared), within 5 s.
+fn prepared_until(s: &Running, code: Option<&str>) -> Value {
+    let start = Instant::now();
+    loop {
+        let answer = prepare_office(s);
+        let done = match code {
+            Some(code) => answer["error"] == code,
+            None => answer["ok"] == true,
+        };
+        if done {
+            return answer;
+        }
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "not {code:?}: {answer}"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+/// #5199: with `--engines-from-machines`, each computer is asked which
+/// engines it has, off the hand-overs' lane. Its target gets one it has
+/// (Codex, with Claude Code unknown there), and the engines are written
+/// beside the targets. A `prepare` is refused at once when that engine is
+/// known not signed in, or the computer known offline; a failed look keeps
+/// what was known; once it is signed in and awake, the work is prepared.
+#[test]
+fn engines_from_machines_choose_an_engine_there_and_refuse_early() {
+    let (mut s, path) = engines_running(true);
+    office_engines(
+        &s,
+        Ok(vec![
+            row("claude", None, None),
+            row("codex", Some(true), Some(false)),
+        ]),
+    );
+    s.start();
+    let start = Instant::now();
+    while s.ask(json!({"op":"targets"}))["targets"]
+        != json!([{"alias":"office","engine":"codex","name":"Office iMac"}])
+    {
+        assert!(start.elapsed() < Duration::from_secs(5), "no codex target");
+        thread::sleep(Duration::from_millis(10));
+    }
+    let refused = prepared_until(&s, Some("engine_not_signed_in"));
+    assert_eq!(refused["ok"], false, "{refused}");
+    let known = read_engines(&engines_path(&path)).unwrap();
+    assert_eq!(known.keys().collect::<Vec<_>>(), ["office"]);
+    let office: &Computer = &known["office"];
+    assert_eq!(office.status.as_ref().unwrap().value, "running");
+    assert!(!office.engines["codex"].signed_in.as_ref().unwrap().value);
+    assert_eq!(office.engines.get("claude"), None, "a null is unknown");
+    // A failed look keeps what was known: still refused after it.
+    office_engines(&s, Err("unreachable".into()));
+    let looks = s.counts.engine_looks.load(Ordering::SeqCst);
+    let start = Instant::now();
+    while s.counts.engine_looks.load(Ordering::SeqCst) < looks + 2 {
+        assert!(start.elapsed() < Duration::from_secs(5), "not looked again");
+        thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(prepare_office(&s)["error"], "engine_not_signed_in");
+    // Signed in there: prepared.
+    office_engines(&s, Ok(vec![row("codex", Some(true), Some(true))]));
+    let prepared = prepared_until(&s, None);
+    assert_eq!(prepared["ok"], true, "{prepared}");
+    // Asleep: refused, with nothing prepared; awake again: prepared.
+    s.counts.machines.lock().unwrap()[1].status = Some("offline".into());
+    prepared_until(&s, Some("computer_offline"));
+    s.counts.machines.lock().unwrap()[1].status = Some("running".into());
+    prepared_until(&s, None);
+    // Nothing known not to be there, so the targets say nothing of it.
+    assert_eq!(
+        s.ask(json!({"op":"targets"}))["targets"][0].get("installed"),
+        None
+    );
+}
+
+/// #5199: an engine not found on that computer (`installed` null with
+/// `installable` true) is refused early, and the targets say so; unknown
+/// proceeds.
+#[test]
+fn an_engine_known_not_there_is_refused_and_told_and_unknown_proceeds() {
+    let (mut s, path) = engines_running(true);
+    // A file written by hand, Codex on the office computer: never written
+    // over, and its computer still asked.
+    write_targets(
+        &path,
+        format!(
+            "{}\n",
+            json!({"version":1,"targets":{"office":{"machine_id":"b".repeat(32),"project":"~/p","engine":"codex"}}})
+        )
+        .as_bytes(),
+    );
+    let by_hand = fs::read(&path).unwrap();
+    office_engines(
+        &s,
+        Ok(vec![
+            row("claude", Some(true), Some(true)),
+            // Harness's row for an engine not on the computer.
+            EngineRow {
+                installable: Some(true),
+                ..row("codex", None, None)
+            },
+        ]),
+    );
+    s.start();
+    prepared_until(&s, Some("engine_missing"));
+    assert_eq!(
+        s.ask(json!({"op":"targets"}))["targets"],
+        json!([{"alias":"office","engine":"codex","installed":false}])
+    );
+    assert_eq!(fs::read(&path).unwrap(), by_hand);
+    // The computer can't say any more: unknown, so it goes as before.
+    office_engines(&s, Ok(vec![row("codex", None, None)]));
+    prepared_until(&s, None);
+}
+
+/// #5199: without `--engines-from-machines` nothing is asked or refused:
+/// the target is Claude Code's as before, an engines file beside the
+/// targets is never read, and the work is prepared.
+#[test]
+fn without_engines_from_machines_nothing_is_asked_or_refused() {
+    let (mut s, path) = engines_running(false);
+    office_engines(&s, Ok(vec![row("claude", Some(true), Some(false))]));
+    s.counts.machines.lock().unwrap()[1].status = Some("offline".into());
+    // An engines file saying the computer is offline, read just now: not
+    // read.
+    let engines = engines_path(&path);
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    write_targets(
+        &engines,
+        format!(
+            "{}\n",
+            json!({"version":1,"computers":{"office":{"status":{"value":"offline","read_ms":now_ms}}}})
+        )
+        .as_bytes(),
+    );
+    s.start();
+    let start = Instant::now();
+    while s.ask(json!({"op":"targets"}))["targets"]
+        != json!([{"alias":"office","engine":"claude","name":"Office iMac"}])
+    {
+        assert!(start.elapsed() < Duration::from_secs(5), "no target");
+        thread::sleep(Duration::from_millis(10));
+    }
+    let asked = s.counts.machine_reads.load(Ordering::SeqCst);
+    let start = Instant::now();
+    while s.counts.machine_reads.load(Ordering::SeqCst) < asked + 2 {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "machines not read again"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(prepare_office(&s)["ok"], true);
+    assert_eq!(s.counts.engine_looks.load(Ordering::SeqCst), 0);
 }
 
 #[test]
@@ -2017,6 +2413,7 @@ fn a_part_started_signed_in_starts_harnesss_daemon_once() {
             targets: s.root.path().join("targets.json"),
             every: Duration::from_millis(20),
             from_machines: None,
+            engines: false,
         });
         s.counts.signed_out.store(signed_out, Ordering::SeqCst);
         s.start();
@@ -2334,6 +2731,9 @@ fn targets_from_machines_needs_an_engine_and_set_up_later() {
         unknown.contains("needs claude, codex or opencode"),
         "{unknown}"
     );
+    // #5199: `--engines-from-machines` asks the computers it finds.
+    let alone = refused(&[&base[..], &["--set-up-later", "--engines-from-machines"]].concat());
+    assert!(alone.contains("it needs that too"), "{alone}");
 }
 
 /// The tasks database, opened by hand as a newer build would write it.
@@ -2732,6 +3132,7 @@ fn the_apps_state_says_harness_signed_in_across_a_restart() {
         targets: s.root.path().join("targets.json"),
         every: Duration::from_millis(20),
         from_machines: None,
+        engines: false,
     });
     let said_until = |s: &Running, want: &str| {
         let start = Instant::now();

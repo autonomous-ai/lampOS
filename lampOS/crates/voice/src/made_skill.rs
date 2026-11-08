@@ -100,6 +100,19 @@ const REQUEST_MARK: &str = "Request: ";
 /// (`app_make::begin`'s `refused`); the voice tells the model to say them.
 pub const NOT_A_SERVICE: &str = "Not possible yet: a skill can't use your mail, calendar or \
      other services, even ones already linked. You can ask me for it yourself any time.";
+/// What a request to make a skill that would write to a linked service is
+/// told with a made skill's reads on ([`READS_ENVIRONMENT`]): a skill reads
+/// one service and never writes ([`NOT_A_SERVICE`] isn't true there; the
+/// testers' sheet, 6 Nov, "a skill is limited with no reason").
+pub const NOT_A_WRITE: &str = "Not possible yet: a skill can read one linked service, but \
+     it can't send, write or change anything there. You can ask me for it yourself any time.";
+/// What a request naming two linked services is told with reads on.
+pub const ONE_SERVICE: &str = "Not possible yet: a skill can read only one linked service, \
+     not two or more. You can ask me for it yourself any time.";
+/// What a request is told with reads on when the service it names has
+/// nothing a made skill reads (Notion, read only through its own tools).
+pub const NOT_READABLE: &str = "Not possible yet: a skill can read one linked service, but \
+     not that one. You can ask me for it yourself any time.";
 /// Words that name a linked service ([`crate::services`]) in a request, as
 /// a whole word: mail and a calendar, and the services' own names.
 const SERVICE_WORDS: [&str; 17] = [
@@ -171,9 +184,67 @@ const WRITE_WORDS: [&str; 21] = [
     "schedule", "put",
 ];
 
-/// Words before "schedule" that make it the thing read ("my schedule"),
-/// not a write ("schedule a meeting").
-const SCHEDULE_AS_A_THING: [&str; 7] = ["my", "the", "tomorrow", "today", "s", "day", "calendar"];
+/// Write words that are also things read: "my schedule", "my latest
+/// Facebook post", "the book titles" (El's P3 on #5679).
+const ALSO_A_THING: [&str; 3] = ["schedule", "post", "book"];
+
+/// Words before one of [`ALSO_A_THING`] that make it the thing read,
+/// whatever follows: "my schedule on my calendar", "the latest post on
+/// Facebook" (El's P2 on #5696).
+const A_THING_AFTER: [&str; 6] = ["my", "the", "s", "latest", "last", "newest"];
+
+/// Words before one of [`ALSO_A_THING`] that make it the thing read only
+/// when the request asks to be read before it ("read me my Facebook post
+/// about the sale", "what's my calendar schedule today"), or at its end or
+/// before one of [`A_THING_BEFORE`] ("my latest Facebook post"); else it
+/// is a verb, "tomorrow book the room", "my calendar book the room",
+/// "facebook post that I'm out" (El's P3s on #5690 and #5696, and P2s on
+/// #5696).
+const MAYBE_A_THING_AFTER: [&str; 6] = ["tomorrow", "today", "day", "calendar", "facebook", "page"];
+
+/// Words after one of [`ALSO_A_THING`] that keep it the thing read after
+/// one of [`MAYBE_A_THING_AFTER`]. Not "for": "tomorrow book for me a
+/// table" writes.
+const A_THING_BEFORE: [&str; 2] = ["from", "of"];
+
+/// Words a request asks to be read with: with one of them, a thing said
+/// with "say" is what is read ("read me the last post saying sale", "the
+/// last post saying we are open, read it to me"), not a post to write
+/// ("latest post: say hi on Facebook"). With none, "my latest post saying
+/// sale on Facebook" can't be told from that write, so it is one.
+const ASKED_TO_READ: [&str; 6] = ["read", "reads", "tell", "what", "show", "check"];
+
+/// Whether `words[at]`, one of [`ALSO_A_THING`], is the thing read.
+fn a_thing(words: &[&str], at: usize) -> bool {
+    let Some(before) = at.checked_sub(1).map(|before| words[before]) else {
+        return false;
+    };
+    let asked = |words: &[&str]| words.iter().any(|word| ASKED_TO_READ.contains(word));
+    if A_THING_AFTER.contains(&before) {
+        let says = words[at + 1..]
+            .iter()
+            .any(|word| ["say", "saying"].contains(word));
+        !says || asked(words)
+    } else if MAYBE_A_THING_AFTER.contains(&before) {
+        asked(&words[..at])
+            || words
+                .get(at + 1)
+                .is_none_or(|next| A_THING_BEFORE.contains(next))
+    } else {
+        false
+    }
+}
+
+/// Whether "put" at `words[at]` writes: with a service named after it, or
+/// put "in", "on", "into" or "to" "my drive" (El's P3 on #5696: "put the
+/// count on the light from my drive" is the lamp's own).
+fn puts_to_a_service(words: &[&str], at: usize) -> bool {
+    let after = &words[at + 1..];
+    names_a_linked_service(&after.join(" "))
+        || after.windows(3).any(|three| {
+            ["in", "on", "into", "to"].contains(&three[0]) && three[1..] == ["my", "drive"]
+        })
+}
 
 /// Words that only ask for the skill itself, before "skill" at a request's
 /// start: "create a skill that reads my calendar" asks for a skill that
@@ -209,9 +280,10 @@ fn asked_of_the_skill<'a>(words: &[&'a str]) -> Vec<&'a str> {
 /// code, and for a calendar or mail the one step `lamp-skills` takes (a
 /// calendar's events of a day, tomorrow when it says so, else today; the
 /// latest mail). Any other service's step the model writes from the
-/// service's reads. None when it names no service or two, one with nothing
-/// to read, or anything that would write.
-fn read_of(request: &str) -> Option<(&'static str, Option<&'static str>)> {
+/// service's reads. Its limit, in the person's words, when it would write
+/// ([`NOT_A_WRITE`]), names two services ([`ONE_SERVICE`]), or names one
+/// with nothing to read or none the lamp knows ([`NOT_READABLE`]).
+fn read_of(request: &str) -> Result<(&'static str, Option<&'static str>), &'static str> {
     let request = request.to_lowercase().replace("e-mail", "email");
     let words: Vec<&str> = request
         .split(|c: char| !c.is_alphanumeric())
@@ -220,10 +292,13 @@ fn read_of(request: &str) -> Option<(&'static str, Option<&'static str>)> {
     let words = asked_of_the_skill(&words);
     let writes = words.iter().enumerate().any(|(at, word)| {
         WRITE_WORDS.contains(word)
-            && !(*word == "schedule" && at > 0 && SCHEDULE_AS_A_THING.contains(&words[at - 1]))
+            && !(ALSO_A_THING.contains(word) && a_thing(&words, at))
+            // "put" writes to a service only when one is named after it:
+            // "put the count on the light" is the lamp's own.
+            && (*word != "put" || puts_to_a_service(&words, at))
     });
     if writes {
-        return None;
+        return Err(NOT_A_WRITE);
     }
     let joined = format!(" {} ", words.join(" "));
     let mut codes: Vec<&'static str> = SERVICE_CODES
@@ -239,11 +314,16 @@ fn read_of(request: &str) -> Option<(&'static str, Option<&'static str>)> {
         .collect();
     codes.sort_unstable();
     codes.dedup();
-    let [code] = codes.as_slice() else {
-        return None;
+    let code = match codes.as_slice() {
+        [code] => code,
+        // Not reached from `brief_with`, which asks this only of a request
+        // that names a service; were it reached, no service is one with
+        // nothing to read.
+        [] => return Err(NOT_READABLE),
+        _ => return Err(ONE_SERVICE),
     };
     if lamp_services::spoken::not_readable(code).is_some() {
-        return None;
+        return Err(NOT_READABLE);
     }
     let step = match *code {
         "google_calendar" if words.contains(&"tomorrow") => {
@@ -256,7 +336,7 @@ fn read_of(request: &str) -> Option<(&'static str, Option<&'static str>)> {
         "google_drive" => Some(DRIVE_READ),
         _ => None,
     };
-    Some((code, step))
+    Ok((code, step))
 }
 
 /// Drive's step, given whole: its files come newest first, and `query` is
@@ -299,7 +379,8 @@ pub fn brief(request: &str) -> Result<String, &'static str> {
 /// skill whose one step reads it ([`read_of`]): a calendar's, mail's or
 /// Drive's step given whole, any other service's reads listed for the model to choose
 /// from (`lamp_services::spoken::whats`, never a whole text). A request
-/// that would write, or names two services, is still [`NOT_A_SERVICE`].
+/// that would write, names two services or one with nothing to read is
+/// told that limit ([`read_of`]); with reads off, any is [`NOT_A_SERVICE`].
 pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
     let request = request.split_whitespace().collect::<Vec<_>>().join(" ");
     if request.is_empty() {
@@ -309,7 +390,10 @@ pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
         return Err("That is too long to ask for as one skill: say it more shortly.");
     }
     if names_a_linked_service(&request) {
-        let (service, step) = read_of(&request).filter(|_| reads).ok_or(NOT_A_SERVICE)?;
+        if !reads {
+            return Err(NOT_A_SERVICE);
+        }
+        let (service, step) = read_of(&request)?;
         let step = match step {
             Some(step) => step.to_owned(),
             None => format!(
@@ -2389,8 +2473,9 @@ light = { dim = 1 }
 
     /// #5288: with a made skill's reads on, a request to be read a calendar
     /// or mail is briefed with its one read step, within [`MOST_BRIEF_BYTES`]
-    /// bytes; a write, another service or both are still [`NOT_A_SERVICE`],
-    /// and with the switch off every one is, as before.
+    /// bytes; a write, two services or one with nothing a skill reads are
+    /// told that limit (the testers' sheet, 6 Nov), and with the switch off
+    /// every one is [`NOT_A_SERVICE`], as before.
     #[test]
     fn with_reads_on_a_calendar_or_mail_read_is_briefed() {
         let calendar = "every evening at nine, read me tomorrow's calendar";
@@ -2413,7 +2498,7 @@ light = { dim = 1 }
         // a made skill can't read yet.
         assert_eq!(
             brief_with("each morning read me my Notion plans", true),
-            Err(NOT_A_SERVICE)
+            Err(NOT_READABLE)
         );
         let drive = brief_with("read me my Google Drive files at nine", true).unwrap();
         assert!(drive.contains("services = { google_drive = \"read\" }"));
@@ -2451,24 +2536,46 @@ light = { dim = 1 }
                 "{brief}"
             );
         }
-        for request in [
-            "glow red when Slack has a message",
-            "read me my Ahrefs numbers",
-            "read me my HubSpot deals",
-            "every friday draft my weekly mail to the team",
-            "when I say wrap up add tomorrow's first meeting to my calendar",
-            "send my calendar to the team",
-            "read my calendar and my mail",
-            "read my Notion page and my GitHub issues",
-            "post my Notion page to Slack",
+        // The testers' sheet, 6 Nov ("a skill is limited with no reason"):
+        // with reads on, "a skill can't use your mail" is false, so each is
+        // told its own limit: a read only, of one service that has one.
+        for (request, limit) in [
+            ("glow red when Slack has a message", NOT_READABLE),
+            ("read me my Ahrefs numbers", NOT_READABLE),
+            ("read me my HubSpot deals", NOT_READABLE),
+            ("every friday draft my weekly mail to the team", NOT_A_WRITE),
+            (
+                "when I say wrap up add tomorrow's first meeting to my calendar",
+                NOT_A_WRITE,
+            ),
+            ("send my calendar to the team", NOT_A_WRITE),
+            ("read my calendar and my mail", ONE_SERVICE),
+            ("read my Notion page and my GitHub issues", ONE_SERVICE),
+            ("post my Notion page to Slack", NOT_A_WRITE),
             // Asking for the skill is no write, but a write after it still is.
-            "create a skill that adds a meeting to my calendar",
-            "write me a skill to send my mail",
-            "schedule a meeting on my calendar",
+            (
+                "create a skill that adds a meeting to my calendar",
+                NOT_A_WRITE,
+            ),
+            ("write me a skill to send my mail", NOT_A_WRITE),
+            ("schedule a meeting on my calendar", NOT_A_WRITE),
             // Heron's P3: a write before "skill" is never dropped with the ask.
-            "send my mail with a skill that reads my calendar",
+            (
+                "send my mail with a skill that reads my calendar",
+                NOT_A_WRITE,
+            ),
         ] {
-            assert_eq!(brief_with(request, true), Err(NOT_A_SERVICE), "{request}");
+            assert_eq!(brief_with(request, true), Err(limit), "{request}");
+        }
+        // Each says what a skill can do, and none that it can't use a
+        // service at all.
+        for limit in [NOT_A_WRITE, ONE_SERVICE, NOT_READABLE] {
+            assert!(limit.contains("a skill can read"), "{limit}");
+            assert!(!limit.contains("can't use"), "{limit}");
+            assert!(
+                limit.ends_with("You can ask me for it yourself any time."),
+                "{limit}"
+            );
         }
         // How people ask for one (lamp-9adf, 4 Nov 23:51): "create a skill
         // that ..." and "my schedule" are no writes.
@@ -2477,8 +2584,103 @@ light = { dim = 1 }
             "Add a new skill to read me my mail each morning",
             "Lampy, make me a skill: read my calendar schedule for tomorrow at my desk",
             "when I sit down, read me tomorrow's schedule from my calendar",
+            // El's P3 on #5679: "post" and "book" said as the thing read, and
+            // "put" with no service after it, are no writes either.
+            "read me my latest Facebook post",
+            "read me the book titles in my Google Drive",
+            "read me my mail and put the count on the light",
+            // El's P2 on #5696: a word after the thing doesn't make it a
+            // verb after "my", "the", "latest", "last" or "newest".
+            "read me my schedule on my calendar",
+            "read me the schedule on my calendar",
+            "read me my latest post on Facebook",
+            "what's the latest post on Facebook",
+            "read me the newest post on my Facebook page",
+            "read the post on my page on Facebook",
+            "read me the last post to my Facebook page",
+            "read me the latest post that my Facebook page has",
+            "read the post it got on Facebook",
+            "read me the post a friend left on Facebook",
+            "read me the last post saying sale on Facebook",
+            "read my schedule from my calendar",
+            "read me tomorrow's schedule from my calendar",
+            "what's on my schedule today in my calendar",
+            "read me my calendar schedule for tomorrow",
+            "read me the files in my Google Drive and put the count on the light",
+            "read me my mail and put the count on the light from my drive",
+            // El's P2s on #5696's restate: a read asked for before the
+            // service and the thing, and "read it to me" after a saying.
+            "read me my Facebook post about the sale",
+            "read me my Facebook page post about the sale",
+            "what's my calendar schedule today",
+            "read me my calendar schedule at nine",
+            "read me the facebook post on my page",
+            "read me the latest facebook post on my page",
+            "read me tomorrow schedule on my calendar",
+            "read me today schedule on my calendar",
+            "the last post saying we are open on Facebook, read it to me",
+            "show me my latest post saying sale on Facebook",
+            "tell me if my last post says hi on Facebook",
         ] {
             assert!(brief_with(request, true).is_ok(), "{request}");
+        }
+        // As verbs, they still write.
+        for request in [
+            "post my mail to Facebook",
+            "book a meeting on my calendar",
+            "put a meeting on my calendar",
+            "read my mail and post it on Facebook",
+            // El's P3 on #5690: a word that makes it the thing read, then
+            // what it writes.
+            "my calendar, book a meeting",
+            "my calendar schedule a meeting",
+            "tomorrow book a meeting on my calendar",
+            "today post a photo to Facebook",
+            "each day post a hello on Facebook",
+            "the calendar book me a dentist at nine",
+            "at the end of the day book a room on my calendar",
+            "facebook post that I'm out",
+            "on my Facebook page post that we are closed",
+            "latest post: say hi on Facebook",
+            "last post on facebook say we are open",
+            "newest post to facebook saying hi",
+            "read my mail then put it in my drive",
+            // El's P3s on #5696: any object after "tomorrow", "today",
+            // "day", "calendar", "facebook" or "page" and the verb.
+            "today post my photo to Facebook",
+            "today post this on Facebook",
+            "today post them to Facebook",
+            "today post something on Facebook",
+            "facebook post this",
+            "facebook post them",
+            "facebook post something nice",
+            "facebook post hello world",
+            "page post we are open today on Facebook",
+            "tomorrow book my flight on my calendar",
+            "tomorrow book us a table on my calendar",
+            "my calendar book us a table",
+            "my calendar book the room",
+            "tomorrow book the room on my calendar",
+            "my calendar book dinner",
+            "the calendar book in a meeting",
+            "the calendar schedule my week",
+            "my calendar schedule my week",
+            "my calendar schedule lunch with Sam",
+            "tomorrow schedule lunch on my calendar",
+            "calendar schedule dinner at seven",
+            "post my photo to Facebook",
+            "tomorrow post an update on Facebook",
+            "facebook post saying hi",
+            "read my mail and put the file in Google Drive",
+            // El's P3 on #5696's restate: "for" after the verb.
+            "facebook post for the shop saying we are open",
+            "tomorrow book for me a table on my calendar",
+            // With nothing asked to be read, a saying is a post to write.
+            "when I sit down, my latest post saying sale on Facebook",
+            "latest post saying hi on Facebook",
+            "the newest post: saying we are closed, on Facebook",
+        ] {
+            assert_eq!(brief_with(request, true), Err(NOT_A_WRITE), "{request}");
         }
         for request in [
             calendar,

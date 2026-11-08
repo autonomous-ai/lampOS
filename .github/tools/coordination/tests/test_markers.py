@@ -469,6 +469,122 @@ class ReadAskNamesTwoReads(unittest.TestCase):
                          "none")
 
 
+class QueueAsks(unittest.TestCase):
+    """7 Nov (the PM, after Twelve's promote table): a writer's READ ASK on the Queue that names TWO READS asks for the PR
+    it names, by its head (or a same-patch head) or by its number on the first line. #5647 and #5650 were asked TWO READS
+    only on the Queue and merged on one read."""
+    BODY = {"login": "", "body": "A launcher fix.", "pr_body": True}
+    ONE = c("writer-b", "READ-OK " + HEAD + "\n\nJarvis, 06:06, the security read")
+
+    def reads(self, queue, pr="5650", heads=HEAD, extra=()):
+        return two_reads([self.BODY, self.ONE] + list(extra), heads, W, queue=queue, pr=pr)
+
+    def test_a_queue_read_ask_by_head_names_two_reads(self):
+        q = [c("writer-a", "READ ASK " + HEAD + "\nTWO READS. SubDarren, 06:05, to the **Reviewer-lead** and **Jarvis**: #5650.")]
+        self.assertEqual(self.reads(q), "short 1")
+        self.assertEqual(self.reads(q, extra=[c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 08:00")]), "met 2")
+
+    def test_a_queue_read_ask_by_number_names_two_reads(self):
+        q = [c("writer-a", "El, 05:18, to **Faye**: **READ ASK (restate) [#5650](https://example.invalid/5650)** at `"
+               + OTHER[:10] + "`. TWO READS: Jarvis restates, and a second reader.")]
+        self.assertEqual(self.reads(q), "short 1")
+
+    def test_a_queue_read_ask_on_a_same_patch_earlier_head(self):
+        q = [c("writer-a", "READ ASK " + OTHER[:10] + "\nTWO READS, security.")]
+        self.assertEqual(self.reads(q, heads=[HEAD, OTHER]), "short 1")
+
+    def test_a_comma_signed_queue_read_ask(self):
+        # 7 Nov (the second reviewer's HOLD on #5653): signed with a comma, not a colon, before READ ASK.
+        for first in ("Sixth, READ ASK to the **Reviewer-lead**: [#5650](https://example.invalid/5650)",
+                      "Friday, 17:51, READ ASK to **Thirteen** and **Heron**: [#5650](https://example.invalid/5650)"):
+            self.assertEqual(self.reads([c("writer-a", first + "\nTWO READS.")]), "short 1", first)
+        # Prose naming a READ ASK after a comma but not as the marker still asks nothing.
+        self.assertEqual(self.reads([c("writer-a", "Faye, 07:28, the hour: #5650's READ ASK was posted, TWO READS")]), "none")
+
+    def test_a_dash_signed_queue_read_ask(self):
+        # 7 Nov (#5653's P3s): signed with an em dash, an en dash or a spaced hyphen before READ ASK.
+        for first in ("Twelve — READ ASK #5650", "Twelve – READ ASK #5650", "Second - READ ASK #5650",
+                      "Second - **READ ASK** `" + HEAD[:10] + "`"):
+            self.assertEqual(self.reads([c("writer-a", first + "\nTWO READS.")]), "short 1", first)
+        # Prose mid-line, or a hyphen inside a word, still asks nothing.
+        for first in ("Faye, 07:28 the hour. #5650 had a READ ASK naming TWO READS", "the pre-READ ASK note for #5650"):
+            self.assertEqual(self.reads([c("writer-a", first + "\nTWO READS.")]), "none", first)
+
+    def test_queue_shas_takes_only_asking_first_lines(self):
+        # 7 Nov (#5653's P3s): `reads2.py --queue-shas FILE` gives lib.sh's coord_same_patch the shas on Queue first lines
+        # QUEUE_ASK takes, so both read one regex.
+        from reads2 import queue_shas
+        q = [c("writer-a", "Sixth, READ ASK to **El**: `" + HEAD[:10] + "`\nTWO READS."),
+             c("writer-a", "Twelve — READ ASK " + OTHER + "\nTWO READS."),
+             c("writer-a", "the hour #5650 had a READ ASK abcdef1234 naming TWO READS"),
+             c("writer-a", "READ ASK #5650\nat 1234567abc, TWO READS.")]
+        self.assertEqual(queue_shas(q), [HEAD[:10], OTHER])
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
+            f.write("".join(json.dumps(x) + "\n" for x in q)); qpath = f.name
+        try:
+            r = subprocess.run([sys.executable, "-I", os.path.join(HERE, "reads2.py"), "--queue-shas", qpath],
+                               capture_output=True, text=True, check=True)
+            self.assertEqual(r.stdout.split(), [HEAD[:10], OTHER])
+        finally:
+            os.unlink(qpath)
+
+    def test_a_queue_read_ask_on_an_older_commit_of_the_pr(self):
+        # 7 Nov (the second reviewer's HOLD on #5653): asked at OTHER, then a fix pushed on top (another patch). The ask
+        # counts by the PR's commits, but a READ-OK on OTHER still does not count as a read on HEAD.
+        q = [c("writer-a", "READ ASK " + OTHER[:10] + "\nTWO READS.")]
+        self.assertEqual(two_reads([self.BODY, self.ONE], [HEAD], W, queue=q, pr="5650", commits=[OTHER, HEAD]), "short 1")
+        self.assertEqual(two_reads([self.BODY, self.ONE], [HEAD], W, queue=q, pr="5650"), "none")
+        old = c("writer-a", "READ-OK " + OTHER + "\n\nReviewer-lead, 08:00")
+        self.assertEqual(two_reads([self.BODY, self.ONE, old], [HEAD], W, queue=q, pr="5650", commits=[OTHER, HEAD]), "short 1")
+
+    def test_the_cli_reads_the_pr_commits_file(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
+            f.write(json.dumps(c("writer-a", "READ ASK " + OTHER[:10] + "\nTWO READS.")) + "\n"); qpath = f.name
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+            f.write("writer-a\nwriter-b\n"); wpath = f.name
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+            f.write(HEAD + "\n" + OTHER + "\n"); cpath = f.name
+        try:
+            lines = "".join(json.dumps(x) + "\n" for x in (self.BODY, self.ONE))
+            def run(*extra):
+                return subprocess.run([sys.executable, "-I", os.path.join(HERE, "reads2.py"), "--writers", wpath, "--queue", qpath,
+                                       "--pr", "5650", *extra, HEAD], input=lines, capture_output=True, text=True, check=True).stdout.strip()
+            self.assertEqual(run("--pr-commits", cpath), "short 1")
+            self.assertEqual(run(), "none")
+        finally:
+            os.unlink(qpath); os.unlink(wpath); os.unlink(cpath)
+
+    def test_queue_comments_that_do_not_ask_this_pr(self):
+        for body in ("READ ASK " + OTHER[:10] + "\nTWO READS, for #5651.",           # another PR's head
+                     "READ ASK [#5651](https://example.invalid) TWO READS",       # another PR's number
+                     "READ ASK " + HEAD + "\nOne read, the Reviewer-lead.",       # no TWO READS
+                     "READ ASK " + HEAD + "\nPrivacy needs TWO READS.\nONE READ: tests only.",   # opted out
+                     "Faye, 07:28: the hour. #5650 had a READ ASK naming TWO READS on the Queue."):  # not a READ ASK line
+            self.assertEqual(self.reads([c("writer-a", body)]), "none", body)
+        # A non-writer's Queue READ ASK asks nothing.
+        self.assertEqual(self.reads([c("stranger", "READ ASK " + HEAD + "\nTWO READS")]), "none")
+        # #56500 is not #5650.
+        self.assertEqual(self.reads([c("writer-a", "READ ASK [#56500](x) TWO READS")]), "none")
+
+    def test_without_a_queue_nothing_changes(self):
+        self.assertEqual(two_reads([self.BODY, self.ONE], HEAD, W), "none")
+
+    def test_the_cli_reads_the_queue_file(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
+            f.write(json.dumps(c("writer-a", "READ ASK " + HEAD + "\nTWO READS.")) + "\n"); qpath = f.name
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+            f.write("writer-a\nwriter-b\n"); wpath = f.name
+        try:
+            lines = "".join(json.dumps(x) + "\n" for x in (self.BODY, self.ONE))
+            def run(*extra):
+                return subprocess.run([sys.executable, "-I", os.path.join(HERE, "reads2.py"), "--writers", wpath, *extra, HEAD],
+                                      input=lines, capture_output=True, text=True, check=True).stdout.strip()
+            self.assertEqual(run("--queue", qpath, "--pr", "5650"), "short 1")
+            self.assertEqual(run(), "none")
+        finally:
+            os.unlink(qpath); os.unlink(wpath)
+
+
 class LiftedByCommit(unittest.TestCase):
     """6 Nov (#5534): lifting words naming a full commit; an unsigned READ-OK never lifts a signed HOLD (#5542)."""
     OLD = "1d3d9711f8ce871e21483fd840f57b3a5570d174"

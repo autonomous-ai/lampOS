@@ -7247,6 +7247,71 @@ async fn a_skills_note_for_its_picture_goes_once_with_its_look_turn() {
     );
 }
 
+/// #5694: asked to "look right", the model called `take_a_look` and then
+/// said it was "looking across it from the other side", though the head
+/// never moved. The route's own look's turn tells it the head did not move,
+/// once, after the look's question; the character's look note and the
+/// look's function say so too.
+#[tokio::test]
+async fn the_routes_own_look_tells_the_model_its_head_did_not_move() {
+    const STILL: &str = "\n\n(Your head did not move for this look: say only what is in front of you, and never say you turned or looked to a side.)";
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Lamp, look to your right.".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call("c1", LOOK_CALL, json!({}))])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("A laptop on the desk."), Ok(ChatEvent::Done)],
+                vec![text("Still the desk."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let mut engine = skill_looking(script.clone(), r#"{"ok":true}"#);
+    let look = |request| ProviderInput::Written {
+        search: false,
+        request,
+        session: 1,
+        privacy_generation: 1,
+        text: crate::speak_up::LOOK_FULL_NOTE.into(),
+        look: true,
+        quoted: false,
+    };
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(look_and_words(&mut engine).await.0, Some((1, 1, None)));
+    engine.submit(look(2));
+    look_and_words(&mut engine).await;
+    engine.submit(look(3));
+    look_and_words(&mut engine).await;
+    let asked = script.asked.lock().unwrap();
+    let jpeg = [0xFF, 0xD8, 0xFF];
+    assert_eq!(
+        asked[1].last(),
+        Some(&Message::user_seeing(
+            format!("{}{STILL}", crate::speak_up::LOOK_FULL_NOTE),
+            &jpeg
+        ))
+    );
+    assert_eq!(
+        asked[2].last(),
+        Some(&Message::user_seeing(
+            crate::speak_up::LOOK_FULL_NOTE,
+            &jpeg
+        )),
+        "once"
+    );
+    let told = super::worker::LOOK_CALL_NOTE;
+    assert!(told.contains("never moves your head"), "{told}");
+    assert!(told.contains("never say you turned"), "{told}");
+    let tool = super::worker::look_tool().description;
+    assert!(tool.contains("never moves your head"), "{tool}");
+}
+
 /// A skill's answer's note for its picture: the words after "When the
 /// picture comes:", bounded and cut at a character's end; none without them.
 #[test]
@@ -9658,6 +9723,91 @@ async fn a_soft_keep_claim_is_a_claim_only_in_a_round_with_no_calls() {
             "{labels:?}"
         );
         assert_eq!(script.asked.lock().unwrap().len(), rounds, "{labels:?}");
+    }
+}
+
+/// lamp-06c1, build 10538, 6 Nov, S14 req 363: "Yes. Please keep that."
+/// was answered "Your goldfish's name, Pip, " then "is kept." with no
+/// `remember` call (`calls=none`), and the goldfish was never kept. On a
+/// line that is only a yes, a reply whose first sentence says back that it
+/// is kept is a keep claim: held, asked again once, then the plain line.
+/// The same reply to a question is said as it comes.
+#[tokio::test]
+async fn a_keep_said_back_to_a_yes_with_no_remember_is_a_claim() {
+    type Chats = Vec<Vec<Result<ChatEvent, net::Error>>>;
+    let claimed = || {
+        vec![
+            text("Your goldfish's name, Pip, "),
+            text("is kept."),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let cases: Vec<(&str, Chats, &str, usize)> = vec![
+        // Claimed twice with no call: the plain line.
+        (
+            "Yes. Please keep that.",
+            vec![claimed(), claimed()],
+            crate::remember::NOT_KEPT_LINE,
+            2,
+        ),
+        // Claimed, then the truth when asked again.
+        (
+            "Yes. Please keep that.",
+            vec![
+                claimed(),
+                vec![text("Sorry, I didn't keep that."), Ok(ChatEvent::Done)],
+            ],
+            "Sorry, I didn't keep that.",
+            2,
+        ),
+        // A question's answer is no claim.
+        (
+            "Lamp, is my goldfish's name kept?",
+            vec![claimed()],
+            "Your goldfish's name, Pip,",
+            1,
+        ),
+    ];
+    for (heard, chats, first_said, rounds) in cases {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(heard.into())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let runner: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) }));
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            runner,
+            Arc::new(Instant::now),
+        )
+        .announcing(false);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: Vec<&String> = labels
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        assert!(
+            said.first()
+                .is_some_and(|said| said.starts_with(&format!("said:{first_said}"))),
+            "{heard}: {first_said}: {labels:?}"
+        );
+        assert_eq!(script.asked.lock().unwrap().len(), rounds, "{labels:?}");
+        let told = script.asked.lock().unwrap().iter().any(|messages| {
+            messages
+                .iter()
+                .any(|message| *message == Message::system(crate::remember::KEEP_CLAIMED_UNKEPT))
+        });
+        assert_eq!(told, rounds == 2, "{heard}: {labels:?}");
+        if rounds == 2 {
+            assert!(
+                !said.iter().any(|said| said.contains("is kept")),
+                "{labels:?}"
+            );
+        }
     }
 }
 

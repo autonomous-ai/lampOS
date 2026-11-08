@@ -2,7 +2,9 @@
 
 A person can text the lamp from the Autonomous app and get an answer in
 text, and the news of a task it handed over when nobody is at the lamp.
-**Off unless `LAMP_MESSAGES=on`**, with `LAMP_CLOUD=on`.
+**Off unless `LAMP_MESSAGES=on`**, with `LAMP_CLOUD=on`. Skills' lines
+alone (guard mode's) also go up with `LAMP_SKILL_MESSAGES=on`, which opens
+nothing else (7 Nov, #1685).
 
 The design was agreed on #1673 (the first builder, 19 October 07:3x and
 08:05).
@@ -221,8 +223,12 @@ minutes." ([guard-mode.md](guard-mode.md), #1685).
 - **Who sends:** `lamp-skills`, for a skill whose `[permissions]` give
   `messages = true`, checked again as each text leaves the program
   ([skills.md](skills.md), "A watch").
-- **Carried up with `LAMP_MESSAGES=on`** (`lamp_cloud::unasked`): off
-  unless set, the same switch as texts. `lamp-cloud` listens on
+- **Carried up with `LAMP_MESSAGES=on` or `LAMP_SKILL_MESSAGES=on`**
+  (`lamp_cloud::unasked`): off unless either is set. `LAMP_MESSAGES` is the
+  same switch as texts; `LAMP_SKILL_MESSAGES` (7 Nov, #1685) carries only
+  these skills' lines, with the same bounds and naming rules below, and
+  nothing else: `chat.send` stays refused, nothing goes onto `chat/in`, and
+  no second-route text turn or voice task news goes up. `lamp-cloud` listens on
   `messages/out` from the start and sends each piece on `fd_channel` as
   the backend reads unasked news (the backend and the app, #1722, 21 Oct):
   V1's `chat.event`, the top-level `id` the lamp's own, no `run_id` and no

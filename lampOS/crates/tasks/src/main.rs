@@ -58,6 +58,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut watch = true;
     let mut progress = false;
     let mut push_wait = false;
+    let mut push_watch = false;
     let mut close_told = false;
     let mut set_up_later = false;
     let mut sign_in_by_code = false;
@@ -67,6 +68,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut engines_ready = false;
     let mut absolute_folder = false;
     let mut from_machines = None;
+    let mut engines_from_machines = false;
     let mut seen = std::collections::BTreeSet::new();
     while let Some(arg) = args.next() {
         if !seen.insert(arg.clone()) {
@@ -79,6 +81,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--no-watch" => watch = false,
             "--progress" => progress = true,
             "--push-wait" => push_wait = true,
+            "--push-watch" => push_watch = true,
             "--close-told" => close_told = true,
             "--set-up-later" => set_up_later = true,
             "--sign-in-by-code" => sign_in_by_code = true,
@@ -87,6 +90,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--new-folder" => new_folder = true,
             "--engines-ready" => engines_ready = true,
             "--absolute-folder" => absolute_folder = true,
+            "--engines-from-machines" => engines_from_machines = true,
             "--targets-from-machines" => {
                 let engine = args
                     .next()
@@ -140,8 +144,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if app_socket.is_some() && !sign_in_by_code {
         return Err("--app-socket takes the app's sign-in, only with --sign-in-by-code".into());
     }
+    if engines_from_machines && from_machines.is_none() {
+        return Err(
+            "--engines-from-machines asks the computers --targets-from-machines finds; it needs that too"
+                .into(),
+        );
+    }
     if push_wait && !watch {
         return Err("--push-wait reads with the watch; it cannot go with --no-watch".into());
+    }
+    if push_watch && !watch {
+        return Err("--push-watch reads with the watch; it cannot go with --no-watch".into());
     }
     if !enabled {
         println!(
@@ -181,12 +194,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         watch,
         progress,
         push_wait,
+        push_watch,
         close_told,
         targets_newer,
         set_up_later: set_up_later.then_some(SetUpLater {
             targets: targets_path,
             every: SET_UP_LOOK_EVERY,
             from_machines,
+            engines: engines_from_machines,
         }),
         sign_in_by_code,
         app_socket,

@@ -163,7 +163,8 @@ lamp says so.
 
 ### News for the phone, unasked (`messages/out`)
 
-With `LAMP_MESSAGES=on`, a skill's short line for the person's phone, as
+With `LAMP_MESSAGES=on`, or `LAMP_SKILL_MESSAGES=on` (7 Nov, #1685: these
+lines only, nothing else of texts), a skill's short line for the person's phone, as
 guard mode's "Someone was at your desk at 14:31, for about 2 minutes.", goes
 up on `fd_channel` with nothing asked first: V1's `chat.event` with no run,
 its `data.event` a `task_news` event with its own `id` and `time` and the

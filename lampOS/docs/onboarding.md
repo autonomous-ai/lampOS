@@ -367,7 +367,9 @@ reads `{"op":"status"}` on `LAMP_TASKS_DIR`'s `request.sock` every 20 s, off
 the voice's loop, while the sentence is not decided (from when the
 onboarding file loads; the read is let go once it is decided, and a voice
 started on a decided file lets it go as the file loads, so the thread ends
-at its next wake), and takes its `signed_in` ([tasks.md](tasks.md), "The
+at its next wake; a read whose thread cannot be started logs "Harness's
+sign-in not read: …" once and is not kept, so the next closing handed out
+starts it again, one try each time), and takes its `signed_in` ([tasks.md](tasks.md), "The
 sign-in on `status`"). `yes` or `offline` drops it, and so does no tasks part
 (`LAMP_TASKS_DIR` unset). No answer, or a lamp-tasks that does not say (an
 older build, or one restarted just before the closing that has not read
@@ -384,6 +386,7 @@ record: `onboarding_harness_line` with its `outcome`. Tests:
 `the_sentence_about_harness_is_dropped_unless_harness_is_signed_out`,
 `an_unknown_sign_in_is_read_again_at_the_next_closing`,
 `the_read_of_harness_is_let_go_once_the_sentence_is_decided`,
+`a_read_that_could_not_be_started_is_started_again_at_the_next_closing`,
 `with_the_first_tries_the_sentence_about_harness_is_in_the_one_closing`,
 `the_done_note_carries_the_sentence_once_for_each_switch`,
 `the_two_step_walks_one_closing_carries_the_sentence`,
@@ -1377,8 +1380,34 @@ how_you_sound prompt N played whole (call)`, or `cut`, or `with a gap`, or
 moment its playback is known whole or cut. A test driven from outside times
 its answer by it.
 
+**A slow provider is not the person's miss** (#5563, lamp-3e83, 7 Nov: a
+call's line went to the chat as a turn, its first round had not begun in
+time, the lamp said "Sorry, my thoughts are slow just now." and then "I
+didn't catch that."). When the second route says its down line
+(`ProviderOutput::DownLineSaid`, `LAMP_SECOND_DOWN_LINE=on`) for a call's
+line (one told `StepCall`, its start known) begun from 1.5 s before the
+prompt's end to the window's end, a refused try is given back at its
+judgement as a prompt never said: none of the five is spent, the next
+prompt is not `near_missed`, it counts under `MOST_UNSAID` like any prompt
+given back, and its record says `"why": "the provider was slow"`
+(`NearFlow::provider_slow`, coordinator `near_provider_slow`). An accepted
+try stands. Test:
+`near_flow_tests::a_try_whose_line_the_slow_provider_answered_is_not_a_miss`.
+
+**A heard call is asked for again twice at most** (#5563). A try whose call
+was heard surely and still refused, answered over the prompt's last word or
+refused as the lamp speaking, the name heard twice or no level known,
+counts in memory (`heard_refused`, kept across an absence as the re-offers
+are); a third such try ends the name part as five spent prompts do
+(`MOST_HEARD_ASKS`). A name unheard or heard under 0.95 does not count.
+Before it, the re-offers of a call over the prompt and the prompts given
+back spent none of the five, so a person heard every time could be asked
+more than five times. Test:
+`near_flow_tests::a_heard_call_is_asked_for_again_twice_at_most`.
+
 **The name part's end.** At most five prompts, and the part stops asking
-once five can't reach three accepted (`asks_again`). Three accepted calls make
+once five can't reach three accepted (`asks_again`), or after a third heard
+call refused (above). Three accepted calls make
 the bar (`near_rise`: the quietest less 3 dB, held to 16–24 dB); the bar and
 its tries are written to `/var/lib/lampOS/voice/near-call.json` (0600, whole),
 and only after that write completes is the name part done

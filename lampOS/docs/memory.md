@@ -585,12 +585,12 @@ short-term. Now, on a line admitted as a known person's, no face seen
 speaking it, when the eyes' looks through it held their own known face in at
 least 3 and no other face in any (`SpeakingFaces::one_face_in_view`; a look
 with nobody in it is no other face), and the conversation has shown **no
-other voice**, **their keep is theirs, and so is a forget of it**: a
+other voice**, **their keep is theirs, but no forget runs on it**: a
 `remember` on the line is written in their scope (`ScopeLease::take_by_one_face`,
-`ScopeLease::kept_by_one_face`), and a single-item `forget` searches their
-scope, then the room's (`ScopeLease::reached_by_one_face`, the one decision
-the memory route in `tools.rs` reads for both, so a forget is never narrower
-than the keep). **Every read stays the room's**: the line is narrowed to the
+`ScopeLease::kept_by_one_face`), and a single-item `forget` is judged by the
+same decision (`ScopeLease::reached_by_one_face`, the one the memory route in
+`tools.rs` reads for both) and runs nowhere until the mouth is seen saying
+it (below; #5627). **Every read stays the room's**: the line is narrowed to the
 room, so no recall or hits from their scope, no memory note of theirs, no
 person's context, no thread or summary of theirs; the turn is told and read
 as without the rule. Why (reviewer-three's P1 on #4584, option 2, Friday's
@@ -620,9 +620,11 @@ seen speaking shows another person, and since only the keep goes to them
 the cost is words kept, never read. A second face in any look, an unknown
 face, no face in view, or another voice, and it is as before. A line
 admitted as the room's with nobody named is untouched, so an unplaced voice
-still reaches nobody's memory (#4196, #4207). **A forget follows the keep:**
-a single-item `forget` on such a line removes from their scope what the
-same rule kept there, and looks in the room's too only when theirs has
+still reaches nobody's memory (#4196, #4207). **How a forget would follow
+the keep** (`remember::run_one_face_forget`, which no live path calls since
+#5627; kept for when a forget there is allowed again): a single-item
+`forget` on such a line removes from their scope what the same rule kept
+there, and looks in the room's too only when theirs has
 nothing about it (Fourteen's lamp-9adf check on build 9699: "forget my
 coffee" searched only the room's while the coffee was kept as theirs, a fault
 already in 9610). That no-match is an outcome the forget sets itself
@@ -642,10 +644,16 @@ memory, a switch off), is the room's only, since after the room's recall
 on such a line it would take their last kept thing (Thirteen's P2 on
 #5022). **Forgetting needs the mouth seen speaking** (the memory owner, 16:49 on
 #5385: "tạm thời chưa cho xóa nếu ko detect đc mở miệng", no deleting while
-an open mouth is not detected), with no exception: a bare forget on such a
+an open mouth is not detected), with no exception: a forget on such a
 line, theirs by their face alone in view or named late on a line admitted
 as the room's (`ScopeLease::reached_by_one_face`), is asked of no memory,
-theirs or the room's (`tools::run_call_with_scope`). Right after their own
+theirs or the room's (`tools::run_call_with_scope`), with only
+`LAMP_PERSON_SCOPE_ONE_FACE` on. A forget naming what (`about`) or which
+(`source_id`) is told `ONE_FACE_NAMED_FORGET`, so the lamp says it will
+forget that when it sees them say it and asks them to look at it and say it
+again (#5627, from Thirteen's read of #5608: until then it deleted in their
+scope with the mouth unseen, so someone off camera could remove a kept thing
+of theirs by naming it). For a bare forget, right after their own
 plain new keep (the very next request of the same worker and session, the
 same person, no other memory call or forget by what on the line before it,
 within `HELD_FORGET_FOR`: `tools::one_face_just_kept`) the lamp says it will
@@ -1460,7 +1468,29 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     After a lone no, or with nothing done, a `forget` runs as before.
     Nothing is written either way (lamp-06c1, 5 Nov: a lone yes after
     "Mondays now, not Fridays.", after a done keep and after a done forget
-    was told to ask, and the lamp asked again). The `on` check and the REPLACES journal line use the same words.
+    was told to ask, and the lamp asked again). The done write outlives a
+    new session for the same scope (`replace_session`): each line's note
+    read opens one, and a done write asks the note again (#2540), so on
+    build 10538 (6 Nov, S1 req 271, S6 311, S13 339) every such yes found
+    none and asked again; a session for another scope, or one closing, lets
+    it go. The done write is the yes's "last turn" only when it was done
+    for the request just before the yes (no exchange of the thread's
+    between them: `heard::done_last_turn`, `Thread::answered_between`); a
+    write done two turns back, or for no known request, is none (the
+    Reviewer-lead's P2 on #5607: "My bike is blue." kept, "My goldfish is
+    called Pip." answered with no `remember`, then "Yes. Please keep that."
+    must not be told Pip is kept). And before round 1 of a line that is only a yes, with no offer
+    waiting and nothing asked in the lamp's answer before it, the model is
+    told the same, whatever it then calls (after a done forget, "Yes.
+    Please forget it." counts as that yes: only a yes once its forget
+    words are left out; `heard::done_already`,
+    `DONE_ALREADY_TOLD`): on 10538 the yes after a done forget was answered
+    with a `recall`, never a `forget`, so the call's check never saw it. A
+    done keep or change then backs that turn's "Kept." as a held keep's
+    does; a done forget does not (tests:
+    `a_done_write_outlives_a_new_session_for_the_same_scope`,
+    `a_yes_after_a_done_write_is_told_it_is_done_before_it_answers`,
+    `a_done_write_two_turns_back_is_not_the_yes_last_turn`). The `on` check and the REPLACES journal line use the same words.
     A line that says more than yes ("Yes, my dog is called Moe") is its own,
     as ever. No extra round: one thread lookup in the call.
   - **A yes after a second offer.** On lamp-06c1 on 4 Nov (build 10012),

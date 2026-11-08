@@ -163,6 +163,46 @@ explicitly incomplete. A successful command means a report was produced:
 always inspect `replay_complete_for_recorded_capture`, source certification,
 status, and limitations before using the comparison.
 
+## One WAV through the mic2 chain (`process-wav`)
+
+`lamp-audio process-wav` runs a 16 kHz, mono, 16-bit PCM WAV through the
+processor the voice's capture worker gives mic2, with noise suppression on or
+off, and writes the result as a WAV of the same length (#5540):
+
+```sh
+cargo run -p lamp-audio --release --locked --offline -- process-wav \
+  IN.wav OUT.wav --ns on|off [--linear]
+```
+
+It builds the processor as the capture worker does,
+`EchoProcessor::with_reference(ns, Reference::AsGiven)`, and with `--linear`
+writes the canceller's linear output (before the residual echo suppressor and
+noise suppression) in place of the final output. Software adds nothing else
+between ALSA and `mic2/audio`: no gain and no AGC. Any other format is refused
+and nothing is written; so is a WAV with no samples ("has no samples"). The
+tail is padded to a whole 10 ms block and the output trimmed back to the
+input's length. It prints one line: blocks processed and the input and output
+RMS in dBFS.
+
+What it does not model:
+
+- **The speaker.** The render reference is silence: two silent blocks as the
+  speaker's prime, then one silent render block before each capture block,
+  with a delay hint of 0 ms. On the lamp the reference is what the speaker
+  accepted, at the delay its queue gives; with the lamp talking, the echo
+  canceller and its suppressor act on the microphone in ways this cannot show.
+- **The hardware.** The WAV stands for the samples after the board's own
+  processing and the ALSA `plug` resampling. Whatever the Jieli did to the
+  sound is in the WAV or it is not.
+- **Faults and resets.** The lamp hands a block on uncancelled while the
+  reference has faulted and resets the processor after a gap; here the
+  processor runs once from the start without either.
+
+The output is a few milliseconds behind the input, as on the lamp (the linear
+output 4 ms, the final output 8 ms). Noise suppression takes a steady tone
+for noise: a −30 dBFS 1 kHz tone comes out near −30 dBFS with `--ns off` and
+about 11 dB lower with `--ns on`.
+
 ## Local verification
 
 ```sh
