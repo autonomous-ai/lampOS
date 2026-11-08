@@ -12464,6 +12464,9 @@ async fn answer(
     // ruling on #5215, [`crate::action_claim::stands`]). The strict lines
     // judge every turn.
     let worded_turn = shared.worded_claims && !crate::action_claim::asked_as_a_question(&said);
+    // Whether the line asks to read something back: then a `list_reminders`
+    // may back a time a worded claim says (the Reviewer-lead's P2 on #5737).
+    let read_asked = crate::action_claim::worded_as_a_question(&said);
     let words = Message::user(said.clone());
     let event_words = said.clone();
     // The line's words, for a carried keep held on it ([`hold_carried_keep`]).
@@ -13354,6 +13357,7 @@ async fn answer(
                                         if crate::action_claim::stands(
                                             kind,
                                             held,
+                                            read_asked,
                                             turn_called
                                                 .iter()
                                                 .map(|(name, args)| (name.as_str(), args)),
@@ -13785,7 +13789,9 @@ async fn answer(
                 };
                 let unmade = crate::action_claim::claim_as(&held, true, worded_turn)
                     .flatten()
-                    .filter(|kind| !crate::action_claim::stands(*kind, &held, called()));
+                    .filter(|kind| {
+                        !crate::action_claim::stands(*kind, &held, read_asked, called())
+                    });
                 // A worded claim beside calls is held only for a limit it
                 // said that none of them carried (the first builder's ruling
                 // on #5215): its note says so, never that nothing ran.

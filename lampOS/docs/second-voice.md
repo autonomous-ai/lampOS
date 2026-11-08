@@ -3599,13 +3599,18 @@ after a take-over, but now for every turn:
   claimed time the call can't hold counts as unbacked; on lamp-52e6 "Hey
   Lamp, keep the light on until ten." got a `keep_rule`, which keeps the
   light on always, and "I'll keep my light on until ten."). The limit is
-  the reply's first clock after "until", "till" or "at" ("ten", "10:30
-  pm", "22:00", "ten thirty-five", "a quarter past ten", "half past ten",
-  "quarter to ten", "noon", "midnight") or length after "for" or "in"
-  ("one minute", "a minute", "5 mins", "twenty-five minutes", "half an
-  hour", "an hour and a half"), read by `action_claim::worded_limit`;
-  words read as neither ("until you're back", "for nine", "at ten
-  percent", "at 20%", "at one point") are no limit. **Only the first limit
+  the reply's first clock after "until", "till", "at" or "for" ("ten",
+  "10:30 pm", "10.30", "22:00", "ten thirty-five", "a quarter past ten",
+  "half past ten", "ten to ten", "five past nine", "a quarter to midnight"
+  = 11:45 pm, "noon", "midnight") or length after "for" or "in" ("one
+  minute", "a minute", "5 mins", "twenty-five minutes", "half an hour",
+  "an hour and a half", "one hour and thirty minutes"), read by
+  `action_claim::worded_limit`. A bare hour is a clock only before the
+  reply's end, a mark (not '%'), "am", "pm", "o'clock" or a day word
+  ("tonight", "today", "tomorrow", "this", "in", "on"), and never past
+  twelve: "until ten." and "set for ten." are clocks, "at 20", "at 10
+  brightness", "at ten percent", "at 20%" and "at one point" are no limit,
+  nor is "until you're back". **Only the first limit
   is judged**: a second one in the reply ("Timer set for five minutes, and
   I'll keep the light on until ten." beside a 300-second set) is not
   checked, and while the reply streams, a limit in a piece after the one
@@ -3613,11 +3618,19 @@ after a take-over, but now for every turn:
   beside a call of its kind that carried it (`action_claim::stands`):
   `seconds` of the same length (`set_timer`, `snooze_reminder`) or a
   `time`, `from` or `to` on the same clock (`set_reminder`,
-  `repeat_reminder`; a clock said without am or pm takes either). A clock
-  stands beside `set_timer` or `snooze_reminder`, whose ring is a length
-  from now ("Your tea timer is set and will ring at 9:39."), and any limit
-  beside `list_reminders`, which reads back what is set (the
-  Reviewer-lead's P2 on #5737). A light call and `keep_rule` carry none. Otherwise it is
+  `repeat_reminder`; a clock said without am or pm takes either). For a
+  timer or reminder claim only, a clock stands beside `set_timer` or
+  `snooze_reminder`, whose ring is a length from now ("Your tea timer is
+  set and will ring at 9:39."); never for a kept light, so "I'll keep my
+  light on until ten." beside `keep_rule` and a five-minute `set_timer` is
+  held. A reminder's time stands beside `list_reminders`, which reads back
+  what is set, only when the heard line is worded as a question
+  (`action_claim::worded_as_a_question`: a '?', or its first word after
+  the address one of the status question words, "could" or "would",
+  requests asked as questions included), so "Your reminder is set for
+  ten." after "Remind me at ten." with only a listing is held (the
+  Reviewer-lead's two P2s on #5737). A light call and `keep_rule` carry
+  none. Otherwise it is
   held as a claim with no call: alone, asked again once, the note
   `action_claim::LIMIT_NOTE` saying the calls that ran did run and are
   not to be made again, and a second such claim said not done; beside
@@ -3661,7 +3674,9 @@ after a take-over, but now for every turn:
   `a_timers_length_said_stands_only_beside_a_set_that_carried_it`,
   `a_said_limit_no_call_carried_is_said_with_the_worded_claims_off`,
   `a_timers_ring_time_said_beside_its_set_stands`,
-  `a_limit_after_the_first_sentence_is_judged_only_in_its_piece` and
+  `a_limit_after_the_first_sentence_is_judged_only_in_its_piece`,
+  `a_kept_lights_clock_beside_a_rule_and_a_timer_is_held`,
+  `a_reminders_time_beside_only_a_listing_after_a_set_ask_is_held` and
   `action_claim::tests::*`.
 - **A reply never offers to keep what its `remember` call keeps** (finding
   K2 on #3504: lamp-06c1, 28 Oct, "Want me to keep that as the change?
