@@ -1849,9 +1849,12 @@ pub struct Held {
     /// Whether a look since the last check lacked the match's id: the next
     /// print must then read the same face ([`Held::printed`]).
     gapped: bool,
-    /// The print read at the last check while held or matched, the eyes'
-    /// own print of the held face, to tell the same face back after a gap
-    /// ([`Held::printed`]). In memory only, gone with [`Held::let_go`].
+    /// The eyes' own print of the held face: from the check that matched
+    /// them ([`Held::matched_print`]) or a later one [`Held::printed`] read
+    /// as theirs, never from a print only [`HOLD_LIKENESS`] alike, so a face
+    /// held once on that bar never becomes the reference (the
+    /// Reviewer-lead's P2 on #5546). In memory only, gone with
+    /// [`Held::let_go`].
     last_print: Option<Vec<f32>>,
 }
 
@@ -1927,8 +1930,18 @@ impl Held {
         self.on
     }
 
-    /// A check matched someone, whose near face had this passing id.
+    /// A check matched someone, whose near face had this passing id and was
+    /// printed `print`: the reference a gap's return is read against
+    /// ([`Held::printed`]).
+    pub fn matched_print(&mut self, now: Instant, id: Option<String>, print: &[f32]) {
+        self.matched(now, id);
+        self.last_print = Some(print.to_vec());
+    }
+
+    /// A check matched someone, whose near face had this passing id, with
+    /// no print to keep as the reference.
     pub fn matched(&mut self, now: Instant, id: Option<String>) {
+        self.last_print = None;
         self.matched_at = Some(now);
         self.unbroken = id.is_some();
         self.missed = 0;
@@ -1940,10 +1953,15 @@ impl Held {
     /// One look: whether each passing id is in it (`in_view`), and whether
     /// it found any face (`anyone`). A look without the match's id ends
     /// [`Held::unbroken`] if it found a face, or if it is past
-    /// [`UNBROKEN_MISSES`] looks in a row that found none; either way the
-    /// next print must read their face ([`Held::printed`]).
+    /// [`UNBROKEN_MISSES`] looks in a row that found none; either way a
+    /// printed check must then read their face ([`Held::printed`]), while an
+    /// unprinted one keeps them only within that face-less bound.
     pub fn looked(&mut self, in_view: impl FnOnce(&str) -> bool, anyone: bool) {
-        if self.matched_id.as_deref().is_some_and(in_view) {
+        // With no passing id at the match there is nothing to miss.
+        let Some(matched) = self.matched_id.as_deref() else {
+            return;
+        };
+        if in_view(matched) {
             self.missed = 0;
             return;
         }
@@ -1962,28 +1980,32 @@ impl Held {
     /// is them, on their id again or on a new one, which the next held print
     /// carries ([`Held::carry`]); under it, someone else, let go at this
     /// check. With no print, the gap stays as [`Held::looked`] left it
-    /// (#5546). This print is kept for the next check.
-    pub fn printed(&mut self, print: &[f32], id: Option<&str>) {
-        if self.gapped {
-            self.gapped = false;
-            let same = self
-                .last_print
-                .as_deref()
-                .is_some_and(|last| likeness(last, print) >= SAME_PERSON);
-            match (same, self.matched_id.as_deref()) {
-                (true, Some(matched)) if id == Some(matched) => {
-                    self.unbroken = true;
-                    self.missed = 0;
-                }
-                (true, Some(_)) => self.pending = id.map(str::to_owned),
-                (true, None) => {}
-                (false, _) => {
-                    self.unbroken = false;
-                    self.pending = None;
-                }
+    /// (#5546). A print read as theirs becomes the reference. After a gap,
+    /// the likeness to the reference (`None` with none) and whether it was
+    /// read as the same face, for the journal; else `None`.
+    pub fn printed(&mut self, print: &[f32], id: Option<&str>) -> Option<(Option<f32>, bool)> {
+        if !self.gapped {
+            return None;
+        }
+        self.gapped = false;
+        let alike = self.last_print.as_deref().map(|last| likeness(last, print));
+        let same = alike.is_some_and(|alike| alike >= SAME_PERSON);
+        match (same, self.matched_id.as_deref()) {
+            (true, Some(matched)) if id == Some(matched) => {
+                self.unbroken = true;
+                self.missed = 0;
+            }
+            (true, Some(_)) => self.pending = id.map(str::to_owned),
+            (true, None) => {}
+            (false, _) => {
+                self.unbroken = false;
+                self.pending = None;
             }
         }
-        self.last_print = Some(print.to_vec());
+        if same {
+            self.last_print = Some(print.to_vec());
+        }
+        Some((alike, same))
     }
 
     /// Whether a check that found nobody keeps the one known: only within
@@ -3165,8 +3187,7 @@ mod tests {
             if ms % RECOGNISE_EVERY.as_millis() as u64 == 0 {
                 let now = start + Duration::from_millis(ms);
                 if ms == 0 {
-                    held.printed(&at_match, id.as_deref());
-                    held.matched(now, id.clone());
+                    held.matched_print(now, id.clone(), &at_match);
                     named = true;
                 } else if !(named
                     && match print {
@@ -3444,6 +3465,52 @@ mod tests {
         // Stamped after the print, as before: that check, 3.95 s after the
         // stamp, held too, the name kept past 6 s.
         assert_eq!(held_checks_with_print_latency(152), vec![2052, 4104]);
+    }
+
+    /// The Reviewer-lead's P2 on #5546: someone else sits into the known
+    /// person's place with no gap, on their passing id, and is held once on
+    /// the 0.30 bar alone (0.35 to the kept prints, 0.30 to the print read
+    /// at the match). After one to five face-less looks they come back, on
+    /// that id or a new one, printed as themself (1.0 to their own earlier
+    /// print): their held print never became the reference, so they are
+    /// let go.
+    #[test]
+    fn a_face_held_on_the_bar_alone_never_becomes_the_reference() {
+        let print = |to_match: f32| -> Vec<f32> {
+            let rest = (1.0 - to_match * to_match).sqrt();
+            (0..PRINT)
+                .map(|n| match n {
+                    0 => to_match,
+                    1 => rest,
+                    _ => 0.0,
+                })
+                .collect()
+        };
+        let start = Instant::now();
+        let then = start + RECOGNISE_EVERY;
+        let back = then + Duration::from_millis(500);
+        for missed in [1, 2, 3, 5] {
+            for back_id in ["f1", "f2"] {
+                let mut held = Held::new(true);
+                held.matched_print(start, Some("f1".into()), &print(1.0));
+                held.looked(|id| id == "f1", true);
+                // Gapless: no decision, held on the bar.
+                assert_eq!(held.printed(&print(0.30), Some("f1")), None);
+                assert!(held.keeps_print(then, Some(0.35), Some("f1")));
+                for _ in 0..missed {
+                    held.looked(|_| false, false);
+                }
+                held.looked(|id| id == back_id, true);
+                let read = held.printed(&print(0.30), Some(back_id));
+                let (alike, same) = read.expect("a gap's return is decided");
+                assert!(
+                    (alike.unwrap() - 0.30).abs() < 1e-5,
+                    "against the match's print"
+                );
+                assert!(!same, "{missed} looks, back on {back_id}");
+                assert!(!held.keeps_print(back, Some(0.35), Some(back_id)));
+            }
+        }
     }
 
     #[test]
