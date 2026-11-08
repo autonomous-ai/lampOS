@@ -1835,6 +1835,12 @@ pub struct Held {
     /// The new passing id this check found following the match's, until a
     /// print of it passes [`HOLD_LIKENESS`] ([`Held::carry`]).
     pending: Option<String>,
+    /// Whether the match's passing id has been in every look since the
+    /// match or its carry ([`Held::looked`]): only then does a check with no
+    /// print keep them ([`Held::keeps_unprinted`]). A look without it, as
+    /// when they get up and someone sits into their place and inherits the
+    /// id from the box overlap, ends it (the Reviewer-lead's HOLD on #5546).
+    unbroken: bool,
 }
 
 impl Held {
@@ -1845,6 +1851,7 @@ impl Held {
             matched_id: None,
             follows: false,
             pending: None,
+            unbroken: false,
         }
     }
 
@@ -1886,6 +1893,7 @@ impl Held {
         let carried = id.is_some() && self.pending.as_deref() == id;
         if carried {
             self.matched_id = self.pending.take();
+            self.unbroken = true;
         }
         carried
     }
@@ -1897,8 +1905,19 @@ impl Held {
     /// A check matched someone, whose near face had this passing id.
     pub fn matched(&mut self, now: Instant, id: Option<String>) {
         self.matched_at = Some(now);
+        self.unbroken = id.is_some();
         self.matched_id = id;
         self.pending = None;
+    }
+
+    /// One look: whether each passing id is in it (`in_view`). A look
+    /// without the match's id ends [`Held::unbroken`] until the next match.
+    // One missed look ends it, even a detector's flicker: a tolerance of a
+    // look or two goes here if that lets go of people still in place.
+    pub fn looked(&mut self, in_view: impl FnOnce(&str) -> bool) {
+        if self.unbroken && !self.matched_id.as_deref().is_some_and(in_view) {
+            self.unbroken = false;
+        }
     }
 
     /// Whether a check that found nobody keeps the one known: only within
@@ -1925,11 +1944,15 @@ impl Held {
     }
 
     /// Whether a check with no print keeps the one known: within the hold,
-    /// only if no near face was seen (`near`), or the near face seen but not
-    /// printed (turned, too small) has the passing id the match had. Another
-    /// face, or one with no id to tell it by, lets them go at once.
+    /// only while the match's passing id has been in every look since
+    /// ([`Held::looked`]), and then if no near face was seen (`near`), or
+    /// the near face seen but not printed (turned, too small) has that id.
+    /// Another face, one with no id to tell it by, or an id that left the
+    /// view (someone else may have sat into it) lets them go at once, as
+    /// with the hold off.
     pub fn keeps_unprinted(&self, now: Instant, near: bool, id: Option<&str>) -> bool {
         self.keeps(now)
+            && self.unbroken
             && (!near
                 || self
                     .matched_id
@@ -1939,6 +1962,7 @@ impl Held {
 
     /// Let go at once: the camera closed, or the check let them go.
     pub fn let_go(&mut self) {
+        self.unbroken = false;
         self.matched_at = None;
         self.matched_id = None;
         self.pending = None;
@@ -2942,10 +2966,10 @@ mod tests {
         assert!(held.keeps_unprinted(then, false, None));
         assert!(!held.keeps_unprinted(start + KNOWN_HOLD, false, None));
         assert!(!held.keeps_unprinted(start + KNOWN_HOLD, true, Some("f3")));
-        // A match with no passing id: an unprinted near face lets go.
+        // A match with no passing id: no check without a print keeps them.
         held.matched(start, None);
         assert!(!held.keeps_unprinted(then, true, None));
-        assert!(held.keeps_unprinted(then, false, None));
+        assert!(!held.keeps_unprinted(then, false, None));
     }
 
     /// #4885: with both switches, a near face on a new passing id that
@@ -3003,6 +3027,74 @@ mod tests {
         assert!(printed.keeps_print(then, Some(0.32), Some("f4")));
         assert!(printed.carry(Some("f4")));
         assert!(printed.keeps_unprinted(then, true, Some("f4")));
+    }
+
+    /// The Reviewer-lead's HOLD on #5546: looks every 0.1 s, the known
+    /// person's box, nobody for `away_ms` before 1.0 s, then someone else's
+    /// box over their last one (overlap above 0.2 within 1.5 s, so it
+    /// inherits their passing id), never printed (turned, too small); with
+    /// `away_ms` 0 it is the known person's own box going on. They match at
+    /// the check at 0 s; checks follow every 2 s, as main.rs's unprinted
+    /// branch takes them. Whether the known name is still out at 2.5 s and
+    /// 3.5 s.
+    fn swap_into_known_place(on: bool, away_ms: u64) -> (bool, bool) {
+        let start = Instant::now();
+        let mut ids = crate::bus_out::Ids::default();
+        let mut held = Held::new(on);
+        let mut named = false;
+        let mut at = Vec::new();
+        for ms in (0..=3500u64).step_by(100) {
+            let boxes: &[[f32; 4]] = match ms {
+                ms if ms < 1000 - away_ms => &[[0.40, 0.30, 0.60, 0.60]],
+                ms if ms < 1000 => &[],
+                _ => &[[0.45, 0.32, 0.65, 0.62]],
+            };
+            let look: Vec<String> = ids
+                .of(boxes, ms * 1000)
+                .iter()
+                .map(|id| format!("f{id}"))
+                .collect();
+            let id = look.first().cloned();
+            held.looked(|matched| look.iter().any(|seen| seen == matched));
+            if ms == 1000 {
+                assert_eq!(
+                    id.as_deref(),
+                    Some("f1"),
+                    "the box over theirs has their id"
+                );
+            }
+            if ms % RECOGNISE_EVERY.as_millis() as u64 == 0 {
+                let now = start + Duration::from_millis(ms);
+                if ms == 0 {
+                    held.matched(now, id.clone());
+                    named = true;
+                } else if !(named && held.keeps_unprinted(now, id.is_some(), id.as_deref())) {
+                    held.let_go();
+                    named = false;
+                }
+            }
+            if ms == 2500 || ms == 3500 {
+                at.push(named);
+            }
+        }
+        (at[0], at[1])
+    }
+
+    #[test]
+    fn swap_into_known_place_lets_go_at_the_base_time_with_the_hold_on() {
+        // Off: the 2 s check lets go, so nobody is named at 2.5 s or 3.5 s.
+        assert_eq!(swap_into_known_place(false, 500), (false, false));
+        // On: the same. Before the fix the one who sat down kept the name
+        // to the 4 s check, named at both.
+        assert_eq!(swap_into_known_place(true, 500), (false, false));
+    }
+
+    /// The hold's purpose kept: the known person stays in place unprinted
+    /// (turned) through the 2 s check; its 4 s bound is tested above.
+    #[test]
+    fn swap_into_known_place_none_the_known_one_stays_through_a_missed_check() {
+        assert_eq!(swap_into_known_place(true, 0), (true, true));
+        assert_eq!(swap_into_known_place(false, 0), (false, false));
     }
 
     #[test]
