@@ -3623,14 +3623,24 @@ after a take-over, but now for every turn:
   `snooze_reminder`, whose ring is a length from now ("Your tea timer is
   set and will ring at 9:39."); never for a kept light, so "I'll keep my
   light on until ten." beside `keep_rule` and a five-minute `set_timer` is
-  held. A reminder's time stands beside `list_reminders`, which reads back
+  held. **A kept light's claim** (`action_claim::Claim::LightKept`, whose
+  every run says "until", "till" or "for" and a time) **is never carried**:
+  no call keeps the light until a time (a light call and `keep_rule` carry
+  no limit, a Schedule call keeps no light), so it is held beside any
+  call, whatever follows its hour ("I'll keep my light on until ten and
+  then dim." beside `keep_rule`, "… until ten." beside `keep_rule` and a
+  22:00 `set_reminder`, "… for five minutes." beside `keep_rule` and a
+  300-second `set_timer`; the Reviewer-lead's P2s on #5737 at
+  2dffedb30b). A reminder's time stands beside `list_reminders`, which reads back
   what is set, only when the heard line is worded as a question
   (`action_claim::worded_as_a_question`: a '?', or its first word after
   the address one of the status question words, "could" or "would",
   requests asked as questions included), so "Your reminder is set for
   ten." after "Remind me at ten." with only a listing is held (the
-  Reviewer-lead's two P2s on #5737). A light call and `keep_rule` carry
-  none. Otherwise it is
+  Reviewer-lead's two P2s on #5737). A known gap: "can you", "could you"
+  or "would you remind me at ten" and "remind me at ten?" are worded as
+  questions, so a set claim beside only `list_reminders` stands. A light
+  call and `keep_rule` carry none. Otherwise it is
   held as a claim with no call: alone, asked again once, the note
   `action_claim::LIMIT_NOTE` saying the calls that ran did run and are
   not to be made again, and a second such claim said not done; beside
@@ -3676,7 +3686,8 @@ after a take-over, but now for every turn:
   `a_timers_ring_time_said_beside_its_set_stands`,
   `a_limit_after_the_first_sentence_is_judged_only_in_its_piece`,
   `a_kept_lights_clock_beside_a_rule_and_a_timer_is_held`,
-  `a_reminders_time_beside_only_a_listing_after_a_set_ask_is_held` and
+  `a_reminders_time_beside_only_a_listing_after_a_set_ask_is_held`,
+  `a_kept_lights_claim_is_held_beside_any_call` and
   `action_claim::tests::*`.
 - **A reply never offers to keep what its `remember` call keeps** (finding
   K2 on #3504: lamp-06c1, 28 Oct, "Want me to keep that as the change?
