@@ -704,8 +704,9 @@ fn a_worded_claims_limit_no_call_carried_is_held() {
     );
 }
 
-/// The same claim with no limit said beside the kept rule stands, byte for
-/// byte as with the worded claims off: the rule did keep the light on.
+/// The same words with no limit said beside the kept rule (no worded claim:
+/// a kept light's runs need "until", "till" or "for" and a time) are said,
+/// byte for byte as with the worded claims off.
 #[test]
 fn a_worded_claim_with_no_limit_beside_a_kept_rule_stands() {
     let claim = "I'll keep my light on.";
@@ -760,4 +761,59 @@ fn a_said_limit_no_call_carried_is_said_with_the_worded_claims_off() {
     );
     assert_eq!(went.said, said(&[claim]));
     assert_eq!((went.asked, went.notes.len()), (2, 0));
+}
+
+/// The Reviewer-lead's P2 on #5737: the model often says a timer's result
+/// as a clock; beside the set, which carries only its length, it stands.
+#[test]
+fn a_timers_ring_time_said_beside_its_set_stands() {
+    let claim = "Your tea timer is set and will ring at 9:39.";
+    let went = turn_with(
+        true,
+        true,
+        false,
+        "Lamp, set a tea timer for five minutes.",
+        calling_with("set_timer", json!({"text": "Tea", "seconds": 300})),
+        vec![saying(claim)],
+    );
+    assert_eq!(went.said, said(&[claim]));
+    assert_eq!((went.asked, went.notes.len()), (2, 0), "{went:?}");
+}
+
+/// The Reviewer-lead's P3 on #5737, kept as it is: while the reply streams,
+/// a worded claim is judged on what came by its first sentence's end, so a
+/// limit in a later piece is not checked; in the same piece it is.
+#[test]
+fn a_limit_after_the_first_sentence_is_judged_only_in_its_piece() {
+    let heard = "Lamp, remind me in ten minutes.";
+    let set = || calling_with("set_timer", json!({"text": "Reminder", "seconds": 600}));
+    let (first, then) = ("Reminder set. ", "It rings in five minutes.");
+    let went = turn_with(
+        true,
+        true,
+        false,
+        heard,
+        set(),
+        vec![vec![text(first), text(then), Ok(ChatEvent::Done)]],
+    );
+    assert_eq!((went.asked, went.notes.len()), (2, 0), "{went:?}");
+    assert!(
+        went.said.iter().any(|said| said.contains("five minutes")),
+        "{went:?}"
+    );
+    let whole = format!("{first}{then}");
+    let went = turn_with(
+        true,
+        true,
+        false,
+        heard,
+        set(),
+        vec![saying(&whole), saying(&whole)],
+    );
+    assert_eq!(
+        went.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{went:?}"
+    );
+    assert_eq!(went.notes, [crate::action_claim::LIMIT_NOTE]);
 }

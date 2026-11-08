@@ -3600,14 +3600,24 @@ after a take-over, but now for every turn:
   Lamp, keep the light on until ten." got a `keep_rule`, which keeps the
   light on always, and "I'll keep my light on until ten."). The limit is
   the reply's first clock after "until", "till" or "at" ("ten", "10:30
-  pm", "22:00", "noon", "midnight") or length after "for" or "in" ("one
-  minute", "a minute", "90 seconds", "half an hour"), read by
-  `action_claim::worded_limit`; words read as neither ("until you're
-  back", "for nine") are no limit. Such a claim stands only beside a call
-  of its kind that carried it (`action_claim::stands`): `seconds` of the
-  same length (`set_timer`, `snooze_reminder`) or a `time` on the same
-  clock (`set_reminder`, `repeat_reminder`; a clock said without am or pm
-  takes either). A light call and `keep_rule` carry none. Otherwise it is
+  pm", "22:00", "ten thirty-five", "a quarter past ten", "half past ten",
+  "quarter to ten", "noon", "midnight") or length after "for" or "in"
+  ("one minute", "a minute", "5 mins", "twenty-five minutes", "half an
+  hour", "an hour and a half"), read by `action_claim::worded_limit`;
+  words read as neither ("until you're back", "for nine", "at ten
+  percent", "at 20%", "at one point") are no limit. **Only the first limit
+  is judged**: a second one in the reply ("Timer set for five minutes, and
+  I'll keep the light on until ten." beside a 300-second set) is not
+  checked, and while the reply streams, a limit in a piece after the one
+  that ends its first sentence is not either. Such a claim stands only
+  beside a call of its kind that carried it (`action_claim::stands`):
+  `seconds` of the same length (`set_timer`, `snooze_reminder`) or a
+  `time`, `from` or `to` on the same clock (`set_reminder`,
+  `repeat_reminder`; a clock said without am or pm takes either). A clock
+  stands beside `set_timer` or `snooze_reminder`, whose ring is a length
+  from now ("Your tea timer is set and will ring at 9:39."), and any limit
+  beside `list_reminders`, which reads back what is set (the
+  Reviewer-lead's P2 on #5737). A light call and `keep_rule` carry none. Otherwise it is
   held as a claim with no call: alone, asked again once, the note
   `action_claim::LIMIT_NOTE` saying the calls that ran did run and are
   not to be made again, and a second such claim said not done; beside
@@ -3649,7 +3659,9 @@ after a take-over, but now for every turn:
   `a_worded_claims_limit_no_call_carried_is_held`,
   `a_worded_claim_with_no_limit_beside_a_kept_rule_stands`,
   `a_timers_length_said_stands_only_beside_a_set_that_carried_it`,
-  `a_said_limit_no_call_carried_is_said_with_the_worded_claims_off` and
+  `a_said_limit_no_call_carried_is_said_with_the_worded_claims_off`,
+  `a_timers_ring_time_said_beside_its_set_stands`,
+  `a_limit_after_the_first_sentence_is_judged_only_in_its_piece` and
   `action_claim::tests::*`.
 - **A reply never offers to keep what its `remember` call keeps** (finding
   K2 on #3504: lamp-06c1, 28 Oct, "Want me to keep that as the change?
