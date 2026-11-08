@@ -2613,10 +2613,11 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             }
                             bus.saw(&faces, &opens, picture.filled, now);
                             // An unprinted check holds the known one only
-                            // while their passing id stays in every look
+                            // while their passing id stays in every look,
+                            // but for a short run of looks with no face
                             // (`who::Held::looked`, the HOLD on #5546).
                             if let Some(who) = who.as_mut() {
-                                who.held.looked(|id| bus.in_view(id));
+                                who.held.looked(|id| bus.in_view(id), !faces.is_empty());
                             }
                             if let Some(yes) = yawns_yes {
                                 bus.activity_yawns_allowed(yes);
@@ -2665,7 +2666,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 &who.printed_ids,
                             )
                         {
-                            who.looked_for = Some(Instant::now());
+                            // The look's own time: a match is stamped with
+                            // it, not after the print's ~152 ms, so the hold's
+                            // 4 s bound counts from the same clock as the
+                            // checks (the Reviewer-lead's P2 on #5546).
+                            let checked = Instant::now();
+                            who.looked_for = Some(checked);
                             // A new near id that follows the held one's
                             // may carry the hold, once a print of it passes
                             // (both `LAMP_FACE_KNOWN_HOLD` and
@@ -2676,7 +2682,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             });
                             if who.known.is_some() {
                                 who.held.follow(
-                                    Instant::now(),
+                                    checked,
                                     near_id.as_deref(),
                                     followed.as_deref(),
                                     heights.iter().filter(|h| **h >= NEAR_ENOUGH).count(),
@@ -2734,7 +2740,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 taking.look_seen(&heights, print, near_face.as_deref(),
                                     frame_us, lamp_ipc::monotonic_us(), permit.held());
                             } else if let Some(print) = print {
-                                let now = Instant::now();
+                                let now = checked;
                                 let found = who
                                     .people
                                     .who(&print)
@@ -2747,6 +2753,10 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                         .as_ref()
                                         .and_then(|unconfirmed| unconfirmed.here(&print));
                                 }
+                                // After a gap, only this print reading the
+                                // held face keeps the hold, on their id or a
+                                // new one (`who::Held::printed`, #5546).
+                                who.held.printed(&print, near_id.as_deref());
                                 // With the hold on (`LAMP_FACE_FULL_CROP` or
                                 // `LAMP_FACE_KNOWN_HOLD`), a miss within
                                 // the hold keeps the one known, as they were,
@@ -2817,7 +2827,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 }
                             } else if who.known.is_some()
                                 && who.held.keeps_unprinted(
-                                    Instant::now(),
+                                    checked,
                                     near.is_some(),
                                     near_id.as_deref(),
                                 )
