@@ -3666,6 +3666,21 @@ facts stay `remember`.
   drop. No older rule is ever dropped to make room, and every read asks
   for the whole scope, so the note, `list_rules` and the policy's fact all
   see every rule.
+- **A repeat isn't kept twice** (#5477, lamp-9adf, 6 Nov). A `keep_rule`
+  whose rule is already kept in that scope, word for word (letters and
+  digits, case and punctuation aside) and with the same marks, writes
+  nothing. It's told "already kept" and linked as a kept rule is, at the
+  scope's most too, so repeats never fill it.
+- **Forgetting the light never says "nobody asked" while a rule in words
+  may be the one meant** (#5477). With no rule that keeps the light on,
+  `forget_rule {about: light}` tells the model the rules it can forget by
+  number:
+  - the room's when nobody is known;
+  - a known person's own, read only while the line is still theirs, with
+    the room's beside them, unnumbered and said to stay kept.
+
+  The model forgets the one meant by its number, or says plainly that
+  nothing was removed.
 - **Used.** Each new session is told, after its memory note, every rule of
   the room's and then of the known person's, as "How you were asked to
   behave", within the note's 300 ms. Another person's rules are never read
