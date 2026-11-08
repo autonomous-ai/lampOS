@@ -1520,6 +1520,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     "lamp-eyes: asked to forget a face; forgotten: {forgot}; {unsearched} set-aside files could not be searched, and the forget waits for them"
                                 );
                                 who.known = None;
+                                who.held.let_go();
                                 let mut answer = serde_json::json!({"forgot": forgot, "unsearched": unsearched, "name_id_free": name_id_free});
                                 if let Some(id) = id {
                                     answer["id"] = id.into();
@@ -1529,6 +1530,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             Ok(lamp_eyes::who::Forgot { forgot, .. }) => {
                                 eprintln!("lamp-eyes: asked to forget a face; forgotten: {forgot}");
                                 who.known = None;
+                                who.held.let_go();
                                 let mut answer = serde_json::json!({"forgot": forgot, "name_id_free": name_id_free});
                                 if let Some(id) = id {
                                     answer["id"] = id.into();
@@ -2755,8 +2757,20 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 }
                                 // After a gap, only this print reading the
                                 // held face keeps the hold, on their id or a
-                                // new one (`who::Held::printed`, #5546).
-                                who.held.printed(&print, near_id.as_deref());
+                                // new one (`who::Held::printed`, #5546):
+                                // journaled with numbers only, never a name.
+                                if let Some((alike, same)) =
+                                    who.held.printed(&print, near_id.as_deref())
+                                    && who.known.is_some()
+                                {
+                                    let alike = alike
+                                        .map_or_else(|| "none".to_owned(), |alike| format!("{alike:.3}"));
+                                    eprintln!(
+                                        "lamp-eyes: known hold: after a gap the near face is {alike} to the last held print (same face at {}): {}",
+                                        lamp_eyes::who::SAME_PERSON,
+                                        if same { "same face" } else { "let go" }
+                                    );
+                                }
                                 // With the hold on (`LAMP_FACE_FULL_CROP` or
                                 // `LAMP_FACE_KNOWN_HOLD`), a miss within
                                 // the hold keeps the one known, as they were,
@@ -2784,7 +2798,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     }
                                 } else {
                                     if found.is_some() {
-                                        who.held.matched(now, near_id.clone());
+                                        who.held.matched_print(now, near_id.clone(), &print);
                                     } else {
                                         who.held.let_go();
                                     }
@@ -2839,7 +2853,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 // or the near face has their passing id
                                 // (`who::Held::keeps_unprinted`, #3285).
                                 if let Some(known) = who.known.as_mut() {
-                                    known.2 = Instant::now();
+                                    known.2 = checked;
                                 }
                                 if let Some(path) = &arguments.known_file {
                                     lamp_eyes::who::renew_known(path);
