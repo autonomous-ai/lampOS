@@ -768,6 +768,13 @@ impl BusOut {
         self.ids.index_of(id)
     }
 
+    /// Whether the face `id` (`f3`) is in the last look.
+    pub fn in_view(&self, id: &str) -> bool {
+        id.strip_prefix('f')
+            .and_then(|number| number.parse().ok())
+            .is_some_and(|number| self.ids.index_of(number).is_some())
+    }
+
     /// The passing id the face `id` (`f3`) follows ([`Ids::followed`]), only
     /// while speaking is judged, as [`Self::speaking_id`].
     pub fn followed_id(&self, id: &str) -> Option<String> {

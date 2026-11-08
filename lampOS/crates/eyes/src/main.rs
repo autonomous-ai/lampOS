@@ -2612,6 +2612,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 bus.set_head_moved(moved, age_ms);
                             }
                             bus.saw(&faces, &opens, picture.filled, now);
+                            // An unprinted check holds the known one only
+                            // while their passing id stays in every look
+                            // (`who::Held::looked`, the HOLD on #5546).
+                            if let Some(who) = who.as_mut() {
+                                who.held.looked(|id| bus.in_view(id));
+                            }
                             if let Some(yes) = yawns_yes {
                                 bus.activity_yawns_allowed(yes);
                             }
