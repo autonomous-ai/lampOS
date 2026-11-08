@@ -439,20 +439,27 @@ fn a_device_change_claimed_in_other_words_twice_with_no_call_says_it_was_not_don
 }
 
 /// A turn that made its call is untouched by the worded claims, byte for
-/// byte: the words beside the call, and after it.
+/// byte: the words beside the call, and after it. A limit said ("for one
+/// minute") is one the call carried.
 #[test]
 fn a_claim_in_other_words_beside_its_call_is_untouched() {
-    for (heard, words, name) in [
+    for (heard, words, name, args) in [
         (
             "Lamp, set a timer to one minute.",
             "I've set a timer for one minute.",
             "set_timer",
+            json!({"text": "Timer", "seconds": 60}),
         ),
-        ("Louder.", "I've turned the volume up.", "volume_up"),
-        ("Brighter.", "Okay, brighter.", "light_brighter"),
+        (
+            "Louder.",
+            "I've turned the volume up.",
+            "volume_up",
+            json!({}),
+        ),
+        ("Brighter.", "Okay, brighter.", "light_brighter", json!({})),
     ] {
         let mut beside = vec![text(words)];
-        beside.extend(calling(name));
+        beside.extend(calling_with(name, args.clone()));
         let went = |worded_on: bool| {
             turn_with(
                 true,
@@ -472,7 +479,7 @@ fn a_claim_in_other_words_beside_its_call_is_untouched() {
                 worded_on,
                 true,
                 heard,
-                calling(name),
+                calling_with(name, args.clone()),
                 vec![saying(words)],
             )
         };
@@ -654,4 +661,103 @@ fn a_request_asked_as_a_question_is_still_judged_by_the_worded_claims() {
     assert_eq!(went.said, said(&[crate::action_claim::NOT_DONE_LINE]));
     assert_eq!((went.asked, went.ran.len()), (2, 0));
     assert!(told_claim(&went), "{:?}", went.notes);
+}
+
+/// `calling`, with the call's arguments.
+fn calling_with(name: &str, args: Value) -> Vec<net::Result<ChatEvent>> {
+    vec![
+        Ok(ChatEvent::ToolCalls(vec![call("c0", name, args)])),
+        Ok(ChatEvent::Done),
+    ]
+}
+
+/// The light rule `keep_rule` keeps: always, with no end time.
+fn light_kept() -> Vec<net::Result<ChatEvent>> {
+    calling_with(
+        crate::rules::KEEP_RULE,
+        json!({"rule": "Keep the light on.", "about": "light", "never": true}),
+    )
+}
+
+/// The first builder's ruling on #5215 (lamp-52e6): "Hey Lamp, keep the
+/// light on until ten." got a `keep_rule` call, which keeps the light on
+/// always, and "I'll keep my light on until ten.", which claims more than
+/// was done. A said limit no call carried is a claim with no call: held,
+/// asked again once, and a second such claim is said as the not-done line.
+#[test]
+fn a_worded_claims_limit_no_call_carried_is_held() {
+    let claim = "I'll keep my light on until ten.";
+    let went = worded(
+        "Hey Lamp, keep the light on until ten.",
+        light_kept(),
+        vec![saying(claim), saying(claim)],
+    );
+    assert_eq!(went.said, said(&[crate::action_claim::NOT_DONE_LINE]));
+    assert_eq!(went.asked, 3);
+    assert_eq!(went.ran, [crate::rules::KEEP_RULE]);
+    assert!(
+        went.notes
+            .iter()
+            .any(|note| note == crate::action_claim::LIMIT_NOTE),
+        "{:?}",
+        went.notes
+    );
+}
+
+/// The same claim with no limit said beside the kept rule stands, byte for
+/// byte as with the worded claims off: the rule did keep the light on.
+#[test]
+fn a_worded_claim_with_no_limit_beside_a_kept_rule_stands() {
+    let claim = "I'll keep my light on.";
+    let went = |worded_on: bool| {
+        turn_with(
+            true,
+            worded_on,
+            true,
+            "Hey Lamp, keep the light on.",
+            light_kept(),
+            vec![saying(claim)],
+        )
+    };
+    assert_eq!(went(true), went(false));
+    assert_eq!(went(true).said, said(&[claim]));
+    assert_eq!(went(true).asked, 2);
+}
+
+/// A timer's length said in other words stands beside a set that carried
+/// it ("for one minute", 60 seconds), and is held beside one that didn't
+/// (300 seconds), as a claim beside calls of another kind.
+#[test]
+fn a_timers_length_said_stands_only_beside_a_set_that_carried_it() {
+    let claim = "Timer set for one minute.";
+    let heard = "Lamp, set a timer for one minute.";
+    let set =
+        |seconds: u64| calling_with("set_timer", json!({"text": "Timer", "seconds": seconds}));
+    let went =
+        |worded_on: bool| turn_with(true, worded_on, true, heard, set(60), vec![saying(claim)]);
+    assert_eq!(went(true), went(false));
+    assert!(went(true).notes.is_empty(), "{:?}", went(true).notes);
+    // The words beside a set for five minutes: not said, the set runs and
+    // its own line is said (`LAMP_SECOND_SAY_WITH_CALL`). Without the worded
+    // claims they are said, in its place.
+    let mut beside = vec![text(claim)];
+    beside.extend(set(300));
+    let went = |worded_on: bool| turn_with(true, worded_on, true, heard, beside.clone(), vec![]);
+    assert_eq!(went(true).said, said(&["Timer set. It rings at 7:52 am."]));
+    assert_eq!(went(true).ran, ["set_timer"]);
+    assert_eq!(went(false).said, said(&[claim]));
+}
+
+/// With the worded claims off, a limit no call carried is said as before.
+#[test]
+fn a_said_limit_no_call_carried_is_said_with_the_worded_claims_off() {
+    let claim = "I'll keep my light on until ten.";
+    let went = claimed(
+        true,
+        "Hey Lamp, keep the light on until ten.",
+        light_kept(),
+        vec![saying(claim)],
+    );
+    assert_eq!(went.said, said(&[claim]));
+    assert_eq!((went.asked, went.notes.len()), (2, 0));
 }
