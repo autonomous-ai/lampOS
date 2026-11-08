@@ -869,3 +869,58 @@ fn a_reminders_time_beside_only_a_listing_after_a_set_ask_is_held() {
     );
     assert_eq!(went.notes, [crate::action_claim::LIMIT_NOTE]);
 }
+
+/// The Reviewer-lead's P2s on #5737 at 2dffedb30b: no call keeps the light
+/// on until a time, so a kept light's claim, whose every run says a limit,
+/// is held beside any call: a rule alone, whatever follows the hour, and a
+/// rule beside a reminder or a timer that carries the same time.
+#[test]
+fn a_kept_lights_claim_is_held_beside_any_call() {
+    let kept = || {
+        call(
+            "c0",
+            crate::rules::KEEP_RULE,
+            json!({"rule": "Keep the light on.", "about": "light", "never": true}),
+        )
+    };
+    let mut said_anyway = Vec::new();
+    for (claim, beside) in [
+        ("I'll keep my light on until ten and then dim.", None),
+        (
+            "I'll keep my light on until ten.",
+            Some(call(
+                "c1",
+                "set_reminder",
+                json!({"text": "Lights", "time": "22:00"}),
+            )),
+        ),
+        (
+            "I'll keep my light on for five minutes.",
+            Some(call(
+                "c1",
+                "set_timer",
+                json!({"text": "Lights", "seconds": 300}),
+            )),
+        ),
+    ] {
+        let went = turn_with(
+            true,
+            true,
+            false,
+            "Hey Lamp, keep the light on until ten.",
+            vec![
+                Ok(ChatEvent::ToolCalls(
+                    std::iter::once(kept()).chain(beside).collect(),
+                )),
+                Ok(ChatEvent::Done),
+            ],
+            vec![saying(claim), saying(claim)],
+        );
+        if went.said != said(&[crate::action_claim::NOT_DONE_LINE])
+            || went.notes != [crate::action_claim::LIMIT_NOTE]
+        {
+            said_anyway.push((claim, went.said));
+        }
+    }
+    assert!(said_anyway.is_empty(), "said: {said_anyway:?}");
+}
