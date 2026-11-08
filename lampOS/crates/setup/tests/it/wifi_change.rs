@@ -1761,7 +1761,7 @@ fn p2_a_hold_that_fails_part_way_leaves_the_lamp_on_the_live_network() {
 
 /// A fresh folder of the test's own, for `recover`'s files.
 fn recover_dir(name: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("lamp-setup-{name}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("lamp-setup-wifi-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir
