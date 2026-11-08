@@ -1091,9 +1091,14 @@ analysis on #3126). With the switch on:
   in about 14 missed the face). After a look without that id, a face but
   not theirs or a longer run of none, the face alone decides, never its
   box or id (`Held::printed`): the next print is theirs only if it is at
-  least `SAME_PERSON` (0.363) alike to the print read at the last check,
-  the eyes' own print of the held face, kept in memory only and dropped
-  with the hold. Then the hold goes on, on their id or on a new one their
+  least `SAME_PERSON` (0.363) alike to the eyes' own print of the held
+  face: the print of the check that matched them, or of a later one read
+  as theirs this way, never one held on the 0.30 bar alone, so someone
+  held once on that bar never becomes the reference (the Reviewer-lead's
+  P2 on #5546). It is kept in memory only and dropped with the hold or a
+  forget. Each gap's return is journaled with numbers only:
+  `lamp-eyes: known hold: after a gap the near face is 0.412 to the last
+  held print (same face at 0.363): same face` (or `: let go`). Then the hold goes on, on their id or on a new one their
   box took (no overlap with its last box, or another box taking it), which
   that held print carries to the known file (`Held::carry`). Under it, as
   a close family face 0.30 alike or more to their kept prints sitting
