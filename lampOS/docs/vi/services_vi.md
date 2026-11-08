@@ -1018,6 +1018,12 @@ Facebook"). Đứng sau "tomorrow", "today", "day", "calendar", "facebook" hay
 hoặc ở cuối yêu cầu hay trước "from" hoặc "of" ("my latest Facebook post"),
 còn lại là động từ ("tomorrow book the room", "my calendar book the room",
 "tomorrow book for me a table"; các P3 của El trên #5690 và các P2 trên #5696).
+Ở đó, "a", "an", "me", "it", "the" hay "my" ngay sau chúng biến chúng thành
+động từ, kể cả khi đã có lời xin đọc trước đó, nếu giữa lời xin đọc đó và chúng
+có "and", "then" hay "also" ("check my calendar and tomorrow schedule a
+meeting"); nếu không có, nó chỉ ra thứ nào được đọc ("read me my Facebook post
+a week ago"; HOLD của first builder trên #5719). Chữ "s" của "let's" không phải "'s" ("let's post a photo on
+Facebook"; các P3 của first builder trên #5696).
 Với "say" hay "saying", một từ xin đọc ở bất kỳ đâu trong yêu cầu giữ nó là
 việc đọc ("the last post saying we are open, read it to me"); không có từ nào
 thì đó là một bài cần đăng. Luật này bắt đầu từ lamp-9adf lúc 23:51 ngày 4/11, khi

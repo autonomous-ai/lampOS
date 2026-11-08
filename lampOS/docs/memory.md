@@ -3167,7 +3167,21 @@ then use that person's scope:
   it reads `yes` in at least half of the looks between the line's start and
   end (at least three looks). Each of the eyes' frames counts once, however
   often it is read, and their silence one empty look each 500 ms, so a short
-  line never passes on one frame.
+  line never passes on one frame. A line under 2 s (a 0.5 s "yes" spans two
+  looks) is so always the room's; with `LAMP_VOICE_SHORT_LINE_SPEAKER=on`
+  (off in the product, #5522) a face is its speaker only when its `yes`
+  began in it (`SpeakingFaces::line_counted`): `yes` in at least half of
+  the line's own looks and `no` in none, at least three looks in the 2 s
+  window ending at its end (`SHORT_LINE_WINDOW`), one of the eyes' own
+  looks in that window before the line, and no face reading `yes` in any
+  look before it. The eyes score `yes` over their own sliding 2 s window,
+  so a face that stopped talking up to 2 s before still reads `yes`, and
+  that `yes` cannot be told from a speaker's: a listener's short "yes"
+  right after someone else talked would come back as theirs (the
+  Reviewer-lead's P2 on #5660). So any `yes` before the line leaves it
+  the room's. The cost: a short line said right after anyone in view
+  talked, the speaker included, stays the room's as it is without the
+  switch.
   - **Only the known person's face** (its passing id is the eyes'
     `known-face`, and the known name is still the admitted person's): the
     line stays theirs.
