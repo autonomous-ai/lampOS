@@ -1813,6 +1813,15 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
 /// lamp: people at it were 0.12 to 0.27 on lamp-4ace. Smaller faces are not
 /// recognised and not remembered.
 pub const NEAR_ENOUGH: f32 = 0.10;
+
+/// Whether a look found anyone at the lamp: a face at least [`NEAR_ENOUGH`]
+/// of the picture's height `tall`. A far or flicker face is no one to
+/// [`Held::looked`] (#5546).
+pub fn any_near(faces: &[crate::faces::Face], tall: f32) -> bool {
+    faces
+        .iter()
+        .any(|face| face.height / tall.max(1.0) >= NEAR_ENOUGH)
+}
 /// How long the lamp may take to remember a face, and how many prints it
 /// takes of it.
 pub const TAKING_FOR_US: u64 = 4_000_000;
@@ -1892,14 +1901,15 @@ pub struct Held {
     pending: Option<String>,
     /// Whether the match's passing id has been in every look since the
     /// match or its carry, but for up to [`UNBROKEN_MISSES`] looks in a row
-    /// that found no face ([`Held::looked`]): only then does a check with no
-    /// print keep them ([`Held::keeps_unprinted`]). A longer gap, as when
+    /// that found no face ([`Held::looked`]): only then does a check with an
+    /// unprinted near face keep them ([`Held::keeps_unprinted`]; one with
+    /// nobody near needs only [`KNOWN_HOLD`]). A longer gap, as when
     /// they get up and someone sits into their place and inherits the id
     /// from the box overlap, or a look with a face but not their id, ends it
     /// (the Reviewer-lead's HOLD on #5546), until a print reads their face
     /// again ([`Held::printed`]).
     unbroken: bool,
-    /// Looks in a row without the match's id, none of them with a face.
+    /// Looks in a row without the match's id, none of them with a near face.
     missed: u8,
     /// Whether a look since the last check lacked the match's id: the next
     /// print must then read the same face ([`Held::printed`]).
@@ -2006,8 +2016,9 @@ impl Held {
     }
 
     /// One look: whether each passing id is in it (`in_view`), and whether
-    /// it found any face (`anyone`). A look without the match's id ends
-    /// [`Held::unbroken`] if it found a face, or if it is past
+    /// it found any near face (`anyone`, [`NEAR_ENOUGH`] tall: a far or
+    /// flicker face is no one, #5546). A look without the match's id ends
+    /// [`Held::unbroken`] if it found a near face, or if it is past
     /// [`UNBROKEN_MISSES`] looks in a row that found none; either way a
     /// printed check must then read their face ([`Held::printed`]), while an
     /// unprinted one keeps them only within that face-less bound.
@@ -2091,20 +2102,21 @@ impl Held {
     }
 
     /// Whether a check with no print keeps the one known: within the hold,
-    /// only while the match's passing id has been in every look since
-    /// ([`Held::looked`]), and then if no near face was seen (`near`), or
-    /// the near face seen but not printed (turned, too small) has that id.
-    /// Another face, one with no id to tell it by, or an id that left the
-    /// view (someone else may have sat into it) lets them go at once, as
-    /// with the hold off.
+    /// if no near face was seen (`near`), however long the looks before it
+    /// found no face (a screen blank, #5546 on lamp-52e6), as no name goes
+    /// on anyone; or if the near face seen but not printed (turned, too
+    /// small) has the match's passing id and that id has been in every look
+    /// since ([`Held::looked`]). Another face, one with no id to tell it by,
+    /// or an id that left the view (someone else may have sat into it) lets
+    /// them go at once, as with the hold off.
     pub fn keeps_unprinted(&self, now: Instant, near: bool, id: Option<&str>) -> bool {
         self.keeps(now)
-            && self.unbroken
             && (!near
-                || self
-                    .matched_id
-                    .as_deref()
-                    .is_some_and(|matched| id == Some(matched)))
+                || (self.unbroken
+                    && self
+                        .matched_id
+                        .as_deref()
+                        .is_some_and(|matched| id == Some(matched))))
     }
 
     /// Let go at once: the camera closed, or the check let them go.
@@ -3132,10 +3144,11 @@ mod tests {
         assert!(held.keeps_unprinted(then, false, None));
         assert!(!held.keeps_unprinted(start + KNOWN_HOLD, false, None));
         assert!(!held.keeps_unprinted(start + KNOWN_HOLD, true, Some("f3")));
-        // A match with no passing id: no check without a print keeps them.
+        // A match with no passing id: an unprinted near face lets go, a
+        // check with nobody near keeps them within the bound.
         held.matched(start, None);
         assert!(!held.keeps_unprinted(then, true, None));
-        assert!(!held.keeps_unprinted(then, false, None));
+        assert!(held.keeps_unprinted(then, false, None));
     }
 
     /// #4885: with both switches, a near face on a new passing id that
@@ -3486,12 +3499,114 @@ mod tests {
         // Before: the missed look at 0.7 s ended the hold, let go at 2 s.
         assert_eq!(known_with_flicker(true), (true, true));
         assert_eq!(known_with_flicker(false), (false, false));
-        // A look with another face and not theirs ends it at once.
+        // A look with another face and not theirs ends it for a near face at
+        // once; a check with nobody near still keeps them within the bound.
         let start = Instant::now();
         let mut held = Held::new(true);
         held.matched(start, Some("f1".into()));
         held.looked(|_| false, true);
-        assert!(!held.keeps_unprinted(start, false, None));
+        assert!(!held.keeps_unprinted(start, true, Some("f1")));
+        assert!(held.keeps_unprinted(start, false, None));
+    }
+
+    /// #5546 on lamp-52e6: the kit's screen blanks, 1.5 to 3 s, gave 15 to
+    /// 30 looks with no face, far past `UNBROKEN_MISSES`. A check that finds
+    /// nobody near keeps the one known up to `KNOWN_HOLD` however long the
+    /// blank, and lets go at it.
+    #[test]
+    fn a_blank_past_the_face_less_bound_keeps_the_hold_while_nobody_is_near() {
+        for blank in [5u64, 10, 20, 39] {
+            let start = Instant::now();
+            let mut held = Held::new(true);
+            held.matched(start, Some("f1".into()));
+            for _ in 0..blank {
+                held.looked(|_| false, false);
+            }
+            let after = start + Duration::from_millis(blank * 100);
+            assert!(held.keeps_unprinted(after, false, None), "{blank} looks");
+            assert!(!held.keeps_unprinted(start + KNOWN_HOLD, false, None));
+        }
+    }
+
+    /// The same blank as main.rs takes it: looks every 0.1 s, the known one
+    /// matched at 0 s, 30 face-less looks from 0.5 s, then their box back,
+    /// checks every 2 s unprinted. The 2 s check, in the blank, keeps them,
+    /// so `known` is neither let go (deleted) nor rewritten; the 4 s one
+    /// lets go at the bound.
+    #[test]
+    fn a_blank_of_face_less_looks_never_lets_go_or_rewrites_known_within_the_bound() {
+        let start = Instant::now();
+        let mut held = Held::new(true);
+        let (mut named, mut let_go, mut written) = (false, Vec::new(), 0);
+        for ms in (0..=4000u64).step_by(100) {
+            let blank = (500..3500).contains(&ms);
+            let id = (!blank).then_some("f1");
+            held.looked(|matched| id == Some(matched), id.is_some());
+            if ms % RECOGNISE_EVERY.as_millis() as u64 == 0 {
+                let now = start + Duration::from_millis(ms);
+                if ms == 0 {
+                    held.matched(now, id.map(str::to_owned));
+                    named = true;
+                    written += 1;
+                } else if named && held.keeps_unprinted(now, id.is_some(), id) {
+                    // Held: `renew_known` only, no write.
+                } else {
+                    held.let_go();
+                    named = false;
+                    let_go.push(ms);
+                }
+            }
+        }
+        assert_eq!(written, 1, "known written once, at the match");
+        assert_eq!(let_go, vec![4000], "let go only at the 4 s bound");
+    }
+
+    /// A far face (under `NEAR_ENOUGH`) or a flicker of one in a look that
+    /// misses the known one is no one there: `any_near` is false, so their
+    /// id back near and unprinted still keeps them. A near face ends it.
+    #[test]
+    fn a_far_or_flicker_face_does_not_cut_the_hold() {
+        let face = |height: f32| crate::faces::Face {
+            score: 0.9,
+            x: 0.0,
+            y: 0.0,
+            width: height,
+            height,
+            marks: [(0.0, 0.0); 5],
+        };
+        let tall = 100.0;
+        assert!(!any_near(&[], tall));
+        assert!(!any_near(&[face(9.0)], tall));
+        assert!(!any_near(&[face(2.0), face(9.9)], tall));
+        assert!(any_near(&[face(2.0), face(10.0)], tall));
+        let start = Instant::now();
+        let then = start + RECOGNISE_EVERY;
+        let mut held = Held::new(true);
+        held.matched(start, Some("f1".into()));
+        held.looked(|_| false, any_near(&[face(6.0)], tall));
+        held.looked(|id| id == "f1", true);
+        assert!(held.keeps_unprinted(then, true, Some("f1")));
+        held.looked(|_| false, any_near(&[face(20.0)], tall));
+        held.looked(|id| id == "f1", true);
+        assert!(!held.keeps_unprinted(then, true, Some("f1")));
+    }
+
+    /// A near face seen but not printed after such a blank, even back on the
+    /// match's id: its face cannot be read, so it lets go.
+    #[test]
+    fn a_near_unprinted_face_after_a_blank_lets_go() {
+        for blank in [UNBROKEN_MISSES + 1, 5, 20] {
+            let start = Instant::now();
+            let mut held = Held::new(true);
+            held.matched(start, Some("f1".into()));
+            for _ in 0..blank {
+                held.looked(|_| false, false);
+            }
+            held.looked(|id| id == "f1", true);
+            let after = start + Duration::from_millis(u64::from(blank) * 100 + 100);
+            assert!(!held.keeps_unprinted(after, true, Some("f1")), "{blank}");
+            assert!(!held.keeps_unprinted(after, true, Some("f2")), "{blank}");
+        }
     }
 
     /// The Reviewer-lead's P2 on #5546: checks as main.rs takes them, a look
