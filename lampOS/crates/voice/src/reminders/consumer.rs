@@ -31,6 +31,9 @@ use std::{
 
 const DUE_AGE_US: u64 = 3_000_000;
 const TICK: Duration = Duration::from_millis(200);
+/// How long the ledger may refuse every item, with `LAMP_LEDGER_REFENCE`
+/// on, before its re-fence is armed again (#5560).
+const REARM_US: u64 = 60_000_000;
 const REQUEST_BUDGET: Duration = Duration::from_millis(250);
 const PACE_US: u64 = 5_000_000;
 const QUEUE: usize = 4;
@@ -285,6 +288,10 @@ struct Consumer<P: Persistence> {
     /// every item, so a timer is not set to never ring (#5560's fallback),
     /// and whether it was last kept (`None`: not yet judged).
     cannot_ring: Option<(PathBuf, Option<bool>)>,
+    /// Since when the ledger has refused every item, with
+    /// [`Self::cannot_ring`]: after [`REARM_US`] the re-fence is armed again,
+    /// so a store put back while this voice runs is not refused for good.
+    refusing_since: Option<u64>,
 }
 impl<P: Persistence> Consumer<P> {
     fn new(ledger: DeliveryLedger<P>, session: String) -> Self {
@@ -305,17 +312,42 @@ impl<P: Persistence> Consumer<P> {
             outgoing: VecDeque::new(),
             notice_owed: false,
             cannot_ring: None,
+            refusing_since: None,
         }
     }
     /// Keeps [`Self::cannot_ring`]'s file exactly while an item at the
     /// store's revision would be refused for the ledger's own fence,
     /// rewritten each tick so it stays fresh only while this consumer runs
     /// ([`super::CANNOT_RING_FRESH`]).
-    fn judge_cannot_ring(&mut self, due: &ScheduleDue) -> io::Result<()> {
+    fn judge_cannot_ring(&mut self, due: &ScheduleDue, now: u64) -> io::Result<()> {
+        if self.cannot_ring.is_none() {
+            return Ok(());
+        }
+        // An armed re-fence is spent on the store's revision at once, not
+        // only when an item comes; entries it lets go leave the retry too.
+        let before = self.ledger.schedule_revision();
+        if let Err(error) = self.ledger.refence_to(&due.store_id, due.revision) {
+            self.journal
+                .say(format!("the ledger was not re-fenced: {error}"));
+        }
+        if self.ledger.schedule_revision() != before {
+            let ledger = &self.ledger;
+            self.retry
+                .retain(|key, _| matches!(ledger.view(key), Ok(Some(_))));
+        }
+        let refuses = self.ledger.refuses(&due.store_id, due.revision);
+        if !refuses {
+            self.refusing_since = None;
+        } else if now.saturating_sub(*self.refusing_since.get_or_insert(now)) >= REARM_US {
+            self.refusing_since = None;
+            self.ledger.refence_at_start();
+            self.journal.say(
+                "the ledger refused every item for a minute: its re-fence is armed again".into(),
+            );
+        }
         let Some((file, kept)) = &mut self.cannot_ring else {
             return Ok(());
         };
-        let refuses = self.ledger.refuses(&due.store_id, due.revision);
         if refuses {
             std::fs::write(&*file, b"")?;
         }
@@ -868,7 +900,7 @@ impl<P: Persistence> Consumer<P> {
         let Some(due) = due else {
             return self.withdraw();
         };
-        self.judge_cannot_ring(due)?;
+        self.judge_cannot_ring(due, now)?;
         if let Some(current) = &self.current {
             let key = current.token.key.clone();
             if let Err(error) = self.offer(socket, due, &key, now, deadline) {

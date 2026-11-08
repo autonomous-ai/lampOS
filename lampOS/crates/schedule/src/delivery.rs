@@ -234,6 +234,9 @@ pub struct ItemEvidence {
     key: DeliveryKey,
     revision: u64,
     pending: bool,
+    /// The set's own request id: random per set, so a store put back can
+    /// reuse an item's key but never this (#5560).
+    request_id: String,
 }
 impl ItemEvidence {
     pub fn from_get(request: &Request, reply: &Value) -> Result<Self, Error> {
@@ -254,6 +257,7 @@ impl ItemEvidence {
             },
             revision: reply.revision,
             pending: reply.item.state == ItemState::Pending,
+            request_id: reply.item.request_id,
         })
     }
     pub fn key(&self) -> &DeliveryKey {
@@ -283,6 +287,9 @@ impl PendingEvidence {
     }
     pub fn revision(&self) -> u64 {
         self.0.revision()
+    }
+    pub fn request_id(&self) -> &str {
+        &self.0.request_id
     }
 }
 
@@ -419,6 +426,24 @@ struct Entry {
     pending_revision: u64,
     #[serde(deserialize_with = "required_option")]
     previous: Option<RetirementRecord>,
+    /// The item's request id at its admission (#5560); absent in entries a
+    /// build from before wrote, and then left out, so it reads as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    request_id: Option<String>,
+}
+/// An item said and acknowledged, kept past compaction (#5560).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+struct Acked {
+    key: DeliveryKey,
+    /// Its set's request id; with none (an entry from before), the key
+    /// alone matches.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    request_id: Option<String>,
+}
+impl Acked {
+    fn matches(&self, key: &DeliveryKey, request_id: &str) -> bool {
+        self.key == *key && self.request_id.as_deref().is_none_or(|id| id == request_id)
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct State {
@@ -430,19 +455,22 @@ struct State {
     #[serde(deserialize_with = "required_option")]
     schedule: Option<StoreFence>,
     entries: Vec<Entry>,
-    /// Keys acknowledged and then compacted, the newest [`MAX_ENTRIES`]
+    /// Items said and then compacted or let go, the newest [`MAX_ENTRIES`]
     /// (#5560): an older store, put back under the same `store_id`, holds
-    /// them pending again, and a re-fenced ledger must not admit them.
-    /// Absent while empty, so a ledger with none is written as before.
+    /// them pending again, and a re-fenced ledger must not admit them. A new
+    /// set the older store gives the same key has another request id, and
+    /// is admitted. Absent while empty, so a ledger with none is written as
+    /// before.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    acknowledged: Vec<DeliveryKey>,
+    acknowledged: Vec<Acked>,
     /// Armed by [`DeliveryLedger::refence_at_start`], in memory only: the
     /// next observation below the fence lowers it, once.
     #[serde(skip)]
     refence: bool,
-    /// The fence a re-fence lowered, journaled once it is saved.
+    /// The fence a re-fence lowered, and how many entries it let go,
+    /// journaled once it is saved.
     #[serde(skip)]
-    refenced: Option<u64>,
+    refenced: Option<(u64, usize)>,
 }
 impl State {
     fn check(&self) -> Result<(), Error> {
@@ -471,10 +499,14 @@ impl State {
         if !identity(&fence.store_id)
             || self.next_attempt == 1
             || self.revision == 0
-            || self
-                .acknowledged
-                .iter()
-                .any(|key| key.validate().is_err() || key.store_id != fence.store_id)
+            || self.acknowledged.iter().any(|acked| {
+                acked.key.validate().is_err()
+                    || acked.key.store_id != fence.store_id
+                    || acked
+                        .request_id
+                        .as_deref()
+                        .is_some_and(|id| !request_id(id))
+            })
         {
             return Err(invalid());
         }
@@ -498,6 +530,10 @@ impl State {
                 || entry.prepared_revision == 0
                 || entry.pending_revision < entry.prepared_revision
                 || entry.pending_revision > fence.revision
+                || entry
+                    .request_id
+                    .as_deref()
+                    .is_some_and(|id| !request_id(id))
             {
                 return Err(invalid());
             }
@@ -565,24 +601,61 @@ impl State {
             .binary_search_by(|entry| entry.view.prepared.key.cmp(key))
             .map_err(|_| error("unknown_delivery"))
     }
+    /// Keeps an item said as acknowledged, the newest [`MAX_ENTRIES`].
+    fn acknowledge(&mut self, entry: &Entry) {
+        let acked = Acked {
+            key: entry.view.prepared.key.clone(),
+            request_id: entry.request_id.clone(),
+        };
+        if !self.acknowledged.contains(&acked) {
+            self.acknowledged.push(acked);
+        }
+        // ponytail: the newest 128 only; an older acknowledged item put
+        // back pending by a restored store could be said again.
+        let over = self.acknowledged.len().saturating_sub(MAX_ENTRIES);
+        self.acknowledged.drain(..over);
+    }
+    /// Armed, with the store gone back under the same `store_id`: lets go
+    /// of each entry observed at a revision the older store never reached
+    /// (#5560), so the re-fence can happen. One said (completed) is kept as
+    /// acknowledged, never said again; one never said may be offered again,
+    /// as after a restart. Otherwise changes nothing.
+    fn let_go_unfit(&mut self, store_id: &str, revision: u64) {
+        let behind = self.refence
+            && self
+                .schedule
+                .as_ref()
+                .is_some_and(|fence| fence.store_id == store_id && revision < fence.revision);
+        if !behind {
+            return;
+        }
+        let (kept, gone): (Vec<_>, Vec<_>) = std::mem::take(&mut self.entries)
+            .into_iter()
+            .partition(|entry| fits(entry, revision));
+        self.entries = kept;
+        for entry in &gone {
+            if entry.view.completion.is_some() {
+                self.acknowledge(entry);
+            }
+        }
+        self.refenced = self
+            .refenced
+            .or(Some((0, 0)))
+            .map(|(from, _)| (from, gone.len()));
+    }
     fn observe(&mut self, store_id: &str, revision: u64) -> Result<(), Error> {
         match &mut self.schedule {
             Some(fence) if fence.store_id != store_id => Err(error("store_changed")),
             Some(fence) if revision < fence.revision => {
                 // Lowered only when armed, and only to a revision every entry
-                // still fits under; otherwise refused as before.
-                let fits = self.entries.iter().all(|entry| {
-                    entry.pending_revision <= revision
-                        && entry
-                            .view
-                            .resolution
-                            .as_ref()
-                            .is_none_or(|resolution| resolution.revision() <= revision)
-                });
+                // still fits under ([`State::let_go_unfit`] first); otherwise
+                // refused as before.
+                let fits = self.entries.iter().all(|entry| fits(entry, revision));
                 if !self.refence || !fits {
                     return Err(error("stale_revision"));
                 }
-                self.refenced = Some(fence.revision);
+                let gone = self.refenced.map_or(0, |(_, gone)| gone);
+                self.refenced = Some((fence.revision, gone));
                 fence.revision = revision;
                 self.refence = false;
                 Ok(())
@@ -711,7 +784,32 @@ impl<P: Persistence> DeliveryLedger<P> {
     /// ledger's own fence (`stale_revision` or `store_changed`), so a timer
     /// set now could never be said (#5560's fallback). Changes nothing.
     pub fn refuses(&self, store_id: &str, revision: u64) -> bool {
-        self.state.clone().observe(store_id, revision).is_err()
+        let mut next = self.state.clone();
+        next.let_go_unfit(store_id, revision);
+        next.observe(store_id, revision).is_err()
+    }
+    /// Spends an armed re-fence on the store's revision now, not waiting for
+    /// an item's observation (#5560): the consumer's first tick with the
+    /// store's revision. Unarmed, or with the store not behind, nothing is
+    /// written; a store not behind disarms it.
+    pub fn refence_to(&mut self, store_id: &str, revision: u64) -> Result<(), Error> {
+        self.healthy()?;
+        if !self.state.refence {
+            return Ok(());
+        }
+        let behind = self
+            .state
+            .schedule
+            .as_ref()
+            .is_some_and(|fence| fence.store_id == store_id && revision < fence.revision);
+        if !behind {
+            self.state.refence = false;
+            return Ok(());
+        }
+        let mut next = self.state.clone();
+        next.let_go_unfit(store_id, revision);
+        next.observe(store_id, revision)?;
+        self.save(next)
     }
     pub fn view(&self, key: &DeliveryKey) -> Result<Option<DeliveryView>, Error> {
         self.healthy()?;
@@ -747,10 +845,15 @@ impl<P: Persistence> DeliveryLedger<P> {
             return Err(error("full"));
         }
         let mut next = self.state.clone();
+        next.let_go_unfit(&key.store_id, pending.revision());
         next.observe(&key.store_id, pending.revision())?;
         // After the fence: unarmed, such an item is `stale_revision` as
         // before; armed, the refusal leaves the re-fence unspent.
-        if next.acknowledged.contains(key) {
+        if next
+            .acknowledged
+            .iter()
+            .any(|acked| acked.matches(key, pending.request_id()))
+        {
             return Err(error("acknowledged"));
         }
         let prepared = allocate(&mut next, key, correlation)?;
@@ -765,6 +868,7 @@ impl<P: Persistence> DeliveryLedger<P> {
             prepared_revision: pending.revision(),
             pending_revision: pending.revision(),
             previous: None,
+            request_id: Some(pending.request_id().to_owned()),
         });
         next.entries
             .sort_by(|a, b| a.view.prepared.key.cmp(&b.view.prepared.key));
@@ -985,16 +1089,10 @@ impl<P: Persistence> DeliveryLedger<P> {
         self.healthy()?;
         let mut next = self.state.clone();
         for entry in &self.state.entries {
-            if matches!(entry.view.resolution, Some(Resolution::AckConfirmed { .. }))
-                && !next.acknowledged.contains(&entry.view.prepared.key)
-            {
-                next.acknowledged.push(entry.view.prepared.key.clone());
+            if matches!(entry.view.resolution, Some(Resolution::AckConfirmed { .. })) {
+                next.acknowledge(entry);
             }
         }
-        // ponytail: the newest 128 only; an older acknowledged key put back
-        // pending by a restored store could be said again.
-        let over = next.acknowledged.len().saturating_sub(MAX_ENTRIES);
-        next.acknowledged.drain(..over);
         next.entries.retain(|entry| entry.view.resolution.is_none());
         let removed = self.state.entries.len() - next.entries.len();
         if removed > 0 {
@@ -1046,9 +1144,9 @@ impl<P: Persistence> DeliveryLedger<P> {
             self.failed = true;
             return Err(error("storage"));
         }
-        if let Some(from) = next.refenced.take() {
+        if let Some((from, gone)) = next.refenced.take() {
             eprintln!(
-                "schedule delivery: the ledger's fence ({from}) was ahead of the store's revision ({}); re-fenced to the store at start",
+                "schedule delivery: the ledger's fence ({from}) was ahead of the store's revision ({}); re-fenced to the store, letting go of {gone} entries it never held",
                 next.schedule.as_ref().map_or(0, |fence| fence.revision)
             );
         }
@@ -1057,6 +1155,15 @@ impl<P: Persistence> DeliveryLedger<P> {
     }
 }
 
+/// Whether an entry could have been observed at `revision`.
+fn fits(entry: &Entry, revision: u64) -> bool {
+    entry.pending_revision <= revision
+        && entry
+            .view
+            .resolution
+            .as_ref()
+            .is_none_or(|resolution| resolution.revision() <= revision)
+}
 fn allocate(
     state: &mut State,
     key: &DeliveryKey,
