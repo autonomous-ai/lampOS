@@ -8404,3 +8404,28 @@ Second, and no device was accessed. The original worktree remains clean.
 
 Ready for lamp-voice: gates passed; remaining independent reads owed on
 #5780 and #5781. Device rehearsals #5264/#5265 remain unverified by Second.
+
+## Continuing 2026-11-09, 15:5x +07
+
+The owner said to keep working and never stop at the review handoff. Second
+resumed the Queue loop. #5781 landed in train 744 as 0ca59da30f/d1f6d541f7;
+#5780 received Third's second privacy READ-OK and is in train 748 (#5821).
+#5061's physical comparison remains explicitly unclaimed and routed to First.
+
+Proposed second-P10, the unowned face-forget adapter P2 adjacent to #5803,
+at Queue 6735804069 (08:41Z). Two added regressions failed before the patch.
+At 08:46Z First assigned that exact piece to Third (6735889315), inside the
+proposal window. Second stopped ownership and handed off the uncommitted
+three-file patch, without a competing PR or implementation commit:
+/tmp/second-P10-face-forget.patch, SHA256
+36fe6500a99b3185cfc11fbedbfee3a0baec4fb16027e25db9a401591b8764df.
+Five focused tests pass, one manual timing ignored; the real next-model-request
+regression is included. Strict Clippy on all fourteen normal/test reverse
+voice dependencies passed. Docs: 192 files, 1890 links, zero broken.
+Fresh-process adapter-only timing: first 0.262417 ms, repeated p95 0.006209 ms,
+under the 1 ms target; excludes deletion, IPC, model, lamp and spoken latency.
+No broad/native gate or device claim for this uncommitted handoff.
+
+Second takes one independent source/privacy read of Nine's #5819 at
+b134cea471a2114f3366d150e4473a100e396774. This does not replace First's
+product/default marker or the required product-lamp PASS.
