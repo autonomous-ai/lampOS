@@ -57,6 +57,7 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `for_ms` | integer | milliseconds; more than 30000 lights 30000 | 10000 | | |
 | `lamp_say` | `text` | string, required | words, at most 900 UTF-8 bytes, the voice's own cap (the lamp refuses more, so lamp-mcp does too), said exactly as written once the person isn't talking | — | speak | no |
 | | `rephrase` | boolean | `true`: the lamp says it in its own words instead | `false` | | |
+| | `wait` | boolean | false: returns once the lamp has taken the line ("taken"); true: once it was said ("said") or not (`dropped` with the voice's why), 120 s at most | false | | |
 | `lamp_sound` | `name` | string, required | `hum`, the lamp's own short hum, or one of this computer's clips (`lamp_upload_sound`), played once the person isn't talking; refused in quiet hours where this lamp has them set, and by a lamp that doesn't route `sound` yet | — | speak | no |
 | `lamp_upload_sound` | `name` | string, required | the clip's name: a lowercase letter, then lowercase letters, digits, `_` or `-`, 64 at most, never `hum`; replaces a clip of the same name | — | speak | no |
 | | `path` | string, required | a WAV file on this computer: 16-bit mono PCM at 24 kHz, up to 30 s, no sample past −12 dBFS and no 10 ms past −30 dBFS RMS. Each computer keeps up to 64 clips and 20 MB on the lamp; revoking it deletes them | — | | |
