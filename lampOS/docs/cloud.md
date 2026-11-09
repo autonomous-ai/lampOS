@@ -2240,9 +2240,9 @@ isn't there, so the five kinds are neither listed nor answered.
 Off unless `lamp-cloud` is started with `--control-admin-socket PATH`
 (lamp-control's admin socket, `/run/lampos-control/admin.sock`; docs/control.md,
 "Running the door"). The product `lamp-cloud.service` passes it, with
-`-/run/lampos-control` in its `ReadWritePaths=`; lamp-control itself becomes a
-product unit with #4526, and until that lands a lamp has the socket only with
-lamp-control's own runtime unit. Each
+`-/run/lampos-control` in its `ReadWritePaths=`, and lamp-control's own
+product unit is installed on every lamp (on stable 10824 too), so the socket
+is there once the owner turns developer access on (`control.set`). Each
 kind is one JSON line asked of that socket, as `lamp-control code`, `clients`
 and `revoke` ask it at the lamp, waited on 3 s. `can` lists the five only
 while the socket is there (lamp-control running with `LAMP_CONTROL=on`); an
