@@ -8900,6 +8900,7 @@ impl DaysClient {
         if role.is_some() {
             open["role"] = json!(true);
         }
+        let role_revision = role.and_then(|_| role::revision());
         let answer = bounded_exchange(&self.socket, &for_person(open, person), left);
         let scope = if person.is_some() {
             PERSON_SCOPE
@@ -8922,13 +8923,14 @@ impl DaysClient {
         // short name (an older build's, or one written around the voice) is
         // never told (Jarvis's P3 on #5545).
         if let (Some(person), Ok(_), Some(answer)) = (role, &snapshot, &answer) {
-            role::hold(
+            role::loaded(
                 person,
                 answer
                     .get("role")
                     .and_then(Value::as_str)
                     .filter(|stored| role::name_like(stored))
                     .map(str::to_owned),
+                role_revision,
             );
         }
         if snapshot.is_err() {
@@ -10736,11 +10738,15 @@ impl DaysClient {
             let Some(person) = placed else {
                 return (role::unseen_ended_told(), true);
             };
+            let role_revision = role::revision();
             let line = json!({"op":"role_end","person":person});
             let answer = until
                 .checked_duration_since(Instant::now())
                 .and_then(|left| bounded_exchange_scoped(&self.socket, &line, left, lease));
             if !scope_current(lease) {
+                if answer.as_ref().is_some_and(|answer| answer["ok"] == true) {
+                    role::written(person, None, None);
+                }
                 return (gone(), false);
             }
             // Not written, the role comes back at the next open: it stays
@@ -10749,7 +10755,9 @@ impl DaysClient {
                 eprintln!("lamp-voice provider: a role end was not written (LAMP_MEMORY_ROLE)");
                 return (role::end_failed_told(), true);
             }
-            role::hold(person, None);
+            if !role::written(person, None, role_revision) {
+                return (gone(), false);
+            }
             return (role::ended_told(), true);
         }
         let Some(name) = role::name_of(&call.args) else {
@@ -10776,16 +10784,22 @@ impl DaysClient {
             );
             return (role::unseen_told(&name), true);
         };
+        let role_revision = role::revision();
         let line = json!({"op":"role_set","person":person,"name":name});
         let answer = until
             .checked_duration_since(Instant::now())
             .and_then(|left| bounded_exchange_scoped(&self.socket, &line, left, lease));
         if !scope_current(lease) {
+            if answer.as_ref().is_some_and(|answer| answer["ok"] == true) {
+                role::written(person, None, None);
+            }
             return (gone(), false);
         }
         match answer {
             Some(answer) if answer["ok"] == true => {
-                role::hold(person, Some(name.clone()));
+                if !role::written(person, Some(name.clone()), role_revision) {
+                    return (gone(), false);
+                }
                 (role::set_told(&name), true)
             }
             _ => (gone(), false),
