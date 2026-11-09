@@ -3831,14 +3831,19 @@ pub fn serve(
         }
         // The services' prints only while one is linked (the reader's P3
         // on #5293), known from `lamp-services` itself.
+        // With `LAMP_SAME_VOICE_CONFIRMS` too, every line is printed, linked
+        // or not: the confirm reads the same prints (`services_prints_while`).
+        let confirms = confirming_where(printing, files.same_voice_confirms);
         if printing == Printing::ForServices
             && let Some(folder) = services_folder
             && let Ok(mut heeding) = heeding.lock()
         {
-            heeding.printing_only_while_linked(
+            services_prints_while(
+                &mut heeding,
                 linked_told
                     .clone()
                     .unwrap_or_else(|| crate::services::Linked::new(folder)),
+                confirms.is_some(),
             );
         }
         // What is linked, told to the owner's line, asked again as each line
@@ -3853,10 +3858,14 @@ pub fn serve(
         let hears = printing == Printing::ForEverything;
         // One way only (`LAMP_SAME_VOICE_CONFIRMS`, the memory owner's
         // decision of 4 Nov): no rule judges by voice, and the known
-        // person's own voice only confirms their line.
-        if let Some(bar) = files.same_voice_confirms.filter(|_| hears) {
+        // person's own voice only confirms their line, from the prints for
+        // every rule or the services' alone (`confirming_where`).
+        if let Some(bar) = confirms {
             engine = confirming_by_voice(engine, &heeding, bar);
         }
+        // Whether a voice can show another person to the carry's rules:
+        // never while it only confirms (`voice_shows_another`).
+        let shows_another = voice_shows_another(printing, files.same_voice_confirms);
         // The name heard only in the room's sound opens nothing alone
         // (`LAMP_NAME_SECOND_SIGN=on`, the first builder at 21:03 on
         // #1722).
@@ -4566,14 +4575,14 @@ pub fn serve(
             let another = another_voice.clone();
             engine = engine.carrying_past_silent_where_heard(
                 keeps,
-                hears,
+                shows_another,
                 Arc::new(move || another.load(std::sync::atomic::Ordering::Acquire)),
             );
         }
         // A carried line read as its person's only where the same-voice
         // check runs (`LAMP_CONVERSATION_CARRIED_MEMORY`, Jarvis's P2 on
         // #5842): without it no other voice could ever show.
-        engine = engine.reading_carried_where_heard(hears);
+        engine = engine.reading_carried_where_heard(shows_another);
         remarked_by = Some(heeding.clone());
         // A line begun in a computer's turn is a call, as on the Live route.
         let opening = heeding.clone();
@@ -6517,6 +6526,56 @@ enum Printing {
     ForServices,
 }
 
+/// The bar `LAMP_SAME_VOICE_CONFIRMS` (`confirms`) confirms at on this
+/// route, given what is printed: from the prints for every rule, or from
+/// the services' alone (`LAMP_SAME_VOICE_FOR=services`, as the product sets
+/// both: the memory owner's switch-on, 10 Nov); none with no print. Before,
+/// only the first, so beside the services the confirm never ran.
+fn confirming_where(printing: Printing, confirms: Option<f32>) -> Option<f32> {
+    confirms.filter(|_| printing != Printing::None)
+}
+
+/// Whether a voice can ever show another person in the conversation here,
+/// for the carry past a silent face (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`)
+/// and a carried line read as theirs (`LAMP_CONVERSATION_CARRIED_MEMORY`):
+/// only the prints for every rule, and never while the voice only confirms
+/// (`Voices::confirming_only` judges nothing, so no other voice is ever
+/// recorded and "no other voice" would always hold).
+fn voice_shows_another(printing: Printing, confirms: Option<f32>) -> bool {
+    printing == Printing::ForEverything && confirms.is_none()
+}
+
+/// The services' prints on `heeding`, made only while `linked` says a
+/// service is linked (the reader's P3 on #5293). With the confirm reading
+/// them (`confirming`), every heard line is printed, linked or not, as the
+/// known person's own voice must be learnt from their lines; what is linked
+/// is still asked as each line begins (`Heeding::asking_what_is_linked`).
+fn services_prints_while(
+    heeding: &mut Heeding,
+    linked: Arc<crate::services::Linked>,
+    confirming: bool,
+) {
+    if confirming {
+        heeding.asking_what_is_linked(linked);
+    } else {
+        heeding.printing_only_while_linked(linked);
+    }
+}
+
+/// Where the confirm reads a line's print on `heeding`: the voices kept for
+/// every rule, or the services' alone ([`Heeding::kept_voices`]), whatever
+/// `Voices::confirming_only` says.
+fn confirm_print_of(heeding: &Arc<Mutex<Heeding>>) -> crate::second_provider::PrintOf {
+    let heeding = heeding.clone();
+    Arc::new(move |request| {
+        heeding
+            .lock()
+            .ok()?
+            .kept_voices()?
+            .print_to_confirm(request)
+    })
+}
+
 /// `LAMP_SAME_VOICE_CONFIRMS` on `engine` and `heeding`, the check's
 /// printer already started: `heeding`'s voices judge nothing
 /// (`same_voice::Voices::confirming_only`), and the engine reads each
@@ -6532,17 +6591,9 @@ fn confirming_by_voice(engine: Engine, heeding: &Arc<Mutex<Heeding>>, bar: f32) 
     eprintln!(
         "lamp-voice second: the voice only confirms: a known person's line no face was seen speaking, their face the one face in view, is theirs at cosine {bar:.2} or over against their own voice; nothing ends, holds or splits a conversation by voice (LAMP_SAME_VOICE_CONFIRMS)"
     );
-    let heeding = heeding.clone();
     engine.confirming_by_voice(crate::second_provider::VoiceConfirms {
         owner: Arc::new(crate::same_voice::OwnerVoice::new(bar)),
-        print_of: Arc::new(move |request| {
-            heeding
-                .lock()
-                .ok()?
-                .voices
-                .as_mut()?
-                .print_to_confirm(request)
-        }),
+        print_of: confirm_print_of(heeding),
     })
 }
 
@@ -17623,6 +17674,97 @@ mod tests {
         );
         heeding.hear_for_services(6, Heard::Samples(&[1; 48_000]));
         assert_eq!(*ungated.lock().unwrap(), [6]);
+    }
+
+    /// `LAMP_SAME_VOICE_CONFIRMS` beside `LAMP_SAME_VOICE_FOR=services`, as
+    /// the product sets both (the memory owner's switch-on, 10 Nov): the
+    /// confirm reads the services' prints, every line printed whether or not
+    /// a service is linked, and the services still judge by them. Before,
+    /// the confirm ran only with the prints for every rule, so in the
+    /// product it confirmed nothing.
+    #[test]
+    fn the_voice_confirms_from_the_services_prints_and_they_still_judge() {
+        use super::Printing::{ForEverything, ForServices, None as NoPrint};
+        use crate::second_provider::Heard;
+        use std::collections::VecDeque;
+        struct Answering(Arc<Mutex<VecDeque<u64>>>);
+        impl crate::same_voice::Printer for Answering {
+            fn ask(&mut self, request: u64, _samples: &[i16]) -> bool {
+                self.0.lock().unwrap().push_back(request);
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                let request = self.0.lock().unwrap().pop_front()?;
+                Some((request, Ok(vec![1.0, 0.0, 0.0])))
+            }
+        }
+        assert_eq!(super::confirming_where(ForServices, Some(0.45)), Some(0.45));
+        assert_eq!(
+            super::confirming_where(ForEverything, Some(0.45)),
+            Some(0.45)
+        );
+        assert_eq!(super::confirming_where(NoPrint, Some(0.45)), None);
+        assert_eq!(super::confirming_where(ForServices, None), None);
+        let heard = |confirming: bool| {
+            let asked = Arc::new(Mutex::new(VecDeque::new()));
+            let heeding = Arc::new(Mutex::new(Heeding::new(true, true, None, None)));
+            {
+                let mut heeding = heeding.lock().unwrap();
+                heeding.checking_the_voice_for_services(Box::new(Answering(asked)));
+                super::services_prints_while(
+                    &mut heeding,
+                    crate::services::Linked::told(false),
+                    confirming,
+                );
+            }
+            let hook = super::hearing_hook(&heeding, false, false, true).expect("for the services");
+            hook(
+                1,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            hook(1, Heard::Samples(&[1; 48_000]));
+            hook(1, Heard::Ended);
+            heeding
+        };
+        let heeding = heard(true);
+        assert!(
+            super::confirm_print_of(&heeding)(1).is_some(),
+            "nothing linked, the confirm still has the line's print"
+        );
+        assert!(
+            heeding
+                .lock()
+                .unwrap()
+                .kept_voices()
+                .unwrap()
+                .print_of(1)
+                .is_some(),
+            "the services still judge by it"
+        );
+        let heeding = heard(false);
+        assert!(
+            super::confirm_print_of(&heeding)(1).is_none(),
+            "without the confirm, nothing linked, nothing printed"
+        );
+    }
+
+    /// A voice that only confirms can never show another person, so the
+    /// rules that need one to stay safe stay as without a voice: the carry
+    /// past a silent face (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`) and a
+    /// carried line read as theirs (`LAMP_CONVERSATION_CARRIED_MEMORY`).
+    /// Before, with the prints for every rule and the confirm on, both acted
+    /// with no voice able to say "someone else": a guest off camera, their
+    /// mouth not read, was carried into the person's conversation.
+    #[test]
+    fn a_voice_that_only_confirms_shows_no_other_person_to_the_carry() {
+        use super::Printing::{ForEverything, ForServices, None as NoPrint};
+        assert!(super::voice_shows_another(ForEverything, None));
+        assert!(!super::voice_shows_another(ForEverything, Some(0.45)));
+        assert!(!super::voice_shows_another(ForServices, Some(0.45)));
+        assert!(!super::voice_shows_another(ForServices, None));
+        assert!(!super::voice_shows_another(NoPrint, None));
     }
 
     /// #2191 on a lamp without `LAMP_SPOKEN_TO` (lamp-52e6 and lamp-4ace):

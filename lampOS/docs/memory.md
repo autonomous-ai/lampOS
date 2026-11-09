@@ -745,9 +745,10 @@ and alone in view, with no other voice heard, is told their recall, hits
 and thread. **Writes happen too:** filing the exchange in their record is
 the owner's "saving counts", so a guest's words can be filed as theirs, and
 their day recall and the nightly extraction (if it is ever on) may take
-them as theirs. `LAMP_SAME_VOICE_CONFIRMS`, when on, makes the guest's voice a
-second voice only once the conversation has a print to tell it from; with
-the guest the conversation's first voice, nothing tells them apart. The
+them as theirs. `LAMP_SAME_VOICE_CONFIRMS` (on in the product since 10 Nov)
+never makes the guest's voice a second voice: it only confirms, so a voice
+like theirs is taken as theirs and any other changes nothing
+([same-voice.md](same-voice.md), "One way only"). The
 lead's ruling on #5522 said a lone face never counts for reads; this rests
 on the memory owner's 16:43 word and the PM's 16:46 reading, so the lead
 confirms before the switch goes on. Off,
@@ -765,6 +766,20 @@ the one-face rule is as above, byte for byte. Tests:
 `memory_scope::tests::a_one_face_line_with_reads_is_read_as_its_persons_and_forgets_need_the_mouth`.
 A line kept as yours while you were the only face in view can include words
 someone else said out of view.
+
+**A line their own voice confirmed** (`LAMP_SAME_VOICE_CONFIRMS=on`, on in
+the product since 10 Nov, the memory owner's switch-on): a line no face was
+seen speaking, their known face the one face in view, whose voice print scores
+0.45 or over against the mean of 3 or more prints of lines their face alone was
+seen saying (kept in RAM only), is taken as their face seen saying it: its keeps,
+reads and seen-saying checks are theirs, as for a line their mouth was read
+saying. A held forget's yes still needs their face. The line is marked
+`LineSeen::by_voice`, so it never counts as the owner's face seen saying it for
+a linked service's send, full read or enrolled print. The voice never ends,
+holds or carries a conversation, and the carry past a silent face stays
+inactive beside it. Known risk, accepted with the switch-on: a voice like
+theirs (a relative) off camera while they sit silent alone in view is kept and
+read as theirs ([same-voice.md](same-voice.md), "One way only").
 
 **Their reminders on such a line** (`LAMP_ONE_FACE_REMINDERS=on`, on in the
 product, the memory owner's call on 4 Nov): the line's keep decides its

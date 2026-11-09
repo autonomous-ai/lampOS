@@ -840,7 +840,9 @@ The memory owner's decision (4 Nov, 01:1x): CAM++ is used one way only,
 as a sign that confirms a line is the known person's, never as one that
 ends, holds or splits a conversation. `LAMP_SAME_VOICE_CONFIRMS=on`, beside
 `LAMP_SAME_VOICE_MODEL`, on the second route only (the coordinator reads it
-and passes `--same-voice-confirms BAR` after the model's path):
+and passes `--same-voice-confirms BAR` after the model's path). On in the
+product since the memory owner's switch-on (10 Nov), beside
+`LAMP_SAME_VOICE_FOR=services`:
 
 - **Their own voice, in RAM only** (`same_voice::OwnerVoice`). Nothing on
   the lamp stores an enrolled voice print, so the known person's voice is
@@ -892,7 +894,8 @@ and passes `--same-voice-confirms BAR` after the model's path):
   owner's lowest (0.43) is under the relative's highest (0.57), so no bar
   separates them. The switch stays off until a real related pair (two
   people of one home, on a lamp mic) is measured, beside the eyes-and-model
-  run below.
+  run below. (Superseded 10 Nov: the memory owner switched it on with this
+  risk accepted; see the end of this section.)
   Before, from Friday's Mac matrix (4 Nov, clean files with no speaker, room
   or mic, `drafts/memory-architecture/campp-mac-matrix.md`): other voices
   reached 0.62 on long lines and 0.53 on short ones against a mean of 3,
@@ -909,21 +912,50 @@ and passes `--same-voice-confirms BAR` after the model's path):
   follows a face). So no score ends a conversation, holds a line or marks
   another voice, and none joins or carries one either. The Live route,
   which has no confirm, starts no check at all with the switch on.
-- **The services' voice checks fail closed.** `services::judging_voices`
-  reads the same voices (`kept_voices()`), so under `confirming_only` its
-  `VoiceAsk::Alike`, `VoiceAsk::Conversation` and `VoiceAsk::Owner` all
-  return None: with `--same-voice-for-services` and a service linked, a
-  send has no voice cosine and is refused, a read is never in full, and
-  `owner_voice::offer` learns nothing. That is no worse than without the
-  model, but turning the switch on removes those positive checks.
+- **With the prints for every rule, the services' voice checks fail
+  closed.** `services::judging_voices` reads the same voices
+  (`kept_voices()`), so under `confirming_only` its `VoiceAsk::Alike`,
+  `VoiceAsk::Conversation` and `VoiceAsk::Owner` all return None.
+- **Beside `LAMP_SAME_VOICE_FOR=services`, as in the product,** the confirm
+  reads the services' own prints (`worker::confirming_where`,
+  `confirm_print_of`). They are never `confirming_only`, so a send, a full
+  read and the owner's enrolled print judge by them as before, and no
+  conversation rule reads a print either way. Every heard line is printed,
+  whether or not a service is linked (`worker::services_prints_while`): the
+  confirm needs the known person's lines. Before 10 Nov the confirm ran only
+  with the prints for every rule, so beside the services it confirmed
+  nothing.
+- **A confirm never stands in for the face at a linked service.** The line
+  the eyes' reading is kept with is marked `LineSeen::by_voice` when only
+  the voice made it theirs. Memory reads it as theirs
+  (`remember::speaker_of`), but `services::seen_saying_owner` does not: a
+  send, a read in full and the owner's enrolled print
+  (`owner_voice::offer`) still need their face seen saying the line. So a
+  voice like the owner's off camera, while they sit silent in view, sends
+  nothing and teaches the owner's print nothing.
+- **No other person is shown by a voice that only confirms.** The carry past
+  a silent face (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`) and a carried line
+  read as theirs (`LAMP_CONVERSATION_CARRIED_MEMORY`) are safe only where a
+  voice can say "someone else". With the confirm on, none can, so both stay
+  inactive, as without a voice, said once at start
+  (`worker::voice_shows_another`). Before 10 Nov they acted beside the
+  confirm with the prints for every rule, and a guest off camera, their mouth
+  not read, was carried into the person's conversation.
 
 Off, nothing changes: no flag is passed and the voices judge as above.
 Shown in tests only (`a_high_match_with_their_face_in_view_is_seen_said_by_them`,
 `a_high_match_with_no_face_in_view_does_nothing`, `a_low_match_does_nothing`,
 `a_low_match_confirming_only_ends_and_holds_nothing`,
-`the_switch_off_changes_nothing`, `the_confirm_bar_is_read_from_the_environment`).
-`lamp-same-voice` and the model are not in the product build yet, so no
-product lamp can turn it on.
+`the_switch_off_changes_nothing`, `the_confirm_bar_is_read_from_the_environment`,
+`the_voice_confirms_from_the_services_prints_and_they_still_judge`,
+`a_voice_that_only_confirms_shows_no_other_person_to_the_carry`,
+`services::tests::a_line_their_voice_alone_confirmed_is_not_their_face_seen_saying_it`).
+`lamp-same-voice` ships beside the voice (#5175) and the model is fetched by
+the updater (`LAMP_UPDATE_MODELS=on`, #5193). **Known risk, accepted with the
+switch-on:** a voice like the owner's (a relative) off camera while they sit
+silent alone in view is read and kept as theirs, as Thirteen's similar pair
+showed on lamp-c0a4; it never sends, reads in full or enrols for a linked
+service. A real related pair is still unmeasured.
 
 ## Not shown
 

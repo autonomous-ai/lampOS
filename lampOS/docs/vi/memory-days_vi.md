@@ -794,9 +794,10 @@ một mình trong khung, không nghe thấy giọng khác, sẽ được nghe `r
 và chuỗi hội thoại của họ. **Việc ghi cũng xảy ra:** ghi lượt trao đổi vào hồ
 sơ của họ là phần «việc lưu được tính» của chủ đèn, nên lời của khách có thể
 được ghi như của họ, và việc nhớ lại theo ngày cùng việc trích xuất ban đêm
-(nếu có lúc được bật) có thể coi đó là lời của họ. `LAMP_SAME_VOICE_CONFIRMS`,
-khi bật, chỉ coi giọng khách là giọng thứ hai khi cuộc trò chuyện đã có dấu
-giọng để so; nếu khách là giọng đầu tiên thì không gì phân biệt được. Phán
+(nếu có lúc được bật) có thể coi đó là lời của họ. `LAMP_SAME_VOICE_CONFIRMS`
+(bật trong bản sản phẩm từ 10/11) không bao giờ coi giọng khách là giọng thứ
+hai: nó chỉ xác nhận, nên một giọng giống họ được coi là của họ, còn giọng khác
+không thay đổi gì ([same-voice.md](../same-voice.md), «One way only»). Phán
 quyết của trưởng nhóm trên #5522 nói một mặt một mình không bao giờ tính cho
 việc đọc; điều này dựa trên lời của người phụ trách ký ức lúc 16:43 và cách
 hiểu của PM lúc 16:46, nên trưởng nhóm xác nhận trước khi bật công tắc. Tắt công tắc thì quy tắc một mặt
@@ -826,6 +827,21 @@ cho thấy liên kết này. Chính câu ghi nhớ không vào nhật ký, như 
 nên dòng mang từ ấy là câu trả lời sau nó. Ký ức từ chối các trường này (một
 bản cũ, hoặc bản hiện tại từ chối người giữ ấy) nhận lại dòng một lần nữa không
 có chúng, được ghi lại như trước.
+
+**Câu mà chính giọng họ xác nhận** (`LAMP_SAME_VOICE_CONFIRMS=on`, bật trong
+bản sản phẩm từ 10/11, theo quyết định bật của người phụ trách ký ức): một câu
+không thấy mặt nào nói, mặt quen của họ là mặt duy nhất trong khung, có dấu
+giọng đạt 0,45 trở lên so với trung bình của từ 3 dấu giọng trở lên lấy từ
+những câu chỉ thấy mặt họ nói (chỉ giữ trong RAM), được coi như thấy mặt họ nói
+câu đó: việc ghi, việc đọc và các kiểm tra «thấy nói» là của họ, như với câu
+thấy miệng họ nói. Lời «có» cho một lệnh quên đang chờ vẫn cần mặt họ. Câu được
+đánh dấu `LineSeen::by_voice`, nên không bao giờ được tính là thấy mặt chủ đèn
+nói câu đó cho việc gửi, việc đọc đầy đủ hay dấu giọng đã đăng ký của dịch vụ
+liên kết. Giọng không bao giờ kết thúc, giữ lại hay mang tiếp một cuộc trò
+chuyện, và việc mang tiếp qua một mặt im lặng vẫn không hoạt động bên cạnh nó.
+Rủi ro đã biết, chấp nhận khi bật: một giọng giống họ (người thân) ngoài khung
+hình khi họ ngồi im một mình trong khung sẽ được ghi và đọc như của họ
+([same-voice.md](../same-voice.md), «One way only»).
 
 **Lời nhắc của họ trên câu như vậy** (`LAMP_ONE_FACE_REMINDERS=on`, bật trong
 bản sản phẩm, quyết định của người phụ trách ký ức ngày 4/11): việc ghi nhớ

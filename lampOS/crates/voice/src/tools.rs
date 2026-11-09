@@ -2608,6 +2608,7 @@ mod tests {
                 speakers: vec![speaker.to_owned()],
                 known: crate::speaking_faces::known_with_face(&known),
                 enrollment: None,
+                by_voice: false,
             })
         };
         seen(request, "f2");

@@ -1987,7 +1987,7 @@ fn past_silent_inactive(keeps: bool, hears: bool) -> Option<&'static str> {
             "the rule keeps no sign of another voice here (LAMP_JOIN_CUT_WORDS or LAMP_SECOND_NAME_CARRIES keep it)",
         ),
         (true, false) => Some(
-            "the same-voice check is not running here (no printer started, a standby beside Live, or none of LAMP_SPOKEN_TO, LAMP_QUIET_GOING_ON_SAME_ONE, LAMP_GOING_ON_NOT_OWN, LAMP_MEMORY_FOLLOWS_FACE on)",
+            "no voice can show another person here (no printer started, a standby beside Live, the prints for the linked services only, the voice only confirming with LAMP_SAME_VOICE_CONFIRMS, or none of LAMP_SPOKEN_TO, LAMP_QUIET_GOING_ON_SAME_ONE, LAMP_GOING_ON_NOT_OWN, LAMP_MEMORY_FOLLOWS_FACE on)",
         ),
     }
 }
@@ -4598,7 +4598,7 @@ impl Engine {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         if shared.carried_memory && !hears {
             eprintln!(
-                "lamp-voice second: LAMP_CONVERSATION_CARRIED_MEMORY is inactive: the same-voice check is not running here; a carried line stays held and the room's"
+                "lamp-voice second: LAMP_CONVERSATION_CARRIED_MEMORY is inactive: no voice can show another person here; a carried line stays held and the room's"
             );
             shared.carried_memory = false;
         }
@@ -7931,7 +7931,9 @@ async fn spoken(
                 let (speakers, pair, alone) =
                     line_sight(eyes, known, begun, finishing, shared.scope_seen).await;
                 // `LAMP_SAME_VOICE_CONFIRMS`: their voice, their face the one
-                // face in view, is their face seen saying it.
+                // face in view, is their face seen saying it. Marked so, as
+                // it only ever fills an empty reading (`by_voice`).
+                let seen_none = speakers.is_empty();
                 let speakers = if shared.scope_seen {
                     let own_face = pair
                         .as_ref()
@@ -7960,6 +7962,9 @@ async fn spoken(
                             speakers: speakers.clone(),
                             known: pair.clone(),
                             enrollment: enrollment.clone(),
+                            // Their voice alone made it theirs: never their
+                            // face seen saying it for a services write.
+                            by_voice: seen_none && !speakers.is_empty(),
                         },
                         shared.remember_speaker,
                         Some(scope),
@@ -8371,6 +8376,7 @@ async fn spoken(
                     speakers: speakers.clone(),
                     known: pair.clone(),
                     enrollment: enrollment.clone(),
+                    by_voice: false,
                 };
                 if shared.remember_speaker {
                     if let Some(lease) = scope.as_ref() {
@@ -8404,6 +8410,7 @@ async fn spoken(
                         speakers,
                         known: eyes.known_with_boot(&known),
                         enrollment,
+                        by_voice: false,
                     },
                     remember_speaker,
                     lease.as_ref(),

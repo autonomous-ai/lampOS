@@ -1155,8 +1155,21 @@ pub(crate) fn seen_saying_owner(request: u64, owner: &str) -> (bool, bool) {
     {
         return (false, false);
     }
-    let line = crate::speaking_faces::line_seen(request);
-    let seen = crate::remember::speaker_of(line.as_ref()).as_deref() == Some(owner);
+    seen_saying_owner_in(crate::speaking_faces::line_seen(request).as_ref(), owner)
+}
+
+/// [`seen_saying_owner`] of the eyes' reading `line`.
+///
+/// A line their face was taken as saying only by their own voice
+/// (`LineSeen::by_voice`, `LAMP_SAME_VOICE_CONFIRMS`) is not seen saying
+/// it: the confirm is for memory, never a send, a full read or the owner's
+/// enrolled print.
+fn seen_saying_owner_in(
+    line: Option<&crate::speaking_faces::LineSeen>,
+    owner: &str,
+) -> (bool, bool) {
+    let seen = line.is_some_and(|line| !line.by_voice)
+        && crate::remember::speaker_of(line).as_deref() == Some(owner);
     let other = line.is_some_and(|line| {
         crate::speaking_faces::someone_elses(&line.speakers, owner, line.known.clone())
     });
@@ -1696,6 +1709,39 @@ fn codes_in(told: &Value) -> Option<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `LAMP_SAME_VOICE_CONFIRMS` beside the services (the memory owner's
+    /// switch-on, 10 Nov): a line their face was taken as saying only because
+    /// their voice confirmed it is theirs for memory, never the owner's face
+    /// seen saying it for a send, a full read or their enrolled print. A
+    /// voice like theirs off camera while they sit silent in view sends
+    /// nothing.
+    #[test]
+    fn a_line_their_voice_alone_confirmed_is_not_their_face_seen_saying_it() {
+        let owner = crate::known_faces::memory_person("Mai");
+        let line = |by_voice: bool| crate::speaking_faces::LineSeen {
+            request: 5_900_001,
+            speakers: vec!["b1/f1".to_owned()],
+            known: Some(("Mai".to_owned(), "b1/f1".to_owned())),
+            enrollment: None,
+            by_voice,
+        };
+        assert_eq!(
+            seen_saying_owner_in(Some(&line(false)), &owner),
+            (true, false),
+            "their face seen saying it"
+        );
+        assert_eq!(
+            seen_saying_owner_in(Some(&line(true)), &owner),
+            (false, false),
+            "only their voice confirmed it"
+        );
+        assert_eq!(
+            crate::remember::speaker_of(Some(&line(true))),
+            Some(owner),
+            "memory still reads it as theirs"
+        );
+    }
 
     /// What is linked, by name, each once, from `lamp-services`' own answer
     /// (#5523): its code when it gives no name; none without a list.
