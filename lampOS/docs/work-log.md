@@ -9310,3 +9310,21 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   remove #5873 from draft at 22:01 GMT+7 for the next train. Its unchanged
   1cc3ff2cc7 fix already has Second's read. Planned stock-device say run
   explicitly excludes reconnect; it cannot clear this known regression.
+
+## 2026-11-09 — Second: onboarding clause review pending docs
+
+- #5890 1c77d7ea30: claimed unclaimed read, 6743283746. Four model_words
+  author tests pass, two independent actual-function tests pass: surrounding
+  clauses/repeated steps and Japanese/Vietnamese instructions preserved.
+- Recorded B sentence removed. Host debug model_words boundary: first
+  3,819 us; 1,000 repeats p95 150,750 ns, max 227,791 ns. No comparative
+  speedup or device/acoustic claim. Temporary tests removed; checkout clean.
+- Concrete stated ceiling: "touch the top of the table" survives against
+  "Pet the top of my head" by overlap. Speech chunk splitting also remains.
+  Requested docs/onboarding.md update, 6743301830; results 6743366798.
+  Final read awaits documentation; PM owns rollout decision.
+- Train758 e3b8a22fe6: exact patch retention for #5888 09fc to 90ab2fe5578
+  and #5887 196 to e3b8. ARM64 still running at last check; no pass claimed.
+- #5878 7d6633bb85 is a substantive follow-up atop unchanged 170cf stack:
+  drops carried rounds at both forget admissions before awaiting deletion.
+  Source/dependency audit only; El's read/HOLD is separate.
