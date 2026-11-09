@@ -1686,11 +1686,36 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     text's own words) and what the session did just before (`Recent`):
     `AsCalled` (a recalled `source_id` with `LAMP_MEMORY_FORGET_ALL`, the
     model's own `about` with `LAMP_MEMORY_FORGET_ABOUT` when nothing was
-    heard or its words were heard in the part of the line that asks to
-    forget), `Named(words)` or `Last`. An `about` never said is dropped
-    and the forget is bare (C35: on lamp-06c1, 9 Nov, build 10824, "Lamp,
-    forget that." came with a 2-word `about`, ran as called and forgot the
-    scarf with no which-question). The guard (`remember::named_forget`, run in
+    heard or its words were heard in the part that asks to forget),
+    `Named(words)` or `Last`. An `about` never said is dropped and the
+    forget is bare (C35: on lamp-06c1, 9 Nov, build 10824, "Lamp, forget
+    that." came with a 2-word `about`, ran as called and forgot the scarf
+    with no which-question; on 5 Nov a made-up `about:"that"` found nothing
+    and the lamp said "Nothing was forgotten" without asking which). A
+    dropped `about` that names something ("I sold
+    my bicycle. Lamp, forget it." called with `about:"bicycle"`) is marked
+    `about_dropped` with those words: the memory asks which, never their
+    last kept thing on a guess (the Reviewer-lead's P2 on #5419). With
+    `LAMP_MEMORY_FORGET_JUST_KEPT` it takes their just kept thing only when
+    that has every word of the dropped `about` (`remember::kept_has_about`),
+    so the bicycle line just after the jasmine tea keep asks which and never
+    forgets the tea. With that switch only, a bare forget is marked the
+    same way with the line's own words outside its forget part, when it
+    has any (`remember::line_names`: without the lamp's name, fillers, the
+    words that name nothing and those that only explain, "I got it wrong";
+    a sentence or clause of one word alone is a misheard call, "Elan.
+    Forget that.", and says nothing). They come before the model's dropped
+    `about`, never replaced by it: "I sold my bicycle. Lamp, forget it."
+    called with `about:"tea"` is marked "sold bicycle" and asks which
+    (Second's P2 on #5419). On
+    lamp-06c1 (6 Nov, build 10343) "I sold my bicycle. Lamp, forget it."
+    heard as "I stole my bicycle lamp. Forget it." came with no `about` and,
+    on a test build, took the tea just kept. Now "stole bicycle" is not
+    the tea, so it asks which; "My tea is jasmine. Forget it." after that
+    keep forgets it; "Lamp, forget that." and "Forget it." stay bare and
+    take the just kept thing. A guessed `source_id` on such a line runs
+    only when the last kept thing, or the follow-up just asked about, has
+    those words. The guard (`remember::named_forget`, run in
     `tools::run_call_with_scope` for spoken turns and in `messages` for
     texts) sends a `Named` pick as `forget {about, heard_named}`.
   - **What names a thing** (`remember::named_subject`): the last sentence
@@ -1794,7 +1819,19 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     on B's "don't forget the wedding cake" heard just after (El's P2 on
     #3127).
   - **`forget_last` stays only for a bare forget:** "forget that" right
-    after a keep removes that keep. A bare forget within 60 s of a named one
+    after a keep removes that keep. With `LAMP_MEMORY_FORGET_JUST_KEPT`
+    (C88, #5022) it removes that keep by its id, in the same person's
+    scope, when the session's last memory call was their own `remember`
+    within 60 s (`remember::just_kept`); past 60 s nothing was given just
+    before, so it asks what or which, as above (C35). The
+    keep's answer tells the model what "that" now is, as on lamp-06c1 (4
+    and 5 Nov) a bare "Lamp, forget that." after the umbrella keep was
+    answered in words. Only a line whose mouth was seen saying it forgets
+    this way: a one-face line (`LAMP_PERSON_SCOPE_ONE_FACE`) forgets
+    nothing, as without the switch (`tools::one_face_just_kept`, #5608),
+    and a carried line's forget is refused as before (the memory owner,
+    16:49 on #5385). Another person's keep and the room's are never
+    reached this way. A bare forget within 60 s of a named one
     in the same scope ("Yes, please forget it.") is that name again; a
     `remember` since ends that. A bare forget just after a follow-up was
     asked is that follow-up's entry (`ForgetPick::Asked`, #2808; "Forget
