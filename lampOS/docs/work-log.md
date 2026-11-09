@@ -8924,3 +8924,19 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   docs fold. Four removed status updates match base rows byte-for-byte;
   other reviewed updates unchanged. Guide 7 passed, diff clean.
 - All product/review checkouts clean; no device action or own product edits.
+
+## 2026-11-09 — Second: motion reconnect and prompting-turn holds
+
+- HOLD #5835 b74fa1eed92098b1895427d48963c050cd7349fd supersedes my
+  scoped rebase READ-OK. Actual MCP/Relink/TLS probe: old move id 2 returns
+  move finished from new connection's unrelated say id 2. Corrected probe
+  asserts ID collision; earlier move-to-move draft timed out without it.
+  Combined reconnect fix must cover body-lease waits too. Source unchanged.
+- HOLD #5870 4ed43493f784636d5fe42689b56b35fc64e61698. During a prompt,
+  voice already owns the ticket but control has no begun event yet. New
+  turn.end closes socket and reports success; actual ControlTurns later
+  opens and admits a person. Native Parts + Says socket + ControlTurns probe
+  fails in 0.00 s. Independent source audit confirms coordinator path.
+- Clean control baseline 182 passed. Probe saved in
+  /tmp/second-5870-prompt-end.rs and .log, removed; checkout clean.
+  No device/acoustic claim. Main workspace remains clean.
