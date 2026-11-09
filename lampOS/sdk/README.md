@@ -177,7 +177,7 @@ Python names first, JavaScript where it differs.
 | A new motion interrupts the one playing | `gesture`, `move`, `express` replace | (no new call) | — | on lamp-voice (`6167fe37a1`), not on stable 10824, which refuses `busy` with `retry_ms` | Nine | not yet |
 | Each joint's degrees, bounds and caps | `get body` | `get("body")` | `lamp_state` | done | Ten | 75c9, 7 Nov, stable 10579: known, each joint's range |
 | Where each joint is, live; model and twin | `body.state` | model, JS twin | — | done on lamp-voice (#4564); not on stable 10824 | Eighth | 75c9, 9 Nov, #4564's lamp-control: 12.5 events a second |
-| Record a move from poses | — | — | — | missing | Ten | not yet |
+| Record a move from poses (degrees, eased) | `move`, made by the client | `move_poses`, `poses_to_frames` / `movePoses`, `posesToFrames` | `lamp_move_poses` | done in the clients (it sends `move`, which stable 10824 takes) | Ten | 75c9, 9 Nov, stock 10824: played 2.8 s as computed; a 40° pose refused before sending |
 | Let the base go limp; a holder's pose | — (lamp-body's lease socket only) | — | — | missing in lamp-control | — | not yet |
 
 ### Light
@@ -235,7 +235,7 @@ Python names first, JavaScript where it differs.
 
 | Capability | lamp-control | Python / JS | lamp-mcp | Status | Owner | Validated |
 |---|---|---|---|---|---|---|
-| Put a skill on the lamp, list, remove | `skill.push`, `skill.list`, `skill.remove` | `push_skill`, `skills`, `remove_skill` / `pushSkill`, `skills`, `removeSkill`; `lamp skill push/list/remove` | `lamp_skill_push`, `lamp_skills`, `lamp_skill_remove` | done, but not yet on customer lamps: refused "skill push is not on this lamp" (no `--manage-socket` in the product unit; 75c9, 9 Nov, 10824's unit: refused as written) | blue | 75c9, 4 Nov, build 10114, by the local leader: check, push, list, remove. Needs lamp-control started with `--manage-socket` |
+| Put a skill on the lamp, list, remove | `skill.push`, `skill.list`, `skill.remove` | `push_skill`, `skills`, `remove_skill` / `pushSkill`, `skills`, `removeSkill`; `lamp skill push/list/remove` | `lamp_skill_push`, `lamp_skills`, `lamp_skill_remove` | done; on customer lamps from the next build (the product unit passes `--manage-socket`, #5819); stable 10824's unit doesn't, so it refuses "skill push is not on this lamp" (75c9, 9 Nov) | blue | 75c9, 4 Nov, build 10114, by the local leader: check, push, list, remove; 75c9, 9 Nov, 10824's lamp-control under the next build's unit: push, list, remove, push, revoke turned it off |
 | Check a skill folder before pushing | — | `lamp skill check` | — | done | blue | not yet |
 
 ## Never readable

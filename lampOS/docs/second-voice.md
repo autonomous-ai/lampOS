@@ -2244,6 +2244,23 @@ order is kept. A written turn is the same from the chat on.
     lamp said" (or "… in a busy room; the model is not told …"), "only
     the lamp's name was said, and the model is told so", and "… no words
     of it came back: asked as the name".
+  - With `LAMP_NAME_WORDLESS_BAR=on` (#5385), that line with no words is
+    asked as the name only when lamp-name heard the name in it at 0.99 or
+    more (`second_provider::wordless_call`: its own `name/heard`
+    subscriber, read all the time by a reader thread of its own, so lines
+    with words, which never ask, do not leave its queue to fill and drop
+    the next hearing; the last 32 kept for 30 s; the best hearing that
+    began from 1.5 s before the line's first sound to its end). Under 0.99, or with no hearing said in full
+    (the call came from `name/rising` alone), it is left as a sound: no
+    chat is asked and nothing is answered, and the journal says "only the
+    lamp's name, and no words of it came back: lamp-name heard it at
+    0.941, under 0.99: not answered as a call (LAMP_NAME_WORDLESS_BAR)".
+    A line with words is judged as before at any score. On lamp-75c9 on
+    9 Nov a line the body's own move opened was heard as the name at 0.941
+    with no words and answered as a call; on lamp-c0a4, 82 real calls
+    scored 0.901 to 1.000 (median 0.964) and 4 had no words back, 3 of
+    them under 0.99: the rule costs about 3 bare calls in 82. Test:
+    `a_wordless_call_under_the_bar_is_not_answered_with_the_switch`.
 - **In a busy room, a line going on waits for the Policy**
   (`LAMP_GOING_ON_ASKS=on`, with the rule and the bus, #1522; #1712, item
   4): a line the rule would let out only as a conversation going on, and
@@ -3642,7 +3659,11 @@ after a take-over, but now for every turn:
   set." beside `set_timer`, `set_reminder`, `repeat_reminder` or
   `snooze_reminder`, and "I'll remind you at …" beside those or
   `list_reminders`, which it also answers, each made in any round of the turn (beside calls of another kind, which run, the next round is told only the claimed kind wasn't done and the others mustn't be called again, `action_claim::beside_calls_note`) (a cut answer's carried
-  rounds too). Each round's opening is held only while its words could
+  rounds too), never a round declined with `not_for_me` and asked once more
+  because the lamp was named to a face: that round's calls run none, so
+  none of them backs a claim (Reviewer-three's after-merge P2 on #5215:
+  `[not_for_me, set_timer]`, then "Timer set." said with nothing set). Each
+  round's opening is held only while its words could
   still begin a claim; at the first that fits none, or a claim whose call
   an earlier round made, it goes on as before. A claim with no call yet is
   held to the round's end: beside a call of its kind it is said; beside
@@ -4378,9 +4399,22 @@ after a take-over, but now for every turn:
       and is told not to repeat calls already run. Partial deletion and
       uncertain outcomes are not described as complete. Setup-name, place
       and reminder deletion results retain only fixed success, kept or
-      uncertain states; an unreported step is never assumed successful.
-      A failed or uncertain step downgrades an `everything=true` claim,
-      including reminder cancellation failures whose producer leaves it true.
+      uncertain states. The same sanitizer carries `room_memory_result`,
+      `sound_consent_result` and `face_expression_consent_result` only as
+      `cleared`, `kept` or `uncertain`; any other value becomes `uncertain`,
+      with no raw payload copied. An absent field stays unreported and is
+      never assumed successful.
+      For room cleanup, the producer reports `cleared` only for a
+      `forget_said` reply with `ok: true` and a nonnegative integer
+      `removed` count, including zero; `ok: false` with `unknown_op` means
+      `kept`, and other replies or a lost reply mean `uncertain`. Each
+      consent-file removal reports `cleared` on success or `NotFound`,
+      otherwise `uncertain`. A non-cleared room or consent outcome sets
+      `everything: false`, and later successful steps cannot restore true.
+      The sanitizer also downgrades an `everything=true` claim for any
+      failed or uncertain step, including reminder cancellation failures
+      whose producer leaves it true. These result fields add no calls,
+      retries or deadlines and do not change the deletion's privacy scope.
       The reset also clears the prior acting answer’s silence-marker state,
       so the fresh round does not inherit its unspoken-reply protocol.
       Earlier memory-keep evidence and its claim-correction allowance reset

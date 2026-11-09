@@ -134,3 +134,68 @@ async fn a_policy_hold_after_a_forget_still_ends_the_turn() {
     assert_eq!(calls.lock().unwrap().len(), 1);
     assert_eq!(calls.lock().unwrap()[0].0, "forget");
 }
+
+#[tokio::test]
+async fn a_partial_forget_reports_cleanup_steps_to_the_next_model_request() {
+    let question = "Forget everything about me.";
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(question.into())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "erase",
+                        "forget_everything",
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    text("I could not confirm all the cleanup."),
+                    Ok(ChatEvent::Done),
+                ],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let runner: ToolRunner = Arc::new(|_, _, _, _| {
+        Box::pin(async {
+            json!({"forgotten":true,"everything":false,
+            "room_memory_result":"kept", "sound_consent_result":"uncertain",
+            "face_expression_consent_result":"cleared", "path":"private canary"})
+        })
+    });
+    let mut engine = Engine::new(
+        script.clone(),
+        || Told {
+            text: "old private canary".into(),
+            after: None,
+            history: vec![],
+        },
+        runner,
+    )
+    .with_after_forget_instruction("Static character.".into())
+    .announcing(false);
+    engine.submit(start(73));
+    engine.submit(audio(73, 1));
+    engine.submit(end(73));
+    turn(&mut engine).await;
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(asked.len(), 2);
+    let note = asked[1][1].words().unwrap();
+    for expected in [
+        "\"room_memory_result\":\"kept\"",
+        "\"sound_consent_result\":\"uncertain\"",
+        "\"face_expression_consent_result\":\"cleared\"",
+        "\"everything\":false",
+    ] {
+        assert!(note.contains(expected), "{note}");
+    }
+    assert!(
+        !serde_json::to_string(&asked[1])
+            .unwrap()
+            .contains("private canary")
+    );
+    assert_eq!(asked[1].last(), Some(&Message::user(question)));
+}

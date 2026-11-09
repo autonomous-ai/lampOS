@@ -275,6 +275,17 @@ when the last step in `order` ends done, skipped or failed (#5499, Thirteen's
 P2 on #5504: with `who_you_are` last, a no to the name or the face still
 hears it). After a name-only end it follows `NAME_ONLY`.
 
+**The walk's end is dated once, for the app** (#5812). The first done line
+handed out keeps when, in Unix ms, in the progress file
+(`Progress::done_at_unix_ms`). A redo of one step or of the whole walk keeps
+it (`Progress::redone`), so a later done line never dates it again; a
+factory reset wipes it with the file, so a new owner's walk is dated anew. A
+walk set up before it was dated, or not yet ended, has none.
+`onboarding/pending` carries what is committed on disk as `done_at_unix_ms`
+(left out while unknown), and lamp-cloud tells the app once from it
+(`onboarding.done`, [cloud.md](cloud.md), "Setup done, told to the app").
+Test: `onboarding::tests::the_walks_end_is_dated_once_and_kept`.
+
 **A fixed line is said even when the chat is late.** These lines still go to
 the model as a written turn, and on the second route a turn whose chat has
 not begun in time used to end unanswered, the walk's line unsaid (lamp-52e6,
@@ -411,7 +422,14 @@ the model's own `setup_step` done ends it while the save is held: the model's
 done waits, and ends it done with the name only once the hold is over unless
 the face is saved first. A hold the voice lets go before its yes (a
 correction, another name, its 45 s) is posted too (`face_save_let_go`), and
-the step is no longer kept open for it; both sides read one bound
+the step is no longer kept open for it: it closes, done with the name only,
+by 20 s after the let-go (`LET_GO_CLOSE_US`), once the room has been quiet
+3 s, so the lamp's own retry line ("Look toward me and say it again", about
+10 s on) no longer pushes the close to 15 s after it (#5139: Fifth's row 6
+on 10441 closed about 25 s after the drop). A line the person says after
+the let-go (a yes, the name again) takes the step back to the usual face
+and name waits, so a retry that is answered is never cut off (test
+`a_let_go_face_save_closes_who_you_are_within_20_s`); both sides read one bound
 (`HELD_SAVE_FOR` is `FACE_SAVE_HELD_US`). The voice's second worker posts that
 let-go, so it is given `LAMP_ONBOARDING` and `LAMP_ONBOARDING_FILE`, the
 exact `on` and an absolute path, and no other worker is
@@ -511,15 +529,23 @@ off until a yes, spoken or in the app.
   off removes it. A yes already there, the voice's or the app's, is left
   as it is. The readers ignore `by`.
 - **It survives the voice.** The voice's start and its progress writes
-  remove a record whose step is not `done`, but not one with `"by":"app"`
-  that still stands: given after the step's last redo
-  (`yes_redone_at_unix_s` in the progress file, set by `redo_setup` for
-  the whole walk or for that step) and after any "no" (`skipped`) at the
-  lamp. So a redo, or a later "no" at the lamp, takes the app's yes back
-  at the next write, as it takes back a spoken one; an app yes given in
-  the same second as a redo is taken back too, the safe side. An app yes
-  with no `at_unix_s` never stands. A yes said at the lamp afterwards is
-  written as the voice's, over the app's.
+  remove a record whose step is not `done`, but not one with `"by":"app"`.
+  A redo (`yes_redone_at_unix_s` in the progress file, set by
+  `redo_setup` for the whole walk or for that step) or a "no" (`skipped`)
+  at the lamp takes it back when the voice first writes it, just before
+  the progress file is replaced, as it takes back a spoken one: the
+  write's count of them (`yes_taken_back`, one more for each redo or
+  "no" of the step, so a second one in the same second is seen too), its
+  redo time or its "no" differs from the progress it replaces. The
+  consent folder is synced after the removal; a removal that fails fails
+  the write before the progress keeps the "no", so the next write tries
+  again rather than keeping a "no" the app's yes outlived. No
+  times are compared, so a "no" stamped before the app's yes (a lamp
+  clock that stepped back) still takes it back (the first builder's P3 on
+  #5567), and an app yes given after a "no" or a redo at setup stands
+  through every later start and write until a new one. An app yes with no
+  `at_unix_s` never stands. A yes said at the lamp afterwards is written
+  as the voice's, over the app's.
 - **Always removed** by a forget of everything, and by the factory reset's
   plan, whoever gave it.
 - **Followed live**: lamp-eyes reads its yes every 2 s, so nothing
@@ -936,7 +962,9 @@ read), whether or not an invitation is pending. The steps the model leads
 by talk (where you sit, who you are, touch, room sounds, face expressions,
 preferences) hold no invitation, so a skill that keeps out of setup, as Head
 pat and Head pat wiggle do, gates on `walk` as well as on `invitations`.
-An older voice leaves it out, read as false.
+An older voice leaves it out, read as false. It also says `done_at_unix_ms`
+once the walk has handed out its done line (#5812, "The walk's end is dated
+once, for the app" above).
 
 Privacy is led first, before step 1, whenever it is available, though its
 record keeps the table's place. It is available only with a verified switch

@@ -3277,6 +3277,46 @@ mod tests {
         );
     }
 
+    /// Nine's wall (a) on #3504: skill push is on in the product. The
+    /// developers' door passes `--manage-socket` at the very socket the
+    /// skills' manage helper listens on, and is ordered after it, so a
+    /// paired computer's `skill.push` reaches the helper on every lamp.
+    #[test]
+    fn the_door_passes_the_skills_manage_socket_it_listens_on() {
+        let unit = |wanted: &str| {
+            PRODUCT
+                .iter()
+                .find(|(name, _)| *name == wanted)
+                .map(|(_, text)| *text)
+                .unwrap_or_else(|| panic!("{wanted} is not installed"))
+        };
+        let listen = unit("lamp-skills-manage.socket")
+            .lines()
+            .find_map(|line| line.strip_prefix("ListenStream="))
+            .expect("the manage socket's ListenStream");
+        let control = unit("lamp-control.service");
+        let exec = control
+            .lines()
+            .find(|line| line.starts_with("ExecStart="))
+            .expect("lamp-control's ExecStart");
+        let words: Vec<&str> = exec.split_whitespace().collect();
+        let manage = words
+            .windows(2)
+            .find(|pair| pair[0] == "--manage-socket")
+            .map(|pair| pair[1]);
+        assert_eq!(manage, Some(listen), "{exec}");
+        let after = control
+            .lines()
+            .find(|line| line.starts_with("After="))
+            .expect("lamp-control's After");
+        assert!(
+            after
+                .split_whitespace()
+                .any(|unit| unit.ends_with("lamp-skills-manage.socket")),
+            "{after}"
+        );
+    }
+
     /// #2853: every unit in `deploy/product/` is in the install list, so a
     /// lamp gets it with an update and no hand step, or is named here with
     /// why it is not yet; every socket installed is enabled.

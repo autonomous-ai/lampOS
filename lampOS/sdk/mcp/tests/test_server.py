@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
-from lampos import Keyring, Lamp, schema
+from lampos import Keyring, Lamp, LampError, schema
 from lampos.testing import FAKE_JPEG, FakeLamp
 from mcp.shared.memory import create_connected_server_and_client_session
 from pydantic import AnyUrl
@@ -20,7 +20,7 @@ from pydantic import AnyUrl
 from lamp_mcp.server import Limits, build, gestures
 
 ALL = {
-    "lamp_state", "lamp_wait_for", "lamp_express", "lamp_gesture", "lamp_look", "lamp_move", "lamp_play", "lamp_joints",
+    "lamp_state", "lamp_wait_for", "lamp_express", "lamp_gesture", "lamp_look", "lamp_move", "lamp_move_poses", "lamp_play", "lamp_joints",
     "lamp_light", "lamp_ring", "lamp_say", "lamp_volume", "lamp_sound", "lamp_upload_sound", "lamp_sounds", "lamp_remove_sound",
     "lamp_end_turn",
     "lamp_events", "lamp_stop",
@@ -147,11 +147,15 @@ def test_play_joints_and_sound_each_send_their_op(tmp_path):
         async with connected(tmp_path, grants=("body", "speak")) as (fake, _, session):
             assert not (await session.call_tool("lamp_play", {"name": "wave"})).isError
             assert fake.asked("play") == [{"name": "wave"}]
-            joints = await session.call_tool("lamp_joints", {"within_ms": 800, "pitch": 10, "elbow": -5})
+            # The door takes yaw and pitch today; roll, shoulder and elbow wait
+            # for the body's goal stream (parts.rs), in its words.
+            elbow = await session.call_tool("lamp_joints", {"within_ms": 800, "pitch": 10, "elbow": -5})
+            assert elbow.isError and "waits for the body's goal stream for roll, shoulder and elbow" in text(elbow), text(elbow)
+            joints = await session.call_tool("lamp_joints", {"within_ms": 800, "pitch": 10, "yaw": -5})
             assert not joints.isError, text(joints)
             [asked] = fake.asked("joints")
             # Under a body lease of its own, named in the request.
-            assert asked["targets"] == {"pitch": 10, "elbow": -5} and asked["within_ms"] == 800
+            assert asked["targets"] == {"pitch": 10, "yaw": -5} and asked["within_ms"] == 800
             assert asked["lease"].startswith("l_")
             none = await session.call_tool("lamp_joints", {"within_ms": 800})
             assert none.isError and "needs at least one of" in text(none)
@@ -187,6 +191,31 @@ def test_body_tools_in_a_row_reuse_the_held_lease_rather_than_be_refused_busy(tm
     run(go())
 
 
+def test_lamp_say_returns_when_taken_and_with_wait_once_said(tmp_path):
+    """`lamp_say` never says "said" before the lamp has said it: without
+    `wait` it returns at once as taken; with `wait`, at the say's `done`:
+    "said" when it finished, else how and why."""
+
+    async def go():
+        async with connected(tmp_path, auto_done=False) as (fake, _, session):
+            taken = await session.call_tool("lamp_say", {"text": "Build passed."})
+            assert text(taken).startswith("taken"), text(taken)
+            call = asyncio.create_task(session.call_tool("lamp_say", {"text": "Done.", "wait": True}))
+            while len(fake.asked("say")) < 2:
+                await asyncio.sleep(0.01)
+            await asyncio.sleep(0.2)
+            assert not call.done(), "a wait that ended before the say's done"
+            await fake.done([r["id"] for r in fake.requests if r["op"] == "say"][-1])
+            assert text(await call) == "said"
+            call = asyncio.create_task(session.call_tool("lamp_say", {"text": "Later.", "wait": True}))
+            while len(fake.asked("say")) < 3:
+                await asyncio.sleep(0.01)
+            await fake.done([r["id"] for r in fake.requests if r["op"] == "say"][-1], "dropped", "dropped: the lamp is private")
+            assert text(await call) == "dropped: dropped: the lamp is private"
+
+    run(go())
+
+
 def test_a_done_that_comes_before_its_answer_is_read_still_ends_the_tool(tmp_path):
     async def go():
         # The fake says `done` right after its answer.
@@ -204,10 +233,14 @@ def test_a_lamp_that_doesnt_route_them_says_so_as_the_tools_error(tmp_path):
     from lampos.testing import LAMP_CONTROL_REFUSES
 
     async def go():
-        async with connected(tmp_path, grants=("body", "speak"), refuses=LAMP_CONTROL_REFUSES) as (fake, _, session):
-            for tool, arguments in (("lamp_play", {"name": "wave"}), ("lamp_joints", {"pitch": 5})):
+        async with connected(
+            tmp_path, grants=("body", "speak"), refuses=LAMP_CONTROL_REFUSES
+        ) as (fake, _, session):
+            for tool, arguments in (("lamp_play", {"name": "wave"}), ("lamp_joints", {"pitch": 0, "roll": 1})):
                 result = await session.call_tool(tool, arguments)
                 assert result.isError and "refused: not routed yet" in text(result), (tool, text(result))
+            # Yaw and pitch alone go, as on a stable lamp.
+            assert not (await session.call_tool("lamp_joints", {"yaw": 0, "pitch": 1})).isError
             # The hum is routed, as lamp-control's `sound` is (#4228).
             assert not (await session.call_tool("lamp_sound", {"name": "hum"})).isError
             assert fake.asked("sound") == [{"name": "hum"}]
@@ -237,6 +270,161 @@ def test_lamp_events_gives_what_the_lamp_said_since_a_seq_and_waits_for_one(tmp_
             assert [(e["seq"], e["ev"], e["count"]) for e in later["events"]] == [(3, "person.left", 0)]
             # Nothing new: an empty list at once without wait_s.
             assert json.loads(text(await session.call_tool("lamp_events", {"since": 3})))["events"] == []
+
+    run(go())
+
+
+async def restart(fake: FakeLamp) -> None:
+    """The lamp restarts, as on every update: each connection closes."""
+    for ws in list(fake._connections):
+        await ws.close(1012, "the lamp restarts")
+
+
+def test_lamp_mcp_connects_again_after_the_lamp_restarts(tmp_path):
+    """Every update restarts the lamp and closes the connection: lamp-mcp
+    connects again by itself, makes its subscriptions again, and its tools
+    work as before."""
+    from lamp_mcp.relink import Relink
+
+    async def go():
+        async with FakeLamp(grants=("look", "light")) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            lamp = await Relink.connect(keyring=ring, pauses=(0.05, 0.1))
+            try:
+                server = build(lamp, client="test laptop")
+                async with create_connected_server_and_client_session(server._mcp_server) as session:
+                    await session.call_tool("lamp_events", {})
+                    await until(lambda: len(fake.asked("subscribe")) >= 1)
+                    await fake.emit("person.arrived", count=1, near=0.3)
+                    said = json.loads(text(await session.call_tool("lamp_events", {"since": 0, "wait_s": 5})))
+                    assert [e["ev"] for e in said["events"]] == ["person.arrived"]
+
+                    subscribed = len(fake.asked("subscribe"))
+                    await restart(fake)
+                    await until(lambda: lamp.connections == 2 and len(fake.asked("subscribe")) > subscribed)
+                    await fake.emit("person.arrived", count=2, near=0.3)
+                    said = json.loads(text(await session.call_tool("lamp_events", {"since": 1, "wait_s": 5})))
+                    assert [(e["ev"], e["count"]) for e in said["events"]] == [("person.arrived", 2)]
+                    result = await session.call_tool("lamp_light", {"colour": "blue", "level": 2})
+                    assert not result.isError, text(result)
+                    assert fake.asked("light")[-1]["colour"] == "blue"
+            finally:
+                await lamp.close()
+
+    run(go())
+
+
+def test_the_first_lamp_events_while_the_lamp_is_away_still_streams_after_it_is_back(tmp_path):
+    """Second's first P2 on #5830: `lamp_events` asked first while the lamp is
+    restarting keeps its subscriptions, so they are made again once it's back."""
+    from lamp_mcp.relink import Relink
+
+    async def go():
+        async with FakeLamp(grants=("look", "light")) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            lamp = await Relink.connect(keyring=ring, pauses=(0.5,))
+            try:
+                server = build(lamp, client="test laptop")
+                async with create_connected_server_and_client_session(server._mcp_server) as session:
+                    await restart(fake)
+                    away = json.loads(text(await session.call_tool("lamp_events", {})))
+                    assert away["events"] == []
+                    await until(lambda: lamp.connections == 2 and fake.asked("subscribe"))
+                    await fake.emit("person.arrived", count=1, near=0.3)
+                    said = json.loads(text(await session.call_tool("lamp_events", {"since": 0, "wait_s": 5})))
+                    assert [e["ev"] for e in said["events"]] == ["person.arrived"]
+            finally:
+                await lamp.close()
+
+    run(go())
+
+
+def test_a_wait_that_ends_during_the_replay_is_not_made_again():
+    """Second's second P2 on #5830: while one subscription is being made again,
+    a wait that ends takes its own off, and the replay doesn't bring it back."""
+    from lamp_mcp.relink import Relink
+
+    class Old:
+        def __init__(self):
+            self.closed = asyncio.Event()
+
+        def on(self, event, handler, *, phrases=None):
+            return asyncio.sleep(0)
+
+        def off(self, event, handler):
+            pass
+
+        async def wait_closed(self):
+            await self.closed.wait()
+
+        async def close(self):
+            pass
+
+    class New(Old):
+        def __init__(self):
+            super().__init__()
+            self.gate = asyncio.Event()
+            self.handlers = []
+
+        async def _on(self, event, handler, phrases):
+            self.handlers.append((event, handler))
+            if event == "touch":
+                await self.gate.wait()
+
+        def on(self, event, handler, *, phrases=None):
+            return self._on(event, handler, phrases)
+
+        def off(self, event, handler):
+            # As the SDK's: quiet for a handler it doesn't have.
+            if (event, handler) in self.handlers:
+                self.handlers.remove((event, handler))
+
+    async def go():
+        old, new = Old(), New()
+
+        async def again():
+            return new
+
+        lamp = Relink(again, old, pauses=(0.01,))
+        touch = lambda event: None  # noqa: E731
+        phrase = lambda event: None  # noqa: E731
+        await lamp.on("touch", touch)
+        await lamp.on("phrase.heard", phrase, phrases=["good night lamp"])
+        old.closed.set()
+        await until(lambda: new.handlers)
+        # The phrase wait ends while touch is still being made again.
+        lamp.off("phrase.heard", phrase)
+        new.gate.set()
+        await until(lambda: lamp.connections == 2)
+        await asyncio.sleep(0.05)
+        assert new.handlers == [("touch", touch)]
+        await lamp.close()
+
+    run(go())
+
+
+def test_lamp_mcp_stops_connecting_again_once_its_computer_is_unpaired(tmp_path):
+    """A hello the lamp refuses can't mend by connecting again: lamp-mcp says
+    so once and stops trying, and its tools answer `closed`."""
+    from lamp_mcp.relink import Relink
+
+    async def go():
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            lamp = await Relink.connect(keyring=ring, pauses=(0.05,))
+            try:
+                fake.clients.clear()  # the owner removed this computer
+                await restart(fake)
+                await until(lambda: lamp.gave_up is not None)
+                assert lamp.gave_up.code == "unpaired"
+                with pytest.raises(LampError) as closed:
+                    await lamp.light("blue", 2, 1000)
+                assert closed.value.code == "closed"
+            finally:
+                await lamp.close()
 
     run(go())
 
@@ -931,6 +1119,7 @@ def test_the_readme_lease_column_is_the_servers_own(tmp_path):
     calls = {
         "lamp_look": {"at": "ahead"},
         "lamp_move": {"step_ms": 100, "frames": [[0, 0, 0, 0, 0], [5, 0, 0, 0, 0], [0, 0, 0, 0, 0]]},
+        "lamp_move_poses": {"poses": [{"pitch": 5}]},
         "lamp_gesture": {"name": "nod"},
         "lamp_light": {"colour": "warm"},
         "lamp_ring": {"rgb": "#ff8000"},
@@ -1121,5 +1310,46 @@ def test_without_speak_volume_is_neither_offered_nor_listed(tmp_path):
             assert "lamp_volume" not in names
             uris = {str(r.uri) for r in (await session.list_resources()).resources}
             assert "lamp://state/volume" not in uris
+
+    run(go())
+
+
+def test_lamp_joints_waits_for_the_bodys_done_as_lamp_look_does(tmp_path):
+    """lamp-control sends `joints`' yaw and pitch as the holder's look, and its
+    `done` follows (body_lease.rs): the tool says finished, or dropped with the
+    body's why, and lets go of its lease at once."""
+    async def go():
+        async with connected(tmp_path, grants=("body",)) as (fake, _, session):
+            joints = await session.call_tool("lamp_joints", {"within_ms": 500, "pitch": 3, "yaw": -4})
+            assert not joints.isError and text(joints) == "joints finished", text(joints)
+            assert fake.asked("lease.release")
+            # A body that refuses it (its lease suspended by a conversation)
+            # says so in the tool's answer instead of "taken".
+            fake.auto_done = False
+            call = asyncio.create_task(session.call_tool("lamp_joints", {"pitch": 1}))
+            while len(fake.asked("joints")) < 2:
+                await asyncio.sleep(0.01)
+            await fake.done(fake.requests[-1]["id"], "dropped", "the body is not held")
+            result = await call
+            assert text(result) == "joints dropped: the body is not held", text(result)
+
+    run(go())
+
+
+def test_a_move_through_poses_is_the_sdks_frames_and_a_pose_it_cant_make_is_refused_before_sending(tmp_path):
+    from lampos import poses_to_frames
+
+    async def go():
+        async with connected(tmp_path, grants=("body",)) as (fake, _, session):
+            refused = await session.call_tool("lamp_move_poses", {"poses": [{"pitch": 40}]})
+            assert refused.isError
+            assert text(refused).endswith("bad_request: pose 1: pitch 40° is farther than a move may take it, 17.6° either way")
+            assert "bad_request: bad_request" not in text(refused)
+            assert not fake.asked("move") and not fake.asked("lease.take")
+            moved = await session.call_tool("lamp_move_poses", {"poses": [{"pitch": 10}, {"yaw": -8}], "hold_ms": 200})
+            assert not moved.isError, text(moved)
+            sent = fake.asked("move")
+            assert len(sent) == 1 and sent[0]["step_ms"] == 50
+            assert sent[0]["frames"] == poses_to_frames([{"pitch": 10}, {"yaw": -8}], hold_ms=200)
 
     run(go())

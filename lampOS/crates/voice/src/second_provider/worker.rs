@@ -4471,6 +4471,34 @@ pub fn serve(
                 );
             }
         }
+        // A line that was only the lamp's name, with no words back, is a
+        // call only on a sure hearing (`LAMP_NAME_WORDLESS_BAR`, #5385).
+        if crate::second_provider::wordless_call::on(
+            std::env::var(crate::second_provider::wordless_call::ENVIRONMENT)
+                .ok()
+                .as_deref(),
+        ) {
+            match files
+                .bus_root
+                .as_deref()
+                .map(crate::second_provider::wordless_call::Hearings::on)
+            {
+                Some(Ok(hearings)) => {
+                    eprintln!(
+                        "lamp-voice second: a line that is only the lamp's name, with no words back, is answered as a call only when lamp-name heard it at {} or more (LAMP_NAME_WORDLESS_BAR)",
+                        crate::second_provider::wordless_call::BAR
+                    );
+                    engine = engine
+                        .holding_a_wordless_call(Arc::new(move |window| hearings.best(window)));
+                }
+                Some(Err(why)) => eprintln!(
+                    "lamp-voice second: a wordless call is answered as before: lamp-name's hearings cannot be taken from the bus: {why} (LAMP_NAME_WORDLESS_BAR)"
+                ),
+                None => eprintln!(
+                    "lamp-voice second: a wordless call is answered as before: no bus to read lamp-name's hearings from (LAMP_NAME_WORDLESS_BAR)"
+                ),
+            }
+        }
         // In a busy room, a line going on waits for the Policy (#1522), as
         // on the Live route: with the rule and the bus.
         if files.going_on_asks
@@ -8390,7 +8418,7 @@ impl Heeding {
             over_the_lamps_voice,
         } = heard
         {
-            self.tell_a_waiting_write(over_the_lamps_voice);
+            self.tell_a_waiting_write(request, over_the_lamps_voice);
         }
         self.printing(request, heard);
     }
@@ -8398,11 +8426,16 @@ impl Heeding {
     /// A line began: a write waiting for its "send" is timed from here, not
     /// from when its words come, and told if it began within the tail of the
     /// lamp's words (`crate::services`).
-    fn tell_a_waiting_write(&self, over_the_lamps_voice: bool) {
+    fn tell_a_waiting_write(&self, request: u64, over_the_lamps_voice: bool) {
         let in_tail = self.said_until_us.is_some_and(|until_us| {
             monotonic_us() <= until_us.saturating_add(super::own_echo::TAIL_US)
         });
-        crate::services::voice_began(over_the_lamps_voice, in_tail, std::time::Instant::now());
+        crate::services::voice_began(
+            request,
+            over_the_lamps_voice,
+            in_tail,
+            std::time::Instant::now(),
+        );
     }
 
     /// A spoken line's sound, for the same-voice check: judged only if it
@@ -8427,7 +8460,7 @@ impl Heeding {
                     crate::untied_going_on::in_grace(monotonic_us(), until_us)
                 }))
             .then_some(request);
-            self.tell_a_waiting_write(over_the_lamps_voice);
+            self.tell_a_waiting_write(request, over_the_lamps_voice);
         }
         if matches!(heard, Heard::BeganOverTheWaitSound) {
             self.began_over = None;

@@ -1839,21 +1839,42 @@ passed. Tests: the notes' exact texts in `remember::tests`.
       A kept thing goes only by its own
       id: one someone unseen kept in their conversation stays (#3113). A
       thing also made from someone else's words stays, and so do those
-      words. The journal gives the count, never a line. What they are told
-      is as before.
+      words. The journal gives the count, never a line. When this cleanup
+      step is attempted, the tool result includes `room_memory_result`:
+      `cleared` only for `ok: true` with a nonnegative integer `removed`
+      count (zero is valid), `kept` only for `ok: false` with
+      `error: "unknown_op"`, and `uncertain` otherwise. A lost or late
+      reply, a malformed receipt, or a storage failure cannot confirm
+      deletion.
     - **An older memory:** it refuses a line with `speaker`
       (`bad_request`): the voice sends it again once without it, the line
       is kept as before, the journal says `room line kept without its
       speaker (older memory)`, and no speaker is sent again that run. It
-      answers `forget_said` with `unknown_op`: nothing more is removed, the
-      journal says so, and the person is told as today. So they hear
-      "forgotten" though the room's lines they said are kept; the same when
-      `forget_said` is refused or its answer comes too late: only the
-      journal says it.
+      answers `forget_said` with `ok: false` and `unknown_op`: nothing
+      more is removed, and `room_memory_result: "kept"` makes the result
+      partial (`everything: false`). An uncertain room cleanup also makes
+      it partial. Earlier builds only journalled these failures and could
+      still say "forgotten"; the result now distinguishes what was cleared
+      from what was kept or could not be confirmed.
     - **Tests:** `remember::tests::room_speaker` (the speaker's source,
       the switch off, both skews) and `crates/memory/tests/it/days_speakers.rs`
       (the table, `forget_said`, the mixed-source rule, schema both ways,
       nothing told).
+  - **The household's consent files:** when `forget_everything` reaches
+    their cleanup, its result reports `sound_consent_result` for
+    `room_sounds` and `face_expression_consent_result` for the neighbouring
+    face-expression consent file. Each is `cleared` when `remove_file`
+    succeeds or returns `NotFound` (already absent), and `uncertain` for
+    any other error. These fields carry fixed states only, never paths,
+    error text, person ids or remembered words.
+  - A room or consent cleanup result other than `cleared` sets
+    `everything: false`; a later successful cleanup does not restore it
+    to true. A step not reached has no result field and is not assumed
+    successful. This reports the existing cleanup work without adding
+    calls, retries or deadlines, or changing whose memory may be removed.
+    The existing final scope and deadline checks still take precedence: a
+    revoked scope or expired overall call returns generic uncertainty rather
+    than releasing these step outcomes.
   - Both clear the conversation thread and stop journalling until a fresh
     worker starts, as `forget` does. `forget` with nothing is as before.
   - **The room's lines about them, for the rest of the day**
@@ -3303,9 +3324,11 @@ then use that person's scope:
   connect, so a line revoked, or narrowed to the room by later speaking
   evidence, sends nothing (Fourth's P2 on #3564), and one revoked or narrowed
   before this step says the face is kept (reviewer-three's P2). The room's
-  lines they were seen saying (#2849) are apart from this: a `forget_said`
-  that fails is journalled, and the answer is as without it. With a name
-  typed at setup, the answer says
+  lines they were seen saying (#2849) are a separate cleanup step:
+  `room_memory_result` reports `cleared`, `kept` or `uncertain` as specified
+  above, and either non-cleared state makes `everything: false`. The same
+  partial-result rule applies to the sound and face-expression consent
+  cleanup. With a name typed at setup, the answer says
   it stays (`setup_name`). A room's line asks the eyes nothing. On lamp-52e6 on 26 Oct
   (build 6963) the memory was forgotten, `people.json` kept the face and its
   name, and the lamp greeted the person by it when asked (the lead on #1711).

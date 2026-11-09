@@ -21,6 +21,7 @@ import { join } from 'node:path';
 import { WebSocketServer } from 'ws';
 import * as schema from './schema.js';
 import { HELLO, b64, pinOf, proof, unb64 } from './keys.js';
+import { MOVE_FRAMES_MIN, MOVE_STEP_MS, moveWhy } from './moves.js';
 
 // As lamp-control stamps it (server.rs `rfc3339_utc`): UTC, to the second, ending `Z`.
 const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -40,12 +41,15 @@ export const LOOK_WAITS = {
 // What lamp-control refuses today, in its own words (crates/control/src/
 // parts.rs, `waits_for`): pass it as `refuses` for a fake that answers as a
 // lamp does now. `lamp fake` does.
+// lamp-control's words for `joints` naming roll, shoulder or elbow (parts.rs).
+export const JOINTS_WAIT = "not routed yet: waits for the body's goal stream for roll, shoulder and elbow; yaw and pitch go now";
+// And for a `joints` leaving out yaw or pitch while the body hasn't said where it is.
+export const JOINTS_UNKNOWN = 'name both yaw and pitch while the body has not said where it is in the last 15 s (get body)';
 export const LAMP_CONTROL_REFUSES = Object.freeze({
-  // No product unit passes --lease-socket yet (docs/control.md).
-  look: "the body's lease socket is not on here",
-  joints: "not routed yet: waits for a goal stream on the body's lease socket",
   play: 'not routed yet: waits for client packages',
 });
+// `look` and `joints` are not in it: the product lamp-body opens its lease socket (stable 10824 and later), so a
+// lamp takes a look, and `joints` at yaw and pitch, refusing roll, shoulder and elbow with JOINTS_WAIT (above).
 // A light's pattern, as lamp-control checks it before the ring (lamp_msgs'
 // LightPattern::check, with the breath's low at 1): the least level each is
 // seen at, and the words it refuses with.
@@ -93,60 +97,52 @@ function wavFrames(data) {
     const id = data.toString('ascii', at, at + 4);
     const size = data.readUInt32LE(at + 4);
     if (id === 'fmt ') format = { channels: data.readUInt16LE(at + 10), rate: data.readUInt32LE(at + 12), bits: data.readUInt16LE(at + 22) };
-    if (id === 'data') return format ? { format, frames: Math.floor(Math.min(size, data.length - at - 8) / 2) } : undefined;
+    // The frames the header says, as hound's `duration` does; `cutShort` when the file holds fewer bytes.
+    if (id === 'data') return format ? { format, frames: Math.floor(size / 2), at: at + 8, cutShort: data.length - at - 8 < size } : undefined;
     at += 8 + size + (size % 2);
   }
   return undefined;
 }
 
+// Why lamp-control would refuse this clip, in sounds.rs `check_clip`'s words and order: its format, its length,
+// a file shorter than its header says, then its loudness; undefined for one it keeps.
 function clipRefusal(data) {
   const read = wavFrames(data);
   if (read === undefined) return 'not a WAV file';
   if (read.format.channels !== 1 || read.format.bits !== 16 || read.format.rate !== 24_000) return 'not 16-bit mono PCM at 24000 Hz';
   if (read.frames < 1 || read.frames > 24_000 * 30) return 'not 1 to 720000 frames (30 s at most)';
+  // Fewer bytes than the header's frames (an odd or an even count short): hound's samples end early.
+  if (read.cutShort) return 'a WAV file cut short';
+  return clipLoudnessRefusal(data, read);
+}
+
+// The voice's loudness cap on a clip, as lamp-control's sounds.rs `check_clip`
+// holds it at upload: no sample past CLIP_PEAK_DBFS, and no 10 ms window
+// (CLIP_WINDOW frames, the last one shorter) louder than CLIP_LOUDEST_DBFS RMS.
+export const CLIP_PEAK_DBFS = -12;
+export const CLIP_LOUDEST_DBFS = -30;
+export const CLIP_WINDOW = 240;
+
+function clipLoudnessRefusal(data, read) {
+  const full = 32_767;
+  const sample = (i) => data.readInt16LE(read.at + 2 * i);
+  let peak = 0;
+  for (let i = 0; i < read.frames; i += 1) peak = Math.max(peak, Math.abs(sample(i)));
+  if (peak > full * 10 ** (CLIP_PEAK_DBFS / 20)) return `a peak past ${CLIP_PEAK_DBFS} dBFS`;
+  let loudest = 0;
+  for (let at = 0; at < read.frames; at += CLIP_WINDOW) {
+    const end = Math.min(at + CLIP_WINDOW, read.frames);
+    let power = 0;
+    for (let i = at; i < end; i += 1) power += sample(i) ** 2;
+    loudest = Math.max(loudest, Math.sqrt(power / (end - at)));
+  }
+  if (loudest > full * 10 ** (CLIP_LOUDEST_DBFS / 20)) return `louder than ${CLIP_LOUDEST_DBFS} dBFS RMS over 10 ms`;
   return undefined;
 }
 
-// A move, as lamp-body's `moves::check` holds it (crates/body/src/moves.rs): head
-// pitch, head roll, base yaw, shoulder, elbow, in counts from rest and counts a
-// second. The Python SDK's skillcheck has the same.
-export const MOVE_STEP_MS = [40, 1000];
-export const MOVE_LASTS_MS = [1500, 10000];
-// A computer's move: 2 frames at the least (lamp-control's protocol.rs
-// FRAMES_MIN); its most are the body's check's (10 s at a 40 ms step, 251).
-export const MOVE_FRAMES_MIN = 2;
-export const MOVE_FARTHEST = [200, 200, 150, 350, 350];
-export const MOVE_FASTEST = [900, 1300, 1000, 800, 800];
-
-// Rust's `{:.0}`, as the body prints a speed: a half rounds to the even neighbour.
-function roundHalfEven(value) {
-  const floor = Math.floor(value);
-  const part = value - floor;
-  if (part !== 0.5) return Math.round(value);
-  return floor % 2 === 0 ? floor : floor + 1;
-}
-
-// Why the body refuses a move of these steps and frames, in its words, at its
-// first problem; null for one it plays.
-export function moveWhy(stepMs, frames) {
-  if (stepMs < MOVE_STEP_MS[0] || stepMs > MOVE_STEP_MS[1]) return `step_ms ${stepMs} is not from 40 to 1000`;
-  const lasts = Math.max(frames.length - 1, 0) * stepMs;
-  if (lasts < MOVE_LASTS_MS[0] || lasts > MOVE_LASTS_MS[1]) return `it lasts ${lasts} ms, not 1500 to 10000`;
-  const rest = (frame) => Array.isArray(frame) && frame.length === 5 && frame.every((count) => count === 0);
-  if (!frames.length || !rest(frames[0]) || !rest(frames.at(-1))) return 'it does not begin and end at nothing';
-  const step = stepMs / 1000;
-  for (let at = 1; at < frames.length; at++) {
-    for (let joint = 0; joint < 5; joint++) {
-      const after = frames[at][joint];
-      if (Math.abs(after) > MOVE_FARTHEST[joint]) return `frame ${at} takes joint ${joint} ${after} counts, farther than ${MOVE_FARTHEST[joint]}`;
-      const speed = Math.abs(after - frames[at - 1][joint]) / step;
-      if (speed > MOVE_FASTEST[joint] + 2 / step) {
-        return `frame ${at} asks joint ${joint} for ${roundHalfEven(speed)} counts a second, faster than ${MOVE_FASTEST[joint]}`;
-      }
-    }
-  }
-  return null;
-}
+// A move's bounds and the body's check of it live in moves.js, which the
+// client uses too; they are exported from here as before.
+export { MOVE_FARTHEST, MOVE_FASTEST, MOVE_FRAMES_MIN, MOVE_LASTS_MS, MOVE_STEP_MS, moveWhy } from './moves.js';
 
 // lamp-control's refusal of a computer's `move` (protocol.rs), in its words, as
 // `bad_request`: its own shape first, then the body's check; null for one it takes.
@@ -381,6 +377,13 @@ export class FakeLamp {
     for (const ws of this.wss.clients) if (this.subscribed.get(ws)?.has(event)) ws.send(frame);
   }
 
+  // The lamp restarts, as on every update: each connection closes (1012,
+  // "service restart"), and pairings stay. A program connects again
+  // (`Lamp.keepConnected`).
+  restart() {
+    for (const ws of this.wss.clients) ws.close(1012, 'the lamp restarts');
+  }
+
   // The ring shows a computer's light while it lasts.
   show(request) {
     this.shown = { light: { on: true, colour: request.colour, level: request.level }, until: this.clock() + request.for_ms };
@@ -442,11 +445,27 @@ export class FakeLamp {
     const held = this.leases.get(lease);
     if (!held) return;
     if (state === 'lost') this.leases.delete(lease);
+    // A suspended lease still stands, but the body is not held: a look or
+    // `joints` under it is taken by the door and dropped by the body.
+    else held.state = state;
     held.ws.send(JSON.stringify({ ev: 'lease', lease, state, ...(why ? { why } : {}) }));
     if (state === 'lost') this.unfollow(lease);
   }
 
   loseLease(lease, why = 'hand') { this.leaseEvent(lease, 'lost', why); }
+
+  // A look the door takes ({ to: 'body' }), and the body's answer as its
+  // `done`: there, or, while the computer's body lease is suspended (a
+  // conversation), dropped as the body says it (body_lease.rs `done_of`).
+  lookDone(ws, id, yaw, pitch) {
+    this.ok(ws, id, { to: 'body' });
+    if (!this.autoDone) return undefined;
+    const suspended = [...this.leases.values()].some((h) => h.ws === ws && h.parts.includes('body') && h.state === 'suspended');
+    ws.send(JSON.stringify(suspended
+      ? { ev: 'done', re: id, how: 'dropped', why: 'the body is not held' }
+      : { ev: 'done', re: id, how: 'finished', yaw, pitch, clamped: false }));
+    return undefined;
+  }
 
   // End the action whose request id was `re`, to the client that asked.
   done(re, how = 'finished', why) {
@@ -757,12 +776,24 @@ export class FakeLamp {
           this.following.set(ws, { lease });
           return this.ok(ws, id, { to: 'body', follow: 'hand' });
         }
-        this.ok(ws, id, { to: 'body' });
-        if (this.autoDone) {
-          const { yaw = 0, pitch = 0 } = typeof request.at === 'object' ? request.at : {};
-          ws.send(JSON.stringify({ ev: 'done', re: id, how: 'finished', yaw, pitch, clamped: false }));
-        }
-        return undefined;
+        const { yaw = 0, pitch = 0 } = typeof request.at === 'object' ? request.at : {};
+        return this.lookDone(ws, id, yaw, pitch);
+      }
+      case 'joints': {
+        // As lamp-control (parts.rs `joints`): roll, shoulder and elbow wait
+        // for the body's goal stream; yaw and pitch go to the body as the
+        // holder's look, a joint not named staying where `get` `body` says it
+        // is, so its `done` follows as a look's does, and taking it ends a
+        // hand-follow as any look does.
+        const { targets } = request;
+        if (['roll', 'shoulder', 'elbow'].some((joint) => joint in targets)) return this.refuse(ws, id, 'refused', JOINTS_WAIT);
+        const now = this.state.body.joints;
+        const yaw = targets.yaw ?? now.yaw.deg;
+        const pitch = targets.pitch ?? now.pitch.deg;
+        // The door's words when the body hasn't said where it is.
+        if (yaw === null || yaw === undefined || pitch === null || pitch === undefined) return this.refuse(ws, id, 'refused', JOINTS_UNKNOWN);
+        this.stopFollowing(ws);
+        return this.lookDone(ws, id, yaw, pitch);
       }
       case 'gesture':
       case 'move':

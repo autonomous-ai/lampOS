@@ -11,10 +11,11 @@ lamp fake --everything          # pairs this computer with it; Ctrl-C ends it
 lamp fake --hands               # also waves a hand after each arrival
 ```
 
-Without `--everything` the fake refuses `play`, `joints` and `look`
-(`lampos.testing.LAMP_CONTROL_REFUSES`; `--hands` answers looks). That is
-stricter than a customer lamp on stable 10824, which takes `look` at
-`ahead`, `hand` or a yaw and pitch, and `joints` at `yaw` and `pitch`. The
+Without `--everything` the fake answers as a customer lamp on stable 10824
+does: it takes `look` at `ahead`, `hand` or a yaw and pitch, and `joints`
+naming only `yaw` and `pitch`; it refuses `play`
+(`lampos.testing.LAMP_CONTROL_REFUSES`) and `joints` naming `roll`,
+`shoulder` or `elbow` (`JOINTS_WAIT`), in lamp-control's words. The
 fake takes what a customer lamp refuses: a skill push, and a motion asked
 while another plays (`busy` with `retry_ms` there; `fake.refuse_next` can
 play it). See [gotchas.md](gotchas.md). Run your program in
@@ -46,9 +47,10 @@ def test_my_ci_light(tmp_path):
     asyncio.run(go())
 ```
 
-`FakeLamp(...)` answers every op by default, as `--everything` does; pass
-`refuses=LAMP_CONTROL_REFUSES` for the refusals above (stricter than a
-stable lamp for `look` and `joints`).
+`FakeLamp(...)` answers every op by default, as `--everything` does, except
+`joints` naming `roll`, `shoulder` or `elbow`, which every fake refuses with
+`JOINTS_WAIT`; pass `refuses=LAMP_CONTROL_REFUSES` (JS:
+`refuses: LAMP_CONTROL_REFUSES`) for the refusals above, as `lamp fake` does.
 
 What the fake gives a test:
 - `fake.asked(op)`: the fields of every `op` request it took, oldest first,
