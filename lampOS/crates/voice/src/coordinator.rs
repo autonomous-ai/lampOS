@@ -17319,6 +17319,7 @@ mod tests {
     mod endpoint_session;
     mod failure_notice;
     mod fixture_at;
+    mod forget_tail;
     mod hand_controls;
     mod holding_answer;
     mod pilot_faults;

@@ -1170,18 +1170,12 @@ fn a_forget_discards_the_prior_rounds_unspoken_marker_protocol() {
         },
     );
     assert!(went.noted, "{went:?}");
-    assert!(
-        went.said
-            .iter()
-            .any(|line| line.trim_start_matches("said:").trim() == "Brighter."),
-        "{went:?}"
-    );
     assert_eq!(went.asked, 3);
     assert_eq!(went.ran, 2);
-    // Since the stage filter (9ace077a52) a `<tag>` is stripped before
-    // speech, so the literal marker never reaches the voice either way:
-    // nothing after "Brighter." is said.
-    assert_eq!(went.said, ["said:Brighter."], "{went:?}");
+    // The immediate forget now cancels the queued "Brighter." too. Since
+    // the stage filter (9ace077a52), the fresh literal <tag> is stripped
+    // before speech. Neither pending old speech nor the marker is spoken.
+    assert!(went.said.is_empty(), "{went:?}");
 }
 
 /// Memory-keep evidence ends at a forget, unlike a completed non-memory action.
