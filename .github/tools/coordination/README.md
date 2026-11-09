@@ -120,6 +120,8 @@ The train merges as it is, by rebase and pinned to its head, after the same prec
 The crates' tests read files in `lampOS/deploy`, `lampOS/skills`, `lampOS/etc` and those docs, so a gain there rebuilds.
 Anything else rebuilds as before, and so does any error (fail closed).
 
+A train GitHub already shows as merged is never rebuilt, whatever `merge-when-green.sh` answered: train 761 (#5904) merged and was answered as behind, so its PRs were left open. The bot then closes the carried PRs as after any merge.
+
 Replay a case without changing anything:
 
 ```sh
