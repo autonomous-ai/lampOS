@@ -768,6 +768,20 @@ pub const CONVERSATION_CARRIES_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIES";
 /// `ScopeLease::save_carried`). Reads, forgets and a yes stay refused. `on`,
 /// and nothing else; off, a carried line keeps nothing, as before.
 pub const CONVERSATION_CARRIED_SAVES_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIED_SAVES";
+
+/// With [`CONVERSATION_CARRIES_ENVIRONMENT`], a line carried in full as a
+/// known person's conversation is read and kept as theirs, as a lone known
+/// face's line is with [`PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT`]: recall,
+/// hits, the memory note, and its `remember` written in their scope at
+/// once, not held for a yes ([`Engine::reading_carried`],
+/// `ScopeLease::read_carried`). No forget of any kind, no correction, rule
+/// or yes runs on it (`ScopeLease::forgets_need_mouth`), and it is still
+/// never journalled or summarised. A line carried for a keep only stays as
+/// before. The memory owner's decision of 9 Nov, after lamp-06c1's S14 run
+/// (build 10824): every carried line refused its recall, so 11 of 14 asks
+/// failed though the facts were stored. `on`, and nothing else; off, a
+/// carried line is as before, byte for byte.
+pub const CONVERSATION_CARRIED_MEMORY_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIED_MEMORY";
 /// A known person's keep on a line no face was seen speaking is theirs when
 /// their known face was the one face in every look of it and no other voice
 /// was heard since the conversation began (the launch testers' item 1 on
@@ -1806,6 +1820,9 @@ struct Shared {
     /// A carried line may save into the conversation's scope
     /// (`LAMP_CONVERSATION_CARRIED_SAVES`, [`Engine::saving_carried`]).
     carried_saves: bool,
+    /// A carried line is read and kept as its person's, forgets refused
+    /// (`LAMP_CONVERSATION_CARRIED_MEMORY`, [`Engine::reading_carried`]).
+    carried_memory: bool,
     /// Who was seen saying a known person's line is kept for its services
     /// write (`LAMP_SERVICES`, [`Engine::keeping_sight_for_services`]).
     services_sight: bool,
@@ -4238,6 +4255,7 @@ impl Engine {
                 scope_seen: false,
                 carries: None,
                 carried_saves: false,
+                carried_memory: false,
                 services_sight: false,
                 past_silent: None,
                 one_face: None,
@@ -4531,6 +4549,41 @@ impl Engine {
     pub fn saving_carried(mut self, on: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.carried_saves = on;
+        self
+    }
+
+    /// With [`Self::carrying_conversations`], a line carried in full is read
+    /// and kept as the carried person's, as a lone known face's line is
+    /// (`LAMP_CONVERSATION_CARRIED_MEMORY=on`, `ScopeLease::read_carried`):
+    /// its recall, hits and note read their memory, and its `remember` is
+    /// written in their scope at once, not held for a yes. No forget,
+    /// correction, rule or yes runs on it, and it is never journalled. A
+    /// line carried for a keep only stays as before. Only with
+    /// [`Self::scoping_by_one_face`]'s tracker showing no other voice, their
+    /// own face the one face in view through the line, and the rule having
+    /// judged its voice: otherwise a carried line stays as before. Off, as
+    /// before.
+    pub fn reading_carried(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.carried_memory = on;
+        self
+    }
+
+    /// [`Self::reading_carried`] only where another voice can be heard:
+    /// `hears`, the same-voice check runs for this route (its printer
+    /// started for every rule). Without it the tracker would never record a
+    /// voice, so "no other voice" would always hold (Jarvis's P2 on #5842,
+    /// as the Reviewer-lead's P2 on #4610 for
+    /// [`Self::carrying_past_silent_where_heard`]): a carried line stays as
+    /// before, said once at start with why.
+    pub(crate) fn reading_carried_where_heard(mut self, hears: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        if shared.carried_memory && !hears {
+            eprintln!(
+                "lamp-voice second: LAMP_CONVERSATION_CARRIED_MEMORY is inactive: the same-voice check is not running here; a carried line stays held and the room's"
+            );
+            shared.carried_memory = false;
+        }
         self
     }
 
@@ -7839,6 +7892,9 @@ async fn spoken(
     // (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`): judged again by the voice
     // once the rule has heard it.
     let mut carried_past_silent = false;
+    // The carried person's own face, when a line is carried in full by
+    // either rule below (`LAMP_CONVERSATION_CARRIED_MEMORY`'s look).
+    let mut carried_face: Option<String> = None;
     let mut one_face = false;
     // No face seen speaking it at all and the admitted person's own known
     // face the only face in view through it: memory's hits may fall back to their scope
@@ -7932,6 +7988,7 @@ async fn spoken(
                         });
                 if carried {
                     carried_past_silent = shared.past_silent.is_some();
+                    carried_face = own_face.map(str::to_owned);
                     eprintln!(
                         "lamp-voice second: request {request}: no face was seen speaking it, in their conversation going on, {}: {} (LAMP_CONVERSATION_CARRIES)",
                         carried_as(&shared),
@@ -8128,6 +8185,7 @@ async fn spoken(
             && carry_into(&shared, lease, &person, keep_only)
         {
             carried_past_silent = shared.past_silent.is_some();
+            carried_face = face.map(str::to_owned);
             eprintln!(
                 "lamp-voice second: request {request}: admitted as the room's, no face seen speaking it, in a known person's conversation going on, {}: {} (LAMP_CONVERSATION_CARRIES)",
                 carried_as(&shared),
@@ -8140,10 +8198,41 @@ async fn spoken(
             }
         }
     }
+    // Carried in full, by either rule above, with
+    // `LAMP_CONVERSATION_CARRIED_MEMORY` (the memory owner's decision of 9
+    // Nov, after lamp-06c1's S14 run): read and kept as the carried person's,
+    // as a lone known face's line is, no forget, correction, rule or yes run
+    // on it, never journalled. Only with the one-face rule's tracker there
+    // and no other voice it recorded in the conversation, nor
+    // `past_silent`'s sign of another person: fails closed, so with no
+    // tracker an off-camera guest's line just after their face stays held
+    // and the room's (Thirteen's P2 on #5842). And only with their own face
+    // the one face in view through the line, by the one-face count
+    // (`SpeakingFaces::one_face_in_view`), as a lone known face's line is
+    // read: a face seen only in the seconds before, gone or out of view as
+    // it is said, is not enough (Jarvis's P2 on #5842: an off-camera guest
+    // just after they walked out). The rule must also judge the line's own
+    // voice, checked once it has (below). A keep-only carry stays as
+    // before.
+    let mut carried_memory = false;
+    if shared.carried_memory
+        && no_other_voice_shown(&shared)
+        && let (Some(lease), Some((eyes, _))) = (scope.as_ref(), &shared.speaking)
+        && carried_face
+            .as_deref()
+            .is_some_and(|face| eyes.one_face_in_view(face, begun, finishing))
+        && lease.read_carried()
+    {
+        carried_memory = true;
+        eprintln!(
+            "lamp-voice second: request {request}: carried: read and kept as theirs, a keep written at once; no forget, correction, rule or yes runs on it, never journalled (LAMP_CONVERSATION_CARRIED_MEMORY)"
+        );
+    }
     // Carried, by either rule above, with `LAMP_CONVERSATION_CARRIED_SAVES`:
     // its keep is held for the carried person's yes, their face seen saying
     // it, never written at once (the first builder's call on #4508).
-    if shared.carried_saves
+    if !carried_memory
+        && shared.carried_saves
         && let Some(lease) = scope.as_ref()
         && lease.save_carried()
     {
@@ -8721,7 +8810,28 @@ async fn spoken(
             "lamp-voice second: request {request}: another voice in the conversation, heard as it was judged: it opens no conversation of the named person's"
         );
     }
-    if (one_face || hits_face || named_by_one_face)
+    // A carried line read as its person's (`LAMP_CONVERSATION_CARRIED_MEMORY`)
+    // the rule never judged (held, empty, its own echo, or no rule): whether
+    // another voice said it is unknown, so it is the room's after all, keeps
+    // and all (Jarvis's P2 on #5842: fail closed unless a voice check ran on
+    // this very line).
+    if carried_memory
+        && !heed_ran
+        && let Some(scope) = scope.as_ref()
+    {
+        scope.narrow_to_room();
+        eprintln!(
+            "lamp-voice second: request {request}: carried, then the rule never heard its voice: told and kept as the room's (LAMP_CONVERSATION_CARRIED_MEMORY)"
+        );
+        if prepared.take().is_some() {
+            eprintln!(
+                "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the person's"
+            );
+        }
+    }
+    // So too a carried line read as its person's
+    // (`LAMP_CONVERSATION_CARRIED_MEMORY`) another voice shows in.
+    if (one_face || hits_face || named_by_one_face || carried_memory)
         && another_voice_heard(shared.one_face.as_deref())
         && let Some(scope) = scope.as_ref()
         && (scope.by_one_face()
