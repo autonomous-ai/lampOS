@@ -2940,7 +2940,7 @@ impl Onboarding {
                 && !hello_after_lamp
                 && quiet_us < START_QUIET_US);
         self.owed_note.bindable = false;
-        let owed = self.owed.clone().or_else(|| self.closing.clone());
+        let owed = self.owed.clone().or_else(|| self.closing_line());
         let note = self.tick_led(now_us, quiet_us, can_speak, paused, face, still)?;
         self.owed_note.again = false;
         if owed.as_ref() == Some(&note) {
@@ -3023,7 +3023,13 @@ impl Onboarding {
         if self.model_held {
             return None;
         }
-        if can_speak && let Some(note) = self.owed.take().or_else(|| self.closing.take()) {
+        if can_speak
+            && let Some(note) = self.owed.take().or_else(|| {
+                let line = self.closing_line();
+                self.closing = None;
+                line
+            })
+        {
             self.owed = self.owed_after.take();
             if note == skill::PREFERENCES_HELLO
                 && let Some(led) = self.led.as_mut()
@@ -3729,9 +3735,8 @@ impl Onboarding {
         if (outcome == Outcome::Done && step == Step::Preferences)
             || (step != Step::Preferences && !ended_before && (last || ended_the_walk))
         {
-            let done = self.preferences_done().to_owned();
-            // "All done, {Name}!" when the walk knows the name (#4080).
-            self.closing = Some(in_language::with_name(&done, self.desired.owner.as_deref()));
+            // Kept without a name: the name is the one known when it is said.
+            self.closing = Some(self.preferences_done().to_owned());
             // Dated once per setup, for the app (`Progress::done_at_unix_ms`).
             self.desired.done_at_unix_ms.get_or_insert_with(unix_ms);
         }
@@ -3747,6 +3752,15 @@ impl Onboarding {
         );
         self.park_out_of_order(at_unix_s, now_us);
         self.save();
+    }
+
+    /// The closing owed, as said now: "All done, {Name}!" with the owner
+    /// the walk knows at this moment (#4080), the nameless line once their
+    /// face is forgotten (the reviewers' P1 on #5809).
+    fn closing_line(&self) -> Option<String> {
+        self.closing
+            .as_deref()
+            .map(|done| in_language::with_name(done, self.desired.owner.as_deref()))
     }
 
     /// Every step in the skill's order has an outcome.
@@ -7170,6 +7184,37 @@ mod tests {
             ),
             "{notes:?}"
         );
+    }
+
+    /// The reviewers' P1 on #5809: the owner's face forgotten after "who
+    /// you are" ended and before the closing is said: the closing names
+    /// nobody, never the forgotten name.
+    #[test]
+    fn a_face_forgotten_before_the_closing_leaves_its_name_out() {
+        let mut room = Room::new("closing-forgotten");
+        room.walk.definition = two_steps();
+        room.walk
+            .finish(Step::WhereYouSit, Outcome::Done, None, room.at);
+        room.walk.desired.owner = Some("Mia".into());
+        room.walk
+            .finish(Step::WhoYouAre, Outcome::Done, None, room.at);
+        room.walk.owed = None;
+        room.walk.owed_after = None;
+        face_forgotten(&room.walk.file);
+        // Read while the lamp may not speak, so the closing waits.
+        for _ in 0..50 {
+            room.at += READ_EVERY_US;
+            room.walk.drain_storage_for_test(room.at);
+            room.walk
+                .tick(room.at, START_QUIET_US, false, false, None, true);
+            if room.walk.desired.owner.is_none() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert_eq!(room.walk.desired.owner, None);
+        let notes = room.wait(4 * S, Some(NEAR_MIDDLE));
+        assert_eq!(notes, [skill::PREFERENCES_DONE], "{notes:?}");
     }
 
     /// The shipped skill cut to #5499's two-step walk (the order before
