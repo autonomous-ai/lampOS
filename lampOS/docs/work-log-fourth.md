@@ -1,3 +1,11 @@
+## 2026-11-10 00:32 ICT — repair ownership and bounded disk cleanup
+
+First assigned the sent-write/forget repair to Twelve (Queue6746607759). Twelve accepted and then explicitly agreed to stack on Third's rebased #5878 before landing (6746685932); Fourth's integration HOLD covers both until the repaired composition is checked. Published fail-first remains6c82603f93. Additional unadmitted control passes. A draft late-receipt assertion incorrectly froze unknown even after a genuine sent receipt; it is being corrected to permit content-free status updates while forbidding restored payload/raw IDs. That draft assertion is not a product finding. Coordination6746839693 records the distinction.
+
+The obsolete train757 host gate was deliberately interrupted. Its native handle is no longer registered and recorded processes5847/34281/88378 are absent; final exit status was not recovered, so no exact exit-code claim. Preserved partial log has78 completed groups,4,019 passes,12 failures and38 ignores across four failed groups. Formatting and strict15-crate Clippy passed earlier; full testing is incomplete and workspace build was not reached. This is not a green gate.
+
+Removed finished Peek target3.3GiB and stopped old-face target4.7GiB, both removal commands confirmed exit0. Only active face-carry regression cache remains. Disk now16GiB free (shared disk, not all improvement attributed here). Logs, published source and active dirty test tree remain. Clean obsolete linked worktrees are being removed without force, preserving branches and their common repository. No device action.
+
 ## 2026-11-10 00:14 ICT — current CI receipts and reproduced send/forget integration HOLD
 
 Photo #5865 head73b93d9094 has fresh ARM64 run42650920808: 1,872 selected passes / eight skips across17 binaries (cloud/update/voice-eval;187 binaries outside selection), plus doc4 and process13 checks. Linux Clippy42650920772 and docs42650920886 pass. Both tested merge787690cabd on basecaca127702; independent merge-tree check matches ee2c1eca78a0922c3b2c98b38cf392b6bd6a9f15. Posted6745210612; current-head read restatements remain pending. The local default-parallel failure and complete serial pass remain explicit in the body.
