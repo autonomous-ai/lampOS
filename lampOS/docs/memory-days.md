@@ -221,7 +221,12 @@ told only the role names of the known faces in view, deduped and naming no
 one, and that the lamp can't tell who is speaking, so it stays Lamp; that
 note is left out entirely while a name is held back (`someone_else_now`). An
 `end_role` the memory did not write keeps the role, and the lamp says it did
-not end.
+not end. A line placed only by one face in view cannot set or end a role:
+voice refuses both calls before writing and keeps the held role unchanged.
+Voice also fences cached role publication across set, end and forget; a late
+session response cannot restore a forgotten role. Conflicting successful
+write responses evict the uncertain cached role until a fresh session read
+(see [memory](memory.md)).
 
 With `LAMP_MEMORY_STRENGTH=on` (the memory owner's Tiers-ideas plan, 3 Nov,
 P2; off unless set, with the Days client only), the voice's `search`,
