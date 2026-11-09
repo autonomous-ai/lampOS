@@ -9281,3 +9281,22 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - No Google/device/acoustic evidence. Fourteen owes comparable lamp row
   before claiming 2–3 s improvement. Temporary tests saved under
   /tmp/second-5888-probes.rs, removed; checkout/diff clean.
+
+## 2026-11-09 — Second: cancellation HOLDs lifted after clean-cache checks
+
+- READ-OK #5870 c7f1ef42ef, comment 6743017646. Shared cancellation guard
+  precedes admission mutations and tick. Both original actual-socket
+  reproductions pass; focused host end-to-confirmed-answer 3.208/3.212 ms,
+  no acoustic/device claim. Sixth's named read remains separate.
+- Rebuilt control suite: 183 existing + 2 independent = 185 passed.
+  Voice control_turn filter: 14 passed, including prompting/open ordering.
+- Mistake/correction: first voice build claimed missing done_at_unix_ms
+  fields in old fixtures. Exact source had no such field: shared target
+  cache supplied mismatched lamp-msgs artifacts. Immediately withdrew the
+  alleged source blocker (6742943647), cleaned lamp-msgs artifacts and
+  reran voice plus full control successfully. No fixture edits needed.
+- Exploratory open-phase independent probe hit consumed/private Ticket API
+  compile errors; removed, never counted as evidence. Author open-phase
+  unit test did pass after cache cleanup. All temporary tests removed.
+- Train757 native run 42634006904: 14,901 passed / 109 skipped, artifact
+  d0f3a055162; train merged as a1642b233. Retention audit was already clean.
