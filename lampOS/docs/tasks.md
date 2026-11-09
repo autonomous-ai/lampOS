@@ -147,7 +147,9 @@ reads, so "client api" never finds "Fix the API client"). A word said is
 held when a row's word is the same, or the same with one of the endings
 s, es, ed, ing, er or ers (`ENDINGS`: "book" for "books.py", "test" for
 "tests", never "testament" or "notebook", the Reviewer-lead's P2 on #5784
-at de9bebdb41). A row fits only when it holds every one of those words,
+at de9bebdb41). A word of one or two letters takes no ending, so "the US
+tax session" never finds "Update user tax settings" (`SHORTEST_STEM`,
+Reviewer-three's P2 on #5784 at 71bf964baa). A row fits only when it holds every one of those words,
 so "the payroll dashboard one" never finds a weather dashboard on
 "dashboard" alone (Reviewer-three's P2 on #5784 at 3d90e56736). Live rows
 come before stopped ones, so "the book program one" finds the session
