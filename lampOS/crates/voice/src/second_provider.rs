@@ -2014,7 +2014,8 @@ fn carried_as(shared: &Shared) -> &'static str {
 /// reused id is someone else, and a known face with no boot is nobody's.
 /// Without it, the bare ids, as before. A follow of the known face the
 /// eyes' last look still says at the line's end waits for their print to
-/// decide (`speaking_faces::known_once_decided`, #4966).
+/// decide (`speaking_faces::known_once_decided`, #4966), and an unsure hold
+/// for a print (`speaking_faces::known_once_printed`, #5738).
 ///
 /// [`SpeakingFaces::known_with_boot`]: crate::speaking_faces::SpeakingFaces::known_with_boot
 async fn line_sight(
@@ -2052,6 +2053,20 @@ async fn line_sight(
             crate::speaking_faces::FOLLOW_DECIDED_WITHIN,
         )
         .await;
+        // An unsure hold (nobody near, or their face not printed since a
+        // gap) ties the line to no one until a print decides (#5738).
+        let read = {
+            let (eyes, file) = (eyes.clone(), known_file.clone());
+            move || eyes.known_with_boot(&file)
+        };
+        let pair = crate::speaking_faces::known_once_printed(
+            &known_file,
+            pair,
+            finishing,
+            crate::speaking_faces::FOLLOW_DECIDED_WITHIN,
+            read,
+        )
+        .await;
         // The known face the only one in view through the line (lamp-3e83).
         let alone = pair
             .as_ref()
@@ -2064,6 +2079,18 @@ async fn line_sight(
                 .await
                 .ok()
                 .flatten();
+        let read = {
+            let file = known_file.clone();
+            move || crate::speaking_faces::known_with_face(&file)
+        };
+        let pair = crate::speaking_faces::known_once_printed(
+            &known_file,
+            pair,
+            finishing,
+            crate::speaking_faces::FOLLOW_DECIDED_WITHIN,
+            read,
+        )
+        .await;
         (speakers, pair, false)
     }
 }

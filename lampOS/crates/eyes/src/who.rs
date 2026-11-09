@@ -66,6 +66,28 @@ pub fn known_face_of(known: &Path) -> PathBuf {
     PathBuf::from(beside)
 }
 
+/// Beside the known file (`--known-file`): `-unsure`, an empty file there
+/// while the one known is held with no print read as theirs since a gap
+/// (`LAMP_FACE_KNOWN_UNSURE=on`, [`Unprinted::Unsure`], #5738). The voice
+/// waits for it to go before it ties a line to them.
+pub fn known_unsure_of(known: &Path) -> PathBuf {
+    let mut beside = known.as_os_str().to_owned();
+    beside.push("-unsure");
+    PathBuf::from(beside)
+}
+
+/// Marks the hold unsure ([`known_unsure_of`]), written before the known
+/// file's time is renewed, so the voice never reads a renewed name without
+/// it.
+pub fn mark_unsure(known: &Path) {
+    let _ = std::fs::write(known_unsure_of(known), b"");
+}
+
+/// A print decided: the hold is sure again, or the name is gone.
+pub fn clear_unsure(known: &Path) {
+    let _ = std::fs::remove_file(known_unsure_of(known));
+}
+
 /// The name of the one known at the lamp (`--known-file`), replaced whole,
 /// or no file; and while speaking is judged, their face's passing id in
 /// [`known_face_of`], which goes with the name. With
@@ -74,6 +96,8 @@ pub fn known_face_of(known: &Path) -> PathBuf {
 /// without it, the name alone, as before.
 pub fn keep_known(path: &Path, name: Option<&str>, id: Option<&str>, face: Option<&str>) {
     let beside = known_face_of(path);
+    // A match, a print's carry or a let-go: whatever was unsure is decided.
+    clear_unsure(path);
     let Some(name) = name else {
         let _ = std::fs::remove_file(&beside);
         let _ = std::fs::remove_file(path);
@@ -1852,6 +1876,18 @@ pub fn known_hold_on() -> bool {
     std::env::var(KNOWN_HOLD_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// Off unless `LAMP_FACE_KNOWN_UNSURE=on` on lamp-eyes, and only with the
+/// hold on: a check with no print, within [`KNOWN_HOLD`], keeps the one
+/// known whatever face is near, but unsure ([`Unprinted::Unsure`]) unless
+/// their passing id has stayed in every look and no gap has come since a
+/// print read them; the voice ties no line to an unsure hold until a print
+/// decides (#5738).
+pub const KNOWN_UNSURE_ENVIRONMENT: &str = "LAMP_FACE_KNOWN_UNSURE";
+
+pub fn known_unsure_on() -> bool {
+    std::env::var(KNOWN_UNSURE_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
 /// Off unless `LAMP_FACE_REFOUND=on` on lamp-eyes: a near face whose passing
 /// id has no print read for it yet is recognised at once, and again at most
 /// every [`REFOUND_RETRY`] while its alignment or print fails
@@ -1921,6 +1957,23 @@ pub struct Held {
     /// Reviewer-lead's P2 on #5546). In memory only, gone with
     /// [`Held::let_go`].
     last_print: Option<Vec<f32>>,
+    /// `LAMP_FACE_KNOWN_UNSURE=on` ([`Held::unsure_holds`]).
+    unsure_on: bool,
+    /// Held unsure since a check with no print ([`Unprinted::Unsure`]),
+    /// until a print decides: a match, a held print, or a let-go.
+    unsure: bool,
+}
+
+/// What a check with no print does with the one known ([`Held::unprinted`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Unprinted {
+    /// Kept, as they were.
+    Sure,
+    /// Kept, with no print read as theirs since a gap: the voice waits for
+    /// a print before it ties a line to them (#5738).
+    Unsure,
+    /// Let go.
+    LetGo,
 }
 
 /// The looks in a row that may find no face at all while [`Held::unbroken`]
@@ -1944,7 +1997,52 @@ impl Held {
             missed: 0,
             gapped: false,
             last_print: None,
+            unsure_on: false,
+            unsure: false,
         }
+    }
+
+    /// With `on` (`LAMP_FACE_KNOWN_UNSURE`), a check with no print holds
+    /// unsure where it would let go or hold with nobody near
+    /// ([`Held::unprinted`]).
+    pub fn unsure_holds(mut self, on: bool) -> Self {
+        self.unsure_on = on;
+        self
+    }
+
+    /// Whether the hold is unsure, waiting for a print ([`Unprinted::Unsure`]).
+    pub fn unsure(&self) -> bool {
+        self.unsure
+    }
+
+    /// A print kept the one known ([`Held::keeps_print`]): sure again.
+    pub fn printed_theirs(&mut self) {
+        self.unsure = false;
+    }
+
+    /// A check with no print, `near` whether a near face was seen and `id`
+    /// its passing id. Off, [`Held::keeps_unprinted`]'s rule: sure or let
+    /// go. On, within [`KNOWN_HOLD`]: sure only while that rule's near
+    /// face holds (their id unbroken) and nothing has been unsure since the
+    /// last print; nobody near, or any other near face, holds unsure, so a
+    /// near face of theirs after a gap is not let go before a print reads
+    /// it, and no line is theirs on the hold alone (#5738).
+    pub fn unprinted(&mut self, now: Instant, near: bool, id: Option<&str>) -> Unprinted {
+        if !self.unsure_on {
+            return if self.keeps_unprinted(now, near, id) {
+                Unprinted::Sure
+            } else {
+                Unprinted::LetGo
+            };
+        }
+        if !self.keeps(now) {
+            return Unprinted::LetGo;
+        }
+        if !self.unsure && near && self.keeps_unprinted(now, near, id) {
+            return Unprinted::Sure;
+        }
+        self.unsure = true;
+        Unprinted::Unsure
     }
 
     /// With `follows` (`bus_out::follows_from_environment`), a followed id
@@ -2013,6 +2111,7 @@ impl Held {
         self.gapped = false;
         self.matched_id = id;
         self.pending = None;
+        self.unsure = false;
     }
 
     /// One look: whether each passing id is in it (`in_view`), and whether
@@ -2128,6 +2227,7 @@ impl Held {
         self.matched_at = None;
         self.matched_id = None;
         self.pending = None;
+        self.unsure = false;
     }
 }
 
@@ -2163,6 +2263,19 @@ pub fn recognise_due_near(
         || (refound
             && near_id.is_some_and(|id| !printed.iter().any(|kept| kept == id))
             && looked_for.is_none_or(|at| now.saturating_duration_since(at) >= REFOUND_RETRY))
+}
+
+/// While the hold is unsure ([`Held::unsure`]) and a near face is seen, a
+/// check every [`REFOUND_RETRY`] instead of every [`RECOGNISE_EVERY`]: the
+/// voice waits at most `FOLLOW_DECIDED_WITHIN` (1 s) past a line's end for
+/// a print to decide (#5738).
+pub fn recognise_due_unsure(
+    looked_for: Option<Instant>,
+    unsure: bool,
+    near: bool,
+    now: Instant,
+) -> bool {
+    unsure && near && looked_for.is_none_or(|at| now.saturating_duration_since(at) >= REFOUND_RETRY)
 }
 
 /// Keeps `id` among the printed ids, dropping the oldest past
@@ -3127,6 +3240,79 @@ mod tests {
         held.matched(start, None);
         assert!(held.keeps_print(then, Some(0.35), Some("f9")));
         assert!(!held.keeps_print(then, Some(0.12), None));
+    }
+
+    /// #5738: their face back near after a gap, not printed (turned, too
+    /// small): with `LAMP_FACE_KNOWN_UNSURE` on, held unsure, not let go,
+    /// whatever its id, until a print decides; off, let go as before.
+    #[test]
+    fn a_near_unprinted_face_after_a_gap_holds_unsure_until_a_print() {
+        let start = Instant::now();
+        let then = start + RECOGNISE_EVERY;
+        for id in [Some("f3"), Some("f4"), None] {
+            let mut held = Held::new(true).unsure_holds(true);
+            held.matched(start, Some("f3".to_owned()));
+            // A look with a near face but not theirs: the gap ends unbroken.
+            held.looked(|_| false, true);
+            assert_eq!(held.unprinted(then, true, id), Unprinted::Unsure);
+            assert!(held.unsure());
+            // The bound still lets go.
+            assert_eq!(
+                held.unprinted(start + KNOWN_HOLD, true, id),
+                Unprinted::LetGo
+            );
+            let mut off = Held::new(true);
+            off.matched(start, Some("f3".to_owned()));
+            off.looked(|_| false, true);
+            assert_eq!(off.unprinted(then, true, id), Unprinted::LetGo);
+        }
+    }
+
+    /// #5738, the first builder's ask: nobody near holds unsure too, and
+    /// their own unbroken id seen after that stays unsure: only a print
+    /// (a match, or a held print) makes it sure, or a let-go ends it.
+    #[test]
+    fn nobody_near_holds_unsure_and_only_a_print_makes_it_sure() {
+        let start = Instant::now();
+        let then = start + RECOGNISE_EVERY;
+        let mut held = Held::new(true).unsure_holds(true);
+        held.matched(start, Some("f3".to_owned()));
+        // Their id in view, unprinted, with nothing unsure yet: sure.
+        assert_eq!(held.unprinted(then, true, Some("f3")), Unprinted::Sure);
+        assert_eq!(held.unprinted(then, false, None), Unprinted::Unsure);
+        assert_eq!(held.unprinted(then, true, Some("f3")), Unprinted::Unsure);
+        held.printed_theirs();
+        assert!(!held.unsure());
+        assert_eq!(held.unprinted(then, true, Some("f3")), Unprinted::Sure);
+        held.unprinted(then, false, None);
+        held.matched(then, Some("f3".to_owned()));
+        assert!(!held.unsure());
+        held.unprinted(then, false, None);
+        held.let_go();
+        assert!(!held.unsure());
+        // Off: nobody near is a sure hold, as before.
+        let mut off = Held::new(true);
+        off.matched(start, Some("f3".to_owned()));
+        assert_eq!(off.unprinted(then, false, None), Unprinted::Sure);
+        assert!(!off.unsure());
+    }
+
+    /// #5738: an unsure hold with a near face asks every `REFOUND_RETRY`,
+    /// so a print decides within the voice's 1 s wait; nobody near, or a
+    /// sure hold, waits for `RECOGNISE_EVERY`.
+    #[test]
+    fn an_unsure_hold_with_a_near_face_is_checked_every_half_second() {
+        let start = Instant::now();
+        let soon = start + REFOUND_RETRY;
+        assert!(recognise_due_unsure(Some(start), true, true, soon));
+        assert!(!recognise_due_unsure(
+            Some(start),
+            true,
+            true,
+            start + REFOUND_RETRY / 2
+        ));
+        assert!(!recognise_due_unsure(Some(start), true, false, soon));
+        assert!(!recognise_due_unsure(Some(start), false, true, soon));
     }
 
     #[test]
@@ -4487,6 +4673,26 @@ mod tests {
     /// The known name, and while speaking is judged its face's passing id
     /// beside it: both 0600, the face gone with no face, both gone with no
     /// name.
+    /// #5738: the unsure mark beside the known file goes with any write of
+    /// it (a match, a carry, a let-go) and with a held print.
+    #[test]
+    fn the_unsure_mark_goes_with_a_print_or_a_let_go() {
+        let known = file("known-unsure").with_file_name("known");
+        let mark = known_unsure_of(&known);
+        assert_eq!(mark.file_name().unwrap(), "known-unsure");
+        keep_known(&known, Some("Lan"), None, Some("f3"));
+        mark_unsure(&known);
+        assert!(mark.exists());
+        keep_known(&known, Some("Lan"), None, Some("f3"));
+        assert!(!mark.exists());
+        mark_unsure(&known);
+        keep_known(&known, None, None, None);
+        assert!(!mark.exists());
+        mark_unsure(&known);
+        clear_unsure(&known);
+        assert!(!mark.exists());
+    }
+
     #[test]
     fn the_known_face_is_kept_beside_the_known_name_and_goes_with_it() {
         use std::os::unix::fs::PermissionsExt;
