@@ -920,6 +920,11 @@ pub struct Onboarding {
     /// A second word owed once [`Self::owed`] is said: how_you_sound's
     /// `near_failed`, after its sentence's line.
     owed_after: Option<String>,
+    /// The walk's closing line ("All done!"), owed once the walk's last
+    /// step ends: said after every line that step's end owes
+    /// ([`Self::owed`], [`Self::owed_after`]), so no step's own line, set
+    /// after its end, can take its place (lamp-52e6, 9 Nov).
+    closing: Option<String>,
     /// A step's first note ("where you sit"'s intro among them) was handed
     /// out by this tick, for the caller to bind to its turn
     /// ([`Self::bind_opener`]).
@@ -1210,6 +1215,7 @@ impl Onboarding {
             led: None,
             owed: None,
             owed_after: None,
+            closing: None,
             opener_said: false,
             opener_turn: None,
             opener_asking: None,
@@ -1323,6 +1329,7 @@ impl Onboarding {
         self.forget_giving();
         self.owed = None;
         self.owed_after = None;
+        self.closing = None;
         self.gesture = None;
     }
 
@@ -1379,6 +1386,7 @@ impl Onboarding {
             self.pending_records.clear();
             self.owed = None;
             self.owed_after = None;
+            self.closing = None;
             self.led = None;
             self.privacy_flow.offer = None;
             self.privacy_flow.attempt = None;
@@ -1980,6 +1988,7 @@ impl Onboarding {
         self.pending_records.retain(|row| row["step"] != "privacy");
         self.owed = None;
         self.owed_after = None;
+        self.closing = None;
         self.privacy_flow.erase_pending = true;
         self.fence_storage();
     }
@@ -2385,7 +2394,9 @@ impl Onboarding {
 
     /// Whether the lamp is in the middle of leading a step.
     pub fn leading(&self) -> bool {
-        self.owed.is_some() || self.led.as_ref().is_some_and(|led| led.asked_us.is_some())
+        self.owed.is_some()
+            || self.closing.is_some()
+            || self.led.as_ref().is_some_and(|led| led.asked_us.is_some())
     }
 
     /// Whether the walk is under way (#3747, the lead on #1711: no sleep
@@ -2822,7 +2833,7 @@ impl Onboarding {
                 && !hello_after_lamp
                 && quiet_us < START_QUIET_US);
         self.owed_note.bindable = false;
-        let owed = self.owed.clone();
+        let owed = self.owed.clone().or_else(|| self.closing.clone());
         let note = self.tick_led(now_us, quiet_us, can_speak, paused, face, still)?;
         self.owed_note.again = false;
         if owed.as_ref() == Some(&note) {
@@ -2905,7 +2916,7 @@ impl Onboarding {
         if self.model_held {
             return None;
         }
-        if can_speak && let Some(note) = self.owed.take() {
+        if can_speak && let Some(note) = self.owed.take().or_else(|| self.closing.take()) {
             self.owed = self.owed_after.take();
             if note == skill::PREFERENCES_HELLO
                 && let Some(led) = self.led.as_mut()
@@ -3534,6 +3545,7 @@ impl Onboarding {
         // it is offered at most [`MOST_LATER_OFFERS`] times; kept through
         // `not_available` (an invitation left unsaid), so the cap is never
         // escaped (the Reviewer-lead's P3 on #4012).
+        let over_before = self.walk_over();
         let kept = self.desired.steps.get(step.name());
         // The step had already ended with an answer this walk: led again
         // only by the face asked for once more, which says nothing more.
@@ -3574,19 +3586,34 @@ impl Onboarding {
         // "Preferences" done, by its answers heard or by the model's report:
         // the walk says its done line as soon as the lamp may speak, never
         // waiting for the person's next line (lamp-29e7, 29 Oct, 8545).
-        // Also the last step in the skill's order, however it ended (#5499:
-        // the two-step walk), once per walk: not when an ask made after the
-        // walk (the face asked for once more) ends it again; a redo removes
-        // the step's outcome, so its new end says it again.
+        // Also the walk's last offered step, however it ended (#5499: the
+        // two-step walk), once per walk: the last step in the skill's order,
+        // or the step whose end leaves the order all ended, a step after it
+        // not available (the Reviewer-lead on #5809). Not when an ask made
+        // after the walk (the face asked for once more) ends it again; a
+        // redo removes the step's outcome, so its new end says it again.
+        let answered = |kept: &Kept| {
+            matches!(
+                kept.outcome,
+                Outcome::Done | Outcome::Skipped | Outcome::Failed
+            )
+        };
+        let last = self.definition.order.last() == Some(&step)
+            && matches!(outcome, Outcome::Done | Outcome::Skipped | Outcome::Failed);
+        let ended_the_walk = !over_before
+            && self.walk_over()
+            && outcome != Outcome::Later
+            && self
+                .definition
+                .order
+                .iter()
+                .any(|step| self.desired.steps.get(step.name()).is_some_and(answered));
         if (outcome == Outcome::Done && step == Step::Preferences)
-            || (step != Step::Preferences
-                && !ended_before
-                && self.definition.order.last() == Some(&step)
-                && matches!(outcome, Outcome::Done | Outcome::Skipped | Outcome::Failed))
+            || (step != Step::Preferences && !ended_before && (last || ended_the_walk))
         {
             let done = self.preferences_done().to_owned();
             // "All done, {Name}!" when the walk knows the name (#4080).
-            self.owed = Some(in_language::with_name(&done, self.desired.owner.as_deref()));
+            self.closing = Some(in_language::with_name(&done, self.desired.owner.as_deref()));
         }
         if self.redoing_one == Some(step) {
             self.redoing_one = None;
@@ -3602,18 +3629,21 @@ impl Onboarding {
         self.save();
     }
 
+    /// Every step in the skill's order has an outcome.
+    fn walk_over(&self) -> bool {
+        self.definition
+            .order
+            .iter()
+            .all(|step| self.desired.steps.contains_key(step.name()))
+    }
+
     /// Every step in the order ended: each step out of it is kept
     /// `not_available` (#5499), so any lamp-update, which waits for all
     /// nine, sees the walk over. Never offered again: re-offers follow
     /// the order. Run when a step ends and at load, so a lamp that ended
     /// the walk on a build without it is filled too (El's P3 on #5521).
     fn park_out_of_order(&mut self, at_unix_s: u64, now_us: u64) {
-        if self
-            .definition
-            .order
-            .iter()
-            .all(|step| self.desired.steps.contains_key(step.name()))
-        {
+        if self.walk_over() {
             for parked in Step::IDS {
                 if !self.desired.steps.contains_key(parked)
                     && Step::named(parked).is_some_and(|s| !self.definition.order.contains(&s))
@@ -3841,6 +3871,7 @@ impl Onboarding {
             self.led = None;
             self.owed = None;
             self.owed_after = None;
+            self.closing = None;
         }
         self.finished_recorded = false;
         self.pending_records
@@ -3944,6 +3975,7 @@ impl Onboarding {
                 self.led = None;
                 self.owed = None;
                 self.owed_after = None;
+                self.closing = None;
                 self.finished_recorded = false;
                 self.pending_records.clear();
                 self.pending_records
@@ -6997,6 +7029,7 @@ mod tests {
         room.walk.drain_storage_for_test(room.at);
         room.walk.owed = None;
         room.walk.owed_after = None;
+        room.walk.closing = None;
         room.walk.redo_step(Step::WhoYouAre, room.at);
         assert_eq!(room.walk.step_count(Step::WhoYouAre), None);
         assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
