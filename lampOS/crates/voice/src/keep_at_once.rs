@@ -14,7 +14,10 @@
 //! English or Vietnamese, [`asks_a_question`]) whose round 1 called
 //! `remember` alone, with no words of its own, and whose kept text holds
 //! every content word of the line ([`covers`], a "not" and a single letter
-//! among them), is answered with [`KEPT`] as soon as every
+//! among them, with "i" still excluded). A payload containing standalone
+//! "a" also needs one kept text with the same ordered content including
+//! every "a"; uncertain split or reordered paraphrases take round 2. A
+//! covered keep is answered with [`KEPT`] as soon as every
 //! call came back kept plainly ([`kept_plainly`]), and the turn ends there:
 //! no second round. Anything else goes on exactly as without the switch:
 //! a keep that failed, was refused, held for a yes, doubted, or told with a
@@ -265,7 +268,11 @@ fn compared(words: &[String]) -> Vec<String> {
 /// in the third person ("I like tea" kept "Likes tea.") stays covered. A
 /// word the call did not keep ("… and explain gravity to me", "… and wish
 /// me luck") is a further ask, or a keep cut short: either way round 2
-/// answers it. Needs no word list of asks.
+/// answers it. Needs no word list of asks. A standalone "a" also requires
+/// one kept text with the same ordered content, retaining every "a": an
+/// incidental article cannot cover a requested letter value. Split or
+/// reordered such paraphrases defer; "i" remains an existing exclusion.
+/// This is conservative lexical coverage, not semantic equivalence.
 pub fn covers(said: &str, kept: &[&str]) -> bool {
     let mut heard = crate::known_faces::lower_words(said);
     if let Some((at, len)) = (0..heard.len()).find_map(|at| {
@@ -282,10 +289,6 @@ pub fn covers(said: &str, kept: &[&str]) -> bool {
     }) {
         heard.drain(at..at + len);
     }
-    let kept: Vec<String> = kept
-        .iter()
-        .flat_map(|text| compared(&crate::known_faces::lower_words(text)))
-        .collect();
     // A question word, an ask's verb and a "not" are content even where
     // the memory's search counts them common: "… where are they", "… tell
     // me about it" and "I don't like tea" each need the kept text to hold
@@ -299,7 +302,31 @@ pub fn covers(said: &str, kept: &[&str]) -> bool {
         })
         .map(|word| crate::remember::about_fold(word))
         .collect();
-    let content: Vec<String> = compared(&heard)
+    let heard = compared(&heard);
+    // A standalone "a" may be a value, not an article. Set membership
+    // would let an unrelated article cover "blood type A". Preserve its
+    // occurrences and order in one kept text, otherwise defer to round 2.
+    // This is deliberately stricter for split or reordered paraphrases.
+    if heard.iter().any(|word| word == "a") {
+        let with_a = |words: Vec<String>| {
+            words
+                .into_iter()
+                .filter(|word| word == "a" || !nothing.contains(word))
+                .collect::<Vec<_>>()
+        };
+        let wanted = with_a(heard.clone());
+        if !kept
+            .iter()
+            .any(|text| with_a(compared(&crate::known_faces::lower_words(text))) == wanted)
+        {
+            return false;
+        }
+    }
+    let kept: Vec<String> = kept
+        .iter()
+        .flat_map(|text| compared(&crate::known_faces::lower_words(text)))
+        .collect();
+    let content: Vec<String> = heard
         .into_iter()
         .filter(|word| !nothing.contains(word))
         .collect();
@@ -551,6 +578,48 @@ mod tests {
             ("Remember that my seat is row F", "Seat is row F."),
             ("Remember that I'm vegan", "Is vegan."),
             ("Remember that I'd like oat milk", "Would like oat milk."),
+        ] {
+            assert!(covers(said, &[kept]), "{said} / {kept}");
+        }
+    }
+
+    #[test]
+    fn a_letter_a_needs_one_ordered_coverage_with_its_occurrences() {
+        for (said, kept) in [
+            ("Remember my blood type is A", vec!["Blood type is B."]),
+            (
+                "Remember my blood type is A",
+                vec!["A person has blood type B."],
+            ),
+            (
+                "Remember my blood type is A",
+                vec!["Blood type is B.", "Has a cat."],
+            ),
+            ("Remember my blood type is A", vec!["Blood type."]),
+            (
+                "Remember my grade is A and my group is A",
+                vec!["Grade and group are A."],
+            ),
+            (
+                "Remember my blood type is A and I have a cat",
+                vec!["Blood type is A.", "Has a cat."],
+            ),
+            ("Remember my blood type is A", vec!["A is the blood type."]),
+        ] {
+            assert!(!covers(said, &kept), "{said} / {kept:?}");
+        }
+        for (said, kept) in [
+            ("Remember my blood type is A", "Blood type is A."),
+            ("Remember my blood type is a", "Blood type is a."),
+            ("Remember that I have a cat", "Has a cat."),
+            (
+                "Remember my grade is A and my group is A",
+                "Grade is A and group is A.",
+            ),
+            (
+                "Make a note that my dentist is on Tuesday",
+                "Their dentist is on Tuesday.",
+            ),
         ] {
             assert!(covers(said, &[kept]), "{said} / {kept}");
         }

@@ -465,3 +465,71 @@ async fn in_english_the_line_is_said_by_the_voice_as_before() {
     assert_eq!(went.asked.len(), 1, "{went:?}");
     assert_eq!(spoken, vec![KEPT.to_owned()], "{went:?}");
 }
+
+fn keeping_text(text: &str) -> Vec<net::Result<ChatEvent>> {
+    vec![
+        Ok(ChatEvent::ToolCalls(vec![call(
+            "letter",
+            "remember",
+            json!({"text": text}),
+        )])),
+        Ok(ChatEvent::Done),
+    ]
+}
+
+/// A value-letter A cannot disappear, nor be covered by an unrelated article.
+#[test]
+fn a_changed_letter_a_value_goes_to_round_two_like_off() {
+    let said = "Remember my blood type is A";
+    let mut premature = Vec::new();
+    for text in ["Blood type is B.", "A person has blood type B."] {
+        let off = keep_turn(
+            false,
+            said,
+            keeping_text(text),
+            vec![words("Let me check that letter.")],
+            kept,
+        );
+        let on = keep_turn(
+            true,
+            said,
+            keeping_text(text),
+            vec![words("Let me check that letter.")],
+            kept,
+        );
+        assert_eq!(off.asked.len(), 2);
+        if on != off {
+            premature.push((text, on.asked.len(), on.said().join(" | ")));
+        }
+    }
+    assert!(
+        premature.is_empty(),
+        "changed letter was fast-acknowledged: {premature:?}"
+    );
+}
+
+#[test]
+fn an_unchanged_letter_a_value_can_still_be_answered_at_once() {
+    let went = keep_turn(
+        true,
+        "Remember my blood type is A",
+        keeping_text("Blood type is A."),
+        vec![words("The second round.")],
+        kept,
+    );
+    assert_eq!(went.asked.len(), 1, "{went:?}");
+    assert_eq!(went.said(), vec![KEPT]);
+}
+
+#[test]
+fn an_ordinary_article_paraphrase_can_still_be_answered_at_once() {
+    let went = keep_turn(
+        true,
+        "Remember that I have a cat",
+        keeping_text("Has a cat."),
+        vec![words("The second round.")],
+        kept,
+    );
+    assert_eq!(went.asked.len(), 1, "{went:?}");
+    assert_eq!(went.said(), vec![KEPT]);
+}

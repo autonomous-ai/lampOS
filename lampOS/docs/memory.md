@@ -1304,7 +1304,13 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   I'll remember that." as soon as the memory answered a plain keep
   (`"remembered": true`, no note, no correction, nothing held, no error)
   and the calls' kept texts cover every content word of the line, a "not"
-  and a single letter among them (`keep_at_once::covers`); a line with a
+  and a single letter among them (`keep_at_once::covers`, with "i" still
+  excluded). A requested payload containing standalone "a" also requires
+  one kept text with the same ordered normalized content, retaining every
+  "a": an incidental article cannot cover a changed letter value. Split,
+  reordered or uncertain article paraphrases take round 2; unchanged
+  "blood type A" and "I have a cat" kept as "Has a cat" remain fast.
+  This is conservative lexical coverage. A line with a
   question word or shape in it, English or Vietnamese, with or without
   its "?" (`keep_at_once::asks_a_question`: "… in the drawer where are
   they"), goes to round 2, as does a keep asked in words other than
