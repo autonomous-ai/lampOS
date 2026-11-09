@@ -5515,7 +5515,24 @@ fn name_in(text: &str) -> Option<String> {
 /// as [`name_in`] reads a line: "W a l t e r." is "Walter". A name said
 /// without its letters is none. English words only.
 fn spelled_name_in(text: &str) -> Option<String> {
-    let mut words = name_words(text)?;
+    // "No, J O E." is four words, so read as a plain no before any lead is
+    // taken off: a leading "no" or "nope" is dropped and the rest read
+    // (a reviewer's P3 on #5695). "No." and "No, thanks." stay no name.
+    let mut rest = text;
+    let mut words = loop {
+        if let Some(words) = name_words(rest) {
+            break words;
+        }
+        let trimmed = rest.trim_start();
+        let end = trimmed.find(char::is_whitespace)?;
+        let first = trimmed[..end]
+            .trim_matches(|c: char| !c.is_alphanumeric())
+            .to_lowercase();
+        if text.contains('?') || !["no", "nope"].contains(&first.as_str()) {
+            return None;
+        }
+        rest = &trimmed[end..];
+    };
     // "My name is Walter, W-A-L-T-E-R." and "It's spelled W A L T E R." (the
     // first builder's and the Reviewer-lead's P3s on #5695). "Sorry, it's
     // W A L T E R." and "No, it's W A L T E R." too (a reviewer's P3 on #5695):
@@ -5523,6 +5540,7 @@ fn spelled_name_in(text: &str) -> Option<String> {
     let leads = [
         &["sorry"][..],
         &["no"],
+        &["nope"],
         &["it's"],
         &["its"],
         &["it", "is"],
@@ -5601,7 +5619,8 @@ fn spelled_in(words: &[&str]) -> Option<String> {
     }
     let spelled = letters_spelled(&rest.join(" "))?;
     if crate::known_faces::folded_words(&spelled) == crate::known_faces::folded_words(first) {
-        return Some((*first).to_owned());
+        let first = first.trim_start_matches(combining);
+        return marks_capped(first).then(|| first.to_owned());
     }
     Some(spelled)
 }
@@ -5613,6 +5632,19 @@ const MOST_SPELLED_LETTERS: usize = 20;
 /// Whether `c` is a combining accent, kept with its letter.
 fn combining(c: char) -> bool {
     ('\u{300}'..='\u{36f}').contains(&c)
+}
+
+/// The most combining marks one letter keeps: past it the line is no name
+/// (a reviewer's P3 on #5695: "W" and 18 marks were quoted with all 18).
+const MOST_MARKS_PER_LETTER: usize = 2;
+
+/// Whether no letter of `word` carries more than [`MOST_MARKS_PER_LETTER`].
+fn marks_capped(word: &str) -> bool {
+    let mut marks = 0;
+    word.chars().all(|c| {
+        marks = if combining(c) { marks + 1 } else { 0 };
+        marks <= MOST_MARKS_PER_LETTER
+    })
 }
 
 /// Letters spelled one by one ([`crate::known_faces::letters_as_word`]
@@ -5651,7 +5683,11 @@ fn letters_spelled(text: &str) -> Option<String> {
         }
         doubled = false;
     }
-    if word.chars().filter(|c| !combining(*c)).count() > MOST_SPELLED_LETTERS {
+    // A mark before any letter has none to sit on: it is dropped, so
+    // "\u{301} W A L T E R" is "Walter" (a reviewer's P3 on #5695).
+    let word = word.trim_start_matches(combining);
+    if word.chars().filter(|c| !combining(*c)).count() > MOST_SPELLED_LETTERS || !marks_capped(word)
+    {
         return None;
     }
     let mut chars = word.chars();
@@ -7431,6 +7467,53 @@ mod tests {
         }
         assert_eq!(spelled_name_in("Sorry."), None);
         assert_eq!(spelled_name_in("No, it's Walter."), None);
+    }
+
+    /// A reviewer's P3 on #5695: "No, J O E." (four words, a plain no) and
+    /// "Nope, it's W A L T E R." were told nothing.
+    #[test]
+    fn a_short_spelling_after_no_or_nope_is_read() {
+        for (line, name) in [
+            ("No, J O E.", "Joe"),
+            ("No, A N N.", "Ann"),
+            ("No, W A L T E R.", "Walter"),
+            ("Nope, J O E.", "Joe"),
+            ("Nope, it's W A L T E R.", "Walter"),
+            ("Nope, it\u{2019}s A N N.", "Ann"),
+        ] {
+            assert_eq!(spelled_name_in(line).as_deref(), Some(name), "{line}");
+        }
+        for line in [
+            "No.",
+            "No, thanks.",
+            "Nope.",
+            "No, no.",
+            "No, J O E?",
+            "No, A J.",
+        ] {
+            assert_eq!(spelled_name_in(line), None, "{line}");
+        }
+    }
+
+    /// A reviewer's P3s on #5695: a letter keeps at most two combining
+    /// marks, and a mark before any letter is dropped.
+    #[test]
+    fn a_spelled_name_caps_its_marks_and_drops_a_stray_one() {
+        let marks = |n: usize| "\u{301}".repeat(n);
+        assert_eq!(
+            spelled_name_in(&format!("W{} A L T E R", marks(2))).as_deref(),
+            Some(format!("W{}alter", marks(2)).as_str())
+        );
+        assert_eq!(spelled_name_in(&format!("W{} A L T E R", marks(3))), None);
+        assert_eq!(spelled_name_in(&format!("W{} A L T E R", marks(18))), None);
+        assert_eq!(
+            spelled_name_in(&format!("Jo{}se, J O S E.", marks(18))),
+            None
+        );
+        assert_eq!(
+            spelled_name_in("\u{301} W A L T E R").as_deref(),
+            Some("Walter")
+        );
     }
 
     /// A reviewer's P3 on #5695: the note was given whenever "who you are"
