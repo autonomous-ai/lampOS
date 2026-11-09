@@ -52,8 +52,16 @@ fn shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byt
         ),
         (Step::Preferences, PREFERENCES_NOTE, PREFERENCES_NOTE),
     ];
-    // The two-step walk (#5499); every step's words stay.
-    assert_eq!(definition.order, [Step::WhereYouSit, Step::WhoYouAre]);
+    // The walk since #4080; every step's words stay.
+    assert_eq!(
+        definition.order,
+        [
+            Step::WhereYouSit,
+            Step::WhoYouAre,
+            Step::Touch,
+            Step::HowYouSound
+        ]
+    );
     assert_eq!(definition.reoffer_after_s, 86_400);
     for (step, first, reoffer) in expected {
         assert_eq!(definition.note(step, false).as_bytes(), first.as_bytes());
@@ -170,19 +178,23 @@ fn shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byt
     );
 }
 
-/// #5499: a two-step order loads; a repeated or unknown step, or one
-/// without who you are, is still refused.
+/// #5499: a shorter order loads (the two-step walk, and #4080's four); a
+/// repeated or unknown step, or one without who you are, is still refused.
 #[test]
 fn a_two_step_order_loads_and_a_repeated_or_unknown_step_is_refused() {
+    const SHIPPED_ORDER: &str =
+        "order = [\"where_you_sit\", \"who_you_are\", \"touch\", \"how_you_sound\"]";
     const TWO: &str = "order = [\"where_you_sit\", \"who_you_are\"]";
-    assert!(SHIPPED.contains(TWO));
+    assert!(SHIPPED.contains(SHIPPED_ORDER));
     assert!(parse(SHIPPED).is_ok());
+    let two = SHIPPED.replacen(SHIPPED_ORDER, TWO, 1);
+    assert!(parse(&two).is_ok());
     for bad in [
         "order = [\"where_you_sit\", \"who_you_are\", \"who_you_are\"]",
         "order = [\"where_you_sit\", \"who_you_are\", \"unknown\"]",
         "order = [\"where_you_sit\"]",
     ] {
-        assert!(parse(&SHIPPED.replacen(TWO, bad, 1)).is_err(), "{bad}");
+        assert!(parse(&two.replacen(TWO, bad, 1)).is_err(), "{bad}");
     }
 }
 
@@ -215,7 +227,7 @@ fn invalid_sequence_bounds_words_and_slots_are_refused() {
     }
     for mutate in [
         |definition: &mut Definition| {
-            definition.order.pop();
+            definition.order.truncate(1);
         },
         |definition: &mut Definition| {
             definition.steps.remove(&Step::Touch);
@@ -549,15 +561,15 @@ fn each_step_says_what_to_do_what_if_it_didnt_work_and_that_it_worked() {
         ),
         (
             Step::HowYouSound,
-            "say 'Hey Lamp' from your seat",
-            "I didn't catch that. Say 'Hey Lamp' again, from your seat.",
-            "Got it, that's three.",
+            "When you want me, say 'Hey Lamp' first. Try it now.",
+            "I didn't catch that. Say 'Hey Lamp' once more.",
+            "Got it. Just say 'Hey Lamp' whenever you want me.",
         ),
         (
             Step::Touch,
-            "Tap the top of my head once, then let go.",
-            "I didn't feel that. Touch the very top of my head with your fingertip, once.",
-            "Got it, I felt that.",
+            "Try petting the top of my head.",
+            "I didn't feel that. Try petting the top of my head.",
+            "That feels nice.",
         ),
         (
             Step::Privacy,
@@ -639,4 +651,33 @@ fn no_step_says_another_steps_words() {
             }
         }
     }
+}
+
+/// #4080 (the lead, 9 Nov): petting and "Hey Lamp" are taught after "who
+/// you are", each in one short line, and the touch reminder names no
+/// fingertip.
+#[test]
+fn the_walk_teaches_petting_and_hey_lamp_after_who_you_are() {
+    let definition = parse(SHIPPED).unwrap();
+    assert_eq!(
+        definition.order,
+        [
+            Step::WhereYouSit,
+            Step::WhoYouAre,
+            Step::Touch,
+            Step::HowYouSound
+        ]
+    );
+    assert!(
+        definition
+            .note(Step::Touch, false)
+            .contains("\"Try petting the top of my head.\"")
+    );
+    assert!(
+        definition
+            .note(Step::HowYouSound, false)
+            .contains("\"When you want me, say 'Hey Lamp' first. Try it now.\"")
+    );
+    assert!(!definition.words.touch_remind.contains("fingertip"));
+    assert!(definition.words.touch_remind.contains("petting"));
 }
