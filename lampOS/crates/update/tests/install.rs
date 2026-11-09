@@ -2981,12 +2981,13 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
         .map(|name| lamp_skills::load(&root.join(name)).unwrap())
         .collect();
     // Not feeling well came with the product after its lamp check (#1681);
-    // the seven of PRODUCT_SKILLS_OFF come installed disabled; the startle
+    // the five of PRODUCT_SKILLS_OFF come installed disabled; the startle
     // came with its move (#2822); the four wellbeing nudges since 25 Oct;
     // Head pat and its wiggle since #4133's design owner's yes (29 Oct);
     // Comfort break, off by its own file and on by its [present] with the
     // product units' LAMP_NUDGES_PRESENT=on (#5207).
-    // Sit back since its played check with a person (#5208, 4 Nov).
+    // Sit back since its played check with a person (#5208, 4 Nov); Light
+    // scenes and Point the light since #5744.
     assert_eq!(installed.len(), 30);
     let bedtime = installed
         .iter()
@@ -3012,11 +3013,12 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     );
     assert!(root.join("bedtime-morning/SKILL.md").is_file());
     // Inventory includes the disabled core and its grants; only live skills
-    // contribute functions. The twenty-one live skills (with music sway and
+    // contribute functions. The twenty-three live skills (with music sway and
     // watch you leave since #2834, Head pat and its wiggle, which declare
     // none, and Sit back, which shares wellbeing_nudges) offer Dance,
     // prepare_to_unplug, hidden at run time unless LAMP_UNPLUG=on, and the
-    // wellbeing nudges' one wellbeing_nudges (since 25 Oct), and Pose's set_pose (#4135).
+    // wellbeing nudges' one wellbeing_nudges (since 25 Oct), Pose's set_pose (#4135),
+    // and Light scenes' light_scene and Point the light's point_light (#5744).
     let inventory = lamp_skills::load_each(&root);
     assert_eq!(inventory.len(), 30);
     assert!(inventory.iter().all(|(_, skill)| skill.is_ok()));
@@ -3035,16 +3037,16 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
             .last()
             .unwrap()
             .starts_with(
-                "The skills here give the model 4 functions (dance, prepare_to_unplug, set_pose, wellbeing_nudges)."
+                "The skills here give the model 6 functions (dance, light_scene, point_light, prepare_to_unplug, set_pose, wellbeing_nudges)."
             ),
         "{listed}"
     );
     let (live, errors) = lamp_skills::load_all(&root);
     assert!(errors.is_empty(), "{errors:?}");
-    assert_eq!(live.len(), 21);
+    assert_eq!(live.len(), 23);
     assert!(live.iter().all(|skill| skill.name != bedtime.name));
     // Each core skill installed off is disabled on the lamp and adds no
-    // function, its tool or not: the 4 above are all a session is told.
+    // function, its tool or not: the 6 above are all a session is told.
     for (name, _) in install::PRODUCT_SKILLS_OFF {
         let skill = installed.iter().find(|skill| skill.name == *name).unwrap();
         assert!(!skill.enabled, "{name}");
@@ -3752,6 +3754,40 @@ fn music_sway_and_watch_you_leave_are_on_in_the_product() {
     // the sitter by face print, which waits for its privacy read (eyes.md).
     assert!(set(eyes, "Environment=LAMP_ACTIVITY=place"));
     assert!(eyes.contains("--recogniser"));
+}
+
+/// Light scenes and Point the light come with the product (#5744): out of
+/// `PRODUCT_SKILLS_OFF`, installed as their own files, turned on, and
+/// reached through `use_skill` (`LAMP_USE_SKILL=on`), so their functions
+/// take no product session past its 32. Light show stays off.
+#[test]
+fn light_scenes_and_point_light_are_on_in_the_product() {
+    let skills = ["light-scenes", "point-light"];
+    let off = |skill: &str| {
+        install::PRODUCT_SKILLS_OFF
+            .iter()
+            .any(|(name, _)| *name == skill)
+    };
+    for skill in skills {
+        assert!(install::PRODUCT_SKILLS.contains(&skill), "{skill}");
+        assert!(!off(skill), "{skill}");
+    }
+    assert!(off("light-show"));
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    for skill in skills {
+        assert_eq!(
+            fs::read(lamp.on(&format!("/var/lib/lampOS/skills/{skill}/skill.toml"))).unwrap(),
+            fs::read(skills_root().join(skill).join("skill.toml")).unwrap(),
+            "{skill} is installed as its own file, turned on"
+        );
+    }
+    let voice = include_str!("../../../deploy/product/lamp-voice.service");
+    assert!(
+        voice
+            .lines()
+            .any(|line| line.trim() == "Environment=LAMP_USE_SKILL=on")
+    );
 }
 
 /// Where the product's voice finds its recorded lines (#1844).
