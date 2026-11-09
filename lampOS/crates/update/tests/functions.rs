@@ -47,9 +47,7 @@ const UNPLUG: &str = "unplug: ";
 /// actions part's 17 and the skills' 1: `use_skill`, which reaches every
 /// skill's function (`LAMP_USE_SKILL=on` since #2826; Dance's `dance`,
 /// Pose's `set_pose` and the wellbeing skills' `[stop]`, `wellbeing_nudges`,
-/// were 3 before it; Light show's `light_show` since #5745, Light scenes'
-/// `light_scene` and Point the light's `point_light` since #5744), before the
-/// search and the look. However many skills
+/// were 3 before it), before the search and the look. However many skills
 /// are installed, the skills' stay 1. The test prints this split. A change
 /// to it is a change to what every session is told: say in its pull
 /// request what is left out past the bound, if anything.
@@ -335,16 +333,7 @@ fn a_product_chat_request_offers_dance_at_the_bound() {
             .any(|name| name == lamp_voice::second_provider::net::search::FETCH),
         "{chat:?}"
     );
-    assert_eq!(
-        skill_tools,
-        [
-            "dance",
-            "light_show",
-            "light_scene",
-            "point_light",
-            "set_pose"
-        ]
-    );
+    assert_eq!(skill_tools, ["dance", "set_pose"]);
     assert!(
         chat.iter().any(|name| name == lamp_voice::use_skill::NAME),
         "{chat:?}"
@@ -400,16 +389,7 @@ fn with_reports_on_dance_stays_at_the_bound() {
         reached,
         ..
     } = product_with(&[(lamp_voice::reports_stop::ENVIRONMENT, "on")]);
-    assert_eq!(
-        skill_tools,
-        [
-            "dance",
-            "light_show",
-            "light_scene",
-            "point_light",
-            "set_pose"
-        ]
-    );
+    assert_eq!(skill_tools, ["dance", "set_pose"]);
     assert!(
         chat.len() > lamp_gemini::MAX_TOOLS && chat.len() <= lamp_voice::second_provider::MAX_TOOLS,
         "{chat:?}"
