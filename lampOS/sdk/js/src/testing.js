@@ -21,6 +21,7 @@ import { join } from 'node:path';
 import { WebSocketServer } from 'ws';
 import * as schema from './schema.js';
 import { HELLO, b64, pinOf, proof, unb64 } from './keys.js';
+import { MOVE_FRAMES_MIN, MOVE_STEP_MS, moveWhy } from './moves.js';
 
 // As lamp-control stamps it (server.rs `rfc3339_utc`): UTC, to the second, ending `Z`.
 const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -139,46 +140,9 @@ function clipLoudnessRefusal(data, read) {
   return undefined;
 }
 
-// A move, as lamp-body's `moves::check` holds it (crates/body/src/moves.rs): head
-// pitch, head roll, base yaw, shoulder, elbow, in counts from rest and counts a
-// second. The Python SDK's skillcheck has the same.
-export const MOVE_STEP_MS = [40, 1000];
-export const MOVE_LASTS_MS = [1500, 10000];
-// A computer's move: 2 frames at the least (lamp-control's protocol.rs
-// FRAMES_MIN); its most are the body's check's (10 s at a 40 ms step, 251).
-export const MOVE_FRAMES_MIN = 2;
-export const MOVE_FARTHEST = [200, 200, 150, 350, 350];
-export const MOVE_FASTEST = [900, 1300, 1000, 800, 800];
-
-// Rust's `{:.0}`, as the body prints a speed: a half rounds to the even neighbour.
-function roundHalfEven(value) {
-  const floor = Math.floor(value);
-  const part = value - floor;
-  if (part !== 0.5) return Math.round(value);
-  return floor % 2 === 0 ? floor : floor + 1;
-}
-
-// Why the body refuses a move of these steps and frames, in its words, at its
-// first problem; null for one it plays.
-export function moveWhy(stepMs, frames) {
-  if (stepMs < MOVE_STEP_MS[0] || stepMs > MOVE_STEP_MS[1]) return `step_ms ${stepMs} is not from 40 to 1000`;
-  const lasts = Math.max(frames.length - 1, 0) * stepMs;
-  if (lasts < MOVE_LASTS_MS[0] || lasts > MOVE_LASTS_MS[1]) return `it lasts ${lasts} ms, not 1500 to 10000`;
-  const rest = (frame) => Array.isArray(frame) && frame.length === 5 && frame.every((count) => count === 0);
-  if (!frames.length || !rest(frames[0]) || !rest(frames.at(-1))) return 'it does not begin and end at nothing';
-  const step = stepMs / 1000;
-  for (let at = 1; at < frames.length; at++) {
-    for (let joint = 0; joint < 5; joint++) {
-      const after = frames[at][joint];
-      if (Math.abs(after) > MOVE_FARTHEST[joint]) return `frame ${at} takes joint ${joint} ${after} counts, farther than ${MOVE_FARTHEST[joint]}`;
-      const speed = Math.abs(after - frames[at - 1][joint]) / step;
-      if (speed > MOVE_FASTEST[joint] + 2 / step) {
-        return `frame ${at} asks joint ${joint} for ${roundHalfEven(speed)} counts a second, faster than ${MOVE_FASTEST[joint]}`;
-      }
-    }
-  }
-  return null;
-}
+// A move's bounds and the body's check of it live in moves.js, which the
+// client uses too; they are exported from here as before.
+export { MOVE_FARTHEST, MOVE_FASTEST, MOVE_FRAMES_MIN, MOVE_LASTS_MS, MOVE_STEP_MS, moveWhy } from './moves.js';
 
 // lamp-control's refusal of a computer's `move` (protocol.rs), in its words, as
 // `bad_request`: its own shape first, then the body's check; null for one it takes.
