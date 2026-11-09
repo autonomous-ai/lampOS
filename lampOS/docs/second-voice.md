@@ -2234,8 +2234,10 @@ order is kept. A written turn is the same from the chat on.
   - With `LAMP_NAME_WORDLESS_BAR=on` (#5385), that line with no words is
     asked as the name only when lamp-name heard the name in it at 0.99 or
     more (`second_provider::wordless_call`: its own `name/heard`
-    subscriber, the best hearing that began from 1.5 s before the line's
-    first sound to its end). Under 0.99, or with no hearing said in full
+    subscriber, read all the time by a reader thread of its own, so lines
+    with words, which never ask, do not leave its queue to fill and drop
+    the next hearing; the last 32 kept for 30 s; the best hearing that
+    began from 1.5 s before the line's first sound to its end). Under 0.99, or with no hearing said in full
     (the call came from `name/rising` alone), it is left as a sound: no
     chat is asked and nothing is answered, and the journal says "only the
     lamp's name, and no words of it came back: lamp-name heard it at
