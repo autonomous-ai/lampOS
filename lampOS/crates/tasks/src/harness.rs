@@ -179,6 +179,14 @@ pub struct Launch {
     pub name: String,
     pub prompt: String,
     pub target: Target,
+    /// The session the person named for this work, in their words ("the
+    /// docs one"), #5535: with `serve --reply-named` the words go into that
+    /// session on the target's computer, never a new one
+    /// ([`Cli::reply_named`]). Absent when none was named, and then the
+    /// launch, its digest and the stored task are as before; a stored task
+    /// that has one needs schema 5.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -363,6 +371,9 @@ pub const ENGINES_KEPT: Duration = Duration::from_secs(300);
 /// answers in 0.4 to 0.7 s and is bounded at 8 s; from a lamp, the read of
 /// that computer's sessions and the typing in come on top.
 pub const ROUTE_TIMEOUT: Duration = Duration::from_secs(20);
+/// The longest session words a launch may carry (#5535): a name or a few
+/// words said for one, never a task.
+pub const MOST_SESSION_BYTES: usize = 128;
 /// How often a Devin just started is looked at until it is idle, for its
 /// first message ([`Cli::first_message`]).
 const FIRST_MESSAGE_LOOK: Duration = Duration::from_millis(500);
@@ -483,6 +494,13 @@ impl Launch {
         {
             return Err("invalid_prompt".into());
         }
+        if let Some(session) = &self.session
+            && (session.trim().is_empty()
+                || session.len() > MOST_SESSION_BYTES
+                || session.chars().any(char::is_control))
+        {
+            return Err("invalid_session".into());
+        }
         Ok(())
     }
 }
@@ -522,6 +540,12 @@ pub struct CliConfig {
     /// [`Cli::route_first`]). Off unless set (`serve --route`): `new`, as
     /// before.
     pub route: bool,
+    /// A task whose launch names a session (#5535) is typed into that
+    /// session on the target's computer with `harness reply`, found among
+    /// that computer's sessions by name or folder ([`Cli::reply_named`]);
+    /// it is never started new. Off unless set (`serve --reply-named`): a
+    /// launch that names a session is not sent (`reply_named_off`).
+    pub reply_named: bool,
     /// A `~/…` target folder is sent as the absolute folder on that
     /// computer once its home is known, learned from the folder an earlier
     /// `new` there reports it started in ([`Cli::folder_of`], P4 step 1).
@@ -614,6 +638,7 @@ impl CliConfig {
             folder_missing: false,
             engines_ready: false,
             route: false,
+            reply_named: false,
             absolute_folder: false,
             new_folder: None,
             new_folder_only: None,
@@ -812,6 +837,10 @@ impl Cli {
         if let Err(code) = launch.validate() {
             return not_sent(&code);
         }
+        // A session named with the switch off: never a new one in its place.
+        if launch.session.is_some() && !self.config.reply_named {
+            return not_sent("reply_named_off");
+        }
         let Ok(_guard) = self.operation.try_lock() else {
             return not_sent("busy");
         };
@@ -840,6 +869,11 @@ impl Cli {
         }
         if let Err(code) = machines(&preflight.stdout, &launch.target.machine_id) {
             return not_sent(code);
+        }
+        // The session the person named is already there: its engine is not
+        // asked about, nothing is routed, and nothing is started.
+        if let Some(session) = &launch.session {
+            return self.reply_named(launch, session, seen);
         }
         if self.config.engines_ready
             && let Some(code) = self.engine_refusal(&launch.target, seen)
@@ -1058,6 +1092,84 @@ impl Cli {
                 None
             }
             Routed::Unsure => uncertain("route_uncertain"),
+        }
+    }
+
+    /// #5535, `serve --reply-named`: the session the person named, found
+    /// among the target computer's sessions (`harness ps --all`, the ones
+    /// stopped this week too) by its name or its folder's, and the words
+    /// typed into it with `harness reply`, as the person would type them
+    /// (behind their own `programs-reply` switch). Taken, it is the task's
+    /// agent (`joined`), which the lamp never closes. Nothing else is ever
+    /// started in its place, so each other end is not sent, with why:
+    /// `session_not_found`, `session_ambiguous` (more than one live one
+    /// fits), `session_stopped` (only a stopped one fits), `session_busy`
+    /// (working, or asking the person something), the reply's refusal
+    /// (`reply_off`, `reply_not_idle`, `reply_not_running`, `reply_failed`),
+    /// or `sessions_…` when the list can't be read. A reply that started and
+    /// gave no answer may have typed, so it is uncertain, never sent again.
+    fn reply_named(&self, launch: &Launch, session: &str, seen: &mut Seen) -> LaunchOutcome {
+        let not_sent = |code: &str| LaunchOutcome::NotSent { code: code.into() };
+        let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
+        let began = Instant::now();
+        let listed = self.run(
+            &[
+                "ps".into(),
+                "--machine".into(),
+                launch.target.machine_id.clone().into(),
+                "--all".into(),
+                "--json".into(),
+            ],
+            self.config.read_timeout.min(self.config.launch_timeout),
+        );
+        seen.took(&listed);
+        let agent_id = match listed {
+            Ok(reply) if reply.success => match named_session(&reply.stdout, session) {
+                Named::Idle(agent_id) => agent_id,
+                Named::Refused(code) => {
+                    eprintln!(
+                        "tasks: {}: the named session: {code}, not sent",
+                        launch.name
+                    );
+                    return not_sent(code);
+                }
+            },
+            Ok(_) => return not_sent("sessions_failed"),
+            Err(error) if error.code == "cancelled" => return not_sent("cancelled"),
+            Err(error) => return not_sent(&format!("sessions_{}", error.code)),
+        };
+        let left = self.config.launch_timeout.saturating_sub(began.elapsed());
+        if left.is_zero() {
+            return not_sent("sessions_timeout");
+        }
+        let reply = self.run(
+            &[
+                "reply".into(),
+                "--machine".into(),
+                launch.target.machine_id.clone().into(),
+                agent_id.clone().into(),
+                "--json".into(),
+                "--".into(),
+                launch.prompt.clone().into(),
+            ],
+            left,
+        );
+        seen.took(&reply);
+        let ms = began.elapsed().as_millis();
+        match reply {
+            Ok(reply) if reply.success && replied(&reply.stdout, &agent_id) => {
+                eprintln!(
+                    "tasks: {}: typed into the named session, in {ms} ms",
+                    launch.name
+                );
+                LaunchOutcome::Joined { agent_id }
+            }
+            // Refused, or its machine did not take the words: nothing typed.
+            Ok(reply) => not_sent(reply_refusal(&reply.stdout)),
+            Err(error) if error.code == "cancelled" => uncertain("cancelled"),
+            // Started, and stopped before it answered: it may have typed.
+            Err(error) if error.spawned => uncertain("reply_uncertain"),
+            Err(error) => not_sent(&format!("reply_{}", error.code)),
         }
     }
 
@@ -3136,6 +3248,81 @@ fn route_answer(bytes: &[u8]) -> Routed {
             _ => Routed::Unsure,
         },
         _ => Routed::Unsure,
+    }
+}
+
+/// What `harness ps --all --json` says of the session the person named.
+#[derive(Debug, PartialEq, Eq)]
+enum Named {
+    /// One live session fits and it is idle: its id.
+    Idle(String),
+    /// Why nothing is typed.
+    Refused(&'static str),
+}
+
+/// A name or folder as the person might say it: lowercase letters and
+/// digits only, in any script, so "Docs-Update", "docs update" and
+/// "docs_update" are one.
+fn session_words(text: &str) -> String {
+    text.chars()
+        .filter(|c| c.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+/// The session the person named among a computer's (#5535): a row fits
+/// when its name or its folder's last part is the words said, or, when no
+/// row is that, contains them (three letters or more). Of those that fit,
+/// one live session is the one; a stopped one is said to be stopped; more
+/// than one live is asked about, never guessed.
+fn named_session(bytes: &[u8], session: &str) -> Named {
+    let Ok(answer) = serde_json::from_slice::<Value>(bytes) else {
+        return Named::Refused("sessions_failed");
+    };
+    let Some(rows) = answer["harnesses"].as_array() else {
+        return Named::Refused("sessions_failed");
+    };
+    let said = session_words(session);
+    if said.is_empty() {
+        return Named::Refused("session_not_found");
+    }
+    let names = |row: &Value| -> [String; 2] {
+        let folder = row["folder"]
+            .as_str()
+            .and_then(|folder| folder.trim_end_matches('/').rsplit('/').next())
+            .unwrap_or_default();
+        [
+            session_words(row["name"].as_str().unwrap_or_default()),
+            session_words(folder),
+        ]
+    };
+    let exact: Vec<&Value> = rows
+        .iter()
+        .filter(|row| names(row).contains(&said))
+        .collect();
+    let fits = if exact.is_empty() && said.chars().count() >= 3 {
+        rows.iter()
+            .filter(|row| names(row).iter().any(|name| name.contains(&said)))
+            .collect()
+    } else {
+        exact
+    };
+    let gone = |row: &&Value| {
+        matches!(
+            row["state"].as_str(),
+            Some("stopped" | "failed" | "offline")
+        )
+    };
+    let live: Vec<&Value> = fits.iter().copied().filter(|row| !gone(row)).collect();
+    match live.as_slice() {
+        [] if fits.is_empty() => Named::Refused("session_not_found"),
+        [] => Named::Refused("session_stopped"),
+        [row] => match (row["id"].as_str(), row["state"].as_str()) {
+            (Some(id), Some("idle")) if agent_id(id) => Named::Idle(id.to_owned()),
+            (Some(id), _) if agent_id(id) => Named::Refused("session_busy"),
+            _ => Named::Refused("sessions_failed"),
+        },
+        _ => Named::Refused("session_ambiguous"),
     }
 }
 
