@@ -181,7 +181,7 @@ lamp says so.
 | `led.resting.preview` (`{"color": [r, g, b]}`) | asked on `light/request` at `conversation` priority (over a skill's glow, under the person's own light), on the host's boot clock, holding 10 s unless asked again, so an abandoned screen leaves nothing behind (V1's 10 s); a save gives it back first. A light asked for at the lamp ("make your light blue") ends it, and a drag that goes on stays given way until it pauses past its 10 s (the reviewer on #1464). Answered only when it fails, as V1, so a drag does not flood `fd_channel`. Refused where the ring takes no lights that lapse (`LAMP_LIGHT_REQUESTS`, on in the product) |
 | `chat.send` (`{"message", "session_id", "speak"}`) | with `LAMP_MESSAGES=on`: acked with `{"run_id", "session_id"}` and put on `chat/in`; the answer goes out after it as `chat.event`s, in V1's shapes ([messages.md](messages.md)). Refused at once when nothing on the lamp takes texts, and for a photo or a file, which aren't read yet. Without the switch, V1's "not on this lamp" |
 | `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued", "by", "held", "at"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`), how many reports wait, and how the newest choice was made: `by` is `voice` (only ever a stop), `app` or `setup` (`null` for a choice kept before these were), `held` is true for a voice's stop from a line whose answer was held, and `at` is when (as `since`), so the app's row can say "Stopped by voice at 3 pm" (#1880). A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
-| `consent.get` (`{}`), `consent.set` (`{"face_expressions": bool}` or `{"room_sounds": bool}`, exactly one) | with `LAMP_APP_CONSENT=on` (#5500, "The two yeses from the app" below): the owner's face expressions yes and, on a lamp with no privacy slide only (`lamp-cloud`'s own `LAMP_PRIVACY_CONTROLS=no-slide`), the room sounds yes. A missing file reads as on only with `LAMP_NOTICING_BY_DEFAULT=on` in `lamp-cloud`'s unit and the old nos kept (the done mark `noticing-old-nos.done` in the folder, `lamp_msgs::consent::read_or`), and as off otherwise; a kept no is off either way (#7767, slice 6). `consent.get` reads the files and answers at once, `{"face_expressions": bool}` on a slide lamp, `{"face_expressions": bool, "room_sounds": bool}` on one with none, and `seen_activity` beside them only where `lamp-cloud` has `LAMP_SEEN_ACTIVITY=on` (#6543; elsewhere refused: "seen activity is not on this lamp"). `consent.set` is handed to root's helper, which keeps a yes (`"by":"app"`; a yes with no file that already reads as on writes nothing) and answers at once; its off keeps a no (`"by":"app"`) whenever the done mark is there, or with `LAMP_NOTICING_BY_DEFAULT=on` in the helper's own unit (`lamp-setup-change@.service`), and otherwise removes the file; `success` carries the same shape as `consent.get`, read after it. Refused at once, before the helper: no key, two keys, a key this lamp lacks (room sounds on a slide lamp: "room sounds is not on this lamp: it has a privacy slide"), a value not `true` or `false`. Listed in `can` only with the switch; without it, V1's "not on this lamp" |
+| `consent.get` (`{}`), `consent.set` (`{"face_expressions": bool, "if": REV}` or `{"room_sounds": bool, "if": REV}`, exactly one key; `if` the key's `rev` from the last `consent.get` or `consent.set`, 1 to 64 printable ASCII characters) | with `LAMP_APP_CONSENT=on` (#5500, "The two yeses from the app" below): the owner's face expressions yes and, on a lamp with no privacy slide only (`lamp-cloud`'s own `LAMP_PRIVACY_CONTROLS=no-slide`), the room sounds yes. A missing file reads as on only with `LAMP_NOTICING_BY_DEFAULT=on` in `lamp-cloud`'s unit and the old nos kept (the done mark `noticing-old-nos.done` in the folder, `lamp_msgs::consent::read_or`), and as off otherwise; a kept no is off either way (#7767, slice 6). `consent.get` reads the files and answers at once, `{"face_expressions": bool, "rev": {"face_expressions": REV}}` on a slide lamp, `{"face_expressions": bool, "room_sounds": bool, "rev": {"face_expressions": REV, "room_sounds": REV}}` on one with none, and `seen_activity` beside them (and in `rev`) only where `lamp-cloud` has `LAMP_SEEN_ACTIVITY=on` (#6543; elsewhere refused: "seen activity is not on this lamp"). `consent.set` is a compare-and-set handed to root's helper, which changes the file only while the key's revision is still `if`: it keeps a yes (`"by":"app"`; a yes with no file that already reads as on writes nothing) and answers at once; its off keeps a no (`"by":"app"`) whenever the done mark is there, or with `LAMP_NOTICING_BY_DEFAULT=on` in the helper's own unit (`lamp-setup-change@.service`), and otherwise removes the file; `success` carries the same shape as `consent.get`, read after it, with the key's new `rev`, and `"stale": true` when nothing changed because the key's revision had moved on (a retry, or a change at the lamp since the app looked): the app then shows what it says and takes its `rev` for the next tap. A key's revision is the same whatever `LAMP_NOTICING_BY_DEFAULT` says: a default yes is no file's, so it reads as the state's (`gone-REV`), and a lamp no (a kept one too) always renews it. Refused at once, before the helper: no key, two keys, a key this lamp lacks (room sounds on a slide lamp: "room sounds is not on this lamp: it has a privacy slide"), a value not `true` or `false`, no `if` or one that is not 1 to 64 printable ASCII characters ("consent.set takes if: the rev from the last consent.get or consent.set"). Listed in `can` only with the switch; without it, V1's "not on this lamp" |
 | `desk_noticing.get` (`{}`), `desk_noticing.set` (`{"allow": bool, "request_id": N}`) | with `LAMP_SEEN_ACTIVITY=on` in `lamp-cloud`'s own unit (#6543, "Desk noticing from the app" below), not behind `LAMP_APP_CONSENT`: the owner's switch for lamp-seen's desk noticing, as mute's. Both answer `{"desk_noticing": {"on": bool, "by": "app"|"voice"|"default"|null, "posture": bool}}`, read from `seen-activity.json` by the same rule as `consent.get` (a missing file is `on: true`, `by: "default"` only with `LAMP_NOTICING_BY_DEFAULT=on` in `lamp-cloud`'s unit and the done mark; a kept no is off either way); `posture` is `LAMP_SEEN_POSTURE=on` in `lamp-cloud`'s unit, so the app shows the disclosure naming posture. `set` needs `request_id`, the app's send time in Unix milliseconds, and hands `{"desk_noticing": {"allow", "request_id"}}` to root's helper (`"by":"app"`; off keeps a no whenever the done mark `noticing-old-nos.done` is there, or with `LAMP_NOTICING_BY_DEFAULT=on` in the helper's own unit, `lamp-setup-change@.service`, and otherwise removes the file, #7767, slice 6), which keeps a yes only with a `request_id` above the mark kept beside it, and answers with the file after it. `allow` that isn't a JSON bool is `allow must be true or false`; no `request_id`, or one that is no positive integer, `request_id must be the app's send time in Unix milliseconds`; a yes at or below the mark, `this request was sent before the lamp's last change: send a new one`; a yes with a `request_id` more than a day past the lamp's clock, `request_id is more than a day ahead of the lamp's clock: send the app's time in Unix milliseconds`. Listed in `can` only with the switch; without it, V1's "not on this lamp" |
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`, and `pushed` for a skill a paired computer pushed), whether it can be removed or turned off, and what it may use in plain words. Without the switch, V1's "not on this lamp" |
 | `skills.install` (`{"url", "sha256", "name", "version"}`, all but `url` optional) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_STORE=on` and the separate Store public key ("Installing from the Skills Store" below): a Skills Store catalogue entry, passed to root's manage helper, which fetches the package over HTTPS and installs it only when it is signed with the Store's key (never a core skill or a core skill's name; `lamp-cloud` writes and fetches nothing); the reply is `skills.list`'s, read after it. Without the Store switch or a valid key, V1's "not on this lamp" |
@@ -3067,8 +3067,8 @@ The owner's face expressions yes (lamp-eyes reads how a near face seems)
 and, on a lamp with no privacy slide, the room sounds yes (lamp-ears notices
 music and laughter), until now given only by a spoken yes at onboarding
 ([onboarding.md](onboarding.md), "The two yeses from the app"). Off unless
-`LAMP_APP_CONSENT=on` exactly, with `LAMP_CLOUD=on`; off in the product unit
-until its lamp check. Both yeses stay off by default.
+`LAMP_APP_CONSENT=on` exactly, with `LAMP_CLOUD=on`; on in the product unit
+since the first builder's yes on 9 Nov, its lamp check still owed. Both yeses stay off by default.
 
 - **Which yeses.** Face expressions on every lamp. Room sounds only where
   lamp-ears reads it, a lamp whose privacy route is `no-slide`: `lamp-cloud`
@@ -3082,15 +3082,78 @@ until its lamp check. Both yeses stay off by default.
   nothing restarts ([onboarding.md](onboarding.md), "Seen activity").
 - **Reading** (`consent.get`): the files in `/var/lib/lampOS/consent`, which
   `lampos` may read (0750 `root:lampos`, files 0640), with the readers' rule:
-  a JSON object whose key is exactly `"yes"`. Nothing is asked of any part.
+  a JSON object whose key is exactly `"yes"`, and each key's revision
+  (`rev`), the state read before and after the files and all read again
+  while it changed between (`lamp_msgs::consent::snapshot`), so a yes and
+  its revision go together. Nothing is asked of any part.
+- **Revisions.** Each change to a yes through the folder's hold
+  (`lamp_msgs::consent::Held`: `flock` on the folder, one change at a time)
+  first keeps a fresh revision for its key, 128 random bits as 32 hex
+  characters, in `/var/lib/lampOS/consent/app-revs.json`
+  (`{"version":1,"revs":{KEY:{"wrote":REV}}}`, a temporary renamed into
+  place), then writes the yes with it
+  (`{"version":1,KEY:"yes","at_unix_s":N,"by":"app","rev":REV}`) or keeps
+  a no with it (`"no"` in place of `"yes"`, #7767), whose own write syncs
+  the folder for both. A removal goes the other way: the yes first, then
+  the fresh revision, the folder synced once for both (#8704). A no never
+  waits on the revision: when the state can't be written (a full disk), the
+  no is kept or the yes removed all the same, the key's revision said
+  `unknown` and one journal line written, and a yes is refused (its
+  revision is written before it, or no yes). So a held change costs one
+  folder sync, as before revisions. A key's revision is `REV` while its file holds a yes with one;
+  `yes-AT_UNIX_S` for a yes with none (a file from a build before
+  revisions, `yes-0` with no time); `gone-REV` while no yes stands and
+  `REV` was kept last (taken back, a kept no, a yes that failed after its
+  state, or no file read as on by default: a default's yes is no file's); `unknown`,
+  which no set matches, while no yes stands and the state is missing,
+  can't be read or names no revision for the key. There is no revision
+  for "never changed": whoever holds the folder first puts a fresh
+  boundary in place (a fresh revision for every key, kept on disk before
+  anything is compared or said; one that can't be kept fails), and the
+  root writers that run at start do so: the voice's storage start and the
+  change helper on each connection. So a lamp's first `consent.get`
+  gives a real revision. Every explicit "no" or withdrawal renews the
+  key's revision, even with no yes there: a spoken "no", the voice's
+  "stop looking" while already off (#8704), a redo, a forget of
+  everything, the reset and an app off that matched. Each makes the
+  state when it is missing. Only a start or a write finding nothing to
+  change writes nothing. No reader takes a yes from the state file (it is no key's file), and the
+  `rev` in a yes changes nothing they read.
 - **Setting** (`consent.set`): checked here, then one line,
-  `{"consent": {KEY: bool}}`, to root's helper `lamp-setup change` on its
-  socket, waited on at most 2 s (the broker's loop waits on it, as on
-  `system.reboot`); the helper checks it again, writes
-  `{"version":1,KEY:"yes","at_unix_s":N,"by":"app"}` whole (0640, the
-  folder's group) or removes the file, and answers before any restart. The
-  reply is what the files say after it. A helper not there is "the lamp's
+  `{"consent":{KEY:bool},"if":REV}`, to root's helper `lamp-setup change`
+  on its socket, waited on at most 2 s (the broker's loop waits on it, as
+  on `system.reboot`); the helper checks it again and, holding the folder,
+  compares `if` to the key's revision now. Unequal: nothing changes, and it
+  answers `{"stale":{KEY:bool},"rev":{KEY:REV}}`, what the lamp keeps
+  ("asked from an older view in the app: left as it is" in the journal).
+  Equal: the new revision first, then the yes or its removal, and it
+  answers `{"done":{KEY:bool},"rev":{KEY:REV}}` before any restart (`REV`
+  for a yes, `gone-REV` for an off; an off renews the revision even with
+  no yes there, while a yes already standing changes nothing and answers
+  the revision as it is). The reply is what
+  the files say after it, the key's yes and `rev` as the helper said them,
+  with `"stale": true` for a stale one. A helper not there is "the lamp's
   settings are not running", with nothing claimed.
+- **What it guarantees.** A retry of a tap that applied (an MQTT QoS 1
+  resend, an app retry) is stale: its revision moved on. A tap made before
+  a later change at the lamp is stale, however many other sets follow
+  (there is no list to fall out of), and even when the key reads as it did
+  (a yes and a "no" at the lamp between), since each change keeps a fresh
+  revision, a "no" while already off too. A yes that fails after its state fails the set and leaves the
+  key `gone-REV`: every revision from before is stale. A state that can't
+  be read (not its shape, over 4 KiB) or is missing is never read as
+  empty: `lamp-cloud`,
+  which can't write, says `unknown` for a key with no yes, and the helper,
+  holding the folder, first puts in its place a fresh boundary (a fresh
+  revision for every key), so `unknown` and every revision from before are
+  stale, and the next `consent.get` hands out one that applies. A take-back
+  that fails keeps what the file held, read holding the folder, and its
+  retry removes only that yes, never a newer one given since.
+- **A reset.** The reset's plan wipes both yeses each through a fresh
+  revision kept first (`reset::finish`), so a revision from before the
+  reset never matches after it; the state file stays. The
+  reset also unlinks the app, and the connection's clean start means
+  nothing queued for the lamp while it was away is delivered later.
 - **Effect.** lamp-eyes reads its yes every 2 s, so face reads start or
   stop within that, with no restart. lamp-ears reads the room sounds yes
   only at its start: after a new yes the helper restarts it
@@ -3105,7 +3168,8 @@ until its lamp check. Both yeses stay off by default.
   its own unit, `lamp-setup-change@.service` (the service
   `lamp-setup-change.socket` starts, `change::apply`), not `lamp-cloud`'s.
   With it on there, the helper's off keeps a no,
-  `{"version":1,KEY:"no","at_unix_s":N,"by":"app"}`, in place of the
+  `{"version":1,KEY:"no","at_unix_s":N,"by":"app","rev":REV}`, its fresh
+  revision kept first as for a removal (the key reads `gone-REV`), in place of the
   removal, and does so once the old nos are kept with the switch off too,
   as the voice's stop does; a yes with no file, on already, writes nothing
   and restarts nothing. `system.info`'s `can` carries `"defaults_on"`
@@ -3115,14 +3179,29 @@ until its lamp check. Both yeses stay off by default.
 - **What takes it back besides the app:** a redo of setup or of the step
   and a later "no" at the lamp (when the voice first writes it, whatever
   the clocks say), a forget of everything and the factory reset, whoever
-  gave it.
-- **Owed before `LAMP_APP_CONSENT` goes on:** the `consent.set` command
-  (`crates/cloud/src/wire.rs`) carries no id or send time, and the helper
-  stamps the yes when it arrives (`crates/setup/src/change.rs`), so an
-  MQTT QoS 1 resend or a late-delivered app yes counts as a new yes, even
-  after a later "no" at the lamp. `desk_noticing.set` closes this for seen
-  activity with its `request_id` and the mark ("Desk noticing from the app"
-  below); `consent.set`'s three keys, its `seen_activity` too, still owe it.
+  gave it, each through the folder's hold with a fresh revision first (the
+  voice's spoken yes too, a kept no, desk noticing's writes and the
+  voice's stop, after the mark's lock where they take it). A take-back the disk refused is retried by the
+  voice every 2 s until the file goes, without a fence or restart, the
+  same way.
+- **Tests:** `consent::tests` (`a_set_without_a_fit_if_is_refused_before_the_helper`,
+  `a_get_says_each_key_this_lamp_has_from_its_file_with_its_rev`),
+  `answer::tests::the_owners_yeses_are_read_and_set_through_the_helper_with_their_switch`,
+  lamp-setup's `change::an_old_rev_stays_stale_after_any_number_of_other_sets`,
+  `a_corrupt_state_makes_every_old_rev_stale_and_a_fresh_get_works`,
+  `a_yes_that_fails_after_the_state_leaves_the_old_rev_stale`,
+  `a_retried_tap_is_stale_and_a_tap_after_a_get_applies`,
+  `a_yes_and_a_no_at_the_lamp_after_a_get_make_its_rev_stale`,
+  `a_no_while_already_off_still_makes_an_older_yes_stale`,
+  `a_removed_state_never_lets_an_old_yes_apply` and
+  `reset::a_reset_leaves_a_fresh_consent_boundary`, lamp-msgs'
+  `consent::tests` (`a_yes_with_a_rev_is_a_yes_and_the_state_file_is_none`,
+  `a_keys_rev_follows_its_file_and_the_helpers_state`,
+  `every_change_through_the_held_folder_is_a_new_rev`,
+  `a_failed_take_back_says_what_it_withdrew_and_its_retry_spares_a_newer_yes`),
+  lamp-voice's `onboarding::storage::tests::a_retried_take_back_spares_a_yes_given_after_it_failed`
+  and `a_start_keeps_the_consent_revisions`, and lamp-update's
+  `install::the_product_takes_the_owners_yeses_from_the_app`.
 
 ## Desk noticing from the app (#6543, `desk_noticing.get`, `desk_noticing.set`)
 
@@ -3173,6 +3252,10 @@ file, no yes.
   to the lamp's now. So the mark never runs far ahead of the clock and
   refuses every later yes.
 - **One writer at a time** (Twelve's P2 on #7551). Every writer of the yes
+  holds the consent folder as well, after the mark's lock, and keeps a
+  fresh revision first (#5500, "The two yeses from the app" above), so a
+  `consent.set` of `seen_activity` made before a desk noticing change or a
+  spoken stop is stale after it. Every writer of the yes
   or the mark holds the mark's lock, `seen-activity-mark.lock` beside it
   (an empty file, `flock`, made `O_NOFOLLOW` in the yes's mode, kept): the
   helper across its check of a yes against the mark and its writes, the
