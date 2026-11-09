@@ -221,8 +221,8 @@ owner: "everything is a skill"). Install puts every product skill in
 `/var/lib/lampOS/skills/` (`install::PRODUCT_SKILLS` in `crates/update`),
 and every core skill is a product skill (the owner: core skills are always
 installed, installable ones as apps; `tests/install.rs` holds the two
-equal, Laugh glance parked out of both): twenty-nine folders are installed,
-twenty enabled, one of them hidden unless `LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
+equal, Laugh glance parked out of both): thirty folders are installed,
+twenty-four enabled (Bedtime and Morning and Comfort break are off by their own files), one of them hidden unless `LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
 break, Stuffy air, Dance and Not feeling well keep their enabled defaults.
 Night sleep (#940) is on: when the lamp sleeps at night, moved out of
 Expression ([alive.md](alive.md#night-sleep-is-a-skill)), with Expression's
@@ -246,10 +246,12 @@ the ears' sound classes, which stay off in the product until YAMNet's
 weights may be shipped (sound-events.md), so until then it never sways.
 Light show (#1679), a show of slow-changing colours a person asks for,
 comes with the product since #5745, its `light_show` reached through
-`use_skill`. Six core skills not yet tried on a lamp are
+`use_skill`. Light scenes and Point the light (#1679) come with the
+product since #5744, asked for by a person only and reached through
+`use_skill` too. Four core skills not yet tried on a lamp are
 installed disabled (`install::PRODUCT_SKILLS_OFF`, each with why): Light out
 when you leave (#1677, [presence.md](presence.md), which must never take the
-light of someone reading face down), Light scenes and Point the light (#1679),
+light of someone reading face down),
 Smoky air and Dusty air
 (#1684), until they are measured for false alarms on real traces, and
 Feelings (#3691), which needs Mood on (`LAMP_MOOD=on`, trial-only). Install
