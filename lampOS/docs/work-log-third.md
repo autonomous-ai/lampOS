@@ -1,3 +1,37 @@
+## 2026-11-09 — face-context assignment and baseline regressions
+
+Ready for lamp-voice: #5803 remains NEXT TRAIN. The separate adapter and
+new context boundary are not ready.
+
+- PM assigned the face-forget context boundary in Queue 6738675383;
+  claimed in 6738734903. Branch `third/face-forget-context-1109` starts on
+  `19ee3d51a`, carrying reviewed #5803 as `9b1521e6d` with the same stable
+  patch ID. This dependency is not a new reviewed context implementation.
+- Four baseline regressions are prepared, not yet run: ordinary and held
+  whole-next-request canaries, stale ordinary batch removal, and fixed
+  face/primary-memory/cleanup outcome preservation. The production reset
+  remains unchanged for the fail-first run. A prototype is outside the
+  worktree only and depends on the separately prepared result adapter.
+- Source integration: El's #5792 already clears pending rename state before
+  awaiting face-forget and suppresses cached rename notes when the boundary
+  ran. Reuse it; preserve separately confirmed fresh rename behavior.
+  Fourth's #5856/#5858 remain memory-only for speech cancellation. The
+  context sites can use the broader existing `remember::is_forget`.
+  Coordination posted in Queue 6739199855.
+- Same-yes setup-save/name prompts are excluded for held face-forget by
+  their existing word guards. No speculative setup suppression is planned.
+  A possible memory-forget/setup-name interaction remains source-only and
+  outside this face-specific task.
+- Adapter's final broad gate continues. Its installer target passed 160/0;
+  four unchanged macOS image_ramlog cases failed, including GNU stat -c
+  incompatibility. Later update-round fixtures are still running. A single
+  one-second process sample showed File::sync_all during fixture install;
+  no stalled process was killed or test rerun. Voice/build remain pending.
+- Cargo jobs are serialized on the existing shared cache. Context's host
+  reset target is under 1 ms, excluding deletion/model/audio; dropping a
+  stale batch can require fresh planning within the existing round limit.
+  No device access, deployment, live model or acoustic acceptance.
+
 ## 2026-11-09 — assigned send-after-echo privacy read
 
 Ready for lamp-voice: #5803 remains NEXT TRAIN; the separate adapter's
@@ -14,6 +48,11 @@ broad local gate continues. No adapter readiness claim.
   The single notification producer does not establish that pattern as
   reachable; reported as P3 hardening, not a demonstrated unsafe send.
   Reduced Pending harness only, no Cargo/Engine test claimed for this read.
+- Fourteen fixed that P3 at `cf0acbac9c` by storing the echo mark with
+  its counted ID. Re-extracted the exact functions and reran unchanged
+  probes with only the reduced struct type adapted: 2 passed / 0 failed.
+  [READ-OK restated](https://github.com/autonomous-ai/lampOS/pull/5851#issuecomment-6738632825).
+  The prior failure remains evidence, not relabelled as passing.
 - Second's previous HOLD requires its own restatement or explicit PM lift.
   Native CI and real service/lamp acceptance were not performed by Third.
 - Routed a separate source-only face-forget context gap to PM in Queue
