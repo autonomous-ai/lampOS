@@ -506,10 +506,13 @@ active restrictions combine by minimum with the product ceiling. Volume
 entry lowers an already louder mixer, preserves a quieter choice, and
 never unmutes. All volume setters, including the app slider and unmute,
 honor the effective ceiling. Any remembered pre-mute level is clamped too.
-Relaxing or removing a restriction never writes back an old setting. If
-entry reduced the mixer volume, that reduction remains after release until
-a later explicit volume action changes it; release does not restore a saved
-user preference.
+Relaxing a restriction never writes back an old setting. Removing the last
+one (the night cap's lift at 06:00, by removal or expiry) gives the Speaker
+back the level the cap lowered at entry, but only while the mixer still
+reads what the cap wrote: any volume change in the night, the app slider,
+up, down, mute or unmute, stands, and a muted Speaker stays muted (#5753).
+That level is kept in Actions' memory only, so an Actions restart during
+the night leaves the lowered level in place after the lift.
 
 Actions stores at most eight stable source identities, including their
 terminal records, in a bounded 16 KiB state. A cap contains `source`,
