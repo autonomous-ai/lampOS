@@ -179,8 +179,8 @@ pub struct Launch {
     pub name: String,
     pub prompt: String,
     pub target: Target,
-    /// The session the person named for this work, in their words ("the
-    /// docs one"), #5535: with `serve --reply-named` the words go into that
+    /// The session the person named for this work, its name as they said it
+    /// ("docs", "docs update"), #5535: with `serve --reply-named` the words go into that
     /// session on the target's computer, never a new one
     /// ([`Cli::reply_named`]). Absent when none was named, and then the
     /// launch, its digest and the stored task are as before; a stored task
@@ -1107,7 +1107,9 @@ impl Cli {
     /// (working, or asking the person something), the reply's refusal
     /// (`reply_off`, `reply_not_idle`, `reply_not_running`, `reply_failed`),
     /// or `sessions_…` when the list can't be read. A reply that started and
-    /// gave no answer may have typed, so it is uncertain, never sent again.
+    /// gave no answer, or one Harness took whose answer can't be read or
+    /// names another session, may have typed, so it is uncertain
+    /// (`reply_uncertain`), never sent again.
     fn reply_named(&self, launch: &Launch, session: &str, seen: &mut Seen) -> LaunchOutcome {
         let not_sent = |code: &str| LaunchOutcome::NotSent { code: code.into() };
         let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
@@ -1164,6 +1166,10 @@ impl Cli {
                 );
                 LaunchOutcome::Joined { agent_id }
             }
+            // Taken by Harness, and an answer that can't say for this
+            // session: the words may be there, so never asked again (the
+            // Reviewer-lead's P3 on #5779).
+            Ok(reply) if reply.success => uncertain("reply_uncertain"),
             // Refused, or its machine did not take the words: nothing typed.
             Ok(reply) => not_sent(reply_refusal(&reply.stdout)),
             Err(error) if error.code == "cancelled" => uncertain("cancelled"),
@@ -3264,17 +3270,25 @@ enum Named {
 /// digits only, in any script, so "Docs-Update", "docs update" and
 /// "docs_update" are one.
 fn session_words(text: &str) -> String {
-    text.chars()
-        .filter(|c| c.is_alphanumeric())
-        .flat_map(char::to_lowercase)
+    words_of(text).concat()
+}
+
+/// The words of a name, folder or what was said: runs of letters and
+/// digits, lowercased.
+fn words_of(text: &str) -> Vec<String> {
+    text.split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
         .collect()
 }
 
 /// The session the person named among a computer's (#5535): a row fits
 /// when its name or its folder's last part is the words said, or, when no
-/// row is that, contains them (three letters or more). Of those that fit,
-/// one live session is the one; a stopped one is said to be stopped; more
-/// than one live is asked about, never guessed.
+/// row is that, when each word said begins one of its words, in order
+/// ("docs" fits "Docs-Update"; "api" never fits "rapid-prototype": the
+/// Reviewer-lead's P2 on #5779). Of those that fit, one live session is
+/// the one; a stopped one is said to be stopped; more than one live is
+/// asked about, never guessed.
 fn named_session(bytes: &[u8], session: &str) -> Named {
     let Ok(answer) = serde_json::from_slice::<Value>(bytes) else {
         return Named::Refused("sessions_failed");
@@ -3286,15 +3300,24 @@ fn named_session(bytes: &[u8], session: &str) -> Named {
     if said.is_empty() {
         return Named::Refused("session_not_found");
     }
-    let names = |row: &Value| -> [String; 2] {
+    let said_words = words_of(session);
+    let parts = |row: &Value| -> [String; 2] {
         let folder = row["folder"]
             .as_str()
             .and_then(|folder| folder.trim_end_matches('/').rsplit('/').next())
             .unwrap_or_default();
         [
-            session_words(row["name"].as_str().unwrap_or_default()),
-            session_words(folder),
+            row["name"].as_str().unwrap_or_default().to_owned(),
+            folder.to_owned(),
         ]
+    };
+    let names = |row: &Value| parts(row).map(|part| session_words(&part));
+    // Each word said begins a word of the name, in order.
+    let begins = |part: &str| {
+        let mut words = words_of(part).into_iter();
+        said_words
+            .iter()
+            .all(|said| words.any(|word| word.starts_with(said.as_str())))
     };
     let exact: Vec<&Value> = rows
         .iter()
@@ -3302,7 +3325,7 @@ fn named_session(bytes: &[u8], session: &str) -> Named {
         .collect();
     let fits = if exact.is_empty() && said.chars().count() >= 3 {
         rows.iter()
-            .filter(|row| names(row).iter().any(|name| name.contains(&said)))
+            .filter(|row| parts(row).iter().any(|part| begins(part)))
             .collect()
     } else {
         exact

@@ -125,15 +125,18 @@ when it is idle as `harness reply` does (openharness#2157, the person's
 `--reply-named` (off unless set; #5535, the owner, 9 Nov) hands the work
 to a session the person names ("go into the docs session and also do
 this"), never a new one. The tasks request `prepare` takes an optional
-`session`, the person's words for it, and it goes into the launch, so the
+`session`, the session's name as the person said it, and it goes into the launch, so the
 yes is to that session (`Launch::session`, absent when none was named;
 a store holding such a task is schema 5). After the yes and the machines
 preflight, `Cli::reply_named` lists that computer's sessions with `harness
 ps --machine <id> --all --json`, the ones stopped this week too, within
 the read bound. A row fits when its name or its folder's last part is
 the words said, compared on letters and digits only ("Docs-Update",
-"docs update"); when no row is that, a row whose name or folder contains
-them (three letters or more). The words are typed in with `harness reply
+"docs update"); when no row is that, a row where each word said begins
+one of the name's or folder's words, in order (three letters or more in
+all: "docs" fits "Docs-Update", "api" never fits "rapid-prototype", the
+Reviewer-lead's P2 on #5779). Words around the name ("the docs one") are
+not stripped, so the voice sends the name alone. The words are typed in with `harness reply
 --machine <id> <agent> --json -- <task>`, which Harness takes for a live,
 idle session behind the person's `programs-reply` switch. Nothing is
 routed, the engine is not asked about (`--engines-ready`, a known
@@ -144,10 +147,10 @@ refusal), and nothing is started new in any case:
   more live ones fit; never guessed); `session_stopped` (only a stopped
   one fits); `session_busy` (working, asking the person something, or
   still starting); the reply's refusal (`reply_off`, `reply_not_idle`,
-  `reply_not_running`, `reply_failed`, a reply taken for another id
-  included); `sessions_failed` or `sessions_<code>` when the list can't
-  be read.
-- **Uncertain:** a reply that started and gave no answer
+  `reply_not_running`, `reply_failed`); `sessions_failed` or
+  `sessions_<code>` when the list can't be read.
+- **Uncertain:** a reply that started and gave no answer, or one Harness
+  took (exit 0) whose answer can't be read or names another session
   (`reply_uncertain`): the words may be there, so never sent again.
 - **Switch off:** a launch that names a session is `not_sent` with
   `reply_named_off` before anything runs; with no session named, the
