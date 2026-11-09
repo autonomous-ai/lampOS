@@ -7049,14 +7049,14 @@ mod tests {
         assert_eq!(room.walk.step_count(Step::WhoYouAre), Some((2, 3)));
         assert_eq!(room.walk.step_count(Step::Touch), None);
         assert_eq!(room.walk.step_count(Step::HowYouSound), Some((3, 3)));
-        let opener = "(Say only this, nothing before or after it: \"Hi! I'm your lamp. Let's get to know each other. Three quick steps, about two minutes. Step one: sit where you usually sit, and look at me.\")";
+        let opener = "(Say only this, nothing before or after it: \"Hi! I'm your lamp. Let's get to know each other. Three quick steps, just a few minutes. Step one: sit where you usually sit, and look at me.\")";
         assert_eq!(room.wait(4 * S, Some(SIDE)), [opener]);
         let said = in_language::said(
             opener.to_owned(),
             Some(crate::language::Language::Vietnamese),
         );
         assert!(
-            said.contains("Có ba bước nhanh, khoảng hai phút. Bước một: bạn ngồi"),
+            said.contains("Có ba bước nhanh, chỉ vài phút thôi. Bước một: bạn ngồi"),
             "{said}"
         );
         report(&room.walk, "where_you_sit", "skipped");

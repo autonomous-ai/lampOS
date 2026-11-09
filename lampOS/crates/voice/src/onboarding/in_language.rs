@@ -1596,7 +1596,7 @@ pub(super) fn said(note: String, language: Option<Language>) -> String {
 
 /// The walk's step words (#4080, the lead, 9 Nov): "Step one: " ...
 /// "Last step: " before a step's first line, and with `intro` the walk's
-/// opening before it ("... Four quick steps, about two minutes. ").
+/// opening before it ("... Four quick steps, just a few minutes. ").
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Counter {
     Step { at: usize, of: usize, intro: bool },
@@ -1638,7 +1638,7 @@ impl Counter {
                 let count = first_letter(&number(&EN_NUMBERS, of), true);
                 let steps = if of == 1 { "step" } else { "steps" };
                 (
-                    format!("{EN_INTRO}{count} quick {steps}, about two minutes. "),
+                    format!("{EN_INTRO}{count} quick {steps}, just a few minutes. "),
                     if last {
                         "Last step: ".to_owned()
                     } else {
@@ -1648,7 +1648,7 @@ impl Counter {
             }
             Some(Language::Vietnamese) => (
                 format!(
-                    "Chào bạn! Mình là chiếc đèn của bạn. Mình làm quen nhau nhé. Có {} bước nhanh, khoảng hai phút. ",
+                    "Chào bạn! Mình là chiếc đèn của bạn. Mình làm quen nhau nhé. Có {} bước nhanh, chỉ vài phút thôi. ",
                     number(&VI_NUMBERS, of)
                 ),
                 if last {
@@ -1659,7 +1659,7 @@ impl Counter {
             ),
             Some(Language::Japanese) => (
                 format!(
-                    "こんにちは！あなたのランプです。仲良くなりましょう。かんたんな{of}ステップで、2分ほどです。"
+                    "こんにちは！あなたのランプです。仲良くなりましょう。かんたんな{of}ステップで、ほんの数分です。"
                 ),
                 if last {
                     "最後のステップ：".to_owned()
@@ -1669,7 +1669,7 @@ impl Counter {
             ),
             Some(Language::Chinese) => (
                 format!(
-                    "你好！我是你的台灯。我们来认识一下吧。一共{}个简单步骤，大约两分钟。",
+                    "你好！我是你的台灯。我们来认识一下吧。一共{}个简单步骤，只要几分钟。",
                     number(&ZH_NUMBERS, of)
                 ),
                 if last {
@@ -1680,7 +1680,7 @@ impl Counter {
             ),
             Some(Language::Korean) => (
                 format!(
-                    "안녕하세요! 저는 당신의 램프예요. 서로 알아가 봐요. 간단한 {of}단계, 2분 정도면 돼요. "
+                    "안녕하세요! 저는 당신의 램프예요. 서로 알아가 봐요. 간단한 {of}단계, 몇 분이면 돼요. "
                 ),
                 if last {
                     "마지막 단계: ".to_owned()
@@ -1704,8 +1704,8 @@ impl Counter {
                     .iter()
                     .position(|word| first_letter(word, true) == count)?;
                 let rest = rest
-                    .strip_prefix("s, about two minutes. ")
-                    .or_else(|| rest.strip_prefix(", about two minutes. "))?;
+                    .strip_prefix("s, just a few minutes. ")
+                    .or_else(|| rest.strip_prefix(", just a few minutes. "))?;
                 (true, Some(of), rest)
             }
             None => (false, None, quoted),
