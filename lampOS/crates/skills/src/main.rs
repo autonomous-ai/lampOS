@@ -109,6 +109,9 @@ const SPEAK_BEGIN: Duration = Duration::from_secs(5);
 /// The longest a tool's line is waited for once the voice has stopped
 /// speaking but not ended its turn (`thinking`).
 const LINE_LONGEST: Duration = Duration::from_secs(4);
+/// The longest a cut line is watched for what it was (#5745): words heard,
+/// or the line said again in a wordless sound's place.
+const CUT_SETTLES: Duration = Duration::from_secs(6);
 /// How often the voice's state, the hand and the pause are read while a run
 /// waits on them.
 const POLL: Duration = Duration::from_millis(20);
@@ -4128,6 +4131,12 @@ impl SearchStop {
             return voice_listening(bus).then(|| "the voice is listening to someone".into());
         };
         let asked = self.asked.as_ref();
+        Self::spoke(heard, asked, false).then(|| "someone spoke to the lamp".into())
+    }
+
+    /// Whether words of a turn later than `asked` came on `heard` since the
+    /// last look: only finished ones when `finished`.
+    fn spoke(heard: &mut Subscriber, asked: Option<&(String, u64)>, finished: bool) -> bool {
         let later = |boot: &str, speech: &Speech| match (speech.request, asked) {
             (Some(turn), Some((was, asked))) if was == boot => turn > *asked,
             _ => true,
@@ -4135,12 +4144,23 @@ impl SearchStop {
         while let Some(message) = receive(heard, Duration::ZERO) {
             let boot = message.header.boot.clone();
             if message.parse::<Speech>().is_ok_and(|speech| {
-                later(&boot, &speech) && speech.text.chars().any(char::is_alphanumeric)
+                (speech.finished || !finished)
+                    && later(&boot, &speech)
+                    && speech.text.chars().any(char::is_alphanumeric)
             }) {
-                return Some("someone spoke to the lamp".into());
+                return true;
             }
         }
-        None
+        false
+    }
+
+    /// Whether a finished line of words came since the last look (#5745);
+    /// none when `voice/heard` can't be read.
+    fn words(&mut self) -> Option<bool> {
+        let asked = self.asked.as_ref();
+        self.heard
+            .as_mut()
+            .map(|heard| Self::spoke(heard, asked, true))
     }
 }
 
@@ -4248,7 +4268,17 @@ fn held_back(sent: &mut Sent, bus: &Bus) -> Option<String> {
 /// speaking then. At most SAY_TIMEOUT in all. What it waited for, in words,
 /// and whether the line was cut: a line said to its end leaves the voice
 /// `resting`, one the person spoke over leaves it `listening`.
+///
+/// The voice stops its line on a sound, before it has any words (#5745:
+/// lamp-52e6, 13:48:35, a wordless sound 590 ms into the light show's
+/// line). So a cut is watched for at most CUT_SETTLES: finished words heard
+/// of a later turn than the call's are a person speaking, and the line
+/// stays cut; the voice speaking again with none is the line said again
+/// in the sound's place, and its end is the line's, by the same rules,
+/// once. Neither within CUT_SETTLES, or the voice not known: cut.
 fn spoken(bus: &Bus) -> (String, bool) {
+    // Subscribed before the line: words heard over it are kept for the cut.
+    let mut heard = SearchStop::new(bus);
     let state = || said_lately::<VoiceState>(bus, VoiceState::TOPIC).map(|now| now.state);
     let asked = clock::now();
     let elapsed = |since: Instant| clock::now().saturating_duration_since(since);
@@ -4273,30 +4303,88 @@ fn spoken(bus: &Bus) -> (String, bool) {
             Some(_) => clock::sleep(POLL),
         }
     }
-    let begun = clock::now();
-    let cut = loop {
+    // The line from `begun` to its end: whether it was cut, or none if the
+    // voice was still speaking at SAY_TIMEOUT. Each look also asks `spoke`,
+    // which ends the wait as a cut.
+    let line = |begun: Instant, spoke: &mut dyn FnMut() -> bool| loop {
         let now = state();
         let over = match now {
             Some(Voice::Speaking) => false,
             Some(Voice::Thinking) => elapsed(begun) >= LINE_LONGEST,
             _ => true,
         };
-        if over {
-            break now == Some(Voice::Listening);
+        if over || spoke() {
+            break Some(!over || now == Some(Voice::Listening));
         }
         if elapsed(begun) >= SAY_TIMEOUT {
-            return ("after the say: the voice was still speaking".into(), false);
+            break None;
         }
         clock::sleep(POLL);
     };
-    (
-        format!(
-            "after the say: spoken from {} ms after the call, the turn over {} ms later",
-            (begun - asked).as_millis(),
-            elapsed(begun).as_millis()
+    let still = || {
+        (
+            "after the say: the voice was still speaking".to_owned(),
+            false,
+        )
+    };
+    let begun = clock::now();
+    let Some(cut) = line(begun, &mut || false) else {
+        return still();
+    };
+    let how = format!(
+        "after the say: spoken from {} ms after the call, the turn over {} ms later",
+        (begun - asked).as_millis(),
+        elapsed(begun).as_millis()
+    );
+    if !cut {
+        return (how, false);
+    }
+    let cut_at = clock::now();
+    loop {
+        match heard.words() {
+            Some(true) => return (format!("{how}; cut by words"), true),
+            None => return (format!("{how}; cut, and voice/heard can't be read"), true),
+            Some(false) => {}
+        }
+        match state() {
+            Some(Voice::Speaking) => break,
+            None => {
+                return (
+                    format!("{how}; cut, and the voice's state is not known"),
+                    true,
+                );
+            }
+            Some(_) if elapsed(cut_at) >= CUT_SETTLES => {
+                return (
+                    format!(
+                        "{how}; cut, nothing settled within {} s",
+                        CUT_SETTLES.as_secs()
+                    ),
+                    true,
+                );
+            }
+            Some(_) => clock::sleep(POLL),
+        }
+    }
+    let mut spoke = false;
+    let again = line(clock::now(), &mut || {
+        spoke = spoke || heard.words() == Some(true);
+        spoke
+    });
+    // Words that came as the line said again ended count too.
+    spoke = spoke || heard.words() == Some(true);
+    match again {
+        _ if spoke => (format!("{how}; cut by words"), true),
+        None => still(),
+        Some(true) => (
+            format!("{how}; cut again: the line said again was cut too"),
+            true,
         ),
-        cut,
-    )
+        Some(false) => (
+            format!("{how}; a cut with no words: the line was said again, then made"),
+            false,
+        ),
+    }
 }
 
 /// The light as it was before the run, from the light shown now: off, or
