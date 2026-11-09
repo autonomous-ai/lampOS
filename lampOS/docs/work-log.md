@@ -8691,3 +8691,22 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - #5850 READ-OK restated at `a6a77fa2685c544a3ef7b67cae58e798ed44f22d`
   after the exact wording/row-grouping delta. Guide 7 checks pass in 0.03 s;
   reconnect in-review wording restored, P3 addressed.
+
+## 2026-11-09 — Second: reconnect completion-generation HOLD
+
+- HOLD train #5852 `e613efc425471ff44589bd57ca643f811c8a195a` for the
+  combined #5849/#5830: old lamp_say(wait=True) id1 survives reconnect;
+  replacement connection's different speech id1 done makes it say said.
+  Actual MCP, Relink and TLS/WebSocket FakeLamp, no product hook or hardware.
+  Full exact-train MCP suite still passes 58 in 7.98 s; integration probe
+  fails under a second. /tmp/second-train751-say-reconnect.py and .log.
+- Separately reproduced on standalone #5830
+  `a8051baa7a133ffee173fcf58566cb25bf664017`: old lamp_start_turn(wait=True)
+  id1 returns turn finished from replacement connection's speech id1 done.
+  /tmp/second-5830-turn-reconnect.py and .log. Prior READ-OK withdrawn for
+  this additional P2; earlier replay/cancellation fixes remain verified.
+- Posted both findings to train, owners and Queue. Removing only #5849 does
+  not remove the turn-start variant. Request-scoped done handlers must be
+  ended or correlated to their originating connection rather than replayed
+  as persistent subscriptions. First owns train disposition; Eighth/Nine
+  own the fix. No device action or new broad-suite claim on standalone head.
