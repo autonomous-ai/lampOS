@@ -820,9 +820,35 @@ fn with_reply_named_a_named_session_is_typed_into_and_never_started_new() {
         assert_eq!(outcome, not_sent(code), "{stdout}");
         assert_eq!(called, ["machines", "ps", "reply"], "{stdout}");
     }
-    // A reply taken for another session is no proof: not sent again.
+    // Taken, with an answer for another session or none readable: the
+    // words may be there, so uncertain, never asked again.
     let (outcome, _, _) = named("docs update", rows.clone(), took(OTHER));
-    assert_eq!(outcome, not_sent("reply_failed"));
+    assert_eq!(outcome, uncertain("reply_uncertain"));
+    let (outcome, _, _) = named("docs update", rows.clone(), json!({"stdout":"not json\n"}));
+    assert_eq!(outcome, uncertain("reply_uncertain"));
+    // Only at a word's start (the Reviewer-lead's P2 on #5779): "api" is
+    // inside "rapid-prototype", never the start of one of its words.
+    let near = json!([ps_row(AGENT, "rapid-prototype", "idle", Some("/w/rapid"))]);
+    let (outcome, called, _) = named("api", near, took(AGENT));
+    assert_eq!(outcome, not_sent("session_not_found"));
+    assert_eq!(called, ["machines", "ps"]);
+    // Each word said begins a word of the name, in order.
+    let worded = json!([ps_row(AGENT, "Fix the API client", "idle", None)]);
+    assert_eq!(
+        named("api cli", worded.clone(), took(AGENT)).0,
+        LaunchOutcome::Joined {
+            agent_id: AGENT.into()
+        }
+    );
+    assert_eq!(
+        named("client api", worded, took(AGENT)).0,
+        not_sent("session_not_found")
+    );
+    // Words around the name are not stripped: the voice sends the name.
+    assert_eq!(
+        named("the docs one", rows.clone(), took(AGENT)).0,
+        not_sent("session_not_found")
+    );
     // A list that can't be read: not sent.
     let mut rig = Rig::new();
     rig.config.reply_named = true;
