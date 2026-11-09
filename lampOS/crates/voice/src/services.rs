@@ -345,14 +345,14 @@ pub struct Pending {
     /// Lines begun since, told with their request ([`line_began`] with
     /// `Some`), echoes included.
     pub heard: u32,
-    /// The newest of those requests, at most [`IDS_KEPT`]: only one of them
-    /// is taken off as an echo.
-    pub heard_ids: VecDeque<u64>,
+    /// The newest of those requests, at most [`IDS_KEPT`], each with
+    /// whether it was held as an echo: only one of them is taken off as an
+    /// echo, and once (the mark goes with its id, so a repeat of an echo
+    /// still kept is never taken off again).
+    pub heard_ids: VecDeque<(u64, bool)>,
     /// Lines of [`heard_ids`](Self::heard_ids) held as the lamp's own echo
     /// since ([`own_echo_held`]), never a person's ([`person_lines`]).
     pub echoes: u32,
-    /// Their requests, at most [`IDS_KEPT`], so none counts twice.
-    pub echoed: VecDeque<u64>,
     /// The one later request the lamp spoke in since.
     pub other: Option<u64>,
     /// The request whose "send" had no voice print, in which the lamp asked
@@ -384,7 +384,6 @@ impl Pending {
             heard: 0,
             heard_ids: VecDeque::new(),
             echoes: 0,
-            echoed: VecDeque::new(),
             other: None,
             asked_again: None,
             began_clear: false,
@@ -519,14 +518,16 @@ pub fn line_heard_in(pending: &mut Option<Pending>, request: u64) {
     let Some(kept) = pending.as_mut() else {
         return;
     };
-    if request <= kept.asked_again.unwrap_or(kept.request) || kept.heard_ids.contains(&request) {
+    if request <= kept.asked_again.unwrap_or(kept.request)
+        || kept.heard_ids.iter().any(|(id, _)| *id == request)
+    {
         return;
     }
     kept.heard = kept.heard.saturating_add(1);
     if kept.heard_ids.len() == IDS_KEPT {
         kept.heard_ids.pop_front();
     }
-    kept.heard_ids.push_back(request);
+    kept.heard_ids.push_back((request, false));
 }
 
 /// [`line_began`] with no request on `pending`: the person's first line
@@ -564,13 +565,13 @@ pub fn echo_held_in(pending: &mut Option<Pending>, request: u64) {
     let Some(kept) = pending.as_mut() else {
         return;
     };
-    if !kept.heard_ids.contains(&request) || kept.echoed.contains(&request) {
+    let Some((_, echoed)) = kept.heard_ids.iter_mut().find(|(id, _)| *id == request) else {
+        return;
+    };
+    if *echoed {
         return;
     }
-    if kept.echoed.len() == IDS_KEPT {
-        kept.echoed.pop_front();
-    }
-    kept.echoed.push_back(request);
+    *echoed = true;
     kept.echoes = kept.echoes.saturating_add(1);
     if kept.cut_by == Some(request) {
         kept.cut = false;
@@ -862,7 +863,6 @@ pub fn gate(
                 heard: 0,
                 heard_ids: VecDeque::new(),
                 echoes: 0,
-                echoed: VecDeque::new(),
                 ..kept
             });
             return Err(json!({ "error": NO_PRINT_YET, "next": SAY_IT_LONGER }));
@@ -2676,6 +2676,32 @@ mod tests {
         line(&mut pending, 99, now + Duration::from_secs(14), None);
         let sent = owners_send(&mut pending, 99, now + Duration::from_secs(16)).unwrap();
         assert_eq!(sent.args["send_id"], "s1");
+    }
+
+    /// Third's P3 on #5851: an echo's mark goes with its counted id, so a
+    /// repeat told after other echoes were told is never taken off again.
+    /// 97 and 98 are the person's, 99 to 107 the lamp's; 104 and 103 are
+    /// told twice, the second time after six more echoes.
+    #[test]
+    fn a_repeated_echo_is_taken_off_once_however_many_came_between() {
+        let now = Instant::now();
+        let mut pending = read_back_in_96(now);
+        for request in 97..=104 {
+            line_heard_in(&mut pending, request);
+        }
+        for request in [104, 103, 99, 100, 101, 102] {
+            echo_held_in(&mut pending, request);
+        }
+        for request in 105..=107 {
+            line_heard_in(&mut pending, request);
+            echo_held_in(&mut pending, request);
+        }
+        echo_held_in(&mut pending, 104);
+        echo_held_in(&mut pending, 103);
+        line_heard_in(&mut pending, 108);
+        let kept = pending.as_ref().unwrap();
+        assert_eq!(kept.echoes, 9);
+        assert_eq!(person_lines(kept), 3, "97, 98 and 108");
     }
 
     #[test]
