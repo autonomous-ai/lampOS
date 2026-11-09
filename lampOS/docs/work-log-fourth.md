@@ -1,3 +1,11 @@
+## 2026-11-10 04:50 ICT — current playback ARM passed and original PR advanced
+
+Manual playback ARM42700979346 completed successfully at exacte7dd922f0a6aafe0db06901fdc2638cafc460426/tree5fbe79b253d0b402f16c1cfac8574c515fc903e1. Whole workspace, PR test profile, one partition:14,954 passed/110 skipped/zero failed in303.600 s. Linux speech_cut_control_resets_real_speaker_before_ack_once explicitly passed, as did all six coordinator forget_tail cases. Four workspace doctests, thirteen process tests, relay, release/export49 binaries plus two examples and upload passed; signing/publishing/promotion skipped. Manual strict Clippy42700992537 also passes. This does not override the retained Mac full-run failures or establish an acoustic boundary.
+
+Updated Fourth's original #5858 branch with exact leasefb7027ad7f→e7dd; current body binds the source-equivalence proof, native outcomes and Linux evidence. Fresh source reads requested6752358201. New PR checks are separately watched: ARM42705972947, Clippy42705973053; Docs42705972915 already passes. Base remainsa226 by live remote check. No install/SSH/device/promotion.
+
+Read Reviewer-lead's original matcher comment6747212491 directly: it explicitly assigns habitual-state P2 to before switch-on, not #5910. It remains outside #5923's accepted punctuation repair. Actual GO-159 samples/replay and future switch decision remain open. Log-only diff check; no new links.
+
 ## 2026-11-10 04:47 ICT — independent skill review; setup settlement blocker reproduced
 
 Supplemental #5921 READ-OK6752181153 on311ff88eb1894b20e44154b1e29aaf9b1de93b95: reviewed seven changed files plus force composition, declaration/pinning and catalog paths. Independently ran four skill-request tests, one callback-priority control and one worker-environment control (4.75 s); all six pass. An initial short-name exact filter selected zero and is not counted; corrected filter selected the intended case. Clean isolated checkout, no edits. Existing reviewer/default and lamp gates remain; no independent full suite, cold-storage or device-latency claim.
