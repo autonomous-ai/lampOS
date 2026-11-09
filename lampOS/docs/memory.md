@@ -2097,7 +2097,28 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     never "I didn't keep that" (Thirteen's P2 on #5701): on 10538 the yes after a done forget was answered
     with a `recall`, never a `forget`, so the call's check never saw it. A
     done keep or change then backs that turn's "Kept." as a held keep's
-    does; a done forget does not (tests:
+    does; a done forget does not. A yes on a one-face line
+    (`LAMP_PERSON_SCOPE_ONE_FACE`, "told and read as the room's, its keep
+    theirs") looks for the done write in the scope its keep goes to, that
+    person's, when the room's has none (`remember::done_for_yes_in`, for
+    both the note before round 1 and a `remember` or `forget` the model
+    calls on that yes, `heard::yes_alone`, so the call is never told
+    "Nothing was kept" beside a done-already note: Seventh's P2 on #5798):
+    on
+    build 10824 (9 Nov, S1 req 390-391) the scarf was kept as theirs and
+    its yes, read as the room's, found none, 5 times in 11. Their keep
+    admitted as theirs (seen speaking) is the same done write for them, so
+    their one-face yes after it is told too. Only a keep or
+    change of theirs, never their forget: it is a note, and a one-face line
+    still forgets and retires nothing. The yes's note opens the room's
+    session before it looks, and a room's session open keeps a person's
+    done keep or change, found by that person's lookups only; their forget,
+    and any done write once another person's session opens, still go
+    (lamp-06c1, 16 Nov, row R5 of #5798: `session_open person=everyone` let
+    the keep go first, and the yes was asked again) (tests:
+    `a_one_face_keep_outlives_the_room_note_its_yes_opens`,
+    `a_one_face_yes_is_told_its_one_face_keep_is_done_already`,
+    `a_one_face_yes_through_done_already_finds_its_keep`,
     `a_done_write_outlives_a_new_session_for_the_same_scope`,
     `a_yes_after_a_done_write_is_told_it_is_done_before_it_answers`,
     `a_done_write_two_turns_back_is_not_the_yes_last_turn`,
