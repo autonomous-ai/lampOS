@@ -9,8 +9,8 @@
 //! connection otherwise), and once acked written to [`FILE`] in lamp-cloud's
 //! state folder, so a restart never sends it again. No date (a walk not
 //! ended, or set up before it was dated) sends nothing. Off unless
-//! [`ENVIRONMENT`] is `on`: Backend and Mobile have yet to confirm the
-//! backend relays a new kind to the app.
+//! [`ENVIRONMENT`] is `on`, as the product's unit sets it (the lead's call,
+//! 9 Nov); `system.info` then says `onboarding_done_supported`.
 use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -18,8 +18,7 @@ use std::time::{Duration, Instant};
 /// The kind the app opens Skills on, once per `(device id, at)`.
 pub const KIND: &str = "onboarding.done";
 
-/// The switch, in lamp-cloud's unit: `on` exactly. Not in the product's
-/// unit until the relay is confirmed.
+/// The switch, in lamp-cloud's unit: `on` exactly. On in the product's.
 pub const ENVIRONMENT: &str = "LAMP_APP_ONBOARDING_DONE";
 
 /// The file, in `STATE_DIRECTORY`, that holds the `at` the broker acked.
