@@ -151,10 +151,12 @@ at de9bebdb41). A word of one or two letters takes no ending, so "the US
 tax session" never finds "Update user tax settings" (`SHORTEST_STEM`,
 Reviewer-three's P2 on #5784 at 71bf964baa). A row fits only when it holds every one of those words,
 so "the payroll dashboard one" never finds a weather dashboard on
-"dashboard" alone (Reviewer-three's P2 on #5784 at 3d90e56736). Live rows
-come before stopped ones, so "the book program one" finds the session
-whose `about` is "I wrote books.py, a short command-line program for
-keeping a reading list", and two that fit are `session_ambiguous`. Harness fills `asks` (the last two
+"dashboard" alone (Reviewer-three's P2 on #5784 at 3d90e56736). So "the
+book program one" finds the session whose `about` is "I wrote books.py, a
+short command-line program for keeping a reading list". Two that fit are
+`session_ambiguous`, a live one beside a stopped one too, since the one
+meant may be the stopped one (the Reviewer-lead's P2 on #5784 at
+71bf964baa). Harness fills `asks` (the last two
 prompts) and `about` (the last recaps) only for a live session with a
 finished turn, within 3 s, for the first 40 rows; a stopped row, or one
 with no turn ended yet, is found by its name or folder alone. A session
@@ -169,11 +171,13 @@ refusal), and nothing is started new in any case:
 - **One live session fits and takes it:** the task's agent, `joined`, as a
   routed one: watched, told, and never closed by the lamp.
 - **Not sent, with why:** `session_not_found`; `session_ambiguous` (two or
-  more live ones fit; never guessed); `session_stopped` (only a stopped
+  more live ones fit, or, found by its work, a live one and a stopped one;
+  never guessed); `session_stopped` (only a stopped
   one fits); `session_busy` (working, asking the person something, or
   still starting); the reply's refusal (`reply_off`, `reply_not_idle`,
   `reply_not_running`, `reply_failed`); `sessions_failed` or
-  `sessions_<code>` when the list can't be read.
+  `sessions_<code>` when the list can't be read, `sessions_timeout` too
+  when it leaves the reply under 1 s of the launch bound (`REPLY_FLOOR`).
 - **Uncertain:** a reply that started and gave no answer, or one Harness
   took (exit 0) whose answer can't be read or names another session
   (`reply_uncertain`): the words may be there, so never sent again.

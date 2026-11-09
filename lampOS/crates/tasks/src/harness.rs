@@ -1103,7 +1103,7 @@ impl Cli {
     /// agent (`joined`), which the lamp never closes. Nothing else is ever
     /// started in its place, so each other end is not sent, with why:
     /// `session_not_found`, `session_ambiguous` (more than one live one
-    /// fits), `session_stopped` (only a stopped one fits), `session_busy`
+    /// fits, or, by its work, a live one and a stopped one), `session_stopped` (only a stopped one fits), `session_busy`
     /// (working, or asking the person something), the reply's refusal
     /// (`reply_off`, `reply_not_idle`, `reply_not_running`, `reply_failed`),
     /// or `sessions_…` when the list can't be read. A reply that started and
@@ -1146,7 +1146,11 @@ impl Cli {
             Err(error) => return not_sent(&format!("sessions_{}", error.code)),
         };
         let left = self.config.launch_timeout.saturating_sub(began.elapsed());
-        if left.is_zero() {
+        // A list that took nearly the whole bound leaves the reply no time
+        // to answer, and a reply cut short may have typed: under
+        // `REPLY_FLOOR` left, nothing is typed (the Reviewer-lead's P3 on
+        // #5784 at 71bf964baa).
+        if left < REPLY_FLOOR {
             return not_sent("sessions_timeout");
         }
         let reply = self.run(
@@ -3340,7 +3344,8 @@ fn named_session(bytes: &[u8], session: &str) -> Named {
     // worked on ("the book program one"), found in what it was asked and
     // what it says it did (the owner, 9 Nov: a person remembers the work,
     // never a session's name or id).
-    let fits = if fits.is_empty() {
+    let by_work = fits.is_empty();
+    let fits = if by_work {
         by_its_work(rows, &said_words)
     } else {
         fits
@@ -3352,6 +3357,13 @@ fn named_session(bytes: &[u8], session: &str) -> Named {
         )
     };
     let live: Vec<&Value> = fits.iter().copied().filter(|row| !gone(row)).collect();
+    // Found by its work, a live session and a stopped one that both hold
+    // the words are not told apart: the one meant may be the stopped one,
+    // so neither is typed into (the Reviewer-lead's P2 on #5784 at
+    // 71bf964baa).
+    if by_work && !live.is_empty() && live.len() < fits.len() {
+        return Named::Refused("session_ambiguous");
+    }
     match live.as_slice() {
         [] if fits.is_empty() => Named::Refused("session_not_found"),
         [] => Named::Refused("session_stopped"),
@@ -3379,6 +3391,11 @@ const NOT_THE_WORK: [&str; 40] = [
 /// Reviewer-lead's P2 on #5784 at de9bebdb41). A word said under
 /// [`SHORTEST_STEM`] letters takes no ending.
 const ENDINGS: [&str; 6] = ["s", "es", "ed", "ing", "er", "ers"];
+
+/// The least time a named session's `harness reply` is given after its
+/// list ([`Cli::reply_named`]): less than this left of the launch bound is
+/// `sessions_timeout`, nothing typed.
+const REPLY_FLOOR: Duration = Duration::from_secs(1);
 
 /// The fewest letters a word needs before an ending may follow it: "us"
 /// is never "user", nor "it" "items" (Reviewer-three's P2 on #5784 at
@@ -3408,10 +3425,10 @@ fn same_word(said: &str, word: &str) -> bool {
 /// order, so "client api" never finds "Fix the API client". A row fits
 /// only when it holds every one of those words ([`same_word`]): "the
 /// payroll dashboard one" never finds a weather dashboard on "dashboard"
-/// alone (Reviewer-three's P2 on #5784 at 3d90e56736). Live rows are
-/// looked at first; with none fitting, the stopped ones are, so they are
-/// said to be stopped. More than one fitting is asked about, never
-/// guessed.
+/// alone (Reviewer-three's P2 on #5784 at 3d90e56736). Every fitting row
+/// is given back, live or stopped: [`named_session`] says a stopped one is
+/// stopped, and more than one fitting, a live one beside a stopped one
+/// too, is asked about, never guessed.
 fn by_its_work<'a>(rows: &'a [Value], said_words: &[String]) -> Vec<&'a Value> {
     let work: Vec<&str> = said_words
         .iter()
@@ -3429,18 +3446,7 @@ fn by_its_work<'a>(rows: &'a [Value], said_words: &[String]) -> Vec<&'a Value> {
         work.iter()
             .all(|said| text.iter().any(|word| same_word(said, word)))
     };
-    let live = |row: &Value| {
-        !matches!(
-            row["state"].as_str(),
-            Some("stopped" | "failed" | "offline")
-        )
-    };
-    let fits: Vec<&Value> = rows.iter().filter(|row| holds_all(row)).collect();
-    if fits.iter().any(|row| live(row)) {
-        fits.into_iter().filter(|row| live(row)).collect()
-    } else {
-        fits
-    }
+    rows.iter().filter(|row| holds_all(row)).collect()
 }
 
 /// Whether `harness reply --json` took the words for `agent_id`: queued in
