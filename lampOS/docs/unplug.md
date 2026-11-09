@@ -3,7 +3,8 @@
 The core `prepare-unplug` skill runs when the person explicitly asks to unplug
 or turn off the lamp. It is installed with the product, but its tool is not
 advertised unless Skills runs with `LAMP_UNPLUG=on`. Body, Expression and Voice
-need the same opt-in. All defaults stay off until a physical lamp trial passes.
+need the same opt-in. The code's default stays off; the product's four units
+set it on since #5747, after lamp-52e6's row 1 on #1699 (20 Oct).
 
 `body.prepare_unplug` is reserved to a `kind = "core"` skill declaring the
 core-only grant `core = ["prepare_unplug"]` in `[permissions]` (the shipped

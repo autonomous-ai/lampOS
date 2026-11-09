@@ -2332,6 +2332,29 @@ fn the_product_keeps_tastes_first_and_leaves_newer_first_and_strength_off() {
     }
 }
 
+/// "I'm unplugging you" folds the arm first in the product (#5747, #1674):
+/// Body, Expression, Skills and Voice each read `LAMP_UNPLUG`, and the fold's
+/// readiness needs all four, so every one of their units sets it.
+#[test]
+fn the_product_folds_for_an_unplug_in_every_part_that_reads_it() {
+    for name in [
+        "lamp-body.service",
+        "lamp-expression.service",
+        "lamp-skills.service",
+        "lamp-voice.service",
+    ] {
+        let unit = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1;
+        assert!(
+            section(unit, "Service").contains(&"Environment=LAMP_UNPLUG=on"),
+            "{name} lacks LAMP_UNPLUG=on"
+        );
+    }
+}
+
 /// #2860: the product sees who speaks, the eyes reading each face's speaking
 /// and the voice reading it, so a full update gives one lamp what the
 /// real-face run had.

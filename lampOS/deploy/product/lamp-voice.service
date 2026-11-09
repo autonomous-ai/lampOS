@@ -299,6 +299,9 @@ Environment=LAMP_RESTORED_MUTE=on
 Environment=LAMP_SLIDE_WAKES=on
 # On after the checks: the button and the app on lamp-52e6 (#3697, 2 Nov), the app's power-off on lamp-0c89 (#3698, 30 Oct).
 Environment=LAMP_SHUTDOWN=on
+# "I'm unplugging you" folds the arm first (#1674, unplug.md): set on Body, Expression, Skills and Voice together
+# (#5747); lamp-52e6 20 Oct, #1699 row 1: ask, fold 6.7 s, head and base home, ready, Expression asleep.
+Environment=LAMP_UNPLUG=on
 # A run that fails before its capture gave any audio, with no control input in flight, leaves the lamp as its person
 # left it, and a fault after the stop's signal is the stop's (#1567). On for #4332: a busy first boot (a privacy
 # connection refused, a capture message late) ended the voice before it heard anything, and the guard then muted a

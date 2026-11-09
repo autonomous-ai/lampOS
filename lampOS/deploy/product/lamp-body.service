@@ -38,6 +38,9 @@ Environment=LAMP_BODY_POSE_ASK=on
 Environment=LAMP_HEAD_TOUCH=on
 # A long strain or a fast-warming joint sits the arm down; twice within an hour seats it until a head hold (#4501, #4899).
 Environment=LAMP_BODY_STRAIN_GUARD=on
+# "I'm unplugging you" folds the arm first (#1674, unplug.md): set on Body, Expression, Skills and Voice together
+# (#5747); lamp-52e6 20 Oct, #1699 row 1: ask, fold 6.7 s, head and base home, ready, Expression asleep.
+Environment=LAMP_UNPLUG=on
 EnvironmentFile=/etc/lampOS/body/lamp.env
 # --speed 300, Tuning::SPEED_CAP (24 Oct): Expression's offsets, the mood poses and gaze moves reach the head at this
 # rate, with the software acceleration six times it (720 -> 1800 counts/s^2); leans keep their 1.5 s and the arm's stand

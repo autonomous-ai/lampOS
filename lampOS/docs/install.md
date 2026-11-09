@@ -222,7 +222,7 @@ owner: "everything is a skill"). Install puts every product skill in
 and every core skill is a product skill (the owner: core skills are always
 installed, installable ones as apps; `tests/install.rs` holds the two
 equal, Laugh glance parked out of both): twenty-nine folders are installed,
-twenty enabled, one of them hidden unless `LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
+twenty enabled, one of them hidden unless `LAMP_UNPLUG=on`, which the product sets (#5747). Welcome back, Reminders, Task news, Onboarding, Stretch
 break, Stuffy air, Dance and Not feeling well keep their enabled defaults.
 Night sleep (#940) is on: when the lamp sleeps at night, moved out of
 Expression ([alive.md](alive.md#night-sleep-is-a-skill)), with Expression's
@@ -234,7 +234,8 @@ lamp-skills only checks it, and the catalogue no longer carries it.
 Not feeling well (#1681) came with the product after its lamp check, row 8
 on lamp-52e6 with the lead (20 Oct 11:35): one slow droop for a failed
 part, and the light back after; it adds no function. Prepare-to-unplug is
-enabled but stays hidden and inactive unless `LAMP_UNPLUG=on`.
+enabled but stays hidden and inactive unless `LAMP_UNPLUG=on`, which the
+product's Skills, Body, Expression and Voice units set since #5747.
 Bedtime and Morning is included with `enabled = false`, awaiting its lamp
 comparison (#1672); it adds no active trigger or advertised tool. Watches
 you leave and Music sway (#1669) are on in the product since #2834, with
@@ -1913,5 +1914,5 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
 
 Install includes `skills/prepare-unplug/{SKILL.md,skill.toml}`. It stays hidden
 and inactive unless `LAMP_UNPLUG=on` is set on Skills, Body, Expression and
-Voice after the lamp checks in [unplug.md](unplug.md). The product does not set
-that switch yet. This skill prepares the physical arm; it is not OS shutdown.
+Voice after the lamp checks in [unplug.md](unplug.md). The product sets it in
+all four units since #5747 (lamp-52e6's row 1 on #1699, 20 Oct). This skill prepares the physical arm; it is not OS shutdown.

@@ -2855,7 +2855,7 @@ refused so a readiness statement cannot run as an ordinary early `say`. The
 initial response is explicitly not readiness. A bounded background run waits
 for body, Expression and actual ring receipts; Voice guards the separate
 completion statement. Installed with the product, hidden while `LAMP_UNPLUG` is
-off. Its second reserved tool, `stay_plugged_in` ("never mind"), is added to
+off; the product sets it on since #5747. Its second reserved tool, `stay_plugged_in` ("never mind"), is added to
 `tools.json` by the program whenever the skill is loaded and refused while no
 latch is in force; no skill may
 declare that name, and its grants are this skill's (it also reads
