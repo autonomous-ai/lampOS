@@ -45,11 +45,10 @@ export const JOINTS_WAIT = "not routed yet: waits for the body's goal stream for
 // And for a `joints` leaving out yaw or pitch while the body hasn't said where it is.
 export const JOINTS_UNKNOWN = 'name both yaw and pitch while the body has not said where it is in the last 15 s (get body)';
 export const LAMP_CONTROL_REFUSES = Object.freeze({
-  // No product unit passes --lease-socket yet (docs/control.md).
-  look: "the body's lease socket is not on here",
-  joints: "not routed yet: waits for a goal stream on the body's lease socket",
   play: 'not routed yet: waits for client packages',
 });
+// `look` and `joints` are not in it: the product lamp-body opens its lease socket (stable 10824 and later), so a
+// lamp takes a look, and `joints` at yaw and pitch, refusing roll, shoulder and elbow with JOINTS_WAIT (above).
 // A light's pattern, as lamp-control checks it before the ring (lamp_msgs'
 // LightPattern::check, with the breath's low at 1): the least level each is
 // seen at, and the words it refuses with.

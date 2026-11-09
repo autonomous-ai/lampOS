@@ -827,9 +827,27 @@ test('a fake like lamp-control refuses what it does not route yet', async () => 
 test('the fake checks the lease before the routing refusal', async () => {
   const { LAMP_CONTROL_REFUSES } = await import('../src/testing.js');
   await withLamp({ grants: schema.grants, refuses: LAMP_CONTROL_REFUSES }, async (lamp) => {
-    await assert.rejects(lamp.look('face'), (error) => error.code === 'no_lease');
+    await assert.rejects(lamp.play('wave'), (error) => error.code === 'no_lease');
     await lamp.withLease(['body'], async () => {
-      await assert.rejects(lamp.look('face'), (error) => error.code === 'refused' && error.why === "the body's lease socket is not on here");
+      await assert.rejects(lamp.play('wave'), (error) => error.code === 'refused' && error.why === 'not routed yet: waits for client packages');
+    });
+  });
+});
+
+// As lamp-control on stable 10824 (parts.rs `joints`, the product lamp-body's
+// lease socket): a look ahead or at an angle is taken, joints naming only yaw
+// and pitch go, and one naming roll, shoulder or elbow is refused whole in its
+// words; face and name stay "not in this release".
+test('the fake takes look and yaw and pitch as a stable lamp does', async () => {
+  const { JOINTS_WAIT, LAMP_CONTROL_REFUSES } = await import('../src/testing.js');
+  await withLamp({ grants: schema.grants, refuses: LAMP_CONTROL_REFUSES }, async (lamp) => {
+    await lamp.withLease(['body'], async (lease) => {
+      assert.equal((await lamp.look({ yaw: 5, pitch: 2 })).to, 'body');
+      assert.equal((await lamp.joints(lease, 300, { yaw: -3, pitch: 1 })).to, 'body');
+      for (const joint of ['roll', 'shoulder', 'elbow']) {
+        await assert.rejects(lamp.joints(lease, 300, { yaw: 0, [joint]: 1 }), (error) => error.code === 'refused' && error.why === JOINTS_WAIT);
+      }
+      await assert.rejects(lamp.look('face'), (error) => error.code === 'refused' && error.why === 'not in this release: look at a face or a name');
     });
   });
 });
@@ -1025,8 +1043,10 @@ test('followHand lets go on a lamp that takes the look without following', async
 test('a look at the hand needs the body\'s lease socket, as other looks do', async () => {
   // lamp-control without --lease-socket refuses every look, `hand` too
   // (parts.rs: "the body's lease socket"), and followHand lets go of its lease.
-  const { LAMP_CONTROL_REFUSES } = await import('../src/testing.js');
-  await withLamp({ grants: ['body', 'look'], refuses: LAMP_CONTROL_REFUSES }, async (lamp, fake) => {
+  // No product unit runs without it since stable 10824; LAMP_CONTROL_REFUSES
+  // takes look, so this lamp is named here.
+  const noLeaseSocket = { look: "the body's lease socket is not on here" };
+  await withLamp({ grants: ['body', 'look'], refuses: noLeaseSocket }, async (lamp, fake) => {
     await lamp.withLease(['body'], async () => {
       for (const at of ['ahead', 'hand']) {
         await assert.rejects(lamp.look(at), (error) => error instanceof byCode.refused && /lease socket/.test(error.message));

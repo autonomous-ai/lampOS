@@ -233,10 +233,14 @@ def test_a_lamp_that_doesnt_route_them_says_so_as_the_tools_error(tmp_path):
     from lampos.testing import LAMP_CONTROL_REFUSES
 
     async def go():
-        async with connected(tmp_path, grants=("body", "speak"), refuses=LAMP_CONTROL_REFUSES) as (fake, _, session):
-            for tool, arguments in (("lamp_play", {"name": "wave"}), ("lamp_joints", {"pitch": 5})):
+        async with connected(
+            tmp_path, grants=("body", "speak"), refuses=LAMP_CONTROL_REFUSES
+        ) as (fake, _, session):
+            for tool, arguments in (("lamp_play", {"name": "wave"}), ("lamp_joints", {"pitch": 0, "roll": 1})):
                 result = await session.call_tool(tool, arguments)
                 assert result.isError and "refused: not routed yet" in text(result), (tool, text(result))
+            # Yaw and pitch alone go, as on a stable lamp.
+            assert not (await session.call_tool("lamp_joints", {"yaw": 0, "pitch": 1})).isError
             # The hum is routed, as lamp-control's `sound` is (#4228).
             assert not (await session.call_tool("lamp_sound", {"name": "hum"})).isError
             assert fake.asked("sound") == [{"name": "hum"}]
