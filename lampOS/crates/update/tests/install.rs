@@ -2353,6 +2353,24 @@ fn the_product_folds_for_an_unplug_in_every_part_that_reads_it() {
             "{name} lacks LAMP_UNPLUG=on"
         );
     }
+    // #5763's P1: a running product lamp never says it may be unplugged; its
+    // skills turn it off at the fold through the socket setup's helper listens on.
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1
+    };
+    let listens = section(unit("lamp-setup-change.socket"), "Socket")
+        .into_iter()
+        .find_map(|line| line.strip_prefix("ListenStream="))
+        .unwrap();
+    assert!(
+        section(unit("lamp-skills.service"), "Service")
+            .contains(&format!("Environment=LAMP_UNPLUG_OFF_SOCKET={listens}").as_str()),
+        "lamp-skills does not turn the lamp off at the fold through {listens}"
+    );
 }
 
 /// #2860: the product sees who speaks, the eyes reading each face's speaking

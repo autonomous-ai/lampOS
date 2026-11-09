@@ -860,6 +860,12 @@ pub struct UnplugLines {
     /// fails before any cancel, or when the body fails one after the cancel
     /// (no stand within 60 s): it can't get up by itself.
     pub check: String,
+    /// A note for the voice when a confirmed fold could not turn the lamp
+    /// off (`unplug::OFF_SOCKET_ENVIRONMENT` set, the helper refused or
+    /// was not reached, #5763): it must not be unplugged yet. A file from
+    /// before it says the built-in words.
+    #[serde(default = "UnplugLines::built_in_not_off")]
+    pub not_off: String,
 }
 
 impl UnplugLines {
@@ -879,7 +885,12 @@ impl UnplugLines {
             stay: "Say exactly: Okay, I'll stay.".into(),
             timeout: "Say exactly: I'm still plugged in, so I'm getting back up.".into(),
             check: "Say exactly: I can't get up by myself; I need to be checked.".into(),
+            not_off: Self::built_in_not_off(),
         }
+    }
+
+    fn built_in_not_off() -> String {
+        "Say exactly: I couldn't turn myself off just now, so please don't unplug me yet.".into()
     }
 
     /// Each line is words, as a say's own are: 1 to [`MOST_WORDS_BYTES`]
@@ -891,6 +902,7 @@ impl UnplugLines {
             ("stay", &self.stay),
             ("timeout", &self.timeout),
             ("check", &self.check),
+            ("not_off", &self.not_off),
         ] {
             if line.trim().is_empty()
                 || line.len() > MOST_WORDS_BYTES

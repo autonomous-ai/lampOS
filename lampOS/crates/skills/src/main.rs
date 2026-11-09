@@ -3271,6 +3271,12 @@ fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
     }
     let failure = loop {
         match unplug::read(bus, &request, since, clock::now_us()) {
+            // A product lamp turns off at the fold (#5763's P1): a running
+            // lamp, its storage still written, never says it may be unplugged.
+            Ok(Progress::Ready) if std::env::var_os(unplug::OFF_SOCKET_ENVIRONMENT).is_some() => {
+                let socket = std::env::var_os(unplug::OFF_SOCKET_ENVIRONMENT).unwrap_or_default();
+                return turn_off(skill, sockets, bus, &request, since, Path::new(&socket));
+            }
             Ok(Progress::Ready) => {
                 // Recheck after the socket opens, immediately before sending.
                 // The voice must not queue a readiness claim for a later scene.
@@ -3478,6 +3484,67 @@ fn say_unplug_failure(skill: &str, sockets: &Sockets) -> String {
         &[],
         || {},
     )
+}
+
+/// Setup's change helper's request for the app's Turn off
+/// (`lamp_keeper::restart::SHUTDOWN_REQUEST`; lamp-skills doesn't depend
+/// on the keeper) and how long its answer is waited for (lamp-cloud's
+/// `RESTART_WAIT`: the helper reads one line and checks one lock).
+const TURN_OFF_REQUEST: &str = r#"{"shutdown":"lamp"}"#;
+const TURN_OFF_WAIT: Duration = Duration::from_secs(2);
+
+/// At a confirmed fold, with a turn-off socket: Ready read once more, then
+/// the helper asked to turn the lamp off, as the app's Turn off asks. Its
+/// runner (`lamp-setup shutdown-now`) says the last words, stops every
+/// part, lets the arm go, lights green, syncs and powers off. Refused or
+/// not reached: the `not_off` note, and the latch kept, as for any failure.
+fn turn_off(
+    skill: &str,
+    sockets: &Sockets,
+    bus: &Bus,
+    request: &str,
+    since: u64,
+    socket: &Path,
+) -> String {
+    let asked = || -> io::Result<serde_json::Value> {
+        let mut stream = UnixStream::connect(socket)?;
+        stream.set_write_timeout(Some(TURN_OFF_WAIT))?;
+        stream.set_read_timeout(Some(TURN_OFF_WAIT))?;
+        if lamp_skills::unplug::read(bus, request, since, clock::now_us())?
+            != lamp_skills::unplug::Progress::Ready
+        {
+            return Err(io::Error::other("the fold was no longer proven"));
+        }
+        writeln!(stream, "{TURN_OFF_REQUEST}")?;
+        let mut line = String::new();
+        BufReader::new(stream.take(64 * 1_024)).read_line(&mut line)?;
+        Ok(serde_json::from_str(&line)?)
+    };
+    let why = match asked() {
+        Ok(answer) if answer["done"]["shutting_down"] == true => {
+            return format!("unplug: folded for {request}; the lamp turns off (setup's shutdown)");
+        }
+        Ok(answer) => format!("the turn-off was not taken: {answer}"),
+        Err(error) => format!("the turn-off could not be asked: {error}"),
+    };
+    if let Some(refused) = sockets.may.refuses(&Call::Say(String::new())) {
+        return format!("unplug: {why}; {refused}");
+    }
+    let note = sockets
+        .may
+        .unplug
+        .as_ref()
+        .map(|lines| lines.not_off.clone())
+        .unwrap_or_default();
+    let said = say(
+        &sockets.say,
+        "unplug: not turned off",
+        skill,
+        json!({"note": note, "priority": 8}),
+        &[],
+        || {},
+    );
+    format!("unplug: {why}; {said}")
 }
 
 fn say_unplug_ready(
@@ -5283,6 +5350,10 @@ mod tests {
                 stay: "Say exactly: Okay, I'll stay.".into(),
                 timeout: "Say exactly: I'm still plugged in, so I'm getting back up.".into(),
                 check: "Say exactly: I can't get up by myself; I need to be checked.".into(),
+                // #5763: said when a confirmed fold could not turn the lamp off.
+                not_off:
+                    "Say exactly: I couldn't turn myself off just now, so please don't unplug me yet."
+                        .into(),
             }
         );
     }

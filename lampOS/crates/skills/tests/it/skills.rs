@@ -13784,6 +13784,160 @@ fn unplug_tool_returns_before_folding_and_says_ready_only_after_render_receipt()
     );
 }
 
+/// A lamp-skills with `LAMP_UNPLUG=on` and a turn-off socket (the product's
+/// setup change helper, #5763's P1), driven to a confirmed fold: a running
+/// lamp, its storage still written, must never say "You can unplug me now".
+/// At the fold's proof it asks the helper to turn the lamp off, and the
+/// helper's runner says the last words once every part is stopped, synced
+/// and powered off. Returns what the helper was asked, and every say asked.
+fn unplug_with_turn_off(helper_answer: serde_json::Value) -> (Vec<String>, Vec<serde_json::Value>) {
+    use lamp_body::unplug::{Phase, Request, State};
+    use lamp_bus::Kind;
+    use serde_json::{Value, json};
+    let dir = tempfile::Builder::new()
+        .prefix("uf")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let skills = dir.path().join("skills");
+    copy(
+        &skills_root().join("prepare-unplug"),
+        &skills.join("prepare-unplug"),
+    );
+    let root = dir.path().join("bus");
+    let bus = Bus::new(&root).unwrap();
+    let tools = dir.path().join("tools");
+    let say_socket = dir.path().join("say.sock");
+    let say = UnixListener::bind(&say_socket).unwrap();
+    say.set_nonblocking(true).unwrap();
+    let off_socket = dir.path().join("change.sock");
+    let helper = UnixListener::bind(&off_socket).unwrap();
+    helper.set_nonblocking(true).unwrap();
+    let _running = Running(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args([
+                "--dir".as_ref(),
+                skills.as_os_str(),
+                "--bus-root".as_ref(),
+                root.as_os_str(),
+                "--tools-dir".as_ref(),
+                tools.as_os_str(),
+                "--say-socket".as_ref(),
+                say_socket.as_os_str(),
+            ])
+            .env("LAMP_UNPLUG", "on")
+            .env(lamp_skills::unplug::OFF_SOCKET_ENVIRONMENT, &off_socket)
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !tools.join("tools.json").exists() || !tools.join("call.sock").exists() {
+        assert!(Instant::now() < deadline, "skill never became available");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let mut caller = UnixStream::connect(tools.join("call.sock")).unwrap();
+    caller
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    writeln!(
+        caller,
+        "{}",
+        json!({"op":"call","name":"prepare_to_unplug","args":{}})
+    )
+    .unwrap();
+    let mut line = String::new();
+    BufReader::new(caller).read_line(&mut line).unwrap();
+    let response: Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(response["ok"], true, "{response}");
+    let request = loop {
+        if let Some(message) = bus.latest(Request::TOPIC).unwrap() {
+            break message.parse::<Request>().unwrap();
+        }
+        assert!(Instant::now() < deadline, "no body request");
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    let mut body = bus
+        .publisher_declared(State::TOPIC, &State::declaration(), "body")
+        .unwrap();
+    let mut expression = bus
+        .publisher(
+            lamp_skills::unplug::EXPRESSION_TOPIC,
+            Kind::Latest,
+            "expression",
+        )
+        .unwrap();
+    expression.expires_after(Some(Duration::from_millis(500)));
+    let mut ring = bus
+        .publisher(lamp_skills::unplug::RING_TOPIC, Kind::Latest, "ring")
+        .unwrap();
+    ring.expires_after(Some(Duration::from_millis(500)));
+    let state = State {
+        request: request.request.clone(),
+        phase: Phase::Ready,
+        why: String::new(),
+    };
+    let asleep = json!({"request":request.request,"asleep":true});
+    let (mut asked, mut said) = (Vec::new(), Vec::new());
+    // Every say asked and every helper line, answered, for 4 s of proof.
+    let until = Instant::now() + Duration::from_secs(4);
+    while Instant::now() < until {
+        let now = lamp_ipc::monotonic_us();
+        body.publish_json(now, &state).unwrap();
+        expression.publish_json(now, &asleep).unwrap();
+        ring.publish_json(now, &asleep).unwrap();
+        if let Ok((stream, _)) = helper.accept() {
+            stream.set_nonblocking(false).unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            asked.push(line.trim().to_owned());
+            writeln!(&stream, "{helper_answer}").unwrap();
+        }
+        if let Ok((stream, _)) = say.accept() {
+            stream.set_nonblocking(false).unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            said.push(serde_json::from_str(&line).unwrap());
+            writeln!(&stream, "{}", json!({"outcome":"spoken"})).unwrap();
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    (asked, said)
+}
+
+#[test]
+fn a_lamp_with_a_turn_off_socket_turns_off_at_the_fold_and_never_says_unplug_me_now() {
+    let (asked, said) = unplug_with_turn_off(serde_json::json!({"done":{"shutting_down":true}}));
+    assert_eq!(asked, [r#"{"shutdown":"lamp"}"#], "said: {said:?}");
+    // The runner says the last words, not lamp-skills: nothing asked of the voice.
+    assert!(said.is_empty(), "{said:?}");
+}
+
+#[test]
+fn a_refused_turn_off_says_not_to_unplug_yet_and_never_says_unplug_me_now() {
+    let (asked, said) = unplug_with_turn_off(
+        serde_json::json!({"refused":"an update is being installed: try again once it is done"}),
+    );
+    assert_eq!(asked, [r#"{"shutdown":"lamp"}"#]);
+    assert!(
+        said.iter()
+            .all(|ask| !ask.to_string().contains("unplug me now")),
+        "{said:?}"
+    );
+    assert_eq!(said.len(), 1, "{said:?}");
+    assert!(
+        said[0]["note"]
+            .as_str()
+            .unwrap()
+            .contains("please don't unplug me yet"),
+        "{said:?}"
+    );
+}
+
 #[test]
 fn onboarding_consent_clauses_cannot_be_removed_when_loading_or_packaging() {
     let dir = tempfile::tempdir().unwrap();

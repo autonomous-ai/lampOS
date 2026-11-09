@@ -20,6 +20,10 @@ failed = "Say briefly: I could not confirm a safe folded position. Please do not
 stay = "Say exactly: Okay, I'll stay."
 timeout = "Say exactly: I'm still plugged in, so I'm getting back up."
 check = "Say exactly: I can't get up by myself; I need to be checked."
+# With a turn-off socket (the product, #5763) ready is never said: a
+# confirmed fold turns the lamp off and the shutdown says the last words;
+# not_off is said when it could not.
+not_off = "Say exactly: I couldn't turn myself off just now, so please don't unplug me yet."
 
 [[do]]
 body = { prepare_unplug = true }

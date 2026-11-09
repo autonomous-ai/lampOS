@@ -47,9 +47,12 @@ Live route while its session has no `prepare_to_unplug` (on its own or
 through `use_skill`), and on the second route while the skills' catalogs
 offer none; with the tool there it is not told.
 
-This prepares the arm; it does not run an operating-system shutdown or cut
-power. Turning the lamp off safely, with the body let go and a light that says
-it may be unplugged, is shutdown.md. An ordinary bedtime request belongs to the bedtime skill.
+Unset `LAMP_UNPLUG_OFF_SOCKET`, this prepares the arm only; it does not run
+an operating-system shutdown or cut power. The product sets it (#5763's P1):
+a running lamp's storage is still written, and a plug pulled then can corrupt
+the SD card, so a product lamp never says it may be unplugged while it runs.
+Its confirmed fold turns it off instead, through shutdown.md's runner (step 7
+below). An ordinary bedtime request belongs to the bedtime skill.
 
 ## From the request to the answer
 
@@ -82,7 +85,7 @@ it may be unplugged, is shutdown.md. An ordinary bedtime request belongs to the 
 6. Skills requires all three fresh, matching receipts before asking Voice for
    the skill's `ready` line, “My arm is folded. You can unplug me now.”
    Every line it says is the skill's own, in `skills/prepare-unplug/skill.toml`'s
-   `[unplug]` (`ready`, `failed`, `stay`, `timeout`, `check`), read only
+   `[unplug]` (`ready`, `failed`, `stay`, `timeout`, `check`, `not_off`), read only
    with its core grant (#940, the first move of "Everything is a skill",
    21 Oct). A file from before `[unplug]` says the words lamp-skills kept
    before, for this release only, and the journal says so. The request carries
@@ -90,6 +93,26 @@ it may be unplugged, is shutdown.md. An ordinary bedtime request belongs to the 
    queued or under way. An ordinary tool answer or an old asleep frame is
    never readiness. Privacy, playback ownership and the voice's own gates
    remain authoritative.
+7. **With `LAMP_UNPLUG_OFF_SOCKET` set** (the product's lamp-skills unit:
+   `/run/lampos-setup-change/change.sock`, root:lampos 0660), the `ready`
+   line is never asked. At the same three receipts, Ready read once more,
+   Skills sends setup's change helper `{"shutdown":"lamp"}`, the app's Turn
+   off (shutdown.md, "The ways a person asks"), and waits 2 s for its answer.
+   On `{"done":{"shutting_down":true}}` the runner says "Going to sleep now.
+   Unplug me when my light turns green.", stops every part read back
+   stopped, lets the arm go only while it is down, lights the ring green only
+   after that, syncs and powers off: no writer is left when the person
+   unplugs it. Refused (an update installing), not reached or no answer:
+   Skills says the skill's `not_off` note ("I couldn't turn myself off just
+   now, so please don't unplug me yet."), and the latch is kept, as for any
+   failure; "never mind" or the timeout stands it up. A "never mind" before
+   the helper's yes cancels as below; after it, the lamp is turning off, as
+   after the app's Turn off, and comes back at its power-up. About 30 s from
+   the ask to the power-off: the fold (6.7 s on lamp-52e6, 20 Oct) and the
+   app's Turn off (20 to 26 s to the lamp gone silent on lamp-0c89, #3698).
+   Tests: `a_lamp_with_a_turn_off_socket_turns_off_at_the_fold_and_never_says_unplug_me_now`,
+   `a_refused_turn_off_says_not_to_unplug_yet_and_never_says_unplug_me_now`;
+   the install pin holds the product unit's socket to the helper's.
 
 The tool response target is under 150 ms on a warmed lamp. This target does
 not include speech recognition or the model deciding to call the tool. Body
