@@ -1122,7 +1122,12 @@ impl Cli {
                 "--all".into(),
                 "--json".into(),
             ],
-            self.config.read_timeout.min(self.config.launch_timeout),
+            // The launch's own bound, not the 10 s read bound: on
+            // lamp-c0a4 on 9 Nov, `ps --all` of the person's Mac took 4.5 to
+            // 10 s, and two hand-overs a person had said yes to twice ran
+            // out at 10 s (`sessions_timeout`). The reply below gets what is
+            // left of the same bound.
+            self.config.launch_timeout,
         );
         seen.took(&listed);
         let agent_id = match listed {
@@ -3368,28 +3373,37 @@ const NOT_THE_WORK: [&str; 40] = [
     "i", "thing", "work", "and",
 ];
 
+/// Endings a word of a session's work may add to a word said, or the
+/// other way round: "book" is "books", "fix" is "fixed", "test" is
+/// "tests" but never "testament", "note" never "notebook" (the
+/// Reviewer-lead's P2 on #5784 at de9bebdb41).
+const ENDINGS: [&str; 6] = ["s", "es", "ed", "ing", "er", "ers"];
+
 /// Whether a word said stands for a word of a session's work: the same
-/// word, or one begins the other and the shorter has four letters or more
-/// ("book" for "books", "program" for "programs"; "app" is only "app").
+/// word, or the same word with one of [`ENDINGS`].
 fn same_word(said: &str, word: &str) -> bool {
     let (short, long) = if said.len() <= word.len() {
         (said, word)
     } else {
         (word, said)
     };
-    short == long || (short.chars().count() >= 4 && long.starts_with(short))
+    short == long
+        || long
+            .strip_prefix(short)
+            .is_some_and(|ending| ENDINGS.contains(&ending))
 }
 
-/// The sessions whose work is what the person said (#5535): each row's
+/// The session whose work is what the person said (#5535): each row's
 /// `asks` and `about` against the words said that name work
 /// ([`NOT_THE_WORK`] left out). Its name and folder are not read here: a
 /// name is matched only as [`named_session`] matches it, word starts in
-/// order, so "client api" never finds "Fix the API client". A row holds a word said when one of its
-/// words is the same word ([`same_word`]). Only rows holding at least half
-/// of those words, and the most of them, fit; two rows holding the most
-/// both fit, so they are asked about, never guessed. A stopped row counts
-/// only when no live one fits, so a live session is never passed over for
-/// an older one.
+/// order, so "client api" never finds "Fix the API client". A row fits
+/// only when it holds every one of those words ([`same_word`]): "the
+/// payroll dashboard one" never finds a weather dashboard on "dashboard"
+/// alone (Reviewer-three's P2 on #5784 at 3d90e56736). Live rows are
+/// looked at first; with none fitting, the stopped ones are, so they are
+/// said to be stopped. More than one fitting is asked about, never
+/// guessed.
 fn by_its_work<'a>(rows: &'a [Value], said_words: &[String]) -> Vec<&'a Value> {
     let work: Vec<&str> = said_words
         .iter()
@@ -3399,44 +3413,26 @@ fn by_its_work<'a>(rows: &'a [Value], said_words: &[String]) -> Vec<&'a Value> {
     if work.is_empty() {
         return Vec::new();
     }
-    let held = |row: &Value| -> usize {
-        let mut text: Vec<String> = Vec::new();
-        text.extend(words_of(row["about"].as_str().unwrap_or_default()));
+    let holds_all = |row: &Value| -> bool {
+        let mut text: Vec<String> = words_of(row["about"].as_str().unwrap_or_default());
         for ask in row["asks"].as_array().into_iter().flatten() {
             text.extend(words_of(ask.as_str().unwrap_or_default()));
         }
         work.iter()
-            .filter(|said| text.iter().any(|word| same_word(said, word)))
-            .count()
+            .all(|said| text.iter().any(|word| same_word(said, word)))
     };
-    let needed = work.len().div_ceil(2);
-    let scored: Vec<(usize, &Value)> = rows
-        .iter()
-        .map(|row| (held(row), row))
-        .filter(|(count, _)| *count >= needed)
-        .collect();
     let live = |row: &Value| {
         !matches!(
             row["state"].as_str(),
             Some("stopped" | "failed" | "offline")
         )
     };
-    // The live ones holding the most; with none live, the stopped ones,
-    // which are said to be stopped.
-    let any_live = scored.iter().any(|(_, row)| live(row));
-    let Some(best) = scored
-        .iter()
-        .filter(|(_, row)| live(row) == any_live)
-        .map(|(count, _)| *count)
-        .max()
-    else {
-        return Vec::new();
-    };
-    scored
-        .into_iter()
-        .filter(|(count, row)| *count == best && live(row) == any_live)
-        .map(|(_, row)| row)
-        .collect()
+    let fits: Vec<&Value> = rows.iter().filter(|row| holds_all(row)).collect();
+    if fits.iter().any(|row| live(row)) {
+        fits.into_iter().filter(|row| live(row)).collect()
+    } else {
+        fits
+    }
 }
 
 /// Whether `harness reply --json` took the words for `agent_id`: queued in
