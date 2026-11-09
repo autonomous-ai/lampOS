@@ -9091,3 +9091,15 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   start from an active prompt. Stock 10824 measurements remain unchanged.
 - Exact-content guide snapshot: seven tests passed in 0.10 s; diff check
   clean. No device run. #5870 prompted-turn cancellation HOLD remains.
+
+## 2026-11-09 — Second: reminders force supplemental check
+
+- #5879 de77e7cab2: baseline reminders tests 2 passed, process tests 50
+  passed in 7.17 s, two independent rejection/composition probes passed.
+  Withdrawals, quotation, named other people and compound requests do not
+  force; schedule/list first_force composition preserves existing setters.
+- No runtime finding. Posted P3 evidence wording: no memory hit cannot
+  establish no prior list in conversation. First/Reviewer-lead retain named
+  and default-on reads; fresh-session lamp gate and native CI outstanding.
+- Temporary tests saved /tmp/second-5879-extra.rs and removed; checkout
+  clean. No device access or end-to-end latency measurement.
