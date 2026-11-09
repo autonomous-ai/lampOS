@@ -171,9 +171,13 @@ a room line heard as no words, and the walk waited the 90 s give-up in
 silence before asking again; stable 10467 did too), the step is asked again
 as soon as the lamp may speak and the room has been quiet `START_QUIET_US`,
 `MOST_UNSAID` (2) times at most, only while that same ask is led and
-nothing has been answered (`Onboarding::first_note_finished`,
-`onboarding_note_unsaid` with `"first": true`). Any of it played, it is
-not; the step gate and the 90 s give-up of a heard ask are as before.
+no words have been heard since that ask, even with nudging off
+(`Onboarding::first_note_finished`, `onboarding_note_unsaid` with
+`"first": true`). A line with any letter or number counts; an empty or
+punctuation-only line does not. Words already heard go through the normal
+answer path, without a re-ask claiming nobody has spoken. Any of the note
+played, it is not asked again; the step gate and the 90 s give-up of a heard
+ask are as before.
 
 ## Installed walk data
 
