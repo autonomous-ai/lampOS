@@ -9201,3 +9201,12 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - First reports 11048 promoted 21:01 despite pre-promote reconnect report.
   Reiterated both exact-build failures and corrective #5873 ask on Queue
   6741995391. No release/device mutation by Second.
+
+## 2026-11-09 — Second: train756 native result and stable guide note
+
+- Train756 merged as 4342bcccc. Downloaded run 42628720705 on exact
+  c200d03ad4: 14,894 passed / 109 skipped. #5881 native ARM64 now green.
+- #5885 stable guide scoped comment 6742163023: lamp_say reconnect warning
+  matches exact-11048 failure; waiting turn shares the issue. Flagged
+  contradictory name.heard first clause for named docs reviewer. No
+  replacement docs READ-OK or device claim.
