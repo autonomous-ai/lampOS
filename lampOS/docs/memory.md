@@ -2203,9 +2203,12 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   reply overtaken by a set, end or forget, even if the forgotten role was
   not cached yet. Successful overlapping writes with uncertain response
   order evict that person's cached role and return the existing unavailable
-  result; they never confirm a possibly stale role. A received successful write whose
-  lease expires before cache publication also evicts it. A lost response
-  retains the existing unknown-outcome behavior; this is not a store rollback. A fresh session open can reload the role.
+  result; they never confirm a possibly stale role. A received successful
+  write also evicts it when the post-response scope check observes expiry or
+  revocation. That check is separate from cache publication: later revocation
+  alone does not advance the cache revision, so this is not an atomic lease
+  revocation fence. A lost response retains the existing unknown-outcome
+  behavior; this is not a store rollback. A fresh session open can reload the role.
   This revision is global: an unrelated person's change can discard an
   outstanding response, but does not clear other already-cached roles.
   No forgotten-person identifiers are retained for this fence, and no cache
