@@ -8,6 +8,7 @@
     "/var/lib/lampos-eyes/people.json.repair.new",
     "/var/lib/lampos-eyes/set-aside",
     "/var/lib/lampos-eyes/people.json.from-photos",
+    "/var/lib/lampos-eyes/people.json.from-photos.new",
     "/var/lib/lampos-eyes/seems.log",
     "/var/lib/lampos-eyes/glance.log",
     "/var/lib/lampos-eyes/owner-voice.json",
