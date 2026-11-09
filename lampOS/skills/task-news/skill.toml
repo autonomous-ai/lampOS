@@ -111,8 +111,9 @@ say = { from = "tasks" }
 # the voice's "(Nobody has spoken. ...)". {who}, {when}, {asked}, {answer},
 # {computer}, {no_question}, {asks}, {waiting}, {how_many}, {each}, {first},
 # {goes_on}, {about}, {signs}, {time}, {minutes}, {name}, {description},
-# {uses}, {ask}, {put_on} and {why} are filled in by the voice, which quotes
-# and cuts the task's and the answer's words; each line has only its own
+# {uses}, {ask}, {put_on}, {why}, {session} and {earlier} are filled in by
+# the voice, which quotes and cuts the task's and the answer's words, and
+# the session's name or first ask; each line has only its own
 # slots. A file without it has the voice say its built-in words, for one
 # release.
 [news.words]
@@ -136,6 +137,8 @@ failed_folder = "The work the person asked you to hand over, \"{asked}\", did no
 failed_signed_out = "The work the person asked you to hand over, \"{asked}\", did not reach {who}, as it isn't signed in on {computer}, so it could not start. Tell them that in one plain, light sentence, with no technical words, and that it has to be signed in there first."
 failed_no_prompt = "The work the person asked you to hand over, \"{asked}\", did not reach {who}: {computer} can't start it with work yet, so trying again won't help. Tell them that in one plain, light sentence, with no technical words, and that the software on that computer has to be updated first."
 failed_busy = "The work the person asked you to hand over, \"{asked}\", did not reach {who}: {who} on {computer} is busy with something else right now, so it was not given to it. Tell them that in one plain, light sentence, with no technical words, and to ask you again once it is done."
+joined = "The work the person asked you to hand over, \"{asked}\", went to {who} in their earlier session \"{session}\", not a new one. Tell them that in one short, plain sentence, naming that session, with no technical words, and that they can tell you if it's the wrong one."
+joined_asked = "The work the person asked you to hand over, \"{asked}\", went to {who} in their earlier session, the one that was asked to \"{earlier}\", not a new one. Tell them that in one short, plain sentence, saying which session by what it was asked, in your own words, with no technical words, and that they can tell you if it's the wrong one."
 answered = "News from a question you handed over for the person. {who} {when} answered the question they asked it: \"{asked}\". Its answer: \"{answer}\". Tell them now in one or two natural spoken sentences, starting with something like \"{who} says…\", then the answer in plain words. Do not read out code, lists, file paths or links; if there is more than fits, say the rest is on {computer}. {no_question}"
 answered_cut = "News from a question you handed over for the person. {who} {when} answered the question they asked it: \"{asked}\". Its answer is long; it begins: \"{answer}\". Tell them now in one or two natural spoken sentences, starting with something like \"{who} says…\", then the answer in one plain line from that beginning, then that the rest is on {computer}. No code, lists, file paths or links, {no_question}"
 together = "News from {how_many} pieces of work you handed over for the person. {each} Tell them now, together, in one turn: one plain spoken sentence for each, starting with something like \"Oh, {first} just finished…\" (\"earlier\" for one a while ago), each with the gist of its result. No code, lists, file paths or links.{goes_on} No question."
