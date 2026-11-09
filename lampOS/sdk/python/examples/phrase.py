@@ -14,7 +14,7 @@ async def main():
     async with await Lamp.connect() as lamp:
 
         async def good_night(event):
-            await lamp.light("warm", 1, 30_000, pattern="breathe")
+            await lamp.light("warm", 2, 30_000, pattern="breathe")  # a breath needs level 2 or up
             await lamp.gesture("nod")
 
         await lamp.on("phrase.heard", good_night, phrases=["good night lamp"])
