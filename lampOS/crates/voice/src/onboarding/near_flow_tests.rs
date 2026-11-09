@@ -103,7 +103,16 @@ impl Store {
             Onboarding::with_storage(self.path.join("progress.json"), self.owner.client());
         walk.unix_clock = clock;
         walk.set_near_available(true);
+        // PARKED (#4080): these tests keep the three-call bar and the
+        // sentence part tested; `teaching` is the shipped step.
+        walk.near.three_calls = true;
         walk.drain_storage_for_test(now);
+        walk
+    }
+    /// A cycle of the shipped step: teaching the call (#4080).
+    fn teaching(&self, now: u64) -> Onboarding {
+        let mut walk = self.cycle(now);
+        walk.near.three_calls = false;
         walk
     }
 }
@@ -816,20 +825,11 @@ fn a_call_after_a_prompt_said_with_a_gap_is_a_try() {
 fn each_call_prompt_answers_the_last_try_and_only_the_first_explains() {
     assert!(NEAR_FIRST.contains("say 'Hey Lamp'"), "{NEAR_FIRST}");
     assert!(
-        NEAR_FIRST.contains("I'll ask until I've heard you three times."),
-        "{NEAR_FIRST}"
-    );
-    assert_eq!(
-        lamp_near_call::TRIES,
-        3,
-        "the line says how many calls it takes"
-    );
-    assert!(
         NEAR_AGAIN.contains("\"Got it. Say 'Hey Lamp' once more.\""),
         "{NEAR_AGAIN}"
     );
     assert!(
-        NEAR_MISSED.contains("\"I didn't catch that. Say 'Hey Lamp' again, from your seat.\""),
+        NEAR_MISSED.contains("\"I didn't catch that. Say 'Hey Lamp' once more.\""),
         "{NEAR_MISSED}"
     );
     let store = Store::new(None);
@@ -1246,8 +1246,10 @@ fn persisted_samples_are_validated_on_load() {
         |p| p.near_call_tries[0].score = Some(0.9),
         |p| p.near_call_prompts = 6,
         |p| p.near_call_prompts = 2,
+        // Done with no sentence and no accepted call (#4080: one call is
+        // enough while teaching it).
         |p| {
-            p.near_call_tries.pop();
+            p.near_call_tries.clear();
             p.steps.insert(
                 Step::HowYouSound.name().into(),
                 Kept {
@@ -1977,7 +1979,7 @@ fn a_later_re_offer_of_how_you_sound_begins_with_the_call_part() {
     assert!(walk.desired.near_call_tries.is_empty());
     walk.desired.steps.remove(Step::HowYouSound.name());
     let first = play(&mut walk, 200 * S, 1_760_000_200_000, 6);
-    assert!(first.words.contains("how you call me"), "{}", first.words);
+    assert!(first.words.contains("say 'Hey Lamp'"), "{}", first.words);
     assert!(!first.words.contains("sentence"), "{}", first.words);
 }
 
@@ -2277,4 +2279,75 @@ fn a_heard_call_is_asked_for_again_twice_at_most() {
             .all(|invitation| invitation.attempt > lamp_near_call::MOST_PROMPTS as u64),
         "no call prompt after the third heard call refused"
     );
+}
+
+/// #4080: one accepted call ends the step, its line said, with no second
+/// call asked, no bar and no sentence.
+#[test]
+fn one_accepted_call_ends_how_you_sound() {
+    let store = Store::new(None);
+    let mut walk = store.teaching(S);
+    assert_eq!(call(&mut walk, 10 * S, 22.4, 1)["accepted"], true);
+    let notes = settle(&mut walk, 20 * S);
+    assert_eq!(outcome(&walk), Some(Outcome::Done));
+    assert_eq!(notes, [NEAR_DONE]);
+    assert_eq!(walk.pending().invitations.len(), 0);
+    assert_eq!(walk.kept().near_call_prompts, 1);
+}
+
+/// #4080: a missed call gets exactly one reminder, then the walk moves on.
+#[test]
+fn a_missed_call_gets_one_remind_then_the_walk_moves_on() {
+    let store = Store::new(None);
+    let mut walk = store.teaching(S);
+    let miss = |walk: &mut Onboarding, at: u64, turn: u64| {
+        let prompt = play(walk, at, 1_760_000_000_000 + at / 1_000, turn);
+        room(walk, &prompt, 2_400, 22.0);
+        // Heard, but not surely: a try, refused.
+        name(walk, &prompt, 2_000, 0.3);
+        let judged = judge(walk, &prompt);
+        assert_eq!(judged["accepted"], false, "{judged}");
+        prompt.words
+    };
+    assert_eq!(miss(&mut walk, 10 * S, 1), NEAR_FIRST);
+    assert_eq!(miss(&mut walk, 30 * S, 2), NEAR_MISSED);
+    let notes = settle(&mut walk, 50 * S);
+    assert_eq!(outcome(&walk), Some(Outcome::Failed));
+    assert_eq!(notes, [NEAR_FAILED]);
+    assert_eq!(walk.pending().invitations.len(), 0);
+    assert_eq!(walk.kept().near_call_prompts, 2);
+}
+
+/// #4080, the lead's rule: no call heard gets one reminder, then the step
+/// fails with its "redo the setup later" line and the walk moves on.
+#[test]
+fn no_call_heard_is_reminded_once_then_fails_and_the_walk_moves_on() {
+    let store = Store::new(None);
+    let mut walk = store.teaching(S);
+    let silent = |walk: &mut Onboarding, at: u64, turn: u64| {
+        let prompt = play(walk, at, 1_760_000_000_000 + at / 1_000, turn);
+        room(walk, &prompt, 2_400, 2.0);
+        let judged = judge(walk, &prompt);
+        assert_eq!(judged["accepted"], false, "{judged}");
+        prompt.words
+    };
+    assert_eq!(silent(&mut walk, 10 * S, 1), NEAR_FIRST);
+    assert_eq!(silent(&mut walk, 30 * S, 2), NEAR_MISSED);
+    let notes = settle(&mut walk, 50 * S);
+    assert_eq!(outcome(&walk), Some(Outcome::Failed));
+    assert_eq!(notes, [NEAR_FAILED]);
+    assert_eq!(walk.pending().invitations.len(), 0);
+}
+
+/// #4080: a skip asked for in the step ends it, said, and the walk moves on.
+#[test]
+fn a_skip_while_teaching_the_call_moves_the_walk_on() {
+    let store = Store::new(None);
+    let mut walk = store.teaching(S);
+    offer(&mut walk, 10 * S);
+    report_skip(&walk);
+    let notes = settle(&mut walk, 20 * S);
+    assert_eq!(outcome(&walk), Some(Outcome::Skipped));
+    assert_eq!(notes, [HOW_YOU_SOUND_SKIPPED]);
+    assert_eq!(walk.pending().invitations.len(), 0);
 }

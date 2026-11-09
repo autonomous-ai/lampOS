@@ -130,6 +130,13 @@ const LINGER_US: u64 = 2_000_000;
 const FRESH_MS: u64 = 700;
 /// "Touch": no touch on the head this long after the ask has failed.
 const TOUCH_GIVE_UP_US: u64 = 60_000_000;
+/// "Touch" done (#4080): the walk steps aside (`walk` false on
+/// `onboarding/pending`) this long after the latest head touch felt, so the
+/// lamp's own pet response (Head pat wiggle: 2 s after the hand lifts) may
+/// play before the next step is asked.
+/// ponytail: timed from Controls' touches, not the pet's end on `controls/pet`;
+/// read that topic if a long pet outlasts it.
+const PET_RESPONSE_US: u64 = 6_000_000;
 /// The name the walk reads Controls' touches under.
 const SUBSCRIBER: &str = "voice_onboarding";
 
@@ -668,11 +675,13 @@ impl Progress {
             || !tries.iter().all(near::valid_try)
             || self.sentence_prompts > near::SENTENCE_PROMPTS
             // The step is done by its sentence part, which asked at least
-            // once; the name part's bar is its own file.
-            || self
-                .steps
-                .get(Step::HowYouSound.name())
-                .is_some_and(|kept| kept.outcome == Outcome::Done && self.sentence_prompts == 0)
+            // once, or, teaching the call (#4080), by one accepted call; the
+            // name part's bar is its own file.
+            || self.steps.get(Step::HowYouSound.name()).is_some_and(|kept| {
+                kept.outcome == Outcome::Done
+                    && self.sentence_prompts == 0
+                    && tries.is_empty()
+            })
         {
             return Err(invalid());
         }
@@ -983,6 +992,13 @@ pub struct Onboarding {
     /// Controls' touches (`controls/touch`), with the bus on: without them
     /// "touch" is not available.
     touches: Option<lamp_bus::Subscriber>,
+    /// "Touch" ended on a touch felt (#4080): until then the walk steps
+    /// aside for the pet response ([`PET_RESPONSE_US`]).
+    pet_response_until_us: Option<u64>,
+    /// PARKED (#4080): "touch" with no touch felt was `later` (#3996); the
+    /// lead's rule makes it failed. True brings `later` back (its tests
+    /// keep the `later` re-offers tested through it).
+    touch_later: bool,
     privacy_flow: PrivacyFlow,
     near: near::NearFlow,
     giving: giving_way::GivingWayFlow,
@@ -1203,7 +1219,11 @@ impl Onboarding {
             available: Step::available,
             gesture: None,
             privacy_flow: PrivacyFlow::default(),
-            near: near::NearFlow::default(),
+            near: {
+                let mut near = near::NearFlow::default();
+                near.three_calls = near::THREE_CALLS;
+                near
+            },
             giving: giving_way::GivingWayFlow::default(),
             unix_clock: unix_ms,
             no_slide: false,
@@ -1228,6 +1248,8 @@ impl Onboarding {
             released: true,
             near_since: None,
             touches: None,
+            pet_response_until_us: None,
+            touch_later: false,
         }
     }
 
@@ -2121,7 +2143,8 @@ impl Onboarding {
             },
             None => self.privacy_pending(),
         };
-        pending.walk = self.under_way().unwrap_or(true);
+        // Stepped aside for the pet response after "touch" (#4080).
+        pending.walk = self.pet_response_until_us.is_none() && self.under_way().unwrap_or(true);
         pending
     }
 
@@ -2797,6 +2820,9 @@ impl Onboarding {
         {
             led.touched = true;
         }
+        if touched && let Some(until) = self.pet_response_until_us.as_mut() {
+            *until = (*until).max(now_us + PET_RESPONSE_US);
+        }
         if face.is_some() {
             self.seen_us = Some(now_us);
         }
@@ -2843,6 +2869,13 @@ impl Onboarding {
                 led.heard.hello_asked = true;
             }
             return Some(note);
+        }
+        // The pet response plays before the next step is asked (#4080).
+        if let Some(until) = self.pet_response_until_us {
+            if now_us < until {
+                return None;
+            }
+            self.pet_response_until_us = None;
         }
         let Some(step) = self.next_step() else {
             if !self.finished_recorded && !self.desired.steps.is_empty() {
@@ -2989,10 +3022,17 @@ impl Onboarding {
             if touched || led.touched {
                 self.finish(step, Outcome::Done, None, now_us);
                 self.owed = self.definition.words.touch_done.clone();
+                self.pet_response_until_us = Some(now_us + PET_RESPONSE_US);
             } else if now_us.saturating_sub(asked_us) >= TOUCH_GIVE_UP_US {
-                // No touch felt is no attempt: later, not failed (#3996).
-                self.finish(step, Outcome::Later, None, now_us);
-                self.owed = Some(self.later_line(step));
+                // No touch felt after the one reminder: failed, said, and the
+                // walk moves on (#4080, the lead's rule; it was `later`, #3996).
+                if self.touch_later {
+                    self.finish(step, Outcome::Later, None, now_us);
+                    self.owed = Some(self.later_line(step));
+                } else {
+                    self.finish(step, Outcome::Failed, None, now_us);
+                    self.owed = self.definition.words.touch_failed.clone();
+                }
             } else if can_speak && quiet_us >= GUIDE_EVERY_US && led.guided_us == Some(asked_us) {
                 led.guided_us = Some(now_us);
                 self.records
@@ -6818,14 +6858,22 @@ mod tests {
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
     }
 
+    /// The shipped skill cut to #5499's two-step walk (the order before
+    /// #4080), so its end and last line stay tested.
+    fn two_steps() -> Arc<skill::Definition> {
+        let mut definition =
+            skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap();
+        definition.order = vec![Step::WhereYouSit, Step::WhoYouAre];
+        Arc::new(definition)
+    }
+
     /// #5499: once the two-step walk ends, its progress holds all nine
     /// steps, the seven out of its order `not_available`, so any
     /// lamp-update sees it over; none of them is ever offered again.
     #[test]
     fn a_two_step_walk_ended_keeps_all_nine_and_offers_no_parked_step() {
         let mut room = Room::new("two-steps-parked");
-        room.walk.definition =
-            Arc::new(skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap());
+        room.walk.definition = two_steps();
         assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
         report(&room.walk, "where_you_sit", "skipped");
         assert_eq!(room.wait(S, None), [WHERE_YOU_SIT_SKIPPED]);
@@ -6897,8 +6945,7 @@ mod tests {
             "the nine-step fixture parks nothing"
         );
         let mut again = Onboarding::at(room.walk.file.clone());
-        again.definition =
-            Arc::new(skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap());
+        again.definition = two_steps();
         // Loaded again under the two-step order, as a restart on this build.
         again.initialized = false;
         again.drain_storage_for_test(0);
@@ -6923,8 +6970,7 @@ mod tests {
     #[test]
     fn the_two_step_walk_ended_name_only_still_says_the_last_line() {
         let mut room = Room::new("two-steps-name-only");
-        room.walk.definition =
-            Arc::new(skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap());
+        room.walk.definition = two_steps();
         room.walk.face_kept = true;
         room.walk
             .finish(Step::WhereYouSit, Outcome::Done, None, room.at);
@@ -6944,9 +6990,7 @@ mod tests {
     fn the_two_step_walk_says_its_last_line_once_after_the_face_asked_again() {
         for saved in [false, true] {
             let mut room = Room::new("two-steps-last-line-once");
-            room.walk.definition = Arc::new(
-                skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap(),
-            );
+            room.walk.definition = two_steps();
             room.walk.face_kept = true;
             room.walk
                 .finish(Step::WhereYouSit, Outcome::Done, None, room.at);
@@ -6984,8 +7028,7 @@ mod tests {
     #[test]
     fn a_redo_with_a_face_already_known_ends_on_the_name_and_says_the_last_line() {
         let mut room = Room::new("redo-face-known");
-        room.walk.definition =
-            Arc::new(skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap());
+        room.walk.definition = two_steps();
         room.walk.face_kept = true;
         room.wait(S, Some(NEAR_MIDDLE));
         let redo = ToolCall {
@@ -8886,6 +8929,14 @@ mod tests {
         (room, says, root)
     }
 
+    /// [`at_touch`] with touch's PARKED `later` give-up (#4080): the
+    /// `later` re-offers (#3996) stay tested through it.
+    fn at_touch_later(name: &str) -> (Room, lamp_bus::Publisher, PathBuf) {
+        let (mut room, says, root) = at_touch(name);
+        room.walk.touch_later = true;
+        (room, says, root)
+    }
+
     /// Ticks at the same moment until "touch" has an outcome, or for up to
     /// two seconds while the bus delivers.
     fn until_touch_ends(room: &mut Room) {
@@ -8926,6 +8977,29 @@ mod tests {
         );
         // Only the outcome is kept.
         assert_eq!(room.walk.kept().steps["touch"].framing, None);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// #4080: a pet on the head ends "touch", and the walk steps aside
+    /// (`walk` false) so the lamp's own pet response (Head pat wiggle) may
+    /// play before the next step is asked. Controls says a pet's first
+    /// contact as a head touch, as any hand on the pads.
+    #[test]
+    fn a_pet_on_the_head_ends_touch_and_lets_the_pet_response_play() {
+        let (mut room, mut says, root) = at_touch("petted");
+        assert!(room.walk.pending().walk);
+        let (_, touches) = crate::hand_controls::test_head_touch("boot", lamp_ipc::monotonic_us());
+        for (at, touch) in touches.iter().enumerate() {
+            says.publish_json(at as u64 + 1, touch).unwrap();
+        }
+        until_touch_ends(&mut room);
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Done));
+        assert!(!room.walk.pending().walk, "the pet response may play");
+        assert_eq!(
+            room.wait(8 * S, Some(NEAR_MIDDLE)),
+            [TOUCH_DONE, PREFERENCES_NOTE]
+        );
+        assert!(room.walk.pending().walk);
         std::fs::remove_dir_all(root).unwrap();
     }
 
@@ -9053,19 +9127,17 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    /// #4080, the lead's rule: no pet felt gets one reminder, then the
+    /// step fails with its "redo the setup later" line and the walk moves
+    /// on (it was `later`, #3996; parked as `touch_later`).
     #[test]
-    fn no_touch_is_reminded_once_then_left_for_later() {
+    fn no_pet_is_reminded_once_then_fails_and_the_walk_moves_on() {
         let (mut room, _says, root) = at_touch("untouched");
-        // No tap felt is no attempt: later, said so (#3996).
         assert_eq!(
             room.wait(61 * S, Some(NEAR_MIDDLE)),
-            [
-                TOUCH_REMIND,
-                crate::onboarding::skill::LATER,
-                PREFERENCES_NOTE
-            ]
+            [TOUCH_REMIND, TOUCH_FAILED, PREFERENCES_NOTE]
         );
-        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Later));
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Failed));
         assert_eq!(room.walk.take_gesture(), None);
         std::fs::remove_dir_all(root).unwrap();
     }
@@ -9087,7 +9159,7 @@ mod tests {
     #[test]
     fn a_step_left_for_later_is_offered_again_after_the_walk_twice_at_most() {
         let later = crate::onboarding::skill::LATER;
-        let (mut room, _says, root) = at_touch("later");
+        let (mut room, _says, root) = at_touch_later("later");
         assert_eq!(
             room.wait(61 * S, Some(NEAR_MIDDLE)),
             [TOUCH_REMIND, later, PREFERENCES_NOTE]
@@ -9141,7 +9213,7 @@ mod tests {
     #[test]
     fn a_later_offer_dropped_before_its_ask_is_given_back_and_after_it_spent() {
         let later = crate::onboarding::skill::LATER;
-        let (mut room, _says, root) = at_touch("later-back");
+        let (mut room, _says, root) = at_touch_later("later-back");
         assert_eq!(
             room.wait(61 * S, Some(NEAR_MIDDLE)),
             [TOUCH_REMIND, later, PREFERENCES_NOTE]
@@ -9197,7 +9269,7 @@ mod tests {
     #[test]
     fn an_owed_line_whose_turn_played_none_of_it_is_said_again() {
         let later = crate::onboarding::skill::LATER;
-        let (mut room, _says, root) = at_touch("owed-unsaid");
+        let (mut room, _says, root) = at_touch_later("owed-unsaid");
         assert_eq!(
             room.wait_played(90 * S, Some(NEAR_MIDDLE), Delivery::Unsaid),
             // The next step's first note, never said either, is asked again
@@ -9213,7 +9285,7 @@ mod tests {
             ]
         );
         std::fs::remove_dir_all(root).unwrap();
-        let (mut room, _says, root) = at_touch("owed-cut");
+        let (mut room, _says, root) = at_touch_later("owed-cut");
         assert_eq!(
             room.wait_played(70 * S, Some(NEAR_MIDDLE), Delivery::Cut),
             [TOUCH_REMIND, later, PREFERENCES_NOTE]
@@ -9273,7 +9345,7 @@ mod tests {
     #[test]
     fn the_later_count_outlasts_an_unsaid_offer_and_an_attempt_a_restart() {
         let later = crate::onboarding::skill::LATER;
-        let (mut room, _says, root) = at_touch("later-kept");
+        let (mut room, _says, root) = at_touch_later("later-kept");
         assert_eq!(
             room.wait(61 * S, Some(NEAR_MIDDLE)),
             [TOUCH_REMIND, later, PREFERENCES_NOTE]
@@ -9310,7 +9382,7 @@ mod tests {
     #[test]
     fn unsaid_offers_of_a_later_step_count_and_then_it_is_never_asked_again() {
         let later = crate::onboarding::skill::LATER;
-        let (mut room, _says, root) = at_touch("later-unsaid");
+        let (mut room, _says, root) = at_touch_later("later-unsaid");
         assert_eq!(
             room.wait(61 * S, Some(NEAR_MIDDLE)),
             [TOUCH_REMIND, later, PREFERENCES_NOTE]
@@ -9344,7 +9416,7 @@ mod tests {
     #[test]
     fn a_tap_in_a_later_steps_offer_does_it() {
         let later = crate::onboarding::skill::LATER;
-        let (mut room, mut says, root) = at_touch("later-tap");
+        let (mut room, mut says, root) = at_touch_later("later-tap");
         assert_eq!(
             room.wait(61 * S, Some(NEAR_MIDDLE)),
             [TOUCH_REMIND, later, PREFERENCES_NOTE]
