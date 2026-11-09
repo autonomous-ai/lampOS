@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from lampos import Keyring, Lamp, LampError, NotPaired, Subscription, WrongLamp, errors, schema
+from lampos import Keyring, Lamp, LampError, NotPaired, Subscription, WrongLamp, errors, poses_to_frames, schema
 from lampos.testing import FakeLamp
 
 REPO_SCHEMA = Path(__file__).resolve().parents[3] / "docs" / "control.schema.json"
@@ -2308,7 +2308,8 @@ def test_the_volume_needs_the_speak_grant(tmp_path):
 
 # Every example but the tour (which has its own test), run from sdk/python as
 # the README runs it, against a fake lamp that grants everything: its
-# arguments, the event it waits for (said once it has subscribed), the ops it exists to send, and the
+# arguments, the event it waits for (said once it has subscribed), the ops it exists to send
+# (with the fields that say what it asks), and the
 # one refusal it may print: `look` at a face is not in this release
 # (docs/control.md), so follow.py asks and is told so. A new example needs its
 # row, so none is left untried. It is a smoke test: a long-running example is
@@ -2318,19 +2319,39 @@ def test_the_volume_needs_the_speak_grant(tmp_path):
 # folder instead (WRITES_FILES), so nothing is left in the repository.
 WRITES_FILES = {"camera.py"}
 EXAMPLE_RUNS = {
-    "air.py": ([], "air", ("get", "light")),
-    "ask_the_person.py": ([], None, ("turn.start",)),
-    "camera.py": (["1"], None, ("camera.snapshot", "camera.stream")),
-    "ci_light.py": (["pass"], None, ("light",)),
-    "curious.py": ([], None, ("lease.take", "move")),
-    "follow.py": ([], "arrived", ("lease.take", "look"), "not now: refused: not in this release: look at a face or a name"),
-    "follow_hand.py": ([], "hand", ("lease.take", "look")),
-    "greet.py": ([], "arrived", ("gesture",)),
-    "phrase.py": ([], "phrase", ("light", "gesture")),
-    "pomodoro.py": ([], None, ("light",)),
+    "air.py": ([], "air", (("get", {"state": ["air"]}), ("light", {"colour": "orange", "level": 2, "pattern": "breathe"}))),
+    "ask_the_person.py": ([], None, (("turn.start", {"prompt": "Shall we go over today's list?"}),)),
+    "camera.py": (["1"], None, ("camera.snapshot", ("camera.stream", {"on": True, "fps": 5}))),
+    "ci_light.py": (["pass"], None, (("light", {"colour": "green", "level": 3, "pattern": "breathe"}),)),
+    # Its three poses, eased as the SDK eases them.
+    "curious.py": ([], None, (
+        "lease.take",
+        ("move", {"frames": poses_to_frames([{"pitch": 3}, {"pitch": 2, "yaw": -3}, {"pitch": 2, "yaw": 3}], hold_ms=400)}),
+    )),
+    "follow.py": ([], "arrived", ("lease.take", ("look", {"at": "face"})), "not now: refused: not in this release: look at a face or a name"),
+    "follow_hand.py": ([], "hand", ("lease.take", ("look", {"at": "hand"}))),
+    "greet.py": ([], "arrived", (("gesture", {"name": "greeting"}),)),
+    "phrase.py": ([], "phrase", (("light", {"colour": "warm", "level": 2, "pattern": "breathe"}), ("gesture", {"name": "nod"}))),
+    "pomodoro.py": ([], None, (("light", {"colour": "warm", "level": 2}),)),
     "push_skill.py": (["../examples/hello-skill"], None, ("skill.push",)),
-    "ring_walk.py": (["50"], None, ("light", "stop")),
+    # Pixel 0 white, a green pixel walking, the whole ring blue, given back.
+    "ring_walk.py": (["50"], None, (
+        ("light", {"pixels": lambda px: isinstance(px, list) and px[0] == "#ffffff" and set(px[1:]) == {"#000000"}}),
+        ("light", {"pixels": lambda px: isinstance(px, list) and px.count("#00ff00") == 1}),
+        ("light", {"rgb": "#0000ff", "brightness": 50}),
+        "stop",
+    )),
 }
+
+
+def _sent(fake, op) -> bool:
+    """An op an example must send: its name, or (name, fields), each field the
+    value the lamp must have been sent or a check of it. examples.test.js's `sent` too."""
+    name, fields = (op, {}) if isinstance(op, str) else op
+    return any(
+        all(want(asked.get(key)) if callable(want) else asked.get(key) == want for key, want in fields.items())
+        for asked in fake.asked(name)
+    )
 
 
 def test_every_example_runs_against_a_fake_lamp_and_sends_what_it_is_for(tmp_path):
@@ -2371,7 +2392,7 @@ def test_every_example_runs_against_a_fake_lamp_and_sends_what_it_is_for(tmp_pat
                         assert asyncio.get_running_loop().time() < deadline, name
                         await asyncio.sleep(0.01)
                     await nudges[nudge](fake)
-                while not all(fake.asked(op) for op in ops) and not said.done():
+                while not all(_sent(fake, op) for op in ops) and not said.done():
                     if asyncio.get_running_loop().time() > deadline:
                         break
                     await asyncio.sleep(0.02)
@@ -2388,7 +2409,7 @@ def test_every_example_runs_against_a_fake_lamp_and_sends_what_it_is_for(tmp_pat
             assert ("not now" not in out) if not refusal else (refusal[0] in out), (name, out)
             assert ran.returncode in (0, -signal.SIGTERM), (name, ran.returncode, out)
             for op in ops:
-                assert fake.asked(op), (name, op, out)
+                assert _sent(fake, op), (name, op, out)
 
     async def go():
         await asyncio.gather(*(one(name, tmp_path / name) for name in sorted(EXAMPLE_RUNS)))
