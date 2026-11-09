@@ -8741,3 +8741,18 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   this standalone head and must use the disconnect-aware helper when
   combined. Asked owners for the combined head and kept the original
   speech-generation probe for its verification.
+
+## 2026-11-09 — Second: joint pose completion ordering review
+
+- HOLD #5855 `dc164e78aab2e44c38e7be65b51f66d4b2f92af7`: a later
+  pose refusal overtakes an earlier outstanding pose, but control pops its
+  oldest pose request. Native actual Posing/Waiting/done_of probe assigns
+  request 42's refusal to 41, then 41's cut_short to 42. Holder reads asks
+  before stepping poses; a gesture makes the current pose unavailable.
+- Baseline control suite 184 passed serial. Separate review probe fails
+  in under 0.01 s; source and output preserved under
+  /tmp/second-5855-pose-order.rs and .log, appended test removed and checkout
+  clean. This is a state-machine/queue test, not a socket or device test.
+- Posted precise source ordering to Banana and Ten (body-side reader).
+  Nine acknowledged ownership of the separate speech reconnect integration
+  fix; combined head not yet available, so train #5852 remains held.
