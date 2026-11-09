@@ -403,8 +403,11 @@ heard line only, nothing kept.
 - **Scopes** it needs from Google: `gmail.readonly` for the profile, the
   list (with `q`) and each get, and `gmail.send` for a send (`gmail.modify`
   or `https://mail.google.com/` cover both). IMAP is not used because it takes
-  only `https://mail.google.com/`. A token without a scope a call needs gets
-  403: "Gmail refused the lamp's link: it may need linking again in the app".
+  only `https://mail.google.com/`. A send the link's listed scopes don't
+  allow is refused before it is read back, and a send Google refuses for its
+  scopes is told the same ("Scopes a write needs", under Writes). A read
+  without a scope it needs gets 403: "Gmail refused the lamp's link: it may
+  need linking again in the app".
 - **Refresh:** through the backend, as every OAuth link ([Refresh](#refresh)).
 
 **A send-only Google sign-in (`gmail-app`):** a Lamp 2's Google sign-in
@@ -527,7 +530,8 @@ before the read-back, `reads::calendar_time`). A request is HTTPS
 only, to the service's own hosts, no redirect followed, 5 s to connect, 15 s
 in all, and at most 1 MiB of the answer read. An error status is said
 plainly: 401 or 403 "<Service> refused the lamp's link: it may need linking
-again in the app", 404 "has no such item", 429 "is busy: try again in a
+again in the app" (a write's 401 or 403 that says its scopes are too few is
+told what to do instead: "Scopes a write needs", under Writes), 404 "has no such item", 429 "is busy: try again in a
 while", else "answered with an error". The token and the refresh token are
 scrubbed from any answer (each spelling, plain or URL-encoded).
 
@@ -635,6 +639,39 @@ at most 3,000 characters (line breaks kept), a subject or title one line of
 at most 200, at most 20 recipients or attendees, each a plain
 `local@domain.tld`. Google Drive and Ahrefs have no write ("the lamp only
 reads …").
+
+**Scopes a write needs** (`writes::SCOPES`). The check applies only to an
+OAuth link that records its scopes: a sign-in (an access token, `auth_type`
+not `pat`) whose `scopes` hold at least one non-blank item. Such a
+`service_write` without `send_id` is checked against them before anything is
+prepared or held, and before anything is asked of the service. One of these
+full scope URLs allows the write (the services' own docs:
+`users.messages.send`, `events.insert`), `https://www.googleapis.com/auth/`
+written `…/` here:
+
+| Service | Action | Any of |
+|---|---|---|
+| `gmail`, `gmail-app` | `send_mail` | `…/gmail.send`, `…/gmail.compose`, `…/gmail.modify`, `https://mail.google.com/` |
+| `google_calendar` | `create_event` | `…/calendar`, `…/calendar.events`, `…/calendar.events.owned` |
+
+`writes::scope_allows` splits each `scopes` item on whitespace (a list kept
+as one spaced string reads alike) and matches each scope as a full URL,
+exactly: a bare name such as `gmail.send` allows nothing, as Google Drive's
+create (#5825) refuses a bare `drive.file`; that check is to call the same
+helper once #5825 lands. Only Google's links record their scopes in this
+form, so no other service is in the table. With
+none of them, the call fails with "<Service> is linked without permission to
+<what>: link it again in the app (Skills, then Connectors) and allow it."
+(`serve::NO_PERMISSION`, after the colon), `<what>` being "send mail" or "add
+calendar events": nothing is held, nothing is called. An app password, a
+personal key (`pat`) or a link recording no scopes is not checked, as
+before.
+
+On the "send", a 401 or 403 whose body says the token's scopes are too few,
+in Google's words (`ACCESS_TOKEN_SCOPE_INSUFFICIENT` or
+`insufficientPermissions`, `writes::scope_refused`), is told the same words
+after "not sent: " (for a service not in the table, `<what>` is "make this
+change"). Any other 401 or 403 keeps its words.
 
 The model is told of `service_write`, first in its description
 (`WRITE_RULE`, then the rule every services function has, below):
@@ -901,6 +938,21 @@ A call to a service that isn't linked fails with "<Service> isn't linked to
 this lamp yet. It can be linked in the app: Skills, then Connectors."
 (`serve::NOT_LINKED`), so the lamp says where to link it, not only that it
 isn't.
+
+A call's `service` reaches a service by its code exactly (either Gmail
+code reaching whichever Gmail link the lamp has, as before), else by a
+catalogue code or name as the model may say it: case aside, spaces and `-`
+read as `_` ("Google Drive", "GMAIL", "google calendar", "GitHub"); of two
+services with one name (Figma's), the linked one (`serve::named`). Such a
+call then gets that service's answer, or its `NOT_LINKED` words.
+
+A call naming a service the lamp has no connector for (no code or name in
+the catalogue matches) fails with "The lamp can't link <name> yet. The services it can
+link are in the app: Skills, then Connectors." (`serve::CANT_LINK`, after the
+first sentence). `<name>` is the name the call gave, said only when it is at
+most 40 characters, all letters, digits, spaces, `-` or `_`; any other name,
+or none, is said as "that service". `services_connected`'s description names
+the services the lamp can link ("The voice's three functions").
 
 ## A made skill's read (proposal #5288, `LAMP_SKILL_READS`, on in the product)
 
@@ -1207,7 +1259,13 @@ up as the skills' folders are), routed to its `call.sock` and nowhere else,
 and never taken from the executive's or a skill's folder.
 
 - **`services_connected {}`**: `{"connected": [{"service", "name",
-  "account", "expired"}], "writes": <LAMP_SERVICES_WRITE>}`.
+  "account", "expired"}], "writes": <LAMP_SERVICES_WRITE>}`. Its
+  description names each service the lamp can link, by its catalogue name
+  once ("The lamp can link only: Gmail, Gmail with Google sign-in, Google
+  Calendar, …, Notion."), and tells the model: "If the person names a service
+  not among them, say the lamp can't link it yet, and never give another
+  reason." It is at most 600 bytes, so the voice's own rule fits before it
+  within the 1,024 its provider link takes.
 - **`service_read {service, what, …}`**: `what` and its arguments as in the
   table above; the answer quoted, cut to who and what about when the owner
   may not be alone. A read in full also needs the line in the
@@ -1356,7 +1414,14 @@ answered as send-only (linked or not, no call made), its send through the
 API only, a refused token said as "Google refused the Gmail sign-in", and
 its renewal under its own code; security mails found and left out whole; answers quoted
 and under the voice's cap; a write refused when off, read back in full and
-sent once within two minutes; the MCP read/write rule, its pinned host, a
+sent once within two minutes; a send or an event the link's listed scopes
+don't allow refused in plain words with nothing held or called, one they
+allow read back, a send Google refuses for its scopes told the same and any
+other 403 its own words, a link with no scopes listed (an app password, a
+personal key) unchecked, a scope allowing only as its full URL (one
+spaced string read as a list, a bare `gmail.send` refused), a service said
+by its name ("Google Drive", "GMAIL") reaching it, and a service the lamp
+can't link told so, a hostile name said as "that service"; the MCP read/write rule, its pinned host, a
 link on another host never called, a write tool read back whole and called
 once on send; the refresh request as V1's; the askers told by their cgroup.
 `-p lamp-cloud` (`services`, `online`, `answer`): both switch words needed,
