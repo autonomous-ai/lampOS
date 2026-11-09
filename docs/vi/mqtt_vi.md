@@ -300,7 +300,7 @@ và đăng câu trả lời của thiết bị. Hành vi đầy đủ: [discord-
 ```
 
 Không có xác nhận. Thiết bị bỏ tin nhắn trừ khi nó đến từ `discord_user_id` đã cấu hình (tin trong
-server còn phải đến từ `discord_guild_id` và mention bot), và bỏ qua `event_id` đã thấy trong 5 phút
+server còn phải đến từ `discord_guild_id` và mention bot, trừ kênh mở hoặc thread đã tham gia; xem `discord-relay_vi.md`), và bỏ qua `event_id` đã thấy trong 5 phút
 gần nhất. Tin được nhận chạy như một lượt agent bình thường. Câu trả lời đi lên kênh thiết bị với
 envelope chuẩn cộng với channel:
 

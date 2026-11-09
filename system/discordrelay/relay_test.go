@@ -1,6 +1,7 @@
 package discordrelay
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -344,5 +345,58 @@ func TestRejectReasonMatchesAccept(t *testing.T) {
 		if ok != (got == "") {
 			t.Errorf("Accept and RejectReason disagree for %+v: ok=%v reason=%q", c.in, ok, got)
 		}
+	}
+}
+
+func TestServerMessageNeedsMentionOutsideOpenPlaces(t *testing.T) {
+	base := domain.MQTTDiscordEventCommand{
+		DiscordUserID: "owner-1", GuildID: "guild-1", Text: "hello", BotUserID: "bot-1",
+	}
+	event := func(id, channel, parent string, mentions bool, author string) domain.MQTTDiscordEventCommand {
+		ev := base
+		ev.EventID, ev.ChannelID, ev.ParentChannelID, ev.MentionsBot = id, channel, parent, mentions
+		ev.DiscordUserID = author
+		return ev
+	}
+	const needsMention = "server message without an @mention of the bot"
+
+	gw, up := &fakeGateway{}, &fakeUplink{}
+	r := newTestRelay(gw, up)
+	r.cfg.DiscordOpenChannels = []string{"open-1"}
+
+	steps := []struct {
+		name string
+		ev   domain.MQTTDiscordEventCommand
+		want string
+	}{
+		{"ordinary channel", event("1", "chan-1", "", false, "owner-1"), needsMention},
+		{"chosen channel", event("2", "open-1", "", false, "owner-1"), ""},
+		{"thread of chosen channel", event("3", "thread-0", "open-1", false, "owner-1"), ""},
+		{"thread not joined", event("4", "thread-1", "chan-1", false, "owner-1"), needsMention},
+		{"mention joins thread", event("5", "thread-1", "chan-1", true, "owner-1"), ""},
+		{"joined thread", event("6", "thread-1", "chan-1", false, "owner-1"), ""},
+		{"other person in joined thread", event("7", "thread-1", "chan-1", false, "someone"), "not from the owner"},
+		{"other person in chosen channel", event("8", "open-1", "", false, "someone"), "not from the owner"},
+	}
+	for _, s := range steps {
+		if got := r.Handle(s.ev); got != s.want {
+			t.Errorf("%s: got %q, want %q", s.name, got, s.want)
+		}
+	}
+
+	other := event("9", "open-1", "", false, "owner-1")
+	other.GuildID = "guild-2"
+	if got := r.Handle(other); got != "from another server" {
+		t.Errorf("another server: got %q", got)
+	}
+}
+
+func TestJoinedThreadsAreBounded(t *testing.T) {
+	r := newTestRelay(&fakeGateway{}, &fakeUplink{})
+	for i := 0; i <= maxJoinedThreads; i++ {
+		r.joinThread(fmt.Sprintf("thread-%d", i))
+	}
+	if len(r.joined) != maxJoinedThreads || r.joined[0] != "thread-1" {
+		t.Fatalf("len=%d first=%s", len(r.joined), r.joined[0])
 	}
 }

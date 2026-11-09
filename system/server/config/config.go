@@ -107,6 +107,9 @@ type Config struct {
 	DiscordManaged bool   `json:"discord_managed" yaml:"discordManaged"`
 	DiscordGuildID string `json:"discord_guild_id" yaml:"discordGuildID"`
 	DiscordUserID  string `json:"discord_user_id" yaml:"discordUserID"`
+	// DiscordOpenChannels lists server channels where the owner need not @mention
+	// the bot.
+	DiscordOpenChannels []string `json:"discord_open_channels,omitempty" yaml:"discordOpenChannels,omitempty"`
 
 	// WhatsappUserID is the E.164 phone number permitted to DM the device's
 	// WhatsApp account.

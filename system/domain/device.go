@@ -182,6 +182,9 @@ type AddChannelRequest struct {
 	DiscordManaged bool   `json:"discord_managed"`
 	DiscordGuildID string `json:"discord_guild_id"`
 	DiscordUserID  string `json:"discord_user_id"`
+	// DiscordOpenChannels lists server channels where the owner need not @mention
+	// the bot. Nil leaves the saved list alone; an empty list clears it.
+	DiscordOpenChannels []string `json:"discord_open_channels,omitempty"`
 
 	// WhatsappUserID is the operator's E.164 phone number (permitted DM caller).
 	WhatsappUserID string `json:"whatsapp_user_id"`
@@ -332,15 +335,18 @@ const (
 
 // MQTTDiscordEventCommand is the fa_channel payload for cmd:"discord_event".
 type MQTTDiscordEventCommand struct {
-	Cmd            string `json:"cmd"`
-	EventID        string `json:"event_id"`
-	DiscordUserID  string `json:"discord_user_id"`
-	GuildID        string `json:"guild_id"`
-	ChannelID      string `json:"discord_channel_id"`
-	AuthorUsername string `json:"author_username"`
-	BotUserID      string `json:"bot_user_id"`
-	MentionsBot    bool   `json:"mentions_bot"`
-	Text           string `json:"text"`
+	Cmd           string `json:"cmd"`
+	EventID       string `json:"event_id"`
+	DiscordUserID string `json:"discord_user_id"`
+	GuildID       string `json:"guild_id"`
+	ChannelID     string `json:"discord_channel_id"`
+	// ParentChannelID is set only when the message is in a thread: the channel the
+	// thread belongs to.
+	ParentChannelID string `json:"parent_channel_id,omitempty"`
+	AuthorUsername  string `json:"author_username"`
+	BotUserID       string `json:"bot_user_id"`
+	MentionsBot     bool   `json:"mentions_bot"`
+	Text            string `json:"text"`
 
 	// Enc and Sealed carry the sealed form: every field above is then inside Sealed
 	// (see discordrelay.Seal). WasSealed is set once the device has opened it.
@@ -575,6 +581,14 @@ func (r *MQTTAddChannelCommand) ToRequest() AddChannelRequest {
 		req.DiscordManaged, _ = cfg["managed"].(bool)
 		req.DiscordGuildID, _ = cfg["guild_id"].(string)
 		req.DiscordUserID, _ = cfg["user_id"].(string)
+		if raw, ok := cfg["open_channels"].([]any); ok {
+			req.DiscordOpenChannels = make([]string, 0, len(raw))
+			for _, v := range raw {
+				if id, ok := v.(string); ok && id != "" {
+					req.DiscordOpenChannels = append(req.DiscordOpenChannels, id)
+				}
+			}
+		}
 	case ChannelSlack:
 		req.SlackBotToken, _ = cfg["bot_token"].(string)
 		req.SlackAppToken, _ = cfg["app_token"].(string)

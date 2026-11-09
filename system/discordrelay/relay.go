@@ -14,6 +14,7 @@ package discordrelay
 
 import (
 	"log/slog"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -45,6 +46,9 @@ const (
 
 	// dedupTTL is how long a seen event id is remembered; the relay can redeliver.
 	dedupTTL = 5 * time.Minute
+
+	// maxJoinedThreads bounds the threads remembered as already joined.
+	maxJoinedThreads = 256
 )
 
 // Gateway is the slice of domain.AgentGateway the relay uses.
@@ -75,6 +79,9 @@ type Relay struct {
 	uplink Uplink
 	runs   map[string]run
 	seen   map[string]time.Time
+	// joined holds the threads the owner has @mentioned the bot in, oldest first.
+	// It lives in memory: after a restart one new @mention brings a thread back.
+	joined []string
 
 	inFlight chan struct{}
 
@@ -156,10 +163,15 @@ func (r *Relay) Handle(ev domain.MQTTDiscordEventCommand) string {
 		GuildID:     ev.GuildID,
 		Content:     ev.Text,
 		MentionsBot: ev.MentionsBot,
+
+		NoMentionNeeded: r.noMentionNeeded(ev),
 	}
 	text, ok := Accept(in, r.cfg.DiscordUserID, r.cfg.DiscordGuildID)
 	if !ok {
 		return RejectReason(in, r.cfg.DiscordUserID, r.cfg.DiscordGuildID)
+	}
+	if ev.GuildID != "" && ev.ParentChannelID != "" && ev.MentionsBot {
+		r.joinThread(ev.ChannelID)
 	}
 
 	select {
@@ -177,6 +189,40 @@ func (r *Relay) Handle(ev domain.MQTTDiscordEventCommand) string {
 	turn := domain.AppendVia(TurnText(ev.AuthorUsername, ev.DiscordUserID, text), domain.ViaDiscord)
 	go r.send(reqID, runID, ev.ChannelID, ev.WasSealed, turn)
 	return ""
+}
+
+// noMentionNeeded reports whether a server message may reach the agent without an
+// @mention: it is in a channel the owner chose, in a thread of such a channel, or in
+// a thread the bot has already joined.
+func (r *Relay) noMentionNeeded(ev domain.MQTTDiscordEventCommand) bool {
+	if ev.GuildID == "" {
+		return false
+	}
+	if slices.Contains(r.cfg.DiscordOpenChannels, ev.ChannelID) {
+		return true
+	}
+	if ev.ParentChannelID == "" {
+		return false
+	}
+	if slices.Contains(r.cfg.DiscordOpenChannels, ev.ParentChannelID) {
+		return true
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Contains(r.joined, ev.ChannelID)
+}
+
+// joinThread remembers a thread as joined, dropping the oldest past the limit.
+func (r *Relay) joinThread(channelID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if slices.Contains(r.joined, channelID) {
+		return
+	}
+	r.joined = append(r.joined, channelID)
+	if len(r.joined) > maxJoinedThreads {
+		r.joined = r.joined[1:]
+	}
 }
 
 // send waits for the agent to be idle, hands it the turn and, meanwhile, keeps the
