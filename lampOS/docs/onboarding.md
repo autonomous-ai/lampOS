@@ -522,15 +522,23 @@ off until a yes, spoken or in the app.
   off removes it. A yes already there, the voice's or the app's, is left
   as it is. The readers ignore `by`.
 - **It survives the voice.** The voice's start and its progress writes
-  remove a record whose step is not `done`, but not one with `"by":"app"`
-  that still stands: given after the step's last redo
-  (`yes_redone_at_unix_s` in the progress file, set by `redo_setup` for
-  the whole walk or for that step) and after any "no" (`skipped`) at the
-  lamp. So a redo, or a later "no" at the lamp, takes the app's yes back
-  at the next write, as it takes back a spoken one; an app yes given in
-  the same second as a redo is taken back too, the safe side. An app yes
-  with no `at_unix_s` never stands. A yes said at the lamp afterwards is
-  written as the voice's, over the app's.
+  remove a record whose step is not `done`, but not one with `"by":"app"`.
+  A redo (`yes_redone_at_unix_s` in the progress file, set by
+  `redo_setup` for the whole walk or for that step) or a "no" (`skipped`)
+  at the lamp takes it back when the voice first writes it, just before
+  the progress file is replaced, as it takes back a spoken one: the
+  write's count of them (`yes_taken_back`, one more for each redo or
+  "no" of the step, so a second one in the same second is seen too), its
+  redo time or its "no" differs from the progress it replaces. The
+  consent folder is synced after the removal; a removal that fails fails
+  the write before the progress keeps the "no", so the next write tries
+  again rather than keeping a "no" the app's yes outlived. No
+  times are compared, so a "no" stamped before the app's yes (a lamp
+  clock that stepped back) still takes it back (the first builder's P3 on
+  #5567), and an app yes given after a "no" or a redo at setup stands
+  through every later start and write until a new one. An app yes with no
+  `at_unix_s` never stands. A yes said at the lamp afterwards is written
+  as the voice's, over the app's.
 - **Always removed** by a forget of everything, and by the factory reset's
   plan, whoever gave it.
 - **Followed live**: lamp-eyes reads its yes every 2 s, so nothing

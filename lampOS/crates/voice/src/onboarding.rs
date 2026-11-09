@@ -461,12 +461,22 @@ pub struct Progress {
     /// [`FACE_EXPRESSIONS`]) was last redone, in Unix seconds: a redo of the
     /// step or of the whole walk (#5500). A yes the owner gave in the app
     /// (`"by":"app"`, `lamp_msgs::consent`) is kept by the voice's starts and
-    /// writes, unlike one with no `done` behind it, but only while it is
-    /// newer than this and than a later "no" at the lamp, so a redo takes it
-    /// back as it takes back a spoken one. Kept through a redo of the whole
-    /// walk; a reset wipes it with the file. An older build reads past it.
+    /// writes, unlike one with no `done` behind it, until the write that
+    /// first changes this time or keeps a new "no" at the lamp, which takes
+    /// it back as it takes back a spoken one, whatever the clocks say
+    /// (`storage::take_back`). Kept through a redo of the whole walk; a
+    /// reset wipes it with the file. An older build reads past it.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub yes_redone_at_unix_s: BTreeMap<String, u64>,
+    /// How many times each yes another part reads was taken back at the
+    /// lamp, by a "no" kept or a redo ([`Self::took_back`]), counted up
+    /// and never down: the write that first changes it takes back an app
+    /// yes (`storage::take_back`), so a second "no" or redo in the same
+    /// second as the first, or after the clock stepped back, is seen too
+    /// (Jarvis's P3 on #5848). Kept through a redo of the whole walk; a
+    /// reset wipes it with the file. An older build reads past it.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub yes_taken_back: BTreeMap<String, u64>,
     /// When the walk first handed out its done line, in Unix ms: the app is
     /// told once from it (`lamp_msgs::OnboardingPending::done_at_unix_ms`,
     /// lamp-cloud's `onboarding.done`). Set once, kept through a redo of a
@@ -485,6 +495,7 @@ impl Progress {
         let mut redone = Self {
             tries_said: self.tries_said,
             harness_line: self.harness_line,
+            yes_taken_back: self.yes_taken_back.clone(),
             done_at_unix_ms: self.done_at_unix_ms,
             ..Self::default()
         };
@@ -503,6 +514,16 @@ impl Progress {
                 .duration_since(std::time::UNIX_EPOCH)
                 .map_or(0, |since| since.as_secs());
             self.yes_redone_at_unix_s.insert(step.to_owned(), now);
+            self.took_back(step);
+        }
+    }
+
+    /// `step`'s yes, if it is one another part reads, taken back at the
+    /// lamp once more, by a "no" or a redo ([`Self::yes_taken_back`]).
+    fn took_back(&mut self, step: &str) {
+        if [ROOM_SOUNDS, FACE_EXPRESSIONS].contains(&step) {
+            let count = self.yes_taken_back.entry(step.to_owned()).or_default();
+            *count = count.saturating_add(1);
         }
     }
 }
@@ -511,8 +532,8 @@ impl Progress {
 /// as [`told_ids`] gives them.
 const MOST_TOLD_IDS: usize = 2;
 
-/// [`Progress::yes_redone_at_unix_s`]' bound: the two yeses, and room for a
-/// later build's.
+/// [`Progress::yes_redone_at_unix_s`]' and [`Progress::yes_taken_back`]'
+/// bound: the two yeses, and room for a later build's.
 const MOST_YES_REDONE: usize = 8;
 
 fn is_zero(value: &u8) -> bool {
@@ -648,6 +669,7 @@ impl Progress {
         }
         if self.face_again_names.len() > MOST_TOLD_IDS
             || self.yes_redone_at_unix_s.len() > MOST_YES_REDONE
+            || self.yes_taken_back.len() > MOST_YES_REDONE
             || !self
                 .face_again_names
                 .iter()
@@ -3480,6 +3502,9 @@ impl Onboarding {
             .filter(|_| outcome == Outcome::NotAvailable || later_offers > 0)
             .and_then(|kept| kept.offered_at_unix_s);
         self.desired.tried.retain(|tried| tried != step.name());
+        if outcome == Outcome::Skipped {
+            self.desired.took_back(step.name());
+        }
         self.desired.steps.insert(
             step.name().to_owned(),
             Kept {
@@ -7712,8 +7737,9 @@ mod tests {
         assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE);
         let mut redone = room.walk.desired.redone();
         assert!(redone.tries_said);
-        // The yeses' redo time aside (#5500, its own test below).
+        // The yeses' redo time and count aside (#5500, its own test below).
         redone.yes_redone_at_unix_s.clear();
+        redone.yes_taken_back.clear();
         assert_eq!(
             redone,
             Progress {
@@ -8129,12 +8155,28 @@ mod tests {
             kept.yes_redone_at_unix_s,
             room.walk.desired.yes_redone_at_unix_s
         );
+        // Each redo and each "no" of a yes step counts once more (Jarvis's
+        // P3 on #5848), kept across a save and a read and a whole redo.
+        assert_eq!(kept.yes_taken_back, room.walk.desired.yes_taken_back);
+        assert_eq!(kept.yes_taken_back[FACE_EXPRESSIONS], 1);
+        room.walk
+            .finish(Step::FaceExpressions, Outcome::Skipped, None, room.at);
+        assert_eq!(room.walk.desired.yes_taken_back[FACE_EXPRESSIONS], 2);
+        let whole = room.walk.desired.redone();
+        assert_eq!(whole.yes_taken_back[FACE_EXPRESSIONS], 3);
+        assert_eq!(whole.yes_taken_back[ROOM_SOUNDS], 1);
         let old: Progress = serde_json::from_str(r#"{"steps":{}}"#).unwrap();
         assert!(old.yes_redone_at_unix_s.is_empty());
+        assert!(old.yes_taken_back.is_empty());
         assert!(
             !serde_json::to_string(&Progress::default())
                 .unwrap()
                 .contains("yes_redone")
+        );
+        assert!(
+            !serde_json::to_string(&Progress::default())
+                .unwrap()
+                .contains("yes_taken_back")
         );
     }
 

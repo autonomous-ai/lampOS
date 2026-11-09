@@ -2235,8 +2235,14 @@ until its lamp check. Both yeses stay off by default.
   (`try-restart lamp-ears.service`) once no update holds lamp-update's
   lock; an off is followed within 2 s without one.
 - **What takes it back besides the app:** a redo of setup or of the step
-  and a later "no" at the lamp (the voice's next write), a forget of
-  everything and the factory reset, whoever gave it.
+  and a later "no" at the lamp (when the voice first writes it, whatever
+  the clocks say), a forget of everything and the factory reset, whoever
+  gave it.
+- **Owed before `LAMP_APP_CONSENT` goes on:** the `consent.set` command
+  (`crates/cloud/src/wire.rs`) carries no id or send time, and the helper
+  stamps the yes when it arrives (`crates/setup/src/change.rs`), so an
+  MQTT QoS 1 resend or a late-delivered app yes counts as a new yes, even
+  after a later "no" at the lamp.
 
 ## A person's linked services (Queue #4710, `connector.*`, `services.list`)
 
