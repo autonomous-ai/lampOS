@@ -21,7 +21,7 @@
 use crate::{
     activity::{Judge, Look},
     away::{Away, Seen},
-    change::{Busy, ViewInDim},
+    change::{Busy, InTheDark, ViewInDim},
     faces, facing,
     picture::Picture,
     speaking,
@@ -771,13 +771,22 @@ impl BusOut {
 
     /// A glance's picture, before it is looked at, with why the room is
     /// not empty if it is not (`change::busy`): with presence said, while
-    /// light-out's dim shows, the view changing is someone (#5746). Only
-    /// the yes leaves, as `room/presence`'s `by = "moved"`.
+    /// light-out's dim shows, the view changing is someone (#5746); while
+    /// its out shows, a stir, and light-out brings its dim back (the
+    /// reviewer's P2 on #5765). Only that leaves, as `room/presence`'s
+    /// `by = "moved"` or `stirred`.
     pub fn glanced(&mut self, picture: &Picture, busy: Option<Busy>, now_us: u64) {
-        if let Some(presence) = self.presence.as_mut()
-            && presence.view.glanced(picture, busy, now_us)
-        {
-            presence.away.moved(now_us);
+        if let Some(presence) = self.presence.as_mut() {
+            match presence.view.glanced(picture, busy, now_us) {
+                InTheDark::Moved => presence.away.moved(now_us),
+                InTheDark::Stirred => {
+                    eprintln!(
+                        "lamp-eyes: the view changed while light-out's light was out: stirred"
+                    );
+                    presence.away.stirred(now_us);
+                }
+                InTheDark::Nothing => {}
+            }
         }
     }
 
@@ -1380,6 +1389,7 @@ mod tests {
                 someone: false,
                 nobody_s: 0,
                 by: None,
+                stirred: false,
             })
         );
         let before_voice = said
@@ -1392,6 +1402,7 @@ mod tests {
                 someone: false,
                 nobody_s: 24,
                 by: None,
+                stirred: false,
             }
         );
         assert_eq!(before_voice, 25, "once a second, then at once: {said:?}");
@@ -1645,6 +1656,7 @@ mod tests {
                 someone: true,
                 nobody_s: 0,
                 by: Some(lamp_msgs::SeenBy::Voice),
+                stirred: false,
             })
         );
         std::fs::remove_dir_all(&root).unwrap();

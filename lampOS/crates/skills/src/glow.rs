@@ -313,6 +313,12 @@ impl Glow {
         }
     }
 
+    /// The steps after this build on `light` (#5746: a stir after the out
+    /// brings back the dim made from the light before the run).
+    pub fn from(&mut self, light: Option<Light>) {
+        self.light = light;
+    }
+
     /// Asks the ring for what `call`, a light, a dim or the light going
     /// out, makes of the light, and says how it went.
     pub fn ask(&mut self, call: &Call) -> String {

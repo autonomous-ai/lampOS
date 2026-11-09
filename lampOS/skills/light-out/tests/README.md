@@ -21,6 +21,7 @@ lamp-skills`, which runs every skill's cases).
 |---|---|---|
 | `dims-after-forty-minutes-goes-out-five-later-and-comes-back-when-you-sit-down` | From 10:00, a face until 30 s, nobody from 50 s (counted from 30 s), someone back at 3000 s | Pass: dimmed two steps at 2430 s, 2400 s after the last face, held five minutes; out over a minute at 2730 s; given back at 3000 s |
 | `comes-back-at-once-when-the-view-changes-in-the-dim` | From 10:00, nobody; at 2550 s, in the dim, someone by `moved` (the eyes saw the view change) | Pass: dimmed at 2400 s; given back at 2550 s, and nothing goes out |
+| `comes-back-to-the-dim-when-the-view-changes-after-the-out` | From 10:00, nobody; at 2800 s, after the out, `stirred` (the eyes saw the view change, nobody still there) for 3 s; someone back at 3200 s | Pass: dimmed at 2400 s, out at 2700 s; the dim again at 2800 s, out again at 3100 s; given back at 3200 s |
 | `waits-for-the-lamp-to-finish-speaking` | From 10:00, nobody; `voice/state` speaking from 2398.5 to 2440.5 s; someone back at 2800 s | Pass: nothing while it speaks, dimmed at 2442 s, the first presence after it rests (`wait = "1h"`), out at 2742 s; given back at 2800 s |
 | `waits-out-the-night` | From 05:15, nobody; someone back at 3060 s | Pass: nothing at 05:55, in the night; dimmed at 06:00 (2700 s) with the chance kept, out at 3000 s; given back at 3060 s |
 | `never-at-night` | From 22:30, nobody; someone back at 2460 s | Pass: nothing: the forty minutes come at 23:10, and someone back at 23:11 spends the chance |

@@ -56,5 +56,7 @@ light = { dim = 2, for = "5m", until = "ends" }
 [[do]]
 # Then out over a minute, like falling asleep: to the ring's ember, never
 # dark, which still shows the lamp can hear. Given back the moment someone
-# is seen, heard or touches it, or when the eyes stop looking.
+# is seen, heard or touches it, or when the eyes stop looking. A movement
+# in view after the out (`stirred`, the reviewer's P2 on #5765) brings the
+# dim back, and its five minutes again (lamp-skills makes it).
 light = { out = true, over = "60s", until = "ends" }

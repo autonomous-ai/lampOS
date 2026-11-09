@@ -11052,6 +11052,7 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
                     someone,
                     nobody_s: if someone { 0 } else { 20 },
                     by: someone.then_some(lamp_msgs::SeenBy::Voice),
+                    stirred: false,
                 },
             )
             .unwrap();
@@ -11562,6 +11563,7 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
                     someone,
                     nobody_s: if someone { 0 } else { 20 },
                     by: someone.then_some(lamp_msgs::SeenBy::Voice),
+                    stirred: false,
                 },
             )
             .unwrap();
@@ -11764,6 +11766,7 @@ fn guard_mode_pauses_under_the_persons_light_until_they_ask_again() {
                     someone,
                     nobody_s: if someone { 0 } else { 20 },
                     by: someone.then_some(lamp_msgs::SeenBy::Voice),
+                    stirred: false,
                 },
             )
             .unwrap();
@@ -11991,6 +11994,7 @@ fn guard_mode_counts_nothing_once_the_ring_has_not_confirmed_its_mark_for_30_s()
                     someone,
                     nobody_s: if someone { 0 } else { 20 },
                     by: someone.then_some(lamp_msgs::SeenBy::Voice),
+                    stirred: false,
                 },
             )
             .unwrap();
@@ -14956,13 +14960,14 @@ fn light_out_dims_five_minutes_then_goes_out_and_anyone_in_the_dim_brings_it_bac
         // Every 2 s of the program's clock for `seconds`, the eyes' value
         // (each good for 3 s), and what was asked of the ring meanwhile.
         let mut nobody_s = 2_390;
-        let mut run = |seconds: u32, by: Option<SeenBy>| -> Vec<LightRequest> {
+        let mut run = |seconds: u32, by: Option<SeenBy>, stir: bool| -> Vec<LightRequest> {
             let mut asked = Vec::new();
-            for _ in 0..seconds / 2 {
+            for step in 0..seconds / 2 {
                 let now = RoomPresence {
                     someone: by.is_some(),
                     nobody_s: if by.is_some() { 0 } else { nobody_s },
                     by,
+                    stirred: stir && step == 0,
                 };
                 presence.publish_json(1, &now).unwrap();
                 nobody_s += 2;
@@ -14976,7 +14981,7 @@ fn light_out_dims_five_minutes_then_goes_out_and_anyone_in_the_dim_brings_it_bac
             }
             asked
         };
-        let dim = run(12, None);
+        let dim = run(12, None, false);
         assert_eq!(
             dim.first()
                 .map(|request| (request.light.clone(), request.fade_ms)),
@@ -14984,31 +14989,53 @@ fn light_out_dims_five_minutes_then_goes_out_and_anyone_in_the_dim_brings_it_bac
             "{back:?}: dimmed two steps at forty minutes: {dim:?}"
         );
         // Halfway through the dim, or not at all.
-        let held = run(150, None);
+        let held = run(150, None, false);
         assert!(
             held.iter().all(|request| request.light.on),
             "{back:?}: still the dim, renewed: {held:?}"
         );
         if let Some(by) = back {
-            let given = run(2, Some(by));
+            let given = run(2, Some(by), false);
             assert!(
                 given
                     .last()
                     .is_some_and(|request| request.claim.until_us < lamp_ipc::monotonic_us()),
                 "{by:?} in the dim gives the light back at once: {given:?}"
             );
-            let after = run(200, Some(by));
+            let after = run(200, Some(by), false);
             assert!(
                 after.iter().all(|request| request.light.on),
                 "{by:?}: nothing goes out after: {after:?}"
             );
             continue;
         }
-        let out = run(160, None);
+        let out = run(160, None, false);
         let out = out
             .iter()
             .find(|request| !request.light.on)
             .unwrap_or_else(|| panic!("out five minutes after the dim: {out:?}"));
         assert_eq!(out.fade_ms, Some(60_000));
+        // The reviewer's P2 on #5765: a stir after the out (the eyes saw the
+        // view change, nobody still there) brings the dim back at once, not
+        // the full light, and its five minutes again, then the out.
+        let dark = run(60, None, false);
+        assert!(dark.iter().all(|request| !request.light.on), "{dark:?}");
+        let again = run(2, None, true);
+        assert_eq!(
+            again.first().map(|request| (
+                request.light.clone(),
+                request.claim.until_us > lamp_ipc::monotonic_us()
+            )),
+            Some((Light::new(true, "white", 2).unwrap(), true)),
+            "a stir after the out: the dim again, held: {again:?}"
+        );
+        let held = run(250, None, false);
+        assert!(held.iter().all(|request| request.light.on), "{held:?}");
+        let out = run(60, None, false);
+        assert!(
+            out.iter()
+                .any(|request| !request.light.on && request.fade_ms == Some(60_000)),
+            "out again five minutes after the stir: {out:?}"
+        );
     }
 }

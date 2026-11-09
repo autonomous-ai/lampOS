@@ -32,6 +32,13 @@ pub struct RoomPresence {
     /// eyes' message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub by: Option<SeenBy>,
+    /// While nobody is at the lamp and light-out's light is out, the view
+    /// changed (#5746, the reviewer's P2 on #5765): a reader the dim missed
+    /// turning a page. Light-out brings its dim back; `nobody_s` goes on.
+    /// Said true for [`RoomPresence::STIRRED_FOR`] after the change; absent
+    /// (false) otherwise, and from an older eyes'.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub stirred: bool,
 }
 
 /// What showed someone at the lamp.
@@ -61,6 +68,9 @@ impl RoomPresence {
     /// looked away or paused, not someone who left: the voice's Arrival
     /// forgives the same 20 s (`crates/voice/src/speak_up.rs`).
     pub const SOMEONE_WITHIN_S: u32 = 20;
+    /// A stir is said this long, so a reader taking once a second misses
+    /// none.
+    pub const STIRRED_FOR: Duration = Duration::from_secs(3);
 
     /// The newest replaces the one before, once a second, each good for
     /// three.
@@ -75,6 +85,12 @@ impl RoomPresence {
         if !self.someone && self.by.is_some() {
             return Err(Invalid(
                 "nobody is at the lamp, and by says what showed someone".into(),
+            ));
+        }
+        if self.someone && self.stirred {
+            return Err(Invalid(
+                "someone is at the lamp, and stirred says the view changed with nobody there"
+                    .into(),
             ));
         }
         if self.someone && self.nobody_s != 0 {

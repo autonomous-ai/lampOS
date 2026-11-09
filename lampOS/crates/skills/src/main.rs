@@ -5,8 +5,8 @@
 use lamp_bus::{Bus, Declaration, Kind, Publisher, Subscriber};
 use lamp_msgs::{
     BodyGesture, Decision, GestureState, Hand, Light, LightOutranked, LightReached, LightRequest,
-    MessageOut, Pause, RequestedAudioContext, RequestedAudioOperation, SkillEvent, SkillStage,
-    Speech, StandAsked, Voice, VoiceState,
+    MessageOut, Pause, RequestedAudioContext, RequestedAudioOperation, RoomPresence, SkillEvent,
+    SkillStage, Speech, StandAsked, Voice, VoiceState,
 };
 use lamp_skills::glow::{GLOW_EVERY, Glow, Glows, REQUESTS_ENVIRONMENT};
 use lamp_skills::requested_audio::{self, Authority};
@@ -1056,6 +1056,7 @@ fn serve(
         glows,
         body_requests: options.body_requests,
         ends: RefCell::new(HashMap::new()),
+        stirs: RefCell::new(HashMap::new()),
         local_time: options.local_time.clone(),
         trust_clock: options.trust_clock,
         clock_waiting: Cell::new(false),
@@ -1555,6 +1556,17 @@ fn observe(
             _ => Some((boot.clone(), turn)),
         };
     }
+    // The view changed while light-out's light was out (#5746): its run
+    // brings its dim back.
+    if message.header.topic == RoomPresence::TOPIC
+        && message
+            .parse::<RoomPresence>()
+            .is_ok_and(|presence| presence.stirred)
+    {
+        for stir in runner.stirs.borrow().values() {
+            let _ = stir.send(());
+        }
+    }
     let made = engine.observe(
         &message.header.topic,
         now_us,
@@ -1625,6 +1637,7 @@ fn handle(mut run: Run, runs: &mut Runs, out: &mut Publisher, runner: &Runner) {
     if run.calls == [Call::Ends] {
         // Its run, waiting, gives back what it held. Dropping the sender
         // ends the wait as well.
+        runner.stirs.borrow_mut().remove(&run.skill);
         if let Some(end) = runner.ends.borrow_mut().remove(&run.skill) {
             let _ = end.send(());
         }
@@ -1736,6 +1749,9 @@ struct Runner {
     body_requests: bool,
     /// By skill, the run that holds something until its trigger ends.
     ends: RefCell<HashMap<String, mpsc::Sender<()>>>,
+    /// By skill, the run with a dim held a while, told each stir
+    /// (`room/presence`'s `stirred`, #5746).
+    stirs: RefCell<HashMap<String, mpsc::Sender<()>>>,
     /// The lamp's local time, for quiet hours.
     local_time: Option<Arc<lamp_local_time::LocalTime>>,
     trust_clock: bool,
@@ -2495,6 +2511,24 @@ fn start(
         runner.ends.borrow_mut().insert(skill.clone(), end);
         ended
     });
+    // A run with a dim held a while (#5746) is told each stir after its
+    // out: the view changed while nobody was there.
+    let stir = calls
+        .iter()
+        .any(|call| {
+            matches!(
+                call,
+                Call::Dim {
+                    for_us: Some(_),
+                    ..
+                }
+            )
+        })
+        .then(|| {
+            let (stir, stirred) = mpsc::channel();
+            runner.stirs.borrow_mut().insert(skill.clone(), stir);
+            stirred
+        });
     std::thread::spawn(move || {
         // A light relative to the person's, or never brighter than it, is
         // made from the light shown as the run began (#1672, #3691); with
@@ -2595,7 +2629,7 @@ fn start(
             &bus,
             before,
             (glows.as_ref(), asks_body),
-            (made, end),
+            (made, end, stir),
         );
         let _ = finished.send(SkillEvent {
             skill,
@@ -3627,6 +3661,10 @@ fn dropped(gesture: &BodyGesture) -> String {
 /// waking stretch (its catalogue's `alive` stretch) is not a skill's to ask.
 const MORNING_STRETCH: &str = "stretching";
 
+/// How often a run whose light is out looks for a stir (#5746): the light
+/// comes back to its dim within this of the eyes saying it.
+const STIR_LOOK: Duration = Duration::from_millis(250);
+
 /// How long after a clip's length the next waits, at most, for the body to
 /// say the clip is `over`: a gesture asked of a lamp still rising waits up
 /// to 3 s for the rise (`crates/body/src/body.rs`, `GESTURE_WAIT`).
@@ -3667,7 +3705,12 @@ fn perform(
     (glows, asks_body): (Option<&Glows>, bool),
     // Told once the body and the light are made, and, for a dim held until
     // its trigger ends, told that end.
-    (made, end): (mpsc::Sender<()>, Option<mpsc::Receiver<()>>),
+    // And, with a dim held a while, told each stir after its out (#5746).
+    (made, end, stir): (
+        mpsc::Sender<()>,
+        Option<mpsc::Receiver<()>>,
+        Option<mpsc::Receiver<()>>,
+    ),
 ) -> String {
     if calls == [Call::PrepareUnplug] {
         let _ = made.send(());
@@ -3875,12 +3918,33 @@ fn perform(
     }
     // What a held dim's while times: made once it has passed, or nothing
     // more if the trigger ended first (someone came back during the dim).
+    // Then, while its out shows, a stir (the view changed with nobody
+    // there, the reviewer's P2 on #5765) brings the dim back, from the
+    // light before the run, and its while again (#5746).
     let mut ended = false;
     if !later.is_empty()
         && let Some(end) = end.as_ref()
     {
-        match clock::recv_timeout(end, hold) {
-            Err(mpsc::RecvTimeoutError::Timeout) => act(
+        // Said as each comes, not only in the run's `done` at its end, so a
+        // journal tells when the dim, the out and a stir were (#5746).
+        eprintln!(
+            "lamp-skills: skill:{skill}: dim: asked of the ring, held {} s before what comes after it",
+            hold.as_secs()
+        );
+        'dim: loop {
+            if !matches!(
+                clock::recv_timeout(end, hold),
+                Err(mpsc::RecvTimeoutError::Timeout)
+            ) {
+                ended = true;
+                said.push(format!(
+                    "held until its trigger ended, before its {} s were up: nothing after the dim is made",
+                    hold.as_secs()
+                ));
+                break;
+            }
+            let from = said.len();
+            act(
                 &later,
                 sockets,
                 bus,
@@ -3889,13 +3953,44 @@ fn perform(
                 &mut played,
                 &mut glow,
                 &mut said,
-            ),
-            _ => {
-                ended = true;
-                said.push(format!(
-                    "held until its trigger ended, before its {} s were up: nothing after the dim is made",
-                    hold.as_secs()
-                ));
+            );
+            eprintln!(
+                "lamp-skills: skill:{skill}: the dim held {} s: {}",
+                hold.as_secs(),
+                said[from..].join("; ")
+            );
+            let Some(stir) = stir.as_ref() else { break };
+            // Stirs said before the out, or while it faded, are not for it.
+            while stir.try_recv().is_ok() {}
+            loop {
+                match clock::recv_timeout(end, STIR_LOOK) {
+                    Err(mpsc::RecvTimeoutError::Timeout) => {}
+                    _ => {
+                        ended = true;
+                        said.push("held until its trigger ended".into());
+                        break 'dim;
+                    }
+                }
+                if stir.try_recv().is_ok() {
+                    while stir.try_recv().is_ok() {}
+                    said.push("stirred after the out: the dim again".into());
+                    eprintln!("lamp-skills: skill:{skill}: stirred after the out: the dim again");
+                    if let Some(glow) = glow.as_mut() {
+                        glow.from(before.clone());
+                    }
+                    changed.left = before.clone();
+                    act(
+                        &first,
+                        sockets,
+                        bus,
+                        asker,
+                        &mut changed,
+                        &mut played,
+                        &mut glow,
+                        &mut said,
+                    );
+                    continue 'dim;
+                }
             }
         }
     }
@@ -5408,7 +5503,7 @@ mod tests {
                 &bus,
                 None,
                 (None, false),
-                (made, None),
+                (made, None, None),
             );
             assert!(outcome.contains("refused"), "{outcome}");
             assert!(
@@ -5661,6 +5756,7 @@ mod tests {
             glows: None,
             body_requests: false,
             ends: RefCell::default(),
+            stirs: RefCell::default(),
             looks: RefCell::default(),
             unplug: RefCell::default(),
             local_time: None,
@@ -5868,7 +5964,7 @@ mod tests {
                 &bus,
                 None,
                 (None, false),
-                (made, None),
+                (made, None, None),
             );
             assert!(said.contains("refused") && said.contains("speak"), "{said}");
             assert!(!said.contains("gesture"), "{said}");
@@ -5962,7 +6058,7 @@ mod tests {
                 &bus,
                 None,
                 (None, false),
-                (made, None),
+                (made, None, None),
             );
             let (told, over_at) = played.join().unwrap();
             assert_eq!(told["gesture"], "stretching");
@@ -6017,6 +6113,7 @@ mod tests {
                     glows: None,
                     body_requests: false,
                     ends: RefCell::default(),
+                    stirs: RefCell::default(),
                     unplug: RefCell::default(),
                     local_time: None,
                     trust_clock: false,
@@ -6096,6 +6193,7 @@ mod tests {
             glows: None,
             body_requests: false,
             ends: RefCell::default(),
+            stirs: RefCell::default(),
             unplug: RefCell::default(),
             local_time: None,
             trust_clock: false,

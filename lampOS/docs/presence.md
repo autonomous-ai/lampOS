@@ -41,6 +41,7 @@ each good for 3 s ([msgs.md](msgs.md)):
 |---|---|
 | `someone` | A face seen, a voice heard or the lamp touched, or, only in light-out's dim, the view changing, within the last 20 s (`RoomPresence::SOMEONE_WITHIN_S`: the voice's Arrival forgave a face lost for the same 20 s, until its hello was removed, #2825) |
 | `nobody_s` | How long nobody has been at the lamp, in whole seconds, from the last of those, or from when the eyes began looking if none came since; 0 while someone is there |
+| `stirred` | While nobody is there and light-out's light is out, the view changed in the last 3 s (#5746): light-out brings its dim back; absent (false) otherwise |
 | `by` | While someone is there, what last showed it: `face`, `voice`, `touch` (a touch or a pet, #5746) or `moved` (the view changed in light-out's dim, #5746); absent while nobody is (and from an older eyes'). At each change to someone the eyes also write `lamp-eyes: someone at the lamp (face, 0.21 of the picture tall)`, `(voice)`, `(touch)` or `(the view changed in light-out's dim)` in their journal (the tallest face as `humans/faces/tracked` publishes it, clamped to the picture), so a run tells a passer-by from someone at the desk (the first builder's lamp check, 19 Oct: four `someone`s in 15 minutes of an office at lunch, cause unknown) |
 
 Counts and times only: no picture, no face, nobody's identity.
@@ -120,29 +121,42 @@ mute, the privacy switch) is nothing, and not counted once they look again
 (below). So a touch resets `nobody_s`, and a touch during light-out's dim
 brings the light straight back.
 
-**The view changing, only in light-out's dim (#5746, the first builder's
-change on #5765).** A reader the eyes can't find, who doesn't touch the lamp
-or speak, still turns pages. While light-out's dim shows, the eyes count the
-view changing as someone, `by = "moved"`; at any other time they never do,
-so movement alone never resets the forty minutes. *How the eyes know the dim
+**The view changing, in light-out's dim and after its out (#5746, the
+first builder's change on #5765, and the reviewer's P2 there).** A reader
+the eyes can't find, who doesn't touch the lamp or speak, still turns
+pages. While light-out's dim shows, the eyes count the view changing as
+someone, `by = "moved"`, and the light comes back. While its out shows,
+after its fade, the view changing is a *stir*: `room/presence` still says
+nobody, with `stirred: true` for 3 s (`RoomPresence::STIRRED_FOR`), and
+light-out brings its dim back, not the full light, and its five minutes
+again, then the out (a reader the dim missed is never left at the ember;
+the lead's head-down reader). At any other time the eyes never count it,
+so movement alone never resets the forty minutes. *How the eyes know what
 shows:* the ring's own words, nothing new on the bus. The ring says a
 request's light `light/reached` after it eases in and after each renewal
-(every 10 s), naming its asker, and says on `light/drawn` what it draws. The
-dim is on while `light/drawn` is the light it last said reached for
-`skill:light-out` (`change::DIM_SOURCE`), that light is on (its out is no
-dim), it was said within 15 s (`DIM_REACHED_WITHIN_US`), and 3 s have
-passed since it first showed (`DIM_SETTLE_US`), so the ring easing down and
-the camera's exposure following are not a change. The out asked, or the
-light given back, and the ring draws something else at once: no dim.
+(every 10 s), naming its asker, and says on `light/drawn` what it draws
+(when it changes, and once a second at rest). Light-out's light shows while
+the newest `light/drawn` is the light the ring last said reached for
+`skill:light-out` (`change::DIM_SOURCE`): on for its dim, off for its out.
+It is held until the ring draws something else, which the ring says at
+once (the out asked, the light given back, the person's light over it),
+and is never timed against the renewals, so a late or unsaid renewal can't
+drop it (the reviewer's P2: a 15 s window against 10 s renewals failed
+towards the dark). A ring that says nothing more leaves it held: a change
+then brings light back, the safe way to be wrong. A change counts 3 s after
+the dim first showed (`DIM_SETTLE_US`), and 65 s after the out first showed
+(`OUT_SETTLE_US`: its minute of fade and the exposure following).
 *What counts as a change:* `change.rs`'s own comparison of each glance with
 the last one compared (a 32 by 24 grid of mean greys, each row's shift
 taken out, each cell past 12 greys and 8 times its learned noise), run at
 every glance with presence on so the room's noise is learned as the
-detector's skip learns it, but only a verdict in the dim counts: 2 cells or
-more (`VIEW_CELLS`), one fewer than the detector's 3, leaning towards a yes,
-since a yes only keeps the light on and a no puts a reader in the dark.
-Only the yes leaves the eyes, as `room/presence`'s `by`: no frame, no cell,
-no place.
+detector's skip learns it; the out's dark picture is compared on its own,
+begun afresh when the out shows, so its noise is learned through the fade.
+Only a verdict in the dim or the out counts: 2 cells or more
+(`VIEW_CELLS`), one fewer than the detector's 3, leaning towards a yes,
+since a yes only brings light back and a no leaves a reader in the dark.
+Only the yes leaves the eyes, as `room/presence`'s `by` or `stirred`: no
+frame, no cell, no place.
 
 **Never "nobody" when it is not known.** Nothing is said while the eyes are
 not looking: the camera closed by the privacy switch, a mute or the voice
@@ -183,6 +197,7 @@ a reader with their head down not darkened, is owed. A test holds the install's 
 |---|---|---|
 | When | `nobody_s` above 2399: nobody for 40 minutes (#5746, was 10) | Faces miss someone reading face down or turned to a second screen; a reader can sit 30 minutes and more without the eyes finding their face. A light that goes out on someone still working is the failure that reads as a machine, so it waits long, and a touch or a pet counts as someone as well as a face or a word. Messages' 5 minutes is its own line on the same signal |
 | How | First the light two steps dimmer, held five minutes (`light = { dim = 2, for = "5m", until = "ends" }`), then the light shown, off, asked of the ring over a minute (`light = { out = true, over = "60s", until = "ends" }`) | A living thing lets the light go slowly: the dim is a soft cue to anyone still there, and the out is "like falling asleep, never snapping off" (the owner). Out is the ember. The out comes only if the dim was held its five minutes (`for` on a dim, [skills.md](skills.md)) |
+| Stirred after the out | While the out shows, after its fade, the eyes seeing the view change (`stirred`, nobody still there) bring the dim back at once, not the full light, and its five minutes again, then the out (the reviewer's P2 on #5765) | The lead's head-down reader is never left at the ember: a page turned after the out is enough |
 | Back | The moment someone is there: the first `someone` (a face at the eyes' next look, at most 600 ms with nobody in view, a voice heard, a touch or a pet, or, during the dim, the view changing) ends the skill's ask, in the dim before anything goes out, and the ring shows the person's own light again, waking over about half a second | The person's light was never touched: the colour and level they chose, kept across a restart with `LAMP_LIGHT_KEEP=on` |
 | Once | Once each time the desk is left (`rearm = "ends"`) | It never goes out again until someone came back |
 | Not in a turn | Only while `voice/state` is `resting`; forty minutes that come while the lamp speaks (a reminder into an empty room) wait up to an hour for it to rest (`wait = "1h"`) | |
@@ -273,7 +288,11 @@ heard, so `someone` comes back and the skill's ask ends with it.
   someone, the pads off nothing
   (`a_touch_or_a_pet_is_someone_and_starts_nobody_again`); a page turned
   nobody without the dim and someone by `moved` in it
-  (`the_view_changing_is_someone_only_in_light_outs_dim`).
+  (`the_view_changing_is_someone_only_in_light_outs_dim`); the dim held through
+  a late renewal (`change::the_dim_holds_through_a_late_renewal`); a stir after
+  the out settles (`change::after_the_out_settles_the_view_changing_is_a_stir`)
+  said at once for 3 s with nobody going on
+  (`away::a_stir_is_said_at_once_for_three_seconds_and_nobody_goes_on`).
 - `crates/voice`: the face fading into a light slowly, no frame falling by a
   tenth, a turn over it as quick as ever, the wake in about half a second
   (`ring_face.rs`); the ring giving the shown request's fade to the face,
@@ -284,13 +303,15 @@ heard, so `someone` comes back and the skill's ask ends with it.
   when the trigger ends, and leaving the light alone without the ring's
   switch; light-out itself on a stepped clock, the dim at forty minutes, the
   out five minutes on, and a face, a word, a touch or the view changing in
-  the dim giving the light back with nothing out
+  the dim giving the light back with nothing out, and a stir after the out
+  bringing the dim back and the out again five minutes later
   (`light_out_dims_five_minutes_then_goes_out_and_anyone_in_the_dim_brings_it_back`).
-- `skills/light-out/tests/`, seven cases written by a script in the format
+- `skills/light-out/tests/`, eight cases written by a script in the format
   `lamp-bus record` writes, `room/presence` every 2 s (each good for 3 s;
   half the eyes' once a second, so the forty minutes are half the lines):
   the dim at forty minutes, out five later and back when someone sits down;
-  back at once when the view changes in the dim, nothing out; waiting for
+  back at once when the view changes in the dim, nothing out; the dim back
+  when the view changes after the out, out again five minutes later; waiting for
   the lamp to finish speaking; the night waited out to 06:00; nothing at
   night; back when the eyes stop looking in the dim; on when asked to keep
   the light on.
@@ -335,8 +356,13 @@ On a lamp with the switches above, the office empty, nothing played:
   noise never settles to (a screen in view) keeps saying the view changed:
   the light then dims and comes back, and never goes out, the safe way to
   be wrong. Not yet measured on a lamp.
-- The eyes know the dim by its asker's name, `skill:light-out`: a skill of
-  that name is the only one whose dim the view ends.
+- The eyes know the dim and the out by their asker's name,
+  `skill:light-out`: a skill of that name is the only one whose light the
+  view changes.
+- A dark room's own noise, or a screen in view, can stir the light back to
+  its dim after the out; it then goes out again five minutes later. That
+  is the safe way to be wrong, and its cost (a dim, then out, again) is for
+  the row to measure.
 - A restart of `lamp-skills` while the light is out lets the ask lapse
   within 15 s (the light comes back) and dims it again at its first
   `room/presence`, out five minutes later. A restart of the eyes begins the count of nobody

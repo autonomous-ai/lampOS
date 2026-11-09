@@ -10,6 +10,7 @@ fn presence_is_two_numbers_and_ignores_fields_added_later() {
         someone: false,
         nobody_s: 312,
         by: None,
+        stirred: false,
     };
     let text = serde_json::to_string(&away).unwrap();
     assert_eq!(text, r#"{"someone":false,"nobody_s":312}"#);
@@ -31,6 +32,7 @@ fn presence_is_two_numbers_and_ignores_fields_added_later() {
         someone: false,
         nobody_s: 0,
         by: None,
+        stirred: false,
     }
     .check()
     .unwrap();
@@ -38,6 +40,7 @@ fn presence_is_two_numbers_and_ignores_fields_added_later() {
         someone: true,
         nobody_s: 0,
         by: None,
+        stirred: false,
     }
     .check()
     .unwrap();
@@ -45,6 +48,7 @@ fn presence_is_two_numbers_and_ignores_fields_added_later() {
         someone: true,
         nobody_s: 4,
         by: None,
+        stirred: false,
     };
     assert!(both.check().unwrap_err().0.contains("0 while someone is"));
     // What showed someone (#1677's lamp check): written only when known,
@@ -53,6 +57,7 @@ fn presence_is_two_numbers_and_ignores_fields_added_later() {
         someone: true,
         nobody_s: 0,
         by: Some(SeenBy::Face),
+        stirred: false,
     };
     let text = serde_json::to_string(&face).unwrap();
     assert_eq!(text, r#"{"someone":true,"nobody_s":0,"by":"face"}"#);
@@ -70,6 +75,7 @@ fn presence_is_two_numbers_and_ignores_fields_added_later() {
         someone: false,
         nobody_s: 9,
         by: Some(SeenBy::Face),
+        stirred: false,
     };
     assert!(nobody_by.check().is_err());
 }

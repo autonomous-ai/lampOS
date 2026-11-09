@@ -1,0 +1,36 @@
+# From 10:00, nobody: the light dims at 2400 s and goes out at 2700 s. At
+# 2800 s, in the dark, the eyes see the view change (a reader the dim
+# missed turning a page, `stirred`, nobody still there): the dim comes
+# back at once, not the full light, and its five minutes again; out
+# again at 3100 s; someone sits down at 3200 s.
+clock = "10:00"
+
+[[expect]]
+at = "2400s"
+within = "1s"
+call = "light"
+args = { dim = 2, for_ms = 300000, until = "ends" }
+
+[[expect]]
+at = "2700s"
+within = "1s"
+call = "light"
+args = { out = true, over_ms = 60000, until = "ends" }
+
+[[expect]]
+at = "2800s"
+within = "1s"
+call = "light"
+args = { dim = 2, for_ms = 300000, until = "ends" }
+
+[[expect]]
+at = "3100s"
+within = "1s"
+call = "light"
+args = { out = true, over_ms = 60000, until = "ends" }
+
+[[expect]]
+at = "3200s"
+within = "1s"
+call = "ends"
+

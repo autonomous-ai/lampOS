@@ -329,6 +329,7 @@ fn with_the_camera_closed_no_box_is_drawn() {
                 someone: true,
                 nobody_s: 0,
                 by: None,
+                stirred: false,
             },
         )
         .unwrap();

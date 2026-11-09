@@ -103,6 +103,8 @@ pub struct Away {
     face_tall: Option<f32>,
     /// Whether someone was said to be there, and when it was said.
     said: Option<(bool, u64)>,
+    /// When the view last changed while light-out's light was out (#5746).
+    stirred_at: Option<u64>,
     /// With far faces judged, what they are judged from.
     far: Option<Far>,
 }
@@ -222,6 +224,14 @@ impl Away {
         self.seen(at_us, SeenBy::Voice);
     }
 
+    /// The view changed at `at_us` while light-out's light was out (#5746,
+    /// the reviewer's P2 on #5765): not someone, but said as `stirred` for
+    /// [`RoomPresence::STIRRED_FOR`], and light-out brings its dim back. The
+    /// caller says it only then ([`crate::change::ViewInDim`]).
+    pub fn stirred(&mut self, at_us: u64) {
+        self.stirred_at = Some(at_us);
+    }
+
     /// A touch on the lamp or a pet on its head at `at_us` (#5746): a hand
     /// is someone, as a voice is, and like one is counted only while the
     /// eyes look (a mute, the privacy switch: nothing).
@@ -273,18 +283,24 @@ impl Away {
                 someone: true,
                 nobody_s: 0,
                 by: self.by,
+                stirred: false,
             });
         }
         let away_us = now_us.saturating_sub(from.unwrap_or(since));
+        let stirred_for = RoomPresence::STIRRED_FOR.as_micros() as u64;
         Some(RoomPresence {
             someone: false,
             nobody_s: u32::try_from(away_us / 1_000_000).unwrap_or(u32::MAX),
             by: None,
+            stirred: self
+                .stirred_at
+                .is_some_and(|at| at >= since && now_us.saturating_sub(at) < stirred_for),
         })
     }
 
     /// What to say at `now_us`, if anything: once a second while the eyes
-    /// look ([`RoomPresence::EVERY`]), and at once when `someone` changes.
+    /// look ([`RoomPresence::EVERY`]), and at once when `someone` changes or
+    /// a stir begins.
     pub fn say(&mut self, now_us: u64) -> Option<RoomPresence> {
         let Some(now) = self.now(now_us) else {
             self.said = None;
@@ -292,7 +308,9 @@ impl Away {
         };
         let every = RoomPresence::EVERY.as_micros() as u64;
         let due = self.said.is_none_or(|(someone, at)| {
-            someone != now.someone || now_us.saturating_sub(at) >= every
+            someone != now.someone
+                || now_us.saturating_sub(at) >= every
+                || (now.stirred && self.stirred_at.is_some_and(|stirred| stirred > at))
         });
         due.then(|| {
             self.said = Some((now.someone, now_us));
@@ -324,6 +342,7 @@ mod tests {
             someone,
             nobody_s,
             by: someone.then_some(SeenBy::Face),
+            stirred: false,
         })
     }
 
@@ -656,6 +675,41 @@ mod tests {
         assert_eq!((moved.someone, moved.by), (true, Some(SeenBy::Moved)));
     }
 
+    /// The reviewer's P2 on #5765: a stir after the out is said at once, as
+    /// `stirred` on a value that still says nobody, for 3 s, and the count
+    /// of nobody goes on.
+    #[test]
+    fn a_stir_is_said_at_once_for_three_seconds_and_nobody_goes_on() {
+        let mut away = Away::default();
+        let mut said = Vec::new();
+        for turn in 0..100u64 {
+            let at = 2_800 * S + turn * S / 10;
+            if turn % 5 == 0 {
+                away.looked(at, None);
+            }
+            if turn == 33 {
+                away.stirred(at);
+            }
+            if let Some(now) = away.say(at) {
+                now.check().unwrap();
+                said.push((at, now));
+            }
+        }
+        let first = said.iter().position(|(_, now)| now.stirred).unwrap();
+        assert_eq!(said[first].0, 2_800 * S + 33 * S / 10, "at once");
+        assert!(said.iter().all(|(_, now)| !now.someone));
+        let stirred: Vec<u64> = said
+            .iter()
+            .filter(|(_, now)| now.stirred)
+            .map(|(at, _)| *at)
+            .collect();
+        assert!(
+            stirred.iter().all(|at| *at < 2_800 * S + 63 * S / 10),
+            "{stirred:?}"
+        );
+        assert!(!said.last().unwrap().1.stirred);
+    }
+
     #[test]
     fn it_is_said_once_a_second_and_at_once_when_someone_comes_or_goes() {
         let mut away = Away::default();
@@ -685,6 +739,7 @@ mod tests {
                     someone: false,
                     nobody_s: 29,
                     by: None,
+                    stirred: false,
                 }
             )
         );
@@ -702,6 +757,7 @@ mod tests {
                     someone: false,
                     nobody_s: 20,
                     by: None,
+                    stirred: false,
                 }
             )
         );

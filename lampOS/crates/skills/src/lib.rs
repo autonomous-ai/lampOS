@@ -9056,14 +9056,14 @@ fn replay_skill(
     let mut calls = calls.into_iter().peekable();
     let mut made = Vec::new();
     // The steps after a dim held a while (#5746), made once it has been
-    // held that long, as the program makes them, unless its run ends first.
-    let mut later: Option<(u64, Vec<Call>)> = None;
-    let keep = |made: &mut Vec<Made>,
-                later: &mut Option<(u64, Vec<Call>)>,
-                calls: Vec<Call>,
-                at_us: u64| {
+    // held that long, as the program makes them, unless its run ends first;
+    // and, while the run holds, its dim and those steps, which a stir after
+    // its out (`room/presence`'s `stirred`) makes again (the reviewer's P2
+    // on #5765).
+    let mut later = Later::default();
+    let keep = |made: &mut Vec<Made>, later: &mut Later, calls: Vec<Call>, at_us: u64| {
         if calls.contains(&Call::Ends) {
-            *later = None;
+            *later = Later::default();
         }
         let mut calls: Vec<Call> = calls
             .into_iter()
@@ -9082,37 +9082,50 @@ fn replay_skill(
             ..
         } = calls[at]
         {
-            *later = Some((at_us + for_us, calls.split_off(at + 1)));
+            let after = calls.split_off(at + 1);
+            later.again = Some((calls[at].clone(), for_us, after.clone()));
+            later.due = Some((at_us + for_us, after));
         }
         made.extend(calls.into_iter().map(|call| Made { at_us, call }));
     };
-    let due = |made: &mut Vec<Made>, later: &mut Option<(u64, Vec<Call>)>, now_us: u64| {
-        if let Some((at_us, _)) = later
-            && *at_us <= now_us
-            && let Some((at_us, calls)) = later.take()
+    let due = |made: &mut Vec<Made>, later: &mut Later, now_us: u64| {
+        if let Some((at_us, _)) = later.due
+            && at_us <= now_us
+            && let Some((at_us, calls)) = later.due.take()
         {
             made.extend(calls.into_iter().map(|call| Made { at_us, call }));
         }
     };
-    let mut call_tools = |engine: &mut Engine,
-                          made: &mut Vec<Made>,
-                          later: &mut Option<(u64, Vec<Call>)>,
-                          until_us: Option<u64>| {
-        while let Some((at, name, args)) =
-            calls.next_if(|(at, _, _)| until_us.is_none_or(|until| *at < until))
-        {
-            // A `[stop]` call makes nothing: its words are the model's
-            // answer (#1685).
-            if let Ok(run) = engine.tool(name, &args, first_us + at)
-                && stop.as_deref() != Some(name)
+    let mut call_tools =
+        |engine: &mut Engine, made: &mut Vec<Made>, later: &mut Later, until_us: Option<u64>| {
+            while let Some((at, name, args)) =
+                calls.next_if(|(at, _, _)| until_us.is_none_or(|until| *at < until))
             {
-                keep(made, later, run.calls, at);
+                // A `[stop]` call makes nothing: its words are the model's
+                // answer (#1685).
+                if let Ok(run) = engine.tool(name, &args, first_us + at)
+                    && stop.as_deref() != Some(name)
+                {
+                    keep(made, later, run.calls, at);
+                }
             }
-        }
-    };
+        };
     for message in messages {
         let at_us = message.header.at_us;
         due(&mut made, &mut later, at_us - first_us);
+        if message.header.topic == RoomPresence::TOPIC
+            && later.due.is_none()
+            && let Some((dim, for_us, after)) = later.again.clone()
+            && serde_json::from_slice::<Value>(&message.payload)
+                .is_ok_and(|presence| presence["stirred"] == json!(true))
+        {
+            let at = at_us - first_us;
+            made.push(Made {
+                at_us: at,
+                call: dim,
+            });
+            later.due = Some((at + for_us, after));
+        }
         // The clock told again at every message, as a live host tells it
         // (`clock_in_with_trust`), so a trigger's `during` window, which
         // needs a local time told within 2 minutes, is replayed over hours.
@@ -9136,6 +9149,15 @@ fn replay_skill(
     }
     call_tools(&mut engine, &mut made, &mut later, None);
     Ok(made)
+}
+
+/// A replayed run's dim held a while ([`replay_skill`]): the steps after it
+/// still to come and when, and, while the run holds, the dim, its while and
+/// those steps, made again on a stir.
+#[derive(Default)]
+struct Later {
+    due: Option<(u64, Vec<Call>)>,
+    again: Option<(Call, u64, Vec<Call>)>,
 }
 
 /// In a watch's case, the eyes' known file from `at` on: the name of the

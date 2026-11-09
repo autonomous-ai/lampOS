@@ -612,82 +612,134 @@ impl Change {
 /// Light-out's light on the ring: a skill's claim is `skill:<name>`
 /// (`crates/skills/src/glow.rs`).
 pub const DIM_SOURCE: &str = "skill:light-out";
-/// The ring says a request's light reached after each renewal while it
-/// shows (`light/reached`), and a skill renews every 10 s
-/// (`glow::GLOW_EVERY`): the dim counts as shown this long after the last.
-pub const DIM_REACHED_WITHIN_US: u64 = 15_000_000;
 /// The view is judged only this long after the dim first showed, so the
 /// ring easing down and the camera's exposure following are not a change.
 pub const DIM_SETTLE_US: u64 = 3_000_000;
-/// This many cells past the bar are the view changing in the dim: one
-/// fewer than the detector's [`CELLS`], leaning towards a yes, since a yes
-/// only keeps the light on and a no puts a reader in the dark (the first
-/// builder on #5765). Under one cell a glance passes on a still room's
-/// noise ([`NOISE_TIMES`]).
+/// And only this long after the out first showed: its fade (at most a
+/// minute, `LightRequest::FADE_MS`) and 5 s for the exposure to follow.
+/// Meanwhile the dark picture's own noise is learned.
+pub const OUT_SETTLE_US: u64 = 65_000_000;
+/// This many cells past the bar are the view changing in the dim or the
+/// out: one fewer than the detector's [`CELLS`], leaning towards a yes,
+/// since a yes only brings light back and a no leaves a reader in the dark
+/// (the first builder on #5765). Under one cell a glance passes on a still
+/// room's noise ([`NOISE_TIMES`]).
 pub const VIEW_CELLS: usize = 2;
 
-/// Whether the view changed while light-out's dim shows (#5746): what the
-/// ring says it draws (`light/drawn`) is the dim light it last said reached
-/// for light-out (`light/reached`), lately and for [`DIM_SETTLE_US`]. The
-/// picture is compared at every glance whatever shows, so the room's noise
-/// is learned as [`Change`] learns it; only in the dim does a change count.
-/// So outside the dim it never says yes, nor touches the count of nobody.
+/// What a glance shows of light-out's light ([`ViewInDim::glanced`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InTheDark {
+    /// No change, or not in light-out's dim or out.
+    Nothing,
+    /// The view changed while the dim showed: someone (`by = "moved"`).
+    Moved,
+    /// The view changed while the out showed: `stirred`, and light-out
+    /// brings its dim back.
+    Stirred,
+}
+
+/// Whether the view changed while light-out's dim or out shows (#5746):
+/// the ring's newest `light/drawn` is the light it last said reached for
+/// light-out (`light/reached`), on for its dim, off for its out, for
+/// [`DIM_SETTLE_US`] or [`OUT_SETTLE_US`]. Held until the ring draws
+/// something else, which it says at once (its out asked, the light given
+/// back, the person's light over it), and never timed against the skill's
+/// 10 s renewals, so a late or unsaid renewal can't drop it (the
+/// reviewer's P2 on #5765). A ring that stops saying anything leaves it
+/// held: a change then brings light back, the safe way to be wrong. The picture is compared at every
+/// glance whatever shows, so the room's noise is learned as [`Change`]
+/// learns it; the out's dark picture is compared on its own, with its own
+/// noise. Only in the dim or the out does a change count, so otherwise it
+/// never says yes, nor touches the count of nobody.
 #[derive(Default)]
 pub struct ViewInDim {
     view: Change,
-    /// The dim light last said reached, since when without a break, and
-    /// when last.
-    reached: Option<(Light, u64, u64)>,
+    /// The out's own comparison, begun afresh each time the out shows.
+    dark: Change,
+    dark_on: bool,
+    /// Light-out's light last said reached, and since when it has shown.
+    shown: Option<(Light, u64)>,
     /// What the ring last said it draws.
     drawn: Option<Light>,
 }
 
 impl ViewInDim {
     /// `light/reached` at `at_us`: light-out's light, if `source` is its.
-    /// Its out is no dim.
     pub fn reached(&mut self, source: &str, light: &Light, at_us: u64) {
         if source != DIM_SOURCE {
             return;
         }
-        if !light.on {
-            self.reached = None;
-            return;
+        if self.shown.as_ref().is_none_or(|(was, _)| was != light) {
+            self.shown = Some((light.clone(), at_us));
         }
-        let since = match &self.reached {
-            Some((was, since, last))
-                if was == light && at_us.saturating_sub(*last) < DIM_REACHED_WITHIN_US =>
-            {
-                *since
-            }
-            _ => at_us,
-        };
-        self.reached = Some((light.clone(), since, at_us));
     }
 
     /// `light/drawn`: what the ring draws now. Its out asked, or the light
-    /// given back, it draws something else at once.
+    /// given back, it draws something else at once, and what light-out
+    /// showed is over.
     pub fn drawn(&mut self, light: Light) {
+        if self
+            .shown
+            .as_ref()
+            .is_some_and(|(shown, _)| *shown != light)
+        {
+            self.shown = None;
+        }
         self.drawn = Some(light);
+    }
+
+    /// Light-out's light shown at `now_us`, settled: `Some(true)` its dim,
+    /// `Some(false)` its out.
+    fn showing(&self, now_us: u64) -> Option<bool> {
+        let (light, since) = self.shown.as_ref()?;
+        let settle = if light.on {
+            DIM_SETTLE_US
+        } else {
+            OUT_SETTLE_US
+        };
+        (self.drawn.as_ref() == Some(light) && now_us.saturating_sub(*since) >= settle)
+            .then_some(light.on)
     }
 
     /// Whether light-out's dim shows at `now_us`, settled.
     pub fn dim(&self, now_us: u64) -> bool {
-        self.reached.as_ref().is_some_and(|(light, since, last)| {
-            now_us.saturating_sub(*last) < DIM_REACHED_WITHIN_US
-                && now_us.saturating_sub(*since) >= DIM_SETTLE_US
-                && self.drawn.as_ref() == Some(light)
-        })
+        self.showing(now_us) == Some(true)
+    }
+
+    /// Whether light-out's out shows at `now_us`, settled.
+    pub fn out(&self, now_us: u64) -> bool {
+        self.showing(now_us) == Some(false)
     }
 
     /// A glance at `now_us` (`busy` as [`Change::detect`] takes it): whether
-    /// the view changed in the dim.
-    pub fn glanced(&mut self, picture: &Picture, busy: Option<Busy>, now_us: u64) -> bool {
+    /// the view changed in the dim or the out.
+    pub fn glanced(&mut self, picture: &Picture, busy: Option<Busy>, now_us: u64) -> InTheDark {
         self.glanced_grid(Grid::of(picture), busy, now_us)
     }
 
-    fn glanced_grid(&mut self, grid: Grid, busy: Option<Busy>, now_us: u64) -> bool {
+    fn glanced_grid(&mut self, grid: Grid, busy: Option<Busy>, now_us: u64) -> InTheDark {
+        let changed = |change: &Change| change.cells().is_some_and(|cells| cells >= VIEW_CELLS);
+        // The out shows, settling or settled: its own comparison, learning
+        // the dark picture's noise from its first glance.
+        let out_shown = self
+            .shown
+            .as_ref()
+            .is_some_and(|(light, _)| !light.on && self.drawn.as_ref() == Some(light));
+        if out_shown {
+            if !self.dark_on {
+                self.dark = Change::default();
+                self.dark_on = true;
+            }
+            self.dark.detect(grid.clone(), busy, now_us);
+        } else {
+            self.dark_on = false;
+        }
         self.view.detect(grid, busy, now_us);
-        self.dim(now_us) && self.view.cells().is_some_and(|cells| cells >= VIEW_CELLS)
+        match self.showing(now_us) {
+            Some(true) if changed(&self.view) => InTheDark::Moved,
+            Some(false) if changed(&self.dark) => InTheDark::Stirred,
+            _ => InTheDark::Nothing,
+        }
     }
 }
 
@@ -696,8 +748,8 @@ mod tests {
     use super::*;
 
     /// #5746: the view changing counts only while light-out's dim shows,
-    /// settled; its out, the light given back, another skill's light or a
-    /// dim the ring stopped saying are no dim. A still room is no change.
+    /// settled; another skill's light, its out drawn or the light given
+    /// back are no dim. A still room is no change.
     #[test]
     fn the_view_changing_counts_only_in_light_outs_dim() {
         let dim = Light::new(true, "white", 2).unwrap();
@@ -707,45 +759,108 @@ mod tests {
         let mut at = 0;
         // A still room for a minute, no dim: nothing, however it changes.
         for seed in 0..100 {
-            assert!(!view.glanced_grid(still(seed), None, at));
+            assert_eq!(view.glanced_grid(still(seed), None, at), InTheDark::Nothing);
             at += GLANCE_US;
         }
-        assert!(!view.glanced_grid(page(), None, at), "no dim: nothing");
+        assert_eq!(
+            view.glanced_grid(page(), None, at),
+            InTheDark::Nothing,
+            "no dim"
+        );
         at += GLANCE_US;
         for seed in 100..110 {
             view.glanced_grid(still(seed), None, at);
             at += GLANCE_US;
         }
         // Another skill's light, then light-out's dim: not before it settles.
-        view.reached("skill:dance", &dim, at);
         view.drawn(dim.clone());
+        view.reached("skill:dance", &dim, at);
         assert!(!view.dim(at));
         view.reached(DIM_SOURCE, &dim, at);
         assert!(!view.dim(at + DIM_SETTLE_US - 1), "settling");
         at += DIM_SETTLE_US;
         assert!(view.dim(at));
-        // In the dim: a still room is no change; a page turned is.
         for seed in 110..120 {
-            assert!(!view.glanced_grid(still(seed), None, at), "{seed}");
+            assert_eq!(
+                view.glanced_grid(still(seed), None, at),
+                InTheDark::Nothing,
+                "{seed}"
+            );
             at += GLANCE_US;
         }
-        assert!(
+        assert_eq!(
             view.glanced_grid(page(), None, at),
-            "a page turned in the dim"
+            InTheDark::Moved,
+            "a page in the dim"
         );
-        at += GLANCE_US;
-        // Renewed every 10 s it stays the dim; unsaid for 15 s it is not.
-        view.reached(DIM_SOURCE, &dim, at);
-        assert!(view.dim(at + DIM_REACHED_WITHIN_US - 1));
-        assert!(!view.dim(at + DIM_REACHED_WITHIN_US));
         // Its out drawn, or the light given back: no dim at once.
-        view.drawn(Light::new(false, "white", 2).unwrap());
-        assert!(!view.dim(at));
-        view.drawn(Light::new(true, "white", 4).unwrap());
+        view.drawn(Light::new(false, "white", 4).unwrap());
         assert!(!view.dim(at));
         view.drawn(dim.clone());
-        view.reached(DIM_SOURCE, &Light::new(false, "white", 2).unwrap(), at);
-        assert!(!view.dim(at + DIM_SETTLE_US), "its out reached");
+        assert!(
+            !view.dim(at),
+            "what light-out showed is over once the ring drew another"
+        );
+        view.reached(DIM_SOURCE, &dim, at);
+        view.drawn(Light::new(true, "white", 4).unwrap());
+        assert!(!view.dim(at + DIM_SETTLE_US), "given back");
+    }
+
+    /// The reviewer's P2 on #5765: the dim is held while the ring draws it,
+    /// whatever the skill's renewals do: no `light/reached` for 20 s (one
+    /// late, one unsaid) and it still shows.
+    #[test]
+    fn the_dim_holds_through_a_late_renewal() {
+        let dim = Light::new(true, "white", 2).unwrap();
+        let mut view = ViewInDim::default();
+        view.drawn(dim.clone());
+        view.reached(DIM_SOURCE, &dim, 1_000_000);
+        assert!(view.dim(1_000_000 + DIM_SETTLE_US));
+        assert!(view.dim(21_000_000), "20 s with no renewal said");
+        assert!(view.dim(600_000_000), "or ten minutes");
+    }
+
+    /// The reviewer's P2 on #5765: once light-out's light is out, after its
+    /// fade settles, the view changing is a stir, judged against the dark
+    /// picture's own noise; a still dark room is nothing.
+    #[test]
+    fn after_the_out_settles_the_view_changing_is_a_stir() {
+        let out = Light::new(false, "white", 4).unwrap();
+        let dark = |seed| Grid::of(&scene(seed, -90.0, false, 0.0, None));
+        let page = || Grid::of(&scene(9, -90.0, false, 0.0, Some((100, 60, 48))));
+        let mut view = ViewInDim::default();
+        let mut at = 0;
+        view.drawn(out.clone());
+        view.reached(DIM_SOURCE, &out, at);
+        // The fade, a minute: nothing counts, a change in it neither.
+        view.glanced_grid(dark(0), None, at);
+        at += GLANCE_US;
+        assert_eq!(
+            view.glanced_grid(page(), None, at),
+            InTheDark::Nothing,
+            "settling"
+        );
+        while at < OUT_SETTLE_US {
+            at += GLANCE_US;
+            view.glanced_grid(dark(at as u32), None, at);
+        }
+        assert!(view.out(at));
+        for _ in 0..20 {
+            assert_eq!(
+                view.glanced_grid(dark(at as u32), None, at),
+                InTheDark::Nothing
+            );
+            at += GLANCE_US;
+        }
+        assert_eq!(
+            view.glanced_grid(page(), None, at),
+            InTheDark::Stirred,
+            "a page in the dark"
+        );
+        // The light given back: nothing.
+        view.drawn(Light::new(true, "white", 4).unwrap());
+        at += GLANCE_US;
+        assert_eq!(view.glanced_grid(dark(1), None, at), InTheDark::Nothing);
     }
 
     /// A room at 320 by 240: a grey wall with a darker desk, the sensor's

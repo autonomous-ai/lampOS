@@ -15,7 +15,9 @@ The moment someone sits down in front of it, speaks to it, touches it or
 pets it, the light is as it was again: the colour and the level the person
 chose, which the lamp keeps. While it is dim, a movement in view (a page
 turned by someone reading with their head down) brings it back as well, so
-it never puts out the light on a reader. It does the same if the lamp stops
+it never puts out the light on a reader. After the light has gone out,
+a movement in view brings it back to the dim, not the full light, and it
+waits five minutes again before it goes out. It does the same if the lamp stops
 looking (the privacy switch, a mute): it never puts the light out on someone
 it cannot see.
 
