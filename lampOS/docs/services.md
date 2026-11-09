@@ -795,7 +795,8 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   second route with its request as its words are told (`Thread::line_heard`
   → `line_began(Some(request))`, `heard`, the newest 8 ids kept). The
   person's lines are the larger count less the echoes, and an echo is taken
-  off only for a request counted with its id, each once (the newest 8 kept):
+  off only for a request counted with its id, and once: the mark goes with
+  its id among the newest 8, so a repeat of it is never taken off again:
   a line the thread never counted (a piece joined to a line going on, or with
   no letter or digit) takes no person's line off, so a person's line and the
   send after an uncounted echo are still two, and cancelled. On lamp-29e7 on 9
