@@ -487,7 +487,7 @@ fn cap_only_zero_or_lost_observation_survives_recovery_and_latest_coalescing() {
         let old = running.latest();
         running.control.level.store(0, Ordering::Release);
         running.control.fail_read.store(lost, Ordering::Release);
-        // Release never restores volume, but its real read can discover zero
+        // Release restores nothing it did not lower, but its real read can find zero
         // or a lost observation. No ordinary volume command runs here.
         let release = running.private(json!({"op":"caps_remove","source":"night","token":"one"}));
         assert_eq!(release["accepted"], true);
