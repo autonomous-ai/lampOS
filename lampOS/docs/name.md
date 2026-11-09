@@ -66,6 +66,19 @@ whom it answers, its 0.999 and 0.95) keeps reading `name/heard`. A first
 sign with no final word was a near miss. `Hearings::rising` in `said.rs`;
 its test is `a_hearing_is_first_signed_as_it_begins_and_said_when_it_falls`.
 
+**A wordless call needs a sure hearing (`LAMP_NAME_WORDLESS_BAR=on`,
+#5385).** lamp-name never knows whether words follow the name, and goes on
+saying every hearing at `--least` on `name/heard`, unchanged. Its readers
+weigh it: the second route's worker asks a line that was only the name,
+with no words back, as the name only on a hearing at 0.99 or more
+([second-voice.md](second-voice.md)), and the body turns to a call only at
+0.99 or more ([body.md](body.md), "Turning to a call"). On lamp-c0a4, 82
+real calls scored 0.901 to 1.000 (5th percentile 0.906, median 0.964) and
+noise wakes 0.941 to 0.978; 4 real calls had no words back, 3 of them
+under 0.99. On lamp-75c9 on 9 Nov a hearing at 0.941 in the body's own
+move's sound, with no words, was turned to 8 ms later and answered as a
+call (Eighth's report on #5385).
+
 **Under its bars (#3923).** A line that starts with "Lamp" is sometimes
 heard as "Ma'am, …" or "Blake, …", and its run of scores reaches neither
 bar. Whatever the switches are, a run of scores from 0.2

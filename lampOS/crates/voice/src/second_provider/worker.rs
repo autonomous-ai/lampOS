@@ -4471,6 +4471,39 @@ pub fn serve(
                 );
             }
         }
+        // A line that was only the lamp's name, with no words back, is a
+        // call only on a sure hearing (`LAMP_NAME_WORDLESS_BAR`, #5385).
+        if crate::second_provider::wordless_call::on(
+            std::env::var(crate::second_provider::wordless_call::ENVIRONMENT)
+                .ok()
+                .as_deref(),
+        ) {
+            match files
+                .bus_root
+                .as_deref()
+                .map(crate::second_provider::wordless_call::Hearings::on)
+            {
+                Some(Ok(hearings)) => {
+                    eprintln!(
+                        "lamp-voice second: a line that is only the lamp's name, with no words back, is answered as a call only when lamp-name heard it at {} or more (LAMP_NAME_WORDLESS_BAR)",
+                        crate::second_provider::wordless_call::BAR
+                    );
+                    let hearings = Mutex::new(hearings);
+                    engine = engine.holding_a_wordless_call(Arc::new(move |window| {
+                        hearings
+                            .lock()
+                            .ok()
+                            .and_then(|mut heard| heard.best(window))
+                    }));
+                }
+                Some(Err(why)) => eprintln!(
+                    "lamp-voice second: a wordless call is answered as before: lamp-name's hearings cannot be taken from the bus: {why} (LAMP_NAME_WORDLESS_BAR)"
+                ),
+                None => eprintln!(
+                    "lamp-voice second: a wordless call is answered as before: no bus to read lamp-name's hearings from (LAMP_NAME_WORDLESS_BAR)"
+                ),
+            }
+        }
         // In a busy room, a line going on waits for the Policy (#1522), as
         // on the Live route: with the rule and the bus.
         if files.going_on_asks
