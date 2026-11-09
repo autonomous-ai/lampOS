@@ -125,7 +125,7 @@ when it is idle as `harness reply` does (openharness#2157, the person's
 `--reply-named` (off unless set; #5535, the owner, 9 Nov) hands the work
 to a session the person names ("go into the docs session and also do
 this"), never a new one. The tasks request `prepare` takes an optional
-`session`, the session's name as the person said it, and it goes into the launch, so the
+`session`, the session as the person said it (its name, or what it worked on), and it goes into the launch, so the
 yes is to that session (`Launch::session`, absent when none was named;
 a store holding such a task is schema 5). After the yes and the machines
 preflight, `Cli::reply_named` lists that computer's sessions with `harness
@@ -135,8 +135,26 @@ the words said, compared on letters and digits only ("Docs-Update",
 "docs update"); when no row is that, a row where each word said begins
 one of the name's or folder's words, in order (three letters or more in
 all: "docs" fits "Docs-Update", "api" never fits "rapid-prototype", the
-Reviewer-lead's P2 on #5779). Words around the name ("the docs one") are
-not stripped, so the voice sends the name alone. The words are typed in with `harness reply
+Reviewer-lead's P2 on #5779). When neither fits, the session is found by
+what it worked on (the owner, 9 Nov: a person remembers the work, never a
+session's name, which for one the lamp started is `lamp-<hex>`, or its
+id): the words said, less the ones that only say which one ("the", "one",
+"session", "earlier", "that", … `NOT_THE_WORK`), against each row's
+`asks` and `about` (never its name or folder, which only the rule above
+reads, so "client api" never finds "Fix the API client"). A word said is held when a row's word is the
+same, or one begins the other and the shorter has four letters or more
+("book" for "books.py"; "app" only for "app"). Rows holding at least half
+of the words and the most of them fit, live ones before stopped ones, so
+"the book program one" finds the session whose `about` is "I wrote
+books.py, a short command-line program for keeping a reading list", and
+two as good are `session_ambiguous`. Harness fills `asks` (the last two
+prompts) and `about` (the last recaps) only for a live session with a
+finished turn, within 3 s, for the first 40 rows; a stopped row, or one
+with no turn ended yet, is found by its name or folder alone. A session
+the lamp started keeps the `lamp-<hex>` it was given with `--name`, which
+Harness never replaces with the agent's title. `harness route` was tried for this
+and not used: on lamp-c0a4 on 9 Nov it took 6.6–18.6 s a call and called
+"add a search feature to the reading list book program" new work. The words are typed in with `harness reply
 --machine <id> <agent> --json -- <task>`, which Harness takes for a live,
 idle session behind the person's `programs-reply` switch. Nothing is
 routed, the engine is not asked about (`--engines-ready`, a known
@@ -158,26 +176,26 @@ refusal), and nothing is started new in any case:
   128 bytes or hold a control character are refused (`bad_session` at
   `prepare`, `invalid_session` at launch).
 - **Tests:** `tests/harness.rs`
-  `with_reply_named_a_named_session_is_typed_into_and_never_started_new`;
+  `with_reply_named_a_named_session_is_typed_into_and_never_started_new`,
+  `with_reply_named_a_session_is_found_by_what_it_worked_on`;
   `engine::tests::a_store_with_a_named_session_is_written_as_schema_five`.
 - **The voice's side** (off unless `LAMP_TASKS_REPLY_NAMED=on`, the
   provider worker's `--tasks-reply-named`, last of the tasks flags; it
   needs only the tasks part): `start_agent_task` takes an optional
-  `session`, described as "Only if the person named one of their sessions
-  to give this to ("the docs session"): its name as they said it. Never
-  guessed, never from the work." It is trimmed and sent as `prepare`'s
+  `session`, described as "Only if the person means earlier work, not a
+  new session: how they said it, its name or what it worked on ("the book
+  program one"). Never guessed." It is trimmed and sent as `prepare`'s
   `session`; blank is none, and words over 128 bytes or with a control
   character prepare nothing and the model is told to ask which session.
   The answer's `where`, which the read-back says, is "<who>, in the
   session "…" on <computer>, not a new one". The session is kept with the
-  task waiting for its yes: with `LAMP_TASKS_ONE_YES`, a read-back said in
-  words must say the session's words too, exactly and in order, every
-  one kept and split as the tasks part splits a name (letters and digits,
-  an apostrophe splitting a word), never by stem ("file" is not "files",
-  "api" is not "the api": Harness may find each as another session),
-  and taken out before the task's words are looked for, so a word the task
-  has too is said twice; otherwise a yes to it starts nothing (the
-  Reviewer-lead's P2 on #5784 and P3 on its READ-OK, Reviewer-three's P2); a session of only filler words ("the
+  task waiting for its yes. With `LAMP_TASKS_ONE_YES`, a yes in the turn
+  that prepared it never starts a task for a named session, whatever the
+  read-back said: which session a line said can't be told from its words
+  ("docs" inside "the docs archive session" is not the "docs" session,
+  and Harness may hold both), so it always waits for a second yes, to the
+  read-back of `start_agent_task`'s answer, whose `where` says the session
+  as prepared (the Reviewer-lead's P2 on #5784, Reviewer-three's P2); a session of only filler words ("the
   that") prepares nothing and the model is told to ask; with `LAMP_TASKS_CORRECT`, an ask that
   changes only the session is a correction and replaces the one waiting. A
   session named for Devin's cloud is refused before anything is asked of
@@ -187,7 +205,7 @@ refusal), and nothing is started new in any case:
   busy routed pick; the other codes above are told as a plain failure.
   Tests: `agent_tasks::tests::a_named_session_is_sent_with_the_task_only_with_the_switch`,
   `agent_tasks::tests::the_reply_named_switch_is_on_only_with_the_tasks_part_and_adds_session`,
-  `agent_tasks::tests::a_read_back_must_say_the_named_session`,
+  `agent_tasks::tests::a_task_for_a_named_session_never_starts_on_one_yes`,
   `agent_tasks::tests::another_session_is_a_correction_and_devins_cloud_takes_none`,
   `task_news::tests::a_busy_named_session_is_told_as_busy_and_its_other_ends_as_a_failure`.
 
