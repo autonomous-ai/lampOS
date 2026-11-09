@@ -2351,3 +2351,22 @@ fn a_skip_while_teaching_the_call_moves_the_walk_on() {
     assert_eq!(notes, [HOW_YOU_SOUND_SKIPPED]);
     assert_eq!(walk.pending().invitations.len(), 0);
 }
+
+/// The Reviewer-lead's P2 on #5809: on the shipped order "how you sound"
+/// is the last step, so its skip says its own line and then the walk's
+/// closing line, never the skip alone.
+#[test]
+fn a_skip_of_the_last_step_still_ends_with_the_closing_line() {
+    let store = Store::new(None);
+    let mut walk = store.teaching(S);
+    walk.definition =
+        Arc::new(skill::parse(include_str!("../../../../skills/onboarding/skill.toml")).unwrap());
+    assert_eq!(walk.definition.order.last(), Some(&Step::HowYouSound));
+    walk.finish(Step::Touch, Outcome::Done, None, S);
+    walk.drain_storage_for_test(S);
+    offer(&mut walk, 10 * S);
+    report_skip(&walk);
+    let notes = settle(&mut walk, 20 * S);
+    assert_eq!(outcome(&walk), Some(Outcome::Skipped));
+    assert_eq!(notes, [HOW_YOU_SOUND_SKIPPED, skill::PREFERENCES_DONE]);
+}
