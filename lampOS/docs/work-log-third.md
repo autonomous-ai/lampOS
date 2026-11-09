@@ -1,3 +1,21 @@
+## 2026-11-09 — train 756 local face integration complete
+
+- Context `170cf2d1c`: gate exited 0, including 146 functional tests;
+  follow-up held_save suite passed 14/0, total 160 focused cases. Strict
+  14-package Clippy, workspace build, formatting and docs pass. One manual
+  timing case ignored. No full local suite all-pass or device claim.
+- Current-head Linux Clippy green: context 42633304544 and adapter
+  42633295209. Docs green: 42633304501 and 42633295622. Native ARM64
+  42633304754 / 42633295359 remain running.
+- Fourth is composing #5856/#5858 with #5792 and both face patches on
+  train756, adding face speech tests before the two predicate changes
+  (Queue 6742341337). Shared the exact context delta and local evidence
+  in 6742521803; independent scoped verdict and PM counting remain open.
+- Rewrote both PR bodies around final behavior, current heads, explicit
+  dependencies and bounded evidence. Removed accumulating carry chronology;
+  older full-local failures and previous-head native evidence remain clear.
+  El's narrow context read remains active, no findings received.
+
 ## 2026-11-09 — train 755 native success and train 756 integration
 
 - Train755 exact native success: adapter `5be5e3745`, ARM64 42629588910,
