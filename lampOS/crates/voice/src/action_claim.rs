@@ -58,7 +58,11 @@
 //! pm.", "The light's staying on until ten.", "It'll stay on until ten."):
 //! "It stays on until you say otherwise.", "Keeping it on until ten would
 //! waste power." and "It's on until ten." (whose "it" may be anything) are
-//! none. A colour said
+//! none. For bare keeping/leaving, clock and decimal punctuation stays
+//! inside the time; a comma is not a claim's end. Advice after the time
+//! and a comma-led question are none. A trailing numeric period waits for
+//! lookahead or model completion because it may still begin a decimal;
+//! other word runs keep their existing streaming decisions. A colour said
 //! ("My light is blue now.") is still no claim, nor is any sentence the run
 //! opens that ends in a '?'. Beside any call a worded claim stands, so work
 //! another tool did stands ("I've added a reminder to your calendar."
@@ -774,7 +778,7 @@ fn words_of<'a>(after: &[Token<'a>]) -> Vec<Option<&'a str>> {
         .iter()
         .map(|token| match token {
             Token::Word(word) | Token::Part(word) => Some(*word),
-            Token::Mark(_) => None,
+            Token::Mark(_, _) => None,
         })
         .collect()
 }
@@ -853,11 +857,11 @@ fn said_clock(after: &[Token<'_>]) -> Option<Limit> {
     };
     let (mut minute, mut next) = (0, 1);
     let mut timed = pm.is_some();
-    if pm.is_none() && after.get(1) == Some(&Token::Mark(':')) {
+    if pm.is_none() && matches!(after.get(1), Some(Token::Mark(':', _))) {
         (minute, pm) = two_digits(2)?;
         (next, timed) = (3, true);
     } else if pm.is_none()
-        && after.get(1) == Some(&Token::Mark('.'))
+        && matches!(after.get(1), Some(Token::Mark('.', _)))
         && let Some(said) = two_digits(2)
     {
         // "10.30".
@@ -881,7 +885,7 @@ fn said_clock(after: &[Token<'_>]) -> Option<Limit> {
     // "am", "pm", "o'clock" or a day word, and never past twelve.
     let bare = match after.get(next) {
         None => true,
-        Some(Token::Mark(mark)) => *mark != '%',
+        Some(Token::Mark(mark, _)) => *mark != '%',
         Some(Token::Word(word) | Token::Part(word)) => {
             matches!(*word, "am" | "pm" | "o'clock") || DAY_WORDS.contains(word)
         }
@@ -1149,16 +1153,18 @@ const WORDED: [(&str, Claim); 65] = [
     // GO-159 (lamp-52e6, 11091): "keeping" said bare ("Got it, keeping
     // the light on until ten."), closing at its time so talk about keeping
     // it on ("Keeping it on until ten would waste power.") is none.
+    // These alone use a complete numeric time and its close: a clock's
+    // colon, a decimal point, or a comma must not end the claim early.
     (
-        "keeping|leaving * light|lights|lamp|it on|off until|till|for # $",
+        "keeping|leaving * light|lights|lamp|it on|off until|till|for @ ~",
         Claim::LightKept,
     ),
     (
-        "keeping|leaving * light|lights|lamp|it on|off until|till|for # am|pm|tonight|o'clock|minute|minutes|hour|hours $",
+        "keeping|leaving * light|lights|lamp|it on|off until|till|for @ am|pm|tonight|o'clock|minute|minutes|hour|hours ~",
         Claim::LightKept,
     ),
     (
-        "keeping|leaving * light|lights|lamp|it on|off for # a|an minute|hour $",
+        "keeping|leaving * light|lights|lamp|it on|off for @ a|an minute|hour ~",
         Claim::LightKept,
     ),
     // The state told as a reply ("The light is on until ten.", "Your light
@@ -1325,7 +1331,10 @@ enum Token<'a> {
     Word(&'a str),
     /// The last word while more text may come: it may yet grow.
     Part(&'a str),
-    Mark(char),
+    /// A mark and whether it can join adjacent numeric components: a
+    /// colon/period directly after a digit, then a digit or no text yet.
+    /// Other matchers ignore this flag and keep their existing rules.
+    Mark(char, bool),
 }
 
 /// `text` (already [`normalised`]) as words and marks.
@@ -1341,7 +1350,14 @@ fn tokens(text: &str, ended: bool) -> Vec<Token<'_>> {
             out.push(Token::Word(&text[from..at]));
         }
         if !c.is_whitespace() {
-            out.push(Token::Mark(c));
+            let numeric = matches!(c, ':' | '.')
+                && at > 0
+                && text.as_bytes()[at - 1].is_ascii_digit()
+                && text
+                    .as_bytes()
+                    .get(at + c.len_utf8())
+                    .is_none_or(u8::is_ascii_digit);
+            out.push(Token::Mark(c, numeric));
         }
     }
     if let Some(from) = start {
@@ -1363,11 +1379,15 @@ enum Slot<'a> {
     Any,
     /// The end, or a mark that is not a '?'.
     End,
+    /// A bare kept time's sentence end, never its comma or clock colon.
+    TimeEnd,
     /// A mark that is not a '?' (after a lead-in).
     Mark,
     /// A time: a word that opens with a digit, one of [`NUMBER_WORDS`],
     /// "tonight", "noon", "midnight", or "the night".
     Time,
+    /// A time whose numeric clock/decimal punctuation stays inside it.
+    ClockTime,
 }
 
 /// The number words a [`Slot::Time`] takes ("for ten minutes", "for half
@@ -1384,6 +1404,8 @@ fn slots(pattern: &str) -> Vec<Slot<'_>> {
             "*" => Slot::Any,
             "$" => Slot::End,
             "#" => Slot::Time,
+            "~" => Slot::TimeEnd,
+            "@" => Slot::ClockTime,
             words => Slot::Words(words),
         })
         .collect()
@@ -1410,8 +1432,8 @@ fn fits(slots: &[Slot<'_>], tokens: &[Token<'_>], at: usize, more: bool) -> Opti
     let Some((slot, rest)) = slots.split_first() else {
         for token in &tokens[at..] {
             match token {
-                Token::Mark('?') => return Some(false),
-                Token::Mark('.' | '!') => return Some(true),
+                Token::Mark('?', _) => return Some(false),
+                Token::Mark('.' | '!', _) => return Some(true),
                 _ => {}
             }
         }
@@ -1428,7 +1450,10 @@ fn fits(slots: &[Slot<'_>], tokens: &[Token<'_>], at: usize, more: bool) -> Opti
         },
         Slot::Any => any_of((0..=ANY_WORDS).map(|taken| {
             let taking = &tokens[at..tokens.len().min(at + taken)];
-            if taking.iter().any(|token| matches!(token, Token::Mark(_))) {
+            if taking
+                .iter()
+                .any(|token| matches!(token, Token::Mark(_, _)))
+            {
                 Some(false)
             } else if taking.iter().any(|token| matches!(token, Token::Part(_)))
                 || taking.len() < taken
@@ -1441,15 +1466,27 @@ fn fits(slots: &[Slot<'_>], tokens: &[Token<'_>], at: usize, more: bool) -> Opti
         Slot::End => match tokens.get(at) {
             None if more => None,
             None => Some(true),
-            Some(Token::Mark('?') | Token::Word(_) | Token::Part(_)) => Some(false),
-            Some(Token::Mark(_)) => Some(true),
+            Some(Token::Mark('?', _) | Token::Word(_) | Token::Part(_)) => Some(false),
+            Some(Token::Mark(_, _)) => Some(true),
+        },
+        Slot::TimeEnd => match tokens.get(at) {
+            None if more => None,
+            None | Some(Token::Mark('.' | '!', _)) => Some(true),
+            Some(Token::Mark(',', _)) if more && at + 1 == tokens.len() => None,
+            Some(_) => Some(false),
         },
         Slot::Mark => match tokens.get(at) {
             None => ran_out,
-            Some(Token::Mark('?') | Token::Word(_) | Token::Part(_)) => Some(false),
-            Some(Token::Mark(_)) => fits(rest, tokens, at + 1, more),
+            Some(Token::Mark('?', _) | Token::Word(_) | Token::Part(_)) => Some(false),
+            Some(Token::Mark(_, _)) => fits(rest, tokens, at + 1, more),
         },
-        Slot::Time => {
+        Slot::Time | Slot::ClockTime => {
+            if matches!(slot, Slot::ClockTime)
+                && let Some(Token::Word(word)) = tokens.get(at)
+                && word.bytes().all(|byte| byte.is_ascii_digit())
+            {
+                return fits_numeric_time(rest, tokens, at + 1, more);
+            }
             let one = |word: &str| {
                 word.starts_with(|c: char| c.is_ascii_digit())
                     || matches!(word, "tonight" | "noon" | "midnight")
@@ -1479,6 +1516,36 @@ fn fits(slots: &[Slot<'_>], tokens: &[Token<'_>], at: usize, more: bool) -> Opti
             }
         }
     }
+}
+
+/// Continue after a numeric time's first component. A trailing period
+/// may still begin a decimal while streaming, so wait for lookahead or
+/// model completion. The scan only advances; no new timer or I/O is used.
+fn fits_numeric_time(
+    rest: &[Slot<'_>],
+    tokens: &[Token<'_>],
+    mut after: usize,
+    more: bool,
+) -> Option<bool> {
+    while let Some(Token::Mark(mark @ (':' | '.'), true)) = tokens.get(after) {
+        match tokens.get(after + 1) {
+            Some(Token::Word(part)) if part.starts_with(|c: char| c.is_ascii_digit()) => {
+                after += 2;
+                // Keep the existing Time convention for compact suffixes
+                // such as 10:30pm or 1.5hours, then close at that token.
+                if !part.bytes().all(|byte| byte.is_ascii_digit()) {
+                    break;
+                }
+            }
+            Some(Token::Part(part)) if part.starts_with(|c: char| c.is_ascii_digit()) => {
+                return None;
+            }
+            None if more => return None,
+            _ if *mark == '.' => break,
+            _ => return Some(false),
+        }
+    }
+    fits(rest, tokens, after, more)
 }
 
 /// Whether `text` (already [`normalised`]) claims an action in other words
@@ -2151,6 +2218,75 @@ pub(crate) mod tests {
             "It's on until ten.",
         ] {
             assert_eq!(claim_as(reply, true, true), Some(None), "{reply:?}");
+        }
+    }
+
+    /// A clock's colon or a decimal point is not the end of a claim;
+    /// neither is a comma before a question or an explanation.
+    #[test]
+    fn bare_kept_time_advice_and_questions_never_claim_at_a_prefix() {
+        for reply in [
+            "Keeping it on until 10:30 would waste power.",
+            "Keeping it on until ten, would that help?",
+            "Keeping it on until 10:30, would that help?",
+            "Keeping it on until 10:30?",
+            "Okay, keeping it on until 10:30 would waste power.",
+            "Leaving it on for 1.5 hours wastes power.",
+            "Leaving it on for 1.5 hours, would that help?",
+            "Keeping it on until ten, as a habit, wastes power.",
+        ] {
+            assert_eq!(claim_as(reply, true, true), Some(None), "{reply:?}");
+            for end in reply.char_indices().map(|(at, _)| at).chain([reply.len()]) {
+                let prefix = &reply[..end];
+                assert!(
+                    !matches!(claim_as(prefix, false, true), Some(Some(_))),
+                    "premature claim at {prefix:?} in {reply:?}"
+                );
+                assert_eq!(claim_as(prefix, false, false), claim(prefix, false));
+            }
+        }
+    }
+
+    /// A real timed claim stays undecided while its numeric punctuation
+    /// or suffix is incomplete, rather than releasing its words early.
+    #[test]
+    fn bare_kept_clock_and_decimal_claims_keep_their_streamed_prefixes() {
+        for reply in [
+            "Keeping it on until 10:30.",
+            "Keeping it on until 10:30 pm.",
+            "Keeping it on until 10:30pm.",
+            "Got it, keeping the light on until 10:30.",
+            "Leaving it on for 1.5 hours.",
+            "Leaving it on for 1.5hours.",
+            "Keeping it on until noon.",
+            "Keeping it on for the night.",
+            "Leaving it on for half an hour.",
+            "Keeping it on until 10. 30 minutes should be enough.",
+            "Keeping it on until 10:30. 5 minutes should be enough.",
+        ] {
+            assert_eq!(
+                claim_as(reply, true, true),
+                Some(Some(Claim::LightKept)),
+                "{reply:?}"
+            );
+            for end in reply.char_indices().map(|(at, _)| at).chain([reply.len()]) {
+                let prefix = &reply[..end];
+                assert_ne!(claim_as(prefix, false, true), Some(None), "{prefix:?}");
+                assert_eq!(claim_as(prefix, false, false), claim(prefix, false));
+            }
+        }
+        for prefix in [
+            "Keeping it on until 10:",
+            "Keeping it on until 10:3",
+            "Keeping it on until 10:30.",
+            "Leaving it on for 1.",
+            "Leaving it on for 1.5 h",
+            "Keeping it on until ten,",
+        ] {
+            assert_eq!(claim_as(prefix, false, true), None, "{prefix:?}");
+        }
+        for prefix in ["Keeping it on until 10. ", "Keeping it on until 10:30. "] {
+            assert_eq!(claim_as(prefix, false, true), Some(Some(Claim::LightKept)));
         }
     }
 
