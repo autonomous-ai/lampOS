@@ -81,8 +81,9 @@ against the gaps above, not only the fake.
   `play` (and a build from before the hum, `sound`) with `refused`, "not
   routed yet: waits for …". Handle it; don't retry. `joints` takes `yaw` and
   `pitch` (degrees from home, as `body_info()` gives them, both named until
-  the body has said where it is); `roll`, `shoulder` and `elbow` are refused
-  until the body's goal stream.
+  the body has said where it is); `roll`, `shoulder` and `elbow` go as the
+  body's pose, only while the lamp stands (else `done` `dropped`, with why);
+  a build from before that refuses them, "not routed yet".
 - **A move must start and end at home** (all five joints 0) and last 1.5 to
   10 s, within each joint's reach and speed. The body's words say which
   frame was wrong.

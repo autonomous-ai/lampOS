@@ -2017,8 +2017,8 @@ Tests: `a_held_lamp_looks_where_its_holder_asks_and_comes_back_when_let_go`,
 `the_lease_door_aims_its_holders_look_and_says_when_it_is_there`.
 
 **A holder's pose** (`lease::Posing`, the protocol's `joints` past yaw and
-pitch; no lamp-control code sends it yet, so `joints` still refuses roll,
-shoulder and elbow until that routing lands): the head's roll from the found home and the shoulder and the elbow
+pitch; lamp-control sends a `joints`' roll, shoulder and elbow as it,
+docs/control.md): the head's roll from the found home and the shoulder and the elbow
 from the folded arm, in degrees, each rising with counts, as `get('body')`
 says them. A joint not named keeps where it is. The body takes it only while
 held and standing still at its full height (a lamp given `--stand`) with no
