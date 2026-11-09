@@ -9444,3 +9444,9 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - Train759 merged caca127702f; complete tree equals audited df8a9dea9e.
   PM reports11091 promoted23:01 (run42650114550), still older than this
   reconnect-repair train. No release mutation by Second.
+
+## 9 November 2026: motion reconnect HOLD lifted; MCP guide read
+
+- #5835 READ-OK `fff419e6dd87d6da91d308ff4ae944f0f9f215b7`, comment 6745052574. Original actual MCP/Relink/TLS old-move/new-say ID-2 collision now returns closed. The motion wait preserves ended_on with the connection generation captured before request. Crates, Python source and JS source stable patch IDs equal the previously read b74 head. My reconnect HOLD is lifted; default-changing approval, second read and physical evidence remain separate.
+- MCP 63 passed, exit 0. Full Python report 155 passed/7 skipped plus six missing exact-head repository-fixture checks passed: 161 distinct passes, one CLI-environment skip. JS report 96 passed/5 skipped plus three missing fixture checks passed: 99 distinct passes, two CAD/LFS skips. Full Python/JS execution handles were lost at compaction; their complete summaries survive. Focused fixture commands returned exit 0. No new Rust or physical measurement claim. Logs /tmp/second-5835-final-{collision,mcp,python,js}.log.
+- #5898 READ-OK `fbce1d09b7d2b3d6797c2736cd8ee2efef38643b`, comment 6744858006. Exact-source guide tests 7 passed. Guide keeps stable MCP reconnect limitation, qualifies single-connection say wait, and points to next-build #5873 repair. Owner device timings are not my acoustic measurement.
