@@ -9135,3 +9135,14 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   #5874 dd3f2c0f1 has 14,864 passed / 110 skipped; #5878 09444cb49
   has 14,872 passed / 111 skipped. Both exact-head success. These receipts
   do not supply the missing independent privacy reads.
+
+## 2026-11-09 — Second: body tag follow-up and host composition
+
+- #5880 READ-OK restated at 28667a113f: production unchanged, tag wording
+  and four malformed-tag assertions only; focused test passes. Null is
+  treated as absent, noted as a small wording qualifier.
+- Applied that body delta temporarily to #5855 476dbbe4ce. One independent
+  control test uses real Lease/Posing responses: greeting enables tags,
+  B's early refusal maps to request 42 and A's later cut to request 41.
+  Passed in-process; no socket/motor timing claim. Patch/tests removed;
+  both checkouts clean. Evidence comment 6741591552, saved composed probe.
