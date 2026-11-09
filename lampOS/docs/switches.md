@@ -1014,3 +1014,17 @@ base updater service using its managed `update/current` link. Other
 installations and older non-product manifests keep the off default. The
 settings allowlist, signed helper request and three-way local-edit policy
 are unchanged; see [updates](updates.md#product-service-units-and-settings-over-the-air).
+
+## Office Peek mode
+
+`LAMP_PEEK` accepts exactly `on` (existing full diagnostic views) or
+`sessions-only` (only projected session Turns). Unset and all other values
+are off. `sessions-only` never initializes a bus, watcher, unit scan or journal
+reader; its other views explicitly report unavailable. An older exact-on
+binary treats the new value as off. The dedicated office template is
+`deploy/units/lamp-peek.service`; it explicitly selects `sessions-only` but
+requires an authorized manual installation and enable, is outside `lampos.target`, and is absent from the
+product. Full mode retains the legacy crate-local template and its separate
+permissions. See [Peek](peek.md#turning-it-on-office-lamps). The authorized
+install/restart, readable Turns and unreadable private-file gate is still
+pending; no product-default change is proposed (#5262).

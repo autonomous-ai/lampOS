@@ -7,7 +7,7 @@ publish.workspace = true
 
 # A read-only page on an office lamp (#2141, docs/peek.md): the eyes' faces
 # as boxes, never pictures, the bus's counts and states, never words, and
-# the units. Off unless `LAMP_PEEK=on`, on 127.0.0.1 unless given a token,
+# the units. Explicit `on` or `sessions-only`; otherwise off. Loopback unless given a token,
 # and never in deploy/product.
 [[bin]]
 name = "lamp-peek"

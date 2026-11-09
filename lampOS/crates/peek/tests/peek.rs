@@ -7,7 +7,7 @@ use lamp_msgs::{
 };
 use lamp_peek::{
     page,
-    serve::{self, Peek},
+    serve::{self, FullSources, Peek, Sources},
     units::UnitRow,
     watch::{self, Seen},
 };
@@ -97,11 +97,13 @@ impl Rig {
             thread::sleep(Duration::from_millis(5));
         }
         let peek = Arc::new(Peek {
-            bus: bus.clone(),
-            seen,
+            sources: Sources::Full(FullSources {
+                bus: bus.clone(),
+                seen,
+                units,
+            }),
             token: token.map(str::to_owned),
             sessions: root.join("sessions"),
-            units,
         });
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         listener.set_nonblocking(true).unwrap();
@@ -585,7 +587,10 @@ fn beyond_this_machine_without_a_token_it_does_not_start() {
     off.env_clear().env("LAMP_BUS_ROOT", &root);
     let (code, said) = ended(off);
     assert_eq!(code, Some(0), "{said}");
-    assert!(said.contains("off (LAMP_PEEK is not on)"), "{said}");
+    assert!(
+        said.contains("off (LAMP_PEEK is neither on nor sessions-only)"),
+        "{said}"
+    );
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -693,7 +698,11 @@ struct EventStream(BufReader<TcpStream>);
 
 impl EventStream {
     fn open(rig: &Rig) -> Self {
-        let mut stream = TcpStream::connect(("127.0.0.1", rig.port)).unwrap();
+        Self::open_port(rig.port)
+    }
+
+    fn open_port(port: u16) -> Self {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
         stream.set_read_timeout(Some(WAIT)).unwrap();
         write!(
             stream,
@@ -1048,4 +1057,330 @@ fn the_units_are_read_once_however_many_ask_at_once() {
         assert!(body.contains("lamp-voice.service"), "{body}");
     }
     assert_eq!(reads.load(Ordering::SeqCst), 1);
+}
+
+/// No Bus object, watcher, or system command is needed to run this server.
+struct SessionsRig {
+    root: PathBuf,
+    port: u16,
+    stop: Option<tokio::sync::oneshot::Sender<()>>,
+    serving: Option<thread::JoinHandle<()>>,
+    forbidden_calls: Arc<std::sync::atomic::AtomicUsize>,
+}
+impl SessionsRig {
+    fn new() -> Self {
+        use std::sync::atomic::AtomicUsize;
+        let root = PathBuf::from(format!("/tmp/lpk-sessions-only-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let forbidden_calls = Arc::new(AtomicUsize::new(0));
+        let (bus_calls, unit_calls) = (forbidden_calls.clone(), forbidden_calls.clone());
+        let sources = Sources::for_mode(
+            lamp_peek::Mode::SessionsOnly,
+            move || {
+                bus_calls.fetch_add(1, Ordering::SeqCst);
+                panic!("sessions-only constructed a Bus")
+            },
+            move || {
+                unit_calls.fetch_add(1, Ordering::SeqCst);
+                panic!("sessions-only constructed unit/journal readers")
+            },
+        )
+        .unwrap();
+        let peek = Arc::new(Peek {
+            sources,
+            token: Some(TOKEN.into()),
+            sessions: root.join("sessions"),
+        });
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (stop, stopped) = tokio::sync::oneshot::channel();
+        let serving = thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            runtime.block_on(async move {
+                let listener = tokio::net::TcpListener::from_std(listener).unwrap();
+                axum::serve(listener, serve::router(peek))
+                    .with_graceful_shutdown(async {
+                        let _ = stopped.await;
+                    })
+                    .await
+                    .unwrap();
+            });
+        });
+        Self {
+            root,
+            port,
+            stop: Some(stop),
+            serving: Some(serving),
+            forbidden_calls,
+        }
+    }
+    fn get(&self, path: &str, authenticated: bool) -> (u16, String) {
+        let mut stream = TcpStream::connect(("127.0.0.1", self.port)).unwrap();
+        stream.set_read_timeout(Some(WAIT)).unwrap();
+        let auth = if authenticated {
+            format!("Cookie: peek={TOKEN}\r\n")
+        } else {
+            String::new()
+        };
+        write!(
+            stream,
+            "GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n{auth}\r\n"
+        )
+        .unwrap();
+        let mut text = String::new();
+        stream.read_to_string(&mut text).unwrap();
+        (text.split(' ').nth(1).unwrap().parse().unwrap(), text)
+    }
+}
+impl Drop for SessionsRig {
+    fn drop(&mut self) {
+        let _ = self.stop.take().unwrap().send(());
+        self.serving.take().unwrap().join().unwrap();
+        let _ = fs::remove_dir_all(&self.root);
+    }
+}
+
+#[test]
+fn sessions_only_http_sse_missing_recovery_and_refresh_never_touch_other_sources() {
+    let rig = SessionsRig::new();
+    for path in VIEWS.into_iter().chain(["/events"]) {
+        assert_eq!(rig.get(path, false).0, 401, "{path}");
+    }
+    let (status, main) = rig.get("/", true);
+    assert_eq!(status, 200);
+    assert!(main.contains("sessions-only"));
+    assert!(main.contains("location.hash||'#turns'"));
+    assert_eq!(main.matches(page::SESSIONS_UNAVAILABLE).count(), 4);
+    for path in ["/cam", "/cam.svg", "/bus", "/bus?topic=voice", "/status"] {
+        let (status, body) = rig.get(path, true);
+        assert_eq!(status, 200, "{path}");
+        assert!(
+            body.contains("Unavailable in sessions-only mode"),
+            "{path}: {body}"
+        );
+    }
+    let mut stream = EventStream::open_port(rig.port);
+    let missing = stream.until(|parts| parts["turns"].contains("sessions are not available yet"));
+    for id in ["overview", "camera", "body", "health"] {
+        assert!(missing[id].contains(page::SESSIONS_UNAVAILABLE), "{id}");
+    }
+    assert!(!missing["turns"].contains("No turn"));
+    let session = rig.root.join("sessions/s1/metadata");
+    fs::create_dir_all(&session).unwrap();
+    let events = session.join("events-1.jsonl");
+    let recovered_at = Instant::now();
+    record(
+        &events,
+        r#"{"kind":"transcript","turn":731,"text":"PRIVATE_PEEK_CANARY"}"#,
+    );
+    record(
+        &events,
+        r#"{"kind":"answer_first_audio","turn":731,"after_decision_ms":117,"note":"PRIVATE_PEEK_CANARY"}"#,
+    );
+    let recovered = stream.until(|parts| parts["turns"].contains("117 ms"));
+    let recovery = recovered_at.elapsed();
+    assert!(
+        recovery <= Duration::from_secs(2),
+        "ordinary session recovery took {recovery:?}"
+    );
+    assert!(!recovered["turns"].contains("sessions are not available yet"));
+    assert!(
+        !recovered
+            .values()
+            .any(|html| html.contains("PRIVATE_PEEK_CANARY"))
+    );
+    let refreshed_at = Instant::now();
+    record(
+        &events,
+        r#"{"kind":"answer_first_audio","turn":732,"after_decision_ms":197}"#,
+    );
+    let refreshed = stream.until(|parts| parts["turns"].contains("197 ms"));
+    let refresh = refreshed_at.elapsed();
+    assert!(
+        refresh <= Duration::from_secs(2),
+        "ordinary metadata refresh took {refresh:?}"
+    );
+    for id in ["overview", "camera", "body", "health"] {
+        assert!(refreshed[id].contains(page::SESSIONS_UNAVAILABLE), "{id}");
+    }
+    let hold = Unreadable::new(&events);
+    assert_eq!(
+        fs::File::open(&events).unwrap_err().kind(),
+        std::io::ErrorKind::PermissionDenied
+    );
+    let refused = stream.until(|parts| parts["turns"].contains("permission."));
+    assert!(refused["turns"].contains("Last read is stale."));
+    assert!(refused["turns"].contains("197 ms"));
+    assert!(
+        !refused
+            .values()
+            .any(|html| html.contains(rig.root.to_str().unwrap()))
+    );
+    drop(hold);
+    let restored_at = Instant::now();
+    record(
+        &events,
+        r#"{"kind":"answer_first_audio","turn":733,"after_decision_ms":297}"#,
+    );
+    let restored = stream.until(|parts| parts["turns"].contains("297 ms"));
+    let permission_recovery = restored_at.elapsed();
+    assert!(
+        permission_recovery <= Duration::from_secs(2),
+        "ordinary permission recovery took {permission_recovery:?}"
+    );
+    assert!(!restored["turns"].contains("permission."));
+    assert!(!restored["turns"].contains("Last read is stale."));
+    assert_eq!(rig.forbidden_calls.load(Ordering::SeqCst), 0);
+    println!(
+        "peek_sessions_only recovery_ms={} repeated_refresh_ms={} permission_recovery_ms={} target_ms=2000 boundary=file_append_to_SSE_metadata; bus_unit_factories=0",
+        recovery.as_millis(),
+        refresh.as_millis(),
+        permission_recovery.as_millis()
+    );
+}
+
+#[test]
+fn sessions_only_switch_preserves_off_and_network_token_rules_in_the_binary() {
+    let executable = env!("CARGO_BIN_EXE_lamp-peek");
+    for mode in ["invalid", "SESSIONS-ONLY", "sessions_only"] {
+        let output = Command::new(executable)
+            .env_clear()
+            .env("LAMP_PEEK", mode)
+            .env("LAMP_PEEK_LISTEN", "not-an-address")
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("off"));
+    }
+    for mode in ["on", "sessions-only"] {
+        let output = Command::new(executable)
+            .env_clear()
+            .env("LAMP_PEEK", mode)
+            .env("LAMP_PEEK_LISTEN", "0.0.0.0:8077")
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2));
+        assert!(String::from_utf8_lossy(&output.stderr).contains("no token"));
+    }
+}
+
+#[test]
+fn actual_sessions_only_binary_ignores_an_invalid_bus_root_and_shuts_down() {
+    struct Child(std::process::Child);
+    impl Drop for Child {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+    let root = PathBuf::from(format!("/tmp/lpk-no-bus-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("sessions/s1/metadata")).unwrap();
+    let poisoned_bus = root.join("not-a-bus-directory");
+    fs::write(&poisoned_bus, b"must never be opened as a Bus").unwrap();
+    record(
+        &root.join("sessions/s1/metadata/events-0.jsonl"),
+        r#"{"kind":"answer_first_audio","turn":811,"after_decision_ms":347}"#,
+    );
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    drop(listener);
+    let mut child = Child(
+        Command::new(env!("CARGO_BIN_EXE_lamp-peek"))
+            .env_clear()
+            .env("LAMP_PEEK", "sessions-only")
+            .env("LAMP_PEEK_LISTEN", address.to_string())
+            .env("LAMP_PEEK_SESSIONS", root.join("sessions"))
+            .env("LAMP_BUS_ROOT", &poisoned_bus)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap(),
+    );
+    let started = Instant::now();
+    loop {
+        if TcpStream::connect(address).is_ok() {
+            break;
+        }
+        assert!(
+            child.0.try_wait().unwrap().is_none(),
+            "sessions-only failed to start with an invalid Bus root"
+        );
+        assert!(started.elapsed() < WAIT, "sessions-only did not listen");
+        thread::sleep(Duration::from_millis(10));
+    }
+    let mut events = EventStream::open_port(address.port());
+    let parts = events.until(|parts| parts["turns"].contains("347 ms"));
+    for id in ["overview", "camera", "body", "health"] {
+        assert!(parts[id].contains(page::SESSIONS_UNAVAILABLE));
+    }
+    drop(events);
+    assert!(
+        Command::new("/bin/kill")
+            .args(["-TERM", &child.0.id().to_string()])
+            .status()
+            .unwrap()
+            .success()
+    );
+    let stopping = Instant::now();
+    loop {
+        if let Some(status) = child.0.try_wait().unwrap() {
+            assert!(status.success());
+            break;
+        }
+        assert!(stopping.elapsed() < WAIT, "sessions-only did not shut down");
+        thread::sleep(Duration::from_millis(10));
+    }
+    let mut full = Command::new(env!("CARGO_BIN_EXE_lamp-peek"));
+    full.env_clear()
+        .env("LAMP_PEEK", "on")
+        .env("LAMP_PEEK_LISTEN", address.to_string())
+        .env("LAMP_BUS_ROOT", &poisoned_bus);
+    // Full mode retains its existing lifecycle: the watcher error is joined
+    // after HTTP shutdown, rather than aborting the server at startup.
+    let mut full = Child(
+        full.stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap(),
+    );
+    let started = Instant::now();
+    loop {
+        if TcpStream::connect(address).is_ok() {
+            break;
+        }
+        assert!(full.0.try_wait().unwrap().is_none());
+        assert!(started.elapsed() < WAIT, "full mode did not listen");
+        thread::sleep(Duration::from_millis(10));
+    }
+    assert!(
+        Command::new("/bin/kill")
+            .args(["-TERM", &full.0.id().to_string()])
+            .status()
+            .unwrap()
+            .success()
+    );
+    let stopping = Instant::now();
+    loop {
+        if let Some(status) = full.0.try_wait().unwrap() {
+            assert_eq!(
+                status.code(),
+                Some(1),
+                "full watcher must report the invalid Bus root"
+            );
+            break;
+        }
+        assert!(stopping.elapsed() < WAIT, "full mode did not shut down");
+        thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(
+        fs::read(&poisoned_bus).unwrap(),
+        b"must never be opened as a Bus"
+    );
+    fs::remove_dir_all(root).unwrap();
 }

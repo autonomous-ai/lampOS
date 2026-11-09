@@ -1,0 +1,43 @@
+# Office-only projected Turns reader (#5262); never install in deploy/product.
+# Provision lamp-peek with primary group lamp-peek, no login and no other groups.
+# Its only extra group is lamp-session-readers, matching Voice and Records.
+# Fill @UNIT_ID@ and @PEEK_SHA256@ as README.md says. Installed/enabled only
+# by an authorized office operator. Remove old full-mode drop-ins first and
+# verify effective LAMP_PEEK=sessions-only; never use full mode on this account.
+[Unit]
+Description=lampOS peek (office session metadata only)
+ConditionHost=@UNIT_ID@
+ConditionPathExists=/var/lib/lampos-setup/done
+After=local-fs.target lamp-setup.service
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=lamp-peek
+Group=lamp-peek
+SupplementaryGroups=lamp-session-readers
+Slice=lampos-parts.slice
+Nice=10
+Environment=LAMP_PEEK=sessions-only
+Environment=LAMP_PEEK_SESSIONS=/var/lib/lampOS/voice/sessions
+# Loopback port 8077 by default. An authorized office network/port 80 drop-in
+# also needs LAMP_PEEK_LISTEN and LoadCredential=peek-token:...; see peek.md.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+ExecStart=/opt/lampOS/peek/@PEEK_SHA256@/lamp-peek
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+SyslogIdentifier=lamp-peek
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+# This reader uses files and HTTP only, never bus, journal or D-Bus sockets.
+RestrictAddressFamilies=AF_INET AF_INET6
+InaccessiblePaths=-/run/lampos-bus -/run/log/journal -/var/log/journal -/run/systemd/private -/run/dbus/system_bus_socket
+
+[Install]
+WantedBy=multi-user.target

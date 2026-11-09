@@ -5,7 +5,10 @@ what an office lamp sees and is doing. It came out of `where_you_sit` failing
 twice on lamp-52e6 on 20 Oct 2026. The cause was a person sitting to the side,
 and only a Mac's camera pointed at the lamp showed it.
 
-It is **off unless `LAMP_PEEK=on`**. It is **never in `deploy/product`**, and
+It is **off unless `LAMP_PEEK=on` or `LAMP_PEEK=sessions-only`**.
+The latter is a dedicated office account's projected Turns view; all other
+panels explicitly say unavailable, with no bus, watcher, unit scan or journal
+reader constructed. `on` retains the existing full diagnostic view. It is **never in `deploy/product`**, and
 **never on a person's lamp**: putting it there would loosen privacy, which is
 the owner's call.
 
@@ -76,8 +79,8 @@ responsive or cached unit-status read. The existing unit-status deadline
 can still delay an entire push by up to 10 s ([below](#what-status-costs));
 this is not a deadline for arbitrary filesystem stalls or a lamp timing
 claim. This status reporting grants no new filesystem permission. The dedicated
-reader policy is described below; the deployment unit and authorized lamp
-check remain separate parts of #2789.
+reader policy and office unit are described below; the authorized lamp
+check remains a separate gate of #5262.
 
 ### Session-reader access
 
@@ -157,15 +160,16 @@ it never repairs their permissions. Its refusal cannot undo exposure from
 an already unsafe external setup.
 
 This does not give the reader membership in `lampos` or authorize a product
-default. The dedicated account still needs a separate bus contract that
-excludes raw speech and private state before delivery. Peek currently filters
+default. Full bus views for a dedicated account still need a separate bus
+contract that excludes raw speech and private state before delivery. Peek currently filters
 raw `voice/heard` and `voice/said` payloads after receiving them, so a
 subscriber-only grant alone would not protect their contents. Its own socket
 must also prevent write/unlink access to another subscriber. The producer-side
 metadata view and its owner remain a separate decision for #2789. The
-own-account unit and an authorized lamp install/restart showing Turns plus an
-unreadable outside
-file remain separate acceptance steps. No physical acceptance is implied by
+new own-account unit therefore uses only `sessions-only`; other views stay
+unavailable pending that separate contract. An authorized lamp install/restart
+showing Turns plus an unreadable outside private file remains an acceptance
+step of #5262. No physical acceptance is implied by
 host permissions tests.
 
 ### Two sessions' stages side by side: `tools/day-stages.sh`
@@ -252,8 +256,65 @@ Tests: `tools/day-stages-test.sh`. Needs `jq`.
 
 ## Turning it on (office lamps)
 
-The unit is a template beside the crate, `crates/peek/lamp-peek.service`. It is
-filled in as `deploy/units/README.md` says, and is not part of
+### Dedicated projected-Turns account (#5262)
+
+`deploy/units/lamp-peek.service` is the office-only template. It explicitly
+sets `LAMP_PEEK=sessions-only` and runs as user/group `lamp-peek`, with only
+`lamp-session-readers` as an extra group. It is outside `lampos.target`, is
+never in `deploy/product`, and requires an authorized manual install/enable.
+The code still defaults off when its switch is unset. Older exact-on Peek
+binaries treat `sessions-only` as off, with no fallback to full mode.
+
+Provision the dedicated non-login account and primary group first. Verify
+its complete local group membership: systemd's `SupplementaryGroups` adds
+groups; it does not erase inherited membership. Do not add it to `lampos`,
+`systemd-journal`, audio/video or any private service group. Install compatible
+Records first, then set its root's `session_read_group` and Voice's
+`LAMP_SESSION_READ_GROUP` to `lamp-session-readers`, following the exact parent,
+root, sibling and ACL checks above. Use a fresh service-session root, or
+verify that every already-shared file contains only the producer projection;
+previously shared raw history is not redacted by this change. Never recursively
+chmod old sessions or widen their private files. Private health stays 0600.
+
+The unit makes the filesystem read-only, hides home/device/private temporary
+state, masks bus/journal/control socket paths, and permits only IPv4/IPv6
+sockets. It has no bus environment or writable bus directory. The account's
+DAC permissions remain the private-file boundary; this is not a filesystem
+containing only session files. Switching this unit to full mode is unsupported;
+its restrictions are retained even if a mistaken drop-in requests that mode.
+When replacing an older full-mode installation, remove or correct its old
+`LAMP_PEEK=on` drop-in before enabling this unit, and verify the effective
+systemd environment still selects `sessions-only`. Existing drop-ins take
+precedence over this template. Default HTTP is loopback port 8077, with the
+same Host/token checks as full mode. A network/port-80 drop-in needs the token and listen address below,
+while retaining `LAMP_PEEK=sessions-only`.
+
+Sessions-only reuses the shared blocking reader and one-second cache, and
+pushes Turns at one-second intervals. The host target is under two seconds
+from an ordinary metadata change or restored access to the corresponding SSE
+update; unlike full mode, no ten-second unit-status read can delay that push.
+Arbitrary filesystem stalls remain outside this target. On this Mac, five fresh
+processes reached the first numeric Turns SSE in 14.791 ms on first use,
+11.941 ms median subsequently (14.791 ms maximum), measured from process
+launch with a small projected metadata file already present. The final
+same-stream tests measured missing-file recovery 1,007 ms, repeated append
+1,006 ms, and restored-permission recovery 1,007 ms, from the filesystem change
+to the numeric Turns event. These measurements exclude browser paint and are
+not device results. The source/unit/HTTP controls do not establish Linux
+sandbox enforcement or device latency.
+
+For physical acceptance, an authorized tester installs the pinned kit and
+unit, restarts, and records fresh voice Turns through the dedicated account.
+Verify the same account cannot read a known private file outside sessions,
+health, an old private session, or journal/bus state. Repeat after a restart,
+confirm the non-Turns panels say unavailable, and measure first and subsequent
+Turns updates and recovery from denied/missing access. No such lamp result is
+claimed here; use the normal kit authorization and posted slot.
+
+### Existing full diagnostic account
+
+The legacy unit is a template beside the crate,
+`crates/peek/lamp-peek.service`. It is filled in as `deploy/units/README.md` says, and is not part of
 `lampos.target`. A drop-in switches it on:
 
 ```ini

@@ -37,16 +37,40 @@ pub struct Glance<'a> {
     pub units: &'a [UnitRow],
 }
 
+/// Why a source is deliberately absent, rather than empty or healthy.
+pub const SESSIONS_UNAVAILABLE: &str =
+    "Unavailable in sessions-only mode; this source is not read.";
+
+pub fn unavailable(source: &str) -> String {
+    format!(
+        "<p class=\"stale\">{}: {SESSIONS_UNAVAILABLE}</p>",
+        escape(source)
+    )
+}
+
 /// The page itself: the sidebar and an empty place for each section, which
 /// the stream fills.
 pub fn main_page() -> String {
+    main_page_for(false)
+}
+
+pub fn sessions_main_page() -> String {
+    main_page_for(true)
+}
+
+fn main_page_for(sessions_only: bool) -> String {
     let mut nav = String::new();
     let mut sections = String::new();
     for (id, name) in SECTIONS {
         let _ = write!(nav, "<a href=\"#{id}\">{name}</a>");
+        let initial = if sessions_only && id != "turns" {
+            unavailable(name)
+        } else {
+            "waiting for the lamp...".to_owned()
+        };
         let _ = write!(
             sections,
-            "<section id=\"{id}\"><h2>{name}</h2><div id=\"{id}-now\">waiting for the lamp...</div></section>"
+            "<section id=\"{id}\"><h2>{name}</h2><div id=\"{id}-now\">{initial}</div></section>"
         );
     }
     let ids = SECTIONS
@@ -54,15 +78,21 @@ pub fn main_page() -> String {
         .map(|(id, _)| format!("'{id}'"))
         .collect::<Vec<_>>()
         .join(",");
+    let start = if sessions_only { "turns" } else { "overview" };
+    let mode = if sessions_only {
+        "read only · sessions-only"
+    } else {
+        "read only"
+    };
     format!(
         "<!doctype html><html><head><meta charset=\"utf-8\"><title>lamp-peek</title>\
          <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>{STYLE}</style></head>\
-         <body><nav><b>lamp-peek</b>{nav}<span class=\"small\">read only</span>\
+         <body><nav><b>lamp-peek</b>{nav}<span class=\"small\">{mode}</span>\
          <a href=\"/bus\">bus</a><a href=\"/status\">units</a></nav><main>{sections}</main>\
          <script>(function(){{var ids=[{ids}];var es=new EventSource('/events');\
          ids.forEach(function(id){{es.addEventListener(id,function(e){{\
          document.getElementById(id+'-now').innerHTML=e.data;}});}});\
-         function show(){{var at=(location.hash||'#overview').slice(1);\
+         function show(){{var at=(location.hash||'#{start}').slice(1);\
          if(ids.indexOf(at)<0){{at='overview';}}\
          ids.forEach(function(id){{document.getElementById(id).hidden=id!==at;}});\
          document.querySelectorAll('nav a').forEach(function(a){{\
