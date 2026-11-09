@@ -9,7 +9,7 @@ from lampos.errors import LampError
 
 async def main():
     async with await Lamp.connect() as lamp:
-        last = 0.0
+        last = float("-inf")  # never greeted: monotonic time can be under 60 s just after boot
 
         async def arrived(event):
             nonlocal last

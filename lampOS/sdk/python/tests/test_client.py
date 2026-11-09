@@ -2042,3 +2042,82 @@ def test_the_volume_needs_the_speak_grant(tmp_path):
                     assert refused.value.code == "no_grant"
 
     run(go())
+
+
+# Every example but the tour (which has its own test), run from sdk/python as
+# the README runs it, against a fake lamp that grants everything: its
+# arguments, the event it waits for (said once it has subscribed), the ops it exists to send, and the
+# one refusal it may print: `look` at a face is not in this release
+# (docs/control.md), so follow.py asks and is told so. A new example needs its
+# row, so none is left untried. One that saves files runs in the test's own
+# folder instead (WRITES_FILES), so nothing is left in the repository.
+WRITES_FILES = {"camera.py"}
+EXAMPLE_RUNS = {
+    "air.py": ([], "air", ("get", "light")),
+    "ask_the_person.py": ([], None, ("turn.start",)),
+    "camera.py": (["1"], None, ("camera.snapshot", "camera.stream")),
+    "ci_light.py": (["pass"], None, ("light",)),
+    "follow.py": ([], "arrived", ("lease.take", "look"), "not now: refused: not in this release: look at a face or a name"),
+    "follow_hand.py": ([], "hand", ("lease.take", "look")),
+    "greet.py": ([], "arrived", ("gesture",)),
+    "phrase.py": ([], "phrase", ("light", "gesture")),
+    "pomodoro.py": ([], None, ("light",)),
+    "push_skill.py": (["../examples/hello-skill"], None, ("skill.push",)),
+    "ring_walk.py": (["50"], None, ("light", "stop")),
+}
+
+
+def test_every_example_runs_against_a_fake_lamp_and_sends_what_it_is_for(tmp_path):
+    """A refused call an example only prints (`not now: …`) or a handler's
+    error would pass a compile check; here each example must reach its ops."""
+    import os
+    import signal
+    import sys
+
+    from lampos.testing import hand_track
+
+    examples = Path(__file__).resolve().parents[1] / "examples"
+    assert {path.name for path in examples.glob("*.py")} - {"tour.py"} == set(EXAMPLE_RUNS)
+    nudges = {
+        "air": lambda fake: fake.set_air(pm2_5=41.0, co2_ppm=1350, feel="stuffy"),
+        "arrived": lambda fake: fake.emit("person.arrived", count=1, near=0.3),
+        "hand": lambda fake: fake.emit_hand_track(hand_track("wave", seconds=1.0)),
+        "phrase": lambda fake: fake.emit("phrase.heard", phrase="good night lamp"),
+    }
+
+    async def one(name, home):
+        args, nudge, ops, *refusal = EXAMPLE_RUNS[name]
+        async with FakeLamp(grants=tuple(schema.grants())) as fake:
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, keyring=Keyring(home))
+            ran = await asyncio.create_subprocess_exec(
+                sys.executable, str(examples / name), *args, cwd=home if name in WRITES_FILES else examples.parent,
+                env={**os.environ, "LAMPOS_HOME": str(home), "PYTHONUNBUFFERED": "1"},
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+            )
+            said = asyncio.ensure_future(ran.communicate())
+            deadline = asyncio.get_running_loop().time() + 15
+            if nudge:
+                while not fake.asked("subscribe") and not said.done():
+                    assert asyncio.get_running_loop().time() < deadline, name
+                    await asyncio.sleep(0.01)
+                await nudges[nudge](fake)
+            while not all(fake.asked(op) for op in ops) and not said.done():
+                if asyncio.get_running_loop().time() > deadline:
+                    break
+                await asyncio.sleep(0.02)
+            # A moment for what it prints after its last op, then it is stopped.
+            if not said.done():
+                await asyncio.sleep(0.5)
+            if not said.done():
+                ran.send_signal(signal.SIGTERM)
+            out = (await said)[0].decode()
+            assert "Traceback" not in out, (name, out)
+            assert ("not now" not in out) if not refusal else (refusal[0] in out), (name, out)
+            assert ran.returncode in (0, -signal.SIGTERM), (name, ran.returncode, out)
+            for op in ops:
+                assert fake.asked(op), (name, op, out)
+
+    async def go():
+        await asyncio.gather(*(one(name, tmp_path / name) for name in sorted(EXAMPLE_RUNS)))
+
+    run(go())
