@@ -19,8 +19,21 @@ async fn cut_while_writing(
     first: ToolCall,
     delay: Duration,
 ) -> (Vec<Message>, Vec<String>, Vec<Value>) {
+    cut_again_while_writing(first, delay, 1).await
+}
+
+/// [`cut_while_writing`], with `cuts` wordless lines, each cutting the one
+/// before it while the call is still awaited; the last answers the words.
+async fn cut_again_while_writing(
+    first: ToolCall,
+    delay: Duration,
+    cuts: u64,
+) -> (Vec<Message>, Vec<String>, Vec<Value>) {
+    let heard = std::iter::once(Ok("Go ahead and send it.".to_owned()))
+        .chain((0..cuts).map(|_| Ok(String::new())))
+        .collect();
     let script = Arc::new(Script {
-        heard: Mutex::new([Ok("Go ahead and send it.".to_owned()), Ok(String::new())].into()),
+        heard: Mutex::new(heard),
         chats: Mutex::new(
             [
                 vec![Ok(ChatEvent::ToolCalls(vec![first])), Ok(ChatEvent::Done)],
@@ -75,11 +88,21 @@ async fn cut_while_writing(
         }
         let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
     }
-    // A wordless line begins, cuts the turn, and hears no words.
-    engine.submit(start(2));
-    engine.retire_through(1);
-    engine.submit(audio(2, 1));
-    engine.submit(end(2));
+    // A wordless line begins, cuts the turn, and hears no words; each next
+    // one cuts the one before it, the call's answer still not come.
+    for line in 2..=cuts + 1 {
+        if line > 2 {
+            let by = tokio::time::Instant::now() + Duration::from_millis(100);
+            while tokio::time::Instant::now() < by {
+                let _ = tokio::time::timeout_at(by, engine.next()).await;
+            }
+        }
+        engine.submit(start(line));
+        engine.retire_through(line - 1);
+        engine.submit(audio(line, 1));
+        engine.submit(end(line));
+    }
+    let last = cuts + 1;
     let mut said = Vec::new();
     loop {
         let event = tokio::time::timeout(Duration::from_secs(5), engine.next())
@@ -87,11 +110,11 @@ async fn cut_while_writing(
             .expect("the held line's turn ends");
         match event {
             ProviderOutput::Transcript {
-                request: Some(2),
+                request: Some(request),
                 text,
                 ..
-            } if !text.is_empty() => said.push(text),
-            ProviderOutput::TurnComplete { request: 2, .. } => break,
+            } if request == last && !text.is_empty() => said.push(text),
+            ProviderOutput::TurnComplete { request, .. } if request == last => break,
             _ => {}
         }
     }
@@ -174,6 +197,40 @@ async fn a_prepare_cut_in_flight_is_answered_as_before() {
         writes.len(),
         2,
         "the held line's own write runs: {writes:?}"
+    );
+    assert_eq!(said, ["It's in your Drive now."]);
+}
+
+/// The HOLD on #5863: a second wordless line cuts the first held one while
+/// it still waits for the send's answer. The last line is still told the
+/// write was sent, given its result, and runs no `service_write`.
+#[tokio::test]
+async fn a_send_cut_twice_before_its_answer_is_still_answered_as_sent() {
+    let send = call(
+        "c1",
+        crate::services::WRITE,
+        json!({"service": "google_drive", "send_id": "s1"}),
+    );
+    let (held, said, writes) = cut_again_while_writing(send, Duration::from_millis(600), 2).await;
+    assert!(
+        held.iter()
+            .any(|message| message.tool_call_id.as_deref() == Some("c1")
+                && message
+                    .words()
+                    .is_some_and(|told| told.contains("\"sent\":true"))),
+        "the send's sent result goes with the words: {held:?}"
+    );
+    assert!(
+        held.iter().any(|message| message.role == "system"
+            && message
+                .words()
+                .is_some_and(|note| note.contains("already sent"))),
+        "the model is told the write was sent: {held:?}"
+    );
+    assert_eq!(
+        writes,
+        [json!({"service": "google_drive", "send_id": "s1"})],
+        "the services saw the one send, nothing prepared again"
     );
     assert_eq!(said, ["It's in your Drive now."]);
 }
