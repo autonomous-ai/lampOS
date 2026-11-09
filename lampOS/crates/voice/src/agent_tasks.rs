@@ -162,7 +162,7 @@ pub const REPLY_NAMED_FLAG: &str = "--tasks-reply-named";
 /// (`lamp_tasks::harness::MOST_SESSION_BYTES`).
 const MOST_SESSION_BYTES: usize = 128;
 /// [`START`]'s `session` parameter with [`REPLY_NAMED_FLAG`].
-const SESSION: &str = "Only if the person named one of their sessions to give this to (\"the docs session\"): its name as they said it. Never guessed, never from the work.";
+const SESSION: &str = "Only if the person means earlier work, not a new session: how they said it, its name or what it worked on (\"the book program one\"). Never guessed.";
 /// Where the second route reads whether a line whose own words ask one of
 /// the staff by name to do something ("ask Claude Code to …") has its
 /// first chat round made to call [`START`] ([`named_ask`], #1722). `on`
@@ -1916,7 +1916,13 @@ const ALREADY_YES: &str = "The person has already said yes to this task as you s
 ///   said and whether it was cut) is within [`CONFIRM_WITHIN`], was not cut
 ///   (the Reviewer-lead's P3 on #5609), ends with a question, names who the
 ///   task was prepared for, and holds every one of the task's content
-///   words, each by a spoken word of the same stem ([`reads_back`]).
+///   words, each by a spoken word of the same stem ([`reads_back`]);
+/// - no session was named for it ([`REPLY_NAMED_FLAG`], #5535). Which
+///   session a read-back said can't be told from its words: "docs" said
+///   inside "the docs archive session" is not the "docs" session, and
+///   Harness may hold both. A task for a named session always waits for a
+///   second yes, to the read-back `start_agent_task` gives, whose `where`
+///   says the session as prepared (Reviewer-three's P2 on #5784).
 ///
 /// The guard that a yes comes only after a read-back stays: this rule only
 /// recognizes a read-back said in words, before the call.
@@ -1931,6 +1937,7 @@ fn yes_in_the_same_turn(
     heard
         && !crate::messages::is_text(request)
         && request == pending.request
+        && pending.session.is_none()
         && now.duration_since(pending.at) <= CONFIRM_WITHIN
         && words.is_some_and(plain_yes)
         && read_back.is_some_and(|(line, ago, cut)| {
@@ -1972,16 +1979,6 @@ fn plain_words(text: &str) -> Vec<String> {
                 .to_lowercase()
         })
         .filter(|word| !word.is_empty())
-        .collect()
-}
-
-/// The words of a session's name, or of a line it is looked for in, as the
-/// tasks part splits a name to match it (`lamp_tasks::harness` `words_of`):
-/// runs of letters and digits, lowercased, every one kept.
-fn name_words(text: &str) -> Vec<String> {
-    text.split(|c: char| !c.is_alphanumeric())
-        .filter(|word| !word.is_empty())
-        .map(str::to_lowercase)
         .collect()
 }
 
@@ -2164,11 +2161,7 @@ fn before_the_question(line: &str) -> &str {
 /// name, which `named` already holds, and "uninstall the codecs" still
 /// needs "codecs" said back. A read-back that
 /// is one question alone ("Shall Claude Code fix the tests?") reads back
-/// nothing, which costs a second yes. A session the person named
-/// ([`REPLY_NAMED_FLAG`], #5535) must be said back too, before the closing
-/// question, by its exact words in order: a yes to a line that never said
-/// it doesn't send the work into it (the Reviewer-lead's P2 on #5784,
-/// Reviewer-three's P2 on it). Only the one-yes rule
+/// nothing, which costs a second yes. Only the one-yes rule
 /// ([`yes_in_the_same_turn`]) reads it.
 fn reads_back(line: &str, pending: &Pending) -> bool {
     let words = plain_words(line);
@@ -2185,41 +2178,13 @@ fn reads_back(line: &str, pending: &Pending) -> bool {
             !name.is_empty() && joined.contains(&name)
         });
     let forms = name_forms(pending);
-    // With a session, the line is split as the tasks part splits a name
-    // (`lamp_tasks::harness` `words_of`: letters and digits, an apostrophe
-    // splitting a word, every word kept; the Reviewer-lead's P3 on #5784).
-    let split = if pending.session.is_some() {
-        name_words
-    } else {
-        plain_words
-    };
-    let said = without_first_form(split(before_the_question(line)), &forms);
+    let said = without_first_form(plain_words(before_the_question(line)), &forms);
     let task_words = without_address(
         plain_words(question_of(&pending.text).unwrap_or(&pending.text)),
         &forms,
     );
     let task = content_words(&task_words.join(" "));
-    // A session the person named is said back as where the work goes, not
-    // as task words: its words exactly, in order, never by stem, so "file"
-    // is not "files" and "api" is not "the api", which Harness may find as
-    // other sessions. The words that say it are taken out first, so a word
-    // the task has too ("the readme" session for "add a line to the
-    // readme") is said twice (the Reviewer-lead's P3 on #5784's READ-OK).
     let mut unused: Vec<&str> = said.iter().map(String::as_str).collect();
-    if let Some(session) = &pending.session {
-        let run = name_words(session);
-        let at = (!run.is_empty())
-            .then(|| {
-                unused
-                    .windows(run.len())
-                    .position(|said| said == run.as_slice())
-            })
-            .flatten();
-        let Some(at) = at else {
-            return false;
-        };
-        unused.drain(at..at + run.len());
-    }
     named
         && !task.is_empty()
         && task.iter().all(|word| {
@@ -3398,24 +3363,17 @@ pub(crate) mod tests {
     /// The Reviewer-lead's P2 on #5784: with a session named, a read-back
     /// that never said it is no read-back, so a yes to it doesn't start the
     /// task, and the work never goes into a session the lamp didn't say.
+    /// Reviewer-three's P2 on #5784: a task for a named session never
+    /// starts on a yes in the turn that prepared it, whatever the read-back
+    /// said, so a yes to "the docs archive session" can't send the work to
+    /// the "docs" session. The same line and yes start it with no session.
     #[test]
-    fn a_read_back_must_say_the_named_session() {
+    fn a_task_for_a_named_session_never_starts_on_one_yes() {
         let at = Instant::now();
         let now = at + Duration::from_secs(1);
-        let named = Pending {
-            session: Some("docs update".into()),
-            ..moon(at)
-        };
-        let unsaid = MOON_BACK;
-        let said = "Claude Code will write a two-line poem about the moon in the docs update session on your office computer. Shall I start it?";
-        assert!(reads_back(unsaid, &moon(at)));
-        assert!(!reads_back(unsaid, &named));
-        assert!(reads_back(said, &named));
-        let half = "Claude Code will write a two-line poem about the moon in the docs session. Shall I start it?";
-        assert!(!reads_back(half, &named));
-        let yes = |line: &str| {
+        let yes = |pending: &Pending, line: &str| {
             yes_in_the_same_turn(
-                &named,
+                pending,
                 9,
                 true,
                 Some("Yes."),
@@ -3423,70 +3381,26 @@ pub(crate) mod tests {
                 now,
             )
         };
-        assert!(!yes(unsaid));
-        assert!(yes(said));
-        // A session word the task has too is said back on its own.
-        let readme = Pending {
-            text: "Add a line to the readme".into(),
-            session: Some("readme".into()),
-            ..moon(at)
-        };
-        assert!(!reads_back(
-            "Claude Code will add a line to the readme. Shall I start it?",
-            &readme
-        ));
-        assert!(reads_back(
-            "Claude Code will add a line to the readme, in the readme session. Shall I start it?",
-            &readme
-        ));
-        // Reviewer-three's P2 on #5784: "file" said is not the "files"
-        // session prepared, whose words are taken exactly, never by stem.
-        let files = Pending {
-            session: Some("files".into()),
-            ..moon(at)
-        };
-        let file_line = "Claude Code will write a two-line poem about the moon in the file session. Shall I start it?";
-        assert!(!reads_back(file_line, &files));
-        assert!(!yes_in_the_same_turn(
-            &files,
-            9,
-            true,
-            Some("Yes."),
-            Some((file_line, Duration::from_secs(8), false)),
-            now,
-        ));
-        assert!(reads_back(
-            "Claude Code will write a two-line poem about the moon in the files session. Shall I start it?",
-            &files
-        ));
-        // Every word, filler too: "the api" needs "the api" said, not
-        // "api" alone, which Harness may find as another session.
-        let the_api = Pending {
-            session: Some("the api".into()),
-            ..moon(at)
-        };
-        assert!(!reads_back(
-            "Claude Code will write a two-line poem about the moon in your api session. Shall I start it?",
-            &the_api
-        ));
-        assert!(reads_back(
-            "Claude Code will write a two-line poem about the moon in your the api session. Shall I start it?",
-            &the_api
-        ));
-        // Split as the tasks part splits: "bob's notes" is "bob s notes".
-        let bobs = Pending {
-            session: Some("bob's notes".into()),
-            ..moon(at)
-        };
-        assert!(reads_back(
-            "Claude Code will write a two-line poem about the moon in Bob's notes. Shall I start it?",
-            &bobs
-        ));
-        // In order: "update docs" is not the "docs update" session.
-        assert!(!reads_back(
-            "Claude Code will write a two-line poem about the moon in the update docs session. Shall I start it?",
-            &named
-        ));
+        assert!(yes(&moon(at), MOON_BACK));
+        for (prepared, spoken) in [
+            ("files", "file"),
+            ("red blue", "blue red"),
+            ("docs", "docs archive"),
+            ("api", "the api"),
+            ("docs update", "docs update"),
+            ("readme", "readme"),
+        ] {
+            let pending = Pending {
+                session: Some(prepared.into()),
+                ..moon(at)
+            };
+            let line = format!(
+                "Claude Code will write a two-line poem about the moon in the {spoken} session on your office computer. Shall I start it?"
+            );
+            assert!(reads_back(&line, &pending), "{prepared}/{spoken}");
+            assert!(!yes(&pending, &line), "{prepared}/{spoken}");
+            assert!(!yes(&pending, MOON_BACK), "{prepared}");
+        }
     }
 
     const MOON_BACK: &str = "Claude Code will write a two-line poem about the moon on your office computer. Shall I start it?";
