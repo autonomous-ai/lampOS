@@ -9256,3 +9256,14 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   No omissions or changed conflict resolution found; no new train tests.
 - #5884 and #5870 remain at their held heads. Mobile confirms stale
   consent never resubmits an old tap; fresh person intent is required.
+
+## 2026-11-09 — Second: unchanged face rebases and reconnect draft blocker
+
+- #5874 5be5e3745d to 67fc27f358 and #5878's three-patch stack ending
+  e4869f92ed to 170cf2d1c9: range-diff equal throughout on train756 base.
+  Adapter dependency equals standalone #5874. No new tests or independent
+  privacy clearance; Second authored the initial adapter handoff.
+- #5873 still draft despite unchanged reviewed 1cc3ff2cc7 and all required
+  CI green. Author's READ ASK followed the already-posted restatement.
+  Linked that exact-head result and asked Nine to mark ready/nominate for
+  corrective train, comment 6742698525. No release or PR-state mutation.
