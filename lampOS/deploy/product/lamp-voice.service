@@ -577,6 +577,10 @@ Environment=LAMP_MEMORY_REPLACES=on
 # "Forget what I said about my bicycle" forgets just those things (#2176): on lamp-06c1 on 4 Nov (build 10012) both
 # bicycle things were forgotten by forget's about, and the coffee one was still found.
 Environment=LAMP_MEMORY_FORGET_ABOUT=on
+# A bare "forget that" right after the same person's keep forgets that keep, by its id in their scope, and past a
+# minute asks which (C88, #5022). The memory owner's call on 5 Nov, after lamp-06c1 answered "Lamp, forget that." 56 s
+# after Olivia's umbrella was kept in words, nothing forgotten, on two days running. Needs LAMP_MEMORY_DAYS above.
+Environment=LAMP_MEMORY_FORGET_JUST_KEPT=on
 # Recall's second version (#2176), with lamp-memory from the same build: on lamp-06c1 on 4 Nov (build 10012) "my"
 # alone found nothing (5 before), the drink order was found, and "last week" got a span answer (span=true).
 Environment=LAMP_MEMORY_RECALL_V2=on
