@@ -468,8 +468,8 @@ The lamp restarts on every update, which closes each connection. Plain
 
 | call | Python | JS | MCP | what it does | status |
 |---|---|---|---|---|---|
-| keep running | `await Lamp.keep_connected(setup)` | `await Lamp.keepConnected(setup, { signal })` | — | connects, runs `setup(lamp)` (subscribe, take leases), and connects again after each close, pausing 1, 2, 5, then 10 s while the lamp can't be reached; stops at once on `NotPaired`, `WrongLamp`, a refused hello, `no_grant`, or an error in `setup` | **next build** (#5833). Run on the customer build's lamp-control across 2 restarts: Python 3 connections; JS 3 setups, each within a second of the lamp being back |
-| lamp-mcp | — | — | the server itself | connects again after the lamp restarts and makes its event subscriptions again. A tool called while the lamp is away answers `closed`; the next one works. A tool still waiting when the connection ends (`lamp_say` or `lamp_start_turn` with `wait`, a body tool) ends `closed` at once: request numbers start over on the new connection, so its wait is never ended by another request's `done` | **next build** (in review). Run: `lamp_events` answered on 3 connections across 2 restarts |
+| keep running | `await Lamp.keep_connected(setup)` | `await Lamp.keepConnected(setup, { signal })` | — | connects, runs `setup(lamp)` (subscribe, take leases), and connects again after each close, pausing 1, 2, 5, then 10 s while the lamp can't be reached; stops at once on `NotPaired`, `WrongLamp`, a refused hello, `no_grant`, or an error in `setup` | works today (9 Nov 2026) on build 11048: across 2 restarts of the lamp's lamp-control, Python and JS each set up again 1.0–1.15 s after it listened again (3 setups each, its first `get` 2–9 ms) |
+| lamp-mcp | — | — | the server itself | connects again after the lamp restarts and makes its event subscriptions again. A tool called while the lamp is away answers `closed`; the next one works. A tool still waiting when the connection ends (`lamp_say` or `lamp_start_turn` with `wait`, a body tool) ends `closed` at once: request numbers start over on the new connection, so its wait is never ended by another request's `done` | **next build** (#5830, #5873). Run: `lamp_events` answered on 3 connections across 2 restarts |
 | today, by hand | `await lamp.wait_closed()` then connect again | `await lamp.closed()` | restart lamp-mcp | — | works today (10824, 9 Nov 2026) |
 
 Python:
@@ -810,11 +810,11 @@ Last verified 9 Nov 2026, on a test lamp running a customer build: 10824 unless 
 | Skill push on customer lamps | next build (#5819; push, list, remove and a revoke shown on a test lamp under the next build's unit, 9 Nov 2026) | stable 11048 refuses "skill push is not on this lamp" |
 | A move from poses (`move_poses`) | next build (#5817) | the lamp plays the move today |
 | Knowing when a motion ended (`wait=True`) | next build, lamp run pending | today it returns when the lamp takes it |
-| Reconnecting across the lamp's restarts | next build (#5833) | `keep_connected` |
+| Reconnecting across the lamp's restarts | works today (9 Nov 2026) | `keep_connected`; on build 11048, Python and JS set up again 1.0–1.15 s after each restart |
 | `joints` for roll, shoulder, elbow | next build (in review; a test lamp, lamp-built, 9 Nov 2026) | refused "not routed yet" on the customer build; the lamp must be standing |
 | The microphone stream, with the owner's consent | in development (draft #5839) | built and tested off the lamp; its lamp check is pending |
 | `look` and `joints` with `wait=True` return the body's own answer | in today's build (11048), lamp run pending | so a program sees when a conversation came first |
-| lamp-mcp's `lamp_say` waits until the line is said | in today's build (11048), lamp run pending | 10824 answered when the voice took the line; across a reconnect the wait can answer `said` wrongly until #5873 |
+| lamp-mcp's `lamp_say` waits until the line is said | works today (9 Nov 2026), on one connection | on build 11048, `said` came 6.0 s after asking for a 65-character line (without `wait`, `taken` in 15 ms). Across a reconnect, 11048 can still answer `said` wrongly; fixed in the next build (#5873) |
 | A brain hearing the person and owning the turn | planned | |
 | A partner's brain installed on an edition lamp | planned | |
 | `play` a recorded move by name | in development | refused "not routed yet: waits for client packages"; send it as `move` |
