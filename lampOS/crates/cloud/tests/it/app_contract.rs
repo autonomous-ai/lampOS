@@ -37,6 +37,9 @@ const READ: &[(&str, &str, Type)] = &[
     ("system.info", "host.hostname", Type::Text),
     // The owner's language (#4473), always said: `en` with no file.
     ("system.info", "host.language", Type::Text),
+    // The walk's end in Unix ms (#5812), said once the voice's heartbeat
+    // carries it: an app that missed `onboarding.done` opens Skills on it.
+    ("system.info", "onboarding_done_at", Type::Whole),
     ("volume.get", "volume", Type::Percent),
     ("volume.get", "raw", Type::Whole),
     ("volume.get", "max_volume", Type::Whole),
@@ -154,6 +157,22 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
     shows
         .publish_json(1, &Light::new(true, "warm", 1).unwrap())
         .unwrap();
+    // The voice's heartbeat, its walk ended (#5812).
+    let mut walk = ring
+        .publisher_declared(
+            lamp_msgs::OnboardingPending::TOPIC,
+            &lamp_msgs::OnboardingPending::declaration(),
+            "voice",
+        )
+        .unwrap();
+    walk.publish_json(
+        lamp_ipc::monotonic_us(),
+        &lamp_msgs::OnboardingPending {
+            done_at_unix_ms: Some(1_762_675_200_000),
+            ..Default::default()
+        },
+    )
+    .unwrap();
     let mut real = Real {
         places,
         bus: Some(Bus::new(&bus_root).unwrap()),
@@ -1223,6 +1242,8 @@ fn system_info_and_health_say_signed_out_only_while_the_bus_says_so() {
     };
     let said = |real: &mut Real, kind: &str| answer(real, kind, &Value::Null).unwrap().unwrap();
     assert!(said(&mut real, "system.info").get("account").is_none());
+    // No heartbeat from the voice: the walk's end is not known (#5812).
+    assert!(said(&mut real, "system.info").get("onboarding_done_at").is_none());
     assert!(said(&mut real, "lamp.health").get("account").is_none());
     let mut state = bus
         .publisher_declared(AccountState::TOPIC, &AccountState::declaration(), "cloud")

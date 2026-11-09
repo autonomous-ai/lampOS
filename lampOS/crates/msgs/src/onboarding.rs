@@ -43,6 +43,12 @@ pub struct OnboardingPending {
     /// leads by talk. Absent from an older voice: false.
     #[serde(default)]
     pub walk: bool,
+    /// When the setup walk handed out its done line, in Unix ms, as committed
+    /// in its progress file: kept through a redo, gone after a factory reset,
+    /// and absent for a walk set up before it was dated or not yet ended.
+    /// lamp-cloud tells the app once from it (`onboarding.done`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done_at_unix_ms: Option<u64>,
 }
 
 impl OnboardingPending {
@@ -143,5 +149,26 @@ mod tests {
         let giving: OnboardingPending =
             serde_json::from_str(&text.replace("privacy", "giving_way")).unwrap();
         assert_eq!(giving.invitations[0].step, OnboardingStep::GivingWay);
+    }
+
+    /// The walk's end date round-trips, is left out while unknown, and an
+    /// older voice's heartbeat without it reads as unknown.
+    #[test]
+    fn done_date_round_trips_and_is_absent_from_older_json() {
+        let pending = OnboardingPending {
+            done_at_unix_ms: Some(1_762_675_200_000),
+            ..OnboardingPending::default()
+        };
+        let text = serde_json::to_string(&pending).unwrap();
+        assert!(text.contains("\"done_at_unix_ms\":1762675200000"));
+        assert_eq!(
+            serde_json::from_str::<OnboardingPending>(&text).unwrap(),
+            pending
+        );
+        let unknown = serde_json::to_string(&OnboardingPending::default()).unwrap();
+        assert!(!unknown.contains("done_at_unix_ms"));
+        let old: OnboardingPending =
+            serde_json::from_str(r#"{"invitations":[],"walk":true}"#).unwrap();
+        assert_eq!(old.done_at_unix_ms, None);
     }
 }
