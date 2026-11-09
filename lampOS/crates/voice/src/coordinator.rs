@@ -7711,12 +7711,18 @@ fn conversation_with_gate_inner(
         // person to hold the head. Told before each poll; kept while the
         // walk hasn't read its progress yet, and between conversations,
         // where there is no walk to ask.
+        let under_way = onboarding
+            .as_ref()
+            .map_or(Some(false), crate::onboarding::Onboarding::under_way);
         if let Some(controls) = controls.as_mut()
-            && let Some(under_way) = onboarding
-                .as_ref()
-                .map_or(Some(false), crate::onboarding::Onboarding::under_way)
+            && let Some(under_way) = under_way
         {
             controls.set_onboarding(under_way);
+        }
+        // The model's replies drop the walk's step words while it is under
+        // way (#5809, [`crate::onboarding::model_words`]).
+        if let Some(under_way) = under_way {
+            crate::onboarding::set_under_way(under_way);
         }
         let walk_under_way = controls.as_ref().is_some_and(HandControls::onboarding);
         // Every turn in hand while the walk is under way, whichever way it

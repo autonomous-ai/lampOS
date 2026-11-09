@@ -1731,6 +1731,44 @@ impl Counter {
     }
 }
 
+/// `text` without the step words ([`Counter`], every language) that `line`
+/// does not say: anywhere in it, or cut off at its end ("Step three:").
+pub(super) fn without_step_words(text: &str, line: &str) -> String {
+    let languages = [
+        None,
+        Some(Language::Vietnamese),
+        Some(Language::Japanese),
+        Some(Language::Chinese),
+        Some(Language::Korean),
+    ];
+    let mut text = text.to_owned();
+    for language in languages {
+        // "Step one: " .. "Step nine: ", then "Last step: ".
+        let words = (1..=9)
+            .map(|at| Counter::Step {
+                at,
+                of: 10,
+                intro: false,
+            })
+            .chain([Counter::Step {
+                at: 1,
+                of: 1,
+                intro: false,
+            }]);
+        for counter in words {
+            let words = counter.said(language);
+            if line.contains(words.trim_end()) {
+                continue;
+            }
+            text = text.replace(&words, "");
+            if let Some(kept) = text.strip_suffix(words.trim_end()) {
+                text = kept.trim_end().to_owned();
+            }
+        }
+    }
+    text
+}
+
 /// "All done!" opening the walk's done line, with the owner's name when
 /// the walk knows it: "All done, Mia!" (#4080).
 pub(super) fn with_name(note: &str, name: Option<&str>) -> String {
