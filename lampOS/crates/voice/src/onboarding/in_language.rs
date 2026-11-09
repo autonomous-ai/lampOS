@@ -1050,6 +1050,61 @@ pub(super) const LINES: &[Line] = &[
         "刚才我们还没问到你的名字。现在试试吧。",
         "아까는 이름을 여쭤보지 못했어요. 지금 여쭤볼게요.",
     ]),
+    // #4080: petting and "Hey Lamp" taught (the lead, 9 Nov).
+    ("When you want me, say 'Hey Lamp' first. Try it now.", [
+        "Khi cần mình, bạn hãy nói 'Hey Lamp' trước nhé. Thử ngay bây giờ đi.",
+        "私を呼びたいときは、最初に「Hey Lamp」と言ってください。今、試してみてください。",
+        "想找我的时候，先说“Hey Lamp”。现在试试吧。",
+        "저를 부르고 싶을 땐 먼저 'Hey Lamp'라고 말해 주세요. 지금 해 보세요.",
+    ]),
+    ("Earlier we skipped saying 'Hey Lamp'. Let's try it now.", [
+        "Lúc nãy mình bỏ qua phần nói 'Hey Lamp'. Giờ mình thử nhé.",
+        "さっきは「Hey Lamp」を飛ばしました。今やってみましょう。",
+        "刚才我们跳过了说“Hey Lamp”。现在试试吧。",
+        "아까 'Hey Lamp'라고 말하는 단계를 건너뛰었어요. 지금 해 볼게요.",
+    ]),
+    ("I didn't catch that. Say 'Hey Lamp' once more.", [
+        "Mình chưa nghe rõ. Bạn nói 'Hey Lamp' thêm lần nữa nhé.",
+        "聞き取れませんでした。もう一度「Hey Lamp」と言ってください。",
+        "我没听清。再说一次“Hey Lamp”。",
+        "잘 못 들었어요. 'Hey Lamp'라고 한 번 더 말해 주세요.",
+    ]),
+    ("Got it. Just say 'Hey Lamp' whenever you want me.", [
+        "Rồi. Khi nào cần mình, bạn chỉ cần nói 'Hey Lamp'.",
+        "はい。用があるときは、いつでも「Hey Lamp」と言ってください。",
+        "好的。想找我的时候，说“Hey Lamp”就行。",
+        "좋아요. 저를 부르고 싶을 땐 언제든 'Hey Lamp'라고 말해 주세요.",
+    ]),
+    ("Try petting the top of my head.", [
+        "Bạn thử vuốt nhẹ đỉnh đầu mình xem.",
+        "私の頭のてっぺんをなでてみてください。",
+        "试着摸摸我的头顶吧。",
+        "제 머리 맨 위를 쓰다듬어 보세요.",
+    ]),
+    ("One more thing: try petting the top of my head.", [
+        "Còn một việc nữa: bạn thử vuốt nhẹ đỉnh đầu mình xem.",
+        "もう一つだけ。私の頭のてっぺんをなでてみてください。",
+        "还有一件事：试着摸摸我的头顶吧。",
+        "아, 아직 안 한 게 하나 있어요. 제 머리 맨 위를 쓰다듬어 보세요.",
+    ]),
+    ("Earlier we skipped petting my head. Let's try it now.", [
+        "Lúc nãy mình bỏ qua phần vuốt đầu. Giờ mình thử nhé.",
+        "さっきは頭をなでるところを飛ばしました。今やってみましょう。",
+        "刚才我们跳过了摸头。现在试试吧。",
+        "아까 제 머리를 쓰다듬는 단계를 건너뛰었어요. 지금 해 볼게요.",
+    ]),
+    ("I didn't feel that. Try petting the top of my head.", [
+        "Mình chưa cảm thấy. Bạn thử vuốt nhẹ đỉnh đầu mình xem.",
+        "感じませんでした。私の頭のてっぺんをなでてみてください。",
+        "我没感觉到。试着摸摸我的头顶吧。",
+        "방금은 느껴지지 않았어요. 제 머리 맨 위를 쓰다듬어 보세요.",
+    ]),
+    ("That feels nice.", [
+        "Dễ chịu quá.",
+        "気持ちいいです。",
+        "好舒服。",
+        "기분 좋아요.",
+    ]),
     ("Now I'll learn how you call me. When I stop talking, say 'Hey Lamp' from your seat, the way you'd get my attention. I'll ask until I've heard you three times.", [
         "Giờ mình sẽ học cách bạn gọi mình. Khi mình nói xong, bạn ngồi tại chỗ và nói 'Hey Lamp', như khi muốn gọi mình. Mình sẽ nhờ bạn cho đến khi nghe được ba lần.",
         "次は、呼びかけ方を覚えます。私が話し終えたら、座ったまま、呼びかけるように「Hey Lamp」と言ってください。三回聞こえるまでお願いします。",
