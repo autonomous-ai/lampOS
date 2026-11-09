@@ -432,6 +432,7 @@ mod tests {
                             trace.onboarding_storage.as_ref().unwrap().client(),
                             definition.clone(),
                         );
+                        walk.uncounted_for_test();
                         walk.drain_storage_for_test(4_000_000);
                         assert_eq!(
                             walk.tick(4_000_000, 4_000_000, true, false, face, true),
@@ -477,6 +478,7 @@ mod tests {
                         trace.onboarding_storage.as_ref().unwrap().client(),
                         definition.clone(),
                     );
+                    walk.uncounted_for_test();
                     walk.drain_storage_for_test(4_000_000);
                     assert_eq!(
                         walk.tick(4_000_000, 4_000_000, true, false, face, true),
