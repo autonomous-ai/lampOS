@@ -411,7 +411,14 @@ the model's own `setup_step` done ends it while the save is held: the model's
 done waits, and ends it done with the name only once the hold is over unless
 the face is saved first. A hold the voice lets go before its yes (a
 correction, another name, its 45 s) is posted too (`face_save_let_go`), and
-the step is no longer kept open for it; both sides read one bound
+the step is no longer kept open for it: it closes, done with the name only,
+by 20 s after the let-go (`LET_GO_CLOSE_US`), once the room has been quiet
+3 s, so the lamp's own retry line ("Look toward me and say it again", about
+10 s on) no longer pushes the close to 15 s after it (#5139: Fifth's row 6
+on 10441 closed about 25 s after the drop). A line the person says after
+the let-go (a yes, the name again) takes the step back to the usual face
+and name waits, so a retry that is answered is never cut off (test
+`a_let_go_face_save_closes_who_you_are_within_20_s`); both sides read one bound
 (`HELD_SAVE_FOR` is `FACE_SAVE_HELD_US`). The voice's second worker posts that
 let-go, so it is given `LAMP_ONBOARDING` and `LAMP_ONBOARDING_FILE`, the
 exact `on` and an absolute path, and no other worker is
