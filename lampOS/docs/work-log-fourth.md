@@ -1,3 +1,11 @@
+## 2026-11-10 06:56 ICT — fixture assertion corrected; earlier enrollment boundary held
+
+Make-skill fixture attempt2 passed workspace formatting (45.485 s) and strict all-target workspace Clippy (314.630 s), then stopped at focused tests:25 passed/one failed/zero ignored,11.19 s body. Discovery served exactly one genuine chat successfully; the new test checked response key name instead of made. Corrected only that assertion. Attempt2 source remained unchanged through its run; failed logs/receipt retained. Attempt3 runs the canonical sequence from formatting on frozen corrected source; shared app, full Voice and workspace build have not run for this repair. Documentation links192/1898/zero broken and diff check pass. No readiness claim.
+
+Second renewed #5922 HOLD in6754663052 at bc08cd73: an actual Engine fail-first demonstrates stale audio waiting for final STT adopting the generation of a validated redo before setup.heard. Author owns the Start-admission token repair. Fourth's earlier settlement read stays valid only for that later boundary; it does not clear this earlier interval. No duplicate repair or device claim. #5870 remains c7f1ef42 with Fourth's two findings unresolved. Integration base remains a2260fd as independently checked at06:54.
+
+Verified Second's #5923 READ-OK6754507079 at a1597e0:49 existing plus three temporary Engine controls passed,52 total; source restored. PR body records it; First and played/default-off gates remain. Log-only diff check; no new links.
+
 ## 2026-11-10 06:43 ICT — face-name reread complete; fixture compile correction under gate
 
 Posted READ-OK6754297300 on #5918 at330f5b2b4895388ec50bfaa8420bb0489d165541 after the exact actual worker prompt regression passed one case,0.00 s body (353.692 s including compilation), with unchanged source hashes and clean checkout. Exact pure-std module six cases and three standalone variants also pass. This resolves Fourth's first/full/go-by finding; Thirteen, current CI and played comparison remain separate. The sole cache was then handed directly to the fixture gate.
