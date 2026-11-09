@@ -13,6 +13,24 @@ Ready for lamp-voice: no (regression and implementation in progress).
   for the Reviewer-three failure and is running it against the old adapter.
 - Added adapter bookkeeping target: under 1 ms, measured separately from
   deletion, IPC, model and device response. No device latency claim.
+- Retrieved Second's immutable handoff `dee08b9910`; patch SHA-256 matched
+  `36fe6500a99b3185cfc11fbedbfee3a0baec4fb16027e25db9a401591b8764df`.
+  Third's project regression independently failed before implementation
+  (0 passed / 1 failed). Applied the patch, added missing-field and
+  unavailable-memory coverage, and narrowed it to never add aggregate
+  `everything: true`: the inner call does not run the outer name/place/
+  voice-print/journal/reminder cleanup. No extra cleanup was added.
+- The actual next-Engine-request regression passed. Final broad gates and
+  fresh-process adapter timing are still in progress, so no readiness claim.
+  The two worktrees share the existing Cargo cache; subsequent commands
+  are serialized to avoid repeated recompilation between their sources.
+- Independent source READ-OK on Expression fixture PR #4664 at
+  `35ffa19d0` (comment 6737246550), with exact-head ARM64 and Linux Clippy
+  success verified. No new local test run claimed. Fixed clock isolation
+  preserves behavioral assertions; the increased bound is a child hang guard.
+- Updated only #3646's PR body to name blocker #5222, the continuation of
+  closed #2094. Store owns its eventual rebase after the broker change;
+  draft, activation and lamp holds remain. No source or branch changed.
 - #5803 now has both Reviewer-three and Tests READ-OK on `8addf65fb`.
   Its rebase to `7fc6ca20e` has identical stable patch ID; carry gates are
   running before push/readiness. Existing native failure and successful
