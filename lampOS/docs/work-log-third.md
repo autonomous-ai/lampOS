@@ -1,3 +1,30 @@
+## 2026-11-09 — both face fixes ready for integration
+
+- #5874 d3db5014f is out of draft, NEXT TRAIN 6744008572 / Queue
+  6744009328. El's carried read plus Fourth's independent exact-head
+  read 6743822238 complete TWO READS. Twelve's later claim was told the
+  missing read is covered (6743875081); no duplicate rerun required.
+- Adapter ARM64 42641983518 passed 14,908/110 skipped, Linux/docs pass.
+  Actual checkout 79b81bfb5 and author head share full tree a1a1ec5e0f0b20933e7531f82b33d2d6257dd5b3.
+- #5878 507fab1ff is out of draft, NEXT TRAIN 6744249320 / Queue
+  6744249972. El explicitly lifted P1 at current head (6743778980);
+  Fourth independently lifted then restated at current head (6744055645).
+  No open context HOLD. El independently fail-first checked an additional
+  forget-everything interruption variant; held-face remains a control.
+- Current context ARM64 42643649330 passed 14,920/111 skipped, release
+  build/doc tests/artifacts; Linux 42643649347 and docs pass. Actual
+  checkout 9bbeae482 merges the authored head into train758 9109f0a9e;
+  tree 747ff9f59eb1972208d3bc7252369fe12a3a51b9 equals the independent
+  local merge tree. Only five train758 Services/docs/SDK paths differ
+  from the authored branch. No bare-author-checkout mislabelling.
+- Prior ARM64 42640206486's actual c11e7c054 checkout equals the entire
+  current authored tree c3affafb5f242bc404a8050de4d5d860e462c165, independently
+  fetched/compared (6743982194). Current native result supersedes it for
+  newest-train integration evidence; historical failures remain recorded.
+- Asked PM to integrate #5792, #5874 and #5878 once, with dependencies;
+  both face branches merge cleanly into train758. Fourth's queued-speech
+  and acoustic acceptance remain separate. No deployment/device action.
+
 ## 2026-11-09 — interruption fix native PASS and Fourth read
 
 - Exact 7d6633bb8 ARM64 42640206486 completed successfully: 14,919
