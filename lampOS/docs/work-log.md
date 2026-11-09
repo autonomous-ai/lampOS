@@ -8788,3 +8788,21 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - Source snapshot /private/tmp/second-landed751-source; raw outputs
   /tmp/second-landed751-say-reconnect.log and
   /tmp/second-landed751-turn-reconnect.log. No product edits/device action.
+
+## 2026-11-09 — Second: three requested rebase restatements
+
+- READ-OK #5833 `9142ddfd1f8192c258fd6b1b52c1d7978929cbd9`: range-diff
+  proves unchanged reconnect code/tests; original abort regression passes.
+  SDK-only JS run87 pass/6 skip, four repository-fixture checks then pass
+  separately after exact-head extraction; two CAD/LFS skips remain.
+  Guide7 pass. No new full Python/device claim.
+- READ-OK #5819 `bdb2c37654e415d4b3f782b4aff469dcb8a9ec14`: normalized
+  source patches unchanged, expected-client check remains under folder lock.
+  Guide7 pass; P3 reported: inherited control.md paragraph still says
+  lamp-voice product lacks manage-socket, contradicting the changed unit.
+- READ-OK #5835 `f624822342c757288a0caabb9c4622433dfefa6e`: feature code
+  and tests byte-identical, inherited name-score/schema delta matches base.
+  Guide7 pass. No unchanged control-suite rerun claimed.
+- Independent agent delta audits spot-checked against actual source diffs.
+  All diff checks clean; no product edits. These restatements do not clear
+  the independently reproduced MCP reconnect integration finding.
