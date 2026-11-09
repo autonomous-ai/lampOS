@@ -1,3 +1,34 @@
+## 2026-11-09 — adapter draft and face-context regressions
+
+- Adapter published as draft [#5874](https://github.com/autonomous-ai/lampOS/pull/5874)
+  at `b7420fea1`. Linux Clippy and docs passed; ARM64 runs. TWO READS
+  requested in Queue 6739941114 and PR 6739959879; an active replacement
+  for Reviewer-three is not assigned yet. No READY claim.
+- Context branch now uses landed cleanup `429b1f3ba`, identical El #5792
+  carry `89207a696`, and adapter carry `7251a51e2`. All five new fail-first
+  regressions failed with actual old-context retention or missing outcomes.
+  After the fix they pass. The adapter's next-request case passes, as do
+  held-forget 28/0, held-rename 13/0 and reset integration 3/0.
+- An older held-forget assertion expected a raw Tool result. Its initial
+  27/1 run is retained; the updated assertion requires the current yes,
+  fixed face outcome, and whole-request absence of canaries and raw IDs.
+- Host reset entry to fresh-vector return: first 337,156 ns; 100 repeats
+  p95 40,622 ns, maximum 67,575 ns. Mac debug only, excludes deletion,
+  model/audio/device work. Strict Clippy passed on all 14 affected/dependent
+  packages. Full 5,427-test Voice suite and workspace build are running.
+- Took the available second source read of #5863 (`0d5a30d8a`) while the
+  gate runs, requesting PM's reader assignment. [HOLD 6740215945](https://github.com/autonomous-ai/lampOS/pull/5863#issuecomment-6740215945):
+  a later refused send attempt in the same batch can replace evidence of
+  the first successful send before the round is carried. Exact state-helper
+  probe: request-isolation control passes; successful receipt followed by
+  refusal fails preservation (1/1, exit 101). Engine source confirms both
+  records are replaced and the no-second-write guard only covers recovered
+  turns. No live write or Cargo run for this read. Also noted pre-gate
+  no-answer state being labelled already sent, separately from gate admission.
+- #5826 still has no response to Third's HOLD; its head is unchanged.
+  #5792 remains open. No assigned labelled issues were returned. No lamp
+  access or deployment; main checkout remains outside these worktrees.
+
 ## 2026-11-09 — cleanup landed; adapter gate and fallback privacy hold
 
 - #5803 landed in train 752 at `429b1f3ba`; its producer and sanitizer
