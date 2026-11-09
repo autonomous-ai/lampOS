@@ -310,7 +310,8 @@ chối trường này (`deny_unknown_fields`).
 ## Vai được giao (`role`, `LAMP_MEMORY_ROLE`)
 
 Với `role:true` trong `session_open` (công tắc `LAMP_MEMORY_ROLE` của voice,
-mặc định tắt; thiết kế của người phụ trách bộ nhớ, 6/11), câu trả lời có thêm
+mặc định tắt, bật trong bản sản phẩm theo quyết định của người phụ trách bộ
+nhớ ngày 9/11; thiết kế của người phụ trách bộ nhớ, 6/11), câu trả lời có thêm
 `"role"`: tên vai mà người được biết mặt đó nhờ đèn đóng, hoặc `null`. Nó được
 đọc cùng lần mở phiên, không bao giờ bằng một yêu cầu riêng; của phòng luôn là
 `null`. `role_set {person, name}` giữ vai (`{ok:true}`), mỗi người một vai,
@@ -329,7 +330,9 @@ Phía voice: lượt của chính người đó được nói vai như dữ li�
 chọn, không phải lời dặn"). Lượt mà đèn không xác định được người nói chỉ được
 nói tên các vai của những khuôn mặt quen đang thấy, bỏ trùng, không kèm tên
 ai, và rằng đèn không biết ai đang nói nên vẫn là Lamp; ghi chú này bị bỏ hẳn
-khi một tên đang được giữ lại (`someone_else_now`). Một `end_role` mà bộ nhớ
+khi một tên đang được giữ lại (`someone_else_now`). Câu chỉ là của người đó vì
+mặt họ một mình trong khung hình (`LAMP_PERSON_SCOPE_ONE_FACE_READS`,
+`forgets_need_mouth`) không đặt hay bỏ vai nào. Một `end_role` mà bộ nhớ
 không ghi được thì vai vẫn giữ và đèn nói là chưa bỏ được.
 
 ## Ghi chú cuộc trò chuyện (`talk_note`, `LAMP_CONVERSATION_SUMMARY`)
@@ -781,6 +784,9 @@ lời yêu cầu của nó không tính là yêu cầu ngay trước (`forget_as
 (`replaces`, `remember::corrects`) bị từ chối như lệnh quên, và khi không có
 id thì bộ so khớp lời sửa bị bỏ qua, nên điều mới được giữ như thường và không
 gì bị thay; `keep_rule`, `list_rules` và `forget_rule` bị từ chối;
+`set_role` và `end_role` cũng bị từ chối, cả trong
+`remember::role_for_guarded` (lần đọc riêng tư trên #5385), nên một vị khách
+ngoài khung hình không bỏ hay thay được vai của người chủ;
 `cancel_reminder` và `snooze_reminder` bị từ chối trừ khi
 `LAMP_ONE_FACE_REMINDERS` bật (điều chấp nhận ngày 4/11); và câu ấy không có
 chủ dịch vụ (`services::owner_of`), nên không `service_read` nào chạy cho nó,

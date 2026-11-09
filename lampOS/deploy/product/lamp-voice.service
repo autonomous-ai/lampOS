@@ -598,6 +598,12 @@ Environment=LAMP_MEMORY_PROFILE=on
 Environment=LAMP_MEMORY_NIGHTLY=on
 Environment=LAMP_MEMORY_NIGHTLY_PATTERNS=on
 Environment=LAMP_MEMORY_NIGHTLY_FEELINGS=on
+# A role a seen person gives the lamp ("you are Harry Potter") lasts with them until they end it (the memory owner's
+# design of 6 Nov, #5545; switched on by their call on 9 Nov). Only a short name is kept, per known face, read once with
+# their session's open; a turn not placed as theirs is told only the role names of the known faces in view, never
+# whose, and nothing while a name is held back. Second route and Days only, both above; needs a lamp-memory from the
+# same build (role_set, role_end), which a product install ships.
+Environment=LAMP_MEMORY_ROLE=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
