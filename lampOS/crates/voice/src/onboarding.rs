@@ -1134,6 +1134,70 @@ pub fn own_words(note: &str) -> Option<&str> {
     fixed_words(note.strip_prefix(OWN_MARK)?)
 }
 
+/// Whether the walk is under way, as the coordinator last read it
+/// ([`Onboarding::under_way`]).
+static UNDER_WAY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub(crate) fn set_under_way(on: bool) {
+    UNDER_WAY.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+pub(crate) fn under_way_now() -> bool {
+    UNDER_WAY.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// The model's words for a turn on `line`: while the walk is under way,
+/// without any step word ("Step three: ", "Last step: ", in any language)
+/// that `line` does not say itself (#5809: answering a name, the model said
+/// "Step three:" before its own words, the walk's next line being step
+/// three). A step's own line, the walk's or the model's ask of it, keeps
+/// its step word; outside the walk nothing is dropped.
+pub(crate) fn model_words(text: String, line: &str, under_way: bool) -> String {
+    if under_way {
+        in_language::without_step_words(&text, line)
+    } else {
+        text
+    }
+}
+
+#[cfg(test)]
+mod model_words_tests {
+    use super::model_words;
+
+    const NOTE: &str =
+        "(Say only this, nothing before or after it: \"Step three: Pet the top of my head.\")";
+
+    #[test]
+    fn a_model_reply_in_the_walk_drops_a_step_word_its_line_does_not_say() {
+        let reply = "Lovely, Walter. Step three: I'd like to remember your face.";
+        assert_eq!(
+            model_words(reply.into(), "Walter.", true),
+            "Lovely, Walter. I'd like to remember your face."
+        );
+        // In the owner's language, and cut off at a piece's end.
+        assert_eq!(
+            model_words("Bước ba: chạm vào đầu mình.".into(), "Walter.", true),
+            "chạm vào đầu mình."
+        );
+        assert_eq!(
+            model_words("Lovely. Last step:".into(), "Walter.", true),
+            "Lovely."
+        );
+    }
+
+    #[test]
+    fn the_walks_own_line_keeps_its_step_word() {
+        let words = "Step three: Pet the top of my head.";
+        assert_eq!(model_words(words.into(), NOTE, true), words);
+    }
+
+    #[test]
+    fn outside_the_walk_nothing_is_dropped() {
+        let reply = "Step three: add the eggs.";
+        assert_eq!(model_words(reply.into(), "How do I bake it?", false), reply);
+    }
+}
+
 pub fn mailbox_of(file: &Path) -> PathBuf {
     let mut name = file.as_os_str().to_owned();
     name.push(".told");

@@ -12363,6 +12363,9 @@ async fn answer(
         request,
         heard_at,
         tags: shared.speech_tags.map(speech_tags::Tags::new),
+        line: std::iter::once(&said)
+            .chain(&notes)
+            .fold(String::new(), |all, part| all + part),
     };
     let began = Instant::now();
     // The bounds below are on the runtime's clock, which a test can step.
@@ -15235,6 +15238,9 @@ struct Queue<'a> {
     /// The reply's tags (`LAMP_SECOND_SPEECH_TAGS`); `None`, pieces as
     /// written.
     tags: Option<speech_tags::Tags>,
+    /// The turn's line and notes: while the walk is under way, the step
+    /// words they do not say are not said ([`crate::onboarding::model_words`]).
+    line: String,
 }
 impl Drop for Queue<'_> {
     /// The reply's tags in the journal, counts only, once it said something.
@@ -15259,6 +15265,8 @@ impl Queue<'_> {
     }
 
     async fn push(&mut self, text: String) -> Result<(), Stop> {
+        let text =
+            crate::onboarding::model_words(text, &self.line, crate::onboarding::under_way_now());
         // With tags (`LAMP_SECOND_SPEECH_TAGS`), the voice is given `spoken`
         // and everything else the lamp's words, which carry none.
         let (spoken, text) = match &mut self.tags {
