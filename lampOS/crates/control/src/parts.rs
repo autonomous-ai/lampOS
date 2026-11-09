@@ -1380,6 +1380,10 @@ impl Parts for Lamp {
             .is_some_and(|camera| camera.streaming(client, turn))
     }
 
+    fn camera_turn(&self, client: &str) -> Option<u64> {
+        self.camera.as_ref().and_then(|camera| camera.turn(client))
+    }
+
     fn camera_end(&mut self, client: &str) {
         if let Some(camera) = &mut self.camera {
             camera.end(client);

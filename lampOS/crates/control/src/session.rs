@@ -44,6 +44,13 @@ pub trait Parts {
     fn camera_streaming(&self, _client: &str, _turn: u64) -> bool {
         false
     }
+    /// The turn of `client`'s newest camera stream ([`Camera::turn`]), for
+    /// the writer to tell an older stream's late `camera.ended` from its own.
+    ///
+    /// [`Camera::turn`]: crate::camera::Camera::turn
+    fn camera_turn(&self, _client: &str) -> Option<u64> {
+        None
+    }
     /// Does `op` for `client`, as [`Parts::act`], where the reply may wait
     /// on the part: a `turn.end` or a `listen.set` the voice answers. What
     /// to run for it off the door's lock comes back as [`Reply::Later`].
