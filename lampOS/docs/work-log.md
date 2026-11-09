@@ -9071,3 +9071,15 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   scripted service answers. Saved /tmp/second-5863-fixed-review-probes.rs
   for rerun (with explicit no-success-on-refused-ID assertion), tests removed,
   checkout clean. No live-service or device claim; HOLD not lifted.
+
+## 2026-11-09 — Second: train and context dependency retention
+
+- Train755 #5876 d8f7091c49 retains #5864 and all three #5851 commits
+  exactly; #5850 differs only in surrounding GUIDE context, preserving
+  newer camera/volume and reconnect wording. Read-only, no new train tests.
+- #5874 dd3f2c0f1 carries the adapter patch unchanged by range-diff; native
+  gates on this new composition remain separate from b7420fea1 evidence.
+- #5878 09444cb49a dependencies preserved: c608e05e11 equals dd3f2c0f1,
+  and 05e6f6af39 has the same stable patch ID as #5792's 41f543f241.
+  Posted dependency evidence only, no independent privacy READ-OK; Tests
+  and Fourth were requested for the new context boundary.
