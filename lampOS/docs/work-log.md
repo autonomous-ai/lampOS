@@ -9300,3 +9300,13 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   unit test did pass after cache cleanup. All temporary tests removed.
 - Train757 native run 42634006904: 14,901 passed / 109 skipped, artifact
   d0f3a055162; train merged as a1642b233. Retention audit was already clean.
+
+## 2026-11-09 — Second: docs restatement and reconnect release handoff
+
+- #5863 READ-OK restated at 47977686cc, comment 6743039974: only the
+  stale journal quotation changed from tested 2fa6ad4f8f; runtime/tests
+  unchanged. Third's own restatement/PM placement is separate.
+- Nine acknowledges 11048 still has the MCP reconnect P2 and plans to
+  remove #5873 from draft at 22:01 GMT+7 for the next train. Its unchanged
+  1cc3ff2cc7 fix already has Second's read. Planned stock-device say run
+  explicitly excludes reconnect; it cannot clear this known regression.
