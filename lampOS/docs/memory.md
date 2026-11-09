@@ -801,14 +801,18 @@ conversation beyond its exchanges, and for how long:
   kept "is hosting a dinner on Friday", wrong when read on another day).
   Test:
   `conversation_summary::tests::the_job_carries_today_and_the_prompt_asks_for_whole_days`.
-- **A name in it is never what the lamp calls them** (#5484, with
+- **Recognized name forms in it are not what the lamp calls them** (#5484, with
   `LAMP_SECOND_FACE_NAME_ONLY=on`, off in the product until its lamp check):
-  each of its lines that gives the person's own name
-  (`face_name_only::names_the_person`; a pet's name is not marked) is told
-  to the turn, and read by the observation pass, marked "(a name said in the
+  each line matching a recognized person-name form is marked
+  (`face_name_only::names_the_person`; for example, "Their name is Ash",
+  "Their first name is Ash", "Their full name is Ash River", and
+  "They go by Ash"). Explicit pet references such as "Their dog's first
+  name is Biscuit" stay unmarked. These forms do not cover every possible
+  paraphrase. A matched line is told to the turn, and read by the
+  observation pass, marked "(a name said in the
   conversation, never what to call them)", with a face or with none; the
-  note as kept is unchanged, and past the room its name lines are left out,
-  never the whole note. A known face's turn is told its face name as the
+  note as kept is unchanged, and past the room its matched name lines are
+  left out, never the whole note. A known face's turn is told its face name as the
   name to call them ("This person is B", `face_name_only::note`), with the
   owner's typed name from the app beside it as theirs too when the reply is
   told it. A "call me A" with no face is used while its line is in view and

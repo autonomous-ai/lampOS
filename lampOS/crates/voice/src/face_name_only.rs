@@ -10,7 +10,7 @@
 //! - a turn of the known face's own person is told their face name as the
 //!   only name to call them ([`note`]), in place of
 //!   [`crate::known_faces::note`];
-//! - every line of the running summary that gives a person's name
+//! - each running-summary line in a recognized person-name form
 //!   ([`names_the_person`]) is told, and read by the observation pass, as a
 //!   name said in the conversation, never what to call them
 //!   ([`relabelled`]), with a face or without one.
@@ -75,6 +75,7 @@ const PERSON_WORDS: [&str; 15] = [
 
 /// Whether a summary's `line` gives the person's own name: "The user's name
 /// is A", "Their name is A", "My name is A", "The person is called A",
+/// "Their first name is A", "Their full name is A B", "They go by A",
 /// "He goes by A", "A's nickname is B", "I'm A", "Call me A". Not a pet's
 /// or a thing's ("Their dog is called Biscuit", "Their dog's name is
 /// Biscuit"), nor "I am tired".
@@ -96,11 +97,21 @@ pub fn names_the_person(line: &str) -> bool {
             .is_some_and(|word| word.starts_with(char::is_uppercase))
     };
     (0..lower.len()).any(|at| match lower[at].as_str() {
-        "name" | "names" | "nickname" => at > 0 && person(at - 1),
+        "name" | "names" | "nickname" => {
+            (at > 0 && person(at - 1))
+                || (lower[at] == "name"
+                    && at > 1
+                    && matches!(lower[at - 1].as_str(), "first" | "full")
+                    && person(at - 2))
+        }
         "called" | "named" => {
             at > 1 && matches!(lower[at - 1].as_str(), "is" | "are" | "was") && person(at - 2)
         }
-        "by" => at > 1 && lower[at - 1] == "goes" && person(at - 2),
+        "by" => {
+            at > 1
+                && person(at - 2)
+                && (lower[at - 1] == "goes" || (lower[at - 1] == "go" && capital(at + 1)))
+        }
         "i'm" => capital(at + 1),
         "am" => at > 0 && lower[at - 1] == "i" && capital(at + 1),
         "me" => at > 0 && lower[at - 1] == "call",
@@ -108,7 +119,7 @@ pub fn names_the_person(line: &str) -> bool {
     })
 }
 
-/// `summary` with each line giving the person's name marked [`SAID`],
+/// `summary` with each recognized person-name line marked [`SAID`],
 /// after any "- " that begins it; other lines as they are.
 pub fn relabelled(summary: &str) -> String {
     summary
@@ -215,6 +226,51 @@ mod tests {
             "rename the file",
         ] {
             assert!(!names_the_person(not), "{not}");
+        }
+    }
+
+    #[test]
+    fn immediate_first_full_names_and_go_by_are_recognized() {
+        for line in [
+            "The user's first name is Ash.",
+            "The person's full name is Ash River.",
+            "They go by Ash.",
+            "Their first name is Ash.",
+            "Their full name is Ash River.",
+            "My first name is Ash.",
+            "My full name is Ash River.",
+        ] {
+            assert!(names_the_person(line), "{line}");
+            let summary = format!("- {line}\n- Likes tea.\n");
+            let marked = format!("- {SAID}{line}\n- Likes tea.\n");
+            assert_eq!(relabelled(&summary), marked);
+            assert_eq!(relabelled(&marked), marked, "idempotent");
+            assert_eq!(told_within(summary.clone(), true, 4096), marked);
+            assert_eq!(
+                told_within(summary.clone(), true, summary.len() + 1),
+                "- Likes tea.\n"
+            );
+            assert_eq!(told(summary.clone(), false), summary);
+            assert_eq!(told_within(summary.clone(), false, 1), summary);
+        }
+    }
+
+    #[test]
+    fn name_modifiers_do_not_reach_past_pets_or_unrelated_nouns() {
+        for line in [
+            "Their dog's first name is Biscuit.",
+            "The person's dog's full name is Biscuit.",
+            "Their dog goes by Biscuit.",
+            "They go by bus.",
+            "Their first dog is named Biscuit.",
+            "Their full address is Elm Street.",
+            "Their first game name is Quest.",
+            "Their full company name is Acme.",
+            "Their first full name is Ash River.",
+        ] {
+            assert!(!names_the_person(line), "{line}");
+            assert_eq!(relabelled(line), line);
+            assert_eq!(told_within(line.to_owned(), true, 4096), line);
         }
     }
 

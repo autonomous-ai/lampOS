@@ -22358,6 +22358,37 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// Fourth's residual forms reach the actual room prompt marked, while
+    /// the explicitly named pet and the switch-off prompt remain unchanged.
+    #[test]
+    fn room_summary_first_full_and_go_by_names_are_marked_in_the_prompt() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let names = [
+            "The user's first name is Ash.",
+            "The person's full name is Ash River.",
+            "They go by Ash.",
+        ];
+        let pet = "Their dog's first name is Biscuit.";
+        let summary = format!(
+            "Current activity: none\nKey facts:\n- {}\n- {}\n- {}\n- {pet}\n",
+            names[0], names[1], names[2]
+        );
+        crate::conversation_summary::keep_for_test(None, Some(&summary));
+        let (told, _) = thread_and_history_told(0, None, None, None, false, true);
+        let (off, _) = thread_and_history_told(0, None, None, None, false, false);
+        crate::conversation_summary::keep_for_test(None, None);
+        let said = crate::face_name_only::SAID;
+        for name in names {
+            assert!(told.contains(&format!("\n- {said}{name}\n")), "{told}");
+            assert!(!told.contains(&format!("\n- {name}\n")), "{told}");
+            assert!(off.contains(&format!("\n- {name}\n")), "{off}");
+        }
+        assert!(told.contains(&format!("\n- {pet}\n")), "{told}");
+        assert!(!told.contains(&format!("{said}{pet}")), "{told}");
+        assert!(off.contains(&summary), "{off}");
+        assert!(!off.contains(said), "{off}");
+    }
+
     /// #2539 (`LAMP_SECOND_FACE_NAME`): a turn that is the known face's own
     /// person is told their name, as the Live route tells it; the room's
     /// turn (or a line narrowed to the room), another person's, a face gone,
