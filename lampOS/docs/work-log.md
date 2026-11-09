@@ -8974,3 +8974,22 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - #5835 still HOLD at b74fa1e. Merge-tree composition conflicts in server.py;
   requested retaining ended_on with its motion-specific timeout. Actual
   rebased head must pass the move-id-2/new-say-id-2 collision before clearance.
+
+## 2026-11-09 — Second: face adapter and interrupted-send checks
+
+- Supplemental #5874 b7420fea1e: six adapter tests, 26 held-forget tests
+  including next-model-request receipt, and one legacy face/memory test
+  passed. Adapter timing first 23.417 us, repeated p95 2.375 us/max 4 us
+  (100 samples), excluding I/O/model/device. Checkout clean. Not an
+  independent privacy read: initial implementation came from my handoff.
+  Third's narrowing correctly avoids promoting inner everything:true.
+- READ-OK #5863 0d5a30d8aa: four interrupted-send tests and 56 services
+  tests passed. Independent Engine joined-line probe also passed: 600 ms
+  delayed send, spoken follow-up joined, original result carried, attempted
+  new prepare blocked, exactly one runner write. Probe removed, checkout
+  clean. No full-suite/device claim; actual blocking-service/fence/replay
+  integration still mocked in existing tests. PM owns reader placement.
+- Train754 read-only audit at 22cb68aeba retained its five patches;
+  #5817 additionally registers curious examples in existing test harnesses.
+  Jarvis explicitly lifted #5848 HOLD on 7c13f34c3; remaining consent P3
+  belongs before switch-on. No train tests or merge performed here.
