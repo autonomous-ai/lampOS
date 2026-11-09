@@ -1,3 +1,14 @@
+## 2026-11-09 18:36 ICT — playback CI and neutral-photo draft
+
+Ready for lamp-voice: no. Published privacy slices still require their readers and documented tester gates. No device access.
+
+- Playback #5858 `4ea13ebf1`: ARM64 run 42605683226 passed 10,748 selected tests / 62 skipped. The Linux real speaker-loop/ALSA-null reset-before-ACK test and three cut/drop/authority helpers explicitly passed. Linux clippy/docs pass. This is host control evidence, not an audible-stop measurement. Provider #5856 remains CI-green.
+- Peek #5861 `9e9c62609` has Second's exact-head READ-OK with an independent 30-test pass (comment 6738932436). Linux clippy/docs pass; ARM64 continues. Reviewer-three and office account/kit/device acceptance remain open.
+- Independent #5263 neutral receipt slice is draft [#5865](https://github.com/autonomous-ai/lampOS/pull/5865), `248b92d2a`, base still-current `19ee3d51ac`. It reuses the narrow mapping and real broker fixtures from closed #2988: every parsed Eyes outcome has identical received-only data; input/local/invalid-JSON/transport failures remain errors. No activation, consent proof, function, SDK or product switch change. Capture-origin/whole-interval proof and removable skill remain separately held.
+- Cloud baseline broker control failed on the old added/unconfirmed data (one failed, one passed). Final suite: 351 passed, zero failed, four ignored (library 313/0/2). Strict all-target Cloud clippy, fmt, workspace build and 192 docs / 1,895 links pass. Three existing detached share fixture threads logged SendError panics while the harness passed; source and logs retained. Initial baseline invocation from the wrong working directory failed the camera UAPI configuration guard, then was rerun correctly from lampOS; no evidence claimed from that compile failure.
+- Existing app contract: 43 photo tests pass at unchanged app head `f57fd88345`; neutral parsing/UI support is `a3b2aa88`. Mapping first/max over 15 outcomes was below one microsecond at logged resolution; a 50 ms delayed synthetic Eyes reply took 74 ms command-to-envelope. No constant-time, real-recognition, network or device latency claim. TWO READS requested in 6739027000 and Queue 6739028022; Linux CI running.
+- Supplemental source-only behaviour read of #5854 `febff5773b` posted as 6739073549: existing quiet/name-only handoff stays natural and stores no owner; no new blocking finding. Not a PM-named behaviour signoff or played row; no tests rerun. Remaining #5259/#5260 comparisons require their assigned lamp/backend runs; no unauthorized device work undertaken.
+
 ## 2026-11-09 18:20 ICT — Peek draft and provider ARM64 gates
 
 Ready for lamp-voice: no. Privacy reads and documented tester gates remain outstanding; no device access.
