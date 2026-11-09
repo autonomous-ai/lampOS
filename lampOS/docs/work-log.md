@@ -8895,3 +8895,19 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - No Second implementation PR remains open except the NEVER MERGE
   rehearsal fixtures. Labelled physical gates remain with First; #5144's
   stale owner/closure request remains outstanding. Continuing review queue.
+
+## 2026-11-09 — Second: playback extension and status guide reads
+
+- Supplemental READ-OK #5858 4ea13ebf1a9ff44cd44d22c37a8b2e728166e675.
+  Source and independent speaker/wire audit found no P1/P2. Exact-head
+  focused native checks: speech_cut 12, forget_tail 6, forget_speech 9,
+  music_scope 3 passed. Old simulated tail again 30,040/130 ms to zero;
+  admission to modelled drop/ACK 791/862 us saturated, 1029/1121 us draining.
+  No acoustic or independent Linux/full-suite claim. P3 stale validation
+  text flagged. Provider parent and PM/device gates remain separate.
+- READ-OK #5868 261ee26767d6bc7ba8bec6869c4069f411912bd1, eight guide
+  status cells matching the supplied stock-10824 camera/volume evidence.
+  Guide tests 7 passed. No device reproduction; temporary developer-access
+  setup distinguished from default enablement and untested volume event.
+- Taking supplemental provider-parent #5856 df4c2ea8a read; El's separate
+  independent read remains active. No code changes or device actions.
