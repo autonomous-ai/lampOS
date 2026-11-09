@@ -58,11 +58,10 @@ It answers as a lamp does today. `gesture`, `move` and `express` are taken
 (`{"to": "body"}`, and `express` says its move and that it showed the
 light: `{"to": "body", "move": "glad-lift", "light": true}`), and `say`
 and `sound` (`hum`, the lamp's own short hum) with `{"to": "voice"}` and
-their `done`. `play` and `joints` are refused, in
-lamp-control's own words ("not routed yet: waits for …"), and `look` with "the
-body's lease socket is not on here". That is older than a customer lamp,
-which takes `look` and `joints` for `yaw` and `pitch` (stable 10824), so try
-those with `--everything`.
+their `done`. `look` at `ahead`, `hand` or an angle is taken, and `joints`
+naming only `yaw` and `pitch`, as a customer lamp (stable 10824) takes them.
+`play`, and `joints` naming `roll`, `shoulder` or `elbow`, are refused in
+lamp-control's own words ("not routed yet: waits for …").
 `--everything` answers every op instead.
 
 ## 2. Your first program (3 minutes)
@@ -303,10 +302,8 @@ and `lamp_stop` (the README's table has each one's
 parameters). Each is offered only with the grant it needs. A body tool takes
 a short body lease of its own, or renews the one it holds, and keeps to what
 hello's `limits` says. A refusal comes back as the tool's error,
-in the lamp's words. `lamp_look` works on a lamp with `--lease-socket` and on
-`lamp fake --everything`; a product lamp refuses it ("the body's lease socket
-is not on here") until lamp-control's unit passes `--lease-socket` too
-(#4526; lamp-body's does, #4568).
+in the lamp's words. `lamp_look` works on customer lamps (the product
+lamp-body opens its lease socket, stable 10824 and later) and on `lamp fake`.
 
 ### Your coding agent knows the SDK: the agent skill
 

@@ -87,11 +87,12 @@ LOOK_WAITS = {
 # lamp-control's words for `joints` naming roll, shoulder or elbow (parts.rs).
 JOINTS_WAIT = "not routed yet: waits for the body's goal stream for roll, shoulder and elbow; yaw and pitch go now"
 LAMP_CONTROL_REFUSES = {
-    # No product unit passes --lease-socket yet (docs/control.md).
-    "look": "the body's lease socket is not on here",
-    "joints": "not routed yet: waits for a goal stream on the body's lease socket",
     "play": "not routed yet: waits for client packages",
 }
+
+# `look` and `joints` are not in it: the product lamp-body opens its lease
+# socket (stable 10824 and later), so a lamp takes a look, and `joints` at yaw
+# and pitch, refusing roll, shoulder and elbow with JOINTS_WAIT (above).
 
 
 # `express`'s feelings and their moves, as lamp-control's feelings.rs.

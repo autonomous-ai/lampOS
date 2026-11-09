@@ -1307,11 +1307,40 @@ def test_the_fake_checks_the_lease_before_the_routing_refusal(tmp_path):
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 with pytest.raises(errors.BY_CODE["no_lease"]):
-                    await lamp.look("face")
+                    await lamp.play("wave")
                 async with lamp.lease("body", for_ms=5000):
                     with pytest.raises(errors.BY_CODE["refused"]) as raised:
+                        await lamp.play("wave")
+                    assert raised.value.why == "not routed yet: waits for client packages"
+
+    run(go())
+
+
+def test_the_fake_takes_look_and_yaw_and_pitch_as_a_stable_lamp_does(tmp_path):
+    # As lamp-control on stable 10824 (parts.rs `joints`, the product
+    # lamp-body's lease socket): look ahead or at an angle is taken, joints
+    # naming only yaw and pitch go, and one naming roll, shoulder or elbow is
+    # refused whole in its words; face and name stay "not in this release".
+    async def go():
+        from lampos.testing import JOINTS_WAIT, LAMP_CONTROL_REFUSES
+
+        async with FakeLamp(
+            grants=schema.grants(), refuses=LAMP_CONTROL_REFUSES
+        ) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                async with lamp.lease("body", for_ms=5000) as lease:
+                    assert (await lamp.look(yaw=5, pitch=2))["to"] == "body"
+                    assert (await lamp.joints(lease, 300, yaw=-3.0, pitch=1.0))["to"] == "body"
+                    for joint in ("roll", "shoulder", "elbow"):
+                        with pytest.raises(errors.BY_CODE["refused"]) as raised:
+                            await lamp.joints(lease, 300, yaw=0.0, **{joint: 1.0})
+                        assert raised.value.why == JOINTS_WAIT
+                    with pytest.raises(errors.BY_CODE["refused"]) as raised:
                         await lamp.look("face")
-                    assert raised.value.why == "the body's lease socket is not on here"
+                    assert raised.value.why == "not in this release: look at a face or a name"
+            # The refused joints never reached the body; one did.
+            assert [r["op"] for r in fake.requests].count("joints") == 1
 
     run(go())
 
@@ -1599,10 +1628,12 @@ def test_follow_hand_lets_go_on_a_lamp_that_takes_the_look_without_following(tmp
 def test_a_look_at_the_hand_needs_the_bodys_lease_socket_as_other_looks_do(tmp_path):
     # lamp-control without --lease-socket refuses every look, `hand` too
     # (parts.rs: "the body's lease socket"), and follow_hand lets go of its lease.
-    from lampos.testing import LAMP_CONTROL_REFUSES
+    # No product unit runs without it since stable 10824; LAMP_CONTROL_REFUSES
+    # takes look, so this lamp is named here.
+    no_lease_socket = {"look": "the body's lease socket is not on here"}
 
     async def go():
-        async with FakeLamp(grants=("body", "look"), refuses=LAMP_CONTROL_REFUSES) as fake:
+        async with FakeLamp(grants=("body", "look"), refuses=no_lease_socket) as fake:
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 async with lamp.lease("body"):

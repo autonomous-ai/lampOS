@@ -38,9 +38,9 @@ lamp fake --everything     # a fake lamp, paired with this computer; leave it ru
 python my_program.py       # in another terminal, same LAMPOS_HOME
 ```
 
-`--everything` answers every op; without it the fake refuses `play` and
-`joints`, and every `look` (but with `--hands`), stricter than a customer
-lamp, which takes `look` and `joints` at yaw and pitch. It takes a skill
+`--everything` answers every op; without it the fake answers as a customer
+lamp does: `look` and `joints` at yaw and pitch taken, `play` and `joints`
+at roll, shoulder or elbow refused in lamp-control's words. It takes a skill
 push, which a customer lamp refuses. In tests, use `lampos.testing.FakeLamp` (JS:
 `FakeLamp` from `lampos/testing`): see [references/testing.md](references/testing.md).
 
