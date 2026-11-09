@@ -96,7 +96,21 @@ nên không xóa gì. Một câu đọc ra không nêu tên nhưng các
 từ khác có thể nêu một thứ («Quên nó đi, ý tôi là địa chỉ») không bao giờ
 xóa thứ được giữ gần nhất theo phỏng đoán: không xóa gì, và đèn hỏi lại một
 lần là thứ nào. Chỉ câu không nêu tên rõ ràng («quên cái đó đi») mới xóa thứ
-được giữ gần nhất.
+được giữ gần nhất, và chỉ khi lần giữ hoặc lần nhắc lại cuối cùng của phiên
+này, trong phạm vi của họ, vừa cho ra một thứ trong vòng `HELD_FORGET_FOR`,
+hoặc đèn vừa hỏi họ một câu hỏi tiếp theo; nếu không (phiên mới, đã quá một
+phút) thì không xóa gì, không bao giờ đoán là thứ được giữ mới nhất (C35).
+Khi phiên đã cho thấy từ một thứ trở lên, mô hình hỏi là thứ nào, và nhật ký
+ghi `lamp-voice provider: a bare forget is not run: nothing was given just
+before and N shown could be meant, asked which`. Khi chưa cho thấy gì, mô
+hình hỏi họ muốn quên gì, và nhật ký ghi `lamp-voice provider: a bare forget
+is not run: nothing was given just before and nothing was shown, asked
+what`. Với
+`LAMP_MEMORY_FORGET_ABOUT`, `about` của mô hình chỉ chạy đúng như gọi khi
+không nghe được gì hoặc các từ của nó có trong phần yêu cầu quên của câu;
+một `about` chưa từng được nói bị bỏ và lệnh quên được xem là không nêu tên
+(lamp-06c1, 9/11, bản 10824: «Lamp, forget that.» đi kèm một `about` 2 từ,
+chạy đúng như gọi và xóa chiếc khăn mà không hỏi là thứ nào).
 
 ## Nhật ký dừng sau một lệnh quên, rồi chạy lại
 
