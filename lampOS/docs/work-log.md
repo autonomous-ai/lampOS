@@ -8852,3 +8852,17 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - Probe saved as /tmp/second-5839-old-audio-fixed.{rs,patch,log}, removed
   from clean checkout. Product mic1/mic2 decision and remaining device
   checks separate. Camera generation counterpart not cleared by this read.
+
+## 2026-11-09 — Second: neutral photo receipt review
+
+- Supplemental READ-OK #5865 at 248b92d2ac6c1e0bf27efdb5050ad764619dc6ba.
+  Complete parsed semantic outcomes have identical public receipts; input,
+  local write and invalid/absent reply failures remain errors. No activation
+  or consent change. Native photos filter: 8 passed in 0.17 s, no ignored.
+- Synthetic mapping first/max 17 microseconds across 15 cases; injected
+  50 ms Eyes delay took 61 ms command-to-envelope. No constant-time,
+  app-suite, real photo/account or device acceptance claim. Checkout clean.
+- Banana acknowledges #5855 ordering P2; Ten will add echoed tags before
+  control matches them. HOLD remains. Combined MCP reconnect follow-up
+  was reported ready locally, but its named remote branch is not available
+  yet. Taking Nine's explicit #5835 rebase read at b74fa1eed9 next.
