@@ -79,8 +79,8 @@ On an authorized lamp, `lamp-skills install PACKAGE.tar` installs through the
 existing service's skill folder; nothing in this example deploys to a device.
 
 `LAMP_REQUESTED_AUDIO` enables playback only when its value is exactly `on`.
-It is off unless set; the product's voice, skills and actions units set it
-(#5749). Packaging and installation do not change the switch.
+It is off by default; packaging and installation do not change the switch.
+Enable it only as part of the separately validated service configuration.
 The person must request music aloud. Voice waits for the confirmation's final
 playback receipt, then uses the same owner and existing speaker worker.
 Stop, interruption, privacy and speaker mute consume the request; no repeat
