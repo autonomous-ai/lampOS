@@ -81,14 +81,56 @@ const ASKS: &[&[&str]] = &[
     &["cho", "minh", "nghe"],
     &["cho", "em", "nghe"],
 ];
-/// A word that, anywhere in the sentence, takes the ask back or turns it
-/// into something else ("don't play anything", "đừng mở nhạc").
-const NOT: &[&str] = &["don't", "dont", "not", "never", "no", "stop", "dung"];
+/// A word that, anywhere in the line, takes the ask back, doubts it or turns
+/// it into something else ("don't play anything", "play some music.
+/// Actually, don't.", "maybe later", "đừng mở nhạc", "thôi").
+const NOT: &[&str] = &[
+    "don't",
+    "dont",
+    "not",
+    "never",
+    "nevermind",
+    "no",
+    "stop",
+    "cancel",
+    "actually",
+    "wait",
+    "maybe",
+    "dung",
+    "thoi",
+];
+/// What is asked for must be a recording: one of these at or after the ask
+/// ("play some music", "mở nhạc"), so "turn on the light" or "play chess"
+/// does not ask.
+const AUDIO: &[&str] = &[
+    "music",
+    "song",
+    "songs",
+    "recording",
+    "recordings",
+    "sound",
+    "sounds",
+    "track",
+    "tracks",
+    "tune",
+    "tunes",
+    "playlist",
+    "melody",
+    "lullaby",
+    "nhac",
+    "bai",
+];
+/// "Something" names a recording only before one of these ("play something
+/// calm", "put on something relaxing"); "play something with me" does not.
+const MOODS: &[&str] = &[
+    "relaxing", "calm", "calming", "quiet", "soft", "soothing", "gentle", "peaceful", "chill",
+];
 
 /// Whether `said`, the line that led to a requested-audio call, plainly asks
 /// to play something (#5764). Some sentence of it must start, past greetings
 /// ([`BEFORE`]) and at most one lead-in ([`LEAD_INS`]), with an ask
-/// ([`ASKS`]), and hold none of [`NOT`]. On lamp-52e6 on 9 Nov, "Lamp, I
+/// ([`ASKS`]) for a recording ([`AUDIO`], or "something" before a
+/// [`MOODS`] word), and no word of the whole line may be one of [`NOT`]. On lamp-52e6 on 9 Nov, "Lamp, I
 /// listened to some relaxing music on the train this morning, it was really
 /// nice." got a `use_skill` call to the relaxing-music skill: talk about
 /// music, not an ask, so it is refused here, not left to the skill's text.
@@ -98,11 +140,14 @@ const NOT: &[&str] = &["don't", "dont", "not", "never", "no", "stop", "dung"];
 // another language or phrasing is refused (the model is told so, and the
 // person can say it plainly). Widen ASKS when a lamp run shows one.
 pub fn asks_to_play(said: &str) -> bool {
+    if crate::known_faces::folded_words(said)
+        .iter()
+        .any(|word| NOT.contains(&word.as_str()))
+    {
+        return false;
+    }
     said.split(['.', '!', '?', ';']).any(|sentence| {
         let words = crate::known_faces::folded_words(sentence);
-        if words.iter().any(|word| NOT.contains(&word.as_str())) {
-            return false;
-        }
         let starts = |at: usize, phrase: &[&str]| {
             words.len() >= at + phrase.len()
                 && words[at..at + phrase.len()]
@@ -123,7 +168,15 @@ pub fn asks_to_play(said: &str) -> bool {
                 at += 1;
             }
         }
+        let asked = &words[at.min(words.len())..];
         ASKS.iter().any(|ask| starts(at, ask))
+            && asked.iter().enumerate().any(|(i, word)| {
+                AUDIO.contains(&word.as_str())
+                    || (word == "something"
+                        && asked
+                            .get(i + 1)
+                            .is_some_and(|next| MOODS.contains(&next.as_str())))
+            })
     })
 }
 
@@ -243,6 +296,12 @@ mod tests {
             "I want to know which songs calm a baby.",
             "Tôi đã nghe nhạc trên tàu sáng nay.",
             "Đừng mở nhạc nhé.",
+            // #5802: a later cancel in the line, and asks for something else.
+            "Lamp, play some relaxing music. Actually, don't.",
+            "Play some music; stop, never mind.",
+            "Lamp, turn on the light.",
+            "Lamp, play chess with me.",
+            "Play something with me.",
             "",
         ] {
             assert!(!asks_to_play(talk), "{talk}");

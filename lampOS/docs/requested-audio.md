@@ -142,8 +142,14 @@ to the call asks to play something (#5764,
 start, past greetings and one lead-in such as "can you", "could I", "I'd like
 to" or "let's", with an ask: play, put on, put some or put something, turn
 on, start, hear, listen to, or Vietnamese "mở/bật/phát nhạc", "mở/bật/phát
-bài" or "cho tôi/mình/em nghe". A sentence with "don't", "not", "never",
-"no", "stop" or "đừng" does not ask. Otherwise Voice drops the offer and
+bài" or "cho tôi/mình/em nghe", and at or after the ask name a recording:
+music, a song, recording, sound, track, tune, playlist, melody, lullaby,
+"nhạc" or "bài", or "something" before relaxing, calm, quiet, soft,
+soothing, gentle, peaceful or chill. "Lamp, turn on the light." and "Lamp,
+play chess with me." do not ask. A line with "don't", "not", "never", "no",
+"stop", "cancel", "actually", "wait", "maybe", "đừng" or "thôi" anywhere,
+in any sentence, does not ask: "Lamp, play some relaxing music. Actually,
+don't." is refused. Otherwise Voice drops the offer and
 tells the model `{"error": NOT_ASKED_TO_PLAY}`: nothing plays, and it must
 not say it is playing. It is never told the skill's confirmation. This
 check is in code, so a skill's "only when explicitly asked" text is no longer
