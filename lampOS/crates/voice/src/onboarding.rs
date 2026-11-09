@@ -2655,6 +2655,14 @@ impl Onboarding {
                 // Nov, #5139) a question with "okay" in it was taken as the
                 // yes to the face, the wait ran out, and no face was kept.
                 // Such a line is the model's to answer; the yes comes after.
+                // The read-back takes its own yes phrases too ("You got
+                // it.", "That's me."); no other yes does (the first
+                // builder's P2 on #5677).
+                let read = if read_back {
+                    reading_with(language, text, &READ_BACK_YES_PHRASES)
+                } else {
+                    read
+                };
                 let yes = read.agrees
                     && read.answers_hello
                     && !read.asks
@@ -4511,7 +4519,7 @@ const NO: [&str; 11] = [
 /// problem", "I don't mind", "Of course", "Go ahead". On lamp-29e7 on 27 Oct
 /// "who you are" took 5 minutes (#3883); a "no problem" there also cleared
 /// the name heard.
-const YES_PHRASES: [&[&str]; 11] = [
+const YES_PHRASES: [&[&str]; 7] = [
     &["no", "problem"],
     &["don't", "mind"],
     &["do", "not", "mind"],
@@ -4520,7 +4528,12 @@ const YES_PHRASES: [&[&str]; 11] = [
     &["would", "not", "mind"],
     &["of", "course"],
     &["go", "ahead"],
-    // Answers to the name's read-back (the first builder's P2 on #5677).
+];
+
+/// Answers to the name's read-back (the first builder's P2 on #5677), a yes
+/// there only: beside [`YES_PHRASES`] they would reach the consents, and
+/// "That's it, forget it." would be a yes to face expressions.
+const READ_BACK_YES_PHRASES: [&[&str]; 4] = [
     &["you", "got", "it"],
     &["that's", "it"],
     &["you", "did"],
@@ -4536,10 +4549,10 @@ const SHORT_ANSWER_WORDS: usize = 4;
 /// did it backwards." (Jarvis's P2 on #5677).
 const WHOLE_YES_PHRASES: [&[&str]; 2] = [&["you", "got", "it"], &["you", "did"]];
 
-/// Where a [`YES_PHRASES`] phrase starting at `at` in `words` ends, when one
-/// counts there as an answer.
-fn yes_phrase_at(words: &[String], at: usize) -> Option<usize> {
-    YES_PHRASES.iter().find_map(|phrase| {
+/// Where a [`YES_PHRASES`] phrase, or one of `more`, starting at `at` in
+/// `words` ends, when one counts there as an answer.
+fn yes_phrase_at(words: &[String], at: usize, more: &[&[&str]]) -> Option<usize> {
+    YES_PHRASES.iter().chain(more).find_map(|phrase| {
         let end = at + phrase.len();
         let said = end <= words.len()
             && words[at..end]
@@ -4555,17 +4568,17 @@ fn yes_phrase_at(words: &[String], at: usize) -> Option<usize> {
     })
 }
 
-/// A line's words with its [`YES_PHRASES`] taken out, and whether it had one.
-/// A phrase counts only as an answer: leading the line, or in a short one. In
-/// a statement ("I'll go ahead and sit down", "There is no problem with the
-/// wifi") it is only words (Fourteen's P2 on #3893).
-fn without_yes_phrases(words: &[String]) -> (Vec<&str>, bool) {
+/// A line's words with its [`YES_PHRASES`] (and `more`) taken out, and
+/// whether it had one. A phrase counts only as an answer: leading the line,
+/// or in a short one. In a statement ("I'll go ahead and sit down", "There is
+/// no problem with the wifi") it is only words (Fourteen's P2 on #3893).
+fn without_yes_phrases<'a>(words: &'a [String], more: &[&[&str]]) -> (Vec<&'a str>, bool) {
     let mut rest = Vec::with_capacity(words.len());
     let mut found = false;
     let mut at = 0;
     let short = words.len() <= SHORT_ANSWER_WORDS;
     while at < words.len() {
-        if let Some(end) = yes_phrase_at(words, at).filter(|_| short || at == 0) {
+        if let Some(end) = yes_phrase_at(words, at, more).filter(|_| short || at == 0) {
             found = true;
             at = end;
             continue;
@@ -4576,14 +4589,15 @@ fn without_yes_phrases(words: &[String]) -> (Vec<&str>, bool) {
     (rest, found)
 }
 
-fn agrees(words: &[String]) -> bool {
-    let (rest, phrase) = without_yes_phrases(words);
+/// A yes, with no no word; `more` yes phrases count too: the read-back's.
+fn agrees(words: &[String], more: &[&[&str]]) -> bool {
+    let (rest, phrase) = without_yes_phrases(words, more);
     (phrase || rest.iter().any(|word| YES.contains(word)))
         && !rest.iter().any(|word| NO.contains(word))
 }
 
 fn refuses(words: &[String]) -> bool {
-    let (rest, _) = without_yes_phrases(words);
+    let (rest, _) = without_yes_phrases(words, &[]);
     rest.iter().any(|word| NO.contains(word))
 }
 
@@ -4986,6 +5000,17 @@ fn words_of(text: &str) -> Vec<String> {
 /// What `text` says, by the walk's rules: in English, by the words above
 /// ([`words_of`]); in the owner's language, by its own ([`in_language`]).
 fn reading(language: Option<crate::language::Language>, text: &str) -> in_language::Reading {
+    reading_with(language, text, &[])
+}
+
+/// [`reading`], with `more` yes phrases for its yes: the read-back's
+/// ([`READ_BACK_YES_PHRASES`]), in English. `yes_or_no`, the consents'
+/// reading, never takes them.
+fn reading_with(
+    language: Option<crate::language::Language>,
+    text: &str,
+    more: &[&[&str]],
+) -> in_language::Reading {
     if let Some(language) = language {
         return in_language::read(language, text);
     }
@@ -5013,6 +5038,7 @@ fn reading(language: Option<crate::language::Language>, text: &str) -> in_langua
                 .filter(|word| *word != "please")
                 .cloned()
                 .collect::<Vec<_>>(),
+            more,
         ) || said_together(&words, "please", "do")
     };
     // Once asked, the hello takes its yes or no from a short answer ("That's
@@ -5026,9 +5052,9 @@ fn reading(language: Option<crate::language::Language>, text: &str) -> in_langua
             word.as_str(),
             "yes" | "yeah" | "yep" | "yup" | "sure" | "no" | "nope" | "nah"
         )
-    }) || yes_phrase_at(&words, 0).is_some();
+    }) || yes_phrase_at(&words, 0, more).is_some();
     in_language::Reading {
-        agrees: agrees(&words),
+        agrees: agrees(&words, more),
         refuses: refuses(&words),
         names_someone: names_someone(text, &words),
         hello_yes: hello_yes(&words),
@@ -5059,7 +5085,7 @@ fn yes_or_no(text: &str) -> Option<bool> {
     if words.is_empty() || words.len() > 4 {
         return None;
     }
-    let (rest, phrase) = without_yes_phrases(&words);
+    let (rest, phrase) = without_yes_phrases(&words, &[]);
     let has = |set: &[&str]| rest.iter().any(|word| set.contains(word));
     // A "…n't" left once the yes phrases are out ("don't mind" is one) is a
     // no: "Right, I don't." and "Yeah, I won't." were a yes, and a consent
@@ -7274,6 +7300,7 @@ mod tests {
     #[test]
     fn yes_phrases_are_a_yes_and_a_plain_no_stays_a_no() {
         let words = |text: &str| words_of(text);
+        let back_agrees = |text: &str| agrees(&words_of(text), &READ_BACK_YES_PHRASES);
         for yes in [
             "No problem",
             "of course",
@@ -7281,7 +7308,7 @@ mod tests {
             "I don't mind",
             "I do not mind",
         ] {
-            assert!(agrees(&words(yes)), "{yes}");
+            assert!(agrees(&words(yes), &[]), "{yes}");
             assert!(!refuses(&words(yes)), "{yes}");
             assert_eq!(yes_or_no(yes), Some(true), "{yes}");
         }
@@ -7290,7 +7317,7 @@ mod tests {
             "There is no problem with the wifi.",
             "I don't mind the noise from the street.",
         ] {
-            assert!(!agrees(&words(statement)), "{statement}");
+            assert!(!agrees(&words(statement), &[]), "{statement}");
         }
         for no in [
             "No",
@@ -7303,7 +7330,8 @@ mod tests {
             "No, you didn't.",
             "That's incorrect.",
         ] {
-            assert!(!agrees(&words(no)), "{no}");
+            assert!(!agrees(&words(no), &[]), "{no}");
+            assert!(!back_agrees(no), "{no}");
             assert!(refuses(&words(no)), "{no}");
         }
         // Neither a yes nor a no: the read-back stays open. "you got it" and
@@ -7316,7 +7344,8 @@ mod tests {
             "You got it mixed up.",
             "You did it backwards.",
         ] {
-            assert!(!agrees(&words(unclear)), "{unclear}");
+            assert!(!agrees(&words(unclear), &[]), "{unclear}");
+            assert!(!back_agrees(unclear), "{unclear}");
             assert!(!refuses(&words(unclear)), "{unclear}");
         }
         for yes in [
@@ -7331,8 +7360,19 @@ mod tests {
             "Yup.",
             "Exactly.",
         ] {
-            assert!(agrees(&words(yes)), "{yes}");
+            assert!(back_agrees(yes), "{yes}");
             assert!(!refuses(&words(yes)), "{yes}");
+        }
+        // The read-back's phrases are its yes alone: no consent nor any
+        // other step's yes (the first builder's P2 on #5677).
+        for back in [
+            "You got it.",
+            "That's it, forget it.",
+            "You did.",
+            "That's me.",
+        ] {
+            assert!(!agrees(&words(back), &[]), "{back}");
+            assert_eq!(yes_or_no(back), None, "{back}");
         }
         assert_eq!(yes_or_no("of course not"), Some(false));
         // Fourth's P3 on #4469: a short line with a yes word and a "…n't"
@@ -8345,7 +8385,7 @@ mod tests {
         assert!(refuses(&words_of("That's so wrong.")));
         for no in ["Uh-uh.", "Mm-mm.", "Nuh-uh."] {
             assert!(refuses(&words_of(no)), "{no}");
-            assert!(!agrees(&words_of(no)), "{no}");
+            assert!(!agrees(&words_of(no), &[]), "{no}");
         }
     }
 
@@ -11215,6 +11255,42 @@ mod tests {
             assert_eq!(room.outcome(Step::FaceExpressions), None, "{line}");
         }
         assert!(!face_expressions_file(&room).exists());
+    }
+
+    /// The read-back's yes phrases are no consent: "That's it, forget it."
+    /// means never mind, and "That's me." or "You did." answer no face
+    /// question (the first builder's P2 on #5677). A plain yes still is one.
+    #[test]
+    fn the_read_backs_yes_phrases_are_no_consent_to_face_expressions() {
+        let mut room = asked_face_expressions("face-expressions-read-back-phrases");
+        for line in [
+            "That's it, forget it.",
+            "That's me.",
+            "You did.",
+            "You got it.",
+        ] {
+            room.walk.heard(line, room.at);
+            assert!(room.wait(S, Some(NEAR_MIDDLE)).is_empty(), "{line}");
+            assert_eq!(room.outcome(Step::FaceExpressions), None, "{line}");
+        }
+        assert!(!face_expressions_file(&room).exists());
+        for (name, yes) in [
+            ("face-expressions-plain-yes", "Yes."),
+            ("face-expressions-plain-sure", "Sure."),
+        ] {
+            let mut room = asked_face_expressions(name);
+            room.walk.heard(yes, room.at);
+            assert_eq!(
+                room.wait(S, Some(NEAR_MIDDLE)),
+                [own_line(skill::FACE_EXPRESSIONS_YES.into())],
+                "{yes}"
+            );
+            assert_eq!(
+                room.outcome(Step::FaceExpressions),
+                Some(Outcome::Done),
+                "{yes}"
+            );
+        }
     }
 
     /// A yes heard before the face question was handed out is another
