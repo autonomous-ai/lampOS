@@ -63,13 +63,11 @@ It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
 (`hum`, the lamp's own short hum) with `{"to": "voice"}` and their `done`,
 `start_turn` with `{"to": "voice"}` and its `done`, `end_turn` and
 `set_listening` as lamp-control does (`FakeLamp.hand_on_head()` lifts a
-mute), and `play` and `joints` refused (`refused`, "not routed yet: waits
-for …"), in lamp-control's own words. By default it also refuses every
-`look`, "the body's lease socket is not on here": that is the fake's
-default, not a lamp's. A customer lamp (stable 10824) has the socket and
-takes `look` at `ahead`, `hand` or a yaw and pitch (`--hands` answers looks
-too), and takes `joints` with `yaw` and `pitch`. The fake takes what a
-customer lamp refuses: a skill push, and a motion asked while another plays
+mute), `look` at `ahead`, `hand` or a yaw and pitch, and `joints` naming
+only `yaw` and `pitch`, as a customer lamp (stable 10824) takes them; and
+`play`, and `joints` naming `roll`, `shoulder` or `elbow`, refused
+(`refused`, "not routed yet: waits for …"), in lamp-control's own words.
+The fake takes what a customer lamp refuses: a skill push, and a motion asked while another plays
 (stable 10824 answers `busy`). `--everything` answers every op instead.
 
 ## Pair with a real lamp
@@ -383,8 +381,10 @@ this release"), `joints` but for `yaw` and `pitch`, and `play`, with
 while another plays with `busy` and `retry_ms`; and `say` and `sound` in its quiet
 hours when it sets them (off by default; a lamp sets its own window, said in
 `lamp.limits["quiet_hours"]`), or while its time isn't known, with `quiet_hours`.
-`lampos.testing.LAMP_CONTROL_REFUSES` is what `lamp fake` refuses: every
-`look` and every `joints` too, which is stricter than a stable lamp.
+`lampos.testing.LAMP_CONTROL_REFUSES` is what `lamp fake` refuses, as a
+stable lamp does: `play` (`FakeLamp(refuses=LAMP_CONTROL_REFUSES)`). Every
+fake refuses `joints` naming `roll`, `shoulder` or `elbow` with
+`lampos.testing.JOINTS_WAIT`, lamp-control's words.
 
 ### Connecting
 

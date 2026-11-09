@@ -51,11 +51,11 @@ async def _fake(args) -> int:
     from .testing import LAMP_CONTROL_REFUSES, FakeLamp, hand_track
 
     hands = getattr(args, "hands", False)
-    refuses = {} if getattr(args, "everything", False) else dict(LAMP_CONTROL_REFUSES)
-    if hands:
-        # A lamp with the body's lease socket, which a look at the hand needs.
-        refuses.pop("look", None)
-    async with FakeLamp(grants=schema.grants(), name="Fake lamp (lamp fake)", refuses=refuses) as fake:
+    everything = getattr(args, "everything", False)
+    refuses = {} if everything else dict(LAMP_CONTROL_REFUSES)
+    async with FakeLamp(
+        grants=schema.grants(), name="Fake lamp (lamp fake)", refuses=refuses
+    ) as fake:
         pairing = await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, keyring=Keyring())
         print(f"a fake lamp at {fake.host}:{fake.port}, paired as {pairing.client} in {Keyring().folder}", flush=True)
         print("run an example in another terminal with the same LAMPOS_HOME; Ctrl-C ends this", flush=True)
