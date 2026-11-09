@@ -269,7 +269,13 @@ async fn prepared_music_for(speaker: &str, revoke: bool) {
         // Inspect the raw queue too: the final output filter must not hide
         // an offer incorrectly enqueued by a revoked answer.
         let mut outputs: Vec<_> = engine.urgent.drain(..).collect();
-        outputs.extend(std::iter::from_fn(|| engine.output.try_recv().ok()));
+        outputs.extend(std::iter::from_fn(|| {
+            engine
+                .output
+                .try_recv()
+                .ok()
+                .map(speech_generation::Output::unfiltered)
+        }));
         no_answer(&outputs);
         assert_eq!(script.asked.lock().unwrap().len(), before_reply);
         assert_eq!(script.chats.lock().unwrap().len(), 1);
