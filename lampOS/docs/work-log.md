@@ -9019,3 +9019,17 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   read. My initial single-send and joined-line tests missed this batch case.
   Fixed head must preserve committed evidence and distinguish pre-gate
   uncertainty from proof of dispatch before any restatement.
+
+## 2026-11-09 — Second: cross-request send receipt hold
+
+- #5863 held0d5a30d8aa has another receipt-loss ordering: an older detached
+  send can finish after a newer send and overwrite services' global slot.
+  Gate/network/server tracing confirms distinct sends can overlap.
+- Actual Engine/scoped fixture with explicit store order Told(11), Told(10),
+  stale-scope unavailable for11: request12 recovery loses11's sent receipt,
+  calls it not sent, and runs another service_write. Expected regression
+  failure in0.63s. Scripted receipt interleaving, not live concurrent network
+  evidence. Saved /tmp/second-5863-old-receipt.patch and .log; removed clean.
+- Opposite same-batch receipt order control (refusal then success) passes
+  in0.32s with no new prepare. Scripted answers only; preserves the needed
+  success-over-refusal ordering while the author fixes both retention cases.
