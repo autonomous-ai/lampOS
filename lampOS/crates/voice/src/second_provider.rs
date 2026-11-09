@@ -13068,6 +13068,15 @@ async fn answer(
                 {
                     scope.release_held_keep(line, &HeldKeepYes(()));
                 }
+                // An admitted forget (`forget`, `forget_everything`,
+                // `forget_my_face`) ends a rename asked before it now,
+                // before it is awaited: neither a scope revoked at its
+                // return nor this turn dropped mid-await leaves the proposal
+                // for a later turn (Reviewer-three on #5792). Run or failed,
+                // they asked to forget it.
+                if crate::remember::is_forget(&call.name) {
+                    held_rename::forgot(shared, request);
+                }
                 let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
@@ -13176,7 +13185,8 @@ async fn answer(
         // Their yes to the new name runs the face rename held for it
         // ([`held_rename::HeldRename`]), before round 1, through the same
         // runner and checks as a model call; the model is told the result.
-        let mut rename_told = rename_note;
+        // Read before a held forget ran: never told past its clean start.
+        let mut rename_told = rename_note.filter(|_| !forgot_before_question);
         if let Some(call) = held_rename_runs.take() {
             let name = call
                 .args
@@ -13216,7 +13226,7 @@ async fn answer(
                 }
             }
         }
-        if let Some((name, why)) = held_rename_dropped {
+        if let Some((name, why)) = held_rename_dropped.filter(|_| !forgot_before_question) {
             messages.push(Message::system(held_rename::dropped_note(&name, why)));
         }
         if let Some(note) = rename_told {
@@ -14882,6 +14892,15 @@ async fn answer(
                     scope.mark_everything_asked(&EverythingShown(()));
                 }
                 ran_tool.store(true, Ordering::Relaxed);
+                // An admitted forget (`forget`, `forget_everything`,
+                // `forget_my_face`) ends a rename asked before it now,
+                // before either runner is awaited: neither a scope
+                // revoked at its return nor this turn dropped mid-await
+                // leaves the proposal for a later turn (Reviewer-three on
+                // #5792). Run or failed, they asked to forget it.
+                if crate::remember::is_forget(&call.name) {
+                    held_rename::forgot(shared, request);
+                }
                 let mut answer = match (&shared.requested_audio, spoken) {
                     (Some((worker_boot, runner)), Some(turn)) if turn.captured => {
                         let context = lamp_msgs::RequestedAudioContext {

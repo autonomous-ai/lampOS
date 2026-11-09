@@ -329,6 +329,29 @@ pub(super) fn ran(shared: &Shared, request: u64, name: &str) {
     }
 }
 
+/// A forget was admitted on `request` (`forget`, `forget_everything` or
+/// `forget_my_face`, [`crate::remember::is_forget`]): a memory forget's
+/// chat starts again from static instructions ([`super::after_forget`]),
+/// and a forgotten face takes the name proposed for it with it, so a rename
+/// asked before it is discarded too (Jarvis on #5792 for the face). Neither the held rename nor its asked
+/// note outlives it, on this turn or any later (Reviewer-three on #5586: the
+/// forgotten proposed name came back in the next prompt). Called before the
+/// forget is awaited, so a revoked scope at its return or the turn dropped
+/// mid-await cannot skip it (Reviewer-three on #5792).
+pub(super) fn forgot(shared: &Shared, request: u64) {
+    let Ok(mut renames) = shared.held_rename.lock() else {
+        return;
+    };
+    let held = renames.held.take().is_some();
+    let asked = renames.asked.take().is_some();
+    if held || asked {
+        eprintln!(
+            "lamp-voice second: request {request}: a memory forget ended the asked face rename"
+        );
+    }
+    renames.sight = None;
+}
+
 /// The answer of a rename a held one already ran for `name` in `request`,
 /// for a model call after the yes: never a second.
 pub(super) fn renamed_already(
