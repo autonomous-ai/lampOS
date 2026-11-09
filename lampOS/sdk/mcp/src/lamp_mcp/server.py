@@ -31,6 +31,7 @@ from lampos.client import SAY_MAX_BYTES
 from mcp.server.fastmcp import FastMCP, Image
 from mcp.server.fastmcp.exceptions import ToolError
 from pydantic import AnyUrl
+from .relink import Relink
 
 # The body's clips an agent is offered: the schema's `examples`, which leave
 # out `idle`, the lamp's own life, and `scanning`, a room sweep (CLAUDE.md
@@ -226,6 +227,22 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     # Nine's nine/mcp-follow).
     follow_now: list = []
 
+    async def ended_on(ended: asyncio.Future, gone: asyncio.Future | None, timeout: float):
+        """`ended`'s result, or `asyncio.TimeoutError` after `timeout`. With
+        `gone` (the connection the request was sent on, `Relink.gone`), a
+        connection that ends first ends the wait `closed`: its `done` can't
+        come on another connection (Second's P2 on #5830)."""
+        if gone is None:
+            return await asyncio.wait_for(asyncio.shield(ended), timeout)
+        waiting = asyncio.ensure_future(asyncio.shield(ended))
+        done, _ = await asyncio.wait({waiting, gone}, timeout=timeout, return_when=asyncio.FIRST_COMPLETED)
+        if waiting in done:
+            return waiting.result()
+        waiting.cancel()
+        if gone in done:
+            raise ToolError("closed: the connection to the lamp closed before this ended; lamp-mcp connects again by itself")
+        raise asyncio.TimeoutError
+
     def held() -> list[str]:
         now = clock()
         for lease in [lease for lease, lapses in leases.items() if lapses <= now]:
@@ -309,6 +326,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             nonlocal asked
             asked = id_
 
+        gone = getattr(lamp, "gone", None)
         lamp.on("lease", follow)
         lamp.on("done", follow)
         try:
@@ -326,7 +344,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 # follow, once the head is there (docs/control.md, "Looking").
                 return f"{op} taken by the {sent['to']}; its lease lapses within {ACTION_LEASE_MS // 1000} s"
             try:
-                what, how, why_ended = await asyncio.wait_for(asyncio.shield(ended), ACTION_LEASE_MS / 1000)
+                what, how, why_ended = await ended_on(ended, gone, ACTION_LEASE_MS / 1000)
             except asyncio.TimeoutError:
                 # No `done` yet (the server sends it once actions reach the
                 # parts): the lease lapses by itself; it is never held open.
@@ -677,6 +695,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 if event.get("re") == asked and not ended.done():
                     ended.set_result(event)
 
+            gone = getattr(lamp, "gone", None)
             lamp.on("done", heard)
             try:
                 try:
@@ -686,7 +705,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 if not wait:
                     return "turn started: the lamp answers the person's next line"
                 try:
-                    done = await asyncio.wait_for(asyncio.shield(ended), MOST_WAIT_S)
+                    done = await ended_on(ended, gone, MOST_WAIT_S)
                 except asyncio.TimeoutError:
                     return "turn started; not ended yet"
                 return f"turn {done.get('how')}" + (f": {done['why']}" if done.get("why") else "")
@@ -863,9 +882,12 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         for event in streamed:
             try:
                 await lamp.on(event, heard_any)
-            except LampError:
-                # An event the lamp doesn't say yet is left out, not fatal.
-                lamp.off(event, heard_any)
+            except LampError as error:
+                # The lamp away (`closed`, a restart): kept, so it is made
+                # again on the next connection (Second's P2 on #5830). An
+                # event the lamp doesn't say yet is left out, not fatal.
+                if error.code != "closed":
+                    lamp.off(event, heard_any)
 
     @server.resource("lamp://events", mime_type="application/json")
     async def events_stream() -> dict:
@@ -916,8 +938,13 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
 
 
 async def serve(lamp_id: str | None, client: str | None) -> None:
-    async with await Lamp.connect(lamp_id) as lamp:
-        await build(lamp, client=client).run_stdio_async()
+    # Connected again by itself after the lamp restarts (every update), so an
+    # agent's tools keep working for as long as lamp-mcp runs (`relink.py`).
+    lamp = await Relink.connect(lamp_id)
+    try:
+        await build(lamp, client=client).run_stdio_async()  # type: ignore[arg-type]
+    finally:
+        await lamp.close()
 
 
 def main(argv: list[str] | None = None) -> None:

@@ -463,7 +463,7 @@ The lamp restarts on every update, which closes each connection. Plain
 | call | Python | JS | MCP | what it does | status |
 |---|---|---|---|---|---|
 | keep running | `await Lamp.keep_connected(setup)` | `await Lamp.keepConnected(setup, { signal })` | — | connects, runs `setup(lamp)` (subscribe, take leases), and connects again after each close, pausing 1, 2, 5, then 10 s while the lamp can't be reached; stops at once on `NotPaired`, `WrongLamp`, a refused hello, `no_grant`, or an error in `setup` | **next build** (in review). Run on the customer build's lamp-control across 2 restarts: Python 3 connections; JS 3 setups, each within a second of the lamp being back |
-| lamp-mcp | — | — | the server itself | connects again after the lamp restarts and makes its event subscriptions again. A tool called while the lamp is away answers `closed`; the next one works | **next build** (in review). Run: `lamp_events` answered on 3 connections across 2 restarts |
+| lamp-mcp | — | — | the server itself | connects again after the lamp restarts and makes its event subscriptions again. A tool called while the lamp is away answers `closed`; the next one works | **next build** (#5830). Run: `lamp_events` answered on 3 connections across 2 restarts |
 | today, by hand | `await lamp.wait_closed()` then connect again | `await lamp.closed()` | restart lamp-mcp | — | works today (10824, 9 Nov 2026) |
 
 Python, in review:

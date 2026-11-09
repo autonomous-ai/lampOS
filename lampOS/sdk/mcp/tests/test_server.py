@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
-from lampos import Keyring, Lamp, schema
+from lampos import Keyring, Lamp, LampError, schema
 from lampos.testing import FAKE_JPEG, FakeLamp
 from mcp.shared.memory import create_connected_server_and_client_session
 from pydantic import AnyUrl
@@ -237,6 +237,194 @@ def test_lamp_events_gives_what_the_lamp_said_since_a_seq_and_waits_for_one(tmp_
             assert [(e["seq"], e["ev"], e["count"]) for e in later["events"]] == [(3, "person.left", 0)]
             # Nothing new: an empty list at once without wait_s.
             assert json.loads(text(await session.call_tool("lamp_events", {"since": 3})))["events"] == []
+
+    run(go())
+
+
+async def restart(fake: FakeLamp) -> None:
+    """The lamp restarts, as on every update: each connection closes."""
+    for ws in list(fake._connections):
+        await ws.close(1012, "the lamp restarts")
+
+
+def test_lamp_mcp_connects_again_after_the_lamp_restarts(tmp_path):
+    """Every update restarts the lamp and closes the connection: lamp-mcp
+    connects again by itself, makes its subscriptions again, and its tools
+    work as before."""
+    from lamp_mcp.relink import Relink
+
+    async def go():
+        async with FakeLamp(grants=("look", "light")) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            lamp = await Relink.connect(keyring=ring, pauses=(0.05, 0.1))
+            try:
+                server = build(lamp, client="test laptop")
+                async with create_connected_server_and_client_session(server._mcp_server) as session:
+                    await session.call_tool("lamp_events", {})
+                    await until(lambda: len(fake.asked("subscribe")) >= 1)
+                    await fake.emit("person.arrived", count=1, near=0.3)
+                    said = json.loads(text(await session.call_tool("lamp_events", {"since": 0, "wait_s": 5})))
+                    assert [e["ev"] for e in said["events"]] == ["person.arrived"]
+
+                    subscribed = len(fake.asked("subscribe"))
+                    await restart(fake)
+                    await until(lambda: lamp.connections == 2 and len(fake.asked("subscribe")) > subscribed)
+                    await fake.emit("person.arrived", count=2, near=0.3)
+                    said = json.loads(text(await session.call_tool("lamp_events", {"since": 1, "wait_s": 5})))
+                    assert [(e["ev"], e["count"]) for e in said["events"]] == [("person.arrived", 2)]
+                    result = await session.call_tool("lamp_light", {"colour": "blue", "level": 2})
+                    assert not result.isError, text(result)
+                    assert fake.asked("light")[-1]["colour"] == "blue"
+            finally:
+                await lamp.close()
+
+    run(go())
+
+
+def test_the_first_lamp_events_while_the_lamp_is_away_still_streams_after_it_is_back(tmp_path):
+    """Second's first P2 on #5830: `lamp_events` asked first while the lamp is
+    restarting keeps its subscriptions, so they are made again once it's back."""
+    from lamp_mcp.relink import Relink
+
+    async def go():
+        async with FakeLamp(grants=("look", "light")) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            lamp = await Relink.connect(keyring=ring, pauses=(0.5,))
+            try:
+                server = build(lamp, client="test laptop")
+                async with create_connected_server_and_client_session(server._mcp_server) as session:
+                    await restart(fake)
+                    away = json.loads(text(await session.call_tool("lamp_events", {})))
+                    assert away["events"] == []
+                    await until(lambda: lamp.connections == 2 and fake.asked("subscribe"))
+                    await fake.emit("person.arrived", count=1, near=0.3)
+                    said = json.loads(text(await session.call_tool("lamp_events", {"since": 0, "wait_s": 5})))
+                    assert [e["ev"] for e in said["events"]] == ["person.arrived"]
+            finally:
+                await lamp.close()
+
+    run(go())
+
+
+def test_a_wait_that_ends_during_the_replay_is_not_made_again():
+    """Second's second P2 on #5830: while one subscription is being made again,
+    a wait that ends takes its own off, and the replay doesn't bring it back."""
+    from lamp_mcp.relink import Relink
+
+    class Old:
+        def __init__(self):
+            self.closed = asyncio.Event()
+
+        def on(self, event, handler, *, phrases=None):
+            return asyncio.sleep(0)
+
+        def off(self, event, handler):
+            pass
+
+        async def wait_closed(self):
+            await self.closed.wait()
+
+        async def close(self):
+            pass
+
+    class New(Old):
+        def __init__(self):
+            super().__init__()
+            self.gate = asyncio.Event()
+            self.handlers = []
+
+        async def _on(self, event, handler, phrases):
+            self.handlers.append((event, handler))
+            if event == "touch":
+                await self.gate.wait()
+
+        def on(self, event, handler, *, phrases=None):
+            return self._on(event, handler, phrases)
+
+        def off(self, event, handler):
+            # As the SDK's: quiet for a handler it doesn't have.
+            if (event, handler) in self.handlers:
+                self.handlers.remove((event, handler))
+
+    async def go():
+        old, new = Old(), New()
+
+        async def again():
+            return new
+
+        lamp = Relink(again, old, pauses=(0.01,))
+        touch = lambda event: None  # noqa: E731
+        phrase = lambda event: None  # noqa: E731
+        await lamp.on("touch", touch)
+        await lamp.on("phrase.heard", phrase, phrases=["good night lamp"])
+        old.closed.set()
+        await until(lambda: new.handlers)
+        # The phrase wait ends while touch is still being made again.
+        lamp.off("phrase.heard", phrase)
+        new.gate.set()
+        await until(lambda: lamp.connections == 2)
+        await asyncio.sleep(0.05)
+        assert new.handlers == [("touch", touch)]
+        await lamp.close()
+
+    run(go())
+
+
+def test_a_wait_begun_before_a_restart_never_takes_a_done_from_the_new_connection(tmp_path):
+    """Second's P2 on #5830: request numbers start over on a new connection,
+    so a `done` handler is never made again there. A turn wait begun before
+    the restart ends `closed` with its connection; the new connection's
+    request 1 finishing doesn't end it as "turn finished"."""
+    from lamp_mcp.relink import Relink
+
+    async def go():
+        async with FakeLamp(grants=("speak", "hear"), auto_done=False) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            lamp = await Relink.connect(keyring=ring, pauses=(0.05,))
+            try:
+                server = build(lamp, client="test laptop")
+                async with create_connected_server_and_client_session(server._mcp_server) as session:
+                    turn = asyncio.create_task(session.call_tool("lamp_start_turn", {"prompt": "First line.", "wait": True}))
+                    await until(lambda: fake.asked("turn.start"))
+                    await restart(fake)
+                    ended = await asyncio.wait_for(turn, 5)
+                    assert ended.isError and "closed" in text(ended), text(ended)
+                    await until(lambda: lamp.connections == 2)
+                    said = await session.call_tool("lamp_say", {"text": "Second line."})
+                    assert not said.isError, text(said)
+                    first = [r for r in fake.received if r.get("op") == "say"][-1]["id"]
+                    await fake.done(first)
+                    await asyncio.sleep(0.1)
+                    assert not lamp._held or all(event not in ("done", "lease") for event, _, _ in lamp._held)
+            finally:
+                await lamp.close()
+
+    run(go())
+
+
+def test_lamp_mcp_stops_connecting_again_once_its_computer_is_unpaired(tmp_path):
+    """A hello the lamp refuses can't mend by connecting again: lamp-mcp says
+    so once and stops trying, and its tools answer `closed`."""
+    from lamp_mcp.relink import Relink
+
+    async def go():
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            lamp = await Relink.connect(keyring=ring, pauses=(0.05,))
+            try:
+                fake.clients.clear()  # the owner removed this computer
+                await restart(fake)
+                await until(lambda: lamp.gave_up is not None)
+                assert lamp.gave_up.code == "unpaired"
+                with pytest.raises(LampError) as closed:
+                    await lamp.light("blue", 2, 1000)
+                assert closed.value.code == "closed"
+            finally:
+                await lamp.close()
 
     run(go())
 
