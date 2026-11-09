@@ -4378,9 +4378,22 @@ after a take-over, but now for every turn:
       and is told not to repeat calls already run. Partial deletion and
       uncertain outcomes are not described as complete. Setup-name, place
       and reminder deletion results retain only fixed success, kept or
-      uncertain states; an unreported step is never assumed successful.
-      A failed or uncertain step downgrades an `everything=true` claim,
-      including reminder cancellation failures whose producer leaves it true.
+      uncertain states. The same sanitizer carries `room_memory_result`,
+      `sound_consent_result` and `face_expression_consent_result` only as
+      `cleared`, `kept` or `uncertain`; any other value becomes `uncertain`,
+      with no raw payload copied. An absent field stays unreported and is
+      never assumed successful.
+      For room cleanup, the producer reports `cleared` only for a
+      `forget_said` reply with `ok: true` and a nonnegative integer
+      `removed` count, including zero; `ok: false` with `unknown_op` means
+      `kept`, and other replies or a lost reply mean `uncertain`. Each
+      consent-file removal reports `cleared` on success or `NotFound`,
+      otherwise `uncertain`. A non-cleared room or consent outcome sets
+      `everything: false`, and later successful steps cannot restore true.
+      The sanitizer also downgrades an `everything=true` claim for any
+      failed or uncertain step, including reminder cancellation failures
+      whose producer leaves it true. These result fields add no calls,
+      retries or deadlines and do not change the deletion's privacy scope.
       The reset also clears the prior acting answer’s silence-marker state,
       so the fresh round does not inherit its unspoken-reply protocol.
       Earlier memory-keep evidence and its claim-correction allowance reset
