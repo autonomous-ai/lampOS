@@ -606,7 +606,14 @@ cái nào.
   `spotify` của nó; khi đó `service_play` được đưa ra thay cho hàm đó, một
   hàm cho một yêu cầu (`tools::skills_after`). Có kỹ năng mà không có việc
   phát nhạc được nêu, hàm riêng của kỹ năng trả lời rằng đèn chưa phát được
-  Spotify; không có kỹ năng, không hàm nào được đưa ra. `action` là `play`,
+  Spotify; không có kỹ năng, không hàm nào được đưa ra. Cùng phép kiểm tra
+  đó áp dụng khi một lần gọi được chạy, không chỉ khi nó được khai báo
+  (`tools::route`, P2 của Reviewer-two trên #5796): một `service_play` mà
+  mô hình tạo khi kỹ năng còn bật, được trả lời sau khi kỹ năng bị gỡ hoặc
+  tắt (hoặc không có tệp tools của các kỹ năng), không ai chạy và không hỏi
+  `lamp-services` gì; mô hình được bảo "Not done: I play Spotify only while
+  the Spotify skill is installed and on, and it isn't now. Say so in a few
+  words." (`services::PLAY_OFF`). `action` là `play`,
   `pause`, `resume`, `next` hoặc `previous`; một `play` nhận `query`, thứ
   người đó đã gọi tên (tối đa 200 byte, một dòng), và `kind`, `track` (nếu
   không nói), `artist`, `album` hoặc `playlist`. Một `play` không có `query`
@@ -1470,7 +1477,9 @@ của chủ đèn phát ngay trên tuyến Live mà không cần thấy khuôn m
 khách hay câu không được nghe và một lần gọi sau một lần đọc trong cùng yêu
 cầu bị từ chối, và câu trả lời được đánh dấu là dữ liệu trích dẫn;
 `service_play` chỉ được khai báo khi có hàm của kỹ năng `spotify`, thay cho
-hàm đó, và hàm đó được đưa ra khi `lamp-services` không nêu việc phát nhạc.
+hàm đó, và hàm đó được đưa ra khi `lamp-services` không nêu việc phát nhạc;
+một lần phát được tạo trước khi kỹ năng bị gỡ, bị tắt hay mất tệp tools
+không hỏi các dịch vụ gì, và một lần khi kỹ năng đang bật hỏi đúng một lần.
 `lamp-skills test skills/spotify`: chỉ câu nói của nó khi được gọi, không gì
 khi người ta nói chuyện về nhạc. Ngoài ra: kho chỉ root (0700/0600) và được ghi trọn, một
 code không bao giờ là một đường dẫn, gỡ và xoá; không bí mật nào trong một

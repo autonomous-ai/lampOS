@@ -4137,7 +4137,7 @@ impl ToolDesk {
             | Route::Onboarding(_)
             | Route::ReportsStop(_)
             | Route::Nobody => {
-                let (sent, sent_us) = tell(&crate::tools::unavailable());
+                let (sent, sent_us) = tell(&crate::tools::nobody_told(&self.settings, &call.name));
                 self.line(
                     lineage.session,
                     request,

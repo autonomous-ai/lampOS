@@ -586,7 +586,14 @@ neither.
   function `spotify`; `service_play` is then offered in that function's
   place, one function for one ask (`tools::skills_after`). With the skill
   and no playback named, the skill's own function answers that the lamp
-  can't play Spotify yet; without the skill, neither is offered. `action`
+  can't play Spotify yet; without the skill, neither is offered. The same
+  check holds when a call is run, not only when it is declared
+  (`tools::route`, Reviewer-two's P2 on #5796): a `service_play` the model
+  made while the skill was on, answered after it was removed or put off (or
+  with no skills' tools file), is run by nobody and asks `lamp-services`
+  nothing; the model is told "Not done: I play Spotify only while the
+  Spotify skill is installed and on, and it isn't now. Say so in a few
+  words." (`services::PLAY_OFF`). `action`
   is `play`, `pause`, `resume`, `next` or `previous`; a `play` takes `query`,
   what the person named (at most 200 bytes, one line), and `kind`, `track`
   (if not said), `artist`, `album` or `playlist`. A `play` with no `query`
@@ -1446,7 +1453,9 @@ product unit setting neither. In `lamp-voice` (`cargo test -p lamp-voice
 route with no face seen, a guest's or an unheard line and a call after a
 read in the same request refused, and the answer marked quoted data;
 `service_play` declared only with the `spotify` skill's function, in its
-place, and that function offered when `lamp-services` names no playback.
+place, and that function offered when `lamp-services` names no playback;
+a play made before the skill was removed, put off or its tools file gone
+asks the services nothing, and one with the skill on asks once.
 `lamp-skills test skills/spotify`: its line only when called, nothing on
 talk of music. Also: the store root-only (0700/0600) and written
 whole, a code never a path, remove and wipe; no secret in a `Debug` or a
