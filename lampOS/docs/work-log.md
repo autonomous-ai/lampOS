@@ -9267,3 +9267,17 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   CI green. Author's READ ASK followed the already-posted restatement.
   Linked that exact-head result and asked Nine to mark ready/nominate for
   corrective train, comment 6742698525. No release or PR-state mutation.
+
+## 2026-11-09 — Second: Gmail concurrent metadata read
+
+- Assigned second read #5888 09fc1e4669; READ-OK comment 6742813616.
+  Full lamp-services 79 passed in 0.84 s. Two independent actual Services
+  probes passed in 0.07 s: reversed metadata completion retains list
+  order, and dropping a read drops all three in-flight request guards.
+- Fan-out capped at ten, no detached work; host guards, filtering and
+  scrubbing retained. Source audit corroborated. P3: waiting for every
+  sibling delays an early error and whole-read timeout can replace it;
+  qualify unchanged-error claim and cover slow dependency latency.
+- No Google/device/acoustic evidence. Fourteen owes comparable lamp row
+  before claiming 2–3 s improvement. Temporary tests saved under
+  /tmp/second-5888-probes.rs, removed; checkout/diff clean.
