@@ -11628,9 +11628,9 @@ fn let_the_walk_go() {
 /// spoken turn of the same session, within [`HELD_SAVE_FOR`], when that
 /// turn is a plain yes to the lamp's read-back. A turn the lamp wrote
 /// leaves it as it is; any other turn drops it. A plain yes whose save is
-/// dropped all the same (a second face, or the speaker not seen saying it)
-/// comes back as [`SetupSave::Dropped`] with why, for the model to be told: left untold, it
-/// made up its own reason on lamp-52e6 (Fifth's run B on #5415, 5 Nov:
+/// dropped all the same (a second face seen saying it) comes back as
+/// [`SetupSave::Dropped`] with why, for the model to be told: left
+/// untold, it made up its own reason on lamp-52e6 (Fifth's run B on #5415, 5 Nov:
 /// "I need to know who you are first"). It runs only on a yes to their
 /// face (`known_faces::face_agreed`): a plain yes to the name said back
 /// keeps it held and has the face question asked first
@@ -11680,7 +11680,7 @@ fn take_held_save(
     let said = said_window(shared);
     let verdict = crate::known_faces::held_save_verdict(&name, &said);
     let plain_yes = verdict == crate::known_faces::HeldSaveVerdict::Runs;
-    // Only these two drop a plain yes the model should hear about.
+    // Only a second face drops a plain yes the model should hear about.
     let mut told = false;
     let why = if now.saturating_duration_since(held.at) > HELD_SAVE_FOR {
         "too late"
@@ -11696,14 +11696,10 @@ fn take_held_save(
         // the yes may be someone else's.
         told = plain_yes;
         "a second face seen at the yes"
-    } else if shared.forget_sight.is_some()
-        && seen_speaking
-            .as_ref()
-            .is_none_or(|line| line.speakers.len() != 1)
-    {
-        told = plain_yes;
-        "the speaker was not seen saying the yes"
     } else {
+        // No face seen saying the yes, or none in view, still runs it (the
+        // lead, 9 Nov: the owner may not face the lamp); the eyes then
+        // keep nothing and the model is told why.
         match verdict {
             crate::known_faces::HeldSaveVerdict::Runs
                 if !called || crate::known_faces::face_agreed(&name, &said) =>
