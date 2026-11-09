@@ -118,8 +118,10 @@ pub const MUTE_BEING_TAKEN: &str = "this computer's mute is still being taken by
 /// Where the events of actions that end later go: the client, and the
 /// event (`done`).
 pub type Events = Arc<dyn Fn(&str, Value) + Send + Sync>;
-/// Where a client's binary camera frames go (`crate::camera`'s fast stream).
-pub type Binary = Arc<dyn Fn(&str, &[u8]) + Send + Sync>;
+/// Where a client's binary camera frames go (`crate::camera`'s fast stream):
+/// the client, the turn of the stream that made it (`Camera::streaming`), and
+/// the frame.
+pub type Binary = Arc<dyn Fn(&str, u64, &[u8]) + Send + Sync>;
 
 /// Something a light request can be published on: the bus, or a test's
 /// list.
@@ -1346,10 +1348,10 @@ impl Parts for Lamp {
             .unwrap_or(Value::Null)
     }
 
-    fn camera_streaming(&self, client: &str) -> bool {
+    fn camera_streaming(&self, client: &str, turn: u64) -> bool {
         self.camera
             .as_ref()
-            .is_some_and(|camera| camera.streaming(client))
+            .is_some_and(|camera| camera.streaming(client, turn))
     }
 
     fn camera_end(&mut self, client: &str) {

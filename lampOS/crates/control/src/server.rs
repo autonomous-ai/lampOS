@@ -152,7 +152,7 @@ struct Open {
     outbox: mpsc::UnboundedSender<Value>,
     /// Its camera frames, binary, [`FRAMES_QUEUED`] at most: past that a
     /// frame is dropped, never queued, so a slow link never grows memory.
-    frames: mpsc::Sender<Vec<u8>>,
+    frames: mpsc::Sender<(u64, Vec<u8>)>,
     /// What it subscribed to, and its phrases, as its session says.
     events: BTreeSet<EventKind>,
     phrases: Vec<String>,
@@ -372,12 +372,12 @@ impl Shared {
     /// Sends `event` to every connection of `client`.
     /// Sends a binary camera frame to every connection of `client` on the
     /// lamp's own network: dropped for one whose queue is full.
-    fn send_binary_to(&self, client: &str, frame: &[u8]) {
+    fn send_binary_to(&self, client: &str, turn: u64, frame: &[u8]) {
         for open in self.open.lock().expect("open").values() {
             if open.client.as_deref() == Some(client)
                 && open.grants.contains(&crate::protocol::Grant::Camera)
             {
-                let _ = open.frames.try_send(frame.to_vec());
+                let _ = open.frames.try_send((turn, frame.to_vec()));
             }
         }
     }
@@ -385,9 +385,9 @@ impl Shared {
     /// Binary camera frames for a client (`crate::camera`'s fast stream).
     pub fn binary(self: &Arc<Self>) -> crate::parts::Binary {
         let shared = Arc::downgrade(self);
-        Arc::new(move |client: &str, frame: &[u8]| {
+        Arc::new(move |client: &str, turn: u64, frame: &[u8]| {
             if let Some(shared) = shared.upgrade() {
-                shared.send_binary_to(client, frame);
+                shared.send_binary_to(client, turn, frame);
             }
         })
     }
@@ -894,7 +894,7 @@ async fn connection<S>(
 {
     let id = shared.next.fetch_add(1, Ordering::Relaxed);
     let (outbox, mut inbox) = mpsc::unbounded_channel::<Value>();
-    let (frames, mut framed) = mpsc::channel::<Vec<u8>>(FRAMES_QUEUED);
+    let (frames, mut framed) = mpsc::channel::<(u64, Vec<u8>)>(FRAMES_QUEUED);
     let (body_state, mut newest_body) = watch::channel::<Option<Value>>(None);
     // Until its sender goes with the connection's entry.
     let mut body_open = true;
@@ -999,17 +999,23 @@ async fn connection<S>(
                     }
                 }
                 frame = framed.recv() => {
-                    let Some(frame) = frame else { continue };
+                    let Some((turn, frame)) = frame else { continue };
                     // Never beyond the lamp's own network (control.md, "The
                     // camera").
                     if remote {
                         continue;
                     }
-                    // Only while its stream still runs: a frame queued
-                    // before an `off`, a `stop`, a re-pairing or an end
-                    // never goes (Thirteen's P3 on #4521).
+                    // Only while the stream that made it still runs: a frame
+                    // queued before an `off`, a `stop`, a re-pairing or an
+                    // end never goes (Thirteen's P3 on #4521), nor through a
+                    // stream started after it, before that one's mark is
+                    // drawn (banana, 9 Nov).
                     let streaming = session.client().is_some_and(|client| {
-                        shared.parts.lock().expect("parts").camera_streaming(client)
+                        shared
+                            .parts
+                            .lock()
+                            .expect("parts")
+                            .camera_streaming(client, turn)
                     });
                     if !streaming {
                         continue;
@@ -1034,6 +1040,28 @@ async fn connection<S>(
                     // (Thirteen's P3 on #4521).
                     if event["ev"] == "camera.ended" {
                         while framed.try_recv().is_ok() {}
+                    }
+                    // A picture goes only while the stream that made it runs,
+                    // never through one started after it (banana, 9 Nov), and
+                    // its turn is the door's own, taken off before it goes.
+                    let mut event = event;
+                    if event["ev"] == "camera.frame" {
+                        let turn = event
+                            .as_object_mut()
+                            .and_then(|fields| fields.remove(crate::camera::TURN_FIELD))
+                            .and_then(|turn| turn.as_u64());
+                        let streaming = turn.is_some_and(|turn| {
+                            session.client().is_some_and(|client| {
+                                shared
+                                    .parts
+                                    .lock()
+                                    .expect("parts")
+                                    .camera_streaming(client, turn)
+                            })
+                        });
+                        if !streaming {
+                            continue;
+                        }
                     }
                     if socket.send(Message::text(event.to_string())).await.is_err() {
                         break;
