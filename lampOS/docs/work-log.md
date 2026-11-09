@@ -9387,3 +9387,19 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - #5884 author accepted all new boundaries: no-op explicit intent rotates,
   none removed in favor of durable initialization/unknown read, withdrawal
   retry identity captured while locked. New implementation still pending.
+
+## 2026-11-09 — Second: train759 native gate and current handoffs
+
+- Downloaded native run 42645175058: exact train df8a9dea9e artifact,
+  14,914 passed / 109 skipped. Previously recorded MCP suite and both
+  collision probes pass on the same train. Merge/release still PM/bot.
+- #5890 streaming fix 5355790f3c has Reviewer-lead's HOLD lifted; Twelve
+  owns named next read. Still no docs update; restated docs requirement
+  6743952278, no duplicate final clearance by Second.
+- #5892 scoped docs note 6744104928: qualify name.heard no-fields clause
+  as10824 and table intro by row's actual build. No overall/device read.
+- Fourteen accepted #5888 returned-count correction, promises per-stage
+  timings and revert if not no-worse before next candidate. 11091 predates
+  #5888 and tonight's promote is unaffected by that change.
+- Own issues5061/5264/5265/5144 have no new comments since14:02 at last
+  15:4x check; their device/owner gates remain separate.
