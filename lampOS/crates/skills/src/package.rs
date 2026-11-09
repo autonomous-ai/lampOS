@@ -2132,13 +2132,14 @@ fn pushed_request(
                 return Err(format!("{name:?} is not a skill's name"));
             }
             match pushed_from(&pushes.dev.join(name)) {
-                Some(from) if from.client == asker => taken_off(pushes.dev, None, name, Some(wait))
-                    .map(|left| {
+                Some(from) if from.client == asker => {
+                    taken_off(pushes.dev, None, name, Some(wait), Some(&asker)).map(|left| {
                         if let Some(left) = left {
                             eprintln!("lamp-skills: asked: removed {name}, but {left}");
                         }
                         serde_json::Value::from(removed_said(name))
-                    }),
+                    })
+                }
                 Some(_) => Err("not removed: another computer pushed that skill".into()),
                 None => Err(format!("no skill {name} pushed from this computer")),
             }
@@ -2400,7 +2401,7 @@ fn moved_in(
 /// first ([`super::CAMERA_FILE`]), so a skill put on again by that name
 /// asks again.
 pub fn remove(skills: &Path, state: Option<&Path>, name: &str) -> Result<String, String> {
-    match taken_off(skills, state, name, None)? {
+    match taken_off(skills, state, name, None, None)? {
         None => Ok(removed_said(name)),
         Some(left) => Err(format!("removed {name}, but {left}")),
     }
@@ -2570,6 +2571,7 @@ fn taken_off(
     state: Option<&Path>,
     name: &str,
     wait: Option<Duration>,
+    pushed_by: Option<&str>,
 ) -> Result<Option<String>, String> {
     if !skill_name_ok(name) {
         return Err(format!(
@@ -2594,6 +2596,17 @@ fn taken_off(
         None => locked(skills)?,
         Some(wait) => locked_within(skills, wait)?,
     };
+    // A computer's own remove: who pushed the folder is checked again under
+    // the lock, since the folder may have been replaced while this waited
+    // for it (the owner removed it, and another computer pushed the same
+    // name): never another computer's push (Second's P2 on #5819).
+    if let Some(asker) = pushed_by {
+        match pushed_from(&target) {
+            Some(from) if from.client == asker => {}
+            Some(_) => return Err("not removed: another computer pushed that skill".into()),
+            None => return Err(format!("no skill {name} pushed from this computer")),
+        }
+    }
     if kind_of(&target) == SkillKind::Core {
         return Err(format!(
             "{name} is a core skill: it comes with the lamp and can't be removed"
@@ -3096,7 +3109,7 @@ pub fn asked(
             // Renamed aside is removed: where it was set aside, and why it
             // was not then deleted, go to the journal alone.
             (Some(serde_json::Value::String(name)), _) => {
-                taken_off(skills, Some(state), name, Some(lock_wait)).map(|left| {
+                taken_off(skills, Some(state), name, Some(lock_wait), None).map(|left| {
                     if let Some(left) = left {
                         eprintln!("lamp-skills: asked: removed {name}, but {left}");
                     }
@@ -3200,6 +3213,78 @@ pub fn list(skills: &Path) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A pushed folder named `name` in `dev`, said as pushed by `client`.
+    fn pushed_folder(dev: &Path, name: &str, client: &str) {
+        let folder = dev.join(name);
+        fs::create_dir_all(&folder).unwrap();
+        fs::write(folder.join("skill.toml"), "version = \"1.0.0\"\n").unwrap();
+        let from = PushedFrom {
+            computer: client.to_owned(),
+            client: client.to_owned(),
+            sha256: "0".repeat(64),
+            at_unix_ms: 1,
+            author: None,
+            author_fingerprint: None,
+        };
+        fs::write(
+            folder.join(crate::PUSHED_FROM),
+            serde_json::to_vec(&from).unwrap(),
+        )
+        .unwrap();
+    }
+
+    /// Second's P2 on #5819: a computer's remove checks who pushed the
+    /// folder under the lock, so a folder another computer pushed is never
+    /// taken off in its name.
+    #[test]
+    fn a_computers_remove_refuses_a_folder_another_computer_pushed() {
+        let dev = std::env::temp_dir().join(format!("remove-owner-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dev);
+        fs::create_dir_all(&dev).unwrap();
+        pushed_folder(&dev, "desk-wave", "c_b");
+        let refused = taken_off(&dev, None, "desk-wave", None, Some("c_a")).unwrap_err();
+        assert_eq!(refused, "not removed: another computer pushed that skill");
+        assert!(dev.join("desk-wave").exists());
+        let _ = fs::remove_dir_all(&dev);
+    }
+
+    /// The race itself: A's remove waits for the folder's lock; meanwhile,
+    /// under that lock, A's skill is replaced by B's of the same name. When
+    /// A's remove gets the lock it finds B's and leaves it.
+    #[test]
+    fn a_remove_waiting_for_the_lock_leaves_a_replacement_by_another_computer() {
+        let dev = std::env::temp_dir().join(format!("remove-race-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dev);
+        fs::create_dir_all(&dev).unwrap();
+        pushed_folder(&dev, "desk-wave", "c_a");
+        let held = locked(&dev).unwrap();
+        let waiting = {
+            let dev = dev.clone();
+            std::thread::spawn(move || {
+                taken_off(
+                    &dev,
+                    None,
+                    "desk-wave",
+                    Some(Duration::from_secs(5)),
+                    Some("c_a"),
+                )
+            })
+        };
+        std::thread::sleep(Duration::from_millis(200));
+        // Under the lock: A's taken off by the owner, B's put on.
+        fs::remove_dir_all(dev.join("desk-wave")).unwrap();
+        pushed_folder(&dev, "desk-wave", "c_b");
+        drop(held);
+        let answer = waiting.join().unwrap();
+        assert_eq!(
+            answer.unwrap_err(),
+            "not removed: another computer pushed that skill"
+        );
+        let still = pushed_from(&dev.join("desk-wave")).unwrap();
+        assert_eq!(still.client, "c_b");
+        let _ = fs::remove_dir_all(&dev);
+    }
 
     /// The person's no to reports: the manage helper deletes the skills'
     /// run totals and the voice's made-skill counts, and says so.
