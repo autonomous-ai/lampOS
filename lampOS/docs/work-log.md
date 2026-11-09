@@ -8488,3 +8488,20 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - An unawaited subscription refusal also opens a second connection while the
   first remains live, but current MCP tools await their remote subscriptions;
   recorded as latent wrapper behavior, not an additional current-tool HOLD.
+
+## 2026-11-09 — Second: SDK reconnect cancellation read
+
+- HOLD #5833 at `454191a8289c4cd0e744c3f47429f7195e4c83e4`:
+  JavaScript keepConnected misses AbortSignal while connect is pending;
+  setup then runs after abort and the connection remains live. Actual SDK
+  and FakeLamp probe gates the connect return boundary, aborts, and observes
+  one setup/light request, unresolved promise, and OPEN socket after 100 ms.
+  `/tmp/second-5833-abort.mjs` and `.log`; no production edits or device action.
+- Exact-head local gates: Python SDK pytest 144 passed, 1 skipped in 18.34 s;
+  JavaScript npm test 90 passed, 2 skipped in 17.01 s. No additional Python
+  P1/P2 established. Cancellation coverage needs the pending-connect boundary.
+- Strengthened #5830 replay/off proof through actual FakeLamp WebSockets, MCP
+  dispatch and lamp_wait_for timeout, with only an earlier replay subscribe
+  delayed deterministically. Held phrase entries zero, actual phrase handler
+  one, wire unsubscribe then stale subscribe. Probe and log:
+  `/tmp/second-5830-mcp-replay-off.py`, `.log`. Added evidence to existing HOLD.
