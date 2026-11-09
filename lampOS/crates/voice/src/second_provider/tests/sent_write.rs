@@ -1046,3 +1046,355 @@ async fn a_send_then_cut_forget_then_cut_never_restores_payload_or_repeats_send(
         );
     }
 }
+
+/// An unasked face forget must preserve both the receipt payload and repeat protection.
+#[tokio::test]
+async fn an_unadmitted_face_forget_keeps_send_payload_and_repeat_protection() {
+    const ARG: &str = "private-send-argument-canary";
+    const RESULT: &str = "private-send-result-canary";
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Go ahead and send it.".to_owned()),
+                Ok(String::new()),
+                Ok(String::new()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "sent-private",
+                        crate::services::WRITE,
+                        json!({"service":"google_drive", "send_id":ARG}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "erase-face",
+                        crate::known_faces::FORGET,
+                        json!({"name": "A"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![Ok(ChatEvent::Done)],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "repeat-send",
+                        crate::services::WRITE,
+                        json!({"service":"google_drive", "title":"Notes", "text":"New copy"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    text("I will report only what is confirmed."),
+                    Ok(ChatEvent::Done),
+                ],
+            ]
+            .into(),
+        ),
+        round_after: Mutex::new(
+            [
+                Duration::ZERO,
+                Duration::ZERO,
+                Duration::from_secs(60),
+                Duration::ZERO,
+                Duration::ZERO,
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let writes = Arc::new(AtomicUsize::new(0));
+    let seen = writes.clone();
+    let (entered, admissions) = std::sync::mpsc::channel();
+    let (release, released) = tokio::sync::oneshot::channel();
+    let release_wait = Arc::new(Mutex::new(Some(released)));
+    let runner: ToolRunner = Arc::new(move |_, _, name, _| {
+        let entered = entered.clone();
+        if name == crate::services::WRITE {
+            seen.fetch_add(1, Ordering::SeqCst);
+            let wait = release_wait.lock().unwrap().take();
+            Box::pin(async move {
+                entered.send("send").unwrap();
+                if let Some(wait) = wait {
+                    wait.await.unwrap();
+                }
+                json!({"sent":true,"service":"google_drive","detail":RESULT})
+            })
+        } else {
+            panic!("unadmitted face forget reached runner: {name}")
+        }
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            if let Ok(name) = admissions.try_recv() {
+                assert_eq!(name, "send");
+                break;
+            }
+            let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+        }
+    })
+    .await
+    .expect("the original send is in flight");
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    release.send(()).unwrap();
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            if script.asked.lock().unwrap().len() == 3 {
+                break;
+            }
+            let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+        }
+    })
+    .await
+    .expect("the refused forget is answered before the parked next model round");
+    assert!(engine.speech_cut().is_none());
+    assert!(admissions.try_recv().is_err());
+    assert!(
+        script.asked.lock().unwrap()[2]
+            .iter()
+            .any(|message| message.tool_call_id.as_deref() == Some("erase-face")),
+        "the face-forget call must actually be evaluated"
+    );
+    let before = script.asked.lock().unwrap().len();
+    let prior = serde_json::to_string(&*script.asked.lock().unwrap()).unwrap();
+    assert!(
+        prior.contains(ARG) && prior.contains(RESULT),
+        "receipt must really have reached the model"
+    );
+    engine.submit(start(3));
+    engine.retire_through(2);
+    engine.submit(audio(3, 1));
+    engine.submit(end(3));
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            if matches!(
+                engine.next().await,
+                ProviderOutput::TurnComplete { request: 3, .. }
+            ) {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("the second resumed turn completes");
+    assert_eq!(
+        writes.load(Ordering::SeqCst),
+        1,
+        "forget must not allow a duplicate send or prepare"
+    );
+    let asked = script.asked.lock().unwrap();
+    assert!(asked.len() > before);
+    let resumed = serde_json::to_string(&asked[before..]).unwrap();
+    for canary in [ARG, RESULT] {
+        assert!(
+            resumed.contains(canary),
+            "{canary} incorrectly scrubbed by unadmitted forget: {resumed}"
+        );
+    }
+}
+
+/// A result arriving after actual forget admission cannot refill scrubbed send payloads.
+#[tokio::test]
+async fn a_late_send_result_after_forget_updates_status_without_restoring_payload() {
+    const CALL_ID: &str = "private-send-call-id-canary";
+    const ARG: &str = "private-send-argument-canary";
+    const RESULT: &str = "private-send-result-canary";
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Go ahead and send it, then forget my face.".to_owned()),
+                Ok(String::new()),
+                Ok(String::new()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        CALL_ID,
+                        crate::services::WRITE,
+                        json!({"service":"google_drive", "send_id":ARG}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "erase-face",
+                        crate::known_faces::FORGET,
+                        json!({"name": "A"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "repeat-send",
+                        crate::services::WRITE,
+                        json!({"service":"google_drive", "title":"Notes", "text":"New copy"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    text("I will report only what is confirmed."),
+                    Ok(ChatEvent::Done),
+                ],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let writes = Arc::new(AtomicUsize::new(0));
+    let seen = writes.clone();
+    let (entered, admissions) = std::sync::mpsc::channel();
+    let (release, released) = tokio::sync::oneshot::channel();
+    let release_wait = Arc::new(Mutex::new(Some(released)));
+    let runner: ToolRunner = Arc::new(move |_, _, name, _| {
+        let entered = entered.clone();
+        if name == crate::services::WRITE {
+            seen.fetch_add(1, Ordering::SeqCst);
+            let wait = release_wait.lock().unwrap().take();
+            Box::pin(async move {
+                entered.send("send").unwrap();
+                if let Some(wait) = wait {
+                    wait.await.unwrap();
+                }
+                json!({"sent":true,"service":"google_drive","detail":RESULT})
+            })
+        } else {
+            assert_eq!(name, crate::known_faces::FORGET);
+            Box::pin(async move {
+                entered.send("forget").unwrap();
+                std::future::pending::<Value>().await
+            })
+        }
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            if let Ok(name) = admissions.try_recv() {
+                assert_eq!(name, "send");
+                break;
+            }
+            let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+        }
+    })
+    .await
+    .expect("the original send is in flight");
+    // Model expiry without measuring a real 20-second deadline. Only the retained
+    // receipt wait expires; the actual send remains blocked on its oneshot.
+    let mut late_result = {
+        let mut sends = engine.shared.sent_write.lock().unwrap();
+        assert_eq!(sends.len(), 1);
+        sends[0].began = tokio::time::Instant::now() - crate::services::DEADLINE;
+        sends[0].told.clone()
+    };
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            if let Ok(name) = admissions.try_recv() {
+                assert_eq!(name, "forget");
+                break;
+            }
+            let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+        }
+    })
+    .await
+    .expect("the resumed words admit forget and block in its runner");
+    let before = script.asked.lock().unwrap().len();
+    let prior = serde_json::to_string(&*script.asked.lock().unwrap()).unwrap();
+    assert!(
+        prior.contains(CALL_ID) && prior.contains(ARG) && !prior.contains(RESULT),
+        "the unanswered send call must really have reached the model"
+    );
+    {
+        let asked = script.asked.lock().unwrap();
+        assert!(
+            asked[1]
+                .iter()
+                .any(|message| message.words() == Some(SEND_NOT_KNOWN_NOTE))
+        );
+        assert!(
+            !asked[1].iter().any(|message| matches!(
+                message.words(),
+                Some(SENT_WRITE_NOTE | SENT_UNKNOWN_NOTE)
+            ))
+        );
+    }
+    // The actual forget runner was entered above. Only now may the old send finish.
+    release.send(()).unwrap();
+    tokio::time::timeout(
+        Duration::from_secs(3),
+        late_result.wait_for(Option::is_some),
+    )
+    .await
+    .expect("old send completes after forget admission")
+    .expect("send result sender remains alive");
+    engine.submit(start(3));
+    engine.retire_through(2);
+    engine.submit(audio(3, 1));
+    engine.submit(end(3));
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            if matches!(
+                engine.next().await,
+                ProviderOutput::TurnComplete { request: 3, .. }
+            ) {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("the second resumed turn completes");
+    assert_eq!(
+        writes.load(Ordering::SeqCst),
+        1,
+        "forget must not allow a duplicate send or prepare"
+    );
+    let asked = script.asked.lock().unwrap();
+    assert!(asked.len() > before);
+    let resumed = serde_json::to_string(&asked[before..]).unwrap();
+    for canary in [CALL_ID, ARG, RESULT] {
+        assert!(
+            !resumed.contains(canary),
+            "{canary} restored after interrupted forget: {resumed}"
+        );
+    }
+    // A genuine late receipt may update the fixed accounting status. It must
+    // not claim that discarded call arguments and result payload are attached.
+    assert!(
+        !asked[before..]
+            .iter()
+            .flatten()
+            .any(|message| message.words() == Some(SENT_WRITE_NOTE)),
+        "the redacted receipt must not promise its discarded call and result"
+    );
+}
