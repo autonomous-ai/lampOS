@@ -742,8 +742,8 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   `"said":"send"` added, only when all hold: it is the id kept; it comes in a
   later request than the one that read it back; the lamp's turn just before
   this one is that read-back's, and the lamp spoke in no other request
-  since; the person's line is the very first begun since the write was
-  prepared; it is the same owner who asked; at most 2 minutes since it was
+  since; the person's line is the very first of theirs begun since the write
+  was prepared (the lamp's own echo is not theirs, below); it is the same owner who asked; at most 2 minutes since it was
   prepared and 30 s (`SEND_WITHIN`, `send_by`) since the lamp last said a
   word of it, or since the read-back could have finished playing at 600 ms a
   word, if later (after the lamp asks once more, since that asking alone);
@@ -814,9 +814,41 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   your voice, so I only send mail when it's you?" (in Vietnamese "Cho tôi
   học giọng của bạn nhé, để tôi chỉ gửi thư khi đúng là bạn?"). …". Not at
   the prepare: the read-back and its "send" are the very next turns.
-- **Any later turn forgets it:** a second line begun by anyone, the lamp
-  speaking in a second other request, or a services call with no `send_id`
-  in another request drops the waiting write.
+- **Any later turn forgets it:** a second person's line (its send is
+  cancelled, "more than one line since"), the lamp speaking in a second other
+  request, or a services call with no `send_id` in another request drops the
+  waiting write. The journal says why: "a waiting write dropped: N lines since
+  its read-back", "… dropped: another call", "… dropped: the lamp answered
+  another request"; a plain send's `service_write` with no write waiting says
+  "a plain send with no write waiting: prepared anew".
+- **The lamp's own echo is no line of the person's** (#5846). A line the
+  second route holds as the lamp's own words heard back (`own_echo`,
+  `Echo::Held`) is told through the thread (`Thread::own_echo_held` →
+  `services::own_echo_held`, journal "the lamp's echo, not counted toward the
+  waiting write"): `Pending.echoes` counts it, and the send checks the
+  person's lines, so it doesn't matter whether the thread hears of the line's
+  start or of its echo first. Each line is counted twice over: by the thread,
+  with no request (`Thread::person` → `line_began(None)`, `lines`), and on the
+  second route with its request as its words are told (`Thread::line_heard`
+  → `line_began(Some(request))`, `heard`, the newest 8 ids kept). The
+  person's lines are the larger count less the echoes, and an echo is taken
+  off only for a request counted with its id, and once: the mark goes with
+  its id among the newest 8, so a repeat of it is never taken off again:
+  a line the thread never counted (a piece joined to a line going on, or with
+  no letter or digit) takes no person's line off, so a person's line and the
+  send after an uncounted echo are still two, and cancelled. On lamp-29e7 on 9
+  Nov the read-back's own "go ahead and send it", heard back, was counted as
+  the first line, so the owner's "send" was the second: the write was
+  dropped, prepared again, read back and echoed again, and the owner said
+  "send" five times. The owner's own "Go ahead and send it." is the
+  read-back's tail word for word, so if `own_echo` ever holds a real reply as
+  the lamp's echo, that line goes unanswered and the owner says it again: that
+  was so before this rule too. A cut the echo's start alone made (begun over the lamp's
+  voice, `voice_began` for that request, `Pending.cut_by`) is undone with
+  it; a cut by the lamp's answer stopped, by another line, or by the thread's
+  own timing (`began_in`) stays. Only a line after the one that prepared the
+  write (or asked once more) counts, each once. A person's line is always
+  counted: every other check above is unchanged.
 - **After a send** the model is told one fixed line: "Say only that it was
   sent, in the conversation's language." when the service answered
   `sent: true`, else "Say only that it was not sent, in the conversation's
@@ -825,12 +857,17 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   letters, digits and `'` as spaces, the fillers `yes`, `yeah`, `yep`, `ok`,
   `okay`, `sure`, `please`, `now`, `lamp`, `lampy`, `hey`, `hi`, `hello`,
   `oh`, `vâng`, `dạ`, `ừ`, `có` taken off both ends, and what is left exactly one of `send`, `send it`,
-  `send that`, `send the message`, `send the email`, `go ahead and send it`,
+  `send that`, `send the message`, `send the email`, `send it now`,
+  `go ahead and send it`, `go ahead and send`, `go ahead send it`,
+  `go ahead send`,
   `gửi`, `gửi đi`, `gửi nó đi`, `gởi`, `gởi đi`, `gui`, `gui di`,
   `gửi đi giúp tôi`, `gui di giup toi`: each has "send", "gửi", "gởi" or
   "gui" in it. So "Yes, send it.", "Vâng, gửi đi" and "Ừ, gửi đi giúp tôi"
-  send, and so does "Hey Lamp, yes, send it."; "do it", "don't send it",
-  "send it to Bo instead", "đừng gửi" and "no" don't.
+  send, and so does "Hey Lamp, yes, send it."; "do it", "go ahead", "don't
+  send it", "send it to Bo instead", "đừng gửi" and "no" don't. The forms
+  without "it" are speech-to-text's: on lamp-9adf on 9 Nov the owner's "Go
+  ahead and send it." came as "Go ahead and send", and the write was prepared
+  and read back again (#5846).
 - **A plain send is heard as an answer** (`send_awaited`). While a write
   waits, a plain send counts as answering the lamp, however the read-back's
   last sentence reads. So it isn't held as a short sound or as the room's lone

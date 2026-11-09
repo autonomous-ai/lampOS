@@ -8360,6 +8360,14 @@ async fn spoken(
     if let Ok(mut last) = shared.heard_last.lock() {
         *last = Some((request, text.clone()));
     }
+    // A write waiting for its "send" counts this line with its request,
+    // before it is judged as the lamp's echo below (`Echo::Held`): only a
+    // line so counted is taken off as one (`crate::services`, #5846).
+    if text.chars().any(char::is_alphanumeric)
+        && let Ok(mut thread) = crate::thread::THREAD.lock()
+    {
+        thread.line_heard(request, std::time::Instant::now());
+    }
     if !shared
         .emit(ProviderOutput::Transcript {
             request: None,
@@ -8618,6 +8626,12 @@ async fn spoken(
         }
         own_echo::Echo::Held(line) => {
             eprintln!("{line}");
+            // Not the person's line: a write waiting for its "send" does not
+            // count it (lamp-29e7, 9 Nov: the read-back's "go ahead and send
+            // it" heard back dropped the write before the owner's "send").
+            if let Ok(mut thread) = crate::thread::THREAD.lock() {
+                thread.own_echo_held(request);
+            }
             (true, None)
         }
         own_echo::Echo::Stripped(kept, line) => {

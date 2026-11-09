@@ -840,9 +840,43 @@ by service: …" của nó được nói trên tham số `action`.
   "Cho tôi học giọng của bạn nhé, để tôi chỉ gửi thư khi đúng là bạn?"). …".
   Không hỏi lúc chuẩn bị: phần đọc lại và câu "send" của nó là các lượt
   ngay sau đó.
-- **Mọi lượt sau đó đều làm quên nó:** một câu thứ hai do bất kỳ ai bắt đầu,
-  đèn nói trong một yêu cầu khác thứ hai, hoặc một lệnh gọi dịch vụ không có
-  `send_id` trong một yêu cầu khác sẽ bỏ lần ghi đang chờ.
+- **Mọi lượt sau đó đều làm quên nó:** một câu thứ hai của người nói (lần
+  gửi của nó bị hủy, "more than one line since"), đèn nói trong một yêu cầu
+  khác thứ hai, hoặc một lệnh gọi dịch vụ không có `send_id` trong một yêu
+  cầu khác sẽ bỏ lần ghi đang chờ. Nhật ký ghi lý do: "a waiting write
+  dropped: N lines since its read-back", "… dropped: another call", "…
+  dropped: the lamp answered another request"; một `service_write` của câu
+  gửi thuần khi không có lần ghi nào chờ ghi "a plain send with no write
+  waiting: prepared anew".
+- **Tiếng vọng của chính đèn không phải câu của người nói** (#5846). Một câu
+  mà tuyến thứ hai giữ lại là lời của chính đèn vọng lại (`own_echo`,
+  `Echo::Held`) được báo qua thread (`Thread::own_echo_held` →
+  `services::own_echo_held`, nhật ký "the lamp's echo, not counted toward the
+  waiting write"): `Pending.echoes` đếm nó, và lần gửi kiểm tra số câu của
+  người nói, nên thread nghe về lúc câu bắt đầu hay về tiếng vọng trước cũng
+  không sao. Mỗi câu được đếm hai lần: bởi thread, không có request
+  (`Thread::person` → `line_began(None)`, `lines`), và trên tuyến thứ hai
+  với request của nó khi lời của nó được báo (`Thread::line_heard` →
+  `line_began(Some(request))`, `heard`, giữ 8 id mới nhất). Số câu của người
+  nói là số đếm lớn hơn trừ số tiếng vọng, và một tiếng vọng chỉ được trừ cho
+  một request đã được đếm kèm id, và chỉ một lần: dấu đi cùng id trong 8 id
+  mới nhất, nên tiếng vọng lặp lại không bao giờ được trừ lần nữa:
+  một câu thread chưa từng đếm (một mảnh nối vào câu đang nói, hoặc không có
+  chữ cái hay chữ số) không trừ câu nào của người nói, nên một câu của người
+  nói và câu gửi sau một tiếng vọng không được đếm vẫn là hai câu, và bị hủy. Trên lamp-29e7 ngày 9/11, chính câu "go
+  ahead and send it" của phần đọc lại vọng lại được tính là câu đầu tiên, nên
+  câu "send" của chủ đèn là câu thứ hai: lần ghi bị bỏ, chuẩn bị lại, đọc lại
+  và lại vọng, và chủ đèn phải nói "send" năm lần. Câu "Go ahead and send
+  it." của chính chủ đèn trùng từng từ với đoạn cuối của phần đọc lại, nên
+  nếu `own_echo` có lúc giữ một câu trả lời thật như tiếng vọng của đèn, câu
+  đó không được trả lời và chủ đèn phải nói lại: điều này trước quy tắc này
+  cũng đã vậy. Một lần cắt chỉ do lúc bắt
+  đầu của tiếng vọng gây ra (bắt đầu đè lên giọng của đèn, `voice_began` cho
+  yêu cầu đó, `Pending.cut_by`) được gỡ cùng nó; lần cắt do câu trả lời của
+  đèn bị dừng, do một câu khác, hay do cách tính giờ của thread (`began_in`)
+  thì giữ nguyên. Chỉ câu sau câu đã chuẩn bị lần ghi (hoặc đã hỏi lại) mới
+  được tính, mỗi câu một lần. Câu của người nói luôn được tính: mọi kiểm tra
+  khác ở trên giữ nguyên.
 - **Sau một lần gửi** mô hình được báo một câu cố định: "Say only that it was
   sent, in the conversation's language." khi dịch vụ trả lời `sent: true`,
   nếu không thì "Say only that it was not sent, in the conversation's
@@ -851,12 +885,17 @@ by service: …" của nó được nói trên tham số `action`.
   cái, chữ số và `'` thành dấu cách, các từ đệm `yes`, `yeah`, `yep`, `ok`,
   `okay`, `sure`, `please`, `now`, `lamp`, `lampy`, `hey`, `hi`, `hello`,
   `oh`, `vâng`, `dạ`, `ừ`, `có` được bỏ ở cả hai đầu, và phần còn lại đúng là một trong `send`, `send it`,
-  `send that`, `send the message`, `send the email`, `go ahead and send it`,
+  `send that`, `send the message`, `send the email`, `send it now`,
+  `go ahead and send it`, `go ahead and send`, `go ahead send it`,
+  `go ahead send`,
   `gửi`, `gửi đi`, `gửi nó đi`, `gởi`, `gởi đi`, `gui`, `gui di`,
   `gửi đi giúp tôi`, `gui di giup toi`: câu nào cũng có "send", "gửi", "gởi"
   hoặc "gui". Vì vậy "Yes, send it.", "Vâng, gửi đi" và "Ừ, gửi đi giúp tôi"
-  thì gửi, "Hey Lamp, yes, send it." cũng vậy; "do it", "don't send it",
-  "send it to Bo instead", "đừng gửi" và "no" thì không.
+  thì gửi, "Hey Lamp, yes, send it." cũng vậy; "do it", "go ahead", "don't
+  send it", "send it to Bo instead", "đừng gửi" và "no" thì không. Các dạng
+  không có "it" là của speech-to-text: trên lamp-9adf ngày 9/11 câu "Go ahead
+  and send it." của chủ đèn đến thành "Go ahead and send", và lần ghi bị
+  chuẩn bị và đọc lại lần nữa (#5846).
 - **Một câu gửi thuần được nghe là câu trả lời** (`send_awaited`). Khi một lệnh
   ghi đang chờ, một câu gửi thuần được tính là trả lời đèn, bất kể câu cuối
   của phần đọc lại ra sao. Vì vậy nó không bị giữ lại như một âm thanh ngắn hay
