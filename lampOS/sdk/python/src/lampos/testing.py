@@ -86,6 +86,8 @@ LOOK_WAITS = {
 # lamp does now. `lamp fake` does.
 # lamp-control's words for `joints` naming roll, shoulder or elbow (parts.rs).
 JOINTS_WAIT = "not routed yet: waits for the body's goal stream for roll, shoulder and elbow; yaw and pitch go now"
+# And for a `joints` leaving out yaw or pitch while the body hasn't said where it is.
+JOINTS_UNKNOWN = "name both yaw and pitch while the body has not said where it is in the last 15 s (get body)"
 LAMP_CONTROL_REFUSES = {
     # No product unit passes --lease-socket yet (docs/control.md).
     "look": "the body's lease socket is not on here",
@@ -956,8 +958,14 @@ class FakeLamp:
                 await self._refuse(ws, id_, "refused", JOINTS_WAIT)
                 return
             now = self.state["body"]["joints"]
+            yaw, pitch = targets.get("yaw", now["yaw"]["deg"]), targets.get("pitch", now["pitch"]["deg"])
+            if yaw is None or pitch is None:
+                # The door's words when the body hasn't said where it is.
+                self.requests.remove(request)
+                await self._refuse(ws, id_, "refused", JOINTS_UNKNOWN)
+                return
             self.stop_following(ws)
-            await self._look_done(ws, id_, targets.get("yaw", now["yaw"]["deg"]), targets.get("pitch", now["pitch"]["deg"]))
+            await self._look_done(ws, id_, yaw, pitch)
         elif op == "volume":
             # As lamp-control through lamp-actions' app calls: a level, the
             # voice's 20-point step within its floor of 10 and ceiling of 100,

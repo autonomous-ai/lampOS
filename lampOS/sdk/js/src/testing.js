@@ -42,6 +42,8 @@ export const LOOK_WAITS = {
 // lamp does now. `lamp fake` does.
 // lamp-control's words for `joints` naming roll, shoulder or elbow (parts.rs).
 export const JOINTS_WAIT = "not routed yet: waits for the body's goal stream for roll, shoulder and elbow; yaw and pitch go now";
+// And for a `joints` leaving out yaw or pitch while the body hasn't said where it is.
+export const JOINTS_UNKNOWN = 'name both yaw and pitch while the body has not said where it is in the last 15 s (get body)';
 export const LAMP_CONTROL_REFUSES = Object.freeze({
   // No product unit passes --lease-socket yet (docs/control.md).
   look: "the body's lease socket is not on here",
@@ -816,8 +818,12 @@ export class FakeLamp {
         const { targets } = request;
         if (['roll', 'shoulder', 'elbow'].some((joint) => joint in targets)) return this.refuse(ws, id, 'refused', JOINTS_WAIT);
         const now = this.state.body.joints;
+        const yaw = targets.yaw ?? now.yaw.deg;
+        const pitch = targets.pitch ?? now.pitch.deg;
+        // The door's words when the body hasn't said where it is.
+        if (yaw === null || yaw === undefined || pitch === null || pitch === undefined) return this.refuse(ws, id, 'refused', JOINTS_UNKNOWN);
         this.stopFollowing(ws);
-        return this.lookDone(ws, id, targets.yaw ?? now.yaw.deg, targets.pitch ?? now.pitch.deg);
+        return this.lookDone(ws, id, yaw, pitch);
       }
       case 'gesture':
       case 'move':
