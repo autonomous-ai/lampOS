@@ -1301,8 +1301,12 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   chat round called `remember` alone with no words, is answered "Okay,
   I'll remember that." as soon as the memory answered a plain keep
   (`"remembered": true`, no note, no correction, nothing held, no error)
-  and the calls' kept texts cover every content word of the line
-  (`keep_at_once::covers`), in the owner's language from its clip rendered
+  and the calls' kept texts cover every content word of the line, a "not"
+  and a single letter among them (`keep_at_once::covers`); a line with a
+  question word or shape in it, English or Vietnamese, with or without
+  its "?" (`keep_at_once::asks_a_question`: "… in the drawer where are
+  they"), goes to round 2, as does a keep asked in words other than
+  English. In the owner's language the line is said from its clip rendered
   ahead, with no second chat round: on lamp-06c1 on 5 Nov that round was
   most of a keep turn's extra 2.1 s, the memory 39 ms. A keep that
   failed, kept nothing, was

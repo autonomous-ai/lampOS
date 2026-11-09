@@ -962,14 +962,23 @@ order is kept. A written turn is the same from the chat on.
     (`keep_at_once::only_keeps`): a plain ask to keep
     (`remember::asked::asks_to_keep`, "Remember that…", "Don't forget
     that…"), with nothing else but thanks, a greeting or the name; no
-    question mark; no second clause after the keep, whatever its words:
+    question mark, and no question word or shape anywhere in it
+    (`keep_at_once::asks_a_question`, Thirteen's P3 on #5565, as speech
+    to text often drops the "?": "what", "where", "when", "who", "why",
+    "how", "which"; "do you", "is it", "can you"; Vietnamese "gì", "đâu",
+    "nào", "sao", "ai", "mấy", "bao giờ", or a "không" or "chưa" ending a
+    sentence), so "… in the drawer where are they" and "… how about you"
+    go to round 2; no second clause after the keep, whatever its words:
     past a comma, colon or spaced dash, anything but thanks, a greeting or
     the name goes to round 2 ("…, and I'd love a joke", "…, so what's the
     weather like"); and no "and", "also", "then", "plus", "but", "so" or
     "or" that starts another ask or a new clause ("… and let me know the
     weather"). "Remember that I like tea and coffee" is still a plain
     keep (the Reviewer-lead's P2 on #5594). A spoken
-    turn only.
+    turn only. The ask to keep is recognised by its English words only
+    (`remember::asked::asks_to_keep`): a keep asked in another language
+    ("Nhớ giúp mình…") goes to round 2 as without the switch, even with
+    that language chosen; recognising it there is a follow-up.
   - **Round 1 called `remember` alone, with no words of its own,** and as
     its first calls, no held forget run before them.
   - **What the calls kept covers the whole line** (`keep_at_once::covers`,
@@ -979,11 +988,17 @@ order is kept. A written turn is the same from the chat on.
     "make a note", "note", "nhớ") must be among the words of the calls'
     `text`s. Both sides are folded as the memory's search folds them
     (`remember::about_fold`: NFC, lower case, `đ` as `d`, no accents),
-    split at anything not a letter or digit, a possessive's `'s` and a
-    plural's `s` taken off (`remember::plural_off`). Not content: the
-    memory's common words (`remember::SEARCH_COMMON`, "I", "my", "is",
-    "and"…), thanks, a greeting or the name, a piece past an apostrophe,
-    "user", "person", "also", "too". So a keep told in the third person
+    split at anything not a letter or digit, a contraction's tail (`'s`,
+    `'m`, `'d`, `'ll`, `'ve`, `'re`) and a plural's `s` taken off
+    (`remember::plural_off`). A word that says "not" ("not", "never",
+    "no", "don't", "can't", "cannot", "không", "chưa", "đừng"…) is its stem
+    and "not", so "I don't like tea" kept "Likes tea." goes to round 2 and
+    kept "Doesn't like tea." stays fast; one letter alone is a word, so
+    "blood type O" kept "type A" goes to round 2 (Thirteen's P3 on #5565).
+    Not content: the memory's common words (`remember::SEARCH_COMMON`,
+    "my", "is", "and"…) but its question words, ask verbs ("tell", "can",
+    "will"…) and "not", which are; "I", "a", thanks, a greeting or the
+    name, "user", "person", "also", "too". So a keep told in the third person
     stays fast ("Remember that I like tea" kept "The user likes tea.",
     "… I take my coffee black" kept "Takes coffee black."), as do "tea and
     coffee" and "my kids are Ann and Bob"; "… and explain gravity to me",
