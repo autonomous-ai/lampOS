@@ -3376,8 +3376,15 @@ const NOT_THE_WORK: [&str; 40] = [
 /// Endings a word of a session's work may add to a word said, or the
 /// other way round: "book" is "books", "fix" is "fixed", "test" is
 /// "tests" but never "testament", "note" never "notebook" (the
-/// Reviewer-lead's P2 on #5784 at de9bebdb41).
+/// Reviewer-lead's P2 on #5784 at de9bebdb41). A word said under
+/// [`SHORTEST_STEM`] letters takes no ending.
 const ENDINGS: [&str; 6] = ["s", "es", "ed", "ing", "er", "ers"];
+
+/// The fewest letters a word needs before an ending may follow it: "us"
+/// is never "user", nor "it" "items" (Reviewer-three's P2 on #5784 at
+/// 71bf964baa); two letters are an acronym or a stop word, held only as
+/// they are.
+const SHORTEST_STEM: usize = 3;
 
 /// Whether a word said stands for a word of a session's work: the same
 /// word, or the same word with one of [`ENDINGS`].
@@ -3388,9 +3395,10 @@ fn same_word(said: &str, word: &str) -> bool {
         (word, said)
     };
     short == long
-        || long
-            .strip_prefix(short)
-            .is_some_and(|ending| ENDINGS.contains(&ending))
+        || short.len() >= SHORTEST_STEM
+            && long
+                .strip_prefix(short)
+                .is_some_and(|ending| ENDINGS.contains(&ending))
 }
 
 /// The session whose work is what the person said (#5535): each row's

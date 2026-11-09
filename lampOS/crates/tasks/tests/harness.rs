@@ -885,6 +885,25 @@ fn with_reply_named_a_session_is_found_by_what_it_worked_on() {
         pick("the test note", json!([testament])),
         (not_sent("session_not_found"), None)
     );
+    // Reviewer-three's P2 at 71bf964baa: a two-letter word takes no
+    // ending, so "us" is never "user"; "user" itself still joins.
+    let user_tax = worked_row(
+        AGENT,
+        "lamp-a7b8",
+        "idle",
+        &["Update user tax settings"],
+        "I changed the user tax settings.",
+    );
+    assert_eq!(
+        pick("the US tax session", json!([user_tax.clone()])),
+        (not_sent("session_not_found"), None)
+    );
+    assert_eq!(
+        pick("the user tax session", json!([user_tax])).0,
+        LaunchOutcome::Joined {
+            agent_id: AGENT.into()
+        }
+    );
 }
 
 /// #5535, `serve --reply-named`: a launch that names a session is typed
