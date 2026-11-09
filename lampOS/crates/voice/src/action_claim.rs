@@ -1461,7 +1461,7 @@ fn runs_claim(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     /// C88: a forget said done, and what says nothing went.
@@ -2017,6 +2017,78 @@ mod tests {
             claim_as("I left a light on for you", false, true),
             Some(None)
         );
+    }
+
+    /// GO-159 (lamp-52e6, 11091): "keep the light on until ten" with the
+    /// worded runs on still got its claim 7 of 8 times and the worded guard
+    /// never fired, so the model's replies opened with shapes the runs
+    /// missed: the light said as "it", "will stay" or "will be", "keeping"
+    /// said bare, "light's", or the state told as a reply.
+    pub(crate) const KEPT_SHAPES: [&str; 12] = [
+        "I'll keep it on until ten.",
+        "Okay, I'll keep it on till 10.",
+        "Sure! The light will stay on until ten.",
+        "Got it, keeping the light on until ten.",
+        "Done, the light's staying on until ten.",
+        "Alright, your light will be on until 10 pm.",
+        "The light is on until ten.",
+        "I'll leave it on until ten.",
+        "Keeping it on until 10 pm.",
+        "It'll stay on until ten.",
+        "Okay, it will stay on until noon.",
+        "Your light'll stay on for two hours.",
+    ];
+
+    /// Each of [`KEPT_SHAPES`] is a kept light's claim on the worded runs
+    /// ("Done," is also the strict "Done.", judged first), so with no call
+    /// it is held.
+    #[test]
+    fn a_kept_light_said_as_it_or_will_stay_is_a_worded_claim() {
+        let mut missed = Vec::new();
+        for reply in KEPT_SHAPES {
+            let text = normalised(reply);
+            if worded_claim(text.trim_end(), true) != Some(Some(Claim::LightKept)) {
+                missed.push(reply);
+            }
+            assert_eq!(
+                claim_as(reply, true, false),
+                claim(reply, true),
+                "{reply:?}"
+            );
+        }
+        assert!(missed.is_empty(), "missed: {missed:?}");
+        for reply in KEPT_SHAPES {
+            let kind = claim_as(reply, true, true).flatten();
+            assert!(kind.is_some(), "{reply:?}");
+            assert!(!stands(kind.unwrap(), reply, false, []), "{reply:?}");
+        }
+    }
+
+    /// The widened kept-light runs keep their controls: no limit said
+    /// after an "it" or a state, talk about keeping it on, persona lines,
+    /// questions and colours are no claims.
+    #[test]
+    fn a_kept_light_without_a_limit_or_as_talk_is_no_worded_claim() {
+        for reply in [
+            "I left a light on for you.",
+            "I'll leave it on for you.",
+            "Turning it off and on again usually helps.",
+            "It stays on until you say otherwise.",
+            "It'll stay on until you're back.",
+            "The light is on until you turn it off.",
+            "The light is on.",
+            "Your light will be on when you get home.",
+            "Keeping it on until ten would waste power.",
+            "Leaving it on for 10 hours wastes power.",
+            "Keeping the light on is easy.",
+            "I'll keep it on until ten?",
+            "The light will stay on until ten?",
+            "It'll stay on until ten?",
+            "My light is blue now.",
+            "It's on until ten.",
+        ] {
+            assert_eq!(claim_as(reply, true, true), Some(None), "{reply:?}");
+        }
     }
 
     #[test]
