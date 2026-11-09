@@ -481,6 +481,65 @@ fn a_reset_marks_this_boot_so_its_shutdown_keeps_no_journal() {
     );
 }
 
+/// #5500: the reset wipes the owner's two yeses each through a fresh
+/// revision kept in the consent folder's state first, so a `consent.set`
+/// revision the app saw before the reset (a yes's or a `gone-` one) never
+/// matches after it.
+#[test]
+fn a_reset_leaves_a_fresh_consent_boundary() {
+    use lamp_msgs::consent;
+    let root = Root::new();
+    let mut plan = lamp(&root);
+    let folder = root.path("consent");
+    fs::create_dir_all(&folder).unwrap();
+    let held = consent::hold(&folder).unwrap();
+    let yes = held
+        .keep_yes(consent::FACE_EXPRESSIONS, 5, consent::BY_APP)
+        .unwrap();
+    let room_before = held.rev(consent::ROOM_SOUNDS).unwrap();
+    drop(held);
+    for (_, name) in consent::FILES {
+        plan.wipe.push(folder.join(name));
+    }
+    reset::reset(&plan, &mut Fake::default()).unwrap();
+    let revs = consent::Revs::read(&folder);
+    for (key, name) in consent::FILES {
+        assert!(!folder.join(name).exists(), "{name}");
+        let after = consent::rev(&folder, key, &revs);
+        assert!(after.starts_with(consent::GONE), "{key}: {after}");
+        assert_ne!(after, yes);
+        assert_ne!(after, format!("{}{yes}", consent::GONE));
+        assert_ne!(after, room_before);
+    }
+}
+
+/// The Reviewer-lead's P2 on #8704: a revision that can't be kept (a folder
+/// in the state's temporary's place) never keeps a yes or stops the reset:
+/// each yes is wiped, and the reset goes on to its end.
+#[test]
+fn a_reset_wipes_the_yeses_when_their_revision_cannot_be_kept() {
+    use lamp_msgs::consent;
+    let root = Root::new();
+    let mut plan = lamp(&root);
+    let folder = root.path("consent");
+    fs::create_dir_all(&folder).unwrap();
+    let held = consent::hold(&folder).unwrap();
+    held.keep_yes(consent::FACE_EXPRESSIONS, 5, consent::BY_APP)
+        .unwrap();
+    held.keep_yes(consent::ROOM_SOUNDS, 5, consent::BY_VOICE)
+        .unwrap();
+    drop(held);
+    fs::create_dir(folder.join("app-revs.change-next")).unwrap();
+    for (_, name) in consent::FILES {
+        plan.wipe.push(folder.join(name));
+    }
+    reset::reset(&plan, &mut Fake::default()).unwrap();
+    for (_, name) in consent::FILES {
+        assert!(!folder.join(name).exists(), "{name}");
+    }
+    assert!(!plan.journal.exists(), "the reset ran to its end");
+}
+
 /// lamp-29e7 on 26 Oct: `systemctl stop lampos.target` returned before the
 /// target's parts had stopped, and Voice's onboarding commit, written as it
 /// stopped, outlived the wipe, so the customer got no first five minutes.

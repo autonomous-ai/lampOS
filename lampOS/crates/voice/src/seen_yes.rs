@@ -733,15 +733,18 @@ fn raise_mark_beside(lock: Option<&lamp_msgs::consent::MarkLock>, path: &Path, a
 
 /// Remove `path`, its folder synced after: whether it was there.
 fn remove(path: &Path) -> io::Result<bool> {
-    match std::fs::remove_file(path) {
-        Ok(()) => {}
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
-        Err(error) => return Err(error),
-    }
-    if let Some(folder) = path.parent() {
-        std::fs::File::open(folder)?.sync_all()?;
-    }
-    Ok(true)
+    // A stop or a forget is an explicit "no", so it always renews the
+    // revision, even with no yes there and no state yet (the state is made
+    // then): an app `consent.set` of seen activity sent before it and
+    // retried after is stale (the Reviewer-lead's second P2 on #8704, and
+    // the coordinator's on a fresh lamp). A yes is removed holding the consent folder, after the mark's
+    // lock, first, then a fresh revision (#5500); a revision that can't be
+    // kept never keeps the yes, it is only logged
+    // (`lamp_msgs::consent::Held::withdraw_at`). The answer says whether a
+    // yes was there.
+    let there = std::fs::symlink_metadata(path).is_ok();
+    lamp_msgs::consent::take_back_at(path, lamp_msgs::consent::SEEN_ACTIVITY)?;
+    Ok(there)
 }
 
 /// Any forget, whoever asked (`remember.rs`'s `forget` and
@@ -777,6 +780,18 @@ fn forgotten_or(path: &Path, by_default: bool) {
     let removed = if forget_takes(path, lamp_msgs::consent::SEEN_ACTIVITY, by_default) {
         remove(path)
     } else {
+        // A kept no or the default stays (#7767); its revision is renewed
+        // all the same, as `remember.rs` renews the other two (Thirteen's
+        // P3 on #8704), best effort: it never changes what the forget does.
+        if path.exists()
+            && let Err(error) =
+                lamp_msgs::consent::renew_holding(path, lamp_msgs::consent::SEEN_ACTIVITY)
+        {
+            eprintln!(
+                "lamp-voice provider: a forget could not renew {}: {error}",
+                path.display()
+            );
+        }
         Ok(false)
     };
     drop(lock);
@@ -794,6 +809,16 @@ fn forgotten_or(path: &Path, by_default: bool) {
 mod tests {
     use super::*;
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    /// A kept file's bytes with its revision taken out (#5500): every held
+    /// write adds a fresh one, so the rest is compared byte for byte.
+    fn sans_rev(path: &Path) -> Vec<u8> {
+        let mut kept: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        assert!(kept["rev"].as_str().is_some(), "{kept}");
+        kept.as_object_mut().unwrap().remove("rev");
+        serde_json::to_vec(&kept).unwrap()
+    }
 
     fn folder(name: &str) -> PathBuf {
         let folder = std::env::temp_dir().join(format!("seen-yes-{name}-{}", std::process::id()));
@@ -1145,7 +1170,7 @@ mod tests {
             json!({"ok": true, "note": LOOKING})
         );
         assert_eq!(
-            std::fs::read(&path).unwrap(),
+            sans_rev(&path),
             br#"{"at_unix_s":7,"by":"voice","seen_activity":"yes","version":1}"#
         );
         let kept = std::fs::metadata(&path).unwrap();
@@ -1239,14 +1264,8 @@ mod tests {
             run_by_default(&path, STOP, false, 9, || Some(group)),
             json!({"ok": true, "note": STOPPED})
         );
-        assert_eq!(
-            std::fs::read(&path).unwrap(),
-            no_bytes(SEEN_ACTIVITY, 9, BY_VOICE)
-        );
-        assert_eq!(
-            std::fs::read(&face).unwrap(),
-            no_bytes(FACE_EXPRESSIONS, 9, BY_VOICE)
-        );
+        assert_eq!(sans_rev(&path), no_bytes(SEEN_ACTIVITY, 9, BY_VOICE));
+        assert_eq!(sans_rev(&face), no_bytes(FACE_EXPRESSIONS, 9, BY_VOICE));
         for file in [&path, &face] {
             let kept = std::fs::metadata(file).unwrap();
             assert_eq!(kept.permissions().mode() & 0o777, 0o640);
@@ -1270,8 +1289,9 @@ mod tests {
         // Off: the stop removes the file, as before, and leaves face's.
         run_at(&path, STOP, false, false, false, 0, || None);
         assert!(!path.exists() && face.exists());
-        // A no that can't be written says not done.
-        std::fs::create_dir(path.with_extension("storage-next")).unwrap();
+        // A no that can't be written says not done (the held write's
+        // temporary, `lamp_msgs::consent::keep_with_group`, blocked).
+        std::fs::create_dir(path.with_extension("change-next")).unwrap();
         assert_eq!(
             run_by_default(&path, STOP, false, 12, || None),
             json!({"ok": false, "note": NOT_KEPT})
@@ -1346,7 +1366,7 @@ mod tests {
             json!({"ok": true, "note": LOOKING})
         );
         assert_eq!(
-            std::fs::read(&path).unwrap(),
+            sans_rev(&path),
             lamp_msgs::consent::bytes(SEEN_ACTIVITY, 8, BY_VOICE)
         );
         assert!(allowed(&face, FACE_EXPRESSIONS, false));
@@ -1412,14 +1432,19 @@ mod tests {
     /// Twelve's P2 on #7551: the stop raises the mark and removes the yes
     /// under the mark's lock, so while root's helper holds it (its check and
     /// write of an app yes) the stop waits, then takes the yes back. A forget
-    /// on a lamp with neither a yes nor a mark makes no lock either.
+    /// on a lamp with neither a yes nor a mark makes no lock either (only
+    /// the fresh revision it renews, #8704).
     #[test]
     fn a_stop_waits_for_the_helpers_lock() {
         let folder = folder("lock");
         std::fs::remove_file(folder.join(lamp_msgs::consent::OLD_NOS_DONE)).unwrap();
         let path = file_in(&folder);
         forgotten(&path);
-        assert_eq!(std::fs::read_dir(&folder).unwrap().count(), 0);
+        let left: Vec<_> = std::fs::read_dir(&folder)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(left, [lamp_msgs::consent::STATE_FILE]);
         let mark = lamp_msgs::consent::mark_in(&folder);
         let helper = lamp_msgs::consent::lock_mark(&folder).unwrap();
         std::thread::scope(|scope| {
@@ -1442,6 +1467,104 @@ mod tests {
         });
         assert!(!path.exists());
         assert!(lamp_msgs::consent::read_mark(&mark).unwrap() > 10);
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// The Reviewer-lead's P2 on #8704: a stop removes the yes even when its
+    /// revision can't be kept (a folder in the state's temporary's place);
+    /// a stop with no yes still renews the revision (their second P2).
+    #[test]
+    fn a_stop_removes_the_yes_when_its_revision_cannot_be_kept() {
+        let folder = folder("blocked-rev");
+        std::fs::remove_file(folder.join(lamp_msgs::consent::OLD_NOS_DONE)).unwrap();
+        let path = file_in(&folder);
+        lamp_msgs::consent::keep_yes_holding(
+            &path,
+            lamp_msgs::consent::SEEN_ACTIVITY,
+            5,
+            lamp_msgs::consent::BY_VOICE,
+            None,
+        )
+        .unwrap();
+        std::fs::create_dir(folder.join("app-revs.change-next")).unwrap();
+        assert_eq!(
+            run_at(&path, STOP, false, false, false, 0, || None),
+            json!({"ok": true, "note": STOPPED})
+        );
+        assert!(!path.exists());
+        std::fs::remove_dir(folder.join("app-revs.change-next")).unwrap();
+        let state = std::fs::read(folder.join(lamp_msgs::consent::STATE_FILE)).unwrap();
+        assert_eq!(
+            run_at(&path, STOP, false, false, false, 0, || None),
+            json!({"ok": true, "note": NOT_LOOKING})
+        );
+        assert_ne!(
+            std::fs::read(folder.join(lamp_msgs::consent::STATE_FILE)).unwrap(),
+            state,
+            "a stop with no yes renews the revision"
+        );
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// The revision an app `consent.get` hands out for seen activity now.
+    fn app_rev(folder: &Path) -> String {
+        lamp_msgs::consent::hold(folder)
+            .unwrap()
+            .rev(lamp_msgs::consent::SEEN_ACTIVITY)
+            .unwrap()
+    }
+
+    /// The Reviewer-lead's second P2 on #8704: with no yes there, the app
+    /// reads the revision, the person says stop (already off), and the
+    /// app's set retried with the revision from before is stale: the stop
+    /// renewed it. The answer is still NOT_LOOKING.
+    #[test]
+    fn a_stop_while_already_off_makes_an_older_app_yes_stale() {
+        let folder = folder("stop-off-stale");
+        std::fs::remove_file(folder.join(lamp_msgs::consent::OLD_NOS_DONE)).unwrap();
+        let path = file_in(&folder);
+        let old = app_rev(&folder);
+        assert_eq!(
+            run_at(&path, STOP, false, false, false, 0, || None),
+            json!({"ok": true, "note": NOT_LOOKING})
+        );
+        assert!(!path.exists());
+        assert_ne!(app_rev(&folder), old, "the app's old revision is stale");
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// The same on a fresh lamp: no yes and no state. The cloud's
+    /// unheld read gives the revision for no file, the person says stop,
+    /// and that revision never matches after: the stop made the state with
+    /// a fresh revision.
+    #[test]
+    fn a_stop_on_a_fresh_lamp_makes_an_older_app_yes_stale() {
+        let folder = folder("stop-fresh-stale");
+        std::fs::remove_file(folder.join(lamp_msgs::consent::OLD_NOS_DONE)).unwrap();
+        let path = file_in(&folder);
+        let key = lamp_msgs::consent::SEEN_ACTIVITY;
+        assert!(!folder.join(lamp_msgs::consent::STATE_FILE).exists());
+        let old = lamp_msgs::consent::rev(&folder, key, &lamp_msgs::consent::Revs::read(&folder));
+        assert_eq!(
+            run_at(&path, STOP, false, false, false, 0, || None),
+            json!({"ok": true, "note": NOT_LOOKING})
+        );
+        assert!(folder.join(lamp_msgs::consent::STATE_FILE).exists());
+        assert_ne!(app_rev(&folder), old, "the app's old revision is stale");
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// As above for a forget: with no yes there, a forget after the app
+    /// read the revision makes the app's set from before stale.
+    #[test]
+    fn a_forget_while_already_off_makes_an_older_app_yes_stale() {
+        let folder = folder("forget-off-stale");
+        std::fs::remove_file(folder.join(lamp_msgs::consent::OLD_NOS_DONE)).unwrap();
+        let path = file_in(&folder);
+        let old = app_rev(&folder);
+        forgotten_or(&path, false);
+        assert!(!path.exists());
+        assert_ne!(app_rev(&folder), old, "the app's old revision is stale");
         let _ = std::fs::remove_dir_all(folder);
     }
 }

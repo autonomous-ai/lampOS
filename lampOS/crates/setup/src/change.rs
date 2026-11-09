@@ -60,9 +60,17 @@
 //!   reads room sounds' only at start, so a new yes there restarts it once
 //!   no update is at work ([`restart_ears_when_unlocked`]); an off is
 //!   followed within 2 s as it is. `lamp-cloud` sends them only with
-//!   `LAMP_APP_CONSENT=on`, room sounds only on a lamp with no slide. The
-//!   reset's plan, a forget of everything and a redo of setup remove both,
-//!   whoever gave them;
+//!   `LAMP_APP_CONSENT=on`, room sounds only on a lamp with no slide. Each
+//!   is a compare-and-set: it names the key's revision the app last saw
+//!   (`if`, [`lamp_msgs::consent::rev`]), and applies only while that is
+//!   still the key's revision, holding the folder
+//!   ([`lamp_msgs::consent::hold`]); each change, here, at the voice or by
+//!   the reset, writes a fresh revision into the state
+//!   ([`lamp_msgs::consent::STATE_FILE`]) before the yes or the no, so a
+//!   retry of an old tap, or one made before a later "no" at the lamp,
+//!   changes nothing and answers what the lamp keeps now (`stale`). The
+//!   reset's plan, a forget of everything and a redo of setup remove both
+//!   yeses, whoever gave them, each through a fresh revision;
 //! - the owner's desk noticing switch from the app (`desk_noticing`, #6543,
 //!   `docs/cloud.md`, "Desk noticing from the app"): seen activity's yes as
 //!   `consent`'s, with the app's `request_id` (its send time in Unix ms).
@@ -79,7 +87,9 @@
 //!   sends it only with `LAMP_SEEN_ACTIVITY=on`. With
 //!   `LAMP_NOTICING_BY_DEFAULT=on` (#7767, `lamp_msgs::consent`), where a
 //!   missing file is on, an off keeps a no (`"by":"app"`) in place of the
-//!   removal, under the same lock and mark ([`apply_or`]).
+//!   removal, under the same lock and mark ([`apply_or`]). Each write
+//!   holds the consent folder too, after the mark's lock, with a fresh
+//!   revision first, as `consent`'s.
 use crate::serve::{Config, Files, Save, write_private};
 use lamp_update::quiet::{Heard, QUIET, Quiet};
 use serde_json::{Value, json};
@@ -151,8 +161,10 @@ pub enum Change {
     /// words.
     Energy(u8),
     /// One of the owner's yeses from the app (a key of
-    /// [`lamp_msgs::consent::FILES`]): kept, or removed.
-    Consent(&'static str, bool),
+    /// [`lamp_msgs::consent::FILES`]): kept, or removed, only while the
+    /// key's revision is the one the app saw (`if`,
+    /// [`lamp_msgs::consent::fit_rev`]).
+    Consent(&'static str, bool, String),
     /// The owner's desk noticing switch from the app (#6543): seen
     /// activity's yes kept or removed, with the app's `request_id`, checked
     /// against the mark when a yes.
@@ -225,8 +237,9 @@ pub fn fit_name(name: &str) -> Result<String, &'static str> {
 /// `{"language": s}`, `{"voice": s}`, `{"character": s}` (`""` clears
 /// either; or `{"character": {"text": s, "energy"?: 1..5}}`, #6893, or
 /// `{"character": {"energy": 1..5}}` alone, the words kept, #7566), or `{"owner_place": {"name", "lat", "lon", "set_at"}}`
-/// (`null` clears it), or `{"control": bool}`, `{"local_agent": bool}`, `{"monitor": bool}`, or `{"consent": {KEY: bool}}`
-/// with exactly one key of [`lamp_msgs::consent::FILES`], or
+/// (`null` clears it), or `{"control": bool}`, `{"local_agent": bool}`, `{"monitor": bool}`, or `{"consent": {KEY: bool}, "if": REV}`
+/// with exactly one key of [`lamp_msgs::consent::FILES`] and the revision
+/// the app saw (`if` goes with `consent` alone), or
 /// `{"desk_noticing": {"allow": bool, "request_id": N}}` (N a positive
 /// integer, the app's send time in Unix ms).
 pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
@@ -235,10 +248,17 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
     }
     let value: Value = serde_json::from_str(line).map_err(|_| "the request is not JSON")?;
     let object = value.as_object().ok_or("the request is not an object")?;
-    if object.len() != 1 {
+    let rev = object.get("if");
+    if object.len() != 1 + usize::from(rev.is_some()) {
         return Err("the request holds one change".into());
     }
-    let (key, given) = object.iter().next().ok_or("the request holds one change")?;
+    let (key, given) = object
+        .iter()
+        .find(|(key, _)| *key != "if")
+        .ok_or("the request holds one change")?;
+    if rev.is_some() && key != "consent" {
+        return Err("the request holds one change".into());
+    }
     let text = given.as_str();
     match key.as_str() {
         "person_name" => {
@@ -329,7 +349,9 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
                 .map(|(known, _)| *known)
                 .find(|known| known == key)
                 .ok_or(why)?;
-            Ok(Change::Consent(key, yes.as_bool().ok_or(why)?))
+            let yes = yes.as_bool().ok_or(why)?;
+            let rev = lamp_msgs::consent::fit_rev(rev)?;
+            Ok(Change::Consent(key, yes, rev.to_owned()))
         }
         // Checked again here, whatever lamp-cloud sent (#6543): a yes only
         // with an id above the mark and within a day of the lamp's now; an
@@ -651,35 +673,82 @@ pub fn apply_or(change: &Change, config: &Config, by_default: bool) -> io::Resul
                 said: format!("the character's movement level was set to {level}"),
             })
         }
-        Change::Consent(key, yes) => {
-            let path = lamp_msgs::consent::file_in(&config.consent, key)
+        Change::Consent(key, yes, seen) => {
+            use lamp_msgs::consent;
+            let path = consent::file_in(&config.consent, key)
                 .ok_or_else(|| io::Error::other("no such yes"))?;
-            let before = lamp_msgs::consent::read_or(&path, key, by_default).yes;
-            if *yes && !before {
-                keep_yes(&path, key)?;
-            } else if !*yes {
-                if keeps_no(config, by_default) {
-                    keep_no(&path, key)?;
-                } else {
-                    remove(&path)?;
-                }
-            }
             let words = match *key {
-                lamp_msgs::consent::ROOM_SOUNDS => "room sounds",
-                lamp_msgs::consent::SEEN_ACTIVITY => "seen activity",
+                consent::ROOM_SOUNDS => "room sounds",
+                consent::SEEN_ACTIVITY => "seen activity",
                 _ => "face expressions",
             };
-            Ok(Done {
-                data: json!({ key.to_string(): *yes }),
+            // One change at a time, the helper's (the socket starts one per
+            // connection), the voice's and the reset's alike. A state that
+            // can't be read is put back as a fresh boundary first, so no
+            // revision from before it matches.
+            let held = consent::hold(&config.consent)?;
+            let now = held.rev(key)?;
+            // The readers' one rule (#7767): with the default on, no file
+            // is a yes already, and a kept no is no.
+            let before = consent::read_or(&path, key, by_default).yes;
+            let unchanged = |data: Value, said: String| Done {
+                data,
                 restart_schedule: false,
                 restart_voice: false,
                 restart_control: false,
-                restart_ears: *yes && !before && *key == lamp_msgs::consent::ROOM_SOUNDS,
+                restart_ears: false,
+                restart_peek: false,
+                said,
+            };
+            // A tap made against another revision (a retry of one already
+            // applied, or one made before a later change at the lamp):
+            // nothing changes, and the reply is what the lamp keeps now.
+            if *seen != now {
+                return Ok(unchanged(
+                    json!({"stale": { key.to_string(): before }, "rev": { key.to_string(): now }}),
+                    format!(
+                        "the {words} yes was asked from an older view in the app: left as it is"
+                    ),
+                ));
+            }
+            // A yes that stands already is left as it is (the voice's
+            // stays the voice's; a default's writes nothing and restarts
+            // nothing, #7767). An off is an explicit "no": it always renews
+            // the revision, even with no yes there, so no set made against
+            // the one before it applies after.
+            if *yes && before {
+                return Ok(unchanged(
+                    json!({"done": { key.to_string(): true }, "rev": { key.to_string(): now }}),
+                    format!("the {words} yes is on from the app already"),
+                ));
+            }
+            // The state's fresh revision first, then the yes: a yes that
+            // fails after it leaves the key `gone-REV`, every revision
+            // from before stale.
+            // Where a missing file is on (#7767, [`keeps_no`]), the off
+            // keeps a no in place of the removal, its fresh revision first
+            // all the same.
+            let at = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_secs());
+            let rev = if *yes {
+                held.keep_yes(key, at, consent::BY_APP)?
+            } else if keeps_no(config, by_default) {
+                held.keep_no(key, at, consent::BY_APP)?
+            } else {
+                held.take_back(key)?
+            };
+            Ok(Done {
+                data: json!({"done": { key.to_string(): *yes }, "rev": { key.to_string(): rev }}),
+                restart_schedule: false,
+                restart_voice: false,
+                restart_control: false,
+                restart_ears: *yes && *key == consent::ROOM_SOUNDS,
                 restart_peek: false,
                 said: format!(
                     "the {words} yes is {} from the app{}",
                     if *yes { "on" } else { "off" },
-                    if *yes == before { " already" } else { "" }
+                    if !*yes && !before { " already" } else { "" }
                 ),
             })
         }
@@ -693,20 +762,27 @@ pub fn apply_or(change: &Change, config: &Config, by_default: bool) -> io::Resul
             let path = lamp_msgs::consent::file_in(&config.consent, key)
                 .ok_or_else(|| io::Error::other("no such yes"))?;
             let lock = lamp_msgs::consent::lock_mark(&config.consent)?;
+            // The folder held after the mark's lock, never before (#5500):
+            // each write keeps a fresh revision first, so a `consent.set`
+            // of seen activity made before it is stale after.
+            let held = lamp_msgs::consent::hold(&config.consent)?;
             let before = lamp_msgs::consent::read_or(&path, key, by_default).yes;
+            let at = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_secs());
             if *yes {
                 if let Some(why) = desk_refused(*id, lock.read()) {
                     return Err(io::Error::other(Refused(why)));
                 }
                 lock.raise(*id)?;
                 if !before {
-                    keep_yes(&path, key)?;
+                    held.keep_yes(key, at, lamp_msgs::consent::BY_APP)?;
                 }
             } else {
                 if keeps_no(config, by_default) {
-                    keep_no(&path, key)?;
+                    held.keep_no(key, at, lamp_msgs::consent::BY_APP)?;
                 } else {
-                    remove(&path)?;
+                    held.take_back(key)?;
                 }
                 let id = if lamp_msgs::consent::too_far_ahead(*id) {
                     lamp_msgs::consent::now_unix_ms()
@@ -715,6 +791,7 @@ pub fn apply_or(change: &Change, config: &Config, by_default: bool) -> io::Resul
                 };
                 lock.raise(id)?;
             }
+            drop(held);
             drop(lock);
             Ok(Done {
                 data: json!({ key: *yes }),
@@ -792,65 +869,29 @@ fn keep_line(path: &Path, line: Option<&str>) -> io::Result<bool> {
     Ok(before != fs::read(path).ok())
 }
 
-/// A yes from the app kept at `path`, whole and in place at once:
-/// `{"version":1,KEY:"yes","at_unix_s":N,"by":"app"}`, 0640 and the
-/// folder's group (`lampos` on a lamp, which the eyes and the ears are in),
-/// or 0600 where the folder's group is root's, as the voice keeps its own.
-fn keep_yes(path: &Path, key: &str) -> io::Result<()> {
-    keep_answer(path, |at| {
-        lamp_msgs::consent::bytes(key, at, lamp_msgs::consent::BY_APP)
-    })
-}
-
-/// A no from the app kept at `path` as [`keep_yes`] keeps a yes (#7767):
-/// `{"version":1,KEY:"no","at_unix_s":N,"by":"app"}`, so that with
-/// `LAMP_NOTICING_BY_DEFAULT` on the off is never read as the default.
-fn keep_no(path: &Path, key: &str) -> io::Result<()> {
-    keep_answer(path, |at| {
-        lamp_msgs::consent::no_bytes(key, at, lamp_msgs::consent::BY_APP)
-    })
-}
-
-/// `bytes(now)` kept at `path`, whole: written beside it and renamed into
-/// place, in the mode and group [`keep_yes`] names.
-fn keep_answer(path: &Path, bytes: impl FnOnce(u64) -> Vec<u8>) -> io::Result<()> {
-    use std::os::unix::fs::{MetadataExt, PermissionsExt};
-    let folder = path
-        .parent()
-        .ok_or_else(|| io::Error::other("a yes has no folder"))?;
-    let group = Some(fs::metadata(folder)?.gid()).filter(|group| *group != 0);
-    let at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |since| since.as_secs());
-    let bytes = bytes(at);
-    let next = path.with_extension("change-next");
-    let _ = fs::remove_file(&next);
-    let result = (|| {
-        let mut file = fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&next)?;
-        let mode = if group.is_some() { 0o640 } else { 0o600 };
-        file.set_permissions(fs::Permissions::from_mode(mode))?;
-        if group.is_some() {
-            std::os::unix::fs::fchown(&file, None, group)?;
-        }
-        io::Write::write_all(&mut file, &bytes)?;
-        file.sync_all()?;
-        fs::rename(&next, path)?;
-        fs::File::open(folder)?.sync_all()
-    })();
-    if result.is_err() {
-        let _ = fs::remove_file(&next);
+/// The consent folder's revisions put in place if missing or unreadable
+/// ([`lamp_msgs::consent::Held::revs`], #5500), on each connection before
+/// its request is read, so a `consent.get` after any change helper start
+/// gives a real revision; a folder that is not there is left so. Why it
+/// failed, for the journal.
+pub fn consent_boundary(config: &Config) -> Result<(), String> {
+    match lamp_msgs::consent::hold(&config.consent).and_then(|held| held.revs()) {
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!(
+            "the consent revisions could not be kept: {}",
+            error.kind()
+        )),
     }
-    result
 }
 
 /// The refusal of every request without `--enable`.
 pub const OFF: &str = "changes after setup are off";
 
 /// The helper's reply line to one request: `{"done": data}` or
-/// `{"refused": why}`. A refusal never holds what was asked.
+/// `{"refused": why}`; a yes from the app's, `{"done": {KEY: bool}, "rev":
+/// {KEY: REV}}` or `{"stale": {KEY: bool}, "rev": {KEY: REV}}`, as it is.
+/// A refusal never holds what was asked.
 pub fn answer(line: &str, config: &Config, enabled: bool) -> (Value, Option<Done>) {
     if !enabled {
         return (json!({ "refused": OFF }), None);
@@ -860,6 +901,7 @@ pub fn answer(line: &str, config: &Config, enabled: bool) -> (Value, Option<Done
         Err(why) => return (json!({"refused": why}), None),
     };
     match apply(&change, config) {
+        Ok(done) if matches!(change, Change::Consent(..)) => (done.data.clone(), Some(done)),
         Ok(done) => (json!({"done": done.data}), Some(done)),
         Err(error) => match error
             .get_ref()

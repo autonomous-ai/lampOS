@@ -2099,6 +2099,31 @@ fn stop_agents(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<String
         .collect())
 }
 
+/// For one of the owner's yeses (`lamp_msgs::consent::FILES`, #5500): its
+/// folder held, with its key, for the wipe and the fresh revision after it,
+/// as every change to a yes is made, so a `consent.set` from before the
+/// reset never matches after it, even for a key that read off before and
+/// after. None for any other path, a yes whose folder is not there, or one
+/// that can't be held (said in the journal; the wipe goes on).
+fn consent_held(path: &Path) -> Option<(lamp_msgs::consent::Held, &'static str)> {
+    let (folder, name) = (path.parent()?, path.file_name()?);
+    let (key, _) = lamp_msgs::consent::FILES
+        .iter()
+        .find(|(_, known)| name == std::ffi::OsStr::new(known))?;
+    match lamp_msgs::consent::hold(folder) {
+        Ok(held) => Some((held, key)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        // Never in the wipe's way (the Reviewer-lead's P2 on #8704).
+        Err(error) => {
+            eprintln!(
+                "lamp-setup: reset: the consent folder could not be held: {}",
+                error.kind()
+            );
+            None
+        }
+    }
+}
+
 fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io::Result<()> {
     // Before the plan's wipes (#7868, the first builder, 02:02): OpenClaw's
     // check of the cut joins a running gateway through OpenClaw's wrapper,
@@ -2118,8 +2143,20 @@ fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io:
         }
         // Setup's staging copy of a file it writes (`serve::stage`), left
         // beside it by a write cut mid-way (the reviewer-lead's P3 on #3579).
+        // A yes is wiped first, holding its folder, then its revision
+        // renewed (#5500): a revision that can't be kept never keeps a yes
+        // or stops the reset (the Reviewer-lead's P2 on #8704).
+        let held = consent_held(path);
         wipe(&path.with_extension(STAGED))?;
         wipe(path)?;
+        if let Some((held, key)) = held
+            && let Err(error) = held.bump(key)
+        {
+            eprintln!(
+                "lamp-setup: reset: the {key} yes is wiped, but its revision could not be kept: {}",
+                error.kind()
+            );
+        }
         steps.push(Step::Wiped(path.clone()));
         if path.file_name() == Some(KEPT_JOURNAL.as_ref()) {
             forget_this_boot(path);
