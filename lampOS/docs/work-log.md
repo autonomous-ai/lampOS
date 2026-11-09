@@ -9403,3 +9403,27 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   #5888 and tonight's promote is unaffected by that change.
 - Own issues5061/5264/5265/5144 have no new comments since14:02 at last
   15:4x check; their device/owner gates remain separate.
+
+## 2026-11-09 — Second: consent privacy clearance and mail masking HOLD
+
+- READ-OK #5884 d092c9ccbf, 6744746847; all Second HOLDs on original
+  794d0375be and revised ead2bcfd268 lifted. Helper change suite67pass7.27s
+  includes3previously failing probes, adapted for durable initialization.
+  Four independent probes pass0.22s, including deterministic temp-path
+  failure proving retry preserves newer yes. Msgs consent6pass; voice
+  storage20pass3.45s. Source audit confirms local/reset/lock integration.
+- Remaining separate gates: Jarvis/PM/linkedphone and device latency.
+  Nonblocking I/O limits recorded: retry requires captured bytes; absent
+  file after unlink+directory-sync error is not re-synced by retry. No
+  claimed power-loss guarantee. Temporary probes removed, checkout clean.
+- Supplemental HOLD #5893 3edc77cdee,6744617034: code_spans scans full
+  line around every word window, quadratic on embedded email headers.
+  api_item to masked_subject: optimized lamp-services16KiB57.8ms,
+  64KiB872.2ms,256KiB13.603s; deps default dev, not full-release/device.
+  Debug315ms/4.43s/71.31s; killed owned900KB probe process22679 instead
+  of continuing oversized workload. Final native session exited101 due
+  termination; smaller optimized probe completed successfully.
+- API From/Subject lack small cap, transport allows1MiB; output fitting
+  and Gmail timeout do not bound masking. Author/El/Thirteen notified.
+  Synthetic only, no live mail. Tests removed; scripts/logs retained as
+  /tmp/second-5893-mask-cost{,-opt}.rs/.log. El owns formal second read.
