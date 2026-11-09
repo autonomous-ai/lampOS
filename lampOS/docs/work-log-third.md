@@ -1,3 +1,27 @@
+## 2026-11-09 — resume and report partial forget cleanup
+
+Ready for lamp-voice: no
+
+- Reconciled Queue #4710 and its continuation #5385. #4850 was closed by
+  the PM as a duplicate: #5024 shipped the room-reminder policy in train
+  549. Its old branch stays closed and current ownership/docs stay intact.
+- Taking the first builder's assigned follow-up (4710/6555801724) on
+  `third/forget-cleanup-outcomes-1109`, base `a0d68e2a9`: failed room
+  `forget_said` and consent-file removal must be reported with fixed,
+  content-free outcomes and preserved through the forget sanitizer.
+  Current source still had the original omission. No additional calls,
+  retries, scopes or deadlines; added bookkeeping target below 1 ms.
+- Code and injected-failure tests are being made, with English memory and
+  second-voice docs. Two reads remain Reviewer-three and Tests. The first
+  focused Rust compilation is running. Docs checker: nine tests passed,
+  191 docs and 1,885 local links, zero broken. No lamp or latency result yet.
+- #4099 closure recommended to the PM using Mobile's app/lamp PASS on
+  3 Nov (4099/6594483187); build number and raw `can` were not captured.
+- Fourteen's 10824 receipt records a real stable self-switch from 10686,
+  confirmation, healthy core rows and 3/3 spoken stops on 9adf. The blue
+  row was an already-blue kept-rule response. These are the holder's
+  measurements, not a Third device run.
+
 ## 2026-11-01 — room reminders and documentation links
 
 Ready for lamp-voice: no (#4850 is draft); docs #4845 landed in train 497.
