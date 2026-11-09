@@ -8246,6 +8246,68 @@ mod tests {
         assert!(kept.tries_said);
     }
 
+    /// The reviewer on #5824: a walk whose last step (how_you_sound) is not
+    /// available still owes its closing when that step ends, and dates the
+    /// walk's end there too, so the app is still told `onboarding.done`.
+    #[test]
+    fn a_walk_whose_last_step_is_not_available_is_still_dated() {
+        let mut room = Room::new("done-date-last-unavailable");
+        let mut definition = (*room.walk.definition).clone();
+        definition.order = vec![Step::WhereYouSit, Step::WhoYouAre, Step::HowYouSound];
+        room.walk.definition = Arc::new(definition.checked().unwrap());
+        room.walk.available = |step| step != Step::HowYouSound && Step::available(step);
+        assert_eq!(
+            room.wait(27 * S, Some(NEAR_MIDDLE)),
+            [SIT_NOTE, SIT_DONE, WHO_NOTE]
+        );
+        assert_eq!(room.walk.kept().done_at_unix_ms, None);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(
+            room.wait(5 * S, Some(NEAR_MIDDLE)),
+            [skill::PREFERENCES_DONE]
+        );
+        assert_eq!(room.outcome(Step::HowYouSound), Some(Outcome::NotAvailable));
+        let at = room
+            .walk
+            .kept()
+            .done_at_unix_ms
+            .expect("the walk's end is dated");
+        assert_eq!(room.walk.pending().done_at_unix_ms, Some(at));
+    }
+
+    /// A lamp set up before this build: every step done, no date. A redo
+    /// of the whole walk, walked to its end, dates it, so the app is told.
+    #[test]
+    fn a_redo_on_a_lamp_set_up_before_the_date_dates_it() {
+        let mut room = Room::new("done-date-older-lamp");
+        walk_to_the_done_line(&mut room);
+        let file = room.walk.file.clone();
+        let mut progress: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+        progress.as_object_mut().unwrap().remove("done_at_unix_ms");
+        std::fs::write(&file, progress.to_string()).unwrap();
+        let mut again = restarted(&room);
+        assert_eq!(again.walk.kept().done_at_unix_ms, None);
+        assert!(
+            again
+                .walk
+                .kept()
+                .steps
+                .values()
+                .all(|kept| kept.outcome != Outcome::Later)
+        );
+        let redo = ToolCall {
+            id: "c".into(),
+            name: REDO.into(),
+            args: json!({"step": "all"}),
+        };
+        assert!(run(&again.walk.file, &redo).1);
+        // `restarted` turns the Harness line on, signed out.
+        walk_to(&mut again, skill::PREFERENCES_DONE_HARNESS);
+        assert!(again.walk.kept().done_at_unix_ms.is_some());
+        assert!(again.walk.pending().done_at_unix_ms.is_some());
+    }
+
     /// The walk from its first step to "preferences"' done line, with
     /// someone sitting in the middle.
     fn walk_to_the_done_line(room: &mut Room) {
