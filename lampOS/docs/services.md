@@ -618,10 +618,23 @@ neither.
   /v1/me/player/previous`, each with `Content-Length: 0`. Only these routes,
   each by its method, on `api.spotify.com` exactly (`spotify::guard`); no
   redirect followed; 15 s for the whole of it, the renewal included.
+- **An unlink or a relink meanwhile** (#5796). Every unlink, wipe and new
+  link moves the link's generation on, and makes its store change while it
+  holds it (`Spotify::change`). The one call that acts (the player's) is
+  sent only under a read of that generation, unchanged since the access
+  token was had, with the link still kept: an unlink while a play waits on
+  its search leaves it "Spotify isn't linked…" (`not_linked`), a relink
+  "Spotify's link changed in the app while I was asking: nothing was
+  played, ask again" (`changed`), and Spotify's player is never asked. An
+  unlink that comes while the player's call is on its way waits for it, so
+  nothing plays after an unlink has answered.
 - **The answer.** Done: `{"done": "playing" | "paused" | "resumed" | "next"
   | "previous"}`; a play also quotes what it played, as a read's answer is
   (`type`, `title`, `artists`, or a playlist's owner as `by`, nothing else
-  of Spotify's), and the voice marks it quoted data. Refused, the tools
+  of Spotify's), and the voice marks it quoted data and fences its
+  request as a read's ("After a read"): nothing else runs in it, and its
+  words are kept nowhere in the thread. A pause, resume or skip names
+  nothing and fences nothing. Refused, the tools
   socket gives the words in `error` and a `code` beside them (an older voice
   reads `error` alone):
 

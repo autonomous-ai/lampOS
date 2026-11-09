@@ -638,11 +638,23 @@ cái nào.
   `Content-Length: 0`. Chỉ các route này, mỗi route theo method của nó,
   trên đúng `api.spotify.com` (`spotify::guard`); không theo redirect; 15 s
   cho toàn bộ, kể cả việc gia hạn.
+- **Gỡ liên kết hoặc liên kết lại trong lúc đó** (#5796). Mỗi lần gỡ, xoá
+  hết và liên kết mới đều đẩy thế hệ của liên kết lên, và thay đổi kho trong
+  lúc giữ nó (`Spotify::change`). Lệnh gọi duy nhất có tác động (của trình
+  phát) chỉ được gửi dưới một lần đọc thế hệ đó, không đổi từ lúc có access
+  token, và liên kết vẫn còn được giữ: gỡ liên kết trong lúc một lần phát
+  chờ kết quả tìm khiến nó thành "Spotify isn't linked…" (`not_linked`),
+  liên kết lại thành "Spotify's link changed in the app while I was asking:
+  nothing was played, ask again" (`changed`), và trình phát của Spotify
+  không bao giờ bị hỏi. Một lần gỡ đến lúc lệnh gọi trình phát đang đi thì
+  chờ nó, nên không gì được phát sau khi lần gỡ đã trả lời.
 - **Câu trả lời.** Xong: `{"done": "playing" | "paused" | "resumed" |
   "next" | "previous"}`; một `play` còn trích dẫn thứ nó đã phát, như câu trả
   lời của một lần đọc (`type`, `title`, `artists`, hoặc chủ của playlist là
   `by`, không gì khác của Spotify), và giọng nói đánh dấu nó là dữ liệu trích
-  dẫn. Bị từ chối, socket tools đưa lời trong `error` và một `code` bên cạnh
+  dẫn và rào yêu cầu của nó như một lần đọc ("Sau một lần đọc"): không gì
+  khác chạy trong đó, và lời của nó không được giữ ở đâu trong luồng hội
+  thoại. Pause, resume hay chuyển bài không nêu gì và không rào gì. Bị từ chối, socket tools đưa lời trong `error` và một `code` bên cạnh
   (giọng nói cũ hơn chỉ đọc `error`):
 
   | Câu trả lời của Spotify | Lời | `code` |

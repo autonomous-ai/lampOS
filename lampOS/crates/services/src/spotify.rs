@@ -97,6 +97,10 @@ pub const NO_PLAY_SCOPE: &str =
 /// What playback is told when Spotify has no active device (404).
 pub const NO_DEVICE: &str =
     "Nothing is open to play on: open Spotify on your phone or speaker first";
+/// What playback is told when the link was removed or replaced while it
+/// was being asked: nothing was played.
+pub const CHANGED: &str =
+    "Spotify's link changed in the app while I was asking: nothing was played, ask again";
 /// What playback is told when the account isn't Premium (403).
 pub const PREMIUM: &str = "Playing from the lamp needs Spotify Premium";
 /// Playback's actions, for the tool's description and a wrong one.
@@ -361,10 +365,20 @@ struct Held {
 
 /// Spotify's state in this process: the access token, in memory only, one
 /// renewal at a time (a rotated refresh token is good once, so two at once
-/// would refuse each other).
+/// would refuse each other), and the link's generation.
+///
+/// The generation is one more at every unlink, wipe and new link
+/// ([`Spotify::change`]), whose store change is made while it is held, the
+/// held token's lock with it. A playback acts on Spotify only under a read
+/// of it, unchanged since its access token was had and the link still
+/// kept: a request begun before an unlink or a relink never plays after
+/// it (reviewer-three's P2 on #5796), and an unlink waits for a playback
+/// call already sent. Locks are always taken the held token's first, then
+/// the generation's, and a playback holds the generation's alone.
 #[derive(Default)]
 pub struct Spotify {
     held: tokio::sync::Mutex<Option<Held>>,
+    link: tokio::sync::RwLock<u64>,
 }
 
 impl std::fmt::Debug for Spotify {
@@ -373,27 +387,57 @@ impl std::fmt::Debug for Spotify {
     }
 }
 
+/// A change of the link under way ([`Spotify::change`]): while it lives no
+/// read renews and no playback acts, and the store's change is made then.
+pub struct Changing<'a> {
+    held: tokio::sync::MutexGuard<'a, Option<Held>>,
+    _link: tokio::sync::RwLockWriteGuard<'a, u64>,
+}
+
 impl Spotify {
-    /// The access token forgotten: the link removed, every link wiped.
-    pub async fn forget(&self) {
-        *self.held.lock().await = None;
+    /// A change of the link begun: the access token forgotten, the
+    /// generation one more, both held until the [`Changing`] is dropped.
+    /// The caller removes, wipes or keeps the link in the store meanwhile.
+    pub async fn change(&self) -> Changing<'_> {
+        let mut held = self.held.lock().await;
+        *held = None;
+        let mut link = self.link.write().await;
+        *link = link.wrapping_add(1);
+        Changing { held, _link: link }
     }
 
-    /// `set`'s renewal: the link proved by one refresh, its rotated refresh
-    /// token put in `entry` before it is kept, the access token held.
+    /// The access token forgotten and the generation moved on, with no
+    /// store change of the caller's.
+    pub async fn forget(&self) {
+        drop(self.change().await);
+    }
+
+    /// `set`'s renewal, as [`Spotify::link_in`] in a change of its own.
     pub async fn link<H: Http>(
         &self,
         http: &H,
         entry: &mut Entry,
         now: i64,
     ) -> Result<(), Refusal> {
-        let mut held = self.held.lock().await;
-        *held = None;
+        Self::link_in(&mut self.change().await, http, entry, now).await
+    }
+
+    /// `set`'s renewal, within `changing`: the link proved by one refresh,
+    /// its rotated refresh token put in `entry` before it is kept, the
+    /// access token held.
+    pub async fn link_in<H: Http>(
+        changing: &mut Changing<'_>,
+        http: &H,
+        entry: &mut Entry,
+        now: i64,
+    ) -> Result<(), Refusal> {
+        let held = &mut changing.held;
+        **held = None;
         let fresh = renew(http, &entry.api_key, &entry.client_id, now).await?;
         if let Some(rotated) = fresh.refresh_token {
             entry.api_key = rotated;
         }
-        *held = Some(Held {
+        **held = Some(Held {
             stored: entry.api_key.clone(),
             refresh_token: entry.api_key.clone(),
             access_token: fresh.access_token,
@@ -405,14 +449,29 @@ impl Spotify {
     /// An access token for the kept link, `entry` (loaded under the lock):
     /// the one held while it has over [`ACCESS_SKEW_S`] left, else a
     /// renewal, its rotated refresh token kept whole in `store`. A refused
-    /// renewal marks the link expired in the store.
+    /// renewal marks the link expired in the store. Also the link's
+    /// generation the token is for: no change can come between the two,
+    /// since a change takes the held token's lock first.
     async fn access<H: Http>(
         &self,
         http: &H,
         store: &Store,
         now: i64,
-    ) -> Result<(String, Entry), Refused> {
+    ) -> Result<(String, Entry, u64), Refused> {
         let mut held = self.held.lock().await;
+        let generation = *self.link.read().await;
+        let (access, entry) = self.access_held(&mut held, http, store, now).await?;
+        Ok((access, entry, generation))
+    }
+
+    /// [`Spotify::access`]'s work, under the held token's lock.
+    async fn access_held<H: Http>(
+        &self,
+        held: &mut Option<Held>,
+        http: &H,
+        store: &Store,
+        now: i64,
+    ) -> Result<(String, Entry), Refused> {
         let mut entry = store.load(CODE).ok_or_else(not_linked)?;
         if entry.expired(now) {
             *held = None;
@@ -485,7 +544,7 @@ impl Spotify {
             return Err(format!("{CODE} reads: {WHATS}"));
         }
         let read = async {
-            let (access, entry) = self
+            let (access, entry, _) = self
                 .access(http, store, crate::now_secs())
                 .await
                 .map_err(|refused| refused.words)?;
@@ -546,7 +605,7 @@ impl Spotify {
             return Err(Refused::new(NO_PLAY_SCOPE, "relink"));
         }
         let play = async {
-            let (access, entry) = self.access(http, store, crate::now_secs()).await?;
+            let (access, entry, generation) = self.access(http, store, crate::now_secs()).await?;
             let unreached = |_| Refused::new(UNREACHED, "unreached");
             let (call, shown) = match &asked {
                 Asked::Play { query, kind } => {
@@ -569,7 +628,24 @@ impl Spotify {
                 Asked::Next => (player_call(Method::Post, NEXT_PATH, &access), None),
                 Asked::Previous => (player_call(Method::Post, PREVIOUS_PATH, &access), None),
             };
-            let reply = send(http, call).await.map_err(unreached)?;
+            // The one call that acts: only for the link the token was had
+            // for, still kept, and under the generation's read, so an
+            // unlink or a relink waits for it or is seen by it.
+            let sent = {
+                let link = self.link.read().await;
+                match store.load(CODE) {
+                    None => return Err(not_linked()),
+                    Some(_) if *link != generation => {
+                        return Err(Refused::new(CHANGED, "changed"));
+                    }
+                    Some(kept) if kept.expired(crate::now_secs()) => {
+                        return Err(Refusal::Relink.into());
+                    }
+                    Some(_) => {}
+                }
+                send(http, call).await
+            };
+            let reply = sent.map_err(unreached)?;
             self.player_answer(&reply, true).await?;
             let mut done = match shown {
                 Some(shown) => crate::reads::quoted(NAME, vec![shown]),

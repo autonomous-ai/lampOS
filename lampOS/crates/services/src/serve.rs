@@ -264,7 +264,9 @@ impl<H: Http, M: Mail> Services<H, M> {
             ),
             Admin::Wipe => {
                 self.desk.forget(None);
-                self.spotify.forget().await;
+                // Spotify's link changes with the store, under its change:
+                // no playback begun before acts after (#5796).
+                let _changing = self.spotify.change().await;
                 match self.store.wipe() {
                     Ok(()) => (json!({"ok": true}), "every service unlinked".into()),
                     Err(error) => (
@@ -275,9 +277,11 @@ impl<H: Http, M: Mail> Services<H, M> {
             }
             Admin::Remove(code) => {
                 self.desk.forget(Some(&code));
-                if code == spotify::CODE {
-                    self.spotify.forget().await;
-                }
+                let _changing = if code == spotify::CODE {
+                    Some(self.spotify.change().await)
+                } else {
+                    None
+                };
                 match self.store.remove(&code) {
                     Ok(()) => (json!({"ok": true}), format!("{code} unlinked")),
                     Err(error) => (
@@ -323,19 +327,24 @@ impl<H: Http, M: Mail> Services<H, M> {
                     }
                 }
                 // Spotify's link is proved by one renewal at Spotify itself,
-                // its rotated refresh token the one kept.
-                if code == spotify::CODE
-                    && let Err(refusal) = self
-                        .spotify
-                        .link(&self.http, &mut entry, crate::now_secs())
-                        .await
-                {
-                    return (
-                        coded(refusal.words(), refusal.code()),
-                        format!("{code} not linked: {}", refusal.words()),
-                    );
+                // its rotated refresh token the one kept, all under one
+                // change of its link: a playback begun for the old link
+                // never acts on the new (#5796).
+                let mut changing = None;
+                if code == spotify::CODE {
+                    let changing = changing.insert(self.spotify.change().await);
+                    if let Err(refusal) =
+                        Spotify::link_in(changing, &self.http, &mut entry, crate::now_secs()).await
+                    {
+                        return (
+                            coded(refusal.words(), refusal.code()),
+                            format!("{code} not linked: {}", refusal.words()),
+                        );
+                    }
                 }
-                match self.store.keep(&entry) {
+                let kept = self.store.keep(&entry);
+                drop(changing);
+                match kept {
                     Ok(()) => (
                         json!({"ok": true, "connector": code, "scopes": entry.scopes}),
                         format!("{code} linked"),
@@ -1496,6 +1505,136 @@ mod tests {
         // The product's unit leaves it off.
         let unit = include_str!("../../../deploy/product/lamp-services.service");
         assert!(!unit.contains(spotify::PLAYBACK_ENVIRONMENT));
+    }
+
+    /// Spotify, faked by route: the token route answers at once, a search
+    /// says it arrived and waits for a go before it answers one track, and
+    /// a player call answers 204. Every call is kept.
+    struct GatedSpotify {
+        calls: Mutex<Vec<Call>>,
+        arrived: Mutex<std::sync::mpsc::Sender<()>>,
+        go: Mutex<std::sync::mpsc::Receiver<()>>,
+    }
+
+    impl Http for GatedSpotify {
+        async fn send(&self, call: Call) -> Result<Reply, String> {
+            self.calls.lock().unwrap().push(call.clone());
+            let body = if call.url.contains("/api/token") {
+                r#"{"access_token":"acc-planted","token_type":"Bearer","expires_in":3600}"#
+            } else if call.url.contains("/v1/search") {
+                self.arrived.lock().unwrap().send(()).unwrap();
+                self.go.lock().unwrap().recv().unwrap();
+                r#"{"tracks":{"items":[{"name":"Clair de Lune","uri":"spotify:track:4u7EnebtmKWzUH433cf5Qv","artists":[{"name":"Debussy"}]}]}}"#
+            } else {
+                return Ok(Reply {
+                    status: 204,
+                    ..Reply::default()
+                });
+            };
+            Ok(Reply {
+                status: 200,
+                body: body.as_bytes().to_vec(),
+                ..Reply::default()
+            })
+        }
+    }
+
+    /// A play of "Clair de Lune" held at its search while `between` changes
+    /// the link through the admin door; then let go. What the play was
+    /// answered, and every call made.
+    fn play_across(between: impl FnOnce(&Services<GatedSpotify, FakeMail>)) -> (Value, Vec<Call>) {
+        let dir = tempfile::tempdir().unwrap();
+        let (arrived, arrival) = std::sync::mpsc::channel();
+        let (go, gone) = std::sync::mpsc::channel();
+        let services = Arc::new(
+            Services::new(
+                Store(dir.path().join("s")),
+                GatedSpotify {
+                    calls: Mutex::default(),
+                    arrived: Mutex::new(arrived),
+                    go: Mutex::new(gone),
+                },
+                FakeMail::default(),
+                None,
+                true,
+            )
+            .with_spotify(true)
+            .with_playback(true),
+        );
+        let link = json!({"connector":"spotify","auth_type":"pat","api_key":"rt-planted-1",
+                          "credentials":{"client_id":"abc123",
+                          "scopes":"user-read-currently-playing user-modify-playback-state"}});
+        let (answer, _) = run(services.admin(&set_line("spotify", link)));
+        assert_eq!(answer["ok"], true, "{answer}");
+        let playing = services.clone();
+        let play = std::thread::spawn(move || {
+            let line = json!({"op":"call","name":"service_play","args":
+                {"service":"spotify","action":"play","query":"Clair de Lune"}});
+            run(playing.tool(&line.to_string()))
+        });
+        arrival
+            .recv_timeout(Duration::from_secs(10))
+            .expect("the search arrived");
+        between(&services);
+        go.send(()).unwrap();
+        let answered = play.join().unwrap();
+        let calls = services.http.calls.lock().unwrap().clone();
+        (answered, calls)
+    }
+
+    fn played(calls: &[Call]) -> bool {
+        calls.iter().any(|call| call.url.contains("/v1/me/player/"))
+    }
+
+    /// Reviewer-three's P2 on #5796: an unlink that succeeds while a play
+    /// waits on its search leaves nothing to play; the play is refused as
+    /// not linked and Spotify's player is never asked.
+    #[test]
+    fn reviewer_three_unlink_during_search_prevents_playback() {
+        let (answered, calls) = play_across(|services| {
+            let (answer, _) = run(services.admin(r#"{"op":"remove","code":"spotify"}"#));
+            assert_eq!(answer, json!({"ok": true}));
+            assert!(services.store.load("spotify").is_none());
+        });
+        assert_eq!(answered["ok"], false, "{answered}");
+        assert_eq!(answered["code"], "not_linked", "{answered}");
+        assert!(!played(&calls), "the player was asked after the unlink");
+        // A wipe, the same.
+        let (answered, calls) = play_across(|services| {
+            let (answer, _) = run(services.admin(r#"{"op":"wipe"}"#));
+            assert_eq!(answer, json!({"ok": true}));
+        });
+        assert_eq!(answered["code"], "not_linked", "{answered}");
+        assert!(!played(&calls));
+    }
+
+    /// A relink while a play waits on its search: the old request never
+    /// acts on the account that replaced it.
+    #[test]
+    fn a_relink_during_search_prevents_the_old_requests_playback() {
+        let (answered, calls) = play_across(|services| {
+            let other = json!({"connector":"spotify","auth_type":"pat","api_key":"rt-other",
+                               "credentials":{"client_id":"abc123",
+                               "scopes":"user-modify-playback-state"}});
+            let (answer, _) = run(services.admin(&set_line("spotify", other)));
+            assert_eq!(answer["ok"], true, "{answer}");
+            assert_eq!(services.store.load("spotify").unwrap().api_key, "rt-other");
+        });
+        assert_eq!(
+            answered,
+            json!({"ok": false, "error": spotify::CHANGED, "code": "changed"})
+        );
+        assert!(!played(&calls), "the old request played on the new link");
+        // With nothing changed, the same play plays once.
+        let (answered, calls) = play_across(|_| {});
+        assert_eq!(answered["result"]["done"], "playing", "{answered}");
+        assert_eq!(
+            calls
+                .iter()
+                .filter(|call| call.url.ends_with("/v1/me/player/play"))
+                .count(),
+            1
+        );
     }
 
     #[test]

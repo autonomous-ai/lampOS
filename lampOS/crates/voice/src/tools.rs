@@ -6541,6 +6541,12 @@ mod tests {
                     Some(crate::services::WRITE) => {
                         json!({"read_back":"To Ann: hello","send_id":"s1","sent":false})
                     }
+                    // A play quotes what it played; a pause names nothing.
+                    Some(crate::services::PLAY) if line["args"]["action"] == "play" => {
+                        json!({"done":"playing","source":"Spotify",
+                               "quoted":[{"type":"track","title":"Clair de Lune"}]})
+                    }
+                    Some(crate::services::PLAY) => json!({"done":"paused"}),
                     _ => json!({"items":[{"from":"Ann","subject":"Hi"}]}),
                 };
                 kept.lock().unwrap().push(line);
@@ -6789,6 +6795,47 @@ mod tests {
         let last = asked.lock().unwrap().last().unwrap().clone();
         assert_eq!(last["name"], crate::services::PLAY);
         assert_eq!(last["args"]["query"], "Clair de Lune");
+        // Its answer quotes Spotify's titles, so it fences the request as a
+        // read does (#5796): private in the thread, and nothing else after
+        // it, another play, a write, a keep or an action.
+        assert_eq!(told["quoted"][0]["title"], "Clair de Lune");
+        assert!(crate::services::after_read(4_710_013));
+        assert!(crate::thread::THREAD.lock().unwrap().is_private(4_710_013));
+        let before = asked.lock().unwrap().len();
+        for (route, name) in [
+            (&services, crate::services::PLAY),
+            (&services, crate::services::WRITE),
+            (
+                &Route::Memory(PathBuf::from("/missing-memory.sock"), None, None),
+                crate::remember::REMEMBER,
+            ),
+            (&Route::Executive(dir.clone()), "set_light"),
+        ] {
+            let (_, (told, _)) = run_call_scoped(
+                route,
+                &call(name, json!({"service":"spotify","action":"next"})),
+                4_710_013,
+                true,
+                &playing.lease(),
+            );
+            assert_eq!(told["error"], crate::services::AFTER_READ, "{name}");
+        }
+        assert_eq!(asked.lock().unwrap().len(), before, "nothing was asked");
+        // A pause names nothing: its request is not fenced.
+        let pausing = scoped(crate::memory_scope::ScopeSnapshot::of("Ann"), 4_710_014);
+        let (_, (told, answered)) = run_call_scoped(
+            &services,
+            &call(
+                crate::services::PLAY,
+                json!({"service":"spotify","action":"pause"}),
+            ),
+            4_710_014,
+            true,
+            &pausing.lease(),
+        );
+        assert!(answered);
+        assert_eq!(told["done"], "paused");
+        assert!(!crate::services::after_read(4_710_014));
         let before = asked.lock().unwrap().len();
         // On the Live route (no voice judge), no write is prepared or sent.
         let send = scoped(crate::memory_scope::ScopeSnapshot::of("Ann"), 4_710_004);

@@ -1167,6 +1167,15 @@ pub fn run(
         if call.name == WRITE && told.get("sent").and_then(Value::as_bool) == Some(true) {
             ask_owner(&mut told);
         }
+        // A play's answer that quotes what it played (Spotify's titles and
+        // names) fences its request as a read does: nothing else runs after
+        // it, and its words are kept nowhere in the thread (#5796).
+        if call.name == PLAY && told.get("error").is_none() && told.get("quoted").is_some() {
+            read_answered(request);
+            if let Ok(mut thread) = crate::thread::THREAD.lock() {
+                thread.private_for(request);
+            }
+        }
         if call.name == READ && told.get("error").is_none() {
             read_answered(request);
             if let Ok(mut thread) = crate::thread::THREAD.lock() {
