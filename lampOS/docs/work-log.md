@@ -8656,3 +8656,13 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   same dropped 1.0 hearing. This excludes a burst-only explanation on this
   host. Thirteen acknowledges and owns a background-reader fix.
 - Removed completed clean #5843 and #5833 checkouts; saved evidence remains.
+
+## 2026-11-09 — Second: SDK guide status read
+
+- READ-OK #5850 `a626d066e577f02cf79a3f49584115dbe054cbd7`, docs only.
+  Changed rows keep customer limitations separate from pending motion/MCP,
+  reconnect and skill-push work; microphone remains draft/in development.
+- Exact SDK source archive: guide pytest 7 passed in 0.04 s, diff check clean.
+  No full SDK or whole-doc-link rerun for this narrow read. P3: retain
+  “in review” beside reconnect's “next build” while #5833/#5830 stay open.
+  Initial pull ref was not yet available; fetched the named source branch.
