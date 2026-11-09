@@ -138,10 +138,11 @@ who came and went while the eyes were shut is not known. A gap of under 5 s
 ([skills.md](skills.md)): a core skill (`kind = "core"`, version 1.0.0,
 #1698) that may read `room/presence`, `voice/state` and `memory/rules` ("Keep
 the light on", below) and use the light, and nothing more (`[permissions]`). A core skill comes with the lamp, so
-this one is installed, but disabled until its lamp check
-(`install::PRODUCT_SKILLS_OFF`): presence will be switched on for Messages
-too, and that must not put the light out on lamps where nobody has watched
-it. A test holds the install's skills to exactly the core ones.
+this one is installed, and on in the product since #5746 (the lead's
+call, 6 Nov, after #5505 and #5539): until then it was installed disabled
+(`install::PRODUCT_SKILLS_OFF`), so presence on for Messages did not put the
+light out on lamps where nobody had watched it. Its played row on lamp-52e6,
+a reader with their head down not darkened, is owed. A test holds the install's skills to exactly the core ones.
 
 | | Default | Why |
 |---|---|---|
@@ -208,14 +209,13 @@ heard, so `someone` comes back and the skill's ask ends with it.
    product's has the bus). **On in the product since 2 Nov** (the first
    builder's yes on #4710), with `LAMP_PRESENCE_VOICE=addressed`: a skill
    made on the lamp on `room/presence` ("when I come back to my desk") ran
-   only with it (lamp-9adf, 18:21). Light out stays off until its own check.
+   only with it (lamp-9adf, 18:21). Light out reads it, on since #5746.
 2. `LAMP_LIGHT_REQUESTS=on` in the voice's and `lamp-skills`' units (the
    product's have both), and `LAMP_LIGHT_KEEP=on` for the person's light
    across a restart.
 3. `skills/light-out/` in `/var/lib/lampOS/skills`, enabled. Install puts
-   it there disabled until its lamp check (`install::PRODUCT_SKILLS_OFF`,
-   with why); its own `skill.toml` copied over the installed one turns it
-   on.
+   it there as its own `skill.toml`, enabled, since #5746 (it was in
+   `install::PRODUCT_SKILLS_OFF` until then).
 4. `lamp-skills` with `--zone system` (the product's and lamp-4ace's) for
    the quiet hours; without a zone a skill with quiet hours never starts
    itself.

@@ -8,8 +8,8 @@
 # Written to lamp-skills' schema (docs/skills.md); its defaults are in
 # docs/presence.md.
 needs = ["eyes", "light"]
-# A core skill (docs/skills.md, "Core and installable skills"), installed
-# disabled until its lamp check (install::PRODUCT_SKILLS_OFF).
+# A core skill (docs/skills.md, "Core and installable skills"), on in the
+# product since #5746 (the lead's call, 6 Nov).
 # Without the eyes' room/presence it does nothing.
 kind = "core"
 version = "1.0.0"

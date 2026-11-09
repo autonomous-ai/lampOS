@@ -248,10 +248,11 @@ Light show (#1679), a show of slow-changing colours a person asks for,
 comes with the product since #5745, its `light_show` reached through
 `use_skill`. Light scenes and Point the light (#1679) come with the
 product since #5744, asked for by a person only and reached through
-`use_skill` too. Four core skills not yet tried on a lamp are
-installed disabled (`install::PRODUCT_SKILLS_OFF`, each with why): Light out
-when you leave (#1677, [presence.md](presence.md), which must never take the
-light of someone reading face down),
+`use_skill` too. Light out when you leave (#1677, [presence.md](presence.md))
+is on in the product since #5746 (the lead's call, 6 Nov), its played row
+on lamp-52e6 owed: someone reading head down must never lose their light.
+Three core skills not yet tried on a lamp are installed disabled
+(`install::PRODUCT_SKILLS_OFF`, each with why):
 Smoky air and Dusty air
 (#1684), until they are measured for false alarms on real traces, and
 Feelings (#3691), which needs Mood on (`LAMP_MOOD=on`, trial-only). Install

@@ -371,13 +371,17 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // A light show a person asks for (#1679): on in the product since
     // #5745, its played row on lamp-52e6 with it (trials.sh's light-show).
     "light-show",
+    // Light out when you leave (#1677, #5746): the light dims after forty
+    // minutes with nobody at the lamp and goes out five later, on the eyes' `room/presence`
+    // (`LAMP_PRESENCE=on` in the product's lamp-eyes), and comes back when
+    // someone sits down or speaks. Quiet at night by its own `[quiet]`.
+    "light-out",
     // Light scenes and Point the light (#1679, #5744): asked for by a
     // person, never on their own, reached through `use_skill`.
     "light-scenes",
     "point-light",
-    // Installed disabled ([`PRODUCT_SKILLS_OFF`]).
-    "light-out",
     "pose",
+    // Installed disabled ([`PRODUCT_SKILLS_OFF`]).
     "smoky-air",
     "dusty-air",
     "feelings",
@@ -389,12 +393,6 @@ pub const PRODUCT_SKILLS: &[&str] = &[
 /// default and its cases. A skill leaves this list once its lamp check has
 /// passed; until then a person or a trial turns it on on the lamp itself.
 pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
-    (
-        "light-out",
-        "it reads `room/presence`, which the eyes say only with `LAMP_PRESENCE=on` (#1677), off \
-         until the light going out and coming back has been seen on a lamp: someone reading face \
-         down at the desk must never lose their light",
-    ),
     // #1679's three core skills come with the product: Light show since
     // #5745, Light scenes and Point the light since #5744.
     // #1684's two core skills, merged off (the first builder, #1722): a
@@ -560,8 +558,7 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("prepare-unplug", "SKILL.md"),
     skill_file!("startle", "skill.toml"),
     skill_file!("startle", "SKILL.md"),
-    // Installed disabled (PRODUCT_SKILLS_OFF).
-    skill_file_off!("light-out"),
+    skill_file!("light-out", "skill.toml"),
     skill_file!("light-out", "SKILL.md"),
     skill_file!("watch-you-leave", "skill.toml"),
     skill_file!("watch-you-leave", "SKILL.md"),

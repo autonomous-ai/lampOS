@@ -36,7 +36,7 @@ Environment=LAMP_EYES_SPEAKING=on
 Environment=LAMP_MEMORY_STABLE_ID=on
 # Whether anyone is at the lamp, on room/presence (presence.md): a face seen, or a voice said to the
 # lamp (addressed, so chatter at the next desk never counts), within 20 s. Read by skills made on the
-# lamp ("when I come back to my desk"); Light out stays off until its own check (the first builder, 2 Nov).
+# lamp ("when I come back to my desk"), and by Light out when you leave, on in the product since #5746.
 Environment=LAMP_PRESENCE=on
 Environment=LAMP_PRESENCE_VOICE=addressed
 # The head's own moves left out of the speaking read, and a meshed face read from 16 px (#4558): the

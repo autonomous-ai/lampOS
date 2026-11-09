@@ -3022,13 +3022,14 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
         .map(|name| lamp_skills::load(&root.join(name)).unwrap())
         .collect();
     // Not feeling well came with the product after its lamp check (#1681);
-    // the four of PRODUCT_SKILLS_OFF come installed disabled; the startle
+    // the three of PRODUCT_SKILLS_OFF come installed disabled; the startle
     // came with its move (#2822); the four wellbeing nudges since 25 Oct;
     // Head pat and its wiggle since #4133's design owner's yes (29 Oct);
     // Comfort break, off by its own file and on by its [present] with the
     // product units' LAMP_NUDGES_PRESENT=on (#5207).
     // Sit back since its played check with a person (#5208, 4 Nov).
     // Light show since #5745; Light scenes and Point the light since #5744.
+    // Light out on since #5746, out of PRODUCT_SKILLS_OFF.
     assert_eq!(installed.len(), 30);
     let bedtime = installed
         .iter()
@@ -3054,9 +3055,9 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     );
     assert!(root.join("bedtime-morning/SKILL.md").is_file());
     // Inventory includes the disabled core and its grants; only live skills
-    // contribute functions. The twenty-four live skills (with music sway and
-    // watch you leave since #2834, Head pat and its wiggle, which declare
-    // none, and Sit back, which shares wellbeing_nudges) offer Dance,
+    // contribute functions. The twenty-five live skills (with music sway and
+    // watch you leave since #2834, Head pat and its wiggle and Light out
+    // since #5746, which declare none, and Sit back, which shares wellbeing_nudges) offer Dance,
     // prepare_to_unplug, hidden at run time unless LAMP_UNPLUG=on, and the
     // wellbeing nudges' one wellbeing_nudges (since 25 Oct), Pose's set_pose (#4135),
     // Light show's light_show (#5745), and Light scenes' light_scene and
@@ -3085,7 +3086,7 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     );
     let (live, errors) = lamp_skills::load_all(&root);
     assert!(errors.is_empty(), "{errors:?}");
-    assert_eq!(live.len(), 24);
+    assert_eq!(live.len(), 25);
     assert!(live.iter().all(|skill| skill.name != bedtime.name));
     // Each core skill installed off is disabled on the lamp and adds no
     // function, its tool or not: the 7 above are all a session is told.
@@ -3789,6 +3790,41 @@ fn the_product_plays_a_light_show_when_asked() {
             .unwrap()
             .enabled
     );
+}
+
+/// Light out when you leave is a core skill on in the product (#5746, the
+/// lead's call of 6 Nov): installed as its own file, out of
+/// `PRODUCT_SKILLS_OFF`, quiet at night, reading the eyes' `room/presence`
+/// (`LAMP_PRESENCE=on`) and asking the ring for the light out
+/// (`LAMP_LIGHT_REQUESTS=on` in the voice and lamp-skills), so the person's
+/// own light is never turned off as theirs.
+#[test]
+fn the_product_puts_the_light_out_when_nobody_is_there() {
+    assert!(install::PRODUCT_SKILLS.contains(&"light-out"));
+    assert!(
+        !install::PRODUCT_SKILLS_OFF
+            .iter()
+            .any(|(off, _)| *off == "light-out")
+    );
+    let own = fs::read(skills_root().join("light-out/skill.toml")).unwrap();
+    assert!(String::from_utf8_lossy(&own).contains("\n[quiet]"));
+    let mut lamp = Lamp::new(189, &[]);
+    lamp.install().unwrap();
+    assert_eq!(
+        fs::read(lamp.on("/var/lib/lampOS/skills/light-out/skill.toml")).unwrap(),
+        own,
+        "light-out is installed as its own file, turned on"
+    );
+    let set = |unit: &str, line: &str| unit.lines().any(|each| each.trim() == line);
+    let eyes = include_str!("../../../deploy/product/lamp-eyes.service");
+    assert!(set(eyes, "Environment=LAMP_BUS=on"));
+    assert!(set(eyes, "Environment=LAMP_PRESENCE=on"));
+    for unit in [
+        include_str!("../../../deploy/product/lamp-voice.service"),
+        include_str!("../../../deploy/product/lamp-skills.service"),
+    ] {
+        assert!(set(unit, "Environment=LAMP_LIGHT_REQUESTS=on"));
+    }
 }
 
 /// Music sway and watch you leave are core skills in the product (#2834):
