@@ -1143,6 +1143,85 @@ pub async fn known_once_decided(
     known
 }
 
+/// Beside the eyes' known file: `-unsure`, the known file's words moved
+/// there (its face to `-unsure-face`) while the eyes hold the one known
+/// with no print read as theirs since a gap (`lamp-eyes`'
+/// `who::hold_unsure`, `LAMP_FACE_KNOWN_UNSURE`, #5738). The known file is
+/// gone meanwhile: every reader of it sees nobody known.
+pub fn known_unsure_of(known: &Path) -> PathBuf {
+    let mut beside = known.as_os_str().to_owned();
+    beside.push("-unsure");
+    PathBuf::from(beside)
+}
+
+/// The file the second voice's face cache reads for the known person
+/// (#5738): the known file, or while the eyes hold them unsure and it is
+/// gone, the held name beside it ([`known_unsure_of`]), so a hold that
+/// moves aside and comes back is no change of who is known and the cache
+/// stays warm. A line is still tied to them only once a print decides
+/// ([`known_once_printed`]); every other reader reads the known file alone.
+pub fn known_or_held(known: &Path) -> PathBuf {
+    if !known.exists() && known_unsure(known) {
+        known_unsure_of(known)
+    } else {
+        known.to_owned()
+    }
+}
+
+/// Whether the eyes' hold is unsure now: the mark there, written within
+/// [`crate::known_faces::FRESH`] as the known file is.
+pub fn known_unsure(known: &Path) -> bool {
+    std::fs::metadata(known_unsure_of(known))
+        .and_then(|meta| meta.modified())
+        .ok()
+        .and_then(|written| SystemTime::now().duration_since(written).ok())
+        .is_some_and(|age| age < crate::known_faces::FRESH)
+}
+
+/// The known person and face (`known`, read at the line's end `to`), once
+/// a print has decided an unsure hold (#5738, the Reviewer-lead's condition
+/// on #5546 as the first builder widened it): while the eyes hold it
+/// unsure ([`known_unsure`]: nobody near, or a near face not printed since
+/// a gap), the known file is gone and the line is tied to no one; the mark
+/// is read every [`EVERY`] until it goes, then the pair is read again
+/// (`read`): the known file written back by a print of theirs keeps it, a
+/// let-go leaves none. Still unsure `within` past `to`, the line is the
+/// room's. No mark, nothing waits.
+pub async fn known_once_printed<R>(
+    known_file: &Path,
+    known: Option<(String, String)>,
+    to: Instant,
+    within: Duration,
+    read: R,
+) -> Option<(String, String)>
+where
+    R: Fn() -> Option<(String, String)> + Clone + Send + 'static,
+{
+    let file = known_file.to_owned();
+    let unsure = move || {
+        let file = file.clone();
+        async move {
+            tokio::task::spawn_blocking(move || known_unsure(&file))
+                .await
+                .unwrap_or(false)
+        }
+    };
+    if !unsure().await {
+        return known;
+    }
+    let until = to + within;
+    while unsure().await {
+        if Instant::now() >= until {
+            eprintln!(
+                "lamp-voice second: the eyes' hold of the known face stayed unsure, no print within {within:?} of the line's end: the room's line"
+            );
+            return None;
+        }
+        tokio::time::sleep(EVERY.min(until.saturating_duration_since(Instant::now()))).await;
+    }
+    tokio::task::spawn_blocking(read).await.ok().flatten()
+}
+
 /// Whether a line admitted for `person` may be someone else's: a face
 /// spoke through it that is not the face of the person the eyes know now,
 /// or the eyes now know someone other than `person`. No face speaking
@@ -1835,6 +1914,167 @@ mod tests {
         carried.join().unwrap();
         assert_eq!(face.as_deref(), Some("b/f2"));
         assert!(theirs);
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    /// The known face `f1` seen speaking through four looks, the line
+    /// ending now, and the eyes' known file naming them on `f1`.
+    fn held_seen(tag: &str) -> (std::sync::Arc<SpeakingFaces>, PathBuf, Instant, Instant) {
+        let dir = std::env::temp_dir().join(format!(
+            "speaking-faces-unsure-{tag}-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let known = dir.join("known");
+        let eyes = std::sync::Arc::new(SpeakingFaces::default());
+        let from = Instant::now() - EVERY * 4;
+        for index in 0..4u32 {
+            let look = faces(&[("f1", Yes)]);
+            eyes.look(from + EVERY * index, Some((("b", u64::from(index)), &look)));
+        }
+        std::fs::write(&known, "Lan\n").unwrap();
+        std::fs::write(known_face_of(&known), "f1\n").unwrap();
+        (eyes, known, from, from + EVERY * 4)
+    }
+
+    /// The line's known pair once an unsure hold is decided
+    /// ([`known_once_printed`]), and whether the line is theirs.
+    async fn printed_pair(
+        eyes: &std::sync::Arc<SpeakingFaces>,
+        known: &Path,
+        from: Instant,
+        to: Instant,
+        within: Duration,
+    ) -> (Option<String>, bool) {
+        let pair = eyes.known_with_boot(known);
+        let read = {
+            let (eyes, file) = (eyes.clone(), known.to_owned());
+            move || eyes.known_with_boot(&file)
+        };
+        let pair = known_once_printed(known, pair, to, within, read).await;
+        let face = pair.as_ref().map(|(_, face)| face.clone());
+        let theirs = !not_theirs(
+            &eyes.speakers_with_boot(from, to),
+            &crate::known_faces::memory_person("Lan"),
+            pair,
+            true,
+        );
+        (face, theirs)
+    }
+
+    /// The eyes' unsure hold as `who::hold_unsure` leaves it: the known file
+    /// and its face moved to `-unsure` and `-unsure-face`.
+    fn hold_unsure(known: &Path) {
+        let unsure = known_unsure_of(known);
+        std::fs::rename(known, &unsure).unwrap();
+        std::fs::rename(known_face_of(known), known_face_of(&unsure)).unwrap();
+    }
+
+    /// The eyes' print kept them: the known file written back, then the
+    /// hold's files removed (`who::keep_known`).
+    fn print_keeps(known: &Path) {
+        std::fs::write(known, "Lan\n").unwrap();
+        std::fs::write(known_face_of(known), "f1\n").unwrap();
+        let unsure = known_unsure_of(known);
+        std::fs::remove_file(known_face_of(&unsure)).unwrap();
+        std::fs::remove_file(unsure).unwrap();
+    }
+
+    /// #5738: with no unsure hold nothing waits, and a line spoken by the
+    /// known face stays theirs.
+    #[tokio::test]
+    async fn a_sure_hold_ties_the_line_at_once() {
+        let (eyes, known, from, to) = held_seen("none");
+        let (face, theirs) = printed_pair(&eyes, &known, from, to, FOLLOW_DECIDED_WITHIN).await;
+        assert_eq!(face.as_deref(), Some("b/f1"));
+        assert!(theirs);
+        assert!(Instant::now().saturating_duration_since(to) < Duration::from_millis(300));
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    /// #5738, the Reviewer-lead's P2 on #5743: while the eyes hold A unsure,
+    /// a reader of the known file (the first voice's name note, memory's
+    /// person, the second voice's face cache) sees nobody known.
+    #[test]
+    fn an_unsure_hold_names_nobody_to_a_reader_of_the_known_file() {
+        let (_eyes, known, ..) = held_seen("reader");
+        hold_unsure(&known);
+        assert!(known_unsure(&known));
+        assert_eq!(crate::known_faces::known_now(&known), None);
+        assert_eq!(known_with_face(&known), None);
+        // The second voice's face cache alone reads the held name, so the
+        // hold moving aside and back is no change there (V2's point on #5743).
+        let held = known_or_held(&known);
+        assert_eq!(held, known_unsure_of(&known));
+        assert_eq!(crate::known_faces::known_now(&held).as_deref(), Some("Lan"));
+        assert_eq!(crate::known_faces::KnownMark::read(&held), {
+            std::fs::write(known.with_file_name("probe"), "Lan\n").unwrap();
+            crate::known_faces::KnownMark::read(&known.with_file_name("probe"))
+        });
+        print_keeps(&known);
+        assert_eq!(known_or_held(&known), known);
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    /// #5738, the Reviewer-lead's condition on #5546: the eyes hold A
+    /// unsure (their face near after a gap, not printed yet). A's line
+    /// waits; the next print reads A and the known file is back: the line
+    /// is A's. The print reads someone else and the eyes let go: the room's.
+    #[tokio::test]
+    async fn an_unsure_hold_waits_for_the_print_that_decides_it() {
+        let (eyes, known, from, to) = held_seen("theirs");
+        hold_unsure(&known);
+        let file = known.clone();
+        let printed = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(150));
+            print_keeps(&file);
+        });
+        let (face, theirs) = printed_pair(&eyes, &known, from, to, FOLLOW_DECIDED_WITHIN).await;
+        printed.join().unwrap();
+        assert_eq!(face.as_deref(), Some("b/f1"));
+        assert!(theirs);
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+        let (eyes, known, from, to) = held_seen("let-go");
+        hold_unsure(&known);
+        let file = known.clone();
+        let let_go = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(150));
+            let unsure = known_unsure_of(&file);
+            std::fs::remove_file(known_face_of(&unsure)).unwrap();
+            std::fs::remove_file(unsure).unwrap();
+        });
+        let (face, theirs) = printed_pair(&eyes, &known, from, to, FOLLOW_DECIDED_WITHIN).await;
+        let_go.join().unwrap();
+        assert_eq!(face, None);
+        assert!(!theirs);
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    /// #5738: no print at the bound (nobody near, or a face turned away):
+    /// the wait ends there and the line is the room's.
+    #[tokio::test]
+    async fn an_unsure_hold_undecided_at_the_bound_leaves_the_line_the_rooms() {
+        let (eyes, known, from, to) = held_seen("bound");
+        hold_unsure(&known);
+        let within = Duration::from_millis(400);
+        let (face, theirs) = printed_pair(&eyes, &known, from, to, within).await;
+        let past = Instant::now().saturating_duration_since(to);
+        assert!(
+            past >= within && past < within + Duration::from_millis(300),
+            "{past:?}"
+        );
+        assert_eq!(face, None);
+        assert!(!theirs);
+        // A mark the eyes stopped writing is no hold of theirs.
+        let stale = std::fs::File::options()
+            .write(true)
+            .open(known_unsure_of(&known))
+            .unwrap();
+        stale
+            .set_modified(SystemTime::now() - crate::known_faces::FRESH)
+            .unwrap();
+        assert!(!known_unsure(&known));
         std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
     }
 

@@ -16,11 +16,25 @@ enum Lamp {
 }
 
 const READ_BACK: &str = "Walter. Have I got that right?";
+/// Setup's face question, which the model asks after the name's yes.
+const FACE_QUESTION: &str = "May I remember your face, so I know you next time?";
 const NAME_LINE: (&str, Lamp) = ("My name is Walter.", Lamp::Saves(READ_BACK));
 
 /// The eyes requests the voice sent: each save that ran, by its name.
 async fn run(turns: &[(&'static str, Lamp)], two_faces_at: Option<usize>) -> Vec<Value> {
     run_with(turns, two_faces_at, None).await.0
+}
+
+/// As [`run`], with onboarding's "who you are" open (`true`) or past
+/// (`false`), as the walk's file would say.
+async fn run_at_setup(
+    turns: &[(&'static str, Lamp)],
+    two_faces_at: Option<usize>,
+    open: bool,
+) -> Vec<Value> {
+    run_full(turns, two_faces_at, None, Some(open), false)
+        .await
+        .0
 }
 
 /// As [`run`], with the eyes refusing the save on the yes with `refused`,
@@ -29,6 +43,19 @@ async fn run_with(
     turns: &[(&'static str, Lamp)],
     two_faces_at: Option<usize>,
     refused: Option<&'static str>,
+) -> (Vec<Value>, Vec<Vec<Message>>) {
+    run_full(turns, two_faces_at, refused, None, false).await
+}
+
+/// As [`run_with`], with "who you are" open or not as `setup` says, else
+/// as the environment's walk file says (none here), and with the eyes'
+/// speaking read on (`LAMP_EYES_SPEAKING`) when `sight`.
+async fn run_full(
+    turns: &[(&'static str, Lamp)],
+    two_faces_at: Option<usize>,
+    refused: Option<&'static str>,
+    setup: Option<bool>,
+    sight: bool,
 ) -> (Vec<Value>, Vec<Vec<Message>>) {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     // Request numbers of their own: lines seen are the process's.
@@ -101,6 +128,16 @@ async fn run_with(
         )
         .announcing(false)
         .reading_said_from(Arc::new(move || reading.lock().unwrap().clone()));
+    if let Some(open) = setup {
+        engine = engine.reading_setup_from(Arc::new(move || open));
+    }
+    if sight {
+        let path = std::env::temp_dir().join(format!("held-save-{}-{first}", std::process::id()));
+        engine = engine.confirming_forgets_by_sight(
+            Arc::new(crate::speaking_faces::SpeakingFaces::default()),
+            path,
+        );
+    }
     engine.memory_camera(true, 1);
     let mut before: Vec<(String, String)> = Vec::new();
     for (at, (said, lamp)) in turns.iter().enumerate() {
@@ -135,16 +172,113 @@ fn kept() -> Vec<Value> {
     vec![json!({"remember": "Walter", "one_face": true, "replace": false})]
 }
 
-/// (a) and (b): the trace's order, the yes with no model call keeps the
-/// face once, the eyes asked as a model call would ask them.
+/// The notes for the model in the chat a turn asked.
+fn notes(chat: &[Message]) -> Vec<&str> {
+    chat.iter()
+        .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
+        .filter(|content| content.starts_with("(For you to know"))
+        .collect()
+}
+
+/// Whether a chat's notes have the model ask setup's face question.
+fn asks_the_face(chat: &[Message]) -> bool {
+    notes(chat).iter().any(|note| {
+        note.contains("they said yes to their name, Walter") && note.contains(FACE_QUESTION)
+    })
+}
+
+/// (a) and (b): the trace's order, the yes to the face with no model call
+/// keeps the face once, the eyes asked as a model call would ask them. A
+/// yes to the name alone keeps the save held and has the face question
+/// asked first (the first builder's HOLD on #5700); a yes to the name that
+/// asks for the face itself is the yes to it.
 #[tokio::test]
-async fn the_yes_to_the_read_back_keeps_the_held_face_with_no_call() {
-    for yes in [
-        "Yes, that's my name.",
-        "Yes. That's right. Please remember my face.",
+async fn the_yes_to_the_face_keeps_the_held_face_with_no_call() {
+    let (sent, asked) = run_with(
+        &[
+            NAME_LINE,
+            ("Yes, that's my name.", Lamp::Says(FACE_QUESTION)),
+        ],
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(sent, Vec::<Value>::new());
+    assert!(asks_the_face(asked.last().unwrap()), "{asked:?}");
+    let sent = run(
+        &[
+            NAME_LINE,
+            ("Yes, that's my name.", Lamp::Says(FACE_QUESTION)),
+            ("Yes.", Lamp::Says("Got it.")),
+        ],
+        None,
+    )
+    .await;
+    assert_eq!(sent, kept());
+    let sent = run(
+        &[
+            NAME_LINE,
+            (
+                "Yes. That's right. Please remember my face.",
+                Lamp::Says("Got it."),
+            ),
+        ],
+        None,
+    )
+    .await;
+    assert_eq!(sent, kept());
+}
+
+/// A no, or anything but a plain yes, to the face question asked for the
+/// held save drops it: nothing kept.
+#[tokio::test]
+async fn a_no_to_the_face_question_drops_the_held_save() {
+    for answer in ["No, thanks.", "Not now.", "Why do you need my face?"] {
+        let sent = run(
+            &[
+                NAME_LINE,
+                ("Yes, that's my name.", Lamp::Says(FACE_QUESTION)),
+                (answer, Lamp::Says("Okay.")),
+                ("Yes.", Lamp::Says("Got it.")),
+            ],
+            None,
+        )
+        .await;
+        assert_eq!(sent, Vec::<Value>::new(), "{answer}");
+    }
+}
+
+/// Fourteen's HOLD on #5720: a plain yes to a face question the model
+/// turned round keeps nothing, held or with no call at setup.
+#[tokio::test]
+async fn a_yes_to_a_face_question_turned_round_keeps_nothing() {
+    for face in [
+        "Would you rather I didn't remember your face?",
+        "I won't remember your face unless you want me to. Is that okay?",
+        "May I remember just your name, without your face?",
+        "M\u{ec}nh kh\u{f4}ng nh\u{1edb} khu\u{f4}n m\u{1eb7}t b\u{1ea1}n nh\u{e9}?",
     ] {
-        let sent = run(&[NAME_LINE, (yes, Lamp::Says("Got it."))], None).await;
-        assert_eq!(sent, kept(), "{yes}");
+        let sent = run(
+            &[
+                NAME_LINE,
+                ("Yes, that's my name.", Lamp::Says(face)),
+                ("Yes.", Lamp::Says("Got it.")),
+            ],
+            None,
+        )
+        .await;
+        assert_eq!(sent, Vec::<Value>::new(), "held: {face}");
+        let sent = run_at_setup(
+            &[
+                NO_CALL_NAME_LINE,
+                ("Yes. That's my name.", Lamp::Says(face)),
+                ("Yes.", Lamp::Says("Okay.")),
+            ],
+            None,
+            true,
+        )
+        .await;
+        assert_eq!(sent, Vec::<Value>::new(), "at setup: {face}");
     }
 }
 
@@ -183,6 +317,38 @@ async fn a_correction_a_face_question_or_a_second_face_keeps_nothing() {
     assert_eq!(sent, Vec::<Value>::new());
 }
 
+/// The lead's call of 9 Nov: with the eyes' speaking read on, the yes to
+/// the face keeps it though no face was seen saying it (the owner may not
+/// face the lamp), held or with no call at setup. Only a second face seen
+/// speaking the yes refuses, and the model is told why.
+#[tokio::test]
+async fn with_the_speaking_read_an_unseen_yes_keeps_the_face() {
+    let held = [
+        NAME_LINE,
+        ("Yes, that's my name.", Lamp::Says(FACE_QUESTION)),
+        ("Yes.", Lamp::Says("Got it.")),
+    ];
+    let (sent, _) = run_full(&held, None, None, None, true).await;
+    assert_eq!(sent, kept(), "held");
+    let at_setup = [
+        NO_CALL_NAME_LINE,
+        ("Yes. That's my name.", Lamp::Says(FACE_QUESTION)),
+        ("Yes.", Lamp::Says("Thanks, Walter.")),
+    ];
+    let (sent, _) = run_full(&at_setup, None, None, Some(true), true).await;
+    assert_eq!(sent, kept(), "at setup");
+    for (turns, setup) in [(&held, None), (&at_setup, Some(true))] {
+        let (sent, asked) = run_full(turns, Some(2), None, setup, true).await;
+        assert_eq!(sent, Vec::<Value>::new(), "two faces: {setup:?}");
+        assert!(
+            notes(asked.last().unwrap())
+                .iter()
+                .any(|note| note.contains("a second face seen at the yes")),
+            "{asked:?}"
+        );
+    }
+}
+
 /// (d): the model also calls the save after the yes: kept exactly once.
 #[tokio::test]
 async fn a_model_call_after_the_held_save_keeps_it_once() {
@@ -200,18 +366,18 @@ async fn a_model_call_after_the_held_save_keeps_it_once() {
 #[tokio::test]
 async fn a_held_save_that_keeps_nothing_is_told_to_the_model() {
     let (sent, asked) = run_with(
-        &[NAME_LINE, ("Yes, that's my name.", Lamp::Says("Got it."))],
+        &[
+            NAME_LINE,
+            ("Yes, that's my name.", Lamp::Says(FACE_QUESTION)),
+            ("Yes.", Lamp::Says("Got it.")),
+        ],
         None,
         Some("no one face in view"),
     )
     .await;
     assert_eq!(sent, Vec::<Value>::new());
     let last = asked.last().expect("the yes was asked of the model");
-    let notes: Vec<&str> = last
-        .iter()
-        .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
-        .filter(|content| content.starts_with("(For you to know"))
-        .collect();
+    let notes = notes(last);
     assert!(
         notes
             .iter()
@@ -221,7 +387,7 @@ async fn a_held_save_that_keeps_nothing_is_told_to_the_model() {
 }
 
 /// A plain yes whose held save is dropped all the same (here a second
-/// face seen at the yes; the speaking gate's drop takes the same path):
+/// face seen at the yes):
 /// the model is told why, so it makes up no reason of its own (Fifth's
 /// run B on #5415, lamp-52e6, 5 Nov).
 #[tokio::test]
@@ -242,4 +408,166 @@ async fn a_dropped_held_save_after_a_plain_yes_is_told_to_the_model() {
                 && note.contains("a second face seen at the yes")),
         "{last:?}"
     );
+}
+
+/// #5684 (the Walter trace): the model said the name back with no call
+/// at all, and made none on the yes either ("Now I'll take a quick look"
+/// and `calls=none`), so the face wait closed "who you are" with the name
+/// only. While the step is open, the voice has the model ask the face
+/// question on that yes, and runs the save itself on the yes to that: the
+/// face is kept once, and never on the name's yes alone (the first
+/// builder's HOLD on #5700).
+const NO_CALL_NAME_LINE: (&str, Lamp) = ("Name is Walter.", Lamp::Says(READ_BACK));
+const NO_CALL_YES: (&str, Lamp) = (
+    "Yes. That's my name.",
+    Lamp::Says("Oh, good — Walter it is, then. Now I'll take a quick look so I know your face."),
+);
+
+/// (i) The yes to a read-back the model made with no call keeps no face:
+/// the model is told to ask the face question. The yes to that keeps the
+/// face, with the name said back at its start or its end.
+#[tokio::test]
+async fn at_setup_a_yes_to_the_read_back_with_no_call_asks_the_face_question() {
+    let (sent, asked) = run_full(
+        &[NO_CALL_NAME_LINE, NO_CALL_YES],
+        None,
+        None,
+        Some(true),
+        false,
+    )
+    .await;
+    assert_eq!(sent, Vec::<Value>::new());
+    assert!(asks_the_face(asked.last().unwrap()), "{asked:?}");
+    for read_back in [
+        READ_BACK,
+        "Walter, did I get that right?",
+        "Did I get that right, Walter?",
+    ] {
+        let sent = run_at_setup(
+            &[
+                ("Name is Walter.", Lamp::Says(read_back)),
+                ("Yes. That's my name.", Lamp::Says(FACE_QUESTION)),
+                ("Yes.", Lamp::Says("Thanks, Walter.")),
+            ],
+            None,
+            true,
+        )
+        .await;
+        assert_eq!(sent, kept(), "{read_back}");
+    }
+}
+
+/// (i') A no, or anything but a plain yes, to the face question keeps
+/// nothing; nor does a yes to it with no yes to the name before it.
+#[tokio::test]
+async fn at_setup_no_yes_to_the_face_question_keeps_nothing_with_no_call() {
+    for answer in ["No.", "No, don't.", "Not now.", "What will you do with it?"] {
+        let sent = run_at_setup(
+            &[
+                NO_CALL_NAME_LINE,
+                ("Yes. That's my name.", Lamp::Says(FACE_QUESTION)),
+                (answer, Lamp::Says("Okay.")),
+            ],
+            None,
+            true,
+        )
+        .await;
+        assert_eq!(sent, Vec::<Value>::new(), "{answer}");
+    }
+    let sent = run_at_setup(
+        &[
+            NO_CALL_NAME_LINE,
+            ("No, it's Walt.", Lamp::Says(FACE_QUESTION)),
+            ("Yes.", Lamp::Says("Okay.")),
+        ],
+        None,
+        true,
+    )
+    .await;
+    assert_eq!(sent, Vec::<Value>::new());
+}
+
+/// (ii) A correction, a question, the face question with the name folded
+/// in, or a second face seen at the yes: nothing kept.
+#[tokio::test]
+async fn at_setup_no_yes_to_the_read_back_keeps_nothing_with_no_call() {
+    for answer in [
+        ("No, it's Walt.", Lamp::Says("Walt, right?")),
+        (
+            "Why do you need my name?",
+            Lamp::Says("So I can greet you."),
+        ),
+    ] {
+        let sent = run_at_setup(&[NO_CALL_NAME_LINE, answer], None, true).await;
+        assert_eq!(sent, Vec::<Value>::new(), "{}", answer.0);
+    }
+    let sent = run_at_setup(
+        &[
+            (
+                "Name is Walter.",
+                Lamp::Says("Nice to meet you, Walter! May I remember your face?"),
+            ),
+            ("Yes.", Lamp::Says("Got it.")),
+        ],
+        None,
+        true,
+    )
+    .await;
+    assert_eq!(sent, Vec::<Value>::new());
+    let sent = run_at_setup(&[NO_CALL_NAME_LINE, NO_CALL_YES], Some(1), true).await;
+    assert_eq!(sent, Vec::<Value>::new());
+}
+
+/// (iii) The model calls the save after all, on the yes or a turn later:
+/// kept exactly once.
+#[tokio::test]
+async fn at_setup_a_model_call_after_the_yes_keeps_it_once() {
+    let sent = run_at_setup(
+        &[
+            NO_CALL_NAME_LINE,
+            ("Yes. That's my name.", Lamp::Saves("Got it.")),
+        ],
+        None,
+        true,
+    )
+    .await;
+    assert_eq!(sent, kept());
+    let sent = run_at_setup(
+        &[
+            NO_CALL_NAME_LINE,
+            NO_CALL_YES,
+            ("Okay.", Lamp::Saves("All set.")),
+        ],
+        None,
+        true,
+    )
+    .await;
+    assert_eq!(sent, kept());
+}
+
+/// (iv) Past "who you are" (or with no walk), a yes to a name said back
+/// runs nothing the model did not call.
+#[tokio::test]
+async fn past_setup_a_yes_to_the_read_back_with_no_call_keeps_nothing() {
+    let (sent, asked) = run_full(
+        &[NO_CALL_NAME_LINE, NO_CALL_YES],
+        None,
+        None,
+        Some(false),
+        false,
+    )
+    .await;
+    assert_eq!(sent, Vec::<Value>::new());
+    assert!(!asks_the_face(asked.last().unwrap()), "{asked:?}");
+    let sent = run_at_setup(
+        &[
+            NO_CALL_NAME_LINE,
+            ("Yes. That's my name.", Lamp::Says(FACE_QUESTION)),
+            ("Yes.", Lamp::Says("Okay.")),
+        ],
+        None,
+        false,
+    )
+    .await;
+    assert_eq!(sent, Vec::<Value>::new());
 }

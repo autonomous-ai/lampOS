@@ -352,12 +352,24 @@ giữ gì.
 - **Ở `set`:** một lệnh IMAP `LOGIN` được thử trước. Bị từ chối: `failure` với
   "Gmail refused the app password"; không kết nối được: "Gmail couldn't be
   reached"; dù trường hợp nào cũng không gì được lưu.
-- **Đọc:** IMAP qua TLS đến `imap.gmail.com:993`: `LOGIN`, `EXAMINE INBOX`
-  (hộp thư mở ở chế độ chỉ-đọc), `UID SEARCH` (các từ của `search` là cú pháp
+- **Đọc:** IMAP qua TLS đến `imap.gmail.com:993`: `LOGIN`, `EXAMINE` một
+  hộp thư (mở ở chế độ chỉ-đọc), `UID SEARCH` (các từ của `search` là cú pháp
   riêng của Gmail, `X-GM-RAW`), `UID FETCH` lấy From, Subject, Date và phần
-  đầu nội dung bằng `BODY.PEEK` (không gì bị đánh dấu đã đọc), `LOGOUT`. Một
-  danh sách tối đa 10 thư, mỗi thư 300 ký tự; `message {id}` (UID mà một danh
-  sách đưa ra) đến 3,000. Nội dung lấy từ phần văn bản thuần trước, nếu không
+  đầu nội dung bằng `BODY.PEEK` (không gì bị đánh dấu đã đọc), `LOGOUT`.
+  `recent` đọc hộp thư đến (`EXAMINE INBOX`). `search` đọc All Mail, như
+  tìm kiếm riêng của Gmail, nên một thư đã lưu trữ hoặc gắn nhãn nằm ngoài
+  hộp thư đến cũng được tìm thấy (Spam và Trash không nằm trong All Mail):
+  trước tiên một lệnh `LIST "" "*"` tìm hộp thư được đánh dấu `\All` (RFC
+  6154), dù tên của nó theo ngôn ngữ của tài khoản là gì (`[Gmail]/All
+  Mail`, `[Gmail]/Tất cả thư`), và gửi lại tên đúng như máy chủ đã viết
+  (modified UTF-7); khi không hộp thư nào được đánh dấu (All Mail bị ẩn khỏi
+  IMAP trong cài đặt của Gmail) thì tìm kiếm đọc hộp thư đến. Một UID chỉ chỉ
+  một thư trong hộp thư của nó, nên id của một thư từ All Mail mang theo điều
+  đó: `all41` là UID 41 trong All Mail, `41` trơn là UID 41 trong hộp thư
+  đến. `message {id}` mở lại đúng hộp thư mà id nêu (với `all…`, lại `LIST`;
+  nếu All Mail đã không còn, không gì được đọc). Một danh sách tối đa 10 thư,
+  mỗi thư 300 ký tự; `message {id}` (id mà một danh sách đưa ra) đến 3,000.
+  Nội dung lấy từ phần văn bản thuần trước, nếu không
   thì từ HTML đã bỏ thẻ; quoted-printable, base64 và các từ RFC 2047 được giải
   mã. 5 s để kết nối, 20 s cho toàn bộ trao đổi.
 - **Ghi:** SMTP qua TLS đến `smtp.gmail.com:465`: `EHLO`, `AUTH PLAIN` (nếu
@@ -381,9 +393,13 @@ giữ gì.
   reached"; dù trường hợp nào cũng không gì được lưu. Khi thành công,
   `scopes` trong câu trả lời là của liên kết, như backend đã đưa.
 - **Đọc** (`users.messages.list` và `users.messages.get`, mỗi cái nằm trong
-  danh sách đọc): `recent` và `search` liệt kê hộp thư đến
-  (`/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=<count>`, `search`
-  thêm `q=<words>`, cú pháp tìm kiếm riêng của Gmail), rồi lấy từng thư với
+  danh sách đọc): `recent` liệt kê hộp thư đến
+  (`/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=<count>`), còn
+  `search` tìm trong mọi thư, như tìm kiếm riêng của Gmail
+  (`/gmail/v1/users/me/messages?maxResults=<count>&q=<words>`, không nhãn,
+  nên một thư đã lưu trữ hoặc gắn nhãn nằm ngoài hộp thư đến cũng được tìm
+  thấy; Spam và Trash vẫn bị loại, `includeSpamTrash` để mặc định là false),
+  rồi lấy từng thư với
   `format=metadata` (From, Subject, Date) và đoạn xem trước ngắn của Gmail
   (các thực thể HTML được đọc), 300 ký tự của nó. `message {id}` (id riêng
   của Gmail mà một danh sách đưa ra: chữ và số, tối đa 64) lấy thư với
@@ -815,6 +831,29 @@ là một dòng tối đa 200, tối đa 20 người nhận hoặc người tham
 một `local@domain.tld` thuần. Google Drive và Ahrefs không có ghi ("the lamp
 only reads …").
 
+Mô hình được nói về `service_write`, trước tiên trong mô tả của nó
+(`WRITE_RULE`, rồi đến luật mà mọi hàm dịch vụ đều có, ở dưới):
+"Only when the person asks you, now, to send or post something; an ask to
+draft, write, compose or reply to a mail or message is one. No draft is
+saved; nothing goes before they say send: say so. Call it first without
+send_id: it sends nothing and gives a read_back. Say that read_back in full,
+word for word, then ask them to say "go ahead and send it" to send it. Call
+it again with its send_id only if their very next words are that; anything
+else cancels it. Never say a read-back yourself: only one this call gave in
+the same turn, and a new write, or the same one asked again, needs a new
+call. Never say you can't use their services: refuse only for a reason a
+call gave."
+
+Một yêu cầu soạn nháp thư là một yêu cầu gửi nó: Gmail không có nháp (chỉ có
+`send_mail`), nên một yêu cầu như vậy được chuẩn bị và đọc lại như mọi lệnh
+ghi, và không gì được lưu thành nháp. Trên lamp-29e7 ngày 9 tháng 11, "Draft a
+new email for me" bị từ chối mà không có lệnh gọi nào ("I cannot touch your
+mail") và, khi được hỏi tại sao, "Because I'm a lamp."; luật không nói gì về
+nháp, cũng không nói lý do của một lời từ chối đến từ đâu. Toàn bộ luật cùng
+luật chung là 998 trong 1,024 byte của mô tả, chừa 25 byte cho lời riêng của
+`lamp-services` cho hàm ghi: chỉ những câu trọn vẹn, nên danh sách "action,
+by service: …" của nó được nói trên tham số `action`.
+
 ### Cổng gửi của giọng nói
 
 `crates/voice/src/services.rs` giữ các luật riêng của nó, bất kể
@@ -1071,8 +1110,12 @@ do. Các khoá khác là của chính `service_read` cho một việc đọc c�
 `project` và `workspace` (mỗi khoá 1 đến 1.000 byte); không bao giờ `from`
 hay `to`, cũng không bao giờ `graphql`, `variables`, `path`, `params`,
 `tool` hay `arguments` của một việc đọc dạng tự do.
-`query` là từ để tìm (`fullText contains` của Drive), không bao giờ là một
-thứ tự: Drive liệt kê tệp mới nhất trước (`orderBy = modifiedTime desc`) và
+`query` là từ để tìm, mỗi từ trong tên tệp hoặc nội dung của nó (`name
+contains` hoặc `fullText contains` của Drive; `_`, `-` và `.` trong tên tách
+từ), và kết quả theo độ liên quan, vì Drive từ chối một thứ tự đi cùng
+`fullText` (HTTP 400; lamp-3e83, 9/11: một tệp được hỏi bằng tên không bao
+giờ tìm thấy). Nó không bao giờ là một thứ tự: không có `query` thì Drive
+liệt kê tệp mới nhất trước (`orderBy = modifiedTime desc`) và
 thư cũng mới nhất trước, nên một lần đọc những tệp mới nhất thì bỏ `query`;
 một thứ tự hay chỉ "mới nhất" ("order by modifiedTime desc", "newest") bị
 từ chối (`service_read::ordering`, sau khi một kỹ năng được tạo trên một
@@ -1486,10 +1529,14 @@ code không bao giờ là một đường dẫn, gỡ và xoá; không bí mật
 `Debug` hay một lời từ chối; một token chỉ qua https đến các host của chính nó
 (không port, user, fragment hay host giả mạo), đọc chỉ trong danh sách cho
 phép, ghi chỉ trong danh sách ghi; mọi mutation GraphQL bị từ chối; IMAP của
-Gmail chỉ-đọc (`EXAMINE`, `BODY.PEEK`) và SMTP một thư sau `AUTH`; `set`
+Gmail chỉ-đọc (`EXAMINE`, `BODY.PEEK`), tìm kiếm của nó trong All Mail (tìm
+theo dấu `\All` dưới một tên theo ngôn ngữ, nếu không thì hộp thư đến),
+`recent` trong hộp thư đến và `message` trong hộp thư mà id của nó nêu, và
+SMTP một thư sau `AUTH`; `set`
 không giữ gì khi đăng nhập Gmail bị từ chối; một đăng nhập Google của Gmail
 được kiểm tra ở `set` bằng profile của nó (bị từ chối, không kết nối được,
-tài khoản lấy từ đó), được đọc qua REST API (danh sách hộp thư đến, metadata
+tài khoản lấy từ đó), được đọc qua REST API (danh sách hộp thư đến, một tìm
+kiếm trong mọi thư và thư đã lưu trữ của nó được đọc theo id, metadata
 của từng thư, một thư trọn vẹn từ phần văn bản thuần, token của nó bị xoá,
 thư bảo mật bị bỏ ra, một id không phải của Gmail không bao giờ được gửi),
 được gia hạn qua backend, được gửi qua API chỉ khi có câu "send" nói ra, và

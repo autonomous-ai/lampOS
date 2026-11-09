@@ -230,8 +230,7 @@ Unknown private fields and enum values are refused. Neither direct calls nor
 `use_skill` can obtain authority through model arguments; both preserve the
 original context and deadlines. Written and Messages requests, including
 `speak=true`, cannot supply spoken context. Ordinary calls retain their
-existing wire. Off unless set; on in the product's voice, skills and actions
-units since #5749. See [requested audio](requested-audio.md) for switch-off
+existing wire. See [requested audio](requested-audio.md) for default-off
 advertisement, confirmation retirement, immutable asset checks and terminal
 cancellation. This does not extend autonomous three-second sound cues.
 
@@ -451,8 +450,7 @@ The switch declares two functions, `reports_stop` and `reports_state`
 unit sets it: a product lamp's chat request offers 40 of the lamp's own
 functions (`PRODUCT_FUNCTIONS`, `crates/update/tests/functions.rs`), the
 voice's own 21 with these two among them, the actions part's 17, Dance's
-`dance`, Pose's `set_pose` (#4135) and Light show's `light_show` (#5745),
-the skills' reached through `use_skill`. At the bound a core skill's function is never the one cut (the
+`dance` and Pose's `set_pose` (#4135). At the bound a core skill's function is never the one cut (the
 owner's rule, on #2614; [install.md](install.md)), and on the chat route
 neither is `reports_stop` nor any of the actions part's (the first builder,
 on #2644): the cut takes the second route's fetch, then its time

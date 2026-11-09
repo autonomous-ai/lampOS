@@ -339,6 +339,9 @@ const SKILL_PENDING: &str = ".reset-skill-pending";
 /// and retired folders are selected by their
 /// reserved names, even before a package mark was written. A link is passed
 /// over and a missing folder removes nothing. Returns removed folders in order.
+/// `folder` must be absolute: selection and no-follow deletion use the same
+/// root, never the caller's current directory. Relative paths are refused
+/// with [`io::ErrorKind::InvalidInput`] before reading any directory.
 pub fn remove_installed_skills(folder: &Path) -> io::Result<Vec<PathBuf>> {
     remove_installed_skills_with(folder, &mut || Ok(()))
 }
@@ -349,6 +352,12 @@ fn remove_installed_skills_with(
     folder: &Path,
     after_remove: &mut impl FnMut() -> io::Result<()>,
 ) -> io::Result<Vec<PathBuf>> {
+    if !folder.is_absolute() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "the reset's skills folder must be absolute",
+        ));
+    }
     let entries = match fs::read_dir(folder) {
         Ok(entries) => entries,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),

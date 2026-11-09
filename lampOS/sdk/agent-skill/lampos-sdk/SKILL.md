@@ -14,12 +14,19 @@ protocol underneath:
 | you write | use | install |
 |---|---|---|
 | Python | `lampos` | `pip install "git+https://github.com/autonomous-ai/lampOS@lamp-voice#subdirectory=lampOS/sdk/python"` |
-| JavaScript (Node 20.11+) | `lampos` | clone the repo, then `npm install ./lampOS/sdk/js` |
+| JavaScript (Node 20.11+) | `lampos` | `git clone --branch lamp-voice https://github.com/autonomous-ai/lampOS.git`, then in your project `npm install --install-links <the clone>/lampOS/sdk/js` (a copy, so Node finds its `ws`) |
 | an AI agent's tools | `lamp-mcp` | both in one command: `pip install "lampos @ git+https://github.com/autonomous-ai/lampOS@lamp-voice#subdirectory=lampOS/sdk/python" "lamp-mcp @ git+https://github.com/autonomous-ai/lampOS@lamp-voice#subdirectory=lampOS/sdk/mcp"`, then `claude mcp add lamp -- lamp-mcp` (or any MCP client) |
 
-The packages aren't on PyPI or npm yet; install from the repository as above.
+The packages aren't on PyPI or npm yet (`pip install lampos` and
+`npm install lampos` fail); install from the repository as above.
 `lamp-mcp` needs `lampos` in the same `pip` command, or pip looks for it on
 PyPI and fails.
+
+**On a customer lamp (stable 10824)** five things are missing: skill push,
+joints past yaw and pitch and `play`, limp and pose, mDNS (pair with
+`--host`), and local event times (`at` is UTC). Read
+[references/gotchas.md](references/gotchas.md#on-a-customer-lamp-today-stable-10824)
+before promising any of them.
 
 ## Start without a lamp
 
@@ -31,8 +38,10 @@ lamp fake --everything     # a fake lamp, paired with this computer; leave it ru
 python my_program.py       # in another terminal, same LAMPOS_HOME
 ```
 
-`--everything` answers every op; without it the fake refuses what real lamps
-don't route yet, as they do. In tests, use `lampos.testing.FakeLamp` (JS:
+`--everything` answers every op; without it the fake refuses `play` and
+`joints`, and every `look` (but with `--hands`), stricter than a customer
+lamp, which takes `look` and `joints` at yaw and pitch. It takes a skill
+push, which a customer lamp refuses. In tests, use `lampos.testing.FakeLamp` (JS:
 `FakeLamp` from `lampos/testing`): see [references/testing.md](references/testing.md).
 
 ## Pair with a real lamp
@@ -117,9 +126,10 @@ elsewhere:
 - **A new motion cuts the one playing short:** a gesture, move or
   feeling's move asked while another plays replaces it, eased out from where
   the body is. While the person is using the lamp, the body drops the new
-  one ("the person is using the lamp").
-- **Quiet hours:** a lamp setting (`limits.quiet_hours`, by default 22:00 to
-  07:00, or `off`). `say` and `sound` are refused `quiet_hours` then; the
+  one ("the person is using the lamp"). Stable 10824 and older refuse it
+  `busy` with `retry_ms` instead: wait and ask again.
+- **Quiet hours:** a lamp setting (`limits.quiet_hours`, `off` by default,
+  or a `{from, to}` window the lamp sets). `say` and `sound` are refused `quiet_hours` then; the
   light still works.
 - **Be a living thing, not a machine:** react to something that happened, let
   a move finish, don't loop gestures. A lamp switching feelings every 3 s
@@ -178,8 +188,8 @@ that runs for days, and a web app on the SDK:
 ## Gotchas we hit
 
 Read [references/gotchas.md](references/gotchas.md) before your first real
-run: breathe and pulse levels, one pulse a minute, `busy` while a motion
-plays, the light's `shows`, the restart mute.
+run: what a customer lamp lacks today, breathe and pulse levels, one pulse a
+minute, `busy` while a motion plays, the light's `shows`, the restart mute.
 
 ## Debugging
 

@@ -231,6 +231,33 @@ fn a_timer_claimed_after_a_set_the_ledger_refused_is_never_said() {
     assert_eq!(ran(true).said, said(&["Timer set."]));
 }
 
+/// Reviewer-three's after-merge P2 on #5326: a forget discards the later
+/// calls of its batch, so a `set_timer` planned beside it never ran and is
+/// no call of its kind. "Timer set." in the clean round after it is held as
+/// a claim with no call, never said as it came.
+#[test]
+fn a_timer_the_forget_discarded_never_backs_a_claim() {
+    let went = claimed(
+        true,
+        "Forget that, then set a timer for one minute.",
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![
+                call("erase", crate::remember::FORGET, json!({})),
+                call("stale", "set_timer", json!({"seconds": 60})),
+            ])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![saying("Timer set."), saying("Timer set.")],
+    );
+    assert_eq!(went.ran, [crate::remember::FORGET], "{went:?}");
+    assert!(
+        went.said.iter().all(|said| !said.contains("Timer set")),
+        "{went:?}"
+    );
+    assert!(told_claim(&went), "{went:?}");
+    assert_eq!(went.asked, 3, "{went:?}");
+}
+
 /// lamp-52e6, the earlier run: "Louder." and "Brighter." with no call. The
 /// first is held (without the switch too) and asked again; a second with no
 /// call is the plain line that it wasn't done, never silence.

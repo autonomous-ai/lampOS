@@ -653,6 +653,16 @@ each under the quiet rule. A round
    "the channel cannot be reached", not a round held for good (#830). One
    lookup runs at a time: while one that ran over has not ended, a round
    starts none and says "an earlier name lookup has not ended".
+   **A busy channel is asked again.** Every file a round reads, the
+   manifest and each part's files alike, is asked for again after 2, 5 and
+   10 s when the channel answered 5xx or gave no answer and nothing of the
+   file had come yet, each wait only if it ends within the file's own
+   900 s (`fetch::AGAIN_AFTER`, `again_while_busy`). On 9 Nov from 12:30
+   GitHub's release downloads answered 504 to about six tries in ten, and
+   since a round needs every file, lamp-74ff refused five rounds in a row,
+   each on another file (the lead's proposal on #1711). A missing file
+   (404), any other answer, or a file cut short half way refuses as before:
+   its bytes are already written, and its SHA-256 check throws them away.
 3. **The build.** The envelope's key fingerprint must be the lamp's and
    its signature must match the manifest's bytes. Then, before anything
    else of the manifest is read, its `min_updater`: one above this
@@ -1163,6 +1173,17 @@ already in a home. A test pins the product unit's sandbox to 7071's and
 each folder a round writes itself to inside it (`own_unit_line_tests` in
 `main.rs`, #4540).
 
+When planning a newer product build, the round names an installed regular
+`lamp-update.service` as "not carried by rounds; its installed unit is kept"
+(#5061). This reports the policy only: the product manifest omits that unit,
+so no candidate-byte comparison is claimed. It also names any carried unit
+with different text that the plan leaves unchanged because only comments,
+blank lines or trailing whitespace differ. A unit written along with a
+binary or setting change is not reported as retained. Both notices use the
+already loaded unit texts and plan, plus one local metadata check for the
+updater's unit: no new network or systemd calls, no unit contents in the
+journal, and no repetition when the installed build is already up to date.
+
 ### Its records
 
 In `/var/lib/lampos-update/` (`records.rs`), each written whole:
@@ -1295,12 +1316,15 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `the settings writer refreshed has proved itself (its back ended well): the copy before is removed` | a refreshed writer's first `back` ended well |
 | `the settings writer refreshed is put back (its back failed): the copy before is the writer again` | a refreshed writer's first `back` failed |
 | `the settings writer refreshed is put back (its first apply failed): the copy before is the writer again, and this lamp-update may be asked to be it again` | a refreshed writer's first `apply` failed: the build is refused, the writer is not (#5539) |
+| `lamp-update: <why>; asking again in N s` | the channel answered 5xx or gave no answer before any of a file came: it is asked for again after 2, 5 and then 10 s, within the file's own time; the round goes on if a later try brings it |
 | `the settings writer could not be put back or proved (…): …` | either of those two asked of the unit, and it failed |
 | `the settings writer's back failed in a run that began before it was refreshed: the next back judges it` | the failed `back` may be the copy before's, so nothing is put back for it |
 | **The journal** (`acting`, at the round's start) | |
 | `the journal could not be read (…): kept as …, and the units are taken as they are` | a `journal.json` it can't parse is set aside, and the round goes on (#1505) |
 | `putting build N back: the switch was cut short (lamp-update stopped, or the lamp lost power)` | a journal left by a switch that didn't finish: that build is put back |
 | **What the build brings** | |
+| `lamp-update.service is not carried by rounds; its installed unit is kept` | a new product build is planned and the installed updater unit is a regular file; policy only, since the manifest has no candidate text for it |
+| `… is kept: only comments, blank lines or trailing whitespace differ` | a carried unit has such text differences and the plan leaves it unchanged; never for a unit being rewritten with a binary or setting change |
 | `installed … beside …` | each new folder, a self-switch's or a climb's updater too |
 | `fetched … into …` | a model the build pins, fetched into the model store |
 | `kept …: it is not the pinned model` | a model file at a path of its own that isn't the pinned one: the lamp's, kept |
@@ -2748,9 +2772,18 @@ own choice, the queue and the exit note a crash came from, and the login a
 ping rotated, `rotated.json`); the controls (`controls.json`, the product's
 pins file, read with `--touch`, and the pins file prepare gives a lamp moved
 from V1, read without it); the skills turned off (`off`, read by lamp-skills at
-a start and by lamp-cloud for the app); and lamp-records (a voice session
-folder, taken as a session with nothing refused). The other parts follow, by
-harm.
+a start and by lamp-cloud for the app); lamp-records (a voice session
+folder, taken as a session with nothing refused); and the body (#5759): the
+lamp's own poses, `/etc/lampOS/body/lamp.env`, in each shape its writers give
+and as lamp-06c1 and lamp-fc4b hold it, started from the product unit and read
+by the let-go, the generic package's seated `measured.env` started from its
+own unit, and the first stand's record, read so a lamp that stood never asks
+again. Not kept, and why: setup's reset plan is a build's own setting, and
+install keeps every SHA-256 it has had (`install::RESET_PLAN`);
+lamp-policy's `--log-dir` is written and never read back; the output caps
+(`LAMP_OUTPUT_CAPS_DIR`) are off in the product, so no lamp holds them yet,
+and their fixture is owed before that switch goes on. The other parts follow,
+by harm.
 
 **Published Controls single-implementation replay check** (#2809): the
 Controls `release_pair` target selects pinned 6408/6498

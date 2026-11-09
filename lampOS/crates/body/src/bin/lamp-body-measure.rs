@@ -751,6 +751,27 @@ mod tests {
         values.iter().map(OsString::from).collect()
     }
 
+    /// #5759: the let-go reads `--home` and `--folded-arm` from every kept
+    /// `lamp.env` and `measured.env` (tests/fixtures/stores), so a later build still judges a
+    /// shipped lamp down before the power goes.
+    #[test]
+    fn let_go_reads_every_kept_lamp_env() {
+        let folder = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/stores");
+        let mut read = 0;
+        for entry in std::fs::read_dir(folder).unwrap() {
+            let path = entry.unwrap().path();
+            let name = path.file_name().unwrap().to_string_lossy().into_owned();
+            if !(name.starts_with("lamp-env-") || name.starts_with("measured-env-")) {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).unwrap();
+            let (_, folded) = let_go_poses(&text).unwrap_or_else(|why| panic!("{name}: {why}"));
+            assert_eq!(folded.is_some(), text.contains("--folded-arm "), "{name}");
+            read += 1;
+        }
+        assert!(read >= 5, "{read}");
+    }
+
     #[test]
     fn let_go_reads_home_and_the_folded_arm_from_lamp_env() {
         let standing = "# read\nBODY_POSES=\"--home 1916,2049,2041 --folded-arm 2046,2046 --stand 1772,2049,2041,2633,2603 --pitch-window 1740,2030 --torque on\"\n";

@@ -37,7 +37,7 @@ use crate::{
     gesture::{Gestures, Mood, Pose},
     idle,
     inspection::{Interest, PortIo, Runtime},
-    lease,
+    lease::{self, REST_SLACK},
     protocol::{ReadOnlyRequest, ReadWindow, StatusFlags, StatusParser},
     units::ENCODER_MAX,
 };
@@ -71,7 +71,6 @@ const EASE_STEPS: u16 = 100;
 /// this many steps, a minute.
 const EASES_ALLOWED: usize = 3;
 const EASE_MEMORY_STEPS: u64 = 3_000;
-const REST_SLACK: u16 = 24;
 /// At rest on its goal: within `REST_SLACK` of it. The same slack attests a
 /// fold for unplugging: lamp-52e6's elbow rests 13 counts past its folded
 /// goal (2082 against 2069) every time it folds (#1699 trial, 2026-10-20).
@@ -1230,6 +1229,10 @@ pub struct Glimpse {
     pub step: u64,
     pub mood: Mood,
     pub goals: [u16; 3],
+    /// Where the pose wants each joint this step, before it is eased there
+    /// or a rest writes its goal where it stopped: what a holder's look is
+    /// judged against (lamp-75c9, 7 Nov: a resting head stopped 17 short).
+    pub wanted: [u16; 3],
     pub positions: [u16; 3],
     pub loads: [u16; 3],
     /// What each of the three joints' temperature register reads.
@@ -7100,6 +7103,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             step: report.steps,
             mood,
             goals: written,
+            wanted: wanted_of.map(|wanted| wanted.round().clamp(0.0, 4_095.0) as u16),
             positions: COMMANDED.map(|joint| samples[joint.index()].position),
             loads: COMMANDED.map(|joint| samples[joint.index()].load),
             temperatures: COMMANDED.map(|joint| samples[joint.index()].temperature),

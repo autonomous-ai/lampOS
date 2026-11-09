@@ -19,6 +19,7 @@ from lampos import Keyring, Lamp, LampError, NotPaired, Subscription, WrongLamp,
 from lampos.testing import FakeLamp
 
 REPO_SCHEMA = Path(__file__).resolve().parents[3] / "docs" / "control.schema.json"
+REPO_MODEL = REPO_SCHEMA.with_name("lamp.model.json")
 
 
 # A move the body plays (and lamp-control takes): 4 frames of 500 ms, 1.5 s in
@@ -42,6 +43,28 @@ def test_the_packaged_schema_is_the_repositorys():
     if not REPO_SCHEMA.exists():
         pytest.skip("docs/control.schema.json is not beside this copy")
     assert json.loads(REPO_SCHEMA.read_text()) == schema.schema()
+
+
+def test_the_packaged_model_is_the_repositorys_and_names_the_protocols_joints():
+    from lampos import model
+
+    if not REPO_MODEL.exists():
+        pytest.skip("docs/lamp.model.json is not beside this copy")
+    assert json.loads(REPO_MODEL.read_text()) == model()
+    targets = schema.schema()["$defs"]["joints"]["properties"]["targets"]["properties"]
+    assert sorted(joint["name"] for joint in model()["joints"]) == sorted(targets)
+    # A fresh copy each call.
+    model()["joints"].clear()
+    assert len(model()["joints"]) == 5
+
+
+def test_the_packaged_hardware_is_the_repositorys():
+    from lampos import hardware
+
+    repo = REPO_MODEL.with_name("lamp.hardware.json")
+    if not repo.exists():
+        pytest.skip("docs/lamp.hardware.json is not beside this copy")
+    assert json.loads(repo.read_text()) == hardware()
 
 
 def test_proofs_name_what_they_are_for():
@@ -145,7 +168,13 @@ def test_the_debug_log_redacts_what_would_pair_or_hello_as_this_computer():
                   {"re": 4, "ok": True, "to": "body", "follow": "hand"},
                   {"re": 5, "ok": True, "limits": {"say": {"most": 6, "within_ms": 60_000}, "hold_max_ms": 30_000, "lease_max_ms": 600_000,
                                                    "take_max_ms": 600_000, "say_max_chars": 300,
-                                                   "quiet_hours": {"from": "22:00", "to": "07:00"}}}):
+                                                   "quiet_hours": {"from": "22:00", "to": "07:00"}}},
+                  {"re": 6, "ok": True, "state": {"volume": {"level": 40, "muted": False}, "body": {
+                      "known": True, "stands": True, "speed_deg_s": 4.4, "acceleration_deg_s2": 35.2, "load_limit": None,
+                      "heat_stop_c": 62, "counts_per_turn": 4096,
+                      "joints": {"yaw": {"counts": 2026, "deg": 1.0, "min_deg": -3.5, "max_deg": 3.5, "min_counts": 1975,
+                                         "max_counts": 2055, "home_counts": 2015, "folded_counts": None, "stand_counts": None}}}}},
+                  {"re": 7, "ok": True, "state": {"body": {"known": False, "why": "the body has not said its limits in the last 15 s"}}}):
         assert "<not shown>" not in json.dumps(debug.redact(sample)), sample
     assert shown["text"].startswith("<13 chars, tag ") and "Build" not in shown["text"]
     # Keyed for this run: the same text tags the same, and the unkeyed SHA-256's start isn't it.
@@ -580,6 +609,19 @@ def test_get_replies_with_light_and_shows_are_the_schemas():
         assert not list(validator.iter_errors({"re": 1, "ok": True, "state": {"light": light}})), light
     assert list(validator.iter_errors({"re": 1, "ok": True, "state": {"light": {"shows": {"on": True}}}}))
 
+def test_get_replies_with_body_and_volume_are_the_schemas():
+    jsonschema = pytest.importorskip("jsonschema")
+    validator = jsonschema.Draft202012Validator({**schema.schema(), "$ref": "#/$defs/reply"})
+    yaw = {"counts": None, "deg": None, "min_deg": -3.5, "max_deg": 3.5, "min_counts": 1975, "max_counts": 2055,
+           "home_counts": 2015, "folded_counts": None, "stand_counts": None}
+    body = {"known": True, "joints": {"yaw": yaw}, "stands": True, "speed_deg_s": 4.4, "acceleration_deg_s2": 35.2,
+            "load_limit": 0.6, "heat_stop_c": 62, "counts_per_turn": 4096.0}
+    for state in ({"body": {"known": False, "why": "the body has not said its limits in the last 15 s"}},
+                  {"body": body}, {"volume": None}, {"volume": {"level": 40, "muted": False}}):
+        assert not list(validator.iter_errors({"re": 1, "ok": True, "state": state})), state
+    assert list(validator.iter_errors({"re": 1, "ok": True, "state": {"body": {**body, "joints": {"knee": yaw}}}}))
+
+
 def test_the_examples_compile_and_call_only_what_the_client_has():
     import ast
 
@@ -618,6 +660,43 @@ def test_the_tour_runs_every_step_against_a_fake_lamp(tmp_path):
             assert fake.asked("joints")[0]["targets"] == {"pitch": 5}
 
     asyncio.run(asyncio.wait_for(go(), 60))
+
+
+def test_the_camera_example_saves_a_picture_and_a_frame(tmp_path):
+    """examples/camera.py, run as a developer would: with the `camera` grant
+    it saves both JPEGs; without it, it says the lamp refused and exits 1."""
+    import os
+    import sys
+
+    from lampos.testing import FAKE_JPEG
+
+    example = Path(__file__).resolve().parents[1] / "examples" / "camera.py"
+
+    async def go(grants, home, cwd):
+        async with FakeLamp(grants=grants) as fake:
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, keyring=Keyring(home))
+            ran = await asyncio.create_subprocess_exec(
+                sys.executable, str(example), "0.5", cwd=cwd,
+                env={**os.environ, "LAMPOS_HOME": str(home)},
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+            )
+            said = (await ran.communicate())[0].decode()
+            return ran.returncode, said, fake
+
+    work = tmp_path / "with"
+    work.mkdir()
+    code, said, fake = asyncio.run(asyncio.wait_for(go(("camera",), tmp_path / "a", work), 60))
+    assert code == 0, said
+    assert (work / "snapshot.jpg").read_bytes() == FAKE_JPEG
+    assert (work / "last-frame.jpg").read_bytes() == FAKE_JPEG
+    assert [r["on"] for r in fake.asked("camera.stream")] == [True, False], said
+
+    work = tmp_path / "without"
+    work.mkdir()
+    code, said, _ = asyncio.run(asyncio.wait_for(go(("light",), tmp_path / "b", work), 60))
+    assert code == 1, said
+    assert "snapshot: refused," in said and "Traceback" not in said, said
+    assert not (work / "snapshot.jpg").exists()
 
 
 def test_the_readme_reference_names_every_public_call_command_and_option():

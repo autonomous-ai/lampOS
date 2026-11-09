@@ -1,7 +1,7 @@
 # lampOS skills: physical skills, each a folder in /var/lib/lampOS/skills (lampOS/docs/skills.md).
 # The product unit (lampOS/docs/install.md); install puts every product skill in that folder
-# (lamp-update's install::PRODUCT_SKILLS: every core skill). Twenty-four of the thirty are enabled; Bedtime and Morning
-# stays off until its lamp comparison, Comfort break is off by its file and on by its [present], and install::PRODUCT_SKILLS_OFF's four are installed off
+# (lamp-update's install::PRODUCT_SKILLS: every core skill). Seventeen are enabled; Bedtime and Morning
+# stays off until its lamp comparison, and install::PRODUCT_SKILLS_OFF's seven are installed off
 # until their lamp checks. A skill speaks only through the voice's say service
 # (LAMP_SAY=on in lamp-voice.service, its socket in the group lampos); the voice has no hello of its own (#2825), so only
 # Welcome back greets, and its reminders and task news wait for their skills' asks (=skill).
@@ -68,11 +68,6 @@ Environment=LAMP_SKILLS_KNOWN_FILE=/run/lampos-eyes/known
 # manage helper alone writes it. An Environment= line, as an older
 # lamp-skills ignores it where it would end at an unknown flag (#2157).
 Environment=LAMP_SKILLS_DEV_DIR=/var/lib/lampOS/skills-dev
-# Music to relax (#1685, #5749): a spoken request for a skill's checked local recording plays it after the
-# confirmation; Stop, an interruption, the privacy slide or mute ends it, and nothing resumes (requested-audio.md).
-# The same line in lamp-voice, lamp-skills and lamp-actions; played on lamp-4ace on 6963 (#2793). Installing
-# the skill (relaxing-music, a Store skill) is separate: with none installed nothing plays.
-Environment=LAMP_REQUESTED_AUDIO=on
 ExecStart=/opt/lampOS/skills/current/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket /run/lampos-actions/call.sock --say-socket /run/lampos-say/say.sock --tools-dir /run/lampos-skills --state-dir /var/lib/lampos-skills-state --zone system
 Restart=on-failure
 RestartSec=5s

@@ -238,6 +238,7 @@ each line plays exactly as before.
 | The second route's line when a reply claims again an action no call made | `action_claim::NOT_DONE_LINE` ("Sorry, I didn't do that. Could you ask me again?") | said as the turn's text (`LAMP_ACTION_CLAIM_CHECKED`, on in the product, #5215) | the owner's words (`language::fixed_in`) |
 | The second route's line when an answer to the lamp's own question gets no words | `second_provider::ANSWER_AGAIN_LINE` ("Sorry, could you say that again?") | said as the turn's text (`LAMP_ANSWER_ASK_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
 | The second route's word when each sentence of a reply was an offer to keep left out | `keep_quietly::GOT_IT` ("Got it.") | said as the turn's text (`LAMP_KEEP_QUIETLY`, on in the product, a known person's own scope) | the owner's words (`language::fixed_in`) |
+| The second route's answer to a plain keep (`LAMP_KEEP_ANSWERS_AT_ONCE`, C59) | `keep_at_once::KEPT` ("Okay, I'll remember that.") | said as the turn's text, at once, with no second chat round | rendered ahead by this route's voice as the wordless cut-in lines are, played from that clip as the turn's piece; not rendered yet, the turn asks round 2 as without the switch |
 | The first stand's touch-only ask and its beat before moving | `first_stand::ASK_TOUCH_ONLY` ("I'd like to stretch for the first time. Rest your hand on my head when you're ready."), `GOING` ("Okay, here I go.") | asked of the say service as `text`, the model told to say the words | the model told the owner's words (the say service swaps a `text` that is a fixed line, `language::at_start`); in another language the first stand asks only this one, never the spoken yes (body.md, Fourth's finding on #4710) |
 
 The words are `language::FIXED_LINES`, one row per English line with its
@@ -949,6 +950,89 @@ order is kept. A written turn is the same from the chat on.
   words after the marker are preserved. The local processing target is
   under 1 ms; the prompt's effect on the model and acoustic latency still
   need a lamp replay.
+- **With `LAMP_KEEP_ANSWERS_AT_ONCE=on` a plain keep is answered at once,
+  with no second chat round** (C59; off unless set, in no unit). On
+  lamp-06c1 on 5 Nov (the batch-100 runs) 70 keep turns took 3804 ms at
+  the median from the words heard to the answer's first audio, against
+  1746 ms for 268 turns with no call: the memory answered in 39 ms, but
+  round 1 streams only the `remember` call and the first words come from
+  round 2, about 1.4 s later (`Engine::keeping_at_once`,
+  `crate::keep_at_once`):
+  - **Only a line that only asks to keep something**
+    (`keep_at_once::only_keeps`): a plain ask to keep
+    (`remember::asked::asks_to_keep`, "Remember that…", "Don't forget
+    that…"), with nothing else but thanks, a greeting or the name; no
+    question mark; no second clause after the keep, whatever its words:
+    past a comma, colon or spaced dash, anything but thanks, a greeting or
+    the name goes to round 2 ("…, and I'd love a joke", "…, so what's the
+    weather like"); and no "and", "also", "then", "plus", "but", "so" or
+    "or" that starts another ask or a new clause ("… and let me know the
+    weather"). "Remember that I like tea and coffee" is still a plain
+    keep (the Reviewer-lead's P2 on #5594). A spoken
+    turn only.
+  - **Round 1 called `remember` alone, with no words of its own,** and as
+    its first calls, no held forget run before them.
+  - **What the calls kept covers the whole line** (`keep_at_once::covers`,
+    the Reviewer-lead's 09:56 P2 on #5594, for a further ask with no comma,
+    which speech to text often drops): every content word of the heard
+    line past its lead-in ("remember", "don't forget", "keep in mind",
+    "make a note", "note", "nhớ") must be among the words of the calls'
+    `text`s. Both sides are folded as the memory's search folds them
+    (`remember::about_fold`: NFC, lower case, `đ` as `d`, no accents),
+    split at anything not a letter or digit, a possessive's `'s` and a
+    plural's `s` taken off (`remember::plural_off`). Not content: the
+    memory's common words (`remember::SEARCH_COMMON`, "I", "my", "is",
+    "and"…), thanks, a greeting or the name, a piece past an apostrophe,
+    "user", "person", "also", "too". So a keep told in the third person
+    stays fast ("Remember that I like tea" kept "The user likes tea.",
+    "… I take my coffee black" kept "Takes coffee black."), as do "tea and
+    coffee" and "my kids are Ann and Bob"; "… and explain gravity to me",
+    "… and recommend a book", "… and wish me luck", "… then explain
+    gravity", "… and also a joke" and "… and a joke would be nice" leave
+    a word the call did not keep and go to round 2, with no list of asks.
+    A paraphrase with another word ("favourite" kept "favorite") goes to
+    round 2 too: it costs the round, never an answer. The clause and
+    joining-word rules above stay as a further guard, for a further ask
+    the model folded into the kept text.
+  - **Every keep came back kept plainly** (`keep_at_once::kept_plainly`):
+    `"remembered": true` with nothing for the model to say (no `note`, no
+    `held`, no `replaced` or `not_replaced`, no `error`; `kept_for` only
+    when the line did not ask for everyone or the room). A correction that
+    `replaced` an older one goes to round 2, which says what changed. The
+    lamp then says "Okay, I'll remember that." (`keep_at_once::KEPT`), and
+    the turn ends. The journal says `N keep(s) kept plainly for a line that
+    only asks to keep; "…" said at once, and no round 2 is asked
+    (LAMP_KEEP_ANSWERS_AT_ONCE)`.
+  - **In the owner's language** the line is its row in
+    `language::FIXED_LINES` (Vietnamese "Được, mình sẽ nhớ điều đó."),
+    rendered ahead as the worker starts and at each line's start, as the
+    wordless cut-in lines are (`Engine::render_fixed_answers`,
+    `FixedClips`), and played from that clip as the turn's piece
+    (`Queue::push_clip`; journal `… said at once from its clip rendered
+    ahead`). Until the clip is kept (the voice slow or failed at start),
+    the turn asks round 2 as without the switch (journal `the keep's line
+    is not rendered ahead in the owner's language yet; round 2 answers`).
+    In English nothing is rendered ahead: the line goes to the voice as the
+    turn's piece, as before.
+  - **Anything else goes on exactly as without the switch.** A keep that
+    failed, kept nothing, was refused, held for a yes, doubted, or told
+    with a note ("Already kept") goes to round 2, which is told what the
+    memory answered and says it (journal: `a keep was not kept plainly;
+    round 2 says what happened`); so a failed keep is never said kept.
+    Another call beside it, the model's own words, or more asked go on as
+    before. The privacy gates (the speaker seen, the scope, a gap's hold,
+    a carried line's keep held for a yes) all run before the call is
+    answered, unchanged.
+  - **Timing replay** (`tests::keep_at_once::the_timing_replay_…`, the
+    test clock, the 5 Nov medians as fake latencies: round 1's first event
+    1656 ms for a keep and 1250 ms for a plain answer, round 2's 1338 ms,
+    the memory 39 ms, the voice's first audio 462 and 404 ms; from the
+    words' end to the engine's first audio, the stretch before the chat
+    begins not modelled): a plain answer 1654 ms, a keep 3495 ms off and
+    2157 ms on. That saves 1338 ms, the whole second round; what is left
+    over a plain answer, +503 ms, is round 1's later first event (a call
+    starts about 406 ms later than words), the memory and the voice. Not
+    yet measured on a lamp.
 - **With `LAMP_SECOND_SPEECH_TAGS=on` the voice may be given an emotion
   tag** (off unless set, on in the product unit from 28 Oct, the owner's
   pick at lamp-52e6; #2901, the lead's proposal on #1711, 22 Oct). The
@@ -5047,7 +5131,10 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   room's`, so with two faces in view the journal says which one a line
   went to (#3699). A face the eyes say `follows` a lost passing id (their
   `LAMP_FACE_KNOWN_HOLD=on` and `LAMP_FACE_REFOUND=on`, #4885, eyes.md "The
-  followed id") is that face, but only on the eyes' word as of the line's
+  followed id") is that face (and a line ending while the eyes mark their
+  hold unsure, `LAMP_FACE_KNOWN_UNSURE=on`, waits up to 1 s for a print:
+  then the known file as it stands, or the room's at the bound, #5738,
+  eyes.md "Unsure until a print"), but only on the eyes' word as of the line's
   end: each link said in their looks up to it, kept as a chain (longer
   than the eyes, which drop a link 1.5 s after the old id was lost: the
   voice keeps it for the 30 s of looks it keeps unless a look cuts it), so a face re-found twice in a line (`f15` to `f16` to `f17`,

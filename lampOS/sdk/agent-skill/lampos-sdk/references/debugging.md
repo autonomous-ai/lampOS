@@ -19,7 +19,13 @@
   only between its own events, so it can miss some.
 - **Try against the fake first:** `lamp fake --everything` answers every op;
   if it works there and not on the lamp, it's the lamp's state (grants,
-  private, quiet hours, a part that doesn't route the op yet).
+  private, quiet hours, a part that doesn't route the op yet, or one of the
+  customer-lamp gaps in [gotchas.md](gotchas.md)).
+
+A `busy` with `retry_ms` after a gesture or move on stable 10824 is the last
+motion still playing: wait `retry_ms`. A `look` that ends `cut_short`
+"something holds the head" on a resting lamp, with no hand on it, is a known
+stable 10824 fault: treat close to the target as arrived, or ask again.
 
 ## On the lamp (the journal recipe)
 

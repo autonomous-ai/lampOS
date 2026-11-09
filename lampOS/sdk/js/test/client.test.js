@@ -124,6 +124,10 @@ test('the debug log redacts what would pair or hello as this computer', async ()
     { ev: 'hand', seen: true, x: 0.4, y: 0.5, size: 0.12, open: true, confidence: 0.9 },
     { re: 4, ok: true, to: 'body', follow: 'hand' },
     { re: 5, ok: true, limits: { say: { most: 6, within_ms: 60000 }, hold_max_ms: 30000, lease_max_ms: 600000, take_max_ms: 600000, say_max_chars: 300, quiet_hours: { from: '22:00', to: '07:00' } } },
+    { re: 6, ok: true, state: { volume: { level: 40, muted: false }, body: {
+      known: true, stands: true, speed_deg_s: 4.4, acceleration_deg_s2: 35.2, load_limit: null, heat_stop_c: 62, counts_per_turn: 4096,
+      joints: { yaw: { counts: 2026, deg: 1.0, min_deg: -3.5, max_deg: 3.5, min_counts: 1975, max_counts: 2055, home_counts: 2015, folded_counts: null, stand_counts: null } } } } },
+    { re: 7, ok: true, state: { body: { known: false, why: 'the body has not said its limits in the last 15 s' } } },
   ]) assert.ok(!JSON.stringify(debug.redact(frame)).includes('<not shown>'), JSON.stringify(frame));
   assert.ok(shown.text.startsWith('<13 chars, tag ') && !shown.text.includes('Build'));
   // Keyed for this run: the same text tags the same, and the unkeyed SHA-256's start isn't it.
@@ -520,6 +524,41 @@ test('the tour runs every step against a fake lamp', async () => {
   } finally {
     await fake.stop();
   }
+});
+
+test('the camera example saves a picture and a frame, and says a refusal', async () => {
+  const { spawn } = await import('node:child_process');
+  const { FAKE_JPEG } = await import('../src/testing.js');
+  const example = new URL('../examples/camera.js', import.meta.url).pathname;
+  const run = async (grants) => {
+    const fake = await FakeLamp.start({ grants });
+    const home = folder();
+    const cwd = folder();
+    try {
+      await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, keyring: new Keyring(home) });
+      // Not execFileSync: the fake answers on this process's event loop.
+      const [code, said] = await new Promise((resolve, reject) => {
+        const child = spawn(process.execPath, [example, '0.5'], { cwd, env: { ...process.env, LAMPOS_HOME: home } });
+        let out = '';
+        child.stdout.on('data', (chunk) => { out += chunk; });
+        child.stderr.on('data', (chunk) => { out += chunk; });
+        child.on('error', reject);
+        child.on('close', (exit) => resolve([exit, out]));
+      });
+      return { code, said, cwd, streams: fake.asked('camera.stream').map((r) => r.on) };
+    } finally {
+      await fake.stop();
+    }
+  };
+  const granted = await run(['camera']);
+  assert.equal(granted.code, 0, granted.said);
+  assert.deepEqual(readFileSync(`${granted.cwd}/snapshot.jpg`), FAKE_JPEG);
+  assert.deepEqual(readFileSync(`${granted.cwd}/last-frame.jpg`), FAKE_JPEG);
+  assert.deepEqual(granted.streams, [true, false], granted.said);
+  const refused = await run(['light']);
+  assert.equal(refused.code, 1, refused.said);
+  assert.ok(refused.said.includes('snapshot: refused,') && !refused.said.includes('    at '), refused.said);
+  assert.ok(!existsSync(`${refused.cwd}/snapshot.jpg`));
 });
 
 test('the examples call only what the client has', async () => {

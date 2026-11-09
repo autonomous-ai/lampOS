@@ -1943,7 +1943,32 @@ mod tests {
                 "messages" if call.url.contains("q=gone") => {
                     reply(200, json!({"messages":[{"id":"18a9"},{"id":"18a1"}]}))
                 }
-                "messages" => reply(200, json!({"messages":[{"id":"18a1"},{"id":"18a2"}]})),
+                // Order 4417's mail is archived: out of the inbox, in
+                // all mail, as Gmail's own labels have it.
+                "messages" if call.url.contains("q=4417") => {
+                    if call.url.contains("labelIds=INBOX") {
+                        reply(200, json!({"resultSizeEstimate":0}))
+                    } else {
+                        reply(200, json!({"messages":[{"id":"18b7"}]}))
+                    }
+                }
+                "messages" if call.url.contains("labelIds=INBOX") => {
+                    reply(200, json!({"messages":[{"id":"18a1"},{"id":"18a2"}]}))
+                }
+                "messages" => reply(
+                    200,
+                    json!({"messages":[{"id":"18b7"},{"id":"18a1"},{"id":"18a2"}]}),
+                ),
+                "messages/18b7" => reply(
+                    200,
+                    api_mail(
+                        "18b7",
+                        "Shop",
+                        "Order 4417 shipped",
+                        "On its way",
+                        "Order 4417 is on its way",
+                    ),
+                ),
                 // A mail whose whole text came cut at the 1 MB limit.
                 "messages/18aL" if call.url.contains("format=full") => Ok(Reply {
                     status: 200,
@@ -2076,6 +2101,51 @@ mod tests {
         );
     }
 
+    /// The owner's 9 Nov: an order number's search found the inbox's mail
+    /// but never an archived one. A search looks in all mail, as Gmail's
+    /// own does (Spam and Trash still out); `recent` stays the inbox; the
+    /// archived mail a search gave reads by its id.
+    #[test]
+    fn a_gmail_sign_in_searches_all_mail_and_lists_the_inbox() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = api_services(dir.path(), false);
+        run(services.admin(&oauth_gmail("planted-gmail-4710")));
+        let before = services.http.calls().len();
+        let answer = run(services.tool(&read_line(
+            json!({"service":"gmail","what":"search","query":"4417"}),
+        )));
+        assert_eq!(answer["ok"], true, "{answer}");
+        let quoted = answer["result"]["quoted"].as_array().unwrap();
+        assert_eq!(quoted.len(), 1, "{answer}");
+        assert_eq!(quoted[0]["id"], "18b7");
+        assert_eq!(quoted[0]["subject"], "Order 4417 shipped");
+        let list = &services.http.calls()[before].url;
+        assert!(!list.contains("labelIds"), "{list}");
+        assert!(!list.contains("includeSpamTrash"), "{list}");
+        // Its id reads it whole.
+        let answer = run(services.tool(&read_line(
+            json!({"service":"gmail","what":"message","id":"18b7"}),
+        )));
+        assert_eq!(answer["ok"], true, "{answer}");
+        assert_eq!(
+            answer["result"]["quoted"][0]["text"],
+            "Order 4417 is on its way"
+        );
+        // `recent` lists the inbox only: no archived mail.
+        let answer = run(services.tool(&read_line(
+            json!({"service":"gmail","what":"recent","count":5}),
+        )));
+        assert_eq!(answer["ok"], true, "{answer}");
+        assert!(!answer.to_string().contains("18b7"), "{answer}");
+        assert!(
+            services
+                .http
+                .calls()
+                .iter()
+                .any(|call| call.url.ends_with("/messages?labelIds=INBOX&maxResults=5"))
+        );
+    }
+
     #[test]
     fn a_gmail_sign_in_reads_through_the_api_and_leaves_out_security_mail() {
         let dir = tempfile::tempdir().unwrap();
@@ -2130,13 +2200,13 @@ mod tests {
         )));
         assert_eq!(answer["result"]["quoted"][0], "a security mail, left out");
         assert!(!answer.to_string().contains("482913"));
-        // A search is Gmail's own words in the inbox; an id not Gmail's
+        // A search is Gmail's own words in all mail; an id not Gmail's
         // is refused before any call.
         run(services.tool(&read_line(
             json!({"service":"gmail","what":"search","query":"from:mom"}),
         )));
         assert!(services.http.calls().iter().any(|call| call.url
-            == "https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=5&q=from%3Amom"));
+            == "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5&q=from%3Amom"));
         let before = services.http.calls().len();
         let refused = run(services.tool(&read_line(
             json!({"service":"gmail","what":"message","id":"../profile"}),

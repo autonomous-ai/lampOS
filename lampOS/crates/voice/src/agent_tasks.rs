@@ -2021,11 +2021,95 @@ fn stands_for(said: &str, word: &str) -> bool {
     stem(said) == stem(word)
 }
 
+/// The forms of the name the task was prepared for, each as its plain
+/// words: the name and the forms the voice hears for it, the same ones the
+/// `named` check of [`reads_back`] looks for.
+fn name_forms(pending: &Pending) -> Vec<Vec<String>> {
+    let mut forms: Vec<Vec<String>> = std::iter::once(pending.who)
+        .chain(
+            KINDS
+                .iter()
+                .filter(|kind| kind.name == pending.who)
+                .flat_map(|kind| kind.heard.iter().copied()),
+        )
+        .map(plain_words)
+        .filter(|form| !form.is_empty())
+        .collect();
+    // The longest first, so "claude code" goes whole before any shorter
+    // form could take part of it.
+    forms.sort_by_key(|form| std::cmp::Reverse(form.len()));
+    forms
+}
+
+/// `words` with the first run of words that is one of `forms` left out:
+/// the name the read-back gives who will do it. A later form is a word of
+/// the read-back's own ("Codex will uninstall the codecs" says "codecs"
+/// back, the Reviewer-lead's P3 on #5785's READ-OK).
+fn without_first_form(words: Vec<String>, forms: &[Vec<String>]) -> Vec<String> {
+    for at in 0..words.len() {
+        if let Some(form) = forms.iter().find(|form| words[at..].starts_with(form)) {
+            let mut kept = words;
+            kept.drain(at..at + form.len());
+            return kept;
+        }
+    }
+    words
+}
+
+/// The words that address one of the staff in a task ("ask Codex to …",
+/// "have Claude Code …"): only a form right after one of them is the
+/// agent's name in the task's own words.
+const ADDRESSING: [&str; 5] = ["ask", "have", "tell", "get", "let"];
+
+/// The task's `words` with each form of the name left out only where it
+/// addresses the agent, right after one of [`ADDRESSING`]: "uninstall the
+/// codecs" keeps "codecs", which the read-back must then say (the
+/// Reviewer-lead's P3 on #5785's READ-OK: stripping it everywhere let
+/// "Codex will uninstall it" start that task on one yes).
+fn without_address(words: Vec<String>, forms: &[Vec<String>]) -> Vec<String> {
+    let mut kept: Vec<String> = Vec::with_capacity(words.len());
+    let mut at = 0;
+    while at < words.len() {
+        let addressed = kept
+            .last()
+            .is_some_and(|before| ADDRESSING.contains(&before.as_str()));
+        if addressed && let Some(form) = forms.iter().find(|form| words[at..].starts_with(form)) {
+            at += form.len();
+        } else {
+            kept.push(words[at].clone());
+            at += 1;
+        }
+    }
+    kept
+}
+
+/// `line` without its closing question: the last sentence, when it ends
+/// with '?', from just after the '.', '!' or '?' before it. A line that is
+/// one question alone leaves nothing.
+fn before_the_question(line: &str) -> &str {
+    let end = line
+        .trim_end_matches(|c: char| c.is_whitespace() || matches!(c, '"' | '”' | '\'' | '’' | ')'));
+    let Some(body) = end.strip_suffix('?') else {
+        return line;
+    };
+    body.rfind(['.', '!', '?']).map_or("", |at| &body[..=at])
+}
+
 /// Whether the lamp's `line` says `pending` back: it names who the task was
 /// prepared for (the name, or a form the voice hears for it, spaces aside)
 /// and holds every one of the task's content words, each by a spoken word
 /// of its own with the same stem ([`stands_for`]): one spoken word stands
-/// for one task word at most. Only the one-yes rule
+/// for one task word at most. The words of the name and the closing
+/// question ("Shall I start it?") never stand for a task word: "Code" in
+/// "Claude Code" is not the "code" of "Delete the code", and the question's
+/// "start" is not the "start" of "Start the server" (the Reviewer-lead's
+/// P3 on #5609's READ-OK). In the task's words the name is left out only
+/// where it addresses the agent ([`without_address`]), so "Ask Claude Code
+/// to fix the tests" needs "ask", "fix" and "tests" read back beside the
+/// name, which `named` already holds, and "uninstall the codecs" still
+/// needs "codecs" said back. A read-back that
+/// is one question alone ("Shall Claude Code fix the tests?") reads back
+/// nothing, which costs a second yes. Only the one-yes rule
 /// ([`yes_in_the_same_turn`]) reads it.
 fn reads_back(line: &str, pending: &Pending) -> bool {
     let words = plain_words(line);
@@ -2041,8 +2125,14 @@ fn reads_back(line: &str, pending: &Pending) -> bool {
             let name: String = name.split_whitespace().collect();
             !name.is_empty() && joined.contains(&name)
         });
-    let task = content_words(&pending.text);
-    let mut unused: Vec<&str> = words.iter().map(String::as_str).collect();
+    let forms = name_forms(pending);
+    let said = without_first_form(plain_words(before_the_question(line)), &forms);
+    let task_words = without_address(
+        plain_words(question_of(&pending.text).unwrap_or(&pending.text)),
+        &forms,
+    );
+    let task = content_words(&task_words.join(" "));
+    let mut unused: Vec<&str> = said.iter().map(String::as_str).collect();
     named
         && !task.is_empty()
         && task.iter().all(|word| {
@@ -3464,6 +3554,113 @@ pub(crate) mod tests {
             ),
         ] {
             assert!(reads_back(line, &task(text)), "{text} / {line}");
+        }
+    }
+
+    /// The Reviewer-lead's P3 on #5609's READ-OK: the agent's name and the
+    /// closing question never stand for a task word. A task that names the
+    /// agent needs its other words read back, the name aside.
+    #[test]
+    fn one_yes_reads_back_past_the_name_and_the_closing_question() {
+        let at = Instant::now();
+        let now = at + Duration::from_secs(1);
+        let task = |text: &str| Pending {
+            text: text.into(),
+            ..moon(at)
+        };
+        for (text, line) in [
+            // "Code" in the name is not the task's "code".
+            (
+                "Delete the code",
+                "Claude Code will delete it. Shall I start it?",
+            ),
+            // The question's "start" is not the task's "start".
+            (
+                "Start the server",
+                "Claude Code will stark the server. Shall I start it?",
+            ),
+            // A read-back that is one question alone says nothing back.
+            ("Start the server", "Shall Claude Code start the server?"),
+            (
+                "Ask Claude Code to fix the tests",
+                "Claude Code will fix them. Shall I start it?",
+            ),
+        ] {
+            assert!(!reads_back(line, &task(text)), "{text} / {line}");
+            assert!(
+                !yes_in_the_same_turn(
+                    &task(text),
+                    9,
+                    true,
+                    Some("Yes."),
+                    Some((line, Duration::from_secs(8), false)),
+                    now
+                ),
+                "{text} / {line}"
+            );
+        }
+        for (text, line) in [
+            (
+                "Delete the code",
+                "Claude Code will delete the code. Shall I start it?",
+            ),
+            (
+                "Start the server",
+                "Claude Code will start the server. Shall I start it?",
+            ),
+            (
+                "Ask Claude Code to fix the tests",
+                "I'll ask Claude Code to fix the tests. Shall I start it?",
+            ),
+            (
+                "Ask Claude Code to fix the tests",
+                "Okay! I'll ask Claude Code to fix the tests. Want me to go ahead?",
+            ),
+        ] {
+            assert!(reads_back(line, &task(text)), "{text} / {line}");
+            assert!(
+                yes_in_the_same_turn(
+                    &task(text),
+                    9,
+                    true,
+                    Some("Yes."),
+                    Some((line, Duration::from_secs(8), false)),
+                    now
+                ),
+                "{text} / {line}"
+            );
+        }
+        // The Reviewer-lead's P3 on #5785's READ-OK: a form of the name
+        // that is the task's own word, not who it is asked of, still has to
+        // be said back. Only "ask Codex to …" addresses Codex.
+        let codex = |text: &str| Pending {
+            text: text.into(),
+            who: "Codex",
+            ..moon(at)
+        };
+        for (text, line, said) in [
+            (
+                "Uninstall the codecs",
+                "Codex will uninstall it. Shall I start it?",
+                false,
+            ),
+            (
+                "Uninstall the codecs",
+                "Codex will uninstall the codecs. Shall I start it?",
+                true,
+            ),
+            (
+                "Ask Codex to uninstall the codecs",
+                "I'll ask Codex to uninstall it. Shall I?",
+                false,
+            ),
+            (
+                "Ask Codex to uninstall the codecs",
+                "I'll ask Codex to uninstall the codecs. Shall I?",
+                true,
+            ),
+        ] {
+            assert_eq!(reads_back(line, &codex(text)), said, "{text} / {line}");
         }
     }
 

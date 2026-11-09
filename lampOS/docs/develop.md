@@ -9,28 +9,32 @@ A developer's quick-start, for decision 1, developers first. It covers:
 The protocol itself is [control.md](control.md). The skill format is
 [skill-format.md](skill-format.md).
 
-**What runs today, and what is pending.** Every command below is in merged
-code, or marked **pending** with the PR or branch it waits on. Until those
-land, the pending steps run against the SDKs' fake lamp only, never a real
-lamp.
+**What runs today.** Customer lamps run the stable build, **10824**
+(lamp-voice `65991c7229`). Everything below works there, except what this
+table marks. The full list, with what to do instead, is in
+[sdk/README.md](../sdk/README.md#on-a-customer-lamp-today-stable-10824).
 
-| step | state |
+| step | on a customer lamp (stable 10824) |
 |---|---|
-| The fake lamp, pairing, the SDKs, `lamp-mcp`, `lamp skill check` | merged |
-| `express`: a feeling as the feelings skill's own move and light | merged: #4020 |
-| `look` at `ahead` or an angle, under a body lease | merged: #4247, on a lamp with `--lease-socket` (the product lamp-body unit passes it since #4568; lamp-control's unit with #4526) |
+| The fake lamp, the SDKs, `lamp-mcp`, `lamp skill check` | on your computer; the SDKs aren't on PyPI or npm yet, so install from a checkout |
+| lamp-control on the lamp | on every lamp, off until the owner turns developer access on in the app |
+| Pairing through the app | works; pass the lamp's address with `--host` (no lamp announces itself by mDNS yet) |
+| Events, states, `light`, `say`, `sound`, `volume`, `express`, `gesture`, `move` | works. A motion asked while the last one sent through lamp-control plays is refused `busy` with `retry_ms` on 10824; the next stable replaces it instead |
+| `look` at `ahead`, an angle or a `hand`, under a body lease | works; on a resting lamp a look may end `cut_short` just short of its target (fixed on lamp-voice, #5711, for the next stable) |
 | `look` at `face` or `name` | not in this release |
-| lamp-control as a product part, off by default | pending: #3876 |
-| The owner's "Add a developer computer" screen in the app | pending: a later piece of #3504 |
-| `lamp skill check` reading format 2 as the lamp does | merged: #3979 |
-| `skill.push` on the lamp: the door and the `skills` grant | merged: #3910 |
-| Loading pushed skills, and checking signed ones | not in this release: #3879 and Eighth's piece B (`eighth/skills-dev-p3`) are parked |
-| `lamp skill keygen`, `pack --sign`, `push`, `install`, `list`, `remove` | pending: blue's `blue/sdk-skill-sign`, not yet a PR |
-| Packing and checking an author's signature on the lamp (`lamp-skills pack --author`) | merged: #3931, #3938 |
+| `joints` | `yaw` and `pitch` only |
+| `play` | refused: "not routed yet: waits for client packages" |
+| `camera.snapshot`, `camera.stream` | works, local network only (not the fast frame path) |
+| `skill.push`, `lamp skill push/list/remove` | not yet on customer lamps: "skill push is not on this lamp" |
+| Signed skills (`keygen`, `pack --sign`, `install`) | not in this release |
+
+Event times (`at`) are UTC, `…Z`, on every build.
 
 ## 1. Install the SDK, and try it with no lamp (2 minutes)
 
-From a checkout of this repository. On Debian or Ubuntu, run
+From a checkout of this repository's `lamp-voice` branch, where the SDKs
+live (`git clone --branch lamp-voice https://github.com/autonomous-ai/lampOS.git && cd lampOS`;
+the default branch, `main`, has none). On Debian or Ubuntu, run
 `sudo apt install python3-venv` first: without it, Python 3.12's `venv`
 fails.
 
@@ -56,9 +60,9 @@ light: `{"to": "body", "move": "glad-lift", "light": true}`), and `say`
 and `sound` (`hum`, the lamp's own short hum) with `{"to": "voice"}` and
 their `done`. `play` and `joints` are refused, in
 lamp-control's own words ("not routed yet: waits for …"), and `look` with "the
-body's lease socket is not on here", as a product lamp refuses it until
-lamp-control's unit passes `--lease-socket` too (#4526; lamp-body's does,
-#4568).
+body's lease socket is not on here". That is older than a customer lamp,
+which takes `look` and `joints` for `yaw` and `pitch` (stable 10824), so try
+those with `--everything`.
 `--everything` answers every op instead.
 
 ## 2. Your first program (3 minutes)
@@ -196,7 +200,7 @@ READMEs' "Everything you can read" gives each one's fields and an example.
   - `mood` (`energy`, `warmth`, `awake`, `asleep`).
   - `lamp`.
   - `air` is planned.
-- **Never:** camera frames, audio, transcripts, the words around a phrase, face prints or names.
+- **Never:** transcripts, the words around a phrase, face prints or names. The camera's pictures only with the `camera` grant (`sdk/python/examples/camera.py`); the `microphone` grant is not routed yet, so no audio.
 
 ### The same in JavaScript
 
@@ -204,7 +208,7 @@ Node 20.11 or later. In your project, install the SDK as a copy, not a
 link, so Node finds its `ws`:
 
 ```sh
-npm i --install-links /path/to/lampOS/sdk/js
+npm i --install-links /path/to/lampOS/lampOS/sdk/js
 ```
 
 ```js
@@ -249,28 +253,31 @@ package.
 ## 3. Your lamp (2 minutes)
 
 **Turn the door on.** `lamp-control` serves the protocol on
-`wss://<lamp>.local:7731/v1`, only with `LAMP_CONTROL=on`
-([control.md](control.md), "Running the door").
-- **Pending (#3876):** it becomes a product part on every lamp, installed
-  and off, with `LAMP_CONTROL=off`.
-- **Later:** the owner turns developer access on in the app.
-- **Until both:** a test lamp needs a /run drop-in setting
-  `LAMP_CONTROL=on`, by whoever looks after that lamp.
+`wss://<lamp>.local:7731/v1` ([control.md](control.md), "Running the
+door"). It is on every lamp, and nothing listens until the owner turns
+developer access on in the app, which starts it within moments. Turning it
+off closes every computer's connection.
 
-**Pair once.** In the app, the owner chooses *Add a developer computer*
-and ticks the grants. The app shows an 8-digit code, the lamp's pin (64
-hex) and a 5-minute expiry.
-- **Pending:** that app screen is a later piece.
-- **Until then:** on a test lamp, its keeper runs this as root:
-  `lamp-control code --grants body,light,speak,look`. It prints the code
-  and the pin.
+**Pair once.** In the app, the owner adds a developer computer and ticks
+the grants. The lamp says the first 8 characters of its pin aloud, and the
+app shows the same 8 for the owner to confirm they match; only then does it
+show the 8-digit code, the lamp's full pin (64 hex) and a 5-minute expiry. If
+the lamp couldn't say its pin, the app cancels the code.
+No lamp announces itself by mDNS yet, so give `lamp pair` the lamp's
+address, its name (`lamp-xxxx.local`) or its IP address. A step-by-step
+walkthrough is in [sdk/README.md](../sdk/README.md#pair-a-computer-with-a-customer-lamp).
+
+On a test lamp without the app, its keeper can make a code as root:
+`lamp-control code --grants body,light,speak,look`. It prints the code and
+the pin.
 
 ```sh
-lamp pair 12345678 --pin 3f9a…     # the code and the pin
+lamp pair 12345678 --pin 3f9a… --host lamp-xxxx.local   # the code, the pin, the lamp's address
 lamp hello                         # connects and shows the grants
 ```
 
-The pin is checked before anything is sent, so the code's proof never
+The pin is checked after the TLS and WebSocket handshakes and before any
+protocol frame, so the code's proof never
 reaches another host. Then run `first.py` with no `LAMPOS_HOME`, against
 the real lamp. The lamp gives a small nod when a computer pairs, and the
 owner can revoke it at any time, which closes its connections at once.
@@ -391,10 +398,12 @@ format 2 that is presence (someone there, how near), never the picture.
 
 ## 6. Push it, sign it, share it (not in this release)
 
-Pushing a skill from a computer is parked for this release (#3879 and
-Eighth's piece B on the lamp), and signing waits on blue's
-`blue/sdk-skill-sign` in the SDK. Against that branch's fake lamp these
-steps run as shown.
+**Not on customer lamps yet.** The product lamp-control isn't started with
+`--manage-socket`, so on stable 10824 every push, list and remove is refused,
+"skill push is not on this lamp". Signing waits on blue's
+`blue/sdk-skill-sign` in the SDK. Push, list and remove run against the fake
+lamp (`lamp fake`); the signing steps only against that branch's. On a real lamp, run the same behaviour as a program on your
+computer while it is connected (step 2).
 
 **Push** it to your own lamp. It needs the `skills` grant, and lands in
 your computer's own folder there:

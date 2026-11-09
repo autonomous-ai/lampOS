@@ -179,7 +179,7 @@ fn every_event_from_the_bus_validates_against_the_schema() {
         ("humans/faces/tracked", json!({"faces": []}), 17 * S),
         ("room/stood_up", json!({"side": "left"}), 18 * S),
         ("room/stood_up", json!({}), 18 * S),
-        ("name/heard", json!({}), 19 * S),
+        ("name/heard", json!({"score": 0.94, "ago_ms": 75}), 19 * S),
         (
             "ears/classes",
             json!({"scores": {"music": 0.9, "door": 0.7}}),
@@ -219,6 +219,27 @@ fn every_event_from_the_bus_validates_against_the_schema() {
             "speaker/volume",
             json!({"volume": 0, "muted": true}),
             29 * S,
+        ),
+        (
+            "light/drawn",
+            json!({"on": true, "colour": "warm", "level": 3}),
+            28 * S,
+        ),
+        (
+            "diagnostics",
+            json!({"level": 0, "name": "body", "message": "", "values": [{"key": "temperature_head_pitch", "value": "44"}]}),
+            28 * S,
+        ),
+        (
+            "body/joint_states",
+            json!({
+                "name": ["base_yaw", "shoulder", "elbow", "head_roll", "head_pitch"],
+                "position": [-0.5, 0.7, -1.1, 0.02, 0.3],
+                "velocity": [0.4, 0.0, 0.0, 0.0, 0.0],
+                "effort": [0.1, 0.35, 0.2, 0.0, 0.06],
+                "commanded": [-0.4, 0.7, -1.1, 0.0, 0.3],
+            }),
+            28 * S,
         ),
     ];
     let mut kinds = std::collections::BTreeSet::new();
@@ -265,6 +286,7 @@ fn every_event_from_the_bus_validates_against_the_schema() {
         "hand",
         "air.changed",
         "volume.changed",
+        "body.state",
     ] {
         assert!(kinds.contains(kind), "{kind} not seen: {kinds:?}");
     }
@@ -323,4 +345,70 @@ fn get_air_and_device_validate_against_the_schema() {
         )
         .is_err()
     );
+}
+
+/// `get`'s `body` and `volume`, as the door answers them from the bus, hold
+/// the schema's reply `state` (harness-reviewer's P3 on #4580: the schema had
+/// neither, so a strict check of a real reply refused it): the body not
+/// known, known with every joint, and known with its positions gone stale;
+/// the volume before lamp-actions has said it, and after.
+#[test]
+fn get_body_and_volume_validate_against_the_schema() {
+    use lamp_control::protocol::StateKind;
+    let root = schema();
+    let state = &root["$defs"]["reply"]["oneOf"][0]["properties"]["state"]["properties"];
+    let mut watch = Watch::new();
+    let not_known = watch.state(StateKind::Body);
+    assert_eq!(not_known["known"], json!(false));
+    holds(&root, &state["body"], &not_known, "body").unwrap();
+    holds(
+        &root,
+        &state["volume"],
+        &watch.state(StateKind::Volume),
+        "volume",
+    )
+    .unwrap();
+    let radians = |counts: f64| (counts - 2_048.0) * std::f64::consts::TAU / 4_096.0;
+    watch.take(
+        "body/limits",
+        &json!({"joints": [
+                    {"name": "base_yaw", "min": 1975, "max": 2055, "home": 2015},
+                    {"name": "shoulder", "min": 1970, "max": 2730, "folded": 2050, "stand": 2650},
+                    {"name": "elbow", "min": 1967, "max": 2680, "folded": 2047, "stand": 2600},
+                    {"name": "head_roll", "min": 2014, "max": 2074, "home": 2044},
+                    {"name": "head_pitch", "min": 1955, "max": 2015, "home": 2000}],
+                "speed": 50.0, "acceleration": 400.0, "force": null, "heat_stop": 62, "stands": true}),
+        S,
+    );
+    watch.take(
+        "body/joint_states",
+        &json!({"name": ["base_yaw", "shoulder", "elbow", "head_roll", "head_pitch"],
+                "position": [radians(2_026.0), radians(2_050.0), radians(2_047.0), radians(2_044.0), radians(1_966.0)]}),
+        S,
+    );
+    watch.take("speaker/volume", &json!({"volume": 40, "muted": false}), S);
+    let body = watch.state(StateKind::Body);
+    assert_eq!(body["joints"]["pitch"]["deg"], json!(3.0), "{body}");
+    holds(&root, &state["body"], &body, "body").unwrap();
+    holds(
+        &root,
+        &state["volume"],
+        &watch.state(StateKind::Volume),
+        "volume",
+    )
+    .unwrap();
+    // The positions lapse while the limits are said again: counts and deg null.
+    watch.take(
+        "body/limits",
+        &json!({"joints": [{"name": "base_yaw", "min": 1975, "max": 2055, "home": 2015}]}),
+        10 * S,
+    );
+    watch.lapse(S + lamp_control::watch::READING_STALE_US);
+    let stale = watch.state(StateKind::Body);
+    assert!(stale["joints"]["yaw"]["counts"].is_null(), "{stale}");
+    holds(&root, &state["body"], &stale, "body").unwrap();
+    // A joint field the schema doesn't name is caught.
+    let mut extra = body.clone();
+    extra["joints"]["yaw"]["torque"] = json!(true);
+    assert!(holds(&root, &state["body"], &extra, "body").is_err());
 }

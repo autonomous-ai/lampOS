@@ -2499,7 +2499,22 @@ tasks flags; it needs only the tasks part):
     Downloads" without "trash" or without "downloads" are all refused
     (the Reviewer-lead's P2s on #5609). Before, half the content words,
     then all but one, and then near forms were enough, and the unheard
-    part started;
+    part started. The words of the name and the closing question never
+    stand for a task word: the first of the name's forms in the line
+    (those the name check uses) is left out of it, and so is the line's
+    last sentence when it ends with "?". In the task a form is left out
+    only where it addresses the agent, right after "ask", "have", "tell",
+    "get" or "let", so "Uninstall the codecs" read back as "Codex will
+    uninstall it" is refused and "Codex will uninstall the codecs" is not
+    (the Reviewer-lead's P3 on #5785's READ-OK). "Delete the code" read back as "Claude
+    Code will delete it. Shall I start it?" (the name's "Code") and "Start
+    the server" read back as "Claude Code will stark the server. Shall I
+    start it?" (the question's "start") are refused. A task that names the
+    agent, "Ask Claude Code to fix the tests", needs "ask", "fix" and
+    "tests" said back beside the name ("I'll ask Claude Code to fix the
+    tests. Shall I start it?"). A read-back that is one question alone
+    ("Shall Claude Code start the server?") says nothing back and costs a
+    second yes (the Reviewer-lead's P3 on #5609's READ-OK);
   - that line was not cut. It is marked cut on its own exchange, so a yes
     in any later request reads it as cut too: kept as heard after a cut
     (`thread::heard_only`, the second route with `LAMP_SAID_AS_HEARD=on`),
@@ -2507,7 +2522,9 @@ tasks flags; it needs only the tasks part):
     Stop, or cut its answer (`over_the_lamps_voice`, `after_stop` or
     `heard_of_cut` on that line's Start, marked by
     `thread::began_over_the_lamps_voice` from both routes' provider
-    workers, `mark_cut_read_back`). On the Live route the lamp's line is
+    workers, `mark_cut_read_back`; on the Live route the three flags are
+    read from the Start itself, `start_cuts_read_back`, so the test drives
+    the same reading as the call site). On the Live route the lamp's line is
     never cut down to what was heard, so without this a yes said over a
     read-back cut off, or after a Stop by hand or head with
     `LAMP_SAID_AS_HEARD` off, was checked against the whole line, its
@@ -2529,6 +2546,7 @@ every description, answer and line is byte-for-byte as before
 `one_yes_never_counts_over_a_cut_read_back`,
 `one_yes_needs_every_task_word_read_back`,
 `one_yes_matches_task_words_by_stem_one_for_one`,
+`one_yes_reads_back_past_the_name_and_the_closing_question`,
 `a_start_over_the_lamps_voice_or_after_a_stop_marks_the_read_back_cut`
 (in both `provider_worker` and `second_provider`),
 `thread::tests::answered_last_but_cut_says_a_read_back_was_cut`,

@@ -3622,6 +3622,22 @@ pub fn serve(
         );
     }
     engine = engine.saying_at_once(say_at_once);
+    // A line that only asks to keep something, kept plainly, answered at
+    // once with no second round (`LAMP_KEEP_ANSWERS_AT_ONCE=on`, C59). In
+    // an owner's language, only from its clip rendered ahead in it.
+    let keep_at_once = crate::keep_at_once::on();
+    if keep_at_once {
+        eprintln!(
+            "lamp-voice second: a line that only asks to keep something, kept plainly, is answered at once with \"{}\" and no second round (LAMP_KEEP_ANSWERS_AT_ONCE){}",
+            crate::language::fixed_in(language, crate::keep_at_once::KEPT),
+            if language.is_some() {
+                ", from its clip rendered ahead; until then round 2 answers"
+            } else {
+                ""
+            }
+        );
+    }
+    engine = engine.keeping_at_once(keep_at_once);
     // A reply that claims a light, volume or Schedule action in the acting
     // part's own words, with no call of that kind, is never said as it is
     // (`LAMP_ACTION_CLAIM_CHECKED=on`, #5215).
@@ -4641,6 +4657,9 @@ pub fn serve(
                     // whoever wrote it, makes the cache cold (#2807), and
                     // this refresh's observation, read after, may end it.
                     let read = tokio::task::spawn_blocking(move || {
+                        // An unsure hold's name moved aside is still the
+                        // one known to this cache (#5738).
+                        let path = crate::speaking_faces::known_or_held(&path);
                         let mark = crate::known_faces::KnownMark::read(&path);
                         let at = Instant::now();
                         (

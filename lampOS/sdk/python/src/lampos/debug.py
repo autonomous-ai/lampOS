@@ -46,8 +46,13 @@ SHOWN = frozenset({
     "clip_max_bytes", "part_max_chars", "parts_max", "clips_max", "store_max_bytes",
     # `light`'s own colours (the ring, pixel by pixel) and hello's ring.
     "brightness", "fade_ms", "pixels", "rgb", "ring",
-    # The `volume` op and `volume.changed`.
-    "muted", "step",
+    # The `volume` op, its `get` state and `volume.changed`.
+    "muted", "step", "volume",
+    # `get` `body`: the body's bounds and where each joint is, its numbers, never who.
+    "acceleration_deg_s2", "body", "counts", "counts_per_turn", "deg", "folded_counts", "heat_stop_c", "home_counts",
+    "load_limit", "max_counts", "max_deg", "min_counts", "min_deg", "speed_deg_s", "stand_counts", "stands",
+    # Each joint of a `body.state` beyond `get` `body`'s.
+    "goal_deg", "load", "moving", "temp_c",
     "asleep", "at", "clamped", "class", "client", "code", "colour", "confidence", "count", "elbow", "error", "ev", "events",
     "express", "facing", "from", "feeling", "for_ms", "frames", "got", "grants", "hold_max_ms", "how", "lease_max_ms", "say_max_bytes",
     "id", "joints", "kind", "lamp", "lamp_state", "lease", "level", "light", "limits", "manage",
