@@ -275,6 +275,17 @@ when the last step in `order` ends done, skipped or failed (#5499, Thirteen's
 P2 on #5504: with `who_you_are` last, a no to the name or the face still
 hears it). After a name-only end it follows `NAME_ONLY`.
 
+**The walk's end is dated once, for the app** (#5812). The first done line
+handed out keeps when, in Unix ms, in the progress file
+(`Progress::done_at_unix_ms`). A redo of one step or of the whole walk keeps
+it (`Progress::redone`), so a later done line never dates it again; a
+factory reset wipes it with the file, so a new owner's walk is dated anew. A
+walk set up before it was dated, or not yet ended, has none.
+`onboarding/pending` carries what is committed on disk as `done_at_unix_ms`
+(left out while unknown), and lamp-cloud tells the app once from it
+(`onboarding.done`, [cloud.md](cloud.md), "Setup done, told to the app").
+Test: `onboarding::tests::the_walks_end_is_dated_once_and_kept`.
+
 **A fixed line is said even when the chat is late.** These lines still go to
 the model as a written turn, and on the second route a turn whose chat has
 not begun in time used to end unanswered, the walk's line unsaid (lamp-52e6,
@@ -936,7 +947,9 @@ read), whether or not an invitation is pending. The steps the model leads
 by talk (where you sit, who you are, touch, room sounds, face expressions,
 preferences) hold no invitation, so a skill that keeps out of setup, as Head
 pat and Head pat wiggle do, gates on `walk` as well as on `invitations`.
-An older voice leaves it out, read as false.
+An older voice leaves it out, read as false. It also says `done_at_unix_ms`
+once the walk has handed out its done line (#5812, "The walk's end is dated
+once, for the app" above).
 
 Privacy is led first, before step 1, whenever it is available, though its
 record keeps the table's place. It is available only with a verified switch

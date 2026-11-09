@@ -765,6 +765,20 @@ impl Lamp for Real {
         self.harness_sign_in.clone()
     }
 
+    fn onboarding(&self) -> Option<u64> {
+        self.latest(lamp_msgs::OnboardingPending::TOPIC)?
+            .parse::<lamp_msgs::OnboardingPending>()
+            .ok()?
+            .done_at_unix_ms
+    }
+
+    fn onboarding_done(&self) -> Option<PathBuf> {
+        crate::onboarding_done::on()
+            .then(|| std::env::var_os("STATE_DIRECTORY"))
+            .flatten()
+            .map(|dir| PathBuf::from(dir).join(crate::onboarding_done::FILE))
+    }
+
     fn make_skill(&self) -> Option<PathBuf> {
         self.make_skill.clone()
     }

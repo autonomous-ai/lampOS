@@ -166,6 +166,19 @@ pub trait Lamp {
         None
     }
 
+    /// When the setup walk handed out its done line, in Unix ms, from the
+    /// voice's `onboarding/pending` heartbeat (#5812): none while unknown.
+    fn onboarding(&self) -> Option<u64> {
+        None
+    }
+
+    /// The file the app's `onboarding.done` acked is kept in
+    /// (`crate::onboarding_done`): there only with
+    /// `LAMP_APP_ONBOARDING_DONE=on` and a state folder.
+    fn onboarding_done(&self) -> Option<std::path::PathBuf> {
+        None
+    }
+
     /// lamp-voice's app-make socket, for a skill typed in the owner's app
     /// (`LAMP_APP_MAKE_SKILL=on` with the skills page, #2813,
     /// `crate::make_skill`).
@@ -442,6 +455,11 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             // lamp signed in says what it always said.
             if let Some(account) = lamp.account() {
                 info["account"] = json!(account);
+            }
+            // `onboarding_done_at` (#5812): the walk's end in Unix ms, only
+            // when known, so an app that missed `onboarding.done` reads it.
+            if let Some(at) = lamp.onboarding() {
+                info["onboarding_done_at"] = json!(at);
             }
             some(info)
         }
@@ -813,6 +831,9 @@ pub mod tests {
         pub control: Option<crate::control::Door>,
         /// The owner's two yeses from the app (#5500), with their switch.
         pub consent: Option<crate::consent::Place>,
+        /// What `onboarding` says, and the switch's file (#5812).
+        pub onboarding: Option<u64>,
+        pub onboarding_done: Option<std::path::PathBuf>,
     }
 
     impl Lamp for Fake {
@@ -904,6 +925,12 @@ pub mod tests {
         }
         fn harness_sign_in(&self) -> Option<crate::harness_sign_in::Place> {
             self.harness_sign_in.clone()
+        }
+        fn onboarding(&self) -> Option<u64> {
+            self.onboarding
+        }
+        fn onboarding_done(&self) -> Option<std::path::PathBuf> {
+            self.onboarding_done.clone()
         }
         fn make_skill(&self) -> Option<std::path::PathBuf> {
             self.make_skill.clone()
@@ -1155,6 +1182,16 @@ pub mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(told["recovery"], true);
+        // #5812: `onboarding_done_at` only once the walk's end is known.
+        assert!(info.get("onboarding_done_at").is_none(), "{info}");
+        let mut done = Fake {
+            onboarding: Some(1_762_675_200_000),
+            ..Fake::default()
+        };
+        let told = answer(&mut done, "system.info", &Value::Null)
+            .unwrap()
+            .unwrap();
+        assert_eq!(told["onboarding_done_at"], 1_762_675_200_000u64);
         // #2937: a lamp that can't tell its reset says nothing of it; one
         // that can says hold or none.
         assert!(info.get("reset").is_none(), "{info}");

@@ -467,6 +467,13 @@ pub struct Progress {
     /// walk; a reset wipes it with the file. An older build reads past it.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub yes_redone_at_unix_s: BTreeMap<String, u64>,
+    /// When the walk first handed out its done line, in Unix ms: the app is
+    /// told once from it (`lamp_msgs::OnboardingPending::done_at_unix_ms`,
+    /// lamp-cloud's `onboarding.done`). Set once, kept through a redo of a
+    /// step or of the whole walk, so a redo never tells the app again; a
+    /// reset wipes it with the file. An older build reads past it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done_at_unix_ms: Option<u64>,
 }
 
 impl Progress {
@@ -478,6 +485,7 @@ impl Progress {
         let mut redone = Self {
             tries_said: self.tries_said,
             harness_line: self.harness_line,
+            done_at_unix_ms: self.done_at_unix_ms,
             ..Self::default()
         };
         for step in [ROOM_SOUNDS, FACE_EXPRESSIONS] {
@@ -1593,6 +1601,7 @@ impl Onboarding {
         lamp_msgs::OnboardingPending {
             invitations,
             walk: false,
+            done_at_unix_ms: self.committed.done_at_unix_ms,
         }
     }
 
@@ -2118,6 +2127,7 @@ impl Onboarding {
             Some(offer) => lamp_msgs::OnboardingPending {
                 invitations: vec![offer],
                 walk: false,
+                done_at_unix_ms: self.committed.done_at_unix_ms,
             },
             None => self.privacy_pending(),
         };
@@ -3499,6 +3509,8 @@ impl Onboarding {
                 && matches!(outcome, Outcome::Done | Outcome::Skipped | Outcome::Failed))
         {
             self.owed = Some(self.preferences_done().to_owned());
+            // Dated once per setup, for the app (`Progress::done_at_unix_ms`).
+            self.desired.done_at_unix_ms.get_or_insert_with(unix_ms);
         }
         if self.led.as_ref().is_some_and(|led| led.step == step) {
             self.led = None;
@@ -7807,6 +7819,39 @@ mod tests {
         // An older file without the field reads as not yet decided.
         let old: Progress = serde_json::from_str(r#"{"steps":{}}"#).unwrap();
         assert_eq!(old.harness_line, None);
+    }
+
+    /// The app's "setup done" signal (`onboarding.done`): the walk's end
+    /// dates it once, in what is committed, and the heartbeat carries it; a
+    /// restart reads it back; a redo of the whole walk and of one step keep
+    /// it; a walk not yet ended has none.
+    #[test]
+    fn the_walks_end_is_dated_once_and_kept() {
+        let mut room = Room::new("done-date");
+        assert_eq!(room.walk.kept().done_at_unix_ms, None);
+        assert_eq!(room.walk.pending().done_at_unix_ms, None);
+        walk_to_the_done_line(&mut room);
+        let at = room.walk.kept().done_at_unix_ms.expect("the walk's end is dated");
+        assert_eq!(room.walk.pending().done_at_unix_ms, Some(at));
+        // The voice restarts: the date is read back.
+        let mut again = restarted(&room);
+        assert_eq!(again.walk.kept().done_at_unix_ms, Some(at));
+        assert_eq!(again.walk.pending().done_at_unix_ms, Some(at));
+        // Real time passes, so a second dating would show.
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        let redo = ToolCall {
+            id: "c".into(),
+            name: REDO.into(),
+            args: json!({"step": "all"}),
+        };
+        assert!(run(&again.walk.file, &redo).1);
+        // `restarted` turns the Harness line on, signed out.
+        walk_to(&mut again, skill::PREFERENCES_DONE_HARNESS);
+        assert_eq!(again.walk.kept().done_at_unix_ms, Some(at));
+        again.walk.redo_step(Step::Preferences, again.at);
+        again.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(again.walk.kept().done_at_unix_ms, Some(at));
+        assert_eq!(again.walk.pending().done_at_unix_ms, Some(at));
     }
 
     /// #5488: signed in (or signed in and offline), or with no tasks part,
