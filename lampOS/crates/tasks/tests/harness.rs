@@ -719,11 +719,41 @@ fn with_reply_named_a_slow_session_list_waits_for_the_launch_bound() {
     );
 }
 
+/// #5535, the Reviewer-lead's P3 on #5784 at 71bf964baa: a session list
+/// that leaves the reply under a second of the launch bound is
+/// `sessions_timeout`, and nothing is typed, never a reply cut short.
+#[test]
+fn with_reply_named_a_list_that_leaves_no_time_types_nothing() {
+    let mut rig = Rig::new();
+    rig.config.reply_named = true;
+    rig.config.route = true;
+    rig.config.engines_ready = true;
+    rig.config.read_timeout = Duration::from_secs(3);
+    rig.config.launch_timeout = Duration::from_millis(5600);
+    let rows = json!([ps_row(AGENT, "docs", "idle", None)]);
+    let mut ps = step(json!({"you":null,"machine":"desk-pc","harnesses":rows,"next":[]}));
+    ps["delay_ms"] = json!(5000);
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"route":{"default":true},
+        "ps":ps,
+        "reply":step(json!({"ok":true,"name":"x","id":AGENT,"message":"m1","state":"queued"}))
+    }));
+    let mut request = launch();
+    request.session = Some("docs".into());
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::NotSent {
+            code: "sessions_timeout".into()
+        }
+    );
+    assert!(rig.calls().iter().all(|call| call["args"][0] != "reply"));
+}
+
 /// #5535, the owner on 9 Nov: a person remembers what a session worked on,
 /// never its name ("lamp-b1287be5…") or id. With no name or folder fitting,
 /// the session is found by its work (`asks`, `about`); two as good are
-/// asked about, never guessed; a live one is never passed over for a
-/// stopped one; words that only say "which one" find nothing.
+/// asked about, never guessed, a live one beside a stopped one too; words
+/// that only say "which one" find nothing.
 #[test]
 fn with_reply_named_a_session_is_found_by_what_it_worked_on() {
     let pick = |session: &str, rows: Value| {
@@ -818,7 +848,9 @@ fn with_reply_named_a_session_is_found_by_what_it_worked_on() {
         pick("the book program", json!([busy])),
         (not_sent("session_busy"), None)
     );
-    // A stopped one that fits as well never wins over a live one.
+    // A live one and a stopped one that both fit are asked about: the one
+    // meant may be the stopped one (the Reviewer-lead's P2 on #5784 at
+    // 71bf964baa), and nothing is typed into the live one.
     let old = worked_row(
         OTHER,
         "lamp-7f8a8dcb047b88eeca3ea3b8b634b420",
@@ -830,11 +862,8 @@ fn with_reply_named_a_session_is_found_by_what_it_worked_on() {
         pick(
             "the book program reading list",
             json!([books.clone(), old.clone()])
-        )
-        .0,
-        LaunchOutcome::Joined {
-            agent_id: AGENT.into()
-        }
+        ),
+        (not_sent("session_ambiguous"), None)
     );
     assert_eq!(
         pick("the book program", json!([old])),
