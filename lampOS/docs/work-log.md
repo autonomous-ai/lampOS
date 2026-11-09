@@ -8806,3 +8806,16 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - Independent agent delta audits spot-checked against actual source diffs.
   All diff checks clean; no product edits. These restatements do not clear
   the independently reproduced MCP reconnect integration finding.
+
+## 2026-11-09 — Second: dropped face-save close review
+
+- READ-OK #5854 `febff5773b3e89bfcc46e563f637de29e59a88d7`, onboarding
+  timing/state only. Exact-head baseline288 passed31.18 s (author reported
+  308; no claim to that count). Independent mailbox/Room probe passes:
+  duplicate drop preserves original20 s close, replacement hold and later
+  question keep step open, no owner invented. Three cases0.72 s.
+- Separate source audit confirms ordering and guards. Temporary test
+  preserved /tmp/second-5854-drop-boundaries.rs, removed; checkout clean.
+  No physical latency or lamp acceptance. PM subsequently named El and
+  Reviewer-lead; this read supplements their assigned reads.
+- Taking Fourteen's explicit #5851 fixed-head restatement next.
