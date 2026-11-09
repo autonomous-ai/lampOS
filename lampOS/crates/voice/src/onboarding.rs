@@ -7831,7 +7831,11 @@ mod tests {
         assert_eq!(room.walk.kept().done_at_unix_ms, None);
         assert_eq!(room.walk.pending().done_at_unix_ms, None);
         walk_to_the_done_line(&mut room);
-        let at = room.walk.kept().done_at_unix_ms.expect("the walk's end is dated");
+        let at = room
+            .walk
+            .kept()
+            .done_at_unix_ms
+            .expect("the walk's end is dated");
         assert_eq!(room.walk.pending().done_at_unix_ms, Some(at));
         // The voice restarts: the date is read back.
         let mut again = restarted(&room);

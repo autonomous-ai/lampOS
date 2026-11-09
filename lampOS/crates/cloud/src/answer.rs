@@ -461,6 +461,12 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             if let Some(at) = lamp.onboarding() {
                 info["onboarding_done_at"] = json!(at);
             }
+            // `onboarding_done_supported` (#5812, Mobile's ask): this lamp
+            // will send `onboarding.done`, so the app may wait for it. Only
+            // with the switch on (and a state folder); none otherwise.
+            if lamp.onboarding_done().is_some() {
+                info["onboarding_done_supported"] = json!(true);
+            }
             some(info)
         }
         "system.version" => some(lamp.versions()),
@@ -1192,6 +1198,17 @@ pub mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(told["onboarding_done_at"], 1_762_675_200_000u64);
+        // Mobile's ask: `onboarding_done_supported` only with the switch on.
+        assert!(info.get("onboarding_done_supported").is_none(), "{info}");
+        assert!(told.get("onboarding_done_supported").is_none(), "{told}");
+        let mut will = Fake {
+            onboarding_done: Some("/nonexistent/onboarding-done".into()),
+            ..Fake::default()
+        };
+        let told = answer(&mut will, "system.info", &Value::Null)
+            .unwrap()
+            .unwrap();
+        assert_eq!(told["onboarding_done_supported"], true);
         // #2937: a lamp that can't tell its reset says nothing of it; one
         // that can says hold or none.
         assert!(info.get("reset").is_none(), "{info}");
