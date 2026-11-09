@@ -10925,6 +10925,18 @@ pub(crate) fn picture_note(answer: &Value) -> Option<String> {
     (!note.is_empty()).then(|| note.to_owned())
 }
 
+/// What goes after a look turn's question: a skill's `note` for its
+/// picture, wrapped; for the route's own look (`search` false) with no note,
+/// [`HEAD_STILL_NOTE`]; for a skill's look with no note, nothing, since a
+/// skill's look (`look_for`) may have moved the head.
+pub(crate) fn look_turn_note(search: bool, note: Option<String>) -> Option<String> {
+    match note {
+        Some(note) => Some(format!("{PICTURE_NOTE_BEFORE}{note}{PICTURE_NOTE_AFTER}")),
+        None if !search => Some(HEAD_STILL_NOTE.to_owned()),
+        None => None,
+    }
+}
+
 /// Asks the coordinator for `request`'s full look (`LookAsked`), made by a
 /// call of `name`'s: dropped, and why, in a turn the lamp wrote itself
 /// (unless `heard` says it may look all the same: a skill's search's own
@@ -10973,11 +10985,7 @@ async fn ask_look(
     );
     // What goes after the look turn's question: a skill's note for its
     // picture, or, for the route's own look, that the head did not move.
-    let note = match note {
-        Some(note) => Some(format!("{PICTURE_NOTE_BEFORE}{note}{PICTURE_NOTE_AFTER}")),
-        None if !search => Some(HEAD_STILL_NOTE.to_owned()),
-        None => None,
-    };
+    let note = look_turn_note(search, note);
     // Kept before the coordinator hears of the look, so its turn finds it.
     if dropped.is_none()
         && let Some(session) = session
