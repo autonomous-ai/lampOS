@@ -398,6 +398,13 @@ impl Camera {
             .is_some_and(|(now, running)| *now == turn && running.load(Ordering::SeqCst))
     }
 
+    /// The turn of `client`'s newest stream, running or ended by itself
+    /// (the lamp private, the camera closed), until its `off`: a
+    /// `camera.ended` of an older turn is not this stream's end.
+    pub fn turn(&self, client: &str) -> Option<u64> {
+        self.streams.get(client).map(|(turn, _)| *turn)
+    }
+
     /// Ends `client`'s stream, if any, without an event: its own `off`,
     /// `stop` or going.
     pub fn end(&mut self, client: &str) {
@@ -556,14 +563,26 @@ fn run_fast(
     }
 }
 
-/// The internal field a `camera.frame` event carries its stream's turn in,
-/// for the writer to hold it to that stream ([`Camera::streaming`]) and take
-/// off before it goes: a computer never sees it.
+/// The internal field a `camera.frame` or `camera.ended` event carries its
+/// stream's turn in, for the writer to hold it to that stream
+/// ([`Camera::streaming`], [`Camera::turn`]) and take off before it goes: a
+/// computer never sees it.
 pub const TURN_FIELD: &str = "_stream_turn";
 
-/// A `camera.frame` event with its stream's turn; any other as it is.
+/// Whether a `camera.ended` of stream `turn` is an older stream's late end,
+/// after a newer stream of the same client started (`newest`, its
+/// [`Camera::turn`]): then it is not the newer stream's end, and the writer
+/// drops it. An end without a turn, or with no stream left, is taken as it is.
+pub fn older_end(turn: Option<u64>, newest: Option<u64>) -> bool {
+    turn.zip(newest)
+        .is_some_and(|(turn, newest)| turn != newest)
+}
+
+/// A `camera.frame` or `camera.ended` event with its stream's turn; any
+/// other as it is. An older stream's late end then never ends a newer one
+/// (banana's P3 on #5881).
 fn with_turn(mut event: Value, turn: u64) -> Value {
-    if event["ev"] == "camera.frame" {
+    if event["ev"] == "camera.frame" || event["ev"] == "camera.ended" {
         event[TURN_FIELD] = json!(turn);
     }
     event
@@ -795,13 +814,59 @@ mod tests {
 
     #[test]
     fn a_frame_event_carries_its_streams_turn_for_the_writer_alone() {
-        // The writer holds a slow-path picture to the stream that made it and
-        // takes the turn off before it goes (server.rs); nothing else is
-        // marked.
+        // The writer holds a slow-path picture and a stream's end to the
+        // stream that made them and takes the turn off before they go
+        // (server.rs); nothing else is marked.
         let frame = with_turn(json!({"ev": "camera.frame", "jpeg": "…"}), 7);
         assert_eq!(frame[TURN_FIELD], 7);
         let ended = with_turn(json!({"ev": "camera.ended", "why": "x"}), 7);
-        assert!(ended.get(TURN_FIELD).is_none());
+        assert_eq!(ended[TURN_FIELD], 7);
+        let other = with_turn(json!({"ev": "camera.snapshot"}), 7);
+        assert!(other.get(TURN_FIELD).is_none());
+    }
+
+    #[test]
+    fn an_older_streams_late_end_never_ends_a_newer_one() {
+        // banana's P3 on #5881: the first stream's thread may say its
+        // `camera.ended` after the computer started a second stream. The
+        // second's turn is the client's newest; the first's end is older and
+        // is dropped, while the second's own end, even once it stopped
+        // itself, still goes.
+        let sight = dir().join("sight.jpg");
+        std::fs::write(&sight, JPEG).unwrap();
+        let mut camera =
+            Camera::new(sight, Arc::new(|| false)).marking(Arc::new(|_, _| {}), drawn_now());
+        let events: Events = Arc::new(|_, _| {});
+        assert_eq!(camera.turn("c_1"), None);
+        camera
+            .stream("c_1", true, None, None, events.clone())
+            .unwrap();
+        let first = camera.turn("c_1").unwrap();
+        camera
+            .stream("c_1", true, None, None, events.clone())
+            .unwrap();
+        let second = camera.turn("c_1").unwrap();
+        assert_ne!(first, second);
+        assert!(
+            older_end(Some(first), camera.turn("c_1")),
+            "the first's late end"
+        );
+        assert!(
+            !older_end(Some(second), camera.turn("c_1")),
+            "the second's own"
+        );
+        // Ended by itself (private, the camera closed), the turn stays the
+        // newest until `off`, so its end still goes.
+        camera.streams["c_1"].1.store(false, Ordering::SeqCst);
+        assert_eq!(camera.turn("c_1"), Some(second));
+        assert!(!older_end(Some(second), camera.turn("c_1")));
+        // After `off`, an end with no stream left goes as it is; so does one
+        // without a turn.
+        camera.end("c_1");
+        assert_eq!(camera.turn("c_1"), None);
+        assert!(!older_end(Some(first), camera.turn("c_1")));
+        assert!(!older_end(None, Some(second)));
+        assert_eq!(camera.turn("c_2"), None);
     }
 
     #[test]

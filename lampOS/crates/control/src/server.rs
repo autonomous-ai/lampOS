@@ -1036,15 +1036,29 @@ async fn connection<S>(
                     {
                         continue;
                     }
+                    let mut event = event;
                     // Ended: the frames still queued for it never go
-                    // (Thirteen's P3 on #4521).
+                    // (Thirteen's P3 on #4521). An older stream's end that
+                    // comes after a newer stream started is not this one's:
+                    // it neither empties the newer stream's frames nor tells
+                    // the computer (banana's P3 on #5881). Its turn is the
+                    // door's own, taken off before it goes.
                     if event["ev"] == "camera.ended" {
+                        let turn = event
+                            .as_object_mut()
+                            .and_then(|fields| fields.remove(crate::camera::TURN_FIELD))
+                            .and_then(|turn| turn.as_u64());
+                        let newest = session.client().and_then(|client| {
+                            shared.parts.lock().expect("parts").camera_turn(client)
+                        });
+                        if crate::camera::older_end(turn, newest) {
+                            continue;
+                        }
                         while framed.try_recv().is_ok() {}
                     }
                     // A picture goes only while the stream that made it runs,
                     // never through one started after it (banana, 9 Nov), and
                     // its turn is the door's own, taken off before it goes.
-                    let mut event = event;
                     if event["ev"] == "camera.frame" {
                         let turn = event
                             .as_object_mut()
