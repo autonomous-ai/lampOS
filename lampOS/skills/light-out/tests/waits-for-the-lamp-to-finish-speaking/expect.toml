@@ -1,16 +1,24 @@
-# From 10:00, nobody; the lamp speaks from 598.5 s to 640.5 s (a reminder into
-# an empty room). Ten minutes of nobody come at 600 s, in the middle of it:
-# the light goes out at the first presence after the lamp rests again, 641 s,
-# and comes back when someone sits down at 720 s.
+# From 10:00, nobody; the lamp speaks from 2398.5 s to 2440.5 s (a reminder
+# into an empty room). Forty minutes of nobody come at 2400 s, in the
+# middle of it: the light dims at the first presence after the lamp rests
+# again, 2442 s, goes out five minutes later, and comes back when someone
+# sits down at 2800 s.
 clock = "10:00"
 
 [[expect]]
-at = "641s"
+at = "2442s"
 within = "1s"
 call = "light"
-args = { out = true, over_ms = 30000, until = "ends" }
+args = { dim = 2, for_ms = 300000, until = "ends" }
 
 [[expect]]
-at = "720s"
+at = "2742s"
+within = "1s"
+call = "light"
+args = { out = true, over_ms = 60000, until = "ends" }
+
+[[expect]]
+at = "2800s"
 within = "1s"
 call = "ends"
+

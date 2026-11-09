@@ -1347,6 +1347,7 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
             Call::Dim {
                 steps: 1,
                 until_ends: false,
+                for_us: None,
             },
             "light",
         ),
@@ -2837,7 +2838,8 @@ light = { dim = 1, until = "ends" }
         runs[0].1,
         [Call::Dim {
             steps: 1,
-            until_ends: true
+            until_ends: true,
+            for_us: None,
         }]
     );
     // Nobody at the desk: nothing.
@@ -2886,6 +2888,7 @@ light = { dim = 1 }
     let dim = Call::Dim {
         steps: 1,
         until_ends: false,
+        for_us: None,
     };
     assert_eq!(runs_at(&skill, &messages), [(600, vec![dim.clone()])]);
     // The same face seen at 600 s, just before the air: looked at.
@@ -7025,6 +7028,7 @@ fn a_rearm_line_waits_for_the_field_to_stay_past_it_for_a_while() {
         Call::Dim {
             steps: 1,
             until_ends: true,
+            for_us: None,
         },
     ];
     // A spell, 9 minutes under 1,000, a spell: once, as the line was not
@@ -7335,6 +7339,7 @@ fn each_item_of_a_list_on_its_own_and_steps_by_the_trigger_that_fired() {
         Call::Dim {
             steps: 1,
             until_ends: false,
+            for_us: None,
         },
         Call::Say("It failed.".into()),
     ];
@@ -14870,5 +14875,140 @@ light = { colour = "warm" }
             seen.events
         );
         assert_eq!((seen.looked, seen.lights.len()), (None, 0));
+    }
+}
+
+/// #5746, light-out as the program runs it on a stepped clock: forty
+/// minutes of nobody dim the person's light two steps; five minutes on, it
+/// goes out over a minute. Someone in the five minutes of dim, by a face, a
+/// word, a touch or the view changing, gives the light back at once, and
+/// nothing goes out.
+#[test]
+fn light_out_dims_five_minutes_then_goes_out_and_anyone_in_the_dim_brings_it_back() {
+    use lamp_msgs::{RoomPresence, SeenBy, Voice};
+    for back in [
+        None,
+        Some(SeenBy::Face),
+        Some(SeenBy::Voice),
+        Some(SeenBy::Touch),
+        Some(SeenBy::Moved),
+    ] {
+        // Short: a socket's whole path has to fit in 103 bytes.
+        let dir = tempfile::Builder::new()
+            .prefix("lo")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let root = dir.path();
+        copy(
+            &skills_root().join("light-out"),
+            &root.join("skills/light-out"),
+        );
+        let bus = Bus::new(root.join("bus")).unwrap();
+        let mut requests = bus.subscribe(LightRequest::TOPIC, "ring").unwrap();
+        let mut presence = bus
+            .publisher_declared(RoomPresence::TOPIC, &RoomPresence::declaration(), "eyes")
+            .unwrap();
+        bus.publisher_declared(Light::TOPICS[1], &Light::declaration(), "ring")
+            .unwrap()
+            .publish_json(1, &Light::new(true, "white", 4).unwrap())
+            .unwrap();
+        bus.publisher_declared(VoiceState::TOPIC, &VoiceState::declaration(), "voice")
+            .unwrap()
+            .publish_json(
+                1,
+                &VoiceState {
+                    state: Voice::Resting,
+                },
+            )
+            .unwrap();
+        let clock = Clock::at(root);
+        // Midday where the lamp is, outside its [quiet] 23:00 to 06:00.
+        let minute = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            / 60
+            % 1_440;
+        let midday = (720 - minute as i64 + 1_440 + 720) % 1_440 - 720;
+        let _running = Running(
+            Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+                .args([
+                    "--dir".as_ref(),
+                    root.join("skills").as_os_str(),
+                    "--bus-root".as_ref(),
+                    root.join("bus").as_os_str(),
+                    "--boot-id".as_ref(),
+                    OsStr::new("boot-test"),
+                    "--utc-offset-minutes".as_ref(),
+                    OsStr::new(&midday.to_string()),
+                ])
+                .args(clock.args())
+                .env("LAMP_LIGHT_REQUESTS", "on")
+                .env("LAMP_SKILLS_ASK", "skip")
+                .spawn()
+                .unwrap(),
+        );
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty() {
+            assert!(Instant::now() < deadline, "light-out was never loaded");
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        // Every 2 s of the program's clock for `seconds`, the eyes' value
+        // (each good for 3 s), and what was asked of the ring meanwhile.
+        let mut nobody_s = 2_390;
+        let mut run = |seconds: u32, by: Option<SeenBy>| -> Vec<LightRequest> {
+            let mut asked = Vec::new();
+            for _ in 0..seconds / 2 {
+                let now = RoomPresence {
+                    someone: by.is_some(),
+                    nobody_s: if by.is_some() { 0 } else { nobody_s },
+                    by,
+                };
+                presence.publish_json(1, &now).unwrap();
+                nobody_s += 2;
+                clock.skip(Duration::from_secs(2));
+                while let Some(message) = requests.recv(Duration::from_millis(20)).unwrap() {
+                    asked.push(message.parse().unwrap());
+                }
+            }
+            while let Some(message) = requests.recv(ONE_PASS).unwrap() {
+                asked.push(message.parse().unwrap());
+            }
+            asked
+        };
+        let dim = run(12, None);
+        assert_eq!(
+            dim.first()
+                .map(|request| (request.light.clone(), request.fade_ms)),
+            Some((Light::new(true, "white", 2).unwrap(), None)),
+            "{back:?}: dimmed two steps at forty minutes: {dim:?}"
+        );
+        // Halfway through the dim, or not at all.
+        let held = run(150, None);
+        assert!(
+            held.iter().all(|request| request.light.on),
+            "{back:?}: still the dim, renewed: {held:?}"
+        );
+        if let Some(by) = back {
+            let given = run(2, Some(by));
+            assert!(
+                given
+                    .last()
+                    .is_some_and(|request| request.claim.until_us < lamp_ipc::monotonic_us()),
+                "{by:?} in the dim gives the light back at once: {given:?}"
+            );
+            let after = run(200, Some(by));
+            assert!(
+                after.iter().all(|request| request.light.on),
+                "{by:?}: nothing goes out after: {after:?}"
+            );
+            continue;
+        }
+        let out = run(160, None);
+        let out = out
+            .iter()
+            .find(|request| !request.light.on)
+            .unwrap_or_else(|| panic!("out five minutes after the dim: {out:?}"));
+        assert_eq!(out.fade_ms, Some(60_000));
     }
 }

@@ -17,14 +17,16 @@ use std::time::Duration;
 /// A reader treats no fresh value as not known, never as nobody.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RoomPresence {
-    /// A face was seen, or a voice heard, within
-    /// [`RoomPresence::SOMEONE_WITHIN_S`].
+    /// A face was seen, a voice heard or the lamp touched within
+    /// [`RoomPresence::SOMEONE_WITHIN_S`], or, in light-out's dim, the view
+    /// changed (#5746).
     pub someone: bool,
     /// How long nobody has been at the lamp, in whole seconds: since the
     /// last face seen or voice heard, or, with neither since the eyes began
     /// looking, since they began. 0 while someone is there.
     pub nobody_s: u32,
-    /// While someone is there, what last showed it: a face or a voice
+    /// While someone is there, what last showed it: a face, a voice, a
+    /// touch or, in light-out's dim, the view changing
     /// (#1677, the first builder's lamp check), so a run can tell a passer-by
     /// from someone at the desk. Absent while nobody is, and from an older
     /// eyes' message.
@@ -38,6 +40,11 @@ pub struct RoomPresence {
 pub enum SeenBy {
     Face,
     Voice,
+    /// A touch on the lamp, or a pet on its head (#5746): someone's hand.
+    Touch,
+    /// The view changed while light-out's dim showed (#5746): a reader the
+    /// eyes can't find turning a page. Never said outside that dim.
+    Moved,
 }
 
 impl RoomPresence {

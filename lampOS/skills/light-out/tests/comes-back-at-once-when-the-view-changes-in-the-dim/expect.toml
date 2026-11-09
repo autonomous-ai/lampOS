@@ -1,0 +1,16 @@
+# From 10:00, nobody, and nothing moving: the light dims at 2400 s. At
+# 2550 s, in the dim, the eyes see the view change (a page turned, by =
+# "moved"): someone, and the light is given back at once; it never goes out.
+clock = "10:00"
+
+[[expect]]
+at = "2400s"
+within = "1s"
+call = "light"
+args = { dim = 2, for_ms = 300000, until = "ends" }
+
+[[expect]]
+at = "2550s"
+within = "1s"
+call = "ends"
+

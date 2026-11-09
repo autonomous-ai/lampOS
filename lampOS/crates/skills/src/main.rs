@@ -3717,6 +3717,30 @@ fn perform(
             .collect()
     };
     let (first, after) = (keep(first), keep(after));
+    // A dim held a while (#5746, light-out's five minutes): the steps after
+    // it are made that long after, unless its trigger ends first. Never in
+    // a skill with a say (the skill's load refuses it), so it is in `first`.
+    let (first, later, hold) = match first.iter().position(|call| {
+        matches!(
+            call,
+            Call::Dim {
+                for_us: Some(_),
+                ..
+            }
+        )
+    }) {
+        Some(at) => {
+            let hold = match first[at] {
+                Call::Dim {
+                    for_us: Some(for_us),
+                    ..
+                } => Duration::from_micros(for_us),
+                _ => Duration::ZERO,
+            };
+            (first[..=at].to_vec(), first[at + 1..].to_vec(), hold)
+        }
+        None => (first, Vec::new(), Duration::ZERO),
+    };
     // What the voice is asked to say: a note in its own words, or words it
     // keeps itself (#939); or to play the skill's own sound (#938), which
     // it plays at once or refuses at once, with why.
@@ -3849,6 +3873,32 @@ fn perform(
             wait_out(skill, calls, bus, changed.lasting_us, &mut said);
         }
     }
+    // What a held dim's while times: made once it has passed, or nothing
+    // more if the trigger ended first (someone came back during the dim).
+    let mut ended = false;
+    if !later.is_empty()
+        && let Some(end) = end.as_ref()
+    {
+        match clock::recv_timeout(end, hold) {
+            Err(mpsc::RecvTimeoutError::Timeout) => act(
+                &later,
+                sockets,
+                bus,
+                asker,
+                &mut changed,
+                &mut played,
+                &mut glow,
+                &mut said,
+            ),
+            _ => {
+                ended = true;
+                said.push(format!(
+                    "held until its trigger ended, before its {} s were up: nothing after the dim is made",
+                    hold.as_secs()
+                ));
+            }
+        }
+    }
     if let Some(last) = played.last.as_mut() {
         clock::sleep(last.until().saturating_duration_since(clock::now()));
         // The last clip has no next to wait on it: one the body dropped or
@@ -3875,9 +3925,9 @@ fn perform(
     // pale breath, #1681) waits for that end, however long, the ring's
     // request renewed meanwhile when it is asked of the ring.
     let held = end.filter(|_| {
-        (changed.dimmed > 0 || changed.coloured) && (glow.is_some() || before.is_some())
+        !ended && (changed.dimmed > 0 || changed.coloured) && (glow.is_some() || before.is_some())
     });
-    let held_until_ends = held.is_some();
+    let held_until_ends = held.is_some() || ended;
     if let Some(end) = held {
         let _ = end.recv();
         said.push("held until its trigger ended".into());
@@ -5725,6 +5775,7 @@ mod tests {
             Call::Dim {
                 steps: 1,
                 until_ends: false,
+                for_us: None,
             },
             Call::Mood {
                 mood: "reading".into(),

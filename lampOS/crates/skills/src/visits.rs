@@ -213,7 +213,9 @@ impl Visits {
             }
             self.unseen.push_back((last_us, at_us));
         }
-        let face = by != Some(SeenBy::Voice);
+        // A face, or an older eyes' value that names nothing; a voice, a
+        // touch or the view changing (#5746) is no face seen.
+        let face = !matches!(by, Some(SeenBy::Voice | SeenBy::Touch | SeenBy::Moved));
         match (open, someone) {
             (false, true) => self.spells.push_back((at_us, None, face)),
             (true, true) => {

@@ -23,9 +23,9 @@ light = true
 [trigger]
 topic = "room/presence"
 field = "nobody_s"
-above = 599               # nobody for ten minutes: faces and voices miss a person reading face down, so longer than V1's 5-minute dim
+above = 2399              # nobody for forty minutes (#5746): a reader the eyes can't find sits 30 min and more; a touch, a pet or a word counts as someone too
 rearm = "ends"            # once each time nobody is there; again only after someone came back
-wait = "1h"               # the lamp speaking when the ten minutes come (a reminder into an empty room): it goes out once that ends
+wait = "1h"               # the lamp speaking when the forty minutes come (a reminder into an empty room): it dims once that ends
 
 [[while]]                 # never in the middle of a turn
 topic = "voice/state"
@@ -46,7 +46,15 @@ to = "06:00"
 policy = "light"
 
 [[do]]
-# Out over 30 s, like falling asleep: to the ring's ember, never dark, which
-# still shows the lamp can hear. Given back the moment someone is seen or
-# heard, or when the eyes stop looking.
-light = { out = true, over = "30s", until = "ends" }
+# First a dim, two steps, held five minutes (#5746): a soft cue to anyone
+# still there. Any sign of someone in those five minutes, a face, a word, a
+# touch or a pet, or the view changing (the eyes watch for movement only
+# while this dim shows, docs/presence.md), ends the skill and the light is
+# given back at once; so does the eyes stopping looking.
+light = { dim = 2, for = "5m", until = "ends" }
+
+[[do]]
+# Then out over a minute, like falling asleep: to the ring's ember, never
+# dark, which still shows the lamp can hear. Given back the moment someone
+# is seen, heard or touches it, or when the eyes stop looking.
+light = { out = true, over = "60s", until = "ends" }

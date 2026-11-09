@@ -3,8 +3,11 @@
 //! heard within [`RoomPresence::SOMEONE_WITHIN_S`], or nobody, and for how
 //! long. The eyes own it because they own the larger part of the evidence,
 //! the faces; the voice's lines come to them on `voice/heard`, as they do
-//! for the mouth (`mesh::Heard`). Pure arithmetic on the times it is given:
-//! the bus is `bus_out`'s.
+//! for the mouth (`mesh::Heard`). A touch on the lamp or a pet on its head
+//! (`controls/touch`, `controls/pet`) is someone too, as a voice is (#5746),
+//! and so, only while light-out's dim shows, is the view changing
+//! (`change::ViewInDim`). Pure arithmetic on the times it is given: the bus
+//! is `bus_out`'s.
 //!
 //! Nothing is said while the eyes are not looking (the camera closed by the
 //! privacy switch, a mute or the voice gone, or stalled): nobody can be said
@@ -219,6 +222,20 @@ impl Away {
         self.seen(at_us, SeenBy::Voice);
     }
 
+    /// A touch on the lamp or a pet on its head at `at_us` (#5746): a hand
+    /// is someone, as a voice is, and like one is counted only while the
+    /// eyes look (a mute, the privacy switch: nothing).
+    pub fn touched(&mut self, at_us: u64) {
+        self.seen(at_us, SeenBy::Touch);
+    }
+
+    /// The view changed at `at_us`, while light-out's dim showed (#5746:
+    /// a reader the eyes can't find turning a page). The caller says it only
+    /// then ([`crate::change::ViewInDim`]).
+    pub fn moved(&mut self, at_us: u64) {
+        self.seen(at_us, SeenBy::Moved);
+    }
+
     fn seen(&mut self, at_us: u64, by: SeenBy) {
         if self.someone_at_us.is_none_or(|at| at_us >= at) {
             self.someone_at_us = Some(at_us);
@@ -226,8 +243,8 @@ impl Away {
         }
     }
 
-    /// Why someone is there, for the journal: a face and how tall, or a
-    /// voice. Counts only, no words.
+    /// Why someone is there, for the journal: a face and how tall, a voice,
+    /// a touch or the view changing in the dim. Counts only, no words.
     pub fn cause(&self) -> String {
         match self.by {
             Some(SeenBy::Face) => format!(
@@ -235,6 +252,8 @@ impl Away {
                 self.face_tall.unwrap_or(0.0)
             ),
             Some(SeenBy::Voice) => "voice".into(),
+            Some(SeenBy::Touch) => "touch".into(),
+            Some(SeenBy::Moved) => "the view changed in light-out's dim".into(),
             None => "nothing".into(),
         }
     }
@@ -598,6 +617,43 @@ mod tests {
             at += S / 2;
         }
         assert_eq!(low.now(240 * S), present(true, 0), "slid sideways");
+    }
+
+    /// #5746: a touch or a pet is someone, as a voice is, and the count of
+    /// nobody starts again from it; while the eyes are shut (a mute, the
+    /// privacy switch) it is nothing, and not counted once they look again.
+    #[test]
+    fn a_touch_is_someone_and_starts_nobody_again_but_not_while_the_eyes_are_shut() {
+        let mut away = Away::default();
+        looks(&mut away, 0, 2_000, false);
+        assert_eq!(away.now(2_000 * S), present(false, 2_000));
+        away.touched(2_000 * S);
+        looks(&mut away, 2_000, 2_010, false);
+        let touched = away.now(2_010 * S).unwrap();
+        assert_eq!((touched.someone, touched.by), (true, Some(SeenBy::Touch)));
+        assert_eq!(away.cause(), "touch");
+        looks(&mut away, 2_010, 2_060, false);
+        assert_eq!(
+            away.now(2_060 * S),
+            present(false, 60),
+            "counted from the touch"
+        );
+        // Shut: a touch then says nothing, and is not someone once they look.
+        away.touched(2_100 * S);
+        assert_eq!(away.now(2_100 * S), None);
+        looks(&mut away, 2_106, 2_110, false);
+        assert_eq!(away.now(2_110 * S), present(false, 4));
+    }
+
+    /// #5746: the view changing in the dim is someone, by `moved`.
+    #[test]
+    fn the_view_changing_is_someone_by_moved() {
+        let mut away = Away::default();
+        looks(&mut away, 0, 2_500, false);
+        away.moved(2_500 * S);
+        looks(&mut away, 2_500, 2_501, false);
+        let moved = away.now(2_501 * S).unwrap();
+        assert_eq!((moved.someone, moved.by), (true, Some(SeenBy::Moved)));
     }
 
     #[test]

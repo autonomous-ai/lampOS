@@ -13,17 +13,24 @@
 //! list is left to run out.
 //!
 //! With `LAMP_PRESENCE=on` as well (#1677), whether anyone is at the lamp,
-//! on `room/presence` ([`crate::away`]): the faces of each look and the
-//! voice's lines on `voice/heard`, said once a second while the eyes look.
+//! on `room/presence` ([`crate::away`]): the faces of each look, the
+//! voice's lines on `voice/heard`, a touch or a pet (`controls/touch`,
+//! `controls/pet`, #5746) and, only while light-out's dim shows on the ring
+//! (`light/reached`, `light/drawn`), the view changing
+//! ([`crate::change::ViewInDim`]), said once a second while the eyes look.
 use crate::{
     activity::{Judge, Look},
     away::{Away, Seen},
-    faces, facing, speaking,
+    change::{Busy, ViewInDim},
+    faces, facing,
+    picture::Picture,
+    speaking,
 };
 use lamp_bus::{Bus, Publisher, Subscriber};
 use lamp_msgs::{
-    CameraClosed, Diagnostic, Face, Faces, FamiliarLevel, HumanFamiliar, HumanSeems, Level,
-    RoomActivity, RoomPresence, Speech, StoodUp, TurnVerdict, VoiceTurn,
+    CameraClosed, Diagnostic, Face, Faces, FamiliarLevel, HeadPet, HumanFamiliar, HumanSeems,
+    Level, Light, LightReached, RoomActivity, RoomPresence, Speech, StoodUp, TouchEvent,
+    TurnVerdict, VoiceTurn,
 };
 use serde::Serialize;
 use std::{io, time::Duration};
@@ -428,6 +435,21 @@ struct Presence {
     away: Away,
     /// Whether the last value said someone, for the journal's line.
     said_someone: bool,
+    /// A touch and a pet (#5746), and the ring's `light/reached` and
+    /// `light/drawn`, which say when light-out's dim shows: each is left
+    /// out, and said once, if it can't be subscribed to.
+    touch: Option<Subscriber>,
+    pet: Option<Subscriber>,
+    reached: Option<Subscriber>,
+    drawn: Option<Subscriber>,
+    view: ViewInDim,
+}
+
+/// `topic` subscribed to for presence, or none, said in the journal.
+fn presence_input(bus: &Bus, topic: &str, type_name: &str) -> Option<Subscriber> {
+    bus.subscribe_typed(topic, "eyes_presence", type_name)
+        .map_err(|error| eprintln!("lamp-eyes: {topic} is not taken for presence: {error}"))
+        .ok()
 }
 
 impl BusOut {
@@ -630,6 +652,11 @@ impl BusOut {
             addressed,
             away: Away::default(),
             said_someone: false,
+            touch: presence_input(bus, TouchEvent::TOPIC, TouchEvent::TYPE),
+            pet: presence_input(bus, HeadPet::TOPIC, HeadPet::TYPE),
+            reached: presence_input(bus, LightReached::TOPIC, LightReached::TYPE),
+            drawn: presence_input(bus, "light/drawn", Light::TYPE),
+            view: ViewInDim::default(),
         });
         Ok(())
     }
@@ -742,6 +769,18 @@ impl BusOut {
         }
     }
 
+    /// A glance's picture, before it is looked at, with why the room is
+    /// not empty if it is not (`change::busy`): with presence said, while
+    /// light-out's dim shows, the view changing is someone (#5746). Only
+    /// the yes leaves, as `room/presence`'s `by = "moved"`.
+    pub fn glanced(&mut self, picture: &Picture, busy: Option<Busy>, now_us: u64) {
+        if let Some(presence) = self.presence.as_mut()
+            && presence.view.glanced(picture, busy, now_us)
+        {
+            presence.away.moved(now_us);
+        }
+    }
+
     /// The passing id the last look gave the face at `index` of what the
     /// detector found, only while speaking is judged: the eyes' `known-face`
     /// file names it beside the known person's name, so the voice can tell
@@ -809,6 +848,47 @@ impl BusOut {
                         .is_ok_and(|turn| turn.verdict == TurnVerdict::Answered);
                 if counts {
                     presence.away.heard(line.header.at_us.min(now_us));
+                }
+            }
+            // A touch or a pet is someone, as a voice is (#5746); one with
+            // its pads turned off is not said to the eyes as a hand.
+            let mut touched =
+                |subscriber: &mut Option<Subscriber>,
+                 enabled: &dyn Fn(&lamp_bus::Message) -> bool| {
+                    while let Some(Ok(Some(message))) =
+                        subscriber.as_mut().map(|touch| touch.recv(Duration::ZERO))
+                    {
+                        if enabled(&message) {
+                            presence.away.touched(message.header.at_us.min(now_us));
+                        }
+                    }
+                };
+            touched(&mut presence.touch, &|message| {
+                message
+                    .parse::<TouchEvent>()
+                    .is_ok_and(|touch| touch.enabled)
+            });
+            touched(&mut presence.pet, &|message| {
+                message.parse::<HeadPet>().is_ok_and(|pet| pet.enabled)
+            });
+            while let Some(Ok(Some(message))) = presence
+                .reached
+                .as_mut()
+                .map(|reached| reached.recv(Duration::ZERO))
+            {
+                if let Ok(reached) = message.parse::<LightReached>() {
+                    presence
+                        .view
+                        .reached(&reached.source, &reached.light, message.header.at_us);
+                }
+            }
+            while let Some(Ok(Some(message))) = presence
+                .drawn
+                .as_mut()
+                .map(|drawn| drawn.recv(Duration::ZERO))
+            {
+                if let Ok(light) = message.parse::<Light>() {
+                    presence.view.drawn(light);
                 }
             }
             let before = presence.said_someone;
@@ -1324,6 +1404,186 @@ mod tests {
             "{said:?}"
         );
         assert_eq!(said.len(), before_voice + 6, "{said:?}");
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// #5746: a touch on the lamp, or a pet on its head, is someone on
+    /// `room/presence`, and the count of nobody starts again from it; one
+    /// with the pads turned off is nothing.
+    #[test]
+    fn a_touch_or_a_pet_is_someone_and_starts_nobody_again() {
+        // Named in full, so this test also builds against the eyes before #5746 (its fail-first run).
+        use lamp_msgs::{ClockStamp, HeadPet, TouchEvent, TouchGesture, TouchIntent, TouchSource};
+        let root = std::path::PathBuf::from(format!("/tmp/lpt-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut hears = bus
+            .subscribe_typed(RoomPresence::TOPIC, "test", RoomPresence::TYPE)
+            .unwrap();
+        let mut touches = bus
+            .publisher_declared(TouchEvent::TOPIC, &TouchEvent::declaration(), "controls")
+            .unwrap();
+        let mut pets = bus
+            .publisher_declared(HeadPet::TOPIC, &HeadPet::declaration(), "controls")
+            .unwrap();
+        let mut out = BusOut::on(&bus).unwrap();
+        out.say_presence_by(&bus, true).unwrap();
+        let s = 1_000_000u64;
+        let stamp = ClockStamp {
+            clock_id: "boot".into(),
+            at_us: 1,
+            sequence: 1,
+        };
+        let touch = |enabled: bool| TouchEvent {
+            stamp: stamp.clone(),
+            session_id: "controls".into(),
+            reader_session_id: "gpio".into(),
+            enabled,
+            source: TouchSource::Head,
+            name: "head".into(),
+            contact_id: 1,
+            gesture: TouchGesture::Touch,
+            when_speaking: TouchIntent::Stop,
+            when_quiet: TouchIntent::Notice,
+            when_asleep: None,
+            began_us: 1,
+            observed_us: 1,
+            released_us: None,
+            active_mask: 1,
+            active_names: vec!["pad37".into()],
+            position: None,
+            toward_pad: None,
+            distance: 0.0,
+            speed: 0.0,
+        };
+        let pet = HeadPet {
+            stamp: stamp.clone(),
+            session_id: "controls".into(),
+            reader_session_id: "gpio".into(),
+            enabled: true,
+            contact_id: 2,
+            began_us: 1,
+            petted_us: 1,
+            observed_us: 1,
+            swaps: 3,
+            swaps_per_second: 2.0,
+            resting: false,
+            ended: false,
+        };
+        let mut last = None;
+        let mut looks = |out: &mut BusOut, from: u64, to: u64, last: &mut Option<RoomPresence>| {
+            let mut at = from * s;
+            while at < to * s {
+                out.saw(&[], &[], PICTURE, at);
+                out.tick(at);
+                while let Some(message) = hears.recv(Duration::ZERO).unwrap() {
+                    *last = Some(message.parse::<RoomPresence>().unwrap());
+                }
+                at += s / 2;
+            }
+        };
+        looks(&mut out, 1, 100, &mut last);
+        assert_eq!(
+            last.map(|now| (now.someone, now.nobody_s)),
+            Some((false, 98))
+        );
+        // The pads turned off: no hand.
+        touches.publish_json(100 * s, &touch(false)).unwrap();
+        looks(&mut out, 100, 101, &mut last);
+        assert_eq!(last.map(|now| now.someone), Some(false), "{last:?}");
+        touches.publish_json(101 * s, &touch(true)).unwrap();
+        looks(&mut out, 101, 102, &mut last);
+        assert_eq!(last.map(|now| now.someone), Some(true), "a touch: {last:?}");
+        looks(&mut out, 102, 160, &mut last);
+        assert_eq!(
+            last.map(|now| (now.someone, now.nobody_s)),
+            Some((false, 58)),
+            "counted from the touch: {last:?}"
+        );
+        pets.publish_json(160 * s, &pet).unwrap();
+        looks(&mut out, 160, 161, &mut last);
+        assert_eq!(last.map(|now| now.someone), Some(true), "a pet: {last:?}");
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// #5746: the view changing is someone only while light-out's dim
+    /// shows on the ring, said on `light/reached` and `light/drawn`.
+    #[test]
+    fn the_view_changing_is_someone_only_in_light_outs_dim() {
+        let root = std::path::PathBuf::from(format!("/tmp/lpv-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut hears = bus
+            .subscribe_typed(RoomPresence::TOPIC, "test", RoomPresence::TYPE)
+            .unwrap();
+        let mut reached = bus
+            .publisher_declared(LightReached::TOPIC, &LightReached::declaration(), "ring")
+            .unwrap();
+        let mut drawn = bus
+            .publisher_declared("light/drawn", &Light::declaration(), "ring")
+            .unwrap();
+        let mut out = BusOut::on(&bus).unwrap();
+        out.say_presence_by(&bus, true).unwrap();
+        let s = 1_000_000u64;
+        // A plain wall, and a page (a bright box) on it.
+        let picture = |page: bool| {
+            let mut rgb = vec![120u8; 320 * 240 * 3];
+            if page {
+                for y in 60..140 {
+                    for x in 100..180 {
+                        rgb[(y * 320 + x) * 3..(y * 320 + x) * 3 + 3].fill(230);
+                    }
+                }
+            }
+            Picture::from_rgb(&rgb, 320, 240).unwrap()
+        };
+        let mut last = None;
+        let mut glance =
+            |out: &mut BusOut, at: u64, page: bool, last: &mut Option<RoomPresence>| {
+                out.glanced(&picture(page), None, at);
+                out.saw(&[], &[], PICTURE, at);
+                out.tick(at);
+                while let Some(message) = hears.recv(Duration::ZERO).unwrap() {
+                    *last = Some(message.parse::<RoomPresence>().unwrap());
+                }
+            };
+        for look in 0..20 {
+            glance(&mut out, s + look * s / 2, false, &mut last);
+        }
+        // Pages turned with no dim: nobody.
+        for look in 20..40 {
+            glance(&mut out, s + look * s / 2, look % 4 < 2, &mut last);
+        }
+        assert_eq!(last.map(|now| now.someone), Some(false), "no dim: {last:?}");
+        // Light-out's dim shows, and settles; a still room is nobody.
+        let dim = Light::new(true, "white", 2).unwrap();
+        let at = 21 * s;
+        drawn.publish_json(at, &dim).unwrap();
+        reached
+            .publish_json(
+                at,
+                &LightReached {
+                    source: "skill:light-out".into(),
+                    light: dim.clone(),
+                },
+            )
+            .unwrap();
+        for look in 0..10 {
+            glance(&mut out, at + look * s / 2, false, &mut last);
+        }
+        assert_eq!(
+            last.map(|now| now.someone),
+            Some(false),
+            "a still dim: {last:?}"
+        );
+        glance(&mut out, at + 5 * s, true, &mut last);
+        assert_eq!(
+            last.map(|now| (now.someone, now.by)),
+            Some((true, Some(lamp_msgs::SeenBy::Moved))),
+            "a page turned in the dim: {last:?}"
+        );
         std::fs::remove_dir_all(&root).unwrap();
     }
 

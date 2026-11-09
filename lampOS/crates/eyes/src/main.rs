@@ -2439,6 +2439,11 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 let _ = kept.keep(&working);
             }
             stage(&mut stage_at, &mut stages[0]);
+            // With presence said, whether the view changed while light-out's
+            // dim shows (#5746): only a yes leaves, as someone.
+            if let (Some(bus), Ok(picture)) = (bus_out.as_mut(), decoded.as_ref()) {
+                bus.glanced(picture, busy, lamp_ipc::monotonic_us());
+            }
             // Set when this look sends nothing (an answer's held face is gone).
             let mut quiet = false;
             let found = decoded.and_then(|picture| {

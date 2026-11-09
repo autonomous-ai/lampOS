@@ -546,6 +546,7 @@ mod tests {
         Call::Dim {
             steps,
             until_ends: false,
+            for_us: None,
         }
     }
 

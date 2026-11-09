@@ -2475,9 +2475,12 @@ pub enum Call {
     },
     /// Steps dimmer, to the actions part's `light_dimmer`; with
     /// `until_ends`, held until the trigger stops holding, then given back.
+    /// With `for_us` (#5746, light-out's five minutes of dim), the steps
+    /// after it wait that long, and are not made if the trigger ends first.
     Dim {
         steps: u8,
         until_ends: bool,
+        for_us: Option<u64>,
     },
     /// The light goes out (#1677): asked of the ring only
     /// (`LAMP_LIGHT_REQUESTS=on`) as the light shown, off, faded into over
@@ -2690,10 +2693,17 @@ impl Call {
             Self::Show { name, frames } => {
                 ("show", json!({ "show": name, "frames": frames.len() }))
             }
-            Self::Dim { steps, until_ends } => {
+            Self::Dim {
+                steps,
+                until_ends,
+                for_us,
+            } => {
                 let mut args = json!({ "dim": steps });
                 if *until_ends {
                     args["until"] = json!("ends");
+                }
+                if let Some(for_us) = for_us {
+                    args["for_ms"] = json!(for_us / 1_000);
                 }
                 ("light", args)
             }
@@ -4366,6 +4376,23 @@ fn manifest(
             })
             .count()
     };
+    // A dim held a while (#5746) times the steps after it, with nothing
+    // spoken whose own time would be another clock.
+    if steps.iter().any(|(_, step)| {
+        matches!(
+            step,
+            Step::Call(Call::Dim {
+                for_us: Some(_),
+                ..
+            })
+        )
+    }) && (says(None) > 0 || names.iter().any(|name| says(Some(name)) > 0))
+    {
+        return Err(
+            "a dim's for goes in a skill with no say or sound: the steps after it wait for it"
+                .into(),
+        );
+    }
     if says(None) > 1 || names.iter().any(|name| says(Some(name)) > 1) {
         return Err(
             "one say or sound a skill (or one for each trigger its steps name): its other steps are made, \
@@ -4959,9 +4986,18 @@ fn light_call(file: LightFile) -> Result<Call, String> {
             })
         }
         (None, Some(steps)) if (1..=4).contains(&steps) => {
-            if file.level.is_some() || file.lasting.is_some() {
-                return Err("dim takes no level and no for".into());
+            if file.level.is_some() {
+                return Err("dim takes no level".into());
             }
+            // A dim held a while before the steps after it (#5746): only
+            // held until its trigger ends, which can cut the while short.
+            if file.lasting.is_some() && !until_ends {
+                return Err(
+                    "a dim's for goes with until = \"ends\": the steps after it wait that long, unless the trigger ends first"
+                        .into(),
+                );
+            }
+            let for_us = file.lasting.as_deref().map(duration_us).transpose()?;
             if file.keep.is_some() {
                 return Err("keep goes with a colour: a dim is given back".into());
             }
@@ -4971,7 +5007,11 @@ fn light_call(file: LightFile) -> Result<Call, String> {
             if file.no_brighter.is_some() {
                 return Err("dim takes no no_brighter: a dim is never brighter".into());
             }
-            Ok(Call::Dim { steps, until_ends })
+            Ok(Call::Dim {
+                steps,
+                until_ends,
+                for_us,
+            })
         }
         _ => {
             Err("a light is a colour (with a level and a for), dim = 1 to 4, or out = true".into())
@@ -9015,15 +9055,49 @@ fn replay_skill(
     calls.sort_by_key(|(at, _, _)| *at);
     let mut calls = calls.into_iter().peekable();
     let mut made = Vec::new();
-    let keep = |made: &mut Vec<Made>, calls: Vec<Call>, at_us: u64| {
-        made.extend(
-            calls
-                .into_iter()
-                .filter(|call| *call != Call::AfterSay)
-                .map(|call| Made { at_us, call }),
-        );
+    // The steps after a dim held a while (#5746), made once it has been
+    // held that long, as the program makes them, unless its run ends first.
+    let mut later: Option<(u64, Vec<Call>)> = None;
+    let keep = |made: &mut Vec<Made>,
+                later: &mut Option<(u64, Vec<Call>)>,
+                calls: Vec<Call>,
+                at_us: u64| {
+        if calls.contains(&Call::Ends) {
+            *later = None;
+        }
+        let mut calls: Vec<Call> = calls
+            .into_iter()
+            .filter(|call| *call != Call::AfterSay)
+            .collect();
+        if let Some(at) = calls.iter().position(|call| {
+            matches!(
+                call,
+                Call::Dim {
+                    for_us: Some(_),
+                    ..
+                }
+            )
+        }) && let Call::Dim {
+            for_us: Some(for_us),
+            ..
+        } = calls[at]
+        {
+            *later = Some((at_us + for_us, calls.split_off(at + 1)));
+        }
+        made.extend(calls.into_iter().map(|call| Made { at_us, call }));
     };
-    let mut call_tools = |engine: &mut Engine, made: &mut Vec<Made>, until_us: Option<u64>| {
+    let due = |made: &mut Vec<Made>, later: &mut Option<(u64, Vec<Call>)>, now_us: u64| {
+        if let Some((at_us, _)) = later
+            && *at_us <= now_us
+            && let Some((at_us, calls)) = later.take()
+        {
+            made.extend(calls.into_iter().map(|call| Made { at_us, call }));
+        }
+    };
+    let mut call_tools = |engine: &mut Engine,
+                          made: &mut Vec<Made>,
+                          later: &mut Option<(u64, Vec<Call>)>,
+                          until_us: Option<u64>| {
         while let Some((at, name, args)) =
             calls.next_if(|(at, _, _)| until_us.is_none_or(|until| *at < until))
         {
@@ -9032,23 +9106,24 @@ fn replay_skill(
             if let Ok(run) = engine.tool(name, &args, first_us + at)
                 && stop.as_deref() != Some(name)
             {
-                keep(made, run.calls, at);
+                keep(made, later, run.calls, at);
             }
         }
     };
     for message in messages {
         let at_us = message.header.at_us;
+        due(&mut made, &mut later, at_us - first_us);
         // The clock told again at every message, as a live host tells it
         // (`clock_in_with_trust`), so a trigger's `during` window, which
         // needs a local time told within 2 minutes, is replayed over hours.
         if let Some(clock_ms) = clock_ms {
             engine.clock(0, at_us, clock_ms + (at_us - first_us) / 1_000);
         }
-        call_tools(&mut engine, &mut made, Some(at_us - first_us));
+        call_tools(&mut engine, &mut made, &mut later, Some(at_us - first_us));
         // Time passes as the messages come: a held run whose trigger topic
         // went silent ends at the first message of any topic after.
         for run in engine.tick(at_us) {
-            keep(&mut made, run.calls, at_us - first_us);
+            keep(&mut made, &mut later, run.calls, at_us - first_us);
         }
         for run in engine.observe(
             &message.header.topic,
@@ -9056,10 +9131,10 @@ fn replay_skill(
             &message.payload,
             message.header.expires_ms,
         ) {
-            keep(&mut made, run.calls, at_us - first_us);
+            keep(&mut made, &mut later, run.calls, at_us - first_us);
         }
     }
-    call_tools(&mut engine, &mut made, None);
+    call_tools(&mut engine, &mut made, &mut later, None);
     Ok(made)
 }
 
