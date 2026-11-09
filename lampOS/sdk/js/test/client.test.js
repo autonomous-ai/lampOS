@@ -1104,6 +1104,20 @@ test('a clip is uploaded in parts, played, listed and removed', async () => {
     assert.deepEqual(await lamp.sounds(), []);
     await assert.rejects(lamp.sound('chime'), /no clip named chime/);
     await assert.rejects(lamp.uploadSound('bad', Buffer.from('not a wav')), /not a WAV/);
+    // The lamp's loudness cap, in its words (sounds.rs `check_clip`; lamp-75c9
+    // refused a louder clip so, 9 Nov).
+    await assert.rejects(lamp.uploadSound('loud', wav(0.5, 1_100)), (error) => error.why === 'clip: louder than -30 dBFS RMS over 10 ms');
+    const click = wav(0.5, 0);
+    click.writeInt16LE(9_000, 44);
+    await assert.rejects(lamp.uploadSound('click', click), (error) => error.why === 'clip: a peak past -12 dBFS');
+    assert.deepEqual(await lamp.sounds(), []);
+    // A file shorter than its header says, by an odd or an even count of bytes: refused as sounds.rs's hound says,
+    // and the connection goes on (Reviewer-two's P2 on #5800).
+    for (const short of [1, 2]) {
+      const clip = wav(0.01, 0);
+      await assert.rejects(lamp.uploadSound('short', clip.subarray(0, clip.length - short)), (error) => error.why === 'clip: a WAV file cut short');
+      assert.deepEqual(await lamp.sounds(), []);
+    }
   });
 });
 

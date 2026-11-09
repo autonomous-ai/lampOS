@@ -95,17 +95,46 @@ function wavFrames(data) {
     const id = data.toString('ascii', at, at + 4);
     const size = data.readUInt32LE(at + 4);
     if (id === 'fmt ') format = { channels: data.readUInt16LE(at + 10), rate: data.readUInt32LE(at + 12), bits: data.readUInt16LE(at + 22) };
-    if (id === 'data') return format ? { format, frames: Math.floor(Math.min(size, data.length - at - 8) / 2) } : undefined;
+    // The frames the header says, as hound's `duration` does; `cutShort` when the file holds fewer bytes.
+    if (id === 'data') return format ? { format, frames: Math.floor(size / 2), at: at + 8, cutShort: data.length - at - 8 < size } : undefined;
     at += 8 + size + (size % 2);
   }
   return undefined;
 }
 
+// Why lamp-control would refuse this clip, in sounds.rs `check_clip`'s words and order: its format, its length,
+// a file shorter than its header says, then its loudness; undefined for one it keeps.
 function clipRefusal(data) {
   const read = wavFrames(data);
   if (read === undefined) return 'not a WAV file';
   if (read.format.channels !== 1 || read.format.bits !== 16 || read.format.rate !== 24_000) return 'not 16-bit mono PCM at 24000 Hz';
   if (read.frames < 1 || read.frames > 24_000 * 30) return 'not 1 to 720000 frames (30 s at most)';
+  // Fewer bytes than the header's frames (an odd or an even count short): hound's samples end early.
+  if (read.cutShort) return 'a WAV file cut short';
+  return clipLoudnessRefusal(data, read);
+}
+
+// The voice's loudness cap on a clip, as lamp-control's sounds.rs `check_clip`
+// holds it at upload: no sample past CLIP_PEAK_DBFS, and no 10 ms window
+// (CLIP_WINDOW frames, the last one shorter) louder than CLIP_LOUDEST_DBFS RMS.
+export const CLIP_PEAK_DBFS = -12;
+export const CLIP_LOUDEST_DBFS = -30;
+export const CLIP_WINDOW = 240;
+
+function clipLoudnessRefusal(data, read) {
+  const full = 32_767;
+  const sample = (i) => data.readInt16LE(read.at + 2 * i);
+  let peak = 0;
+  for (let i = 0; i < read.frames; i += 1) peak = Math.max(peak, Math.abs(sample(i)));
+  if (peak > full * 10 ** (CLIP_PEAK_DBFS / 20)) return `a peak past ${CLIP_PEAK_DBFS} dBFS`;
+  let loudest = 0;
+  for (let at = 0; at < read.frames; at += CLIP_WINDOW) {
+    const end = Math.min(at + CLIP_WINDOW, read.frames);
+    let power = 0;
+    for (let i = at; i < end; i += 1) power += sample(i) ** 2;
+    loudest = Math.max(loudest, Math.sqrt(power / (end - at)));
+  }
+  if (loudest > full * 10 ** (CLIP_LOUDEST_DBFS / 20)) return `louder than ${CLIP_LOUDEST_DBFS} dBFS RMS over 10 ms`;
   return undefined;
 }
 
