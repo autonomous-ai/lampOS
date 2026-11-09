@@ -3,13 +3,16 @@
 Status: the first builder accepted this topic and model direction on
 [19 October at 09:02](https://github.com/autonomous-ai/lampOS/issues/1669#issuecomment-6258073073).
 Third reviewed the typed contract on 19 October. A publisher now exists in
-Ears behind `LAMP_EARS_CLASSES=on`, off unless set and only with
+Ears behind `LAMP_EARS_CLASSES=on`, off unless set (on in the product unit since 9 Nov, #5748) and only with
 `LAMP_PRIVACY_CONTROLS=on`, or `no-slide` with a stored yes (see "The publisher behind LAMP_EARS_CLASSES"
 below). Third's privacy read of its two-second retention found no P1 or P2
 (19 October); its scores still need the empty-room and busy-room
-measurement, and the owner's word, before any unit sets it.
-No deployment unit changes; by default Ears publishes levels and sudden
-changes, not music or laughter.
+measurement, and the owner's word, before any unit sets it. The product's
+`lamp-ears.service` sets it since 9 Nov (the lead's ask on #5748), with
+`LAMP_EARS_CLASSES_MODEL=/opt/lampOS/ears/models/yamnet.onnx`; the model's
+files are not shipped yet (below), so a product lamp publishes `invalid_model`
+until they are. Without the switch Ears publishes levels and sudden changes,
+not music or laughter.
 
 ## Purpose and boundaries
 
@@ -176,10 +179,10 @@ upbeat track whose 60 s held under the bar too often. Each skill keeps one
 case made of that run's own scores.
 
 The first of them, the music sway (`skills/music-sway`, #2834), is installed
-off in the product (`install::PRODUCT_SKILLS_OFF`): the product's
-`lamp-ears.service` doesn't set `LAMP_EARS_CLASSES` until the weights'
-distribution review below (#5748) is read and released, so on a product lamp
-it would have nothing to read and never sway; it reads
+off in the product (`install::PRODUCT_SKILLS_OFF`) until its lamp row after a
+full update is seen. The product's `lamp-ears.service` sets
+`LAMP_EARS_CLASSES` since 9 Nov (#5748), with YAMNet's two files from our own
+conversion (below) in `models.json`. Music sway reads
 `scores.music` and does nothing without this topic. It never sways to the
 lamp's own music (#2833): a requested recording (#1757) plays while
 `voice/state` is `listening`, which its `resting` condition holds back, and
