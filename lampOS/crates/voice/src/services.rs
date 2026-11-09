@@ -368,8 +368,9 @@ mod kept {
     static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
     /// The newest requests a read answered in.
     static READ_IN: Mutex<VecDeque<u64>> = Mutex::new(VecDeque::new());
-    /// The newest requests' sends past the gate or refused, each with what
-    /// it was told once it was ([`super::send_state`]).
+    /// The newest send tries past the gate or refused, by the voice's
+    /// attempt id, each with what it was told once it was
+    /// ([`super::send_state`]).
     static SENT: Mutex<VecDeque<(u64, Option<Value>)>> = Mutex::new(VecDeque::new());
     pub fn pending<R>(f: impl FnOnce(&mut Option<Pending>) -> R) -> R {
         f(&mut PENDING
@@ -640,11 +641,12 @@ pub fn may_send(name: &str, args: &Value, request: u64) -> bool {
             }))
 }
 
-/// Where `request`'s send got to in [`run`], before any route's fence
-/// (#5853): a cut turn's lease is no longer current, so the route's own
-/// answer to it says only that nothing ran, though the service sent the
-/// write. Kept per request, the newest [`SENDS_KEPT`] requests', each its
-/// strongest try's ([`keep_send`]); `None` for a request whose send never
+/// Where one send try got to in [`run`], before any route's fence (#5853):
+/// a cut turn's lease is no longer current, so the route's own answer to
+/// it says only that nothing ran, though the service sent the write. Kept
+/// by the second route's own attempt id ([`ATTEMPT`]), so a receipt stays
+/// with the very call that made it (Second's HOLD on #5863: a request-wide
+/// receipt was given to a refused try); `None` for a try that never
 /// reached the gate.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SendState {
@@ -654,17 +656,34 @@ pub enum SendState {
     Told(Value),
 }
 
-/// How many requests' sends [`send_state`] keeps: an older request's slow
-/// send finishing never overwrites a newer one's (Second's trace on #5863).
-pub const SENDS_KEPT: usize = 8;
+/// The argument the second route marks a send try with: its attempt id,
+/// taken out in [`run`] before anything reads the call, so neither the
+/// gate nor `lamp-services` ever sees it.
+pub const ATTEMPT: &str = "lamp_send_attempt";
 
-/// [`SendState`] of `request`'s send.
-pub fn send_state(request: u64) -> Option<SendState> {
+/// How many tries' receipts [`send_state`] keeps: eight requests' batches
+/// at their most (`second_provider::net::MOST_CALLS`). Refusals go first,
+/// so a try that went or may have gone is let go last.
+pub const RECEIPTS_KEPT: usize = 8 * 64;
+
+/// [`SendState`] of the send try `attempt`.
+pub fn send_state(attempt: u64) -> Option<SendState> {
     kept::sent(|sent| {
         sent.iter()
-            .find(|(of, _)| *of == request)
+            .find(|(of, _)| *of == attempt)
             .map(|(_, told)| told.clone().map_or(SendState::Asked, SendState::Told))
     })
+}
+
+/// `call` without its [`ATTEMPT`], and that attempt id, if it had one.
+fn take_attempt(call: &ToolCall) -> (ToolCall, Option<u64>) {
+    let mut call = call.clone();
+    let attempt = call
+        .args
+        .as_object_mut()
+        .and_then(|args| args.remove(ATTEMPT))
+        .and_then(|attempt| attempt.as_u64());
+    (call, attempt)
 }
 
 /// How far a send got in [`run`], for [`keep_send`].
@@ -678,47 +697,50 @@ enum Got<'a> {
     Answered(&'a Value),
 }
 
-/// `request`'s send kept for [`send_state`], its strongest try's (Third's
-/// HOLD on #5863): a write sent beats any later try, a try past the gate
-/// beats a refusal, and a later try's refusal in the same request (the
-/// gate's "nothing waiting" for a write it already sent) never replaces
-/// either. A try's own answer replaces its asking.
-fn keep_send(request: u64, got: Got<'_>) {
+/// The send try `attempt` kept for [`send_state`]; a try with no attempt
+/// id (the Live route's) keeps nothing. A sent receipt is never undone.
+/// When full, the oldest refusal goes, else the oldest try.
+fn keep_send(attempt: Option<u64>, got: Got<'_>) {
+    let Some(attempt) = attempt else { return };
     kept::sent(|sent| {
-        let at = sent.iter().position(|(of, _)| *of == request);
-        let mine = at.map(|at| &sent[at].1);
-        let went = mine.is_some_and(|told| told.as_ref().is_some_and(|told| told["sent"] == true));
-        let passed = mine.is_some_and(Option::is_none);
-        let keep = match got {
-            Got::Refused(told) => (!went && !passed).then(|| Some(told.clone())),
-            Got::Asked => (!went).then_some(None),
-            Got::Answered(told) => (!went).then(|| Some(told.clone())),
+        let told = match got {
+            Got::Refused(told) | Got::Answered(told) => Some(told.clone()),
+            Got::Asked => None,
         };
-        let Some(told) = keep else { return };
-        if let Some(at) = at {
-            sent[at].1 = told;
+        if let Some(kept) = sent.iter_mut().find(|(of, _)| *of == attempt) {
+            if kept.1.as_ref().is_none_or(|told| told["sent"] != true) {
+                kept.1 = told;
+            }
             return;
         }
-        // A new request's: the oldest request's goes when full, never a
-        // newer one's for an older request's.
-        if sent.len() >= SENDS_KEPT {
-            let Some((oldest, _)) = sent.iter().enumerate().min_by_key(|(_, (of, _))| *of) else {
-                return;
-            };
-            if sent[oldest].0 > request {
-                return;
-            }
-            sent.remove(oldest);
+        if sent.len() >= RECEIPTS_KEPT {
+            let refused = sent
+                .iter()
+                .position(|(_, told)| told.as_ref().is_some_and(|told| told["sent"] != true));
+            sent.remove(refused.unwrap_or(0));
         }
-        sent.push_back((request, told));
+        sent.push_back((attempt, told));
     });
 }
 
-/// [`keep_send`], for a test standing in for [`run`]: answered `told`, or
-/// asked with `None`.
+/// [`keep_send`] for a test standing in for [`run`]: the try marked in
+/// `args`, answered `told`, or asked with `None`.
 #[cfg(test)]
-pub fn keep_send_for_test(request: u64, told: Option<&Value>) {
-    keep_send(request, told.map_or(Got::Asked, Got::Answered));
+pub fn keep_send_for_test(args: &Value, told: Option<&Value>) {
+    keep_send(
+        args.get(ATTEMPT).and_then(Value::as_u64),
+        told.map_or(Got::Asked, Got::Answered),
+    );
+}
+
+/// `args` without the second route's [`ATTEMPT`], as `lamp-services` gets
+/// them, for a test's own services.
+#[cfg(test)]
+pub fn without_attempt(mut args: Value) -> Value {
+    if let Some(args) = args.as_object_mut() {
+        args.remove(ATTEMPT);
+    }
+    args
 }
 
 /// Whether [`gate`] takes `call` as a send: one with the model's id, or
@@ -1153,6 +1175,9 @@ pub fn run(
     heard: bool,
     lease: Option<&crate::memory_scope::ScopeLease>,
 ) -> (Value, bool) {
+    // The second route's attempt id, never anyone else's to read (#5853).
+    let (call, attempt) = take_attempt(call);
+    let call = &call;
     let now = Instant::now();
     let private_room = crate::person::private_room();
     let owner = owner_of(lease);
@@ -1254,13 +1279,13 @@ pub fn run(
             // A refused send is kept as refused, so it is never told as
             // sent (#5853).
             if send_id {
-                keep_send(request, Got::Refused(&told));
+                keep_send(attempt, Got::Refused(&told));
             }
             return (told, true);
         }
     };
     if send_id {
-        keep_send(request, Got::Asked);
+        keep_send(attempt, Got::Asked);
     }
     let (mut told, answered) = ask(folder, &call, DEADLINE);
     if answered {
@@ -1272,7 +1297,7 @@ pub fn run(
             ask_owner(&mut told);
         }
         if send_id {
-            keep_send(request, Got::Answered(&told));
+            keep_send(attempt, Got::Answered(&told));
         }
         if call.name == READ && told.get("error").is_none() {
             read_answered(request);
@@ -2771,72 +2796,50 @@ mod tests {
         );
         kept::pending(|pending| *pending = None);
         assert_eq!(send_state(11), None, "never at the gate");
-        keep_send(11, Got::Asked);
+        keep_send(Some(11), Got::Asked);
         assert_eq!(send_state(11), Some(SendState::Asked));
-        keep_send(11, Got::Answered(&json!({"sent":true})));
+        keep_send(Some(11), Got::Answered(&json!({"sent":true})));
         assert_eq!(send_state(11), Some(SendState::Told(json!({"sent":true}))));
-        assert_eq!(send_state(12), None, "another request's");
-        keep_send(12, Got::Refused(&json!({"error": OTHER_VOICE})));
+        assert_eq!(send_state(12), None, "another try's");
+        keep_send(Some(12), Got::Refused(&json!({"error": OTHER_VOICE})));
         assert_eq!(
             send_state(12),
             Some(SendState::Told(json!({"error": OTHER_VOICE}))),
             "a refusal is kept as told"
         );
+        keep_send(None, Got::Asked);
+        let (bare, attempt) = take_attempt(&call(
+            WRITE,
+            json!({"send_id":"s1", "lamp_send_attempt": 7}),
+        ));
+        assert_eq!((bare.args, attempt), (json!({"send_id":"s1"}), Some(7)));
     }
 
-    /// Third's HOLD on #5863: a sent receipt followed in the same request by
-    /// the gate's refusal of a second try keeps `sent: true`; a try past the
-    /// gate is not hidden by a later refusal either, and its own answer
-    /// replaces its asking. Another request starts over.
+    /// Third's and Second's HOLDs on #5863: each try's receipt is its own,
+    /// so a refused try never takes another's success, nor undoes its own
+    /// sent one; when full, refusals go first, never a try that went.
     #[test]
-    fn a_later_refusal_in_the_same_request_never_hides_a_sent_write() {
+    fn each_send_tries_receipt_is_its_own_and_refusals_go_first() {
         let sent = json!({"sent": true});
         let nothing = json!({"error": NOTHING_WAITING});
-        keep_send(21, Got::Asked);
-        keep_send(21, Got::Answered(&sent));
-        keep_send(21, Got::Refused(&nothing));
-        keep_send(21, Got::Asked);
-        assert_eq!(send_state(21), Some(SendState::Told(sent.clone())));
-        keep_send(22, Got::Asked);
-        keep_send(22, Got::Refused(&nothing));
-        assert_eq!(send_state(22), Some(SendState::Asked), "past the gate");
-        keep_send(22, Got::Answered(&json!({"sent": false})));
-        assert_eq!(
-            send_state(22),
-            Some(SendState::Told(json!({"sent": false}))),
-            "its own answer"
-        );
-        keep_send(23, Got::Refused(&nothing));
-        keep_send(23, Got::Refused(&json!({"error": CANCELLED})));
-        assert_eq!(
-            send_state(23),
-            Some(SendState::Told(json!({"error": CANCELLED}))),
-            "refusals only: the latest"
-        );
-    }
-
-    /// Second's trace on #5863: an older request's slow send finishing
-    /// after a newer one's keeps both, each its own; a full store lets the
-    /// oldest request's go, and never takes in an older one over a newer.
-    #[test]
-    fn an_older_requests_send_never_overwrites_a_newer_ones() {
-        let sent = json!({"sent": true});
-        keep_send(30, Got::Asked);
-        keep_send(31, Got::Asked);
-        keep_send(31, Got::Answered(&sent));
-        keep_send(30, Got::Answered(&json!({"sent": false})));
-        assert_eq!(send_state(31), Some(SendState::Told(sent.clone())));
-        assert_eq!(
-            send_state(30),
-            Some(SendState::Told(json!({"sent": false})))
-        );
-        for request in 32..32 + SENDS_KEPT as u64 {
-            keep_send(request, Got::Asked);
+        keep_send(Some(1), Got::Asked);
+        keep_send(Some(1), Got::Answered(&sent));
+        keep_send(Some(1), Got::Refused(&nothing));
+        keep_send(Some(2), Got::Refused(&nothing));
+        assert_eq!(send_state(1), Some(SendState::Told(sent.clone())));
+        assert_eq!(send_state(2), Some(SendState::Told(nothing.clone())));
+        for attempt in 3..=RECEIPTS_KEPT as u64 {
+            keep_send(Some(attempt), Got::Refused(&nothing));
         }
-        assert_eq!(send_state(30), None, "the oldest request's let go");
-        let newest = 31 + SENDS_KEPT as u64;
-        keep_send(29, Got::Answered(&sent));
-        assert_eq!(send_state(29), None, "an older one is not taken in");
-        assert_eq!(send_state(newest), Some(SendState::Asked));
+        keep_send(Some(10_000), Got::Asked);
+        keep_send(Some(10_001), Got::Asked);
+        assert_eq!(
+            send_state(1),
+            Some(SendState::Told(sent)),
+            "the sent one stays"
+        );
+        assert_eq!(send_state(2), None, "the oldest refusal went");
+        assert_eq!(send_state(3), None);
+        assert_eq!(send_state(10_001), Some(SendState::Asked));
     }
 }

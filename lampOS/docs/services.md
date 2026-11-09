@@ -788,12 +788,14 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   lamp-9adf, 9 Nov). On the second route a send's call runs to its answer
   even when a newer line cuts the turn, and the line that answers those
   words again is given the send's call and where the services got to with
-  it (`send_state`, kept by request in `run` before any route's fence:
-  asked once past the gate, then told the service's answer or the gate's
-  refusal; kept per request, the newest 8 (`SENDS_KEPT`), so an older
-  request's slow send finishing later never overwrites a newer one's; within
-  a request the strongest try, so a later try's refusal never hides a write
-  sent), told the write was sent unless it was
+  it (`send_state`, kept in `run` before any route's fence by the second
+  route's own attempt id, which it adds to each send's arguments as
+  `lamp_send_attempt` and `run` takes out before the gate or
+  `lamp-services` sees them: asked once past the gate, then told the
+  service's answer or the gate's refusal. Each try's receipt is its own, so
+  a refused try never takes another's success, and an older request's slow
+  send finishing later never overwrites a newer one's; 512 kept
+  (`RECEIPTS_KEPT`), refusals let go first), told the write was sent unless it was
   refused, and runs no
   `service_write` in its turn
   ([second-voice.md](second-voice.md), `LAMP_JOIN_CUT_WORDS`'s carried
