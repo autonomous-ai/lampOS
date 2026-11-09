@@ -12,6 +12,7 @@ use crate::memory_scope::FaceCache;
 enum Lamp {
     Says(&'static str),
     Calls(&'static str, &'static str),
+    CallsWithStale(&'static str, &'static str),
 }
 
 impl Lamp {
@@ -19,7 +20,7 @@ impl Lamp {
     fn name(&self) -> &'static str {
         match self {
             Lamp::Says(_) => "",
-            Lamp::Calls(name, _) => name,
+            Lamp::Calls(name, _) | Lamp::CallsWithStale(name, _) => name,
         }
     }
 }
@@ -119,15 +120,16 @@ async fn run_full(
     for (who, _, lamp, _) in turns {
         match lamp {
             Lamp::Says(line) => chats.push_back(vec![text(line), Ok(ChatEvent::Done)]),
-            Lamp::Calls(name, line) => {
-                chats.push_back(vec![
-                    Ok(ChatEvent::ToolCalls(vec![call(
-                        "c1",
-                        name,
-                        json!({"name": who}),
-                    )])),
-                    Ok(ChatEvent::Done),
-                ]);
+            Lamp::Calls(name, line) | Lamp::CallsWithStale(name, line) => {
+                let mut calls = vec![call("c1", name, json!({"name": who}))];
+                if matches!(lamp, Lamp::CallsWithStale(_, _)) {
+                    calls.push(call(
+                        "stale",
+                        "set_timer",
+                        json!({"label": "old private context"}),
+                    ));
+                }
+                chats.push_back(vec![Ok(ChatEvent::ToolCalls(calls)), Ok(ChatEvent::Done)]);
                 chats.push_back(vec![text(line), Ok(ChatEvent::Done)]);
             }
         }
@@ -991,9 +993,20 @@ async fn a_forget_they_asked_for_just_before_runs_on_the_call() {
     ])
     .await;
     assert_eq!(ran.forgets, [(FACE.to_owned(), json!({"name": "A"}))]);
-    // Run, never held: the model was given the forget's own result.
-    let told = ran.asked[2].last().cloned().unwrap();
-    assert_eq!(told, Message::tool("c1", json!({"ok": true}).to_string()));
+    // Run, never held: its fixed outcome survives in the fresh request.
+    let next = &ran.asked[2];
+    assert_eq!(next.last(), Some(&Message::user("Yes.")));
+    let encoded = serde_json::to_value(next).unwrap();
+    let receipt = json!({"tool": FACE, "outcome": {"ok": true, "face_forgotten": true}});
+    assert!(
+        encoded[1]["content"]
+            .as_str()
+            .unwrap()
+            .contains(&receipt.to_string())
+    );
+    let clean = serde_json::to_string(next).unwrap();
+    assert!(!clean.contains("old private context"));
+    assert!(!clean.contains("tool_call_id"));
 
     let asked = (
         "A",
@@ -1480,26 +1493,31 @@ async fn a_face_forgets_partial_cleanup_reaches_the_next_model_request() {
     .await;
     assert_eq!(ran.calls, [(FACE.to_owned(), json!({"name": "A"}))]);
     assert_eq!(ran.asked.len(), 2);
-    let told = ran.asked[1].last().unwrap();
-    assert_eq!(
-        told,
-        &Message::tool(
-            "c1",
-            json!({
-                "ok": true,
-                "memory": crate::remember::FACE_MEMORY_PARTIAL,
-                "everything": false,
-                "room_memory_result": "kept",
-                "sound_consent_result": "uncertain",
-                "face_expression_consent_result": "cleared",
-            })
-            .to_string(),
-        ),
-    );
+    let next = &ran.asked[1];
+    assert_eq!(next.last(), Some(&Message::user("Forget my face.")));
+    let clean = serde_json::to_string(next).unwrap();
+    for canary in [
+        "internal-memory canary",
+        "old private context",
+        "tool_call_id",
+    ] {
+        assert!(!clean.contains(canary), "{clean}");
+    }
+    let receipt = json!({"tool": FACE, "outcome": {
+        "ok": true,
+        "face_forgotten": true,
+        "primary_memory_result": "forgotten",
+        "everything": false,
+        "room_memory_result": "kept",
+        "sound_consent_result": "uncertain",
+        "face_expression_consent_result": "cleared",
+    }});
+    let encoded = serde_json::to_value(next).unwrap();
     assert!(
-        !serde_json::to_string(told)
+        encoded[1]["content"]
+            .as_str()
             .unwrap()
-            .contains("internal-memory canary")
+            .contains(&receipt.to_string())
     );
 }
 
@@ -1664,4 +1682,79 @@ async fn a_doubted_keep_stays_without_the_eyes() {
         ran.calls,
         [(crate::remember::REMEMBER.to_owned(), json!({"name": "A"}))]
     );
+}
+
+/// An admitted face forget may also empty personal memory. Neither its
+/// next request nor later calls planned from the old context may reuse it.
+#[tokio::test]
+async fn face_forget_context_ordinary_discards_the_entire_next_request_and_batch() {
+    for result in [
+        json!({"ok": true, "memory": "forgotten too"}),
+        json!({"ok": true, "everything": false, "memory": "private result canary"}),
+        json!({"ok": false, "error": "private result canary"}),
+    ] {
+        let ran = run_seen_from_result(
+            &[(
+                "A",
+                "Forget my face, then set a timer.",
+                Lamp::CallsWithStale(FACE, "I will report only the confirmed outcome."),
+                0,
+            )],
+            None,
+            5_851_001,
+            result,
+        )
+        .await;
+        assert_eq!(ran.asked.len(), 2);
+        assert!(
+            serde_json::to_string(&ran.asked[0])
+                .unwrap()
+                .contains("old private context")
+        );
+        let clean = serde_json::to_string(&ran.asked[1]).unwrap();
+        assert!(!clean.contains("old private context"), "{clean}");
+        assert!(!clean.contains("private result canary"), "{clean}");
+        assert!(!clean.contains("tool_call_id"), "{clean}");
+        assert!(clean.contains("1 later calls"), "{clean}");
+        assert_eq!(ran.calls, [(FACE.to_owned(), json!({"name": "A"}))]);
+        assert_eq!(
+            ran.asked[1].last(),
+            Some(&Message::user("Forget my face, then set a timer."))
+        );
+    }
+}
+
+/// The same boundary applies before round one when a held face forget is
+/// admitted by the person's yes, including a missing or partial receipt.
+#[tokio::test]
+async fn face_forget_context_held_yes_discards_the_entire_next_request() {
+    for result in [
+        json!({"ok": true, "memory": "forgotten too"}),
+        json!({"ok": true, "everything": false, "memory": "private result canary"}),
+        json!({"error": "private result canary"}),
+    ] {
+        let ran = run_seen_from_result(
+            &[
+                ("A", "What do you know about me?", ASKS, 0),
+                (
+                    "A",
+                    "Yes.",
+                    Lamp::Says("I will report only the confirmed outcome."),
+                    5,
+                ),
+            ],
+            None,
+            5_851_101,
+            result,
+        )
+        .await;
+        assert_eq!(ran.calls, [(FACE.to_owned(), json!({"name": "A"}))]);
+        let clean = serde_json::to_string(ran.asked.last().unwrap()).unwrap();
+        assert!(!clean.contains("old private context"), "{clean}");
+        assert!(!clean.contains("private result canary"), "{clean}");
+        assert_eq!(
+            ran.asked.last().unwrap().last(),
+            Some(&Message::user("Yes."))
+        );
+    }
 }
