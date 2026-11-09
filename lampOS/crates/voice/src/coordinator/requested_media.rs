@@ -107,7 +107,9 @@ impl Reply {
         // Even unavailable preparation consumes this turn's single attempt.
         self.media.offered = true;
         self.media.binding = Some(offer.context.clone());
-        self.media.confirmation_retired_at_us = None;
+        // A retirement before the offer stays: it is this turn's confirmation,
+        // said with the call (#5764). Later provider audio clears it
+        // (`append_provider_audio`), so newer words must retire again.
         self.media.ticket = service.offer(offer);
         if self.media.ticket.is_some() {
             self.cloud.movable = false;
@@ -186,13 +188,28 @@ impl Reply {
         if !self.requested_audio_waiting() || !self.output_settled(pending) {
             return false;
         }
-        if !matches!(self.cloud.outcome, Some(RequestOutcome::Complete))
-            || !self.had_audio
-            || self.playback_gaps != 0
-            || self.media.confirmation_retired_at_us.is_none()
-        {
-            // A failed, empty or gapped confirmation ends the offer. Dropping
-            // the ticket releases the grant without I/O on this loop.
+        let ended = [
+            (
+                !matches!(self.cloud.outcome, Some(RequestOutcome::Complete)),
+                "the confirmation failed",
+            ),
+            (!self.had_audio, "the confirmation was empty"),
+            (self.playback_gaps != 0, "the confirmation had a gap"),
+            (
+                self.media.confirmation_retired_at_us.is_none(),
+                "the confirmation never retired",
+            ),
+        ]
+        .into_iter()
+        .find_map(|(ended, why)| ended.then_some(why));
+        if let Some(why) = ended {
+            // A failed, empty or gapped confirmation ends the offer, said once
+            // (#5764: it ended with nothing to say why). Dropping the ticket
+            // releases the grant without I/O on this loop.
+            eprintln!(
+                "lamp-voice: request {}: requested audio cancelled: {why}",
+                self.owner.turn()
+            );
             self.media.ticket = None;
             return false;
         }
