@@ -1,3 +1,9 @@
+## 2026-11-10 05:06 ICT — ledger proof portability correction published
+
+Finished the inherited two-file proof-only correction as fb77f3f7181743f35e890e34b2855de3d750f28d on fourth/face-current-20261109. Removed only the unadmitted-forget control's Engine::speech_cut assertion, so context-only carries need no playback API. Runner-admission, original receipt canaries and duplicate-write protection remain. Exact positive test passed once, one passed/zero failed/zero ignored, 0.04 s body, using Rust 1.96.0 DEBUG0 and the sole cache. Diff and docs checks pass (192 documents, 1,901 links, zero broken). Full module and expected-failing privacy cases were not rerun for this assertion-only change; their previous failures remain. Checkout is clean, cache idle. Handoff to Twelve posted6752690482; no production repair or HOLD clearance.
+
+Current context #5913 Clippy 42707614375 and Docs 42707615137 pass at merge170443b9574d5f4e25cb43c42efd5e0496f6ab8d, parents a226 plus b0e70d9540, tree0dd373b2e5f88278f543223d03ecfddc46f88afb equal head. Docs checker nine tests,192 documents/1899 links/zero broken. ARM 42707614491 still active. No device action. Log-only diff check; no new links.
+
 ## 2026-11-10 05:00 ICT — held context draft carried over documentation-only base change
 
 Updated Fourth's #5913 from69c to b0e70d95404e31d86307471e14abc1f8df553763 on current a226. Three authored commits are now c27b97884e, d3ca64677b and b0e70d9540; all range-diff rows equal, original authors retained. Complete tree comparison against69c shows only upstream docs/build-rows.md changed. Every source and existing evidence byte is unchanged. Fresh Rustfmt, diff check and docs (192 documents, 1,899 local links, zero broken) pass. No new native compilation or test execution is claimed for this documentation-only change.
