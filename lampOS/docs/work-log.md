@@ -8676,3 +8676,18 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - `cargo test -q -p lamp-voice --lib action_claim`: 43 passed, including both
   new declined-round cases and worded variants. Diff check clean; checkout
   clean. No full voice-suite, independent fail-first or device run claimed.
+
+## 2026-11-09 — Second: send read-back echo review
+
+- READ-OK #5851 `34509dd5bfaaad0fa799ab36b9fb2de47b17f151`, one send-gate
+  read. Traced Start, queued Transcript, direct echo notification and worker
+  thread counting: both test orders are reachable. Existing owner, voice,
+  read-back, previous-turn and time bounds remain; distinct/explicit cuts
+  are not cleared by an echo. No concrete P1/P2 found.
+- `cargo test -q -p lamp-voice --lib services`: 76 passed in 2.07 s; diff
+  check and checkout clean. P3 integration coverage for delayed transcript
+  consumption/stale-scope suppression and an intervening real line. No full
+  voice or lamp rerun; second read and actual lamp row remain separate.
+- #5850 READ-OK restated at `a6a77fa2685c544a3ef7b67cae58e798ed44f22d`
+  after the exact wording/row-grouping delta. Guide 7 checks pass in 0.03 s;
+  reconnect in-review wording restored, P3 addressed.
