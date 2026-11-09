@@ -1428,6 +1428,8 @@ struct Shared {
     )>,
     /// Audio packets sent by this process.
     sequence: AtomicU64,
+    /// Latest admitted speech cut, independent of the credited output queue.
+    speech_cut: Mutex<Option<crate::speech_cut::ProviderCut>>,
     out: mpsc::Sender<speech_generation::Output>,
     /// One current request's speech fence, shared with fixed preludes and cues
     /// that may precede its model answer. Older retired requests cannot replace it.
@@ -4176,6 +4178,7 @@ impl Engine {
                 said_until_us: AtomicU64::new(0),
                 said: Mutex::new((0, Vec::new(), crate::not_speech::CallsLeftOut::new())),
                 sequence: AtomicU64::new(0),
+                speech_cut: Mutex::new(None),
                 out,
                 speech_generation: Mutex::new(None),
                 heed: None,
@@ -6924,6 +6927,15 @@ impl Engine {
     }
 
     /// A new turn replaces any older one. False for a retired request.
+    /// The latest admitted cut is a bounded priority register, not audio output.
+    pub(crate) fn speech_cut(&self) -> Option<crate::speech_cut::ProviderCut> {
+        *self
+            .shared
+            .speech_cut
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+    }
+
     fn begin(&mut self, request: u64, session: u64) -> bool {
         if request <= self.retired_through {
             return false;
@@ -16235,6 +16247,20 @@ impl Queue<'_> {
     /// The request continues, but none of its old pending speech may continue.
     fn forget(&mut self) {
         self.generation.borrow().invalidate();
+        let cut = crate::speech_cut::ProviderCut {
+            request: self.request,
+            through: self.shared.sequence.load(Ordering::Relaxed),
+            admitted_at_us: monotonic_us(),
+        };
+        let mut latest = self
+            .shared
+            .speech_cut
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if latest.as_ref().is_none_or(|old| old.request <= cut.request) {
+            *latest = Some(cut);
+        }
+        drop(latest);
         self.generation
             .send_replace(speech_generation::Generation::default());
         self.speech.abort_all();

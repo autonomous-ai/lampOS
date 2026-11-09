@@ -562,6 +562,8 @@ fn controls(
             Control::StartCapture
             | Control::ConnectReference { .. }
             | Control::ProviderOutputCapacity { .. }
+            | Control::ProviderSpeechCutApplied { .. }
+            | Control::CutSpeech { .. }
             | Control::NameGrant { .. } => {
                 return Err(io::Error::other("invalid ring control command"));
             }

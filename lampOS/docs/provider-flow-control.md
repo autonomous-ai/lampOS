@@ -130,3 +130,49 @@ A subsequent integration of Agent 2 through `3eaa0365a` is recorded in
 [voice evaluation integration](voice-eval-integration-20261011.md). Its source
 identity and gates supersede this 696-test checkpoint without changing the
 provider flow-control protocol.
+
+## Admitted-forget fence over priority control (device validation pending)
+
+The downstream forget extension uses control independently of credited output:
+`WorkerEvent::ProviderSpeechCut` carries the current request, inclusive old
+provider `Audio.sequence` watermark and monotonic admission time. A saturated
+PCM queue must not prevent this fence from reaching the coordinator. These are
+sequence watermarks, not packet-credit counters or new interaction authority.
+The coordinator validates the current request, removes old reply PCM, and
+continues counting/discarding late old packets so capacity accounting remains
+cumulative across the cut. Cancelling unsent output consumes no packet credit.
+
+`Control::CutSpeech` names the existing turn owner and the inclusive old
+speaker-chunk watermark, a different sequence space from provider audio. Fresh
+speaker chunks wait for matching `WorkerEvent::SpeechCutApplied`, emitted only
+after the speaker's checked physical stop/reset. Only then does
+`Control::ProviderSpeechCutApplied` release the provider continuation. The local
+acknowledgment budget is 250 ms; failure/timeout cannot authorize continuation
+through an unconfirmed cut. No extra cloud round or new playback permission is
+introduced. Accepted-write receipts stay true; discard does not report old
+speech as drained or retired. Duplicate and stale-owner controls must not stop
+fresh audio. Existing authority renewal and capture remain independent.
+
+These private variants require coordinator and workers from the same voice
+release. Supported updates install immutable hash-named release directories;
+Linux `current_exe()` resolves the parent's running release for its children.
+This is not a negotiated cross-version protocol or executable-descriptor pin.
+No independently updated worker or manual executable replacement is supported.
+
+The provider-only baseline was 30,040 ms emitted/unplayed under host saturation
+and 130 ms in a draining control, with simulated speaker retirement. Mac
+formatting and strict `lamp-voice`/`lamp-audio` all-target clippy pass. Focused
+Mac tests pass 30 cases: speech_cut 12, forget_tail 6, forget_speech 9 and
+music_scope 3. The forget_tail filter covers baseline measurements and
+coordinator cut controls. Matched host simulations at `38654f37c` reduce old audio across five
+buckets from 30,040 ms saturated and 130 ms draining to zero. Actual Engine
+admission to modelled drop/ACK is 1,788/1,946 us saturated and 1,656/1,786 us
+draining. Speaker cut/ACK is scripted simulation (`acoustic=false`), not a
+hardware measurement or worst-case bound. The workspace build is still running;
+no pass is claimed. Linux speaker-helper and actual speaker-loop tests have not run;
+acoustic acceptance remains pending. See [second voice](second-voice.md) for
+exact reproduction commands and the remaining device plan.
+A reset acknowledgment measures a local control boundary, not last audible
+speech. The device goal is at most one second from admitted forget to old words
+stopping; a same-request scene without actual old pending speech is
+NOT EXERCISED. No new performance or acoustic result is claimed here.

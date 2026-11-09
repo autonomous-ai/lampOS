@@ -398,6 +398,12 @@ impl Speaker {
         self.clock_started
     }
 
+    /// The installed snapshot, for checking a same-owner cut. This observation
+    /// grants no permission; callers must check its owner, privacy and freshness.
+    pub fn authority(&self) -> Option<Snapshot> {
+        self.guard.state()
+    }
+
     /// Whether the authority installed here has lapsed now: the worker was
     /// held up past its lease and nothing fresher has been installed since.
     /// None installed yet is not a lapse.
