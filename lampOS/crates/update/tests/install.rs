@@ -2351,28 +2351,6 @@ fn the_product_refences_a_ledger_ahead_of_its_store() {
     );
 }
 
-/// Music to relax (#1685, #5749): a spoken request may play a skill's
-/// checked local recording only with `LAMP_REQUESTED_AUDIO=on` in all three
-/// parts that read it, so the product sets it in each.
-#[test]
-fn the_product_plays_requested_audio_in_voice_skills_and_actions() {
-    for name in [
-        "lamp-voice.service",
-        "lamp-skills.service",
-        "lamp-actions.service",
-    ] {
-        let unit = install::PRODUCT
-            .iter()
-            .find(|(unit, _)| *unit == name)
-            .unwrap()
-            .1;
-        assert!(
-            section(unit, "Service").contains(&"Environment=LAMP_REQUESTED_AUDIO=on"),
-            "{name} lacks LAMP_REQUESTED_AUDIO=on"
-        );
-    }
-}
-
 /// #2860: the product sees who speaks, the eyes reading each face's speaking
 /// and the voice reading it, so a full update gives one lamp what the
 /// real-face run had.

@@ -356,11 +356,6 @@ Environment=LAMP_SKILLS_DIR=/run/lampos-skills
 # installed skills no longer push the lamp's own past the chat route's 48 (lamp-9adf, 6 Nov, on 10441: the_time,
 # reports_state and fetch_page left out). Who was here and Guard mode answered through it there by drop-in (#1685).
 Environment=LAMP_USE_SKILL=on
-# Music to relax (#1685, #5749): a spoken request for a skill's checked local recording plays it after the
-# confirmation; Stop, an interruption, the privacy slide or mute ends it, and nothing resumes (requested-audio.md).
-# The same line in lamp-voice, lamp-skills and lamp-actions; played on lamp-4ace on 6963 (#2793). Installing
-# the skill (relaxing-music, a Store skill) is separate: with none installed nothing plays.
-Environment=LAMP_REQUESTED_AUDIO=on
 # "Stop sending reports" and asking whether they're sent (#2862, reports_stop.rs): the voice can only
 # turn them off, never on.
 Environment=LAMP_REPORTS=on
