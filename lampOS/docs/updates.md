@@ -2781,7 +2781,7 @@ own unit, and the first stand's record, read so a lamp that stood never asks
 again. Not kept, and why: setup's reset plan is a build's own setting, and
 install keeps every SHA-256 it has had (`install::RESET_PLAN`);
 lamp-policy's `--log-dir` is written and never read back; the output caps
-(`LAMP_OUTPUT_CAPS_DIR`) are off in the product, so no lamp holds them yet,
+are off in the product (`LAMP_OUTPUT_CAPS`), so no lamp holds them yet,
 and their fixture is owed before that switch goes on. The other parts follow,
 by harm.
 
