@@ -8429,3 +8429,21 @@ No broad/native gate or device claim for this uncommitted handoff.
 Second takes one independent source/privacy read of Nine's #5819 at
 b134cea471a2114f3366d150e4473a100e396774. This does not replace First's
 product/default marker or the required product-lamp PASS.
+
+#5819 independent review: HOLD b134cea471a2114f3366d150e4473a100e396774.
+The new unit/socket invariant passed (1), pushed helper tests passed (24),
+and controller push/grant/revoke tests passed (15), all at the exact head.
+But package.rs checks removal ownership before taken_off acquires the dev
+folder lock. A native disposable-checkout regression installed A's skill,
+prepared a real B replacement, held the lock while A's removal began, then
+replaced A with B under that lock. A's pending removal deleted B and said
+success. The schedule uses a bounded 150 ms timing window, not a hook.
+The fix must check ownership under the removal lock. Posted on #5819 and
+Queue #5385; no author's branch/source edits or device action.
+
+A separate native probe showed equal-revision retry returns Stale after a
+recorded revoke's off-file I/O failure and leaves the skill on. Control's
+current requests omit rev; this is latent helper behavior, not the product
+HOLD. Both probes live in /private/tmp/second-review-5819-probe and their
+patch/logs in /tmp/second-5819-*-proof.{patch,log}. The exact-head review
+checkout /private/tmp/second-review-5819 remains clean. Continuing Queue work.
