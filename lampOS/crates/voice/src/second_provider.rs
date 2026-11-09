@@ -8342,6 +8342,14 @@ async fn spoken(
     if let Ok(mut last) = shared.heard_last.lock() {
         *last = Some((request, text.clone()));
     }
+    // A write waiting for its "send" counts this line with its request,
+    // before it is judged as the lamp's echo below (`Echo::Held`): only a
+    // line so counted is taken off as one (`crate::services`, #5846).
+    if text.chars().any(char::is_alphanumeric)
+        && let Ok(mut thread) = crate::thread::THREAD.lock()
+    {
+        thread.line_heard(request, std::time::Instant::now());
+    }
     if !shared
         .emit(ProviderOutput::Transcript {
             request: None,

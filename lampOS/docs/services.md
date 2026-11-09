@@ -789,12 +789,23 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   `Echo::Held`) is told through the thread (`Thread::own_echo_held` →
   `services::own_echo_held`, journal "the lamp's echo, not counted toward the
   waiting write"): `Pending.echoes` counts it, and the send checks the
-  person's lines, `lines` less `echoes`, so it doesn't matter whether the
-  thread hears of the line's start or of its echo first. On lamp-29e7 on 9
+  person's lines, so it doesn't matter whether the thread hears of the line's
+  start or of its echo first. Each line is counted twice over: by the thread,
+  with no request (`Thread::person` → `line_began(None)`, `lines`), and on the
+  second route with its request as its words are told (`Thread::line_heard`
+  → `line_began(Some(request))`, `heard`, the newest 8 ids kept). The
+  person's lines are the larger count less the echoes, and an echo is taken
+  off only for a request counted with its id, each once (the newest 8 kept):
+  a line the thread never counted (a piece joined to a line going on, or with
+  no letter or digit) takes no person's line off, so a person's line and the
+  send after an uncounted echo are still two, and cancelled. On lamp-29e7 on 9
   Nov the read-back's own "go ahead and send it", heard back, was counted as
   the first line, so the owner's "send" was the second: the write was
   dropped, prepared again, read back and echoed again, and the owner said
-  "send" five times. A cut the echo's start alone made (begun over the lamp's
+  "send" five times. The owner's own "Go ahead and send it." is the
+  read-back's tail word for word, so if `own_echo` ever holds a real reply as
+  the lamp's echo, that line goes unanswered and the owner says it again: that
+  was so before this rule too. A cut the echo's start alone made (begun over the lamp's
   voice, `voice_began` for that request, `Pending.cut_by`) is undone with
   it; a cut by the lamp's answer stopped, by another line, or by the thread's
   own timing (`began_in`) stays. Only a line after the one that prepared the

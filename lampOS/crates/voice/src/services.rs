@@ -33,6 +33,7 @@
 use lamp_gemini::{Tool, ToolCall};
 use serde_json::{Value, json};
 use std::{
+    collections::VecDeque,
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
@@ -337,13 +338,21 @@ pub struct Pending {
     /// ([`own_echo_held`]), the read-back is not cut after all. `None` when
     /// anything else cut it.
     pub cut_by: Option<u64>,
-    /// Lines begun since the write was prepared, echoes included.
+    /// Lines begun since the write was prepared, echoes included, as the
+    /// thread counts them, with no request ([`line_began`] with `None`):
+    /// never less an echo.
     pub lines: u32,
-    /// Lines held as the lamp's own echo since ([`own_echo_held`]), never a
-    /// person's: [`lines`](Self::lines) less these are the person's.
+    /// Lines begun since, told with their request ([`line_began`] with
+    /// `Some`), echoes included.
+    pub heard: u32,
+    /// The newest of those requests, at most [`IDS_KEPT`]: only one of them
+    /// is taken off as an echo.
+    pub heard_ids: VecDeque<u64>,
+    /// Lines of [`heard_ids`](Self::heard_ids) held as the lamp's own echo
+    /// since ([`own_echo_held`]), never a person's ([`person_lines`]).
     pub echoes: u32,
-    /// The latest request held as the lamp's echo, so none counts twice.
-    pub echoed: Option<u64>,
+    /// Their requests, at most [`IDS_KEPT`], so none counts twice.
+    pub echoed: VecDeque<u64>,
     /// The one later request the lamp spoke in since.
     pub other: Option<u64>,
     /// The request whose "send" had no voice print, in which the lamp asked
@@ -372,8 +381,10 @@ impl Pending {
             cut: false,
             cut_by: None,
             lines: 0,
+            heard: 0,
+            heard_ids: VecDeque::new(),
             echoes: 0,
-            echoed: None,
+            echoed: VecDeque::new(),
             other: None,
             asked_again: None,
             began_clear: false,
@@ -487,17 +498,43 @@ pub fn lamp_cut(request: u64) {
     });
 }
 
-/// A person's line began (`thread::Thread::person`, both routes).
-pub fn line_began(now: Instant) {
-    kept::pending(|pending| began_in(pending, now));
+/// How many line requests a waiting write keeps, begun and held as echoes.
+const IDS_KEPT: usize = 8;
+
+/// A person's line began. With no `request` (`thread::Thread::person`, both
+/// routes: the thread hears no request with a person's words), counted and
+/// never taken off as an echo; with its `request` (`Thread::line_heard`, the
+/// second route, as each line's words are told), counted apart, and only such
+/// a line is taken off when held as the lamp's echo ([`own_echo_held`]).
+pub fn line_began(request: Option<u64>, now: Instant) {
+    kept::pending(|pending| match request {
+        Some(request) => line_heard_in(pending, request),
+        None => began_in(pending, now),
+    });
 }
 
-/// [`line_began`] on `pending`: the person's first line after the write
-/// was prepared may send it, if it began once the read-back could have been
-/// said whole (each word [`WORD_TAKES`] at least); one said over it, or
-/// before any of it, marks it cut. A line held as the lamp's own echo
-/// ([`own_echo_held`]) is not the person's, whichever is told first, so a
-/// second line is not dropped here: [`gate`] cancels a send after a second
+/// [`line_began`] with `request` on `pending`: a line after the one that
+/// prepared the write (or asked once more), each once.
+pub fn line_heard_in(pending: &mut Option<Pending>, request: u64) {
+    let Some(kept) = pending.as_mut() else {
+        return;
+    };
+    if request <= kept.asked_again.unwrap_or(kept.request) || kept.heard_ids.contains(&request) {
+        return;
+    }
+    kept.heard = kept.heard.saturating_add(1);
+    if kept.heard_ids.len() == IDS_KEPT {
+        kept.heard_ids.pop_front();
+    }
+    kept.heard_ids.push_back(request);
+}
+
+/// [`line_began`] with no request on `pending`: the person's first line
+/// after the write was prepared may send it, if it began once the read-back
+/// could have been said whole (each word [`WORD_TAKES`] at least); one said
+/// over it, or before any of it, marks it cut. A line held as the lamp's own
+/// echo ([`own_echo_held`]) is not the person's, whichever is told first, so
+/// a second line is not dropped here: [`gate`] cancels a send after a second
 /// person's line ([`person_lines`]), and [`PENDING_FOR`] and [`send_by`]
 /// bound how long it waits.
 pub fn began_in(pending: &mut Option<Pending>, now: Instant) {
@@ -519,17 +556,21 @@ pub fn own_echo_held(request: u64) {
     kept::pending(|pending| echo_held_in(pending, request));
 }
 
-/// [`own_echo_held`] on `pending`. Only a line after the one that prepared
-/// the write (or asked once more for its "send"), and each once.
+/// [`own_echo_held`] on `pending`. Only a line counted with its request
+/// ([`line_heard_in`]), so after the one that prepared the write (or asked
+/// once more for its "send"), and each once: an echo of a line never
+/// counted takes no person's line off.
 pub fn echo_held_in(pending: &mut Option<Pending>, request: u64) {
     let Some(kept) = pending.as_mut() else {
         return;
     };
-    let after = kept.asked_again.unwrap_or(kept.request);
-    if request <= after || kept.echoed.is_some_and(|echoed| request <= echoed) {
+    if !kept.heard_ids.contains(&request) || kept.echoed.contains(&request) {
         return;
     }
-    kept.echoed = Some(request);
+    if kept.echoed.len() == IDS_KEPT {
+        kept.echoed.pop_front();
+    }
+    kept.echoed.push_back(request);
     kept.echoes = kept.echoes.saturating_add(1);
     if kept.cut_by == Some(request) {
         kept.cut = false;
@@ -540,10 +581,13 @@ pub fn echo_held_in(pending: &mut Option<Pending>, request: u64) {
     );
 }
 
-/// The person's lines since the write was prepared: those begun, less those
-/// held as the lamp's echo.
+/// The person's lines since the write was prepared: those begun, as the
+/// thread or the line's request counts them, whichever counted more, less
+/// those held as the lamp's echo (each one counted with its request). A
+/// line one count missed is never taken off: on the thread's, a piece joined
+/// to a line going on, or with no letter or digit, counts no line.
 fn person_lines(kept: &Pending) -> u32 {
-    kept.lines.saturating_sub(kept.echoes)
+    kept.lines.max(kept.heard).saturating_sub(kept.echoes)
 }
 
 /// The words of `text` as a read-back is checked: lower case, letters and
@@ -815,8 +859,10 @@ pub fn gate(
                 asked_again: Some(request),
                 other: None,
                 lines: 0,
+                heard: 0,
+                heard_ids: VecDeque::new(),
                 echoes: 0,
-                echoed: None,
+                echoed: VecDeque::new(),
                 ..kept
             });
             return Err(json!({ "error": NO_PRINT_YET, "next": SAY_IT_LONGER }));
@@ -2454,11 +2500,13 @@ mod tests {
         pending
     }
 
-    /// A line of `request` begun at `began`, its words told to the thread a
-    /// moment later; `echo`: held as the lamp's own (over its voice), told
-    /// before its words came (`Some(true)`) or after (`Some(false)`).
+    /// A line of `request` begun at `began`, its words counted with its
+    /// request, then by the thread a moment later; `echo`: held as the
+    /// lamp's own (over its voice), told before the thread counts it
+    /// (`Some(true)`) or after (`Some(false)`).
     fn line(pending: &mut Option<Pending>, request: u64, began: Instant, echo: Option<bool>) {
         voice_began_in(pending, request, echo.is_some(), began);
+        line_heard_in(pending, request);
         if echo == Some(true) {
             echo_held_in(pending, request);
         }
@@ -2575,6 +2623,59 @@ mod tests {
         line(&mut pending, 98, now + Duration::from_secs(14), None);
         let refused = owners_send(&mut pending, 98, now + Duration::from_secs(16));
         assert_eq!(refused.unwrap_err()["error"], NOT_READ_BACK);
+    }
+
+    /// Thirteen's P2 on #5851: an echo takes off only a line counted with
+    /// its request. One the thread never counted (a piece joined to a line
+    /// going on, or none with a letter), or counted with its request alone,
+    /// takes no person's line off: a person's line and then the send are
+    /// two, and it is cancelled.
+    #[test]
+    fn an_echo_of_a_line_never_counted_takes_no_persons_line_off() {
+        let now = Instant::now();
+        for counted_with_request in [false, true] {
+            let mut pending = read_back_in_96(now);
+            voice_began_in(&mut pending, 97, true, now + Duration::from_secs(9));
+            if counted_with_request {
+                line_heard_in(&mut pending, 97);
+            }
+            echo_held_in(&mut pending, 97);
+            line(&mut pending, 98, now + Duration::from_secs(11), None);
+            line(&mut pending, 99, now + Duration::from_secs(14), None);
+            let refused = owners_send(&mut pending, 99, now + Duration::from_secs(16));
+            assert_eq!(
+                refused.unwrap_err()["error"],
+                CANCELLED,
+                "counted with its request: {counted_with_request}"
+            );
+            assert_eq!(pending, None);
+        }
+        // The thread's count alone, as on the Live route: never taken off.
+        let mut pending = read_back_in_96(now);
+        began_in(&mut pending, now + Duration::from_secs(10));
+        echo_held_in(&mut pending, 97);
+        assert_eq!(pending.as_ref().unwrap().echoes, 0);
+    }
+
+    /// Echoes told out of order each count once: 98 held, then 97.
+    #[test]
+    fn echoes_told_out_of_order_each_count_once() {
+        let now = Instant::now();
+        let mut pending = read_back_in_96(now);
+        // 97 over the lamp's voice, 98 just after it.
+        for (request, over, began) in [(97, true, 9), (98, false, 11)] {
+            let began = now + Duration::from_secs(began);
+            voice_began_in(&mut pending, request, over, began);
+            line_heard_in(&mut pending, request);
+            began_in(&mut pending, began + Duration::from_secs(1));
+        }
+        echo_held_in(&mut pending, 98);
+        echo_held_in(&mut pending, 97);
+        echo_held_in(&mut pending, 98);
+        assert_eq!(pending.as_ref().unwrap().echoes, 2);
+        line(&mut pending, 99, now + Duration::from_secs(14), None);
+        let sent = owners_send(&mut pending, 99, now + Duration::from_secs(16)).unwrap();
+        assert_eq!(sent.args["send_id"], "s1");
     }
 
     #[test]
