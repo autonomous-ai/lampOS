@@ -173,10 +173,10 @@ def test_play_joints_and_sound_each_send_their_op(tmp_path):
 def test_body_tools_in_a_row_reuse_the_held_lease_rather_than_be_refused_busy(tmp_path):
     """A move handed to the body leaves its lease to lapse; the next body tool
     renews and uses it, since the lamp refuses a second take even from its
-    own holder."""
+    own holder. On a lamp from before #4209 (no `motion_done`)."""
 
     async def go():
-        async with connected(tmp_path, auto_done=False) as (fake, _, session):
+        async with connected(tmp_path, auto_done=False, motion_done=False) as (fake, _, session):
             plain = fake._ok
 
             async def handed(ws, id_, **fields):
@@ -217,6 +217,33 @@ def test_lamp_say_returns_when_taken_and_with_wait_once_said(tmp_path):
                 await asyncio.sleep(0.01)
             await fake.done([r["id"] for r in fake.requests if r["op"] == "say"][-1], "dropped", "dropped: the lamp is private")
             assert text(await call) == "dropped: dropped: the lamp is private"
+
+    run(go())
+
+
+def test_a_motion_tool_returns_at_the_motions_done_where_the_lamp_says_motion_done(tmp_path):
+    """#4209: a lamp that tells a motion's end (`motion_done`) has
+    `lamp_gesture` and `lamp_move` return once it ended, saying how, so an
+    agent's next motion doesn't cut it short and a drop reaches it."""
+
+    async def go():
+        async with connected(tmp_path, auto_done=False) as (fake, _, session):
+            frames = [[0, 0, 0, 0, 0], [20, 0, 30, 0, 0], [20, 0, 30, 0, 0], [0, 0, 0, 0, 0]]
+            call = asyncio.create_task(session.call_tool("lamp_gesture", {"name": "nod"}))
+            while not fake.asked("gesture"):
+                await asyncio.sleep(0.01)
+            await asyncio.sleep(0.2)
+            assert not call.done(), "the gesture's tool ended before its done"
+            await fake.done(next(r["id"] for r in fake.requests if r["op"] == "gesture"))
+            assert text(await call) == "nod finished"
+            call = asyncio.create_task(session.call_tool("lamp_move", {"step_ms": 500, "frames": frames}))
+            while not fake.asked("move"):
+                await asyncio.sleep(0.01)
+            asked = next(r["id"] for r in fake.requests if r["op"] == "move")
+            await fake.done(asked, "dropped", "dropped: the person is using the lamp")
+            result = await call
+            assert not result.isError
+            assert text(result) == "move dropped: dropped: the person is using the lamp"
 
     run(go())
 
@@ -443,6 +470,44 @@ def test_a_wait_begun_before_a_restart_never_takes_a_done_from_the_new_connectio
     run(go())
 
 
+def test_a_move_wait_begun_before_a_restart_ends_closed_and_never_takes_a_new_done(tmp_path):
+    """Second's HOLD on #5835: a `lamp_move` waiting for its motion's `done`
+    (lease request 1, move request 2) ends `closed` when its connection
+    ends; the new connection's request 2 (a say) finishing never makes it
+    say "move finished"."""
+    from lamp_mcp.relink import Relink
+
+    async def go():
+        async with FakeLamp(grants=("body", "speak"), auto_done=False) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            lamp = await Relink.connect(keyring=ring, pauses=(0.05,))
+            try:
+                server = build(lamp, client="test laptop")
+                async with create_connected_server_and_client_session(server._mcp_server) as session:
+                    frames = [[0, 0, 0, 0, 0], [20, 0, 30, 0, 0], [20, 0, 30, 0, 0], [0, 0, 0, 0, 0]]
+                    move = asyncio.create_task(session.call_tool("lamp_move", {"step_ms": 500, "frames": frames}))
+                    await until(lambda: fake.asked("move"))
+                    old = [r for r in fake.received if r.get("op") == "move"][-1]["id"]
+                    await restart(fake)
+                    ended = await asyncio.wait_for(move, 5)
+                    assert ended.isError and "closed" in text(ended), text(ended)
+                    await until(lambda: lamp.connections == 2)
+                    for line in ("One.", "Two."):
+                        said = await session.call_tool("lamp_say", {"text": line})
+                        assert text(said).startswith("taken"), text(said)
+                    new = [r for r in fake.received if r.get("op") == "say"][-1]["id"]
+                    # The collision Second forced: the new say has the old move's number.
+                    assert new == old, (new, old)
+                    await fake.done(new)
+                    await asyncio.sleep(0.1)
+                    assert not lamp._held or all(event not in ("done", "lease") for event, _, _ in lamp._held)
+            finally:
+                await lamp.close()
+
+    run(go())
+
+
 def test_a_say_wait_begun_before_a_restart_ends_closed_and_never_takes_a_new_done(tmp_path):
     """Second's train #5852 case for #5849: `lamp_say(wait=True)` asked on one
     connection ends `closed` when that connection ends; the new connection's
@@ -607,10 +672,11 @@ def test_a_lease_whose_action_is_refused_or_never_ends_is_not_listed_held(tmp_pa
 
 def test_an_action_handed_to_a_part_ends_at_once(tmp_path):
     """blue's P3 on #3813: lamp-control answers `move` with `{"to": "body"}`
-    and sends no `done`, so the tool doesn't wait out its lease."""
+    and sends no `done` on a lamp from before #4209 (no `motion_done`), so
+    the tool doesn't wait out its lease."""
 
     async def go():
-        async with connected(tmp_path, auto_done=False) as (fake, _, session):
+        async with connected(tmp_path, auto_done=False, motion_done=False) as (fake, _, session):
             plain = fake._ok
 
             async def handed(ws, id_, **fields):

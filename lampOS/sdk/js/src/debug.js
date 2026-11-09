@@ -53,7 +53,7 @@ export const SHOWN = new Set([
   'asleep', 'at', 'clamped', 'class', 'client', 'code', 'colour', 'confidence', 'count', 'elbow', 'error', 'ev', 'events',
   'express', 'facing', 'from', 'feeling', 'for_ms', 'frames', 'got', 'grants', 'hold_max_ms', 'how', 'id', 'lease_max_ms', 'say_max_bytes',
   'joints', 'kind', 'lamp', 'lamp_state', 'lease', 'level', 'light', 'limits', 'manage', 'mood',
-  'most', 'motion', 'mute', 'name', 'near', 'ok', 'on', 'op', 'open', 'parts', 'pattern', 'paused', 'phrase', 'phrases',
+  'most', 'motion', 'motion_done', 'mute', 'name', 'near', 'ok', 'on', 'op', 'open', 'parts', 'pattern', 'paused', 'phrase', 'phrases',
   'pitch', 'presence', 'press', 'private', 'push', 'quiet_hours', 're', 'refused', 'retry_ms',
   'roll', 'say', 'say_max_chars', 'score', 'seen', 'shoulder', 'shows', 'side', 'size', 'skill', 'skills', 'started', 'state',
   'step_ms', 'strength', 'take_max_ms', 'talking', 'targets', 'to', 'turn', 'until', 'v', 'where', 'why',

@@ -41,8 +41,12 @@ from .relink import Relink
 # A body lease for one look or move, never renewed: released at `done`, or
 # left to lapse if `done` doesn't come (Nine, #3504 13:27).
 ACTION_LEASE_MS = 10_000
-# The body actions lamp-control ends with a `done` after its `{"to": "body"}`.
+# The body actions lamp-control ends with a `done` after its `{"to": "body"}`;
+# `move` too where hello's limits say `motion_done` (#4209).
 DONE_FOLLOWS = {"look", "joints"}
+# Waited for a motion's `done` at most: lamp-control tells one never begun
+# after 10 s and one with no end heard after 60 s, so this is past both.
+MOTION_WAIT_S = 75
 # The longest `lamp_follow_hand` follows, in one call.
 MOST_FOLLOW_S = 60
 # Said in place of a starting `lamp_follow_hand` when a stop comes meanwhile.
@@ -338,14 +342,16 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 if not ended.done():
                     ended.set_result(("done", "refused", None))
                 raise refused(error) from error
-            if sent.get("to") and op not in DONE_FOLLOWS:
+            motion_done = op == "move" and bool(lamp.limits.get("motion_done"))
+            if sent.get("to") and op not in DONE_FOLLOWS and not motion_done:
                 # Handed to a part (`{"to": "body"}`): no `done` follows, so
                 # the tool ends now and the lease lapses by itself (blue's
                 # P3 on #3813, lamp-control part 4, #3805). A `look`'s does
                 # follow, once the head is there (docs/control.md, "Looking").
                 return f"{op} taken by the {sent['to']}; its lease lapses within {ACTION_LEASE_MS // 1000} s"
             try:
-                what, how, why_ended = await ended_on(ended, gone, ACTION_LEASE_MS / 1000)
+                wait_s = MOTION_WAIT_S if motion_done else ACTION_LEASE_MS / 1000
+                what, how, why_ended = await ended_on(ended, gone, wait_s)
             except asyncio.TimeoutError:
                 # No `done` yet (the server sends it once actions reach the
                 # parts): the lease lapses by itself; it is never held open.
@@ -473,9 +479,21 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
 
         @server.tool()
         async def lamp_gesture(name: Gesture) -> str:  # type: ignore[valid-type]
-            """One of the lamp's own gestures: nod, headshake, greeting, laugh, shy, a dance, …"""
-            await act("gesture", name=name)
-            return f"{name} taken"
+            """One of the lamp's own gestures: nod, headshake, greeting, laugh, shy, a dance, …
+            Where the lamp tells a motion's end (`motion_done`), it returns once the gesture has
+            ended: `finished`, or `dropped`/`cut_short` with the body's why."""
+            if not lamp.limits.get("motion_done"):
+                await act("gesture", name=name)
+                return f"{name} taken"
+            limits.take("gesture")
+            try:
+                done = await asyncio.wait_for(lamp.gesture(name, wait=True), MOTION_WAIT_S)
+            except LampError as error:
+                raise refused(error) from error
+            except asyncio.TimeoutError:
+                return f"{name} taken; no end heard within {MOTION_WAIT_S} s"
+            why = done.get("why")
+            return f"{name} {done.get('how')}" + (f": {why}" if why else "")
 
         @server.tool()
         async def lamp_look(

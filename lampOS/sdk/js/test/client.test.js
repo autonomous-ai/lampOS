@@ -407,7 +407,9 @@ test('actions send the schema\'s fields and wait for done', async () => {
     await lamp.light('warm', 3, 10_000, 'breathe');
     await lamp.say('Build passed.');
     await lamp.express('glad');
-    assert.equal((await lamp.gesture('nod', { wait: true })).to, 'body');
+    // The lamp says `motion_done`: the wait resolves to the gesture's `done`.
+    const ended = await lamp.gesture('nod', { wait: true });
+    assert.deepEqual([ended.ev, ended.how], ['done', 'finished']);
     await lamp.stop();
     assert.deepEqual(fake.asked('light'), [{ colour: 'warm', level: 3, pattern: 'breathe', for_ms: 10000 }]);
     assert.deepEqual(fake.asked('say'), [{ text: 'Build passed.' }]);
@@ -873,9 +875,10 @@ test('a refused waiting action leaves nothing behind to reject on close', async 
 });
 
 test('a waiting gesture or move returns at the body\'s answer', async () => {
-  // lamp-control's reply shape: `{"re":N,"ok":true,"to":"body"}` and no
-  // `done` after it; autoDone off, so nothing else ever comes.
-  await withLamp({ autoDone: false }, async (lamp) => {
+  // A lamp-control from before #4209 (no `motion_done` in hello's limits):
+  // `{"re":N,"ok":true,"to":"body"}` and no `done` after it; autoDone off,
+  // so nothing else ever comes.
+  await withLamp({ autoDone: false, motionDone: false }, async (lamp) => {
     await lamp.withLease(['body'], async () => {
       const nod = await lamp.gesture('nod', { wait: true });
       const move = await lamp.move(PLAYABLE, 500, { wait: true });
@@ -912,9 +915,52 @@ test('a refused on() takes off only its own copy of the handler', async () => {
   });
 });
 
-test('only gesture and move end a wait at their reply, as control.md says', async () => {
+test('a waiting motion ends at its done where the lamp says motion_done', async () => {
+  // #4209: hello's limits say `motion_done`, so `{ wait: true }` resolves to
+  // the `done` the lamp sends once the body says what became of the motion.
+  await withLamp({ autoDone: false }, async (lamp, fake) => {
+    assert.equal(lamp.limits.motion_done, true);
+    await lamp.withLease(['body'], async () => {
+      let ended = false;
+      const nod = lamp.gesture('nod', { wait: true }).then((done) => { ended = true; return done; });
+      await until(() => fake.asked('gesture').length);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      assert.equal(ended, false, 'a wait that ended before the motion\'s done');
+      fake.done(fake.requests.at(-1).id);
+      assert.equal((await nod).how, 'finished');
+      const move = lamp.move(PLAYABLE, 500, { wait: true });
+      await until(() => fake.asked('move').length);
+      fake.done(fake.requests.at(-1).id, 'dropped', 'dropped: the person is using the lamp');
+      const dropped = await move;
+      assert.deepEqual([dropped.how, dropped.why], ['dropped', 'dropped: the person is using the lamp']);
+    }, { forMs: 5000 });
+    const glad = lamp.express('glad', undefined, { wait: true });
+    await until(() => fake.asked('express').length);
+    fake.done(fake.requests.at(-1).id);
+    assert.equal((await glad).how, 'finished');
+    // Too slight to move: no move, no `done`, the answer at once.
+    const still = await lamp.express('glad', 0.01, { wait: true });
+    assert.deepEqual([still.to, still.move], ['body', null]);
+    assert.equal(lamp.done.size, 0);
+  });
+});
+
+test('a waiting say resolves to its done', async () => {
+  await withLamp({ autoDone: false }, async (lamp, fake) => {
+    let ended = false;
+    const said = lamp.say('Word for word.', { wait: true }).then((done) => { ended = true; return done; });
+    await until(() => fake.asked('say').length);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(ended, false, 'a say\'s wait that ended before its done');
+    fake.done(fake.requests.at(-1).id);
+    assert.equal((await said).how, 'finished');
+    assert.equal(lamp.done.size, 0);
+  });
+});
+
+test('only gesture, move and express end a wait at their reply on a lamp without motion_done', async () => {
   const { ENDS_AT_REPLY } = await import('../src/client.js');
-  assert.deepEqual([...ENDS_AT_REPLY].sort(), ['gesture', 'move']);
+  assert.deepEqual([...ENDS_AT_REPLY].sort(), ['express', 'gesture', 'move']);
 });
 
 test('a request after the lamp has gone is refused at once, never left waiting', async () => {
@@ -927,7 +973,7 @@ test('a request after the lamp has gone is refused at once, never left waiting',
 });
 
 test('a waiting gesture keeps no done', async () => {
-  await withLamp({ autoDone: false }, async (lamp) => {
+  await withLamp({ autoDone: false, motionDone: false }, async (lamp) => {
     const pending = lamp.gesture('nod', { wait: true });
     assert.equal(lamp.done.size, 0, 'a done kept for an action that gets none');
     await pending;
