@@ -22,13 +22,20 @@ Ready for lamp-voice: no
   of 02770). A standalone reproduction matched; the exact library test
   passed with a group-owned temporary directory (1/1, 0.06 s). No project
   source was changed for either host issue. Original failures are retained.
-- The serial broad run continues: 33 completed targets, 1,918 passed,
-  one Keeper failure as explained, nine ignored at this checkpoint.
-  Workspace build and native CI remain pending; no PR-ready claim.
+- The serial broad run finished: 102 completed targets, 10,327 passed,
+  six failed, 56 ignored. Voice library passed 5,355 / 0 / 15; all its
+  remaining targets passed. Update round passed 269. The additional five
+  failures are unchanged host-platform cases: Setup unconditionally reads
+  Linux procfs, and four image-journal fixtures use GNU stat options that
+  this Mac rejects, leaving missing retention folders/counts. Exact names
+  and evidence are in the task's verification record. Workspace build is
+  running; native CI and the two reads remain pending. No ready claim.
 - Docs checker: nine tests, 191 docs and 1,885 local links, zero broken.
-  Host debug sanitizer first 0.062368 ms, repeated p50 0.007126 ms /
-  p95 0.007420 ms / max 0.010846 ms (1,000 samples). Boundary is sanitizer
-  entry to outcome only, not deletion/IPC, startup, model or lamp latency.
+  The grouped sanitizer sample remains recorded, but is not cold first
+  use. An isolated fresh-process fixture passed 1/1: first 0.162282 ms,
+  repeated p50 0.010581 ms / p95 0.012215 ms / max 0.061787 ms (1,000
+  samples). Boundary is sanitizer entry to outcome only, not deletion/IPC,
+  startup, model or lamp latency; the broader gate was running alongside.
   Required reads remain Reviewer-three and Tests. No device access.
 - #4099 closure recommended to the PM using Mobile's app/lamp PASS on
   3 Nov (4099/6594483187); build number and raw `can` were not captured.
