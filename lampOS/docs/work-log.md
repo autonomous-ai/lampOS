@@ -9160,3 +9160,18 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - Snapshot /private/tmp/second-11048-source; logs
   /tmp/second-11048-{say,turn}-reconnect.log. Both failed assertion as
   expected; websocket restart diagnostics are incidental to the probe.
+
+## 2026-11-09 — Second: camera generation privacy read and train756
+
+- READ-OK #5881 19d61af9a8. Both frame paths carry the originating stream
+  turn to the writer; missing/invalid turns fail closed and internal JSON
+  marker is removed. Full control 182 passed; independent TLS writer probe
+  passes in 0.07 s, rejecting queued old/missing turns and accepting both
+  fresh binary/JSON frames after replacement. Controlled Parts state, no
+  camera/ring latency claim. Test saved /tmp/second-5881-writer.rs, removed.
+- Linux Clippy/SDK/docs green, ARM64 pending at review. Physical evidence
+  remains Ten's. Comment 6741758589; checkout clean.
+- Train756 c200d03ad4 source audit: all 25 patches preserved exactly by
+  range-diff: #5880 28667a113f, #5866 effa9f8c88, #5842 e55077de96,
+  #5809 all 22 commits through 149d7c9e53. Spot-checked first two mappings.
+  No new train tests and no change to the separately flagged MCP fault.
