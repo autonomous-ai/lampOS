@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-11-07 00:41 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1711, posted by the PM (Faye) since 4 Nov, are the live ones.
+Written by the first builder from the team's review page at 2026-11-09 10:22 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1711, posted by the PM (Faye) since 4 Nov, are the live ones.
 
-**Build 91.2% over 76 rows. Quality 67.1% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
+**Build 91.4% over 76 rows. Quality 67.9% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -72,7 +72,7 @@ Written by the first builder from the team's review page at 2026-11-07 00:41 (+0
 | Keeps going when one part fails | 1.00 | — | — | Built: each part its own unit, restarted alone, health says how the lamp is |
 | Change the Wi-Fi, name or time zone after setup, without a reset | 0.85 | #1982 #1995 #2038 #2851 #2852 #2853 | fourteen, mobile, migrate | 6 Nov 17:3x, down from 0.95: the name and time zone work; |
 | Hand-overs from a home lamp: Harness installed, the person signed in | 0.95 | #751 #765 #798 #1854 #2702 #2838 #2839 #2840 #2841 #2842 | eighth, tests, subdarren, blue | 6 Nov 11:1x, up from 0.88, on stable 10441: lamp-c0a4 (#5228, SubDarren, 10:31–10:40) went from signed out to a spoken sign-in, the person approving the code in Harness, the daemon started, a hand-over to Claude Code by … |
-| Updates cover the whole lamp, so V3, V4 and V5 update a shipped lamp in place: units, models, the updater itself, rollback, every part’s saved data read across versions | 0.85 | #1369 #1505 #2700 #2809 #2810 | migrate, tests, second | 6 Nov 17:3x, down from 0.88: 52e6’s 8474 to 10441 update still stands, but #5539’s dead end and a part skipped by its own condition (#5476) can each leave a lamp unable to update. |
+| Updates cover the whole lamp, so V3, V4 and V5 update a shipped lamp in place: units, models, the updater itself, rollback, every part’s saved data read across versions | 1.00 | #1369 #1505 #2700 #2809 #2810 | migrate, tests, second | 9 Nov 10:2x, up from 0.85 (scored by the lead’s agent for the lead): #5476’s and #5539’s fixes are in 10686, 10749 and 10824, and lamp-52e6 played two real update rounds across builds with them, 10686 to 10749 (8 Nov) an… |
 | The company sees its lamps in homes: health, crash and support logs, opt-in | 0.95 | #1683 #1755 #2862 | jarvis, mobile, backend, tests | 22 Oct 12:46, up from 0.9: the health report lists the product parts that have failed, under the same consent (Second, #2764). |
 | The factory’s per-lamp steps: body poses, touch pads, the update key | 0.95 | #1682 #1717 #1744 #2817 #2818 #3578 | third, thirteen, first, fifth | 26 Oct 20:3x, up from 0.9: #3578’s step 4 on lamp-52e6 with 7071: the self-test passed, “the lamp is stopped, every part finished” for 23 units, then the reset and the reboot into setup, with nothing left behind. |
 | Reads your mood from your face or voice *(mood, for later: not in the build figure)* | 0.45 | #2796 #2797 #2798 #2799 #2800 | ten, fourth, sixth, fifth | 23 Oct 02:1x, up from 0.35: the product units carry the face reader, Blendshape alone (#2953, #2799 closed), and onboarding’s one ask whether the lamp may notice how a face seems, keeping only a yes, is merged (#3082, tr… |
@@ -99,12 +99,12 @@ Written by the first builder from the team's review page at 2026-11-07 00:41 (+0
 | Fast answers | 0.75 | 0.85 | 23 Oct 10:1x, up from 0.7: a real person (the lead, lamp-52e6, build G, 09:16–09:31): the first sound at 1.18–1.71 s on five of six lines, one tool follow-up at 7.8 s. |
 | Knows when you have finished | 0.70 | 0.85 | 27 Oct 01:3x, unchanged: a bare “Lamp.”, a pause, then the request, right after a voice start, still splits and is held in a room not yet known to be quiet. |
 | Cutting in | 0.55 | 0.75 | 31 Oct 16:1x, unchanged: on lamp-4ace’s product unit (c08b4c08f6), “Wait, hold on.” about 6 s into a story was handled 4 of 6 times. |
-| Stop words | 0.60 | 0.75 | 5 Nov 09:5x, up from 0.5: on build 10226’s pre-promote checks, “Stop” over a story was answered “Okay, I’ll stop there.” at once on both product lamps, lamp-06c1 (4 of 55 words played) and lamp-c0a4 (15 of 119), the mode… |
+| Stop words | 0.70 | 0.75 | 9 Nov 10:2x, up from 0.6: stable 10824 (promoted 9 Nov 08:41) has the stop words heard over the lamp’s own voice (LAMP_STOP_WORDS_KEYTERM on, #5111 closed). |
 | Its own echo | 0.65 | 0.70 | Measured right today (#968): the canceller takes a median 54 dB off the lamp’s own voice on lamp-52e6, the same hardware; |
 | Not spoken to | 0.50 | 0.90 | 3 Nov 23:3x, down from 0.6: the core-verifier at 9868 held only 1 of 6 desk lines in a going-on thread (two called recall on talk between people), with #5034 reverted; |
 | Several people | 0.70 | 0.85 | 23 Oct 11:2x, up from 0.65: a follow-up is asked only of the person who told it. |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
-| Speaking up on its own | 0.80 | 0.85 | 6 Nov 17:3x, down from 0.85: one stale oldest item silences every later reminder and timer (#5498), on stable; |
+| Speaking up on its own | 0.85 | 0.85 | 9 Nov 10:2x, back up from 0.8: #5498’s fix (a stale oldest reminder no longer silences every later one, ec2be29dbc) is on stable since 10686, and on 10824 a one-minute timer rang and was said on lamp-52e6 (Fifth, 07:20) … |
 | Onboarding, as a first-time person meets it | 0.55 | 0.90 | 4 Nov 08:3x, down from 0.6: a tester’s lamp-0c4e (3 Nov) never saved the face at setup (a question with “okay” taken as the yes, the face wait closed early), so nothing was kept, and the second try saved a misheard name … |
 | Remembers you: your name and what you told it | 0.70 | 0.90 | 6 Nov 23:0x, up from 0.6: Friday’s memory scenes on stock 10538 (lamp-06c1): pooled 0.80, scene average 0.73, S0 on 10579. |
 | A good companion | 0.70 | 0.90 | 6 Nov 11:1x, down from 0.75, on stable 10441: the core-verifier counts one claimed action not done (lamp-52e6, 04:24, 10441’s voice: “I’ve kept the light on until ten.” with no call and no schedule item), so claimed-not-… |
