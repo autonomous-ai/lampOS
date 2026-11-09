@@ -901,8 +901,12 @@ do. Các khoá khác là của chính `service_read` cho một việc đọc c�
 `project` và `workspace` (mỗi khoá 1 đến 1.000 byte); không bao giờ `from`
 hay `to`, cũng không bao giờ `graphql`, `variables`, `path`, `params`,
 `tool` hay `arguments` của một việc đọc dạng tự do.
-`query` là từ để tìm (`fullText contains` của Drive), không bao giờ là một
-thứ tự: Drive liệt kê tệp mới nhất trước (`orderBy = modifiedTime desc`) và
+`query` là từ để tìm, mỗi từ trong tên tệp hoặc nội dung của nó (`name
+contains` hoặc `fullText contains` của Drive; `_`, `-` và `.` trong tên tách
+từ), và kết quả theo độ liên quan, vì Drive từ chối một thứ tự đi cùng
+`fullText` (HTTP 400; lamp-3e83, 9/11: một tệp được hỏi bằng tên không bao
+giờ tìm thấy). Nó không bao giờ là một thứ tự: không có `query` thì Drive
+liệt kê tệp mới nhất trước (`orderBy = modifiedTime desc`) và
 thư cũng mới nhất trước, nên một lần đọc những tệp mới nhất thì bỏ `query`;
 một thứ tự hay chỉ "mới nhất" ("order by modifiedTime desc", "newest") bị
 từ chối (`service_read::ordering`, sau khi một kỹ năng được tạo trên một
