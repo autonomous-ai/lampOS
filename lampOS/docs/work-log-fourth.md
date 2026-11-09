@@ -1,3 +1,13 @@
+## 2026-11-09 18:20 ICT — Peek draft and provider ARM64 gates
+
+Ready for lamp-voice: no. Privacy reads and documented tester gates remain outstanding; no device access.
+
+- Provider #5856 at `df4c2ea8a`: Linux ARM64 run 42604342492 passed 10,494 selected tests / 58 skipped, including all nine cancellation regressions. Linux strict clippy and docs also pass. Playback #5858 at `4ea13ebf1` has green Linux clippy/docs; ARM64 tests continue. Both await TWO READS and their separate playback/acoustic acceptance.
+- Completed assigned #5262 source/unit slice as draft [#5861](https://github.com/autonomous-ai/lampOS/pull/5861), `9e9c62609`, based on `19ee3d51ac`. Sessions-only acquires no bus, watcher, unit scan or journal reader; other panels explicitly say unavailable. The office unit uses a dedicated non-login account and session-reader group, with no product or automatic installation change. Provisioning must check inherited groups, old on-mode drop-ins and projection-only history; no private file permissions are widened.
+- Peek final local gates: 30 tests, full formatting, strict all-target Peek clippy, workspace build and 192 docs / 1,896 links pass. Actual predecessor refuses the new mode as off. Shared target reuse initially served a new binary during the predecessor probe; package clean and rebuild corrected the probe, followed by another package clean and complete current Peek gates. No result from the mistaken binary is claimed.
+- Actual Peek startup-to-first numeric SSE: first 14.791 ms, four subsequent launches median 11.941 ms, max 14.791 ms. Final missing-file/repeated-append/permission recovery: 1,007/1,006/1,007 ms. Synthetic Mac loopback metadata only, no browser paint or lamp claim. Shutdown test closes SSE before SIGTERM; inherited active-stream/stalled-file shutdown is not proven bounded. Source audit found no additional actionable issue; it is not an external privacy read.
+- Requested TWO READS and office tester on #5861/#5262 and Queue comment 6738731061. Linux CI is running. App #129 remains unchanged for its paired tomorrow sitting. Reviewing the independent neutral-photo acknowledgement remainder of #5263; full capture-origin/consent activation and the skill remain held.
+
 ## 2026-11-09 18:03 ICT — provider and playback drafts published
 
 Ready for lamp-voice: no. Both privacy slices remain draft for TWO READS, CI and their documented lamp gates. No device access.
