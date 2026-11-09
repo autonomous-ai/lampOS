@@ -203,7 +203,89 @@ impl Channel for Web {
         }
         let until = Instant::now() + self.whole;
         let this = &*self;
-        get(url, most, out, until, |url| this.open(url, until))
+        again_while_busy(&AGAIN_AFTER, until, out, std::thread::sleep, |out| {
+            get(url, most, out, until, |url| this.open(url, until))
+        })
+    }
+}
+
+/// The waits before a file is asked for again, after the channel answered
+/// that it is busy (a 5xx) or gave no answer, and nothing of the file came.
+/// On 9 Nov from 12:30 GitHub's release downloads answered 504 to about six
+/// tries in ten, and a round needs every file, so lamp-74ff refused five
+/// rounds in a row, each on another file (the lead's proposal on #1711).
+const AGAIN_AFTER: [Duration; 3] = [
+    Duration::from_secs(2),
+    Duration::from_secs(5),
+    Duration::from_secs(10),
+];
+
+/// How [`exchange`] begins the failure of an answer it doesn't take.
+const ANSWERED: &str = "the channel answered ";
+
+/// Whether a failed GET is worth asking again: the channel unreachable, or
+/// answering 5xx. Never a missing file, one too large or cut short, or any
+/// other answer.
+fn worth_again(failed: &Fetch) -> bool {
+    match failed {
+        Fetch::Unreachable(_) => true,
+        Fetch::Failed(why) => why
+            .strip_prefix(ANSWERED)
+            .is_some_and(|code| code.starts_with('5')),
+        Fetch::Missing => false,
+    }
+}
+
+/// `attempt`, asked again after each of `waits` while it fails in a way
+/// [`worth_again`] takes, wrote nothing into `out`, and the wait ends before
+/// `until`. A file cut short half way is never asked again: its bytes are
+/// already the caller's, and its hash check throws them away.
+fn again_while_busy(
+    waits: &[Duration],
+    until: Instant,
+    out: &mut dyn Write,
+    mut sleep: impl FnMut(Duration),
+    mut attempt: impl FnMut(&mut dyn Write) -> Result<u64, Fetch>,
+) -> Result<u64, Fetch> {
+    let mut waits = waits.iter();
+    loop {
+        let mut counted = Counted {
+            out: &mut *out,
+            bytes: 0,
+        };
+        let failed = match attempt(&mut counted) {
+            Ok(bytes) => return Ok(bytes),
+            Err(failed) => failed,
+        };
+        let wrote = counted.bytes;
+        match waits.next() {
+            Some(&wait) if wrote == 0 && worth_again(&failed) && Instant::now() + wait < until => {
+                eprintln!(
+                    "lamp-update: {failed}; asking again in {} s",
+                    wait.as_secs()
+                );
+                sleep(wait);
+            }
+            _ => return Err(failed),
+        }
+    }
+}
+
+/// A writer that counts what went through it.
+struct Counted<'a> {
+    out: &'a mut dyn Write,
+    bytes: u64,
+}
+
+impl Write for Counted<'_> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let wrote = self.out.write(buf)?;
+        self.bytes += wrote as u64;
+        Ok(wrote)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.out.flush()
     }
 }
 
@@ -361,7 +443,7 @@ fn exchange(
             return Ok(Answer::Redirect(location));
         }
         404 | 410 => return Ok(Answer::Missing),
-        _ => return Err(Fetch::Failed(format!("the channel answered {code}"))),
+        _ => return Err(Fetch::Failed(format!("{ANSWERED}{code}"))),
     }
     let chunked = header("transfer-encoding")
         .is_some_and(|value| value.to_ascii_lowercase().contains("chunked"));
@@ -659,6 +741,91 @@ mod tests {
             Ok(Box::new(socket) as Box<dyn Stream>)
         });
         (result, out)
+    }
+
+    /// 9 Nov (the lead's proposal on #1711): GitHub's release downloads
+    /// answered 504 to most tries, and a round that needs every file was
+    /// refused on whichever came back 504. A busy answer is asked again,
+    /// and the file comes on the third try.
+    #[test]
+    fn a_busy_channel_is_asked_again_and_the_file_comes() {
+        let (port, server) = serve(vec![
+            b"HTTP/1.1 504 Gateway Time-out\r\nContent-Length: 0\r\n\r\n".to_vec(),
+            b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n".to_vec(),
+            b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello".to_vec(),
+        ]);
+        let mut out = Vec::new();
+        let mut slept = Vec::new();
+        let until = Instant::now() + Duration::from_secs(10);
+        let result = again_while_busy(
+            &AGAIN_AFTER,
+            until,
+            &mut out,
+            |wait| slept.push(wait),
+            |out| {
+                get("https://h/x", 100, out, until, |_| {
+                    let socket = TcpStream::connect(("127.0.0.1", port)).unwrap();
+                    Ok(Box::new(socket) as Box<dyn Stream>)
+                })
+            },
+        );
+        assert_eq!(result, Ok(5));
+        assert_eq!(out, b"hello");
+        assert_eq!(slept, AGAIN_AFTER[..2]);
+        assert_eq!(server.join().unwrap().len(), 3);
+    }
+
+    /// Only a busy or silent channel is asked again, only while nothing of
+    /// the file came, and only within the file's own time.
+    #[test]
+    fn a_missing_file_a_half_file_and_the_last_wait_are_not_asked_again() {
+        let until = Instant::now() + Duration::from_secs(60);
+        let mut tries = 0;
+        let mut out = Vec::new();
+        let mut asked = |result: Result<u64, Fetch>, wrote: &'static [u8]| {
+            tries = 0;
+            out.clear();
+            let failed = again_while_busy(
+                &AGAIN_AFTER,
+                until,
+                &mut out,
+                |_| {},
+                |out| {
+                    tries += 1;
+                    out.write_all(wrote).unwrap();
+                    result.clone()
+                },
+            );
+            (failed, tries)
+        };
+        assert_eq!(asked(Err(Fetch::Missing), b""), (Err(Fetch::Missing), 1));
+        let refused = Err(Fetch::Failed("the channel answered 403".into()));
+        assert_eq!(asked(refused.clone(), b""), (refused, 1));
+        let lost = Err(Fetch::Failed("the connection was lost: reset".into()));
+        assert_eq!(asked(lost.clone(), b""), (lost, 1));
+        // Half a file came: its bytes are the caller's, so it is not asked
+        // again.
+        let busy = Err(Fetch::Failed("the channel answered 504".into()));
+        assert_eq!(asked(busy.clone(), b"hel"), (busy.clone(), 1));
+        // Busy every time: asked once and then after each wait, and the
+        // last answer is the one given.
+        assert_eq!(asked(busy.clone(), b""), (busy, 4));
+        let silent = Err(Fetch::Unreachable("no answer".into()));
+        assert_eq!(asked(silent.clone(), b""), (silent.clone(), 4));
+        // No wait that would end past the file's time.
+        let soon = Instant::now() + Duration::from_secs(3);
+        let mut tries = 0;
+        let failed = again_while_busy(
+            &AGAIN_AFTER,
+            soon,
+            &mut Vec::new(),
+            |_| {},
+            |_| {
+                tries += 1;
+                silent.clone()
+            },
+        );
+        assert_eq!((failed, tries), (silent, 2));
     }
 
     #[test]
