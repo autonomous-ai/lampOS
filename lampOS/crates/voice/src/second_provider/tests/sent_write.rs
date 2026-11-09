@@ -788,3 +788,111 @@ async fn a_ninth_send_try_never_takes_the_first_ones_receipt() {
         "no service_write ran after the batch"
     );
 }
+
+/// The P3 on #5863: a finished clock call `call_0` is carried with its
+/// round, then a later round's send reuses the id `call_0` and is cut
+/// before it is carried. The held line still gets the send's own receipt
+/// under that id, beside the clock's, so the sent note matches what it is
+/// given.
+#[tokio::test]
+async fn a_send_reusing_a_carried_calls_id_still_brings_its_receipt() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Go ahead and send it.".to_owned()), Ok(String::new())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "call_0",
+                        crate::tools::THE_TIME,
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "call_0",
+                        crate::services::WRITE,
+                        json!({"service": "google_drive", "send_id": "s1"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("It's in your Drive now."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let writes: Writes = Arc::default();
+    let seen = writes.clone();
+    let (sending, under_way) = std::sync::mpsc::channel();
+    let runner: ToolRunner = Arc::new(move |_, _, name, args| {
+        let sending = sending.clone();
+        let send = name == crate::services::WRITE;
+        if send {
+            seen.lock()
+                .unwrap()
+                .push(crate::services::without_attempt(args));
+        }
+        Box::pin(async move {
+            if !send {
+                return json!({"time": "10:00"});
+            }
+            let _ = sending.send(());
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            json!({"sent": true, "service": "google_drive"})
+        })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    loop {
+        if under_way.try_recv().is_ok() {
+            break;
+        }
+        let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+    }
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(5), engine.next())
+            .await
+            .expect("the held line's turn ends");
+        if let ProviderOutput::TurnComplete { request: 2, .. } = event {
+            break;
+        }
+    }
+    let held = script.asked.lock().unwrap().last().cloned().unwrap();
+    assert!(
+        held.iter()
+            .any(|message| message.tool_call_id.as_deref() == Some("call_0")
+                && message.words().is_some_and(|told| told.contains("10:00"))),
+        "the clock's carried round stays: {held:?}"
+    );
+    assert!(
+        held.iter()
+            .any(|message| message.tool_call_id.as_deref() == Some("call_0")
+                && message
+                    .words()
+                    .is_some_and(|told| told.contains("\"sent\":true"))),
+        "the send's own receipt goes with the words: {held:?}"
+    );
+    assert!(
+        held.iter()
+            .any(|message| message.role == "system" && message.words() == Some(SENT_WRITE_NOTE)),
+        "the note matches what is given: {held:?}"
+    );
+    assert_eq!(
+        writes.lock().unwrap().len(),
+        1,
+        "the one send, nothing prepared again"
+    );
+}
