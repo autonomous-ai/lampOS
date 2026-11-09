@@ -852,7 +852,12 @@ by service: …" của nó được nói trên tham số `action`.
   và câu trả lời lại những lời đó được đưa lệnh gọi của lần gửi cùng chỗ
   dịch vụ đã làm tới (`send_state`, giữ theo yêu cầu trong `run` trước mọi
   hàng rào của tuyến: đã hỏi khi qua cổng, rồi câu trả lời của dịch vụ hay
-  lời từ chối của cổng), được báo là lần ghi đã gửi trừ khi bị từ chối, và
+  lời từ chối của cổng; giữ theo từng yêu cầu, 8 yêu cầu mới nhất
+  (`SENDS_KEPT`), nên một lần gửi chậm của yêu cầu cũ xong muộn hơn không bao
+  giờ ghi đè lên của yêu cầu mới hơn; trong một yêu cầu giữ lần thử mạnh
+  nhất, nên lời từ chối của một lần thử sau không bao giờ che một lần ghi đã
+  gửi), được báo là
+  lần ghi đã gửi trừ khi bị từ chối, và
   không chạy `service_write` nào trong lượt đó
   ([second-voice.md](../second-voice.md), các vòng được mang theo của
   `LAMP_JOIN_CUT_WORDS`).

@@ -4133,7 +4133,10 @@ after a take-over, but now for every turn:
   wordless line cut the turn, and the held line answering it, given no trace
   of the send, prepared a new write and read it back). The send runs on a
   task of its own (`sending`), so it reaches its answer after the cut, and
-  is kept with that answer (`SentWrite`, by the send's own request) until
+  is kept with that answer (`SentWrite`, by the send's own request, every
+  try of one batch, so a later try the gate refuses as nothing waiting never
+  hides the one that went; every try is carried with its own result, and the
+  note follows the one that went) until
   its round is carried, a turn given it ends (`sent_given_over`), or its
   words are let go. The line answering those words again, held or joined
   with new ones, finds it by any of the words' requests (`origins`), so
@@ -4148,9 +4151,12 @@ after a take-over, but now for every turn:
   answer; its sent result goes with its words`. The cut turn's own answer is
   fenced to "not running" once its lease is stale, so where the services
   got to with it (`services::send_state`) is told instead: their answer, or
-  the gate's refusal. Past the gate with no answer, or no answer within the
-  bound, the note says it was sent and its result is not known
-  (`SENT_UNKNOWN_NOTE`), never that nothing was sent. In that line's turn a
+  the gate's refusal, kept per request (an older request's late answer never
+  overwrites a newer one's), the strongest of the request's tries. Past the gate
+  with no answer, the note says it was sent and its result is not known
+  (`SENT_UNKNOWN_NOTE`); no answer within the bound and nothing at the
+  services, that whether it went is not known (`SEND_NOT_KNOWN_NOTE`, its
+  `service_write` told `SEND_NOT_KNOWN`); never that nothing was sent. In that line's turn a
   `service_write` is not run: it is told `ALREADY_SENT`, so no new
   read-back follows; the mark ends with the turn. A send refused by the
   gate, or answered "not running" before the services had it, goes with its

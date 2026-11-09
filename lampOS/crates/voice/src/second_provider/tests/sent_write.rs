@@ -460,6 +460,11 @@ async fn a_refused_second_send_in_one_batch_never_hides_the_first() {
         "the send that went goes with the words: {held:?}"
     );
     assert!(
+        held.iter()
+            .any(|message| message.tool_call_id.as_deref() == Some("duplicate")),
+        "and the batch's refused try with its own result, each call id answered: {held:?}"
+    );
+    assert!(
         held.iter().any(|message| message.role == "system"
             && message
                 .words()
@@ -473,6 +478,191 @@ async fn a_refused_second_send_in_one_batch_never_hides_the_first() {
             json!({"service": "google_drive", "send_id": "s1"}),
         ],
         "the batch's two sends, and no third call: nothing prepared again"
+    );
+    assert_eq!(said, ["It's in your Drive now."]);
+}
+
+/// Second's trace on #5863: an older request's slow send (R) is still
+/// under way when a newer write is prepared, read back and sent (S); S is
+/// cut, its own answer fenced to "not running", and R's answer comes
+/// after S's but before the recovery reads it. The services keep each
+/// request's send, so S's held line is still told "sent", and nothing is
+/// prepared again.
+#[tokio::test]
+async fn an_older_slow_send_finishing_late_never_hides_a_newer_one() {
+    let send = |id: &str, send_id: &str| {
+        call(
+            id,
+            crate::services::WRITE,
+            json!({"service": "google_drive", "send_id": send_id}),
+        )
+    };
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Go ahead and send it.".to_owned()),
+                Ok("Save a note called Notes, buy milk.".to_owned()),
+                Ok("Go ahead and send it.".to_owned()),
+                Ok(String::new()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![send("r1", "s0")])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "p1",
+                        crate::services::WRITE,
+                        json!({"service": "google_drive", "title": "Notes", "text": "Buy milk"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    text("A file Notes: Buy milk. Say go ahead and send it."),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![send("s1", "s2")])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "p2",
+                        crate::services::WRITE,
+                        json!({"service": "google_drive", "title": "Notes", "text": "Buy milk"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("It's in your Drive now."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let writes: Writes = Arc::default();
+    let seen = writes.clone();
+    let late = Arc::new(tokio::sync::Notify::new());
+    let (sending_s, s_under_way) = std::sync::mpsc::channel();
+    let runner: ToolRunner = Arc::new(move |request, _, name, args| {
+        if name == crate::services::WRITE {
+            seen.lock().unwrap().push(args.clone());
+        }
+        let late = late.clone();
+        let sending_s = sending_s.clone();
+        let send_id = args["send_id"].as_str().map(str::to_owned);
+        Box::pin(async move {
+            match send_id.as_deref() {
+                // R: answered only once S's answer is in.
+                Some("s0") => {
+                    let _ = tokio::time::timeout(Duration::from_secs(3), late.notified()).await;
+                    let told = json!({"sent": false, "error": "too slow"});
+                    crate::services::keep_send_for_test(request, Some(&told));
+                    told
+                }
+                // S: sent, then fenced, R finishing in between.
+                Some(_) => {
+                    let _ = sending_s.send(());
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+                    let sent = json!({"sent": true, "service": "google_drive"});
+                    crate::services::keep_send_for_test(request, Some(&sent));
+                    late.notify_one();
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                    crate::tools::unavailable()
+                }
+                None => json!({"read_back": "A file Notes: Buy milk", "send_id": "s2"}),
+            }
+        })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false);
+    let until = async |engine: &mut Engine, request: u64| loop {
+        let event = tokio::time::timeout(Duration::from_secs(5), engine.next())
+            .await
+            .expect("the turn ends");
+        if matches!(event, ProviderOutput::TurnComplete { request: of, .. } if of == request) {
+            break;
+        }
+    };
+    // R begins, and a newer line cuts it while its send is under way.
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    while writes.lock().unwrap().is_empty() {
+        let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+    }
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    until(&mut engine, 2).await;
+    // The read-back's "send", cut while S is under way.
+    engine.submit(start(3));
+    engine.retire_through(2);
+    engine.submit(audio(3, 1));
+    engine.submit(end(3));
+    loop {
+        if s_under_way.try_recv().is_ok() {
+            break;
+        }
+        let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+    }
+    engine.submit(start(4));
+    engine.retire_through(3);
+    engine.submit(audio(4, 1));
+    engine.submit(end(4));
+    let mut said = Vec::new();
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(5), engine.next())
+            .await
+            .expect("the held line's turn ends");
+        match event {
+            ProviderOutput::Transcript {
+                request: Some(4),
+                text,
+                ..
+            } if !text.is_empty() => said.push(text),
+            ProviderOutput::TurnComplete { request: 4, .. } => break,
+            _ => {}
+        }
+    }
+    assert_eq!(
+        crate::services::send_state(1),
+        Some(crate::services::SendState::Told(
+            json!({"sent": false, "error": "too slow"})
+        )),
+        "R finished after S"
+    );
+    let asked = script.asked.lock().unwrap();
+    let held = asked.last().unwrap();
+    assert!(
+        held.iter()
+            .any(|message| message.tool_call_id.as_deref() == Some("s1")
+                && message
+                    .words()
+                    .is_some_and(|told| told.contains("\"sent\":true"))),
+        "S's own sent answer goes with the words: {held:?}"
+    );
+    assert!(
+        held.iter().any(|message| message.role == "system"
+            && message
+                .words()
+                .is_some_and(|note| note.contains("already sent"))),
+        "the model is told the write was sent: {held:?}"
+    );
+    assert_eq!(
+        writes.lock().unwrap().len(),
+        3,
+        "R, the prepare and S: nothing prepared again {:?}",
+        writes.lock().unwrap()
     );
     assert_eq!(said, ["It's in your Drive now."]);
 }
