@@ -4460,8 +4460,13 @@ after a take-over, but now for every turn:
       keep claim is checked again. Completed non-memory calls retain their
       existing confirmation allowance.
       This reset does not read the memory service or add a chat round;
-      normal context is composed again on the next turn. Face-only forgets retain their
-      existing path. Tests are in `second_provider/tests/after_forget.rs`
+      normal context is composed again on the next turn. A `forget_my_face`
+      call does not trigger this active-turn context reset. When it also
+      runs `forget_everything`, its `face_and_memory` adapter carries the
+      fixed cleanup states and `everything: false`, with a fixed explanation
+      when primary memory is gone but related cleanup remains unconfirmed
+      ([memory.md](memory.md)); this does not add a context reset.
+      Tests are in `second_provider/tests/after_forget.rs`
       and `held_forget.rs`, with the prior acting-answer case in
       `short_done.rs`; a lamp replay is still needed. This boundary
       clears model context, not speech already queued: a pre-forget piece,
