@@ -376,7 +376,7 @@ with `Z` (`2026-10-27T08:40:01Z`): convert it to local time yourself. `welcome`,
 - `phrase.heard`: `phrase`, one this computer registered; never what else was said. Grant
   `hear`. **A known bug on the customer build (9 Nov):** a subscribed phrase was not
   delivered, though the lamp heard the line. Don't build on it until it's marked fixed.
-- `name.heard`: no fields on the customer build: the lamp's name was called. Grant `hear`.
+- `name.heard`: the lamp's name was called; no fields on 10824, and `score` on 11048. Grant `hear`.
   Works today (9 Nov 2026). A sound like the name can wake the lamp, so a `name.heard` may
   come with nobody calling; 11048 adds `score` (0–1, how sure the listener was;
   real calls score 0.90 to 1.00), so a program that acts on its own can ask for more, e.g.
@@ -390,7 +390,8 @@ with `Z` (`2026-10-27T08:40:01Z`): convert it to local time yourself. `welcome`,
   In today's build, lamp run pending.
 - `body.state`: `joints` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`, each `deg`, `counts`,
   `goal_deg`, `load`, `moving`, `temp_c`) and `lamp` (`light`, `talking`, `private`); about
-  12.5 a second. Grant `body`. Next build (PR #4564).
+  12.5 a second. Grant `body`. Works today (9 Nov 2026, the customer build 11048): 50 in
+  4 s with all five joints and their `temp_c`, and none after `unsubscribe`.
 - `air.changed`: `pm1_0`, `pm2_5`, `pm4_0`, `pm10`, `co2_ppm`, `humidity`, `temperature`,
   `feel`; at most once every 5 s. Grant `air`. In today's build, lamp run pending.
 - `volume.changed`: `level` (0–100), `muted`. Grant `speak`. In today's build; lamp run on 10824
@@ -765,12 +766,12 @@ Events as they came to the SDK, with nothing removed but secrets:
 ```json
 {"ev": "name.heard", "at": "2026-11-09T07:54:02Z"}
 ```
-on the customer build's lamp-control (10824), and with the score (11048, lamp run pending):
+on the customer build's lamp-control (10824), and with the score on the customer build 11048 (9 Nov 2026):
 ```json
-{"ev": "name.heard", "at": "2026-11-09T08:55:45Z", "score": 1.0}
+{"ev": "name.heard", "at": "2026-11-09T15:30:03Z", "score": 1.0}
 ```
 
-`body.state` (11048, lamp run pending), in the shape the lamp sends it, `at` in UTC (one joint shown):
+`body.state` (works today on 11048, 9 Nov 2026), in the shape the lamp sends it, `at` in UTC (one joint shown):
 ```json
 {"ev":"body.state","at":"2026-10-30T08:40:00Z","joints":{"yaw":{"deg":-25.8,"counts":1722,"goal_deg":-22.9,"load":0.1,"moving":true,"temp_c":41}},"lamp":{"light":{"on":true,"colour":"warm","level":3},"talking":false,"private":false}}
 ```
@@ -781,7 +782,7 @@ A test lamp sent all five joints in each event, and `lamp` with `light`, `talkin
 
 ## Plan and status
 
-Last verified 9 Nov 2026, on a test lamp running the customer build (10824).
+Last verified 9 Nov 2026, on a test lamp running a customer build: 10824 unless a row names 11048.
 
 | What | Status | Notes |
 |---|---|---|
@@ -794,7 +795,7 @@ Last verified 9 Nov 2026, on a test lamp running the customer build (10824).
 | Look ahead or to an angle; joints yaw and pitch | works today (9 Nov 2026) | |
 | Your own `move` | works today (9 Nov 2026) | |
 | Events: the name called (`name.heard`) | works today (9 Nov 2026) | about 1.9 s after the line ends |
-| `name.heard` says how sure it is (`score`) | in today's build (11048), lamp run pending | on 10824 a `name.heard` came with no score, and could come with nobody calling |
+| `name.heard` says how sure it is (`score`) | works today (9 Nov 2026) | 2 of 2 calls came with `score: 1.0` on 11048, about 3.2 and 3.5 s from the start of the line; on 10824 a `name.heard` came with no score, and could come with nobody calling |
 | Leases, and the person coming first | works today (9 Nov 2026) | |
 | Turns: start a turn | works today (9 Nov 2026) | the lamp's own model answers the turn |
 | Turns: end a turn, the program's own mute | in today's build, lamp run pending | ending a turn that hasn't begun yet is refused `busy`; `stop()` drops it |
@@ -805,7 +806,7 @@ Last verified 9 Nov 2026, on a test lamp running the customer build (10824).
 | Volume | works today (9 Nov 2026) | set, step and read; `volume.changed` not yet shown |
 | A new motion replaces the one playing | in today's build (11048), lamp run pending | 10824 refused `busy` with `retry_ms` |
 | A look on a resting lamp says `clamped` | in today's build (11048), lamp run pending | 10824 may answer `cut_short` |
-| `body.state`: where each joint is, live | in today's build (11048), lamp run pending | 12.5 a second |
+| `body.state`: where each joint is, live | works today (9 Nov 2026) | on 11048: 12.5 a second, all five joints with `temp_c`; none after `unsubscribe` |
 | Skill push on customer lamps | next build (#5819; push, list, remove and a revoke shown on a test lamp under the next build's unit, 9 Nov 2026) | stable 11048 refuses "skill push is not on this lamp" |
 | A move from poses (`move_poses`) | next build (#5817) | the lamp plays the move today |
 | Knowing when a motion ended (`wait=True`) | next build, lamp run pending | today it returns when the lamp takes it |
