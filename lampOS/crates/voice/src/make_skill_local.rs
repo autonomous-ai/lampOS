@@ -2090,6 +2090,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             questions: false,
             now: false,
             one_yes: false,
+            reply_named: false,
         };
         for tasks in [None, Some(tasks)] {
             let off = Settings {

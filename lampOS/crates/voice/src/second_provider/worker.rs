@@ -29561,6 +29561,7 @@ mod memory_observer {
             questions: false,
             now: false,
             one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -29829,6 +29830,7 @@ mod memory_observer {
             questions: false,
             now: false,
             one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };

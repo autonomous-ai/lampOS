@@ -152,6 +152,17 @@ pub const CORRECT_FLAG: &str = "--tasks-correct";
 /// the task prepared in its own turn. `on` only.
 pub const ONE_YES_ENVIRONMENT: &str = "LAMP_TASKS_ONE_YES";
 pub const ONE_YES_FLAG: &str = "--tasks-one-yes";
+/// Where it reads whether the person may name one of their sessions for
+/// the work ([`Place::reply_named`], #5535): [`START`] takes a `session`,
+/// sent to the tasks part with the task, which types it into that session
+/// (`lamp-tasks serve --reply-named`). `on` only.
+pub const REPLY_NAMED_ENVIRONMENT: &str = "LAMP_TASKS_REPLY_NAMED";
+pub const REPLY_NAMED_FLAG: &str = "--tasks-reply-named";
+/// The longest session words sent, as the tasks part takes them
+/// (`lamp_tasks::harness::MOST_SESSION_BYTES`).
+const MOST_SESSION_BYTES: usize = 128;
+/// [`START`]'s `session` parameter with [`REPLY_NAMED_FLAG`].
+const SESSION: &str = "Only if the person named one of their sessions to give this to (\"the docs session\"): its name as they said it. Never guessed, never from the work.";
 /// Where the second route reads whether a line whose own words ask one of
 /// the staff by name to do something ("ask Claude Code to …") has its
 /// first chat round made to call [`START`] ([`named_ask`], #1722). `on`
@@ -254,6 +265,10 @@ struct Pending {
     /// Prepared with [`CORRECT_FLAG`]: its note says a corrected ask
     /// replaces it.
     correct: bool,
+    /// The session the person named for it ([`REPLY_NAMED_FLAG`], #5535):
+    /// a read-back must say it too ([`reads_back`]), and another session is
+    /// a correction.
+    session: Option<String>,
 }
 
 static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
@@ -743,6 +758,16 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
             }),
         )
     };
+    // With the switch (#5535), the session the person named, if any.
+    let mut start_parameters = start_parameters;
+    if place.reply_named
+        && let Some(properties) = start_parameters["properties"].as_object_mut()
+    {
+        properties.insert(
+            "session".into(),
+            json!({"type": "string", "description": SESSION}),
+        );
+    }
     let mut tools = vec![
         Tool {
             name: START.into(),
@@ -1584,6 +1609,9 @@ pub struct Place {
     pub now: bool,
     /// A spoken hand-over needs one yes ([`ONE_YES_FLAG`], #5169).
     pub one_yes: bool,
+    /// The person may name one of their sessions for the work
+    /// ([`REPLY_NAMED_FLAG`], #5535).
+    pub reply_named: bool,
 }
 
 /// The provider worker's arguments for what the environment says.
@@ -1632,7 +1660,19 @@ pub fn arguments_from_environment() -> Vec<String> {
     ) {
         arguments.push(ONE_YES_FLAG.to_owned());
     }
+    if reply_named(
+        &arguments,
+        std::env::var(REPLY_NAMED_ENVIRONMENT).ok().as_deref(),
+    ) {
+        arguments.push(REPLY_NAMED_FLAG.to_owned());
+    }
     arguments
+}
+
+/// Whether [`REPLY_NAMED_FLAG`] goes after `arguments`: `on`, and only with
+/// the tasks part; it needs no other switch.
+fn reply_named(arguments: &[String], value: Option<&str>) -> bool {
+    value == Some("on") && !arguments.is_empty()
 }
 
 /// Whether [`SIGN_IN_APP_FLAG`] goes after `arguments`: `on`, and only
@@ -1814,6 +1854,10 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
         [flag, rest @ ..] if flag == ONE_YES_FLAG => (true, rest),
         _ => (false, rest),
     };
+    let (reply_named, rest) = match rest {
+        [flag, rest @ ..] if flag == REPLY_NAMED_FLAG => (true, rest),
+        _ => (false, rest),
+    };
     Ok((
         Some(Place {
             directory: PathBuf::from(directory),
@@ -1832,6 +1876,7 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
             questions,
             now,
             one_yes,
+            reply_named,
         }),
         rest,
     ))
@@ -1927,6 +1972,16 @@ fn plain_words(text: &str) -> Vec<String> {
                 .to_lowercase()
         })
         .filter(|word| !word.is_empty())
+        .collect()
+}
+
+/// The words of a session's name, or of a line it is looked for in, as the
+/// tasks part splits a name to match it (`lamp_tasks::harness` `words_of`):
+/// runs of letters and digits, lowercased, every one kept.
+fn name_words(text: &str) -> Vec<String> {
+    text.split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
         .collect()
 }
 
@@ -2109,7 +2164,11 @@ fn before_the_question(line: &str) -> &str {
 /// name, which `named` already holds, and "uninstall the codecs" still
 /// needs "codecs" said back. A read-back that
 /// is one question alone ("Shall Claude Code fix the tests?") reads back
-/// nothing, which costs a second yes. Only the one-yes rule
+/// nothing, which costs a second yes. A session the person named
+/// ([`REPLY_NAMED_FLAG`], #5535) must be said back too, before the closing
+/// question, by its exact words in order: a yes to a line that never said
+/// it doesn't send the work into it (the Reviewer-lead's P2 on #5784,
+/// Reviewer-three's P2 on it). Only the one-yes rule
 /// ([`yes_in_the_same_turn`]) reads it.
 fn reads_back(line: &str, pending: &Pending) -> bool {
     let words = plain_words(line);
@@ -2126,13 +2185,41 @@ fn reads_back(line: &str, pending: &Pending) -> bool {
             !name.is_empty() && joined.contains(&name)
         });
     let forms = name_forms(pending);
-    let said = without_first_form(plain_words(before_the_question(line)), &forms);
+    // With a session, the line is split as the tasks part splits a name
+    // (`lamp_tasks::harness` `words_of`: letters and digits, an apostrophe
+    // splitting a word, every word kept; the Reviewer-lead's P3 on #5784).
+    let split = if pending.session.is_some() {
+        name_words
+    } else {
+        plain_words
+    };
+    let said = without_first_form(split(before_the_question(line)), &forms);
     let task_words = without_address(
         plain_words(question_of(&pending.text).unwrap_or(&pending.text)),
         &forms,
     );
     let task = content_words(&task_words.join(" "));
+    // A session the person named is said back as where the work goes, not
+    // as task words: its words exactly, in order, never by stem, so "file"
+    // is not "files" and "api" is not "the api", which Harness may find as
+    // other sessions. The words that say it are taken out first, so a word
+    // the task has too ("the readme" session for "add a line to the
+    // readme") is said twice (the Reviewer-lead's P3 on #5784's READ-OK).
     let mut unused: Vec<&str> = said.iter().map(String::as_str).collect();
+    if let Some(session) = &pending.session {
+        let run = name_words(session);
+        let at = (!run.is_empty())
+            .then(|| {
+                unused
+                    .windows(run.len())
+                    .position(|said| said == run.as_slice())
+            })
+            .flatten();
+        let Some(at) = at else {
+            return false;
+        };
+        unused.drain(at..at + run.len());
+    }
     named
         && !task.is_empty()
         && task.iter().all(|word| {
@@ -2302,6 +2389,17 @@ fn unreached(place: &Place) -> Value {
     }
 }
 
+/// The tasks part's `prepare` request: with a session only when the
+/// person named one ([`REPLY_NAMED_FLAG`], #5535), so without it the
+/// request is as it always was.
+fn preparation(guard: Value, task: &str, target: &str, session: Option<&str>) -> Value {
+    let mut request = json!({"op":"prepare","guard":guard,"text":task,"target":target});
+    if let Some(session) = session {
+        request["session"] = json!(session);
+    }
+    request
+}
+
 /// [`run`] with the staff as known.
 fn run_for(
     place: &Place,
@@ -2344,6 +2442,30 @@ fn run_for(
                     true,
                 );
             }
+            // The session the person named (#5535): only with the switch,
+            // and refused, not cut, when it can't be a session's name.
+            let session = if place.reply_named {
+                call.args
+                    .get("session")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|session| !session.is_empty())
+            } else {
+                None
+            };
+            // A session of no words that name anything ("the one") can't be
+            // said back or told apart: asked about, never sent (the
+            // Reviewer-lead's P3 on #5784's READ-OK).
+            if session.is_some_and(|session| {
+                session.len() > MOST_SESSION_BYTES
+                    || session.chars().any(char::is_control)
+                    || content_words(session).is_empty()
+            }) {
+                return (
+                    json!({"error": "That is not a session's name: ask which session they mean, in a few words."}),
+                    true,
+                );
+            }
             // Who is settled before the tasks part is asked anything.
             let member = match chosen(place, staff, &call.args) {
                 Ok(member) => member,
@@ -2352,6 +2474,15 @@ fn run_for(
             let (target, who) = member.map_or((place.target.as_str(), CLAUDE_CODE), |member| {
                 (member.alias.as_str(), member.kind.name)
             });
+            // Devin's cloud has no sessions of the person's to name (the
+            // Reviewer-lead's P3 on #5784): refused, never sent.
+            if session.is_some() && member.is_some_and(|member| member.kind.engine == "devin-cloud")
+            {
+                return (
+                    json!({"error": "Devin works in its own cloud, with no session of theirs to name: hand it over without one, or to another agent."}),
+                    true,
+                );
+            }
             let recorded;
             let task = if place.questions && is_question(task) {
                 recorded = format!("{task} {PAST_WORK}");
@@ -2381,7 +2512,7 @@ fn run_for(
             };
             let mut prepared = ask_until_sure(
                 &place.directory.join("request.sock"),
-                &json!({"op":"prepare","guard":guard,"text":task,"target":target}),
+                &preparation(guard, task, target, session),
                 left,
             );
             // The target the work was prepared for, for the read-back.
@@ -2402,7 +2533,7 @@ fn run_for(
                         };
                         prepared = ask_until_sure(
                             &place.directory.join("request.sock"),
-                            &json!({"op":"prepare","guard":again,"text":task,"target":other}),
+                            &preparation(again, task, &other, session),
                             left,
                         );
                         sent_to = other;
@@ -2433,7 +2564,9 @@ fn run_for(
                             .filter(|waiting| {
                                 place.correct
                                     && waiting.id != id
-                                    && (waiting.text != task || waiting.who != who)
+                                    && (waiting.text != task
+                                        || waiting.who != who
+                                        || waiting.session.as_deref() != session)
                                     && may_confirm(waiting, request, heard, Instant::now())
                             })
                             .map(|waiting| waiting.id);
@@ -2445,6 +2578,7 @@ fn run_for(
                             who,
                             text: task.to_owned(),
                             correct: place.correct,
+                            session: session.map(str::to_owned),
                         });
                     }
                     if let Some(old) = replaced {
@@ -2466,6 +2600,12 @@ fn run_for(
                     });
                     let place_said = if cloud {
                         format!("{who}, in Devin's cloud")
+                    } else if let Some(session) = session {
+                        // The read-back says who, and where it goes (#5535).
+                        format!(
+                            "{who}, in the session \"{session}\" on {}, not a new one",
+                            where_done(place, &sent_to)
+                        )
                     } else {
                         format!("{who} on {}", where_done(place, &sent_to))
                     };
@@ -3124,6 +3264,7 @@ pub(crate) mod tests {
             questions: false,
             now: false,
             one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -3180,6 +3321,7 @@ pub(crate) mod tests {
             who: CLAUDE_CODE,
             text: String::new(),
             correct: false,
+            session: None,
         };
         assert!(may_confirm(&pending, 6, true, at + Duration::from_secs(10)));
         // In the request that prepared it: the model asking itself.
@@ -3216,6 +3358,7 @@ pub(crate) mod tests {
             who: CLAUDE_CODE,
             text: String::new(),
             correct: false,
+            session: None,
         };
         assert!(may_confirm(
             &pending,
@@ -3248,7 +3391,102 @@ pub(crate) mod tests {
             who: CLAUDE_CODE,
             text: "Write a two-line poem about the moon".into(),
             correct: false,
+            session: None,
         }
+    }
+
+    /// The Reviewer-lead's P2 on #5784: with a session named, a read-back
+    /// that never said it is no read-back, so a yes to it doesn't start the
+    /// task, and the work never goes into a session the lamp didn't say.
+    #[test]
+    fn a_read_back_must_say_the_named_session() {
+        let at = Instant::now();
+        let now = at + Duration::from_secs(1);
+        let named = Pending {
+            session: Some("docs update".into()),
+            ..moon(at)
+        };
+        let unsaid = MOON_BACK;
+        let said = "Claude Code will write a two-line poem about the moon in the docs update session on your office computer. Shall I start it?";
+        assert!(reads_back(unsaid, &moon(at)));
+        assert!(!reads_back(unsaid, &named));
+        assert!(reads_back(said, &named));
+        let half = "Claude Code will write a two-line poem about the moon in the docs session. Shall I start it?";
+        assert!(!reads_back(half, &named));
+        let yes = |line: &str| {
+            yes_in_the_same_turn(
+                &named,
+                9,
+                true,
+                Some("Yes."),
+                Some((line, Duration::from_secs(8), false)),
+                now,
+            )
+        };
+        assert!(!yes(unsaid));
+        assert!(yes(said));
+        // A session word the task has too is said back on its own.
+        let readme = Pending {
+            text: "Add a line to the readme".into(),
+            session: Some("readme".into()),
+            ..moon(at)
+        };
+        assert!(!reads_back(
+            "Claude Code will add a line to the readme. Shall I start it?",
+            &readme
+        ));
+        assert!(reads_back(
+            "Claude Code will add a line to the readme, in the readme session. Shall I start it?",
+            &readme
+        ));
+        // Reviewer-three's P2 on #5784: "file" said is not the "files"
+        // session prepared, whose words are taken exactly, never by stem.
+        let files = Pending {
+            session: Some("files".into()),
+            ..moon(at)
+        };
+        let file_line = "Claude Code will write a two-line poem about the moon in the file session. Shall I start it?";
+        assert!(!reads_back(file_line, &files));
+        assert!(!yes_in_the_same_turn(
+            &files,
+            9,
+            true,
+            Some("Yes."),
+            Some((file_line, Duration::from_secs(8), false)),
+            now,
+        ));
+        assert!(reads_back(
+            "Claude Code will write a two-line poem about the moon in the files session. Shall I start it?",
+            &files
+        ));
+        // Every word, filler too: "the api" needs "the api" said, not
+        // "api" alone, which Harness may find as another session.
+        let the_api = Pending {
+            session: Some("the api".into()),
+            ..moon(at)
+        };
+        assert!(!reads_back(
+            "Claude Code will write a two-line poem about the moon in your api session. Shall I start it?",
+            &the_api
+        ));
+        assert!(reads_back(
+            "Claude Code will write a two-line poem about the moon in your the api session. Shall I start it?",
+            &the_api
+        ));
+        // Split as the tasks part splits: "bob's notes" is "bob s notes".
+        let bobs = Pending {
+            session: Some("bob's notes".into()),
+            ..moon(at)
+        };
+        assert!(reads_back(
+            "Claude Code will write a two-line poem about the moon in Bob's notes. Shall I start it?",
+            &bobs
+        ));
+        // In order: "update docs" is not the "docs update" session.
+        assert!(!reads_back(
+            "Claude Code will write a two-line poem about the moon in the update docs session. Shall I start it?",
+            &named
+        ));
     }
 
     const MOON_BACK: &str = "Claude Code will write a two-line poem about the moon on your office computer. Shall I start it?";
@@ -3857,6 +4095,235 @@ pub(crate) mod tests {
         assert!(!take(&flags).unwrap().0.unwrap().one_yes);
     }
 
+    /// #5535: `LAMP_TASKS_REPLY_NAMED=on` with the tasks part gives
+    /// [`REPLY_NAMED_FLAG`], taken after the other switches; only then does
+    /// [`START`] take a `session`.
+    #[test]
+    fn the_reply_named_switch_is_on_only_with_the_tasks_part_and_adds_session() {
+        let tasks = vec![FLAG.to_owned(), "/run/t".to_owned()];
+        assert!(reply_named(&tasks, Some("on")));
+        assert!(!reply_named(&tasks, Some("1")));
+        assert!(!reply_named(&tasks, None));
+        assert!(!reply_named(&[], Some("on")));
+        let flags: Vec<String> = [FLAG, "/run/t", ONE_YES_FLAG, REPLY_NAMED_FLAG, "--next"]
+            .map(str::to_owned)
+            .to_vec();
+        let (place, rest) = take(&flags).unwrap();
+        let place = place.unwrap();
+        assert!(place.reply_named && place.one_yes);
+        assert_eq!(rest, ["--next".to_owned()]);
+        let off = take(&[FLAG.to_owned(), "/run/t".to_owned()])
+            .unwrap()
+            .0
+            .unwrap();
+        assert!(!off.reply_named);
+        let session = |place: &Place| {
+            let tools = declared(place, &[]);
+            let start = tools.iter().find(|tool| tool.name == START).unwrap();
+            start.parameters.as_ref().unwrap()["properties"]
+                .get("session")
+                .cloned()
+        };
+        assert_eq!(session(&off), None);
+        assert_eq!(session(&place).unwrap()["description"], SESSION);
+        assert_eq!(session(&place).unwrap()["type"], "string");
+        assert!(SESSION.len() < 200);
+    }
+
+    /// The Reviewer-lead's P3s on #5784: with the switch, a corrected ask
+    /// that changes only the session replaces the one waiting, and a
+    /// session named for Devin's cloud is refused before anything is asked
+    /// of the tasks part.
+    #[test]
+    fn another_session_is_a_correction_and_devins_cloud_takes_none() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *PENDING.lock().unwrap() = None;
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-session-fix-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status = |revision: u64| json!({"ok":true,"store_id":"s1","revision":revision,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(0)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"a","revision":1}),
+                ),
+                ("request.sock", status(1)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":8,"prepared_digest":"b","revision":2}),
+                ),
+                ("request.sock", json!({"ok":true,"revision":3})),
+            ],
+        );
+        let mut on = place(&directory, false);
+        on.reply_named = true;
+        on.correct = true;
+        let call = |args: Value| ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args,
+        };
+        let task = "Add a line to the readme";
+        let (told, _) = run(
+            &on,
+            &call(json!({"task":task,"session":"docs"})),
+            3,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        assert!(
+            told["where"]
+                .as_str()
+                .unwrap()
+                .starts_with("Claude Code, in the session \"docs\" on "),
+            "{told}"
+        );
+        let (told, _) = run(
+            &on,
+            &call(json!({"task":task,"session":"site"})),
+            4,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        assert!(
+            told["next"].as_str().unwrap().starts_with(REPLACED_NEXT),
+            "{told}"
+        );
+        let pending = PENDING.lock().unwrap().clone().unwrap();
+        assert_eq!((pending.id, pending.session.as_deref()), (8, Some("site")));
+        let ops: Vec<String> = std::iter::from_fn(|| seen.recv_timeout(PEER_WAIT).ok())
+            .map(|op| op["op"].as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(ops, ["status", "prepare", "status", "prepare", "cancel"]);
+        *PENDING.lock().unwrap() = None;
+        // Devin's cloud: refused, nothing asked of the part.
+        let cloud = [Member {
+            alias: "cloud".into(),
+            kind: KINDS
+                .iter()
+                .find(|kind| kind.engine == "devin-cloud")
+                .unwrap(),
+        }];
+        let mut cloudy = place(&directory, true);
+        cloudy.reply_named = true;
+        cloudy.target = "cloud".into();
+        let (told, answered) = run_for(
+            &cloudy,
+            &cloud,
+            &call(json!({"task":task,"session":"docs"})),
+            5,
+            true,
+            PEER_WAIT,
+        );
+        assert!(answered && told.get("error").is_some(), "{told}");
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #5535: with the switch, a session the person named goes to the tasks
+    /// part with the task, and the read-back says it goes into that
+    /// session, not a new one. Without the switch, or with none named, the
+    /// request is as it always was; words that can't be a session's name
+    /// prepare nothing.
+    #[test]
+    fn a_named_session_is_sent_with_the_task_only_with_the_switch() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-session-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status = |revision: u64| json!({"ok":true,"store_id":"s1","revision":revision,"summary":{"session_id":"sess"}});
+        let prepared = |id: u64| json!({"ok":true,"id":id,"prepared_digest":"abc","revision":1});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(0)),
+                ("request.sock", prepared(7)),
+                ("request.sock", status(1)),
+                ("request.sock", prepared(8)),
+                ("request.sock", status(2)),
+                ("request.sock", prepared(9)),
+            ],
+        );
+        let mut on = place(&directory, false);
+        on.reply_named = true;
+        let off = place(&directory, false);
+        let call = |args: Value| ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args,
+        };
+        let (told, answered) = run(
+            &on,
+            &call(json!({"task":"Add a line to the readme","session":"  docs update "})),
+            3,
+            true,
+            PEER_WAIT,
+        );
+        assert!(answered && told["prepared"] == json!(true), "{told}");
+        assert!(
+            told["where"]
+                .as_str()
+                .unwrap()
+                .starts_with("Claude Code, in the session \"docs update\" on "),
+            "{told}"
+        );
+        assert!(told["where"].as_str().unwrap().ends_with(", not a new one"));
+        assert_eq!(seen.recv().unwrap()["op"], "status");
+        let prepare = seen.recv().unwrap();
+        assert_eq!(prepare["op"], "prepare");
+        assert_eq!(prepare["session"], "docs update");
+        // Off: the session is not sent, and the read-back is as before.
+        let (told, _) = run(
+            &off,
+            &call(json!({"task":"Add a line to the readme","session":"docs update"})),
+            4,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        assert!(!told["where"].as_str().unwrap().contains("session"));
+        assert_eq!(seen.recv().unwrap()["op"], "status");
+        assert!(seen.recv().unwrap().get("session").is_none());
+        // On, with none named or only spaces: as before.
+        let (told, _) = run(
+            &on,
+            &call(json!({"task":"Add a line to the readme","session":"  "})),
+            5,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        assert_eq!(seen.recv().unwrap()["op"], "status");
+        assert!(seen.recv().unwrap().get("session").is_none());
+        // Words that can't be a session's name: nothing asked of the part.
+        for words in [
+            "docs\nrm".to_owned(),
+            "x".repeat(129),
+            "the that".to_owned(),
+        ] {
+            let (told, answered) = run(
+                &on,
+                &call(json!({"task":"Add a line to the readme","session":words})),
+                6,
+                true,
+                PEER_WAIT,
+            );
+            assert!(answered && told.get("error").is_some(), "{told}");
+        }
+        assert!(seen.try_recv().is_err());
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
     #[test]
     fn the_switch_is_an_absolute_directory_and_an_alias_and_is_taken_from_the_front() {
         assert!(arguments(None, None, None, None, None, None, None, None, None).is_empty());
@@ -3979,6 +4446,7 @@ pub(crate) mod tests {
                 questions: false,
                 now: false,
                 one_yes: false,
+                reply_named: false,
                 sign_in: false,
                 sign_in_app: false,
             })
@@ -4392,6 +4860,7 @@ pub(crate) mod tests {
             questions: false,
             now: false,
             one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -4647,6 +5116,7 @@ pub(crate) mod tests {
             questions: false,
             now: false,
             one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -4732,6 +5202,7 @@ pub(crate) mod tests {
             questions: false,
             now: false,
             one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -4825,6 +5296,7 @@ pub(crate) mod tests {
             questions: false,
             now: false,
             one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -4883,6 +5355,7 @@ pub(crate) mod tests {
             questions: false,
             now: false,
             one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -4943,6 +5416,7 @@ pub(crate) mod tests {
             questions: false,
             now: false,
             one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -5049,6 +5523,7 @@ pub(crate) mod tests {
             questions: false,
             now: false,
             one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         }
@@ -5454,6 +5929,7 @@ pub(crate) mod tests {
             questions: false,
             now: false,
             one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         }
@@ -6621,6 +7097,7 @@ pub(crate) mod tests {
                 who: CLAUDE_CODE,
                 text: "Summarise the readme in three short lines".into(),
                 correct,
+                session: None,
             });
             let note = pending_note(2, at).unwrap();
             assert_eq!(note.contains("that is not a yes"), correct, "{note}");
@@ -7031,6 +7508,7 @@ pub(crate) mod tests {
                 questions: false,
                 now: false,
                 one_yes: false,
+                reply_named: false,
                 sign_in: false,
                 sign_in_app: false,
             })
@@ -7583,6 +8061,7 @@ pub(crate) mod tests {
             questions: false,
             now: false,
             one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         }
@@ -7888,6 +8367,7 @@ pub(crate) mod tests {
             who: CLAUDE_CODE,
             text: String::new(),
             correct,
+            session: None,
         };
         *PENDING.lock().unwrap() = Some(waiting(false));
         assert_eq!(
