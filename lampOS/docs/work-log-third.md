@@ -1,3 +1,31 @@
+## 2026-11-09 — current adapter native gate and context publication
+
+- Adapter #5874 carried unchanged to `dd3f2c0f1` on train 754. Exact-head
+  ARM64 42622361677 passed 14,864 tests, 110 skipped; release build,
+  doc tests and artifact export passed. Linux 42622361322 and docs
+  42622361297 passed. El's independent privacy READ-OK is 6741063675;
+  the second independent read and PM placement remain pending. Draft.
+- Context is draft #5878 at `09444cb49`, explicitly carrying El #5792
+  and adapter #5874. Latest carry fmt, strict 14-package Clippy, focused
+  face cases 5/0, held-forget 28/0, held-rename 13/0, reset 3/0,
+  claim-evidence 26/0, onboarding 1/0 and workspace build passed.
+  Docs: 192 files, 1,898 links, none broken. Linux 42623144303 and docs
+  42623144129 passed; ARM64 42623144133 is testing. A watcher network
+  timeout was diagnosed and only the watcher resumed, not the CI run.
+- #5863's first repair `9d6edcbf0` still evicted a successful first send
+  on the ninth same-request attempt, then could associate aggregate
+  success with a refused call. Exact retention probe 1/1; HOLD 6740876175.
+  Separate P3 6741137083: repeated generated `call_0` can suppress a new
+  recovered receipt. It does not establish another duplicate external write.
+  Twelve pushed `8562ea72c`; reread in progress, no HOLD lift yet.
+- Fourth owns the separately assigned face queued-speech cancellation.
+  Queue coordination 6741032476 preserves both El's pre-await rename
+  cleanup and Fourth's speech fence. Context latency is host bookkeeping
+  only; no audio, lamp or end-to-end acceptance claimed.
+- Queue through 6741268733: latest plan is tonight's promote subject to
+  acceptance, superseding the earlier morning plan below. Third makes
+  no deployment, live mail/Drive write, or promote.
+
 ## 2026-11-09 — native adapter green; context carry and resolved mail hold
 
 - #5874 `b7420fea1` exact-head ARM64 42616309383 passed 14,855 tests,
