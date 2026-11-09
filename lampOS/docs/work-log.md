@@ -9226,3 +9226,17 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - New promote candidate 11091 / 4342bcccc8 still fails both unchanged
   MCP/Relink/TLS say/turn reconnect probes against exact extracted source.
   Notified PM/Nine on Queue 6742330495. #5873 still open. No deploy/merge.
+
+## 2026-11-09 — Second: prompt cancellation repaired, admission race remains
+
+- HOLD #5870 e1db6ae37e, comment 6742472024. Original actual Parts/Says/
+  ControlTurns prompt test now passes; full control baseline 183 passed.
+  Host end-call to voice-confirmed answer 2.587 ms, not acoustic latency.
+- New actual-socket probe waits until ticket cancellation is observed, then
+  calls admitted before tick, matching coordinator order. admitted returns
+  true and opens prompting turn; production then queues TurnOpened before
+  its later cancellation tick. Expected assertion fails in 0.01 s. Gate
+  admission on cancellation; tick-before-admit author tests miss this case.
+- Saved /tmp/second-5870-prompt-end-fixed.rs and admit-before-tick.rs/logs;
+  temporary integration files removed, checkout/diff clean. No model/device
+  response claim. Source audit independently identified the same ordering.
