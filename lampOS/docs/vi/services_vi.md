@@ -665,27 +665,32 @@ là một dòng tối đa 200, tối đa 20 người nhận hoặc người tham
 một `local@domain.tld` thuần. Google Drive và Ahrefs không có ghi ("the lamp
 only reads …").
 
-**Scope một lần ghi cần** (`writes::SCOPES`). Khi một liên kết là một lần
-đăng nhập (có access token, `auth_type` không phải `pat`) mà danh sách
-`scopes` không rỗng, một `service_write` không có `send_id` được kiểm tra với
-nó trước khi bất cứ gì được chuẩn bị hay giữ, và trước khi hỏi dịch vụ bất cứ
-gì. Một trong các scope sau cho phép lần ghi, mỗi scope khớp nguyên vẹn hoặc
-theo tên sau `https://www.googleapis.com/auth/` (tài liệu của chính các dịch
-vụ: `users.messages.send`, `events.insert`):
+**Scope một lần ghi cần** (`writes::SCOPES`). Kiểm tra này chỉ áp dụng cho
+một liên kết OAuth có ghi lại scope: một lần đăng nhập (có access token,
+`auth_type` không phải `pat`) mà `scopes` có ít nhất một mục không trống.
+Một `service_write` như vậy không có `send_id` được kiểm tra với chúng trước
+khi bất cứ gì được chuẩn bị hay giữ, và trước khi hỏi dịch vụ bất cứ gì. Một
+trong các URL scope đầy đủ sau cho phép lần ghi (tài liệu của chính các dịch
+vụ: `users.messages.send`, `events.insert`), `https://www.googleapis.com/auth/`
+được viết là `…/` ở đây:
 
 | Dịch vụ | Action | Bất kỳ scope nào trong |
 |---|---|---|
-| `gmail`, `gmail-app` | `send_mail` | `gmail.send`, `gmail.compose`, `gmail.modify`, `https://mail.google.com/` |
-| `google_calendar` | `create_event` | `calendar`, `calendar.events`, `calendar.events.owned` |
+| `gmail`, `gmail-app` | `send_mail` | `…/gmail.send`, `…/gmail.compose`, `…/gmail.modify`, `https://mail.google.com/` |
+| `google_calendar` | `create_event` | `…/calendar`, `…/calendar.events`, `…/calendar.events.owned` |
 
-Chỉ liên kết của Google liệt kê scope theo dạng này, nên không dịch vụ nào
-khác có trong bảng (phần ghi của Google Drive, với kiểm tra riêng, là #5825).
+`writes::scope_allows` tách mỗi mục `scopes` theo khoảng trắng (một danh sách
+giữ thành một chuỗi cách nhau bởi dấu cách được đọc như nhau) và khớp mỗi
+scope như một URL đầy đủ, chính xác: một tên trần như `gmail.send` không cho
+phép gì, như phần tạo tệp của Google Drive (#5825) từ chối một `drive.file`
+trần; kiểm tra đó sẽ gọi cùng hàm này khi #5825 vào. Chỉ liên kết của Google
+ghi scope theo dạng này, nên không dịch vụ nào khác có trong bảng.
 Không có scope nào trong số đó thì lệnh gọi thất bại với "<Service> is linked
 without permission to <what>: link it again in the app (Skills, then
 Connectors) and allow it." (`serve::NO_PERMISSION`, sau dấu hai chấm),
 `<what>` là "send mail" hoặc "add calendar events": không gì được giữ, không
 gì được gọi. Một mật khẩu ứng dụng, một khoá cá nhân (`pat`) hoặc một liên kết
-không liệt kê scope thì không bị kiểm tra, như trước.
+không ghi lại scope thì không bị kiểm tra, như trước.
 
 Ở lần "send", một 401 hoặc 403 mà nội dung nói scope của token không đủ, theo
 cách Google nói (`ACCESS_TOKEN_SCOPE_INSUFFICIENT` hoặc
@@ -882,8 +887,16 @@ Một lệnh gọi đến dịch vụ chưa liên kết thất bại với "<Ser
 to this lamp yet. It can be linked in the app: Skills, then Connectors."
 (`serve::NOT_LINKED`), để đèn nói chỗ liên kết, không chỉ nói là chưa có.
 
-Một lệnh gọi nêu một dịch vụ mà đèn không có connector (không có mã trong
-catalogue) thất bại với "The lamp can't link <name> yet. The services it can
+`service` của một lệnh gọi đến một dịch vụ theo đúng mã của nó (mỗi mã Gmail
+đến liên kết Gmail mà đèn có, như trước), nếu không thì theo một mã hoặc tên
+trong catalogue như mô hình có thể nói: không phân biệt hoa thường, khoảng
+trắng và `-` được đọc là `_` ("Google Drive", "GMAIL", "google calendar",
+"GitHub"); với hai dịch vụ cùng một tên (của Figma), là dịch vụ đã liên kết
+(`serve::named`). Lệnh gọi đó khi ấy nhận câu trả lời của dịch vụ đó, hoặc lời
+`NOT_LINKED` của nó.
+
+Một lệnh gọi nêu một dịch vụ mà đèn không có connector (không mã hay tên nào
+trong catalogue khớp) thất bại với "The lamp can't link <name> yet. The services it can
 link are in the app: Skills, then Connectors." (`serve::CANT_LINK`, sau câu
 đầu). `<name>` là tên lệnh gọi đưa ra, chỉ được nói khi nó tối đa 40 ký tự,
 toàn chữ cái, chữ số, khoảng trắng, `-` hoặc `_`; mọi tên khác, hoặc không có
@@ -1352,7 +1365,10 @@ lần gửi hay một sự kiện mà scope được liệt kê của liên kế
 từ chối bằng lời rõ ràng, không gì được giữ hay gọi, một lần được cho phép
 được đọc lại, một lần gửi Google từ chối vì scope được nói cùng lời đó và mọi
 403 khác giữ lời riêng, một liên kết không liệt kê scope (mật khẩu ứng dụng,
-khoá cá nhân) không bị kiểm tra, và một dịch vụ đèn không liên kết được thì
+khoá cá nhân) không bị kiểm tra, một scope chỉ cho phép khi là URL đầy đủ
+(một chuỗi cách nhau bởi dấu cách được đọc như danh sách, một `gmail.send`
+trần bị từ chối), một dịch vụ được nói theo tên ("Google Drive", "GMAIL")
+đến được nó, và một dịch vụ đèn không liên kết được thì
 được nói như vậy, một tên độc hại được nói là "that service"; luật
 đọc/ghi MCP, host được ghim của nó, một liên kết trên host khác không bao giờ
 được gọi, một tool ghi được đọc lại trọn và gọi một lần khi gửi; yêu cầu làm

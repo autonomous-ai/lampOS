@@ -411,13 +411,42 @@ impl<H: Http, M: Mail> Services<H, M> {
         }
     }
 
+    /// The service `asked` names: its code exactly (through
+    /// [`Self::linked_code`]), else a code or a name as the model may say
+    /// it ("Google Drive", "GMAIL"), case aside and spaces and `-` read as
+    /// `_`. Of two services with one name (Figma's), the linked one.
+    fn named(&self, asked: &str) -> Option<&'static catalog::Service> {
+        if let Some(service) = catalog::service(self.linked_code(asked)) {
+            return Some(service);
+        }
+        let plain = |name: &str| -> String {
+            name.trim()
+                .chars()
+                .map(|c| match c {
+                    ' ' | '-' => '_',
+                    c => c.to_ascii_lowercase(),
+                })
+                .collect()
+        };
+        let asked = plain(asked);
+        let matched: Vec<&'static catalog::Service> = catalog::SERVICES
+            .iter()
+            .filter(|service| plain(service.code) == asked || plain(service.name) == asked)
+            .filter_map(|service| catalog::service(self.linked_code(service.code)))
+            .collect();
+        matched
+            .iter()
+            .find(|service| self.store.load(service.code).is_some())
+            .or(matched.first())
+            .copied()
+    }
+
     /// The service a call names, linked, its token renewed if it is near
     /// its end and the backend is known.
     async fn linked(&self, args: &Value) -> Result<(&'static catalog::Service, Entry), String> {
         let asked = args.get("service").and_then(Value::as_str);
         let service = asked
-            .map(|asked| self.linked_code(asked))
-            .and_then(catalog::service)
+            .and_then(|asked| self.named(asked))
             .ok_or_else(|| cant_link(asked))?;
         let mut entry = self
             .store
@@ -690,8 +719,8 @@ impl<H: Http, M: Mail> Services<H, M> {
         let asked = args.get("service").and_then(Value::as_str);
         if let Some(why) = asked.and_then(reads::never_read).or_else(|| {
             asked
-                .map(|asked| self.linked_code(asked))
-                .and_then(reads::never_read)
+                .and_then(|asked| self.named(asked))
+                .and_then(|service| reads::never_read(service.code))
         }) {
             return Err(why.into());
         }
@@ -780,9 +809,11 @@ impl<H: Http, M: Mail> Services<H, M> {
             "nothing is waiting to be sent: it was cancelled, already sent or over two minutes old",
         )?;
         // Compared as linked: a send prepared as `gmail-app` may be
-        // confirmed as `gmail`, and the reverse, as [`Self::linked_code`].
+        // confirmed as `gmail`, and the reverse, as [`Self::linked_code`];
+        // and by any name [`Self::named`] reads as its service.
         let asked = args.get("service").and_then(Value::as_str);
-        if asked.map(|asked| self.linked_code(asked)) != Some(self.linked_code(pending.service)) {
+        let code = |asked: &str| self.named(asked).map(|service| service.code);
+        if asked.and_then(code).is_none() || asked.and_then(code) != code(pending.service) {
             return Err("that send_id is for another service; nothing was sent".into());
         }
         let (service, entry) = self.linked(args).await?;
@@ -2489,6 +2520,62 @@ mod tests {
         }
         let read = run(services.tool(&read_line(json!({"service":"dropbox","what":"files"}))));
         assert_eq!(read["error"], cant("dropbox"));
+        assert!(services.http.calls.lock().unwrap().is_empty());
+    }
+
+    /// A service named as the model may say it, by its name or its code in
+    /// any case, with spaces or `-` for `_`, reaches that service: its
+    /// linked answer, or its words for not linked, never "can't link".
+    #[test]
+    fn a_service_said_by_its_name_reaches_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = services(dir.path(), "{}", true);
+        let ask = |service: &str, args: Value| {
+            let mut args = args;
+            args["service"] = json!(service);
+            let line = json!({"op":"call","name":"service_write","args":args});
+            run(services.tool(&line.to_string()))
+        };
+        let mail = json!({"action":"send_mail","to":["mom@home.test"],"subject":"Dinner","text":"Home by 7"});
+        let comment = json!({"action":"comment","repo":"o/r","number":3,"text":"LGTM"});
+        for (asked, name) in [
+            ("Google Drive", "Google Drive"),
+            ("GMAIL", "Gmail"),
+            ("google calendar", "Google Calendar"),
+            ("google-calendar", "Google Calendar"),
+            ("GitHub", "GitHub"),
+        ] {
+            assert_eq!(
+                ask(asked, mail.clone())["error"],
+                format!("{name} {NOT_LINKED}"),
+                "{asked}"
+            );
+        }
+        assert_eq!(
+            ask("Outlook", mail.clone())["error"],
+            "The lamp can't link Outlook yet. The services it can link are in the app: Skills, then Connectors."
+        );
+        run(services.admin(&set_line(
+            "github",
+            json!({"auth_type":"pat","access_token":"ghp-planted"}),
+        )));
+        run(services.admin(&set_line(
+            "gmail",
+            json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":"me@home.test"}}),
+        )));
+        let answer = ask("GitHub", comment);
+        assert_eq!(answer["ok"], true, "{answer}");
+        let answer = ask("GMAIL", mail);
+        assert_eq!(answer["ok"], true, "{answer}");
+        // Sent by "send" under either way of saying it.
+        let id = answer["result"]["send_id"].as_str().unwrap().to_owned();
+        let line = json!({"op":"call","name":"service_write",
+            "args":{"service":"Gmail","send_id":id,"said":"send"}});
+        let sent = run(services.tool(&line.to_string()));
+        assert_ne!(
+            sent["error"], "that send_id is for another service; nothing was sent",
+            "{sent}"
+        );
         assert!(services.http.calls.lock().unwrap().is_empty());
     }
 

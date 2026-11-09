@@ -78,10 +78,10 @@ pub struct Allowed {
 }
 
 /// The scopes a write needs, from each service's own docs (Gmail's
-/// `users.messages.send`, Calendar's `events.insert`). Only Google's links
-/// list their scopes in this form; a scope is matched whole or as the name
-/// after `https://www.googleapis.com/auth/`. Google Drive's are with its
-/// writes (#5825).
+/// `users.messages.send`, Calendar's `events.insert`), each a full scope
+/// URL as Google records it. Only Google's sign-ins record their scopes;
+/// [`scope_allows`] matches them whole. Google Drive's are with its writes
+/// (#5825).
 pub const SCOPES: &[Allowed] = &[
     Allowed {
         code: "gmail",
@@ -99,44 +99,46 @@ pub const SCOPES: &[Allowed] = &[
         code: "google_calendar",
         action: "create_event",
         what: "add calendar events",
-        scopes: &["calendar", "calendar.events", "calendar.events.owned"],
+        scopes: &[
+            "https://www.googleapis.com/auth/calendar",
+            "https://www.googleapis.com/auth/calendar.events",
+            "https://www.googleapis.com/auth/calendar.events.owned",
+        ],
     },
 ];
 
 const GMAIL_SEND: &[&str] = &[
-    "gmail.send",
-    "gmail.compose",
-    "gmail.modify",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.modify",
     "https://mail.google.com/",
 ];
 
-/// A scope as the table names it: Google's short name, or the whole scope.
-fn short_scope(scope: &str) -> &str {
-    let scope = scope.trim();
-    scope
-        .strip_prefix("https://www.googleapis.com/auth/")
-        .unwrap_or(scope)
-        .trim_end_matches('/')
+/// Whether `entry`'s scopes hold one of `needed`, each taken whole as a
+/// full scope URL (a list kept as one spaced string read alike); a bare
+/// name such as `gmail.send` allows nothing.
+/// Drive's create uses it too once #5825 lands.
+pub fn scope_allows(entry: &Entry, needed: &[&str]) -> bool {
+    entry
+        .scopes
+        .iter()
+        .flat_map(|scopes| scopes.split_whitespace())
+        .any(|scope| needed.contains(&scope))
 }
 
 /// What `args`' write on `code` would do, when `entry` is a sign-in that
-/// lists its scopes and none of them allows it; else `None`. An app
-/// password, a personal key or a link with no scopes listed is not checked.
+/// records its scopes and none of them allows it; else `None`. An app
+/// password, a personal key or a link recording no scopes is not checked.
 pub fn scope_missing(code: &str, args: &Value, entry: &Entry) -> Option<&'static str> {
-    if !entry.oauth() || entry.scopes.is_empty() {
+    let recorded = entry.scopes.iter().any(|scopes| !scopes.trim().is_empty());
+    if !entry.oauth() || !recorded {
         return None;
     }
     let action = text(args, "action")?;
     let allowed = SCOPES
         .iter()
         .find(|allowed| allowed.code == code && allowed.action == action)?;
-    let held = |needed: &str| {
-        entry
-            .scopes
-            .iter()
-            .any(|scope| short_scope(scope) == short_scope(needed))
-    };
-    (!allowed.scopes.iter().any(|needed| held(needed))).then_some(allowed.what)
+    (!scope_allows(entry, allowed.scopes)).then_some(allowed.what)
 }
 
 /// What a write on `code` does, for a refusal that doesn't name its action.
@@ -601,6 +603,43 @@ mod tests {
             0,
         )
         .unwrap()
+    }
+
+    /// A Google sign-in for Gmail recording `scopes`.
+    fn gmail_scoped(scopes: Value) -> Entry {
+        Entry::from_set(
+            "gmail",
+            &json!({"auth_type":"oauth","access_token":"t","expires_in":3600,"scopes":scopes}),
+            0,
+        )
+        .unwrap()
+    }
+
+    /// Scopes are full URLs, a list kept as one spaced string read alike;
+    /// a bare name allows nothing.
+    #[test]
+    fn a_scope_allows_only_as_its_full_url() {
+        let send = json!({"action":"send_mail"});
+        let spaced = gmail_scoped(json!([
+            "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send"
+        ]));
+        assert!(scope_allows(&spaced, GMAIL_SEND));
+        assert_eq!(scope_missing("gmail", &send, &spaced), None);
+        let full_gmail = gmail_scoped(json!(["https://mail.google.com/"]));
+        assert_eq!(scope_missing("gmail", &send, &full_gmail), None);
+        for bare in [json!(["gmail.send"]), json!(["gmail.readonly gmail.send"])] {
+            let entry = gmail_scoped(bare.clone());
+            assert!(!scope_allows(&entry, GMAIL_SEND), "{bare}");
+            assert_eq!(
+                scope_missing("gmail", &send, &entry),
+                Some("send mail"),
+                "{bare}"
+            );
+        }
+        // A link recording no scopes is not checked.
+        for none in [json!([]), json!(["  "])] {
+            assert_eq!(scope_missing("gmail", &send, &gmail_scoped(none)), None);
+        }
     }
 
     #[test]
