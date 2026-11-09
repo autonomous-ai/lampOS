@@ -131,6 +131,57 @@ fn only_a_template_changing_is_written_and_reloaded_and_nothing_restarted() {
     assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
     assert_eq!(unit(&lamp, TEMPLATE), template(" --usb 01da:5875@3-1.1.4"));
     assert_eq!(lamp.calls(), ["reload"]);
+    assert!(
+        !lamp
+            .said
+            .iter()
+            .any(|line| line.starts_with(&format!("{TEMPLATE} is kept:")))
+    );
+}
+
+#[test]
+fn a_comment_only_template_and_the_updaters_retained_unit_are_named_without_poll_spam() {
+    let mut lamp = lamp();
+    let own = unit(&lamp, round::OWN_UNIT);
+    let before = template("");
+    let candidate = format!("{before}# private candidate comment\n\n");
+    publish(&mut lamp, "eyes 1", &[(TEMPLATE, candidate)]);
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    assert_eq!(unit(&lamp, TEMPLATE), before);
+    assert_eq!(unit(&lamp, round::OWN_UNIT), own);
+    assert!(lamp.calls().is_empty());
+    assert!(
+        lamp.said.iter().any(|line| line
+            == "lamp-update.service is not carried by rounds; its installed unit is kept")
+    );
+    assert!(lamp.said.iter().any(|line| line ==
+        "lamp-eyes-camera@.service is kept: only comments, blank lines or trailing whitespace differ"));
+    assert!(
+        !lamp
+            .said
+            .iter()
+            .any(|line| line.contains("private candidate comment"))
+    );
+    assert_eq!(
+        lamp.channel.fetched,
+        [
+            format!("{CHANNEL}{}", manifest::ENVELOPE),
+            format!(
+                "https://channel.test/build-2/product.{}",
+                manifest::manifest_name(TEMPLATE)
+            ),
+        ]
+    );
+
+    lamp.said.clear();
+    lamp.channel.fetched.clear();
+    assert_eq!(lamp.round(), Outcome::UpToDate(2));
+    assert!(!lamp.said.iter().any(|line| line.contains("is kept")));
+    assert_eq!(
+        lamp.channel.fetched,
+        [format!("{CHANNEL}{}", manifest::ENVELOPE)]
+    );
+    assert!(lamp.calls().is_empty());
 }
 
 #[test]
