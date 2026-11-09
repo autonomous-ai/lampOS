@@ -1,3 +1,13 @@
+## 2026-11-09 17:00 ICT — app read accepted; provider gates and playback extension
+
+Ready for lamp-voice: no. Provider cancellation remains uncommitted while its broader gates run; playback extension is a separate unverified checkout. No device work.
+
+- App #129 `f57fd88345` has App Only READ-OK; its paired #5667 lamp check remains open behind that PR's P2 fix. Asked the first builder/PM to pin the corrected lamp head and confirm Fifth, kit/slot and app operator on Queue #5385, comment 6736731893. The app and lamp gate are not treated as merged or complete.
+- Provider slice rebased cleanly to `3d8afb4152`. Formatting and strict clippy across voice/cloud/control/skills/memory/update/voice-eval passed. Docs: 9 tests, 192 documents, 1,890 links, none broken. Current-base compiled fixtures: nine cancellation tests and two real-IPC tail fixtures passed. Bookkeeping host probe: first 23.135 microseconds; 1,000 repeats median 2.172, p99 6.321, maximum 17.079 microseconds. Tail remains 30,040 ms saturated and 130 ms draining, with simulated speaker retirement.
+- Fail-first control removed both admission resets: four cancellation regressions failed, then original source was restored. The later raw-output music-scope fixture adaptation was corrected to bypass the cancellation filter, preserving its original security assertion; that test-only correction awaits its recheck.
+- Broad local gate: initial run stopped on untouched camera timing (2.6 fps); isolated camera passed and all 146 control tests passed serially. Serial cloud run hit the existing incomplete-HTTP-body mock weakness (EOF parsing empty body); its earlier package run had 305 passes. The full serial run continues, with memory 161 passed/2 ignored so far. Original failures remain retained; workspace build has not run, and no full-green claim is made.
+- First/PM explicitly assigned Fourth the coordinator/playback extension in Queue comment 6736405980, with Reviewer-three reading and old audible speech stopped within one second. Work is isolated in `/tmp/fourth-forget-playback-20261109`; the provider foundation is copied but remains a separate review slice. Priority cut watermarks and a physical-speaker ACK barrier preserve the request and existing authority. Provider, speaker and protocol code are drafted; coordinator integration and production-path verification are pending. ALSA null and synthetic held debt do not prove real queued PCM removal or acoustic latency. Design posted as comment 6737026608.
+
 ## 2026-11-09 16:18 ICT — app retry finding fixed; provider forget in progress
 
 Ready for release: no. App #129 awaits App Only's re-read and #5667's paired lamp check; provider work has no PR yet.
