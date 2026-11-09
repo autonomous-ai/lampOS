@@ -1117,11 +1117,11 @@ pub(super) const LINES: &[Line] = &[
         "是我！需要我的时候，就说“Hey Lamp”。",
         "저예요! 제가 필요할 땐 언제든 'Hey Lamp'라고 말해 주세요.",
     ]),
-    ("I didn't catch that. Wait a moment, then say 'Hey Lamp' again.", [
-        "Mình chưa nghe rõ. Bạn đợi một chút rồi nói lại 'Hey Lamp' nhé.",
-        "聞き取れませんでした。少し待ってから、もう一度「Hey Lamp」と言ってください。",
-        "我没听清。稍等一下，再说一次“Hey Lamp”。",
-        "잘 못 들었어요. 잠깐 기다렸다가 'Hey Lamp'라고 다시 말해 주세요.",
+    ("I didn't catch that. Try once more when I stop talking.", [
+        "Mình chưa nghe rõ. Khi mình nói xong, bạn thử lại lần nữa nhé.",
+        "聞き取れませんでした。私が話し終わったら、もう一度試してください。",
+        "我没听清。等我说完，再试一次。",
+        "잘 못 들었어요. 제가 말을 마치면 한 번 더 해 보세요.",
     ]),
     ("No worries. Just say 'Hey Lamp' whenever you need me.", [
         "Không sao. Khi nào cần mình, cứ nói 'Hey Lamp' nhé.",
