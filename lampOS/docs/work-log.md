@@ -9120,3 +9120,18 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   removed from checkout. Initial parent-cwd Cargo failed camera UAPI config;
   all reported test results ran from lampOS. Review comment 6741330102.
 - Train755 merged c917d3193, containing previously audited #5864/#5851/#5850.
+
+## 2026-11-09 — Second: body reply tags and rebased native receipts
+
+- READ-OK #5880 79d8bc360a: replacement/refusal/terminal replies preserve
+  their command's tag; older control ignores the added lease field and
+  untagged command answers remain unchanged. #5855 contract matches by
+  source, combined physical run still owed.
+- Mac body/control suite 921 passed, 1 ignored. Two added terminal-path and
+  malformed-tag probes passed, saved /tmp/second-5880-tags.rs, removed.
+  P3: invalid tags are refused, not ignored as the PR body says; accepted
+  tag range is u64. No hardware or end-to-end latency measurement.
+- Independently downloaded ARM64 runs 42622361677 and 42623144133:
+  #5874 dd3f2c0f1 has 14,864 passed / 110 skipped; #5878 09444cb49
+  has 14,872 passed / 111 skipped. Both exact-head success. These receipts
+  do not supply the missing independent privacy reads.
