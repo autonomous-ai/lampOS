@@ -8555,3 +8555,19 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   under docs/verification/second-face-forget-handoff-20261109; unchanged
   SHA25636fe6500a99b3185cfc11fbedbfee3a0baec4fb16027e25db9a401591b8764df.
   Full/native gates still unperformed; Third owns carry and independent proof.
+
+## 2026-11-09 — Second: reconnect HOLDs lifted on fixed heads
+
+- READ-OK #5830 `a8051baa7a133ffee173fcf58566cb25bf664017`:
+  first-offline stream retains retryable subscriptions; replay checks entry
+  identity before and after awaiting subscription, so cancellation stays off.
+  Original actual-MCP/FakeLamp probes pass; full MCP suite 56 passed in 17.62 s.
+  Replay probe's wait-for-bug condition changed to a replay-completion barrier;
+  unchanged assertion sees zero held phrase entries and zero live handlers,
+  with only unsubscribe on the wire. Latent refusal reconnect leak also fixed.
+- READ-OK #5833 `3949b3964fa3f4242e5c2eb883aed1dae43e563f`:
+  post-connect abort closes without setup; already-aborted pause returns.
+  Original probe now observes zero setups/commands, settled promise and closed
+  socket at 100 ms. Full JS 91 passed, 2 skipped. Python unchanged by this fix.
+- Both review checkouts clean; no product edits or device/latency acceptance.
+  #5835 correlation HOLD and #5419 wrong-topic deletion HOLD remain with owners.
