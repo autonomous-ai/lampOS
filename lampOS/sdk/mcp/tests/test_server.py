@@ -20,7 +20,7 @@ from pydantic import AnyUrl
 from lamp_mcp.server import Limits, build, gestures
 
 ALL = {
-    "lamp_state", "lamp_wait_for", "lamp_express", "lamp_gesture", "lamp_look", "lamp_move", "lamp_play", "lamp_joints",
+    "lamp_state", "lamp_wait_for", "lamp_express", "lamp_gesture", "lamp_look", "lamp_move", "lamp_move_poses", "lamp_play", "lamp_joints",
     "lamp_light", "lamp_ring", "lamp_say", "lamp_volume", "lamp_sound", "lamp_upload_sound", "lamp_sounds", "lamp_remove_sound",
     "lamp_end_turn",
     "lamp_events", "lamp_stop",
@@ -1119,6 +1119,7 @@ def test_the_readme_lease_column_is_the_servers_own(tmp_path):
     calls = {
         "lamp_look": {"at": "ahead"},
         "lamp_move": {"step_ms": 100, "frames": [[0, 0, 0, 0, 0], [5, 0, 0, 0, 0], [0, 0, 0, 0, 0]]},
+        "lamp_move_poses": {"poses": [{"pitch": 5}]},
         "lamp_gesture": {"name": "nod"},
         "lamp_light": {"colour": "warm"},
         "lamp_ring": {"rgb": "#ff8000"},
@@ -1331,5 +1332,24 @@ def test_lamp_joints_waits_for_the_bodys_done_as_lamp_look_does(tmp_path):
             await fake.done(fake.requests[-1]["id"], "dropped", "the body is not held")
             result = await call
             assert text(result) == "joints dropped: the body is not held", text(result)
+
+    run(go())
+
+
+def test_a_move_through_poses_is_the_sdks_frames_and_a_pose_it_cant_make_is_refused_before_sending(tmp_path):
+    from lampos import poses_to_frames
+
+    async def go():
+        async with connected(tmp_path, grants=("body",)) as (fake, _, session):
+            refused = await session.call_tool("lamp_move_poses", {"poses": [{"pitch": 40}]})
+            assert refused.isError
+            assert text(refused).endswith("bad_request: pose 1: pitch 40° is farther than a move may take it, 17.6° either way")
+            assert "bad_request: bad_request" not in text(refused)
+            assert not fake.asked("move") and not fake.asked("lease.take")
+            moved = await session.call_tool("lamp_move_poses", {"poses": [{"pitch": 10}, {"yaw": -8}], "hold_ms": 200})
+            assert not moved.isError, text(moved)
+            sent = fake.asked("move")
+            assert len(sent) == 1 and sent[0]["step_ms"] == 50
+            assert sent[0]["frames"] == poses_to_frames([{"pitch": 10}, {"yaw": -8}], hold_ms=200)
 
     run(go())
