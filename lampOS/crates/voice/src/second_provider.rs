@@ -12868,6 +12868,8 @@ async fn answer(
         // Their yes to the read-back runs the setup face save held for it
         // ([`HeldSave`]), before round 1, through the same runner and check
         // as a model call; the model is told it is kept.
+        // When the held setup face save ended, if it ran.
+        let mut saved_at = None;
         if let Some(call) = held_save_runs.take() {
             let by_rule = shared
                 .hold
@@ -12879,6 +12881,12 @@ async fn answer(
                 );
             } else {
                 let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
+                // The save is the eyes' wait (1.5-3.3 s on lamp-52e6), bounded
+                // by its own timeout, before round 1 is sent: round 1's start
+                // bound runs from its end, not the line's, or it is spent
+                // (lamp-52e6, request 9: the yes to the face ended "my
+                // thoughts are slow").
+                saved_at = Some(tokio::time::Instant::now());
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
                 }
@@ -13033,9 +13041,10 @@ async fn answer(
             );
             messages.extend(rounds);
         }
-        // Round 1's bounds run from here, or from its one ask again after a
-        // line lost on the network (`LAMP_RESEND_LOST_LINE`).
-        let mut from = begun;
+        // Round 1's bounds run from here (or from a held setup face save's
+        // end), or from its one ask again after a line lost on the network
+        // (`LAMP_RESEND_LOST_LINE`).
+        let mut from = saved_at.unwrap_or(begun);
         let mut resent = false;
         // A `not_for_me` not taken, once (#2191).
         let mut named_asked_again = false;
@@ -13240,7 +13249,16 @@ async fn answer(
                     } else {
                         begin_within(heard, shared.written_wait)
                     };
-                    let mut next = tokio::time::timeout_at(at(first_wait), stream.next()).await;
+                    // The wait sound stays timed from the line's end (or a
+                    // resend), not from a held face save's end: the person
+                    // hears it as soon as before, and the chat still has its
+                    // whole bound after it.
+                    let first_at = if cues.is_some() && !resent {
+                        begun + first_wait
+                    } else {
+                        at(first_wait)
+                    };
+                    let mut next = tokio::time::timeout_at(first_at, stream.next()).await;
                     if next.is_err()
                         && let Some(cues) = cues
                     {
