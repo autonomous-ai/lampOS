@@ -1165,6 +1165,34 @@ hold, which needs the match's id, let them go. With both on:
 
 With either switch off nothing is followed and no `follows` is said.
 
+**Unsure until a print** (#5738), only with `LAMP_FACE_KNOWN_UNSURE=on` and
+the hold on (off unless set; `who::known_unsure_on`). A check with no
+print, within the 4 s bound, no longer lets the one known go for a near face
+that isn't their unbroken id, and no longer holds them sure with nobody
+near: both hold them **unsure** (`who::Held::unprinted`). Sure stays only
+for their own id in every look since, with nothing unsure since the last
+print.
+
+- **Marked beside the known file.** An unsure check writes `known-unsure`
+  (empty, `who::known_unsure_of`) before it renews the known file's time.
+  A print decides: a match, a held print or a carry makes it sure again,
+  and a let-go removes the name; either way the mark goes
+  (`who::keep_known`, `who::clear_unsure`).
+- **Checked every half second.** While unsure with a near face, a check is
+  due every 0.5 s (`who::recognise_due_unsure`), not every 2 s, so a print
+  comes within the voice's wait.
+- **The voice waits for it.** A line ending while the mark is fresh (3 s,
+  as the known file) is tied to no one until it goes, at most 1 s past
+  the line's end (`speaking_faces::known_once_printed`): then the known
+  file as it stands, theirs only if a print kept them; still unsure at the
+  bound, the room's ([second-voice.md](second-voice.md)). So their face
+  back near after a gap is not let go before a print reads it, and neither
+  a voice off camera with nobody near nor a far face on their passing id
+  (the Reviewer-lead's P3s on #5546) gets their name from the hold alone.
+
+Off, nothing changes. The lamp check: on lamp-52e6, the #5546 row
+(row-5546i): A's lines after a gap to A with miss-cold 0, C's to the room.
+
 Off, nothing changes: each miss lets go, as before. The lamp check: on
 lamp-52e6, the lead's face from a seat with the switch on and off, the
 score in the journal, the known file held and `who` naming them.
