@@ -65,6 +65,10 @@ EnvironmentFile=-/etc/lampOS/skills/store.env
 # A skill made on this lamp sent to the Skills Store (fourteen-P13): only on the owner's Share in the app,
 # packed unsigned from its own files and sent with the lamp's key; a reviewer reads it before it is listed.
 Environment=LAMP_SKILLS_SHARE=on
+# Guard mode's texts, an installable skill from the Store (#5752, #1685): only lamp-skills' lines on messages/out
+# go up as unasked news (visit times and lengths, never a name, picture or sound; kept 90 days for the owner).
+# LAMP_MESSAGES stays off: no app texts onto chat/in, no text turns. Shown on lamp-9adf, 7 Nov 15:33-15:42.
+Environment=LAMP_SKILL_MESSAGES=on
 # A skill added from a file in the app, on a spoken yes (#5080): skills.upload, the file fetched from the backend
 # and handed to lamp-voice's app-make socket, the same line there.
 Environment=LAMP_SKILL_UPLOAD=on

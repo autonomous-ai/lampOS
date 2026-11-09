@@ -459,10 +459,9 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
     ),
     (
         "guard-mode",
-        "an installable skill (#1685), not yet tried on a lamp: it needs `room/presence` \
-         (`LAMP_PRESENCE=on`), and its texts reach the phone only with `LAMP_SKILL_MESSAGES=on` \
-         (skills' lines alone) or `LAMP_MESSAGES=on` in `lamp-cloud`, either of which carries \
-         `messages/out` up as unasked news",
+        "an installable skill (#1685): its owner puts it on from the Skills Store; the product \
+         has what it needs, `room/presence` (`LAMP_PRESENCE=on`) and its texts carried up as \
+         unasked news with `LAMP_SKILL_MESSAGES=on` in `lamp-cloud` (#5752)",
     ),
     (
         "laugh-glance",
