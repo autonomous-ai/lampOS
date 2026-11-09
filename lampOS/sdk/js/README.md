@@ -44,7 +44,7 @@ LAMPOS_HOME=/tmp/lampos-try node examples/greet.js
 
 Terminal 1 then shows `asked {"op":"gesture","name":"greeting"}`. Every
 example runs this way: `tour.js` (every kind of call, one step at a time; with `lamp fake --everything` nothing is refused), `greet.js`, `follow.js`, `follow-hand.js` (with `lamp fake --hands`), `phrase.js`, `pomodoro.js`,
-`ci-light.js`, `ask-the-person.js`, and `push-skill.js ../examples/hello-skill` (a pairing with `skills` and `speak`).
+`ci-light.js`, `ask-the-person.js`, `camera.js` (a pairing with `camera`: saves `snapshot.jpg` and a stream's `last-frame.jpg`), and `push-skill.js ../examples/hello-skill` (a pairing with `skills` and `speak`).
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
 `express` as the feelings skill's move and light, `say` and `sound`
@@ -303,9 +303,12 @@ about its `axis` by `sign * (deg - zero_deg)` after its `rest_quat`.
 
 ### Never readable
 
-Through this door, by any grant: camera frames or pictures, audio, transcripts
-or the words around a phrase, face prints, and anyone's name. A hand's or a
-face's place in the picture is a share of it, never the picture.
+Through this door, by any grant: transcripts or the words around a phrase,
+face prints, and anyone's name. The camera's pictures come only with the
+`camera` grant, on the lamp's own network and never while it is private
+(`examples/camera.js`); the `microphone` grant is not routed yet, so no audio
+leaves. With `look` alone, a hand's or a face's place in the picture is a
+share of it, never the picture.
 
 ## Reference
 
