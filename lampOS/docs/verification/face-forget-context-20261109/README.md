@@ -98,12 +98,59 @@ The rename test retained the old Marisol/Tove proposal in that same turn.
 These were assertion failures after actual Engine runs, not compilation or
 socket setup failures. No production context edit was present for this run.
 
-The fix changes only the two active-context admission predicates to include
-face-forget and extends the fixed receipt sanitizer. It reuses the existing
+The initial fix changed the two active-context admission predicates to include
+face-forget and extended the fixed receipt sanitizer. It reuses the existing
 reset and stale-batch cancellation; the memory-only predicate remains for
 callers that need the narrower classification. The adapter's next-request
 test now checks its fixed outcomes in the fresh system receipt and asserts
 that the entire request contains neither private canary nor raw tool IDs.
+
+### Cancellation follow-up: focused reproduction and fix
+
+El's [review hold 6742634543](https://github.com/autonomous-ai/lampOS/pull/5878#issuecomment-6742634543)
+identified earlier tool rounds retained for a later turn while an admitted
+forget awaits its result. If that turn is cut or dropped during the await,
+the after-return reset cannot clear those retained rounds.
+
+The follow-up clears carried earlier tool rounds at both admitted-forget
+sites, alongside `held_rename::forgot` and before awaiting the call. This
+applies to `forget`, `forget_everything` and `forget_my_face`, including a
+confirmed held forget. Calls held or refused before admission keep their
+existing behavior. After return, the existing reset still rebuilds the
+current local messages with the current question and fixed outcomes; no
+deletion result is invented for a call whose result was not received.
+
+The original face and plain-forget cases both failed on the actual resumed
+model request: the prior recall call and result survived the cut. The first
+command ran outside the Rust workspace and failed before testing because its
+camera build settings were absent; that is not regression evidence. A first
+held-confirmation fixture was anonymous and timed out before its runner;
+then its face cache was loaded before camera authority invalidated it. Those
+fixture failures are not product failures. The final control loads a known
+person after camera authority is installed and reaches the blocked held
+runner.
+
+With both admission clears applied, the two reproduced regressions and the
+confirmed-held interruption control pass **3/3**. Each drives a real Engine
+with synthetic tool results, cuts the awaited forget with an empty line,
+and inspects the entire resumed model request. The held control was not
+shown failing on the old production code. Logs are
+`/private/tmp/third-cut-forget-fail-first-root.log`,
+`/private/tmp/third-cut-forget-fail-first-scoped.log` and
+`/private/tmp/third-cut-forget-fixed.log`.
+
+The follow-up local gate passed: formatting, strict all-target Clippy for
+the 14 affected/dependent packages, workspace build, and 163 focused tests
+with zero failures (one manual timing test ignored). The focused suites
+cover context reset, held forget and rename, after-forget behavior, action
+claims, onboarding, person scope and held save. Logs are
+`/private/tmp/third-context-cut-fix-*.log`. Native CI for the new commit
+remains pending; passing gates alone do not clear El's hold. The admission clear adds no I/O or
+await; it only drops retained request-local messages under the existing
+mutex. Prior reset timing measures the after-return sanitizer, not this
+new admission clear; combined admission and acoustic latency remain with
+Fourth's speech-stop acceptance. No device result is claimed. This change
+does not retract queued audio or alter deletion calls, scopes or deadlines.
 
 Formatting and documentation links passed (192 docs, 1,898 links, 0 broken).
 The five new fixed regressions passed (one manual timing test ignored), and

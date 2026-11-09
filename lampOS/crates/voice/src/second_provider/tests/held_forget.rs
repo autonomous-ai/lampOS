@@ -1758,3 +1758,170 @@ async fn face_forget_context_held_yes_discards_the_entire_next_request() {
         );
     }
 }
+
+/// Cutting an admitted forget while its runner waits must not carry an
+/// earlier recall round into the empty line's resumed model request.
+async fn cut_during_forget_discards_recalled_round(name: &'static str, held: bool) {
+    let question = if held {
+        "What do you know about me?"
+    } else if name == FACE {
+        "Forget my face."
+    } else {
+        "Forget my favorite color."
+    };
+    let mut heard = vec![Ok(question.to_owned())];
+    if held {
+        heard.push(Ok("Yes.".to_owned()));
+    }
+    heard.push(Ok(String::new()));
+    let mut chats = vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "private-recall-call-canary",
+                crate::remember::RECALL,
+                json!({"query": "favorite color"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "forget-call",
+                name,
+                json!({"name": "A", "text": "favorite color"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+    ];
+    if held {
+        chats.push(vec![text("Shall I forget your face?"), Ok(ChatEvent::Done)]);
+    }
+    chats.push(vec![
+        text("I will report only what is confirmed."),
+        Ok(ChatEvent::Done),
+    ]);
+    let script = Arc::new(Script {
+        heard: Mutex::new(heard.into()),
+        chats: Mutex::new(chats.into()),
+        ..Script::default()
+    });
+    let (begun, waiting) = std::sync::mpsc::channel();
+    let runner: ToolRunner = Arc::new(move |_, _, called, _| {
+        let begun = begun.clone();
+        Box::pin(async move {
+            if called == name {
+                begun.send(()).unwrap();
+                std::future::pending::<()>().await;
+            }
+            json!({"memories": ["private-recall-result-canary"]})
+        })
+    });
+    let scoped_runner = runner.clone();
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false);
+    if held {
+        // A confirmation belongs to a known person's session; an
+        // anonymous yes is correctly refused before the runner.
+        let path = std::env::temp_dir().join(format!(
+            "cut-held-forget-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::write(&path, "A").unwrap();
+        let cache = Arc::new(FaceCache::default());
+        engine = engine.with_memory_scope(
+            lamp_turn_owner::BootId::new([43; 16]).unwrap(),
+            cache.clone(),
+            Arc::new(move |request, heard, name, args, _| {
+                scoped_runner(request, heard, name, args)
+            }),
+            None,
+        );
+        engine.memory_camera(true, 1);
+        cache.replace(
+            cache.begin_refresh(),
+            crate::known_faces::FaceObservation::read(&path),
+        );
+        std::fs::remove_file(path).unwrap();
+    }
+    let request = 5_878_100;
+    engine.submit(start(request));
+    engine.submit(audio(request, 1));
+    engine.submit(end(request));
+    let forgetting = if held {
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+                .await
+                .expect("the face-forget question finishes");
+            if matches!(event, ProviderOutput::TurnComplete { request: done, .. } if done == request)
+            {
+                break;
+            }
+        }
+        engine.submit(start(request + 1));
+        engine.submit(audio(request + 1, 1));
+        engine.submit(end(request + 1));
+        request + 1
+    } else {
+        request
+    };
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if waiting.try_recv().is_ok() {
+                break;
+            }
+            let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+        }
+    })
+    .await
+    .expect("the admitted forget reaches its blocked runner");
+    {
+        let asked = script.asked.lock().unwrap();
+        assert!(
+            serde_json::to_string(&*asked)
+                .unwrap()
+                .contains("private-recall-result-canary")
+        );
+    }
+    let resumed = forgetting + 1;
+    engine.submit(start(resumed));
+    engine.retire_through(forgetting);
+    engine.submit(audio(resumed, 1));
+    engine.submit(end(resumed));
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+            .await
+            .expect("the empty line's resumed turn finishes");
+        if matches!(event, ProviderOutput::TurnComplete { request: done, .. } if done == resumed) {
+            break;
+        }
+    }
+    let asked = script.asked.lock().unwrap();
+    assert!(asked.len() >= if held { 4 } else { 3 });
+    let next = serde_json::to_string(asked.last().unwrap()).unwrap();
+    for canary in ["private-recall-call-canary", "private-recall-result-canary"] {
+        assert!(
+            !next.contains(canary),
+            "{canary} survived cut during {name}: {next}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn cut_during_face_forget_drops_prior_recall_from_resumed_request() {
+    cut_during_forget_discards_recalled_round(FACE, false).await;
+}
+
+#[tokio::test]
+async fn cut_during_held_face_forget_drops_prior_recall_from_resumed_request() {
+    cut_during_forget_discards_recalled_round(FACE, true).await;
+}
+
+#[tokio::test]
+async fn cut_during_plain_forget_drops_prior_recall_from_resumed_request() {
+    cut_during_forget_discards_recalled_round(crate::remember::FORGET, false).await;
+}
