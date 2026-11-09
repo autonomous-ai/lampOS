@@ -1,3 +1,24 @@
+## 2026-11-09 — context native green and review corrections
+
+- Context #5878 exact `09444cb49`: ARM64 42623144133 passed 14,872 tests,
+  111 skipped, release build, doc tests and artifact export. PR evidence
+  6741329263; TWO READS and explicit #5792/#5874 dependencies remain.
+- #5863 `8562ea72c`: READ-OK 6741323351 lifts Third's blocking holds.
+  Per-attempt receipts and 64-per-request retention resolve the successful
+  first-send loss/reassociation. Four reduced bookkeeping probes passed;
+  production routes strip the internal marker before gate/IPC. Generated
+  call-ID deduplication and the stale journal citation remain explicit P3s.
+  No independent Engine/Cargo/device/live-write run for this reread.
+- #5826: corrected my prior approval with HOLD 6741306688. Unsupported
+  RFC2047 UTF-7 encoded-word names remain marked checked: the valid
+  Q-encoded run.exe stays encoded, misses never(), and qualifies by PDF MIME.
+  Exact-function reduced probe 1 passed / 2 failed, exit 101. Earlier
+  RFC2231, quoted-header and PDF repairs still stand. Requested only a
+  fail-closed attachment encoded-word decoder; no live attachment fetched.
+- Queue 6741337257 records both native results and review changes. Took
+  #5865 neutral-photo-receipt independent source/synthetic read at
+  `248b92d2a`, claim 6741368931. No real photo/account/device action.
+
 ## 2026-11-09 — current adapter native gate and context publication
 
 - Adapter #5874 carried unchanged to `dd3f2c0f1` on train 754. Exact-head
