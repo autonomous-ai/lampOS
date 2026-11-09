@@ -465,6 +465,25 @@ fn a_device_change_claimed_in_other_words_twice_with_no_call_says_it_was_not_don
     }
 }
 
+/// GO-159 (lamp-52e6, 11091): the kept light's claim the worded runs
+/// missed, said as "it", "will stay" or "keeping" ("I'll keep it on until
+/// ten."), twice with no call: said as the plain line that it wasn't done,
+/// as "I've kept the light on until ten." is.
+#[test]
+fn a_kept_light_said_as_it_or_will_stay_twice_with_no_call_says_it_was_not_done() {
+    let heard = "Hey Lamp, keep the light on until ten.";
+    for claim in crate::action_claim::tests::KEPT_SHAPES {
+        let went = worded(heard, saying(claim), vec![saying(claim)]);
+        assert_eq!(
+            went.said,
+            said(&[crate::action_claim::NOT_DONE_LINE]),
+            "{claim}"
+        );
+        assert_eq!((went.asked, went.ran.len()), (2, 0), "{claim}");
+        assert!(told_claim(&went), "{claim}: {:?}", went.notes);
+    }
+}
+
 /// A turn that made its call is untouched by the worded claims, byte for
 /// byte: the words beside the call, and after it. A limit said ("for one
 /// minute") is one the call carried.
