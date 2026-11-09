@@ -109,6 +109,38 @@ tài khoản ElevenLabs. Khả năng sử dụng còn phụ thuộc provider/tà
 hình. Xác minh danh mục công khai không thay thế việc tổng hợp âm thanh thực tế
 bằng tài khoản đó hoặc nghe trên thiết bị.
 
+## Tiếng Hàn và giọng ElevenLabs
+
+Tiếng Hàn dùng `stt_language: "ko"` (`LANG_KO` trong `hal/presets.py`); `ko-KR` và
+`ko_KR` được chuẩn hóa về `ko`. Khi chọn Korean, STT nhận dạng tiếng Hàn, language
+gate nhận lời nói tiếng Hàn (nhãn AmberNet `ko`), Gemini Live nhận gợi ý `ko-KR`, và
+agent được yêu cầu trả lời bằng tiếng Hàn. Các câu của robot (nói lại, đang nghe,
+khởi động lại, bật/tắt mic, xoa đầu, câu chờ nhạc, filler, thông báo OTA, prompt
+chào khi thức dậy và khi đổi tên) đều có bản tiếng Hàn. Chitchat tiếng Hàn phải khớp
+nguyên câu như tiếng Nhật, vì tiếng Hàn gắn đuôi vào từ: `미안해` được trả lời tại
+chỗ, còn `미안한데 지금 몇 시야?` được gửi cho agent.
+
+Nhóm ElevenLabs `ko` dùng chung cho HAL HTTP và WebSocket. Vẫn chọn được giọng Hàn khi
+ngôn ngữ robot là ngôn ngữ khác; khi đó agent vẫn trả lời theo ngôn ngữ nó nghe được,
+và giọng Hàn đọc câu trả lời.
+
+Sáu giọng sau được chọn từ
+[danh mục tiếng Hàn chính thức của ElevenLabs](https://elevenlabs.io/text-to-speech/korean)
+ngày 2026-11-09. Từng giọng đã được tổng hợp qua proxy Autonomous và phát trên một
+Intern 2 (âm thanh đầu tiên khoảng 1,2 giây, tương đương các nhóm khác).
+
+| Giọng | Đặc điểm (nhãn ElevenLabs) | ElevenLabs voice ID |
+|---|---|---|
+| Anna Kim (mặc định) | Dịu dàng, điềm tĩnh, rõ ràng | `uyVNoMrnUku1dZyVEXwD` |
+| Selly Han | Ấm, điềm tĩnh, đều | `ETPP7D0aZVdEj12Aa7ho` |
+| Rosa Oh | Điềm tĩnh, trau chuốt, chừng mực | `sf8Bpb1IU97NI9BHSMRf` |
+| Stella | Đều, rõ ràng, vui vẻ | `1YzIw7PZ7iaD4alelyHY` |
+| Hyunbin | Khéo léo, rõ ràng, chừng mực | `s07IwTCOrCDCaETjUVjx` |
+| Minho | Khéo léo, rõ ràng, đều | `U1cJYS4EdbaHmfR7YzHd` |
+
+HAL đổi tên giọng sang ID. HAL trước 0.1.305 không biết các tên này và gửi chính tên
+làm voice ID, ElevenLabs từ chối, nên giọng tiếng Hàn cần HAL 0.1.305 trở lên.
+
 Lớp giọng nói speech-to-speech độ trễ thấp, chạy **song song** với pipeline STT
 → agent thông thường. Model realtime xử lý hội thoại tán gẫu trực tiếp (trả lời
 âm thanh dưới 1 giây) và **delegate** (chuyển giao) những gì cần đến agent chính

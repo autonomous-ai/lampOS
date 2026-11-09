@@ -77,6 +77,8 @@ Fields come from `SetupRequest` in `system/domain/device.go`. `device_id`, `llm_
 
 Japanese uses `stt_language: "ja"`. Setup offers Japanese (日本語), Japanese voice enrollment phrases and six curated ElevenLabs voices; the default is Shizuka. See [Japanese voice catalog](realtime-voice.md#japanese-language-and-elevenlabs-voices).
 
+Korean uses `stt_language: "ko"`. Setup offers Korean (한국어), Korean voice enrollment phrases and six curated ElevenLabs voices; the default is Anna Kim. See [Korean language and voices](realtime-voice.md#korean-language-and-elevenlabs-voices).
+
 **Response:** Returns immediately `{"status": 1}`. Setup runs async in a goroutine after 2s delay.
 
 **Messaging channel:** The entire Telegram, Slack, Discord, or iMessage configuration is optional during initial setup. Omitting it does not block setup; configure a channel later with `POST /api/device/channel`. Credentials supplied to `POST /api/device/setup` keep the existing setup path but are not channel-validated there; `POST /api/device/channel` validates the credentials required by its selected channel.

@@ -115,6 +115,39 @@ ElevenLabs account's My Voices. Availability still depends on the configured
 provider/account. Public catalog verification does not replace a live synthesis
 check with that account or device playback.
 
+## Korean language and ElevenLabs voices
+
+Korean uses `stt_language: "ko"` (`LANG_KO` in `hal/presets.py`); `ko-KR` and
+`ko_KR` normalize to `ko`. With Korean selected, STT transcribes Korean, the
+language gate accepts Korean speech (AmberNet label `ko`), Gemini Live gets the
+`ko-KR` hint, and the agent is told to reply in Korean. The robot's own phrases
+(retry, listening, reboot, mic toggle, head pat, music cues, fillers, OTA notice,
+wake and rename prompts) have Korean versions. Korean chitchat must match the
+whole utterance, like Japanese, because Korean attaches endings to words: `미안해`
+gets a local reply, while `미안한데 지금 몇 시야?` goes to the agent.
+
+The ElevenLabs `ko` bucket is shared by HAL HTTP and WebSocket. Korean voices can
+also be picked while the robot language is something else; the agent then still
+answers in the language it hears, read by the Korean voice.
+
+The following six voices were selected from the
+[official ElevenLabs Korean catalog](https://elevenlabs.io/text-to-speech/korean)
+on 2026-11-09. Each one was synthesized through the Autonomous proxy and played on
+an Intern 2 (first audio about 1.2 s, the same as the other buckets).
+
+| Voice | Character (ElevenLabs label) | ElevenLabs voice ID |
+|---|---|---|
+| Anna Kim (default) | Tender, calm and clear | `uyVNoMrnUku1dZyVEXwD` |
+| Selly Han | Warm, calm and steady | `ETPP7D0aZVdEj12Aa7ho` |
+| Rosa Oh | Calm, polished and measured | `sf8Bpb1IU97NI9BHSMRf` |
+| Stella | Steady, clear and cheerful | `1YzIw7PZ7iaD4alelyHY` |
+| Hyunbin | Diplomatic, clear and measured | `s07IwTCOrCDCaETjUVjx` |
+| Minho | Diplomatic, clear and steady | `U1cJYS4EdbaHmfR7YzHd` |
+
+HAL maps a voice name to its ID. HAL before 0.1.305 does not know these names and
+sends the name itself as the voice ID, which ElevenLabs rejects, so Korean voices
+need HAL 0.1.305 or later.
+
 Low-latency, speech-to-speech voice layer that runs **in parallel** with the
 normal STT → agent pipeline. The realtime model handles casual conversation
 directly (sub-second audio replies) and **delegates** anything that needs the

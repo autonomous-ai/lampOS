@@ -1525,12 +1525,13 @@ var elevenLabsVoicesByLang = map[string][]string{
 	"en": {"Rachel", "Sarah", "Nicole", "Terra", "Maria", "Sophie", "Piper", "Mia", "Kimmy", "Brianna", "Ally", "Tori", "Brian", "Adam", "Daniel", "George", "James", "Liam", "Charlie", "Sam", "Sean", "Kael", "Brooks", "Erion"},
 	"vi": {"Ngan", "Linh", "Huyen", "Freya", "Nathan", "Quan"},
 	"ja": {"Shizuka", "Konoha", "Rin", "Asahi", "Hinata", "Hiroki"},
+	"ko": {"Anna Kim", "Selly Han", "Rosa Oh", "Stella", "Hyunbin", "Minho"},
 	"zh": {"Amy", "Sage", "Xiaoxi", "Yun", "Evan Zhao", "Jin"},
 }
 
 func elevenLabsLanguageBucket(lang string) string {
 	lang = strings.ToLower(strings.TrimSpace(lang))
-	for _, bucket := range []string{"vi", "ja", "zh"} {
+	for _, bucket := range []string{"vi", "ja", "ko", "zh"} {
 		if strings.HasPrefix(lang, bucket) {
 			return bucket
 		}
@@ -1545,7 +1546,7 @@ func ElevenLabsVoicesForLang(lang string) []string {
 		return append([]string(nil), elevenLabsVoicesByLang[elevenLabsLanguageBucket(lang)]...)
 	}
 	var voices []string
-	for _, bucket := range []string{"en", "vi", "ja", "zh"} {
+	for _, bucket := range []string{"en", "vi", "ja", "ko", "zh"} {
 		voices = append(voices, elevenLabsVoicesByLang[bucket]...)
 	}
 	return voices

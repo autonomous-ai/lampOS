@@ -38,6 +38,8 @@ func TestGetVoicesWhenHALUnavailable(t *testing.T) {
 		{"elevenlabs", "ja-JP", japanese, http.StatusOK},
 		{"elevenlabs", "ja_JP", japanese, http.StatusOK},
 		{"elevenlabs", "JA-jp", japanese, http.StatusOK},
+		{"elevenlabs", "ko", []string{"Anna Kim", "Selly Han", "Rosa Oh", "Stella", "Hyunbin", "Minho"}, http.StatusOK},
+		{"elevenlabs", "ko-KR", []string{"Anna Kim", "Selly Han", "Rosa Oh", "Stella", "Hyunbin", "Minho"}, http.StatusOK},
 		{"elevenlabs", "vi-VN", []string{"Ngan", "Linh", "Huyen", "Freya", "Nathan", "Quan"}, http.StatusOK},
 		{"elevenlabs", "zh-TW", []string{"Amy", "Sage", "Xiaoxi", "Yun", "Evan Zhao", "Jin"}, http.StatusOK},
 		{"openai", "ja", domain.TTSVoicesByProvider[domain.TTSProviderOpenAI], http.StatusOK},

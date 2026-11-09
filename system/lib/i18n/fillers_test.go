@@ -65,7 +65,7 @@ func TestHermesDocumentedToolsHaveLocalisedFillers(t *testing.T) {
 	`)
 	for _, tool := range tools {
 		t.Run(tool, func(t *testing.T) {
-			for _, lang := range []string{LangEN, LangVI, LangZhCN, LangZhTW, LangJA} {
+			for _, lang := range []string{LangEN, LangVI, LangZhCN, LangZhTW, LangJA, LangKO} {
 				pool := FillerForTool(lang, tool)
 				if len(pool) == 0 {
 					t.Errorf("%s: missing filler pool: %v", lang, pool)
