@@ -850,13 +850,15 @@ by service: …" của nó được nói trên tham số `action`.
   chưa làm gì** (#5853, lamp-9adf, 9/11). Trên tuyến thứ hai, lệnh gọi của
   một lần gửi vẫn chạy đến khi có câu trả lời dù một câu mới hơn cắt lượt,
   và câu trả lời lại những lời đó được đưa lệnh gọi của lần gửi cùng chỗ
-  dịch vụ đã làm tới (`send_state`, giữ theo yêu cầu trong `run` trước mọi
-  hàng rào của tuyến: đã hỏi khi qua cổng, rồi câu trả lời của dịch vụ hay
-  lời từ chối của cổng; giữ theo từng yêu cầu, 8 yêu cầu mới nhất
-  (`SENDS_KEPT`), nên một lần gửi chậm của yêu cầu cũ xong muộn hơn không bao
-  giờ ghi đè lên của yêu cầu mới hơn; trong một yêu cầu giữ lần thử mạnh
-  nhất, nên lời từ chối của một lần thử sau không bao giờ che một lần ghi đã
-  gửi), được báo là
+  dịch vụ đã làm tới với chính lần thử đó (`send_state`, giữ trong `run`
+  trước mọi hàng rào của tuyến theo mã lần thử của tuyến thứ hai, được thêm
+  vào tham số của mỗi lần gửi là `lamp_send_attempt` và được `run` bỏ ra
+  trước khi cổng hay `lamp-services` thấy: đã hỏi khi qua cổng, rồi câu trả
+  lời của dịch vụ hay lời từ chối của cổng. Biên nhận của mỗi lần thử là của
+  riêng nó, nên một lần thử bị từ chối không bao giờ nhận thành công của lần
+  khác, và một lần gửi chậm của yêu cầu cũ xong muộn hơn không bao giờ ghi
+  đè lên của yêu cầu mới hơn; giữ 512 (`RECEIPTS_KEPT`), lời từ chối bị bỏ
+  trước), được báo là
   lần ghi đã gửi trừ khi bị từ chối, và
   không chạy `service_write` nào trong lượt đó
   ([second-voice.md](../second-voice.md), các vòng được mang theo của

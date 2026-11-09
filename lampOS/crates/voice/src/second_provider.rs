@@ -1715,6 +1715,8 @@ struct Shared {
     own_echo: bool,
     spare: Mutex<Option<Kept>>,
     spares: AtomicU64,
+    /// The last send try's attempt id ([`send_attempt`], #5853).
+    send_attempts: AtomicU64,
     /// The write's send under way, or answered, for a turn a newer line may
     /// cut before its round is carried ([`SentWrite`], #5853).
     sent_write: Mutex<Vec<SentWrite>>,
@@ -4235,6 +4237,7 @@ impl Engine {
                 sent_write: Mutex::new(Vec::new()),
                 write_sent_in: Mutex::new(None),
                 spares: AtomicU64::new(0),
+                send_attempts: AtomicU64::new(0),
                 warmed: Mutex::new(None),
                 begun: Mutex::new(None),
                 wait_sound_only: Mutex::new(None),
@@ -9805,16 +9808,19 @@ fn carry_round(shared: &Shared, request: u64, round: &[Message]) {
 }
 
 /// A write's send under way in `request`'s turn (#5853): its call, when it
-/// began, and the services' answer once it came. Every send of one request
-/// is kept ([`SENDS_KEPT`] at most), so a later try in the same batch, the
-/// gate's refusal of a write already sent, never hides the one that went
-/// (Third's HOLD on #5863). Kept by [`sending`] until
+/// began, its attempt id ([`send_attempt`]) and the route's answer once it
+/// came. Every try of a request is kept, up to a batch's
+/// [`net::MOST_CALLS`], refusals let go first, so a later try (the gate's
+/// refusal of a write already sent) never hides the one that went (Third's
+/// and Second's HOLDs on #5863); the newest [`SENDS_KEPT`] requests'. Kept
+/// by [`sending`] until
 /// the turn carries the round ([`carry_round`]), a turn given it ends
 /// ([`sent_given_over`]) or its words are let go, so every newer line that
 /// cuts the words while the send is still awaited finds what it did: the
 /// cut turn never finished the round that would have carried it.
 struct SentWrite {
     request: u64,
+    attempt: u64,
     call: net::ToolCall,
     began: tokio::time::Instant,
     told: tokio::sync::watch::Receiver<Option<Value>>,
@@ -9832,42 +9838,81 @@ const SENT_UNKNOWN_NOTE: &str = "(For you to know: their go-ahead already sent t
 const SEND_NOT_KNOWN_NOTE: &str = "(For you to know: their go-ahead asked for the write to be sent, but whether it went is not known. Say you could not confirm it; do not call service_write again for it.)";
 /// What a `service_write` is told in that turn: nothing runs, nor "sent".
 const SEND_NOT_KNOWN: &str = "Not run: whether the write their go-ahead asked for went is not known. Do not prepare it again; say you could not confirm it.";
-/// The most sends kept ([`SentWrite`]): a batch's tries, and the newest
-/// requests'.
+/// How many requests' send tries are kept ([`SentWrite`]).
 const SENDS_KEPT: usize = 8;
 /// What a `service_write` is told in a turn answering words whose write was
 /// sent ([`sent_already`]): nothing runs, so no new read-back follows.
 const ALREADY_SENT: &str = "Not run: the write their go-ahead asked for was already sent. Do not prepare it again; say what was done.";
 
-/// `running`, a call of `request`'s turn: a write's send
-/// ([`crate::services::may_send`]) is run on a task of its own, so it goes
-/// on to its answer if a newer line cuts the turn, and kept in
-/// [`Shared::sent_write`] with that answer (`told_of`) once it comes
-/// (#5853). Any other call: `running` as it is.
+/// A new attempt id for `call` of `request` when it is a write's send
+/// ([`crate::services::may_send`]), and its arguments marked with it
+/// ([`crate::services::ATTEMPT`]), so the services keep its receipt as its
+/// own (#5853). Any other call: none, and its arguments as they are.
+fn send_attempt(shared: &Shared, request: u64, call: &net::ToolCall) -> (Option<u64>, Value) {
+    if !crate::services::may_send(&call.name, &call.args, request) {
+        return (None, call.args.clone());
+    }
+    let attempt = shared.send_attempts.fetch_add(1, Ordering::Relaxed) + 1;
+    let mut args = call.args.clone();
+    if let Some(marked) = args.as_object_mut() {
+        marked.insert(crate::services::ATTEMPT.into(), attempt.into());
+    }
+    (Some(attempt), args)
+}
+
+/// Whether a kept try was answered and did not go: the first let go.
+fn refused(sent: &SentWrite) -> bool {
+    sent.told
+        .borrow()
+        .as_ref()
+        .is_some_and(|told| told["sent"] != true && *told != crate::tools::unavailable())
+}
+
+/// `running`, `call` of `request`'s turn: a write's send (`attempt` from
+/// [`send_attempt`]) is run on a task of its own, so it goes on to its
+/// answer if a newer line cuts the turn, and kept in [`Shared::sent_write`]
+/// with that answer (`told_of`) once it comes (#5853). Any other call:
+/// `running` as it is.
 fn sending<T: Send + 'static>(
     shared: &Shared,
-    request: u64,
+    (request, attempt): (u64, Option<u64>),
     call: &net::ToolCall,
     running: BoxFuture<'static, T>,
     told_of: fn(&T) -> Value,
 ) -> BoxFuture<'static, T> {
-    if !crate::services::may_send(&call.name, &call.args, request) {
+    let Some(attempt) = attempt else {
         return running;
-    }
+    };
     let (answered, told) = tokio::sync::watch::channel(None);
-    // Kept per request: when full, the oldest request's try goes, never a
-    // newer request's for an older one's (Second's trace on #5863).
     if let Ok(mut sent) = shared.sent_write.lock() {
-        let oldest = sent.iter().map(|sent| sent.request).min();
-        if sent.len() >= SENDS_KEPT
-            && let Some(oldest) = oldest.filter(|oldest| *oldest <= request)
-            && let Some(at) = sent.iter().position(|sent| sent.request == oldest)
-        {
-            sent.remove(at);
-        }
-        if sent.len() < SENDS_KEPT {
+        // The newest requests': an older request's tries go first, never a
+        // newer one's for an older one's (Second's trace on #5863).
+        let mut requests: Vec<u64> = sent.iter().map(|sent| sent.request).collect();
+        requests.sort_unstable();
+        requests.dedup();
+        let fits = if requests.contains(&request) || requests.len() < SENDS_KEPT {
+            true
+        } else if requests[0] < request {
+            let oldest = requests[0];
+            sent.retain(|sent| sent.request != oldest);
+            true
+        } else {
+            false
+        };
+        // A batch at its bound: a refused try goes, never one that went or
+        // may have gone.
+        let mine = sent.iter().filter(|sent| sent.request == request).count();
+        let fits = fits
+            && (mine < net::MOST_CALLS
+                || sent
+                    .iter()
+                    .position(|sent| sent.request == request && refused(sent))
+                    .map(|at| sent.remove(at))
+                    .is_some());
+        if fits {
             sent.push(SentWrite {
                 request,
+                attempt,
                 call: call.clone(),
                 began: tokio::time::Instant::now(),
                 told,
@@ -9945,6 +9990,7 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
                 .map(|sent| {
                     (
                         sent.request,
+                        sent.attempt,
                         sent.call.clone(),
                         sent.began,
                         sent.told.clone(),
@@ -9957,8 +10003,8 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
         return SentWith::Nothing;
     };
     // Each try's answer, waited for within its own bound.
-    let mut tries = Vec::new();
-    for (_, call, began, mut told) in kept {
+    let mut answers = Vec::new();
+    for (_, attempt, call, began, mut told) in kept {
         let came = tokio::time::timeout_at(
             began + crate::services::DEADLINE,
             told.wait_for(Option::is_some),
@@ -9967,54 +10013,53 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
         .ok()
         .and_then(Result::ok)
         .map(|told| told.clone().unwrap_or_default());
-        tries.push((call, came));
+        answers.push((attempt, call, came));
     }
     if !still_holding(shared, request) {
         return SentWith::Cut;
     }
-    // A cut turn's lease is no longer current, so a call's answer may be
-    // fenced to "not running" after the services sent it: theirs is asked,
-    // the strongest of the request's tries (`services::send_state`).
+    // Each try with its own result (Second's HOLD on #5863: never another
+    // try's): the route's answer, or, fenced to "not running" as a cut
+    // turn's lease is no longer current, where the services got to with
+    // that very try (`services::send_state`, by its attempt id).
     use crate::services::SendState;
     let unavailable = crate::tools::unavailable();
-    let own = |came: &Option<Value>| came.clone().filter(|told| *told != unavailable);
-    let went = tries.iter().find_map(|(call, came)| {
-        own(came)
-            .filter(|told| told["sent"] == true)
-            .map(|told| (call.clone(), told))
-    });
-    let (call, told, note) = if let Some((call, told)) = went {
-        (call, told, Some(SENT_WRITE_NOTE))
+    let tries: Vec<Try> = answers
+        .into_iter()
+        .map(|(attempt, call, came)| {
+            let own = came.clone().filter(|told| *told != unavailable);
+            let (told, got) = match (own, crate::services::send_state(attempt), came) {
+                (Some(told), _, _) => (told, Got::Told),
+                (None, Some(SendState::Told(told)), _) => (told, Got::Told),
+                (None, Some(SendState::Asked), _) => (unavailable.clone(), Got::Asked),
+                (None, None, None) => (unavailable.clone(), Got::Unknown),
+                // Answered "not running" before the services had it.
+                (None, None, Some(told)) => (told, Got::Told),
+            };
+            Try { call, told, got }
+        })
+        .collect();
+    let note = if tries
+        .iter()
+        .any(|tried| tried.got == Got::Told && tried.told["sent"] == true)
+    {
+        Some(SENT_WRITE_NOTE)
+    } else if tries.iter().any(|tried| tried.got == Got::Asked) {
+        Some(SENT_UNKNOWN_NOTE)
+    } else if tries.iter().any(|tried| tried.got == Got::Unknown) {
+        Some(SEND_NOT_KNOWN_NOTE)
     } else {
-        // The try with no answer of its own (fenced, or none in time), else
-        // the first.
-        let (call, came) = tries
-            .iter()
-            .find(|(_, came)| own(came).is_none())
-            .unwrap_or(&tries[0])
-            .clone();
-        match (crate::services::send_state(origin), own(&came), came) {
-            (Some(SendState::Told(told)), _, _) if told["sent"] == true => {
-                (call, told, Some(SENT_WRITE_NOTE))
-            }
-            // Passed the gate with no answer: sent, its result not known.
-            (Some(SendState::Asked), _, _) => (call, unavailable, Some(SENT_UNKNOWN_NOTE)),
-            // Refused by the gate, or answered not sent.
-            (Some(SendState::Told(told)), _, _) | (None, Some(told), _) => (call, told, None),
-            // No answer in time, and the services hold nothing of it.
-            (None, None, None) => (call, unavailable, Some(SEND_NOT_KNOWN_NOTE)),
-            // Answered "not running" before the services had it: nothing sent.
-            (None, None, Some(told)) => (call, told, None),
-        }
+        None
     };
     eprintln!(
-        "lamp-voice second: request {request}: request {origin}'s {} was sent before a newer line cut its answer; {} goes with its words",
-        call.name,
+        "lamp-voice second: request {request}: request {origin}'s {} send tr{} began before a newer line cut its answer; {} go with its words",
+        tries.len(),
+        if tries.len() == 1 { "y" } else { "ies" },
         match note {
-            Some(SENT_WRITE_NOTE) => "its sent result",
-            Some(SENT_UNKNOWN_NOTE) => "the send, its result not known,",
-            Some(_) => "the send, not known to have gone,",
-            None => "its result, not sent,",
+            Some(SENT_WRITE_NOTE) => "the sent one and each try's own result",
+            Some(SENT_UNKNOWN_NOTE) => "a send whose result is not known",
+            Some(_) => "a send not known to have gone",
+            None => "their results, none sent,",
         }
     );
     let instead = match note {
@@ -10025,29 +10070,44 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
     if let Ok(mut sent_in) = shared.write_sent_in.lock() {
         *sent_in = Some((request, origin, instead));
     }
-    // Every try of the batch with its own result, the one told above with
-    // what it got to, so each call id meets its answer (Second's repro on
-    // #5863); once only.
+    // Every try with its own result, so each call id meets its answer
+    // (Second's repro on #5863); once only.
     let carried = carried_rounds(shared, request).iter().any(|message| {
         tries
             .iter()
-            .any(|(tried, _)| message.tool_call_id.as_deref() == Some(tried.id.as_str()))
+            .any(|tried| message.tool_call_id.as_deref() == Some(tried.call.id.as_str()))
     });
     if !carried {
-        let calls: Vec<net::ToolCall> = tries.iter().map(|(tried, _)| tried.clone()).collect();
+        let calls: Vec<net::ToolCall> = tries.iter().map(|tried| tried.call.clone()).collect();
         let round: Vec<Message> = std::iter::once(Message::assistant_calls(None, &calls))
-            .chain(tries.iter().map(|(tried, came)| {
-                let result = if tried.id == call.id {
-                    told.clone()
-                } else {
-                    came.clone().unwrap_or_else(crate::tools::unavailable)
-                };
-                Message::tool(tried.id.clone(), result.to_string())
-            }))
+            .chain(
+                tries
+                    .iter()
+                    .map(|tried| Message::tool(tried.call.id.clone(), tried.told.to_string())),
+            )
             .collect();
         carry_round(shared, request, &round);
     }
     SentWith::Told(note)
+}
+
+/// One send try as [`sent_with_words`] carries it: its call, its own
+/// result, and how far it is known to have got.
+struct Try {
+    call: net::ToolCall,
+    told: Value,
+    got: Got,
+}
+
+/// How far a send try is known to have got.
+#[derive(PartialEq)]
+enum Got {
+    /// Its result is known: the service's answer, or its refusal.
+    Told,
+    /// Past the gate with no answer: it may have gone.
+    Asked,
+    /// No answer within the bound, and the services hold nothing of it.
+    Unknown,
 }
 
 /// `request`'s turn over: a send given to it ([`sent_with_words`]) is done
@@ -12671,19 +12731,15 @@ async fn run_tool(
         );
         return serde_json::json!({ "error": ONE_FACE_FORGET });
     }
+    // A send runs to its answer even if a newer line cuts the turn, its
+    // receipt kept as its own (#5853).
+    let (attempt, args) = send_attempt(shared, request, call);
     let running: BoxFuture<'static, Value> = match (&shared.scoped_tools, scope) {
-        (Some(run), Some(scope)) => run(
-            request,
-            heard,
-            call.name.clone(),
-            call.args.clone(),
-            scope.clone(),
-        ),
+        (Some(run), Some(scope)) => run(request, heard, call.name.clone(), args, scope.clone()),
         (Some(_), None) => Box::pin(std::future::ready(crate::tools::unavailable())),
-        (None, _) => (shared.tools)(request, heard, call.name.clone(), call.args.clone()),
+        (None, _) => (shared.tools)(request, heard, call.name.clone(), args),
     };
-    // A send runs to its answer even if a newer line cuts the turn (#5853).
-    let running = sending(shared, request, call, running, Value::clone);
+    let running = sending(shared, (request, attempt), call, running, Value::clone);
     // A connected service can take seconds to answer (a mail box, a web
     // service): past the wait sound's time the person hears it, as for a
     // slow chat, never a silence (`crate::services::DEADLINE`).
@@ -15221,18 +15277,19 @@ async fn answer(
                             .filter(|scope| audio_scope_current(scope, &context))
                         {
                             Some(scope) => {
+                                let (attempt, args) = send_attempt(shared, request, call);
                                 let running = runner(
                                     context.clone(),
                                     lamp_gemini::ToolCall {
                                         id: call.id.clone(),
                                         name: call.name.clone(),
-                                        args: call.args.clone(),
+                                        args,
                                     },
                                     scope.clone(),
                                 );
                                 sending(
                                     shared,
-                                    request,
+                                    (request, attempt),
                                     call,
                                     running,
                                     |answer: &crate::tools::ToolAnswer| answer.told.clone(),
