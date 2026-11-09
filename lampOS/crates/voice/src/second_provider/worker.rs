@@ -49,6 +49,64 @@ fn invalid(message: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, message)
 }
 
+/// Audio invalidation is not authority: the ordinary Gate still checks every send.
+#[derive(Default)]
+struct SpeechCuts {
+    sent: Option<crate::speech_cut::ProviderCut>,
+    waiting: bool,
+    // End-to-end control roundtrip through the physical speaker acknowledgement,
+    // distinct from each IPC message's existing 100 ms age bound.
+    waiting_since: Option<Instant>,
+}
+
+impl SpeechCuts {
+    fn publish(
+        &mut self,
+        cut: Option<crate::speech_cut::ProviderCut>,
+        retired_through: u64,
+        send: impl FnOnce(crate::speech_cut::ProviderCut) -> io::Result<()>,
+    ) -> io::Result<()> {
+        if self.sent.is_some_and(|old| old.request <= retired_through) {
+            self.waiting = false;
+            self.waiting_since = None;
+        }
+        let Some(cut) = cut.filter(|cut| cut.request > retired_through) else {
+            self.waiting = false;
+            self.waiting_since = None;
+            return Ok(());
+        };
+        if self.sent.is_none_or(|old| {
+            cut.request > old.request || (cut.request == old.request && cut.through > old.through)
+        }) {
+            send(cut)?;
+            self.sent = Some(cut);
+            self.waiting = true;
+            self.waiting_since.get_or_insert_with(Instant::now);
+        }
+        if self.waiting_since.is_some_and(|at| {
+            at.elapsed() >= Duration::from_micros(crate::speech_cut::ACK_TIMEOUT_US)
+        }) {
+            return Err(invalid("second route speech cut acknowledgement expired"));
+        }
+        Ok(())
+    }
+
+    fn applied(&mut self, request: u64, through: u64) {
+        if self
+            .sent
+            .is_some_and(|cut| cut.request == request && through == cut.through)
+        {
+            self.waiting = false;
+            self.waiting_since = None;
+        }
+    }
+
+    fn discards(&self, event: &ProviderOutput) -> bool {
+        matches!(event, ProviderOutput::Audio { request, sequence, .. }
+            if self.sent.is_some_and(|cut| *request == cut.request && *sequence <= cut.through))
+    }
+}
+
 /// The fixture's authority bookkeeping: who owns the turn, which requests
 /// are over, and whether the controller is still there.
 struct Gate {
@@ -66,6 +124,7 @@ struct Gate {
     rides_stall: bool,
     /// Since when it holds closed, the last authority's install.
     held_since: Option<u64>,
+    speech_cuts: SpeechCuts,
 }
 
 enum Drain {
@@ -85,6 +144,7 @@ impl Gate {
             skipped_expired: 0,
             rides_stall: false,
             held_since: None,
+            speech_cuts: SpeechCuts::default(),
         }
     }
 
@@ -364,10 +424,14 @@ impl Gate {
                     self.install(monotonic_us(), snapshot, engine)?
                 }
                 Some(Control::ProviderOutputCapacity { through }) => self.flow.grant(through)?,
+                Some(Control::ProviderSpeechCutApplied { request, through }) => {
+                    self.speech_cuts.applied(request, through);
+                }
                 Some(
                     Control::StartCapture
                     | Control::ConnectReference { .. }
-                    | Control::NameGrant { .. },
+                    | Control::NameGrant { .. }
+                    | Control::CutSpeech { .. },
                 ) => {
                     return Err(invalid("invalid second route provider control"));
                 }
@@ -12847,6 +12911,19 @@ pub async fn run(
                 engine.submit(command);
             }
         }
+        // A cut bypasses both audio credit and the one retained output packet.
+        gate.speech_cuts
+            .publish(engine.speech_cut(), gate.retired_through, |cut| {
+                channels
+                    .control
+                    .send(WorkerEvent::ProviderSpeechCut { cut })
+            })?;
+        if pending
+            .as_ref()
+            .is_some_and(|event| gate.speech_cuts.discards(event))
+        {
+            pending = None;
+        }
         // Output kept waiting for a request since retired is dropped.
         if pending
             .as_ref()
@@ -12903,6 +12980,23 @@ pub async fn run(
         if gate.holds(monotonic_us(), &mut engine) {
             continue;
         }
+        // link.tick above can yield while a forget is admitted. Re-read the
+        // register before any output crosses the process boundary.
+        gate.speech_cuts
+            .publish(engine.speech_cut(), gate.retired_through, |cut| {
+                channels
+                    .control
+                    .send(WorkerEvent::ProviderSpeechCut { cut })
+            })?;
+        if pending
+            .as_ref()
+            .is_some_and(|event| gate.speech_cuts.discards(event))
+        {
+            pending = None;
+        }
+        if gate.speech_cuts.waiting {
+            continue;
+        }
         if let Some(event) = pending.take()
             && !gate.send_or_discard(&engine, monotonic_us(), &event, |event| {
                 channels.data.send(event)
@@ -12918,6 +13012,93 @@ mod route_checks;
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn speech_cuts_coalesce_and_only_matching_acknowledgements_release_output() {
+        use super::SpeechCuts;
+        use crate::speech_cut::ProviderCut;
+        let cut = |request, through| ProviderCut {
+            request,
+            through,
+            admitted_at_us: 1,
+        };
+        let mut cuts = SpeechCuts::default();
+        cuts.publish(Some(cut(7, 10)), 0, |_| Ok(())).unwrap();
+        assert!(cuts.waiting);
+        cuts.applied(6, 100);
+        cuts.applied(7, 9);
+        cuts.applied(7, 12);
+        assert!(cuts.waiting, "a future unsent ACK cannot release this cut");
+        cuts.publish(Some(cut(7, 11)), 0, |_| Ok(())).unwrap();
+        cuts.applied(7, 10);
+        assert!(cuts.waiting);
+        cuts.applied(7, 11);
+        assert!(!cuts.waiting);
+        cuts.publish(Some(cut(7, 11)), 0, |_| panic!("duplicate cut"))
+            .unwrap();
+        assert!(!cuts.waiting);
+        cuts.waiting_since = Some(std::time::Instant::now() - std::time::Duration::from_secs(1));
+        cuts.publish(Some(cut(8, 11)), 7, |_| Ok(())).unwrap();
+        assert!(
+            cuts.waiting_since.unwrap().elapsed() < std::time::Duration::from_millis(250),
+            "new owner must not inherit retired owner's ACK deadline"
+        );
+        cuts.applied(7, 100);
+        assert!(cuts.waiting);
+        cuts.publish(Some(cut(8, 11)), 8, |_| panic!("retired cut"))
+            .unwrap();
+        assert!(!cuts.waiting);
+    }
+
+    #[test]
+    fn speech_cut_acknowledgement_timeout_fails_closed() {
+        use super::SpeechCuts;
+        use crate::speech_cut::ProviderCut;
+        let mut cuts = SpeechCuts::default();
+        let cut = ProviderCut {
+            request: 7,
+            through: 10,
+            admitted_at_us: 1,
+        };
+        cuts.publish(Some(cut), 0, |_| Ok(())).unwrap();
+        cuts.waiting_since =
+            Some(std::time::Instant::now() - std::time::Duration::from_millis(251));
+        assert!(
+            cuts.publish(Some(cut), 0, |_| panic!("duplicate cut"))
+                .is_err()
+        );
+        assert!(cuts.waiting);
+    }
+
+    #[test]
+    fn speech_cut_watermark_is_inclusive_and_does_not_consume_fresh_audio() {
+        use super::SpeechCuts;
+        use crate::{provider_worker::ProviderOutput, speech_cut::ProviderCut};
+        let mut cuts = SpeechCuts::default();
+        cuts.publish(
+            Some(ProviderCut {
+                request: 7,
+                through: 10,
+                admitted_at_us: 1,
+            }),
+            0,
+            |_| Ok(()),
+        )
+        .unwrap();
+        let audio = |request, sequence| ProviderOutput::Audio {
+            request,
+            sequence,
+            provider_event_at_us: 1,
+            source_frames: 1,
+            source_offset: 0,
+            samples: vec![1],
+        };
+        assert!(cuts.discards(&audio(7, 10)));
+        assert!(!cuts.discards(&audio(7, 11)));
+        assert!(!cuts.discards(&audio(8, 10)));
+        cuts.applied(7, 10);
+        assert!(cuts.discards(&audio(7, 10)));
+    }
+
     /// #5139 (a tester's lamp-0c4e, 3 Nov): with no owner the by-default
     /// name was skipped with no word. Told once, at the first reply with no
     /// owner; not on the next, nor with an owner; once more after an owner

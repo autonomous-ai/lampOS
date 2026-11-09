@@ -5341,6 +5341,8 @@ impl ProviderIntake {
                 }
                 Control::StartCapture
                 | Control::ConnectReference { .. }
+                | Control::ProviderSpeechCutApplied { .. }
+                | Control::CutSpeech { .. }
                 | Control::NameGrant { .. } => {
                     return Err(io::Error::other("invalid provider command").into());
                 }

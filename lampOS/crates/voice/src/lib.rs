@@ -188,6 +188,7 @@ pub mod slide_wake;
 pub mod speak_up;
 pub mod speaker_check;
 pub mod speaking_faces;
+pub mod speech_cut;
 pub mod staff_note;
 pub mod stage_cost;
 pub mod stalls;
