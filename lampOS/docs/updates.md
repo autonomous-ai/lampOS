@@ -2748,9 +2748,18 @@ own choice, the queue and the exit note a crash came from, and the login a
 ping rotated, `rotated.json`); the controls (`controls.json`, the product's
 pins file, read with `--touch`, and the pins file prepare gives a lamp moved
 from V1, read without it); the skills turned off (`off`, read by lamp-skills at
-a start and by lamp-cloud for the app); and lamp-records (a voice session
-folder, taken as a session with nothing refused). The other parts follow, by
-harm.
+a start and by lamp-cloud for the app); lamp-records (a voice session
+folder, taken as a session with nothing refused); and the body (#5759): the
+lamp's own poses, `/etc/lampOS/body/lamp.env`, in each shape its writers give
+and as lamp-06c1 and lamp-fc4b hold it, started from the product unit and read
+by the let-go, the generic package's seated `measured.env` started from its
+own unit, and the first stand's record, read so a lamp that stood never asks
+again. Not kept, and why: setup's reset plan is a build's own setting, and
+install keeps every SHA-256 it has had (`install::RESET_PLAN`);
+lamp-policy's `--log-dir` is written and never read back; the output caps
+(`LAMP_OUTPUT_CAPS_DIR`) are off in the product, so no lamp holds them yet,
+and their fixture is owed before that switch goes on. The other parts follow,
+by harm.
 
 **Published Controls single-implementation replay check** (#2809): the
 Controls `release_pair` target selects pinned 6408/6498
