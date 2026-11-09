@@ -9481,3 +9481,8 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - #5890 docs gate reminder postedQueue6745474958 before overnight train: code reads do not satisfy still-absent onboarding behavior/limits and clause-latency docs.
 - #5893 performance-only READ-OK restated`ab0a510a9ae2dc60457c5f71548df26d277d46a2`, comment6745542772. Read latest token/continuation delta and retained caps. Services87 + independent1passed, exit0. Same subject sizes16393/65548/262153 took327/209.209/83.208us, each515bytes, package-opt-level3 host probe. /tmp/second-5893-mask-ab0.log. Probe removed/checkoutclean. El's privacy HOLD and default/device gates remain separate.
 - Jarvis independently READ-OK'd #5884 d092, lifting his original HOLD with fail-first forget-ABA/no-file-race evidence. My earlier assigned second read remains; default-on/phone/device acceptance separate.
+
+## 9 November 2026: Gmail concurrency revert read
+
+- #5903 READ-OK `df646e7939b37ecf7a70dee8e701922702b7e48f`, comment6745623967. Exact inverse of landed907d81d4d65b24c8c08e89258f9dbb4a97a6bdb4 (#5888), matching stable patch IDd0d127182deb1ceb46f8e37064b82630b857cb1b. Sequential metadata gets restored, EN/VI docs reverted, unrelated behavior untouched.
+- Services78passed0.79s; two adapted independent actual Services/FakeGmailApi probes passed0.12s: no overlapping delayed gets/list order and cancellation drops one active request. Both commands exit0. /tmp/second-5903-{services,probes}.log; temporary source removed, checkoutclean. Device rollback rationale is Fourteen's two20s timeouts; my earlier host read never established device speedup and these tests do not diagnose Google/device latency. CI/train gate separate.
