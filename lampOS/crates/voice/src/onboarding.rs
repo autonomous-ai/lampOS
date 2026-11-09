@@ -4540,6 +4540,13 @@ const READ_BACK_YES_PHRASES: [&[&str]; 4] = [
     &["that's", "me"],
 ];
 
+/// The read-back's no beside [`NO`] and any "…n't": the "…n't" words
+/// written without their apostrophe, and "nah" (the Reviewer-lead's P3s at
+/// e659c04e5b on #5768).
+const READ_BACK_NO: [&str; 8] = [
+    "not", "nah", "isnt", "wasnt", "didnt", "doesnt", "arent", "dont",
+];
+
 /// Lines no longer than this are an answer as a whole: "Sure, go ahead."
 const SHORT_ANSWER_WORDS: usize = 4;
 
@@ -4620,8 +4627,10 @@ const NOT_A_NAME: [&str; 29] = [
 /// What a line of only a word or two is when it is not a name.
 const NOT_A_NAME_ALONE: [&str; 8] = ["what", "huh", "hmm", "um", "uh", "hey", "hi", "hello"];
 
+/// A "…n't" is never a name: "Nah, isn't." to the read-back was kept as one
+/// (the Reviewer-lead's P3 at e659c04e5b on #5768).
 fn not_a_name(word: &str) -> bool {
-    NOT_A_NAME.contains(&word) || YES.contains(&word) || NO.contains(&word)
+    NOT_A_NAME.contains(&word) || YES.contains(&word) || NO.contains(&word) || word.ends_with("n't")
 }
 
 /// Where a name starts in `words` (of `text`): after "call me", "name is",
@@ -5053,15 +5062,15 @@ fn reading_with(
             "yes" | "yeah" | "yep" | "yup" | "sure" | "no" | "nope" | "nah"
         )
     }) || yes_phrase_at(&words, 0, more).is_some();
-    // In the read-back (`more` given), a "…n't" before a yes word is a no:
-    // "That isn't right.", "Didn't get it right." confirmed a wrong name (the
-    // Reviewer-lead's P2 on #5768). "Yes, you didn't miss a letter." stays a
-    // yes, and elsewhere "I didn't catch that." still asks again.
-    let negated = !more.is_empty() && {
+    // In the read-back (`more` given), any "…n't" (with or without its
+    // apostrophe), "not" or "nah" is a no, wherever a yes word sits: "That
+    // isn't right.", "Yeah, that isn't it." confirmed a wrong name (the
+    // Reviewer-lead's P2s on #5768). "Yes, you didn't miss a letter." then
+    // asks again, a cheap error; "I didn't catch that." still does.
+    let negated = !more.is_empty() && !again && {
         let (rest, _) = without_yes_phrases(&words, more);
         rest.iter()
-            .position(|word| word.ends_with("n't"))
-            .is_some_and(|at| rest[at..].iter().any(|word| YES.contains(word)))
+            .any(|word| word.ends_with("n't") || READ_BACK_NO.contains(word))
     };
     in_language::Reading {
         agrees: agrees(&words, more) && !negated,
@@ -8422,8 +8431,7 @@ mod tests {
             "You got it!",
             "Yep, that's me.",
             "Exactly right.",
-            // A "…n't" after the yes word is no no (Jarvis on #5677).
-            "Yes, you didn't miss a letter.",
+            "Yes, that's it.",
         ]
         .into_iter()
         .enumerate()
@@ -8717,6 +8725,15 @@ mod tests {
                 "Didn't get it right.",
                 "That doesn't sound right.",
                 "That's not right.",
+                // Wherever the yes word sits, and without the apostrophe
+                // (the Reviewer-lead's P2 and P3s at e659c04e5b on #5768).
+                "Yeah, that isn't it.",
+                "Right, it isn't.",
+                "Correct\u{2026} it isn't.",
+                "Yes it isn't.",
+                "Yes, no, that's wrong",
+                "That isnt right.",
+                "Nah, isn't.",
             ]
             .into_iter()
             .map(|answer| (answer, "Walter, did I get that right?", answer)),
