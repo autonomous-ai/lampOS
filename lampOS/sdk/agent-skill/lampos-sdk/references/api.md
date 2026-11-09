@@ -16,8 +16,12 @@ naming every public call, tool, event and error code they have.
 | the lamp, grants, limits | `lamp.info`, `lamp.grants`, `lamp.limits` | `lamp.info`, `lamp.grants`, `lamp.limits` | in `lamp_state("lamp")` and the tool list |
 | close | `await lamp.close()`, or `async with` | `await lamp.close()` | — |
 | wait until it ends | `await lamp.wait_closed()` | `await lamp.closed()` | — |
-| find lamps on this network | `await find()` (`lampos.discovery`, `lampos[find]`) | `await find()` | — |
+| find lamps on this network | `await find()` (`lampos.discovery`, the `[find]` extra) | `await find()` | — |
 | any op of the schema | `await lamp.request(op, **fields)` (`on_id=` is told its id before it is sent) | `lamp.request(op, fields)` | — |
+
+No lamp announces itself by mDNS yet (stable 10824): `find()` and `lamp find`
+return none, so give `host` (`lamp-xxxx.local` or the IP address). The
+pairing keeps it for later connects.
 
 ## Events and state
 
@@ -74,7 +78,7 @@ reading in 15 s, and `body` until the body has found home.
 | still mine? | `lease.held`, `lease.state`, `lease.lost_why` | `lease.held`, `lease.state` | `lamp://lease` |
 
 Parts: `body` (grant body), `light` (light), `voice` (speak). `for_ms` up to
-30,000, renewed for you while held.
+600,000 a take, renewed for you while held.
 
 ## Actions
 
@@ -82,11 +86,11 @@ Parts: `body` (grant body), `light` (light), `voice` (speak). `for_ms` up to
 |---|---|---|---|---|
 | a feeling (move and light) | `await lamp.express("glad", 0.5)` (`glad`, `lively`, `low`) | `lamp.express('glad', 0.5)` | `lamp_express(feeling, strength)` | body and light |
 | a gesture | `await lamp.gesture("nod", wait=False)` | `lamp.gesture('nod', { wait })` | `lamp_gesture(name)` | body |
-| look | `await lamp.look("ahead")`, `look(yaw=20, pitch=5)`, `look("hand")` | `lamp.look('ahead')`, `lamp.look({ yaw, pitch })` | `lamp_look(at, yaw, pitch)` | body, a body lease |
+| look (`face`, `name` refused on stable 10824) | `await lamp.look("ahead")`, `look(yaw=20, pitch=5)`, `look("hand")` | `lamp.look('ahead')`, `lamp.look({ yaw, pitch })` | `lamp_look(at, yaw, pitch)` | body, a body lease |
 | follow a hand | `async with lamp.follow_hand() as following:` | `lamp.withHand(async (following) => …)`, `lamp.followHand().start()` | `lamp_follow_hand(seconds)`, `lamp_follow_stop()` | body and look |
 | a move of your own | `await lamp.move(frames, step_ms)` | `lamp.move(frames, stepMs)` | `lamp_move(step_ms, frames)` | body, a body lease |
-| a recorded move | `await lamp.play(name)` | `lamp.play(name)` | `lamp_play(name)` | body, a body lease |
-| aim the joints | `await lamp.joints(lease, 1000, pitch=5)` | `lamp.joints(lease, 1000, { pitch: 5 })` | `lamp_joints(within_ms, pitch, roll, yaw, shoulder, elbow)` | body, the lease named |
+| a recorded move (refused on every lamp today) | `await lamp.play(name)` | `lamp.play(name)` | `lamp_play(name)` | body, a body lease |
+| aim the joints (stable 10824: `yaw`, `pitch` only) | `await lamp.joints(lease, 1000, pitch=5)` | `lamp.joints(lease, 1000, { pitch: 5 })` | `lamp_joints(within_ms, pitch, roll, yaw, shoulder, elbow)` | body, the lease named |
 | light | `await lamp.light("green", 3, 10_000, pattern="breathe")` (no `pattern`: steady) | `lamp.light('green', 3, 10000, 'breathe')` (`undefined`: steady) | `lamp_light(colour, level, for_ms, pattern)` | light |
 | ring, pixel by pixel | `await lamp.ring(pixels, for_ms=3_000, brightness=50)`: `lamp.ring_pixels` colours (`"#rrggbb"` or `(r, g, b)`), from pixel 0 around the ring | `lamp.ring(pixels, { forMs: 3000, brightness: 50 })` (`lamp.ringPixels` of them) | `lamp_ring(pixels, rgb, brightness, for_ms)` | light |
 | one colour of your own | `await lamp.light_rgb("#ff8000", for_ms=10_000, brightness=40)` | `lamp.lightRgb('#ff8000', { forMs: 10000, brightness: 40 })` | | light |
@@ -137,8 +141,10 @@ These need the `skills` grant. A pushed skill runs on the lamp after the
 computer goes, never beyond the computer's other grants, and a revoke turns it
 off. `lamp skill push` checks the folder first, as `lamp skill check` does.
 A push needs `skills` plus every grant the skill's `[permissions]` asks, is
-1 MiB at most packed, and needs lamp-control started with `--manage-socket`
-(a product lamp has no lamp-control unit until #4526). To try it:
+1 MiB at most packed, and needs lamp-control started with `--manage-socket`.
+**Not yet on customer lamps:** the product unit on stable 10824 doesn't pass
+it, so every skill op is refused, "skill push is not on this lamp". Try it on
+`lamp fake`. To try it:
 `lampOS/sdk/examples/hello-skill`, which asks only `speak`.
 From lamp-mcp, with the same grant: `lamp_skill_push(folder)`, `lamp_skills()`
 and `lamp_skill_remove(name)`.

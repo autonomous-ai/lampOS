@@ -189,6 +189,14 @@ fn main() -> ExitCode {
     // whatever LAMP_SIGNED_OUT says.
     let telling_on = signed_out::on_from_environment();
     signed_out::tell_the_app(telling_on);
+    // The app told once that setup is done (#5812): LAMP_APP_ONBOARDING_DONE=on
+    // with a state folder, where the acked date is kept.
+    lamp_cloud::onboarding_done::switch(
+        lamp_cloud::onboarding_done::on()
+            .then(|| std::env::var_os("STATE_DIRECTORY"))
+            .flatten()
+            .map(|dir| PathBuf::from(dir).join(lamp_cloud::onboarding_done::FILE)),
+    );
     let mut login = watches_login(
         telling_on,
         lamp_cloud::services::on_from_environment(),

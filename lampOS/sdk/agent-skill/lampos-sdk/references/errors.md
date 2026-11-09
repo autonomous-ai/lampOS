@@ -20,6 +20,12 @@ first: it says exactly what was wrong.
 | `bad_request` | The request doesn't fit the protocol; `why` names the field. Check it against the schema (control.schema.json). |
 | `off` | Developer access is off on this lamp: the owner turns it on in the app. |
 
+On stable 10824 and older, `busy` with `retry_ms` also means a motion still
+plays (the last gesture, move or feeling's move lamp-control sent, from any computer; the lamp's own motions don't count): wait `retry_ms` and
+send it again. Without `retry_ms`, it is a held part, as in the table. On a
+customer lamp, `refused` "skill push is not on this lamp" means skill push
+isn't there yet ([gotchas.md](gotchas.md)): don't retry.
+
 Not from the lamp, but from the SDK: `not_paired` (no pairing here: run `lamp pair`),
 `wrong_lamp` (the certificate isn't the pinned one: pair again), `closed`
 (the connection ended: connect again; a lamp restarts on every update).

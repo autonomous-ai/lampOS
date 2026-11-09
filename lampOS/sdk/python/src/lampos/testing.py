@@ -15,6 +15,7 @@ request it took. It moves nothing, so it never stands in for a lamp check.
 
 from __future__ import annotations
 
+import array
 import asyncio
 import base64
 import datetime
@@ -26,6 +27,7 @@ import math
 import os
 import random
 import ssl
+import sys
 import tempfile
 import time
 import wave
@@ -82,6 +84,8 @@ LOOK_WAITS = {
 # What lamp-control refuses today, in its own words (crates/control/src/
 # parts.rs, `waits_for`): pass it as `refuses=` for a fake that answers as a
 # lamp does now. `lamp fake` does.
+# lamp-control's words for `joints` naming roll, shoulder or elbow (parts.rs).
+JOINTS_WAIT = "not routed yet: waits for the body's goal stream for roll, shoulder and elbow; yaw and pitch go now"
 LAMP_CONTROL_REFUSES = {
     # No product unit passes --lease-socket yet (docs/control.md).
     "look": "the body's lease socket is not on here",
@@ -161,7 +165,9 @@ def _frames_of(data: bytes) -> int | None:
 
 
 def _clip_refusal(data: bytes) -> str | None:
-    """Why lamp-control would refuse this clip, its format and length only."""
+    """Why lamp-control would refuse this clip, in sounds.rs `check_clip`'s
+    words and order: its format, its length, a file shorter than its header
+    says, then its loudness; None for one it keeps."""
     try:
         with wave.open(io.BytesIO(data)):
             pass
@@ -172,6 +178,39 @@ def _clip_refusal(data: bytes) -> str | None:
         return "not 16-bit mono PCM at 24000 Hz"
     if not 1 <= frames <= 24_000 * 30:
         return "not 1 to 720000 frames (30 s at most)"
+    with wave.open(io.BytesIO(data)) as read:
+        pcm = read.readframes(frames)
+    # Fewer bytes than the header's frames (an odd or an even count short):
+    # hound's samples end early.
+    if len(pcm) != 2 * frames:
+        return "a WAV file cut short"
+    return _clip_loudness_refusal(pcm)
+
+
+# The voice's loudness cap on a clip, as lamp-control's sounds.rs `check_clip`
+# holds it at upload: no sample past CLIP_PEAK_DBFS, and no 10 ms window
+# (CLIP_WINDOW frames, the last one shorter) louder than CLIP_LOUDEST_DBFS RMS.
+CLIP_PEAK_DBFS = -12.0
+CLIP_LOUDEST_DBFS = -30.0
+CLIP_WINDOW = 240
+
+
+def _clip_loudness_refusal(pcm: bytes) -> str | None:
+    samples = array.array("h", pcm)
+    if sys.byteorder == "big":
+        samples.byteswap()
+    full = 32_767.0
+    if max((abs(sample) for sample in samples), default=0) > full * 10 ** (CLIP_PEAK_DBFS / 20):
+        return f"a peak past {CLIP_PEAK_DBFS:g} dBFS"
+    loudest = max(
+        (
+            math.sqrt(sum(sample * sample for sample in samples[at : at + CLIP_WINDOW]) / len(samples[at : at + CLIP_WINDOW]))
+            for at in range(0, len(samples), CLIP_WINDOW)
+        ),
+        default=0.0,
+    )
+    if loudest > full * 10 ** (CLIP_LOUDEST_DBFS / 20):
+        return f"louder than {CLIP_LOUDEST_DBFS:g} dBFS RMS over 10 ms"
     return None
 
 
@@ -512,6 +551,10 @@ class FakeLamp:
             return
         if state == "lost":
             self.leases.pop(lease)
+        else:
+            # A suspended lease still stands, but the body is not held: a look
+            # or `joints` under it is taken by the door and dropped by the body.
+            holder["state"] = state
         event: dict[str, Any] = {"ev": "lease", "lease": lease, "state": state}
         if why is not None:
             event["why"] = why
@@ -535,6 +578,19 @@ class FakeLamp:
         mutes, self.mutes = self.mutes, {}
         for ws, re in mutes.values():
             await ws.send(json.dumps({"ev": "done", "re": re, "how": "cut_short", "why": "a hand on the head"}))
+
+    async def _look_done(self, ws: ServerConnection, id_: int, yaw: float, pitch: float) -> None:
+        """A look the door takes (`{"to": "body"}`), and the body's answer as
+        its `done`: there, or, while the computer's body lease is suspended (a
+        conversation), dropped as the body says it (body_lease.rs `done_of`)."""
+        await self._ok(ws, id_, to="body")
+        if not self.auto_done:
+            return
+        suspended = any(h["ws"] is ws and "body" in h["parts"] and h.get("state") == "suspended" for h in self.leases.values())
+        if suspended:
+            await self._send_done(id_, {"how": "dropped", "why": "the body is not held"})
+        else:
+            await self._send_done(id_, {"how": "finished", "yaw": yaw, "pitch": pitch, "clamped": False})
 
     async def _send_done(self, re: int, fields: dict[str, Any]) -> None:
         ws = self._asker.get(re)
@@ -886,10 +942,22 @@ class FakeLamp:
                 self.following[id(ws)] = (ws, lease)
                 await self._ok(ws, id_, to="body", follow="hand")
                 return
-            await self._ok(ws, id_, to="body")
-            if self.auto_done:
-                at = request["at"] if isinstance(request["at"], dict) else {"yaw": 0.0, "pitch": 0.0}
-                await self._send_done(id_, {"how": "finished", "yaw": at["yaw"], "pitch": at["pitch"], "clamped": False})
+            at = request["at"] if isinstance(request["at"], dict) else {"yaw": 0.0, "pitch": 0.0}
+            await self._look_done(ws, id_, at["yaw"], at["pitch"])
+        elif op == "joints":
+            # As lamp-control (parts.rs `joints`): roll, shoulder and elbow
+            # wait for the body's goal stream; yaw and pitch go to the body as
+            # the holder's look, a joint not named staying where `get` `body`
+            # says it is, so its `done` follows as a look's does, and taking it
+            # ends a hand-follow as any look does.
+            targets = request["targets"]
+            if any(joint in targets for joint in ("roll", "shoulder", "elbow")):
+                self.requests.remove(request)
+                await self._refuse(ws, id_, "refused", JOINTS_WAIT)
+                return
+            now = self.state["body"]["joints"]
+            self.stop_following(ws)
+            await self._look_done(ws, id_, targets.get("yaw", now["yaw"]["deg"]), targets.get("pitch", now["pitch"]["deg"]))
         elif op == "volume":
             # As lamp-control through lamp-actions' app calls: a level, the
             # voice's 20-point step within its floor of 10 and ceiling of 100,

@@ -673,6 +673,28 @@ in Google's words (`ACCESS_TOKEN_SCOPE_INSUFFICIENT` or
 after "not sent: " (for a service not in the table, `<what>` is "make this
 change"). Any other 401 or 403 keeps its words.
 
+The model is told of `service_write`, first in its description
+(`WRITE_RULE`, then the rule every services function has, below):
+"Only when the person asks you, now, to send or post something; an ask to
+draft, write, compose or reply to a mail or message is one. No draft is
+saved; nothing goes before they say send: say so. Call it first without
+send_id: it sends nothing and gives a read_back. Say that read_back in full,
+word for word, then ask them to say "go ahead and send it" to send it. Call
+it again with its send_id only if their very next words are that; anything
+else cancels it. Never say a read-back yourself: only one this call gave in
+the same turn, and a new write, or the same one asked again, needs a new
+call. Never say you can't use their services: refuse only for a reason a
+call gave."
+
+An ask to draft a mail is an ask to send it: Gmail has no draft (`send_mail`
+only), so such an ask is prepared and read back as any write, and nothing is
+saved as a draft. On lamp-29e7 on 9 Nov "Draft a new email for me" was refused
+with no call ("I cannot touch your mail") and, asked why, "Because I'm a
+lamp."; the rule said nothing of drafts, nor where a refusal's reason comes
+from. The whole rule with the shared one is 998 of the description's 1,024 bytes,
+which leaves 25 for `lamp-services`' own words for the write: whole sentences
+only, so its "action, by service: …" list is told on the `action` parameter.
+
 ### The voice's send gate
 
 `crates/voice/src/services.rs` holds its own rules, whatever `lamp-services`
@@ -946,8 +968,12 @@ other keys are `service_read`'s own for a fixed read: `count` (1 to 10),
 `query` (search words), `id`, `repo`, `calendar`, `project` and
 `workspace` (each 1 to 1,000 bytes); never `from` or `to`, nor a free-form
 read's `graphql`, `variables`, `path`, `params`, `tool` or `arguments`.
-`query` is searched for (Drive's `fullText contains`), never an order:
-Drive lists files newest first (`orderBy = modifiedTime desc`) and mail
+`query` is searched for, each word in a file's name or its text (Drive's
+`name contains` or `fullText contains`, a name's `_`, `-` and `.` splitting
+words), and comes back by relevance, as Drive refuses an order beside
+`fullText` (HTTP 400; lamp-3e83, 9 Nov: a file asked for by its name was
+never found). It is never an order: with no `query` Drive lists files newest
+first (`orderBy = modifiedTime desc`) and mail
 comes newest first, so a read of the latest leaves it out; an order or the
 latest alone ("order by modifiedTime desc", "newest") is refused
 (`service_read::ordering`, after a lamp's made skill read 0 files with

@@ -22,7 +22,7 @@
       "maximum": 9007199254740991
     },
     "time": {
-      "description": "The lamp's local time with its offset (RFC 3339).",
+      "description": "A time in UTC, RFC 3339 with `Z` (`2026-10-27T08:40:01Z`), as lamp-control writes it; a client turns it into local time itself.",
       "type": "string",
       "format": "date-time"
     },
@@ -1906,7 +1906,7 @@
         },
         "at": {
           "$ref": "#/$defs/time",
-          "description": "The lamp's local time, on the events about the room. welcome, lease and done may not carry it."
+          "description": "When it happened, in UTC (`…Z`), on the events about the room. welcome, lease and done may not carry it."
         }
       },
       "required": [
@@ -2063,6 +2063,25 @@
             "required": [
               "class"
             ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "name.heard"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "score": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "How sure the lamp's listener was that it heard its name, to a hundredth. A sound like the name can reach the lamp's own bar, so a program that acts on its own may want a higher one."
+              }
+            }
           }
         },
         {

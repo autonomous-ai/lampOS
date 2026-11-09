@@ -698,6 +698,29 @@ cách Google nói (`ACCESS_TOKEN_SCOPE_INSUFFICIENT` hoặc
 đó sau "not sent: " (với một dịch vụ không có trong bảng, `<what>` là "make
 this change"). Mọi 401 hoặc 403 khác giữ lời của nó.
 
+Mô hình được nói về `service_write`, trước tiên trong mô tả của nó
+(`WRITE_RULE`, rồi đến luật mà mọi hàm dịch vụ đều có, ở dưới):
+"Only when the person asks you, now, to send or post something; an ask to
+draft, write, compose or reply to a mail or message is one. No draft is
+saved; nothing goes before they say send: say so. Call it first without
+send_id: it sends nothing and gives a read_back. Say that read_back in full,
+word for word, then ask them to say "go ahead and send it" to send it. Call
+it again with its send_id only if their very next words are that; anything
+else cancels it. Never say a read-back yourself: only one this call gave in
+the same turn, and a new write, or the same one asked again, needs a new
+call. Never say you can't use their services: refuse only for a reason a
+call gave."
+
+Một yêu cầu soạn nháp thư là một yêu cầu gửi nó: Gmail không có nháp (chỉ có
+`send_mail`), nên một yêu cầu như vậy được chuẩn bị và đọc lại như mọi lệnh
+ghi, và không gì được lưu thành nháp. Trên lamp-29e7 ngày 9 tháng 11, "Draft a
+new email for me" bị từ chối mà không có lệnh gọi nào ("I cannot touch your
+mail") và, khi được hỏi tại sao, "Because I'm a lamp."; luật không nói gì về
+nháp, cũng không nói lý do của một lời từ chối đến từ đâu. Toàn bộ luật cùng
+luật chung là 998 trong 1,024 byte của mô tả, chừa 25 byte cho lời riêng của
+`lamp-services` cho hàm ghi: chỉ những câu trọn vẹn, nên danh sách "action,
+by service: …" của nó được nói trên tham số `action`.
+
 ### Cổng gửi của giọng nói
 
 `crates/voice/src/services.rs` giữ các luật riêng của nó, bất kể
@@ -970,8 +993,12 @@ do. Các khoá khác là của chính `service_read` cho một việc đọc c�
 `project` và `workspace` (mỗi khoá 1 đến 1.000 byte); không bao giờ `from`
 hay `to`, cũng không bao giờ `graphql`, `variables`, `path`, `params`,
 `tool` hay `arguments` của một việc đọc dạng tự do.
-`query` là từ để tìm (`fullText contains` của Drive), không bao giờ là một
-thứ tự: Drive liệt kê tệp mới nhất trước (`orderBy = modifiedTime desc`) và
+`query` là từ để tìm, mỗi từ trong tên tệp hoặc nội dung của nó (`name
+contains` hoặc `fullText contains` của Drive; `_`, `-` và `.` trong tên tách
+từ), và kết quả theo độ liên quan, vì Drive từ chối một thứ tự đi cùng
+`fullText` (HTTP 400; lamp-3e83, 9/11: một tệp được hỏi bằng tên không bao
+giờ tìm thấy). Nó không bao giờ là một thứ tự: không có `query` thì Drive
+liệt kê tệp mới nhất trước (`orderBy = modifiedTime desc`) và
 thư cũng mới nhất trước, nên một lần đọc những tệp mới nhất thì bỏ `query`;
 một thứ tự hay chỉ "mới nhất" ("order by modifiedTime desc", "newest") bị
 từ chối (`service_read::ordering`, sau khi một kỹ năng được tạo trên một

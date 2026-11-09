@@ -1104,6 +1104,20 @@ test('a clip is uploaded in parts, played, listed and removed', async () => {
     assert.deepEqual(await lamp.sounds(), []);
     await assert.rejects(lamp.sound('chime'), /no clip named chime/);
     await assert.rejects(lamp.uploadSound('bad', Buffer.from('not a wav')), /not a WAV/);
+    // The lamp's loudness cap, in its words (sounds.rs `check_clip`; lamp-75c9
+    // refused a louder clip so, 9 Nov).
+    await assert.rejects(lamp.uploadSound('loud', wav(0.5, 1_100)), (error) => error.why === 'clip: louder than -30 dBFS RMS over 10 ms');
+    const click = wav(0.5, 0);
+    click.writeInt16LE(9_000, 44);
+    await assert.rejects(lamp.uploadSound('click', click), (error) => error.why === 'clip: a peak past -12 dBFS');
+    assert.deepEqual(await lamp.sounds(), []);
+    // A file shorter than its header says, by an odd or an even count of bytes: refused as sounds.rs's hound says,
+    // and the connection goes on (Reviewer-two's P2 on #5800).
+    for (const short of [1, 2]) {
+      const clip = wav(0.01, 0);
+      await assert.rejects(lamp.uploadSound('short', clip.subarray(0, clip.length - short)), (error) => error.why === 'clip: a WAV file cut short');
+      assert.deepEqual(await lamp.sounds(), []);
+    }
   });
 });
 
@@ -1342,5 +1356,72 @@ test('the volume needs the speak grant', async () => {
   await withLamp({ grants: ['body'] }, async (lamp) => {
     await assert.rejects(lamp.volume({ to: 10 }), (error) => error.code === 'no_grant');
     await assert.rejects(lamp.get('volume'), (error) => error.code === 'no_grant');
+  });
+});
+
+// lamp-75c9, 9 Nov 14:33: a joints asked while a conversation had the lease
+// suspended was answered { to: 'body' } by the door and refused by the body
+// ('the body is not held'); without a wait, nothing told the program. With
+// `wait`, the body's `done` comes back. test_client.py has the same.
+test('a look or joints waits for the body\'s done and says when a conversation drops it', async () => {
+  await withLamp({ grants: ['body', 'look'] }, async (lamp, fake) => {
+    const until = async (ready) => { while (!ready()) await new Promise((r) => setTimeout(r, 10)); };
+    await lamp.withLease(['body'], async (lease) => {
+      const there = await lamp.look({ yaw: -10, pitch: 5 }, { wait: true });
+      assert.deepEqual([there.ev, there.how, there.yaw, there.pitch], ['done', 'finished', -10, 5]);
+      const aimed = await lamp.joints(lease, 300, { pitch: 2, yaw: -4 }, { wait: true });
+      assert.deepEqual([aimed.how, aimed.yaw, aimed.pitch], ['finished', -4, 2]);
+      // Without `wait`, only the door's answer, as before.
+      assert.equal((await lamp.joints(lease, 300, { yaw: 1 })).to, 'body');
+      // A conversation suspends the lease: the door still takes the look, and
+      // the body's `done` says it was dropped.
+      fake.leaseEvent(lease.id, 'suspended', 'conversation');
+      await until(() => lease.state === 'suspended');
+      let dropped = await lamp.joints(lease, 300, { yaw: -13 }, { wait: true });
+      assert.deepEqual([dropped.how, dropped.why], ['dropped', 'the body is not held']);
+      dropped = await lamp.look({ yaw: 3, pitch: 1 }, { wait: true });
+      assert.deepEqual([dropped.how, dropped.why], ['dropped', 'the body is not held']);
+      fake.leaseEvent(lease.id, 'held');
+      await until(() => lease.state === 'held');
+      assert.equal((await lamp.look('ahead', { wait: true })).how, 'finished');
+      // A look at the hand has no `done` to wait for.
+      await assert.rejects(lamp.look('hand', { wait: true }), /followHand/);
+    }, { forMs: 5000 });
+    assert.deepEqual(fake.asked('joints')[0], { lease: 'l_1', targets: { pitch: 2, yaw: -4 }, within_ms: 300 });
+  });
+});
+
+// Reviewer-two's P2 on #5837: lamp-control ends a hand-follow as soon as
+// another look is taken, so the SDK does too, before the wait for the body's
+// `done`. A refused look leaves it be, and the fake's `joints` is held to the
+// door's rules. test_client.py has the same.
+test('a waiting look ends a hand-follow when taken, not at its done', async () => {
+  const { JOINTS_WAIT } = await import('../src/testing.js');
+  await withLamp({ grants: ['body', 'look'] }, async (lamp, fake) => {
+    const following = await lamp.followHand().start();
+    assert.ok(following.following);
+    fake.autoDone = false;
+    // Taken, with its `done` held back: the follow ends at once.
+    const look = lamp.look({ yaw: 2, pitch: 1 }, { wait: true });
+    look.catch(() => {});
+    while (fake.asked('look').length < 2) await new Promise((r) => setTimeout(r, 10));
+    while (following.following) await new Promise((r) => setTimeout(r, 10));
+    fake.done(fake.requests.at(-1).id);
+    assert.equal((await look).how, 'finished');
+    assert.ok(!following.following);
+    fake.autoDone = true;
+    // A refused look leaves a following alone.
+    const again = await lamp.followHand().start();
+    await assert.rejects(lamp.look('face', { wait: true }), byCode.refused);
+    assert.ok(again.following);
+    await again.stop();
+    await lamp.withLease(['body'], async (lease) => {
+      // Roll, shoulder and elbow wait for the body's goal stream.
+      await assert.rejects(lamp.joints(lease, 300, { elbow: 4 }, { wait: true }), (error) => error.why === JOINTS_WAIT);
+      // A joint not named stays where `get` `body` says it is.
+      const body = (await lamp.get('body')).body.joints;
+      const done = await lamp.joints(lease, 300, { yaw: -3 }, { wait: true });
+      assert.deepEqual([done.yaw, done.pitch], [-3, body.pitch.deg]);
+    }, { forMs: 5000 });
   });
 });

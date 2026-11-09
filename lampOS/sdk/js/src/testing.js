@@ -40,6 +40,8 @@ export const LOOK_WAITS = {
 // What lamp-control refuses today, in its own words (crates/control/src/
 // parts.rs, `waits_for`): pass it as `refuses` for a fake that answers as a
 // lamp does now. `lamp fake` does.
+// lamp-control's words for `joints` naming roll, shoulder or elbow (parts.rs).
+export const JOINTS_WAIT = "not routed yet: waits for the body's goal stream for roll, shoulder and elbow; yaw and pitch go now";
 export const LAMP_CONTROL_REFUSES = Object.freeze({
   // No product unit passes --lease-socket yet (docs/control.md).
   look: "the body's lease socket is not on here",
@@ -93,17 +95,46 @@ function wavFrames(data) {
     const id = data.toString('ascii', at, at + 4);
     const size = data.readUInt32LE(at + 4);
     if (id === 'fmt ') format = { channels: data.readUInt16LE(at + 10), rate: data.readUInt32LE(at + 12), bits: data.readUInt16LE(at + 22) };
-    if (id === 'data') return format ? { format, frames: Math.floor(Math.min(size, data.length - at - 8) / 2) } : undefined;
+    // The frames the header says, as hound's `duration` does; `cutShort` when the file holds fewer bytes.
+    if (id === 'data') return format ? { format, frames: Math.floor(size / 2), at: at + 8, cutShort: data.length - at - 8 < size } : undefined;
     at += 8 + size + (size % 2);
   }
   return undefined;
 }
 
+// Why lamp-control would refuse this clip, in sounds.rs `check_clip`'s words and order: its format, its length,
+// a file shorter than its header says, then its loudness; undefined for one it keeps.
 function clipRefusal(data) {
   const read = wavFrames(data);
   if (read === undefined) return 'not a WAV file';
   if (read.format.channels !== 1 || read.format.bits !== 16 || read.format.rate !== 24_000) return 'not 16-bit mono PCM at 24000 Hz';
   if (read.frames < 1 || read.frames > 24_000 * 30) return 'not 1 to 720000 frames (30 s at most)';
+  // Fewer bytes than the header's frames (an odd or an even count short): hound's samples end early.
+  if (read.cutShort) return 'a WAV file cut short';
+  return clipLoudnessRefusal(data, read);
+}
+
+// The voice's loudness cap on a clip, as lamp-control's sounds.rs `check_clip`
+// holds it at upload: no sample past CLIP_PEAK_DBFS, and no 10 ms window
+// (CLIP_WINDOW frames, the last one shorter) louder than CLIP_LOUDEST_DBFS RMS.
+export const CLIP_PEAK_DBFS = -12;
+export const CLIP_LOUDEST_DBFS = -30;
+export const CLIP_WINDOW = 240;
+
+function clipLoudnessRefusal(data, read) {
+  const full = 32_767;
+  const sample = (i) => data.readInt16LE(read.at + 2 * i);
+  let peak = 0;
+  for (let i = 0; i < read.frames; i += 1) peak = Math.max(peak, Math.abs(sample(i)));
+  if (peak > full * 10 ** (CLIP_PEAK_DBFS / 20)) return `a peak past ${CLIP_PEAK_DBFS} dBFS`;
+  let loudest = 0;
+  for (let at = 0; at < read.frames; at += CLIP_WINDOW) {
+    const end = Math.min(at + CLIP_WINDOW, read.frames);
+    let power = 0;
+    for (let i = at; i < end; i += 1) power += sample(i) ** 2;
+    loudest = Math.max(loudest, Math.sqrt(power / (end - at)));
+  }
+  if (loudest > full * 10 ** (CLIP_LOUDEST_DBFS / 20)) return `louder than ${CLIP_LOUDEST_DBFS} dBFS RMS over 10 ms`;
   return undefined;
 }
 
@@ -442,11 +473,27 @@ export class FakeLamp {
     const held = this.leases.get(lease);
     if (!held) return;
     if (state === 'lost') this.leases.delete(lease);
+    // A suspended lease still stands, but the body is not held: a look or
+    // `joints` under it is taken by the door and dropped by the body.
+    else held.state = state;
     held.ws.send(JSON.stringify({ ev: 'lease', lease, state, ...(why ? { why } : {}) }));
     if (state === 'lost') this.unfollow(lease);
   }
 
   loseLease(lease, why = 'hand') { this.leaseEvent(lease, 'lost', why); }
+
+  // A look the door takes ({ to: 'body' }), and the body's answer as its
+  // `done`: there, or, while the computer's body lease is suspended (a
+  // conversation), dropped as the body says it (body_lease.rs `done_of`).
+  lookDone(ws, id, yaw, pitch) {
+    this.ok(ws, id, { to: 'body' });
+    if (!this.autoDone) return undefined;
+    const suspended = [...this.leases.values()].some((h) => h.ws === ws && h.parts.includes('body') && h.state === 'suspended');
+    ws.send(JSON.stringify(suspended
+      ? { ev: 'done', re: id, how: 'dropped', why: 'the body is not held' }
+      : { ev: 'done', re: id, how: 'finished', yaw, pitch, clamped: false }));
+    return undefined;
+  }
 
   // End the action whose request id was `re`, to the client that asked.
   done(re, how = 'finished', why) {
@@ -757,12 +804,20 @@ export class FakeLamp {
           this.following.set(ws, { lease });
           return this.ok(ws, id, { to: 'body', follow: 'hand' });
         }
-        this.ok(ws, id, { to: 'body' });
-        if (this.autoDone) {
-          const { yaw = 0, pitch = 0 } = typeof request.at === 'object' ? request.at : {};
-          ws.send(JSON.stringify({ ev: 'done', re: id, how: 'finished', yaw, pitch, clamped: false }));
-        }
-        return undefined;
+        const { yaw = 0, pitch = 0 } = typeof request.at === 'object' ? request.at : {};
+        return this.lookDone(ws, id, yaw, pitch);
+      }
+      case 'joints': {
+        // As lamp-control (parts.rs `joints`): roll, shoulder and elbow wait
+        // for the body's goal stream; yaw and pitch go to the body as the
+        // holder's look, a joint not named staying where `get` `body` says it
+        // is, so its `done` follows as a look's does, and taking it ends a
+        // hand-follow as any look does.
+        const { targets } = request;
+        if (['roll', 'shoulder', 'elbow'].some((joint) => joint in targets)) return this.refuse(ws, id, 'refused', JOINTS_WAIT);
+        const now = this.state.body.joints;
+        this.stopFollowing(ws);
+        return this.lookDone(ws, id, targets.yaw ?? now.yaw.deg, targets.pitch ?? now.pitch.deg);
       }
       case 'gesture':
       case 'move':
