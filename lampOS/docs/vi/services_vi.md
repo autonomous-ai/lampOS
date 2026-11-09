@@ -816,11 +816,23 @@ by service: …" của nó được nói trên tham số `action`.
   `Echo::Held`) được báo qua thread (`Thread::own_echo_held` →
   `services::own_echo_held`, nhật ký "the lamp's echo, not counted toward the
   waiting write"): `Pending.echoes` đếm nó, và lần gửi kiểm tra số câu của
-  người nói, `lines` trừ `echoes`, nên thread nghe về lúc câu bắt đầu hay về
-  tiếng vọng trước cũng không sao. Trên lamp-29e7 ngày 9/11, chính câu "go
+  người nói, nên thread nghe về lúc câu bắt đầu hay về tiếng vọng trước cũng
+  không sao. Mỗi câu được đếm hai lần: bởi thread, không có request
+  (`Thread::person` → `line_began(None)`, `lines`), và trên tuyến thứ hai
+  với request của nó khi lời của nó được báo (`Thread::line_heard` →
+  `line_began(Some(request))`, `heard`, giữ 8 id mới nhất). Số câu của người
+  nói là số đếm lớn hơn trừ số tiếng vọng, và một tiếng vọng chỉ được trừ cho
+  một request đã được đếm kèm id, mỗi request một lần (giữ 8 cái mới nhất):
+  một câu thread chưa từng đếm (một mảnh nối vào câu đang nói, hoặc không có
+  chữ cái hay chữ số) không trừ câu nào của người nói, nên một câu của người
+  nói và câu gửi sau một tiếng vọng không được đếm vẫn là hai câu, và bị hủy. Trên lamp-29e7 ngày 9/11, chính câu "go
   ahead and send it" của phần đọc lại vọng lại được tính là câu đầu tiên, nên
   câu "send" của chủ đèn là câu thứ hai: lần ghi bị bỏ, chuẩn bị lại, đọc lại
-  và lại vọng, và chủ đèn phải nói "send" năm lần. Một lần cắt chỉ do lúc bắt
+  và lại vọng, và chủ đèn phải nói "send" năm lần. Câu "Go ahead and send
+  it." của chính chủ đèn trùng từng từ với đoạn cuối của phần đọc lại, nên
+  nếu `own_echo` có lúc giữ một câu trả lời thật như tiếng vọng của đèn, câu
+  đó không được trả lời và chủ đèn phải nói lại: điều này trước quy tắc này
+  cũng đã vậy. Một lần cắt chỉ do lúc bắt
   đầu của tiếng vọng gây ra (bắt đầu đè lên giọng của đèn, `voice_began` cho
   yêu cầu đó, `Pending.cut_by`) được gỡ cùng nó; lần cắt do câu trả lời của
   đèn bị dừng, do một câu khác, hay do cách tính giờ của thread (`began_in`)

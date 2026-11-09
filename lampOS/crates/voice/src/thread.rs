@@ -722,9 +722,10 @@ impl Thread {
             self.heard_done = false;
         }
         // A new line begins: a write waiting for its "send" counts it
-        // (`crate::services`), so only the very next line can send it.
+        // (`crate::services`), so only the very next line can send it. The
+        // person's words come with no request: never taken off as an echo.
         if self.heard.trim().is_empty() && text.chars().any(char::is_alphanumeric) {
-            crate::services::line_began(now);
+            crate::services::line_began(None, now);
         }
         add(&mut self.heard, text, PERSON_BYTES);
         // Scrubbed joined too: a code or an account split across pieces is
@@ -734,10 +735,18 @@ impl Thread {
         self.heard_done = finished;
     }
 
+    /// The line of `request`'s words are told (`second_provider`, before
+    /// they go out as the person's): a write waiting for its "send" counts
+    /// it with its request, the only kind of line it takes off when held as
+    /// the lamp's echo ([`Self::own_echo_held`]).
+    pub fn line_heard(&mut self, request: u64, now: Instant) {
+        crate::services::line_began(Some(request), now);
+    }
+
     /// The line of `request` was held as the lamp's own words heard back
     /// (`second_provider`, `own_echo`): a write waiting for its "send" does
-    /// not count it as the person's (`crate::services`), as [`Self::person`]
-    /// counts each line begun.
+    /// not count it as the person's (`crate::services`), if it counted it
+    /// with its request ([`Self::line_heard`]).
     pub fn own_echo_held(&mut self, request: u64) {
         crate::services::own_echo_held(request);
     }
