@@ -57,6 +57,21 @@ async fn run_full(
     setup: Option<bool>,
     sight: bool,
 ) -> (Vec<Value>, Vec<Vec<Message>>) {
+    let (sent, asked, _) = run_timed(turns, two_faces_at, refused, setup, sight, None).await;
+    (sent, asked)
+}
+
+/// As [`run_full`], with the eyes taking `slow` over each save and each
+/// chat's first event coming a second late, and what the voice was asked
+/// to say.
+async fn run_timed(
+    turns: &[(&'static str, Lamp)],
+    two_faces_at: Option<usize>,
+    refused: Option<&'static str>,
+    setup: Option<bool>,
+    sight: bool,
+    slow: Option<Duration>,
+) -> (Vec<Value>, Vec<Vec<Message>>, Vec<String>) {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     // Request numbers of their own: lines seen are the process's.
     let first = 9_000 + 100 * NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -85,6 +100,7 @@ async fn run_full(
                 .collect(),
         ),
         chats: Mutex::new(chats),
+        first_event_after: slow.map(|_| Duration::from_secs(1)),
         ..Script::default()
     });
     // What was said, as the thread's window gives it: the turn in hand and
@@ -111,7 +127,14 @@ async fn run_full(
             eyes.lock()
                 .unwrap()
                 .push(json!({"remember": args["name"], "one_face": true, "replace": false}));
-            json!({"ok": true, "remembered": args["name"]})
+            let told = json!({"ok": true, "remembered": args["name"]});
+            if let Some(slow) = slow {
+                return Box::pin(async move {
+                    tokio::time::sleep(slow).await;
+                    told
+                });
+            }
+            told
         } else {
             json!({"error": crate::known_faces::SAY_IT_BACK})
         };
@@ -157,7 +180,7 @@ async fn run_full(
         engine.submit(start(request));
         engine.submit(audio(request, 1));
         engine.submit(end(request));
-        turn(&mut engine).await;
+        turn_within(&mut engine, Duration::from_secs(10)).await;
         engine.retire_through(request);
         let lamp_said = match lamp {
             Lamp::Says(line) | Lamp::Saves(line) => line,
@@ -165,7 +188,8 @@ async fn run_full(
         before.push(((*said).to_owned(), (*lamp_said).to_owned()));
     }
     let asked = script.asked.lock().unwrap().clone();
-    (sent.lock().unwrap().clone(), asked)
+    let spoken = script.spoken.lock().unwrap().clone();
+    (sent.lock().unwrap().clone(), asked, spoken)
 }
 
 fn kept() -> Vec<Value> {
@@ -227,6 +251,29 @@ async fn the_yes_to_the_face_keeps_the_held_face_with_no_call() {
     )
     .await;
     assert_eq!(sent, kept());
+}
+
+/// The held save's wait at the eyes (3.5 s here; 1.5-3.3 s on lamp-52e6)
+/// does not count against round 1's start bound: the yes to the face is
+/// answered, never with the down line (lamp-52e6, request 9).
+#[tokio::test(start_paused = true)]
+async fn a_slow_held_save_still_has_the_yes_answered() {
+    let (sent, _, spoken) = run_timed(
+        &[
+            NAME_LINE,
+            ("Yes, that's my name.", Lamp::Says(FACE_QUESTION)),
+            ("Yes, please.", Lamp::Says("Got it.")),
+        ],
+        None,
+        None,
+        None,
+        false,
+        Some(Duration::from_millis(3_500)),
+    )
+    .await;
+    assert_eq!(sent, kept());
+    assert!(!spoken.iter().any(|line| line == DOWN_LINE), "{spoken:?}");
+    assert!(spoken.iter().any(|line| line == "Got it."), "{spoken:?}");
 }
 
 /// A no, or anything but a plain yes, to the face question asked for the
