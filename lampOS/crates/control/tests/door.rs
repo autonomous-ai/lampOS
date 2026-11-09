@@ -2129,3 +2129,39 @@ async fn the_owner_takes_the_lamp_back_and_the_computers_stay_paired() {
         json!({"error": "client: a computer's id"})
     );
 }
+
+/// ten's 75c9 case (9 Nov, stable 10824): a computer paired with `hear`,
+/// subscribed to `phrase.heard` alone with one phrase, hears it when the
+/// voice publishes `voice/heard` as it does on a lamp: a declared
+/// `lamp_msgs/Speech`, finished, with its `request`, through the real bus
+/// and `watch_bus`, not handed to `deliver` directly.
+#[tokio::test]
+async fn a_phrase_heard_on_the_bus_reaches_its_subscriber() {
+    let lamp = lamp("phrase-bus").await;
+    let bus = lamp_bus::Bus::new(lamp.dir.join("bus")).unwrap();
+    let watch = Arc::new(std::sync::Mutex::new(lamp_control::watch::Watch::new()));
+    server::watch_bus(&bus, watch, lamp.shared.clone()).unwrap();
+    let mut socket = paired(&lamp, json!(["body", "light", "look", "hear"]), 43).await;
+    let subscribed = send(
+        &mut socket,
+        json!({"id": 3, "op": "subscribe", "events": ["phrase.heard"], "phrases": ["good night lamp"]}),
+    )
+    .await;
+    assert_eq!(subscribed["ok"], true, "{subscribed}");
+    let mut heard = bus
+        .publisher_declared("voice/heard", &lamp_msgs::Speech::declaration(), "voice")
+        .unwrap();
+    let line = lamp_msgs::Speech {
+        text: "Lamp. Good night lamp.".into(),
+        finished: true,
+        locale: None,
+        request: Some(148),
+    };
+    heard.publish_json(1, &line).unwrap();
+    let told = next(&mut socket).await;
+    assert_eq!(
+        (&told["ev"], &told["phrase"]),
+        (&json!("phrase.heard"), &json!("good night lamp")),
+        "{told}"
+    );
+}

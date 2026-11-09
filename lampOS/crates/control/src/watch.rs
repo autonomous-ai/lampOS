@@ -728,25 +728,142 @@ impl Watch {
 /// The phrases of `phrases` that `heard` holds, whole words, ignoring case
 /// and punctuation: "Lights please!" holds "lights please".
 pub fn phrases_in<'a>(heard: &str, phrases: &'a [String]) -> Vec<&'a str> {
-    let words = crate::protocol::phrase_words;
+    // Each word without its apostrophes, so "it's" and "its" are one.
+    let words = |text: &str| -> Vec<String> {
+        crate::protocol::phrase_words(text)
+            .into_iter()
+            .map(|word| word.replace('\'', ""))
+            .filter(|word| !word.is_empty())
+            .collect()
+    };
     let heard = words(heard);
     phrases
         .iter()
         .filter(|phrase| {
-            let wanted = words(phrase);
-            !wanted.is_empty()
-                && heard
-                    .windows(wanted.len())
-                    .any(|window| window == wanted.as_slice())
+            let wanted: String = words(phrase).concat();
+            !wanted.is_empty() && spells(&heard, &wanted)
         })
         .map(String::as_str)
         .collect()
+}
+
+/// Whether some run of whole `heard` words spells `wanted`, its words'
+/// letters joined: the recognizer may write "goodnight" where the phrase
+/// says "good night", or the other way round (lamp-75c9, 9 Nov: a line
+/// heard with the phrase in it, and nothing told). The heard run may also
+/// end in one "s" more than the phrase: the recognizer wrote "lamps" for a
+/// played "lamp" (lamp-75c9 run13b, 10 Nov). Only the heard side gains it,
+/// so a phrase is matched as written ("please press s" by itself, "yes"
+/// never by "ye"). Each run is compared at every word edge until it is
+/// longer than the phrase and one "s", so a short prefix never ends the
+/// search; "goodnights lamp" or "good knight lamp" never match.
+fn spells(heard: &[String], wanted: &str) -> bool {
+    (0..heard.len()).any(|start| {
+        let mut joined = String::new();
+        for word in &heard[start..] {
+            joined.push_str(word);
+            if joined == wanted || joined.strip_suffix('s') == Some(wanted) {
+                return true;
+            }
+            if joined.len() > wanted.len() {
+                return false;
+            }
+        }
+        false
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::protocol::StateKind;
+
+    /// lamp-75c9, 9 Nov: the recognizer's own spelling still matches.
+    /// Words are joined over a run of whole words, both ways round; a
+    /// different word, or a longer one, never matches.
+    #[test]
+    fn a_phrase_matches_however_its_words_are_joined() {
+        let phrase = vec!["good night lamp".to_owned()];
+        assert_eq!(
+            phrases_in("Lamp. Goodnight, lamp.", &phrase),
+            ["good night lamp"]
+        );
+        assert_eq!(
+            phrases_in("Lamp. Good night lamp.", &phrase),
+            ["good night lamp"]
+        );
+        assert_eq!(phrases_in("good-night lamp", &phrase), ["good night lamp"]);
+        let joined = vec!["goodnight lamp".to_owned()];
+        assert_eq!(phrases_in("Good night, lamp!", &joined), ["goodnight lamp"]);
+        assert!(phrases_in("good knight lamp", &phrase).is_empty());
+        assert!(phrases_in("goodnights lamp", &phrase).is_empty());
+        assert_eq!(
+            phrases_in("so good nightlamp", &phrase),
+            ["good night lamp"]
+        );
+        let its = vec!["it's bedtime".to_owned()];
+        assert_eq!(phrases_in("Its bedtime now", &its), ["it's bedtime"]);
+        assert!(phrases_in("night lamp", &phrase).is_empty());
+    }
+
+    /// lamp-75c9 run13b, 10 Nov: the recognizer wrote "lamps" for a
+    /// played "good night lamp", and only the phrases without "lamp" were
+    /// told. The heard run may end in one "s" more than the phrase, at its
+    /// end only; a phrase is always matched as written (reviewer-two's P2 on
+    /// #5971: "please press s" stopped matching itself).
+    #[test]
+    fn a_phrase_matches_its_last_word_with_an_s_more() {
+        let phrase = vec!["good night lamp".to_owned()];
+        assert_eq!(
+            phrases_in("Lamp good night lamps", &phrase),
+            ["good night lamp"]
+        );
+        assert_eq!(
+            phrases_in("good night lamp's", &phrase),
+            ["good night lamp"]
+        );
+        let light = vec!["turn off the light".to_owned()];
+        assert_eq!(
+            phrases_in("Please turn off the lights now.", &light),
+            ["turn off the light"]
+        );
+        // Only the run's end: an "s" inside it is another word.
+        assert!(phrases_in("goodnights lamp", &phrase).is_empty());
+        assert!(phrases_in("good nights lamp", &phrase).is_empty());
+        // One "s", no more, and never another letter.
+        assert!(phrases_in("good night lampss", &phrase).is_empty());
+        assert!(phrases_in("good night lamb", &phrase).is_empty());
+        assert!(phrases_in("good night lampshade", &phrase).is_empty());
+        // The phrase side never loses its "s".
+        let lights = vec!["turn off the lights".to_owned()];
+        assert!(phrases_in("turn off the light", &lights).is_empty());
+        let yes = vec!["yes please lamps".to_owned()];
+        assert!(phrases_in("yes please lamp", &yes).is_empty());
+    }
+
+    /// Reviewer-two's P2 on #5971: a phrase whose last word ends in "s",
+    /// or is "s", matches identical heard words; a run is not given up at
+    /// the first word edge that reaches the phrase without its "s".
+    #[test]
+    fn a_phrase_ending_in_s_matches_itself() {
+        for phrase in [
+            "please press s",
+            "please pass s",
+            "turn off the lights",
+            "good night lamps",
+        ] {
+            let phrases = vec![phrase.to_owned()];
+            assert_eq!(phrases_in(phrase, &phrases), [phrase], "{phrase}");
+            assert_eq!(
+                phrases_in(&format!("and {phrase} now"), &phrases),
+                [phrase],
+                "{phrase} inside a line"
+            );
+        }
+        let press = vec!["please press s".to_owned()];
+        assert_eq!(phrases_in("please presss", &press), ["please press s"]);
+        assert!(phrases_in("please press", &press).is_empty());
+    }
 
     const S: u64 = 1_000_000;
 
