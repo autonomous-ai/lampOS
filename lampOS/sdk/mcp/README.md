@@ -29,6 +29,14 @@ never, and a said text only by its length and a tag keyed for the run. stdout st
 Phrases and events' fields are logged as they are, and your MCP client may keep a server's stderr in its own logs
 (Claude Code does), so with `--verbose` the phrases the lamp matched can outlive the session.
 
+**When the lamp restarts** (every update), lamp-mcp connects again by itself
+and makes its event subscriptions again, pausing 1, 2, 5, then 10 s while the
+lamp can't be reached. A tool called while the lamp is away answers `closed`;
+the next call after it is back works. Leases end with the restart; the next
+body tool takes a new one. It stops trying, and says why once on stderr, when
+connecting again can't mend it: the computer was removed in the app (`unpaired`),
+or another lamp answers at the address. Then pair again and restart lamp-mcp.
+
 ## Tools
 
 Each is one op, offered only when the lamp granted what it needs. Every
