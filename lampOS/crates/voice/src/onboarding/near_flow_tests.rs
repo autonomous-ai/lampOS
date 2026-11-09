@@ -2375,3 +2375,68 @@ fn a_skip_of_the_last_step_still_ends_with_the_closing_line() {
     assert_eq!(outcome(&walk), Some(Outcome::Skipped));
     assert_eq!(notes, [HOW_YOU_SOUND_SKIPPED, skill::PREFERENCES_DONE]);
 }
+
+/// The walk on the shipped order, past touch: "how you sound" is its last
+/// step, taught as shipped.
+fn shipped_last(store: &Store) -> Onboarding {
+    let mut walk = store.teaching(S);
+    walk.definition =
+        Arc::new(skill::parse(include_str!("../../../../skills/onboarding/skill.toml")).unwrap());
+    assert_eq!(walk.definition.order.last(), Some(&Step::HowYouSound));
+    walk.finish(Step::Touch, Outcome::Done, None, S);
+    walk.drain_storage_for_test(S);
+    walk.owed = None;
+    walk.owed_after = None;
+    walk
+}
+
+/// lamp-52e6, 9 Nov: a walk ending on "how you sound" done says its line,
+/// then the walk's closing, with the owner's name when it knows it.
+#[test]
+fn a_walk_ending_on_how_you_sound_done_says_the_closing_after_its_line() {
+    for (owner, closing) in [
+        (None, skill::PREFERENCES_DONE.to_owned()),
+        (
+            Some("Walter"),
+            in_language::with_name(skill::PREFERENCES_DONE, Some("Walter")),
+        ),
+    ] {
+        let store = Store::new(None);
+        let mut walk = shipped_last(&store);
+        walk.desired.owner = owner.map(str::to_owned);
+        assert_eq!(call(&mut walk, 10 * S, 22.4, 1)["accepted"], true);
+        let mut notes = settle(&mut walk, 20 * S);
+        notes.extend(settle(&mut walk, 30 * S));
+        assert_eq!(outcome(&walk), Some(Outcome::Done));
+        assert_eq!(notes, [NEAR_DONE.to_owned(), closing], "{owner:?}");
+    }
+}
+
+/// The Reviewer-lead on #5809: with "how you sound" not available, the
+/// walk's last offered step is touch, and its end says the closing.
+#[test]
+fn a_walk_without_how_you_sound_ends_with_the_closing_after_touch() {
+    let store = Store::new(None);
+    let mut walk = store.teaching(S);
+    walk.definition =
+        Arc::new(skill::parse(include_str!("../../../../skills/onboarding/skill.toml")).unwrap());
+    walk.set_near_available(false);
+    walk.desired.owner = Some("Walter".into());
+    walk.finish(Step::Touch, Outcome::Done, None, S);
+    walk.drain_storage_for_test(S);
+    let mut notes = settle(&mut walk, 10 * S);
+    notes.extend(settle(&mut walk, 20 * S));
+    assert_eq!(
+        notes.last().map(String::as_str),
+        Some(in_language::with_name(skill::PREFERENCES_DONE, Some("Walter")).as_str()),
+        "{notes:?}"
+    );
+    assert_eq!(
+        notes
+            .iter()
+            .filter(|note| note.contains("All done"))
+            .count(),
+        1,
+        "{notes:?}"
+    );
+}
