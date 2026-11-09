@@ -4105,7 +4105,28 @@ after a take-over, but now for every turn:
   of the cut answer's finished rounds`. A round still waiting on a call is
   not carried. Words joined with new ones start again (#5026, lamp-0529,
   3 Nov: a search, a page and a second search were lost to a 0-word line,
-  and the answer came from the model's memory). Words answered again may
+  and the answer came from the model's memory). A connected service's send
+  (`service_write` with its `send_id`, `services::may_send`) is the one call
+  carried even while it is still awaited (#5853, lamp-9adf, 9 Nov: the
+  person's "go ahead and send it" was sent to Google Drive 0.9 s after a
+  wordless line cut the turn, and the held line answering it, given no trace
+  of the send, prepared a new write and read it back). The send runs on a
+  task of its own (`sending`), so it reaches its answer after the cut, and
+  is kept with that answer (`SentWrite`) until its round is carried. The
+  line answering those words again, held or joined with new ones, waits for
+  the answer, at most `services::DEADLINE` (20 s) from when the send began,
+  and goes on from the send's call and result, with the note "their
+  go-ahead already sent the write they asked for … do not call
+  service_write again for it" (`SENT_WRITE_NOTE`); the journal says
+  `request M: request N's service_write was sent before a newer line cut its
+  answer; its sent result goes with its words`. The cut turn's own answer is
+  fenced to "not running" once its lease is stale, so the services' own
+  answer (`services::sent_answer`) is told instead. With no answer within
+  the bound, the note says it was sent and its result is not known
+  (`SENT_UNKNOWN_NOTE`), never that nothing was sent. In that line's turn a
+  `service_write` is not run: it is told `ALREADY_SENT`, so no new
+  read-back follows. A send refused by the gate goes with its refusal only.
+  A line that lets the cut words go drops the kept send. Words answered again may
   still be searched again, but are written once (`WriteOwner`; lamp-06c1, 26 Oct,
   build 6963: one "remember my favourite planet is Saturn" was kept three
   times, by two empty held lines answering it again): the first request to

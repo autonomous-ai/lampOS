@@ -1696,6 +1696,12 @@ struct Shared {
     own_echo: bool,
     spare: Mutex<Option<Kept>>,
     spares: AtomicU64,
+    /// The write's send under way, or answered, for a turn a newer line may
+    /// cut before its round is carried ([`SentWrite`], #5853).
+    sent_write: Mutex<Option<SentWrite>>,
+    /// The request answering words whose own write was sent
+    /// ([`sent_with_words`]): no `service_write` runs in its turn (#5853).
+    write_sent_in: Mutex<Option<u64>>,
     /// The privacy generation one was opened under before any line
     /// ([`Engine::listening`]); `None` again when listening stops.
     warmed: Mutex<Option<u64>>,
@@ -4201,6 +4207,8 @@ impl Engine {
                 name_as_a_sentence: false,
                 own_echo: false,
                 spare: Mutex::new(None),
+                sent_write: Mutex::new(None),
+                write_sent_in: Mutex::new(None),
                 spares: AtomicU64::new(0),
                 warmed: Mutex::new(None),
                 begun: Mutex::new(None),
@@ -8954,6 +8962,17 @@ async fn spoken(
                     }
                 }
             };
+            // Their go-ahead's write, sent while the cut turn still awaited
+            // it (#5853): its result goes with the words, never prepared
+            // again.
+            let mut rounds = rounds;
+            let sent_note = match sent_with_words(&shared, carried.request, request).await {
+                Some((round, note)) => {
+                    rounds.extend(round);
+                    note
+                }
+                None => None,
+            };
             eprintln!(
                 "lamp-voice second: request {request} is held, so request {}'s words, cut short by it, are answered in its place",
                 carried.request
@@ -8981,7 +9000,11 @@ async fn spoken(
             } else {
                 Vec::new()
             };
-            let notes = earlier.into_iter().chain(notes).collect();
+            let notes = earlier
+                .into_iter()
+                .chain(notes)
+                .chain(sent_note.map(str::to_owned))
+                .collect();
             tokio::join!(
                 though_held,
                 answer(
@@ -9119,6 +9142,7 @@ async fn spoken(
         .as_ref()
         .map(|carried| carried.earlier.clone())
         .unwrap_or_default();
+    let cut_from = carried.as_ref().map(|carried| carried.request);
     let (text, carried, parts) = match carried {
         Some(carried) if name_refused(&shared, request, &carried) => {
             (text, Some(carried), vec![own])
@@ -9142,6 +9166,18 @@ async fn spoken(
             joined
         }
         None => (text, None, vec![own]),
+    };
+    // Joined with words whose write their go-ahead sent while the cut turn
+    // still awaited it (#5853): its result goes with them. Any other send
+    // kept is let go with its line.
+    let (sent_round, sent_note) = match cut_from.filter(|_| carried.is_none()) {
+        Some(cut) => sent_with_words(&shared, cut, request)
+            .await
+            .unwrap_or_default(),
+        None => {
+            drop_sent_write(&shared, None);
+            (Vec::new(), None)
+        }
     };
     // Words cut short in their pause's grace and not joined to this line,
     // another person's: still answered, first, in this answer
@@ -9385,6 +9421,7 @@ async fn spoken(
         // Reviewer-lead's P2s on #5053).
         .chain(crate::keep_quietly::note_for(scope.as_ref(), request))
         .chain(opens)
+        .chain(sent_note.map(str::to_owned))
         // Last, right before the person's words: an acknowledgement asked
         // among the other notes was said only once in two on lamp-06c1
         // (30 Oct, #3997's cut-in proposal).
@@ -9406,7 +9443,7 @@ async fn spoken(
             said_by: request,
             unchecked: Vec::new(),
             memory_write_owner: memory_write_owner.clone(),
-            rounds: Vec::new(),
+            rounds: sent_round,
             // The earlier words told first stay with these, never joined:
             // a line that cuts this one short tells them again (Seventh's
             // P3 on #4916).
@@ -9599,6 +9636,151 @@ fn carry_round(shared: &Shared, request: u64, round: &[Message]) {
     {
         carried.rounds.extend_from_slice(round);
     }
+}
+
+/// A write's send under way in `request`'s turn (#5853): its call, when it
+/// began, and the services' answer once it came. Kept by [`sending`] until
+/// the turn carries the round ([`carry_round`]), so a newer line that cuts
+/// the turn while the send is still awaited finds what it did: the cut turn
+/// never finished the round that would have carried it.
+struct SentWrite {
+    request: u64,
+    call: net::ToolCall,
+    began: tokio::time::Instant,
+    told: tokio::sync::watch::Receiver<Option<Value>>,
+}
+
+/// Told the model answering words again whose own write their go-ahead
+/// sent (#5853), beside the send's call and result.
+const SENT_WRITE_NOTE: &str = "(For you to know: their go-ahead already sent the write they asked for; its service_write call and result are given with their words. Say in a few words what was done; do not call service_write again for it.)";
+/// The same, when the send's answer did not come within
+/// [`crate::services::DEADLINE`]: sent, its result not known, never "nothing
+/// was sent".
+const SENT_UNKNOWN_NOTE: &str = "(For you to know: their go-ahead already sent the write they asked for, but its result is not known yet. Say it was sent and that you could not confirm it yet; do not call service_write again for it.)";
+/// What a `service_write` is told in a turn answering words whose write was
+/// sent ([`sent_already`]): nothing runs, so no new read-back follows.
+const ALREADY_SENT: &str = "Not run: the write their go-ahead asked for was already sent. Do not prepare it again; say what was done.";
+
+/// `running`, a call of `request`'s turn: a write's send
+/// ([`crate::services::may_send`]) is run on a task of its own, so it goes
+/// on to its answer if a newer line cuts the turn, and kept in
+/// [`Shared::sent_write`] with that answer (`told_of`) once it comes
+/// (#5853). Any other call: `running` as it is.
+fn sending<T: Send + 'static>(
+    shared: &Shared,
+    request: u64,
+    call: &net::ToolCall,
+    running: BoxFuture<'static, T>,
+    told_of: fn(&T) -> Value,
+) -> BoxFuture<'static, T> {
+    if !crate::services::may_send(&call.name, &call.args, request) {
+        return running;
+    }
+    let (answered, told) = tokio::sync::watch::channel(None);
+    if let Ok(mut sent) = shared.sent_write.lock() {
+        *sent = Some(SentWrite {
+            request,
+            call: call.clone(),
+            began: tokio::time::Instant::now(),
+            told,
+        });
+    }
+    let task = tokio::spawn(async move {
+        let out = running.await;
+        let _ = answered.send(Some(told_of(&out)));
+        out
+    });
+    Box::pin(async move {
+        match task.await {
+            Ok(out) => out,
+            Err(error) => std::panic::resume_unwind(error.into_panic()),
+        }
+    })
+}
+
+/// The send kept in [`Shared::sent_write`] dropped: `request`'s only, or
+/// any with `None`.
+fn drop_sent_write(shared: &Shared, request: Option<u64>) {
+    if let Ok(mut sent) = shared.sent_write.lock()
+        && sent
+            .as_ref()
+            .is_some_and(|sent| request.is_none_or(|request| sent.request == request))
+    {
+        *sent = None;
+    }
+}
+
+/// The send `cut`'s turn made before a newer line cut it, for `request`,
+/// the line answering `cut`'s words again (#5853, lamp-9adf: the write was
+/// sent, the held line's model was given no trace of it, and prepared a new
+/// one). Its call and result, as [`carry_round`] would have carried them,
+/// and the note to tell; its answer waited for, bounded by the services'
+/// [`crate::services::DEADLINE`] from when it began. A send kept for
+/// another request is dropped, so it never reaches a later line. Sent or
+/// not known: `request`'s turn runs no `service_write` ([`sent_already`]).
+/// Refused (its answer an error of its own): only the result goes, as a
+/// finished round would.
+async fn sent_with_words(
+    shared: &Shared,
+    cut: u64,
+    request: u64,
+) -> Option<(Vec<Message>, Option<&'static str>)> {
+    let sent = shared.sent_write.lock().ok()?.take()?;
+    if sent.request != cut {
+        return None;
+    }
+    let mut told = sent.told;
+    let came = tokio::time::timeout_at(
+        sent.began + crate::services::DEADLINE,
+        told.wait_for(Option::is_some),
+    )
+    .await
+    .ok()
+    .and_then(Result::ok)
+    .and_then(|told| told.clone());
+    // A cut turn's lease is no longer current, so its call's answer may be
+    // fenced to "not running" after the services sent it: theirs is asked.
+    let unavailable = crate::tools::unavailable();
+    let came = match came {
+        Some(told) if told != unavailable => Some(told),
+        came => crate::services::sent_answer(cut).or(came),
+    };
+    let (told, note) = match came {
+        Some(told) if told["sent"] == true => (told, Some(SENT_WRITE_NOTE)),
+        Some(told) if told != unavailable => (told, None),
+        came => (came.unwrap_or(unavailable), Some(SENT_UNKNOWN_NOTE)),
+    };
+    eprintln!(
+        "lamp-voice second: request {request}: request {cut}'s {} was sent before a newer line cut its answer; {} goes with its words",
+        sent.call.name,
+        match note {
+            Some(SENT_WRITE_NOTE) => "its sent result",
+            Some(_) => "the send, its result not known,",
+            None => "its result",
+        }
+    );
+    if note.is_some()
+        && let Ok(mut sent_in) = shared.write_sent_in.lock()
+    {
+        *sent_in = Some(request);
+    }
+    let round = vec![
+        Message::assistant_calls(None, std::slice::from_ref(&sent.call)),
+        Message::tool(sent.call.id.clone(), told.to_string()),
+    ];
+    Some((round, note))
+}
+
+/// What `request`'s `name` call is told instead of running, when it is a
+/// `service_write` in a turn answering words whose write was sent
+/// ([`sent_with_words`]).
+fn sent_already(shared: &Shared, request: u64, name: &str) -> Option<Value> {
+    (name == crate::services::WRITE
+        && shared
+            .write_sent_in
+            .lock()
+            .is_ok_and(|sent_in| *sent_in == Some(request)))
+    .then(|| serde_json::json!({ "error": ALREADY_SENT }))
 }
 
 /// `request`'s carried rounds dropped, after a memory forget (#4848).
@@ -12194,22 +12376,19 @@ async fn run_tool(
         );
         return serde_json::json!({ "error": ONE_FACE_FORGET });
     }
-    let running = async {
-        match (&shared.scoped_tools, scope) {
-            (Some(run), Some(scope)) => {
-                run(
-                    request,
-                    heard,
-                    call.name.clone(),
-                    call.args.clone(),
-                    scope.clone(),
-                )
-                .await
-            }
-            (Some(_), None) => crate::tools::unavailable(),
-            (None, _) => (shared.tools)(request, heard, call.name.clone(), call.args.clone()).await,
-        }
+    let running: BoxFuture<'static, Value> = match (&shared.scoped_tools, scope) {
+        (Some(run), Some(scope)) => run(
+            request,
+            heard,
+            call.name.clone(),
+            call.args.clone(),
+            scope.clone(),
+        ),
+        (Some(_), None) => Box::pin(std::future::ready(crate::tools::unavailable())),
+        (None, _) => (shared.tools)(request, heard, call.name.clone(), call.args.clone()),
     };
+    // A send runs to its answer even if a newer line cuts the turn (#5853).
+    let running = sending(shared, request, call, running, Value::clone);
     // A connected service can take seconds to answer (a mail box, a web
     // service): past the wait sound's time the person hears it, as for a
     // slow chat, never a silence (`crate::services::DEADLINE`).
@@ -14625,6 +14804,16 @@ async fn answer(
                     messages.push(Message::tool(call.id.clone(), told.to_string()));
                     continue;
                 }
+                // Words whose own write their go-ahead sent, answered again
+                // (#5853): never a second write, nor one prepared again.
+                if let Some(told) = sent_already(shared, request, &call.name) {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: the write their go-ahead asked for was already sent",
+                        call.name
+                    );
+                    messages.push(Message::tool(call.id.clone(), told.to_string()));
+                    continue;
+                }
                 // A face save their yes already ran ([`HeldSave`]): never a
                 // second.
                 if let Some(told) = saved_already(shared, request, call) {
@@ -14712,7 +14901,7 @@ async fn answer(
                             .filter(|scope| audio_scope_current(scope, &context))
                         {
                             Some(scope) => {
-                                runner(
+                                let running = runner(
                                     context.clone(),
                                     lamp_gemini::ToolCall {
                                         id: call.id.clone(),
@@ -14720,6 +14909,13 @@ async fn answer(
                                         args: call.args.clone(),
                                     },
                                     scope.clone(),
+                                );
+                                sending(
+                                    shared,
+                                    request,
+                                    call,
+                                    running,
+                                    |answer: &crate::tools::ToolAnswer| answer.told.clone(),
                                 )
                                 .await
                             }
@@ -14909,6 +15105,9 @@ async fn answer(
             // Every call answered: the round goes with the words if a line
             // cuts them now (#5026). After a memory forget, no round before
             // it goes (#4848): they hold what the forget discarded.
+            // A send answered within its turn goes with the round, never
+            // again on its own ([`sent_with_words`]).
+            drop_sent_write(shared, Some(request));
             if forgot_this_round {
                 drop_carried_rounds(shared, request);
             } else {
