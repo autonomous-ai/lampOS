@@ -21,7 +21,7 @@
 //!   conversation, in its thread, and is never written.
 //! - **Read once**: with the person's `session_open` (`"role":true`), the
 //!   read already done when their session opens; no request a turn. Held
-//!   here per person ([`hold`]); a set or an end changes it and the memory
+//!   here per person ([`loaded`]); a set or an end changes it and the memory
 //!   at once.
 //! - **Told**: a turn of a placed seen speaker gets their own role's line
 //!   ([`own_line`]) right after the self-description, framed as a name they
@@ -141,12 +141,40 @@ pub const CLAUSE_WORDS: &[&str] = &[
     "đừng",
 ];
 
+// One revision avoids retaining forgotten person ids as invalidation tombstones.
+// No cache lock is held while memory answers a request.
+struct Roles {
+    revision: u64,
+    names: BTreeMap<String, String>,
+}
+
+impl Roles {
+    const fn new() -> Self {
+        Self {
+            revision: 0,
+            names: BTreeMap::new(),
+        }
+    }
+
+    fn change(&mut self, person: &str, role: Option<String>) {
+        self.revision = self.revision.wrapping_add(1);
+        match role {
+            Some(role) => {
+                self.names.insert(person.to_owned(), role);
+            }
+            None => {
+                self.names.remove(person);
+            }
+        }
+    }
+}
+
 // The tests keep each thread's held roles apart, so a forget of everyone
 // in one test never clears another's.
 #[cfg(test)]
 thread_local! {
-    static ROLES_FOR_TEST: std::cell::RefCell<BTreeMap<String, String>> =
-        const { std::cell::RefCell::new(BTreeMap::new()) };
+    static ROLES_FOR_TEST: std::cell::RefCell<Roles> =
+        const { std::cell::RefCell::new(Roles::new()) };
 }
 
 static ON: OnceLock<bool> = OnceLock::new();
@@ -154,15 +182,15 @@ static ON: OnceLock<bool> = OnceLock::new();
 /// Each known person's role, by memory id, as their session's open read it
 /// or their own set or end changed it.
 #[cfg(not(test))]
-static ROLES: Mutex<BTreeMap<String, String>> = Mutex::new(BTreeMap::new());
+static ROLES: Mutex<Roles> = Mutex::new(Roles::new());
 
 #[cfg(not(test))]
-fn with_roles<T>(f: impl FnOnce(&mut BTreeMap<String, String>) -> T) -> Option<T> {
+fn with_roles<T>(f: impl FnOnce(&mut Roles) -> T) -> Option<T> {
     Some(f(&mut *ROLES.lock().ok()?))
 }
 
 #[cfg(test)]
-fn with_roles<T>(f: impl FnOnce(&mut BTreeMap<String, String>) -> T) -> Option<T> {
+fn with_roles<T>(f: impl FnOnce(&mut Roles) -> T) -> Option<T> {
     ROLES_FOR_TEST.with(|roles| Some(f(&mut roles.borrow_mut())))
 }
 
@@ -233,29 +261,58 @@ pub fn tools() -> Vec<Tool> {
 
 /// `person`'s role as held now.
 pub fn cached(person: &str) -> Option<String> {
-    with_roles(|roles| roles.get(person).cloned()).flatten()
+    with_roles(|roles| roles.names.get(person).cloned()).flatten()
 }
 
-/// `person`'s role is now `role` (`None`: they have none).
-pub(crate) fn hold(person: &str, role: Option<String>) {
-    with_roles(|roles| match role {
-        Some(role) => {
-            roles.insert(person.to_owned(), role);
+/// Capture before asking memory; a poisoned cache admits no publication.
+pub(crate) fn revision() -> Option<u64> {
+    with_roles(|roles| roles.revision)
+}
+
+/// Publish a session read only if no set, end or forget has intervened.
+pub(crate) fn loaded(person: &str, role: Option<String>, before: Option<u64>) {
+    with_roles(|roles| {
+        if before != Some(roles.revision) {
+            return;
         }
-        None => {
-            roles.remove(person);
+        match role {
+            Some(role) => {
+                roles.names.insert(person.to_owned(), role);
+            }
+            None => {
+                roles.names.remove(person);
+            }
         }
     });
 }
 
-/// The memory forgot `person`'s everything, or everyone's (`None`): their
-/// role went with it.
+/// A successful write invalidates older loads. If another change intervened,
+/// response order cannot establish the store's final value: evict this person's
+/// cache rather than install or retain a possibly stale role.
+pub(crate) fn written(person: &str, role: Option<String>, before: Option<u64>) -> bool {
+    with_roles(|roles| {
+        let current = before == Some(roles.revision);
+        roles.change(person, if current { role } else { None });
+        current
+    })
+    .unwrap_or(false)
+}
+
+#[cfg(test)]
+pub(crate) fn hold(person: &str, role: Option<String>) {
+    with_roles(|roles| roles.change(person, role));
+}
+
+/// Forget invalidates pending replies even when the cache has no entry yet.
 pub(crate) fn forgot(person: Option<&str>) {
-    with_roles(|roles| match person {
-        Some(person) => {
-            roles.remove(person);
+    with_roles(|roles| {
+        roles.revision = roles.revision.wrapping_add(1);
+        match person {
+            Some(person) => {
+                roles.names.remove(person);
+            }
+            None => roles.names.clear(),
         }
-        None => roles.clear(),
     });
 }
 
@@ -436,6 +493,78 @@ pub fn end_failed_told() -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn forgotten_absent_role_rejects_old_load_but_allows_fresh_load() {
+        forgot(None);
+        let old = revision();
+        forgot(Some("a"));
+        loaded("a", Some("Harry".into()), old);
+        assert_eq!(cached("a"), None);
+        loaded("a", Some("Ron".into()), revision());
+        assert_eq!(cached("a").as_deref(), Some("Ron"));
+    }
+
+    #[test]
+    fn set_and_end_each_invalidate_older_session_reads() {
+        for value in [Some("Ron".to_owned()), None] {
+            forgot(None);
+            hold("a", Some("Harry".into()));
+            let old = revision();
+            assert!(written("a", value.clone(), revision()));
+            loaded("a", Some("Harry".into()), old);
+            assert_eq!(cached("a"), value);
+        }
+    }
+
+    #[test]
+    fn delayed_successful_write_after_forget_cannot_restore_role() {
+        for value in [Some("Harry".to_owned()), None] {
+            forgot(None);
+            let old = revision();
+            forgot(Some("a"));
+            assert!(!written("a", value, old));
+            assert_eq!(cached("a"), None);
+        }
+    }
+
+    #[test]
+    fn overlapping_writes_evict_an_uncertain_cached_winner() {
+        forgot(None);
+        let first = revision();
+        let second = revision();
+        assert!(written("a", Some("Ron".into()), second));
+        let pending = revision();
+        assert!(!written("a", Some("Harry".into()), first));
+        loaded("a", Some("Harry".into()), pending);
+        assert_eq!(cached("a"), None);
+        loaded("a", Some("Ron".into()), revision());
+        assert_eq!(cached("a").as_deref(), Some("Ron"));
+    }
+
+    #[test]
+    fn received_write_with_revoked_admission_evicts_cached_role() {
+        forgot(None);
+        hold("a", Some("Harry".into()));
+        let pending = revision();
+        assert!(!written("a", None, None));
+        loaded("a", Some("Harry".into()), pending);
+        assert_eq!(cached("a"), None);
+    }
+
+    #[test]
+    fn unrelated_forget_invalidates_pending_loads_without_clearing_other_roles() {
+        forgot(None);
+        hold("b", Some("Ron".into()));
+        let old = revision();
+        forgot(Some("a"));
+        loaded("b", Some("Harry".into()), old);
+        assert_eq!(cached("b").as_deref(), Some("Ron"));
+        let old = revision();
+        forgot(None);
+        loaded("b", Some("Harry".into()), old);
+        assert_eq!(cached("b"), None);
+    }
 
     /// Words alone set nothing: praise, a description, or a name never heard
     /// as a name; a name heard as one, or asked for in words, does.
