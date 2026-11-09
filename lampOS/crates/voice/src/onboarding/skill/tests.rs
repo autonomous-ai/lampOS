@@ -549,9 +549,9 @@ fn each_step_says_what_to_do_what_if_it_didnt_work_and_that_it_worked() {
     let three = [
         (
             Step::WhereYouSit,
-            "Sit where you usually sit and look at me.",
-            "I can't see your face yet.",
-            "Got it, I can see you well there.",
+            "Sit where you usually sit, and look at me.",
+            "I can't see you yet. Look at me for a moment.",
+            "There you are. I can see you.",
         ),
         (
             Step::WhoYouAre,
@@ -561,15 +561,15 @@ fn each_step_says_what_to_do_what_if_it_didnt_work_and_that_it_worked() {
         ),
         (
             Step::HowYouSound,
-            "When you want me, say 'Hey Lamp' first. Try it now.",
-            "I didn't catch that. Say 'Hey Lamp' once more.",
-            "Got it. Just say 'Hey Lamp' whenever you want me.",
+            "When you want me, start with 'Hey Lamp'. When I stop talking, give it a try.",
+            "I didn't catch that. Wait a moment, then say 'Hey Lamp' again.",
+            "That's me! Say 'Hey Lamp' whenever you need me.",
         ),
         (
             Step::Touch,
-            "Try petting the top of my head.",
-            "I didn't feel that. Try petting the top of my head.",
-            "That feels nice.",
+            "Pet the top of my head.",
+            "Gently, on top of my head.",
+            "Mmm, that feels nice.",
         ),
         (
             Step::Privacy,
@@ -599,7 +599,10 @@ fn each_step_says_what_to_do_what_if_it_didnt_work_and_that_it_worked() {
         ),
     ];
     assert!(super::PREFERENCES_HELLO.contains("May I say hello when you sit down?"));
-    assert!(super::PREFERENCES_DONE.contains("Got it, that's everything."));
+    assert!(
+        super::PREFERENCES_DONE
+            .contains("All done! You can add more skills in the Autonomous app.")
+    );
     for (step, todo, again, worked) in three {
         let lines = lines_of(step);
         for line in [todo, again, worked]
@@ -671,13 +674,16 @@ fn the_walk_teaches_petting_and_hey_lamp_after_who_you_are() {
     assert!(
         definition
             .note(Step::Touch, false)
-            .contains("\"Try petting the top of my head.\"")
+            .contains("\"Pet the top of my head.\"")
     );
+    assert!(definition.note(Step::HowYouSound, false).contains(
+        "\"When you want me, start with 'Hey Lamp'. When I stop talking, give it a try.\""
+    ));
+    assert!(!definition.words.touch_remind.contains("fingertip"));
     assert!(
         definition
-            .note(Step::HowYouSound, false)
-            .contains("\"When you want me, say 'Hey Lamp' first. Try it now.\"")
+            .words
+            .touch_remind
+            .contains("\"Gently, on top of my head.\"")
     );
-    assert!(!definition.words.touch_remind.contains("fingertip"));
-    assert!(definition.words.touch_remind.contains("petting"));
 }
