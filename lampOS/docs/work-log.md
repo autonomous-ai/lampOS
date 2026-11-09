@@ -8447,3 +8447,23 @@ current requests omit rev; this is latent helper behavior, not the product
 HOLD. Both probes live in /private/tmp/second-review-5819-probe and their
 patch/logs in /tmp/second-5819-*-proof.{patch,log}. The exact-head review
 checkout /private/tmp/second-review-5819 remains clean. Continuing Queue work.
+
+#5780 landed in train748 (#5821), commit8580c5ed03 on lamp-voice3d8afb4152.
+Both resumed implementation PRs are now landed. The log branch is rebased
+on that current lamp-voice; no device acceptance is implied.
+
+#5419 refreshed independent privacy read: HOLD
+bbe723728304cb1b5e59c99f30bfe71929319bdd. Existing selected routing/scope/
+worker tests passed42 and product invariant passed1. Native bounded probe:
+keep jasmine tea(id5), hear "I sold my bicycle. Lamp, forget it.", model
+forget about:"tea". Both normalize about_dropped:"tea"; switch off asks
+which with no deletion, switch on sends forget id5 and returns success.
+remember.rs:4109 prioritizes the rejected model about over line_names;
+:9189 matches only that model text. The heard line must constrain the target
+regardless of an unheard model about. Posted exact-head HOLD to PR/Queue.
+/tmp/second-5419-model-about.log and second-5419-review-probes.patch retain
+proof, with no production edits to the author's checkout/branch.
+One-word "Bicycle. Forget it." also takes tea under the deliberate one-word
+call heuristic. The intervening-forget probe shows stale proof, but its old
+forget_last can pick the same item; not claimed as a new destructive outcome.
+One-face/carried fences remain intact. Continuing the Queue loop.
