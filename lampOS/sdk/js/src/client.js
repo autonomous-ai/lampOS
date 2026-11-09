@@ -13,6 +13,7 @@ import * as debug from './debug.js';
 import * as schema from './schema.js';
 import { LampError, NotPaired, WrongLamp, byCode, fromReply } from './errors.js';
 import { Keyring, b64, isPin, pinOf, proof, unb64 } from './keys.js';
+import { POSES_STEP_MS, posesToFrames } from './moves.js';
 
 /** A fast stream's binary `camera.frame`: its header, with the JPEG as `data`. */
 export function binaryFrame(message) {
@@ -544,6 +545,14 @@ export class Lamp {
     try { return await body(following); } finally { await following.stop(); }
   }
   move(frames, stepMs, { wait = false } = {}) { return this.act('move', { step_ms: stepMs, frames }, wait); }
+  // A move through `poses`, each the degrees of the joints it turns from the
+  // standing pose ({ pitch: 10, yaw: -8 }), eased there and back
+  // (`posesToFrames`). A LampError (code 'bad_request'), before sending, for poses a move can't make.
+  movePoses(poses, { holdMs = 400, wait = false } = {}) {
+    let frames;
+    try { frames = posesToFrames(poses, { stepMs: POSES_STEP_MS, holdMs }); } catch (error) { return Promise.reject(error); }
+    return this.move(frames, POSES_STEP_MS, { wait });
+  }
   play(name, { wait = false } = {}) { return this.act('play', { name }, wait); }
   // Aim the joints named, in degrees, under `lease`. Its answer when the door
   // takes it; with `wait`, the body's `done`, as look's.

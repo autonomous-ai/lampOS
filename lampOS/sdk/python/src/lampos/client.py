@@ -32,6 +32,7 @@ from websockets.exceptions import ConnectionClosed
 from . import debug, errors, schema
 from .errors import BY_CODE, LampError, NotPaired, WrongLamp, from_reply
 from .keys import Keyring, Pairing, b64, is_pin, pin_of, proof, unb64
+from .moves import POSES_STEP_MS, poses_to_frames
 
 Handler = Callable[[dict], Any]
 
@@ -735,6 +736,14 @@ class Lamp:
 
     async def move(self, frames: list[list[int]], step_ms: int, *, wait: bool = False) -> dict:
         return await self._act("move", wait, step_ms=step_ms, frames=frames)
+
+    async def move_poses(self, poses: list[dict], *, hold_ms: int = 400, wait: bool = False) -> dict:
+        """A move through `poses`, each the degrees of the joints it turns
+        from the standing pose (`{"pitch": 10, "yaw": -8}`), eased there and
+        back (`moves.poses_to_frames`). LampError `bad_request`, before sending, for poses
+        a move can't make."""
+        frames = poses_to_frames(poses, step_ms=POSES_STEP_MS, hold_ms=hold_ms)
+        return await self.move(frames, POSES_STEP_MS, wait=wait)
 
     async def play(self, name: str, *, wait: bool = False) -> dict:
         return await self._act("play", wait, name=name)

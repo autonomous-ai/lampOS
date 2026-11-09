@@ -28,6 +28,7 @@ from typing import Any, Literal
 
 from lampos import Lamp, LampError, schema
 from lampos.client import SAY_MAX_BYTES
+from lampos.moves import POSES_STEP_MS, poses_to_frames
 from mcp.server.fastmcp import FastMCP, Image
 from mcp.server.fastmcp.exceptions import ToolError
 from pydantic import AnyUrl
@@ -480,6 +481,20 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             """A move of your own: `frames` of 5 joint offsets in counts (pitch, roll, yaw, shoulder,
             elbow), the first and last all 0, one every `step_ms` (40 to 1000), lasting 1.5 to 10 s. The body checks it."""
             return await with_body_lease("move", step_ms=step_ms, frames=frames)
+
+        @server.tool()
+        async def lamp_move_poses(poses: list[dict[str, float]], hold_ms: int = 400) -> str:
+            """A move through a few poses, in degrees from the standing pose, eased there and
+            back: each pose names the joints it turns, `pitch` (up positive), `roll`, `yaw`
+            (right positive), `shoulder` and `elbow` (up positive), e.g. [{"pitch": 10},
+            {"yaw": -8}]; a joint left out stays put. Each pose is held `hold_ms` (0 to 10000).
+            At most pitch and roll 17.6°, yaw 13.2°, shoulder and elbow 30.8°, and 10 s in all;
+            the body still holds each joint to its own bounds."""
+            try:
+                frames = poses_to_frames(poses, step_ms=POSES_STEP_MS, hold_ms=hold_ms)
+            except LampError as error:
+                raise ToolError(f"bad_request: {error.why}") from error
+            return await with_body_lease("move", step_ms=POSES_STEP_MS, frames=frames)
 
         @server.tool()
         async def lamp_play(name: str) -> str:

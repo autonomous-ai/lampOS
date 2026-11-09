@@ -1425,3 +1425,52 @@ test('a waiting look ends a hand-follow when taken, not at its done', async () =
     }, { forMs: 5000 });
   });
 });
+
+// The same poses give the same frames in both SDKs: this digest is
+// test_client.py's too.
+const POSES_CASES = [[[{"pitch":10},{"pitch":-5,"yaw":8}],400],[[{"yaw":1}],0],[[{"shoulder":20,"elbow":-12.5},{"roll":-2.25,"pitch":3}],250],[[{"roll":0.5},{"roll":0.5},{"roll":0.5}],0]];
+const POSES_DIGEST = 'e35bf686207b90cb4ba49373a765e63f0beeaade9e4b63165e8c09e0ae5ae765';
+
+test('poses become a move the body plays, eased there and back, as Python makes it', async () => {
+  const { createHash } = await import('node:crypto');
+  const { posesToFrames } = await import('../src/index.js');
+  const { COUNTS_PER_DEGREE, moveWhy } = await import('../src/moves.js');
+  const made = POSES_CASES.map(([poses, holdMs]) => posesToFrames(poses, { holdMs }));
+  assert.equal(createHash('sha256').update(JSON.stringify(made)).digest('hex'), POSES_DIGEST);
+  const frames = made[0];
+  assert.equal(moveWhy(50, frames), null);
+  // Up is positive for pitch, as get('body') and joints count it: fewer counts.
+  const up = [-Math.round(10 * COUNTS_PER_DEGREE), 0, 0, 0, 0];
+  const at = frames.findIndex((frame) => JSON.stringify(frame) === JSON.stringify(up));
+  assert.deepEqual(frames.slice(at, at + 9), Array(9).fill(up));
+  assert.ok((made[1].length - 1) * 50 >= 1500);
+  assert.equal(made[3].length - 1, 4 * 8);
+});
+
+test('poses a move cannot make are refused with the joint, before sending', async () => {
+  const { posesToFrames } = await import('../src/index.js');
+  for (const [poses, words] of [
+    [[], 'at least one pose'],
+    [[{}], 'name at least one of pitch, roll, yaw, shoulder, elbow'],
+    [[{ nose: 3 }], "'nose' is not a joint"],
+    [[{ pitch: true }], 'pitch must be a number of degrees'],
+    [[{ pitch: NaN }], 'pitch must be a number of degrees'],
+    [[{ pitch: 40 }], 'pitch 40° is farther than a move may take it, 17.6° either way'],
+    [[{ yaw: -14 }], 'yaw -14° is farther than a move may take it, 13.2° either way'],
+    [Array(12).fill({ shoulder: 30, elbow: -30 }), "longer than a move's 10000"],
+  ]) {
+    assert.throws(() => posesToFrames(poses), (error) => error instanceof LampError && error.code === 'bad_request' && error.message.includes(words), words);
+  }
+  assert.throws(() => posesToFrames([{ yaw: 2 }], { holdMs: -1 }), /holdMs/);
+  await withLamp({}, async (lamp, fake) => {
+    await lamp.withLease(['body'], async () => {
+      await assert.rejects(lamp.movePoses([{ pitch: 40 }]), /farther than a move may take it/);
+      assert.deepEqual(fake.asked('move'), []);
+      await lamp.movePoses([{ pitch: 10 }, { yaw: -8 }], { holdMs: 200 });
+    }, { forMs: 5000 });
+    const sent = fake.asked('move');
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].step_ms, 50);
+    assert.deepEqual(sent[0].frames, posesToFrames([{ pitch: 10 }, { yaw: -8 }], { holdMs: 200 }));
+  });
+});

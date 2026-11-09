@@ -25,6 +25,7 @@ const EXAMPLE_RUNS = {
   'ask-the-person.js': [[], null, ['turn.start']],
   'camera.js': [['1'], null, ['camera.snapshot', 'camera.stream']],
   'ci-light.js': [['pass'], null, ['light']],
+  'curious.js': [[], null, ['lease.take', 'move']],
   'follow.js': [[], 'arrived', ['lease.take', 'look'], 'not now: refused: not in this release: look at a face or a name'],
   'follow-hand.js': [[], 'hand', ['lease.take', 'look']],
   'greet.js': [[], 'arrived', ['gesture']],
