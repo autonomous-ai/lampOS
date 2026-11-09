@@ -405,6 +405,70 @@ def test_a_wait_that_ends_during_the_replay_is_not_made_again():
     run(go())
 
 
+def test_a_wait_begun_before_a_restart_never_takes_a_done_from_the_new_connection(tmp_path):
+    """Second's P2 on #5830: request numbers start over on a new connection,
+    so a `done` handler is never made again there. A turn wait begun before
+    the restart ends `closed` with its connection; the new connection's
+    request 1 finishing doesn't end it as "turn finished"."""
+    from lamp_mcp.relink import Relink
+
+    async def go():
+        async with FakeLamp(grants=("speak", "hear"), auto_done=False) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            lamp = await Relink.connect(keyring=ring, pauses=(0.05,))
+            try:
+                server = build(lamp, client="test laptop")
+                async with create_connected_server_and_client_session(server._mcp_server) as session:
+                    turn = asyncio.create_task(session.call_tool("lamp_start_turn", {"prompt": "First line.", "wait": True}))
+                    await until(lambda: fake.asked("turn.start"))
+                    await restart(fake)
+                    ended = await asyncio.wait_for(turn, 5)
+                    assert ended.isError and "closed" in text(ended), text(ended)
+                    await until(lambda: lamp.connections == 2)
+                    said = await session.call_tool("lamp_say", {"text": "Second line."})
+                    assert not said.isError, text(said)
+                    first = [r for r in fake.received if r.get("op") == "say"][-1]["id"]
+                    await fake.done(first)
+                    await asyncio.sleep(0.1)
+                    assert not lamp._held or all(event not in ("done", "lease") for event, _, _ in lamp._held)
+            finally:
+                await lamp.close()
+
+    run(go())
+
+
+def test_a_say_wait_begun_before_a_restart_ends_closed_and_never_takes_a_new_done(tmp_path):
+    """Second's train #5852 case for #5849: `lamp_say(wait=True)` asked on one
+    connection ends `closed` when that connection ends; the new connection's
+    request 1 (another line) finishing never makes it say "said"."""
+    from lamp_mcp.relink import Relink
+
+    async def go():
+        async with FakeLamp(grants=("speak", "hear"), auto_done=False) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            lamp = await Relink.connect(keyring=ring, pauses=(0.05,))
+            try:
+                server = build(lamp, client="test laptop")
+                async with create_connected_server_and_client_session(server._mcp_server) as session:
+                    first = asyncio.create_task(session.call_tool("lamp_say", {"text": "First line.", "wait": True}))
+                    await until(lambda: fake.asked("say"))
+                    await restart(fake)
+                    ended = await asyncio.wait_for(first, 5)
+                    assert ended.isError and "closed" in text(ended), text(ended)
+                    await until(lambda: lamp.connections == 2)
+                    second = await session.call_tool("lamp_say", {"text": "Second line."})
+                    assert text(second).startswith("taken"), text(second)
+                    asked = [r for r in fake.received if r.get("op") == "say"][-1]["id"]
+                    await fake.done(asked)
+                    await asyncio.sleep(0.1)
+            finally:
+                await lamp.close()
+
+    run(go())
+
+
 def test_lamp_mcp_stops_connecting_again_once_its_computer_is_unpaired(tmp_path):
     """A hello the lamp refuses can't mend by connecting again: lamp-mcp says
     so once and stops trying, and its tools answer `closed`."""
