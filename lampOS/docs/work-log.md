@@ -8940,3 +8940,14 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - Clean control baseline 182 passed. Probe saved in
   /tmp/second-5870-prompt-end.rs and .log, removed; checkout clean.
   No device/acoustic claim. Main workspace remains clean.
+
+## 2026-11-09 — Second: playback validation wording reconciled
+
+- READ-OK #5858 fb7027ad7fbe242a55bb0129cadfb07828c990d5 carries from
+  4ea13ebf1a: only two validation paragraphs changed, runtime identical.
+  P3 stale build/Linux wording answered; acoustic limitation and original
+  Mac full-suite failure retained. Downloaded CI 42605683226 confirms source
+  SHA and 10748 pass/62 skip, including real speaker-loop reset-before-ACK
+  and three speaker helpers. No new runtime rerun or device claim.
+- Awaiting authors' held fixes while auditing train 753's retention of the
+  already-read patches. No Second product PR besides NEVER MERGE fixtures.
