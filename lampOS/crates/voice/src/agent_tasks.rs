@@ -2230,10 +2230,28 @@ const NOT_A_YES: &str = " The same ask again, in the same words or others, is no
 /// What `next` begins with when a corrected ask replaced the one waiting.
 const REPLACED_NEXT: &str = "This one replaces the earlier task, which you will not start now.";
 
-/// [`prepared_next`], with [`CORRECT_FLAG`]'s sentence, and begun with
-/// [`REPLACED_NEXT`] when this task replaced one waiting.
-fn next_for(place: &Place, choosing: bool, who: &str, replaced: bool) -> String {
-    let next = prepared_next(place.lead_in, choosing, who);
+/// What `next` says, in place of [`prepared_next`], for a task that goes
+/// into a session the person named (#5535): the person hears where it goes
+/// before their yes, even when the model said the task back already and
+/// would otherwise ask only "Shall I start it?" (the Reviewer-lead's P2 on
+/// #5784 at de9bebdb41). A yes said before this call is not taken for it
+/// ([`yes_in_the_same_turn`]), so a yes without the session said is never
+/// asked again with nothing new.
+fn session_next(who: &str) -> String {
+    format!(
+        "This goes into one of the person's earlier sessions, not a new one, and their yes is still needed for that. In one short sentence say {who} will do it and where, as `where` says it, {NAMES_BACK}, and ask whether to start it there. Start it only if the person says yes."
+    )
+}
+
+/// [`prepared_next`] ([`session_next`] for a task into a named session),
+/// with [`CORRECT_FLAG`]'s sentence, and begun with [`REPLACED_NEXT`] when
+/// this task replaced one waiting.
+fn next_for(place: &Place, choosing: bool, who: &str, replaced: bool, session: bool) -> String {
+    let next = if session {
+        session_next(who)
+    } else {
+        prepared_next(place.lead_in, choosing, who)
+    };
     if !place.correct {
         return next;
     }
@@ -2574,7 +2592,13 @@ fn run_for(
                     } else {
                         format!("{who} on {}", where_done(place, &sent_to))
                     };
-                    let mut next = next_for(place, choosing(place, staff), who, replaced.is_some());
+                    let mut next = next_for(
+                        place,
+                        choosing(place, staff),
+                        who,
+                        replaced.is_some(),
+                        session.is_some() && !cloud,
+                    );
                     // With the switch, the person's yes to a read-back said in
                     // words may be this very line: then the task is started
                     // now, not asked about again (#5169).
@@ -4099,6 +4123,14 @@ pub(crate) mod tests {
                 .starts_with("Claude Code, in the session \"docs\" on "),
             "{told}"
         );
+        // The Reviewer-lead's P2 on #5784 at de9bebdb41: never only "Shall
+        // I start it?" for a named session; the session is said first.
+        assert_eq!(
+            told["next"],
+            json!(format!("{} {CORRECTED_NEXT}", session_next("Claude Code"))),
+            "{told}"
+        );
+        assert!(!told["next"].as_str().unwrap().contains("Shall I start it?"));
         let (told, _) = run(
             &on,
             &call(json!({"task":task,"session":"site"})),
@@ -4107,8 +4139,12 @@ pub(crate) mod tests {
             PEER_WAIT,
         );
         assert!(told["prepared"] == json!(true), "{told}");
-        assert!(
-            told["next"].as_str().unwrap().starts_with(REPLACED_NEXT),
+        assert_eq!(
+            told["next"],
+            json!(format!(
+                "{REPLACED_NEXT} {} {CORRECTED_NEXT}",
+                session_next("Claude Code")
+            )),
             "{told}"
         );
         let pending = PENDING.lock().unwrap().clone().unwrap();
@@ -6992,11 +7028,11 @@ pub(crate) mod tests {
             );
             for choosing in [false, true] {
                 assert!(
-                    next_for(&on, choosing, "Codex", false).ends_with(
+                    next_for(&on, choosing, "Codex", false, false).ends_with(
                         "Only their yes starts it: the same ask again, in the same words or others, is not a yes."
                     )
                 );
-                assert!(!next_for(&off, choosing, "Codex", false).contains("not a yes"));
+                assert!(!next_for(&off, choosing, "Codex", false, false).contains("not a yes"));
             }
         }
         // A task prepared, then the same ask in other words: the note
@@ -8310,16 +8346,16 @@ pub(crate) mod tests {
                 off.lead_in = lead_in;
                 let before = prepared_next(lead_in, choosing, "Codex");
                 for replaced in [false, true] {
-                    assert_eq!(next_for(&off, choosing, "Codex", replaced), before);
+                    assert_eq!(next_for(&off, choosing, "Codex", replaced, false), before);
                 }
                 let mut on = off.clone();
                 on.correct = true;
                 assert_eq!(
-                    next_for(&on, choosing, "Codex", false),
+                    next_for(&on, choosing, "Codex", false, false),
                     format!("{before} {CORRECTED_NEXT}")
                 );
                 assert_eq!(
-                    next_for(&on, choosing, "Codex", true),
+                    next_for(&on, choosing, "Codex", true, false),
                     format!("{REPLACED_NEXT} {before} {CORRECTED_NEXT}")
                 );
             }
