@@ -163,6 +163,9 @@ The installer's `.install-NAME-PID` and `.removed-NAME-PID` folders go too,
 including an install stopped before writing its package mark. Links are not
 followed. The reset's `.reset-skill-pending` folder is always finished;
 folders with other names and no package mark stay.
+The cleanup helper requires an absolute folder path and refuses relative paths
+before reading the directory, so selection and no-follow deletion resolve the
+same root. The product passes `/var/lib/lampOS/skills`.
 A known older deployment using another progress path requires an explicit
 migration; arbitrary legacy environment paths are not imported, and old progress
 alone is not proof that the privacy exercise was completed.
