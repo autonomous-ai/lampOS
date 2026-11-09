@@ -1717,6 +1717,10 @@ struct Shared {
     spares: AtomicU64,
     /// The last send try's attempt id ([`send_attempt`], #5853).
     send_attempts: AtomicU64,
+    /// The send tries [`sent_with_words`] put in carried rounds, by attempt
+    /// id, the newest [`crate::services::RECEIPTS_KEPT`]: a call id alone
+    /// may be a finished round's other call's (the P3 on #5863).
+    carried_attempts: Mutex<std::collections::VecDeque<u64>>,
     /// The write's send under way, or answered, for a turn a newer line may
     /// cut before its round is carried ([`SentWrite`], #5853).
     sent_write: Mutex<Vec<SentWrite>>,
@@ -4238,6 +4242,7 @@ impl Engine {
                 write_sent_in: Mutex::new(None),
                 spares: AtomicU64::new(0),
                 send_attempts: AtomicU64::new(0),
+                carried_attempts: Mutex::new(std::collections::VecDeque::new()),
                 warmed: Mutex::new(None),
                 begun: Mutex::new(None),
                 wait_sound_only: Mutex::new(None),
@@ -10036,7 +10041,12 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
                 // Answered "not running" before the services had it.
                 (None, None, Some(told)) => (told, Got::Told),
             };
-            Try { call, told, got }
+            Try {
+                attempt,
+                call,
+                told,
+                got,
+            }
         })
         .collect();
     let note = if tries
@@ -10071,13 +10081,30 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
         *sent_in = Some((request, origin, instead));
     }
     // Every try with its own result, so each call id meets its answer
-    // (Second's repro on #5863); once only.
-    let carried = carried_rounds(shared, request).iter().any(|message| {
-        tries
-            .iter()
-            .any(|tried| message.tool_call_id.as_deref() == Some(tried.call.id.as_str()))
+    // (Second's repro on #5863); once only: already carried when every try's
+    // attempt was, and its call id is still in the rounds. The call id
+    // alone may be a finished round's other call's, a clock's `call_0`
+    // before a send's `call_0` (the P3 on #5863).
+    let rounds = carried_rounds(shared, request);
+    let carried = shared.carried_attempts.lock().is_ok_and(|attempts| {
+        tries.iter().all(|tried| {
+            attempts.contains(&tried.attempt)
+                && rounds
+                    .iter()
+                    .any(|message| message.tool_call_id.as_deref() == Some(tried.call.id.as_str()))
+        })
     });
     if !carried {
+        if let Ok(mut attempts) = shared.carried_attempts.lock() {
+            for tried in &tries {
+                if !attempts.contains(&tried.attempt) {
+                    if attempts.len() >= crate::services::RECEIPTS_KEPT {
+                        attempts.pop_front();
+                    }
+                    attempts.push_back(tried.attempt);
+                }
+            }
+        }
         let calls: Vec<net::ToolCall> = tries.iter().map(|tried| tried.call.clone()).collect();
         let round: Vec<Message> = std::iter::once(Message::assistant_calls(None, &calls))
             .chain(
@@ -10094,6 +10121,7 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
 /// One send try as [`sent_with_words`] carries it: its call, its own
 /// result, and how far it is known to have got.
 struct Try {
+    attempt: u64,
     call: net::ToolCall,
     told: Value,
     got: Got,
