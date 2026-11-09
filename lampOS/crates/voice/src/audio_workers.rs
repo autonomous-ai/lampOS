@@ -620,6 +620,9 @@ fn capture_loop<D: CaptureDevice>(
                     }
                     prepare_requested = true;
                 }
+                Control::CutSpeech { .. } | Control::ProviderSpeechCutApplied { .. } => {
+                    return Err(io::Error::other("speech cut sent to capture").into());
+                }
                 Control::ProviderOutputCapacity { .. } => {
                     return Err(io::Error::other("provider capacity sent to capture").into());
                 }
@@ -1431,6 +1434,7 @@ fn speaker_loop(
     let mut link: Option<ReferenceChannels> = None;
     let mut pending: Option<PendingChunk> = None;
     let mut last_sequence = 0;
+    let mut cuts = SpeechCuts::default();
     let mut flush_count = speaker.flush_count();
     // Since when the authority has been lapsed, the speaker silent (#1178).
     let mut lapsed_since: Option<u64> = None;
@@ -1511,6 +1515,33 @@ fn speaker_loop(
                         flush_count,
                     )?;
                 }
+                Control::CutSpeech { owner, through } => {
+                    let applied =
+                        cuts.apply(owner, through, speaker.authority(), monotonic_us(), || {
+                            speaker.stop()?;
+                            Ok(monotonic_us())
+                        })?;
+                    if let Some(applied_at_us) = applied {
+                        // Keep accepted receipts, but cancel completion debt. A
+                        // physical discard is never evidence of drained speech.
+                        if report_discard(channels, speaker, output, &mut flush_count, recording)? {
+                            report_speech_reset(channels, speech)?;
+                        }
+                        if pending.as_ref().is_some_and(|partial| {
+                            cuts.discards(
+                                partial.chunk.permit.owner(),
+                                partial.chunk.chunk_sequence,
+                            )
+                        }) {
+                            pending = None;
+                        }
+                        channels.control.send(WorkerEvent::SpeechCutApplied {
+                            owner,
+                            through,
+                            applied_at_us,
+                        })?;
+                    }
+                }
                 Control::ConnectReference { peer } => {
                     if link.is_some() {
                         return Err(io::Error::other("reference peer already bound").into());
@@ -1535,6 +1566,7 @@ fn speaker_loop(
                     return Ok(EndReason::Stopped);
                 }
                 Control::StartCapture
+                | Control::ProviderSpeechCutApplied { .. }
                 | Control::ProviderOutputCapacity { .. }
                 | Control::NameGrant { .. } => {
                     return Err(io::Error::other("invalid speaker command").into());
@@ -1800,6 +1832,14 @@ fn speaker_loop(
                 );
             }
             last_sequence = chunk.chunk_sequence;
+            // Control and PCM use separate sockets: old PCM may arrive after
+            // the cut acknowledgment. Never install or write those packets.
+            if cuts.discards(chunk.permit.owner(), chunk.chunk_sequence) {
+                stall_pass.done();
+                finish_tick(tick);
+                continue 'tick;
+            }
+
             match speaker.install(chunk.snapshot) {
                 Ok(()) => supersede_speech(
                     channels,
@@ -2044,6 +2084,49 @@ fn speaker_loop(
         }
         stall_pass.done();
         finish_tick(tick);
+    }
+}
+
+/// One owner-scoped monotonic cut. The coordinator holds fresh chunks until
+/// its acknowledgment, so a new cutoff cannot race a newer accepted chunk.
+#[derive(Default)]
+struct SpeechCuts {
+    applied: Option<(TurnOwner, u64, u64)>,
+}
+
+impl SpeechCuts {
+    fn discards(&self, owner: TurnOwner, sequence: u64) -> bool {
+        self.applied
+            .is_some_and(|(cut_owner, through, _)| owner == cut_owner && sequence <= through)
+    }
+
+    fn apply(
+        &mut self,
+        owner: TurnOwner,
+        through: u64,
+        authority: Option<Snapshot>,
+        now_us: u64,
+        drop_pcm: impl FnOnce() -> Result<u64>,
+    ) -> Result<Option<u64>> {
+        let now = MonoTime::from_micros(now_us);
+        if !authority.is_some_and(|snapshot| {
+            snapshot.owner() == Some(owner)
+                && snapshot.microphone_permission() == Permission::Allowed
+                && snapshot.issued_at() <= now
+                && now < snapshot.expires_at()
+        }) {
+            return Ok(None);
+        }
+        if let Some((previous_owner, previous_through, applied_at_us)) = self.applied
+            && previous_owner == owner
+            && through <= previous_through
+        {
+            // A repeated control must not drop fresh same-request speech.
+            return Ok(Some(applied_at_us));
+        }
+        let applied_at_us = drop_pcm()?;
+        self.applied = Some((owner, through, applied_at_us));
+        Ok(Some(applied_at_us))
     }
 }
 
@@ -2727,6 +2810,116 @@ mod peer_stop_speaker_tests {
         );
     }
 
+    /// Real control dispatch and ALSA drop/prepare, not held device-tail or
+    /// acoustic evidence: the null device consumes accepted PCM immediately.
+    #[test]
+    fn speech_cut_control_resets_real_speaker_before_ack_once() {
+        use lamp_turn_owner::{AdmissionState, AdmittedInput, CaptureState, Controller};
+
+        let mut ends = ends();
+        let boot = ends.speech.owner().unwrap().boot();
+        let now = MonoTime::from_micros(monotonic_us());
+        let mut controller = Controller::new(boot, now);
+        controller
+            .set_microphone_permission(now, Permission::Allowed)
+            .unwrap();
+        let until = now.checked_add(100_000).unwrap();
+        controller
+            .set_capture(now, CaptureState::RetainingUntil(until))
+            .unwrap();
+        controller
+            .set_admission(now, AdmissionState::OpenUntil(until))
+            .unwrap();
+        let owner = controller.admit(now, AdmittedInput::NewTurn).unwrap();
+        let snapshot = controller.snapshot(now).unwrap();
+        // Completion debt is logical here; do not mislabel it as PCM actually
+        // retained by ALSA. The assertion below observes the real reset epoch.
+        ends.speech = SpeechPlayback::default();
+        ends.speech
+            .speech_accepted(
+                owner,
+                7,
+                PlaybackCursor {
+                    epoch: ends.speaker.queued_range().epoch,
+                    frame: 0,
+                },
+                PlaybackCursor {
+                    epoch: ends.speaker.queued_range().epoch,
+                    frame: 100,
+                },
+                monotonic_us(),
+                true,
+            )
+            .unwrap();
+        ends.parent
+            .control
+            .send(Control::Authority { snapshot })
+            .unwrap();
+        ends.parent
+            .control
+            .send(Control::CutSpeech { owner, through: 7 })
+            .unwrap();
+        ends.parent
+            .control
+            .send(Control::CutSpeech { owner, through: 7 })
+            .unwrap();
+        ends.parent.control.send(Control::Stop).unwrap();
+        let flushes = ends.speaker.flush_count();
+        let old_epoch = ends.speaker.queued_range().epoch;
+        let result = speaker_loop(
+            &mut ends.channels,
+            &mut ends.speaker,
+            boot,
+            &ends._directory.path,
+            &mut None,
+            &mut ends.speech,
+            &mut ReferenceOutput::default(),
+        );
+        assert!(matches!(result, Ok(EndReason::Stopped)), "{result:?}");
+        // One cut and the terminal Stop, not a second cut for the duplicate.
+        assert_eq!(ends.speaker.flush_count(), flushes + 2);
+        assert_eq!(ends.speaker.authority().unwrap().owner(), Some(owner));
+        assert_eq!(
+            ends.speaker.authority().unwrap().microphone_permission(),
+            Permission::Allowed
+        );
+        assert!(ends.speech.owner().is_none());
+        let mut resets = 0;
+        let mut acknowledgments = Vec::new();
+        while let Some(event) = ends.parent.control.receive::<WorkerEvent>().unwrap() {
+            match event {
+                WorkerEvent::PlaybackClockReset {
+                    previous,
+                    next_epoch,
+                    ..
+                } => {
+                    assert!(acknowledgments.is_empty(), "reset must precede cut ACK");
+                    assert_eq!(previous.epoch, old_epoch);
+                    assert!(next_epoch > old_epoch);
+                    resets += 1;
+                }
+                WorkerEvent::SpeechCutApplied {
+                    owner: applied_owner,
+                    through,
+                    applied_at_us,
+                } => {
+                    assert_eq!(resets, 1, "ACK requires the real PCM reset receipt");
+                    assert_eq!(applied_owner, owner);
+                    assert_eq!(through, 7);
+                    assert!(applied_at_us > 0);
+                    acknowledgments.push(applied_at_us);
+                }
+                WorkerEvent::SpeechDrained { .. } | WorkerEvent::SpeechRetired { .. } => {
+                    panic!("a cut is not successful speech completion");
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(resets, 1);
+        assert_eq!(acknowledgments.len(), 2);
+        assert_eq!(acknowledgments[0], acknowledgments[1]);
+    }
+
     /// The same refused link with no Stop queued, as a capture worker that
     /// crashed leaves it: the fault it was, nothing stopped or reported here.
     #[test]
@@ -2747,3 +2940,7 @@ mod peer_stop_speaker_tests {
         assert_eq!(gaps_cancelled(&mut ends.parent), 0);
     }
 }
+
+#[cfg(test)]
+#[path = "audio_workers/speech_cut_tests.rs"]
+mod speech_cut_tests;

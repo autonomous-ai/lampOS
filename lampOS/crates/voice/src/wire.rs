@@ -3,6 +3,7 @@
 use crate::{
     diagnostic_control::{DiagnosticFinished, DiagnosticStarted},
     options::NoiseSuppression,
+    speech_cut::ProviderCut,
 };
 use lamp_audio::ownership::{PlaybackCursor, QueuedRange};
 use lamp_ipc::MAX_DATAGRAM_BYTES;
@@ -35,6 +36,17 @@ pub enum Control {
     ProviderOutputCapacity {
         through: u64,
     },
+    /// The coordinator applied this provider speech fence. No authority is granted.
+    ProviderSpeechCutApplied {
+        request: u64,
+        through: u64,
+    },
+    /// Drop speech through this speaker-chunk sequence for the named live owner.
+    /// The speaker checks its installed authority; this message grants none.
+    CutSpeech {
+        owner: TurnOwner,
+        through: u64,
+    },
     /// The sleep capture's name-only grant, or its revocation (migrate-P2):
     /// sent to that worker alone, beside no [`Control::Authority`]. It never
     /// grants a microphone to any other worker.
@@ -63,6 +75,8 @@ impl<'de> Deserialize<'de> for Control {
             ConnectReference { peer: BootId },
             StartCapture {},
             ProviderOutputCapacity { through: u64 },
+            ProviderSpeechCutApplied { request: u64, through: u64 },
+            CutSpeech { owner: TurnOwner, through: u64 },
             NameGrant { grant: NameGrant },
             Stop {},
         }
@@ -73,6 +87,10 @@ impl<'de> Deserialize<'de> for Control {
             StrictControl::ProviderOutputCapacity { through } => {
                 Self::ProviderOutputCapacity { through }
             }
+            StrictControl::ProviderSpeechCutApplied { request, through } => {
+                Self::ProviderSpeechCutApplied { request, through }
+            }
+            StrictControl::CutSpeech { owner, through } => Self::CutSpeech { owner, through },
             StrictControl::NameGrant { grant } => Self::NameGrant { grant },
             StrictControl::Stop {} => Self::Stop,
         })
@@ -177,6 +195,18 @@ pub enum WorkerEvent {
     /// This travels independently of credited provider answer packets.
     ProviderLink {
         link: crate::provider_link::ProviderLink,
+    },
+    /// An admitted forget's fence, independent of credited provider data.
+    /// The coordinator validates the request against its current reply.
+    ProviderSpeechCut {
+        cut: ProviderCut,
+    },
+    /// A scoped speaker cut completed, after its physical stop/reset succeeded.
+    /// This is discard evidence, never a successful playback receipt.
+    SpeechCutApplied {
+        owner: TurnOwner,
+        through: u64,
+        applied_at_us: u64,
     },
     VisualContext {
         receipt: crate::visual_context::Receipt,
@@ -1000,5 +1030,99 @@ mod privacy_receipt_tests {
             serde_json::from_value::<PrivacyReceipt>(serde_json::to_value(invalid).unwrap())
                 .is_err()
         );
+    }
+}
+
+#[cfg(test)]
+mod speech_cut_wire_tests {
+    use super::*;
+    use serde_json::{Value, json};
+
+    fn owner() -> TurnOwner {
+        serde_json::from_value(json!({
+            "boot": BootId::new([71; 16]).unwrap(), "turn": 7, "generation": 1,
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn priority_cut_control_census_is_strict_and_never_a_renewal() {
+        for (kind, command) in [
+            (
+                "provider_speech_cut_applied",
+                Control::ProviderSpeechCutApplied {
+                    request: 7,
+                    through: 0,
+                },
+            ),
+            (
+                "cut_speech",
+                Control::CutSpeech {
+                    owner: owner(),
+                    through: u64::MAX,
+                },
+            ),
+        ] {
+            assert!(!command.is_renewal());
+            let bytes = encode(&command).unwrap();
+            let decoded: Control = decode(&bytes).unwrap();
+            assert_eq!(encode(&decoded).unwrap(), bytes);
+            let value: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(value["kind"], kind);
+            let mut extra = value.clone();
+            extra["grant"] = json!(true);
+            assert!(serde_json::from_value::<Control>(extra).is_err());
+            let mut missing = value.clone();
+            missing.as_object_mut().unwrap().remove("through");
+            assert!(serde_json::from_value::<Control>(missing).is_err());
+            let mut negative = value;
+            negative["through"] = json!(-1);
+            assert!(serde_json::from_value::<Control>(negative).is_err());
+        }
+        assert!(
+            decode::<Control>(
+                br#"{"kind":"provider_speech_cut_applied","request":7,"through":0,"through":1}"#
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn priority_cut_receipt_census_is_strict_and_preserves_watermarks() {
+        for (kind, event) in [
+            (
+                "provider_speech_cut",
+                WorkerEvent::ProviderSpeechCut {
+                    cut: ProviderCut {
+                        request: 7,
+                        through: 0,
+                        admitted_at_us: 100,
+                    },
+                },
+            ),
+            (
+                "speech_cut_applied",
+                WorkerEvent::SpeechCutApplied {
+                    owner: owner(),
+                    through: u64::MAX,
+                    applied_at_us: 200,
+                },
+            ),
+        ] {
+            let bytes = encode(&event).unwrap();
+            let decoded: WorkerEvent = decode(&bytes).unwrap();
+            assert_eq!(encode(&decoded).unwrap(), bytes);
+            let mut value: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(value["kind"], kind);
+            value["grant"] = json!(true);
+            assert!(serde_json::from_value::<WorkerEvent>(value).is_err());
+        }
+        for bad in [
+            json!({"kind":"provider_speech_cut","cut":{"request":7,"through":0,"admitted_at_us":100,"grant":true}}),
+            json!({"kind":"speech_cut_applied","owner":owner(),"through":0}),
+            json!({"kind":"speech_cut_applied","owner":owner(),"through":0,"applied_at_us":-1}),
+        ] {
+            assert!(serde_json::from_value::<WorkerEvent>(bad).is_err());
+        }
     }
 }

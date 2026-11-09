@@ -946,6 +946,8 @@ fn probe(mut channels: WorkerChannels) -> Result<()> {
                 Control::StartCapture
                 | Control::ConnectReference { .. }
                 | Control::ProviderOutputCapacity { .. }
+                | Control::ProviderSpeechCutApplied { .. }
+                | Control::CutSpeech { .. }
                 | Control::NameGrant { .. },
             ) => {
                 return Err(io::Error::other("invalid probe command").into());
