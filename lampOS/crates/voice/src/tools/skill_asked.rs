@@ -45,39 +45,101 @@ const ASKS: &[(&[&str], &str)] = &[
     (&["party", "lights"], SHOW),
 ];
 
-/// Every other word the line may hold: a greeting, the lamp's name, a
-/// "please", "can you", "give me a", "turn on the", "show me a", "do a",
-/// "I'd like a". Any word not here or in the ask ("off", "don't", "no",
-/// "what", "later", a story) leaves the line to the model: a missed force
-/// only means the model answers as without the switch, while a wrong one
-/// changes the light nobody asked to change.
-const AROUND: &[&str] = &[
-    "hey", "hi", "hello", "ok", "okay", "lamp", "so", "oh", "wait", "please", "now", "thanks",
-    "thank", "you", "can", "could", "would", "will", "give", "me", "us", "set", "put", "turn",
-    "switch", "on", "a", "an", "the", "my", "some", "i", "i'd", "id", "like", "want", "need", "do",
-    "show", "start", "play", "make", "it", "let's", "lets",
+/// Words the line may hold anywhere: a greeting, the lamp's name, a
+/// "please", a "thanks", an article. Any word not here, in a request
+/// ([`REQUESTS`]) or in the ask ("off", "don't", "no", "what", "later", a
+/// story) leaves the line to the model: a missed force only means the model
+/// answers as without the switch, while a wrong one changes the light nobody
+/// asked to change.
+const AROUND: &[&[&str]] = &[
+    &["hey"],
+    &["hi"],
+    &["hello"],
+    &["ok"],
+    &["okay"],
+    &["lamp"],
+    &["so"],
+    &["oh"],
+    &["wait"],
+    &["please"],
+    &["now"],
+    &["thanks"],
+    &["thank", "you"],
+    &["a"],
+    &["an"],
+    &["the"],
+    &["my"],
+    &["some"],
 ];
 
+/// The request constructions, whole, and only before the ask: "can you",
+/// "give me", "turn on", "show me", "do", "I'd like", "I want". "I", "like",
+/// "you" and "do" alone are not one, so a preference ("I like movie light")
+/// or a question ("do you like movie light?", "would you like a light
+/// show?") is the model's.
+const REQUESTS: &[&[&str]] = &[
+    &["can", "you"],
+    &["could", "you"],
+    &["would", "you"],
+    &["will", "you"],
+    &["give", "me"],
+    &["give", "us"],
+    &["show", "me"],
+    &["show", "us"],
+    &["set"],
+    &["put", "on"],
+    &["turn", "on"],
+    &["switch", "on"],
+    &["do"],
+    &["start"],
+    &["play"],
+    &["make", "it"],
+    &["let's"],
+    &["lets"],
+    &["i'd", "like"],
+    &["id", "like"],
+    &["i", "would", "like"],
+    &["i", "want"],
+    &["i", "need"],
+];
+
+/// How many words of `words` from `at` the first of `phrases` takes, if one.
+fn phrase_at(words: &[String], at: usize, phrases: &[&[&str]]) -> Option<usize> {
+    phrases
+        .iter()
+        .find(|phrase| {
+            phrase
+                .iter()
+                .enumerate()
+                .all(|(next, word)| words.get(at + next).is_some_and(|said| said == word))
+        })
+        .map(|phrase| phrase.len())
+}
+
 /// The skill's function a line plainly asks for, if any: the line holds
-/// exactly one ask ([`ASKS`]) and no word but those [`AROUND`].
+/// exactly one ask ([`ASKS`]), requests ([`REQUESTS`]) only before it, and
+/// no word but those [`AROUND`].
 pub fn asks_for(said: &str) -> Option<&'static str> {
     let words = lower_words(said);
     let mut asked = None;
     let mut at = 0;
     while at < words.len() {
-        let found = ASKS.iter().find(|(ask, _)| {
-            ask.iter()
-                .enumerate()
-                .all(|(next, word)| words.get(at + next).is_some_and(|said| said == word))
-        });
+        let found = ASKS
+            .iter()
+            .find(|(ask, _)| phrase_at(&words, at, &[ask]).is_some());
         if let Some((ask, name)) = found {
             if asked.is_some() {
                 return None;
             }
             asked = Some(*name);
             at += ask.len();
-        } else if AROUND.contains(&words[at].as_str()) {
-            at += 1;
+        } else if let Some(taken) = phrase_at(&words, at, AROUND).or_else(|| {
+            asked
+                .is_none()
+                .then(|| phrase_at(&words, at, REQUESTS))
+                .flatten()
+        }) {
+            at += taken;
         } else {
             return None;
         }
@@ -127,6 +189,55 @@ pub fn offered_now(settings: crate::tools::Settings) -> impl Fn(&str) -> bool + 
 mod tests {
     use super::*;
     use std::sync::Arc;
+
+    #[test]
+    fn reviewer_three_preferences_and_questions_do_not_force_skills() {
+        let forced = force(Some(Arc::new(|_| true)));
+        let mut wrongly_forced = Vec::new();
+        for said in [
+            "Lamp, do you like movie light?",
+            "Lamp, I like movie light.",
+            "Lamp, I like the light show.",
+        ] {
+            if let Some(call) = forced(&[Message::user(said)]) {
+                wrongly_forced.push((said, call));
+            }
+        }
+        assert!(
+            wrongly_forced.is_empty(),
+            "non-command lines forced calls: {wrongly_forced:?}"
+        );
+    }
+
+    /// A preference or a question about a scene or a show is the model's;
+    /// only a request construction before the ask forces.
+    #[test]
+    fn a_preference_or_a_question_is_not_an_ask() {
+        for said in [
+            "Do you like the night light?",
+            "Do you want a light show?",
+            "Would you like a movie light?",
+            "Can you like a light show?",
+            "I like movie light.",
+            "I love the light show.",
+            "I want to like movie light.",
+            "Is that a light show?",
+            "Movie light, do you like it?",
+            "Movie light, I like.",
+            "Lamp, you movie light.",
+        ] {
+            assert_eq!(asks_for(said), None, "{said}");
+        }
+        for (said, name) in [
+            ("I want a movie light, please.", SCENE),
+            ("I would like a light show.", SHOW),
+            ("Can you do a light show?", SHOW),
+            ("Could you please put on the reading light?", SCENE),
+            ("Let's do a light show.", SHOW),
+        ] {
+            assert_eq!(asks_for(said), Some(name), "{said}");
+        }
+    }
 
     /// The played lines on lamp-52e6 (9 Nov) and the skills' own examples
     /// are forced to their skill; a line with any other word is not.
