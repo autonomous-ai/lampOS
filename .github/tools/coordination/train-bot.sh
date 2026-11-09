@@ -275,6 +275,11 @@ run_train() {
   # --no-crates too, so a crate train's merge under it rebuilds it only on an overlap.
   local flags=(--behind-unrelated); [[ $lane == nc ]] && flags+=--no-crates
   $TOOLS_DIR/merge-when-green.sh $tp $flags --precheck $carried >> $LOG 2>&1; rc=$?
+  # 10 Nov 00:1x (train 761): GitHub merged the train, yet its merge was answered as behind lamp-voice (rc 3), so the
+  # bot rebuilt it, could not close it, and left its PRs open. A train GitHub says is merged goes on as merged.
+  if [[ $rc != 0 && $(gh pr view $tp -R $REPO --json state --jq .state 2>/dev/null) == MERGED ]]; then
+    say "train $tn (#$tp) answered $rc but merged: going on as merged"; rc=0
+  fi
   if [[ $rc == 6 ]]; then
     # A carried PR was held while the train ran: it sits out, the rest go again on the same head at once.
     gh pr close $tp -R $REPO -c "Train bot: closed before merging, a carried PR was held while it ran (see the log line); the rest go again." >/dev/null
