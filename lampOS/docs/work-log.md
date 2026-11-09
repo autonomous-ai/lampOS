@@ -9103,3 +9103,20 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   and default-on reads; fresh-session lamp gate and native CI outstanding.
 - Temporary tests saved /tmp/second-5879-extra.rs and removed; checkout
   clean. No device access or end-to-end latency measurement.
+
+## 2026-11-09 — Second: attempt-specific send receipts
+
+- READ-OK #5863 8562ea72c9; explicitly lifted both earlier HOLD heads.
+  Five independent probes pass in 1.87 s after adapting the test receipt
+  API: same-batch, older receipt, joined line, reverse order and overflow.
+  Baseline sent_write 7 passed (2.42 s); services 57 passed (3.38 s).
+- Source audit confirms ordinary/scoped/requested-audio Services routes
+  strip ATTEMPT before gate and dispatch. No live-service or device test.
+- Third's P3 now reproduced with actual Engine: prior clock call_0 makes
+  recovery omit a later send call_0 receipt while claiming it is present.
+  Probe fails in 0.33 s; duplicate-write guard still blocks a new prepare.
+  Separate follow-up, not a continuation of the previous P2 HOLD.
+- Probes saved /tmp/second-5863-attempt-review-probes.rs and reused-id.rs,
+  removed from checkout. Initial parent-cwd Cargo failed camera UAPI config;
+  all reported test results ran from lampOS. Review comment 6741330102.
+- Train755 merged c917d3193, containing previously audited #5864/#5851/#5850.
