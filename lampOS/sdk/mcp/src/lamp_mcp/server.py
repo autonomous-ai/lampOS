@@ -513,7 +513,8 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         ) -> str:
             """Aim the joints you name, in degrees (−180 to 180), reached within `within_ms`
             (0 or more; the body's caps pace each step): head `pitch` and `roll`, base `yaw`, `shoulder`
-            and `elbow`. At least one.
+            and `elbow`. At least one. `roll`, `shoulder` and `elbow` are taken only while the lamp
+            stands; otherwise the tool says the body dropped them, and why.
             The body bounds each step as it does every move. A lamp that doesn't route `joints` yet
             says so, as the tool's error."""
             targets = {
