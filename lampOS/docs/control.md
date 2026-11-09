@@ -1006,8 +1006,8 @@ A paired computer keeps clips of its own on its lamp and plays them by name
 Eighth's proposal on #3504, agreed by Nine and blue. A paired computer can
 put a rules skill of its own on its own lamp, with no Store, the way a skill
 the owner makes by voice is installed today. `lamp-control` serves the ops
-below with `--manage-socket`; the manage helper's side (lamp-skills, piece
-B) follows. The schema has the three request ops, and both SDKs push, list
+below with `--manage-socket`, which the product unit passes; the manage
+helper's side is lamp-skills' (piece B). The schema has the three request ops, and both SDKs push, list
 and remove (`push_skill`/`pushSkill`, `lamp skill push|list|remove`).
 
 **Not yet on customer lamps.** The product unit passes no `--manage-socket`,
@@ -1156,12 +1156,16 @@ on the lamp that run on their own".
   pushed skills are off whichever change was lost; paired again, it pushes
   them again under its grants then. A re-pair with the same grants tells
   the helper nothing, so it isn't a way to send a lost `grants_pushed_by`.
-- **Not on before the helper's half:** no product unit passes
-  `--manage-socket`, and it must not be passed before lamp-skills' manage
-  helper keeps its record of revokes and grant changes (Eighth's piece B).
-  An install that the door stops waiting for at 60 s may still finish in
+- **On in the product:** `deploy/product/lamp-control.service` passes
+  `--manage-socket /run/lampos-skills-manage/manage.sock`, the socket
+  `lamp-skills-manage.socket` listens on, and is ordered after it (test
+  `the_door_passes_the_skills_manage_socket_it_listens_on` in
+  `lamp-update`). It waited for lamp-skills' manage helper to keep its
+  record of revokes and grant changes (Eighth's piece B, `.revoked.json`):
+  an install that the door stops waiting for at 60 s may still finish in
   the helper, and only that record refuses it if the computer's pairing
-  changed meanwhile.
+  changed meanwhile. The door itself is still off until the owner's
+  developer setting writes `LAMP_CONTROL=on`.
 - **The SDKs:** `lamp skill push FOLDER` runs `lamp skill check`, compares
   what the skill asks with the pairing's grants and the rules above
   (refusing on the computer with the lamp's own `no_grant` why, before any

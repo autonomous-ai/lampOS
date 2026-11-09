@@ -235,7 +235,7 @@ Python names first, JavaScript where it differs.
 
 | Capability | lamp-control | Python / JS | lamp-mcp | Status | Owner | Validated |
 |---|---|---|---|---|---|---|
-| Put a skill on the lamp, list, remove | `skill.push`, `skill.list`, `skill.remove` | `push_skill`, `skills`, `remove_skill` / `pushSkill`, `skills`, `removeSkill`; `lamp skill push/list/remove` | `lamp_skill_push`, `lamp_skills`, `lamp_skill_remove` | done, but not yet on customer lamps: refused "skill push is not on this lamp" (no `--manage-socket` in the product unit; 75c9, 9 Nov, 10824's unit: refused as written) | blue | 75c9, 4 Nov, build 10114, by the local leader: check, push, list, remove. Needs lamp-control started with `--manage-socket` |
+| Put a skill on the lamp, list, remove | `skill.push`, `skill.list`, `skill.remove` | `push_skill`, `skills`, `remove_skill` / `pushSkill`, `skills`, `removeSkill`; `lamp skill push/list/remove` | `lamp_skill_push`, `lamp_skills`, `lamp_skill_remove` | done; on customer lamps from the next build (the product unit passes `--manage-socket`, #5819); stable 10824's unit doesn't, so it refuses "skill push is not on this lamp" (75c9, 9 Nov) | blue | 75c9, 4 Nov, build 10114, by the local leader: check, push, list, remove; 75c9, 9 Nov, 10824's lamp-control under the next build's unit: push, list, remove, push, revoke turned it off |
 | Check a skill folder before pushing | — | `lamp skill check` | — | done | blue | not yet |
 
 ## Never readable

@@ -257,7 +257,8 @@ asking only `speak`. What a push needs:
 - **The lamp:** lamp-control started with `--manage-socket`, its link to the
   root helper that installs skills ([control.md](../../docs/control.md),
   piece 7). Without it the lamp answers `refused`, "skill push is not on this
-  lamp". The product unit on stable 10824 doesn't pass it.
+  lamp". The product unit on stable 10824 doesn't pass it; the next build's
+  does.
 
 ## Everything you can read
 

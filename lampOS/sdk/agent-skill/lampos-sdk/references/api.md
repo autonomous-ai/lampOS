@@ -142,9 +142,9 @@ computer goes, never beyond the computer's other grants, and a revoke turns it
 off. `lamp skill push` checks the folder first, as `lamp skill check` does.
 A push needs `skills` plus every grant the skill's `[permissions]` asks, is
 1 MiB at most packed, and needs lamp-control started with `--manage-socket`.
-**Not yet on customer lamps:** the product unit on stable 10824 doesn't pass
-it, so every skill op is refused, "skill push is not on this lamp". Try it on
-`lamp fake`. To try it:
+**Not on stable 10824's customer lamps:** their product unit doesn't pass it,
+so every skill op is refused, "skill push is not on this lamp". The next
+build's product unit passes it. Try it on `lamp fake` meanwhile. To try it:
 `lampOS/sdk/examples/hello-skill`, which asks only `speak`.
 From lamp-mcp, with the same grant: `lamp_skill_push(folder)`, `lamp_skills()`
 and `lamp_skill_remove(name)`.
