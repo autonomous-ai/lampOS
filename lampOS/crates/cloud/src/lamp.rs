@@ -773,10 +773,7 @@ impl Lamp for Real {
     }
 
     fn onboarding_done(&self) -> Option<PathBuf> {
-        crate::onboarding_done::on()
-            .then(|| std::env::var_os("STATE_DIRECTORY"))
-            .flatten()
-            .map(|dir| PathBuf::from(dir).join(crate::onboarding_done::FILE))
+        crate::onboarding_done::kept_in()
     }
 
     fn make_skill(&self) -> Option<PathBuf> {

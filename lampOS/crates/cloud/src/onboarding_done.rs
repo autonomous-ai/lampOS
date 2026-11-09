@@ -28,9 +28,28 @@ pub const FILE: &str = "onboarding-done";
 /// How often the heartbeat is looked at.
 pub const EVERY: Duration = Duration::from_secs(1);
 
-/// Whether the switch is on.
+/// Whether the switch is on in the environment.
 pub fn on() -> bool {
     std::env::var(ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
+/// [`FILE`]'s path while the switch is on, set once at start ([`switch`]).
+static KEPT_IN: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
+/// Turns it on, kept in `file`, or off (`None`): lamp-cloud's start, with
+/// the switch on and a state folder.
+pub fn switch(file: Option<PathBuf>) {
+    *KEPT_IN
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = file;
+}
+
+/// [`switch`]'s setting: where the acked date is kept, while it is on.
+pub fn kept_in() -> Option<PathBuf> {
+    KEPT_IN
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone()
 }
 
 /// The reply's `data`.

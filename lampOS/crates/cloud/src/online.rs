@@ -2738,7 +2738,10 @@ mod tests {
         let told = dones(&seen);
         // The client may also send its own copy again: two at least.
         assert!(told.len() >= 2, "{told:?} {lines:?}");
-        assert!(told.iter().all(|reply| reply["data"] == serde_json::json!({"at": DONE_AT})));
+        assert!(
+            told.iter()
+                .all(|reply| reply["data"] == serde_json::json!({"at": DONE_AT}))
+        );
         let connects = seen
             .iter()
             .filter(|seen| matches!(seen, Seen::Connect { .. }))
@@ -2767,7 +2770,10 @@ mod tests {
                 "{seen:?}"
             );
             assert!(dones(&seen).is_empty(), "{seen:?}");
-            assert!(!lines.iter().any(|line| line.starts_with("onboarding.done")), "{lines:?}");
+            assert!(
+                !lines.iter().any(|line| line.starts_with("onboarding.done")),
+                "{lines:?}"
+            );
         }
         assert!(!dir.path().join(crate::onboarding_done::FILE).exists());
     }

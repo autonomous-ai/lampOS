@@ -40,6 +40,10 @@ const READ: &[(&str, &str, Type)] = &[
     // The walk's end in Unix ms (#5812), said once the voice's heartbeat
     // carries it: an app that missed `onboarding.done` opens Skills on it.
     ("system.info", "onboarding_done_at", Type::Whole),
+    // This lamp will send `onboarding.done` (Mobile's ask on #5824): said
+    // only with LAMP_APP_ONBOARDING_DONE on, so the app waits for the event
+    // on such a lamp alone.
+    ("system.info", "onboarding_done_supported", Type::Flag),
     ("volume.get", "volume", Type::Percent),
     ("volume.get", "raw", Type::Whole),
     ("volume.get", "max_volume", Type::Whole),
@@ -157,6 +161,8 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
     shows
         .publish_json(1, &Light::new(true, "warm", 1).unwrap())
         .unwrap();
+    // The switch on, with a state folder (#5812); no other test here reads it.
+    lamp_cloud::onboarding_done::switch(Some(root.join(lamp_cloud::onboarding_done::FILE)));
     // The voice's heartbeat, its walk ended (#5812).
     let mut walk = ring
         .publisher_declared(
@@ -1243,7 +1249,11 @@ fn system_info_and_health_say_signed_out_only_while_the_bus_says_so() {
     let said = |real: &mut Real, kind: &str| answer(real, kind, &Value::Null).unwrap().unwrap();
     assert!(said(&mut real, "system.info").get("account").is_none());
     // No heartbeat from the voice: the walk's end is not known (#5812).
-    assert!(said(&mut real, "system.info").get("onboarding_done_at").is_none());
+    assert!(
+        said(&mut real, "system.info")
+            .get("onboarding_done_at")
+            .is_none()
+    );
     assert!(said(&mut real, "lamp.health").get("account").is_none());
     let mut state = bus
         .publisher_declared(AccountState::TOPIC, &AccountState::declaration(), "cloud")
