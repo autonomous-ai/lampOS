@@ -25,6 +25,7 @@ mod opens_further;
 mod pause_join;
 mod person_scope_seen;
 mod remember_speaker;
+mod sent_write;
 mod short_done;
 mod unplayed_join;
 mod voice_confirms;
