@@ -2293,7 +2293,12 @@ socket; `crates/voice/src/photo_faces.rs`):
 `--photo-dir` as a new 0600 file and sends the ask, only over the lamp's own
 account channel, and removes the file afterwards ([cloud.md](cloud.md), "A
 face from the app's photo"). The eyes make the folder theirs at 0700 when
-they start, and refuse one open to others (`photo::ready`).
+they start, and refuse one open to others (`photo::ready`). Cloud returns only
+`{"received":true}` for any parsed Eyes reply, including recognition/refusal
+outcomes; the app receives no name, enrollment or pending-face result from
+this upload. Eyes' internal outcomes and consent behavior are unchanged.
+Invalid-JSON/absent answers remain transport errors. This receipt does not
+activate the held product speaker-consent path (#5263).
 
 Tests (`photo.rs`):
 - the file read once and removed, a second ask finding nothing; one too
