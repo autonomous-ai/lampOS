@@ -1,5 +1,30 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Give photo uploads a receipt without an enrollment answer (2026-11-09)
+
+V1's `system/server/device/delivery/mqtt/face_enroll_handler.go` acknowledges
+starting, then returns HAL's enrollment result over the account channel.
+That result is not a safe contract for an unconfirmed photo: it tells a
+remote sender whether the lamp already knows the subject. Reuse the narrow
+neutral-receipt mapping and broker-boundary fixtures from the held #2988
+(`c71274d32`), independently of its unlanded activation/consent changes.
+Keep current input validation, exact account topic, Eyes request shape,
+0600 temporary handoff, cleanup and bounded socket reads/writes.
+
+Every parsed Eyes outcome maps to the same `{"received":true}` success data;
+no enrollment, pending face, question or identity is promised. Invalid-JSON or
+absent replies and local/input failures remain failures. The app already
+accepts this neutral receipt and leaves its face list unchanged (`a3b2aa88`);
+it continues reading legacy replies too. This changes neither the Eyes wire
+contract nor the SDK, switches, function census or product activation.
+
+The mapping adds no I/O and has a host target under 1 ms. Socket timing,
+recognition timing, broker scheduling and actual lamp/app latency are not made
+constant or proved by this payload-only fix. The existing two-second per-read/per-write socket
+timeouts and file-write behavior remain; there is no new total operation deadline; trusted capture, whole-interval speaker
+proof, physical acceptance and removable-skill work remain separate #5263 gates.
+See [Cloud](cloud.md#a-face-from-the-apps-photo-1968-facesadd_photo).
+
 ## Bind signed source to saved ordinary decisions without another executor (2026-10-28)
 
 Reuse the full existing Ed25519 manifest verifier at its compiled capability,
