@@ -9083,3 +9083,11 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   and 05e6f6af39 has the same stable patch ID as #5792's 41f543f241.
   Posted dependency evidence only, no independent privacy READ-OK; Tests
   and Fourth were requested for the new context boundary.
+
+## 2026-11-09 — Second: turn guide promise corrected
+
+- READ-OK #5871 70399c9e82, explicitly lifting 24a14817f2 HOLD. Both
+  rows now say the cancellation fix is in review and distinguish a queued
+  start from an active prompt. Stock 10824 measurements remain unchanged.
+- Exact-content guide snapshot: seven tests passed in 0.10 s; diff check
+  clean. No device run. #5870 prompted-turn cancellation HOLD remains.
