@@ -2838,17 +2838,25 @@ impl Onboarding {
         // read alone is ([`Self::heard_line`]).
         // A name spelled ("W a l t e r.") is the word it spells (#5564), so
         // after a no the spelled name is read back and confirmed as any
-        // name told (Jarvis's P2 on #5677).
-        let spelled = if language.is_none() && !led.face_only {
-            crate::known_faces::letters_as_word(text)
-        } else {
-            None
-        };
-        // A line of letters alone names someone as a name said does: the
-        // reading's own test knows no spelling.
+        // name told (Jarvis's P2 on #5677). It is read by the one reader the
+        // spelled-name note uses ([`spelled_name_in`]), so the name the note
+        // dictates is the name its yes confirms: "It's W, A, L, T, E, R."
+        // and "Jane, J A Y N E." are Walter and Jayne here too (Jarvis's P1
+        // on #5695).
+        let english = language.is_none() && !led.face_only;
+        let spelled = if english { spelled_name_in(text) } else { None };
+        // A spelled line names someone as a name said does: the reading's
+        // own test knows no spelling.
         let names_someone = read.names_someone || spelled.is_some();
-        let told_name = if language.is_none() && !led.face_only {
-            spelled.or_else(|| name_told(text))
+        // Letters alone that the reader refuses (a digit among them, more
+        // than 20) are no name said either.
+        let told_name = if english {
+            spelled.or_else(|| {
+                crate::known_faces::letters_as_word(text)
+                    .is_none()
+                    .then(|| name_told(text))
+                    .flatten()
+            })
         } else {
             None
         };
@@ -9448,7 +9456,7 @@ mod tests {
             );
             assert_eq!(
                 room.walk.kept().face_again_names,
-                [lamp_msgs::known::person_id(name)],
+                [lamp_msgs::known::person_id(&name.to_lowercase())],
                 "{answer}"
             );
         }
@@ -9810,6 +9818,76 @@ mod tests {
                 room.walk.kept().face_again_names,
                 [lamp_msgs::known::person_id("walter")],
                 "{name}"
+            );
+        }
+    }
+
+    /// #5580 with #5669 (Jarvis's P1 on #5695): the spelled-name note and
+    /// the read-back read a spelled name with one reader
+    /// ([`spelled_name_in`]), so they never disagree. His seven lines and
+    /// the "Sorry, it's" / "No, it's" leads, each played as "My name is
+    /// Water." → the read-back → "No." → "Could you spell it?" → the line →
+    /// the note's own read-back → "Yes." → "No thanks.": the step ends done
+    /// with the name the note dictated, and only its ids.
+    #[test]
+    fn the_note_and_the_read_back_read_one_spelled_name() {
+        for (at, line, name) in [
+            (0, "W a l t e r.", "Walter"),
+            (1, "It's W, A, L, T, E, R.", "Walter"),
+            (2, "It's spelled W A L T E R.", "Walter"),
+            (3, "My name is Walter, W-A-L-T-E-R.", "Walter"),
+            (4, "Walter, W A L T E R.", "Walter"),
+            (5, "That's spelled W, A, L, T, E, R.", "Walter"),
+            (6, "Jane, J A Y N E.", "Jayne"),
+            (7, "Sorry, it's W A L T E R.", "Walter"),
+            (8, "No, it's W A L T E R.", "Walter"),
+        ] {
+            let note = spelled_name_note(line, false, None, || true)
+                .unwrap_or_else(|| panic!("no note: {line}"));
+            let read_back = note
+                .split_once("only this: \"")
+                .and_then(|(_, rest)| rest.split_once("\" Never"))
+                .map(|(read_back, _)| read_back.to_owned())
+                .unwrap_or_else(|| panic!("{note}"));
+            assert_eq!(
+                read_back,
+                format!("{name}, did I get that right?"),
+                "{line}"
+            );
+            let mut room = Room::new(&format!("pair-{at}"));
+            room.walk.face_kept = true;
+            assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+            assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+            room.walk.heard("My name is Water.", room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk.lamp_words("Water, did I get that right?");
+            room.walk.lamp_said(room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk.heard("No.", room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk.lamp_words("Sorry! Could you spell it?");
+            room.walk.lamp_said(room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk.heard(line, room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk.lamp_words(&read_back);
+            room.walk.lamp_said(room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk.heard("Yes.", room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk
+                .lamp_words("May I remember your face, so I know you next time?");
+            room.walk.lamp_said(room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk.heard("No thanks.", room.at);
+            report(&room.walk, "who_you_are", "done");
+            let notes = room.wait(4 * S, Some(NEAR_MIDDLE));
+            assert_eq!(notes, [skill::NAME_ONLY, PREFERENCES_NOTE], "{line}");
+            assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done), "{line}");
+            assert_eq!(
+                room.walk.kept().face_again_names,
+                [lamp_msgs::known::person_id(&name.to_lowercase())],
+                "{line}"
             );
         }
     }
