@@ -8834,3 +8834,21 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   flagged because every fake still refuses arm joints. Checkout clean.
 - Taking supplemental #5861 source/unit privacy read while the held-code
   owners prepare fixes. No product edits or device action.
+
+## 2026-11-09 — Second: Peek read and microphone generation fix
+
+- READ-OK #5861 `9e9c6260965ed29fd95899f517785e8255b9efdf`, supplemental
+  source/unit privacy read. SessionsOnly has no full-source values and
+  never acquires bus/watcher/unit/journal factories; common HTTP guard
+  remains. Dedicated-account template audit agrees. Native Peek30 pass,
+  including <=2 s ordinary file/recovery-to-SSE assertions. No Linux
+  sandbox/account/device acceptance or active-stream shutdown claim.
+- READ-OK #5839 `a40103104ac71116c104c7b92022b67d118f7062`; queued-old-
+  microphone P1 lifted. Stream turn travels through producer/sink/queue
+  to writer. Clean control199 pass serial. Adapted original actual Door/TLS
+  writer probe rejects old generation after off/on with no new ring mark;
+  positive control delivers replacement generation on same socket. Pass
+  0.35 s, original failure0.09 s (host test duration, not audio latency).
+- Probe saved as /tmp/second-5839-old-audio-fixed.{rs,patch,log}, removed
+  from clean checkout. Product mic1/mic2 decision and remaining device
+  checks separate. Camera generation counterpart not cleared by this read.
