@@ -734,3 +734,31 @@ async fn a_forget_cut_at_its_return_still_ends_the_asked_rename() {
         }
     }
 }
+
+/// Jarvis's remaining P3 on #5792, owned by the face-context boundary:
+/// the already-composed note is discarded on this turn, not only the next.
+#[tokio::test]
+async fn face_forget_context_drops_a_pending_rename_from_the_same_turn() {
+    for on in [true, false] {
+        let turns = face_forget();
+        let ran = run(&turns[..2], on).await;
+        assert_eq!(ran.forgot, 1, "on {on}");
+        assert_eq!(ran.sent, Vec::<Value>::new(), "on {on}");
+        assert_eq!(ran.asked.len(), 4, "on {on}");
+        if on {
+            assert!(
+                !marisol_in(&ran.asked[2]).is_empty(),
+                "the initial face-forget request had the cached proposal"
+            );
+        }
+        let next = ran.asked.last().unwrap();
+        assert_eq!(marisol_in(next), Vec::<String>::new(), "on {on}, same turn");
+        assert_eq!(next.last(), Some(&Message::user("Forget my face.")));
+        assert!(!serde_json::to_string(next).unwrap().contains("Tove"));
+        assert!(
+            serde_json::to_string(next)
+                .unwrap()
+                .contains("A face forget call has run")
+        );
+    }
+}
