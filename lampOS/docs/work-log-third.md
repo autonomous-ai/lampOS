@@ -1,3 +1,30 @@
+## 2026-11-09 — assigned send-after-echo privacy read
+
+Ready for lamp-voice: #5803 remains NEXT TRAIN; the separate adapter's
+broad local gate continues. No adapter readiness claim.
+
+- Completed PM-assigned second privacy read of #5851 at `a9a225a50d`:
+  [READ-OK with P3](https://github.com/autonomous-ai/lampOS/pull/5851#issuecomment-6738440529).
+  Traced request-aware counting before transcript emission and echo
+  classification, worker/thread boundaries and both coordinator Start
+  producers. Original uncounted-echo P2 is fixed; no new production P1/P2.
+- Independent extracted-function Rust probe: one passing uncounted-echo
+  case, one failing duplicate-after-eviction case. The two independent
+  eight-ID FIFOs can admit repeat echo credit after different evictions.
+  The single notification producer does not establish that pattern as
+  reachable; reported as P3 hardening, not a demonstrated unsafe send.
+  Reduced Pending harness only, no Cargo/Engine test claimed for this read.
+- Second's previous HOLD requires its own restatement or explicit PM lift.
+  Native CI and real service/lamp acceptance were not performed by Third.
+- Routed a separate source-only face-forget context gap to PM in Queue
+  comment 6738256795. Existing Engine messages and remaining batch survive
+  that path; current docs acknowledge it. Proposed an entire-next-request
+  canary regression, ordinary and held, coordinated with Fourth. No new
+  assignment or implementation yet; adapter reporting scope stays narrow.
+- Read all Queue updates through 6738387280 (11:01 UTC). #5852's old
+  combined SDK train remains held; standalone #5830's fix is separately
+  approved. No new #5803 feedback in that interval. No device access.
+
 ## 2026-11-09 — cleanup carry ready; adapter verification continues
 
 Ready for lamp-voice: yes for #5803 at `7fc6ca20e`; no for the separate
