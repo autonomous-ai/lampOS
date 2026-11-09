@@ -162,6 +162,7 @@ pub async fn send_on(client: &reqwest::Client, call: Call) -> Result<Reply, Stri
         Method::Get => reqwest::Method::GET,
         Method::Post => reqwest::Method::POST,
         Method::Patch => reqwest::Method::PATCH,
+        Method::Put => reqwest::Method::PUT,
     };
     let mut request = client.request(method, &call.url);
     for (name, value) in &call.headers {

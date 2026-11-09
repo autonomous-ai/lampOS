@@ -86,13 +86,19 @@ fn main() -> ExitCode {
     // Spotify (#5460): linked and read only with its own switch, renewed
     // at Spotify itself.
     let spotify_on = on(std::env::var(spotify::ENVIRONMENT).ok().as_deref());
-    if spotify_on {
+    // Its playback (#5460): only with Spotify on too, by the owner's voice.
+    let playback_on =
+        spotify_on && on(std::env::var(spotify::PLAYBACK_ENVIRONMENT).ok().as_deref());
+    if playback_on {
+        say("Spotify on: what is playing, read by voice; playback by voice");
+    } else if spotify_on {
         say("Spotify on: what is playing, read by voice; no playback control");
     }
     let services = Arc::new(
         serve::Services::new(store::Store(store), Https, Gmail, backend, write_on)
             .with_skill_reads(skill_reads)
-            .with_spotify(spotify_on),
+            .with_spotify(spotify_on)
+            .with_playback(playback_on),
     );
     let tools_dir = run.join("tools");
     let opened = (|| -> io::Result<(UnixListener, UnixListener)> {
@@ -100,7 +106,7 @@ fn main() -> ExitCode {
         fs::set_permissions(&tools_dir, fs::Permissions::from_mode(0o755))?;
         let admin = bind(&run.join("admin.sock"))?;
         let calls = bind(&tools_dir.join(tools::CALL_SOCKET))?;
-        tools::write(&tools_dir, spotify_on)?;
+        tools::write(&tools_dir, spotify_on, playback_on)?;
         Ok((admin, calls))
     })();
     let (admin, calls) = match opened {

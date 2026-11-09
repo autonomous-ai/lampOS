@@ -18,9 +18,14 @@
 //! the link expired and is said as "link it again in the app"; at `set` it
 //! is a `failure` with the code [`Refusal::code`].
 //!
-//! Playback control is not built: the `user-modify-playback-state` scope a
-//! link may hold is never used, and `service_write` for Spotify is refused.
-//! It is reserved for `LAMP_SERVICES_PLAYBACK`, which nothing reads yet.
+//! Playback (#5460, "playback without a read-back"), behind a second
+//! switch, `LAMP_SERVICES_PLAYBACK`, off unless `on` and only with
+//! `LAMP_SERVICES_SPOTIFY=on` too: the owner's voice's `service_play` plays
+//! a search result, pauses, resumes or skips on the person's active Spotify
+//! device, at once, with no read-back (it is playback, not a send). It needs
+//! the `user-modify-playback-state` scope among the link's; without it the
+//! person is told to link Spotify again in the app. `service_write` for
+//! Spotify is always refused.
 use crate::catalog::Method;
 use crate::net::{self, Call, Http, Reply};
 use crate::store::{Entry, Store};
@@ -36,14 +41,29 @@ pub const NAME: &str = "Spotify";
 pub const ENVIRONMENT: &str = "LAMP_SERVICES_SPOTIFY";
 /// Spotify's accounts host: the token route, and nothing else on it.
 pub const ACCOUNTS_HOST: &str = "accounts.spotify.com";
-/// Spotify's Web API host: the one read.
+/// Spotify's Web API host: the one read, and playback's few routes.
 pub const API_HOST: &str = "api.spotify.com";
+/// The switch for playback, read by `lamp-services`: off unless `on`, and
+/// only with [`ENVIRONMENT`] on too.
+pub const PLAYBACK_ENVIRONMENT: &str = "LAMP_SERVICES_PLAYBACK";
 /// The token route, on [`ACCOUNTS_HOST`].
 pub const TOKEN_PATH: &str = "/api/token";
 /// The one read, on [`API_HOST`].
 pub const NOW_PLAYING_PATH: &str = "/v1/me/player/currently-playing";
-/// The scopes the app asks for. The modify scope is for playback, which is
-/// not built ([`ENVIRONMENT`]'s doc).
+/// Playback's search, on [`API_HOST`]: a spoken name to one item.
+pub const SEARCH_PATH: &str = "/v1/search";
+/// Playback's play and resume (`PUT`), on [`API_HOST`].
+pub const PLAY_PATH: &str = "/v1/me/player/play";
+/// Playback's pause (`PUT`), on [`API_HOST`].
+pub const PAUSE_PATH: &str = "/v1/me/player/pause";
+/// Playback's next (`POST`), on [`API_HOST`].
+pub const NEXT_PATH: &str = "/v1/me/player/next";
+/// Playback's previous (`POST`), on [`API_HOST`].
+pub const PREVIOUS_PATH: &str = "/v1/me/player/previous";
+/// The scope playback needs among the link's.
+pub const MODIFY_SCOPE: &str = "user-modify-playback-state";
+/// The scopes the app asks for. The modify scope is for playback
+/// ([`PLAYBACK_ENVIRONMENT`]).
 pub const SCOPES: [&str; 3] = [
     "user-read-playback-state",
     "user-read-currently-playing",
@@ -64,9 +84,27 @@ pub const OFF: &str = "Spotify is off on this lamp";
 pub const RELINK: &str = "Spotify refused the lamp's link: link it again in the app";
 /// What a renewal that could not be made is said as.
 pub const UNREACHED: &str = "Spotify couldn't be reached: try again in a while";
-/// What a Spotify write is told: the lamp only reads what is playing.
+/// What a Spotify write is told, and `service_play`, while playback is
+/// off: the lamp only reads what is playing.
 pub const NO_PLAYBACK: &str =
     "The lamp doesn't control Spotify's playback: it only reads what is playing";
+/// What a Spotify write is told while playback is on: it is never a write.
+pub const PLAY_NOT_WRITE: &str =
+    "Spotify isn't written to: play, pause or skip it with service_play";
+/// What playback is told when the link lacks [`MODIFY_SCOPE`].
+pub const NO_PLAY_SCOPE: &str =
+    "Spotify's link doesn't allow playing: link Spotify again in the app to allow playback";
+/// What playback is told when Spotify has no active device (404).
+pub const NO_DEVICE: &str =
+    "Nothing is open to play on: open Spotify on your phone or speaker first";
+/// What playback is told when the account isn't Premium (403).
+pub const PREMIUM: &str = "Playing from the lamp needs Spotify Premium";
+/// Playback's actions, for the tool's description and a wrong one.
+pub const ACTIONS: [&str; 5] = ["play", "pause", "resume", "next", "previous"];
+/// What a play may search for (`kind`), a track unless said.
+pub const KINDS: [&str; 4] = ["track", "artist", "album", "playlist"];
+/// The longest spoken name searched for, in bytes.
+pub const QUERY_MOST: usize = 200;
 /// What Spotify reads, for the tools' description and a wrong `what`.
 pub const WHATS: &str = "now_playing";
 /// The one item of a read with nothing playing.
@@ -101,14 +139,42 @@ impl Refusal {
     }
 }
 
+/// Why playback, or the access token it needs, did not happen: the words
+/// said and a code the tools socket gives beside them (`code`), never with
+/// what Spotify answered.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Refused {
+    pub words: String,
+    pub code: &'static str,
+}
+
+impl Refused {
+    fn new(words: impl Into<String>, code: &'static str) -> Self {
+        Self {
+            words: words.into(),
+            code,
+        }
+    }
+}
+
+impl From<Refusal> for Refused {
+    fn from(refusal: Refusal) -> Self {
+        Self::new(refusal.words(), refusal.code())
+    }
+}
+
 /// Whether `call` may go to Spotify: https, exactly one of its two hosts,
-/// no user, port or fragment, and only the token route or the one read.
+/// no user, port or fragment, and only the token route, the one read and
+/// playback's search, play, pause, next and previous, each by its method.
 pub fn guard(call: &Call) -> Result<(), String> {
     let (host, path) = net::split(&call.url)?;
     let host = host.to_ascii_lowercase();
     let allowed = matches!(
         (call.method, host.as_str(), path.as_str()),
-        (Method::Post, ACCOUNTS_HOST, TOKEN_PATH) | (Method::Get, API_HOST, NOW_PLAYING_PATH)
+        (Method::Post, ACCOUNTS_HOST, TOKEN_PATH)
+            | (Method::Get, API_HOST, NOW_PLAYING_PATH | SEARCH_PATH)
+            | (Method::Put, API_HOST, PLAY_PATH | PAUSE_PATH)
+            | (Method::Post, API_HOST, NEXT_PATH | PREVIOUS_PATH)
     );
     if allowed {
         Ok(())
@@ -345,14 +411,12 @@ impl Spotify {
         http: &H,
         store: &Store,
         now: i64,
-    ) -> Result<(String, Entry), String> {
+    ) -> Result<(String, Entry), Refused> {
         let mut held = self.held.lock().await;
-        let mut entry = store
-            .load(CODE)
-            .ok_or_else(|| format!("{NAME} {}", crate::serve::NOT_LINKED))?;
+        let mut entry = store.load(CODE).ok_or_else(not_linked)?;
         if entry.expired(now) {
             *held = None;
-            return Err(RELINK.into());
+            return Err(Refusal::Relink.into());
         }
         if held
             .as_ref()
@@ -378,11 +442,11 @@ impl Spotify {
                     eprintln!("lamp-services: spotify's refused link not marked");
                 }
                 eprintln!("lamp-services: spotify's link not renewed: Spotify refused it");
-                return Err(RELINK.into());
+                return Err(Refusal::Relink.into());
             }
             Err(Refusal::Unreached) => {
                 eprintln!("lamp-services: spotify's link not renewed: not reached");
-                return Err(UNREACHED.into());
+                return Err(Refusal::Unreached.into());
             }
         };
         let latest = fresh.refresh_token.unwrap_or(refresh_token);
@@ -421,7 +485,10 @@ impl Spotify {
             return Err(format!("{CODE} reads: {WHATS}"));
         }
         let read = async {
-            let (access, entry) = self.access(http, store, crate::now_secs()).await?;
+            let (access, entry) = self
+                .access(http, store, crate::now_secs())
+                .await
+                .map_err(|refused| refused.words)?;
             let call = Call {
                 method: Method::Get,
                 url: format!("https://{API_HOST}{NOW_PLAYING_PATH}?additional_types=track,episode"),
@@ -459,6 +526,315 @@ impl Spotify {
             .await
             .map_err(|_| format!("{NAME} didn't answer in time"))?
     }
+
+    /// `service_play` of Spotify, behind [`PLAYBACK_ENVIRONMENT`] (the
+    /// switches are the caller's to check): `action` one of [`ACTIONS`] on
+    /// the person's active device, at once and with no read-back, within
+    /// [`WITHIN`]. A play searches `query` as `kind` (a track unless said)
+    /// and plays the first item found; a play with no `query` resumes. A
+    /// link without [`MODIFY_SCOPE`] is refused before Spotify is asked
+    /// anything. The item played is quoted as a read's is.
+    pub async fn play<H: Http>(
+        &self,
+        http: &H,
+        store: &Store,
+        args: &Value,
+    ) -> Result<Value, Refused> {
+        let asked = asked(args)?;
+        let entry = store.load(CODE).ok_or_else(not_linked)?;
+        if !entry.scopes.iter().any(|scope| scope == MODIFY_SCOPE) {
+            return Err(Refused::new(NO_PLAY_SCOPE, "relink"));
+        }
+        let play = async {
+            let (access, entry) = self.access(http, store, crate::now_secs()).await?;
+            let unreached = |_| Refused::new(UNREACHED, "unreached");
+            let (call, shown) = match &asked {
+                Asked::Play { query, kind } => {
+                    let reply = send(http, search_call(&access, query, kind))
+                        .await
+                        .map_err(unreached)?;
+                    self.player_answer(&reply, false).await?;
+                    let text = String::from_utf8_lossy(&reply.body);
+                    let text = net::scrub(&net::scrub(&text, &access), &entry.api_key);
+                    let Some(found) = found(&text, kind) else {
+                        return Err(Refused::new(
+                            format!("{NAME} found nothing called \"{query}\""),
+                            "not_found",
+                        ));
+                    };
+                    (play_call(&access, kind, &found.uri), Some(found.shown))
+                }
+                Asked::Pause => (player_call(Method::Put, PAUSE_PATH, &access), None),
+                Asked::Resume => (player_call(Method::Put, PLAY_PATH, &access), None),
+                Asked::Next => (player_call(Method::Post, NEXT_PATH, &access), None),
+                Asked::Previous => (player_call(Method::Post, PREVIOUS_PATH, &access), None),
+            };
+            let reply = send(http, call).await.map_err(unreached)?;
+            self.player_answer(&reply, true).await?;
+            let mut done = match shown {
+                Some(shown) => crate::reads::quoted(NAME, vec![shown]),
+                None => json!({}),
+            };
+            done["done"] = json!(asked.done());
+            Ok(done)
+        };
+        tokio::time::timeout(WITHIN, play)
+            .await
+            .map_err(|_| Refused::new(format!("{NAME} didn't answer in time"), "unreached"))?
+    }
+
+    /// Spotify's answer to a search or a player call, as said: 2xx is done;
+    /// 401 forgets the held token (the next call renews); 403 is Premium
+    /// needed, a scope missing, or refused; 404 on a player call is no
+    /// active device; 429 busy.
+    async fn player_answer(&self, reply: &Reply, player: bool) -> Result<(), Refused> {
+        let error: SpotifyError = serde_json::from_slice(&reply.body).unwrap_or_default();
+        match reply.status {
+            200..=204 => Ok(()),
+            401 => {
+                *self.held.lock().await = None;
+                Err(Refused::new(
+                    format!("{NAME} refused the lamp's link: it may need linking again in the app"),
+                    "relink",
+                ))
+            }
+            403 if error.error.reason == "PREMIUM_REQUIRED" => {
+                Err(Refused::new(PREMIUM, "premium"))
+            }
+            403 if error.error.message.to_ascii_lowercase().contains("scope") => {
+                Err(Refused::new(NO_PLAY_SCOPE, "relink"))
+            }
+            403 => Err(Refused::new(
+                format!("{NAME} wouldn't do that just now"),
+                "refused",
+            )),
+            404 if player => Err(Refused::new(NO_DEVICE, "no_device")),
+            429 => Err(Refused::new(
+                format!("{NAME} is busy: try again in a while"),
+                "busy",
+            )),
+            _ => Err(Refused::new(
+                format!("{NAME} answered with an error"),
+                "error",
+            )),
+        }
+    }
+}
+
+/// What the voice's model is told when Spotify isn't linked.
+fn not_linked() -> Refused {
+    Refused::new(format!("{NAME} {}", crate::serve::NOT_LINKED), "not_linked")
+}
+
+/// Spotify's Web API error answer: only its reason and message are read,
+/// and neither is said.
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct SpotifyError {
+    error: SpotifyErrorBody,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct SpotifyErrorBody {
+    message: String,
+    reason: String,
+}
+
+/// One playback action, as asked.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Asked {
+    Play { query: String, kind: &'static str },
+    Pause,
+    Resume,
+    Next,
+    Previous,
+}
+
+impl Asked {
+    /// What the answer's `done` says was done.
+    fn done(&self) -> &'static str {
+        match self {
+            Self::Play { .. } => "playing",
+            Self::Pause => "paused",
+            Self::Resume => "resumed",
+            Self::Next => "next",
+            Self::Previous => "previous",
+        }
+    }
+}
+
+/// `service_play`'s arguments read: `action`, and for a play `query` and
+/// `kind`. A play with no query resumes.
+fn asked(args: &Value) -> Result<Asked, Refused> {
+    let text = |key: &str| {
+        args.get(key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .unwrap_or_default()
+    };
+    let wrong = || {
+        Refused::new(
+            format!(
+                "{CODE} plays: {} (play takes query and kind: {})",
+                ACTIONS.join(", "),
+                KINDS.join(", ")
+            ),
+            "invalid",
+        )
+    };
+    Ok(match text("action") {
+        "play" => {
+            let query = text("query");
+            if query.is_empty() {
+                return Ok(Asked::Resume);
+            }
+            if query.len() > QUERY_MOST || query.chars().any(char::is_control) {
+                return Err(Refused::new(
+                    "Say a shorter name of what to play",
+                    "invalid",
+                ));
+            }
+            let kind = match text("kind") {
+                "" => "track",
+                kind => KINDS
+                    .iter()
+                    .copied()
+                    .find(|known| *known == kind)
+                    .ok_or_else(wrong)?,
+            };
+            Asked::Play {
+                query: query.to_owned(),
+                kind,
+            }
+        }
+        "pause" => Asked::Pause,
+        "resume" => Asked::Resume,
+        "next" => Asked::Next,
+        "previous" => Asked::Previous,
+        _ => return Err(wrong()),
+    })
+}
+
+/// The headers of a Web API call with `access` as the bearer.
+fn api_headers(access: &str) -> Vec<(String, String)> {
+    vec![
+        ("accept".into(), "application/json".into()),
+        ("user-agent".into(), "lampOS-services".into()),
+        ("authorization".into(), format!("Bearer {access}")),
+    ]
+}
+
+/// The search for `query` as `kind`: a few items, playable for the
+/// person's own market.
+fn search_call(access: &str, query: &str, kind: &str) -> Call {
+    let query = form(&[
+        ("q", query),
+        ("type", kind),
+        ("limit", "5"),
+        ("market", "from_token"),
+    ]);
+    Call {
+        method: Method::Get,
+        url: format!("https://{API_HOST}{SEARCH_PATH}?{query}"),
+        headers: api_headers(access),
+        body: None,
+    }
+}
+
+/// A player call with an empty body, said as `Content-Length: 0`: Spotify
+/// answers a `PUT` or `POST` without one 411, and the client sends none
+/// for an empty body.
+fn player_call(method: Method, path: &str, access: &str) -> Call {
+    let mut headers = api_headers(access);
+    headers.push(("content-length".into(), "0".into()));
+    Call {
+        method,
+        url: format!("https://{API_HOST}{path}"),
+        headers,
+        body: None,
+    }
+}
+
+/// Playing `uri`: a track by its URI, an artist, album or playlist as the
+/// context.
+fn play_call(access: &str, kind: &str, uri: &str) -> Call {
+    let body = if kind == "track" {
+        json!({ "uris": [uri] })
+    } else {
+        json!({ "context_uri": uri })
+    };
+    let mut headers = api_headers(access);
+    headers.push(("content-type".into(), "application/json".into()));
+    Call {
+        method: Method::Put,
+        url: format!("https://{API_HOST}{PLAY_PATH}"),
+        headers,
+        body: Some(body.to_string().into_bytes()),
+    }
+}
+
+/// The item a search found: its URI and what is said of it.
+struct Found {
+    uri: String,
+    shown: Value,
+}
+
+/// A Spotify URI of `kind`: `spotify:<kind>:` and an id of letters and
+/// digits.
+fn uri_ok(uri: &str, kind: &str) -> bool {
+    uri.strip_prefix("spotify:")
+        .and_then(|rest| rest.strip_prefix(kind))
+        .and_then(|rest| rest.strip_prefix(':'))
+        .is_some_and(|id| {
+            !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric())
+        })
+}
+
+/// The first item of `kind` in a search's answer with a good URI, made
+/// small: its type, title, and artists, or a playlist's owner. Nothing
+/// else of Spotify's answer is kept.
+fn found(body: &str, kind: &str) -> Option<Found> {
+    let answer: Value = serde_json::from_str(body).ok()?;
+    let text = |value: &Value, key: &str| {
+        value
+            .get(key)
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .filter(|text| !text.is_empty())
+    };
+    let item = answer
+        .get(format!("{kind}s"))?
+        .get("items")?
+        .as_array()?
+        .iter()
+        .find(|item| text(item, "uri").is_some_and(|uri| uri_ok(&uri, kind)))?;
+    let mut shown = serde_json::Map::new();
+    shown.insert("type".into(), json!(kind));
+    if let Some(title) = text(item, "name") {
+        shown.insert("title".into(), json!(title));
+    }
+    let artists: Vec<String> = item
+        .get("artists")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|artist| text(artist, "name"))
+        .take(5)
+        .collect();
+    if !artists.is_empty() {
+        shown.insert("artists".into(), json!(artists.join(", ")));
+    }
+    if let Some(owner) = item
+        .get("owner")
+        .and_then(|owner| text(owner, "display_name"))
+    {
+        shown.insert("by".into(), json!(owner));
+    }
+    Some(Found {
+        uri: text(item, "uri")?,
+        shown: Value::Object(shown),
+    })
 }
 
 /// One renewal: the call, guarded, and its answer read.
@@ -720,14 +1096,37 @@ mod tests {
             ),
             (Method::Get, "https://api.spotify.com/v1/me/player"),
             (Method::Patch, "https://api.spotify.com/v1/me/player/play"),
-            (Method::Post, "https://api.spotify.com/v1/me/player/next"),
+            (Method::Post, "https://api.spotify.com/v1/me/player/play"),
+            (Method::Put, "https://api.spotify.com/v1/me/player/next"),
+            (Method::Get, "https://api.spotify.com/v1/me/player/pause"),
+            (Method::Put, "https://api.spotify.com/v1/me/player/volume"),
+            (Method::Post, "https://api.spotify.com/v1/me/player/queue"),
+            (Method::Put, "https://api.spotify.com/v1/me/player"),
+            (Method::Post, "https://api.spotify.com/v1/search"),
+            (Method::Get, "https://evil.test/v1/search?q=x"),
             (
                 Method::Get,
                 "https://api.spotify.com/v1/me/player/currently-playing#x",
             ),
         ] {
             let refused = run(send(&Local(fake.port), call(method, url)));
-            assert!(refused.is_err(), "{url}");
+            assert!(refused.is_err(), "{method:?} {url}");
+        }
+        // Playback's routes, each by its own method alone.
+        for (method, url) in [
+            (
+                Method::Get,
+                "https://api.spotify.com/v1/search?q=x&type=track",
+            ),
+            (Method::Put, "https://api.spotify.com/v1/me/player/play"),
+            (Method::Put, "https://api.spotify.com/v1/me/player/pause"),
+            (Method::Post, "https://api.spotify.com/v1/me/player/next"),
+            (
+                Method::Post,
+                "https://api.spotify.com/v1/me/player/previous",
+            ),
+        ] {
+            assert!(guard(&call(method, url)).is_ok(), "{url}");
         }
         // Nothing reached the server.
         assert!(fake.seen().is_empty());
@@ -949,5 +1348,246 @@ mod tests {
             now_playing(r#"{"is_playing":true,"item":null,"currently_playing_type":"ad"}"#),
             json!(NOTHING_PLAYING)
         );
+    }
+
+    const TOKEN: &str =
+        r#"{"access_token":"acc-planted-1","token_type":"Bearer","expires_in":3600}"#;
+    const TRACKS: &str = r#"{"tracks":{"items":[{"name":"Clair de Lune","uri":"spotify:track:4u7EnebtmKWzUH433cf5Qv","artists":[{"name":"Debussy"}],"album":{"name":"Suite"},"id":"4u7"}]}}"#;
+    /// Spotify's search may give a playlist as null: the first good one is
+    /// taken.
+    const PLAYLISTS: &str = r#"{"playlists":{"items":[null,{"name":"Focus","uri":"spotify:playlist:37i9dQZF1DX","owner":{"display_name":"Spotify"}}]}}"#;
+
+    fn stored(dir: &std::path::Path, scopes: &str) -> Store {
+        let store = Store(dir.join("s"));
+        let data = json!({
+            "connector": "spotify",
+            "auth_type": "pat",
+            "api_key": "rt-planted-1",
+            "credentials": {"client_id": "0123456789abcdef0123456789abcdef", "scopes": scopes}
+        });
+        store
+            .keep(&Entry::from_set(CODE, &data, 100).unwrap())
+            .unwrap();
+        store
+    }
+
+    const ALL_SCOPES: &str =
+        "user-read-playback-state user-read-currently-playing user-modify-playback-state";
+
+    /// A play searches the spoken name and plays the first item on the
+    /// active device (a track by its URI, a playlist as the context); pause,
+    /// resume, next and previous are one call each, the access token held.
+    #[test]
+    fn playback_plays_a_search_result_and_pauses_resumes_and_skips() {
+        let done = || answer("204 No Content", "", "");
+        let fake = FakeSpotify::start(vec![
+            answer("200 OK", TOKEN, ""),
+            answer("200 OK", TRACKS, ""),
+            done(),
+            answer("200 OK", PLAYLISTS, ""),
+            answer("202 Accepted", "", ""),
+            done(),
+            done(),
+            done(),
+            done(),
+            done(),
+        ]);
+        let http = Local(fake.port);
+        let dir = tempfile::tempdir().unwrap();
+        let store = stored(dir.path(), ALL_SCOPES);
+        let spotify = Spotify::default();
+        let played = run(spotify.play(
+            &http,
+            &store,
+            &json!({"action": "play", "query": "clair de lune"}),
+        ))
+        .unwrap();
+        assert_eq!(played["done"], "playing");
+        assert_eq!(played["source"], "Spotify");
+        assert_eq!(
+            played["quoted"][0],
+            json!({"type": "track", "title": "Clair de Lune", "artists": "Debussy"})
+        );
+        let seen = fake.seen();
+        assert_eq!(seen[0].line, "POST /api/token HTTP/1.1");
+        assert!(
+            seen[1].line.starts_with(
+                "GET /v1/search?q=clair+de+lune&type=track&limit=5&market=from_token "
+            ),
+            "{}",
+            seen[1].line
+        );
+        assert!(
+            seen[1]
+                .headers
+                .contains("authorization: bearer acc-planted-1")
+        );
+        assert_eq!(seen[2].line, "PUT /v1/me/player/play HTTP/1.1");
+        assert_eq!(
+            serde_json::from_str::<Value>(&seen[2].body).unwrap(),
+            json!({"uris": ["spotify:track:4u7EnebtmKWzUH433cf5Qv"]})
+        );
+        assert!(
+            seen[2]
+                .headers
+                .contains("authorization: bearer acc-planted-1")
+        );
+        // A playlist, by name: its context, the null item passed over.
+        let played = run(spotify.play(
+            &http,
+            &store,
+            &json!({"action": "play", "query": "focus", "kind": "playlist"}),
+        ))
+        .unwrap();
+        assert_eq!(
+            played["quoted"][0],
+            json!({"type": "playlist", "title": "Focus", "by": "Spotify"})
+        );
+        let seen = fake.seen();
+        assert!(seen[3].line.contains("type=playlist"));
+        assert_eq!(
+            serde_json::from_str::<Value>(&seen[4].body).unwrap(),
+            json!({"context_uri": "spotify:playlist:37i9dQZF1DX"})
+        );
+        // Pause, resume (and a play with nothing named), next, previous.
+        for (action, line, said) in [
+            ("pause", "PUT /v1/me/player/pause HTTP/1.1", "paused"),
+            ("resume", "PUT /v1/me/player/play HTTP/1.1", "resumed"),
+            ("play", "PUT /v1/me/player/play HTTP/1.1", "resumed"),
+            ("next", "POST /v1/me/player/next HTTP/1.1", "next"),
+            (
+                "previous",
+                "POST /v1/me/player/previous HTTP/1.1",
+                "previous",
+            ),
+        ] {
+            let done = run(spotify.play(&http, &store, &json!({"action": action}))).unwrap();
+            assert_eq!(done, json!({"done": said}), "{action}");
+            let last = fake.seen().last().unwrap().clone();
+            assert_eq!(last.line, line, "{action}");
+            assert!(last.headers.contains("content-length: 0"), "{action}");
+            assert!(last.body.is_empty(), "{action}");
+        }
+        // One renewal for all of it, and no token ever kept or said.
+        assert_eq!(fake.seen().len(), 10);
+        let file = std::fs::read_to_string(store.0.join("spotify.json")).unwrap();
+        assert!(!file.contains("acc-planted"));
+    }
+
+    /// Spotify's refusals said plainly, with their codes: no active device
+    /// (404), Premium needed (403), the access token refused (401, then
+    /// renewed), and nothing found.
+    #[test]
+    fn playback_says_no_device_premium_relink_and_nothing_found() {
+        let fake = FakeSpotify::start(vec![
+            answer("200 OK", TOKEN, ""),
+            answer(
+                "404 Not Found",
+                r#"{"error":{"status":404,"message":"Player command failed: No active device found","reason":"NO_ACTIVE_DEVICE"}}"#,
+                "",
+            ),
+            answer(
+                "403 Forbidden",
+                r#"{"error":{"status":403,"message":"Player command failed: Premium required","reason":"PREMIUM_REQUIRED"}}"#,
+                "",
+            ),
+            answer(
+                "401 Unauthorized",
+                r#"{"error":{"status":401,"message":"The access token expired"}}"#,
+                "",
+            ),
+            answer(
+                "200 OK",
+                r#"{"access_token":"acc-planted-2","token_type":"Bearer","expires_in":3600}"#,
+                "",
+            ),
+            answer("200 OK", r#"{"tracks":{"items":[]}}"#, ""),
+            answer(
+                "200 OK",
+                r#"{"artists":{"items":[{"name":"X","uri":"https://evil.test/x"}]}}"#,
+                "",
+            ),
+            answer(
+                "403 Forbidden",
+                r#"{"error":{"status":403,"message":"Insufficient client scope"}}"#,
+                "",
+            ),
+            answer("429 Too Many Requests", "", ""),
+        ]);
+        let http = Local(fake.port);
+        let dir = tempfile::tempdir().unwrap();
+        let store = stored(dir.path(), ALL_SCOPES);
+        let spotify = Spotify::default();
+        let refused = |args: Value| run(spotify.play(&http, &store, &args)).unwrap_err();
+        assert_eq!(
+            refused(json!({"action": "pause"})),
+            Refused::new(NO_DEVICE, "no_device")
+        );
+        assert!(NO_DEVICE.contains("open Spotify on your phone or speaker first"));
+        assert_eq!(
+            refused(json!({"action": "next"})),
+            Refused::new(PREMIUM, "premium")
+        );
+        let expired = refused(json!({"action": "resume"}));
+        assert_eq!(expired.code, "relink");
+        // The held token was forgotten: the next call renews.
+        let nothing = refused(json!({"action": "play", "query": "zzqx"}));
+        assert_eq!(
+            nothing,
+            Refused::new("Spotify found nothing called \"zzqx\"", "not_found")
+        );
+        let seen = fake.seen();
+        assert_eq!(seen[4].line, "POST /api/token HTTP/1.1");
+        assert!(
+            seen[5]
+                .headers
+                .contains("authorization: bearer acc-planted-2")
+        );
+        // An item whose URI isn't Spotify's is never played.
+        let odd = refused(json!({"action": "play", "query": "x", "kind": "artist"}));
+        assert_eq!(odd.code, "not_found");
+        assert_eq!(fake.seen().len(), 7);
+        assert_eq!(
+            refused(json!({"action": "previous"})),
+            Refused::new(NO_PLAY_SCOPE, "relink")
+        );
+        assert_eq!(refused(json!({"action": "pause"})).code, "busy");
+        assert_eq!(fake.seen().len(), 9);
+        // No answer's words are ever said, nor a token.
+        for words in [expired.words, odd.words] {
+            assert!(!words.contains("expired") && !words.contains("planted"));
+        }
+    }
+
+    /// A link without the modify scope, a wrong action or kind, and no
+    /// link at all: refused before Spotify is asked anything.
+    #[test]
+    fn playback_without_its_scope_or_a_good_ask_calls_nothing() {
+        let fake = FakeSpotify::start(vec![]);
+        let http = Local(fake.port);
+        let dir = tempfile::tempdir().unwrap();
+        let spotify = Spotify::default();
+        let unlinked = Store(dir.path().join("none"));
+        let none = run(spotify.play(&http, &unlinked, &json!({"action": "pause"}))).unwrap_err();
+        assert_eq!(none.code, "not_linked");
+        assert!(none.words.contains("Connectors"));
+        let store = stored(
+            dir.path(),
+            "user-read-playback-state user-read-currently-playing",
+        );
+        let scope = run(spotify.play(&http, &store, &json!({"action": "pause"}))).unwrap_err();
+        assert_eq!(scope, Refused::new(NO_PLAY_SCOPE, "relink"));
+        assert!(NO_PLAY_SCOPE.contains("link Spotify again in the app"));
+        for args in [
+            json!({"action": "volume", "level": 100}),
+            json!({}),
+            json!({"action": "play", "query": "x", "kind": "episode"}),
+            json!({"action": "play", "query": "x".repeat(QUERY_MOST + 1)}),
+            json!({"action": "play", "query": "a\nb"}),
+        ] {
+            let refused = run(spotify.play(&http, &store, &args)).unwrap_err();
+            assert_eq!(refused.code, "invalid", "{args}");
+        }
+        assert!(fake.seen().is_empty());
     }
 }

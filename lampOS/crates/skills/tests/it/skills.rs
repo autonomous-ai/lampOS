@@ -541,6 +541,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "look-for-things",
             "meal-check",
             "quiet-focus",
+            "spotify",
             "who-was-here"
         ]
     );

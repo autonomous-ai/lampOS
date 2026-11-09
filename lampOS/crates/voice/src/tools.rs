@@ -818,10 +818,15 @@ pub fn skill_tools(settings: &Settings) -> Vec<Tool> {
 fn skills_after(settings: &Settings, told: &[Tool]) -> Vec<Tool> {
     // The skills' after the executive's: a name already told stays its, and
     // a name the skills' own folder gives is its ([`skills_folders`]).
+    // The `spotify` skill's function gives way to Spotify's playback when
+    // that is declared (#5791): one function for one ask.
+    let playing = told.iter().any(|tool| tool.name == crate::services::PLAY);
+    let gives_way = |name: &str| playing && name == crate::services::PLAY_SKILL;
     let mut skills: Vec<Tool> = Vec::new();
     for folder in skills_folders(settings) {
         for tool in catalog(&folder.join(CATALOG_FILE)) {
-            if !voices_own(&tool.name)
+            if !gives_way(&tool.name)
+                && !voices_own(&tool.name)
                 && !is_schedule_tool(&tool.name)
                 && !told.iter().any(|earlier| earlier.name == tool.name)
                 && !skills.iter().any(|earlier| earlier.name == tool.name)
@@ -885,7 +890,20 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     // The connected services' functions, before the executive's: never the
     // ones the executive or a skill names (`voices_own`).
     if let Some(folder) = &settings.services {
-        tools.extend(crate::services::tools(folder));
+        // Spotify's playback only with the installable `spotify` skill on
+        // (#5791): the person puts it on, never the product.
+        let play_skill = || {
+            skills_folders(settings).iter().any(|skills| {
+                catalog(&skills.join(CATALOG_FILE))
+                    .iter()
+                    .any(|tool| tool.name == crate::services::PLAY_SKILL)
+            })
+        };
+        tools.extend(
+            crate::services::tools(folder)
+                .into_iter()
+                .filter(|tool| tool.name != crate::services::PLAY || play_skill()),
+        );
     }
     if let Some(directory) = &settings.exec {
         let room = bound.saturating_sub(tools.len());
@@ -6552,15 +6570,73 @@ mod tests {
             assert_eq!(route(&off, name), Route::Nobody, "{name}");
         }
         assert!(crate::services::arguments(None).is_empty());
-        // On: the flag and its folder, the three declared with the rule,
+        // On: the flag and its folder, the four declared with the rule,
         // routed there; nothing else of the folder's.
         let flags = vec![crate::services::FLAG.to_owned(), folder.clone()];
         let (on, rest) = take(&flags).unwrap();
         assert!(rest.is_empty());
         assert_eq!(on.services, Some(dir.clone()));
+        // Spotify's playback only with the installable `spotify` skill on
+        // (#5791), and then in that skill's place.
+        let named = |settings: &Settings| -> Vec<String> {
+            declared(settings)
+                .into_iter()
+                .map(|tool| tool.name)
+                .collect()
+        };
+        assert_eq!(named(&on), &crate::services::NAMES[..3]);
+        let skills = schedule_directory("services-spotify-skill");
+        std::fs::write(
+            skills.join(CATALOG_FILE),
+            json!({"tools":[
+                {"name":crate::services::PLAY_SKILL,"description":"Spotify, the skill."},
+                {"name":"light_scene","description":"A scene."},
+            ]})
+            .to_string(),
+        )
+        .unwrap();
+        let with_skill = Settings {
+            skills: Some(skills.clone()),
+            ..on.clone()
+        };
+        assert_eq!(
+            named(&with_skill),
+            [
+                crate::services::CONNECTED,
+                crate::services::READ,
+                crate::services::WRITE,
+                crate::services::PLAY,
+                "light_scene"
+            ]
+        );
+        // With no playback named by lamp-services, the skill's own function.
+        let no_playback = schedule_directory("services-no-playback");
+        let three: Vec<Value> = crate::services::NAMES[..3]
+            .iter()
+            .map(|name| json!({"name":name,"description":"From lamp-services."}))
+            .collect();
+        std::fs::write(
+            no_playback.join(CATALOG_FILE),
+            json!({ "tools": three }).to_string(),
+        )
+        .unwrap();
+        let older = Settings {
+            services: Some(no_playback.clone()),
+            ..with_skill.clone()
+        };
+        assert_eq!(
+            named(&older),
+            [
+                crate::services::CONNECTED,
+                crate::services::READ,
+                crate::services::WRITE,
+                crate::services::PLAY_SKILL,
+                "light_scene"
+            ]
+        );
+        std::fs::remove_dir_all(&skills).unwrap();
+        std::fs::remove_dir_all(&no_playback).unwrap();
         let tools = declared(&on);
-        let named: Vec<&str> = tools.iter().map(|tool| tool.name.as_str()).collect();
-        assert_eq!(named, crate::services::NAMES);
         for tool in &tools {
             assert!(tool.description.contains("quoted data"), "{}", tool.name);
             assert!(tool.description.contains("one-time code"), "{}", tool.name);
@@ -6615,6 +6691,7 @@ mod tests {
         let before = asked.lock().unwrap().len();
         for (route, name) in [
             (&services, crate::services::WRITE),
+            (&services, crate::services::PLAY),
             (
                 &Route::Memory(PathBuf::from("/missing-memory.sock"), None, None),
                 crate::remember::REMEMBER,
@@ -6655,7 +6732,11 @@ mod tests {
             narrowed,
         ];
         for scope in &refused {
-            for name in [crate::services::READ, crate::services::WRITE] {
+            for name in [
+                crate::services::READ,
+                crate::services::WRITE,
+                crate::services::PLAY,
+            ] {
                 let (_, (told, _)) = run_call_scoped(
                     &services,
                     &call(
@@ -6688,6 +6769,27 @@ mod tests {
             );
             assert_eq!(told["error"], crate::services::NOT_HEARD, "{name}");
         }
+        assert_eq!(asked.lock().unwrap().len(), before, "nothing was asked");
+        // Spotify's playback (#5460): the owner's heard line plays at once,
+        // with no read-back, on the Live route too; its answer is quoted.
+        let playing = scoped(crate::memory_scope::ScopeSnapshot::of("Ann"), 4_710_013);
+        let (whom, (told, answered)) = run_call_scoped(
+            &services,
+            &call(
+                crate::services::PLAY,
+                json!({"service":"spotify","action":"play","query":"Clair de Lune"}),
+            ),
+            4_710_013,
+            true,
+            &playing.lease(),
+        );
+        assert_eq!(whom, "the services");
+        assert!(answered);
+        assert_eq!(told["note"], crate::services::DATA_NOTE);
+        let last = asked.lock().unwrap().last().unwrap().clone();
+        assert_eq!(last["name"], crate::services::PLAY);
+        assert_eq!(last["args"]["query"], "Clair de Lune");
+        let before = asked.lock().unwrap().len();
         // On the Live route (no voice judge), no write is prepared or sent.
         let send = scoped(crate::memory_scope::ScopeSnapshot::of("Ann"), 4_710_004);
         let write = call(

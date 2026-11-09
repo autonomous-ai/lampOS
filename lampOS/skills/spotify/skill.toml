@@ -1,0 +1,35 @@
+# Spotify (#5791, on #5460's contract): the person asks the lamp to play,
+# pause or skip their music, and their own Spotify does it on the device
+# they have it open on (their phone, computer or speaker). Installable from
+# the Skills Store, never core: it needs Spotify Premium and a Spotify link
+# made in the app, so its owner puts it on. Started by its tool alone: no
+# trigger and no [ask], since a person asked; never on its own.
+#
+# The playing itself is lamp-services' `service_play`, the owner's voice's
+# own function (docs/services.md, "Spotify: playback"): a skill never reaches
+# a linked service's playback. With this skill on and `service_play` named
+# (LAMP_SERVICES_SPOTIFY and LAMP_SERVICES_PLAYBACK on), the voice offers
+# `service_play` in this skill's place and this function is not offered
+# (crates/voice/src/tools.rs, `skills_after`); without this skill the voice
+# offers neither. With playback off, its one line says the lamp can't play
+# Spotify yet. It never touches the microphone, the camera, the light or the
+# body.
+needs = ["voice"]
+# Its owner puts it on and takes it off (docs/skills.md, "Core and
+# installable skills").
+kind = "installable"
+version = "1.0.0"
+tool = "spotify"
+
+# What it may use, and nothing more: its line. It reads no topic.
+[permissions]
+speak = true
+
+[choice]
+name = "action"
+about = "What they asked of their Spotify: play, pause, resume, next or previous."
+one_of = ["play", "pause", "resume", "next", "previous"]
+
+# The model's line: the note is what it is told to say.
+[[do]]
+say = "Playing Spotify isn't on on this lamp yet. Say so in a few words, and nothing else."

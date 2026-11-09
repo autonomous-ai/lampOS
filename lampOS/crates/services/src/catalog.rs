@@ -9,6 +9,9 @@ pub enum Method {
     Get,
     Post,
     Patch,
+    /// Spotify's playback alone (`spotify.rs`): no catalog read or write
+    /// is a `PUT`.
+    Put,
 }
 
 impl Method {
@@ -17,6 +20,7 @@ impl Method {
             Self::Get => "GET",
             Self::Post => "POST",
             Self::Patch => "PATCH",
+            Self::Put => "PUT",
         }
     }
 }
@@ -292,7 +296,8 @@ pub const SERVICES: &[Service] = &[
     // `spotify.rs` alone: its link is a refresh token the lamp renews at
     // `accounts.spotify.com` itself (PKCE, no secret), and only the access
     // token goes to `api.spotify.com`. Both hosts exactly, no subdomain.
-    // No write: playback control is not built.
+    // No write here: its playback (`service_play`, behind
+    // `LAMP_SERVICES_PLAYBACK`) is `spotify.rs`'s own, never a write.
     Service {
         code: "spotify",
         name: "Spotify",

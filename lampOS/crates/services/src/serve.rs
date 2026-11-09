@@ -164,7 +164,7 @@ pub fn parse_tool(line: &str) -> Result<(String, Value), String> {
     let name = value
         .get("name")
         .and_then(Value::as_str)
-        .filter(|name| [tools::CONNECTED, tools::READ, tools::WRITE].contains(name))
+        .filter(|name| [tools::CONNECTED, tools::READ, tools::WRITE, tools::PLAY].contains(name))
         .ok_or("no such function")?;
     let args = match value.get("args") {
         None | Some(Value::Null) => json!({}),
@@ -188,6 +188,9 @@ pub struct Services<H, M> {
     pub skill_reads: bool,
     /// `LAMP_SERVICES_SPOTIFY=on`: Spotify may be linked and read (#5460).
     pub spotify_on: bool,
+    /// `LAMP_SERVICES_PLAYBACK=on`, with `spotify_on`: the voice's
+    /// `service_play` may control Spotify's playback (#5460).
+    pub playback_on: bool,
     /// Spotify's access token, in memory only.
     pub spotify: Spotify,
     pub desk: Desk,
@@ -220,6 +223,7 @@ impl<H: Http, M: Mail> Services<H, M> {
             write_on,
             skill_reads: false,
             spotify_on: false,
+            playback_on: false,
             spotify: Spotify::default(),
             desk: Desk::default(),
         }
@@ -228,6 +232,12 @@ impl<H: Http, M: Mail> Services<H, M> {
     /// With `LAMP_SERVICES_SPOTIFY` as `on` gives it.
     pub fn with_spotify(mut self, on: bool) -> Self {
         self.spotify_on = on;
+        self
+    }
+
+    /// With `LAMP_SERVICES_PLAYBACK` as `on` gives it.
+    pub fn with_playback(mut self, on: bool) -> Self {
+        self.playback_on = on;
         self
     }
 
@@ -344,16 +354,28 @@ impl<H: Http, M: Mail> Services<H, M> {
     /// line break.
     pub async fn tool(&self, line: &str) -> Value {
         let answer = match parse_tool(line.trim_end_matches(['\r', '\n'])) {
-            Err(why) => Err(why),
-            Ok((name, args)) => match name.as_str() {
-                tools::CONNECTED => Ok(self.connected()),
-                tools::READ => self.read(&args).await,
-                _ => self.write(&args).await,
-            },
+            Err(why) => Err(spotify::Refused {
+                words: why,
+                code: "",
+            }),
+            Ok((name, args)) => {
+                let plain = |answer: Result<Value, String>| {
+                    answer.map_err(|words| spotify::Refused { words, code: "" })
+                };
+                match name.as_str() {
+                    tools::CONNECTED => Ok(self.connected()),
+                    tools::READ => plain(self.read(&args).await),
+                    tools::PLAY => self.play(&args).await,
+                    _ => plain(self.write(&args).await),
+                }
+            }
         };
+        // Playback's refusals carry a code beside their words (`code`); an
+        // older voice reads `error` alone.
         let answer = match answer {
             Ok(result) => json!({"ok": true, "result": result}),
-            Err(why) => json!({"ok": false, "error": why}),
+            Err(refused) if refused.code.is_empty() => json!({"ok": false, "error": refused.words}),
+            Err(refused) => json!({"ok": false, "error": refused.words, "code": refused.code}),
         };
         if answer.to_string().len() < ANSWER_MOST {
             answer
@@ -757,11 +779,37 @@ impl<H: Http, M: Mail> Services<H, M> {
         .await
     }
 
+    /// `service_play` (#5460): Spotify's playback on the person's active
+    /// device, only with `LAMP_SERVICES_SPOTIFY` and `LAMP_SERVICES_PLAYBACK`
+    /// both on, else `not_allowed` and nothing asked. No read-back: it is
+    /// playback, not a send. Only the voice calls it ([`Self::skill_tool`]
+    /// refuses a made skill).
+    async fn play(&self, args: &Value) -> Result<Value, spotify::Refused> {
+        let refused = |words: &str, code| spotify::Refused {
+            words: words.to_owned(),
+            code,
+        };
+        if args.get("service").and_then(Value::as_str) != Some(spotify::CODE) {
+            return Err(refused("only Spotify is played", "invalid"));
+        }
+        if !self.spotify_on {
+            return Err(refused(spotify::OFF, "not_allowed"));
+        }
+        if !self.playback_on {
+            return Err(refused(spotify::NO_PLAYBACK, "not_allowed"));
+        }
+        self.spotify.play(&self.http, &self.store, args).await
+    }
+
     async fn write(&self, args: &Value) -> Result<Value, String> {
-        // Playback control is not built: nothing is prepared or sent, and
-        // the link's modify scope is never used.
+        // Spotify is never written: its playback is `service_play`'s, and
+        // nothing is prepared or sent here.
         if args.get("service").and_then(Value::as_str) == Some(spotify::CODE) {
-            return Err(spotify::NO_PLAYBACK.into());
+            return Err(if self.spotify_on && self.playback_on {
+                spotify::PLAY_NOT_WRITE.into()
+            } else {
+                spotify::NO_PLAYBACK.into()
+            });
         }
         if !self.write_on {
             return Err("writing to services is off on this lamp".into());
@@ -1399,6 +1447,55 @@ mod tests {
         // The product's unit leaves it off.
         let unit = include_str!("../../../deploy/product/lamp-services.service");
         assert!(!unit.contains(spotify::ENVIRONMENT));
+    }
+
+    /// Spotify's playback (#5460) needs both switches: with either off it is
+    /// `not_allowed` in plain words and nothing is asked; a made skill can
+    /// never call it, whatever is on; a write of Spotify is never one.
+    #[test]
+    fn spotify_playback_needs_both_switches_and_is_never_a_skills() {
+        let dir = tempfile::tempdir().unwrap();
+        let play = |args: Value| json!({"op":"call","name":"service_play","args":args}).to_string();
+        let pause = play(json!({"service":"spotify","action":"pause"}));
+        let off = services(dir.path(), "{}", true).with_playback(true);
+        assert_eq!(
+            run(off.tool(&pause)),
+            json!({"ok": false, "error": spotify::OFF, "code": "not_allowed"})
+        );
+        let no_playback = services(dir.path(), "{}", true).with_spotify(true);
+        assert_eq!(
+            run(no_playback.tool(&pause)),
+            json!({"ok": false, "error": spotify::NO_PLAYBACK, "code": "not_allowed"})
+        );
+        let on = services(dir.path(), "{}", true)
+            .with_spotify(true)
+            .with_playback(true)
+            .with_skill_reads(true);
+        // Not linked: said so, with where to link it.
+        let unlinked = run(on.tool(&pause));
+        assert_eq!(unlinked["code"], "not_linked");
+        assert!(unlinked["error"].as_str().unwrap().contains("Connectors"));
+        // Only Spotify is played.
+        let other = run(on.tool(&play(json!({"service":"gmail","action":"pause"}))));
+        assert_eq!(other["code"], "invalid");
+        // A made skill's call is refused at the door, all switches on.
+        assert_eq!(
+            run(on.skill_tool(&pause)),
+            json!({"ok": false, "error": SKILL_READS_ONLY})
+        );
+        // A write of Spotify points to playback, and is never prepared.
+        let write = json!({"op":"call","name":"service_write",
+                           "args":{"service":"spotify","action":"play"}});
+        assert_eq!(
+            run(on.tool(&write.to_string())),
+            json!({"ok": false, "error": spotify::PLAY_NOT_WRITE})
+        );
+        for services in [&off, &no_playback, &on] {
+            assert!(services.http.calls.lock().unwrap().is_empty());
+        }
+        // The product's unit leaves it off.
+        let unit = include_str!("../../../deploy/product/lamp-services.service");
+        assert!(!unit.contains(spotify::PLAYBACK_ENVIRONMENT));
     }
 
     #[test]

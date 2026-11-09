@@ -1,0 +1,11 @@
+# "Lamp, play Clair de Lune on Spotify", with the skill's own function
+# offered (playback off): only its line, which says the lamp can't play
+# Spotify yet. No light, no move.
+[[call_tool]]
+name = "spotify"
+at = "0s"
+args = { action = "play" }
+
+[[expect]]
+call = "say"
+args = { note = "Playing Spotify isn't on on this lamp yet. Say so in a few words, and nothing else." }

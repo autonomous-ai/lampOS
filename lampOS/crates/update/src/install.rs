@@ -477,6 +477,15 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "an installable skill, not yet tried on a lamp: one warm word when they look up after 45 \
          minutes head down (the eyes' `room/activity`), which its owner chooses; a played check on a lamp comes first",
     ),
+    // An installable Skills Store skill (#5791): it needs Spotify Premium
+    // and a linked account, so its person puts it on.
+    (
+        "spotify",
+        "an installable Skills Store skill (#5791), not yet tried on a lamp: it needs Spotify \
+         Premium and a Spotify link made in the app, and it plays only with \
+         `LAMP_SERVICES_SPOTIFY=on` and `LAMP_SERVICES_PLAYBACK=on` in `lamp-services`, both \
+         off in the product",
+    ),
     (
         "who-was-here",
         "an installable skill, not yet tried on a lamp (#1685): it reads `room/presence`, which the \

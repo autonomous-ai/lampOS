@@ -1,0 +1,4 @@
+{"topic":"voice/state","declaration":{"type":"lamp_msgs/VoiceState","version":1,"kind":"latest"}}
+{"header":{"topic":"voice/state","kind":"latest","enc":"json","type":"lamp_msgs/VoiceState","source":"lamp_bus_cli","boot":"cb646259d46a46d0","seq":1,"at_us":0,"at_unix_ms":1792126035547},"payload_b64":"eyJzdGF0ZSI6InJlc3RpbmcifQ=="}
+{"header":{"topic":"voice/state","kind":"latest","enc":"json","type":"lamp_msgs/VoiceState","source":"lamp_bus_cli","boot":"a98e10a006508800","seq":1,"at_us":20000000,"at_unix_ms":1792126055547},"payload_b64":"eyJzdGF0ZSI6Imxpc3RlbmluZyJ9"}
+{"header":{"topic":"voice/state","kind":"latest","enc":"json","type":"lamp_msgs/VoiceState","source":"lamp_bus_cli","boot":"37ecc817c2c09892","seq":1,"at_us":60000000,"at_unix_ms":1792126095547},"payload_b64":"eyJzdGF0ZSI6InJlc3RpbmcifQ=="}
