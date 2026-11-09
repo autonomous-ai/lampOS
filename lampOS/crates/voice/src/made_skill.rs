@@ -177,11 +177,12 @@ const SERVICE_CODES: [(&str, &str); 20] = [
 
 /// Words of a request that would write, send or change something: a made
 /// skill only reads (writes are not ruled yet).
-/// ("posts" is left out: a Page's posts are read.)
 /// With each verb's "s" form too, as the voice's model often words a
 /// skill: "a skill that checks my calendar and schedules a meeting" (#5719's
-/// row on lamp-9adf). Not "marks", more often the thing read.
-const WRITE_WORDS: [&str; 29] = [
+/// row on lamp-9adf); "posts", "books" and "schedules" are also things read
+/// ([`ALSO_A_THING`]: a Page's posts). Not "marks" or "archives", more often
+/// the thing read ("my email archives", Reviewer-three's P3 on #5793).
+const WRITE_WORDS: [&str; 28] = [
     "send",
     "sends",
     "draft",
@@ -202,7 +203,6 @@ const WRITE_WORDS: [&str; 29] = [
     "deletes",
     "mark",
     "archive",
-    "archives",
     "invite",
     "invites",
     "book",
@@ -2695,6 +2695,8 @@ light = { dim = 1 }
             "a skill that reads me my latest Facebook posts",
             "a skill that tells me the books in my Google Drive",
             "read me the files in my Google Drive and puts the count on the light",
+            // Reviewer-three's P3 on #5793: "archives" is the thing read.
+            "a skill that reads my email archives",
         ] {
             assert!(brief_with(request, true).is_ok(), "{request}");
         }
@@ -2772,7 +2774,6 @@ light = { dim = 1 }
             "a skill that forwards my latest mail to the team",
             "a skill that deletes my last email",
             "a skill that invites Sam on my calendar",
-            "a skill that archives my mail",
             "a skill that puts my mail in Google Drive",
         ] {
             assert_eq!(brief_with(request, true), Err(NOT_A_WRITE), "{request}");

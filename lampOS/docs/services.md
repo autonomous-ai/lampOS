@@ -977,8 +977,8 @@ on 4 Nov),
 with a fixed read and no write word ("send", "reply", "add", "post", "schedule",
 ...), each in its "s" form too ("schedules", "posts", "forwards"), as the
 voice's model often words a skill ("a skill that checks my calendar and
-schedules a meeting", #5719's row on lamp-9adf; not "marks", more often the
-thing read). The rest are told their own limit, in the person's words (the testers'
+schedules a meeting", #5719's row on lamp-9adf; not "marks" or "archives",
+more often the thing read). The rest are told their own limit, in the person's words (the testers'
 sheet, 6 Nov: "a skill is limited with no reason"), never `NOT_A_SERVICE`,
 which says no skill can use a service and is false with the switch on:
 a write is `NOT_A_WRITE` ("Not possible yet: a skill can read one linked

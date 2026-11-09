@@ -1000,8 +1000,8 @@ công tắc ở đó là tắt trên lamp-9adf ngày 4/11),
 đọc cố định và không có từ ghi nào ("send", "reply", "add", "post", "schedule", ...),
 kể cả dạng có "s" của mỗi từ ("schedules", "posts", "forwards"), vì model của
 giọng nói hay viết skill như vậy ("a skill that checks my calendar and
-schedules a meeting", dòng test của #5719 trên lamp-9adf; trừ "marks", thường là
-thứ được đọc hơn);
+schedules a meeting", dòng test của #5719 trên lamp-9adf; trừ "marks" và
+"archives", thường là thứ được đọc hơn);
 những yêu cầu còn lại được báo đúng giới hạn của chúng, bằng lời nói với người
 dùng (bảng của tester, 6/11: "a skill is limited with no reason"), không bao giờ
 là `NOT_A_SERVICE`, vì câu đó nói không skill nào dùng được dịch vụ, điều sai
