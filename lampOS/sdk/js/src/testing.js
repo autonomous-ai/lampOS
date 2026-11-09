@@ -40,6 +40,8 @@ export const LOOK_WAITS = {
 // What lamp-control refuses today, in its own words (crates/control/src/
 // parts.rs, `waits_for`): pass it as `refuses` for a fake that answers as a
 // lamp does now. `lamp fake` does.
+// lamp-control's words for `joints` naming roll, shoulder or elbow (parts.rs).
+export const JOINTS_WAIT = "not routed yet: waits for the body's goal stream for roll, shoulder and elbow; yaw and pitch go now";
 export const LAMP_CONTROL_REFUSES = Object.freeze({
   // No product unit passes --lease-socket yet (docs/control.md).
   look: "the body's lease socket is not on here",
@@ -442,11 +444,27 @@ export class FakeLamp {
     const held = this.leases.get(lease);
     if (!held) return;
     if (state === 'lost') this.leases.delete(lease);
+    // A suspended lease still stands, but the body is not held: a look or
+    // `joints` under it is taken by the door and dropped by the body.
+    else held.state = state;
     held.ws.send(JSON.stringify({ ev: 'lease', lease, state, ...(why ? { why } : {}) }));
     if (state === 'lost') this.unfollow(lease);
   }
 
   loseLease(lease, why = 'hand') { this.leaseEvent(lease, 'lost', why); }
+
+  // A look the door takes ({ to: 'body' }), and the body's answer as its
+  // `done`: there, or, while the computer's body lease is suspended (a
+  // conversation), dropped as the body says it (body_lease.rs `done_of`).
+  lookDone(ws, id, yaw, pitch) {
+    this.ok(ws, id, { to: 'body' });
+    if (!this.autoDone) return undefined;
+    const suspended = [...this.leases.values()].some((h) => h.ws === ws && h.parts.includes('body') && h.state === 'suspended');
+    ws.send(JSON.stringify(suspended
+      ? { ev: 'done', re: id, how: 'dropped', why: 'the body is not held' }
+      : { ev: 'done', re: id, how: 'finished', yaw, pitch, clamped: false }));
+    return undefined;
+  }
 
   // End the action whose request id was `re`, to the client that asked.
   done(re, how = 'finished', why) {
@@ -757,12 +775,20 @@ export class FakeLamp {
           this.following.set(ws, { lease });
           return this.ok(ws, id, { to: 'body', follow: 'hand' });
         }
-        this.ok(ws, id, { to: 'body' });
-        if (this.autoDone) {
-          const { yaw = 0, pitch = 0 } = typeof request.at === 'object' ? request.at : {};
-          ws.send(JSON.stringify({ ev: 'done', re: id, how: 'finished', yaw, pitch, clamped: false }));
-        }
-        return undefined;
+        const { yaw = 0, pitch = 0 } = typeof request.at === 'object' ? request.at : {};
+        return this.lookDone(ws, id, yaw, pitch);
+      }
+      case 'joints': {
+        // As lamp-control (parts.rs `joints`): roll, shoulder and elbow wait
+        // for the body's goal stream; yaw and pitch go to the body as the
+        // holder's look, a joint not named staying where `get` `body` says it
+        // is, so its `done` follows as a look's does, and taking it ends a
+        // hand-follow as any look does.
+        const { targets } = request;
+        if (['roll', 'shoulder', 'elbow'].some((joint) => joint in targets)) return this.refuse(ws, id, 'refused', JOINTS_WAIT);
+        const now = this.state.body.joints;
+        this.stopFollowing(ws);
+        return this.lookDone(ws, id, targets.yaw ?? now.yaw.deg, targets.pitch ?? now.pitch.deg);
       }
       case 'gesture':
       case 'move':

@@ -516,9 +516,12 @@ class Lamp:
             raise from_reply(reply.get("error", {}))
         return reply
 
-    async def _act(self, op: str, wait: bool, **fields: Any) -> dict:
+    async def _act(self, op: str, wait: bool, *, taken: Callable[[], None] | None = None, **fields: Any) -> dict:
         """An action: its reply when taken, or with `wait` its `done` event;
         for the actions no `done` follows yet (`ENDS_AT_REPLY`), the reply.
+        `taken` runs once the lamp has taken it, before any wait for its
+        `done`, and never for a refusal: what the lamp ends on taking it ends
+        here then, even if the wait is cancelled (Reviewer-two's P2 on #5837).
         `request` takes the next id before it first yields, so this is it."""
         id_ = self._next_id
         # Handed to the body, which says nothing back, `gesture` and `move`
@@ -533,6 +536,8 @@ class Lamp:
             if done is not None:
                 self._done.pop(id_, None)
             raise
+        if taken is not None:
+            taken()
         return reply if done is None else await done
 
     # The reader.
@@ -700,13 +705,24 @@ class Lamp:
     async def gesture(self, name: str, *, wait: bool = False) -> dict:
         return await self._act("gesture", wait, name=name)
 
-    async def look(self, at: str | None = None, *, yaw: float | None = None, pitch: float | None = None) -> dict:
+    async def look(
+        self, at: str | None = None, *, yaw: float | None = None, pitch: float | None = None, wait: bool = False
+    ) -> dict:
+        """Turn the head (`at`, or `yaw`/`pitch` in degrees). Its answer when
+        the door takes it; with `wait`, the body's `done` instead: `finished`
+        with where the head got to, or `dropped` with why (`the body is not
+        held` while a conversation suspends your lease). A look at `hand` has
+        no `done` (`follow_hand`)."""
+        if wait and at == "hand":
+            raise BY_CODE["bad_request"]("a look at hand is followed until it ends, with no done: use follow_hand")
         target: Any = at if at is not None else {"yaw": yaw or 0.0, "pitch": pitch or 0.0}
-        reply = await self._act("look", False, at=target)
-        # Taken, another look ends a following (lamp-control's own rule).
+        # Taken, another look ends a following (lamp-control's own rule), at
+        # once, not after its `done`.
+        return await self._act("look", wait, taken=self._another_look, at=target)
+
+    def _another_look(self) -> None:
         if self._following is not None:
             self._following.end("cut_short", "another look")
-        return reply
 
     def follow_hand(self, *, for_ms: int = 10_000, why: str | None = None) -> Following:
         """`async with lamp.follow_hand() as following:` turns the head after
@@ -723,8 +739,12 @@ class Lamp:
     async def play(self, name: str, *, wait: bool = False) -> dict:
         return await self._act("play", wait, name=name)
 
-    async def joints(self, lease: Lease, within_ms: int, **targets: float) -> dict:
-        return await self._act("joints", False, lease=lease.id, targets=targets, within_ms=within_ms)
+    async def joints(self, lease: Lease, within_ms: int, *, wait: bool = False, **targets: float) -> dict:
+        """Aim the joints named, in degrees, under `lease`. Its answer when the
+        door takes it; with `wait`, the body's `done`, as `look`'s."""
+        # lamp-control sends yaw and pitch as the holder's look, so taking it
+        # ends a following too (parts.rs `joints`).
+        return await self._act("joints", wait, taken=self._another_look, lease=lease.id, targets=targets, within_ms=within_ms)
 
     async def light(self, colour: str, level: int, for_ms: int, pattern: str | None = None) -> dict:
         return await self._act("light", False, colour=colour, level=level, pattern=pattern, for_ms=for_ms)

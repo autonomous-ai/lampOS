@@ -400,7 +400,10 @@ export class Lamp {
 
   // An action: its reply when taken, or with `wait` its `done` event; for the
   // actions no `done` follows yet (`ENDS_AT_REPLY`), the reply.
-  act(op, fields, wait = false) {
+  // `onTaken` runs once the lamp has taken the action, before any wait for its
+  // `done`, and never for a refusal: what the lamp ends on taking it ends here
+  // then, even if the wait is abandoned (Reviewer-two's P2 on #5837).
+  act(op, fields, wait = false, onTaken = undefined) {
     const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
     // Checked before an id is taken, so an action refused here has no id,
     // and every id is this call's own.
@@ -416,7 +419,8 @@ export class Lamp {
     // carries the rejection to the caller and this one has no listener, which
     // Node would end the program for.
     done?.catch(() => {});
-    const taken = this.send(id, op, clean);
+    const sent = this.send(id, op, clean);
+    const taken = onTaken ? sent.then((reply) => { onTaken(); return reply; }) : sent;
     if (!done) return taken;
     // A refused action takes its `done` back, so nothing is left to reject,
     // unheard, when the connection closes.
@@ -518,12 +522,18 @@ export class Lamp {
 
   express(feeling, strength) { return this.act('express', { feeling, strength }); }
   gesture(name, { wait = false } = {}) { return this.act('gesture', { name }, wait); }
-  // Taken, another look ends a following (lamp-control's own rule).
-  async look(at) {
-    const reply = await this.act('look', { at });
-    this.following?.end('cut_short', 'another look');
-    return reply;
+  // Turn the head (`at`, or `{ yaw, pitch }` in degrees). Its answer when the
+  // door takes it; with `wait`, the body's `done` instead: `finished` with
+  // where the head got to, or `dropped` with why ('the body is not held' while
+  // a conversation suspends your lease). A look at 'hand' has no `done`
+  // (followHand). Taken, another look ends a following (lamp-control's rule).
+  async look(at, { wait = false } = {}) {
+    if (wait && at === 'hand') throw new LampError('a look at hand is followed until it ends, with no done: use followHand', { code: 'bad_request' });
+    // Taken, another look ends a following (lamp-control's own rule), at
+    // once, not after its `done`.
+    return this.act('look', { at }, wait, () => this.#anotherLook());
   }
+  #anotherLook() { this.following?.end('cut_short', 'another look'); }
   // `const following = await lamp.followHand().start()` ... `await
   // following.stop()`, or `await lamp.withHand(async (following) => ...)`:
   // the head turns after the hand the lamp sees. Listen with
@@ -535,7 +545,11 @@ export class Lamp {
   }
   move(frames, stepMs, { wait = false } = {}) { return this.act('move', { step_ms: stepMs, frames }, wait); }
   play(name, { wait = false } = {}) { return this.act('play', { name }, wait); }
-  joints(lease, withinMs, targets) { return this.act('joints', { lease: lease.id, targets, within_ms: withinMs }); }
+  // Aim the joints named, in degrees, under `lease`. Its answer when the door
+  // takes it; with `wait`, the body's `done`, as look's.
+  // lamp-control sends yaw and pitch as the holder's look, so taking it ends a
+  // following too (parts.rs `joints`).
+  joints(lease, withinMs, targets, { wait = false } = {}) { return this.act('joints', { lease: lease.id, targets, within_ms: withinMs }, wait, () => this.#anotherLook()); }
   light(colour, level, forMs, pattern) { return this.act('light', { colour, level, pattern, for_ms: forMs }); }
   // How many pixels the ring has, from hello's limits (undefined from a lamp before pixel lights).
   get ringPixels() { return this.limits.ring?.pixels; }

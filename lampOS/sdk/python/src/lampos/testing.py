@@ -82,6 +82,8 @@ LOOK_WAITS = {
 # What lamp-control refuses today, in its own words (crates/control/src/
 # parts.rs, `waits_for`): pass it as `refuses=` for a fake that answers as a
 # lamp does now. `lamp fake` does.
+# lamp-control's words for `joints` naming roll, shoulder or elbow (parts.rs).
+JOINTS_WAIT = "not routed yet: waits for the body's goal stream for roll, shoulder and elbow; yaw and pitch go now"
 LAMP_CONTROL_REFUSES = {
     # No product unit passes --lease-socket yet (docs/control.md).
     "look": "the body's lease socket is not on here",
@@ -512,6 +514,10 @@ class FakeLamp:
             return
         if state == "lost":
             self.leases.pop(lease)
+        else:
+            # A suspended lease still stands, but the body is not held: a look
+            # or `joints` under it is taken by the door and dropped by the body.
+            holder["state"] = state
         event: dict[str, Any] = {"ev": "lease", "lease": lease, "state": state}
         if why is not None:
             event["why"] = why
@@ -535,6 +541,19 @@ class FakeLamp:
         mutes, self.mutes = self.mutes, {}
         for ws, re in mutes.values():
             await ws.send(json.dumps({"ev": "done", "re": re, "how": "cut_short", "why": "a hand on the head"}))
+
+    async def _look_done(self, ws: ServerConnection, id_: int, yaw: float, pitch: float) -> None:
+        """A look the door takes (`{"to": "body"}`), and the body's answer as
+        its `done`: there, or, while the computer's body lease is suspended (a
+        conversation), dropped as the body says it (body_lease.rs `done_of`)."""
+        await self._ok(ws, id_, to="body")
+        if not self.auto_done:
+            return
+        suspended = any(h["ws"] is ws and "body" in h["parts"] and h.get("state") == "suspended" for h in self.leases.values())
+        if suspended:
+            await self._send_done(id_, {"how": "dropped", "why": "the body is not held"})
+        else:
+            await self._send_done(id_, {"how": "finished", "yaw": yaw, "pitch": pitch, "clamped": False})
 
     async def _send_done(self, re: int, fields: dict[str, Any]) -> None:
         ws = self._asker.get(re)
@@ -886,10 +905,22 @@ class FakeLamp:
                 self.following[id(ws)] = (ws, lease)
                 await self._ok(ws, id_, to="body", follow="hand")
                 return
-            await self._ok(ws, id_, to="body")
-            if self.auto_done:
-                at = request["at"] if isinstance(request["at"], dict) else {"yaw": 0.0, "pitch": 0.0}
-                await self._send_done(id_, {"how": "finished", "yaw": at["yaw"], "pitch": at["pitch"], "clamped": False})
+            at = request["at"] if isinstance(request["at"], dict) else {"yaw": 0.0, "pitch": 0.0}
+            await self._look_done(ws, id_, at["yaw"], at["pitch"])
+        elif op == "joints":
+            # As lamp-control (parts.rs `joints`): roll, shoulder and elbow
+            # wait for the body's goal stream; yaw and pitch go to the body as
+            # the holder's look, a joint not named staying where `get` `body`
+            # says it is, so its `done` follows as a look's does, and taking it
+            # ends a hand-follow as any look does.
+            targets = request["targets"]
+            if any(joint in targets for joint in ("roll", "shoulder", "elbow")):
+                self.requests.remove(request)
+                await self._refuse(ws, id_, "refused", JOINTS_WAIT)
+                return
+            now = self.state["body"]["joints"]
+            self.stop_following(ws)
+            await self._look_done(ws, id_, targets.get("yaw", now["yaw"]["deg"]), targets.get("pitch", now["pitch"]["deg"]))
         elif op == "volume":
             # As lamp-control through lamp-actions' app calls: a level, the
             # voice's 20-point step within its floor of 10 and ceiling of 100,
