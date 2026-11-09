@@ -296,7 +296,19 @@ impl Watch {
                     None => json!({}),
                 },
             )],
-            "name/heard" => vec![Out::Event(EventKind::NameHeard, json!({}))],
+            // With the listener's score, to a hundredth as `sound.heard`'s,
+            // so a program can set its own bar: a sound like the name can
+            // reach the lamp's (Queue #5385, 9 Nov 15:00 and 15:36). Left
+            // out when the bus gives none.
+            "name/heard" => vec![Out::Event(
+                EventKind::NameHeard,
+                match payload["score"].as_f64() {
+                    Some(score) if score.is_finite() => {
+                        json!({"score": (score.clamp(0.0, 1.0) * 100.0).round() / 100.0})
+                    }
+                    _ => json!({}),
+                },
+            )],
             "voice/heard" => match (payload["text"].as_str(), payload["finished"].as_bool()) {
                 (Some(text), Some(true)) if !text.trim().is_empty() => {
                     vec![Out::Heard(text.to_owned())]
@@ -1258,5 +1270,34 @@ mod tests {
         // And the limits stop too.
         watch.lapse(10 * S + READING_STALE_US);
         assert_eq!(watch.state(StateKind::Body)["known"], false);
+    }
+
+    /// `name.heard` carries the listener's score, to a hundredth, so a
+    /// program can set its own bar (the 75c9 false wake scored 0.941, real
+    /// calls 0.90 to 1.00: Queue #5385, 9 Nov).
+    #[test]
+    fn the_names_score_goes_with_name_heard() {
+        let mut watch = Watch::new();
+        let heard = |watch: &mut Watch, payload: Value| match watch
+            .take("name/heard", &payload, S)
+            .as_slice()
+        {
+            [Out::Event(EventKind::NameHeard, fields)] => fields.clone(),
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(
+            heard(&mut watch, json!({"score": 0.9413, "ago_ms": 75})),
+            json!({"score": 0.94})
+        );
+        assert_eq!(
+            heard(&mut watch, json!({"score": 1.0, "ago_ms": 360})),
+            json!({"score": 1.0})
+        );
+        // Never past 0 to 1, and none when the bus gives none.
+        assert_eq!(
+            heard(&mut watch, json!({"score": 1.7})),
+            json!({"score": 1.0})
+        );
+        assert_eq!(heard(&mut watch, json!({"ago_ms": 75})), json!({}));
     }
 }

@@ -2069,6 +2069,25 @@
           "if": {
             "properties": {
               "ev": {
+                "const": "name.heard"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "score": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "How sure the lamp's listener was that it heard its name, to a hundredth. A sound like the name can reach the lamp's own bar, so a program that acts on its own may want a higher one."
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
                 "const": "touch"
               }
             }

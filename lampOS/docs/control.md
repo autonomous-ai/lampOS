@@ -81,7 +81,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `person.facing` | `facing` | `humans/faces/tracked` | `look` |
 | `hand` | `seen`; when seen, `x`, `y` (the palm's centre, a share of the picture from its left and top), `size` (the palm's width, a share of the picture's), `open`, `confidence` | `humans/hands/tracked`: one message per look that sees a hand, none without. Told when first seen, moved or grown by 0.05, opened or closed, at most every 250 ms with the newest held back until then; `seen: false` once, 1 s after the last message. A message under 0.5 confidence, or a share outside 0 to 1, is no hand. Never the picture, keypoints or the tracker's clock | `look` |
 | `phrase.heard` | `phrase`: one the client registered | `voice/heard`, matched on the lamp: the client is told which phrase, **never what was said** | `hear` |
-| `name.heard` | | `name/heard` | `hear` |
+| `name.heard` | `score` (the listener's, 0–1 to a hundredth; left out when the bus gives none). A sound like the name can pass the lamp's own bar (0.9): lamp-75c9 woke at 0.941 on no words on 9 Nov, while real calls scored 0.90 to 1.00, so a program acting on its own sets its own bar | `name/heard` | `hear` |
 | `sound.heard` | `class` (`knock`, `music`, …), `score` | `ears/classes` | `sound` |
 | `touch` | `kind` (`tap`, `pet`, `hold`), `where` | `controls/touch`, `controls/gesture`, `body/hand` | none |
 | `button` | `press` (`press`, `long_press`) | `controls/gesture` | none |
@@ -478,7 +478,7 @@ sees the lamp handled; a read-only `body_state` grant is proposed on Queue
 #3997 and would settle it.
 
 ```json
-{"ev":"body.state","at":"2026-10-30T15:40:00+07:00","joints":{"yaw":{"deg":-25.8,"counts":1722,"goal_deg":-22.9,"load":0.1,"moving":true,"temp_c":41},"pitch":{"deg":17.2,"counts":2244,"goal_deg":17.2,"load":0.06,"moving":false,"temp_c":44}},"lamp":{"light":{"on":true,"colour":"warm","level":3},"talking":false,"private":false}}
+{"ev":"body.state","at":"2026-10-30T08:40:00Z","joints":{"yaw":{"deg":-25.8,"counts":1722,"goal_deg":-22.9,"load":0.1,"moving":true,"temp_c":41},"pitch":{"deg":17.2,"counts":2244,"goal_deg":17.2,"load":0.06,"moving":false,"temp_c":44}},"lamp":{"light":{"on":true,"colour":"warm","level":3},"talking":false,"private":false}}
 ```
 
 - **Each joint**, under the `joints` op's names, holds these fields:
