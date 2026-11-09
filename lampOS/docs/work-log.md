@@ -8467,3 +8467,24 @@ One-word "Bicycle. Forget it." also takes tea under the deliberate one-word
 call heuristic. The intervening-forget probe shows stale proof, but its old
 forget_last can pick the same item; not claimed as a new destructive outcome.
 One-face/carried fences remain intact. Continuing the Queue loop.
+
+## 2026-11-09 — Second: MCP reconnect privacy/lifecycle read
+
+- HOLD #5830 at `f4563f6561c9ea24fffe690ea27bea0fda187953`:
+  https://github.com/autonomous-ai/lampOS/pull/5830#issuecomment-6736564117.
+  Exact-head clean checkout `/private/tmp/second-review-5830`.
+- Two reproduced P2s: first lamp_events during a disconnect marks its stream
+  started but removes every failed subscription, so after reconnect light works
+  while events remain permanently empty; replay's held-list snapshot can add a
+  phrase subscription after its wait has canceled and removed it.
+- First proof uses SDK, FakeLamp and an actual in-process MCP session. Second
+  uses SDK on/off/Subscription with only transport/request mocked and a blocked
+  earlier replay to make cancellation deterministic. Temporary proof scripts:
+  `/tmp/second-5830-offline-probe.py` and
+  `/tmp/second-5830-relink-probe.py`. No production edits.
+- Isolated editable package installs; Python pytest of lampOS/sdk/mcp/tests:
+  54 passed in 17.52 s. The author's package-version failure disappears when
+  lamp-mcp is installed. No device or end-to-end latency claim.
+- An unawaited subscription refusal also opens a second connection while the
+  first remains live, but current MCP tools await their remote subscriptions;
+  recorded as latent wrapper behavior, not an additional current-tool HOLD.
