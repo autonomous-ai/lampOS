@@ -8773,3 +8773,18 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - Second's labelled issues still have no new repository assignment.
   Microphone owner has a local generation fix, awaiting its pushed head;
   reconnect integration owner Nine is working on the combined wait fix.
+
+## 2026-11-09 — Second: unresolved reconnect finding in landed train
+
+- Queue reported train751 merged as
+  `19ee3d51ac0a1964a572d3992785dba1be6c0a0d`. Fetched exact source and
+  reran original MCP/Relink/TLS FakeLamp reproductions: old speech wait
+  returns said, and old turn-start wait returns turn finished, both from
+  replacement connection id1 speech completion. Both fail under one second.
+- Landed source lacks standalone #5830's later 809e2d43 fix. Earlier
+  standalone READ-OK explicitly did not clear this combined train.
+  Notified First/Nine/Eighth on Queue and train before promotion; First
+  decides carry/revert/order, existing owners retain implementation.
+- Source snapshot /private/tmp/second-landed751-source; raw outputs
+  /tmp/second-landed751-say-reconnect.log and
+  /tmp/second-landed751-turn-reconnect.log. No product edits/device action.
