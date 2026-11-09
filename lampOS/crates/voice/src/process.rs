@@ -1085,6 +1085,10 @@ fn worker_command(
             role,
             var(crate::remember::FORGET_ABOUT_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_forget_just_kept_worker_environment(
+            role,
+            var(crate::remember::FORGET_JUST_KEPT_ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_room_not_asker_worker_environment(
             role,
             var(crate::remember::ROOM_NOT_ASKER_ENVIRONMENT).as_deref(),
@@ -1348,6 +1352,16 @@ fn memory_forget_about_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::FORGET_ABOUT_ENVIRONMENT, "on"))
+}
+
+// A bare "forget that" right after the person's own keep forgets that keep
+// (C88, #5022), passed the same narrow way, to the same two routes.
+fn memory_forget_just_kept_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::FORGET_JUST_KEPT_ENVIRONMENT, "on"))
 }
 
 // Journalling resumed with a fresh session (#2176 row 1b), passed the same
@@ -2617,6 +2631,12 @@ mod tests {
                         "LAMP_MEMORY_FORGET_ABOUT",
                         ["provider", "second"].as_slice(),
                     ),
+                    // And "forget that" right after a keep (C88).
+                    (
+                        memory_forget_just_kept_worker_environment,
+                        "LAMP_MEMORY_FORGET_JUST_KEPT",
+                        ["provider", "second"].as_slice(),
+                    ),
                     // The room's kept things as someone's (#2176): both routes.
                     (
                         memory_room_not_asker_worker_environment,
@@ -2902,6 +2922,7 @@ mod tests {
                     crate::remember::ROOM_AFTER_FORGET_ENVIRONMENT,
                     crate::remember::needs_face::ENVIRONMENT,
                     crate::remember::FORGET_ABOUT_ENVIRONMENT,
+                    crate::remember::FORGET_JUST_KEPT_ENVIRONMENT,
                     crate::remember::JOURNAL_RESUMES_ENVIRONMENT,
                     crate::remember::LINK_USED_ENVIRONMENT,
                     crate::remember::ROOM_SPEAKER_ENVIRONMENT,
@@ -3121,6 +3142,7 @@ mod tests {
                     "LAMP_MEMORY_FORGET_ABOUT=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
                     "LAMP_MEMORY_FORGET_ASKS=on",
+                    "LAMP_MEMORY_FORGET_JUST_KEPT=on",
                     "LAMP_MEMORY_JOURNAL_RESUMES=on",
                     "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_LINK_USED=on",
@@ -3188,6 +3210,7 @@ mod tests {
                     "LAMP_MEMORY_FORGET_ABOUT=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
                     "LAMP_MEMORY_FORGET_ASKS=on",
+                    "LAMP_MEMORY_FORGET_JUST_KEPT=on",
                     "LAMP_MEMORY_JOURNAL_RESUMES=on",
                     "LAMP_MEMORY_KEEP_ASKED=on",
                     "LAMP_MEMORY_KEEP_HEARD=on",
