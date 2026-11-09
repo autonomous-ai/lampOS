@@ -169,7 +169,12 @@ idle session behind the person's `programs-reply` switch. Nothing is
 routed, the engine is not asked about (`--engines-ready`, a known
 refusal), and nothing is started new in any case:
 - **One live session fits and takes it:** the task's agent, `joined`, as a
-  routed one: watched, told, and never closed by the lamp.
+  routed one: watched, told, and never closed by the lamp. How the person
+  knows that session is kept on the task (`dispatch.joined`, listed): its
+  `name`, or its folder's last part when it has none, never a lamp-made
+  `lamp-<hex>` one, and its first `ask`, on one line, cut at a word to 80
+  characters. Task news says it at once, so a wrong join is heard (the
+  Reviewer-lead's P2 on #5784 at 71bf964baa). A routed join keeps none.
 - **Not sent, with why:** `session_not_found`; `session_ambiguous` (two or
   more live ones fit, or, found by its work, a live one and a stopped one;
   never guessed); `session_stopped` (only a stopped
@@ -188,8 +193,10 @@ refusal), and nothing is started new in any case:
   `prepare`, `invalid_session` at launch).
 - **Tests:** `tests/harness.rs`
   `with_reply_named_a_named_session_is_typed_into_and_never_started_new`,
-  `with_reply_named_a_session_is_found_by_what_it_worked_on`;
-  `engine::tests::a_store_with_a_named_session_is_written_as_schema_five`.
+  `with_reply_named_a_session_is_found_by_what_it_worked_on`,
+  `with_reply_named_the_joined_session_is_kept_by_its_name_and_first_ask`;
+  `engine::tests::a_store_with_a_named_session_is_written_as_schema_five`,
+  `engine::tests::a_joined_sessions_name_and_first_ask_are_kept_and_listed`.
 - **The voice's side** (off unless `LAMP_TASKS_REPLY_NAMED=on`, the
   provider worker's `--tasks-reply-named`, last of the tasks flags; it
   needs only the tasks part): `start_agent_task` takes an optional
@@ -218,11 +225,18 @@ refusal), and nothing is started new in any case:
   the model sends anyway is dropped. Task news tells
   `session_busy` (and `reply_not_idle`) with the `failed_busy` words, as a
   busy routed pick; the other codes above are told as a plain failure.
+  Work said yes to that joined a session is told once, at once, within
+  10 minutes of the hand-over on this boot (`<store>:<task>:joined`, beside
+  its later finish): with the `joined` words, naming the session by its
+  name, or with `joined_asked`, by what it was first asked, and that the
+  person can say if it's the wrong one. A new session, or the router's
+  pick, is not told so.
   Tests: `agent_tasks::tests::a_named_session_is_sent_with_the_task_only_with_the_switch`,
   `agent_tasks::tests::the_reply_named_switch_is_on_only_with_the_tasks_part_and_adds_session`,
   `agent_tasks::tests::a_task_for_a_named_session_never_starts_on_one_yes`,
   `agent_tasks::tests::another_session_is_a_correction_and_devins_cloud_takes_none`,
-  `task_news::tests::a_busy_named_session_is_told_as_busy_and_its_other_ends_as_a_failure`.
+  `task_news::tests::a_busy_named_session_is_told_as_busy_and_its_other_ends_as_a_failure`,
+  `task_news::tests::work_that_joined_an_earlier_session_names_that_session_once`.
 
 `--progress` (off unless set; #732, the second builder, 2026-10-15) reads
 how each task handed over is going with one `harness ps` a machine and puts

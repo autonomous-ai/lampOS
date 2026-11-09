@@ -1,7 +1,9 @@
 //! Durable task policy. A launch intent is committed before it can leave this
 //! module. Transcript observations and qualified speech receipts are separate.
 use crate::{
-    harness::{Closed, EngineKind, Launch, LaunchOutcome, Observation, Target, prompt_fits},
+    harness::{
+        Closed, EngineKind, JoinedSession, Launch, LaunchOutcome, Observation, Target, prompt_fits,
+    },
     protocol::{MAX_PAGE_SIZE, MAX_REPLY_BYTES, Request},
     store::{MAX_STATE_BYTES, Store},
 };
@@ -215,6 +217,12 @@ struct Dispatch {
     agent_id: Option<String>,
     creation_id: Option<String>,
     code: Option<String>,
+    /// The person's own session a named hand-over joined, as they would
+    /// know it ([`JoinedSession`]): listed with the task, so the voice says
+    /// which one took the work (the Reviewer-lead's P2 on #5784 at
+    /// 71bf964baa). Absent otherwise; a store without it reads as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    joined: Option<JoinedSession>,
 }
 impl Dispatch {
     fn prepared() -> Self {
@@ -226,6 +234,7 @@ impl Dispatch {
             agent_id: None,
             creation_id: None,
             code: None,
+            joined: None,
         }
     }
 }
@@ -1956,7 +1965,7 @@ impl<P: Persistence> Engine<P> {
             // and not being closed, below. One the store still sees working
             // is the race where the router saw it idle: uncertain, since the
             // words were typed (the local leader's P2 on #4422).
-            LaunchOutcome::Joined { agent_id } => next
+            LaunchOutcome::Joined { agent_id, .. } => next
                 .tasks
                 .iter()
                 .any(|task| task.dispatch.agent_id.as_ref() == Some(agent_id) && !handed_on(task)),
@@ -1976,7 +1985,7 @@ impl<P: Persistence> Engine<P> {
         // A follow-up the router typed into a session an earlier, spent task
         // of the lamp's had: that task gives the session to this one, so the
         // store keeps one task a session and this one watches and tells it.
-        if let LaunchOutcome::Joined { agent_id: id } = &outcome {
+        if let LaunchOutcome::Joined { agent_id: id, .. } = &outcome {
             let before = next.tasks.len();
             next.tasks
                 .retain(|task| task.id == task_id || task.dispatch.agent_id.as_ref() != Some(id));
@@ -1995,9 +2004,13 @@ impl<P: Persistence> Engine<P> {
                 task.dispatch.agent_id = Some(id);
             }
             // The person's own session: told as any task's, never closed.
-            LaunchOutcome::Joined { agent_id: id } if agent_id(&id) => {
+            LaunchOutcome::Joined {
+                agent_id: id,
+                session,
+            } if agent_id(&id) => {
                 task.dispatch.state = DispatchState::Accepted;
                 task.dispatch.agent_id = Some(id);
+                task.dispatch.joined = session;
                 task.closable = false;
             }
             LaunchOutcome::Pending { creation_id: id } if creation_id(&id) => {
@@ -3400,6 +3413,7 @@ mod tests {
                 id,
                 LaunchOutcome::Joined {
                     agent_id: AGENT.into(),
+                    session: None,
                 },
                 &clock(0),
             )
@@ -3438,6 +3452,56 @@ mod tests {
         assert!(engine.begin_close(&clock(10_000_000)).unwrap().is_none());
     }
 
+    /// The Reviewer-lead's P2 on #5784 at 71bf964baa: how the person knows
+    /// the session a named hand-over joined is kept on its dispatch, saved
+    /// and listed, for the voice to say at once; a join without one, and a
+    /// store from before it, keep none.
+    #[test]
+    fn a_joined_sessions_name_and_first_ask_are_kept_and_listed() {
+        let (mut engine, memory) = opened();
+        let id = queued(&mut engine, 0);
+        engine.begin_launch(&clock(0)).unwrap().unwrap();
+        let session = JoinedSession {
+            name: Some("Docs-Update".into()),
+            ask: Some("Update the setup page".into()),
+        };
+        engine
+            .finish_launch(
+                id,
+                LaunchOutcome::Joined {
+                    agent_id: AGENT.into(),
+                    session: Some(session.clone()),
+                },
+                &clock(0),
+            )
+            .unwrap();
+        assert_eq!(engine.state.tasks[0].dispatch.joined, Some(session));
+        assert_eq!(
+            stored(&memory).tasks[0].dispatch,
+            engine.state.tasks[0].dispatch
+        );
+        let page = engine
+            .handle(
+                &Request::List {
+                    after_id: 0,
+                    limit: 8,
+                },
+                &clock(0),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            page["items"][0]["dispatch"]["joined"],
+            json!({"name":"Docs-Update","ask":"Update the setup page"})
+        );
+        // None kept: not written, and read back as none.
+        let mut dispatch = serde_json::to_value(&engine.state.tasks[0].dispatch).unwrap();
+        dispatch.as_object_mut().unwrap().remove("joined");
+        let older: Dispatch = serde_json::from_value(dispatch).unwrap();
+        assert_eq!(older.joined, None);
+        assert!(!serde_json::to_string(&older).unwrap().contains("joined"));
+    }
+
     /// A follow-up the router typed into a session an earlier task of the
     /// lamp's had (the local leader's P2 on #4422): that task gives the
     /// session over once it is spent, so the follow-up watches and tells
@@ -3453,6 +3517,7 @@ mod tests {
                     id,
                     LaunchOutcome::Joined {
                         agent_id: AGENT.into(),
+                        session: None,
                     },
                     &clock(at),
                 )
