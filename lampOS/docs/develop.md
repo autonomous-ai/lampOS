@@ -196,7 +196,7 @@ READMEs' "Everything you can read" gives each one's fields and an example.
   - `mood` (`energy`, `warmth`, `awake`, `asleep`).
   - `lamp`.
   - `air` is planned.
-- **Never:** camera frames, audio, transcripts, the words around a phrase, face prints or names.
+- **Never:** transcripts, the words around a phrase, face prints or names. The camera's pictures only with the `camera` grant (`sdk/python/examples/camera.py`); the `microphone` grant is not routed yet, so no audio.
 
 ### The same in JavaScript
 

@@ -620,6 +620,43 @@ def test_the_tour_runs_every_step_against_a_fake_lamp(tmp_path):
     asyncio.run(asyncio.wait_for(go(), 60))
 
 
+def test_the_camera_example_saves_a_picture_and_a_frame(tmp_path):
+    """examples/camera.py, run as a developer would: with the `camera` grant
+    it saves both JPEGs; without it, it says the lamp refused and exits 1."""
+    import os
+    import sys
+
+    from lampos.testing import FAKE_JPEG
+
+    example = Path(__file__).resolve().parents[1] / "examples" / "camera.py"
+
+    async def go(grants, home, cwd):
+        async with FakeLamp(grants=grants) as fake:
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, keyring=Keyring(home))
+            ran = await asyncio.create_subprocess_exec(
+                sys.executable, str(example), "0.5", cwd=cwd,
+                env={**os.environ, "LAMPOS_HOME": str(home)},
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+            )
+            said = (await ran.communicate())[0].decode()
+            return ran.returncode, said, fake
+
+    work = tmp_path / "with"
+    work.mkdir()
+    code, said, fake = asyncio.run(asyncio.wait_for(go(("camera",), tmp_path / "a", work), 60))
+    assert code == 0, said
+    assert (work / "snapshot.jpg").read_bytes() == FAKE_JPEG
+    assert (work / "last-frame.jpg").read_bytes() == FAKE_JPEG
+    assert [r["on"] for r in fake.asked("camera.stream")] == [True, False], said
+
+    work = tmp_path / "without"
+    work.mkdir()
+    code, said, _ = asyncio.run(asyncio.wait_for(go(("light",), tmp_path / "b", work), 60))
+    assert code == 1, said
+    assert "snapshot: refused," in said and "Traceback" not in said, said
+    assert not (work / "snapshot.jpg").exists()
+
+
 def test_the_readme_reference_names_every_public_call_command_and_option():
     import argparse
     import inspect

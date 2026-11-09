@@ -43,7 +43,7 @@ LAMPOS_HOME=/tmp/lampos-try python examples/greet.py
 
 Terminal 1 then shows `asked {"op": "gesture", "name": "greeting"}`. Every
 example runs this way: `tour.py` (every kind of call, one step at a time; with `lamp fake --everything` nothing is refused), `greet.py`, `follow.py`, `follow_hand.py` (with `lamp fake --hands`),
-`phrase.py`, `pomodoro.py`, `ci_light.py`, `ask_the_person.py`, and `push_skill.py ../examples/hello-skill` (a pairing with `skills` and `speak`).
+`phrase.py`, `pomodoro.py`, `ci_light.py`, `ask_the_person.py`, `camera.py` (a pairing with `camera`: saves `snapshot.jpg` and a stream's `last-frame.jpg`), and `push_skill.py ../examples/hello-skill` (a pairing with `skills` and `speak`).
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
 `express` as the feelings skill's move and light, `say` and `sound`
@@ -314,9 +314,12 @@ And two that come by themselves, with no subscription:
 
 ### Never readable
 
-Through this door, by any grant: camera frames or pictures, audio, transcripts
-or the words around a phrase, face prints, and anyone's name. A hand's or a
-face's place in the picture is a share of it, never the picture.
+Through this door, by any grant: transcripts or the words around a phrase,
+face prints, and anyone's name. The camera's pictures come only with the
+`camera` grant, on the lamp's own network and never while it is private
+(`examples/camera.py`); the `microphone` grant is not routed yet, so no audio
+leaves. With `look` alone, a hand's or a face's place in the picture is a
+share of it, never the picture.
 
 ## Reference
 
