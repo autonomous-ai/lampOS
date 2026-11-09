@@ -312,8 +312,11 @@ pub fn yes_alone(
         return None;
     }
     // Read before the thread is locked: the two locks are never held
-    // together.
-    let done = super::done_last_in(lease);
+    // together. The same lookup as [`done_already`]'s, so a one-face yes's
+    // call is told the same done keep its note was, never "Nothing was
+    // kept" beside it (Seventh's P2 on #5798). Its one-face fallback never
+    // finds a forget, so a `forget` call runs as before.
+    let done = super::done_for_yes_in(lease);
     let thread = crate::thread::THREAD.lock().ok()?;
     yes_alone_in(
         &thread,
@@ -429,7 +432,8 @@ pub(crate) fn done_already(
         return None;
     }
     // Read before the thread is locked, as [`yes_alone`] does.
-    let done = super::done_last_in(lease)?;
+    // A one-face line's yes, the scope its keep went to (#5607 on 06c1).
+    let done = super::done_for_yes_in(lease)?;
     let thread = crate::thread::THREAD.lock().ok()?;
     done_already_in(
         &thread,
