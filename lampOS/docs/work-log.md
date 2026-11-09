@@ -9175,3 +9175,12 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   range-diff: #5880 28667a113f, #5866 effa9f8c88, #5842 e55077de96,
   #5809 all 22 commits through 149d7c9e53. Spot-checked first two mappings.
   No new train tests and no change to the separately flagged MCP fault.
+
+## 2026-11-09 — Second: generated call ID receipt omission fixed
+
+- READ-OK #5863 restated at 2fa6ad4f8f, comment 6741850690. Exact clock
+  call_0 then interrupted send call_0 regression now passes. Five earlier
+  independent cases plus eight author sent_write cases: 14 passed in 4.88 s.
+- New bounded carried-attempt bookkeeping resolves the reproduced P3;
+  Third's stale journal quotation remains a docs follow-up. Host/scripted
+  service scope only. Temporary tests removed, checkout/diff check clean.
