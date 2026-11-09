@@ -305,9 +305,9 @@ pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf
 /// The skills every lamp receives: each a folder of `lampOS/skills/`, put in
 /// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
 /// Every core skill is one (the owner: core skills are always installed;
-/// `tests/install.rs` holds the two lists equal). Twenty-one keep their
-/// folders' own default: twenty enabled, Bedtime and Morning disabled by its
-/// own `enabled = false` until its lamp comparison (#1672), and Comfort break
+/// `tests/install.rs` holds the two lists equal). Twenty-four keep their
+/// folders' own default: twenty-three enabled (Bedtime and Morning since #5753,
+/// with `LAMP_OUTPUT_CAPS=on` in the product units), and Comfort break
 /// by its own but on by its `[present]` with `LAMP_NUDGES_PRESENT=on`, which
 /// the product's skills units set (#5207); those of
 /// [`PRODUCT_SKILLS_OFF`] are installed disabled until their lamp checks,

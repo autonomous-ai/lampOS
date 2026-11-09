@@ -635,7 +635,13 @@ fn a_disabled_core_stays_in_inventory_and_cannot_be_packaged_replaced_or_removed
     let dir = tempfile::tempdir().unwrap();
     let skills = dir.path().join("skills");
     fs::create_dir(&skills).unwrap();
-    let core = copied(&dir.path().join("source"), "bedtime-morning", "", "");
+    // Bedtime and Morning, turned off as it shipped before #5753.
+    let core = copied(
+        &dir.path().join("source"),
+        "bedtime-morning",
+        "enabled = true",
+        "enabled = false",
+    );
     assert!(!load(&core).unwrap().enabled);
     assert!(
         package::pack(&core, &dir.path().join("out"))
