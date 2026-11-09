@@ -440,8 +440,8 @@ nó chỉ là danh tính của tài khoản và `gmail.send`, không có `gmail.
   và một token bị Google từ chối được báo lần đầu ở một lần gửi.
 - **Đọc:** không có. Một `service_read` của `gmail-app`, đã liên kết hay
   chưa, đều trả lời "This Gmail link, made with Google sign-in, can only send
-  mail. To read mail, link Gmail with an app password in the app: Skills,
-  then Connectors." Danh sách đọc của nó rỗng, nên không route đọc nào được
+  mail. To read mail, link Gmail with an app password in the app: open this
+  lamp, then Connectors." Danh sách đọc của nó rỗng, nên không route đọc nào được
   gọi với token của nó.
 - **Ghi:** `send_mail`, được đọc lại và gửi như của `gmail`, khi có câu
   "send" nói ra: một `POST /gmail/v1/users/me/messages/send` từ chính tài
@@ -870,7 +870,7 @@ skill đọc dịch vụ được lên kế hoạch). Khi bật, xem
 phần "Một kỹ năng tự tạo đọc dịch vụ".
 
 Một lệnh gọi đến dịch vụ chưa liên kết thất bại với "<Service> isn't linked
-to this lamp yet. It can be linked in the app: Skills, then Connectors."
+to this lamp yet. It can be linked in the app: open this lamp, then Connectors."
 (`serve::NOT_LINKED`), để đèn nói chỗ liên kết, không chỉ nói là chưa có.
 
 ## Một kỹ năng tự tạo đọc dịch vụ (đề xuất #5288, `LAMP_SKILL_READS`, bật trong sản phẩm)
@@ -1028,7 +1028,7 @@ cùng `--state-dir` của nó; tắt, [switches.md](../switches.md)). Một lầ
 bị từ chối vì dịch vụ chưa liên kết (`NOT_LINKED`; không bao giờ "couldn't
 be reached" hay một lời từ chối khác) được nói một lần, như lời chính xác qua
 socket nói sau khi cổng được xét lại: "Gmail isn't linked to this lamp yet.
-It can be linked in the app: Skills, then Connectors." Tên kỹ năng được giữ
+It can be linked in the app: open this lamp, then Connectors." Tên kỹ năng được giữ
 trong `link-noted` của thư mục trạng thái, nên không lần đọc sau và không lần
 khởi động lại nào nói lại; một lần đọc thành công bỏ nó ra, nên một liên kết
 mất về sau được báo thêm một lần. Dòng "not read" của journal thêm "told
@@ -1101,9 +1101,9 @@ Nếu dịch vụ nó đọc không có trong danh sách, kỹ năng vẫn đư�
 hỏi như trước, và:
 
 - tạo bằng giọng nói, câu trả lời của việc tạo có `needs_link`
-  (`[{"code", "name"}]`), và đèn nói một câu trước lời hỏi: "Gmail isn't
-  linked yet: link it in the app, under Skills, then Connectors, and the
-  skill will start then.";
+  (`[{"code", "name"}]`), và đèn nói chỗ liên kết trước lời hỏi: "Gmail
+  isn't linked yet. Link it in the app: open this lamp, then Connectors.
+  The skill will start then.";
 - tạo từ ứng dụng, lời yêu cầu giữ nó, và `skills.made` báo nó là
   `needs_link: [{"code": "gmail", "name": "Gmail"}]`, `[]` khi không thiếu
   gì.

@@ -1340,8 +1340,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             "{answer}"
         );
         let next = answer["next"].as_str().unwrap();
-        let sentence = "Gmail isn't linked yet: link it in the app, under Skills, then \
-                        Connectors, and the skill will start then.";
+        let sentence = "Gmail isn't linked yet. Link it in the app: open this lamp, then \
+                        Connectors. The skill will start then.";
         let (link, ask) = (
             next.find(sentence).expect(next),
             next.find(made_skill::ASK_TO_PUT_ON).expect(next),

@@ -424,7 +424,7 @@ account's identity and `gmail.send` only, no `gmail.readonly`.
   Google refuses is first told at a send.
 - **Reads:** none. A `service_read` of `gmail-app`, linked or not, answers
   "This Gmail link, made with Google sign-in, can only send mail. To read
-  mail, link Gmail with an app password in the app: Skills, then
+  mail, link Gmail with an app password in the app: open this lamp, then
   Connectors." Its read list is empty, so no read route is ever called with
   its token.
 - **Writes:** `send_mail`, read back and sent as `gmail`'s, on a spoken
@@ -845,7 +845,7 @@ Nov the model told the owner to link a calendar that was already linked
 section.
 
 A call to a service that isn't linked fails with "<Service> isn't linked to
-this lamp yet. It can be linked in the app: Skills, then Connectors."
+this lamp yet. It can be linked in the app: open this lamp, then Connectors."
 (`serve::NOT_LINKED`), so the lamp says where to link it, not only that it
 isn't.
 
@@ -1002,7 +1002,7 @@ with its `--state-dir`; off, [switches.md](switches.md)). A read refused
 because the service isn't linked (`NOT_LINKED`; never "couldn't be
 reached" or another refusal) is said once, as exact words through the say
 socket after the gate is judged again: "Gmail isn't linked to this lamp
-yet. It can be linked in the app: Skills, then Connectors." The skill's
+yet. It can be linked in the app: open this lamp, then Connectors." The skill's
 name is kept in the state folder's `link-noted`, so no later read and no
 restart says it again; a read that succeeds takes it out, so a link lost
 later is told once more. The journal's "not read" line adds "told once",
@@ -1079,9 +1079,9 @@ it reads isn't in the list, the skill is still kept and asked about as
 before, and:
 
 - made by voice, the make's answer carries `needs_link`
-  (`[{"code", "name"}]`), and the lamp says one sentence before its ask:
-  "Gmail isn't linked yet: link it in the app, under Skills, then
-  Connectors, and the skill will start then.";
+  (`[{"code", "name"}]`), and the lamp says where to link it before its ask:
+  "Gmail isn't linked yet. Link it in the app: open this lamp, then
+  Connectors. The skill will start then.";
 - made from the app, the ask keeps it, and `skills.made` tells it as
   `needs_link: [{"code": "gmail", "name": "Gmail"}]` ([cloud.md](cloud.md),
   "A skill typed in the app"), `[]` when nothing is missing.

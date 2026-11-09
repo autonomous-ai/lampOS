@@ -683,16 +683,16 @@ pub fn needs_link(uses: &Uses, linked: impl FnOnce() -> Option<Vec<String>>) -> 
     Some(vec![json!({"code": code, "name": service_name(code)})])
 }
 
-/// What the lamp adds aloud for each of [`needs_link`]'s services: one
-/// short plain sentence where the person links it. None with none.
+/// What the lamp adds aloud for each of [`needs_link`]'s services: where
+/// the person links it, in short plain sentences. None with none.
 pub fn needs_link_said(needs: &[Value]) -> Option<String> {
     let said: Vec<String> = needs
         .iter()
         .filter_map(|need| need["name"].as_str())
         .map(|name| {
             format!(
-                "{name} isn't linked yet: link it in the app, under Skills, then Connectors, and \
-                 the skill will start then."
+                "{name} isn't linked yet. Link it in the app: open this lamp, then Connectors. \
+                 The skill will start then."
             )
         })
         .collect();
@@ -4039,8 +4039,8 @@ body = { gesture = "nod" }
         assert_eq!(
             needs_link_said(&[json!({"code": "gmail", "name": "Gmail"})]).as_deref(),
             Some(
-                "Gmail isn't linked yet: link it in the app, under Skills, then Connectors, and \
-                 the skill will start then."
+                "Gmail isn't linked yet. Link it in the app: open this lamp, then Connectors. \
+                 The skill will start then."
             )
         );
         assert_eq!(needs_link_said(&[]), None);

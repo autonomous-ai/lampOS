@@ -682,7 +682,7 @@ before ([skills.md](skills.md), "Asked for in the app").
   for a skill that reads none); absent when `lamp-services` couldn't say, or before the check
   is kept, a moment after `kept` first shows ([services.md](services.md),
   "Not linked when it is made"). The skill is kept and asked about either
-  way; the app can show where to link it (Skills, then Connectors).
+  way; the app can show where to link it (open this lamp, then Connectors).
 - **Put on only by a spoken yes at the lamp** (the lead's ruling on #1711,
   20 Oct 08:37): the lamp tells the kept skill aloud at a good moment with
   someone there, and only a spoken yes within 120 s of that ask puts it on,

@@ -191,7 +191,7 @@ pub struct Services<H, M> {
 /// What a call to a service not linked is told, after its name: and where
 /// the person links it, so the lamp says the way, not only the lack.
 pub const NOT_LINKED: &str =
-    "isn't linked to this lamp yet. It can be linked in the app: Skills, then Connectors.";
+    "isn't linked to this lamp yet. It can be linked in the app: open this lamp, then Connectors.";
 
 /// Gmail's app password as IMAP and SMTP take it: Google shows it in
 /// groups of four with spaces, which are not part of it (a phone's copy
@@ -1266,7 +1266,7 @@ mod tests {
         ));
         assert_eq!(
             answer["error"],
-            "Notion isn't linked to this lamp yet. It can be linked in the app: Skills, then Connectors."
+            "Notion isn't linked to this lamp yet. It can be linked in the app: open this lamp, then Connectors."
         );
         let connected = run(services.tool(r#"{"op":"call","name":"services_connected"}"#));
         assert!(!connected.to_string().contains("planted"));
@@ -2268,6 +2268,19 @@ mod tests {
             reads::GMAIL_APP_NO_READS
         );
         assert!(services.http.calls().is_empty());
+    }
+
+    /// A Lamp 2 in the app has no Connectors under Skills: they are a row
+    /// on the lamp's own page, so the lamp says that way.
+    #[test]
+    fn where_to_link_is_the_lamps_own_connectors() {
+        for told in [NOT_LINKED, reads::GMAIL_APP_NO_READS] {
+            assert!(
+                told.contains("in the app: open this lamp, then Connectors."),
+                "{told}"
+            );
+            assert!(!told.contains("Skills"), "{told}");
+        }
     }
 
     #[test]

@@ -254,7 +254,7 @@ pub const WHATS: &[(&str, &str)] = &[
 
 /// What the lamp says to a read of `gmail-app`, a Google sign-in that
 /// may only send (its scopes hold no `gmail.readonly`).
-pub const GMAIL_APP_NO_READS: &str = "This Gmail link, made with Google sign-in, can only send mail. To read mail, link Gmail with an app password in the app: Skills, then Connectors.";
+pub const GMAIL_APP_NO_READS: &str = "This Gmail link, made with Google sign-in, can only send mail. To read mail, link Gmail with an app password in the app: open this lamp, then Connectors.";
 
 /// Why `code` is never read, whether or not it is linked: `gmail-app`'s
 /// answer, so a read is refused before its token is looked at.

@@ -69,9 +69,9 @@ sau:
    vụ là `NOT_A_SERVICE`, như trước. Khi đã giữ, một kỹ năng có bước đọc một
    dịch vụ chưa liên kết lúc đó (`services_connected`, hỏi một lần, tối đa
    500 ms) vẫn được giữ, và việc tạo báo điều đó: tạo bằng giọng nói,
-   `needs_link` trong câu trả lời của việc tạo và một câu nói trước lời hỏi,
-   "Gmail isn't linked yet: link it in the app, under Skills, then
-   Connectors, and the skill will start then."; tạo từ ứng dụng,
+   `needs_link` trong câu trả lời của việc tạo và chỗ liên kết được nói trước lời
+   hỏi, "Gmail isn't linked yet. Link it in the app: open this lamp, then
+   Connectors. The skill will start then."; tạo từ ứng dụng,
    `needs_link: [{"code", "name"}]` trong `skills.made`. Khi `lamp-services`
    không trả lời thì không có cả hai, và việc tạo vẫn thành
    ([services_vi.md](services_vi.md), "Chưa liên kết lúc tạo").
