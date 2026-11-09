@@ -160,9 +160,36 @@ refusal), and nothing is started new in any case:
 - **Tests:** `tests/harness.rs`
   `with_reply_named_a_named_session_is_typed_into_and_never_started_new`;
   `engine::tests::a_store_with_a_named_session_is_written_as_schema_five`.
-- **Not yet:** the voice's side (`start_agent_task`'s `session`, the
-  read-back naming the session, Task news' words for the codes above)
-  comes in a later PR; until then nothing sends `session`.
+- **The voice's side** (off unless `LAMP_TASKS_REPLY_NAMED=on`, the
+  provider worker's `--tasks-reply-named`, last of the tasks flags; it
+  needs only the tasks part): `start_agent_task` takes an optional
+  `session`, described as "Only if the person named one of their sessions
+  to give this to ("the docs session"): its name as they said it. Never
+  guessed, never from the work." It is trimmed and sent as `prepare`'s
+  `session`; blank is none, and words over 128 bytes or with a control
+  character prepare nothing and the model is told to ask which session.
+  The answer's `where`, which the read-back says, is "<who>, in the
+  session "…" on <computer>, not a new one". The session is kept with the
+  task waiting for its yes: with `LAMP_TASKS_ONE_YES`, a read-back said in
+  words must say the session's words too, exactly and in order, every
+  one kept and split as the tasks part splits a name (letters and digits,
+  an apostrophe splitting a word), never by stem ("file" is not "files",
+  "api" is not "the api": Harness may find each as another session),
+  and taken out before the task's words are looked for, so a word the task
+  has too is said twice; otherwise a yes to it starts nothing (the
+  Reviewer-lead's P2 on #5784 and P3 on its READ-OK, Reviewer-three's P2); a session of only filler words ("the
+  that") prepares nothing and the model is told to ask; with `LAMP_TASKS_CORRECT`, an ask that
+  changes only the session is a correction and replaces the one waiting. A
+  session named for Devin's cloud is refused before anything is asked of
+  the tasks part. Without the switch the parameter isn't offered, and one
+  the model sends anyway is dropped. Task news tells
+  `session_busy` (and `reply_not_idle`) with the `failed_busy` words, as a
+  busy routed pick; the other codes above are told as a plain failure.
+  Tests: `agent_tasks::tests::a_named_session_is_sent_with_the_task_only_with_the_switch`,
+  `agent_tasks::tests::the_reply_named_switch_is_on_only_with_the_tasks_part_and_adds_session`,
+  `agent_tasks::tests::a_read_back_must_say_the_named_session`,
+  `agent_tasks::tests::another_session_is_a_correction_and_devins_cloud_takes_none`,
+  `task_news::tests::a_busy_named_session_is_told_as_busy_and_its_other_ends_as_a_failure`.
 
 `--progress` (off unless set; #732, the second builder, 2026-10-15) reads
 how each task handed over is going with one `harness ps` a machine and puts

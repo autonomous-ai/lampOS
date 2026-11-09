@@ -1599,7 +1599,9 @@ fn note_failed(
         Some("folder_missing") => Some(&words.failed_folder),
         Some("engine_signed_out") => Some(&words.failed_signed_out),
         Some("engine_no_prompt") => Some(&words.failed_no_prompt),
-        Some("agent_busy") => Some(&words.failed_busy),
+        // A session the person named that is busy (#5535, `serve
+        // --reply-named`) is told as a busy routed one.
+        Some("agent_busy" | "session_busy" | "reply_not_idle") => Some(&words.failed_busy),
         _ => None,
     };
     if let Some(line) = refused
@@ -3164,6 +3166,44 @@ mod tests {
             note_failed(&own(), &task("claude", json!([])), true, FOLDER),
             note_failed(&own(), &task("claude", json!([])), true, None)
         );
+    }
+
+    /// `serve --reply-named` (#5535): a session the person named that is
+    /// busy is told as a busy one, as the router's pick is; the other ends
+    /// of a named session are told as a plain failure.
+    #[test]
+    fn a_busy_named_session_is_told_as_busy_and_its_other_ends_as_a_failure() {
+        let busy = note_failed(
+            &own(),
+            &task("claude", json!([])),
+            false,
+            Some("agent_busy"),
+        );
+        assert!(
+            busy.as_deref().is_some_and(|told| told.contains("is busy")),
+            "{busy:?}"
+        );
+        for code in ["session_busy", "reply_not_idle"] {
+            assert_eq!(
+                note_failed(&own(), &task("claude", json!([])), false, Some(code)),
+                busy,
+                "{code}"
+            );
+        }
+        let plain = note_failed(&own(), &task("claude", json!([])), false, None);
+        for code in [
+            "session_not_found",
+            "session_ambiguous",
+            "session_stopped",
+            "reply_off",
+            "reply_named_off",
+        ] {
+            assert_eq!(
+                note_failed(&own(), &task("claude", json!([])), false, Some(code)),
+                plain,
+                "{code}"
+            );
+        }
     }
 
     /// `serve --engines-ready` (openharness#1788): a hand-over refused as
