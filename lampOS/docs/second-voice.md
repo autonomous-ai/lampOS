@@ -4481,13 +4481,17 @@ after a take-over, but now for every turn:
       and `held_forget.rs`, with the prior acting-answer case in
       `short_done.rs`; a lamp replay is still needed.
     - **Admitting a forget cancels pending provider speech.** Before dispatching
-      an admitted memory forget, the route invalidates the old speech
+      an admitted `forget`, `forget_everything` or `forget_my_face`, the route invalidates the old speech
       generation. Pending TTS tasks, sentence packets, an unfinished packet,
       a blocked output send and an `UNSAID` carry are dropped. Fresh speech
       uses a new generation in the same request. This provider-local layer
       needs no request interruption or wire message of its own. The engine filters invalidated speech still
       in its own output channel. The confirmed held-forget path does the
-      same; locally held/refused calls and face-only forgets do not.
+      same; locally held or refused calls do not. Both admission paths also
+      clear pending rename state and carried tool rounds before awaiting
+      deletion, so cancellation cannot preserve an earlier name proposal
+      or resume earlier recalled payloads. Face deletion does not gain
+      any additional permission from this speech fence.
       Replayable words in the wordless-cut buffers are cleared too. Existing
       enqueued audio sample counts and conservative echo timing are retained,
       since earlier audio can already be outside the provider. These estimates
@@ -4588,7 +4592,7 @@ after a take-over, but now for every turn:
 
       With an authorized lamp and pinned build, repeat first-use and repeated
       same-request scenes that actually leave old speech pending before an
-      admitted memory forget. Measure admission to last audible old sample,
+      admitted memory or face forget. Measure admission to last audible old sample,
       test a slow/stalled downstream path, then verify the fresh reply and
       reference recovery. Record the exact scene, build, queue evidence and
       timing boundary. If the model never produces old pending speech before

@@ -13570,7 +13570,7 @@ async fn answer(
                 {
                     scope.release_held_keep(line, &HeldKeepYes(()));
                 }
-                if after_forget::is_memory_forget(&call.name) {
+                if crate::remember::is_forget(&call.name) {
                     queue.forget();
                 }
                 // An admitted forget (`forget`, `forget_everything`,
@@ -15408,7 +15408,7 @@ async fn answer(
                     scope.mark_everything_asked(&EverythingShown(()));
                 }
                 ran_tool.store(true, Ordering::Relaxed);
-                if after_forget::is_memory_forget(&call.name) {
+                if crate::remember::is_forget(&call.name) {
                     queue.forget();
                 }
                 // An admitted forget (`forget`, `forget_everything`,

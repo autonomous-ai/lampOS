@@ -20,33 +20,45 @@ const OLD: i16 = 111;
 const FRESH: i16 = 222;
 
 struct TailServices {
+    tool: &'static str,
     round: AtomicUsize,
     admit: Arc<Notify>,
 }
-struct TailListener;
+struct TailListener(&'static str);
 impl Listener for TailListener {
     fn send(&self, _: &[i16]) -> net::Result<()> {
         Ok(())
     }
     fn finish(self: Box<Self>, _: u64) -> BoxFuture<'static, net::Result<String>> {
-        Box::pin(async { Ok("Forget that preference.".into()) })
+        let line = if self.0 == "forget_my_face" {
+            "Forget my face."
+        } else {
+            "Forget that preference."
+        };
+        Box::pin(async move { Ok(line.into()) })
     }
 }
 impl Services for TailServices {
     fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
-        Box::pin(async { Ok(Box::new(TailListener) as Box<dyn Listener>) })
+        let tool = self.tool;
+        Box::pin(async move { Ok(Box::new(TailListener(tool)) as Box<dyn Listener>) })
     }
     fn chat(&self, _: Vec<net::Message>) -> BoxStream<'static, net::Result<net::ChatEvent>> {
         use net::ChatEvent;
         if self.round.fetch_add(1, Ordering::SeqCst) == 0 {
             let admit = self.admit.clone();
+            let tool = self.tool;
             stream::iter([Ok(ChatEvent::Text("Old speech. ".into()))])
                 .chain(stream::once(async move {
                     admit.notified().await;
                     Ok(ChatEvent::ToolCalls(vec![net::ToolCall {
                         id: "forget".into(),
-                        name: "forget".into(),
-                        args: json!({"about":"that preference"}),
+                        name: tool.into(),
+                        args: if tool == "forget_my_face" {
+                            json!({"name":"A"})
+                        } else {
+                            json!({"about":"that preference"})
+                        },
                         extra: None,
                     }]))
                 }))
@@ -111,7 +123,7 @@ impl SpeakerModel {
     }
 }
 
-async fn measure_forget_tail(draining: bool, playback_extension: bool) {
+async fn measure_forget_tail(draining: bool, playback_extension: bool, tool: &'static str) {
     let admit = Arc::new(Notify::new());
     let entered = Arc::new(Notify::new());
     let finish = Arc::new(Notify::new());
@@ -119,18 +131,23 @@ async fn measure_forget_tail(draining: bool, playback_extension: bool) {
         let entered = entered.clone();
         let finish = finish.clone();
         Arc::new(move |_, _, name, _| {
-            assert_eq!(name, "forget");
+            assert_eq!(name, tool);
             // Synchronous runner entry is immediately after Queue::forget.
             entered.notify_one();
             let finish = finish.clone();
             Box::pin(async move {
                 finish.notified().await;
-                json!({"forgotten":true})
+                if tool == "forget_my_face" {
+                    json!({"ok":true})
+                } else {
+                    json!({"forgotten":true})
+                }
             })
         })
     };
     let mut engine = Engine::new(
         Arc::new(TailServices {
+            tool,
             round: AtomicUsize::new(0),
             admit: admit.clone(),
         }),
@@ -301,7 +318,7 @@ async fn measure_forget_tail(draining: bool, playback_extension: bool) {
         "each emitted frame counted exactly once"
     );
     println!(
-        "forget_admission draining={draining} worker_frames={worker_frames} ipc_frames={ipc_frames} coordinator_frames={} speaker_unaccepted_frames={} accepted_unretired_frames={} retired_frames={} emitted_unplayed_ms={:.3}; boundary=actual_tool_runner_entry_after_provider_invalidation; speaker=simulated; acoustic=false",
+        "forget_admission tool={tool} draining={draining} worker_frames={worker_frames} ipc_frames={ipc_frames} coordinator_frames={} speaker_unaccepted_frames={} accepted_unretired_frames={} retired_frames={} emitted_unplayed_ms={:.3}; boundary=actual_tool_runner_entry_after_provider_invalidation; speaker=simulated; acoustic=false",
         reply.pcm.len(),
         speaker.unaccepted,
         speaker.accepted,
@@ -457,7 +474,7 @@ async fn measure_forget_tail(draining: bool, playback_extension: bool) {
         assert!(parent.data.receive::<ProviderOutput>().unwrap().is_none());
         assert_eq!(handed, outstanding + speaker.retired);
         println!(
-            "forget_extension draining={draining} before_worker_frames={worker_frames} before_ipc_frames={ipc_frames} before_coordinator_frames={coordinator_discarded} before_speaker_unaccepted_frames={model_unaccepted_discarded} before_accepted_unretired_frames={model_accepted_discarded} before_emitted_unplayed_ms={:.3} after_worker_frames=0 after_ipc_frames=0 after_coordinator_frames=0 after_speaker_unaccepted_frames=0 after_accepted_unretired_frames=0 after_emitted_unplayed_ms=0.000 admission_to_modelled_drop_us={} admission_to_modelled_ack_us={}; boundary=actual_Engine_admission_to_scripted_speaker_cut_and_ACK; speaker=simulated; acoustic=false",
+            "forget_extension tool={tool} draining={draining} before_worker_frames={worker_frames} before_ipc_frames={ipc_frames} before_coordinator_frames={coordinator_discarded} before_speaker_unaccepted_frames={model_unaccepted_discarded} before_accepted_unretired_frames={model_accepted_discarded} before_emitted_unplayed_ms={:.3} after_worker_frames=0 after_ipc_frames=0 after_coordinator_frames=0 after_speaker_unaccepted_frames=0 after_accepted_unretired_frames=0 after_emitted_unplayed_ms=0.000 admission_to_modelled_drop_us={} admission_to_modelled_ack_us={}; boundary=actual_Engine_admission_to_scripted_speaker_cut_and_ACK; speaker=simulated; acoustic=false",
             outstanding as f64 / 24.0,
             model_drop_at_us.saturating_sub(cut.admitted_at_us),
             model_ack_at_us.saturating_sub(cut.admitted_at_us)
@@ -525,22 +542,32 @@ async fn measure_forget_tail(draining: bool, playback_extension: bool) {
 
 #[tokio::test(flavor = "current_thread")]
 async fn forget_admission_measures_saturated_emitted_tail() {
-    measure_forget_tail(false, false).await;
+    measure_forget_tail(false, false, "forget").await;
 }
 
 #[tokio::test(flavor = "current_thread")]
 async fn forget_admission_measures_draining_emitted_tail() {
-    measure_forget_tail(true, false).await;
+    measure_forget_tail(true, false, "forget").await;
 }
 
 #[tokio::test(flavor = "current_thread")]
 async fn forget_extension_clears_the_same_saturated_tail() {
-    measure_forget_tail(false, true).await;
+    measure_forget_tail(false, true, "forget").await;
 }
 
 #[tokio::test(flavor = "current_thread")]
 async fn forget_extension_clears_the_same_draining_tail() {
-    measure_forget_tail(true, true).await;
+    measure_forget_tail(true, true, "forget").await;
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn face_forget_extension_clears_saturated_emitted_tail() {
+    measure_forget_tail(false, true, "forget_my_face").await;
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn face_forget_extension_clears_draining_emitted_tail() {
+    measure_forget_tail(true, true, "forget_my_face").await;
 }
 
 /// Real provider worker/control IPC: withheld audio credits and a refused or
@@ -562,6 +589,7 @@ async fn provider_cut_without_ack_holds_output_and_stops_or_fails_closed() {
         let admit = Arc::new(Notify::new());
         let engine = Engine::new(
             Arc::new(TailServices {
+                tool: "forget",
                 round: AtomicUsize::new(0),
                 admit: admit.clone(),
             }),
@@ -707,6 +735,7 @@ async fn admitted_engine_cut_crosses_saturated_ipc_and_fences_late_audio_until_a
     };
     let mut engine = Engine::new(
         Arc::new(TailServices {
+            tool: "forget",
             round: AtomicUsize::new(0),
             admit: admit.clone(),
         }),

@@ -436,6 +436,7 @@ async fn queue_forget_bookkeeping_timing_and_tag_reset() {
         request: REQUEST,
         heard_at: Instant::now(),
         tags: Some(speech_tags::Tags::new(true)),
+        line: String::new(),
     };
     let mut times = Vec::new();
     for _ in 0..1_001 {
@@ -490,6 +491,7 @@ async fn queued_cue_and_prelude_are_invalidated_but_fresh_and_lifecycle_output_s
         request: REQUEST,
         heard_at: Instant::now(),
         tags: None,
+        line: String::new(),
     };
     assert!(cue(&shared, REQUEST, vec![3; 120]).await.is_ok());
     assert!(
@@ -563,4 +565,379 @@ async fn older_request_cannot_replace_the_latest_speech_fence() {
         engine.try_output().is_none(),
         "latest queued text remains fenced"
     );
+}
+
+/// Probe the actual admission boundary, not the tool's successful return:
+/// the runner remains blocked while old queued output and its token are checked.
+async fn admitted_named_forget_cuts_speech(name: &'static str, heard: &'static str) {
+    const QUEUED_PRIVATE: &str = "The second orchid is amber.";
+    for stalled in [true, false] {
+        let (tts_release, tts_wait) = tokio::sync::oneshot::channel();
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(heard.into())].into()),
+            chats: Mutex::new(
+                [
+                    vec![
+                        text(&format!("{PRIVATE} ")),
+                        text(&format!("{QUEUED_PRIVATE} ")),
+                        Ok(ChatEvent::ToolCalls(vec![call(
+                            "erase-named",
+                            name,
+                            json!({"name":"A"}),
+                        )])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text(FRESH), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            piece_gap: Some(Duration::from_millis(100)),
+            speech_hold: Mutex::new(stalled.then_some((PRIVATE, tts_wait))),
+            lasting: (!stalled).then_some((PRIVATE, PACKET_SAMPLES * 32)),
+            ..Script::default()
+        });
+        let token: Arc<Mutex<Option<speech_generation::Generation>>> = Arc::default();
+        let (admit, admitted) = tokio::sync::oneshot::channel();
+        let (release, released) = tokio::sync::oneshot::channel();
+        let gate = Arc::new(Mutex::new(Some((admit, released))));
+        let observed = token.clone();
+        let runner: ToolRunner = Arc::new(move |request, spoken, called, _| {
+            assert_eq!(request, REQUEST);
+            assert!(spoken);
+            assert_eq!(called, name);
+            // Synchronous runner entry precedes polling the deletion future.
+            let invalidated = !observed.lock().unwrap().as_ref().unwrap().current();
+            let (admit, released) = gate
+                .lock()
+                .unwrap()
+                .take()
+                .expect("exactly one admitted forget");
+            admit.send(invalidated).unwrap();
+            Box::pin(async move {
+                released.await.unwrap();
+                if name == crate::known_faces::FORGET {
+                    json!({"ok":true})
+                } else {
+                    json!({"forgotten":true})
+                }
+            })
+        });
+        let mut engine = Engine::new(
+            script.clone(),
+            || "Static character.".to_owned().into(),
+            runner,
+        )
+        .announcing(false);
+        let old = engine.shared.speech_generation(REQUEST).borrow().clone();
+        *token.lock().unwrap() = Some(old.clone());
+        engine.submit(start(REQUEST));
+        engine.submit(audio(REQUEST, 1));
+        engine.submit(end(REQUEST));
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        assert!(
+            script
+                .spoken
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|line| line == PRIVATE)
+        );
+        if stalled {
+            assert!(
+                script.speech_hold.lock().unwrap().is_none(),
+                "old TTS must be waiting"
+            );
+        } else {
+            assert_eq!(
+                engine.shared.out.capacity(),
+                0,
+                "old output must actually saturate the queue"
+            );
+        }
+        let invalidated_before_io = tokio::time::timeout(Duration::from_secs(1), admitted)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            script
+                .spoken
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|line| line == QUEUED_PRIVATE),
+            "second old sentence must actually be queued"
+        );
+        assert!(
+            invalidated_before_io,
+            "{name}: speech must be invalidated before entering the runner, stalled={stalled}"
+        );
+        assert!(!old.current());
+        let cut = engine
+            .speech_cut()
+            .expect("admitted forget must publish the playback cut before tool I/O completes");
+        assert_eq!(cut.request, REQUEST);
+        if !stalled {
+            assert!(cut.through > 0);
+        }
+        while let Some(event) = engine.try_output() {
+            assert!(!matches!(event, ProviderOutput::Audio { .. }));
+            assert!(
+                !matches!(event, ProviderOutput::Transcript { finished:false, text, .. } if text.trim() == PRIVATE || text.trim() == QUEUED_PRIVATE)
+            );
+        }
+        release.send(()).unwrap();
+        let events = collect_named_forget(&mut engine, REQUEST).await;
+        assert_fresh_audio(&events);
+        if stalled {
+            assert!(
+                tts_release.send(()).is_err(),
+                "old stalled stream must be cancelled"
+            );
+        }
+    }
+}
+
+async fn collect_named_forget(engine: &mut Engine, request: u64) -> Vec<ProviderOutput> {
+    tokio::time::timeout(Duration::from_secs(2), async {
+        let mut events = Vec::new();
+        loop {
+            let event = engine.next().await;
+            assert!(
+                !matches!(event, ProviderOutput::TurnFailed { .. }),
+                "{event:?}"
+            );
+            let done =
+                matches!(event, ProviderOutput::TurnComplete { request: of, .. } if of == request);
+            events.push(event);
+            if done {
+                return events;
+            }
+        }
+    })
+    .await
+    .expect("cancelled old speech must not hold the fresh same-request reply")
+}
+
+#[tokio::test(start_paused = true)]
+async fn face_forget_cuts_stalled_and_queued_speech_before_runner_io() {
+    admitted_named_forget_cuts_speech(crate::known_faces::FORGET, "Forget my face and say done.")
+        .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn forget_everything_cuts_stalled_and_queued_speech_before_runner_io() {
+    // No known-person scope: this exercises ordinary admission; the runner
+    // may refuse storage, but admission already fences prepared speech.
+    admitted_named_forget_cuts_speech(
+        crate::remember::FORGET_EVERYTHING,
+        "Forget everything about me and say done.",
+    )
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn unasked_face_forget_does_not_fence_or_cancel_old_speech() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Tell me about the orchid.".into())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    text(&format!("{PRIVATE} ")),
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "unasked-face",
+                        crate::known_faces::FORGET,
+                        json!({"name":"A"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        piece_gap: Some(Duration::from_millis(10)),
+        speech_after: Some(Duration::from_millis(100)),
+        ..Script::default()
+    });
+    let runner: ToolRunner =
+        Arc::new(|_, _, _, _| panic!("an unasked face forget must not reach the runner"));
+    let mut engine =
+        Engine::new(script, || "Static character.".to_owned().into(), runner).announcing(false);
+    let old = engine.shared.speech_generation(REQUEST).borrow().clone();
+    let events = finish(&mut engine).await;
+    assert!(old.current());
+    assert!(engine.speech_cut().is_none());
+    let samples: Vec<_> = events
+        .iter()
+        .filter_map(|event| match event {
+            ProviderOutput::Audio { samples, .. } => Some(samples.as_slice()),
+            _ => None,
+        })
+        .flatten()
+        .copied()
+        .collect();
+    assert_eq!(samples, vec![PRIVATE.len() as i16; 1_500]);
+}
+
+#[tokio::test(start_paused = true)]
+async fn held_yes_face_forget_fences_queued_prelude_before_runner_io() {
+    struct KnownFile(std::path::PathBuf);
+    impl Drop for KnownFile {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+    let known = KnownFile(std::env::temp_dir().join(format!(
+        "face-speech-held-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    )));
+    std::fs::write(&known.0, "A").unwrap();
+    let cache = Arc::new(crate::memory_scope::FaceCache::default());
+    cache.replace(
+        cache.begin_refresh(),
+        crate::known_faces::FaceObservation::read(&known.0),
+    );
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Who am I?".into()), Ok("Yes.".into())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "held-face",
+                        crate::known_faces::FORGET,
+                        json!({"name":"A"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Shall I forget your face?"), Ok(ChatEvent::Done)],
+                vec![text(FRESH), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let token: Arc<Mutex<Option<speech_generation::Generation>>> = Arc::default();
+    let observed = token.clone();
+    let (admit, admitted) = tokio::sync::oneshot::channel();
+    let (release, released) = tokio::sync::oneshot::channel();
+    let gate = Arc::new(Mutex::new(Some((admit, released))));
+    let runner: ScopedToolRunner = Arc::new(move |request, heard, name, _, scope| {
+        assert_eq!(
+            request, REQUEST,
+            "the original unasked call must remain held"
+        );
+        assert!(heard);
+        assert_eq!(name, crate::known_faces::FORGET);
+        assert_eq!(
+            scope.scope().unwrap().person(),
+            Some(crate::remember::person_id("A").as_str())
+        );
+        let invalidated = !observed.lock().unwrap().as_ref().unwrap().current();
+        let (admit, released) = gate
+            .lock()
+            .unwrap()
+            .take()
+            .expect("one confirmed face forget");
+        admit.send(invalidated).unwrap();
+        Box::pin(async move {
+            released.await.unwrap();
+            json!({"ok":true})
+        })
+    });
+    let mut engine = Engine::new(
+        script.clone(),
+        || "Static character.".to_owned().into(),
+        Arc::new(|_, _, _, _| panic!("face call must use its admitted scope")),
+    )
+    .with_memory_scope(
+        lamp_turn_owner::BootId::new([174; 16]).unwrap(),
+        cache.clone(),
+        runner,
+        None,
+    )
+    .announcing(false);
+    engine.memory_camera(true, 1);
+    // Camera admission starts a new cache epoch; publish the observed face after it.
+    cache.replace(
+        cache.begin_refresh(),
+        crate::known_faces::FaceObservation::read(&known.0),
+    );
+    engine.submit(start(REQUEST - 1));
+    engine.submit(audio(REQUEST - 1, 1));
+    engine.submit(end(REQUEST - 1));
+    collect_named_forget(&mut engine, REQUEST - 1).await;
+    assert!(
+        engine.speech_cut().is_none(),
+        "holding the original call must not cut speech"
+    );
+    {
+        let held = engine.shared.held_forget.lock().unwrap();
+        let held = held
+            .held
+            .as_ref()
+            .expect("real first request must hold the call");
+        assert!(
+            held.asked,
+            "the question must have been spoken before yes can admit it"
+        );
+        assert_eq!(held.call.name, crate::known_faces::FORGET);
+    }
+    // Held calls run before round one. Queue the same-request fixed-prelude
+    // output through Shared::emit, the path a prelude uses before answer().
+    let old = engine.shared.speech_generation(REQUEST).borrow().clone();
+    *token.lock().unwrap() = Some(old.clone());
+    let sequence = engine.shared.sequence.fetch_add(1, Ordering::Relaxed) + 1;
+    assert!(
+        engine
+            .shared
+            .emit(ProviderOutput::Transcript {
+                request: Some(REQUEST),
+                text: PRIVATE.into(),
+                finished: false,
+            })
+            .await
+    );
+    assert!(
+        engine
+            .shared
+            .emit(ProviderOutput::Audio {
+                request: REQUEST,
+                sequence,
+                provider_event_at_us: monotonic_us(),
+                source_frames: PACKET_SAMPLES,
+                source_offset: 0,
+                samples: vec![7; PACKET_SAMPLES],
+            })
+            .await
+    );
+    engine.submit(start(REQUEST));
+    engine.submit(audio(REQUEST, 1));
+    engine.submit(end(REQUEST));
+    let invalidated_before_io = tokio::time::timeout(Duration::from_secs(1), admitted)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        invalidated_before_io,
+        "held yes must fence old speech before polling the deletion future"
+    );
+    assert!(!old.current());
+    let cut = engine
+        .speech_cut()
+        .expect("held face forget must publish a playback cut");
+    assert_eq!(cut.request, REQUEST);
+    assert!(cut.through >= sequence);
+    assert_eq!(
+        script.asked.lock().unwrap().len(),
+        2,
+        "held forget runs before the yes turn's first model round"
+    );
+    while let Some(event) = engine.try_output() {
+        assert!(!matches!(event, ProviderOutput::Audio { .. }));
+        assert!(
+            !matches!(event, ProviderOutput::Transcript { finished:false, text, .. } if text.trim() == PRIVATE)
+        );
+    }
+    release.send(()).unwrap();
+    assert_fresh_audio(&collect_named_forget(&mut engine, REQUEST).await);
 }

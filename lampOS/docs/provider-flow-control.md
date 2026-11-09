@@ -133,6 +133,14 @@ provider flow-control protocol.
 
 ## Admitted-forget fence over priority control (device validation pending)
 
+The Second-route fence applies to admitted `forget`, `forget_everything` and
+`forget_my_face`, including a confirmed held call. It runs synchronously before
+deletion I/O, after the existing admission checks. Merely holding or refusing
+a call does not cut speech. Pending rename cleanup and carried-round clearing
+remain separate pre-await actions, so interruption during deletion cannot
+resume earlier recalled payloads. The result sanitizer retains its existing
+separate memory and face outcome mappings.
+
 The downstream forget extension uses control independently of credited output:
 `WorkerEvent::ProviderSpeechCut` carries the current request, inclusive old
 provider `Audio.sequence` watermark and monotonic admission time. A saturated

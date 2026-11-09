@@ -2363,3 +2363,52 @@ host admission-to-drop acknowledgment distinct from measured last audible old
 sample. The model must actually produce pending old speech in the same request
 before admitted forget; otherwise the lamp scene is NOT EXERCISED. No extension
 latency, acoustic success or device acceptance is claimed by this entry.
+
+
+## 9 November — face forget uses the existing speech cut
+
+PM's Queue decision 6740970251 assigns the same one-second audible-stop target
+to admitted face forget. Reuse the provider generation fence and downstream
+priority cut/ACK path from #5856/#5858. Broaden only the two pre-await speech
+admission predicates to `remember::is_forget`; retain #5792's rename cleanup
+at both sites and #5878's carried-round clear before runner I/O plus its
+independent post-result context reset. The interruption repair is carried from
+`7d6633bb85`; all three interruption cases also pass in this composition. Do not broaden
+`after_forget::is_memory_forget`, which interprets memory-specific cleanup
+fields. Authorization, confirmation holds, deletion scope and tool census stay
+with their existing gates. No additional network call, task or queue is added.
+
+V1's `hal/realtime/orchestrator.py::flush_output` discards provider output before
+a new turn and waits a bounded time for announcements; its `announce` path also
+flushes old output. Reuse the discard-before-continuation principle, not its
+new-turn boundary or announcement wait: this Rust fence must preserve the
+current request and execute before deletion can block. Those V1 methods do not
+establish face-forget or physical-tail acceptance for this extension.
+
+The previous playback validation entry above predates completed Linux CI.
+Run 42614103903 subsequently passed 10,762 selected tests with 62 skipped,
+including the actual Linux speaker-loop ALSA-null reset-before-ACK case, at
+`fb7027ad7f` merged with `429b1f3ba8`. That is evidence for its named memory-only
+source, not for this new face extension. New face tests and measurements must
+be reported separately. Real last-audible-sample timing remains an authorized
+lamp gate; host scripted drop/ACK cannot satisfy it.
+
+
+On the composed train-756 source (`4342bcccc8` plus the named dependencies),
+fail-first provider checks passed 11 controls and failed both ordinary and
+held-yes face admissions at the pre-I/O invalidation assertion. The two face
+tail fixtures separately failed for a missing cut at 30,040 ms saturated and
+130 ms draining. After the two predicate changes, the face filter passed 22
+cases (two existing manual measurements ignored), and all 13 provider speech
+cases passed. Those filters overlap and are not a sum of unique tests.
+
+The same face tail fixtures now discard all old frames: saturated
+admission-to-scripted-drop/ACK was 1,414/1,567 microseconds and draining was
+1,282/1,366 microseconds. These use real Engine admission, credited IPC and
+coordinator logic with a simulated speaker. Queue bookkeeping alone, one
+sentence and no tasks, measured first 8.924 microseconds; 1,000 repetitions
+had median 2.259, p99 3.992 and maximum 12.408 microseconds. The bookkeeping
+target is under 1 ms; neither measurement is an acoustic or worst-case bound.
+Initial socket-denied sandbox runs and corrected test cache-epoch/person-key
+assumptions are setup failures, not product fail-first evidence. Broader native
+and device gates remain separate from these focused host results.
