@@ -155,6 +155,11 @@ const TOUCH_REMIND_BY_US: u64 = 20_000_000;
 /// "Touch": a remind that still could not be said holds the fail this much
 /// past [`TOUCH_GIVE_UP_US`] at most, so the step stays bounded.
 const TOUCH_REMIND_GRACE_US: u64 = 10_000_000;
+/// "Touch": a remind is heard out this long before the step fails, so its
+/// "Gently, on top of my head." is never followed at once by the fail line
+/// (the Reviewer-lead's P2 on #5857); no remind is said later than this
+/// before [`TOUCH_GIVE_UP_US`] + [`TOUCH_REMIND_GRACE_US`].
+const TOUCH_REMIND_HEARD_US: u64 = 8_000_000;
 /// "Touch" done (#4080): the walk steps aside (`walk` false on
 /// `onboarding/pending`) this long after the latest head touch felt, so the
 /// lamp's own pet response (Head pat wiggle: 2 s after the hand lifts) may
@@ -3490,12 +3495,13 @@ impl Onboarding {
                 self.owed = self.definition.words.touch_done.clone();
                 self.pet_response_until_us = Some(now_us + PET_RESPONSE_US);
             } else if now_us.saturating_sub(asked_us)
-                >= TOUCH_GIVE_UP_US
-                    + if led.guided_us == Some(asked_us) {
-                        TOUCH_REMIND_GRACE_US
-                    } else {
-                        0
-                    }
+                >= match led.guided_us.filter(|&at| at != asked_us) {
+                    // Reminded: 60 s, or the remind heard out, within 70 s.
+                    Some(reminded) => (reminded.saturating_sub(asked_us) + TOUCH_REMIND_HEARD_US)
+                        .clamp(TOUCH_GIVE_UP_US, TOUCH_GIVE_UP_US + TOUCH_REMIND_GRACE_US),
+                    // Never reminded (the room never quiet): 70 s.
+                    None => TOUCH_GIVE_UP_US + TOUCH_REMIND_GRACE_US,
+                }
             {
                 // No touch felt after the one reminder: failed, said, and the
                 // walk moves on (#4080, the lead's rule; it was `later`, #3996).
@@ -3511,6 +3517,8 @@ impl Onboarding {
                     || (now_us.saturating_sub(asked_us) >= TOUCH_REMIND_BY_US
                         && quiet_us >= START_QUIET_US))
                 && led.guided_us == Some(asked_us)
+                && now_us.saturating_sub(asked_us)
+                    <= TOUCH_GIVE_UP_US + TOUCH_REMIND_GRACE_US - TOUCH_REMIND_HEARD_US
             {
                 led.guided_us = Some(now_us);
                 self.records
@@ -10526,6 +10534,75 @@ mod tests {
             notes.extend(room.wait(7 * S, Some(NEAR_MIDDLE)));
         }
         assert_eq!(notes[..2], [TOUCH_REMIND, TOUCH_FAILED]);
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Failed));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// When "touch" was asked, by the walk's own record.
+    fn touch_asked_us(room: &Room) -> u64 {
+        room.walk
+            .records
+            .iter()
+            .rev()
+            .find(|record| {
+                record["kind"] == "onboarding_step"
+                    && record["step"] == "touch"
+                    && record["state"] == "asked"
+            })
+            .and_then(|record| record["at_us"].as_u64())
+            .expect("touch asked")
+    }
+
+    /// The Reviewer-lead's P2 on #5857: the room's first 3 s of quiet comes
+    /// just after 60 s; the remind is said and heard out 8 s before the
+    /// fail, never followed at once by it.
+    #[test]
+    fn a_remind_said_after_a_minute_is_heard_out_before_the_fail() {
+        let (mut room, _says, root) = at_touch("late-remind");
+        let asked = touch_asked_us(&room);
+        let mut notes = Vec::new();
+        // Noise every 2.5 s to 58 s: quiet first reaches 3 s at 61 s.
+        while room.at < asked + 58 * S {
+            room.said = room.at;
+            notes.extend(room.wait(5 * S / 2, Some(NEAR_MIDDLE)));
+        }
+        room.said = asked + 58 * S;
+        let mut timed = Vec::new();
+        while room.at < asked + 75 * S && timed.len() < 2 {
+            for note in room.wait(S / 4, Some(NEAR_MIDDLE)) {
+                timed.push((room.at - asked, note));
+            }
+        }
+        assert!(notes.is_empty(), "{notes:?}");
+        assert_eq!(timed.len(), 2, "{timed:?}");
+        assert_eq!(timed[0].1, TOUCH_REMIND);
+        assert_eq!(timed[1].1, TOUCH_FAILED);
+        assert!(timed[0].0 > 60 * S, "{timed:?}");
+        assert!(
+            timed[1].0 - timed[0].0 >= TOUCH_REMIND_HEARD_US,
+            "{timed:?}"
+        );
+        assert!(timed[1].0 <= 70 * S + S, "{timed:?}");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// The same, the quiet first after 62 s: too late to be heard out, so no
+    /// remind; the step fails at 70 s.
+    #[test]
+    fn no_remind_is_said_too_late_to_be_heard_out() {
+        let (mut room, _says, root) = at_touch("no-late-remind");
+        let asked = touch_asked_us(&room);
+        while room.at < asked + 62 * S {
+            room.said = room.at;
+            assert!(room.wait(3 * S - S / 2, Some(NEAR_MIDDLE)).is_empty());
+        }
+        room.said = room.at;
+        let notes = room.wait(10 * S, Some(NEAR_MIDDLE));
+        assert_eq!(
+            notes.first().map(String::as_str),
+            Some(TOUCH_FAILED),
+            "{notes:?}"
+        );
         assert_eq!(room.outcome(Step::Touch), Some(Outcome::Failed));
         std::fs::remove_dir_all(root).unwrap();
     }
