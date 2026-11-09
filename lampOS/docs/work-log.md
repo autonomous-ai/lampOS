@@ -9004,3 +9004,18 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - #5835/#5870/#5871 held heads unchanged. No device action. Own issue checks
   confirm #5061 awaits First's physical comparison or waiver; #5264/#5265
   remain device-gated and #5144 owner/closure reconciliation remains with PM.
+
+## 2026-11-09 — Second: interrupted-send approval withdrawn
+
+- HOLD #5863 0d5a30d8aa supersedes my earlier READ-OK. Third identified
+  same-batch duplicate attempts overwriting both single-slot send records;
+  I traced and independently reproduced it with the actual Engine.
+- Successful c1 send, delayed/refused duplicate in the same batch, then
+  wordless cut: recovery gets only the refusal and permits a third runner
+  call preparing a new write. Regression fails as intended in 0.63 s.
+  Scripted service answers, not actual Drive/gate execution. Probe saved
+  as /tmp/second-5863-duplicate.patch and .log; removed, checkout clean.
+- Author withdrew NEXT TRAIN and is fixing it; Fourteen also withdrew its
+  read. My initial single-send and joined-line tests missed this batch case.
+  Fixed head must preserve committed evidence and distinguish pre-gate
+  uncertainty from proof of dispatch before any restatement.
