@@ -4037,6 +4037,95 @@ mod tests {
         assert!(looked.unmeasured_gaze_socket.is_none());
     }
 
+    /// The kept poses files (tests/fixtures/stores, #5759) whose names start
+    /// with `prefix`: what a lamp already holds, as its day's writer or a
+    /// person wrote it.
+    fn kept_poses_files(prefix: &str) -> Vec<(String, String)> {
+        let folder = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/stores");
+        let mut kept: Vec<(String, String)> = std::fs::read_dir(folder)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| {
+                path.file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.starts_with(prefix))
+            })
+            .map(|path| {
+                let name = path.file_name().unwrap().to_string_lossy().into_owned();
+                (name, std::fs::read_to_string(&path).unwrap())
+            })
+            .collect();
+        kept.sort();
+        kept
+    }
+
+    /// `BODY_POSES` as systemd's `EnvironmentFile=` gives it: the one line,
+    /// its double quotes taken off.
+    fn poses_of(lamp_env: &str) -> &str {
+        lamp_env
+            .lines()
+            .find_map(|line| line.strip_prefix("BODY_POSES=\"")?.strip_suffix('"'))
+            .expect("a kept poses file has BODY_POSES")
+    }
+
+    /// `unit`'s `ExecStart` with `poses` for `$BODY_POSES`, split on
+    /// whitespace as systemd splits it unquoted, read as the body reads it.
+    fn started_by(unit: &str, poses: &str) -> Result<Option<Arguments>, &'static str> {
+        let exec = unit
+            .lines()
+            .find_map(|line| line.strip_prefix("ExecStart="))
+            .expect("the unit has an ExecStart");
+        let words: Vec<String> = exec
+            .split_whitespace()
+            .skip(1)
+            .flat_map(|word| match word {
+                "$BODY_POSES" => poses.split_whitespace().map(str::to_owned).collect(),
+                "%H" | "@UNIT_ID@" => vec!["lamp-a63e".to_owned()],
+                "@SERVO_DEVICE@" => vec!["/dev/ttyACM0".to_owned()],
+                "@MOTOR_LOCK_DIR@" => vec!["/var/lib/lampos-locks/motor".to_owned()],
+                word => vec![word.to_owned()],
+            })
+            .collect();
+        parse_with(words.iter().map(OsString::from), Some(poses))
+    }
+
+    /// Each later build's body must start on every poses file a lamp holds,
+    /// or every lamp holding that shape stops moving after the update: the
+    /// product's `lamp.env` from the product unit, and the generic
+    /// package's seated `measured.env` from its own unit (#2163).
+    #[test]
+    fn the_body_starts_on_every_kept_poses_file() {
+        const PRODUCT: &str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../deploy/product/lamp-body.service"
+        ));
+        const GENERIC: &str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../deploy/units/lamp-body.service"
+        ));
+        let lamp_envs = kept_poses_files("lamp-env-");
+        let measured = kept_poses_files("measured-env-");
+        assert!(
+            lamp_envs.len() >= 4 && !measured.is_empty(),
+            "{lamp_envs:?} {measured:?}"
+        );
+        for (unit, kept) in [(PRODUCT, lamp_envs), (GENERIC, measured)] {
+            for (name, text) in kept {
+                let poses = poses_of(&text);
+                let read = started_by(unit, poses)
+                    .unwrap_or_else(|why| panic!("{name}: {why}"))
+                    .unwrap_or_else(|| panic!("{name}: read as help"));
+                let home = poses
+                    .split_whitespace()
+                    .skip_while(|word| *word != "--home")
+                    .nth(1)
+                    .and_then(home_of);
+                assert_eq!(read.home, home, "{name}");
+                assert_eq!(read.gaze.is_some(), poses.contains("--gaze "), "{name}");
+            }
+        }
+    }
+
     #[test]
     fn a_gesture_is_asked_for_by_the_name_of_a_clip_and_nothing_else() {
         const WIGGLE: lamp_body::clips::Clip = lamp_body::clips::Clip {

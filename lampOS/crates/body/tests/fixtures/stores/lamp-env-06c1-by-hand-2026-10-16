@@ -1,0 +1,3 @@
+# lamp-06c1, read at rest with torque off by el, 2026-10-16 12:1x (~/el-backup-20261016/body-inspect-rest.txt).
+# home/folded-arm: found at rest. stand: lamp-4ace's with this lamp's roll and yaw. gaze, pitch-window: lamp-52e6's, NOT measured here yet.
+BODY_POSES="--home 1772,2057,2034 --folded-arm 2050,2059 --stand 1772,2057,2034,2657,2602 --gaze 782,557 --pitch-window 1670,1995 --torque on"
