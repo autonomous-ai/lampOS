@@ -349,12 +349,24 @@ giữ gì.
 - **Ở `set`:** một lệnh IMAP `LOGIN` được thử trước. Bị từ chối: `failure` với
   "Gmail refused the app password"; không kết nối được: "Gmail couldn't be
   reached"; dù trường hợp nào cũng không gì được lưu.
-- **Đọc:** IMAP qua TLS đến `imap.gmail.com:993`: `LOGIN`, `EXAMINE INBOX`
-  (hộp thư mở ở chế độ chỉ-đọc), `UID SEARCH` (các từ của `search` là cú pháp
+- **Đọc:** IMAP qua TLS đến `imap.gmail.com:993`: `LOGIN`, `EXAMINE` một
+  hộp thư (mở ở chế độ chỉ-đọc), `UID SEARCH` (các từ của `search` là cú pháp
   riêng của Gmail, `X-GM-RAW`), `UID FETCH` lấy From, Subject, Date và phần
-  đầu nội dung bằng `BODY.PEEK` (không gì bị đánh dấu đã đọc), `LOGOUT`. Một
-  danh sách tối đa 10 thư, mỗi thư 300 ký tự; `message {id}` (UID mà một danh
-  sách đưa ra) đến 3,000. Nội dung lấy từ phần văn bản thuần trước, nếu không
+  đầu nội dung bằng `BODY.PEEK` (không gì bị đánh dấu đã đọc), `LOGOUT`.
+  `recent` đọc hộp thư đến (`EXAMINE INBOX`). `search` đọc All Mail, như
+  tìm kiếm riêng của Gmail, nên một thư đã lưu trữ hoặc gắn nhãn nằm ngoài
+  hộp thư đến cũng được tìm thấy (Spam và Trash không nằm trong All Mail):
+  trước tiên một lệnh `LIST "" "*"` tìm hộp thư được đánh dấu `\All` (RFC
+  6154), dù tên của nó theo ngôn ngữ của tài khoản là gì (`[Gmail]/All
+  Mail`, `[Gmail]/Tất cả thư`), và gửi lại tên đúng như máy chủ đã viết
+  (modified UTF-7); khi không hộp thư nào được đánh dấu (All Mail bị ẩn khỏi
+  IMAP trong cài đặt của Gmail) thì tìm kiếm đọc hộp thư đến. Một UID chỉ chỉ
+  một thư trong hộp thư của nó, nên id của một thư từ All Mail mang theo điều
+  đó: `all41` là UID 41 trong All Mail, `41` trơn là UID 41 trong hộp thư
+  đến. `message {id}` mở lại đúng hộp thư mà id nêu (với `all…`, lại `LIST`;
+  nếu All Mail đã không còn, không gì được đọc). Một danh sách tối đa 10 thư,
+  mỗi thư 300 ký tự; `message {id}` (id mà một danh sách đưa ra) đến 3,000.
+  Nội dung lấy từ phần văn bản thuần trước, nếu không
   thì từ HTML đã bỏ thẻ; quoted-printable, base64 và các từ RFC 2047 được giải
   mã. 5 s để kết nối, 20 s cho toàn bộ trao đổi.
 - **Ghi:** SMTP qua TLS đến `smtp.gmail.com:465`: `EHLO`, `AUTH PLAIN` (nếu
@@ -378,9 +390,13 @@ giữ gì.
   reached"; dù trường hợp nào cũng không gì được lưu. Khi thành công,
   `scopes` trong câu trả lời là của liên kết, như backend đã đưa.
 - **Đọc** (`users.messages.list` và `users.messages.get`, mỗi cái nằm trong
-  danh sách đọc): `recent` và `search` liệt kê hộp thư đến
-  (`/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=<count>`, `search`
-  thêm `q=<words>`, cú pháp tìm kiếm riêng của Gmail), rồi lấy từng thư với
+  danh sách đọc): `recent` liệt kê hộp thư đến
+  (`/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=<count>`), còn
+  `search` tìm trong mọi thư, như tìm kiếm riêng của Gmail
+  (`/gmail/v1/users/me/messages?maxResults=<count>&q=<words>`, không nhãn,
+  nên một thư đã lưu trữ hoặc gắn nhãn nằm ngoài hộp thư đến cũng được tìm
+  thấy; Spam và Trash vẫn bị loại, `includeSpamTrash` để mặc định là false),
+  rồi lấy từng thư với
   `format=metadata` (From, Subject, Date) và đoạn xem trước ngắn của Gmail
   (các thực thể HTML được đọc), 300 ký tự của nó. `message {id}` (id riêng
   của Gmail mà một danh sách đưa ra: chữ và số, tối đa 64) lấy thư với
@@ -1267,10 +1283,14 @@ code không bao giờ là một đường dẫn, gỡ và xoá; không bí mật
 `Debug` hay một lời từ chối; một token chỉ qua https đến các host của chính nó
 (không port, user, fragment hay host giả mạo), đọc chỉ trong danh sách cho
 phép, ghi chỉ trong danh sách ghi; mọi mutation GraphQL bị từ chối; IMAP của
-Gmail chỉ-đọc (`EXAMINE`, `BODY.PEEK`) và SMTP một thư sau `AUTH`; `set`
+Gmail chỉ-đọc (`EXAMINE`, `BODY.PEEK`), tìm kiếm của nó trong All Mail (tìm
+theo dấu `\All` dưới một tên theo ngôn ngữ, nếu không thì hộp thư đến),
+`recent` trong hộp thư đến và `message` trong hộp thư mà id của nó nêu, và
+SMTP một thư sau `AUTH`; `set`
 không giữ gì khi đăng nhập Gmail bị từ chối; một đăng nhập Google của Gmail
 được kiểm tra ở `set` bằng profile của nó (bị từ chối, không kết nối được,
-tài khoản lấy từ đó), được đọc qua REST API (danh sách hộp thư đến, metadata
+tài khoản lấy từ đó), được đọc qua REST API (danh sách hộp thư đến, một tìm
+kiếm trong mọi thư và thư đã lưu trữ của nó được đọc theo id, metadata
 của từng thư, một thư trọn vẹn từ phần văn bản thuần, token của nó bị xoá,
 thư bảo mật bị bỏ ra, một id không phải của Gmail không bao giờ được gửi),
 được gia hạn qua backend, được gửi qua API chỉ khi có câu "send" nói ra, và

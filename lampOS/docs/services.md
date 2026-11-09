@@ -337,14 +337,25 @@ heard line only, nothing kept.
 - **At `set`:** an IMAP `LOGIN` is tried first. Refused: `failure` with "Gmail
   refused the app password"; unreachable: "Gmail couldn't be reached"; either
   way nothing is kept.
-- **Reads:** IMAP over TLS to `imap.gmail.com:993`: `LOGIN`, `EXAMINE INBOX`
-  (the mailbox opened read-only), `UID SEARCH` (`search`'s words are Gmail's
+- **Reads:** IMAP over TLS to `imap.gmail.com:993`: `LOGIN`, `EXAMINE` of
+  one mailbox (opened read-only), `UID SEARCH` (`search`'s words are Gmail's
   own, `X-GM-RAW`), `UID FETCH` of From, Subject, Date and the start of the
-  text with `BODY.PEEK` (nothing is marked read), `LOGOUT`. A list is at most
-  10 mails, 300 characters of each; `message {id}` (the UID a list gave) up
-  to 3,000. Text comes from a plain part first, else HTML with its tags
-  taken out; quoted-printable, base64 and RFC 2047 words are decoded. 5 s to
-  connect, 20 s for the whole exchange.
+  text with `BODY.PEEK` (nothing is marked read), `LOGOUT`. `recent` reads
+  the inbox (`EXAMINE INBOX`). `search` reads All Mail, as Gmail's own
+  search does, so an archived or labelled mail out of the inbox is found
+  too (Spam and Trash are not in All Mail): a `LIST "" "*"` first finds the
+  mailbox flagged `\All` (RFC 6154), whatever its name in the account's
+  language (`[Gmail]/All Mail`, `[Gmail]/Tất cả thư`), sent back as the
+  server spelled it (modified UTF-7); with none flagged (All Mail hidden
+  from IMAP in Gmail's settings) the search reads the inbox. A UID names a
+  mail only within its mailbox, so an id from All Mail carries it: `all41`
+  is UID 41 in All Mail, a bare `41` UID 41 in the inbox. `message {id}`
+  opens the mailbox its id names again (for `all…`, the `LIST` again; with
+  All Mail gone since, nothing is read). A list is at most 10 mails, 300
+  characters of each; `message {id}` (an id a list gave) up to 3,000. Text
+  comes from a plain part first, else HTML with its tags taken out;
+  quoted-printable, base64 and RFC 2047 words are decoded. 5 s to connect,
+  20 s for the whole exchange.
 - **Writes:** SMTP over TLS to `smtp.gmail.com:465`: `EHLO`, `AUTH PLAIN`
   (else `LOGIN`), `MAIL`, `RCPT` for each recipient, `DATA`, `QUIT`. One plain
   text message in UTF-8, its body in base64, from the account itself.
@@ -364,9 +375,13 @@ heard line only, nothing kept.
   "Gmail couldn't be reached"; either way nothing is kept. On success the
   answer's `scopes` are the link's, as the backend gave them.
 - **Reads** (`users.messages.list` and `users.messages.get`, each on the
-  read list): `recent` and `search` list the inbox
-  (`/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=<count>`, `search`
-  adding `q=<words>`, Gmail's own search), then get each mail with
+  read list): `recent` lists the inbox
+  (`/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=<count>`), and
+  `search` all mail, as Gmail's own search does
+  (`/gmail/v1/users/me/messages?maxResults=<count>&q=<words>`, no label,
+  so an archived or labelled mail out of the inbox is found too; Spam and
+  Trash stay out, `includeSpamTrash` left at its default, false), then get
+  each mail with
   `format=metadata` (From, Subject, Date) and Gmail's short preview (its
   HTML entities read), 300 characters of it. `message {id}` (Gmail's own id
   a list gave: letters and digits, at most 64) gets it with `format=full`:
@@ -1247,10 +1262,13 @@ whole, a code never a path, remove and wipe; no secret in a `Debug` or a
 refusal; a token only over https to its own hosts (no port, user, fragment or
 lookalike host), reads only on the allow-list, writes only on the write list;
 every GraphQL mutation refused; Gmail's IMAP read-only (`EXAMINE`,
-`BODY.PEEK`) and SMTP's one message after `AUTH`; `set` keeping nothing on a
-refused Gmail login; a Gmail Google sign-in checked at `set` with its profile
-(refused, unreached, its account taken from it), read through the REST API
-(the inbox list, each mail's metadata, one mail whole from its plain part,
+`BODY.PEEK`), its search in All Mail (found by its `\All` flag under a
+localized name, else the inbox), `recent` in the inbox and `message` in
+the mailbox its id names, and SMTP's one message after `AUTH`; `set`
+keeping nothing on a refused Gmail login; a Gmail Google sign-in checked at
+`set` with its profile (refused, unreached, its account taken from it),
+read through the REST API (the inbox list, a search in all mail and its
+archived mail read by id, each mail's metadata, one mail whole from its plain part,
 its token scrubbed, security mails left out, an id not Gmail's never sent),
 renewed through the backend, sent through the API only on a spoken "send",
 and an app password never sent to the API; a `gmail-app` link kept on its
