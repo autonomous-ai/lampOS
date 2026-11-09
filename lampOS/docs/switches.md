@@ -809,7 +809,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_TASK_NEWS_RETELL` | If you talk over the lamp telling you a task finished, it tells you once more when the room is quiet. |
 | `LAMP_TASKS_NOW` | You can ask how any of your agents' recent work is going, or if one finished, and hear it at once. |
 | `LAMP_TASKS_ONE_YES` | When the lamp reads back a task for your computer, one yes is enough to start it. |
-| `LAMP_TASKS_REPLY_NAMED` | You can point the lamp at earlier work on your computer, by its session's name or by what it worked on ("the book program one"), and it gives the new work to that session. |
+| `LAMP_TASKS_REPLY_NAMED` | Describe earlier work on your computer ("the book program one") and the lamp gives it the new work. |
 | `LAMP_UNPLUG` | You can ask the lamp to fold up for unplugging; it says when it's done, and "never mind" undoes it. |
 | `LAMP_UNPLUG_STAY_MIN` | If nobody unplugs the folded lamp within 10 minutes, it says it's still plugged in and gets back up. |
 | `--caller-caps` | Nothing you'd notice: the lamp's body checks who asks it to move, so a skill can't take a person's place. |
