@@ -366,3 +366,60 @@ async fn held_reports_never_dispatch_music_or_supply_its_private_context() {
         }
     }
 }
+
+/// #5764, lamp-52e6 on 9 Nov (case on3a, request 15): a line that only
+/// talks about music got a `use_skill` call to the relaxing-music skill and
+/// its offer. An offer for a line that does not ask to play is refused: no
+/// recording goes to the coordinator, and the model is told nothing plays,
+/// never the skill's confirmation. A line that asks still gets its offer.
+#[tokio::test]
+async fn talk_about_music_gets_no_recording_and_the_model_is_told_so() {
+    for (words, asks) in [
+        (
+            "Lamp, I listened to some relaxing music on the train this morning, it was really nice.",
+            false,
+        ),
+        ("Lamp, what kind of music helps people relax?", false),
+        ("Lamp, can you play some relaxing music?", true),
+    ] {
+        for wrapped in [false, true] {
+            let script = Arc::new(Script {
+                heard: Mutex::new([Ok(words.to_owned())].into()),
+                chats: Mutex::new(
+                    [
+                        vec![
+                            Ok(ChatEvent::ToolCalls(vec![music_call(wrapped)])),
+                            Ok(ChatEvent::Done),
+                        ],
+                        vec![text("Ready."), Ok(ChatEvent::Done)],
+                    ]
+                    .into(),
+                ),
+                ..Default::default()
+            });
+            let (engine, calls) = recording_engine(script.clone());
+            let mut engine = engine;
+            engine.submit(start(REQUEST));
+            engine.submit(audio(REQUEST, 1));
+            engine.submit(end(REQUEST));
+            let outputs = music_outputs(&mut engine).await;
+            let offers = outputs
+                .iter()
+                .filter(|event| matches!(event, ProviderOutput::RequestedAudio { .. }))
+                .count();
+            assert_eq!(offers, usize::from(asks), "{words}");
+            assert_eq!(calls.audio.lock().unwrap().len(), 1, "{words}");
+            let told = if asks {
+                json!({"ok": true})
+            } else {
+                json!({"error": crate::requested_audio::NOT_ASKED_TO_PLAY})
+            };
+            let asked = script.asked.lock().unwrap();
+            assert_eq!(
+                asked[1].last(),
+                Some(&Message::tool(CALL_ID, told.to_string())),
+                "{words}"
+            );
+        }
+    }
+}
