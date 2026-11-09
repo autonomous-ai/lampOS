@@ -381,7 +381,9 @@ heard line only, nothing kept.
   (`/gmail/v1/users/me/messages?maxResults=<count>&q=<words>`, no label,
   so an archived or labelled mail out of the inbox is found too; Spam and
   Trash stay out, `includeSpamTrash` left at its default, false), then get
-  each mail with
+  each mail, every get at once (each is a web read of its own, a new
+  connection; one after another a full list took about 12 s on a lamp),
+  their answers read in the list's order, with
   `format=metadata` (From, Subject, Date) and Gmail's short preview (its
   HTML entities read), 300 characters of it. `message {id}` (Gmail's own id
   a list gave: letters and digits, at most 64) gets it with `format=full`:
