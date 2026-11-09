@@ -562,7 +562,7 @@ fn each_step_says_what_to_do_what_if_it_didnt_work_and_that_it_worked() {
         (
             Step::HowYouSound,
             "When you want me, start with 'Hey Lamp'. When I stop talking, give it a try.",
-            "I didn't catch that. Wait a moment, then say 'Hey Lamp' again.",
+            "I didn't catch that. Try once more when I stop talking.",
             "That's me! Say 'Hey Lamp' whenever you need me.",
         ),
         (
