@@ -348,13 +348,16 @@ export class FakeLamp {
     return fake;
   }
 
-  // `autoDone: false` leaves a play's or say's `done` to the test.
+  // `autoDone: false` leaves a play's, say's, gesture's or move's `done` to
+  // the test. `motionDone: false` answers a gesture or a move as a
+  // lamp-control from before #4209: no `motion_done` in hello's limits, and
+  // no `done` follows them.
   // `refuses`: ops refused `refused` with this why, as a lamp that doesn't
   // route them yet does (LAMP_CONTROL_REFUSES); none by default.
-  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', autoDone = true, refuses = {}, followsHand = true } = {}) {
+  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', autoDone = true, refuses = {}, followsHand = true, motionDone = true } = {}) {
     // `followsHand: false` answers a look at `hand` as a lamp-control from
     // before #4183 does: taken, with no `follow`, and nothing follows it.
-    Object.assign(this, { code, grants: [...grants], host: '127.0.0.1', port: 0, pin: '', fp: '', autoDone, refuses: { ...refuses }, followsHand });
+    Object.assign(this, { code, grants: [...grants], host: '127.0.0.1', port: 0, pin: '', fp: '', autoDone, refuses: { ...refuses }, followsHand, motionDone });
     this.asker = new Map();
     this.lamp = { id: lampId, name, v: schema.VERSION };
     this.clients = new Map();
@@ -727,7 +730,8 @@ export class FakeLamp {
       ws.close();
       return null;
     }
-    this.ok(ws, request.id, { lamp: this.lamp, grants: paired.grants, limits: LIMITS });
+    const limits = this.motionDone ? { ...LIMITS, motion_done: true } : LIMITS;
+    this.ok(ws, request.id, { lamp: this.lamp, grants: paired.grants, limits });
     return request.client;
   }
 
@@ -940,15 +944,18 @@ export class FakeLamp {
         return this.ok(ws, id);
       case 'express': {
         // As lamp-control's feelings.rs: the feelings skill's three, its
-        // move to the body (smaller below strength 0.5) and its light; no
-        // `done` follows. The fake always shows the light.
+        // move to the body (smaller below strength 0.5) and its light; with
+        // motionDone its move's `done` follows (none when no move was sent).
+        // The fake always shows the light.
         const name = FEELING_MOVES[request.feeling];
         if (!name) return this.refuse(ws, id, 'bad_request', 'feeling: one of glad, lively, low');
         const rounded = Math.round(Math.min(Math.max((request.strength ?? 0.5) / 0.5, 0), 1) * 4);
         // `low` goes no smaller than three quarters (feelings.rs `least_step`).
         const step = rounded === 0 ? 0 : Math.max(rounded, request.feeling === 'low' ? 3 : 1);
         const move = step === 0 ? null : step === 4 ? name : `${name}-${step * 25}`;
-        return this.ok(ws, id, { to: 'body', move, light: true });
+        this.ok(ws, id, { to: 'body', move, light: true });
+        if (move !== null && this.motionDone && this.autoDone) this.done(id);
+        return undefined;
       }
       case 'look': {
         // As lamp-control with --lease-socket (parts.rs `look`): `face` and
@@ -987,9 +994,12 @@ export class FakeLamp {
       }
       case 'gesture':
       case 'move':
-        // As lamp-control routes them: the body takes them, and no `done`
-        // follows.
-        return this.ok(ws, id, { to: 'body' });
+        // As lamp-control routes them: the body takes them; with motionDone
+        // a `done` follows once the body says it ended (`finished`, or
+        // `dropped`/`cut_short` with the body's why).
+        this.ok(ws, id, { to: 'body' });
+        if (this.motionDone && this.autoDone) this.done(id);
+        return undefined;
       case 'skill.push':
         return this.push(ws, client, id, request);
       case 'skill.list':

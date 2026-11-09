@@ -127,6 +127,13 @@ lamp's own life (its rest glance, its feelings' small moves) stands back, and
 it comes back about 10 s after the agent goes idle. A lease another computer holds, or one the lamp suspends because
 someone is talking to it, comes back as the tool's error, never retried.
 
+**A motion's end** (#4209): on a lamp whose hello `limits` say `motion_done`,
+`lamp_gesture` and `lamp_move` return once the motion has ended, as
+`nod finished`, or `dropped` / `cut_short` with the body's why (`move dropped:
+dropped: the person is using the lamp`), within 75 s at most. So an agent's
+next motion follows the last instead of cutting it short. On an older lamp
+they return as soon as the body takes them (`nod taken`).
+
 **Refusals** come back as the tool's error, with the lamp's code and words:
 `busy`, `refused: centre of gravity 27 mm > 22 mm`, `quiet_hours`,
 `rate: … (try again in 900 ms)`. On stable 10824 and older, a gesture, move

@@ -160,6 +160,10 @@ impl LightOut for lamp_bus::Publisher {
     }
 }
 
+/// The name a computer's `move` is given to the body, and said back on
+/// `body/gesture`.
+pub const MOVE_NAME: &str = "control";
+
 /// `look` at `face` and at `name`: out of this release.
 pub const NOT_IN_THIS_RELEASE: &str = "not in this release: look at a face or a name";
 
@@ -205,6 +209,12 @@ pub struct Lamp {
     next_say: u64,
     /// The microphone, the ears' blocks on the bus; none without the bus.
     microphone: Option<crate::microphone::Microphone>,
+    /// Each computer's motion handed to the body and not yet told, when
+    /// the body's `body/gesture` is read (#4209, `crate::motion_done`).
+    motions: Option<Arc<Mutex<crate::motion_done::Motions>>>,
+    /// The connection the request in hand came on (`Parts::asking`), for a
+    /// motion's `done`.
+    asking: Option<u64>,
 }
 
 /// What each computer has going on the voice.
@@ -305,7 +315,73 @@ impl Lamp {
             says: Says::default(),
             next_say: 0,
             microphone: None,
+            motions: None,
+            asking: None,
         }
+    }
+
+    /// Each `gesture`, `move` and feeling's move told with a `done` once
+    /// the body says on `body/gesture` (read through `gestures`) what
+    /// became of it: `finished`, `cut_short` or `dropped` with the body's
+    /// why (#4209). A thread of its own reads it and checks every second
+    /// for a motion the body never began or never said the end of.
+    pub fn telling_motions(mut self, mut gestures: lamp_bus::Subscriber) -> Self {
+        let motions: Arc<Mutex<crate::motion_done::Motions>> = Arc::default();
+        let kept = motions.clone();
+        let events = self.events.clone();
+        let clock = self.clock;
+        std::thread::spawn(move || {
+            loop {
+                let told = match gestures.recv(std::time::Duration::from_secs(1)) {
+                    Ok(Some(message)) => match message.json() {
+                        Ok(payload) => kept.lock().expect("motions").said(&payload, clock()),
+                        Err(_) => continue,
+                    },
+                    Ok(None) => kept.lock().expect("motions").lapse(clock()),
+                    Err(_) => {
+                        std::thread::sleep(std::time::Duration::from_millis(200));
+                        kept.lock().expect("motions").lapse(clock())
+                    }
+                };
+                for (client, done) in told {
+                    events(&client, done);
+                }
+            }
+        });
+        self.motions = Some(motions);
+        self
+    }
+
+    /// `client`'s request `re`, a motion named `name`, sent to the body
+    /// with `send`: kept for its `done` **before** it is sent, so the
+    /// body's `began` can never come first and be missed (Second's on
+    /// #5835), and taken back if the body didn't take it.
+    fn motion_sending(
+        &mut self,
+        client: &str,
+        re: u64,
+        name: &str,
+        send: impl FnOnce(&mut Self) -> Result<Value, Error>,
+    ) -> Result<Value, Error> {
+        if let Some(motions) = &self.motions {
+            let told = motions.lock().expect("motions").sent(
+                client,
+                self.asking,
+                re,
+                name,
+                (self.clock)(),
+            );
+            for (client, done) in told {
+                (self.events)(&client, done);
+            }
+        }
+        let sent = send(self);
+        if sent.is_err()
+            && let Some(motions) = &self.motions
+        {
+            motions.lock().expect("motions").withdraw(client, re);
+        }
+        sent
     }
 
     /// The computers' own clips, kept under `folder` (the door's
@@ -529,7 +605,13 @@ impl Lamp {
         self.to_body(ask, client)
     }
 
-    fn express(&mut self, client: &str, feeling: &str, strength: f32) -> Result<Value, Error> {
+    fn express(
+        &mut self,
+        client: &str,
+        re: u64,
+        feeling: &str,
+        strength: f32,
+    ) -> Result<Value, Error> {
         let feeling =
             feelings::named(feeling).map_err(|why| Error::new(ErrorCode::BadRequest, why))?;
         let mut answer = json!({"to": "body"});
@@ -539,7 +621,10 @@ impl Lamp {
         {
             Some(scaled) => {
                 answer["move"] = json!(scaled.name);
-                self.motion(json!({"move": scaled}), client)?;
+                let name = scaled.name.clone();
+                self.motion_sending(client, re, &name, |lamp| {
+                    lamp.motion(json!({"move": scaled}), client)
+                })?;
             }
             None => answer["move"] = Value::Null,
         }
@@ -1329,11 +1414,15 @@ fn waits_for(what: &str) -> Error {
 impl Parts for Lamp {
     fn act(&mut self, client: &str, re: u64, op: &Op, _now_us: u64) -> Result<Value, Error> {
         match op {
-            Op::Gesture { name } => self.motion(json!({"gesture": name}), client),
-            Op::Move { step_ms, frames } => self.motion(
-                json!({"move": {"name": "control", "step_ms": step_ms, "frames": frames}}),
-                client,
-            ),
+            Op::Gesture { name } => self.motion_sending(client, re, name, |lamp| {
+                lamp.motion(json!({"gesture": name}), client)
+            }),
+            Op::Move { step_ms, frames } => self.motion_sending(client, re, MOVE_NAME, |lamp| {
+                lamp.motion(
+                    json!({"move": {"name": MOVE_NAME, "step_ms": step_ms, "frames": frames}}),
+                    client,
+                )
+            }),
             Op::Light {
                 colour: Some(colour),
                 level,
@@ -1398,7 +1487,7 @@ impl Parts for Lamp {
                     .ok_or_else(|| not_here("the microphone"))?
                     .stream(client, *on, events)
             }
-            Op::Express { feeling, strength } => self.express(client, feeling, *strength),
+            Op::Express { feeling, strength } => self.express(client, re, feeling, *strength),
             Op::Sound { name } => self.sound(client, re, name),
             Op::Play { .. } => Err(waits_for("client packages")),
             Op::TurnStart { prompt } => self.turn_start(client, re, prompt.as_deref()),
@@ -1421,6 +1510,9 @@ impl Parts for Lamp {
     /// person, as before. Shut off the lock: a shutdown never waits.
     fn gone(&mut self, client: &str, now_us: u64) {
         self.stop(client, now_us);
+        if let Some(motions) = &self.motions {
+            motions.lock().expect("motions").gone(client);
+        }
         let (held, turns) = {
             let mut voice = self.voice.lock().expect("voice");
             (voice.mutes.remove(client), voice.turns.remove(client))
@@ -1434,6 +1526,14 @@ impl Parts for Lamp {
         {
             let _ = held.shutdown(Shutdown::Both);
         }
+    }
+
+    fn motion_done(&self) -> bool {
+        self.motions.is_some()
+    }
+
+    fn asking(&mut self, connection: Option<u64>) {
+        self.asking = connection;
     }
 
     fn state(&self, kind: StateKind) -> Value {

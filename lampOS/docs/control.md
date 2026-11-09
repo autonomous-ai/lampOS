@@ -161,7 +161,8 @@ the `glad-lift` move, and the light breathing every 6 s for 12 s; `lively` is
   20 a minute.
 - **The answer** is `{"to":"body","move":"glad-lift","light":true}`, with
   `move` the one sent (`glad-lift-50` at 0.25, null under 0.0625) and `light`
-  the reason when none was shown. No `done` follows, as with `gesture`.
+  the reason when none was shown. Its move's `done` follows as a
+  `gesture`'s does ("A motion's `done`" below); none when no move was sent.
 
 Tests keep the compiled moves equal to the skill's files, the table equal to
 its `[[do]]`, and the light equal to lamp-skills' for every light a person may
@@ -572,9 +573,49 @@ check runs every 250 ms), waits for that hold rather than being dropped; if
 `body` is let go first, it is `dropped` ("the body lease ended"), and it is
 only ever sent under the lease it was asked under, never another taken in its
 place. `gesture`
-and `move` answer `{"to":"body"}` once the body has them, and no `done`
-follows yet: the body plays or drops them by its own checks and doesn't say
-which back. An SDK's wait for them returns at the answer.
+and `move` answer `{"to":"body"}` once the body has them.
+
+**A motion's `done`** (#4209). With `--bus-root` and `--mood-socket`, the
+door reads the body's `body/gesture` and ends each `gesture`, `move` and
+feeling's move (`express`) with a `done` on the request that asked it, and
+hello's `limits` say `"motion_done": true` (`crate::motion_done`):
+
+| the body says | `done` |
+|---|---|
+| `began`, then `over` | `finished` |
+| `dropped` before it began (`dropped: the person is using the lamp`, a move it can't play, `dropped: another was asked after it`) | `dropped`, `why` the body's |
+| `dropped` while it played, with a why (`ended: by conversation`) | `cut_short`, `why` the body's |
+| `dropped` while it played, with no why, and a newer motion of that name waiting (the door's own `replace`: the product body names no why for it) | `cut_short`, "replaced by a newer motion" |
+| `dropped` while it played, with no why and nothing newer waiting | `cut_short`, "the body ended it" |
+| nothing begun within 10 s | `dropped`, "the body did not begin it within 10 s" |
+| begun, no end within 60 s | `cut_short`, "the body did not say it ended within 60 s" |
+
+The product body runs without `--arbitration`, so `body/gesture` names no
+asker: a motion is matched by its name (as asked, `control` for a `move`,
+the scaled feeling's for an `express`), oldest first. A skill's same
+gesture begun in the same 10 s could be taken for the computer's; the body
+plays one at a time, so at most one of the two is told wrong. A computer
+that goes is told nothing more; at most 32 motions wait across every
+computer, past which the oldest is told as never begun. Without the body's
+word (no `--bus-root`, or no `--mood-socket`), `motion_done` isn't said, no
+`done` follows a motion, and an SDK's wait for them returns at the answer,
+as before #4209. Test: `a_motion_is_told_finished_or_dropped_as_the_body_says`
+(`tests/door.rs`).
+
+A motion's `done` goes to **the connection that asked it alone**, never
+another connection of the same computer: two programs sharing one pairing
+each number their own requests, so a `re` alone can't say whose it is
+(test `a_motions_done_goes_to_the_connection_that_asked_it_alone`). A
+motion is kept for its `done` before it is sent to the body, so the body's
+`began` can never arrive first and be missed, and taken back if the body
+didn't take it.
+
+The 10 s is for a folded lamp: the body stands it up before the motion.
+On lamp-75c9 (9 Nov) a nod asked 11 s after lamp-body started was still
+waiting at 4 s; the door told it as never begun, and the computer's next
+ask then made the body drop it ("another was asked after it"). A
+computer that asks right after lamp-body starts, or while the lamp is
+folded, may wait up to that long for its first motion to begin.
 
 ### Errors
 

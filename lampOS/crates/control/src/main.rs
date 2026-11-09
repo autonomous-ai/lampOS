@@ -318,6 +318,21 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
             "the microphone stream is off (--microphone)"
         }
     );
+    // The body's word on each motion (`body/gesture`), for a gesture's,
+    // move's and feeling's move's `done` (#4209); without it they end at
+    // their answer, as hello's limits then say.
+    let gestures = match (&bus, &body) {
+        (Some(bus), Some(_)) => match bus.subscribe(lamp_msgs::BodyGesture::TOPIC, "control") {
+            Ok(subscriber) => Some(subscriber),
+            Err(error) => {
+                eprintln!(
+                    "lamp-control: no motion done, since body/gesture can't be read: {error}"
+                );
+                None
+            }
+        },
+        _ => None,
+    };
     let shared = server::Shared::new_with(door, identity.pin.clone(), move |events| {
         let lamp = parts::Lamp::new(body, light, say, clock_id, events)
             .watching(watching)
@@ -326,6 +341,9 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
             Some((listen, marking)) => lamp.hearing(listen, marking, sink_for_ears, microphone),
             None => lamp,
         };
+        if let Some(gestures) = gestures {
+            lamp = lamp.telling_motions(gestures);
+        }
         if let Some(actions) = actions {
             lamp = lamp.volume_through(actions);
         }

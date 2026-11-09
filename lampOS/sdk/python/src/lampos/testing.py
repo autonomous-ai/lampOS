@@ -447,16 +447,22 @@ class FakeLamp:
         auto_done: bool = True,
         refuses: dict[str, str] | None = None,
         follows_hand: bool = True,
+        motion_done: bool = True,
     ):
         self.code = code
+        # True says `motion_done` in hello's limits and ends a gesture or a
+        # move with a `done`, as lamp-control reading the body's word does
+        # (#4209); False answers them as a lamp-control from before it:
+        # taken, and no `done` follows.
+        self.motion_done = motion_done
         # Ops refused `refused` with this why, as a lamp that doesn't route
         # them yet does (LAMP_CONTROL_REFUSES); none by default.
         self.refuses = dict(refuses or {})
         # False answers a look at `hand` as a lamp-control from before #4183
         # does: taken, with no `follow`, and nothing follows it.
         self.follows_hand = follows_hand
-        # gesture, move and play end with `done` at once; False leaves it to
-        # the test (`done`).
+        # gesture, move (with motion_done) and play end with `done` at once;
+        # False leaves it to the test (`done`).
         self.auto_done = auto_done
         self._asker: dict[int, ServerConnection] = {}
         self.grants = list(grants)
@@ -857,7 +863,8 @@ class FakeLamp:
             await self._refuse(ws, request["id"], "unpaired", "not paired, or a bad signature")
             await ws.close()
             return None
-        await self._ok(ws, request["id"], lamp=self.lamp, grants=paired["grants"], limits=LIMITS)
+        limits = {**LIMITS, "motion_done": True} if self.motion_done else LIMITS
+        await self._ok(ws, request["id"], lamp=self.lamp, grants=paired["grants"], limits=limits)
         return request["client"]
 
     # The grant each event and state needs, as lamp-control's own (#3736).
@@ -1106,9 +1113,12 @@ class FakeLamp:
             self._stop_listening(ws)
             await self._ok(ws, id_)
         elif op in ("gesture", "move"):
-            # As lamp-control routes them: the body takes them, and no
-            # `done` follows.
+            # As lamp-control routes them: the body takes them; with
+            # motion_done a `done` follows once the body says it ended
+            # (`finished`, or `dropped`/`cut_short` with the body's why).
             await self._ok(ws, id_, to="body")
+            if self.motion_done and self.auto_done:
+                await self.done(id_)
         elif op == "light" and ("pixels" in request or "rgb" in request):
             # A computer's own colours (the ring, pixel by pixel), as
             # lamp-control's parts.rs: to the ring, each pixel at the brightness.
@@ -1141,12 +1151,16 @@ class FakeLamp:
             await self._ok(ws, id_, to="ring")
         elif op == "express":
             # As lamp-control's feelings.rs: the feelings skill's three, its
-            # move to the body (smaller below strength 0.5) and its light; no
-            # `done` follows. The fake always shows the light.
+            # move to the body (smaller below strength 0.5) and its light; with
+            # motion_done its move's `done` follows (none when no move was
+            # sent). The fake always shows the light.
             if request["feeling"] not in FEELING_MOVES:
                 await self._refuse(ws, id_, "bad_request", "feeling: one of glad, lively, low")
                 return
-            await self._ok(ws, id_, to="body", move=_feeling_move(request), light=True)
+            move = _feeling_move(request)
+            await self._ok(ws, id_, to="body", move=move, light=True)
+            if move is not None and self.motion_done and self.auto_done:
+                await self.done(id_)
         elif op == "look":
             # As lamp-control with --lease-socket (parts.rs `look`): `face`
             # and `name` aren't routed; `hand` is followed until a stop,

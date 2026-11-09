@@ -2056,6 +2056,10 @@
             ]
           }
         },
+        "motion_done": {
+          "const": true,
+          "description": "Present when a `gesture`, `move` or feeling's move ends with a `done` once the body says what became of it (#4209): `finished` at its end, `dropped` (never began: the person using the lamp, a move it can't play, nothing begun within 10 s) or `cut_short` (ended as it played: replaced by a newer motion, or for the person), each with the body's `why`. Without it, a lamp-control from before reads no word from the body, and an SDK's wait for them ends at the answer."
+        },
         "ring": {
           "type": "object",
           "description": "The ring as light's pixels see it.",

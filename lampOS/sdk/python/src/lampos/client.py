@@ -43,7 +43,10 @@ KEEPALIVE_S = 20.0
 # The actions lamp-control answers `{"to":"body"}` with no `done` after
 # (docs/control.md): a wait for them ends at that answer. `say` and
 # `turn.start` answer `{"to":"voice"}` and their `done` does follow.
-ENDS_AT_REPLY = frozenset({"gesture", "move"})
+# Ended at their answer by a lamp-control that doesn't say `motion_done` in
+# hello's limits (from before #4209): it hands them to the body and says
+# nothing back.
+ENDS_AT_REPLY = frozenset({"gesture", "move", "express"})
 # A phrase's floor in letters and digits, lamp-control's PHRASE_MIN_LETTERS.
 # The SDK's check is a pre-check: it may let through what the lamp refuses,
 # never the other way.
@@ -610,10 +613,12 @@ class Lamp:
         here then, even if the wait is cancelled (Reviewer-two's P2 on #5837).
         `request` takes the next id before it first yields, so this is it."""
         id_ = self._next_id
-        # Handed to the body, which says nothing back, `gesture` and `move`
-        # get no `done` (docs/control.md): their wait ends at the answer, so
-        # none is kept for them.
-        done = asyncio.get_running_loop().create_future() if wait and op not in ENDS_AT_REPLY else None
+        # A lamp that says `motion_done` ends `gesture`, `move` and an
+        # express's move with a `done` once the body says what became of
+        # them; on one that doesn't, their wait ends at the answer, so none
+        # is kept for them.
+        at_reply = op in ENDS_AT_REPLY and not self.limits.get("motion_done")
+        done = asyncio.get_running_loop().create_future() if wait and not at_reply else None
         if done is not None:
             self._done[id_] = done
         try:
@@ -624,6 +629,11 @@ class Lamp:
             raise
         if taken is not None:
             taken()
+        # An express too slight to move (`"move": null`) sends the body
+        # nothing, so no `done` follows: its wait ends at the answer.
+        if done is not None and op == "express" and reply.get("move") is None:
+            self._done.pop(id_, None)
+            return reply
         return reply if done is None else await done
 
     # The reader.
@@ -786,8 +796,8 @@ class Lamp:
 
     # Actions.
 
-    async def express(self, feeling: str, strength: float | None = None) -> dict:
-        return await self._act("express", False, feeling=feeling, strength=strength)
+    async def express(self, feeling: str, strength: float | None = None, *, wait: bool = False) -> dict:
+        return await self._act("express", wait, feeling=feeling, strength=strength)
 
     async def gesture(self, name: str, *, wait: bool = False) -> dict:
         return await self._act("gesture", wait, name=name)
@@ -876,11 +886,12 @@ class Lamp:
         `(r, g, b)`, for `for_ms`, at `brightness` 0-100."""
         return await self._act("light", False, rgb=_hex(rgb), brightness=brightness, fade_ms=fade_ms, for_ms=for_ms)
 
-    async def say(self, text: str, *, rephrase: bool = False) -> dict:
+    async def say(self, text: str, *, rephrase: bool = False, wait: bool = False) -> dict:
         """Say `text` in the lamp's voice, exactly as written, once the person
         isn't talking. `rephrase=True` lets the lamp's model say it in its own
-        words instead, as before."""
-        return await self._act("say", False, text=text, rephrase=True if rephrase else None)
+        words instead, as before. `wait=True` returns its `done` once it has
+        been said (`finished`), or `dropped`/`cut_short` with the voice's why."""
+        return await self._act("say", wait, text=text, rephrase=True if rephrase else None)
 
     # The camera (the `camera` grant): the eyes' own newest picture, never
     # while the lamp is private.

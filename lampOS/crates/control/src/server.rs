@@ -399,9 +399,17 @@ impl Shared {
         )
     }
 
-    fn send_to(&self, client: &str, event: Value) {
-        for open in self.open.lock().expect("open").values() {
-            if open.client.as_deref() == Some(client) {
+    fn send_to(&self, client: &str, mut event: Value) {
+        // An action's end for one connection (`motion_done`'s
+        // [`crate::motion_done::CONNECTION`]): to that connection alone,
+        // the tag taken off, so another program of the same computer, with
+        // its own request numbers, never takes it as its own.
+        let only = event
+            .as_object_mut()
+            .and_then(|fields| fields.remove(crate::motion_done::CONNECTION))
+            .and_then(|connection| connection.as_u64());
+        for (id, open) in self.open.lock().expect("open").iter() {
+            if open.client.as_deref() == Some(client) && only.is_none_or(|only| only == *id) {
                 let _ = open.outbox.send(event.clone());
             }
         }
@@ -910,6 +918,7 @@ async fn connection<S>(
     // Weak, so a revoke that drops the connection's outbox still closes it.
     let answers = outbox.downgrade();
     let (mut session, welcome) = shared.door.lock().expect("door").open();
+    session.set_connection(id);
     if remote {
         session.set_remote();
     }
