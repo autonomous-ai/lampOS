@@ -8511,6 +8511,171 @@ show = "short"
     assert_eq!(program.colours(0), Vec::<String>::new());
 }
 
+/// A show after the model's line, as light-show has it (#5745).
+const SHOW_AFTER_SAY: &str = r#"
+tool = "light_show"
+[[do]]
+say = "Say the show is starting."
+[[do]]
+after = "say"
+show = "short"
+"#;
+
+/// How the model's line after a call is cut in the #5745 cases, as
+/// lamp-52e6's request 30 was at 13:48:35: the voice speaking, then
+/// listening 590 ms in, on a sound before it has any words.
+#[derive(Clone, Copy, PartialEq)]
+enum AfterCut {
+    /// Nothing heard; the voice says the line again 4 s later, to its end.
+    SaidAgain,
+    /// A finished "stop" heard after the cut.
+    Words,
+    /// Nothing at all for 6 s.
+    Nothing,
+    /// The line said again, and "no, not that" heard before its end.
+    WordsWhileSaidAgain,
+}
+
+impl ToolProgram {
+    /// The voice now `state`.
+    fn voice_is(&mut self, state: lamp_msgs::Voice) {
+        self.voice.publish_json(1, &VoiceState { state }).unwrap();
+        // The program looks at the voice every 20 ms.
+        std::thread::sleep(Duration::from_millis(100));
+    }
+
+    /// The call of `tool`, asked in turn 30, with its line cut as `how`:
+    /// the colours asked for after it, and the run's done event.
+    fn cut_after(&mut self, tool: &str, how: AfterCut) -> (Vec<String>, SkillEvent) {
+        use lamp_msgs::Voice::{Listening, Resting, Speaking};
+        let bus = Bus::new(self._dir.path().join("bus")).unwrap();
+        let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
+        self.heard_in("lamp, can you do it", Some(30));
+        self.voice_is(Listening);
+        assert_eq!(self.call(tool, "{}")["ok"], true);
+        self.voice_is(Speaking);
+        self.clock.skip(Duration::from_millis(590));
+        self.voice_is(Listening);
+        // The sound's turn: nothing heard in it.
+        self.heard_in("", Some(31));
+        match how {
+            AfterCut::Words => self.heard_in("stop", Some(31)),
+            AfterCut::Nothing => {
+                // Said once a second, as the voice says its state.
+                for _ in 0..7 {
+                    self.clock.skip(Duration::from_secs(1));
+                    self.voice_is(Listening);
+                }
+            }
+            AfterCut::SaidAgain | AfterCut::WordsWhileSaidAgain => {
+                self.clock.skip(Duration::from_secs(2));
+                self.voice_is(Listening);
+                self.clock.skip(Duration::from_secs(2));
+                self.voice_is(Speaking);
+                // Nothing is made while the line is said again.
+                assert_eq!(
+                    self.colours_within(0, Duration::from_millis(300)),
+                    Vec::<String>::new()
+                );
+                if how == AfterCut::WordsWhileSaidAgain {
+                    self.heard_in("no, not that", Some(32));
+                }
+                self.clock.skip(Duration::from_millis(1_200));
+                self.voice_is(Resting);
+            }
+        }
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let done = loop {
+            assert!(Instant::now() < deadline, "the run never ended");
+            self.clock.skip(Duration::from_millis(500));
+            if let Some(message) = events.recv(Duration::from_millis(100)).unwrap() {
+                let event: SkillEvent = message.parse().unwrap();
+                if event.stage == SkillStage::Done {
+                    break event;
+                }
+            }
+        };
+        (self.colours_within(0, Duration::ZERO), done)
+    }
+}
+
+/// #5745, lamp-52e6 at 13:48:35: a sound with no words cut the light
+/// show's line 590 ms in, and the voice said the line again 4 s later. The
+/// show is played when that line ends.
+#[test]
+fn a_say_cut_by_a_sound_with_no_words_is_said_again_and_its_after_steps_are_made() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::SaidAgain);
+    assert_eq!(
+        colours.first().map(String::as_str),
+        Some("purple"),
+        "{}",
+        done.why
+    );
+    assert!(
+        done.why
+            .contains("a cut with no words: the line was said again, then made"),
+        "{}",
+        done.why
+    );
+}
+
+/// A person who speaks over the line still cancels what comes after it.
+#[test]
+fn a_say_cut_by_words_makes_nothing_after_it() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::Words);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+/// A cut that neither words nor the line said again follow within 6 s is
+/// dropped, as before.
+#[test]
+fn a_cut_that_never_settles_makes_nothing_after_it() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::Nothing);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+/// Words that come while the line is said again (late speech-to-text)
+/// still cancel what comes after it.
+#[test]
+fn words_heard_after_the_line_is_said_again_still_cancel() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::WordsWhileSaidAgain);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+/// Dance has the same `after = "say"`: a sound with no words over "let's
+/// dance" still ends in its warm glow and dance, through its own folder.
+#[test]
+fn a_dance_cut_by_a_sound_with_no_words_still_dances() {
+    let dance = fs::read_to_string(skills_root().join("dance/skill.toml")).unwrap();
+    let mut program = ToolProgram::with("dance", &dance, &[]);
+    let (colours, done) = program.cut_after("dance", AfterCut::SaidAgain);
+    assert_eq!(
+        colours.first().map(String::as_str),
+        Some("warm"),
+        "{}",
+        done.why
+    );
+}
+
 /// #1679: the loader holds the new steps to what they are for: a kept
 /// light and a show only in a skill a person starts by its tool; a kept
 /// light steady and for good; a turn only of the reading pose, across the
