@@ -13988,6 +13988,11 @@ async fn answer(
             }
             let first_calls = !called_earlier;
             called_earlier |= !calls.is_empty();
+            // Where this batch starts in the claim evidence, and how many of
+            // its entries were taken out since: a call's own entry is found
+            // by its place, never by its name (#5326).
+            let batch_start = turn_called.len();
+            let mut batch_dropped = 0;
             turn_called.extend(
                 calls
                     .iter()
@@ -14594,6 +14599,10 @@ async fn answer(
                     just_kept = None;
                     offer_hold = crate::remember::OfferHold::default();
                     forgot_this_round = true;
+                    // Nor do they count as done: a dropped `set_timer` never
+                    // backs a "Timer set." in the clean round, and their
+                    // arguments are not kept (reviewer-three on #5326).
+                    turn_called.truncate(batch_start + call_index + 1 - batch_dropped);
                     // Later calls were planned from the context just discarded.
                     // Ask again from the person's words, never run those arguments.
                     break;
@@ -14653,10 +14662,9 @@ async fn answer(
                 // A ring refused because the ledger can't ring it (#5560) was
                 // never set: not a call of its kind, so the claim check holds
                 // a "Timer set." after it (`LAMP_ACTION_CLAIM_CHECKED`).
-                if crate::reminders::is_cannot_ring(&answer.told)
-                    && let Some(at) = turn_called.iter().rposition(|(name, _)| *name == call.name)
-                {
-                    turn_called.remove(at);
+                if crate::reminders::is_cannot_ring(&answer.told) {
+                    turn_called.remove(batch_start + call_index - batch_dropped);
+                    batch_dropped += 1;
                 }
                 // A carried line's keep held for their yes (#4508): its ask
                 // is the code's own, and is said (`LAMP_KEEP_QUIETLY`).
