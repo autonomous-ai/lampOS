@@ -9146,3 +9146,17 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   B's early refusal maps to request 42 and A's later cut to request 41.
   Passed in-process; no socket/motor timing claim. Patch/tests removed;
   both checkouts clean. Evidence comment 6741591552, saved composed probe.
+
+## 2026-11-09 — Second: 11048 promotion still carries reconnect fault
+
+- First scheduled 11048 / 889a3af0a0 for 20:55. Exact extracted Python/MCP
+  source still fails both original actual-MCP/Relink/TLS reconnect probes:
+  an old say wait returns said; an old turn wait returns turn finished,
+  each from the replacement connection's different request completion.
+- #5873 1cc3ff2cc7 remains open despite green reviewed fix. Flagged exact
+  candidate to PM/Nine/Eighth before promotion in Queue 6741625173; asked
+  to include verified fix or explicitly choose correction/exclusion.
+  No merge/revert/device action. Voice rows do not cover this SDK case.
+- Snapshot /private/tmp/second-11048-source; logs
+  /tmp/second-11048-{say,turn}-reconnect.log. Both failed assertion as
+  expected; websocket restart diagnostics are incidental to the probe.
