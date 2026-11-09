@@ -106,8 +106,8 @@ What lamp-4ace's units read today (`deploy/lamp-4ace/`):
 From the units (lamp-4ace's and the product's) and the reset plans: memory `/var/lib/lampos-memory`, faces
 `/var/lib/lampos-eyes/people.json`, its exact interrupted-write siblings
 `people.json.new` and `people.json.repair.new` in the same directory, the
-faces from photos not yet confirmed (`people.json.from-photos`, only with
-`--photo-dir`), what the eyes set aside beside it
+faces from photos not yet confirmed (`people.json.from-photos`, and
+`people.json.from-photos.new` a cut save left, only with `--photo-dir`), what the eyes set aside beside it
 (`/var/lib/lampos-eyes/set-aside`, #1505), a labelled session's face reads
 (`seems.log`), the glance log (`glance.log`) and the owner's voice print for
 the linked services' sends (`owner-voice.json`, and `owner-voice.json.new`

@@ -771,7 +771,7 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 45] = [
+const PERSON_STORES: [&str; 46] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
@@ -784,6 +784,9 @@ const PERSON_STORES: [&str; 45] = [
     // Faces added from photos, not yet agreed to by their person, beside
     // the people's file (#1968): `photo::Unconfirmeds::beside`.
     "/var/lib/lampos-eyes/people.json.from-photos",
+    // Its staging copy, left by a save cut between its write and its rename
+    // (`photo::Unconfirmeds::staging`): names and prints too.
+    "/var/lib/lampos-eyes/people.json.from-photos.new",
     // The face reads of a labelled session (`lamp-eyes --seems-log`, #1671),
     // the one path the eyes take for it (`seems_log::PATH`).
     "/var/lib/lampos-eyes/seems.log",
@@ -921,6 +924,35 @@ fn current_reset_plans_wipe_people_and_both_temporaries_without_widening_the_dir
             0o700
         );
     }
+}
+
+/// A save of the faces from photos cut between its write and its rename
+/// leaves `people.json.from-photos.new`, names and prints in it: the product
+/// reset takes it with the file, and nothing else beside them.
+#[test]
+fn a_product_reset_removes_the_photo_faces_staging_copy() {
+    let plan: Plan =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    plan.check().unwrap();
+    let root = Root::new();
+    let directory = root.0.join("var/lib/lampos-eyes");
+    fs::create_dir_all(&directory).unwrap();
+    let files = ["people.json.from-photos", "people.json.from-photos.new"];
+    for file in files {
+        fs::write(directory.join(file), br#"{"name":"Rin","print":[0.5]}"#).unwrap();
+    }
+    let kept = directory.join("people.json.from-photos.new.keep");
+    fs::write(&kept, b"unrelated synthetic setting").unwrap();
+    for path in &plan.wipe {
+        reset::wipe(&root.0.join(path.strip_prefix("/").unwrap())).unwrap();
+    }
+    for file in files {
+        assert!(
+            fs::symlink_metadata(directory.join(file)).is_err(),
+            "{file}"
+        );
+    }
+    assert_eq!(fs::read(kept).unwrap(), b"unrelated synthetic setting");
 }
 
 /// Harness's real layout under the tasks part's home (Nine on #1016, from
@@ -1699,7 +1731,7 @@ fn check_reads_the_product_plan_install_places() {
 }
 
 /// How far after its folder a store's rest may be named: the farthest on
-/// 1 Nov, `people.json.from-photos`, ends 187 bytes after
+/// 10 Nov, `people.json.from-photos.new`, ends 222 bytes after
 /// `/var/lib/lampos-eyes/`.
 const NAMED_NEAR: usize = 240;
 

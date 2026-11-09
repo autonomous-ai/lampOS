@@ -244,7 +244,9 @@ pub fn run(socket: &Path, call: &ToolCall) -> (Value, bool) {
         (YES, None) => {
             json!({"ok": true, "result": "Remembered: you'll know them now. Tell them so in a few words."})
         }
-        (NO, None) => {
+        // Only the eyes' `{"let_go":true}` is a deletion: `false` or any
+        // other answer deleted nothing, and is never said as let go.
+        (NO, None) if answer["let_go"] == true => {
             json!({"ok": true, "result": "Let go. Tell them in a few words: okay, you've let it go."})
         }
         (_, Some("not_here")) => {
@@ -587,6 +589,36 @@ mod tests {
                 .iter()
                 .all(|tool| !is_tool(&tool.name))
         );
+    }
+
+    /// A no the eyes deleted nothing for, `{"let_go":false}` or a save
+    /// that failed, is never told to the model as let go.
+    #[test]
+    fn a_no_the_eyes_did_not_delete_is_not_said_as_let_go() {
+        let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+        let not_deleted: fn(&Value) -> Value = |line| {
+            if line.get("photo_here").is_some() {
+                json!({"photo_here": "Kim"})
+            } else {
+                json!({"let_go": false})
+            }
+        };
+        let not_saved: fn(&Value) -> Value = |line| {
+            if line.get("photo_here").is_some() {
+                json!({"photo_here": "Kim"})
+            } else {
+                json!({"error": "storage"})
+            }
+        };
+        for (name, answer) in [("no-false", not_deleted), ("no-storage", not_saved)] {
+            let (socket, _) = eyes(name, answer);
+            let (said, answered) = run(&socket, &call(NO));
+            assert!(answered, "{name}: {said}");
+            assert!(said.get("ok").is_none(), "{name}: {said}");
+            assert!(said["error"].as_str().is_some(), "{name}: {said}");
+            assert!(!said.to_string().contains("let it go"), "{name}: {said}");
+            let _ = std::fs::remove_file(socket);
+        }
     }
 
     /// The eyes refuse a face that has gone: the model is told nothing

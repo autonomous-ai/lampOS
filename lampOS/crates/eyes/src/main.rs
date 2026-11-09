@@ -1440,11 +1440,17 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 &who.photo_seen,
                 lamp_ipc::monotonic_us(),
             );
+            // A let-go not saved keeps the face, asked and unseen: the
+            // next look tries again.
             for name in unanswered {
-                if unconfirmed.let_go(&name).unwrap_or(false) {
-                    eprintln!(
+                match unconfirmed.let_go(&name) {
+                    Ok(true) => eprintln!(
                         "lamp-eyes: a face from a photo was let go: no answer in its meeting"
-                    );
+                    ),
+                    Ok(false) => {}
+                    Err(error) => {
+                        eprintln!("lamp-eyes: a face from a photo was not let go: {error}")
+                    }
                 }
                 who.photo_seen.retain(|(seen, _)| seen != &name);
             }
@@ -1728,17 +1734,24 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     }
                     Some(Ask::PhotoNo(name)) => match who.unconfirmed.as_mut() {
                         None => serde_json::json!({"error": "photos_off"}),
-                        Some(unconfirmed) => {
-                            let gone = unconfirmed.let_go(&name).unwrap_or(false);
-                            if gone {
-                                eprintln!(
-                                    "lamp-eyes: a face from a photo was let go: its person said no"
-                                );
-                                who.photo_here = None;
-                                who.photo_seen.retain(|(seen, _)| seen != &name);
+                        // A no not saved is `storage`, never a let-go: the
+                        // face is kept as it was and the voice says so.
+                        Some(unconfirmed) => match unconfirmed.let_go(&name) {
+                            Ok(gone) => {
+                                if gone {
+                                    eprintln!(
+                                        "lamp-eyes: a face from a photo was let go: its person said no"
+                                    );
+                                    who.photo_here = None;
+                                    who.photo_seen.retain(|(seen, _)| seen != &name);
+                                }
+                                serde_json::json!({"let_go": gone})
                             }
-                            serde_json::json!({"let_go": gone})
-                        }
+                            Err(error) => {
+                                eprintln!("lamp-eyes: a face from a photo was not let go: {error}");
+                                serde_json::json!({"error": "storage"})
+                            }
+                        },
                     },
                     Some(Ask::RememberSpeaker(_)) if !who.remember_speaker => {
                         serde_json::json!({"error": "not_understood"})
