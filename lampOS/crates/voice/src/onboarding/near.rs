@@ -104,6 +104,14 @@ const MOST_HEARD_ASKS: u8 = 2;
 /// for a line begun in its window (#5563).
 const SLOW: &str = "the provider was slow";
 
+/// PARKED (#4080): the step teaches the call (the lead, 9 Nov): one
+/// accepted call ends it, a miss gets one reminder, and no bar or sentence
+/// is asked. To bring back the three-call bar and the sentence part, set
+/// this to true (the flow's `three_calls` starts from it).
+pub(super) const THREE_CALLS: bool = false;
+/// Teaching the call: its prompts, the first and one reminder (#4080).
+const TEACH_PROMPTS: u8 = 2;
+
 /// Why a gapped prompt with nothing said after it is given back.
 const GAPPED: &str = "the prompt was played with a gap";
 /// The sentence's level bar is never under this rise over the room's quiet
@@ -301,6 +309,9 @@ pub(crate) struct NearFlow {
     /// Call tries heard surely and still refused ([`MOST_HEARD_ASKS`]).
     /// Kept across an absence, as `reoffered` is.
     heard_refused: u8,
+    /// PARKED (#4080): the three-call bar and the sentence part, as
+    /// [`THREE_CALLS`] says; off, the step only teaches the call.
+    pub(super) three_calls: bool,
 }
 
 impl NearFlow {
@@ -1355,7 +1366,23 @@ impl Onboarding {
         // A name part short of a bar says `near_failed` at the step's end,
         // after the sentence's line, so a step left `later` says only that
         // one line (Seventh's P3 2 on #4192, the Reviewer-lead's P2 on #4269).
-        self.owed = (outcome == Outcome::Done).then(|| self.definition.words.near_done.clone());
+        if self.near.three_calls {
+            self.owed = (outcome == Outcome::Done).then(|| self.definition.words.near_done.clone());
+        }
+    }
+
+    /// Teaching the call ended (#4080): done on one accepted call, failed
+    /// otherwise, missed or none heard, after its one reminder (the lead's
+    /// rule: never `later`, the walk moves on). Its line is said before the
+    /// walk's done line, when this step is last.
+    fn teach_finished(&mut self, now_us: u64) {
+        let (outcome, line) = if self.near.named == Some(Outcome::Done) {
+            (Outcome::Done, self.definition.words.near_done.clone())
+        } else {
+            (Outcome::Failed, self.definition.words.near_failed.clone())
+        };
+        self.finish(Step::HowYouSound, outcome, None, now_us);
+        self.owed_after = self.owed.replace(line);
     }
 
     /// The step being led, with storage idle.
@@ -1378,6 +1405,17 @@ impl Onboarding {
         }
         let sentence = self.near.named.is_some();
         let prompts = *self.prompts(sentence);
+        if sentence && !self.near.three_calls {
+            self.teach_finished(now_us);
+            return;
+        }
+        let again = |prompts: u8, accepted: usize, three: bool| {
+            if three {
+                asks_again(usize::from(prompts), accepted)
+            } else {
+                accepted == 0 && prompts < TEACH_PROMPTS
+            }
+        };
         if sentence {
             // Every sentence prompt was used, its try never judged (a new
             // voice cycle): failed.
@@ -1387,8 +1425,11 @@ impl Onboarding {
             }
         } else if self.near.offer.is_none()
             && self.near.finishing.is_none()
-            && (!asks_again(usize::from(prompts), self.desired.near_call_tries.len())
-                || self.near.heard_refused > MOST_HEARD_ASKS)
+            && (!again(
+                prompts,
+                self.desired.near_call_tries.len(),
+                self.near.three_calls,
+            ) || self.near.heard_refused > MOST_HEARD_ASKS)
         {
             let at_unix_s = (self.unix_clock)() / 1_000;
             self.near.finishing = Some(Calibrated::of(
@@ -1397,7 +1438,10 @@ impl Onboarding {
             ));
         }
         if let Some(calibrated) = self.near.finishing.clone() {
-            let outcome = if calibrated.is_some() {
+            // Teaching, one accepted call is done; no bar is kept, so the
+            // near rule keeps its default (#4080).
+            let called = !self.near.three_calls && !self.desired.near_call_tries.is_empty();
+            let outcome = if calibrated.is_some() || called {
                 Outcome::Done
             } else {
                 Outcome::Failed
