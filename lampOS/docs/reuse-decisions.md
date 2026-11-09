@@ -2292,3 +2292,20 @@ this projection's narrower explicit budgets, followed by authoritative serde
 seeds. Retain complete original bytes and copy only selected facts. No new JSON
 parser, State store, dependency, missing-file inference, filesystem reader or
 shared privileged framework is introduced. See the [projection profile](ordinary-product-context.md).
+
+## Forget cancels pending provider speech (Fourth, 9 November 2026)
+
+V1's `hal/drivers/voice/tts/device_input_gate.py` uses a generation counter
+and wakes its queue when cancelling deferred speech. Keep that cancellation
+invariant: clearing a deque alone cannot stop a worker already waiting on
+speech or output capacity. Do not port its threads or device gate into the
+Rust voice route. The existing bounded sentence channels, owned TTS task set
+and request authority remain the owners here. A per-answer generation and
+cancellable wait invalidate old provider speech while the same request makes
+its clean reply. No new wire message or speaker authority is introduced.
+
+The newer wordless-cut replay buffers also hold pending words; forget clears
+those copies. Audio already returned to the worker remains outside this
+provider-local change. Sample and echo timing are conservative enqueued
+estimates, retained rather than claiming the speaker stopped. Host tests and
+the downstream tail measurement are not an acoustic or device acceptance run.
