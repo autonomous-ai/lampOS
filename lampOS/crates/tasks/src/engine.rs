@@ -87,7 +87,11 @@ fn persistence_kept<P: Persistence>(persistence: &P) -> Option<String> {
 ///
 /// 4: a target's engine may be `hermes` (#3504, 27 Oct). Only a state
 /// holding a Hermes task is written as 4, by the same rule.
-const SCHEMA: u32 = 4;
+///
+/// 5: a task's launch may name the session the person asked for (#5535,
+/// `serve --reply-named`). Only a state holding such a task is written as
+/// 5, by the same rule.
+const SCHEMA: u32 = 5;
 /// The oldest `schema` this build reads and writes: a state with no Devin
 /// task.
 const OLDEST_SCHEMA: u32 = 1;
@@ -685,16 +689,22 @@ fn task_label(store_id: &str, id: u64) -> String {
 
 impl State {
     /// The `schema` this state is written with: the lowest that reads every
-    /// task in it: 4 with a Hermes task, 3 with a Devin Cloud one, 2 with a
-    /// Devin one, else [`OLDEST_SCHEMA`].
+    /// task in it: 5 with a task whose launch names a session, 4 with a
+    /// Hermes task, 3 with a Devin Cloud one, 2 with a Devin one, else
+    /// [`OLDEST_SCHEMA`].
     fn schema_needed(&self) -> u32 {
         self.tasks
             .iter()
-            .map(|task| match task.launch.target.engine {
-                EngineKind::Hermes => 4,
-                EngineKind::DevinCloud => 3,
-                EngineKind::Devin => 2,
-                _ => OLDEST_SCHEMA,
+            .map(|task| {
+                if task.launch.session.is_some() {
+                    return 5;
+                }
+                match task.launch.target.engine {
+                    EngineKind::Hermes => 4,
+                    EngineKind::DevinCloud => 3,
+                    EngineKind::Devin => 2,
+                    _ => OLDEST_SCHEMA,
+                }
             })
             .max()
             .unwrap_or(OLDEST_SCHEMA)
@@ -1608,7 +1618,12 @@ impl<P: Persistence> Engine<P> {
         let mut next = self.state.clone();
         let at = next_audit(&mut next, now)?;
         match request {
-            Request::Prepare { text, target, .. } => {
+            Request::Prepare {
+                text,
+                target,
+                session,
+                ..
+            } => {
                 // Targets written for a newer build: nothing is handed over
                 // until they match this one (#1505).
                 if self.targets_newer.is_some() {
@@ -1645,10 +1660,13 @@ impl<P: Persistence> Engine<P> {
                     .get(target)
                     .ok_or_else(|| err("target", "Choose a provisioned target alias."))?;
                 // Known to fail on that computer (#5199): refused now, with
-                // why, rather than after the person's yes.
+                // why, rather than after the person's yes. A session the
+                // person named is already running there (#5535): its
+                // engine's sign-in is not asked about.
                 if let Some((code, message)) = self
                     .readiness
                     .get(target)
+                    .filter(|_| session.is_none())
                     .and_then(|known| known.refusal(target_value.engine))
                 {
                     return Err(err(code, message));
@@ -1658,7 +1676,17 @@ impl<P: Persistence> Engine<P> {
                     name: task_label(&next.store_id, id),
                     prompt: text.clone(),
                     target: target_value.clone(),
+                    session: session.clone(),
                 };
+                if launch
+                    .validate()
+                    .is_err_and(|code| code == "invalid_session")
+                {
+                    return Err(err(
+                        "bad_session",
+                        "The session named is not valid: a name or a few words.",
+                    ));
+                }
                 if launch.validate().is_err() || !prompt_fits(text) {
                     return Err(err(
                         "bad_text",
@@ -2607,6 +2635,7 @@ fn receipt_body(state: &State, request: &Request) -> Result<Value, Error> {
             guard,
             text,
             target,
+            ..
         } => {
             let task = state
                 .tasks
@@ -2796,6 +2825,7 @@ mod tests {
             guard: guard(engine, "prepare"),
             text: text.into(),
             target: "desk".into(),
+            session: None,
         }
     }
     fn prepare(engine: &mut Engine<Memory>, at: u64) -> u64 {
@@ -4502,7 +4532,7 @@ mod tests {
         assert!(engine.summary()["set_aside"].is_null());
         let mut newer: Value =
             serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
-        newer["schema"] = json!(5);
+        newer["schema"] = json!(SCHEMA + 1);
         let memory = Memory::default();
         memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&newer).unwrap());
         let engine = Engine::open(
@@ -4514,7 +4544,7 @@ mod tests {
         )
         .unwrap();
         let kept = engine.summary()["set_aside"].as_str().unwrap().to_owned();
-        assert!(kept.starts_with("tasks.sqlite3.newer-5-"), "{kept}");
+        assert!(kept.starts_with("tasks.sqlite3.newer-6-"), "{kept}");
         drop(engine);
         let mut engine = Engine::open(
             memory.clone(),
@@ -4843,6 +4873,50 @@ mod tests {
         assert!(Engine::open(memory, hermes(), STORE, RESTART, &clock(2)).is_err());
     }
 
+    /// #5535: a task whose launch names the session the person asked for
+    /// is stored with it and written as 5, which a build before it sets
+    /// aside; one that names a session under schema 4 is refused. A task
+    /// with none is stored and digested as before, with no `session` key.
+    #[test]
+    fn a_store_with_a_named_session_is_written_as_schema_five() {
+        let memory = Memory::default();
+        let mut engine =
+            Engine::open(memory.clone(), targets(), STORE, SESSION, &clock(0)).unwrap();
+        prepare(&mut engine, 0);
+        let plain = written(&memory);
+        assert_eq!(plain["schema"], 1);
+        assert!(plain["tasks"][0]["launch"].get("session").is_none());
+        let mut request = preparation(&engine, "Add a line to the readme.");
+        if let Request::Prepare { session, .. } = &mut request {
+            *session = Some("docs update".into());
+        }
+        engine.handle(&request, &clock(1), true).unwrap();
+        let stored = written(&memory);
+        assert_eq!(stored["schema"], 5);
+        assert_eq!(stored["tasks"][1]["launch"]["session"], "docs update");
+        drop(engine);
+        let engine = Engine::open(memory.clone(), targets(), STORE, RESTART, &clock(2))
+            .expect("a schema-5 store opens");
+        assert_eq!(
+            engine.state.tasks[1].launch.session.as_deref(),
+            Some("docs update")
+        );
+        drop(engine);
+        let mut wrong = written(&memory);
+        wrong["schema"] = json!(4);
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&wrong).unwrap());
+        assert!(Engine::open(memory, targets(), STORE, RESTART, &clock(3)).is_err());
+        // Words that are not a session's name prepare nothing.
+        let (mut engine, _) = opened();
+        let mut request = preparation(&engine, "Add a line to the readme.");
+        if let Request::Prepare { session, .. } = &mut request {
+            *session = Some("docs\nrm".into());
+        }
+        let refused = engine.handle(&request, &clock(1), true).unwrap_err();
+        assert_eq!(refused.code, "bad_session");
+    }
+
     /// A store from a newer `schema` is set aside whole and this build
     /// starts with an empty one, never destroying it (#1505).
     #[test]
@@ -4851,7 +4925,7 @@ mod tests {
         accepted(&mut engine, 0);
         let mut newer: Value =
             serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
-        newer["schema"] = json!(5);
+        newer["schema"] = json!(6);
         newer["tasks"][0]["dispatch"]["state"] = json!("a_state_from_later");
         let bytes = serde_json::to_vec(&newer).unwrap();
         let memory = Memory::default();
@@ -4865,7 +4939,7 @@ mod tests {
         )
         .expect("a newer store is set aside, not refused");
         let kept = engine.set_aside().unwrap().to_owned();
-        assert!(kept.starts_with("tasks.sqlite3.newer-5-"), "{kept}");
+        assert!(kept.starts_with("tasks.sqlite3.newer-6-"), "{kept}");
         assert_eq!(
             memory.0.borrow().kept,
             [(kept, bytes)],
@@ -5878,7 +5952,7 @@ mod tests {
         assert_eq!(
             (SCHEMA, vocabulary.as_str()),
             (
-                4,
+                5,
                 "dispatch: prepared queued attempting accepted pending not_sent uncertain cancelled invalidated; \
                  read: requested attempting finished failed; speech: claimed spoken uncertain; \
                  close: attempting closed refused left failed; engine: codex claude opencode devin devin-cloud hermes"

@@ -122,6 +122,45 @@ when it is idle as `harness reply` does (openharness#2157, the person's
 - **Not yet shown:** any run with a real `harness route`, which
   harness-reviewer is building (29 Oct).
 
+`--reply-named` (off unless set; #5535, the owner, 9 Nov) hands the work
+to a session the person names ("go into the docs session and also do
+this"), never a new one. The tasks request `prepare` takes an optional
+`session`, the person's words for it, and it goes into the launch, so the
+yes is to that session (`Launch::session`, absent when none was named;
+a store holding such a task is schema 5). After the yes and the machines
+preflight, `Cli::reply_named` lists that computer's sessions with `harness
+ps --machine <id> --all --json`, the ones stopped this week too, within
+the read bound. A row fits when its name or its folder's last part is
+the words said, compared on letters and digits only ("Docs-Update",
+"docs update"); when no row is that, a row whose name or folder contains
+them (three letters or more). The words are typed in with `harness reply
+--machine <id> <agent> --json -- <task>`, which Harness takes for a live,
+idle session behind the person's `programs-reply` switch. Nothing is
+routed, the engine is not asked about (`--engines-ready`, a known
+refusal), and nothing is started new in any case:
+- **One live session fits and takes it:** the task's agent, `joined`, as a
+  routed one: watched, told, and never closed by the lamp.
+- **Not sent, with why:** `session_not_found`; `session_ambiguous` (two or
+  more live ones fit; never guessed); `session_stopped` (only a stopped
+  one fits); `session_busy` (working, asking the person something, or
+  still starting); the reply's refusal (`reply_off`, `reply_not_idle`,
+  `reply_not_running`, `reply_failed`, a reply taken for another id
+  included); `sessions_failed` or `sessions_<code>` when the list can't
+  be read.
+- **Uncertain:** a reply that started and gave no answer
+  (`reply_uncertain`): the words may be there, so never sent again.
+- **Switch off:** a launch that names a session is `not_sent` with
+  `reply_named_off` before anything runs; with no session named, the
+  hand-over is as before either way. Session words that are blank, over
+  128 bytes or hold a control character are refused (`bad_session` at
+  `prepare`, `invalid_session` at launch).
+- **Tests:** `tests/harness.rs`
+  `with_reply_named_a_named_session_is_typed_into_and_never_started_new`;
+  `engine::tests::a_store_with_a_named_session_is_written_as_schema_five`.
+- **Not yet:** the voice's side (`start_agent_task`'s `session`, the
+  read-back naming the session, Task news' words for the codes above)
+  comes in a later PR; until then nothing sends `session`.
+
 `--progress` (off unless set; #732, the second builder, 2026-10-15) reads
 how each task handed over is going with one `harness ps` a machine and puts
 it on the bus as `tasks/status`, without the agent's words: ["Progress on
