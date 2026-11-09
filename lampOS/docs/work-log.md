@@ -9240,3 +9240,19 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - Saved /tmp/second-5870-prompt-end-fixed.rs and admit-before-tick.rs/logs;
   temporary integration files removed, checkout/diff clean. No model/device
   response claim. Source audit independently identified the same ordering.
+
+## 2026-11-09 — Second: example field checks and train757 retention
+
+- READ-OK #5887 1961268736, comment 6742670415: exact-source Python
+  every-example harness 1 passed / 114 deselected in 7.97 s; JS harness
+  1 passed in 7.64 s. Field-aware request smoke tests only, no SDK behavior
+  change or physical/latency claim.
+- Restated #5855 at 7dfc481b31, comment 6742530395: runtime unchanged from
+  reviewed 476 head; only guide/README rebase context. Guide 7 passed in
+  0.10 s, diff clean. Physical tagged body/control composition still owed.
+- Train757 d0f3a05516 source-retention audit: #5885 7ff to 3dd exact,
+  #5855 runtime retained in 23dda8f9c65, #5824 9d444d03c2 to d0f exact;
+  earlier onboarding changes and reviewed #5880 tags are already in base.
+  No omissions or changed conflict resolution found; no new train tests.
+- #5884 and #5870 remain at their held heads. Mobile confirms stale
+  consent never resubmits an old tap; fresh person intent is required.
