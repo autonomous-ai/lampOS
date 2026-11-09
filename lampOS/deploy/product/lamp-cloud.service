@@ -79,6 +79,12 @@ Environment=LAMP_APP_RESTART=on
 # (/run/lampos-tasks/app.sock, its --app-socket); the code and the email go to the backend over HTTPS only,
 # never on the broker. The same switch as lamp-voice.service's, with LAMP_TASKS_SIGN_IN there.
 Environment=LAMP_TASKS_SIGN_IN_APP=on
+# The app's faces.add_photo (#1968, cloud.md "A face from the app's photo"; on with the eyes' --photo-dir and the
+# voice's asking, #5750): a JPEG of at most 8 MiB from the lamp's own account written as a new 0600 file in the
+# photo folder, the eyes asked, and the file removed after, answered or not; nothing of a photo leaves the lamp.
+Environment=LAMP_PHOTO_FACES=on
+Environment=LAMP_EYES_PHOTO_DIR=/run/lampos-photos
+Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos
