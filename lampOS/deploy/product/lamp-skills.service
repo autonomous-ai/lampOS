@@ -28,6 +28,8 @@ Nice=10
 Environment=LAMP_SKILLS_ASK=skip
 # Night sleep (#940): its rest leased to Expression, and its claim on the night said every minute.
 Environment=LAMP_SKILL_ROUTINES=on
+# Bedtime and Morning's night caps (#5753): its [limits] sent to Actions, with LAMP_SKILL_ROUTINES above.
+Environment=LAMP_OUTPUT_CAPS=on
 # A skill's light is asked of the ring (#1132): the ring's half is the voice's LAMP_LIGHT_REQUESTS (17 Oct).
 Environment=LAMP_LIGHT_REQUESTS=on
 # A stand asked by voice (#4135): the Pose skill's stand step, read by lamp-body's LAMP_BODY_POSE_ASK.

@@ -27,6 +27,9 @@ RuntimeDirectoryPreserve=restart
 StateDirectory=lampos-output-caps
 StateDirectoryMode=0700
 Environment=LAMP_OUTPUT_CAPS_DIR=/var/lib/lampos-output-caps
+# Bedtime and Morning's night caps (#5753): light 24 and raw volume 35 from 21:00 to 06:00, never unmuting
+# and never writing an old volume back (#2804: all five cases on lamp-06c1, 22-23 Oct).
+Environment=LAMP_OUTPUT_CAPS=on
 Environment=LAMP_SCHEDULE_TOOLS=on
 Environment=LAMP_SCHEDULE_SOCKET=/run/lampos-schedule/call.sock
 # A reminder every so many minutes or hours, 15 minutes to 24 hours (repeat_reminder's interval, #4710 2 Nov):

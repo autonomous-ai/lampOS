@@ -79,10 +79,11 @@ fn disabled_skills_are_validated_but_never_started_or_offered() {
 }
 
 #[test]
-fn core_bedtime_manifest_is_disabled_and_has_no_model_function() {
+fn core_bedtime_manifest_is_enabled_and_has_no_model_function() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/bedtime-morning");
     let skill = load(&path).unwrap();
-    assert!(!skill.enabled);
+    // On in the product since #5753.
+    assert!(skill.enabled);
     assert!(skill.is_routine());
     assert!(skill.tool.is_none());
     // Its rest and wake are Night sleep's now (#940): the evening glow and
@@ -739,20 +740,17 @@ fn relative_lights_and_resettles_are_checked_at_load() {
     }
 }
 
-/// The real bedtime-morning manifest, switched on.
+/// The real bedtime-morning manifest, on as it ships (#5753).
 fn bedtime_morning(root: &Path) -> Skill {
     let from = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/bedtime-morning");
     let folder = root.join("bedtime-morning");
     fs::create_dir_all(&folder).unwrap();
-    fs::copy(from.join("SKILL.md"), folder.join("SKILL.md")).unwrap();
-    let text = fs::read_to_string(from.join("skill.toml")).unwrap();
-    assert!(text.contains("enabled = false"));
-    fs::write(
-        folder.join("skill.toml"),
-        text.replace("enabled = false", "enabled = true"),
-    )
-    .unwrap();
-    load(&folder).unwrap()
+    for file in ["SKILL.md", "skill.toml"] {
+        fs::copy(from.join(file), folder.join(file)).unwrap();
+    }
+    let skill = load(&folder).unwrap();
+    assert!(skill.enabled);
+    skill
 }
 
 const FACE: &[u8] =

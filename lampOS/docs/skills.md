@@ -796,7 +796,7 @@ judged. The hum given is this face's hello; a morning chance dropped or let
 go, or a face it does not hold for, Welcome back greets as before, and its
 hello claims the morning's day: a later face gets Welcome back's hello, never
 the morning's. With
-Bedtime and Morning off (its default), routines off, or no rested night,
+Bedtime and Morning off (on in the product since #5753), routines off, or no rested night,
 nothing changes ([`trigger.yields_to`](#the-schema-as-lamp-skills-reads-it), and
 [bedtime-morning.md](bedtime-morning.md#one-greeting-after-a-rested-night)).
 
@@ -1256,7 +1256,7 @@ and version and held to the add-on limits, for a judge. Without
 | Who was here | installable | "Was anyone here while I was out?" (#1685): the owner's call, 19 Oct: an installable skill. The model is told the lamp's record of the room from `room/presence` (#1721), times only, never a picture or who (with `LAMP_WHO_WAS_HERE_KNOWN=on`, at most "someone the lamp knows", and with `LAMP_WHO_WAS_HERE_NAMES=on` the name of someone who said yes to being named, #1997). Not in the product's install: not yet tried on a lamp, `room/presence` is off in the product, and a session past its 32 functions without `LAMP_USE_SKILL=on` |
 | Morning agenda, Tomorrow's plan, Morning mail | installable | V1's Store skills Morning Routine and daily-briefing, ported as reads of a linked service (Fourteen's marks on #5385, 6 Nov, items A2 to A4): once a local day, with someone settled at the desk (`near = 0.14`), the lamp reads aloud today's Google Calendar (07:00 to 11:00, after 2 minutes), tomorrow's (18:00 to 21:30, after 2 minutes) or the five newest mails' senders and subjects (07:00 to 11:00, after 20 minutes, so it doesn't follow straight on from the agenda). Each is one `read` step and nothing else, under the read's own gate and words ([services.md](services.md), "A made skill's read"), with no tool, so none takes a session function. One read at a time on the lamp: a second skill's read waits until a minute after the first one ended, under its own hour (services.md, "One read at a time", #5618), so mail never comes between the agenda's lines. Each needs its owner's service linked and the owner's face known to the lamp, and says nothing without them. Not in the product's install (`NOT_PRODUCT_SKILLS`): they come from the Skills Store |
 | Night sleep (#940) | core | When the lamp sleeps at night, moved out of Expression with today's numbers: 23:00 to 06:00, nobody seen, the voice resting and the lamp awake for 15 minutes, then Expression's rest (with `LAMP_REST_THROUGH_SOUNDS=on`, a sound heard as no words does not begin the voice's 15 minutes again: only words, its name, a push, a touch or the lamp speaking do; a sound with no words, a baby or an alarm too, does not, #1672); no light, sound or words, asked of nobody. Expression's bow, breath and reflex wakes are unchanged, except that with the same switch in `lamp-expression` the voice thinking no longer wakes the night's sleep, only the lamp's own answer does, and its name stirs it rather than waking it (#4285) ([alive.md](alive.md#night-sleep-is-a-skill)). On in the product units (`LAMP_SKILL_ROUTINES`, `LAMP_REST_REQUESTS`), with Expression's built-in sleep as the fallback for one release |
-| Bedtime and Morning (`bedtime-morning`) | core, disabled | Installed for every product lamp, with authored evening glow, morning hum and output-limit data; its own rest and wake moved to Night sleep (#940); no active trigger or tool until enabled after its lamp comparison |
+| Bedtime and Morning (`bedtime-morning`) | core, on in the product (#5753) | Installed for every product lamp, with authored evening glow, morning hum and output-limit data; its own rest and wake moved to Night sleep (#940); no tool. On since #5753 after its nights on lamp-06c1 (#2803, #2804), with `LAMP_OUTPUT_CAPS=on` in the product's Actions, Skills and voice units for its night ceilings |
 | Desk tutor, Desk tutor's marks | installable | Desk tutor reads handwriting from the full look's still (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`), which a product lamp takes since #2791's product half. With its marks, its two functions would take a product Live session past its 32 (#1667's count). Its marks are called only after its look. Both become core once a session can take their functions (#1668) |
 
 Which of the skills to come are core and which installable is the owner's
@@ -1264,7 +1264,7 @@ list in [v1-verdicts.md](v1-verdicts.md), "The owner's scope decisions,
 2026-10-19".
 
 A core skill comes with the lamp: `lamp-update install` writes it (on
-the product, thirty-one folders: twenty-two enabled, the seven of `PRODUCT_SKILLS_OFF` disabled, and Bedtime and Morning and Comfort break disabled by their own files, Comfort break on by its `[present]`), and a core
+the product, thirty-one folders: twenty-three enabled (Bedtime and Morning since #5753), the seven of `PRODUCT_SKILLS_OFF` disabled, and Comfort break disabled by its own file, on by its `[present]`), and a core
 skill's file taken away or changed by hand is written again at the next
 install and the next update round: a core skill's files are the build's,
 not the person's (#1722; [updates.md](updates.md), "The product's
@@ -1273,7 +1273,7 @@ skills"). What the person set is kept: the skills turned off with
 and a skill's state there. A core skill someone turned on stays on
 through an install or update round (the first builder on #2585): an
 update changes what the build ships, not what was chosen on the lamp. A
-core skill that is off by default (Bedtime and Morning, and those of
+core skill that is off by default (Comfort break, and those of
 `install::PRODUCT_SKILLS_OFF`) is turned on by editing its installed
 `skill.toml` (`enabled = true`, or install's off line taken out), or from
 the app (`skills.on`, #2815), which makes that edit through the manage
@@ -2826,7 +2826,7 @@ where it goes:
 | Hello when someone comes back to the desk | The Welcome back skill on a product lamp and on lamp-4ace; the voice's own (`speak_up.rs`, asking the Policy, #883) was removed (#2825) | Skill: Welcome back |
 | A reminder or timer coming due | The Reminders skill on a product lamp (`LAMP_SCHEDULE_SPEAK=skill`), asking while the voice rests, so one due during a talk is said when it ends, with the look: the voice says it in the skill's words (`[reminder.words]`, #940), and itself when no ask comes within 10 s. The voice's reminder consumer, timing it too, on lamp-4ace (`on`) | Skill: Reminders (setting one stays a voice tool) |
 | News of a task handed to Claude Code or Codex, and progress news | The Task news skill on a product lamp for done and failed (`LAMP_TASK_NEWS=skill`): the voice tells it in the skill's words (`[news.words]`, #940), and itself when no ask comes within 10 s of having it (at once, without the sway, for news that settled while nobody was there: the skill's ask is gone 20 s after the work settles, and an item's run cannot wait), and for stopped and asking news too (#1722: a look, and a curious tilt for a question). The voice (`task_news.rs`) on lamp-4ace; progress news is the Policy's act, off in the product | Skill: Task news |
-| Sleep at night, waking in the morning | [Bedtime and Morning](bedtime-morning.md), disabled until measured | Skill selects local windows and fresh absence/arrival; Expression keeps the owned renderer and reflexes |
+| Sleep at night, waking in the morning | [Bedtime and Morning](bedtime-morning.md), on in the product since #5753 | Skill selects local windows and fresh absence/arrival; Expression keeps the owned renderer and reflexes |
 | Turning to a voice, looking away to think, back before its first word, nods while speaking | Voice, body, Expression | Built in: the conversation, under a second |
 | A tap on the head, a hand held on it, three seconds to sleep | Controls, Expression, voice (#711, #849) | Built in: a reflex, under 150 ms |
 | One startled glance at a bang | The Startle skill's move (`skills/startle/skill.toml`, `[startle]`, #2822), played by Expression as its reflex; no catalogue carries it | Skill: Startle (core, Expression's reflex) |

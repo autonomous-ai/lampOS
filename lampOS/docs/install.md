@@ -222,7 +222,7 @@ owner: "everything is a skill"). Install puts every product skill in
 and every core skill is a product skill (the owner: core skills are always
 installed, installable ones as apps; `tests/install.rs` holds the two
 equal, Laugh glance parked out of both): thirty-one folders are installed,
-twenty-two enabled (Bedtime and Morning and Comfort break are off by their own files, the seven of `PRODUCT_SKILLS_OFF` by install), one of them hidden unless `LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
+twenty-three enabled (Bedtime and Morning since #5753; Comfort break is off by its own file, the seven of `PRODUCT_SKILLS_OFF` by install), one of them hidden unless `LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
 break, Stuffy air, Dance and Not feeling well keep their enabled defaults.
 Night sleep (#940) is on: when the lamp sleeps at night, moved out of
 Expression ([alive.md](alive.md#night-sleep-is-a-skill)), with Expression's
@@ -235,8 +235,9 @@ Not feeling well (#1681) came with the product after its lamp check, row 8
 on lamp-52e6 with the lead (20 Oct 11:35): one slow droop for a failed
 part, and the light back after; it adds no function. Prepare-to-unplug is
 enabled but stays hidden and inactive unless `LAMP_UNPLUG=on`.
-Bedtime and Morning is included with `enabled = false`, awaiting its lamp
-comparison (#1672); it adds no active trigger or advertised tool. Watches
+Bedtime and Morning is included enabled since #5753, after its nights on
+lamp-06c1 (#2803, #2804), with `LAMP_OUTPUT_CAPS=on` in the Actions, Skills
+and voice units for its night ceilings; it adds no advertised tool. Watches
 you leave and Music sway (#1669) are on in the product since #2834, with
 the eyes' `LAMP_ACTIVITY=place` for Watches you leave: the sitter followed
 by place only, never by a face print. With `room/activity` said, Stretch
@@ -350,8 +351,8 @@ not the runtime journals. The paths do not enable a feature.
 `LAMP_SKILL_ROUTINES` (Skills) and `LAMP_REST_REQUESTS` (Expression) are on
 in the product units for Night sleep (#940): its rest leased to Expression
 and its claim on the night, with Expression's built-in sleep as the
-fallback for one release; `LAMP_OUTPUT_CAPS` remains unset, and Bedtime
-and Morning remains disabled. Actions
+fallback for one release; `LAMP_OUTPUT_CAPS=on` in the same units since
+#5753, for Bedtime and Morning's night caps. Actions
 requires its caps directory only when `LAMP_OUTPUT_CAPS=on`.
 The paths come as `Environment=` lines, not as the binaries' `--daily-state`
 and `--caps-dir` options, so an older Actions or Skills from the channel
@@ -1558,7 +1559,7 @@ It writes each skill of `install::PRODUCT_SKILLS` at REV into
 `tests/` and hidden files, 0644 in 0755 folders, and the skills of
 `install::PRODUCT_SKILLS_OFF` with `install::OFF_LINE` above their
 `skill.toml`. A skill the build ships off (that line, or its own
-`enabled = false`, as Bedtime and Morning) that the lamp has turned on
+`enabled = false`, as Comfort break) that the lamp has turned on
 stays on, as a round keeps it (`product_skills::keep_turned_on`): when the
 lamp's `skill.toml` turns it on, or lamp-skills' `on` (in its
 `--state-dir`) names it and the lamp's file is missing or still the
@@ -1987,12 +1988,13 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   `LAMP_SKILLS_ASK=skip` until the Policy's gate (#939). Only in tests: no
   lamp has run the product unit with them yet, and Reminders and Task news
   have not run as skills on any lamp.
-- Bedtime and Morning (#1672): an installed skill that is disabled.
-  Host installation tests check that nineteen skills are active, the new
-  skill is absent from the live catalog, and the Skills and Actions units
-  declare their private durable paths without enabling any new switch.
-  The directories' creation by systemd and the routine's behavior on a lamp
-  still need the comparison recorded in [bedtime-morning.md](bedtime-morning.md).
+- Bedtime and Morning (#1672): an installed skill, enabled since #5753.
+  Host installation tests check that it is live with no function of its
+  own, that the Skills and Actions units declare their private durable
+  paths, and that `LAMP_OUTPUT_CAPS=on` is in the Actions, Skills and voice
+  units (`the_product_runs_bedtime_and_morning_with_its_night_caps`). Its
+  nights on lamp-06c1 are #2803 and #2804; a played row on the product
+  build is still owed (#5753).
 
 ## Prepare-to-unplug core skill (#1674)
 
