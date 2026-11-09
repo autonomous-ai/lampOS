@@ -4625,6 +4625,9 @@ pub fn serve(
                     // whoever wrote it, makes the cache cold (#2807), and
                     // this refresh's observation, read after, may end it.
                     let read = tokio::task::spawn_blocking(move || {
+                        // An unsure hold's name moved aside is still the
+                        // one known to this cache (#5738).
+                        let path = crate::speaking_faces::known_or_held(&path);
                         let mark = crate::known_faces::KnownMark::read(&path);
                         let at = Instant::now();
                         (
