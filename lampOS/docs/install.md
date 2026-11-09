@@ -573,6 +573,17 @@ back to go back; a part that names its build in its unit (lamp-4ace,
 lamp-52e6) is switched as before, both in one round
 ([updates.md](updates.md), "One round").
 
+An install writes every product unit byte for byte; a round deliberately
+keeps some installed text (#5061). While planning a new product build, it
+names `lamp-update.service` as not carried by rounds: its product manifest
+has no candidate text for that unit, so this is a policy notice, not a claim
+that the file is stale. It also names a carried unit whose text differs only
+in comments, blank lines or trailing whitespace when the plan leaves that
+unit alone. These notices contain no unit contents, require no extra fetch
+or systemd call, and do not repeat on polls of an already installed build.
+`lamp-update check-units` remains the way to compare all installed unit text
+with a specified product build.
+
 ## Two ways in
 
 A lamp can get lampOS as the keeper's package through the old runtime's

@@ -1043,7 +1043,50 @@ impl Run<'_, '_> {
         self.fetching = to_fetch(self.config, &changes, &self.placings);
         self.room(&changes)?;
         let placing = self.product_skills(state, &manifest, &installed, &carried)?;
+        self.retained_units(&manifest, &installed, &companions, &carried, &changes);
         Ok((manifest, changes, placing))
+    }
+
+    /// Say which unit text a new product round deliberately keeps (#5061).
+    /// Reuse the verified candidate texts and plan; no fetch or systemd call.
+    /// The updater's unit is absent from product manifests, so its line says
+    /// only the policy, never that it differs from the candidate build.
+    fn retained_units(
+        &mut self,
+        manifest: &Manifest,
+        installed: &[Installed],
+        companions: &BTreeMap<String, String>,
+        carried: &BTreeMap<String, String>,
+        changes: &[Change],
+    ) {
+        if !manifest
+            .units
+            .iter()
+            .any(|unit| unit.lamp == manifest::PRODUCT_LAMP)
+        {
+            return;
+        }
+        let own = self.config.on(&self.config.units).join(OWN_UNIT);
+        if fs::symlink_metadata(own).is_ok_and(|metadata| metadata.file_type().is_file()) {
+            self.say(&format!(
+                "{OWN_UNIT} is not carried by rounds; its installed unit is kept"
+            ));
+        }
+        for (name, after) in carried {
+            if changes.iter().any(|change| &change.unit == name) {
+                continue;
+            }
+            let before = installed
+                .iter()
+                .find(|part| &part.unit == name)
+                .map(|part| &part.text)
+                .or_else(|| companions.get(name));
+            if before.is_some_and(|before| before != after && unit::same(before, after)) {
+                self.say(&format!(
+                    "{name} is kept: only comments, blank lines or trailing whitespace differ"
+                ));
+            }
+        }
     }
 
     /// The build's product skills (#2014's P2), fetched and checked, and

@@ -1163,6 +1163,17 @@ already in a home. A test pins the product unit's sandbox to 7071's and
 each folder a round writes itself to inside it (`own_unit_line_tests` in
 `main.rs`, #4540).
 
+When planning a newer product build, the round names an installed regular
+`lamp-update.service` as "not carried by rounds; its installed unit is kept"
+(#5061). This reports the policy only: the product manifest omits that unit,
+so no candidate-byte comparison is claimed. It also names any carried unit
+with different text that the plan leaves unchanged because only comments,
+blank lines or trailing whitespace differ. A unit written along with a
+binary or setting change is not reported as retained. Both notices use the
+already loaded unit texts and plan, plus one local metadata check for the
+updater's unit: no new network or systemd calls, no unit contents in the
+journal, and no repetition when the installed build is already up to date.
+
 ### Its records
 
 In `/var/lib/lampos-update/` (`records.rs`), each written whole:
