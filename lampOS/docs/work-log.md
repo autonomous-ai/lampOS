@@ -8819,3 +8819,18 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   No physical latency or lamp acceptance. PM subsequently named El and
   Reviewer-lead; this read supplements their assigned reads.
 - Taking Fourteen's explicit #5851 fixed-head restatement next.
+
+## 2026-11-09 — Second: send-gate fix and fake routing read
+
+- READ-OK #5851 `cf0acbac9c06c57a8510d118228092af9fc40e5b`; my
+  34509dd5bf HOLD lifted. Full correction read includes actual spoken
+  ordering before Transcript/Echo::Held, counted-ID credit and co-evicted
+  echo mark. Fresh native services79 pass2.41 s. No real send/Engine/device
+  acceptance. This supersedes my earlier mistaken code approval and hold.
+- READ-OK #5860 `e6676374f50152d9a24317a7c6ab8d0a32810952`: Python/MCP
+  211 pass1 skip, JS92 pass2 CAD skips. Clean composition with #5862
+  6df6ef85 in uncommitted tree3539129289;3 Python+3 JS focused tests pass.
+  No branch merge/push, named5862 readers retained. P3 --everything wording
+  flagged because every fake still refuses arm joints. Checkout clean.
+- Taking supplemental #5861 source/unit privacy read while the held-code
+  owners prepare fixes. No product edits or device action.
