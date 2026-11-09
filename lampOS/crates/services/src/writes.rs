@@ -68,6 +68,94 @@ pub const ACTIONS: &[(&str, &str)] = &[
 /// What an MCP service writes, for the tools' description.
 pub const MCP_ACTIONS: &str = "call {tool, arguments}";
 
+/// What one write needs a link to allow: the service, its action, what it
+/// does in the person's words, and the scopes any one of which allows it.
+pub struct Allowed {
+    pub code: &'static str,
+    pub action: &'static str,
+    pub what: &'static str,
+    pub scopes: &'static [&'static str],
+}
+
+/// The scopes a write needs, from each service's own docs (Gmail's
+/// `users.messages.send`, Calendar's `events.insert`), each a full scope
+/// URL as Google records it. Only Google's sign-ins record their scopes;
+/// [`scope_allows`] matches them whole. Google Drive's are with its writes
+/// (#5825).
+pub const SCOPES: &[Allowed] = &[
+    Allowed {
+        code: "gmail",
+        action: "send_mail",
+        what: "send mail",
+        scopes: GMAIL_SEND,
+    },
+    Allowed {
+        code: "gmail-app",
+        action: "send_mail",
+        what: "send mail",
+        scopes: GMAIL_SEND,
+    },
+    Allowed {
+        code: "google_calendar",
+        action: "create_event",
+        what: "add calendar events",
+        scopes: &[
+            "https://www.googleapis.com/auth/calendar",
+            "https://www.googleapis.com/auth/calendar.events",
+            "https://www.googleapis.com/auth/calendar.events.owned",
+        ],
+    },
+];
+
+const GMAIL_SEND: &[&str] = &[
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://mail.google.com/",
+];
+
+/// Whether `entry`'s scopes hold one of `needed`, each taken whole as a
+/// full scope URL (a list kept as one spaced string read alike); a bare
+/// name such as `gmail.send` allows nothing.
+/// Drive's create uses it too once #5825 lands.
+pub fn scope_allows(entry: &Entry, needed: &[&str]) -> bool {
+    entry
+        .scopes
+        .iter()
+        .flat_map(|scopes| scopes.split_whitespace())
+        .any(|scope| needed.contains(&scope))
+}
+
+/// What `args`' write on `code` would do, when `entry` is a sign-in that
+/// records its scopes and none of them allows it; else `None`. An app
+/// password, a personal key or a link recording no scopes is not checked.
+pub fn scope_missing(code: &str, args: &Value, entry: &Entry) -> Option<&'static str> {
+    let recorded = entry.scopes.iter().any(|scopes| !scopes.trim().is_empty());
+    if !entry.oauth() || !recorded {
+        return None;
+    }
+    let action = text(args, "action")?;
+    let allowed = SCOPES
+        .iter()
+        .find(|allowed| allowed.code == code && allowed.action == action)?;
+    (!scope_allows(entry, allowed.scopes)).then_some(allowed.what)
+}
+
+/// What a write on `code` does, for a refusal that doesn't name its action.
+pub fn what_written(code: &str) -> &'static str {
+    SCOPES
+        .iter()
+        .find(|allowed| allowed.code == code)
+        .map_or("make this change", |allowed| allowed.what)
+}
+
+/// Whether a 401 or 403's body says the link's scopes are too few, in
+/// Google's words for it.
+pub fn scope_refused(body: &[u8]) -> bool {
+    let body = String::from_utf8_lossy(body);
+    body.contains("ACCESS_TOKEN_SCOPE_INSUFFICIENT") || body.contains("insufficientPermissions")
+}
+
 /// An MCP service's write, checked and read back: `tool` is the service's
 /// own listing of it, which is a write (`mcp::is_read` false).
 pub fn prepare_mcp(
@@ -515,6 +603,43 @@ mod tests {
             0,
         )
         .unwrap()
+    }
+
+    /// A Google sign-in for Gmail recording `scopes`.
+    fn gmail_scoped(scopes: Value) -> Entry {
+        Entry::from_set(
+            "gmail",
+            &json!({"auth_type":"oauth","access_token":"t","expires_in":3600,"scopes":scopes}),
+            0,
+        )
+        .unwrap()
+    }
+
+    /// Scopes are full URLs, a list kept as one spaced string read alike;
+    /// a bare name allows nothing.
+    #[test]
+    fn a_scope_allows_only_as_its_full_url() {
+        let send = json!({"action":"send_mail"});
+        let spaced = gmail_scoped(json!([
+            "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send"
+        ]));
+        assert!(scope_allows(&spaced, GMAIL_SEND));
+        assert_eq!(scope_missing("gmail", &send, &spaced), None);
+        let full_gmail = gmail_scoped(json!(["https://mail.google.com/"]));
+        assert_eq!(scope_missing("gmail", &send, &full_gmail), None);
+        for bare in [json!(["gmail.send"]), json!(["gmail.readonly gmail.send"])] {
+            let entry = gmail_scoped(bare.clone());
+            assert!(!scope_allows(&entry, GMAIL_SEND), "{bare}");
+            assert_eq!(
+                scope_missing("gmail", &send, &entry),
+                Some("send mail"),
+                "{bare}"
+            );
+        }
+        // A link recording no scopes is not checked.
+        for none in [json!([]), json!(["  "])] {
+            assert_eq!(scope_missing("gmail", &send, &gmail_scoped(none)), None);
+        }
     }
 
     #[test]
