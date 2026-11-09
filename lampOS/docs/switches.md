@@ -695,7 +695,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_SECOND_FIRST_WORDS` | The lamp can start speaking an answer after its first few words, rather than waiting for a full phrase. |
 | `LAMP_SECOND_FLUX` | Nothing you'd notice: the lamp tries a newer service for turning your English speech into words. |
 | `LAMP_SECOND_FACE_NAME` | When the lamp knows your face and sees you ask, it can say your name back; someone off camera is never told it. |
-| `LAMP_SECOND_FACE_NAME_ONLY` | When the lamp knows your face, it calls you by the name your face is saved under, even if another name came up in the talk. |
+| `LAMP_SECOND_FACE_NAME_ONLY` | When it knows your face, the lamp uses your saved name or app name, not a name from earlier talk. |
 | `LAMP_SECOND_CHECKING_LINE` | When the lamp looks something up, it says "Let me check." first instead of going quiet. |
 | `LAMP_SECOND_MEMORY_HITS` | The lamp checks what it remembers against each thing you say, so its answers can use those memories. |
 | `LAMP_SECOND_QUIET_HELD` | Nothing you'd notice: the lamp holds back silence after you pause instead of sending it off. |
