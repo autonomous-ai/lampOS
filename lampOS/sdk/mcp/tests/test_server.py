@@ -147,11 +147,15 @@ def test_play_joints_and_sound_each_send_their_op(tmp_path):
         async with connected(tmp_path, grants=("body", "speak")) as (fake, _, session):
             assert not (await session.call_tool("lamp_play", {"name": "wave"})).isError
             assert fake.asked("play") == [{"name": "wave"}]
-            joints = await session.call_tool("lamp_joints", {"within_ms": 800, "pitch": 10, "elbow": -5})
+            # The door takes yaw and pitch today; roll, shoulder and elbow wait
+            # for the body's goal stream (parts.rs), in its words.
+            elbow = await session.call_tool("lamp_joints", {"within_ms": 800, "pitch": 10, "elbow": -5})
+            assert elbow.isError and "waits for the body's goal stream for roll, shoulder and elbow" in text(elbow), text(elbow)
+            joints = await session.call_tool("lamp_joints", {"within_ms": 800, "pitch": 10, "yaw": -5})
             assert not joints.isError, text(joints)
             [asked] = fake.asked("joints")
             # Under a body lease of its own, named in the request.
-            assert asked["targets"] == {"pitch": 10, "elbow": -5} and asked["within_ms"] == 800
+            assert asked["targets"] == {"pitch": 10, "yaw": -5} and asked["within_ms"] == 800
             assert asked["lease"].startswith("l_")
             none = await session.call_tool("lamp_joints", {"within_ms": 800})
             assert none.isError and "needs at least one of" in text(none)
@@ -1121,5 +1125,27 @@ def test_without_speak_volume_is_neither_offered_nor_listed(tmp_path):
             assert "lamp_volume" not in names
             uris = {str(r.uri) for r in (await session.list_resources()).resources}
             assert "lamp://state/volume" not in uris
+
+    run(go())
+
+
+def test_lamp_joints_waits_for_the_bodys_done_as_lamp_look_does(tmp_path):
+    """lamp-control sends `joints`' yaw and pitch as the holder's look, and its
+    `done` follows (body_lease.rs): the tool says finished, or dropped with the
+    body's why, and lets go of its lease at once."""
+    async def go():
+        async with connected(tmp_path, grants=("body",)) as (fake, _, session):
+            joints = await session.call_tool("lamp_joints", {"within_ms": 500, "pitch": 3, "yaw": -4})
+            assert not joints.isError and text(joints) == "joints finished", text(joints)
+            assert fake.asked("lease.release")
+            # A body that refuses it (its lease suspended by a conversation)
+            # says so in the tool's answer instead of "taken".
+            fake.auto_done = False
+            call = asyncio.create_task(session.call_tool("lamp_joints", {"pitch": 1}))
+            while len(fake.asked("joints")) < 2:
+                await asyncio.sleep(0.01)
+            await fake.done(fake.requests[-1]["id"], "dropped", "the body is not held")
+            result = await call
+            assert text(result) == "joints dropped: the body is not held", text(result)
 
     run(go())

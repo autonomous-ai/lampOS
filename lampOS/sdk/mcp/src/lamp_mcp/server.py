@@ -40,7 +40,7 @@ from pydantic import AnyUrl
 # left to lapse if `done` doesn't come (Nine, #3504 13:27).
 ACTION_LEASE_MS = 10_000
 # The body actions lamp-control ends with a `done` after its `{"to": "body"}`.
-DONE_FOLLOWS = {"look"}
+DONE_FOLLOWS = {"look", "joints"}
 # The longest `lamp_follow_hand` follows, in one call.
 MOST_FOLLOW_S = 60
 # Said in place of a starting `lamp_follow_hand` when a stop comes meanwhile.

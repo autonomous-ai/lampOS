@@ -404,6 +404,87 @@ def test_the_fake_answers_look_as_lamp_control_does(tmp_path):
     run(go())
 
 
+def test_a_look_or_joints_waits_for_the_bodys_done_and_says_when_a_conversation_drops_it(tmp_path):
+    """lamp-75c9, 9 Nov 14:33: a `joints` asked while a conversation had the
+    lease suspended was answered `{"to": "body"}` by the door and refused by
+    the body ("the body is not held"); without a wait, nothing told the
+    program. With `wait`, the body's `done` comes back."""
+    async def go():
+        async with FakeLamp(grants=("body", "look")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                async with lamp.lease("body", for_ms=5000) as lease:
+                    there = await lamp.look(yaw=-10, pitch=5, wait=True)
+                    assert (there["ev"], there["how"], there["yaw"], there["pitch"]) == ("done", "finished", -10.0, 5.0)
+                    aimed = await lamp.joints(lease, 300, wait=True, pitch=2.0, yaw=-4.0)
+                    assert (aimed["how"], aimed["yaw"], aimed["pitch"]) == ("finished", -4.0, 2.0)
+                    # Without `wait`, only the door's answer, as before.
+                    assert (await lamp.joints(lease, 300, yaw=1.0))["to"] == "body"
+                    # A conversation suspends the lease: the door still takes
+                    # the look, and the body's `done` says it was dropped.
+                    await fake.lease_event(lease.id, "suspended", "conversation")
+                    while lease.state != "suspended":
+                        await asyncio.sleep(0.01)
+                    dropped = await lamp.joints(lease, 300, wait=True, yaw=-13.0)
+                    assert (dropped["how"], dropped["why"]) == ("dropped", "the body is not held")
+                    dropped = await lamp.look(yaw=3, pitch=1, wait=True)
+                    assert (dropped["how"], dropped["why"]) == ("dropped", "the body is not held")
+                    await fake.lease_event(lease.id, "held")
+                    while lease.state != "held":
+                        await asyncio.sleep(0.01)
+                    assert (await lamp.look(at="ahead", wait=True))["how"] == "finished"
+                    # A look at the hand has no `done` to wait for.
+                    with pytest.raises(errors.BY_CODE["bad_request"], match="follow_hand"):
+                        await lamp.look("hand", wait=True)
+            assert fake.asked("joints")[0] == {"lease": "l_1", "targets": {"pitch": 2.0, "yaw": -4.0}, "within_ms": 300}
+
+    run(go())
+
+def test_a_waiting_look_ends_a_hand_follow_when_taken_not_at_its_done(tmp_path):
+    """Reviewer-two's P2 on #5837: lamp-control ends a hand-follow as soon as
+    another look is taken, so the SDK does too, before the wait for the
+    body's `done`. A cancelled wait can't leave it following, a refused look
+    leaves it be, and the fake's `joints` is held to the door's rules."""
+    from lampos.testing import JOINTS_WAIT
+
+    async def go():
+        async with FakeLamp(grants=("body", "look")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                following = await lamp.follow_hand().start()
+                assert following.following
+                fake.auto_done = False
+                # Taken, with its `done` held back: the follow ends at once.
+                look = asyncio.ensure_future(lamp.look(yaw=2, pitch=1, wait=True))
+                while not fake.asked("look")[1:]:
+                    await asyncio.sleep(0.01)
+                while following.following:
+                    await asyncio.sleep(0.01)
+                assert not look.done()
+                # The wait cancelled, then its `done`: nothing comes back.
+                look.cancel()
+                await fake.done(fake.requests[-1]["id"])
+                await asyncio.sleep(0.05)
+                assert not following.following
+                fake.auto_done = True
+                # A refused look leaves a following alone.
+                again = await lamp.follow_hand().start()
+                with pytest.raises(errors.BY_CODE["refused"]):
+                    await lamp.look("face", wait=True)
+                assert again.following
+                await again.stop()
+                async with lamp.lease("body", for_ms=5000) as lease:
+                    # Roll, shoulder and elbow wait for the body's goal stream.
+                    with pytest.raises(errors.BY_CODE["refused"]) as raised:
+                        await lamp.joints(lease, 300, wait=True, elbow=4.0)
+                    assert raised.value.why == JOINTS_WAIT
+                    # A joint not named stays where `get` `body` says it is.
+                    body = (await lamp.get("body"))["body"]["joints"]
+                    done = await lamp.joints(lease, 300, wait=True, yaw=-3.0)
+                    assert (done["yaw"], done["pitch"]) == (-3.0, body["pitch"]["deg"])
+
+    run(go())
+
 def test_actions_send_the_schemas_fields_and_wait_for_done(tmp_path):
     async def go():
         async with FakeLamp() as fake:
