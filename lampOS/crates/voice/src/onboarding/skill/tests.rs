@@ -599,10 +599,9 @@ fn each_step_says_what_to_do_what_if_it_didnt_work_and_that_it_worked() {
         ),
     ];
     assert!(super::PREFERENCES_HELLO.contains("May I say hello when you sit down?"));
-    assert!(
-        super::PREFERENCES_DONE
-            .contains("All done! You can add more skills in the Autonomous app.")
-    );
+    assert!(super::PREFERENCES_DONE.contains(
+        "All done! I can set timers and reminders, answer questions, and change my light."
+    ));
     for (step, todo, again, worked) in three {
         let lines = lines_of(step);
         for line in [todo, again, worked]

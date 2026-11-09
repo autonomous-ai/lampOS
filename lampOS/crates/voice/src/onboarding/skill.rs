@@ -36,7 +36,13 @@ pub(crate) const FACE_EXPRESSIONS_NO: &str =
 /// "Preferences"' done line, the walk's own once the step is done: the
 /// walk's last words, so they also say where the app's buttons and gestures
 /// guide is (#1711 item 1).
-pub(crate) const PREFERENCES_DONE: &str = "(Say only this, nothing before or after it: \"All done! You can add more skills in the Autonomous app. Now, ask me anything.\")";
+pub(crate) const PREFERENCES_DONE: &str = "(Say only this, nothing before or after it: \"All done! I can set timers and reminders, answer questions, and change my light. Just say 'Hey Lamp'. You can add skills any time in the Autonomous app.\")";
+
+/// Said once after "how you sound"'s call is accepted (#4080, the lead,
+/// 9 Nov): one try of the voice route, never asked again; the step is done
+/// on the call alone, and the walk waits for it at most
+/// `TRY_IT_US` ([`super::Onboarding::tick`]).
+pub(crate) const NEAR_TRY: &str = "(Say only this, nothing before or after it: \"Now try it: say 'Hey Lamp, turn your light blue.'\")";
 
 /// "Who you are" ended with the name only on a lamp that keeps faces
 /// (#5139): what is remembered waits for a face, so the person is told, and
@@ -53,18 +59,18 @@ pub(crate) const FACE_AGAIN: &str = "(Nobody has spoken. Ask exactly this: \"One
 /// once per setup with `LAMP_ONBOARDING_FIRST_TRIES` on (#5316, the first
 /// customers' stage 2 on #5296): the introduction ends on what to do next,
 /// a few everyday things, never a list of features.
-pub(crate) const PREFERENCES_DONE_TRIES: &str = "(Say only this, nothing before or after it: \"All done! You can add more skills in the Autonomous app. Now, ask me anything. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one.\")";
+pub(crate) const PREFERENCES_DONE_TRIES: &str = "(Say only this, nothing before or after it: \"All done! I can set timers and reminders, answer questions, and change my light. Just say 'Hey Lamp'. You can add skills any time in the Autonomous app. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one.\")";
 
 /// [`PREFERENCES_DONE`] ending with the one sentence about Harness
 /// (`harness_line::SENTENCE`), inside the same quoted line: one closing
 /// turn (#5488, with `LAMP_ONBOARDING_HARNESS_LINE` on and Harness not
 /// signed in).
-pub(crate) const PREFERENCES_DONE_HARNESS: &str = "(Say only this, nothing before or after it: \"All done! You can add more skills in the Autonomous app. Now, ask me anything. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.\")";
+pub(crate) const PREFERENCES_DONE_HARNESS: &str = "(Say only this, nothing before or after it: \"All done! I can set timers and reminders, answer questions, and change my light. Just say 'Hey Lamp'. You can add skills any time in the Autonomous app. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.\")";
 
 /// [`PREFERENCES_DONE_TRIES`] ending with the same sentence, with
 /// `LAMP_ONBOARDING_FIRST_TRIES` on too: still one closing turn, so a new
 /// owner never hears two speeches at the end (the PM on #5488).
-pub(crate) const PREFERENCES_DONE_TRIES_HARNESS: &str = "(Say only this, nothing before or after it: \"All done! You can add more skills in the Autonomous app. Now, ask me anything. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.\")";
+pub(crate) const PREFERENCES_DONE_TRIES_HARNESS: &str = "(Say only this, nothing before or after it: \"All done! I can set timers and reminders, answer questions, and change my light. Just say 'Hey Lamp'. You can add skills any time in the Autonomous app. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.\")";
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]

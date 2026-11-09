@@ -137,6 +137,11 @@ const TOUCH_GIVE_UP_US: u64 = 60_000_000;
 /// ponytail: timed from Controls' touches, not the pet's end on `controls/pet`;
 /// read that topic if a long pet outlasts it.
 const PET_RESPONSE_US: u64 = 6_000_000;
+/// "How you sound" done (#4080, the lead, 9 Nov): after its try line
+/// ([`skill::NEAR_TRY`]) the walk says nothing more this long, so the
+/// person may try one light turn; a line heard ends the wait at once, and
+/// that turn holds `can_speak` until it ends.
+const TRY_IT_US: u64 = 8_000_000;
 /// The name the walk reads Controls' touches under.
 const SUBSCRIBER: &str = "voice_onboarding";
 
@@ -995,6 +1000,12 @@ pub struct Onboarding {
     /// "Touch" ended on a touch felt (#4080): until then the walk steps
     /// aside for the pet response ([`PET_RESPONSE_US`]).
     pet_response_until_us: Option<u64>,
+    /// The try line said (#4080): until then nothing more is said
+    /// ([`TRY_IT_US`]).
+    try_it_until_us: Option<u64>,
+    /// The line owed after the try line, the walk's closing: kept here until
+    /// the try line is said, as `owed_after` holds the try line.
+    after_try: Option<String>,
     /// PARKED (#4080): "touch" with no touch felt was `later` (#3996); the
     /// lead's rule makes it failed. True brings `later` back (its tests
     /// keep the `later` re-offers tested through it).
@@ -1255,6 +1266,8 @@ impl Onboarding {
             near_since: None,
             touches: None,
             pet_response_until_us: None,
+            try_it_until_us: None,
+            after_try: None,
             touch_later: false,
             counted: true,
             redoing_one: None,
@@ -1323,6 +1336,8 @@ impl Onboarding {
         self.forget_giving();
         self.owed = None;
         self.owed_after = None;
+        self.try_it_until_us = None;
+        self.after_try = None;
         self.gesture = None;
     }
 
@@ -1379,6 +1394,8 @@ impl Onboarding {
             self.pending_records.clear();
             self.owed = None;
             self.owed_after = None;
+            self.try_it_until_us = None;
+            self.after_try = None;
             self.led = None;
             self.privacy_flow.offer = None;
             self.privacy_flow.attempt = None;
@@ -1980,6 +1997,8 @@ impl Onboarding {
         self.pending_records.retain(|row| row["step"] != "privacy");
         self.owed = None;
         self.owed_after = None;
+        self.try_it_until_us = None;
+        self.after_try = None;
         self.privacy_flow.erase_pending = true;
         self.fence_storage();
     }
@@ -2432,6 +2451,8 @@ impl Onboarding {
         self.heard_words(text);
         if text.chars().any(char::is_alphanumeric) {
             self.lamp_spoke_last = false;
+            // A line after the try line ends its wait (#4080).
+            self.try_it_until_us = None;
         }
         let nudge = self.nudge;
         let face_kept = self.face_kept;
@@ -2905,8 +2926,19 @@ impl Onboarding {
         if self.model_held {
             return None;
         }
+        // The try line's wait (#4080): nothing is said until it is over.
+        if let Some(until) = self.try_it_until_us {
+            if now_us < until {
+                return None;
+            }
+            self.try_it_until_us = None;
+        }
         if can_speak && let Some(note) = self.owed.take() {
             self.owed = self.owed_after.take();
+            if note == skill::NEAR_TRY {
+                self.owed = self.after_try.take();
+                self.try_it_until_us = Some(now_us + TRY_IT_US);
+            }
             if note == skill::PREFERENCES_HELLO
                 && let Some(led) = self.led.as_mut()
             {
@@ -3841,6 +3873,8 @@ impl Onboarding {
             self.led = None;
             self.owed = None;
             self.owed_after = None;
+            self.try_it_until_us = None;
+            self.after_try = None;
         }
         self.finished_recorded = false;
         self.pending_records
@@ -3944,6 +3978,8 @@ impl Onboarding {
                 self.led = None;
                 self.owed = None;
                 self.owed_after = None;
+                self.try_it_until_us = None;
+                self.after_try = None;
                 self.finished_recorded = false;
                 self.pending_records.clear();
                 self.pending_records
@@ -7006,7 +7042,7 @@ mod tests {
         assert_eq!(
             notes.last().map(String::as_str),
             Some(
-                "(Say only this, nothing before or after it: \"All done, Mia! You can add more skills in the Autonomous app. Now, ask me anything.\")"
+                "(Say only this, nothing before or after it: \"All done, Mia! I can set timers and reminders, answer questions, and change my light. Just say 'Hey Lamp'. You can add skills any time in the Autonomous app.\")"
             ),
             "{notes:?}"
         );

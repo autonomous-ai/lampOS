@@ -1391,6 +1391,11 @@ impl Onboarding {
         };
         self.finish(Step::HowYouSound, outcome, None, now_us);
         self.owed_after = self.owed.replace(line);
+        // Done: one try of the voice route, asked once, before whatever
+        // follows (#4080, the lead, 9 Nov). The step is already done.
+        if outcome == Outcome::Done {
+            self.after_try = self.owed_after.replace(super::skill::NEAR_TRY.to_owned());
+        }
     }
 
     /// The step being led, with storage idle.

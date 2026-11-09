@@ -1123,6 +1123,12 @@ pub(super) const LINES: &[Line] = &[
         "我没听清。稍等一下，再说一次“Hey Lamp”。",
         "잘 못 들었어요. 잠깐 기다렸다가 'Hey Lamp'라고 다시 말해 주세요.",
     ]),
+    ("Now try it: say 'Hey Lamp, turn your light blue.'", [
+        "Giờ bạn thử nhé: nói 'Hey Lamp, chuyển đèn sang màu xanh dương.'",
+        "では試してみてください。「Hey Lamp、ライトを青にして」と言ってください。",
+        "现在试试吧：说“Hey Lamp，把灯变成蓝色。”",
+        "이제 해 보세요. 'Hey Lamp, 불빛을 파란색으로 바꿔 줘.'라고 말해 보세요.",
+    ]),
     ("No worries. Just say 'Hey Lamp' whenever you need me.", [
         "Không sao. Khi nào cần mình, cứ nói 'Hey Lamp' nhé.",
         "大丈夫です。用があるときは、いつでも「Hey Lamp」と言ってください。",
@@ -1490,17 +1496,17 @@ pub(super) const LINES: &[Line] = &[
         "你坐下的时候，我可以跟你打个招呼吗？",
         "자리에 앉으시면 인사해도 될까요?",
     ]),
-    ("You can add more skills in the Autonomous app. Now, ask me anything.", [
-        "Bạn có thể thêm kỹ năng trong app Autonomous. Giờ thì hỏi mình bất cứ điều gì nhé.",
-        "Autonomous アプリでスキルを追加できます。では、何でも聞いてください。",
-        "你可以在 Autonomous App 里添加更多技能。现在，问我什么都行。",
-        "Autonomous 앱에서 스킬을 더 추가할 수 있어요. 이제 무엇이든 물어보세요.",
+    ("I can set timers and reminders, answer questions, and change my light. Just say 'Hey Lamp'. You can add skills any time in the Autonomous app.", [
+        "Mình có thể hẹn giờ, nhắc việc, trả lời câu hỏi và đổi màu đèn. Cứ nói 'Hey Lamp' nhé. Bạn có thể thêm kỹ năng bất cứ lúc nào trong app Autonomous.",
+        "タイマーやリマインダーの設定、質問への答え、ライトの色の変更ができます。「Hey Lamp」と呼んでください。Autonomous アプリでいつでもスキルを追加できます。",
+        "我可以设定计时器和提醒、回答问题，还能改变灯光。只要说“Hey Lamp”。你随时可以在 Autonomous App 里添加技能。",
+        "타이머와 알림을 맞추고, 질문에 답하고, 불빛을 바꿀 수 있어요. 'Hey Lamp'라고만 말해 주세요. Autonomous 앱에서 언제든 스킬을 추가할 수 있어요.",
     ]),
-    ("You can add more skills in the Autonomous app. Now, ask me anything. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one.", [
-        "Bạn có thể thêm kỹ năng trong app Autonomous. Giờ thì hỏi mình bất cứ điều gì nhé. Nếu bạn muốn bắt đầu từ đâu đó, cứ nhờ mình hẹn giờ, hỏi thời tiết, hay hỏi bất cứ điều gì bạn tò mò. Bạn cũng có thể thêm kỹ năng từ Skill Store trong app, hoặc cứ nhờ mình tạo một kỹ năng.",
-        "Autonomous アプリでスキルを追加できます。では、何でも聞いてください。まずは、タイマーや天気、気になることを何でも聞いてみてください。アプリの Skill Store からスキルを追加したり、私にスキルを作ってと頼んだりもできますよ。",
-        "你可以在 Autonomous App 里添加更多技能。现在，问我什么都行。想先试试的话，可以让我定个计时器、问问天气，或者问任何你好奇的事。你也可以在 App 的 Skill Store 里添加技能，或者直接让我帮你做一个。",
-        "Autonomous 앱에서 스킬을 더 추가할 수 있어요. 이제 무엇이든 물어보세요. 처음이라면 타이머나 날씨, 아니면 궁금한 건 뭐든 물어봐 주세요. 앱의 Skill Store에서 스킬을 추가하거나, 저한테 하나 만들어 달라고 하셔도 돼요.",
+    ("I can set timers and reminders, answer questions, and change my light. Just say 'Hey Lamp'. You can add skills any time in the Autonomous app. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one.", [
+        "Mình có thể hẹn giờ, nhắc việc, trả lời câu hỏi và đổi màu đèn. Cứ nói 'Hey Lamp' nhé. Bạn có thể thêm kỹ năng bất cứ lúc nào trong app Autonomous. Nếu bạn muốn bắt đầu từ đâu đó, cứ nhờ mình hẹn giờ, hỏi thời tiết, hay hỏi bất cứ điều gì bạn tò mò. Bạn cũng có thể thêm kỹ năng từ Skill Store trong app, hoặc cứ nhờ mình tạo một kỹ năng.",
+        "タイマーやリマインダーの設定、質問への答え、ライトの色の変更ができます。「Hey Lamp」と呼んでください。Autonomous アプリでいつでもスキルを追加できます。まずは、タイマーや天気、気になることを何でも聞いてみてください。アプリの Skill Store からスキルを追加したり、私にスキルを作ってと頼んだりもできますよ。",
+        "我可以设定计时器和提醒、回答问题，还能改变灯光。只要说“Hey Lamp”。你随时可以在 Autonomous App 里添加技能。想先试试的话，可以让我定个计时器、问问天气，或者问任何你好奇的事。你也可以在 App 的 Skill Store 里添加技能，或者直接让我帮你做一个。",
+        "타이머와 알림을 맞추고, 질문에 답하고, 불빛을 바꿀 수 있어요. 'Hey Lamp'라고만 말해 주세요. Autonomous 앱에서 언제든 스킬을 추가할 수 있어요. 처음이라면 타이머나 날씨, 아니면 궁금한 건 뭐든 물어봐 주세요. 앱의 Skill Store에서 스킬을 추가하거나, 저한테 하나 만들어 달라고 하셔도 돼요.",
     ]),
     // The sentence about Harness (#5488, `harness_line::SENTENCE`), alone
     // and ending each closing it goes into.
@@ -1510,17 +1516,17 @@ pub(super) const LINES: &[Line] = &[
         "如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
         "컴퓨터로 일하신다면 앱의 Harness에서 연결해 주세요, 제가 일을 맡아 드릴게요.",
     ]),
-    ("You can add more skills in the Autonomous app. Now, ask me anything. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.", [
-        "Bạn có thể thêm kỹ năng trong app Autonomous. Giờ thì hỏi mình bất cứ điều gì nhé. Nếu bạn làm việc trên máy tính, mình có thể nhận việc giúp bạn: mở mục Harness trong app để kết nối nhé.",
-        "Autonomous アプリでスキルを追加できます。では、何でも聞いてください。パソコンでお仕事をしているなら、アプリの Harness でつなぐと、私が作業を引き受けられますよ。",
-        "你可以在 Autonomous App 里添加更多技能。现在，问我什么都行。如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
-        "Autonomous 앱에서 스킬을 더 추가할 수 있어요. 이제 무엇이든 물어보세요. 컴퓨터로 일하신다면 앱의 Harness에서 연결해 주세요, 제가 일을 맡아 드릴게요.",
+    ("I can set timers and reminders, answer questions, and change my light. Just say 'Hey Lamp'. You can add skills any time in the Autonomous app. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.", [
+        "Mình có thể hẹn giờ, nhắc việc, trả lời câu hỏi và đổi màu đèn. Cứ nói 'Hey Lamp' nhé. Bạn có thể thêm kỹ năng bất cứ lúc nào trong app Autonomous. Nếu bạn làm việc trên máy tính, mình có thể nhận việc giúp bạn: mở mục Harness trong app để kết nối nhé.",
+        "タイマーやリマインダーの設定、質問への答え、ライトの色の変更ができます。「Hey Lamp」と呼んでください。Autonomous アプリでいつでもスキルを追加できます。パソコンでお仕事をしているなら、アプリの Harness でつなぐと、私が作業を引き受けられますよ。",
+        "我可以设定计时器和提醒、回答问题，还能改变灯光。只要说“Hey Lamp”。你随时可以在 Autonomous App 里添加技能。如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
+        "타이머와 알림을 맞추고, 질문에 답하고, 불빛을 바꿀 수 있어요. 'Hey Lamp'라고만 말해 주세요. Autonomous 앱에서 언제든 스킬을 추가할 수 있어요. 컴퓨터로 일하신다면 앱의 Harness에서 연결해 주세요, 제가 일을 맡아 드릴게요.",
     ]),
-    ("You can add more skills in the Autonomous app. Now, ask me anything. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.", [
-        "Bạn có thể thêm kỹ năng trong app Autonomous. Giờ thì hỏi mình bất cứ điều gì nhé. Nếu bạn muốn bắt đầu từ đâu đó, cứ nhờ mình hẹn giờ, hỏi thời tiết, hay hỏi bất cứ điều gì bạn tò mò. Bạn cũng có thể thêm kỹ năng từ Skill Store trong app, hoặc cứ nhờ mình tạo một kỹ năng. Nếu bạn làm việc trên máy tính, mình có thể nhận việc giúp bạn: mở mục Harness trong app để kết nối nhé.",
-        "Autonomous アプリでスキルを追加できます。では、何でも聞いてください。まずは、タイマーや天気、気になることを何でも聞いてみてください。アプリの Skill Store からスキルを追加したり、私にスキルを作ってと頼んだりもできますよ。パソコンでお仕事をしているなら、アプリの Harness でつなぐと、私が作業を引き受けられますよ。",
-        "你可以在 Autonomous App 里添加更多技能。现在，问我什么都行。想先试试的话，可以让我定个计时器、问问天气，或者问任何你好奇的事。你也可以在 App 的 Skill Store 里添加技能，或者直接让我帮你做一个。如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
-        "Autonomous 앱에서 스킬을 더 추가할 수 있어요. 이제 무엇이든 물어보세요. 처음이라면 타이머나 날씨, 아니면 궁금한 건 뭐든 물어봐 주세요. 앱의 Skill Store에서 스킬을 추가하거나, 저한테 하나 만들어 달라고 하셔도 돼요. 컴퓨터로 일하신다면 앱의 Harness에서 연결해 주세요, 제가 일을 맡아 드릴게요.",
+    ("I can set timers and reminders, answer questions, and change my light. Just say 'Hey Lamp'. You can add skills any time in the Autonomous app. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.", [
+        "Mình có thể hẹn giờ, nhắc việc, trả lời câu hỏi và đổi màu đèn. Cứ nói 'Hey Lamp' nhé. Bạn có thể thêm kỹ năng bất cứ lúc nào trong app Autonomous. Nếu bạn muốn bắt đầu từ đâu đó, cứ nhờ mình hẹn giờ, hỏi thời tiết, hay hỏi bất cứ điều gì bạn tò mò. Bạn cũng có thể thêm kỹ năng từ Skill Store trong app, hoặc cứ nhờ mình tạo một kỹ năng. Nếu bạn làm việc trên máy tính, mình có thể nhận việc giúp bạn: mở mục Harness trong app để kết nối nhé.",
+        "タイマーやリマインダーの設定、質問への答え、ライトの色の変更ができます。「Hey Lamp」と呼んでください。Autonomous アプリでいつでもスキルを追加できます。まずは、タイマーや天気、気になることを何でも聞いてみてください。アプリの Skill Store からスキルを追加したり、私にスキルを作ってと頼んだりもできますよ。パソコンでお仕事をしているなら、アプリの Harness でつなぐと、私が作業を引き受けられますよ。",
+        "我可以设定计时器和提醒、回答问题，还能改变灯光。只要说“Hey Lamp”。你随时可以在 Autonomous App 里添加技能。想先试试的话，可以让我定个计时器、问问天气，或者问任何你好奇的事。你也可以在 App 的 Skill Store 里添加技能，或者直接让我帮你做一个。如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
+        "타이머와 알림을 맞추고, 질문에 답하고, 불빛을 바꿀 수 있어요. 'Hey Lamp'라고만 말해 주세요. Autonomous 앱에서 언제든 스킬을 추가할 수 있어요. 처음이라면 타이머나 날씨, 아니면 궁금한 건 뭐든 물어봐 주세요. 앱의 Skill Store에서 스킬을 추가하거나, 저한테 하나 만들어 달라고 하셔도 돼요. 컴퓨터로 일하신다면 앱의 Harness에서 연결해 주세요, 제가 일을 맡아 드릴게요.",
     ]),
     ("That's fine, you can redo the setup later. Just ask me to redo the setup.", [
         "Không sao, bạn có thể cài đặt lại sau. Chỉ cần bảo mình cài đặt lại.",
@@ -1818,6 +1824,7 @@ mod tests {
                 super::super::skill::LAST_LATER,
                 super::super::skill::PREFERENCES_DONE_HARNESS,
                 super::super::skill::PREFERENCES_DONE_TRIES_HARNESS,
+                super::super::skill::NEAR_TRY,
             ]
             .map(str::to_owned),
         );
@@ -1870,23 +1877,23 @@ mod tests {
         let closing = [
             (
                 None,
-                "All done! You can add more skills in the Autonomous app. Now, ask me anything.",
+                "All done! I can set timers and reminders, answer questions, and change my light. Just say 'Hey Lamp'. You can add skills any time in the Autonomous app.",
             ),
             (
                 Some(Language::Vietnamese),
-                "Xong hết rồi! Bạn có thể thêm kỹ năng trong app Autonomous. Giờ thì hỏi mình bất cứ điều gì nhé.",
+                "Xong hết rồi! Mình có thể hẹn giờ, nhắc việc, trả lời câu hỏi và đổi màu đèn. Cứ nói 'Hey Lamp' nhé. Bạn có thể thêm kỹ năng bất cứ lúc nào trong app Autonomous.",
             ),
             (
                 Some(Language::Japanese),
-                "全部終わりました！Autonomous アプリでスキルを追加できます。では、何でも聞いてください。",
+                "全部終わりました！タイマーやリマインダーの設定、質問への答え、ライトの色の変更ができます。「Hey Lamp」と呼んでください。Autonomous アプリでいつでもスキルを追加できます。",
             ),
             (
                 Some(Language::Chinese),
-                "全部完成！你可以在 Autonomous App 里添加更多技能。现在，问我什么都行。",
+                "全部完成！我可以设定计时器和提醒、回答问题，还能改变灯光。只要说“Hey Lamp”。你随时可以在 Autonomous App 里添加技能。",
             ),
             (
                 Some(Language::Korean),
-                "모두 끝났어요! Autonomous 앱에서 스킬을 더 추가할 수 있어요. 이제 무엇이든 물어보세요.",
+                "모두 끝났어요! 타이머와 알림을 맞추고, 질문에 답하고, 불빛을 바꿀 수 있어요. 'Hey Lamp'라고만 말해 주세요. Autonomous 앱에서 언제든 스킬을 추가할 수 있어요.",
             ),
         ];
         for (language, line) in closing {

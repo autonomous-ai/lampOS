@@ -278,6 +278,13 @@ fn settle(walk: &mut Onboarding, at: u64) -> Vec<String> {
     notes
 }
 
+/// [`settle`] long enough for a step's end line and the line owed after it.
+fn settle_both(walk: &mut Onboarding, at: u64) -> Vec<String> {
+    let mut notes = settle(walk, at);
+    notes.extend(settle(walk, at));
+    notes
+}
+
 /// Nobody in front of the lamp, over two loops (a mailbox read may hold
 /// the first).
 fn nobody(walk: &mut Onboarding, at: u64) {
@@ -2293,9 +2300,9 @@ fn one_accepted_call_ends_how_you_sound() {
     let store = Store::new(None);
     let mut walk = store.teaching(S);
     assert_eq!(call(&mut walk, 10 * S, 22.4, 1)["accepted"], true);
-    let notes = settle(&mut walk, 20 * S);
+    let notes = settle_both(&mut walk, 20 * S);
     assert_eq!(outcome(&walk), Some(Outcome::Done));
-    assert_eq!(notes, [NEAR_DONE]);
+    assert_eq!(notes, [NEAR_DONE, TRY_IT]);
     assert_eq!(walk.pending().invitations.len(), 0);
     assert_eq!(walk.kept().near_call_prompts, 1);
 }
@@ -2374,4 +2381,64 @@ fn a_skip_of_the_last_step_still_ends_with_the_closing_line() {
     let notes = settle(&mut walk, 20 * S);
     assert_eq!(outcome(&walk), Some(Outcome::Skipped));
     assert_eq!(notes, [HOW_YOU_SOUND_SKIPPED, skill::PREFERENCES_DONE]);
+}
+
+/// The shipped walk, "how you sound" its last step, being taught.
+fn last_step(store: &Store, owner: Option<&str>) -> Onboarding {
+    let mut walk = store.teaching(S);
+    walk.definition =
+        Arc::new(skill::parse(include_str!("../../../../skills/onboarding/skill.toml")).unwrap());
+    assert_eq!(walk.definition.order.last(), Some(&Step::HowYouSound));
+    walk.desired.owner = owner.map(str::to_owned);
+    walk.finish(Step::Touch, Outcome::Done, None, S);
+    walk.drain_storage_for_test(S);
+    walk
+}
+
+const TRY_IT: &str = "(Say only this, nothing before or after it: \"Now try it: say 'Hey Lamp, turn your light blue.'\")";
+const CLOSING: &str = "(Say only this, nothing before or after it: \"All done! I can set timers and reminders, answer questions, and change my light. Just say 'Hey Lamp'. You can add skills any time in the Autonomous app.\")";
+const CLOSING_MIA: &str = "(Say only this, nothing before or after it: \"All done, Mia! I can set timers and reminders, answer questions, and change my light. Just say 'Hey Lamp'. You can add skills any time in the Autonomous app.\")";
+
+/// The lead, 9 Nov: an accepted call is followed by one try of the voice
+/// route, asked once; the step is done on the call alone, with no light
+/// turn, and the closing follows a short wait.
+#[test]
+fn an_accepted_call_asks_for_one_light_try_then_closes() {
+    let store = Store::new(None);
+    let mut walk = last_step(&store, None);
+    assert_eq!(call(&mut walk, 10 * S, 22.4, 1)["accepted"], true);
+    assert_eq!(settle_both(&mut walk, 20 * S), [NEAR_DONE, TRY_IT]);
+    assert_eq!(outcome(&walk), Some(Outcome::Done));
+    // Nobody tries: the closing waits, then comes, and the ask is never
+    // said again.
+    assert_eq!(settle_both(&mut walk, 25 * S), Vec::<String>::new());
+    assert_eq!(settle_both(&mut walk, 29 * S), [CLOSING]);
+    assert_eq!(settle_both(&mut walk, 90 * S), Vec::<String>::new());
+}
+
+/// A line heard after the try lets the closing through at once: it is said
+/// when the lamp may speak, after that turn.
+#[test]
+fn a_line_heard_after_the_try_lets_the_closing_through() {
+    let store = Store::new(None);
+    let mut walk = last_step(&store, Some("Mia"));
+    assert_eq!(call(&mut walk, 10 * S, 22.4, 1)["accepted"], true);
+    assert_eq!(settle_both(&mut walk, 20 * S), [NEAR_DONE, TRY_IT]);
+    walk.heard("Hey Lamp, turn your light blue.", 21 * S);
+    assert_eq!(settle_both(&mut walk, 22 * S), [CLOSING_MIA]);
+    assert_eq!(outcome(&walk), Some(Outcome::Done));
+}
+
+/// A missed call is never followed by the try.
+#[test]
+fn a_missed_call_gives_no_try_line() {
+    let store = Store::new(None);
+    let mut walk = last_step(&store, None);
+    for (at, turn) in [(10 * S, 1), (30 * S, 2)] {
+        let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
+        room(&mut walk, &prompt, 2_400, 2.0);
+        assert_eq!(judge(&mut walk, &prompt)["accepted"], false);
+    }
+    assert_eq!(settle_both(&mut walk, 50 * S), [NEAR_FAILED, CLOSING]);
+    assert_eq!(settle_both(&mut walk, 90 * S), Vec::<String>::new());
 }
