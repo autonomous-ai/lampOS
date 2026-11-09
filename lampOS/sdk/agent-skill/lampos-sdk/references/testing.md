@@ -11,8 +11,13 @@ lamp fake --everything          # pairs this computer with it; Ctrl-C ends it
 lamp fake --hands               # also waves a hand after each arrival
 ```
 
-Without `--everything` the fake refuses what real lamps don't route yet
-(`lampos.testing.LAMP_CONTROL_REFUSES`), as they do. Run your program in
+Without `--everything` the fake refuses `play`, `joints` and `look`
+(`lampos.testing.LAMP_CONTROL_REFUSES`; `--hands` answers looks). That is
+stricter than a customer lamp on stable 10824, which takes `look` at
+`ahead`, `hand` or a yaw and pitch, and `joints` at `yaw` and `pitch`. The
+fake takes what a customer lamp refuses: a skill push, and a motion asked
+while another plays (`busy` with `retry_ms` there; `fake.refuse_next` can
+play it). See [gotchas.md](gotchas.md). Run your program in
 another terminal with the same `LAMPOS_HOME`. The fake also plays a small
 day on its own: every `--every` seconds (10) it says `person.arrived`, then
 `phrase.heard` ("good night lamp"), then `person.left`, for `--cycles` rounds
@@ -42,7 +47,8 @@ def test_my_ci_light(tmp_path):
 ```
 
 `FakeLamp(...)` answers every op by default, as `--everything` does; pass
-`refuses=LAMP_CONTROL_REFUSES` to answer as a lamp does today.
+`refuses=LAMP_CONTROL_REFUSES` for the refusals above (stricter than a
+stable lamp for `look` and `joints`).
 
 What the fake gives a test:
 - `fake.asked(op)`: the fields of every `op` request it took, oldest first,

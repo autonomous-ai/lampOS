@@ -122,5 +122,5 @@ The SDK checks the lamp's certificate against the pin before it sends anything, 
 - [develop.md](../develop.md): events, state, leases, `lamp-mcp`, skills.
 - [The SDK map](../../sdk/README.md): every capability, its call in each SDK, its status, whether it was validated on a lamp.
 - [control.md](../control.md): the protocol.
-- JavaScript: the same calls in camelCase, `npm i /path/to/lampOS/sdk/js`, and `lampos fake` ([sdk/js](../../sdk/js/README.md)).
+- JavaScript: the same calls in camelCase, `npm i --install-links /path/to/lampOS/lampOS/sdk/js`, and `lampos fake` ([sdk/js](../../sdk/js/README.md)).
 

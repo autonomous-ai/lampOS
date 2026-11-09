@@ -1,6 +1,6 @@
 # Control: programming the lamp from your own code
 
-**New here?** [develop.md](develop.md) is the quick-start: pair, a first program in Python or JavaScript, lamp-mcp, and a skill pushed and shared, in 10 minutes.
+**New here?** [develop.md](develop.md) is the quick-start: pair, a first program in Python or JavaScript, lamp-mcp, and a skill pushed and shared, in 10 minutes (skill push is not yet on customer lamps: "Skills pushed from a computer").
 
 The lamp's programming protocol, v1: what a developer's code, an agent or a
 skill may ask of the lamp, and what the lamp tells it. Designed by Nine on
@@ -101,7 +101,7 @@ lamp-control reads each topic on its own thread. A state topic's message that sa
 | `gesture` | `name`, a body clip (below; any lowercase name, the body answers one it doesn't have) | `mood.sock` `{gesture}` | `body` | no |
 | `look` | `at`: `face`, `hand`, `name`, `ahead`, or `{yaw, pitch}` in degrees (yaw right and pitch up positive; any finite number, the body clamps it to its reach). `hand` follows it until `stop`, another look or the lease ends | `ahead` and `{yaw, pitch}`: the body's lease socket `{look}`, eased to and held while the lease is, inside the gaze's reach and the pose's bounds (below); `hand` with the lease socket's hold; `face` and `name` refused, "not in this release: look at a face or a name" | `body` (and `look` for `face` and `hand`) | body |
 | `move` | `step_ms` 40–1,000, `frames` (2 at least; at most the body's 10 s allows, 251 at a 40 ms step) of 5 joints in counts, first and last all 0, lasting 1.5–10 s, each joint within the body's reach and speed | `mood.sock` `{move}`; the door holds it to `moves.rs`'s check first, so a move the body would drop is refused with its words | `body` | body |
-| `play` | `name` of a move in the client's installed package | the same, from its `moves/NAME.json` | `body` | body |
+| `play` | `name` of a move in the client's installed package | **today:** refused, "not routed yet: waits for client packages". Later: the same, from its `moves/NAME.json` | `body` | body |
 | `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`, degrees from home; one at least), `within_ms` (any, 0 or more) | **today:** `yaw` and `pitch` go as the holder's look on the body's lease socket, said `"from":"home"`: the body takes its pose's offset off, so on a standing lamp too they're the degrees `get` `body` says, cut by the body from its pose as every look is, with the look's `done` in the same frame (a joint not named stays where `get` `body` says it is; before the body has said its limits, name both). `roll`, `shoulder` and `elbow` are refused until the body's own goal stream, every step through its caps. **Not a goal stream yet:** `within_ms` isn't used (the body eases at its own pace), and each `joints` replaces the look before it, whose `done` comes `cut_short`, so send one per move, not 40 a second | `body` | body, named |
 | `light` | `colour` (one of 10), `level` 1–5, `pattern`, `for_ms` ≤ 30 s | `light/request` at the priority `lamp-control` stamps | `light` | no |
 | `light` with `rgb` or `pixels` | `rgb` (`#rrggbb`), or `pixels` (one `#rrggbb` per pixel, hello's `limits.ring.pixels` of them), `brightness` 0–100, `fade_ms`, `for_ms` ≤ 30 s | `light/request` with `pixels`, at the same priority and claim as a named light, and the nearest named colour and level beside them for a ring that draws none ("The ring, pixel by pixel") | `light` | no |
@@ -190,8 +190,8 @@ so it never outlives that lease, and only the holder's connection is read.
   how many counts short. The door makes that the computer's `done`.
 - **On a product lamp** lamp-control's product unit passes `--lease-socket`
   (`/run/lampos-body/lease.sock`, #4526) and the product lamp-body unit opens
-  it (#4568). Until both are on the lamp, lamp-control retries the socket and
-  `look` is refused as the body not reachable.
+  it (#4568). Both are on stable 10824. A lamp-control without the socket
+  retries it, and `look` is refused as the body not reachable.
 
 **Colours and patterns:** the ten of `lamp_msgs::Light::COLOURS` (`yellow`,
 `red`, `green`, `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm`),
@@ -227,7 +227,7 @@ has its own line on the consent screen.
 
 | door | for | phase |
 |---|---|---|
-| Live local API: WebSocket JSON over TLS, mDNS, paired keys | a developer's own code | 1 |
+| Live local API: WebSocket JSON over TLS, paired keys (mDNS planned, not announced yet) | a developer's own code | 1 |
 | MCP: the same API as MCP tools, served on the developer's computer | Claude, ChatGPT and other agents | 1 |
 | SDKs: thin Python and JavaScript clients | developers | 1 |
 | Rules skills: today's `skill.toml`, published as a versioned format | anyone, no code | 2 |
@@ -253,7 +253,7 @@ lamp-control clients
 - **Following a hand:** a `look` at `hand` under the `body` lease has each hold say `"follow":"hand"` (`{"hold":{"for_ms":30000,"follow":"hand"}}`), said at once when it starts or stops, not at the next renewal; a hold without it follows nothing. lamp-body does the fast loop on the lamp from `humans/hands/tracked`, so the picture and the loop never leave it. It ends with the holder's `stop` (never rated), another look once it is taken (rated as motion, one a second; a refused look, such as one at `face`, leaves it following), or the lease ending, and a new holder never starts out following. A body that doesn't know `follow` refuses the hold, which ends the lease as `released`, as any refused hold does.
 - **Rates off, the default** (the person's decision, 30 Oct 02:1x: "remove the rate"): unless `--rates default` (or `LAMP_CONTROL_RATES=default`; the flag wins; `off` is the default) turns them back on, lamp-control lifts every rate in the table below: `express`, motion, `joints`, `light`, `say`/`sound`, `skill.push`, `skill.list`/`skill.remove`. Two stay: the refused actions' guard (20 a second, then the connection closes), and the phrase changes (6 a minute), which bound `hear` for privacy, not pace: lifted, a program could cycle a word list to learn what people near the lamp say. Hello's `limits` then says `"rates": "off"`, with only the `refused` and `phrases` windows, so a client doesn't pace itself to rates the door doesn't hold. The body still bounds every move itself (below). It's read once at start, journaled ("rates off" or "rates on"), and a bad value stops lamp-control. The product unit sets neither, so it runs with the rates off.
 - **The quiet hours, off by default** (the owner's "no limits for developers", 30 Oct): `--quiet-hours HH:MM-HH:MM` (or `LAMP_CONTROL_QUIET`; the flag wins) sets this lamp's window and turns them on; unset, or `off`, they are off. It is read once at the start, and a bad value (a window whose ends are the same minute too) stops lamp-control there. The window, or `off`, is journaled at start and said in hello's `limits`. `--zone` (an IANA name, or `system`, the default) is the lamp's local time for the quiet hours below. With a window set, a zone that can't be read is journaled, and every computer's `say` and `sound` is refused as quiet until it can, never a silent UTC; with them off, the time is never asked and nothing is refused.
-- **Skill push:** with `--manage-socket` (root's manage helper, `/run/lampos-skills-manage/manage.sock`), the skill ops are served and a pushed package is kept in `--state-dir`'s `push/` for the helper ("Skills pushed from a computer" below). Without it, each is refused with "skill push is not on this lamp".
+- **Skill push:** with `--manage-socket` (root's manage helper, `/run/lampos-skills-manage/manage.sock`), the skill ops are served and a pushed package is kept in `--state-dir`'s `push/` for the helper ("Skills pushed from a computer" below). Without it, each is refused with "skill push is not on this lamp". The product unit doesn't pass it, so skill push is not yet on customer lamps.
 - **The certificate:** made on first start in `--state-dir` (`/var/lib/lampos-control`): P-256, valid to 2100, `cert.der` and `key.der`, the key 0600. Its pin, the certificate's SHA-256 in hex, is journaled at start and returned with every pairing code.
 - **Listening:** `--listen`, `0.0.0.0:7731` by default. TLS 1.3 only, and only `/v1`: any other path is 404 before the WebSocket opens.
   - Frames are capped at 64 KiB, text only.
@@ -276,10 +276,14 @@ lamp-control clients
 listens until the owner turns developer access on in the app. Script skills
 (phase 3) use the same messages on `/run/lampos-control/control.sock`.
 
-**Finding the lamp:** mDNS `_lampos._tcp`, with TXT `id`, `name`, `v=1` and
-`fp`: the first 16 hex characters of the SHA-256 of the lamp's certificate.
-The certificate is self-signed, made per lamp on its first start, and the
-client pins it at pairing.
+**Finding the lamp:** planned: mDNS `_lampos._tcp`, with TXT `id`, `name`,
+`v=1` and `fp`: the first 16 hex characters of the SHA-256 of the lamp's
+certificate. The SDKs look for it, but nothing on the lamp announces it yet,
+on any build: `lamp find` finds nothing, and pairing needs the lamp's address,
+`--host <lamp>.local` (the lamp's own host name, such as `lamp-75c9.local`)
+or its IP address. The SDKs keep the address with the pairing, so later
+connects need nothing. The certificate is self-signed, made per lamp on its
+first start, and the client pins it at pairing.
 
 **Frames:** UTF-8 JSON, one message per text frame. The lamp's first frame
 on every connection is a welcome, carrying a nonce of 32 random bytes made for
@@ -292,9 +296,10 @@ that connection, which pairing's proof and hello's signature cover:
   `{"re": 7, "ok": false, "error": {"code": "...", "why": "..."}}`. `re` is
   null when the request's id couldn't be read. A field the op doesn't know
   refuses it (`bad_request`), so a typo is never a step silently not taken.
-- An event: `{"ev": "...", ...}`. The events about the room carry `at`, the
-  lamp's local time with its offset (`"2026-10-27T12:30:01+07:00"`);
-  `welcome`, `lease` and `done` may not.
+- An event: `{"ev": "...", ...}`. The events about the room carry `at`, in
+  UTC as RFC 3339 with `Z` (`"2026-10-27T08:40:01Z"`, `server::rfc3339_utc`);
+  a client converts it to local time itself. `welcome`, `lease` and `done`
+  may not carry it.
 - A client ignores a field it doesn't know, in a reply, an error or an
   event, so new fields can be added without a new version.
 - **Keepalive:** after `hello`, a connection that sends nothing for 2 minutes
@@ -309,7 +314,8 @@ that connection, which pairing's proof and hello's signature cover:
    code and as 8 digits **with the pin of the lamp's certificate** (its full
    SHA-256, 64 hex), the lamp's id and the expiry (5 min). A new code voids
    the old one.
-2. **`lamp pair`** (in the SDKs) finds the lamp by mDNS, connects, and
+2. **`lamp pair`** (in the SDKs) connects to the lamp at `--host` (mDNS
+   would find it without, but no lamp announces it yet: "Finding the lamp"), and
    **checks the certificate against the app's pin before it sends any
    frame**: only the TLS handshake and the WebSocket's upgrade request, which
    carry no secret, go before it. An SDK that can't check it must not pair. Then it sends the
@@ -600,7 +606,7 @@ which back. An SDK's wait for them returns at the answer.
 | `gesture` | `name` (a lowercase name of a body clip, `idle` and `scanning` too; ≤ 64 chars) | `body` | — |
 | `look` | `at`: `"face"` (+ `look`), `"hand"` (+ `look`, followed), `"name"`, `"ahead"`, or `{yaw, pitch}` in degrees (any finite number; the body clamps it to its reach); `"face"` and `"name"` are refused in this release, "not in this release: look at a face or a name" | `body` | body |
 | `move` | `step_ms` 40–1,000, `frames` 2 at least (at most what 10 s allows: 251 at 40 ms) of five joints (body counts from home), first and last all 0, lasting 1.5–10 s ((frames − 1) × `step_ms`), within the body's reach and speed (`lamp_body::moves::check`) | `body` | body |
-| `play` | `name` (a recorded move of the client's package) | `body` | body |
+| `play` | `name` (a recorded move of the client's package); refused today, "not routed yet: waits for client packages" | `body` | body |
 | `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`; degrees from −180 to 180, at least one), `within_ms` (0 or more; the body's caps pace each step) | `body` | body |
 | `light` | `colour` (one of the ten), `level` 1–5, optional `pattern` (`breathe`, `candle`, `pulse`), `for_ms` 1–30,000 | `light` | — |
 | `light` (own colours) | exactly one of `colour`, `rgb` or `pixels`; with `rgb` or `pixels`: optional `brightness` 0–100 (no `level` or `pattern`); optional `fade_ms` 1,000–60,000 | `light` | — |
@@ -794,6 +800,8 @@ body bounds every move itself, whatever the rate:
 - **Priority and caller caps:** with `--arbitration` and `--caller-caps`, it holds a computer to `skill` priority.
 
 A computer's new `gesture`, `move` or `express` move interrupts the motion playing: the door sends each to the body with `"replace": true` (`{"gesture":"nod","replace":true,...}`, `{"move":{...},"replace":true,...}`), and holds no slot and refuses none as busy. The body ends what plays, if it is at `skill` priority or lower (another computer's motion, a skill's, the lamp's own idle life), easing it out at once from where it is under its own caps (the gesture step, the arm's step, the anti-tip rule), and plays the new one after; its journal says it once, "gesture stretching ended for nod from control:<client>", and `body/gesture` says the ended one `dropped`, "ended: replaced by a newer motion". The new one is checked from the pose it begins in, as any gesture is, so one that would tip there is still dropped. The person always wins: while someone is talking with the lamp (listening, thinking or speaking), over a gesture paused for that talk, over the conversation's motion (the lamp's glance for its caller, the voice's gestures), a hand on the lamp or the person's own interaction, the body refuses it with why "dropped: the person is using the lamp", with or without `--arbitration`, whatever is playing. A voice gesture still waiting for the lamp to stand is kept by its priority only under `--arbitration`; without it, the talk it belongs to is what refuses the replace. The body honours `replace` only from lamp-control, an asker named `control:<client>` (or `lamp-control/control:<client>` under `--caller-caps`), with or without `--arbitration`; the same mark from a skill or any other asker is taken as absent, and its gesture asked over one playing is dropped by the body as before ("dropped: another gesture plays", or "dropped: busy, skill" with `--arbitration`). `look` and `joints` are not motions here.
+
+**On stable 10824 and older** there is no replace: a `gesture`, `move` or `express` move asked while the door's last motion still plays is refused `busy`, "busy: a motion plays for N ms more", with `retry_ms` (#4209). Wait `retry_ms` and ask again. The replace above is from the build after 10824.
 
 `express` is counted only in its own class: not in motion, though it moves the body, and not in `light`, though it lights the ring. The ring's own arbitration and the light rate bound its light.
 
@@ -1002,6 +1010,13 @@ below with `--manage-socket`; the manage helper's side (lamp-skills, piece
 B) follows. The schema has the three request ops, and both SDKs push, list
 and remove (`push_skill`/`pushSkill`, `lamp skill push|list|remove`).
 
+**Not yet on customer lamps.** The product unit passes no `--manage-socket`,
+so on a customer lamp (stable 10824 and lamp-voice alike) every skill op,
+`skill.push`, `skill.list` and `skill.remove`, is refused `refused`, "skill
+push is not on this lamp". Try a push on the fake lamp (`lamp fake`), or run
+the same behaviour as a program on the computer while it is connected.
+`lamp skill check` runs on the computer, offline, and works anywhere.
+
 **What is different about it:** every other grant ends with the
 connection or the lease. **A pushed skill keeps running after the computer
 goes**, as a skill: under lamp-skills' own caps and at a skill's priority,
@@ -1175,24 +1190,30 @@ ignores fields it doesn't know. An op the lamp doesn't know is a
 
 ## To come
 
-These pieces follow one PR each, each off by default:
-- the server: WSS, mDNS, the per-lamp certificate, pairing and `hello`
-  with Ed25519 (Nine, #3736);
-- each action routed to the part that does it, under the lamp's own user,
-  with the priority stamped by `lamp-control`, never the caller's word;
-- the events from the bus;
-- the app's switches;
-- the SDKs (blue, `sdk/python` and `sdk/js`) and `lamp-mcp` (Eighth,
-  `sdk/mcp`).
+Landed, on stable 10824: the server (WSS, the per-lamp certificate, pairing
+and `hello` with Ed25519, #3736); the actions routed to their parts; the
+events from the bus; the app's developer setting (`control.set`) and pairing
+codes (`control.code`); the SDKs (`sdk/python`, `sdk/js`) and `lamp-mcp`
+(`sdk/mcp`), installed from a checkout, not published to PyPI or npm.
+
+Still to come:
+- the mDNS announcement (`_lampos._tcp`), so `lamp find` and `lamp pair`
+  without `--host` find a lamp;
+- skill push on customer lamps (`--manage-socket` in the product unit);
+- `joints` for `roll`, `shoulder` and `elbow`, `play`, and the microphone's
+  sound;
+- the fast camera stream on customer lamps (`--frames-socket` in the
+  product lamp-eyes unit).
 
 ## Open questions
 
 Nine's, for the first builder (#3504, 12:24):
 
-1. Is one pairing code over the owner's account channel "approval, never
-   control"? Or must pairing stay on the LAN, which needs the app to reach
-   the lamp locally?
-2. Port 7731 and the name `lamp-control`.
+1. ~~Is one pairing code over the owner's account channel "approval, never
+   control"? Or must pairing stay on the LAN?~~ The app asks the code over
+   the account channel (`control.code`, sealed to the app), and pairing
+   itself is on the LAN, checked against the certificate's pin.
+2. ~~Port 7731 and the name `lamp-control`.~~ Both shipped.
 3. ~~Should `express` wait for the `feelings` skill (#3691) to fix its
    names?~~ It carries that skill's three, `glad`, `lively` and `low`; the
    schema still takes any short lowercase name, so a lamp with more is no
