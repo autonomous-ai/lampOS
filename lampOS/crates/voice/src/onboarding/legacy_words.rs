@@ -35,7 +35,7 @@ pub const PRIVACY_FAILED: &str = "(Say only this, nothing before or after it: \"
 pub const NEAR_FIRST: &str = "(Say only this, nothing before or after it: \"When you want me, start with 'Hey Lamp'. When I stop talking, give it a try.\")";
 pub const NEAR_AGAIN: &str =
     "(Say only this, nothing before or after it: \"Got it. Say 'Hey Lamp' once more.\")";
-pub const NEAR_MISSED: &str = "(Say only this, nothing before or after it: \"I didn't catch that. Wait a moment, then say 'Hey Lamp' again.\")";
+pub const NEAR_MISSED: &str = "(Say only this, nothing before or after it: \"I didn't catch that. Try once more when I stop talking.\")";
 pub const NEAR_DONE: &str = "(Say only this, nothing before or after it: \"That's me! Say 'Hey Lamp' whenever you need me.\")";
 pub const NEAR_FAILED: &str = "(Say only this, nothing before or after it: \"No worries. Just say 'Hey Lamp' whenever you need me.\")";
 pub const SENTENCE_FIRST: &str = "(Say only this, nothing before or after it: \"Now say any sentence to me, the way you'd talk to me.\")";
