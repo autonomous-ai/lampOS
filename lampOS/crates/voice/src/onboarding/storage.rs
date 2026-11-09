@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         Arc, Mutex,
-        mpsc::{self, Receiver, SyncSender, TryRecvError, TrySendError},
+        mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TryRecvError, TrySendError},
     },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
@@ -15,6 +15,13 @@ use std::{
 const MAX_PROGRESS: usize = 16 * 1024;
 const MAX_MAILBOX: usize = 16 * 1024;
 const MAX_LINES: usize = 128;
+/// How often the worker retries a take-back the disk refused, as often as
+/// lamp-eyes re-reads its yes.
+const RETRY_TAKE_BACK: Duration = Duration::from_secs(2);
+/// Consent files a take-back failed to remove, each with the bytes it held
+/// then: retried only while it still holds them, so a yes written after
+/// (the app's, or the voice's on a later yes) is never removed by a retry.
+type Owed = Vec<(PathBuf, Vec<u8>)>;
 
 #[derive(Clone)]
 pub(crate) struct Paths {
@@ -354,13 +361,38 @@ impl ServiceStorage {
             .spawn(move || {
                 // Optional profile I/O belongs to this worker too, once per service.
                 let hardware_location = profile();
-                while let Ok(job) = jobs.recv() {
+                let mut owed = Owed::new();
+                let mut retry_at = Instant::now();
+                loop {
+                    // A failed write leaves storage idle until a fence or a
+                    // restart, so a refused take-back is retried here.
+                    let job = if owed.is_empty() {
+                        jobs.recv().map_err(|_| RecvTimeoutError::Disconnected)
+                    } else {
+                        jobs.recv_timeout(retry_at.saturating_duration_since(Instant::now()))
+                    };
+                    let job = match job {
+                        Ok(job) => job,
+                        Err(RecvTimeoutError::Timeout) => {
+                            retry_take_backs(&mut owed);
+                            retry_at = Instant::now() + RETRY_TAKE_BACK;
+                            continue;
+                        }
+                        Err(RecvTimeoutError::Disconnected) => break,
+                    };
+                    let was_owed = !owed.is_empty();
                     let result = before(job.tag)
-                        .and_then(|()| execute(&files, job.operation))
+                        .and_then(|()| run(&files, job.operation, &mut owed))
                         .map(|mut update| {
                             update.hardware_location = hardware_location.clone();
                             update
                         });
+                    if !was_owed && !owed.is_empty() {
+                        eprintln!(
+                            "lamp-voice: a take-back the disk refused is retried every 2 s until it goes"
+                        );
+                        retry_at = Instant::now() + RETRY_TAKE_BACK;
+                    }
                     if completed
                         .send(Completion {
                             tag: job.tag,
@@ -441,7 +473,7 @@ fn read_bounded(path: &Path, max: usize) -> io::Result<Option<Vec<u8>>> {
     }
     Ok(Some(bytes))
 }
-fn atomic_progress(paths: &Paths, progress: &Progress) -> io::Result<()> {
+fn atomic_progress(paths: &Paths, progress: &Progress, owed: &mut Owed) -> io::Result<()> {
     use std::os::unix::fs::OpenOptionsExt;
     let path = &paths.progress;
     progress.check()?;
@@ -460,8 +492,9 @@ fn atomic_progress(paths: &Paths, progress: &Progress) -> io::Result<()> {
     // the progress holding it is kept, so a crash between the two leaves
     // no yes rather than one the owner just said no to. A take-back that
     // fails fails the write before the progress keeps the "no", so the next
-    // write still sees it new and tries again (Jarvis's P2 on #5848).
-    take_back(paths, progress, before.as_ref())?;
+    // write still sees it new and tries again (Jarvis's P2 on #5848); the
+    // worker also retries it on its own ([`retry_take_backs`]).
+    take_back(paths, progress, before.as_ref(), owed)?;
     let next = path.with_extension("storage-next");
     let mut file = fs::OpenOptions::new()
         .create_new(true)
@@ -495,8 +528,17 @@ fn atomic_progress(paths: &Paths, progress: &Progress) -> io::Result<()> {
 /// builder's P3 on #5567), and a start or a write that keeps the same "no"
 /// or redo leaves an app yes given after it. The consent folder is synced
 /// after a removal, so the take-back is on disk before the progress that
-/// keeps the "no". The first error is returned, after every step is tried.
-fn take_back(paths: &Paths, progress: &Progress, before: Option<&Progress>) -> io::Result<()> {
+/// keeps the "no". Each is made holding the consent folder, a fresh
+/// revision kept first (`lamp_msgs::consent::take_back_at`, #5500), so a
+/// `consent.set` from before it never applies after. The first error is
+/// returned, after every step is tried; a file that failed to go is added
+/// to `owed` for the worker to retry.
+fn take_back(
+    paths: &Paths,
+    progress: &Progress,
+    before: Option<&Progress>,
+    owed: &mut Owed,
+) -> io::Result<()> {
     let no = |progress: &Progress, step: &str| {
         progress
             .steps
@@ -518,20 +560,58 @@ fn take_back(paths: &Paths, progress: &Progress, before: Option<&Progress>) -> i
             continue;
         }
         let path = consent_path(paths, step);
-        let result = match fs::remove_file(&path) {
-            Ok(()) => path
-                .parent()
-                .ok_or_else(|| io::Error::other("a consent file has no folder"))
-                .and_then(fs::File::open)
-                .and_then(|folder| folder.sync_all()),
-            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
-            Err(e) => Err(e),
+        // What the file held is read holding the folder, before anything
+        // changes: a retry removes only that yes, never a newer one given
+        // after this take-back failed and the folder was let go.
+        let result = match lamp_msgs::consent::withdraw_at(&path, step) {
+            Ok(()) => Ok(()),
+            Err(refused) => {
+                if let Some(held) = refused.held {
+                    owed.retain(|(owed, _)| *owed != path);
+                    owed.push((path, held));
+                }
+                Err(refused.error)
+            }
         };
         if first.is_ok() {
             first = result;
         }
     }
     first
+}
+
+/// The step whose yes is kept at `path` ([`consent_path`]): face
+/// expressions at its own name, room sounds at any other.
+fn step_of(path: &Path) -> &'static str {
+    if super::face_expressions_beside(path) == path {
+        super::FACE_EXPRESSIONS
+    } else {
+        super::ROOM_SOUNDS
+    }
+}
+
+/// Each take-back the disk refused tried again: kept owed only while the
+/// file still holds what it held then and its removal fails again, each
+/// holding the consent folder with a fresh revision kept first, as
+/// [`take_back`]. Only removes, never writes a yes or the progress.
+fn retry_take_backs(owed: &mut Owed) {
+    owed.retain(|(path, held)| {
+        let step = step_of(path);
+        let Some(folder) = path.parent() else {
+            return false;
+        };
+        let Ok(holding) = lamp_msgs::consent::hold(folder) else {
+            return true;
+        };
+        match read_bounded(path, MAX_PROGRESS) {
+            Ok(Some(bytes)) if bytes == *held => holding.withdraw_at(path, step).is_err(),
+            Ok(_) => false,
+            Err(_) => true,
+        }
+    });
+    if owed.is_empty() {
+        eprintln!("lamp-voice: no take-back the disk refused is owed any more");
+    }
 }
 
 /// [`consent`] for every step in [`YES_STEPS`], each handled before the
@@ -585,55 +665,46 @@ fn app_yes_stands(path: &Path, step: &str) -> bool {
 /// read: removed unless the step's kept outcome is a yes (`done`), or it is
 /// the owner's yes from the app that still stands ([`app_yes_stands`]);
 /// written, when `new` (the write that first keeps the yes), whole as
-/// `{"version":1,STEP:"yes","at_unix_s":..,"by":"voice"}`, 0640 and the
+/// `{"version":1,STEP:"yes","at_unix_s":..,"by":"voice","rev":REV}`, 0640 and the
 /// reader group's (0600 with no group). Never written again from the
 /// progress: a forget of everything removes it for good (`remember.rs`),
 /// whoever gave it. Only the answer and its time, never words, sound or a
 /// face.
 fn consent(paths: &Paths, progress: &Progress, step: &str, new: bool) -> io::Result<()> {
-    use std::os::unix::fs::PermissionsExt;
     let path = &consent_path(paths, step);
+    let folder = path
+        .parent()
+        .ok_or_else(|| io::Error::other("a consent file has no folder"))?;
     let Some(at) = kept_yes(progress, step) else {
+        // Nothing there: nothing to change, and no folder to hold.
+        if matches!(fs::symlink_metadata(path), Err(e) if e.kind() == io::ErrorKind::NotFound) {
+            return Ok(());
+        }
+        // Read and removed holding the folder, a fresh revision first
+        // (#5500), so the app's set can't come between.
+        let held = lamp_msgs::consent::hold(folder)?;
         if app_yes_stands(path, step) {
             return Ok(());
         }
-        return match fs::remove_file(path) {
-            Err(e) if e.kind() != io::ErrorKind::NotFound => Err(e),
-            _ => Ok(()),
-        };
+        return held.take_back_at(path, step).map(|_| ());
     };
     if !new {
         return Ok(());
     }
-    let folder = path
-        .parent()
-        .ok_or_else(|| io::Error::other("a consent file has no folder"))?;
-    let bytes = lamp_msgs::consent::bytes(step, at, lamp_msgs::consent::BY_VOICE);
-    let next = path.with_extension("storage-next");
-    let _ = fs::remove_file(&next);
-    let result = (|| {
-        let mut file = fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&next)?;
-        // The voice's UMask=0077 would leave it 0600: set after create.
-        let mode = if paths.room_sounds_group.is_some() {
-            0o640
-        } else {
-            0o600
-        };
-        file.set_permissions(fs::Permissions::from_mode(mode))?;
-        if let Some(group) = paths.room_sounds_group {
-            std::os::unix::fs::fchown(&file, None, Some(group))?;
-        }
-        file.write_all(&bytes)?;
-        file.sync_all()?;
-        fs::rename(&next, path)?;
-        fs::File::open(folder)?.sync_all()
-    })();
+    // Written holding the folder, a fresh revision kept first and the yes
+    // with it (#5500), 0640 and the reader group's (0600 with none: the
+    // voice's UMask=0077 is set over after create).
+    let result = lamp_msgs::consent::hold(folder).and_then(|held| {
+        held.keep_yes_at(
+            path,
+            step,
+            at,
+            lamp_msgs::consent::BY_VOICE,
+            paths.room_sounds_group,
+        )
+    });
     // Not kept is no to the reader, the safe side; the progress stands.
     if let Err(error) = result {
-        let _ = fs::remove_file(next);
         eprintln!(
             "lamp-voice: the {step} yes was not kept at {}: {error}",
             path.display()
@@ -641,7 +712,11 @@ fn consent(paths: &Paths, progress: &Progress, step: &str, new: bool) -> io::Res
     }
     Ok(())
 }
+#[cfg(test)]
 fn execute(paths: &Paths, operation: Operation) -> io::Result<Update> {
+    run(paths, operation, &mut Owed::new())
+}
+fn run(paths: &Paths, operation: Operation, owed: &mut Owed) -> io::Result<Update> {
     let mut update = Update::default();
     match operation {
         Operation::Initialize => {
@@ -659,11 +734,21 @@ fn execute(paths: &Paths, operation: Operation) -> io::Result<Update> {
                 .unwrap_or_default();
             progress.check()?;
             consents(paths, &progress, |_| false)?;
+            // The consent folder's revisions put in place if missing (the
+            // voice starts at boot, as root), so the app's first
+            // `consent.get` gives a real one (#5500). Not kept: the app's
+            // sets read stale until it is, the safe side.
+            if let Some(folder) = paths.room_sounds.parent()
+                && let Err(error) = lamp_msgs::consent::hold(folder).and_then(|held| held.revs())
+                && error.kind() != io::ErrorKind::NotFound
+            {
+                eprintln!("lamp-voice: the consent revisions were not kept: {error}");
+            }
             update.progress = Some(progress);
             update.checkpoint = Some(None);
         }
         Operation::Commit(progress, erase) => {
-            atomic_progress(paths, &progress)?;
+            atomic_progress(paths, &progress, owed)?;
             if erase {
                 privacy::discard_checkpoint(&paths.checkpoint)?;
                 update.checkpoint = Some(None);
@@ -686,10 +771,10 @@ fn execute(paths: &Paths, operation: Operation) -> io::Result<Update> {
             };
             progress.check()?;
             progress.privacy_discard_pending = true;
-            atomic_progress(paths, &progress)?;
+            atomic_progress(paths, &progress, owed)?;
             privacy::discard_checkpoint(&paths.checkpoint)?;
             progress.privacy_discard_pending = false;
-            atomic_progress(paths, &progress)?;
+            atomic_progress(paths, &progress, owed)?;
             update.progress = Some(progress);
             update.checkpoint = Some(None);
         }
@@ -872,17 +957,25 @@ mod tests {
         let kept = fs::metadata(&paths.room_sounds).unwrap();
         assert_eq!(kept.permissions().mode() & 0o777, 0o640);
         assert_eq!(kept.gid(), group);
+        // With the fresh revision kept for it first (#5500).
+        let rev = lamp_msgs::consent::read(&paths.room_sounds, "room_sounds")
+            .rev
+            .unwrap();
         assert_eq!(
             fs::read(&paths.room_sounds).unwrap(),
-            br#"{"at_unix_s":7,"by":"voice","room_sounds":"yes","version":1}"#
+            lamp_msgs::consent::bytes_with_rev("room_sounds", 7, "voice", &rev)
         );
         // The face expressions yes, kept the same way for lamp-eyes.
         let kept = fs::metadata(&face).unwrap();
         assert_eq!(kept.permissions().mode() & 0o777, 0o640);
         assert_eq!(kept.gid(), group);
+        // With the fresh revision kept for it first (#5500).
+        let rev = lamp_msgs::consent::read(&face, "face_expressions")
+            .rev
+            .unwrap();
         assert_eq!(
             fs::read(&face).unwrap(),
-            br#"{"at_unix_s":7,"by":"voice","face_expressions":"yes","version":1}"#
+            lamp_msgs::consent::bytes_with_rev("face_expressions", 7, "voice", &rev)
         );
         fs::remove_file(&paths.room_sounds).unwrap();
         fs::remove_file(&face).unwrap();
@@ -1137,6 +1230,131 @@ mod tests {
             .unwrap()
             .map(|bytes| serde_json::from_slice::<Progress>(&bytes).unwrap());
         assert_eq!(kept_no, Some(no));
+    }
+
+    /// The privacy reviewer's ask on #5884: storage never retries on its
+    /// own once a write failed, so a take-back the disk refused is retried
+    /// by the worker every [`RETRY_TAKE_BACK`] until the app's yes goes,
+    /// with no further write, fence or restart.
+    #[test]
+    fn a_take_back_the_disk_refused_is_retried_until_the_yes_goes() {
+        use super::super::Outcome;
+        use std::os::unix::fs::PermissionsExt;
+        let files = Files::new();
+        let mut paths = files.paths();
+        let folder = files.0.join("consent");
+        fs::create_dir(&folder).unwrap();
+        paths.room_sounds = folder.join("room-sounds.json");
+        let face = super::super::face_expressions_beside(&paths.room_sounds);
+        fs::write(
+            &face,
+            lamp_msgs::consent::bytes("face_expressions", 100, "app"),
+        )
+        .unwrap();
+        let mut owner = ServiceStorage::start(paths).unwrap();
+        let client = owner.client();
+        assert!(idle(&client).ready);
+        let mode = |mode| fs::set_permissions(&folder, fs::Permissions::from_mode(mode)).unwrap();
+        mode(0o500);
+        // Root writes into a read-only folder: nothing fails to show here.
+        if fs::write(folder.join("probe"), b"").is_ok() {
+            mode(0o700);
+            return;
+        }
+        let no = kept("face_expressions", Outcome::Skipped, 110);
+        assert!(matches!(
+            client.commit(no, false).unwrap(),
+            Submit::Queued(_)
+        ));
+        let state = idle(&client);
+        mode(0o700);
+        assert!(
+            state.failed.is_some(),
+            "a take-back that fails fails the write"
+        );
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while face.exists() {
+            assert!(
+                Instant::now() < deadline,
+                "the app's yes outlived the owner's no while storage is failed"
+            );
+            thread::sleep(Duration::from_millis(20));
+        }
+        // Taken back through a fresh revision (#5500): an app's set from
+        // before the "no" is stale.
+        let revs = lamp_msgs::consent::Revs::read(&folder);
+        assert!(
+            lamp_msgs::consent::rev(&folder, "face_expressions", &revs).starts_with("gone-"),
+            "{revs:?}"
+        );
+        assert_eq!(
+            owner.finish(Duration::from_secs(2)).unwrap(),
+            StorageShutdown::Finished
+        );
+    }
+
+    /// #5500, the second reviewer's P2 3: what a failed take-back owes is
+    /// read holding the folder, so a yes the app gives after the failure
+    /// (the folder let go) is never the one the retry removes.
+    #[test]
+    fn a_retried_take_back_spares_a_yes_given_after_it_failed() {
+        use super::super::Outcome;
+        use std::os::unix::fs::PermissionsExt;
+        let files = Files::new();
+        let mut paths = files.paths();
+        let folder = files.0.join("consent-newer");
+        fs::create_dir(&folder).unwrap();
+        paths.room_sounds = folder.join("room-sounds.json");
+        let face = super::super::face_expressions_beside(&paths.room_sounds);
+        let app = |at| {
+            lamp_msgs::consent::hold(&folder)
+                .unwrap()
+                .keep_yes("face_expressions", at, "app")
+                .unwrap()
+        };
+        app(100);
+        let old = fs::read(&face).unwrap();
+        let mode = |mode| fs::set_permissions(&folder, fs::Permissions::from_mode(mode)).unwrap();
+        mode(0o500);
+        // Root writes into a read-only folder: nothing fails to show here.
+        if fs::write(folder.join("probe"), b"").is_ok() {
+            mode(0o700);
+            return;
+        }
+        let mut owed = Owed::new();
+        let no = kept("face_expressions", Outcome::Skipped, 110);
+        assert!(take_back(&paths, &no, None, &mut owed).is_err());
+        mode(0o700);
+        assert_eq!(owed, vec![(face.clone(), old.clone())]);
+        app(120);
+        let newer = fs::read(&face).unwrap();
+        retry_take_backs(&mut owed);
+        assert!(owed.is_empty());
+        assert_eq!(fs::read(&face).unwrap(), newer);
+    }
+
+    /// #5500: the voice's start keeps the consent folder's revisions when
+    /// none are there, so the app's first `consent.get` gives one a set can
+    /// match, never `unknown`.
+    #[test]
+    fn a_start_keeps_the_consent_revisions() {
+        let files = Files::new();
+        let paths = files.paths();
+        let folder = paths.room_sounds.parent().unwrap().to_path_buf();
+        let rev = || {
+            lamp_msgs::consent::rev(
+                &folder,
+                "face_expressions",
+                &lamp_msgs::consent::Revs::read(&folder),
+            )
+        };
+        assert_eq!(rev(), lamp_msgs::consent::REV_UNKNOWN);
+        execute(&paths, Operation::Initialize).unwrap();
+        let first = rev();
+        assert!(first.starts_with(lamp_msgs::consent::GONE), "{first}");
+        // A later start leaves them as they are.
+        execute(&paths, Operation::Initialize).unwrap();
+        assert_eq!(rev(), first);
     }
 
     /// Two redos of a step in the same second (or after the clock stepped

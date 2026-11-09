@@ -4,11 +4,17 @@
 //! without it both kinds are answered as any this lamp lacks.
 //!
 //! `consent.get` reads the files where they are kept
-//! ([`lamp_msgs::consent::FOLDER`], which `lampos` may read). `consent.set`
-//! takes exactly one key and hands one line to root's helper, `lamp-setup
-//! change`, as the names go, since `lamp-cloud` can write nothing there; the
-//! helper writes or removes the file and answers at once, and the reply is
-//! what the files then say, as `consent.get` answers.
+//! ([`lamp_msgs::consent::FOLDER`], which `lampos` may read), with each
+//! key's revision (`rev`, [`lamp_msgs::consent::rev`]). `consent.set` is a
+//! compare-and-set: exactly one key and `if`, the key's revision the app
+//! saw last, handed as one line to root's helper, `lamp-setup change`, as
+//! the names go, since `lamp-cloud` can write nothing there. The helper
+//! writes or removes the file only while that is still the key's revision,
+//! and answers at once; the reply is what the files then say, as
+//! `consent.get` answers, with `"stale": true` when nothing changed because
+//! the lamp changed the key since (a retry of an old tap, or a "no" at the
+//! lamp after the app looked). With no fit `if` the set is refused before
+//! the helper.
 //!
 //! Room sounds is said, and taken, only where it does something: a lamp
 //! whose privacy route is `no-slide` (lamp-ears reads its yes only there).
@@ -75,19 +81,24 @@ impl Place {
 }
 
 /// What the lamp keeps now, as `consent.get` answers it: each key this lamp
-/// has, `true` only while its file holds a yes.
+/// has, `true` only while its file holds a yes, and `rev`, each key's
+/// revision ([`lamp_msgs::consent::rev`]; `unknown` while the state can't
+/// be read, which the helper never matches).
 pub fn now(place: &Place) -> Value {
     let mut said = Map::new();
-    for key in place.keys() {
-        let yes = lamp_msgs::consent::file_in(&place.folder, key)
-            .is_some_and(|file| lamp_msgs::consent::read(&file, key).yes);
-        said.insert(key.into(), yes.into());
+    let mut rev = Map::new();
+    for (key, yes, kept) in lamp_msgs::consent::snapshot(&place.folder, &place.keys()) {
+        said.insert(key.clone(), yes.into());
+        rev.insert(key, kept.into());
     }
+    said.insert("rev".into(), Value::Object(rev));
     Value::Object(said)
 }
 
 /// The helper's line for `consent.set`'s `data`, or why not: exactly one
-/// key this lamp has, `true` or `false`. No error holds what was sent.
+/// key this lamp has, `true` or `false`, and `if`, the revision the app
+/// saw ([`lamp_msgs::consent::fit_rev`]), sent on as
+/// `{"consent": {KEY: bool}, "if": REV}`. No error holds what was sent.
 pub fn line(place: &Place, data: &Value) -> Result<String, String> {
     let why = || {
         format!(
@@ -95,11 +106,13 @@ pub fn line(place: &Place, data: &Value) -> Result<String, String> {
             place.keys().join(", ")
         )
     };
-    let object = data
-        .as_object()
-        .filter(|object| object.len() == 1)
-        .ok_or_else(why)?;
-    let (key, given) = object.iter().next().ok_or_else(why)?;
+    let object = data.as_object().ok_or_else(why)?;
+    let rev = lamp_msgs::consent::fit_rev(object.get("if"))?;
+    let mut keys = object.iter().filter(|(key, _)| *key != "if");
+    let (key, given) = keys.next().ok_or_else(why)?;
+    if keys.next().is_some() {
+        return Err(why());
+    }
     if key == ROOM_SOUNDS && !place.room_sounds {
         return Err("room sounds is not on this lamp: it has a privacy slide".into());
     }
@@ -107,15 +120,44 @@ pub fn line(place: &Place, data: &Value) -> Result<String, String> {
         return Err(why());
     }
     let yes = given.as_bool().ok_or_else(why)?;
-    Ok(json!({ "consent": { key.as_str(): yes } }).to_string())
+    Ok(json!({ "consent": { key.as_str(): yes }, "if": rev }).to_string())
 }
 
 /// `consent.set`: checked here, made by the helper, and answered with what
-/// the files say after it.
+/// the files say after it, the key's revision as the helper said it, and
+/// `"stale": true` when the helper changed nothing because the key's
+/// revision was no longer the one the app saw.
 pub fn set(place: &Place, data: &Value) -> Result<Value, String> {
     let line = line(place, data)?;
-    crate::settings::ask(&place.socket, &line, place.wait)?;
-    Ok(now(place))
+    let reply = crate::settings::ask_line(&place.socket, &line, place.wait)?;
+    let reply: Value = serde_json::from_str(reply.trim())
+        .map_err(|_| "the lamp's settings did not answer".to_owned())?;
+    let stale = reply.get("stale").is_some();
+    if !stale && reply.get("done").is_none() {
+        return Err(reply
+            .get("refused")
+            .and_then(Value::as_str)
+            .unwrap_or("the lamp's settings did not answer")
+            .to_owned());
+    }
+    // The key set: its yes and revision as the helper said them, together,
+    // read under its hold; the others as they are now.
+    let mut said = now(place);
+    let given = reply.get(if stale { "stale" } else { "done" });
+    if let (Some(Value::Object(given)), Some(Value::Object(revs))) = (given, reply.get("rev")) {
+        for (key, yes) in given {
+            if let (Some(yes), Some(rev)) = (yes.as_bool(), revs.get(key).and_then(Value::as_str))
+                && said.get(key.as_str()).is_some()
+            {
+                said[key.as_str()] = yes.into();
+                said["rev"][key.as_str()] = rev.into();
+            }
+        }
+    }
+    if stale {
+        said["stale"] = true.into();
+    }
+    Ok(said)
 }
 
 /// `consent.get`: [`now`], writing nothing.
@@ -163,32 +205,30 @@ mod tests {
     fn a_set_takes_one_key_this_lamp_has_as_true_or_false() {
         let slide = place(false);
         assert_eq!(
-            line(&slide, &json!({"face_expressions": true})).unwrap(),
-            r#"{"consent":{"face_expressions":true}}"#
+            line(&slide, &json!({"face_expressions": true, "if": "t1"})).unwrap(),
+            r#"{"consent":{"face_expressions":true},"if":"t1"}"#
         );
         assert_eq!(
-            line(&slide, &json!({"face_expressions": false})).unwrap(),
-            r#"{"consent":{"face_expressions":false}}"#
+            line(&slide, &json!({"face_expressions": false, "if": "none"})).unwrap(),
+            r#"{"consent":{"face_expressions":false},"if":"none"}"#
         );
         assert!(
-            line(&slide, &json!({"room_sounds": true}))
+            line(&slide, &json!({"room_sounds": true, "if": "t3"}))
                 .unwrap_err()
                 .contains("privacy slide")
         );
         let no_slide = place(true);
         assert_eq!(
-            line(&no_slide, &json!({"room_sounds": true})).unwrap(),
-            r#"{"consent":{"room_sounds":true}}"#
+            line(&no_slide, &json!({"room_sounds": true, "if": "t4"})).unwrap(),
+            r#"{"consent":{"room_sounds":true},"if":"t4"}"#
         );
         for data in [
-            json!({}),
-            json!(null),
-            json!([true]),
-            json!({"camera": true}),
-            json!({"face_expressions": "yes"}),
-            json!({"face_expressions": 1}),
-            json!({"face_expressions": null}),
-            json!({"face_expressions": true, "room_sounds": true}),
+            json!({"if": "t5"}),
+            json!({"camera": true, "if": "t5"}),
+            json!({"face_expressions": "yes", "if": "t5"}),
+            json!({"face_expressions": 1, "if": "t5"}),
+            json!({"face_expressions": null, "if": "t5"}),
+            json!({"face_expressions": true, "room_sounds": true, "if": "t5"}),
         ] {
             let why = line(&no_slide, &data).unwrap_err();
             assert_eq!(
@@ -197,23 +237,83 @@ mod tests {
                 "{data}"
             );
         }
+        for data in [json!(null), json!([true]), json!("ask")] {
+            assert!(line(&no_slide, &data).is_err(), "{data}");
+        }
+    }
+
+    /// #5500: each set names `if`, the key's revision the app saw, so a
+    /// retry of an old yes after a later "no" at the lamp changes nothing.
+    /// Without one, or with one that is not 1 to 64 printable ASCII
+    /// characters, the set is refused before the helper is asked.
+    #[test]
+    fn a_set_without_a_fit_if_is_refused_before_the_helper() {
+        let no_slide = place(true);
+        for data in [
+            json!({"face_expressions": true}),
+            json!({"room_sounds": false}),
+            json!({"face_expressions": true, "if": ""}),
+            json!({"face_expressions": true, "if": "a".repeat(65)}),
+            json!({"face_expressions": true, "if": "a b"}),
+            json!({"face_expressions": true, "if": "tap\u{e9}"}),
+            json!({"face_expressions": true, "if": 7}),
+            json!({"face_expressions": true, "if": null}),
+        ] {
+            assert_eq!(
+                line(&no_slide, &data),
+                Err(lamp_msgs::consent::REV_REFUSED.into()),
+                "{data}"
+            );
+        }
+        // Through `set`, with a helper listening: never asked.
+        let folder = PathBuf::from(format!("/tmp/lcc-if-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let socket = folder.join("change.sock");
+        let helper = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        helper.set_nonblocking(true).unwrap();
+        let place = place_in(&folder, &socket, true);
+        for data in [
+            json!({"face_expressions": true}),
+            json!({"room_sounds": true, "if": ""}),
+            json!({"face_expressions": true, "if": "a".repeat(65)}),
+            json!({"face_expressions": true, "if": "a b"}),
+            json!({"face_expressions": true, "if": "tap\u{e9}"}),
+        ] {
+            assert_eq!(
+                set(&place, &data),
+                Err(lamp_msgs::consent::REV_REFUSED.into()),
+                "{data}"
+            );
+        }
+        assert_eq!(
+            helper.accept().unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock,
+            "the helper was asked"
+        );
+        assert_eq!(std::fs::read_dir(&folder).unwrap().count(), 1);
+        let _ = std::fs::remove_dir_all(folder);
     }
 
     #[test]
-    fn a_get_says_each_key_this_lamp_has_from_its_file() {
+    fn a_get_says_each_key_this_lamp_has_from_its_file_with_its_rev() {
         let folder = std::env::temp_dir().join(format!("cloud-consent-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(&folder).unwrap();
         let slide = place_in(&folder, Path::new("/nowhere.sock"), false);
         let no_slide = place_in(&folder, Path::new("/nowhere.sock"), true);
-        assert_eq!(get(&slide), json!({"face_expressions": false}));
+        assert_eq!(
+            get(&slide),
+            json!({"face_expressions": false, "rev": {"face_expressions": "unknown"}})
+        );
         assert_eq!(
             get(&no_slide),
-            json!({"face_expressions": false, "room_sounds": false})
+            json!({"face_expressions": false, "room_sounds": false,
+                   "rev": {"face_expressions": "unknown", "room_sounds": "unknown"}})
         );
         std::fs::write(
             folder.join("face-expressions.json"),
-            r#"{"version":1,"face_expressions":"yes","at_unix_s":5,"by":"app"}"#,
+            r#"{"version":1,"face_expressions":"yes","at_unix_s":5,"by":"app","rev":"r1"}"#,
         )
         .unwrap();
         std::fs::write(
@@ -222,11 +322,27 @@ mod tests {
         )
         .unwrap();
         // A slide lamp never says room sounds, even with a file there.
-        assert_eq!(get(&slide), json!({"face_expressions": true}));
+        assert_eq!(
+            get(&slide),
+            json!({"face_expressions": true, "rev": {"face_expressions": "r1"}})
+        );
         assert_eq!(
             get(&no_slide),
-            json!({"face_expressions": true, "room_sounds": true})
+            json!({"face_expressions": true, "room_sounds": true,
+                   "rev": {"face_expressions": "r1", "room_sounds": "yes-5"}})
         );
+        // Taken back after the helper's r2; then a state that can't be
+        // read: `unknown`, which the helper never matches.
+        std::fs::remove_file(folder.join("face-expressions.json")).unwrap();
+        std::fs::write(
+            folder.join(lamp_msgs::consent::STATE_FILE),
+            r#"{"version":1,"revs":{"face_expressions":{"wrote":"r2"}}}"#,
+        )
+        .unwrap();
+        assert_eq!(get(&slide)["rev"], json!({"face_expressions": "gone-r2"}));
+        std::fs::write(folder.join(lamp_msgs::consent::STATE_FILE), "{").unwrap();
+        assert_eq!(get(&slide)["rev"], json!({"face_expressions": "unknown"}));
+        assert_eq!(get(&no_slide)["rev"]["room_sounds"], "yes-5");
         let _ = std::fs::remove_dir_all(folder);
     }
 }

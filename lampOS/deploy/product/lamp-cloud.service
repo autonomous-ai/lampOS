@@ -99,6 +99,12 @@ Environment=LAMP_APP_RESTART=on
 # (/run/lampos-tasks/app.sock, its --app-socket); the code and the email go to the backend over HTTPS only,
 # never on the broker. The same switch as lamp-voice.service's, with LAMP_TASKS_SIGN_IN there.
 Environment=LAMP_TASKS_SIGN_IN_APP=on
+# The owner's two yeses from the app (#5500, docs/cloud.md "The two yeses from the app"): face expressions
+# and, on a lamp with no slide, room sounds, read from /var/lib/lampOS/consent and set through root's
+# `lamp-setup change` helper (/run/lampos-setup-change/change.sock, as LAMP_SETTINGS_CHANGE). Each set is a compare-and-set
+# on the key's revision (`if`), so a retry of an old yes after a later "no" at the lamp changes nothing.
+# The first builder's yes, 9 Nov.
+Environment=LAMP_APP_CONSENT=on
 # The app told once that setup is done (#5812, onboarding.done; system.info's onboarding_done_supported),
 # its acked date kept in the state folder below: on, the lead's call (9 Nov).
 Environment=LAMP_APP_ONBOARDING_DONE=on

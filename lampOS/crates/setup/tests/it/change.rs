@@ -945,12 +945,355 @@ fn the_products_reset_wipes_the_lamps_name_and_the_unit_runs_the_helper() {
     assert!(socket.contains("Accept=yes\n"));
 }
 
+/// The consent folder's revision of `key`, as `consent.get` says it.
+fn rev_now(folder: &std::path::Path, key: &str) -> String {
+    lamp_msgs::consent::rev(folder, key, &lamp_msgs::consent::Revs::read(folder))
+}
+
+/// A `consent.set` line from the app, as lamp-cloud hands it on.
+fn consent_line(key: &str, yes: bool, seen: &str) -> String {
+    json!({"consent": {key: yes}, "if": seen}).to_string()
+}
+
+/// The new revision in a helper's reply.
+fn rev_in(reply: &Value, key: &str) -> String {
+    reply["rev"][key].as_str().unwrap().to_owned()
+}
+
+/// #5500, the reviewer's case 1 on the ask list: a yes, a "no" at the lamp
+/// (the file removed, as the voice's take-back removes it), then many other
+/// sets, never let the first tap's old revision apply again: there is no
+/// list to fall out of, only the key's revision now.
+#[test]
+fn an_old_rev_stays_stale_after_any_number_of_other_sets() {
+    let root = Root::new();
+    let config = root.config();
+    let folder = &config.consent;
+    fs::create_dir_all(folder).unwrap();
+    let face = folder.join("face-expressions.json");
+    // Before any root writer: `unknown`, which no set matches.
+    assert_eq!(rev_now(folder, "face_expressions"), "unknown");
+    change::consent_boundary(&config).unwrap();
+    let t0 = rev_now(folder, "face_expressions");
+    assert!(t0.starts_with("gone-"), "{t0}");
+    let (reply, _) = answer(&consent_line("face_expressions", true, &t0), &config, true);
+    assert_eq!(reply["done"], json!({"face_expressions": true}));
+    let t1 = rev_in(&reply, "face_expressions");
+    assert_eq!(rev_now(folder, "face_expressions"), t1);
+    fs::remove_file(&face).unwrap();
+    assert_eq!(rev_now(folder, "face_expressions"), format!("gone-{t1}"));
+    for n in 0..40 {
+        let seen = rev_now(folder, "room_sounds");
+        let (reply, _) = answer(
+            &consent_line("room_sounds", n % 2 == 0, &seen),
+            &config,
+            true,
+        );
+        assert!(reply.get("done").is_some(), "{n}: {reply}");
+    }
+    for seen in [&t0, &t1] {
+        let (reply, done) = answer(&consent_line("face_expressions", true, seen), &config, true);
+        assert_eq!(
+            reply,
+            json!({"stale": {"face_expressions": false},
+                   "rev": {"face_expressions": format!("gone-{t1}")}})
+        );
+        assert!(!done.unwrap().restart_ears);
+        assert!(!face.exists());
+    }
+}
+
+/// #5500, the reviewer's case 2: a state file not of its shape is never
+/// read as empty. The helper puts a fresh boundary in its place, under the
+/// folder's hold, before it compares: every revision from before is stale,
+/// and the next `consent.get` hands out one that applies.
+#[test]
+fn a_corrupt_state_makes_every_old_rev_stale_and_a_fresh_get_works() {
+    let root = Root::new();
+    let config = root.config();
+    let folder = &config.consent;
+    fs::create_dir_all(folder).unwrap();
+    // The revisions a root writer keeps at start (the voice, the helper).
+    change::consent_boundary(&config).unwrap();
+    let t0 = rev_now(folder, "face_expressions");
+    let face = folder.join("face-expressions.json");
+    let state = folder.join(lamp_msgs::consent::STATE_FILE);
+    let (reply, _) = answer(&consent_line("face_expressions", true, &t0), &config, true);
+    let t1 = rev_in(&reply, "face_expressions");
+    fs::remove_file(&face).unwrap();
+    let seen = rev_now(folder, "face_expressions");
+    for garbage in ["not json", "{\"version\":1,\"revs\":[]}", ""] {
+        fs::write(&state, garbage).unwrap();
+        // lamp-cloud, which can't write, says it unknown meanwhile.
+        assert_eq!(rev_now(folder, "face_expressions"), "unknown");
+        for old in [t0.as_str(), t1.as_str(), seen.as_str(), "unknown"] {
+            let (reply, _) = answer(&consent_line("face_expressions", true, old), &config, true);
+            assert_eq!(
+                reply["stale"],
+                json!({"face_expressions": false}),
+                "{garbage} {old}"
+            );
+            assert!(!face.exists());
+        }
+    }
+    let fresh = rev_now(folder, "face_expressions");
+    assert!(fresh.starts_with("gone-") && fresh != seen);
+    let (reply, _) = answer(
+        &consent_line("face_expressions", true, &fresh),
+        &config,
+        true,
+    );
+    assert_eq!(reply["done"], json!({"face_expressions": true}));
+    assert!(lamp_msgs::consent::read(&face, "face_expressions").yes);
+}
+
+/// #5500, the reviewer's case 3: the state's fresh revision is kept before
+/// the yes. A yes that fails after it fails the set and leaves the key
+/// `gone-REV`, so the tap's revision is stale once the fault is gone.
+#[test]
+fn a_yes_that_fails_after_the_state_leaves_the_old_rev_stale() {
+    let root = Root::new();
+    let config = root.config();
+    let folder = &config.consent;
+    fs::create_dir_all(folder).unwrap();
+    // The revisions a root writer keeps at start (the voice, the helper).
+    change::consent_boundary(&config).unwrap();
+    let t0 = rev_now(folder, "face_expressions");
+    let face = folder.join("face-expressions.json");
+    let blocked = folder.join("face-expressions.change-next");
+    fs::create_dir(&blocked).unwrap();
+    let (reply, done) = answer(&consent_line("face_expressions", true, &t0), &config, true);
+    assert!(
+        reply["refused"]
+            .as_str()
+            .unwrap()
+            .starts_with("the change could not be saved")
+    );
+    assert!(done.is_none() && !face.exists());
+    let after = rev_now(folder, "face_expressions");
+    assert!(after.starts_with("gone-"), "{after}");
+    fs::remove_dir(&blocked).unwrap();
+    let (reply, _) = answer(&consent_line("face_expressions", true, &t0), &config, true);
+    assert_eq!(
+        reply,
+        json!({"stale": {"face_expressions": false}, "rev": {"face_expressions": after}})
+    );
+    assert!(!face.exists());
+}
+
+/// #5500: the same tap again after it applied is stale and says what the
+/// lamp keeps; a fresh flow from a lamp never changed: `none`, a yes, a
+/// "no" at the lamp, and a new tap against the revision a get then gives.
+#[test]
+fn a_retried_tap_is_stale_and_a_tap_after_a_get_applies() {
+    let root = Root::new();
+    let config = root.config();
+    let folder = &config.consent;
+    fs::create_dir_all(folder).unwrap();
+    // The revisions a root writer keeps at start (the voice, the helper).
+    change::consent_boundary(&config).unwrap();
+    let t0 = rev_now(folder, "face_expressions");
+    let face = folder.join("face-expressions.json");
+    let (reply, done) = answer(&consent_line("face_expressions", true, &t0), &config, true);
+    let r1 = rev_in(&reply, "face_expressions");
+    assert_eq!(
+        reply,
+        json!({"done": {"face_expressions": true}, "rev": {"face_expressions": r1}})
+    );
+    assert_eq!(
+        done.unwrap().said,
+        "the face expressions yes is on from the app"
+    );
+    let kept = lamp_msgs::consent::read(&face, "face_expressions");
+    assert!(kept.yes && kept.by_app() && kept.rev.as_deref() == Some(r1.as_str()));
+    let before = fs::read(&face).unwrap();
+    let (reply, done) = answer(&consent_line("face_expressions", true, &t0), &config, true);
+    assert_eq!(
+        reply,
+        json!({"stale": {"face_expressions": true}, "rev": {"face_expressions": r1}})
+    );
+    assert_eq!(
+        done.unwrap().said,
+        "the face expressions yes was asked from an older view in the app: left as it is"
+    );
+    assert_eq!(fs::read(&face).unwrap(), before);
+    // A "no" at the lamp, through the shared take-back.
+    let gone = lamp_msgs::consent::hold(folder)
+        .unwrap()
+        .take_back("face_expressions")
+        .unwrap();
+    assert_eq!(rev_now(folder, "face_expressions"), gone);
+    // The yes's own revision, retried after the "no": stale too.
+    let (reply, _) = answer(&consent_line("face_expressions", true, &r1), &config, true);
+    assert_eq!(reply["stale"], json!({"face_expressions": false}));
+    let (reply, _) = answer(
+        &consent_line("face_expressions", true, &gone),
+        &config,
+        true,
+    );
+    assert_eq!(reply["done"], json!({"face_expressions": true}));
+    assert!(face.exists());
+}
+
+/// #5500, the privacy reviewer's ABA: a yes from the app, a "no" at the
+/// lamp, the app's get, then a yes and a "no" again at the lamp. The key
+/// reads off as when the app looked, but each change at the lamp kept a
+/// fresh revision, so the app's held one is stale.
+#[test]
+fn a_yes_and_a_no_at_the_lamp_after_a_get_make_its_rev_stale() {
+    let root = Root::new();
+    let config = root.config();
+    let folder = &config.consent;
+    fs::create_dir_all(folder).unwrap();
+    // The revisions a root writer keeps at start (the voice, the helper).
+    change::consent_boundary(&config).unwrap();
+    let t0 = rev_now(folder, "face_expressions");
+    let (reply, _) = answer(&consent_line("face_expressions", true, &t0), &config, true);
+    assert!(reply.get("done").is_some());
+    lamp_msgs::consent::hold(folder)
+        .unwrap()
+        .take_back("face_expressions")
+        .unwrap();
+    let held_by_app = rev_now(folder, "face_expressions");
+    {
+        let held = lamp_msgs::consent::hold(folder).unwrap();
+        held.keep_yes("face_expressions", 100, lamp_msgs::consent::BY_VOICE)
+            .unwrap();
+        held.take_back("face_expressions").unwrap();
+    }
+    let now = rev_now(folder, "face_expressions");
+    assert_ne!(now, held_by_app);
+    let (reply, _) = answer(
+        &consent_line("face_expressions", true, &held_by_app),
+        &config,
+        true,
+    );
+    assert_eq!(
+        reply,
+        json!({"stale": {"face_expressions": false}, "rev": {"face_expressions": now}})
+    );
+    assert!(!folder.join("face-expressions.json").exists());
+}
+
+/// #5500, the second reviewer's P2 1: an explicit "no" while already off
+/// renews the revision. A yes pending against `gone-R` never applies after
+/// an app off or a "no" at the lamp that changed nothing on disk.
+#[test]
+fn a_no_while_already_off_still_makes_an_older_yes_stale() {
+    let root = Root::new();
+    let config = root.config();
+    let folder = &config.consent;
+    fs::create_dir_all(folder).unwrap();
+    change::consent_boundary(&config).unwrap();
+    let face = folder.join("face-expressions.json");
+    // The app's off, against the revision now, with nothing there.
+    let pending = rev_now(folder, "face_expressions");
+    let (reply, done) = answer(
+        &consent_line("face_expressions", false, &pending),
+        &config,
+        true,
+    );
+    assert_eq!(reply["done"], json!({"face_expressions": false}));
+    assert_eq!(
+        done.unwrap().said,
+        "the face expressions yes is off from the app already"
+    );
+    let after = rev_in(&reply, "face_expressions");
+    assert_ne!(after, pending);
+    let (reply, _) = answer(
+        &consent_line("face_expressions", true, &pending),
+        &config,
+        true,
+    );
+    assert_eq!(
+        reply,
+        json!({"stale": {"face_expressions": false}, "rev": {"face_expressions": after}})
+    );
+    // A replay of that off: stale, and nothing written.
+    let state = fs::read(folder.join(lamp_msgs::consent::STATE_FILE)).unwrap();
+    let (reply, _) = answer(
+        &consent_line("face_expressions", false, &pending),
+        &config,
+        true,
+    );
+    assert!(reply.get("stale").is_some(), "{reply}");
+    assert_eq!(
+        fs::read(folder.join(lamp_msgs::consent::STATE_FILE)).unwrap(),
+        state
+    );
+    // A "no" at the lamp (the voice's shared take-back), already off.
+    let pending = rev_now(folder, "face_expressions");
+    lamp_msgs::consent::take_back_at(&face, "face_expressions").unwrap();
+    assert_ne!(rev_now(folder, "face_expressions"), pending);
+    let (reply, _) = answer(
+        &consent_line("face_expressions", true, &pending),
+        &config,
+        true,
+    );
+    assert_eq!(reply["stale"], json!({"face_expressions": false}));
+    assert!(!face.exists());
+}
+
+/// #5500, the second reviewer's P2 2: a state file removed never brings a
+/// revision back. Holding the folder puts a fresh boundary in its place
+/// before anything is compared, and lamp-cloud, which can't write, says
+/// `unknown`, which no set matches.
+#[test]
+fn a_removed_state_never_lets_an_old_yes_apply() {
+    let root = Root::new();
+    let config = root.config();
+    let folder = &config.consent;
+    fs::create_dir_all(folder).unwrap();
+    change::consent_boundary(&config).unwrap();
+    let state = folder.join(lamp_msgs::consent::STATE_FILE);
+    let face = folder.join("face-expressions.json");
+    // The reviewer's sequence: a get, a yes sent, a take-back held at the
+    // lamp, the state removed, the yes replayed.
+    let seen = rev_now(folder, "face_expressions");
+    let (reply, _) = answer(
+        &consent_line("face_expressions", true, &seen),
+        &config,
+        true,
+    );
+    assert_eq!(reply["done"], json!({"face_expressions": true}));
+    lamp_msgs::consent::take_back_at(&face, "face_expressions").unwrap();
+    fs::remove_file(&state).unwrap();
+    assert_eq!(rev_now(folder, "face_expressions"), "unknown");
+    for old in [seen.as_str(), "unknown", "none"] {
+        let (reply, _) = answer(&consent_line("face_expressions", true, old), &config, true);
+        assert_eq!(reply["stale"], json!({"face_expressions": false}), "{old}");
+        assert!(!face.exists());
+    }
+    // A yes never applied, its state removed before it arrives: stale.
+    let seen = rev_now(folder, "face_expressions");
+    fs::remove_file(&state).unwrap();
+    let (reply, _) = answer(
+        &consent_line("face_expressions", true, &seen),
+        &config,
+        true,
+    );
+    assert_eq!(reply["stale"], json!({"face_expressions": false}));
+    // The boundary is back on disk, and a tap after a get applies.
+    assert!(state.exists());
+    let (reply, _) = answer(
+        &consent_line(
+            "face_expressions",
+            true,
+            &rev_now(folder, "face_expressions"),
+        ),
+        &config,
+        true,
+    );
+    assert_eq!(reply["done"], json!({"face_expressions": true}));
+}
+
 /// #5500: the owner's yeses from the app, kept as the voice's onboarding
-/// keeps them with `"by":"app"`, 0640 and the folder's group (0600 where it
-/// is root's); off removes the file; only a new room sounds yes asks for
-/// lamp-ears' restart; anything but one known key as true or false is
-/// refused with nothing written. The product's unit may write the folder,
-/// and the reset's plan wipes both files.
+/// keeps them with `"by":"app"` and the revision, 0640 and the folder's
+/// group (0600 where it is root's), as the state is; off removes the file;
+/// only a new room sounds yes asks for lamp-ears' restart; anything but
+/// one known key as true or false with a fit `if` is refused with nothing
+/// written. The product's unit may write the folder, and the reset's plan
+/// wipes both files.
 #[test]
 fn the_owners_yeses_from_the_app_are_kept_as_the_voice_keeps_them() {
     use std::os::unix::fs::MetadataExt;
@@ -958,80 +1301,114 @@ fn the_owners_yeses_from_the_app_are_kept_as_the_voice_keeps_them() {
     let config = root.config();
     let folder = &config.consent;
     fs::create_dir_all(folder).unwrap();
+    // The revisions a root writer keeps at start (the voice, the helper).
+    change::consent_boundary(&config).unwrap();
     let face = folder.join("face-expressions.json");
     let room = folder.join("room-sounds.json");
+    let set = |key: &str, yes: bool| {
+        answer(
+            &consent_line(key, yes, &rev_now(folder, key)),
+            &config,
+            true,
+        )
+    };
 
-    let (reply, done) = answer(r#"{"consent": {"face_expressions": true}}"#, &config, true);
-    assert_eq!(reply, json!({"done": {"face_expressions": true}}));
+    let (reply, done) = set("face_expressions", true);
+    assert_eq!(reply["done"], json!({"face_expressions": true}));
     let done = done.unwrap();
     assert!(!done.restart_ears && !done.restart_voice && !done.restart_control);
-    assert_eq!(done.said, "the face expressions yes is on from the app");
     let kept: Value = serde_json::from_str(&fs::read_to_string(&face).unwrap()).unwrap();
     assert_eq!(kept["version"], 1);
     assert_eq!(kept["face_expressions"], "yes");
     assert_eq!(kept["by"], "app");
+    assert_eq!(kept["rev"], reply["rev"]["face_expressions"]);
     assert!(kept["at_unix_s"].as_u64().unwrap() > 1_700_000_000);
     // The folder's group, when it is not root's; 0600 when it is.
     let group = fs::metadata(folder).unwrap().gid();
-    assert_eq!(mode(&face), if group == 0 { 0o600 } else { 0o640 });
-    if group != 0 {
-        assert_eq!(fs::metadata(&face).unwrap().gid(), group);
+    let state = folder.join(lamp_msgs::consent::STATE_FILE);
+    for file in [&face, &state] {
+        assert_eq!(mode(file), if group == 0 { 0o600 } else { 0o640 });
+        if group != 0 {
+            assert_eq!(fs::metadata(file).unwrap().gid(), group);
+        }
     }
     assert!(!folder.join("face-expressions.change-next").exists());
-    // Again: nothing changes.
-    let (_, done) = answer(r#"{"consent": {"face_expressions": true}}"#, &config, true);
+    assert!(!folder.join("app-revs.change-next").exists());
+    // Again, against the revision now: nothing changes.
+    let before = fs::read(&face).unwrap();
+    let (reply, done) = set("face_expressions", true);
+    assert_eq!(reply["done"], json!({"face_expressions": true}));
     assert_eq!(
         done.unwrap().said,
         "the face expressions yes is on from the app already"
     );
+    assert_eq!(fs::read(&face).unwrap(), before);
     // A new room sounds yes restarts lamp-ears; the same one again doesn't.
-    let (reply, done) = answer(r#"{"consent": {"room_sounds": true}}"#, &config, true);
-    assert_eq!(reply, json!({"done": {"room_sounds": true}}));
+    let (reply, done) = set("room_sounds", true);
+    assert_eq!(reply["done"], json!({"room_sounds": true}));
     assert!(done.unwrap().restart_ears);
     assert_eq!(
         serde_json::from_str::<Value>(&fs::read_to_string(&room).unwrap()).unwrap()["room_sounds"],
         "yes"
     );
-    let (_, done) = answer(r#"{"consent": {"room_sounds": true}}"#, &config, true);
+    let (_, done) = set("room_sounds", true);
     assert!(!done.unwrap().restart_ears);
     // Off removes it, and needs no restart: the readers look every 2 s.
     for key in ["face_expressions", "room_sounds"] {
-        let (reply, done) = answer(
-            &format!(r#"{{"consent": {{"{key}": false}}}}"#),
-            &config,
-            true,
-        );
-        assert_eq!(reply, json!({"done": {key: false}}));
+        let (reply, done) = set(key, false);
+        assert_eq!(reply["done"], json!({key: false}));
+        assert!(rev_in(&reply, key).starts_with("gone-"));
         assert!(!done.unwrap().restart_ears);
     }
     assert!(!face.exists() && !room.exists());
     // Off again, with nothing there: no error.
-    let (reply, _) = answer(r#"{"consent": {"room_sounds": false}}"#, &config, true);
-    assert_eq!(reply, json!({"done": {"room_sounds": false}}));
+    let (reply, _) = set("room_sounds", false);
+    assert_eq!(reply["done"], json!({"room_sounds": false}));
     // A voice's yes already there is left as it is.
     fs::write(
         &face,
         r#"{"version":1,"face_expressions":"yes","at_unix_s":5}"#,
     )
     .unwrap();
-    let (_, done) = answer(r#"{"consent": {"face_expressions": true}}"#, &config, true);
+    assert_eq!(rev_now(folder, "face_expressions"), "yes-5");
+    let (_, done) = set("face_expressions", true);
     assert!(done.unwrap().said.ends_with("already"));
     assert!(!fs::read_to_string(&face).unwrap().contains("app"));
     fs::remove_file(&face).unwrap();
+    fs::remove_file(&state).unwrap();
     for refused in [
-        r#"{"consent": {}}"#,
-        r#"{"consent": {"camera": true}}"#,
-        r#"{"consent": {"face_expressions": "yes"}}"#,
-        r#"{"consent": {"face_expressions": true, "room_sounds": true}}"#,
-        r#"{"consent": true}"#,
+        r#"{"consent": {}, "if": "r"}"#,
+        r#"{"consent": {"camera": true}, "if": "r"}"#,
+        r#"{"consent": {"face_expressions": "yes"}, "if": "r"}"#,
+        r#"{"consent": {"face_expressions": true, "room_sounds": true}, "if": "r"}"#,
+        r#"{"consent": true, "if": "r"}"#,
         r#"{"consent": {"face_expressions": true}, "control": true}"#,
+        r#"{"consent": {"face_expressions": true}, "if": "r", "control": true}"#,
+        r#"{"control": true, "if": "r"}"#,
+        // The revision seen: there, 1 to 64 printable ASCII characters.
+        r#"{"consent": {"face_expressions": true}}"#,
+        r#"{"consent": {"face_expressions": true}, "ask": "none"}"#,
+        r#"{"consent": {"face_expressions": true}, "if": ""}"#,
+        r#"{"consent": {"face_expressions": true}, "if": "a b"}"#,
+        r#"{"consent": {"face_expressions": true}, "if": "café"}"#,
+        r#"{"consent": {"face_expressions": true}, "if": 7}"#,
     ] {
         let (reply, done) = answer(refused, &config, true);
         assert!(reply["refused"].is_string() && done.is_none(), "{refused}");
     }
+    let (reply, _) = answer(
+        &consent_line("face_expressions", true, &"a".repeat(65)),
+        &config,
+        true,
+    );
+    assert_eq!(reply, json!({"refused": lamp_msgs::consent::REV_REFUSED}));
     assert_eq!(fs::read_dir(folder).unwrap().count(), 0);
     // Off, refused as every change is.
-    let (reply, _) = answer(r#"{"consent": {"face_expressions": true}}"#, &config, false);
+    let (reply, _) = answer(
+        &consent_line("face_expressions", true, "none"),
+        &config,
+        false,
+    );
     assert_eq!(reply, json!({"refused": "changes after setup are off"}));
     assert!(!face.exists());
     // Where the product keeps them, and the unit may write there.

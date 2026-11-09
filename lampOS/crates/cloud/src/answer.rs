@@ -1219,8 +1219,10 @@ pub mod tests {
     }
 
     /// A stand-in for root's change helper on `socket`: each line's
-    /// `consent` made in `folder` as `lamp-setup change` makes it, and the
-    /// lines kept; `{"refused": ..}` for anything else.
+    /// `consent` made in `folder` as `lamp-setup change` makes it (a
+    /// compare-and-set on the key's revision, through
+    /// `lamp_msgs::consent::hold`), and the lines kept; `{"refused": ..}`
+    /// for anything else.
     fn consent_helper(
         socket: &std::path::Path,
         folder: &std::path::Path,
@@ -1238,14 +1240,20 @@ pub mod tests {
                 let asked: Value = serde_json::from_str(&line).unwrap_or_default();
                 let reply = match asked["consent"].as_object().and_then(|c| c.iter().next()) {
                     Some((key, yes)) => {
+                        let held = lamp_msgs::consent::hold(&folder).unwrap();
+                        let now = held.rev(key).unwrap();
                         let file = lamp_msgs::consent::file_in(&folder, key).unwrap();
-                        if yes.as_bool() == Some(true) {
-                            std::fs::write(&file, lamp_msgs::consent::bytes(key, 9, "app"))
-                                .unwrap();
+                        let before = lamp_msgs::consent::read(&file, key).yes;
+                        if asked["if"] != now.as_str() {
+                            json!({"stale": {key.as_str(): before}, "rev": {key.as_str(): now}})
                         } else {
-                            let _ = std::fs::remove_file(&file);
+                            let rev = if yes.as_bool() == Some(true) {
+                                held.keep_yes(key, 9, "app").unwrap()
+                            } else {
+                                held.take_back(key).unwrap()
+                            };
+                            json!({"done": {key.as_str(): yes}, "rev": {key.as_str(): rev}})
                         }
-                        json!({"done": {key.as_str(): yes}})
                     }
                     None => json!({"refused": "the request names no change this lamp makes"}),
                 };
@@ -1257,10 +1265,12 @@ pub mod tests {
 
     /// #5500: the owner's two yeses, with `LAMP_APP_CONSENT=on` only.
     /// Off: neither kind in `can`, each "not on this lamp". On a lamp with a
-    /// slide: face expressions alone, read from its file and set through
-    /// the helper, the reply what the files then say; room sounds refused
-    /// and never sent. With no slide, room sounds too. Anything but one
-    /// key this lamp has as true or false is refused before the helper.
+    /// slide: face expressions alone, read from its file with its `rev` and
+    /// set through the helper against the `rev` the app saw, the reply what
+    /// the files then say; room sounds refused and never sent. With no
+    /// slide, room sounds too. A set against an old `rev` changes nothing
+    /// and says `stale`. Anything but one key this lamp has as true or
+    /// false, with `if`, is refused before the helper.
     #[test]
     fn the_owners_yeses_are_read_and_set_through_the_helper_with_their_switch() {
         let folder = std::path::PathBuf::from(format!("/tmp/lcc-{}", std::process::id()));
@@ -1287,31 +1297,63 @@ pub mod tests {
         let can = super::can(&slide);
         assert!(kinds.iter().all(|kind| can.contains(kind)));
         let get = |lamp: &mut Fake| answer(lamp, "consent.get", &json!({})).unwrap().unwrap();
-        assert_eq!(get(&mut slide), json!({"face_expressions": false}));
-        let set = |lamp: &mut Fake, data: Value| answer(lamp, "consent.set", &data);
+        // Before any root writer kept the revisions: `unknown`, stale.
         assert_eq!(
-            set(&mut slide, json!({"face_expressions": true})),
-            Ok(Some(json!({"face_expressions": true})))
+            get(&mut slide),
+            json!({"face_expressions": false, "rev": {"face_expressions": "unknown"}})
         );
-        assert_eq!(get(&mut slide), json!({"face_expressions": true}));
+        // As the voice's start keeps them on a lamp.
+        lamp_msgs::consent::hold(&folder).unwrap().revs().unwrap();
+        let first = get(&mut slide);
+        let t0 = first["rev"]["face_expressions"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert!(t0.starts_with("gone-"), "{first}");
+        let room0 = lamp_msgs::consent::rev(
+            &folder,
+            "room_sounds",
+            &lamp_msgs::consent::Revs::read(&folder),
+        );
+        let set = |lamp: &mut Fake, data: Value| answer(lamp, "consent.set", &data);
+        let on = set(&mut slide, json!({"face_expressions": true, "if": t0}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(on["face_expressions"], true);
+        assert!(on.get("stale").is_none());
+        let r1 = on["rev"]["face_expressions"].as_str().unwrap().to_owned();
+        assert_eq!(r1.len(), 32);
+        assert_eq!(get(&mut slide), on);
+        // The same tap again: stale, what the lamp keeps said.
+        assert_eq!(
+            set(&mut slide, json!({"face_expressions": true, "if": t0})),
+            Ok(Some(
+                json!({"face_expressions": true, "rev": {"face_expressions": r1}, "stale": true})
+            ))
+        );
         assert!(
-            set(&mut slide, json!({"room_sounds": true}))
+            set(&mut slide, json!({"room_sounds": true, "if": t0}))
                 .unwrap_err()
                 .contains("privacy slide")
         );
         assert!(!folder.join("room-sounds.json").exists());
         for data in [
             json!({}),
-            json!({"face_expressions": "yes"}),
-            json!({"face_expressions": true, "room_sounds": true}),
-            json!({"camera": false}),
+            json!({"if": "a3"}),
+            json!({"face_expressions": true}),
+            json!({"face_expressions": true, "ask": "a3"}),
+            json!({"face_expressions": "yes", "if": "a3"}),
+            json!({"face_expressions": true, "room_sounds": true, "if": "a3"}),
+            json!({"camera": false, "if": "a3"}),
         ] {
             assert!(set(&mut slide, data.clone()).is_err(), "{data}");
         }
-        assert_eq!(
-            set(&mut slide, json!({"face_expressions": false})),
-            Ok(Some(json!({"face_expressions": false})))
-        );
+        let off = set(&mut slide, json!({"face_expressions": false, "if": r1}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(off["face_expressions"], false);
+        let gone = off["rev"]["face_expressions"].as_str().unwrap().to_owned();
+        assert!(gone.starts_with("gone-"));
         assert!(!folder.join("face-expressions.json").exists());
 
         let mut no_slide = Fake {
@@ -1320,21 +1362,23 @@ pub mod tests {
         };
         assert_eq!(
             get(&mut no_slide),
-            json!({"face_expressions": false, "room_sounds": false})
+            json!({"face_expressions": false, "room_sounds": false,
+                   "rev": {"face_expressions": gone, "room_sounds": room0}})
         );
-        assert_eq!(
-            set(&mut no_slide, json!({"room_sounds": true})),
-            Ok(Some(
-                json!({"face_expressions": false, "room_sounds": true})
-            ))
-        );
+        let room = set(&mut no_slide, json!({"room_sounds": true, "if": room0}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(room["face_expressions"], false);
+        assert_eq!(room["room_sounds"], true);
+        assert_eq!(room["rev"]["face_expressions"], gone.as_str());
         // Only what passed the checks reached the helper.
         assert_eq!(
             *lines.lock().unwrap(),
             [
-                r#"{"consent":{"face_expressions":true}}"#,
-                r#"{"consent":{"face_expressions":false}}"#,
-                r#"{"consent":{"room_sounds":true}}"#,
+                format!(r#"{{"consent":{{"face_expressions":true}},"if":"{t0}"}}"#),
+                format!(r#"{{"consent":{{"face_expressions":true}},"if":"{t0}"}}"#),
+                format!(r#"{{"consent":{{"face_expressions":false}},"if":"{r1}"}}"#),
+                format!(r#"{{"consent":{{"room_sounds":true}},"if":"{room0}"}}"#),
             ]
         );
         // The helper not there: said, nothing claimed.
@@ -1347,7 +1391,7 @@ pub mod tests {
             ..lamp()
         };
         assert_eq!(
-            set(&mut gone, json!({"room_sounds": false})),
+            set(&mut gone, json!({"room_sounds": false, "if": "a6"})),
             Err("the lamp's settings are not running".to_owned())
         );
         let _ = std::fs::remove_dir_all(&folder);

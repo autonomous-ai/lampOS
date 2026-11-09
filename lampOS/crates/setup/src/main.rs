@@ -693,6 +693,10 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
             }
         };
     }
+    // The consent folder's revisions in place before anything (#5500).
+    if enabled && let Err(why) = change::consent_boundary(&config) {
+        eprintln!("lamp-setup: change: {why}");
+    }
     // The local agent turned on where the installer's step was never made
     // (a lamp updated by the channel): the owner's tap makes its group, user
     // and folder first, from the fixed names, under lamp-update's lock.

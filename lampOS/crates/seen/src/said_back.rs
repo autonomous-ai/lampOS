@@ -381,6 +381,7 @@ mod tests {
             yes: true,
             by: Some("app".into()),
             at_unix_s: Some(at),
+            rev: None,
         }
     }
 

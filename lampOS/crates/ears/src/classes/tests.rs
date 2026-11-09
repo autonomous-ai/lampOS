@@ -662,6 +662,11 @@ fn only_a_stored_room_sounds_yes_is_a_yes() {
             r#"{{"at_unix_s":7,"by":"{by}","room_sounds":"yes","version":1}}"#
         )));
     }
+    // With the revision every change keeps (#5500), as
+    // `lamp_msgs::consent::bytes_with_rev` writes it: still a yes.
+    assert!(read(
+        r#"{"at_unix_s":7,"by":"app","room_sounds":"yes","rev":"0123456789abcdef0123456789abcdef","version":1}"#
+    ));
     let padded = format!(r#"{{"room_sounds":"yes","pad":"{}"}}"#, "x".repeat(4096));
     for text in [
         r#"{"room_sounds":"no"}"#,

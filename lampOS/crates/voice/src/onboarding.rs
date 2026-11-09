@@ -13149,9 +13149,11 @@ mod tests {
         let path = room_sounds_file(&room);
         let kept: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
         let at = room.walk.kept().steps["room_sounds"].at_unix_s;
+        // With the fresh revision kept for it first (#5500).
+        assert_eq!(kept["rev"].as_str().map(str::len), Some(32));
         assert_eq!(
             kept,
-            json!({"version":1,"room_sounds":"yes","at_unix_s":at,"by":"voice"})
+            json!({"version":1,"room_sounds":"yes","at_unix_s":at,"by":"voice","rev":kept["rev"]})
         );
         assert_eq!(
             std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
@@ -13283,9 +13285,12 @@ mod tests {
         let path = face_expressions_file(&room);
         let at = room.walk.kept().steps["face_expressions"].at_unix_s;
         // Exactly what lamp-eyes' `face_expressions_yes` reads as a yes.
+        let rev = lamp_msgs::consent::read(&path, "face_expressions")
+            .rev
+            .unwrap();
         assert_eq!(
             std::fs::read(&path).unwrap(),
-            format!(r#"{{"at_unix_s":{at},"by":"voice","face_expressions":"yes","version":1}}"#)
+            format!(r#"{{"at_unix_s":{at},"by":"voice","face_expressions":"yes","rev":"{rev}","version":1}}"#)
                 .as_bytes()
         );
         assert!(!room_sounds_file(&room).exists());
@@ -13372,9 +13377,12 @@ mod tests {
             .expect("the model keeps the other answers");
         assert!(after_call.contains(worked));
         let at = room.walk.kept().steps["face_expressions"].at_unix_s;
+        let rev = lamp_msgs::consent::read(&face_expressions_file(&room), "face_expressions")
+            .rev
+            .unwrap();
         assert_eq!(
             std::fs::read(face_expressions_file(&room)).unwrap(),
-            format!(r#"{{"at_unix_s":{at},"by":"voice","face_expressions":"yes","version":1}}"#)
+            format!(r#"{{"at_unix_s":{at},"by":"voice","face_expressions":"yes","rev":"{rev}","version":1}}"#)
                 .as_bytes()
         );
         // The model's late report changes nothing.

@@ -591,9 +591,10 @@ The record, for lamp-ears (`onboarding/storage.rs`, `room_sounds`):
   unless it is the owner's yes from the app that still stands (below).
   It is never written back from the progress, so once removed it stays
   gone until a new yes.
-- Shape: `{"version":1,"room_sounds":"yes","at_unix_s":<when the yes was kept>,"by":"voice"}`
-  (keys in that file sorted, as `lamp_msgs::consent::bytes` writes them;
-  files from before `by` have none and are the voice's).
+- Shape: `{"version":1,"room_sounds":"yes","at_unix_s":<when the yes was kept>,"by":"voice","rev":<revision>}`
+  (keys in that file sorted, as `lamp_msgs::consent::bytes_with_rev` writes
+  them; files from before `by` have none and are the voice's, and files
+  from before `rev` read the same).
 - Read rule: yes only when the file is a JSON object whose `room_sounds`
   is exactly `"yes"`. Missing, unreadable, unparseable, over 4096 bytes,
   or anything else is no. Read one version ahead: `version`, `by` and any
@@ -609,8 +610,8 @@ on, in the app (next section).
 
 ## The two yeses from the app (#5500)
 
-With `LAMP_APP_CONSENT=on` on `lamp-cloud` (off unless set, off in the
-product unit for now), the app reads and switches the same two records
+With `LAMP_APP_CONSENT=on` on `lamp-cloud` (off unless set, on in the
+product unit since the first builder's yes on 9 Nov), the app reads and switches the same two records
 (`consent.get`, `consent.set`, [cloud.md](cloud.md), "The two yeses from
 the app"): face expressions on every lamp, room sounds only on a lamp with
 no slide (`lamp-cloud`'s own `LAMP_PRIVACY_CONTROLS=no-slide`). Both stay
@@ -618,10 +619,22 @@ off until a yes, spoken or in the app.
 
 - **Written by root's helper**, `lamp-setup change`: `lamp-cloud` can't
   write the folder. The file is the voice's shape with `"by":"app"`
-  (`{"at_unix_s":N,"by":"app","face_expressions":"yes","version":1}`),
+  (`{"at_unix_s":N,"by":"app","face_expressions":"yes","rev":REV,"version":1}`),
   0640 and the folder's group (`lampos`), 0600 where that group is root's;
   off removes it. A yes already there, the voice's or the app's, is left
   as it is. The readers ignore `by`.
+- **One tap, one change.** Each `consent.set` names the key's revision
+  the app saw (`if`); the helper applies it only while that is still the
+  key's revision, and each change keeps a fresh one in `app-revs.json`
+  beside the yeses first, so an old yes resent after a later "no" at the
+  lamp stays a no ([cloud.md](cloud.md), "The two yeses from the app"). The
+  voice's own changes are made the same way, holding the consent folder
+  (`lamp_msgs::consent::Held`) with a fresh revision kept first: a spoken
+  yes, a take-back on a "no" or a redo (and its retry), a start's or a
+  write's removal of a yes that does not stand (read under the same hold),
+  and a forget of everything. So a yes and a "no" at the lamp after the
+  app looked still leave its revision stale. No reader takes a yes from
+  that file.
 - **It survives the voice.** The voice's start and its progress writes
   remove a record whose step is not `done`, but not one with `"by":"app"`.
   A redo (`yes_redone_at_unix_s` in the progress file, set by
@@ -633,7 +646,11 @@ off until a yes, spoken or in the app.
   redo time or its "no" differs from the progress it replaces. The
   consent folder is synced after the removal; a removal that fails fails
   the write before the progress keeps the "no", so the next write tries
-  again rather than keeping a "no" the app's yes outlived. No
+  again rather than keeping a "no" the app's yes outlived. Storage then
+  writes nothing more until a fence or a restart, so its worker also
+  retries a removal the disk refused every 2 s until the file goes, with
+  no fence or restart (only while the file is still the one it failed to
+  remove; it never writes a yes or the progress). No
   times are compared, so a "no" stamped before the app's yes (a lamp
   clock that stepped back) still takes it back (the first builder's P3 on
   #5567), and an app yes given after a "no" or a redo at setup stands
@@ -671,7 +688,7 @@ everything and the factory reset remove it; the app may set it too ("The
 two yeses from the app", above). The record is
 `/var/lib/lampOS/consent/face-expressions.json` (`FACE_EXPRESSIONS_PATH`,
 beside `room-sounds.json`, written the same way and with the same mode and
-group), shaped `{"version":1,"face_expressions":"yes","at_unix_s":<when>,"by":"voice"}`,
+group), shaped `{"version":1,"face_expressions":"yes","at_unix_s":<when>,"by":"voice","rev":<revision>}`,
 and read by lamp-eyes' `seems::face_expressions_yes` with the same rule:
 yes only when `face_expressions` is exactly `"yes"`.
 
