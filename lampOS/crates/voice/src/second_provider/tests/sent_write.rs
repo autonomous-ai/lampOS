@@ -666,3 +666,122 @@ async fn an_older_slow_send_finishing_late_never_hides_a_newer_one() {
     );
     assert_eq!(said, ["It's in your Drive now."]);
 }
+
+/// Second's HOLD on #5863: a batch sends `c1` to Google Drive, then makes
+/// eight more tries naming Gmail with wrong send ids, each refused; the
+/// last is cut while it waits. The held line is given `c1` with its own
+/// sent result, no refused try shows a success, the note is
+/// [`SENT_WRITE_NOTE`], and no `service_write` runs.
+#[tokio::test]
+async fn a_ninth_send_try_never_takes_the_first_ones_receipt() {
+    let mut batch = vec![call(
+        "c1",
+        crate::services::WRITE,
+        json!({"service": "google_drive", "send_id": "s1"}),
+    )];
+    batch.extend((1..=8).map(|n| {
+        call(
+            &format!("refused-{n}"),
+            crate::services::WRITE,
+            json!({"service": "gmail", "send_id": format!("wrong-{n}")}),
+        )
+    }));
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Go ahead and send it.".to_owned()), Ok(String::new())].into()),
+        chats: Mutex::new(
+            [
+                vec![Ok(ChatEvent::ToolCalls(batch)), Ok(ChatEvent::Done)],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c2",
+                        crate::services::WRITE,
+                        json!({"service": "google_drive", "title": "Notes"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("It's in your Drive now."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let writes: Writes = Arc::default();
+    let seen = writes.clone();
+    let (last, tried) = std::sync::mpsc::channel();
+    let runner: ToolRunner = Arc::new(move |request, _, name, args| {
+        let last = last.clone();
+        if name == crate::services::WRITE {
+            seen.lock().unwrap().push(args.clone());
+        }
+        let id = args["send_id"].as_str().unwrap_or_default().to_owned();
+        Box::pin(async move {
+            if id == "s1" {
+                let sent = json!({"sent": true, "service": "google_drive"});
+                crate::services::keep_send_for_test(request, Some(&sent));
+                return sent;
+            }
+            if id == "wrong-8" {
+                let _ = last.send(());
+                tokio::time::sleep(Duration::from_millis(300)).await;
+            }
+            json!({"error": crate::services::NOTHING_WAITING})
+        })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    loop {
+        if tried.try_recv().is_ok() {
+            break;
+        }
+        let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+    }
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(5), engine.next())
+            .await
+            .expect("the held line's turn ends");
+        if let ProviderOutput::TurnComplete { request: 2, .. } = event {
+            break;
+        }
+    }
+    let held = script.asked.lock().unwrap().get(1).cloned().unwrap();
+    assert!(
+        held.iter()
+            .any(|message| message.tool_call_id.as_deref() == Some("c1")
+                && message.words().is_some_and(
+                    |told| told.contains("\"sent\":true") && told.contains("google_drive")
+                )),
+        "c1 goes with its own sent result: {held:?}"
+    );
+    assert!(
+        held.iter().all(|message| !(message
+            .tool_call_id
+            .as_deref()
+            .is_some_and(|id| id.starts_with("refused-"))
+            && message
+                .words()
+                .is_some_and(|told| told.contains("\"sent\":true")))),
+        "no refused try shows a success: {held:?}"
+    );
+    assert!(
+        held.iter()
+            .any(|message| message.role == "system" && message.words() == Some(SENT_WRITE_NOTE)),
+        "the note is the sent one: {held:?}"
+    );
+    assert_eq!(
+        writes.lock().unwrap().len(),
+        9,
+        "no service_write ran after the batch"
+    );
+}
