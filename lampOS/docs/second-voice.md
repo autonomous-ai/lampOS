@@ -4424,8 +4424,8 @@ after a take-over, but now for every turn:
       of the thread the next turn is given, since it may name what went
       ([memory.md](memory.md), "A forget's answer stays out of the thread").
     - **The active turn forgets its copied context too.** Once an admitted
-      `forget` or `forget_everything` call returns, including an uncertain
-      failure, the next round starts with the configured character and
+      `forget`, `forget_everything` or `forget_my_face` call returns, including
+      an uncertain failure, the next round starts with the configured character and
       language, the current text-only question, and content-free names and
       outcomes of calls already run. It carries no earlier exchanges,
       memory notes, injected personal names, tool arguments or results,
@@ -4459,13 +4459,18 @@ after a take-over, but now for every turn:
       too: a fresh offer to remember stays audible, and an unsupported new
       keep claim is checked again. Completed non-memory calls retain their
       existing confirmation allowance.
-      This reset does not read the memory service or add a chat round;
-      normal context is composed again on the next turn. A `forget_my_face`
-      call does not trigger this active-turn context reset. When it also
-      runs `forget_everything`, its `face_and_memory` adapter carries the
-      fixed cleanup states and `everything: false`, with a fixed explanation
-      when primary memory is gone but related cleanup remains unconfirmed
-      ([memory.md](memory.md)); this does not add a context reset.
+      The reset itself adds no memory-service read. Dropped work may need
+      fresh planning within the existing round limit; normal context is
+      composed again on the next turn. After `forget_my_face`, the sanitized
+      receipt reports `face_forgotten` independently from
+      `primary_memory_result` (`forgotten` or `uncertain`). An absent memory
+      receipt stays unreported. `old_face_records_kept_apart` preserves the
+      fixed old-record warning; an unknown note becomes
+      `face_cleanup_uncertain`. The three fixed cleanup states survive, but
+      this inner path never introduces `everything: true` because it does
+      not perform the outer setup-name, place, voice-print, journal or
+      reminder cleanup ([memory.md](memory.md)). The same-turn reset also
+      discards a pending rename note already composed before the face call.
       Tests are in `second_provider/tests/after_forget.rs`
       and `held_forget.rs`, with the prior acting-answer case in
       `short_done.rs`; a lamp replay is still needed. This boundary

@@ -3422,6 +3422,16 @@ then use that person's scope:
   place, voice print, setup journal or reminders. Missing cleanup fields
   remain unreported. This adds no
   deletion call and changes no scope, ordering or deadline.
+  On the Second route, an admitted `forget_my_face` also resets the active
+  model context after its call returns, including partial or uncertain
+  receipts. The next request keeps only static instructions, the current
+  question and sanitized call outcomes; earlier history, memory notes,
+  pending rename notes, pictures and raw tool payloads are discarded.
+  Later calls from the old batch are replanned, never executed with the old
+  arguments. A confirmed held face-forget uses the same boundary before
+  round one. Locally refused or held calls do not clear context. This does
+  not retract already generated or queued speech; see
+  [the Second-route boundary](second-voice.md).
   The face asked for is the known person's at the lamp, under the name
   the eyes keep (their known file), whatever name the model wrote: on the
   second route without `LAMP_SECOND_FACE_NAME` the model is never told the
