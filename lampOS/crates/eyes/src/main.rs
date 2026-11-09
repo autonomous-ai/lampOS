@@ -736,11 +736,28 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         /// size, and the known person held through a short miss.
         held: lamp_eyes::who::Held,
     }
-    /// A held check keeps the known file as it was, its time renewed, and
-    /// sure again, as a print kept them (`who::Held::printed_theirs`, #5738); with
+    /// A held check keeps the known file as it was, its time renewed; with
     /// the hold carried to a followed passing id by its print (`who::Held::carry`,
     /// #4885), the known face beside it is rewritten to that id.
     fn keep_held(path: &std::path::Path, who: &Who, carried: bool, near_id: Option<&str>) {
+        // Held unsure, the known file moved aside (`who::hold_unsure`): this
+        // print keeps them, so it is written again, on the carried id or the
+        // one held (#5738).
+        let unsure = lamp_eyes::who::known_unsure_of(path).exists();
+        if unsure && let Some((name, ..)) = who.known.as_ref() {
+            let face = if carried {
+                near_id.map(str::to_owned)
+            } else {
+                lamp_eyes::who::unsure_face(path)
+            };
+            lamp_eyes::who::keep_known(
+                path,
+                Some(name),
+                who.people.id_of(name).as_deref(),
+                face.as_deref(),
+            );
+            return;
+        }
         match who.known.as_ref().filter(|_| carried) {
             Some((name, ..)) => lamp_eyes::who::keep_known(
                 path,
@@ -748,10 +765,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 who.people.id_of(name).as_deref(),
                 near_id,
             ),
-            None => {
-                lamp_eyes::who::renew_known(path);
-                lamp_eyes::who::clear_unsure(path);
-            }
+            None => lamp_eyes::who::renew_known(path),
         }
     }
     /// Counts the remembered person recognised at the lamp, at most once in
@@ -2876,10 +2890,16 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     known.2 = checked;
                                 }
                                 if let Some(path) = &arguments.known_file {
-                                    if unprinted == lamp_eyes::who::Unprinted::Unsure {
-                                        lamp_eyes::who::mark_unsure(path);
+                                    // Unsure: the known file moved aside, so
+                                    // no reader of it sees the name held
+                                    // (`who::hold_unsure`, the Reviewer-lead's
+                                    // P2 on #5743).
+                                    match unprinted {
+                                        lamp_eyes::who::Unprinted::Unsure => {
+                                            lamp_eyes::who::hold_unsure(path)
+                                        }
+                                        _ => lamp_eyes::who::renew_known(path),
                                     }
-                                    lamp_eyes::who::renew_known(path);
                                 }
                             } else {
                                 // Nobody near: nobody known at the lamp.
