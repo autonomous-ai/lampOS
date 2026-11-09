@@ -12195,7 +12195,10 @@ const HELD_REFUSALS: &[&str] = &[crate::known_faces::DONT_TELL, crate::photo_fac
 /// is not undone (the memory owner, 16:49 on #5385). The lone face counts
 /// for saving and recall only ("apply it" 16:43, the PM's reading 16:46):
 /// a rule told to every later session of theirs acts for them beyond that
-/// (the privacy read's P2 on #5592). A `remember` correcting a kept thing
+/// (the privacy read's P2 on #5592), and so does a role (`set_role`,
+/// `end_role`, `LAMP_MEMORY_ROLE`): a guest off camera would end or replace
+/// the owner's standing role (the privacy read on #5385). A `remember`
+/// correcting a kept thing
 /// (`replaces`) and a reminder's cancel or snooze are refused too
 /// ([`one_face_refuses`]).
 const ONE_FACE_REFUSED: &[&str] = &[
@@ -12205,6 +12208,8 @@ const ONE_FACE_REFUSED: &[&str] = &[
     crate::rules::KEEP_RULE,
     crate::rules::LIST_RULES,
     crate::rules::FORGET_RULE,
+    crate::remember::role::SET_ROLE,
+    crate::remember::role::END_ROLE,
     crate::known_faces::TELL,
     crate::photo_faces::YES,
 ];
@@ -12215,7 +12220,7 @@ const ONE_FACE_REFUSED: &[&str] = &[
 const ONE_FACE_REMINDER_CHANGES: [&str; 2] = ["cancel_reminder", "snooze_reminder"];
 
 /// What such a call is told instead of running ([`ONE_FACE_REFUSED`]).
-pub(crate) const ONE_FACE_FORGET: &str = "Nothing was forgotten, changed or agreed: I couldn't see who was talking, so I can't forget anything, correct what I kept, keep or read their standing rules, change their reminders, or take a yes for anyone. Ask them to look at me and say it again.";
+pub(crate) const ONE_FACE_FORGET: &str = "Nothing was forgotten, changed or agreed: I couldn't see who was talking, so I can't forget anything, correct what I kept, keep or read their standing rules, set or end a role, change their reminders, or take a yes for anyone. Ask them to look at me and say it again.";
 
 /// Whether the call `name` with `args` is refused on a line someone's by
 /// the one-face rule with `LAMP_PERSON_SCOPE_ONE_FACE_READS`, with

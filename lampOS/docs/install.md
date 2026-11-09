@@ -290,10 +290,11 @@ would take a Live session past its 32, and its marks, called only after its look
 other installable skills, which their owner puts on; and Laugh glance,
 parked (#1669). A test
 fails on a folder in `lampOS/skills/` that is in neither list. With them a
-product lamp has 40 functions of its own: the voice's own 21 (with
-`LAMP_REPORTS=on`, #2862, `reports_stop` and `reports_state` among them),
-the actions part's 17, Dance's and Pose's `set_pose`, which comes with the
-product since #4135 (`PRODUCT_FUNCTIONS` in
+product lamp has 42 functions of its own: the voice's own 24 (with
+`LAMP_REPORTS=on`, #2862, `reports_stop` and `reports_state` among them,
+and `LAMP_MEMORY_ROLE=on`'s `set_role` and `end_role` since 9 Nov), the
+actions part's 17 and `use_skill`, reaching Dance's `dance` and Pose's
+`set_pose`, which comes with the product since #4135 (`PRODUCT_FUNCTIONS` in
 `crates/update/tests/functions.rs`, which fails if one is left out or the
 count changes). On the product's route a chat request takes 48
 (`second_provider::MAX_TOOLS`), and each offers every one, with the
