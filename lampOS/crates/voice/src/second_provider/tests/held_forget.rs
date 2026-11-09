@@ -1453,6 +1453,56 @@ async fn a_held_memory_forgets_uncertain_result_cannot_copy_old_context() {
     assert_eq!(yes.last(), Some(&Message::user("Yes.")));
 }
 
+#[tokio::test]
+async fn a_face_forgets_partial_cleanup_reaches_the_next_model_request() {
+    let result = crate::remember::face_and_memory(
+        json!({"ok": true}),
+        &json!({
+            "forgotten": true,
+            "everything": false,
+            "room_memory_result": "kept",
+            "sound_consent_result": "uncertain",
+            "face_expression_consent_result": "cleared",
+            "private": "internal-memory canary",
+        }),
+    );
+    let ran = run_seen_from_result(
+        &[(
+            "A",
+            "Forget my face.",
+            Lamp::Calls(FACE, "I could not confirm all related cleanup."),
+            0,
+        )],
+        None,
+        5_803_001,
+        result,
+    )
+    .await;
+    assert_eq!(ran.calls, [(FACE.to_owned(), json!({"name": "A"}))]);
+    assert_eq!(ran.asked.len(), 2);
+    let told = ran.asked[1].last().unwrap();
+    assert_eq!(
+        told,
+        &Message::tool(
+            "c1",
+            json!({
+                "ok": true,
+                "memory": crate::remember::FACE_MEMORY_PARTIAL,
+                "everything": false,
+                "room_memory_result": "kept",
+                "sound_consent_result": "uncertain",
+                "face_expression_consent_result": "cleared",
+            })
+            .to_string(),
+        ),
+    );
+    assert!(
+        !serde_json::to_string(told)
+            .unwrap()
+            .contains("internal-memory canary")
+    );
+}
+
 /// C37 (lamp-06c1, 5 Nov): round 1 was a bare `remember`, and round 2 said
 /// "Was that 'rhinodulus' right? I want to be sure", the word already
 /// kept. With `LAMP_MEMORY_DOUBT_UNDOES` that keep is forgotten by its id
