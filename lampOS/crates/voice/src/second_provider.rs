@@ -14202,9 +14202,12 @@ async fn answer(
                         // An opening that may yet offer to keep waits for
                         // its sentence's end (K2): "Want me to keep" alone
                         // would be said before its offer is known.
+                        // So does a step word in the walk (#5890): its ask
+                        // is read whole before it is said or dropped.
                         if sentences.is_empty()
                             && !queue.started
                             && !crate::remember::may_offer_a_keep(split.pending())
+                            && !crate::onboarding::may_open_a_step(split.pending())
                         {
                             sentences.extend(split.clause().or_else(|| {
                                 shared.first_words.and_then(|words| split.words(words))

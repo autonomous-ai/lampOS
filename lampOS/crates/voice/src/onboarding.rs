@@ -1181,14 +1181,26 @@ pub fn own_words(note: &str) -> Option<&str> {
 
 /// Whether the walk is under way, as the coordinator last read it
 /// ([`Onboarding::under_way`]).
+#[cfg(not(test))]
 static UNDER_WAY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+// Per test thread, so a test's walk never reaches another test's replies.
+#[cfg(test)]
+thread_local! {
+    static UNDER_WAY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
 
 pub(crate) fn set_under_way(on: bool) {
+    #[cfg(not(test))]
     UNDER_WAY.store(on, std::sync::atomic::Ordering::Relaxed);
+    #[cfg(test)]
+    UNDER_WAY.set(on);
 }
 
 pub(crate) fn under_way_now() -> bool {
-    UNDER_WAY.load(std::sync::atomic::Ordering::Relaxed)
+    #[cfg(not(test))]
+    return UNDER_WAY.load(std::sync::atomic::Ordering::Relaxed);
+    #[cfg(test)]
+    UNDER_WAY.get()
 }
 
 /// The model's words for a turn on `line`: while the walk is under way,
@@ -1204,6 +1216,13 @@ pub(crate) fn model_words(text: String, line: &str, under_way: bool) -> String {
     } else {
         text
     }
+}
+
+/// Whether a reply's opening `pending` is held to its clause's end before
+/// it is said: while the walk is under way, when it opens with a step word
+/// or may yet ([`model_words`] reads the whole ask, not its first words).
+pub(crate) fn may_open_a_step(pending: &str) -> bool {
+    under_way_now() && in_language::may_open_a_step(pending)
 }
 
 #[cfg(test)]

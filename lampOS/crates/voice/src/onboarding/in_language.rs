@@ -1734,6 +1734,30 @@ impl Counter {
 /// `text` without the step words ([`Counter`], every language) that `line`
 /// does not say: anywhere in it, or cut off at its end ("Step three:").
 pub(super) fn without_step_words(text: &str, line: &str) -> String {
+    let mut text = text.to_owned();
+    for words in step_words() {
+        if let Some(at) = line.find(&words) {
+            // The line's own step: kept only with its own ask after it;
+            // a step word opening some other ask goes with that ask
+            // (tonight's B: "Step three: tell me one thing..." 12 s
+            // before the walk's "Step three: pet the top of my head.").
+            text = without_other_asks(&text, &words, clause(&line[at + words.len()..]));
+            continue;
+        }
+        if line.contains(words.trim_end()) {
+            continue;
+        }
+        text = text.replace(&words, "");
+        if let Some(kept) = text.strip_suffix(words.trim_end()) {
+            text = kept.trim_end().to_owned();
+        }
+    }
+    text
+}
+
+/// Every step word, every language: "Step one: " .. "Step nine: ", then
+/// "Last step: ".
+fn step_words() -> Vec<String> {
     let languages = [
         None,
         Some(Language::Vietnamese),
@@ -1741,40 +1765,35 @@ pub(super) fn without_step_words(text: &str, line: &str) -> String {
         Some(Language::Chinese),
         Some(Language::Korean),
     ];
-    let mut text = text.to_owned();
-    for language in languages {
-        // "Step one: " .. "Step nine: ", then "Last step: ".
-        let words = (1..=9)
-            .map(|at| Counter::Step {
-                at,
-                of: 10,
-                intro: false,
-            })
-            .chain([Counter::Step {
-                at: 1,
-                of: 1,
-                intro: false,
-            }]);
-        for counter in words {
-            let words = counter.said(language);
-            if let Some(at) = line.find(&words) {
-                // The line's own step: kept only with its own ask after it;
-                // a step word opening some other ask goes with that ask
-                // (tonight's B: "Step three: tell me one thing..." 12 s
-                // before the walk's "Step three: pet the top of my head.").
-                text = without_other_asks(&text, &words, clause(&line[at + words.len()..]));
-                continue;
-            }
-            if line.contains(words.trim_end()) {
-                continue;
-            }
-            text = text.replace(&words, "");
-            if let Some(kept) = text.strip_suffix(words.trim_end()) {
-                text = kept.trim_end().to_owned();
-            }
-        }
-    }
-    text
+    languages
+        .into_iter()
+        .flat_map(|language| {
+            (1..=9)
+                .map(|at| Counter::Step {
+                    at,
+                    of: 10,
+                    intro: false,
+                })
+                .chain([Counter::Step {
+                    at: 1,
+                    of: 1,
+                    intro: false,
+                }])
+                .map(move |counter| counter.said(language))
+        })
+        .collect()
+}
+
+/// Whether `pending`, a reply's opening not yet said, opens with a step
+/// word or may still become one ("Step th"): its clause is then held to its
+/// end, so [`without_step_words`] reads the whole ask (Reviewer-lead's P2 on
+/// #5890: the first piece cut at 4 words, "Step three: tell me").
+pub(super) fn may_open_a_step(pending: &str) -> bool {
+    let pending = pending.trim_start();
+    !pending.is_empty()
+        && step_words()
+            .iter()
+            .any(|words| pending.starts_with(words.trim_end()) || words.starts_with(pending))
 }
 
 /// The clause `text` opens with: up to its first sentence end, kept.
