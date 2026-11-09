@@ -230,7 +230,8 @@ Unknown private fields and enum values are refused. Neither direct calls nor
 `use_skill` can obtain authority through model arguments; both preserve the
 original context and deadlines. Written and Messages requests, including
 `speak=true`, cannot supply spoken context. Ordinary calls retain their
-existing wire. See [requested audio](requested-audio.md) for default-off
+existing wire. Off unless set; on in the product's voice, skills and actions
+units since #5749. See [requested audio](requested-audio.md) for switch-off
 advertisement, confirmation retirement, immutable asset checks and terminal
 cancellation. This does not extend autonomous three-second sound cues.
 

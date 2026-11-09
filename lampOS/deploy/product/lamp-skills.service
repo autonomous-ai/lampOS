@@ -68,6 +68,11 @@ Environment=LAMP_SKILLS_KNOWN_FILE=/run/lampos-eyes/known
 # manage helper alone writes it. An Environment= line, as an older
 # lamp-skills ignores it where it would end at an unknown flag (#2157).
 Environment=LAMP_SKILLS_DEV_DIR=/var/lib/lampOS/skills-dev
+# Music to relax (#1685, #5749): a spoken request for a skill's checked local recording plays it after the
+# confirmation; Stop, an interruption, the privacy slide or mute ends it, and nothing resumes (requested-audio.md).
+# The same line in lamp-voice, lamp-skills and lamp-actions; played on lamp-4ace on 6963 (#2793). Installing
+# the skill (relaxing-music, a Store skill) is separate: with none installed nothing plays.
+Environment=LAMP_REQUESTED_AUDIO=on
 ExecStart=/opt/lampOS/skills/current/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket /run/lampos-actions/call.sock --say-socket /run/lampos-say/say.sock --tools-dir /run/lampos-skills --state-dir /var/lib/lampos-skills-state --zone system
 Restart=on-failure
 RestartSec=5s

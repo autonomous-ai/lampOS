@@ -9,9 +9,11 @@ A person speaking to the lamp can ask a skill to play one fixed local
 recording. Voice says a short confirmation, waits for its confirmed speaker
 retirement, then plays the recording under the same live spoken owner.
 `LAMP_REQUESTED_AUDIO=on` is required in **Voice, Skills and Actions**.
-Only the exact value `on` enables it; it is off by default and is not enabled
-in the repository's product or lamp units. Installing a skill does not
-enable playback.
+Only the exact value `on` enables it; it is off unless set. The product's
+`lamp-voice`, `lamp-skills` and `lamp-actions` units set it since #5749
+(9 Nov); the repository's per-lamp units do not. Installing a skill does not
+enable playback, and with the switch on nothing plays until a requested-audio
+skill such as relaxing-music is installed (from the Skills Store).
 
 Voice also requires an explicit absolute `LAMP_SKILLS_DIR` for the existing
 Skills socket. Missing or invalid optional playback configuration disables
