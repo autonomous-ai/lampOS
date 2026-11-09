@@ -3659,7 +3659,11 @@ after a take-over, but now for every turn:
   set." beside `set_timer`, `set_reminder`, `repeat_reminder` or
   `snooze_reminder`, and "I'll remind you at …" beside those or
   `list_reminders`, which it also answers, each made in any round of the turn (beside calls of another kind, which run, the next round is told only the claimed kind wasn't done and the others mustn't be called again, `action_claim::beside_calls_note`) (a cut answer's carried
-  rounds too). Each round's opening is held only while its words could
+  rounds too), never a round declined with `not_for_me` and asked once more
+  because the lamp was named to a face: that round's calls run none, so
+  none of them backs a claim (Reviewer-three's after-merge P2 on #5215:
+  `[not_for_me, set_timer]`, then "Timer set." said with nothing set). Each
+  round's opening is held only while its words could
   still begin a claim; at the first that fits none, or a claim whose call
   an earlier round made, it goes on as before. A claim with no call yet is
   held to the round's end: beside a call of its kind it is said; beside

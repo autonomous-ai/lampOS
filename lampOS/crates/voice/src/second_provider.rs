@@ -14206,16 +14206,6 @@ async fn answer(
             }
             let first_calls = !called_earlier;
             called_earlier |= !calls.is_empty();
-            // Where this batch starts in the claim evidence, and how many of
-            // its entries were taken out since: a call's own entry is found
-            // by its place, never by its name (#5326).
-            let batch_start = turn_called.len();
-            let mut batch_dropped = 0;
-            turn_called.extend(
-                calls
-                    .iter()
-                    .map(|call| (call.name.clone(), call.args.clone())),
-            );
             if calls.iter().any(|call| call.name == NOT_FOR_ME) {
                 let named = heard
                     && shared
@@ -14252,6 +14242,20 @@ async fn answer(
                 }
                 continue;
             }
+            // Only calls that go on to run back a claim: a round declined
+            // above and asked once more ran none, so none of it is kept
+            // (Reviewer-three's after-merge P2 on #5215: `[not_for_me,
+            // set_timer]` then "Timer set." was said with nothing set).
+            // Where this batch starts in the claim evidence, and how many of
+            // its entries were taken out since: a call's own entry is found
+            // by its place, never by its name (#5326).
+            let batch_start = turn_called.len();
+            let mut batch_dropped = 0;
+            turn_called.extend(
+                calls
+                    .iter()
+                    .map(|call| (call.name.clone(), call.args.clone())),
+            );
             // A look asked by its own call (#1712): the coordinator takes the
             // turn's full look, and the turn ends here; its picture comes in
             // the look turn after it. Only in a turn someone spoke.
