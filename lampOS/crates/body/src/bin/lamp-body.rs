@@ -1097,7 +1097,7 @@ impl LeaseDoor {
                 && self.lease.holds(now)
                 && self.limping.on()
             {
-                let said = lamp_body::lease::Limping::look_refused();
+                let said = lamp_body::lease::Limping::look_refused(&line[..end]);
                 look_answered(&said);
                 out += &said;
             } else if lamp_body::lease::Looking::is_look(&line[..end]) {
@@ -3519,7 +3519,7 @@ mod tests {
             .write_all(b"{\"hold\":{\"for_ms\":5000}}\n{\"limp\":true}\n{\"look\":{\"yaw\":10,\"pitch\":0}}\n")
             .unwrap();
         assert!(door.turn(quiet, now, None, None));
-        assert_eq!(said(), "{\"lease\":\"held\"}\n");
+        assert_eq!(said(), "{\"lease\":\"held\",\"tags\":true}\n");
         assert_eq!(said(), "{\"limp\":\"on\"}\n");
         assert_eq!(
             said(),
@@ -3574,7 +3574,7 @@ mod tests {
         assert!(door.turn(quiet, now, None, None));
         line.clear();
         heard.read_line(&mut line).unwrap();
-        assert_eq!(line, "{\"lease\":\"held\"}\n");
+        assert_eq!(line, "{\"lease\":\"held\",\"tags\":true}\n");
         let aim = door.aim(now).unwrap();
         assert!(aim[0] == 0.0 && (aim[1] + 113.8).abs() < 0.1, "{aim:?}");
         let there = ([1678, 2060, 2012], [1680, 2060, 2012]);
@@ -3643,7 +3643,7 @@ mod tests {
         ));
         line.clear();
         heard.read_line(&mut line).unwrap();
-        assert_eq!(line, "{\"lease\":\"held\"}\n");
+        assert_eq!(line, "{\"lease\":\"held\",\"tags\":true}\n");
         assert_eq!(door.pose(now), Some([0.0, 30.0, 20.0]));
         for _ in 0..=THERE_STEPS {
             door.turn(
@@ -3687,7 +3687,7 @@ mod tests {
         holder.write_all(b"{\"hold\":{\"for_ms\":5000}}\n").unwrap();
         assert!(door.turn(quiet, now, None, None));
         heard.read_line(&mut line).unwrap();
-        assert_eq!(line, "{\"lease\":\"held\"}\n");
+        assert_eq!(line, "{\"lease\":\"held\",\"tags\":true}\n");
         // A conversation suspends it, said unasked.
         let talking = Around {
             conversation: true,
@@ -3696,11 +3696,14 @@ mod tests {
         assert!(!door.turn(talking, now, None, None));
         line.clear();
         heard.read_line(&mut line).unwrap();
-        assert_eq!(line, "{\"lease\":\"suspended\",\"why\":\"conversation\"}\n");
+        assert_eq!(
+            line,
+            "{\"lease\":\"suspended\",\"why\":\"conversation\",\"tags\":true}\n"
+        );
         assert!(door.turn(quiet, now, None, None));
         line.clear();
         heard.read_line(&mut line).unwrap();
-        assert_eq!(line, "{\"lease\":\"held\"}\n");
+        assert_eq!(line, "{\"lease\":\"held\",\"tags\":true}\n");
         // A second holder is refused while there is one.
         let other = UnixStream::connect(&path).unwrap();
         assert!(door.turn(quiet, now, None, None));
@@ -3869,7 +3872,7 @@ mod tests {
         let mut heard = BufReader::new(holder.try_clone().unwrap());
         let mut line = String::new();
         heard.read_line(&mut line).unwrap();
-        assert_eq!(line, "{\"lease\":\"held\"}\n");
+        assert_eq!(line, "{\"lease\":\"held\",\"tags\":true}\n");
         door.ended(Some("slumped"));
         line.clear();
         heard.read_line(&mut line).unwrap();

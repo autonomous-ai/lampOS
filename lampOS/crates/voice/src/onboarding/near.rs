@@ -91,6 +91,13 @@ const LOOK_EVERY_US: u64 = 20_000;
 /// heard as the name. The prompt is offered again under [`MOST_REOFFERS`].
 /// The detector's own allowance, `crate::activity::CALL_BEFORE_US`.
 const OVER_PROMPT_MS: u64 = crate::activity::CALL_BEFORE_US / 1_000;
+/// A name heard beginning while the lamp speaks its prompt, or this soon
+/// after the prompt's end, is the lamp's own "Hey Lamp" or its echo
+/// (lamp-52e6, 9 Nov: hits at 0.96 to 0.997 over and 1.1 s after the
+/// lamp's own prompt): never a call, nor a gap that offers the prompt again.
+/// Only a hearing begun after it is judged on its score. lamp-voice has no
+/// echo tail of its own; this is lamp-body's `first_stand::ECHO_TAIL_US`.
+const ECHO_TAIL_MS: u64 = 1_500;
 /// A prompt cut before it played whole (someone spoke over it), or answered
 /// over its last word ([`OVER_PROMPT_MS`]), is offered again with its own
 /// number, this many times in a step at most.
@@ -103,6 +110,14 @@ const MOST_HEARD_ASKS: u8 = 2;
 /// Why a call try is given back when the second route said its down line
 /// for a line begun in its window (#5563).
 const SLOW: &str = "the provider was slow";
+
+/// PARKED (#4080): the step teaches the call (the lead, 9 Nov): one
+/// accepted call ends it, a miss gets one reminder, and no bar or sentence
+/// is asked. To bring back the three-call bar and the sentence part, set
+/// this to true (the flow's `three_calls` starts from it).
+pub(super) const THREE_CALLS: bool = false;
+/// Teaching the call: its prompts, the first and one reminder (#4080).
+const TEACH_PROMPTS: u8 = 2;
 
 /// Why a gapped prompt with nothing said after it is given back.
 const GAPPED: &str = "the prompt was played with a gap";
@@ -301,6 +316,9 @@ pub(crate) struct NearFlow {
     /// Call tries heard surely and still refused ([`MOST_HEARD_ASKS`]).
     /// Kept across an absence, as `reoffered` is.
     heard_refused: u8,
+    /// PARKED (#4080): the three-call bar and the sentence part, as
+    /// [`THREE_CALLS`] says; off, the step only teaches the call.
+    pub(super) three_calls: bool,
 }
 
 impl NearFlow {
@@ -803,9 +821,10 @@ impl Onboarding {
         }
         offer.claimed = true;
         offer.ready = false;
+        let (sentence, prompt) = (offer.sentence, offer.prompt);
         self.near.answers = false;
         let note = Some(
-            match (offer.sentence, offer.prompt, self.near.short) {
+            match (sentence, prompt, self.near.short) {
                 // Each call prompt answers the last try (#3702).
                 (false, _, _) => match self.near.last {
                     Some(true) => self.definition.words.near_again.as_str(),
@@ -814,10 +833,17 @@ impl Onboarding {
                     Some(false) if self.definition.words.near_missed.is_some() => {
                         self.definition.words.near_missed.as_deref().unwrap()
                     }
-                    _ => self.definition.note(
-                        Step::HowYouSound,
-                        self.desired.steps.contains_key(Step::HowYouSound.name()),
-                    ),
+                    // Its first line opens with the step counter (#4080),
+                    // unless the step is offered again.
+                    _ => {
+                        let again = self.desired.steps.contains_key(Step::HowYouSound.name());
+                        let note = self.definition.note(Step::HowYouSound, again).to_owned();
+                        return Some(if again {
+                            note
+                        } else {
+                            self.counted_note(Step::HowYouSound, note, false)
+                        });
+                    }
                 },
                 (true, 1, _) => self.definition.words.sentence_first.as_str(),
                 (true, _, Some(Short::Level)) => self.definition.words.sentence_louder.as_str(),
@@ -829,7 +855,7 @@ impl Onboarding {
         );
         // The sentence's prompts are the walk's own lines, its exact words
         // said by the route, never the model's (#3769, lamp-52e6 30 Oct 08:22).
-        if offer.sentence {
+        if sentence {
             note.map(super::own_line)
         } else {
             note
@@ -1201,8 +1227,10 @@ impl Onboarding {
                 .seen
                 .iter()
                 .filter_map(|seen| match seen {
-                    Seen::Hearing(hearing, heard_ms) if hearing.score >= SCORE => {
-                        call_began_ms(hearing, *heard_ms, listening.ended_ms)
+                    Seen::Hearing(hearing, _)
+                        if hearing.score >= SCORE && !own_hearing(hearing, listening.ended_ms) =>
+                    {
+                        Some(hearing.began_ms)
                     }
                     _ => None,
                 })
@@ -1239,13 +1267,17 @@ impl Onboarding {
                 _ => None,
             })
             .collect();
-        // A name begun over the prompt's last word ([`OVER_PROMPT_MS`]).
+        // The lamp's own name heard over or just after its prompt
+        // ([`ECHO_TAIL_MS`]): no call, and no gap of the person's.
+        let own_heard = self.near.seen.iter().any(|seen| {
+            matches!(seen, Seen::Hearing(hearing, _) if own_hearing(hearing, listening.ended_ms))
+        });
+        let calls_heard = heard
+            .iter()
+            .any(|(after_ms, _)| *after_ms >= ECHO_TAIL_MS as i64);
+        // A line begun over the prompt's last word ([`OVER_PROMPT_MS`]); a
+        // detector's hearing there is the lamp's own ([`ECHO_TAIL_MS`]).
         let early = self.near.seen.iter().any(|seen| match seen {
-            Seen::Hearing(hearing, heard_ms) => {
-                hearing.began_ms < listening.ended_ms
-                    && hearing.score >= SCORE
-                    && call_began_ms(hearing, *heard_ms, listening.ended_ms).is_some()
-            }
             // Its words came after the prompt, so only its start says it
             // was over the last word.
             Seen::Said(line) => {
@@ -1256,11 +1288,12 @@ impl Onboarding {
         });
         // A call caught only as text is a try too (#3923; Seventh's P3 3 on
         // #4192).
-        if !heard.is_empty() || !said.is_empty() {
+        if calls_heard || !said.is_empty() {
             self.mark_tried(Step::HowYouSound);
         }
-        let (hearings, said_lines, levels, mut spoke, spoiled) = self.near.take_evidence();
-        if listening.gapped && heard.is_empty() && said.is_empty() {
+        let (mut hearings, said_lines, levels, mut spoke, spoiled) = self.near.take_evidence();
+        hearings.retain(|hearing| !own_hearing(hearing, listening.ended_ms));
+        if listening.gapped && !own_heard && !calls_heard && said.is_empty() {
             self.give_prompt_back(false, listening.prompt, GAPPED, now_us);
             return;
         }
@@ -1355,7 +1388,23 @@ impl Onboarding {
         // A name part short of a bar says `near_failed` at the step's end,
         // after the sentence's line, so a step left `later` says only that
         // one line (Seventh's P3 2 on #4192, the Reviewer-lead's P2 on #4269).
-        self.owed = (outcome == Outcome::Done).then(|| self.definition.words.near_done.clone());
+        if self.near.three_calls {
+            self.owed = (outcome == Outcome::Done).then(|| self.definition.words.near_done.clone());
+        }
+    }
+
+    /// Teaching the call ended (#4080): done on one accepted call, failed
+    /// otherwise, missed or none heard, after its one reminder (the lead's
+    /// rule: never `later`, the walk moves on). Its line is said before the
+    /// walk's done line, when this step is last.
+    fn teach_finished(&mut self, now_us: u64) {
+        let (outcome, line) = if self.near.named == Some(Outcome::Done) {
+            (Outcome::Done, self.definition.words.near_done.clone())
+        } else {
+            (Outcome::Failed, self.definition.words.near_failed.clone())
+        };
+        self.finish(Step::HowYouSound, outcome, None, now_us);
+        self.owed_after = self.owed.replace(line);
     }
 
     /// The step being led, with storage idle.
@@ -1378,6 +1427,17 @@ impl Onboarding {
         }
         let sentence = self.near.named.is_some();
         let prompts = *self.prompts(sentence);
+        if sentence && !self.near.three_calls {
+            self.teach_finished(now_us);
+            return;
+        }
+        let again = |prompts: u8, accepted: usize, three: bool| {
+            if three {
+                asks_again(usize::from(prompts), accepted)
+            } else {
+                accepted == 0 && prompts < TEACH_PROMPTS
+            }
+        };
         if sentence {
             // Every sentence prompt was used, its try never judged (a new
             // voice cycle): failed.
@@ -1387,8 +1447,11 @@ impl Onboarding {
             }
         } else if self.near.offer.is_none()
             && self.near.finishing.is_none()
-            && (!asks_again(usize::from(prompts), self.desired.near_call_tries.len())
-                || self.near.heard_refused > MOST_HEARD_ASKS)
+            && (!again(
+                prompts,
+                self.desired.near_call_tries.len(),
+                self.near.three_calls,
+            ) || self.near.heard_refused > MOST_HEARD_ASKS)
         {
             let at_unix_s = (self.unix_clock)() / 1_000;
             self.near.finishing = Some(Calibrated::of(
@@ -1397,7 +1460,10 @@ impl Onboarding {
             ));
         }
         if let Some(calibrated) = self.near.finishing.clone() {
-            let outcome = if calibrated.is_some() {
+            // Teaching, one accepted call is done; no bar is kept, so the
+            // near rule keeps its default (#4080).
+            let called = !self.near.three_calls && !self.desired.near_call_tries.is_empty();
+            let outcome = if calibrated.is_some() || called {
                 Outcome::Done
             } else {
                 Outcome::Failed
@@ -1493,6 +1559,12 @@ impl Onboarding {
 /// hearing, sent at `heard_ms`, came after the end). None for one begun
 /// earlier. A name begun before the end is never measured: the prompt is
 /// offered again (`near_judge`).
+/// A hearing begun before the prompt's end plus [`ECHO_TAIL_MS`]: the
+/// lamp's own voice.
+fn own_hearing(hearing: &Hearing, ended_ms: u64) -> bool {
+    hearing.began_ms < ended_ms.saturating_add(ECHO_TAIL_MS)
+}
+
 fn call_began_ms(hearing: &Hearing, heard_ms: u64, ended_ms: u64) -> Option<u64> {
     if hearing.began_ms >= ended_ms {
         Some(hearing.began_ms)
