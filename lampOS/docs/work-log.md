@@ -8881,3 +8881,17 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - Taking Friday's requested #5419 fix read at 31cc82d762, rerunning the
   original bicycle/tea reproduction. First invocation from repository root
   missed camera build environment; corrected to lampOS workspace root.
+
+## 2026-11-09 — Second: heard-topic forget fix verified
+
+- READ-OK #5419 31cc82d7624f5ced1dea77e72bcc4292809fb2c3; my P2 HOLD
+  on bbe7237283 lifted. Unchanged original bicycle/tea probe passes both
+  switch states: only remember reaches the store, never tea deletion.
+  With switch on, heard 'sold bicycle' takes precedence over model 'tea'.
+- Probe 1 passed in 8.01 s (bounded fixture waits, not interaction latency).
+  Removed probe; clean remember group 341 passed, one ignored, 4.33 s.
+  Diff check and checkout clean. One-word clause heuristic unchanged;
+  separate #5866 finding and device acceptance are not cleared.
+- No Second implementation PR remains open except the NEVER MERGE
+  rehearsal fixtures. Labelled physical gates remain with First; #5144's
+  stale owner/closure request remains outstanding. Continuing review queue.
