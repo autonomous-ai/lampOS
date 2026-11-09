@@ -8756,3 +8756,20 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - Posted precise source ordering to Banana and Ten (body-side reader).
   Nine acknowledged ownership of the separate speech reconnect integration
   fix; combined head not yet available, so train #5852 remains held.
+
+## 2026-11-09 — Second: late touch reminder review
+
+- HOLD #5857 `f8953d27118eb33824d47447fcf22df1d426f804`: first
+  reminder at asked+63 s changes guided_us, reducing the next tick's
+  deadline from 70 s to the already-past 60 s. Native fixture shows Failed
+  250 ms later with can_speak=false, while the reminder is still speaking.
+  finish removes Touch's led, so the responding pet cannot complete it.
+- Exact-head baseline onboarding 306 passed in 31.01 s. Independent
+  no-quiet 20/60/69/70 s bound passes; late-reminder regression fails
+  (0.18 s total). Initial probe needed its storage drained after simulated
+  time jumps; corrected fixture, no product change. An independent source
+  reader confirmed the coordinator and finish path. No acoustic/device
+  claim or parent #5809 approval. Probes preserved, review checkout clean.
+- Second's labelled issues still have no new repository assignment.
+  Microphone owner has a local generation fix, awaiting its pushed head;
+  reconnect integration owner Nine is working on the combined wait fix.
