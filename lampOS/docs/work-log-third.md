@@ -1,3 +1,36 @@
+## 2026-11-09 — bounded touch-response check
+
+- With both face fixes ready and no assigned/unowned lamp interaction
+  issue available, traced Controls qualification, bus publication, Voice
+  intake and the head-tap cue at source 507fab1ff. No source change.
+- Controls qualifies a head touch at 20 ms, polls at 1 ms with the slide
+  route / 2 ms otherwise. A quiet tap is qualified release from 120 ms;
+  it is not promised on initial contact. Speaking-touch cancellation and
+  the quiet tap's local hum do not wait for a model request. Bus filesystem
+  work and physical scheduling remain outside a hard host-only guarantee.
+- Four existing functional checks passed: socket wait wakes on the touch
+  (existing median-under-100-ms bound), head touch stops an active answer,
+  quiet tap dispatches its local hum, thinking tap preserves the answer.
+- Existing manual host probes passed, Mac x86_64: real bus state/event to
+  Voice poll, 100 samples each. Product-default wait-off: first 2.730 ms,
+  repeated median 1.807 / p95 2.714 / worst 3.259 ms. Optional wait-on:
+  first 0.534 ms, repeated median 0.540 / p95 0.721 / worst 0.954 ms.
+  The product switch stays off as its existing device gate requires.
+- Coordinator tap-cue decision to first speaker-transport reservation,
+  50 samples: median 2.479 / p95 2.695 / worst 2.752 ms. This probe does
+  not separately print first-use timing. No pad, GPIO qualification,
+  physical speaker, acoustic, or complete end-to-end latency claim; these
+  separate measurements cannot simply be added as an end-to-end result.
+- Commands: `cargo test -q -p lamp-voice --lib <named filter> --
+  --test-threads=1`; manual filters `head_touch_bus_to_poll_latency` and
+  `head_tap_cue_decision_to_speaker_dispatch_latency` additionally used
+  `--ignored --nocapture`. TMPDIR=/tmp/q, jobs=2, shared local cache;
+  Unix test sockets allowed outside sandbox. Logs /private/tmp/third-touch-*.log.
+- Ten-minute integration watch completed without a merge of #5792,
+  #5874 or #5878. All three remained CLEAN/OPEN. Train759 had already
+  selected #5881/#5873/#5863; face changes await a following train.
+  No background watcher remains, no device action, code checkout clean.
+
 ## 2026-11-09 — both face fixes ready for integration
 
 - #5874 d3db5014f is out of draft, NEXT TRAIN 6744008572 / Queue
