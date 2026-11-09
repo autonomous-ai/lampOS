@@ -143,6 +143,11 @@ It replaces the three-agent `harness send` route of 12 October.
 - Keep Harness, agent sessions, browsing and new long-term memory infrastructure
   out of this release. Preserve only the future task and shared-context boundaries
   in the architecture; do not implement them or make live chat depend on them.
+- Any pull request that adds or changes an SDK op, event, grant, refusal,
+  limit or status updates [sdk/GUIDE.md](sdk/GUIDE.md) in the same pull
+  request, with the date the status was last verified; the SDK tests check
+  that every op, event and grant name in `docs/control.schema.json` appears
+  in it.
 - Owner instruction: all code comments, documentation, and notes are English
   only. Keep documentation in this directory, normally `docs/`. This explicit
   instruction overrides any inherited translation requirements.
