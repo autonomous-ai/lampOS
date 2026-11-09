@@ -376,7 +376,11 @@ with `Z` (`2026-10-27T08:40:01Z`): convert it to local time yourself. `welcome`,
 - `phrase.heard`: `phrase`, one this computer registered; never what else was said. Grant
   `hear`. **A known bug on the customer build (9 Nov):** a subscribed phrase was not
   delivered, though the lamp heard the line. Don't build on it until it's marked fixed.
-- `name.heard`: no fields: the lamp's name was called. Grant `hear`. Works today (9 Nov 2026).
+- `name.heard`: no fields on the customer build: the lamp's name was called. Grant `hear`.
+  Works today (9 Nov 2026). A sound like the name can wake the lamp, so a `name.heard` may
+  come with nobody calling; next build (#5836) adds `score` (0–1, how sure the listener was;
+  real calls score 0.90 to 1.00), so a program that acts on its own can ask for more, e.g.
+  `if event.get("score", 0) >= 0.99`.
 - `sound.heard`: `class` (`knock`, `music`, ...), `score`. Grant `sound`. In today's build,
   lamp run pending.
 - `touch`: `kind` (`tap`, `pet`, `hold`), `where`. No grant. In today's build, lamp run pending.
@@ -488,7 +492,7 @@ await Lamp.keep_connected(setup)
 | event | status |
 |---|---|
 | `name.heard` | **works today** (verified 9 Nov 2026, a computer received it on the customer build) |
-| `phrase.heard` | **known bug (9 Nov):** on the customer build a subscribed phrase was not delivered, though the lamp heard the line. Reproduced as working on a development host; the cause on the lamp is being traced. Don't build on it until it's marked fixed |
+| `phrase.heard` | **known bug (9 Nov):** on the customer build a subscribed phrase was not delivered, though the lamp heard the line. A fix is in development. Reproduced as working on a development host; the cause on the lamp is being traced. Don't build on it until it's marked fixed |
 | `lamp.changed`, `touch`, `button`, `person.*`, `hand`, `sound.heard`, `air.changed`, `volume.changed`, `body.state` | see "Every function" and "Each part of the lamp" |
 
 **The planned topics for a brain** (planned): a brain on the lamp gets the same events through its own local socket, plus, with the owner's consent, the lines the person speaks to the lamp while the brain holds the conversation lease.
@@ -719,7 +723,7 @@ You don't need this to use the SDKs; it's for anyone writing their own client or
 
 The `hello`'s `sig` and the pairing proof are left out. They are signatures, never to be shared. `limits` here shows a developer lamp with rates off, the default.
 
-**On the next build** (in review), a motion's end comes back the same way. These are real messages from a development build on the test lamp, 9 Nov:
+**On the next build** (#5835, in review), a motion's end comes back the same way. These are real messages from a development build on the test lamp, 9 Nov:
 
 ```text
 -> {"id":4,"op":"move","step_ms":100,"frames":[[0,0,0,0,0], ... ,[0,0,0,0,0]]}
@@ -761,7 +765,7 @@ Events as they came to the SDK, with nothing removed but secrets:
 ```json
 {"ev": "name.heard", "at": "2026-11-09T07:54:02Z"}
 ```
-on the customer build's lamp-control (10824), and with the score in review:
+on the customer build's lamp-control (10824), and with the score (next build, #5836):
 ```json
 {"ev": "name.heard", "at": "2026-11-09T08:55:45Z", "score": 1.0}
 ```
@@ -790,11 +794,12 @@ Last verified 9 Nov 2026, on a test lamp running the customer build (10824).
 | Look ahead or to an angle; joints yaw and pitch | works today (9 Nov 2026) | |
 | Your own `move` | works today (9 Nov 2026) | |
 | Events: the name called (`name.heard`) | works today (9 Nov 2026) | about 1.9 s after the line ends |
+| `name.heard` says how sure it is (`score`) | next build (#5836) | a `name.heard` can come with nobody calling today |
 | Leases, and the person coming first | works today (9 Nov 2026) | |
 | Turns: start a turn | works today (9 Nov 2026) | the lamp's own model answers the turn |
 | Turns: end a turn, the program's own mute | in today's build, lamp run pending | ending a turn that hasn't begun yet is refused `busy`; `stop()` drops it |
 | Events: arrival, a tap, the rest | in today's build, lamp run pending | |
-| `phrase.heard` | in today's build, lamp run pending | a known bug on the customer build (9 Nov): a subscribed phrase was not delivered, though the lamp heard the line; don't build on it until it's marked fixed |
+| `phrase.heard` | in today's build, lamp run pending | a known bug on the customer build (9 Nov): a subscribed phrase was not delivered, though the lamp heard the line; don't build on it until it's marked fixed; the fix is in development |
 | Follow a hand | in today's build, lamp run pending | the follow loop runs on the lamp |
 | Camera snapshot and stream | works today (9 Nov 2026) | about 2 frames a second at about 320 px today |
 | Volume | works today (9 Nov 2026) | set, step and read; `volume.changed` not yet shown |
@@ -806,7 +811,9 @@ Last verified 9 Nov 2026, on a test lamp running the customer build (10824).
 | Knowing when a motion ended (`wait=True`) | next build, lamp run pending | today it returns when the lamp takes it |
 | Reconnecting across the lamp's restarts | next build (#5833) | `keep_connected` |
 | `joints` for roll, shoulder, elbow | in development | refused "not routed yet" today |
-| The microphone stream, with the owner's consent | in development | built and tested off the lamp |
+| The microphone stream, with the owner's consent | in development (draft #5839) | built and tested off the lamp; its lamp check is pending |
+| `look` and `joints` with `wait=True` return the body's own answer | next build (#5837, in review) | so a program sees when a conversation came first |
+| lamp-mcp's `lamp_say` waits until the line is said | next build (#5849, in review) | today it answers when the voice takes the line |
 | A brain hearing the person and owning the turn | planned | |
 | A partner's brain installed on an edition lamp | planned | |
 | `play` a recorded move by name | in development | refused "not routed yet: waits for client packages"; send it as `move` |
