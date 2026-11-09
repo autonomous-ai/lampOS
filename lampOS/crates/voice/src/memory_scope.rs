@@ -1098,9 +1098,11 @@ impl ScopeLease {
     /// Whose scope this line's `remember` goes to by the one-face rule
     /// ([`Self::take_by_one_face`], [`Self::keep_for_one_face`]), while the
     /// lease is current and no narrow came after. Never a read, a forget or
-    /// a yes: only a keep reads it. The one named exception is the held face
-    /// rename behind `LAMP_NAMES_RENAME_YES`, whose yes it may take, as a
-    /// written risk accepted (`second_provider::held_rename`, docs/eyes.md).
+    /// a yes: only a keep reads it, and the done-already note of a yes after
+    /// that keep (`remember::done_for_yes_in`, a note only). The one named
+    /// exception is the held face rename behind `LAMP_NAMES_RENAME_YES`,
+    /// whose yes it may take, as a written risk accepted
+    /// (`second_provider::held_rename`, docs/eyes.md).
     pub fn kept_by_one_face(&self) -> Option<String> {
         if !self.is_current() {
             return None;
@@ -1122,8 +1124,12 @@ impl ScopeLease {
     /// person's scope and then the room's on a real no-match there
     /// (`remember::run_one_face_forget`), each re-checked right before its
     /// run.
-    /// Every read (`recall`, hits, notes, context) stays the room's, and
-    /// `forget_everything` and a held forget's yes are never theirs by it.
+    /// Every read (`recall`, hits, notes, context) stays the room's, except
+    /// a yes's done-already lookup (`remember::done_for_yes_in`), which asks
+    /// it for `remember` and finds only that person's done keep or change
+    /// from the last turn, never their forget: a note only, nothing read,
+    /// forgotten or retired. `forget_everything` and a held forget's yes are
+    /// never theirs by it.
     /// `None` for any other call, and whenever [`Self::kept_by_one_face`]
     /// is: a revoked line, one narrowed after, or none taken (a second
     /// face, no known face, another voice).
