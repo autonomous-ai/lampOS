@@ -814,9 +814,10 @@ impl Onboarding {
         }
         offer.claimed = true;
         offer.ready = false;
+        let (sentence, prompt) = (offer.sentence, offer.prompt);
         self.near.answers = false;
         let note = Some(
-            match (offer.sentence, offer.prompt, self.near.short) {
+            match (sentence, prompt, self.near.short) {
                 // Each call prompt answers the last try (#3702).
                 (false, _, _) => match self.near.last {
                     Some(true) => self.definition.words.near_again.as_str(),
@@ -825,10 +826,17 @@ impl Onboarding {
                     Some(false) if self.definition.words.near_missed.is_some() => {
                         self.definition.words.near_missed.as_deref().unwrap()
                     }
-                    _ => self.definition.note(
-                        Step::HowYouSound,
-                        self.desired.steps.contains_key(Step::HowYouSound.name()),
-                    ),
+                    // Its first line opens with the step counter (#4080),
+                    // unless the step is offered again.
+                    _ => {
+                        let again = self.desired.steps.contains_key(Step::HowYouSound.name());
+                        let note = self.definition.note(Step::HowYouSound, again).to_owned();
+                        return Some(if again {
+                            note
+                        } else {
+                            self.counted_note(Step::HowYouSound, note, false)
+                        });
+                    }
                 },
                 (true, 1, _) => self.definition.words.sentence_first.as_str(),
                 (true, _, Some(Short::Level)) => self.definition.words.sentence_louder.as_str(),
@@ -840,7 +848,7 @@ impl Onboarding {
         );
         // The sentence's prompts are the walk's own lines, its exact words
         // said by the route, never the model's (#3769, lamp-52e6 30 Oct 08:22).
-        if offer.sentence {
+        if sentence {
             note.map(super::own_line)
         } else {
             note

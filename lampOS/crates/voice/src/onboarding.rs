@@ -1040,6 +1040,12 @@ pub struct Onboarding {
     /// lead's rule makes it failed. True brings `later` back (its tests
     /// keep the `later` re-offers tested through it).
     touch_later: bool,
+    /// The step counter (#4080, the lead, 9 Nov): the intro says how many
+    /// steps, each step opens with its step word ("Step one:" .. "Last step:").
+    /// Off only in tests that pin the steps' own lines.
+    counted: bool,
+    /// A redo of this one step: said alone, never counted (#4080).
+    redoing_one: Option<Step>,
     privacy_flow: PrivacyFlow,
     near: near::NearFlow,
     giving: giving_way::GivingWayFlow,
@@ -1291,6 +1297,8 @@ impl Onboarding {
             touches: None,
             pet_response_until_us: None,
             touch_later: false,
+            counted: true,
+            redoing_one: None,
         }
     }
 
@@ -1536,6 +1544,12 @@ impl Onboarding {
         }
     }
 
+    /// The step words off, for tests that pin a step's own line (#4080).
+    #[cfg(test)]
+    pub(crate) fn uncounted_for_test(&mut self) {
+        self.counted = false;
+    }
+
     #[cfg(test)]
     pub(crate) fn drain_storage_for_test(&mut self, now_us: u64) {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
@@ -1615,6 +1629,36 @@ impl Onboarding {
     /// Whether this voice has the step now: privacy only with a verified
     /// location and receipts, how they sound only with the near-call path,
     /// touch only with Controls' touches to read.
+    /// Where `step` stands in the walk (#4080): its place among the steps
+    /// in `order` that are available, and how many those are, so a step
+    /// with no hardware never makes the count wrong. None with the counter
+    /// off, for a one-step redo, or for a step out of the order.
+    fn step_count(&self, step: Step) -> Option<(usize, usize)> {
+        if !self.counted || self.redoing_one == Some(step) {
+            return None;
+        }
+        let offered: Vec<Step> = self
+            .definition
+            .order
+            .iter()
+            .copied()
+            .filter(|step| self.step_available(*step))
+            .collect();
+        let at = offered.iter().position(|offered| *offered == step)?;
+        Some((at + 1, offered.len()))
+    }
+
+    /// A step's first ask with its counter (#4080): "Step N of M." opens
+    /// its line; the walk's intro also says how many steps there are.
+    fn counted_note(&self, step: Step, note: String, intro: bool) -> String {
+        match self.step_count(step) {
+            Some((at, of)) => {
+                in_language::with_counter(&note, in_language::Counter::Step { at, of, intro })
+            }
+            None => note,
+        }
+    }
+
     fn step_available(&self, step: Step) -> bool {
         match step {
             Step::Privacy => self.privacy_available(),
@@ -3047,7 +3091,9 @@ impl Onboarding {
                 // Bound to its turn, so one never said is asked again at
                 // once ([`Self::first_note_finished`]).
                 self.opener_said = true;
-                return Some(self.definition.note(step, opened).into());
+                let note = self.definition.note(step, opened).to_owned();
+                let intro = step == Step::WhereYouSit && !opened;
+                return Some(self.counted_note(step, note, intro));
             }
             return None;
         };
@@ -3592,9 +3638,14 @@ impl Onboarding {
                 && self.definition.order.last() == Some(&step)
                 && matches!(outcome, Outcome::Done | Outcome::Skipped | Outcome::Failed))
         {
-            self.owed = Some(self.preferences_done().to_owned());
+            let done = self.preferences_done().to_owned();
+            // "All done, {Name}!" when the walk knows the name (#4080).
+            self.owed = Some(in_language::with_name(&done, self.desired.owner.as_deref()));
             // Dated once per setup, for the app (`Progress::done_at_unix_ms`).
             self.desired.done_at_unix_ms.get_or_insert_with(unix_ms);
+        }
+        if self.redoing_one == Some(step) {
+            self.redoing_one = None;
         }
         if self.led.as_ref().is_some_and(|led| led.step == step) {
             self.led = None;
@@ -3817,6 +3868,7 @@ impl Onboarding {
         self.storage_failed = false;
         self.desired.steps.remove(step.name());
         self.desired.yes_redone(step.name());
+        self.redoing_one = Some(step);
         match step {
             Step::HowYouSound => {
                 self.forget_near();
@@ -3949,6 +4001,7 @@ impl Onboarding {
                 self.privacy_flow.waited_out = false;
                 self.privacy_flow.generation = 0;
                 self.desired = self.desired.redone();
+                self.redoing_one = None;
                 self.opener_turn = None;
                 self.opener_unsaid = 0;
                 self.led = None;
@@ -5319,6 +5372,13 @@ mod tests {
 
     /// A room at rest: the lamp's own notes are the only thing said, and
     /// each is taken as said the moment it is begun.
+    /// A walk with the step words off: these tests pin the steps' own
+    /// lines (#4080).
+    fn uncounted(mut walk: Onboarding) -> Onboarding {
+        walk.counted = false;
+        walk
+    }
+
     struct Room {
         walk: Onboarding,
         at: u64,
@@ -5329,8 +5389,12 @@ mod tests {
 
     impl Room {
         fn new(name: &str) -> Self {
+            let mut walk = Onboarding::at(file(name));
+            // These tests pin the steps' own lines; the counter (#4080) has
+            // its own.
+            walk.counted = false;
             Self {
-                walk: Onboarding::at(file(name)),
+                walk,
                 at: 0,
                 said: 0,
                 still: true,
@@ -5606,7 +5670,7 @@ mod tests {
         assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
         // Kept across a restart: nothing is asked again.
         let mut again = Room {
-            walk: Onboarding::at(room.walk.file.clone()),
+            walk: uncounted(Onboarding::at(room.walk.file.clone())),
             at: 0,
             said: 0,
             still: true,
@@ -5917,7 +5981,7 @@ mod tests {
         assert_eq!(room.outcome(Step::Preferences), Some(Outcome::NotAvailable));
         // The same voice: nothing more is offered.
         let mut same = Room {
-            walk: Onboarding::at(room.walk.file.clone()),
+            walk: uncounted(Onboarding::at(room.walk.file.clone())),
             at: 0,
             said: 0,
             still: true,
@@ -5927,7 +5991,7 @@ mod tests {
         assert_eq!(same.wait(30 * S, Some(NEAR_MIDDLE)), NONE);
         // A later voice that has it: offered, after the walk.
         let mut later = Room {
-            walk: Onboarding::at(room.walk.file.clone()),
+            walk: uncounted(Onboarding::at(room.walk.file.clone())),
             at: 0,
             said: 0,
             still: true,
@@ -6921,6 +6985,94 @@ mod tests {
         assert_eq!(room.outcome(Step::WhoYouAre), None);
         room.wait(2 * S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+    }
+
+    /// #4080: the step words follow the offered order: a step with no
+    /// hardware is left out of the count, the intro says how many, and the
+    /// last offered step is "Last step"; said in the owner's language too.
+    #[test]
+    fn the_step_words_count_only_the_offered_steps() {
+        let mut room = Room::new("counted");
+        room.walk.definition =
+            Arc::new(skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap());
+        room.walk.counted = true;
+        room.walk.set_near_available(true);
+        // No Controls on this walk's bus: touch is not offered.
+        assert_eq!(room.walk.step_count(Step::WhereYouSit), Some((1, 3)));
+        assert_eq!(room.walk.step_count(Step::WhoYouAre), Some((2, 3)));
+        assert_eq!(room.walk.step_count(Step::Touch), None);
+        assert_eq!(room.walk.step_count(Step::HowYouSound), Some((3, 3)));
+        let opener = "(Say only this, nothing before or after it: \"Hi! I'm your lamp. Let's get to know each other. Three quick steps, about two minutes. Step one: sit where you usually sit, and look at me.\")";
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [opener]);
+        let said = in_language::said(
+            opener.to_owned(),
+            Some(crate::language::Language::Vietnamese),
+        );
+        assert!(
+            said.contains("Có ba bước nhanh, khoảng hai phút. Bước một: bạn ngồi"),
+            "{said}"
+        );
+        report(&room.walk, "where_you_sit", "skipped");
+        let notes = room.wait(4 * S, Some(NEAR_MIDDLE));
+        assert_eq!(notes[0], WHERE_YOU_SIT_SKIPPED);
+        assert!(
+            notes[1].contains("Ask exactly this: \"Step two: what should I call you?\""),
+            "{notes:?}"
+        );
+        // With touch offered too, how you sound is still the last.
+        let last = in_language::with_counter(
+            NEAR_FIRST,
+            in_language::Counter::Step {
+                at: 4,
+                of: 4,
+                intro: false,
+            },
+        );
+        assert!(
+            last.contains("\"Last step: when you want me, start with 'Hey Lamp'."),
+            "{last}"
+        );
+        let third = in_language::with_counter(
+            TOUCH_NOTE,
+            in_language::Counter::Step {
+                at: 3,
+                of: 4,
+                intro: false,
+            },
+        );
+        assert!(
+            third.contains("\"Step three: pet the top of my head.\""),
+            "{third}"
+        );
+    }
+
+    /// #4080: a redo of one step says just that step, with no step word,
+    /// and the walk's end says the name it knows.
+    #[test]
+    fn a_redo_of_one_step_says_it_without_a_step_word() {
+        let mut room = Room::new("counted-redo");
+        room.walk.definition = two_steps();
+        room.walk.counted = true;
+        room.walk
+            .finish(Step::WhereYouSit, Outcome::Done, None, room.at);
+        room.walk
+            .finish(Step::WhoYouAre, Outcome::Done, None, room.at);
+        room.walk.drain_storage_for_test(room.at);
+        room.walk.owed = None;
+        room.walk.owed_after = None;
+        room.walk.redo_step(Step::WhoYouAre, room.at);
+        assert_eq!(room.walk.step_count(Step::WhoYouAre), None);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        room.walk.desired.owner = Some("Mia".into());
+        report(&room.walk, "who_you_are", "done");
+        let notes = room.wait(4 * S, Some(NEAR_MIDDLE));
+        assert_eq!(
+            notes.last().map(String::as_str),
+            Some(
+                "(Say only this, nothing before or after it: \"All done, Mia! You can add more skills in the Autonomous app. Now, ask me anything.\")"
+            ),
+            "{notes:?}"
+        );
     }
 
     /// The shipped skill cut to #5499's two-step walk (the order before
@@ -7924,7 +8076,7 @@ mod tests {
     /// Harness signed out.
     fn restarted(room: &Room) -> Room {
         let mut again = Room {
-            walk: Onboarding::at(room.walk.file.clone()),
+            walk: uncounted(Onboarding::at(room.walk.file.clone())),
             at: room.at,
             said: room.said,
             still: true,
@@ -9067,7 +9219,7 @@ mod tests {
         assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_OFFER]);
         // A restart mid-step keeps that the intro was said.
         let mut restarted = Room {
-            walk: Onboarding::at(room.walk.file.clone()),
+            walk: uncounted(Onboarding::at(room.walk.file.clone())),
             at: 0,
             said: 0,
             still: true,
@@ -9699,7 +9851,7 @@ mod tests {
         room.wait(4 * S, Some(NEAR_MIDDLE));
         // A walk rebuilt (a restart, a mute) does not ask again.
         let mut again = Room {
-            walk: Onboarding::at(room.walk.file.clone()),
+            walk: uncounted(Onboarding::at(room.walk.file.clone())),
             at: 0,
             said: 0,
             still: true,
@@ -9736,7 +9888,7 @@ mod tests {
         std::fs::write(&file, serde_json::to_vec(&written).unwrap()).unwrap();
         let known = room.walk.kept().steps.clone();
         let mut again = Room {
-            walk: Onboarding::at(file.clone()),
+            walk: uncounted(Onboarding::at(file.clone())),
             at: 0,
             said: 0,
             still: true,
@@ -9770,7 +9922,7 @@ mod tests {
         report(&room.walk, "preferences", "done");
         room.wait(4 * S, Some(NEAR_MIDDLE));
         let mut again = Room {
-            walk: Onboarding::at(room.walk.file.clone()),
+            walk: uncounted(Onboarding::at(room.walk.file.clone())),
             at: 0,
             said: 0,
             still: true,
@@ -9830,7 +9982,7 @@ mod tests {
         report(&room.walk, "preferences", "done");
         room.wait(4 * S, Some(NEAR_MIDDLE));
         let mut again = Room {
-            walk: Onboarding::at(room.walk.file.clone()),
+            walk: uncounted(Onboarding::at(room.walk.file.clone())),
             at: 0,
             said: 0,
             still: true,
@@ -9871,7 +10023,7 @@ mod tests {
         report(&room.walk, "preferences", "done");
         room.wait(4 * S, Some(NEAR_MIDDLE));
         let mut again = Room {
-            walk: Onboarding::at(room.walk.file.clone()),
+            walk: uncounted(Onboarding::at(room.walk.file.clone())),
             at: 0,
             said: 0,
             still: true,
