@@ -417,6 +417,9 @@ Environment=LAMP_SCHEDULE_ASKED=on
 # And a line that is only a plain question about the person's reminders calls list_reminders (lamp-52e6, 9 Nov:
 # "what reminders do I have?" was answered in words with no call in 2 of 8 asks).
 Environment=LAMP_REMINDERS_ASKED=on
+# And a line that is only a plain ask for a light scene or a light show calls its skill (lamp-52e6, 9 Nov: "movie
+# light" and "show me a light show" were answered in words and no call, and the light never changed).
+Environment=LAMP_SKILL_ASKED=on
 # A line is a known person's only when their own face was seen speaking it, else the room's (#3437, reviewer-three's
 # P1 and P2 on #3435): so what the memory keeps without being asked, and "forget everything about me", reach only
 # the person who said it.
