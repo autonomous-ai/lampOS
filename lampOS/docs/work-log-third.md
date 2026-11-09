@@ -1,3 +1,25 @@
+## 2026-11-09 — interrupted forget fix published
+
+- El's HOLD 6742634543 reproduced: cutting the awaited face or ordinary
+  forget carried old recall results into the actual resumed request.
+  Added synchronous carried-round clearing before both runner awaits;
+  kept rename clearing and the post-return context reset.
+- Standalone fix `7d6633bb85b634dfdc2a73681d9b2ac05b0d5f9d` pushed
+  on #5878. Two fail-first regressions plus known-person held-confirmation
+  control pass 3/3; the latter is not claimed as fail-first. Earlier fixture
+  setup failures remain documented separately from product evidence.
+- Local gate exited 0: fmt, strict all-target Clippy for 14 packages,
+  workspace build, 163 focused tests (one manual timing case ignored),
+  docs 192/1898/0 broken. Native fix-head ARM64 42640206486 and Linux
+  42640206498 run; docs 42640206540 passed. No new admission timing or
+  device measurement claimed.
+- Requested El's explicit HOLD reread and Fourth's independent read/
+  composition in 6743268079. Fourth must preserve the name clear, new
+  carried-round clear and speech fence before awaiting. Draft remains.
+- Prior train756 native gates finished: context 170cf2d1c 14,909 passed /
+  111 skipped; adapter 67fc27f35 14,901 passed / 110 skipped. These do not
+  clear the new interruption finding. Adapter still needs reader placement.
+
 ## 2026-11-09 — train 756 local face integration complete
 
 - Context `170cf2d1c`: gate exited 0, including 146 functional tests;
