@@ -1312,6 +1312,8 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `the journal could not be read (…): kept as …, and the units are taken as they are` | a `journal.json` it can't parse is set aside, and the round goes on (#1505) |
 | `putting build N back: the switch was cut short (lamp-update stopped, or the lamp lost power)` | a journal left by a switch that didn't finish: that build is put back |
 | **What the build brings** | |
+| `lamp-update.service is not carried by rounds; its installed unit is kept` | a new product build is planned and the installed updater unit is a regular file; policy only, since the manifest has no candidate text for it |
+| `… is kept: only comments, blank lines or trailing whitespace differ` | a carried unit has such text differences and the plan leaves it unchanged; never for a unit being rewritten with a binary or setting change |
 | `installed … beside …` | each new folder, a self-switch's or a climb's updater too |
 | `fetched … into …` | a model the build pins, fetched into the model store |
 | `kept …: it is not the pinned model` | a model file at a path of its own that isn't the pinned one: the lamp's, kept |
