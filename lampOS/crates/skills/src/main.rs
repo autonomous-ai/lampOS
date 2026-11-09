@@ -2916,6 +2916,29 @@ fn tool_call(
     if run.calls.contains(&Call::PrepareUnplug) && !lamp_body::unplug::enabled() {
         return refuse("Preparing to unplug is not enabled. Do not unplug on my confirmation.");
     }
+    // A turn toward a place needs the body's measured gaze, and lamp-body
+    // listens on its gaze socket only with `--gaze` (a factory lamp has
+    // none): without it the turn would do nothing and say nothing, so the
+    // call is refused and the model told to ask for the thing in front
+    // (#5766's P2). The pose already held stays.
+    if run.calls.iter().any(|call| {
+        matches!(
+            call,
+            Call::Mood {
+                toward: Some(_),
+                ..
+            }
+        )
+    }) && UnixDatagram::unbound()
+        .and_then(|probe| probe.connect(&sockets.gaze))
+        .is_err()
+    {
+        eprintln!(
+            "lamp-skills: {name} with {args} not run: the body has no measured gaze to turn toward a place ({} not listened on)",
+            sockets.gaze.display()
+        );
+        return refuse(lamp_skills::CANNOT_TURN);
+    }
     let made: Vec<Call> = run
         .calls
         .iter()
