@@ -9427,3 +9427,20 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   and Gmail timeout do not bound masking. Author/El/Thirteen notified.
   Synthetic only, no live mail. Tests removed; scripts/logs retained as
   /tmp/second-5893-mask-cost{,-opt}.rs/.log. El owns formal second read.
+
+## 2026-11-09 — Second: bounded masking performance HOLD lifted
+
+- Scoped READ-OK #5893 df2fc214cb, 6744818615; Second's performance HOLD
+  on3edc77cdee explicitly lifted. El retains full second privacy read.
+- Same optimized-services host boundary api_item to masked_subject:
+  16,393bytes57.8ms to0.304ms;65,548bytes872.2ms to0.208ms;
+  262,153bytes13.603s to0.137ms. All outputs515bytes (512+ellipsis).
+  Caps precede normalization/masking; line bounds and password lookups
+  avoid the demonstrated repeated full-line searches.
+- Full services86pass0.35s plus independent probe1pass0.03s, same
+  package opt-level3/default-dev-dependency configuration. No Google,
+  full-release or device timing claim. Probe removed, checkout clean;
+  /tmp/second-5893-mask-fixed.log retains results.
+- Train759 merged caca127702f; complete tree equals audited df8a9dea9e.
+  PM reports11091 promoted23:01 (run42650114550), still older than this
+  reconnect-repair train. No release mutation by Second.
