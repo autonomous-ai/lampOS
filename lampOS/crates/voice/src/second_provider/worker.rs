@@ -4488,13 +4488,8 @@ pub fn serve(
                         "lamp-voice second: a line that is only the lamp's name, with no words back, is answered as a call only when lamp-name heard it at {} or more (LAMP_NAME_WORDLESS_BAR)",
                         crate::second_provider::wordless_call::BAR
                     );
-                    let hearings = Mutex::new(hearings);
-                    engine = engine.holding_a_wordless_call(Arc::new(move |window| {
-                        hearings
-                            .lock()
-                            .ok()
-                            .and_then(|mut heard| heard.best(window))
-                    }));
+                    engine = engine
+                        .holding_a_wordless_call(Arc::new(move |window| hearings.best(window)));
                 }
                 Some(Err(why)) => eprintln!(
                     "lamp-voice second: a wordless call is answered as before: lamp-name's hearings cannot be taken from the bus: {why} (LAMP_NAME_WORDLESS_BAR)"
