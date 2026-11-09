@@ -154,27 +154,28 @@ Python names first, JavaScript where it differs.
 | Capability | lamp-control | Python / JS | lamp-mcp | Status | Owner | Validated |
 |---|---|---|---|---|---|---|
 | Pair a computer, connect | `pair`, `hello` | `pair`, `connect` | (paired at start) | done; no mDNS announcement on any build, so pair with `--host` | Nine | 75c9, 9 Nov, stable 10824's binaries, by blue: paired through a code with `--host lamp-75c9.local`, `hello` |
-| Who is there (never who) | `get presence` | `get("presence")` | `lamp_state`, `lamp://state/presence` | done | Nine | not yet |
-| The light now | `get light` | `get("light")` | `lamp_state` | done | Nine | not yet |
-| The lamp's mood | `get mood` | `get("mood")` | `lamp_state` | done | Nine | not yet |
-| Talking, paused, private, asleep | `get lamp`, `lamp.changed` | `get("lamp")`, `on("lamp.changed")` | `lamp_state`, `lamp_events` | done (quiet hours not produced yet) | Nine | not yet |
+| Who is there (never who) | `get presence` | `get("presence")` | `lamp_state`, `lamp://state/presence` | done | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): `{count: 0, near: 0.0, facing: false}` with nobody in view |
+| The light now | `get light` | `get("light")` | `lamp_state` | done | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): the person's light read (`blue`, level 1, off) with `shows` |
+| The lamp's mood | `get mood` | `get("mood")` | `lamp_state` | done | Nine | not yet: on 75c9 (10824) `mood` answered `null`, no mood state on the bus then |
+| Talking, paused, private, asleep | `get lamp`, `lamp.changed` | `get("lamp")`, `on("lamp.changed")` | `lamp_state`, `lamp_events` | done (quiet hours not produced yet) | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): `get lamp` answered; `lamp.changed` not seen (nothing changed in the run) |
 | A stored grant a build doesn't know: kept, not granted | lamp-control's start (#4936) | — | — | done | harness-reviewer | 75c9, 2 Nov, harness-reviewer's run (root steps by the local leader): an unknown stored grant kept and written back, only `light` granted |
-| The door's limits | `hello` `limits` | `lamp.limits` | — | done; policy-only limits lifted, rates and quiet hours off | Nine | not yet |
+| The door's limits | `hello` `limits` | `lamp.limits` | — | done; policy-only limits lifted, rates and quiet hours off | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): `rates: off`, `lease_max_ms` 600000, `say_max_bytes` 900, `ring.pixels` 32 |
 | lamp-control on every lamp | product unit | — | — | done: on stable, off until the owner turns developer access on in the app | Nine | not yet |
 
 ### Body
 
 | Capability | lamp-control | Python / JS | lamp-mcp | Status | Owner | Validated |
 |---|---|---|---|---|---|---|
-| Hold the body | `lease.take/renew/release` | `lease("body")` / `withLease` | `lamp://lease`, held per call | done | Nine | not yet |
-| Built-in gestures | `gesture` | `gesture` | `lamp_gesture` | done | Nine | not yet |
-| A feeling in body and light | `express` | `express` | `lamp_express` | done (3 feelings) | Nine | not yet |
-| Look at face, hand, name, angle | `look` | `look` | `lamp_look` | done for `ahead` and an angle; `hand` is in development (the lamp doesn't track hands yet, see Follow a hand); `face` and `name` "not in this release". On a resting lamp a look may end `cut_short` on stable 10824 (fixed on lamp-voice, #5711) | Nine | not yet |
+| Hold the body | `lease.take/renew/release` | `lease("body")` / `withLease` | `lamp://lease`, held per call | done | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): `lease.take` held, `release`d |
+| Built-in gestures | `gesture` | `gesture` | `lamp_gesture` | done | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): `nod` played (the body's journal: `gesture nod`, `gesture over` 3 s later) |
+| A feeling in body and light | `express` | `express` | `lamp_express` | done (3 feelings) | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): `glad` 0.6: `glad-lift` played; light "the light is off" (the person's light was off) |
+| Look at face, hand, name, angle | `look` | `look` | `lamp_look` | done for `ahead` and an angle; `hand` is in development (the lamp doesn't track hands yet, see Follow a hand); `face` and `name` "not in this release". On a resting lamp a look may end `cut_short` on stable 10824 (fixed on lamp-voice, #5711) | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): `look` yaw 15 taken; `look` at `face` refused "not in this release: look at a face or a name" |
 | Follow a hand | `look at hand` | `follow_hand` / `followHand` | `lamp_follow_hand`, `lamp_follow_stop` | in development: the door is in; nothing publishes `humans/hands/tracked` and lamp-body refuses `follow` | Nine | not yet |
 | Each joint (pitch, roll, yaw, shoulder, elbow) | `joints` | `joints` | `lamp_joints` | `yaw` and `pitch` only; `roll`, `shoulder`, `elbow` refused "not routed yet" | Ten | 75c9, 7 Nov, stable 10579: pitch alone went; roll refused (again 9 Nov, 10824) |
-| A move of your own | `move` | `move` | `lamp_move` | done | Nine | not yet |
+| A move of your own | `move` | `move` | `lamp_move` | done | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): a 2 s yaw move played (`gesture control`, `over` 2 s later) |
 | A recorded move | `play` | `play` | `lamp_play` | in the clients; lamp-control refuses it, "not routed yet: waits for client packages" | Nine | refused as written: 75c9, 9 Nov, 10824 |
 | A new motion interrupts the one playing | `gesture`, `move`, `express` replace | (no new call) | — | on lamp-voice (`6167fe37a1`), not on stable 10824, which refuses `busy` with `retry_ms` | Nine | not yet |
+| A motion's end told: `wait` ends when it has | `done` on gesture, move, express; hello `limits.motion_done` | `wait=True` / `{ wait: true }` | `lamp_gesture`, `lamp_move` | next build (#5835); stable 10824 returns at the answer | Nine | 75c9, 9 Nov, lamp-built lamp-control and lamp-body: each wait matched the body's own start and end (a 2 s move 2075 ms; a replaced move `cut_short`) |
 | Each joint's degrees, bounds and caps | `get body` | `get("body")` | `lamp_state` | done | Ten | 75c9, 7 Nov, stable 10579: known, each joint's range |
 | Where each joint is, live; model and twin | `body.state` | model, JS twin | — | done on lamp-voice (#4564); not on stable 10824 | Eighth | 75c9, 9 Nov, #4564's lamp-control: 12.5 events a second |
 | Record a move from poses (degrees, eased) | `move`, made by the client | `move_poses`, `poses_to_frames` / `movePoses`, `posesToFrames` | `lamp_move_poses` | done in the clients (it sends `move`, which stable 10824 takes) | Ten | 75c9, 9 Nov, stock 10824: played 2.8 s as computed; a 40° pose refused before sending |

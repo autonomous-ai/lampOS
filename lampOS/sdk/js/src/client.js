@@ -37,7 +37,10 @@ export const RECONNECT_PAUSES = Object.freeze([1, 2, 5, 10]);
 // The actions lamp-control answers `{"to":"body"}` with no `done` after
 // (docs/control.md): a wait for them ends at that answer. `say` and
 // `turn.start` answer `{"to":"voice"}` and their `done` does follow.
-export const ENDS_AT_REPLY = new Set(['gesture', 'move']);
+// Ended at their answer by a lamp-control that doesn't say `motion_done` in
+// hello's limits (from before #4209): it hands them to the body and says
+// nothing back.
+export const ENDS_AT_REPLY = new Set(['gesture', 'move', 'express']);
 // A phrase's floor in letters and digits, lamp-control's PHRASE_MIN_LETTERS.
 // The SDK's check is a pre-check: it may let through what the lamp refuses,
 // never the other way.
@@ -486,10 +489,11 @@ export class Lamp {
     // and every id is this call's own.
     try { check(op, clean); } catch (error) { return Promise.reject(error); }
     const id = this.nextId++;
-    // Handed to the body, which says nothing back, `gesture` and `move` get
-    // no `done` (docs/control.md): their wait ends at the answer, so none is
-    // kept for them.
-    const done = wait && !ENDS_AT_REPLY.has(op)
+    // A lamp that says `motion_done` ends `gesture`, `move` and an express's
+    // move with a `done` once the body says what became of them; on one that
+    // doesn't, their wait ends at the answer, so none is kept for them.
+    const atReply = ENDS_AT_REPLY.has(op) && !this.limits?.motion_done;
+    const done = wait && !atReply
       ? new Promise((resolve, reject) => this.done.set(id, { resolve, reject }))
       : null;
     // A close rejects every `done`; when it comes before the reply, `taken`
@@ -501,7 +505,15 @@ export class Lamp {
     if (!done) return taken;
     // A refused action takes its `done` back, so nothing is left to reject,
     // unheard, when the connection closes.
-    return taken.then(() => done, (error) => { this.done.delete(id); throw error; });
+    // An express too slight to move (`"move": null`) sends the body nothing,
+    // so no `done` follows: its wait ends at the answer.
+    return taken.then(
+      (reply) => {
+        if (op === 'express' && reply.move == null) { this.done.delete(id); return reply; }
+        return done;
+      },
+      (error) => { this.done.delete(id); throw error; },
+    );
   }
 
   frame(frame) {
@@ -598,7 +610,7 @@ export class Lamp {
     try { return await body(lease); } finally { await lease.release(); }
   }
 
-  express(feeling, strength) { return this.act('express', { feeling, strength }); }
+  express(feeling, strength, { wait = false } = {}) { return this.act('express', { feeling, strength }, wait); }
   gesture(name, { wait = false } = {}) { return this.act('gesture', { name }, wait); }
   // Turn the head (`at`, or `{ yaw, pitch }` in degrees). Its answer when the
   // door takes it; with `wait`, the body's `done` instead: `finished` with
@@ -657,7 +669,7 @@ export class Lamp {
   }
   // Say `text` in the lamp's voice, exactly as written, once the person isn't talking; `{ rephrase: true }` lets the
   // lamp's model say it in its own words instead, as before.
-  say(text, { rephrase } = {}) { return this.act('say', { text, rephrase: rephrase ? true : undefined }); }
+  say(text, { rephrase, wait = false } = {}) { return this.act('say', { text, rephrase: rephrase ? true : undefined }, wait); }
   // The speaker's volume, the person's own: one of `to` (0-100), `step` ('up' or 'down'), or `mute` (true or
   // false). Resolves to the level it left, `{ level, muted }`.
   async volume({ to, step, mute } = {}) {

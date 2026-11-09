@@ -562,8 +562,9 @@ def test_actions_send_the_schemas_fields_and_wait_for_done(tmp_path):
                 await lamp.light("warm", 3, 10_000, pattern="breathe")
                 await lamp.say("Build passed.")
                 await lamp.express("glad")
-                taken = await lamp.gesture("nod", wait=True)
-                assert taken["to"] == "body"
+                # The lamp says `motion_done`: the wait returns the gesture's `done`.
+                ended = await lamp.gesture("nod", wait=True)
+                assert (ended["ev"], ended["how"]) == ("done", "finished")
                 await lamp.stop()
             assert fake.asked("light") == [{"colour": "warm", "level": 3, "pattern": "breathe", "for_ms": 10000}]
             assert fake.asked("say") == [{"text": "Build passed."}]
@@ -1366,9 +1367,10 @@ def test_a_refusal_awaited_after_it_came_is_the_callers_alone(tmp_path):
 
 def test_a_waiting_gesture_or_move_returns_at_the_bodys_answer(tmp_path):
     async def go():
-        # lamp-control's reply shape: `{"re":N,"ok":true,"to":"body"}` and no
-        # `done` after it; auto_done off, so nothing else ever comes.
-        async with FakeLamp(auto_done=False) as fake:
+        # A lamp-control from before #4209 (no `motion_done` in hello's
+        # limits): `{"re":N,"ok":true,"to":"body"}` and no `done` after it;
+        # auto_done off, so nothing else ever comes.
+        async with FakeLamp(auto_done=False, motion_done=False) as fake:
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 async with lamp.lease("body", for_ms=5000):
@@ -1376,6 +1378,64 @@ def test_a_waiting_gesture_or_move_returns_at_the_bodys_answer(tmp_path):
                     move = await asyncio.wait_for(lamp.move(PLAYABLE, 500, wait=True), timeout=2)
                 assert (nod["ok"], nod["to"]) == (True, "body")
                 assert (move["ok"], move["to"]) == (True, "body")
+                assert lamp._done == {}
+
+    run(go())
+
+
+def test_a_waiting_motion_ends_at_its_done_where_the_lamp_says_motion_done(tmp_path):
+    async def go():
+        # #4209: hello's limits say `motion_done`, so `wait=True` returns the
+        # `done` the lamp sends once the body says what became of the motion:
+        # `finished` at its end, or `dropped` with the body's why.
+        async with FakeLamp(auto_done=False) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                assert lamp.limits["motion_done"] is True
+                async with lamp.lease("body", for_ms=5000):
+                    nod = asyncio.ensure_future(lamp.gesture("nod", wait=True))
+                    await asyncio.sleep(0.2)
+                    assert not nod.done(), "a wait that ended before the motion's done"
+                    asked = next(r for r in fake.requests if r["op"] == "gesture")
+                    await fake.done(asked["id"])
+                    assert (await asyncio.wait_for(nod, timeout=2))["how"] == "finished"
+                    move = asyncio.ensure_future(lamp.move(PLAYABLE, 500, wait=True))
+                    await asyncio.sleep(0.2)
+                    asked = next(r for r in fake.requests if r["op"] == "move")
+                    await fake.done(asked["id"], "dropped", "dropped: the person is using the lamp")
+                    dropped = await asyncio.wait_for(move, timeout=2)
+                assert (dropped["how"], dropped["why"]) == ("dropped", "dropped: the person is using the lamp")
+                glad = asyncio.ensure_future(lamp.express("glad", wait=True))
+                await asyncio.sleep(0.2)
+                assert not glad.done(), "an express's wait that ended before its move's done"
+                asked = next(r for r in fake.requests if r["op"] == "express")
+                await fake.done(asked["id"])
+                assert (await asyncio.wait_for(glad, timeout=2))["how"] == "finished"
+                # Too slight to move: no move, no `done`, the answer at once.
+                still = await asyncio.wait_for(lamp.express("glad", 0.01, wait=True), timeout=2)
+                assert (still["to"], still["move"]) == ("body", None)
+                assert lamp._done == {}
+
+    run(go())
+
+
+def test_a_waiting_say_ends_at_its_done(tmp_path):
+    async def go():
+        # A say's `done` comes once the voice has said it: `wait=True`
+        # returns it, `dropped` with the voice's why too.
+        async with FakeLamp(auto_done=False) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                said = asyncio.ensure_future(lamp.say("Word for word.", wait=True))
+                await asyncio.sleep(0.2)
+                assert not said.done(), "a say's wait that ended before its done"
+                await fake.done(next(r["id"] for r in fake.requests if r["op"] == "say"))
+                assert (await asyncio.wait_for(said, timeout=2))["how"] == "finished"
+                dropped = asyncio.ensure_future(lamp.say("Not now.", wait=True))
+                await asyncio.sleep(0.2)
+                asked = [r["id"] for r in fake.requests if r["op"] == "say"][-1]
+                await fake.done(asked, "dropped", "dropped: the lamp is private")
+                assert (await asyncio.wait_for(dropped, timeout=2))["how"] == "dropped"
                 assert lamp._done == {}
 
     run(go())
@@ -1428,7 +1488,7 @@ def test_wait_closed_woken_by_a_refusal_taken_elsewhere_keeps_waiting(tmp_path):
 
 def test_a_waiting_gesture_keeps_no_done(tmp_path):
     async def go():
-        async with FakeLamp(auto_done=False) as fake:
+        async with FakeLamp(auto_done=False, motion_done=False) as fake:
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 pending = asyncio.ensure_future(lamp.gesture("nod", wait=True))

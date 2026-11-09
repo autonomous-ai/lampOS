@@ -64,6 +64,15 @@ pub trait Parts {
     fn gone(&mut self, client: &str, now_us: u64) {
         self.stop(client, now_us);
     }
+    /// Whether a `gesture`, `move` or feeling's move gets a `done` once
+    /// the body says what became of it (#4209), told in hello's `limits`
+    /// as `motion_done`.
+    fn motion_done(&self) -> bool {
+        false
+    }
+    /// The connection the next `act` or `reply` is for, told just before
+    /// it: a part that tells an action's end later sends it there alone.
+    fn asking(&mut self, _connection: Option<u64>) {}
 }
 
 /// A part's answer: now, or what to run off the door's lock for it.
@@ -156,6 +165,10 @@ pub struct Session {
     /// From beyond the lamp's own network (`--remote on`): never the camera
     /// or the microphone.
     remote: bool,
+    /// The server's number for this connection, so an action's later word
+    /// (a motion's `done`) goes to this connection alone, never another of
+    /// the same computer's (Second's P2 on #5835).
+    connection: Option<u64>,
 }
 
 /// What a computer beyond the lamp's own network is told when it asks for
@@ -164,6 +177,15 @@ pub const LOCAL_ONLY: &str = "local network only: the camera and the microphone 
 
 impl Session {
     /// This connection comes from beyond the lamp's own network.
+    /// The server's number for this connection.
+    pub fn set_connection(&mut self, connection: u64) {
+        self.connection = Some(connection);
+    }
+
+    pub fn connection(&self) -> Option<u64> {
+        self.connection
+    }
+
     pub fn set_remote(&mut self) {
         self.remote = true;
     }
@@ -516,6 +538,7 @@ impl Door {
             events: BTreeSet::new(),
             phrases: Vec::new(),
             remote: false,
+            connection: None,
         };
         use base64::Engine as _;
         let welcome = json!({
@@ -719,7 +742,9 @@ impl Door {
                 }
                 return outcome;
             }
-            Op::Hello { client, sig } => return self.hello(session, re, client, sig),
+            Op::Hello { client, sig } => {
+                return self.hello(session, re, client, sig, parts.motion_done());
+            }
             _ => {}
         }
         let Some(client) = session.client.clone() else {
@@ -1075,6 +1100,7 @@ impl Door {
             error.retry_ms = Some(retry_ms);
             return reply_refused(Some(re), error);
         }
+        parts.asking(session.connection);
         match parts.reply(&client, re, &op, now_us) {
             Ok(reply) => {
                 // Counted only once the part took it.
@@ -1189,7 +1215,14 @@ impl Door {
         ok(re, json!({"client": id, "grants": grants}))
     }
 
-    fn hello(&mut self, session: &mut Session, re: u64, client: &str, sig: &str) -> Outcome {
+    fn hello(
+        &mut self,
+        session: &mut Session,
+        re: u64,
+        client: &str,
+        sig: &str,
+        motion_done: bool,
+    ) -> Outcome {
         // One hello a connection, so its count of open connections stays
         // right (the Reviewer-lead's P3: a second id kept the first's
         // leases open after it closed).
@@ -1213,15 +1246,21 @@ impl Door {
         let grants = paired.grants.clone();
         *self.open.entry(client.to_owned()).or_default() += 1;
         session.client = Some(client.to_owned());
+        let mut limits = limits(
+            self.quiet.as_ref().and_then(|quiet| quiet.window),
+            self.rates.lifted(),
+        );
+        // A gesture's, a move's and a feeling's move's `done` (#4209): told
+        // so an SDK waits for it only where it comes.
+        if motion_done {
+            limits["motion_done"] = json!(true);
+        }
         ok(
             re,
             json!({
                 "lamp": self.lamp,
                 "grants": grants,
-                "limits": limits(
-                    self.quiet.as_ref().and_then(|quiet| quiet.window),
-                    self.rates.lifted()
-                ),
+                "limits": limits,
             }),
         )
     }

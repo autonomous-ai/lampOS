@@ -22,6 +22,7 @@ pub mod feelings;
 pub mod journal;
 pub mod lease;
 pub mod microphone;
+pub mod motion_done;
 pub mod notes;
 pub mod pairing;
 pub mod parts;
