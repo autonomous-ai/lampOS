@@ -31,6 +31,102 @@ fn arguments(value: Option<&str>) -> Vec<String> {
     }
 }
 
+/// What the model is told when a recording offer is refused because the line
+/// that led to the call did not ask for one ([`asks_to_play`]).
+pub const NOT_ASKED_TO_PLAY: &str = "Nothing is playing and nothing will: a recording plays only when what they said asks you to play it, in words such as \"play some music\" or \"can you put on something relaxing\". Talk about music is not an ask. Do not say you are playing anything or that you will; answer what they said.";
+
+/// What may stand before the ask at a sentence's start.
+const BEFORE: &[&str] = &[
+    "hey", "hi", "hello", "ok", "okay", "lamp", "so", "and", "oh", "now", "please", "just",
+];
+/// "Can you …", "Could I …", "I'd like to …", "Let's …": a lead-in to the ask.
+const LEAD_INS: &[&[&str]] = &[
+    &["can", "you"],
+    &["could", "you"],
+    &["would", "you"],
+    &["will", "you"],
+    &["can", "i"],
+    &["could", "i"],
+    &["may", "i"],
+    &["can", "we"],
+    &["could", "we"],
+    &["i", "want", "to"],
+    &["i", "wanna"],
+    &["i'd", "like", "to"],
+    &["i", "would", "like", "to"],
+    &["let's"],
+    &["lets"],
+    &["let", "me"],
+    &["let", "us"],
+];
+/// The asks themselves, right after any [`BEFORE`] words and one lead-in.
+const ASKS: &[&[&str]] = &[
+    &["play"],
+    &["put", "on"],
+    &["put", "some"],
+    &["put", "something"],
+    &["turn", "on"],
+    &["start"],
+    &["hear"],
+    &["listen", "to"],
+    // Vietnamese, accents folded: "mở nhạc", "bật nhạc", "phát nhạc",
+    // "cho tôi nghe".
+    &["mo", "nhac"],
+    &["bat", "nhac"],
+    &["phat", "nhac"],
+    &["mo", "bai"],
+    &["bat", "bai"],
+    &["phat", "bai"],
+    &["cho", "toi", "nghe"],
+    &["cho", "minh", "nghe"],
+    &["cho", "em", "nghe"],
+];
+/// A word that, anywhere in the sentence, takes the ask back or turns it
+/// into something else ("don't play anything", "đừng mở nhạc").
+const NOT: &[&str] = &["don't", "dont", "not", "never", "no", "stop", "dung"];
+
+/// Whether `said`, the line that led to a requested-audio call, plainly asks
+/// to play something (#5764). Some sentence of it must start, past greetings
+/// ([`BEFORE`]) and at most one lead-in ([`LEAD_INS`]), with an ask
+/// ([`ASKS`]), and hold none of [`NOT`]. On lamp-52e6 on 9 Nov, "Lamp, I
+/// listened to some relaxing music on the train this morning, it was really
+/// nice." got a `use_skill` call to the relaxing-music skill: talk about
+/// music, not an ask, so it is refused here, not left to the skill's text.
+/// "Lamp, can you play some relaxing music?" and "Put on something calm,
+/// please." ask.
+// ponytail: an English and Vietnamese word list, not a classifier; an ask in
+// another language or phrasing is refused (the model is told so, and the
+// person can say it plainly). Widen ASKS when a lamp run shows one.
+pub fn asks_to_play(said: &str) -> bool {
+    said.split(['.', '!', '?', ';']).any(|sentence| {
+        let words = crate::known_faces::folded_words(sentence);
+        if words.iter().any(|word| NOT.contains(&word.as_str())) {
+            return false;
+        }
+        let starts = |at: usize, phrase: &[&str]| {
+            words.len() >= at + phrase.len()
+                && words[at..at + phrase.len()]
+                    .iter()
+                    .zip(phrase)
+                    .all(|(word, want)| word == want)
+        };
+        let mut at = 0;
+        while words
+            .get(at)
+            .is_some_and(|word| BEFORE.contains(&word.as_str()))
+        {
+            at += 1;
+        }
+        if let Some(lead) = LEAD_INS.iter().find(|lead| starts(at, lead)) {
+            at += lead.len();
+            if words.get(at).is_some_and(|word| word == "please") {
+                at += 1;
+            }
+        }
+        ASKS.iter().any(|ask| starts(at, ask))
+    })
+}
+
 /// Samples and the digest of the exact file image from which they were decoded.
 /// Later edits to the path cannot change this recording's bytes.
 #[derive(Debug)]
@@ -131,5 +227,40 @@ mod tests {
         assert_eq!(checked.sha256, format!("{:x}", Sha256::digest(&bytes)));
         assert_ne!(checked.sha256, read_sound(&file).unwrap().sha256);
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #5764: case on3a's two lines talk about music and ask nothing; the
+    /// first got a `use_skill` call on lamp-52e6 on 9 Nov (request 15).
+    #[test]
+    fn only_a_line_that_asks_to_play_is_an_ask() {
+        for talk in [
+            "Lamp, I listened to some relaxing music on the train this morning, it was really nice.",
+            "Lamp, what kind of music helps people relax?",
+            "I love relaxing music.",
+            "Lamp, don't play anything, I'm on a call.",
+            "Can you not play music right now?",
+            "My sister plays the piano every night.",
+            "I want to know which songs calm a baby.",
+            "Tôi đã nghe nhạc trên tàu sáng nay.",
+            "Đừng mở nhạc nhé.",
+            "",
+        ] {
+            assert!(!asks_to_play(talk), "{talk}");
+        }
+        for ask in [
+            "Lamp, can you play some relaxing music?",
+            "Play some relaxing music.",
+            "Hey lamp, please play something calm.",
+            "Put on something relaxing, please.",
+            "Could you please put some music on?",
+            "I'd like to hear some relaxing music.",
+            "I'm stressed. Play something quiet.",
+            "Let's listen to some music.",
+            "Please play a quiet recording.",
+            "Lamp, mở nhạc thư giãn đi.",
+            "Bật nhạc cho mình nhé.",
+        ] {
+            assert!(asks_to_play(ask), "{ask}");
+        }
     }
 }
