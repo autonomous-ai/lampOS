@@ -7088,3 +7088,39 @@ fn a_build_without_the_same_voice_check_still_installs() {
         "{said:?}"
     );
 }
+
+/// Guard mode, an installable skill from the Store (#5752, #1685): the
+/// product carries its texts with skills' lines alone and describes its
+/// tool off first, and opens nothing more of it. Texts from the app, names,
+/// arrivals by sound and turning it on from the app stay off.
+#[test]
+fn the_product_carries_guard_modes_texts_alone_and_its_off_first_words() {
+    let unit = |name: &str| {
+        let text = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1;
+        section(text, "Service")
+    };
+    let cloud = unit("lamp-cloud.service");
+    let skills = unit("lamp-skills.service");
+    assert!(
+        cloud.contains(&"Environment=LAMP_SKILL_MESSAGES=on"),
+        "the cloud lacks LAMP_SKILL_MESSAGES=on"
+    );
+    assert!(
+        skills.contains(&"Environment=LAMP_GUARD_WORDS_V2=on"),
+        "the skills lack LAMP_GUARD_WORDS_V2=on"
+    );
+    for line in cloud.iter().chain(&skills) {
+        for closed in [
+            "LAMP_MESSAGES=",
+            "LAMP_GUARD_NAMES=",
+            "LAMP_GUARD_SOUNDS=",
+            "LAMP_GUARD_FROM_APP=",
+        ] {
+            assert!(!line.contains(&format!("Environment={closed}")), "{line}");
+        }
+    }
+}

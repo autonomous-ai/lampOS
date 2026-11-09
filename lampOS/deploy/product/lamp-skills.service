@@ -62,6 +62,9 @@ Environment=LAMP_SKILLS_DAILY_FILE=/var/lib/lampos-skills-state/daily.json
 # LAMP_WHO_WAS_HERE_KNOWN=on. An Environment= line too, as --known-file is as new as guard mode
 # (19 Oct) and would end an older lamp-skills at its start (#2157).
 Environment=LAMP_SKILLS_KNOWN_FILE=/run/lampos-eyes/known
+# Guard mode's tool described off first (#2827, #5752): "I'm back" turns it off; lamp-06c1, 22 Oct, 5 of 5 off
+# and 5 of 5 on. Its names, sounds and turning it on from the app stay off until their own lamp checks.
+Environment=LAMP_GUARD_WORDS_V2=on
 # The developer folder: skills a paired computer pushed over lamp-control
 # (#3869, docs/skills.md "Skills pushed from a computer"), loaded after the
 # skills folder and held to the protocol's grants. Read only here; the
