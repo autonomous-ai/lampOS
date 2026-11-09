@@ -76,8 +76,10 @@ whole-suite success, real-model behavior or the separate acoustic stop target.
 The unadmitted-forget control starts from words asking only for a send. The
 model proposes a face forget after the send completes, and the test waits
 until the refused call has actually appeared in a subsequent model request
-before cutting again. It requires no forget-runner admission or speech cut,
-retains the original receipt canaries, and still prevents a repeated write.
+before cutting again. It requires no forget-runner admission, retains the
+original receipt canaries, and still prevents a repeated write. The control
+does not inspect the separate playback extension's `Engine::speech_cut` API,
+so it can be carried to the context-only stack without that dependency.
 
 The late-receipt control holds the original send beyond its modeled deadline,
 then waits for actual face-forget runner admission before releasing the send.
@@ -123,3 +125,20 @@ truthful content-free status after late success, and admission crossing a
 previously cloned receipt before publication. Existing multiple-attempt,
 latest-origin and reused-call-ID controls do not themselves include forget;
 they must continue passing and the redaction must remain bound to each attempt.
+
+## Context-only portability follow-up
+
+Removed only the unadmitted-forget control's playback-specific
+`Engine::speech_cut()` assertion. Its runner-admission, retained payload and
+duplicate-send assertions remain unchanged. On the corrected source, Rust
+1.96.0 with DEBUG0, incremental off, two build jobs and a short owned TMPDIR:
+
+```sh
+cargo +1.96.0 test --offline -q -p lamp-voice --lib an_unadmitted_face_forget_keeps_send_payload_and_repeat_protection -- --test-threads=1
+```
+
+One passed, zero failed/ignored, 0.04 s test body. Diff and docs checks pass
+(192 documents, 1,901 links, zero broken). This was the positive portability
+control only; the full module and expected-failing privacy controls were not
+rerun for this assertion-only correction. Their earlier failures remain
+recorded above. No production change or privacy-HOLD clearance is claimed.
