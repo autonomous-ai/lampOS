@@ -9761,7 +9761,9 @@ fn carry_round(shared: &Shared, request: u64, round: &[Message]) {
     }
 }
 
-/// `request`'s carried rounds dropped, after a memory forget (#4848).
+/// `request`'s carried rounds dropped at forget admission, before its
+/// runner is awaited: a cut during deletion must not carry earlier results
+/// into the resumed request (#4848, #5878).
 fn drop_carried_rounds(shared: &Shared, request: u64) {
     if let Ok(mut in_flight) = shared.in_flight.lock()
         && let Some(carried) = in_flight
@@ -13076,6 +13078,7 @@ async fn answer(
                 // they asked to forget it.
                 if crate::remember::is_forget(&call.name) {
                     held_rename::forgot(shared, request);
+                    drop_carried_rounds(shared, request);
                 }
                 let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
@@ -14900,6 +14903,7 @@ async fn answer(
                 // #5792). Run or failed, they asked to forget it.
                 if crate::remember::is_forget(&call.name) {
                     held_rename::forgot(shared, request);
+                    drop_carried_rounds(shared, request);
                 }
                 let mut answer = match (&shared.requested_audio, spoken) {
                     (Some((worker_boot, runner)), Some(turn)) if turn.captured => {
@@ -15111,8 +15115,9 @@ async fn answer(
                 }
             }
             // Every call answered: the round goes with the words if a line
-            // cuts them now (#5026). After a memory forget, no round before
-            // it goes (#4848): they hold what the forget discarded.
+            // cuts them now (#5026). After a forget, no round before it
+            // goes (#4848): admission already cleared the retained rounds,
+            // and this old batch must not put them back.
             if forgot_this_round {
                 drop_carried_rounds(shared, request);
             } else {
