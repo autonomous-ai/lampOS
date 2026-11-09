@@ -41,7 +41,17 @@
 //! reminder or alarm set ("I've set a timer …", "Timer set for one minute"),
 //! the light or volume changed ("I've turned the volume up.", "Okay,
 //! louder."), or the light kept on or off until a time
-//! ([`Claim::LightKept`]; "for" only with a time after it). A colour said
+//! ([`Claim::LightKept`]; "for" only with a time after it). GO-159
+//! (lamp-52e6, 11091) found the kept light's claim still said 7 of 8 times
+//! in shapes the runs missed, so it is also the light said as "it" ("I'll
+//! keep it on until ten.", "I'll leave it on until ten."), "keeping" said
+//! bare and closing at its time ("Got it, keeping the light on until
+//! ten."), and the state told as a reply with a time after "until", "till"
+//! or "for" ("The light is on until ten.", "Your light will be on until 10
+//! pm.", "The light's staying on until ten.", "It'll stay on until ten."):
+//! "It stays on until you say otherwise.", "Keeping it on until ten would
+//! waste power." and "It's on until ten." (whose "it" may be anything) are
+//! none. A colour said
 //! ("My light is blue now.") is still no claim, nor is any sentence the run
 //! opens that ends in a '?'. Beside any call a worded claim stands, so work
 //! another tool did stands ("I've added a reminder to your calendar."
@@ -804,7 +814,7 @@ fn read_as_asked(said: &str) -> (bool, bool, bool) {
 /// After the run, the sentence it opens must not end in a '?'. Each run is
 /// tied to a family with a call behind it, and never a colour said ("My
 /// light is blue now." also answers a colour question).
-const WORDED: [(&str, Claim); 53] = [
+const WORDED: [(&str, Claim); 65] = [
     // "Timer set for one minute.", "Reminder set."
     ("timer|reminder|alarm set|started", Claim::Schedule),
     ("timer's|reminder's|alarm's set|started", Claim::Schedule),
@@ -876,27 +886,27 @@ const WORDED: [(&str, Claim); 53] = [
     // "For" only with a time after it ([`Slot::Time`]): "I left a light on
     // for you." is a persona line (the first builder's P3 on #5588).
     (
-        "i've|i kept|left * light|lights|lamp on|off until|till",
+        "i've|i kept|left * light|lights|lamp|it on|off until|till",
         Claim::LightKept,
     ),
     (
-        "i've|i kept|left * light|lights|lamp on|off for #",
+        "i've|i kept|left * light|lights|lamp|it on|off for #",
         Claim::LightKept,
     ),
     (
-        "i'll|i'm keep|keeping|leave|leaving * light|lights|lamp on|off until|till",
+        "i'll|i'm keep|keeping|leave|leaving * light|lights|lamp|it on|off until|till",
         Claim::LightKept,
     ),
     (
-        "i'll|i'm keep|keeping|leave|leaving * light|lights|lamp on|off for #",
+        "i'll|i'm keep|keeping|leave|leaving * light|lights|lamp|it on|off for #",
         Claim::LightKept,
     ),
     (
-        "i will keep|leave * light|lights|lamp on|off until|till",
+        "i will keep|leave * light|lights|lamp|it on|off until|till",
         Claim::LightKept,
     ),
     (
-        "i will keep|leave * light|lights|lamp on|off for #",
+        "i will keep|leave * light|lights|lamp|it on|off for #",
         Claim::LightKept,
     ),
     (
@@ -923,6 +933,58 @@ const WORDED: [(&str, Claim); 53] = [
         "the|my|your light|lights|lamp is|are staying on|off for #",
         Claim::LightKept,
     ),
+    // GO-159 (lamp-52e6, 11091): "keeping" said bare ("Got it, keeping
+    // the light on until ten."), closing at its time so talk about keeping
+    // it on ("Keeping it on until ten would waste power.") is none.
+    (
+        "keeping|leaving * light|lights|lamp|it on|off until|till|for # $",
+        Claim::LightKept,
+    ),
+    (
+        "keeping|leaving * light|lights|lamp|it on|off until|till|for # am|pm|tonight|o'clock|minute|minutes|hour|hours $",
+        Claim::LightKept,
+    ),
+    (
+        "keeping|leaving * light|lights|lamp|it on|off for # a|an minute|hour $",
+        Claim::LightKept,
+    ),
+    // The state told as a reply ("The light is on until ten.", "Your light
+    // will be on until 10 pm.", "The light's staying on until ten."), and
+    // the light said as "it" ("It'll stay on until ten."): each with a time
+    // after "until", "till" or "for", so "It stays on until you say
+    // otherwise." and "The light is on until you turn it off." are none.
+    (
+        "the|my|your light|lights|lamp is|are on|off until|till|for #",
+        Claim::LightKept,
+    ),
+    (
+        "the|my|your light|lights|lamp will be|remain on|off until|till|for #",
+        Claim::LightKept,
+    ),
+    (
+        "the|my|your light's|lamp's on|off until|till|for #",
+        Claim::LightKept,
+    ),
+    (
+        "the|my|your light's|lamp's staying on|off until|till|for #",
+        Claim::LightKept,
+    ),
+    (
+        "the|my|your light'll|lamp'll stay|be|remain on|off until|till|for #",
+        Claim::LightKept,
+    ),
+    ("it stays|remains on|off until|till|for #", Claim::LightKept),
+    (
+        "it'll stay|remain on|off until|till|for #",
+        Claim::LightKept,
+    ),
+    (
+        "it will stay|remain on|off until|till|for #",
+        Claim::LightKept,
+    ),
+    // Not "it's staying": a streamed "It's" ("It's 9:39.") would wait a
+    // word longer to be judged.
+    ("it is staying on|off until|till|for #", Claim::LightKept),
     // Said as it is done (#5215's rest): "Turning it up.", "Setting a timer
     // for one minute." Each closes at the sentence's end; a timer's "for"
     // only with a time, and a unit, after it: "Turning it off and on again
@@ -1073,7 +1135,7 @@ enum Slot<'a> {
     /// A mark that is not a '?' (after a lead-in).
     Mark,
     /// A time: a word that opens with a digit, one of [`NUMBER_WORDS`],
-    /// "tonight", or "the night".
+    /// "tonight", "noon", "midnight", or "the night".
     Time,
 }
 
@@ -1159,13 +1221,14 @@ fn fits(slots: &[Slot<'_>], tokens: &[Token<'_>], at: usize, more: bool) -> Opti
         Slot::Time => {
             let one = |word: &str| {
                 word.starts_with(|c: char| c.is_ascii_digit())
-                    || word == "tonight"
+                    || matches!(word, "tonight" | "noon" | "midnight")
                     || NUMBER_WORDS.contains(&word)
             };
             let could = |part: &str| {
                 part.starts_with(|c: char| c.is_ascii_digit())
-                    || "tonight".starts_with(part)
-                    || "the".starts_with(part)
+                    || ["tonight", "noon", "midnight", "the"]
+                        .iter()
+                        .any(|word| word.starts_with(part))
                     || NUMBER_WORDS.iter().any(|word| word.starts_with(part))
             };
             match (tokens.get(at), tokens.get(at + 1)) {
