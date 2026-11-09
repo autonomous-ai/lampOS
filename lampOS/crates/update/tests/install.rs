@@ -2981,12 +2981,13 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
         .map(|name| lamp_skills::load(&root.join(name)).unwrap())
         .collect();
     // Not feeling well came with the product after its lamp check (#1681);
-    // the seven of PRODUCT_SKILLS_OFF come installed disabled; the startle
+    // the six of PRODUCT_SKILLS_OFF come installed disabled; the startle
     // came with its move (#2822); the four wellbeing nudges since 25 Oct;
     // Head pat and its wiggle since #4133's design owner's yes (29 Oct);
     // Comfort break, off by its own file and on by its [present] with the
     // product units' LAMP_NUDGES_PRESENT=on (#5207).
     // Sit back since its played check with a person (#5208, 4 Nov).
+    // Light show since #5745.
     assert_eq!(installed.len(), 30);
     let bedtime = installed
         .iter()
@@ -3012,11 +3013,12 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     );
     assert!(root.join("bedtime-morning/SKILL.md").is_file());
     // Inventory includes the disabled core and its grants; only live skills
-    // contribute functions. The twenty-one live skills (with music sway and
+    // contribute functions. The twenty-two live skills (with music sway and
     // watch you leave since #2834, Head pat and its wiggle, which declare
     // none, and Sit back, which shares wellbeing_nudges) offer Dance,
     // prepare_to_unplug, hidden at run time unless LAMP_UNPLUG=on, and the
-    // wellbeing nudges' one wellbeing_nudges (since 25 Oct), and Pose's set_pose (#4135).
+    // wellbeing nudges' one wellbeing_nudges (since 25 Oct), Pose's set_pose (#4135)
+    // and Light show's light_show (#5745).
     let inventory = lamp_skills::load_each(&root);
     assert_eq!(inventory.len(), 30);
     assert!(inventory.iter().all(|(_, skill)| skill.is_ok()));
@@ -3035,16 +3037,16 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
             .last()
             .unwrap()
             .starts_with(
-                "The skills here give the model 4 functions (dance, prepare_to_unplug, set_pose, wellbeing_nudges)."
+                "The skills here give the model 5 functions (dance, light_show, prepare_to_unplug, set_pose, wellbeing_nudges)."
             ),
         "{listed}"
     );
     let (live, errors) = lamp_skills::load_all(&root);
     assert!(errors.is_empty(), "{errors:?}");
-    assert_eq!(live.len(), 21);
+    assert_eq!(live.len(), 22);
     assert!(live.iter().all(|skill| skill.name != bedtime.name));
     // Each core skill installed off is disabled on the lamp and adds no
-    // function, its tool or not: the 4 above are all a session is told.
+    // function, its tool or not: the 5 above are all a session is told.
     for (name, _) in install::PRODUCT_SKILLS_OFF {
         let skill = installed.iter().find(|skill| skill.name == *name).unwrap();
         assert!(!skill.enabled, "{name}");
@@ -3712,6 +3714,38 @@ fn the_pinned_models_are_the_ones_their_parts_check() {
         include_str!("../../../deploy/product/lamp-mood.service")
             .lines()
             .any(|line| line == "Environment=LAMP_MOOD_SEEMS=on")
+    );
+}
+
+/// A light show a person asks for comes with the product (#5745): Light
+/// show is out of `PRODUCT_SKILLS_OFF` and installed as its own file, on,
+/// with its three shows, so a customer's "do a light show" plays one.
+#[test]
+fn the_product_plays_a_light_show_when_asked() {
+    assert!(install::PRODUCT_SKILLS.contains(&"light-show"));
+    assert!(
+        !install::PRODUCT_SKILLS_OFF
+            .iter()
+            .any(|(off, _)| *off == "light-show")
+    );
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    for file in [
+        "skill.toml",
+        "shows/calm.toml",
+        "shows/music.toml",
+        "shows/party.toml",
+    ] {
+        assert_eq!(
+            fs::read(lamp.on(&format!("/var/lib/lampOS/skills/light-show/{file}"))).unwrap(),
+            fs::read(skills_root().join("light-show").join(file)).unwrap(),
+            "{file}"
+        );
+    }
+    assert!(
+        lamp_skills::load(&lamp.on("/var/lib/lampOS/skills/light-show"))
+            .unwrap()
+            .enabled
     );
 }
 

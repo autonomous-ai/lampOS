@@ -244,11 +244,12 @@ break, already on, also waits while a head is down (reading, writing) and
 lets that sitting's stretch go if they don't look up within its ten minutes. Music sway reads
 the ears' sound classes, which stay off in the product until YAMNet's
 weights may be shipped (sound-events.md), so until then it never sways.
-Seven core skills not yet tried on a lamp are
+Light show (#1679), a show of slow-changing colours a person asks for,
+comes with the product since #5745, its `light_show` reached through
+`use_skill`. Six core skills not yet tried on a lamp are
 installed disabled (`install::PRODUCT_SKILLS_OFF`, each with why): Light out
 when you leave (#1677, [presence.md](presence.md), which must never take the
-light of someone reading face down), Light scenes, Point the light and Light
-show (#1679),
+light of someone reading face down), Light scenes and Point the light (#1679),
 Smoky air and Dusty air
 (#1684), until they are measured for false alarms on real traces, and
 Feelings (#3691), which needs Mood on (`LAMP_MOOD=on`, trial-only). Install
