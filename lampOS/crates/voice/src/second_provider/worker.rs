@@ -3150,6 +3150,17 @@ pub fn serve(
             );
             engine = engine.saving_carried(true);
         }
+        // A line carried in full is read and kept as its person's, as a lone
+        // known face's line is, forgets refused (the memory owner's decision
+        // of 9 Nov): its keep written at once, not held for a yes.
+        if std::env::var(crate::second_provider::CONVERSATION_CARRIED_MEMORY_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a carried line is read and kept as that person's, a keep written at once; no forget, correction, rule or yes runs on it, never journalled (LAMP_CONVERSATION_CARRIED_MEMORY)"
+            );
+            engine = engine.reading_carried(true);
+        }
     }
     // Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`, #2377): a held
     // forget's yes counts only from the held person's face seen saying it.
@@ -4531,6 +4542,10 @@ pub fn serve(
                 Arc::new(move || another.load(std::sync::atomic::Ordering::Acquire)),
             );
         }
+        // A carried line read as its person's only where the same-voice
+        // check runs (`LAMP_CONVERSATION_CARRIED_MEMORY`, Jarvis's P2 on
+        // #5842): without it no other voice could ever show.
+        engine = engine.reading_carried_where_heard(hears);
         remarked_by = Some(heeding.clone());
         // A line begun in a computer's turn is a call, as on the Live route.
         let opening = heeding.clone();
@@ -12468,10 +12483,13 @@ fn keep_scoped(
     // kept out too: nothing said off camera is journalled as theirs; only a
     // keep their own face is seen saying yes to is written (the first
     // builder's call on #4508).
+    // A carried line read as its person's (`LAMP_CONVERSATION_CARRIED_MEMORY`)
+    // is kept out too: its keep is written, its exchange never journalled.
     if let Some(lease) = lease
-        && lease
+        && (lease
             .scope()
             .is_some_and(crate::memory_scope::ScopeSnapshot::held)
+            || lease.reads_carried())
     {
         crate::remember::held_by_gap(lease.key().request);
     }
@@ -12536,7 +12554,7 @@ fn keep_scoped(
                         );
                         // A held or carried line is told in the thread,
                         // never folded into a summary or talk note.
-                        if scope.held() {
+                        if scope.held() || lease.reads_carried() {
                             thread.held_for(*request);
                         }
                     }

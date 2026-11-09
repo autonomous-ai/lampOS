@@ -879,6 +879,41 @@ yes confirms a keep whose words someone else may have said; they hear it
 asked first. A same-voice check (`same_voice_releases`, a hook, never true
 yet) is the follow-up.
 
+**A carried line reads and keeps as theirs** (`LAMP_CONVERSATION_CARRIED_MEMORY=on`,
+off by default; the memory owner's decision of 9 Nov after lamp-06c1's S14
+run on build 10824, where every carried line refused its recall, "no face
+was seen speaking it", so 11 of 14 asks failed though the facts were
+stored). A line carried in full for a known person P (the carry above,
+unchanged: never one carried for a keep only, nor one admitted held only by
+a face's gap) is treated as a lone known face's line is with
+`LAMP_PERSON_SCOPE_ONE_FACE_READS` (`ScopeLease::read_carried`): its scope
+is P's and not held, so recall, hits, the memory note and P's thread read
+P's memory (and the room's, as P's reads do), and its `remember` is written
+in P's scope at once (`remember::run_one_face_keep`), not held for a yes;
+it wins over `LAMP_CONVERSATION_CARRIED_SAVES`. It never forgets, retires or
+changes: no forget of any kind, no correction (`replaces`), no rule kept,
+listed or forgotten and no yes runs on it, and the lamp is told to ask them
+to look at it and say it again (`ScopeLease::forgets_need_mouth`,
+`second_provider::one_face_refused`); it holds no forget for a yes. Its
+exchange is still kept out of the journal, the rolling summary and talk
+notes (`ScopeLease::reads_carried`). It needs the one-face rule's tracker
+(`LAMP_PERSON_SCOPE_ONE_FACE` on and acting) showing no other voice in the
+conversation, nor, with `LAMP_CONVERSATION_CARRIES_PAST_SILENT`, its sign
+of another person (`second_provider::no_other_voice_shown`, failing closed):
+with no tracker, a carried line stays held and the room's, as with the
+switch off (Thirteen's P2 on #5842). It also needs the same-voice check
+running for the route (`Engine::reading_carried_where_heard`), the rule to
+have judged the line's own voice (a line it skipped is narrowed to the
+room's), and P's own face the one face in view through the line by the
+one-face count (`SpeakingFaces::one_face_in_view`): P seen only in the 5 s
+before, then gone, is carried but never read as P's (Jarvis's P2 on #5842).
+Another voice the one-face rule
+recorded in the conversation, before the line or as it is judged, makes it
+the room's, keeps and all; a carried line for P never reads anyone else's
+memory. Risk, accepted with the switch: a guest off camera while P's face
+sits silent and alone in view, no other face or voice shown, is told P's
+recall and may add a keep to P's memory.
+
 The old request and response shapes remain accepted. `recall` now selects
 by FTS5 rank and still returns the selected raw entries in chronological
 order; it does not return observations. New operations are:

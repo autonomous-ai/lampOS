@@ -37,6 +37,13 @@ thread_local! {
     /// `LAMP_PERSON_SCOPE_ONE_FACE_READS` ([`Engine::reading_by_one_face`])
     /// for the next [`lines_known`] on this thread, once.
     static ONE_FACE_READS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// `LAMP_CONVERSATION_CARRIED_MEMORY` ([`Engine::reading_carried`]) for
+    /// the next [`lines_known`] on this thread, once.
+    static CARRIED_MEMORY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The same-voice check not running for the route
+    /// ([`Engine::reading_carried_where_heard`]) for the next
+    /// [`lines_known`] on this thread, once.
+    static CARRIED_UNHEARD: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The murmured line's mouths the next [`lines_known`] on this thread
     /// reads in place of [`S4_OPENING_MOUTHS`], once.
     static MURMUR_MOUTHS: std::cell::Cell<Option<&'static [lamp_msgs::SpeakingState]>> =
@@ -272,6 +279,9 @@ enum Voice {
     /// On, the same-voice check not running: the rule judges the line, but
     /// nothing ever records another voice.
     Unchecked,
+    /// On, the rule judging this line and hearing no other voice, as on a
+    /// route whose same-voice check runs.
+    Judged,
 }
 
 /// One line said: its words, the faces in the eyes' looks while it is said
@@ -560,7 +570,7 @@ async fn lines_known(
                 heard.store(true, Ordering::Release);
                 None
             }))
-        } else if voice == Voice::Unchecked {
+        } else if voice == Voice::Unchecked || voice == Voice::Judged {
             // The rule judges this line with no voice print to hear by.
             engine.heeding(Arc::new(|_, _, _, _, _| None))
         } else {
@@ -580,7 +590,10 @@ async fn lines_known(
             Arc::new(move |_| going_on.then(|| (a.clone(), false)))
         }),
     });
-    let mut engine = engine.saving_carried(saves);
+    let mut engine = engine
+        .saving_carried(saves)
+        .reading_carried(CARRIED_MEMORY.with(|on| on.replace(false)))
+        .reading_carried_where_heard(!CARRIED_UNHEARD.with(|unheard| unheard.replace(false)));
     if let Some(found) = DONT_KNOW_FOUND.with(|found| found.borrow_mut().take()) {
         engine = engine.recalling_before_a_dont_know(found);
     }
@@ -3826,4 +3839,553 @@ async fn a_carried_lines_dont_know_searches_nothing_of_theirs() {
         assert_eq!(said, first, "{what}: said as it came");
         assert_eq!(got.rounds.len(), 1, "{what}: never asked again");
     }
+}
+
+/// One line no face was seen speaking, A's face silent in view, in A's
+/// conversation going on: carried, with `LAMP_CONVERSATION_CARRIED_SAVES`
+/// on as on the product, and `memory` as `LAMP_CONVERSATION_CARRIED_MEMORY`.
+/// With `named` false it is admitted as the room's.
+async fn carried_line(
+    what: &str,
+    words: &str,
+    chats: Vec<Vec<net::Result<ChatEvent>>>,
+    in_view: Vec<(&'static str, bool)>,
+    named: bool,
+    memory: bool,
+    voice: Voice,
+) -> Outcome {
+    CARRIED_MEMORY.with(|on| on.set(memory));
+    lines_saving(
+        what,
+        vec![(words.to_owned(), in_view, 0)],
+        chats,
+        BOOT,
+        true,
+        true,
+        None,
+        Some(true),
+        named,
+        true,
+        voice,
+    )
+    .await
+}
+
+/// A recall about A's doctor, and its answer.
+fn recall_doctor() -> Vec<Vec<net::Result<ChatEvent>>> {
+    one_call(crate::remember::RECALL, json!({"query": "doctor"}))
+}
+
+/// The memory owner's decision of 9 Nov (`LAMP_CONVERSATION_CARRIED_MEMORY`,
+/// after lamp-06c1's S14 run): a carried line's keep is written in A's scope
+/// at once, its own line or one admitted as the room's, told and read as
+/// A's, not held. Off, it is held for A's seen yes, as before.
+#[tokio::test]
+async fn with_carried_memory_a_carried_keep_is_written_in_their_scope_at_once() {
+    let a = crate::remember::person_id("A");
+    for named in [true, false] {
+        let what = if named { "cm-keep-own" } else { "cm-keep-room" };
+        let got = carried_line(
+            what,
+            THE_HOTEL,
+            keep_the_hotel(),
+            vec![("f1", false)],
+            named,
+            true,
+            Voice::Judged,
+        )
+        .await;
+        assert_eq!(got.calls, [Some(a.clone())], "{what}: written in A's scope");
+        assert_eq!(got.lease, Some(a.clone()), "{what}");
+        assert!(!got.held, "{what}: read as A's");
+        assert!(
+            !got.rounds[1].contains(&Message::tool(
+                "k1".to_owned(),
+                crate::remember::held_keep_told().to_string()
+            )),
+            "{what}: not held for a yes"
+        );
+        let what = if named {
+            "cm-keep-own-off"
+        } else {
+            "cm-keep-room-off"
+        };
+        let got = carried_line(
+            what,
+            THE_HOTEL,
+            keep_the_hotel(),
+            vec![("f1", false)],
+            named,
+            false,
+            Voice::Off,
+        )
+        .await;
+        assert_eq!(got.calls, [], "{what}: nothing written at once");
+        assert!(got.held, "{what}");
+        assert!(
+            got.rounds[1].contains(&Message::tool(
+                "k1".to_owned(),
+                crate::remember::held_keep_told().to_string()
+            )),
+            "{what}: held for A's yes"
+        );
+    }
+}
+
+/// `LAMP_CONVERSATION_CARRIED_MEMORY`: a carried line's recall reads A's
+/// memory, and so do its note and hits, as a lone known face's line does
+/// (lamp-06c1, S14: 11 of 14 asks refused on carried lines). Off, the recall
+/// runs for no one and nothing is read, as before.
+#[tokio::test]
+async fn with_carried_memory_a_carried_recall_reads_their_memory() {
+    let a = crate::remember::person_id("A");
+    let ask = "Lamp, what did I say about my doctor?";
+    let got = carried_line(
+        "cm-recall",
+        ask,
+        recall_doctor(),
+        vec![("f1", false)],
+        true,
+        true,
+        Voice::Judged,
+    )
+    .await;
+    assert_eq!(got.calls, [Some(a.clone())], "the recall is A's");
+    assert_eq!(
+        got.told,
+        Message::system(format!("for {:?}", Some(a.as_str()))),
+        "A's context"
+    );
+    assert!(
+        !got.noted.is_empty()
+            && got
+                .noted
+                .iter()
+                .all(|(person, _)| person.as_ref() == Some(&a)),
+        "A's note: {:?}",
+        got.noted
+    );
+    assert!(
+        got.hits.iter().all(|hits| hits
+            .as_ref()
+            .is_some_and(|(person, _)| person.as_ref() == Some(&a))),
+        "A's hits: {:?}",
+        got.hits
+    );
+    let got = carried_line(
+        "cm-recall-off",
+        ask,
+        recall_doctor(),
+        vec![("f1", false)],
+        true,
+        false,
+        Voice::Off,
+    )
+    .await;
+    assert_eq!(got.calls, [], "off: the recall runs for no one");
+    assert!(got.held);
+    assert!(got.noted.is_empty(), "off: nothing read: {:?}", got.noted);
+}
+
+/// `LAMP_CONVERSATION_CARRIED_MEMORY` never forgets, retires or changes: on
+/// a carried line a forget of one thing or of everything, a correction of a
+/// kept thing and a standing rule never run, on or off; on, the lamp is told
+/// why, as on a lone known face's line.
+#[tokio::test]
+async fn with_carried_memory_a_carried_line_never_forgets_corrects_or_keeps_rules() {
+    for memory in [true, false] {
+        for (what, words, chats) in [
+            ("cm-forget-one", FORGET_COFFEE, forget_coffee()),
+            ("cm-forget-all", FORGET_ME, forget_everything()),
+            (
+                "cm-replaces",
+                "Lamp, my class is on Thursday now.",
+                one_call(
+                    crate::remember::REMEMBER,
+                    json!({"text": "Class is on Thursday.", "replaces": 3}),
+                ),
+            ),
+            (
+                "cm-keep-rule",
+                "Lamp, always call me Captain.",
+                one_call(
+                    crate::rules::KEEP_RULE,
+                    json!({"rule": "Always call me Captain."}),
+                ),
+            ),
+        ] {
+            let got = carried_line(
+                what,
+                words,
+                chats,
+                vec![("f1", false)],
+                true,
+                memory,
+                Voice::Judged,
+            )
+            .await;
+            assert!(
+                got.calls.is_empty(),
+                "{what} {memory}: never run: {:?}",
+                got.calls
+            );
+            if memory {
+                assert!(refused_by_one_face(&got), "{what}: told why");
+            }
+        }
+    }
+}
+
+/// `LAMP_CONVERSATION_CARRIED_MEMORY` widens nothing about who is carried:
+/// a line carried for A reads and keeps A's only, and a line with another
+/// face in view or seen speaking it, no conversation going on, or another
+/// voice recorded in the conversation (before it or as it is judged) reads
+/// and keeps nobody's but the room's, or stays held, never anyone else's.
+#[tokio::test]
+async fn with_carried_memory_a_carried_line_never_reads_another_persons_memory() {
+    let a = crate::remember::person_id("A");
+    for (what, in_view) in [
+        ("cm-other-face", vec![("f2", false)]),
+        ("cm-two-faces", vec![("f1", false), ("f2", false)]),
+        ("cm-other-speaks", vec![("f1", false), ("f2", true)]),
+    ] {
+        let got = carried_line(
+            what,
+            "Lamp, what did I say about my doctor?",
+            recall_doctor(),
+            in_view,
+            true,
+            true,
+            Voice::Judged,
+        )
+        .await;
+        assert_eq!(got.calls, [None], "{what}: the room's, never A's");
+        assert_eq!(got.lease, None, "{what}");
+    }
+    CARRIED_MEMORY.with(|on| on.set(true));
+    let got = lines_saving(
+        "cm-quiet",
+        vec![(THE_HOTEL.to_owned(), vec![("f1", false)], 0)],
+        keep_the_hotel(),
+        BOOT,
+        true,
+        true,
+        None,
+        Some(false),
+        true,
+        true,
+        Voice::Off,
+    )
+    .await;
+    assert_eq!(got.calls, [None], "no conversation going on: the room's");
+    // Another voice in the conversation: never read as A's.
+    for (what, voice) in [
+        ("cm-voice-before", Voice::AnotherBefore),
+        ("cm-voice-in-it", Voice::AnotherInIt),
+    ] {
+        let got = carried_line(
+            what,
+            "Lamp, what did I say about my doctor?",
+            recall_doctor(),
+            vec![("f1", false)],
+            true,
+            true,
+            voice,
+        )
+        .await;
+        assert!(
+            got.calls.iter().all(|whose| whose.as_ref() != Some(&a)),
+            "{what}: never A's: {:?}",
+            got.calls
+        );
+        assert!(
+            got.noted
+                .iter()
+                .all(|(person, _)| person.as_ref() != Some(&a)),
+            "{what}: {:?}",
+            got.noted
+        );
+    }
+    // A's own carried line: every call, note and hit is A's, nobody else's.
+    let got = carried_line(
+        "cm-only-a",
+        "Lamp, what did I say about my doctor?",
+        recall_doctor(),
+        vec![("f1", false)],
+        false,
+        true,
+        Voice::Judged,
+    )
+    .await;
+    assert_eq!(got.calls, [Some(a.clone())]);
+    assert!(
+        got.noted
+            .iter()
+            .all(|(person, _)| person.as_ref() == Some(&a))
+    );
+}
+
+/// `LAMP_CONVERSATION_CARRIED_MEMORY` with no one-face tracker
+/// (`LAMP_PERSON_SCOPE_ONE_FACE` off, so no other voice could ever be
+/// recorded): a carried line is never read as A's. Its keep stays held for
+/// A's seen yes and its recall runs for no one, as with the switch off: an
+/// off-camera guest just after A's face is never told A's memory nor kept
+/// into it (Thirteen's P2 on #5842).
+#[tokio::test]
+async fn with_carried_memory_and_no_voice_tracker_a_carried_line_stays_held() {
+    for named in [true, false] {
+        let what = if named {
+            "cm-no-tracker-keep-own"
+        } else {
+            "cm-no-tracker-keep-room"
+        };
+        let got = carried_line(
+            what,
+            THE_HOTEL,
+            keep_the_hotel(),
+            vec![("f1", false)],
+            named,
+            true,
+            Voice::Off,
+        )
+        .await;
+        assert_eq!(got.calls, [], "{what}: nothing written at once");
+        assert!(got.held, "{what}: held");
+        assert!(
+            got.rounds[1].contains(&Message::tool(
+                "k1".to_owned(),
+                crate::remember::held_keep_told().to_string()
+            )),
+            "{what}: held for A's yes"
+        );
+        let what = if named {
+            "cm-no-tracker-recall-own"
+        } else {
+            "cm-no-tracker-recall-room"
+        };
+        let got = carried_line(
+            what,
+            "Lamp, what did I say about my doctor?",
+            recall_doctor(),
+            vec![("f1", false)],
+            named,
+            true,
+            Voice::Off,
+        )
+        .await;
+        assert_eq!(got.calls, [], "{what}: the recall runs for no one");
+        assert!(got.held, "{what}");
+        assert!(
+            got.noted.is_empty(),
+            "{what}: nothing read: {:?}",
+            got.noted
+        );
+    }
+}
+
+/// `LAMP_CONVERSATION_CARRIED_MEMORY` where the same-voice check is not
+/// running for the route: the tracker could never record another voice, so
+/// a carried line stays held and the room's, as with no tracker; nor is one
+/// the rule never judged read as A's (Jarvis's P2 on #5842).
+#[tokio::test]
+async fn with_carried_memory_and_no_voice_check_a_carried_line_stays_held() {
+    let a = crate::remember::person_id("A");
+    for named in [true, false] {
+        let what = if named {
+            "cm-unheard-own"
+        } else {
+            "cm-unheard-room"
+        };
+        CARRIED_UNHEARD.with(|unheard| unheard.set(true));
+        let got = carried_line(
+            what,
+            "Lamp, what did I say about my doctor?",
+            recall_doctor(),
+            vec![("f1", false)],
+            named,
+            true,
+            Voice::One,
+        )
+        .await;
+        assert_eq!(got.calls, [], "{what}: the recall runs for no one");
+        assert!(got.held, "{what}");
+        assert!(
+            got.noted.is_empty(),
+            "{what}: nothing read: {:?}",
+            got.noted
+        );
+        // A tracker but no rule judging this very line: its voice unknown,
+        // never read as A's.
+        let what = if named {
+            "cm-unjudged-own"
+        } else {
+            "cm-unjudged-room"
+        };
+        let got = carried_line(
+            what,
+            "Lamp, what did I say about my doctor?",
+            recall_doctor(),
+            vec![("f1", false)],
+            named,
+            true,
+            Voice::One,
+        )
+        .await;
+        assert!(
+            got.calls.iter().all(|whose| whose.as_ref() != Some(&a)),
+            "{what}: never A's: {:?}",
+            got.calls
+        );
+        assert!(
+            got.noted
+                .iter()
+                .all(|(person, _)| person.as_ref() != Some(&a)),
+            "{what}: {:?}",
+            got.noted
+        );
+    }
+}
+
+/// `LAMP_CONVERSATION_CARRIED_MEMORY` needs A's own face the one face in
+/// view through the carried line, as a lone known face's read does: A seen
+/// saying the line before, then gone as an off-camera voice asks at once,
+/// within `CARRY_UNSEEN_WITHIN`, is carried but never read as A's (Jarvis's
+/// P2 on #5842: A walked out). A's face still silent alone in view: read as
+/// A's.
+#[tokio::test]
+async fn with_carried_memory_a_carried_line_with_their_face_gone_is_not_theirs() {
+    let a = crate::remember::person_id("A");
+    fn left(request: u64, known: &std::path::Path) {
+        // Her face gone: the eyes write their known file no more.
+        if request == 2 {
+            let _ = std::fs::remove_file(known);
+            let _ = std::fs::remove_file(known_face_of(known));
+        }
+    }
+    fn stays(_: u64, _: &std::path::Path) {}
+    type Faces = fn(u64, &std::path::Path);
+    let cases = [
+        ("cm-face-gone", vec![], left as Faces, false),
+        ("cm-face-in-view", vec![("f1", false)], stays, true),
+    ];
+    for (what, in_view, faces, theirs) in cases {
+        let mut chats = vec![vec![
+            text("Garden centre on Saturday, noted."),
+            Ok(ChatEvent::Done),
+        ]];
+        chats.extend(recall_doctor());
+        CARRIED_MEMORY.with(|on| on.set(true));
+        let got = lines_known(
+            what,
+            vec![
+                (
+                    "I'm going to the garden centre on Saturday.".to_owned(),
+                    vec![("f1", true)],
+                    0,
+                ),
+                (
+                    "Lamp, what did I say about my doctor?".to_owned(),
+                    in_view,
+                    0,
+                ),
+            ],
+            chats,
+            (BOOT, true, true),
+            None,
+            Some(true),
+            true,
+            true,
+            None,
+            Voice::Judged,
+            (false, &[]),
+            faces,
+            (false, None, None),
+        )
+        .await;
+        assert_eq!(
+            got.calls.contains(&Some(a.clone())),
+            theirs,
+            "{what}: {:?}",
+            got.calls
+        );
+        assert_eq!(
+            got.noted
+                .iter()
+                .any(|(person, words)| person.as_ref() == Some(&a) && words.contains("doctor")),
+            theirs,
+            "{what}: {:?}",
+            got.noted
+        );
+    }
+}
+
+/// `LAMP_CONVERSATION_CARRIED_MEMORY` leaves the one-face rule as it was: a
+/// lone known face's line not in a conversation going on is taken by that
+/// rule, read and kept as theirs with its reads switch, the room's reads
+/// without it, whether or not this switch is on.
+#[tokio::test]
+async fn with_carried_memory_a_one_face_line_is_as_before() {
+    let a = crate::remember::person_id("A");
+    for (memory, reads) in [(true, true), (true, false), (false, true), (false, false)] {
+        let what = format!("cm-one-face-{memory}-{reads}");
+        CARRIED_MEMORY.with(|on| on.set(memory));
+        ONE_FACE_READS.with(|on| on.set(reads));
+        let got = one_face_line(
+            &what,
+            TOKYO,
+            remember_tokyo(),
+            vec![("f1", false)],
+            None,
+            Voice::One,
+        )
+        .await;
+        assert_eq!(got.calls, [Some(a.clone())], "{what}: the keep is A's");
+        assert_eq!(got.lease, reads.then(|| a.clone()), "{what}");
+        assert!(!got.held, "{what}");
+    }
+}
+
+/// A carried line read as its person's (`LAMP_CONVERSATION_CARRIED_MEMORY`)
+/// is still kept out of the journal and every talk note: only its keep is
+/// written; nothing said off camera is journalled as theirs.
+#[test]
+fn a_carried_line_read_as_theirs_is_still_kept_out_of_the_journal() {
+    use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+    let a = crate::remember::person_id("Carried Memory A");
+    let request = 9_110_901_u64;
+    let scope = RequestScope::new(
+        RequestKey {
+            worker: lamp_turn_owner::BootId::new([44; 16]).unwrap(),
+            session: 1,
+            request,
+        },
+        ScopeSnapshot::room(),
+    );
+    let lease = scope.lease();
+    assert!(lease.carry_conversation(&a));
+    assert!(lease.read_carried());
+    assert!(!lease.scope().unwrap().held(), "read as theirs");
+    super::super::worker::keep_admitted(
+        &ProviderOutput::HoldingAnswer {
+            request,
+            session: 1,
+        },
+        &lease,
+    );
+    assert!(crate::remember::kept_out(request));
+    super::super::worker::keep_admitted(
+        &ProviderOutput::Transcript {
+            request: Some(request),
+            text: "Your doctor is on Tuesday.".to_owned(),
+            finished: true,
+        },
+        &lease,
+    );
+    let mut thread = crate::thread::THREAD.lock().unwrap();
+    let later = Instant::now() + Duration::from_secs(1);
+    let given = thread.summary_rest(Some(&a), later);
+    assert!(
+        given.iter().all(|(given, ..)| *given != request),
+        "never in a talk note: {given:?}"
+    );
 }

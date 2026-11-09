@@ -62,8 +62,9 @@ fn reader(lease: Option<&ScopeLease>) -> Option<String> {
 /// ([`ONE_FACE_ENVIRONMENT`]): the person its keep goes to, for [`READS`]
 /// only, while the lease is current, not held and not narrowed since
 /// ([`ScopeLease::narrow_to_room`] ends the keep). `None` for every other
-/// line: two faces, an unknown face, another voice or a carried line never
-/// take the keep.
+/// line: two faces, an unknown face or another voice never take the keep,
+/// nor a carried line unless it is read as its person's
+/// (`LAMP_CONVERSATION_CARRIED_MEMORY`, `ScopeLease::read_carried`).
 fn one_face_reader(lease: Option<&ScopeLease>, name: &str) -> Option<String> {
     let lease = lease.filter(|_| READS.contains(&name))?;
     lease.scope().filter(|scope| !scope.held())?;

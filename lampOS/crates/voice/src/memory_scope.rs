@@ -511,6 +511,12 @@ struct RequestContext {
     /// on it, as nothing saw the mouth say it ([`ScopeLease::forgets_need_mouth`]).
     /// Set under `one_face`'s lock; it counts only while `one_face` is held.
     one_face_reads: AtomicBool,
+    /// A carried line read and kept as the carried person's, as a lone known
+    /// face's line is (`LAMP_CONVERSATION_CARRIED_MEMORY`,
+    /// [`ScopeLease::read_carried`]): their scope, not held. Set once, with
+    /// [`Self::one_face`] and [`Self::one_face_reads`], so no forget, yes or
+    /// correction runs on it. Any narrow after it wins.
+    carried_reads: OnceLock<ScopeSnapshot>,
 }
 
 /// A keep's late look (#2807): the face cache and its generation when the
@@ -636,6 +642,7 @@ impl RequestScope {
                 released_keep: OnceLock::new(),
                 one_face: Mutex::new(None),
                 one_face_reads: AtomicBool::new(false),
+                carried_reads: OnceLock::new(),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
@@ -689,6 +696,7 @@ impl RequestScope {
                 released_keep: OnceLock::new(),
                 one_face: Mutex::new(None),
                 one_face_reads: AtomicBool::new(false),
+                carried_reads: OnceLock::new(),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
@@ -735,6 +743,8 @@ impl ScopeLease {
         self.is_current().then(|| {
             if self.context.narrowed.load(Ordering::Acquire) {
                 &self.context.room
+            } else if let Some(reads) = self.context.carried_reads.get() {
+                reads
             } else if let Some(carried) = self.context.carried.get() {
                 carried
             } else {
@@ -887,6 +897,65 @@ impl ScopeLease {
         }
         self.context.carried_saves.store(true, Ordering::Release);
         true
+    }
+
+    /// A carried line ([`Self::carry_conversation`]) read and kept as the
+    /// carried person's, as a lone known face's line is
+    /// ([`Self::read_by_one_face`]; `LAMP_CONVERSATION_CARRIED_MEMORY`, the
+    /// memory owner's decision of 9 Nov after lamp-06c1's S14 run: 11 of 14
+    /// asks failed on carried lines though the facts were stored). Its
+    /// [`Self::scope`] is theirs, not held: recall, hits, the memory note and
+    /// their thread; its `remember` is written in their scope at once
+    /// ([`Self::kept_by_one_face`]). No forget of any kind, no correction,
+    /// rule or yes runs on it ([`Self::forgets_need_mouth`]), and it is
+    /// still never journalled or summarised ([`Self::reads_carried`]). Who
+    /// counts as carried is unchanged: only a line already carried in full
+    /// for `person`'s conversation. Any later narrow makes it the room's.
+    /// `false`, and nothing changed, for a revoked, narrowed or uncarried
+    /// line, one carried for a keep only ([`Self::carry_keep_only`]), or one
+    /// admitted held only by a face's gap.
+    pub fn read_carried(&self) -> bool {
+        let mut one_face = self
+            .context
+            .one_face
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if !self.is_current()
+            || self.context.narrowed.load(Ordering::Acquire)
+            || self.context.scope.held
+            || self.context.keep_for.get().is_some()
+        {
+            return false;
+        }
+        let Some(person) = self
+            .context
+            .carried
+            .get()
+            .and_then(ScopeSnapshot::person)
+            .map(Arc::<str>::from)
+        else {
+            return false;
+        };
+        let reads = self.context.carried_reads.get_or_init(|| ScopeSnapshot {
+            person: Some(person.clone()),
+            held: false,
+        });
+        if reads.person() != Some(&*person) {
+            return false;
+        }
+        *one_face = Some(person);
+        self.context.one_face_reads.store(true, Ordering::Release);
+        true
+    }
+
+    /// Whether this line is read as its carried person's
+    /// ([`Self::read_carried`]), while current and no narrow came after: its
+    /// exchange is still kept out of the journal and every summary, as any
+    /// carried line's is.
+    pub fn reads_carried(&self) -> bool {
+        self.is_current()
+            && !self.context.narrowed.load(Ordering::Acquire)
+            && self.context.carried_reads.get().is_some()
     }
 
     /// The carried person whose yes this line's keep waits for
@@ -1555,6 +1624,78 @@ mod tests {
         assert!(lease.carry_conversation(&a_id));
         assert!(lease.save_carried());
         assert_eq!(lease.keeper_within(Duration::ZERO), None);
+    }
+    /// `LAMP_CONVERSATION_CARRIED_MEMORY` (the memory owner's decision of 9
+    /// Nov): a line carried in full for A is read and kept as A's, as a lone
+    /// known face's is, and needs the mouth for any forget; it is never B's,
+    /// whoever else was named late, and a narrow after it makes it the
+    /// room's. A line not carried, carried for a keep only, admitted as B's,
+    /// held by a gap, narrowed or revoked takes none.
+    #[test]
+    fn a_carried_line_with_carried_memory_is_read_and_kept_as_its_person_only() {
+        let a = ScopeSnapshot::of("A");
+        let a_id = a.person().unwrap().to_owned();
+        let b = ScopeSnapshot::of("B");
+        for (worker, admitted) in [(21, ScopeSnapshot::room()), (22, a.clone())] {
+            let scope = RequestScope::new(key(worker), admitted);
+            let lease = scope.lease();
+            assert!(!lease.read_carried(), "{worker}: not carried yet");
+            assert!(!lease.forgets_need_mouth(), "{worker}");
+            assert!(lease.carry_conversation(&a_id));
+            assert!(lease.scope().unwrap().held(), "{worker}: held, as before");
+            assert!(lease.read_carried(), "{worker}");
+            assert_eq!(lease.scope(), Some(&a), "{worker}: A's, not held");
+            assert!(lease.reads_carried(), "{worker}");
+            assert_eq!(lease.kept_by_one_face().as_deref(), Some(a_id.as_str()));
+            assert_eq!(
+                lease
+                    .reached_by_one_face(crate::remember::REMEMBER)
+                    .as_deref(),
+                Some(a_id.as_str())
+            );
+            assert!(lease.forgets_need_mouth(), "{worker}: no forget runs");
+            assert_eq!(lease.carried_for(), Some(a_id.as_str()), "{worker}");
+            assert_eq!(lease.saves_carried(), None, "{worker}: nothing held");
+            lease.narrow_to_room();
+            assert_eq!(lease.scope(), Some(&ScopeSnapshot::room()), "{worker}");
+            assert!(!lease.reads_carried(), "{worker}: narrowed");
+            assert_eq!(lease.kept_by_one_face(), None, "{worker}: narrowed");
+            assert!(!lease.forgets_need_mouth(), "{worker}: the room's");
+        }
+        let theirs = RequestScope::new(key(23), b.clone());
+        assert!(!theirs.lease().carry_conversation(&a_id));
+        assert!(!theirs.lease().read_carried(), "B's line is never A's");
+        assert_eq!(theirs.lease().scope(), Some(&b));
+        let keep_only = RequestScope::new(key(24), ScopeSnapshot::room());
+        assert!(keep_only.lease().carry_keep_only(&a_id));
+        assert!(!keep_only.lease().read_carried(), "keep only: no reads");
+        assert!(keep_only.lease().scope().unwrap().held());
+        let gap = RequestScope::new(key(25), ScopeSnapshot::held_of("A"));
+        assert!(gap.lease().carry_conversation(&a_id));
+        assert!(!gap.lease().read_carried(), "admitted held by a gap");
+        let narrowed = RequestScope::new(key(26), a.clone());
+        assert!(narrowed.lease().carry_conversation(&a_id));
+        narrowed.lease().narrow_to_room();
+        assert!(!narrowed.lease().read_carried(), "never widened");
+        let revoked = RequestScope::new(key(27), a);
+        let lease = revoked.lease();
+        assert!(lease.carry_conversation(&a_id));
+        revoked.revoke();
+        assert!(!lease.read_carried(), "revoked");
+        // A room's line looking later, its keeper recorded as B, carried as
+        // A's: read and kept as A's, never B's.
+        let cache = Arc::new(FaceCache::default());
+        let late = RequestScope::looking_later(key(28), ScopeSnapshot::room(), cache);
+        let lease = late.lease();
+        lease.record_keeper(Some(crate::remember::person_id("B")));
+        assert!(lease.carry_conversation(&a_id));
+        assert!(lease.read_carried());
+        assert_eq!(lease.keeper_within(Duration::ZERO), None);
+        assert_eq!(
+            lease.scope().and_then(ScopeSnapshot::person),
+            Some(a_id.as_str())
+        );
+        assert_eq!(lease.kept_by_one_face().as_deref(), Some(a_id.as_str()));
     }
     fn key(worker: u8) -> RequestKey {
         RequestKey {
