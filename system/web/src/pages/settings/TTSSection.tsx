@@ -60,16 +60,18 @@ const LANG_LABEL: Record<Lang, string> = {
   "en":    "English",
   "vi":    "Vietnamese",
   "ja":    "Japanese (日本語)",
+  "ko":    "Korean (한국어)",
   "zh-CN": "Chinese (Simplified)",
   "zh-TW": "Chinese (Traditional)",
 };
-const LANG_OPTIONS: Lang[] = ["", "en", "vi", "ja", "zh-CN", "zh-TW"];
+const LANG_OPTIONS: Lang[] = ["", "en", "vi", "ja", "ko", "zh-CN", "zh-TW"];
 
 // Keep ElevenLabs names a strict subset of HAL's VOICE_IDS_BY_LANG, or they 404.
-type LangBucket = "en" | "vi" | "ja" | "zh";
+type LangBucket = "en" | "vi" | "ja" | "ko" | "zh";
 function langBucket(lang: Lang): LangBucket {
   if (lang === "vi") return "vi";
   if (lang === "ja") return "ja";
+  if (lang === "ko") return "ko";
   if (lang === "zh-CN" || lang === "zh-TW") return "zh";
   return "en";
 }
@@ -82,6 +84,9 @@ const GEMINI_VOICES = [
   "Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird",
   "Zubenelgenubi", "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat",
 ];
+const KOREAN_VOICES = ["Anna Kim", "Selly Han", "Rosa Oh", "Stella", "Hyunbin", "Minho"];
+// HAL learned the Korean voice names in this version; older HAL sends the name as a voice ID and fails.
+const MIN_KOREAN_HAL_VERSION = "0.1.305";
 const VOICES: Record<Vendor, Record<LangBucket, string[]>> = {
   elevenlabs: {
     en: [
@@ -92,14 +97,15 @@ const VOICES: Record<Vendor, Record<LangBucket, string[]>> = {
     ],
     vi: ["Ngan", "Linh", "Huyen", "Freya", "Nathan"],
     ja: ["Shizuka", "Konoha", "Rin", "Asahi", "Hinata", "Hiroki"],
+    ko: KOREAN_VOICES,
     zh: ["Amy", "Sage", "Xiaoxi", "Yun", "Evan Zhao"],
   },
-  openai: { en: OPENAI_VOICES, vi: OPENAI_VOICES, ja: OPENAI_VOICES, zh: OPENAI_VOICES },
-  gemini: { en: GEMINI_VOICES, vi: GEMINI_VOICES, ja: GEMINI_VOICES, zh: GEMINI_VOICES },
+  openai: { en: OPENAI_VOICES, vi: OPENAI_VOICES, ja: OPENAI_VOICES, ko: OPENAI_VOICES, zh: OPENAI_VOICES },
+  gemini: { en: GEMINI_VOICES, vi: GEMINI_VOICES, ja: GEMINI_VOICES, ko: GEMINI_VOICES, zh: GEMINI_VOICES },
 };
 
 function voicesFor(vendor: Vendor, lang: Lang, sttLang: string): string[] {
-  const effective = normalizeLang(lang || sttLang);
+  const effective: Lang = normalizeLang(lang || sttLang);
   return VOICES[vendor][langBucket(effective)];
 }
 
@@ -162,11 +168,13 @@ export function TTSSection({
   const effectiveSpeed = Math.max(speedMin, Math.min(speedMax, ttsSpeed));
 
   const [lang, setLang] = useState<Lang>("");
+  // A saved Korean voice stays visible when the filter follows another robot language.
+  const filterLang: Lang = lang || (KOREAN_VOICES.includes(ttsVoice) ? "ko" : "");
   const [piperInstalled, setPiperInstalled] = useState<string[]>([]);
   const piperLang: string = choice === "piper" ? (ttsVoice.split("_")[0] || "") : "";
   const voices = choice === "piper"
     ? piperInstalled
-    : voicesFor(vendor, lang, sttLanguage);
+    : voicesFor(vendor, filterLang, sttLanguage);
 
   const keyRequired = choice === "openai" || choice === "elevenlabs";
   // A stored key belongs to the choice it was saved under (#309).
@@ -192,19 +200,19 @@ export function TTSSection({
     if (next === "autonomous") {
       if (ttsProvider !== "openai" && ttsProvider !== "elevenlabs" && ttsProvider !== "gemini") {
         setTtsProvider("elevenlabs");
-        setTtsVoice(voicesFor("elevenlabs", lang, sttLanguage)[0]);
+        setTtsVoice(voicesFor("elevenlabs", filterLang, sttLanguage)[0]);
       }
       return;
     }
     if (nextMeta.vendor && nextMeta.vendor !== ttsProvider) {
       setTtsProvider(nextMeta.vendor);
-      setTtsVoice(voicesFor(nextMeta.vendor, lang, sttLanguage)[0]);
+      setTtsVoice(voicesFor(nextMeta.vendor, filterLang, sttLanguage)[0]);
     }
   };
 
   const onVendor = (v: Vendor) => {
     setTtsProvider(v);
-    setTtsVoice(voicesFor(v, lang, sttLanguage)[0]);
+    setTtsVoice(voicesFor(v, filterLang, sttLanguage)[0]);
   };
 
   const onLang = (next: Lang) => {
@@ -331,7 +339,7 @@ export function TTSSection({
         <label htmlFor="tts_lang" style={labelStyle}>Voice language</label>
         <SettingsSelect
           id="tts_lang"
-          value={lang}
+          value={filterLang}
           onValueChange={(value) => onLang(value as Lang)}
           style={selectStyle}
         >
@@ -343,6 +351,11 @@ export function TTSSection({
           <div style={{ fontSize: 12, color: C.textDim, marginTop: 4 }}>
             {vendor === "openai" ? "OpenAI" : "Gemini"} voices are multilingual — the same voice handles any
             language. Filter is a no-op here.
+          </div>
+        )}
+        {filterLang === "ko" && vendor === "elevenlabs" && (
+          <div style={{ fontSize: 12, color: C.textDim, marginTop: 4 }}>
+            Korean voices need hardware drivers (HAL) v{MIN_KOREAN_HAL_VERSION} or later.
           </div>
         )}
       </div>
@@ -380,7 +393,7 @@ export function TTSSection({
         </div>
         <TestVoiceButton
           voice={ttsVoice}
-          lang={piperLang || lang || sttLanguage}
+          lang={piperLang || filterLang || sttLanguage}
           provider={ttsProvider}
           baseUrl={ttsBaseUrl}
           apiKey={ttsApiKey}

@@ -55,6 +55,14 @@ voice against the language-specific catalog, so a Japanese browser selects
 Shizuka instead of retaining Rachel. A valid saved/URL choice is preserved;
 late catalog responses are ignored after a provider, language or voice change.
 
+Settings → Language, Setup and Settings → Voice offer **Korean (한국어)**
+(`stt_language: "ko"`). The Voice filter lists Anna Kim, Selly Han, Rosa Oh,
+Stella, Hyunbin and Minho (default Anna Kim), Test Voice sends a Korean sample, My
+Voice shows Korean enrollment sentences, and the chat page has Korean labels. A
+browser set to Korean preselects Korean in Setup. When the saved voice is Korean
+but the robot language is not, the filter opens on Korean instead of Auto, so the
+saved voice stays visible. A note says Korean voices need HAL 0.1.305 or later.
+
 ### 1.1 Browser Tab Title
 
 The browser tab title (`document.title`) reflects the focused page/tab so multiple device tabs are distinguishable. Driven by the shared `useDocumentTitle` hook (`system/web/src/hooks/useDocumentTitle.ts`); format is `Lamp · <segment>[· <sub-segment>]`.

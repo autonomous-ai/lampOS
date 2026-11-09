@@ -8,7 +8,7 @@ import uuid
 from typing import Iterator, Optional
 from urllib.parse import urlparse
 
-from hal.presets import LANG_EN, LANG_JA, LANG_VI, normalize_language
+from hal.presets import LANG_EN, LANG_JA, LANG_KO, LANG_VI, normalize_language
 from hal.drivers.voice.tts.backend import (
     TTSBackend,
     STREAM_CHUNK_SIZE,
@@ -82,6 +82,16 @@ class ElevenLabsTTSBackend(TTSBackend):
             "Hinata": "j210dv0vWm7fCknyQpbA",
             "Hiroki": "vzIXwvf41vKosKu00hYj",
         },
+        # Curated native Korean voices from elevenlabs.io/text-to-speech/korean.
+        # Keep order/default aligned with system/domain/device.go and the web picker.
+        LANG_KO: {
+            "Anna Kim": "uyVNoMrnUku1dZyVEXwD",
+            "Selly Han": "ETPP7D0aZVdEj12Aa7ho",
+            "Rosa Oh": "sf8Bpb1IU97NI9BHSMRf",
+            "Stella": "1YzIw7PZ7iaD4alelyHY",
+            "Hyunbin": "s07IwTCOrCDCaETjUVjx",
+            "Minho": "U1cJYS4EdbaHmfR7YzHd",
+        },
         _LANG_BUCKET_ZH: {
             "Amy": "bhJUNIXWQQ94l8eI2VUf",
             "Sage": "APSIkVZudNbPAwyPoeVO",
@@ -109,6 +119,8 @@ class ElevenLabsTTSBackend(TTSBackend):
             bucket = LANG_VI
         elif lang.lower().startswith(LANG_JA):
             bucket = LANG_JA
+        elif lang.lower().startswith(LANG_KO):
+            bucket = LANG_KO
         elif lang.startswith(cls._LANG_BUCKET_ZH):
             bucket = cls._LANG_BUCKET_ZH
         elif lang.startswith(LANG_EN):

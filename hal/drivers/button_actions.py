@@ -516,6 +516,8 @@ def _factory_reset_phrase() -> str:
     lang = _current_lang()
     if lang.startswith("ja"):
         return "工場出荷時の設定に戻します。再起動します。"
+    if lang.startswith("ko"):
+        return "공장 초기화를 시작할게요. 지금 재부팅할게요."
     if lang.startswith("vi"):
         return "Đang khôi phục cài đặt gốc. Đang khởi động lại."
     if lang.startswith("zh"):

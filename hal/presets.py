@@ -4,16 +4,20 @@
 LANG_EN = "en"
 LANG_VI = "vi"
 LANG_JA = "ja"
+LANG_KO = "ko"
 LANG_ZH_CN = "zh-CN"
 LANG_ZH_TW = "zh-TW"
-SUPPORTED_LANGS = [LANG_EN, LANG_VI, LANG_ZH_CN, LANG_ZH_TW, LANG_JA]
+SUPPORTED_LANGS = [LANG_EN, LANG_VI, LANG_ZH_CN, LANG_ZH_TW, LANG_JA, LANG_KO]
 DEFAULT_LANG = LANG_EN
 
 def normalize_language(language: str | None) -> str:
-    """Canonicalize Japanese locale aliases without changing other provider codes."""
+    """Canonicalize Japanese and Korean locale aliases without changing other provider codes."""
     value = (language or "").strip()
-    if value.lower().replace("_", "-") in ("ja", "ja-jp"):
+    key = value.lower().replace("_", "-")
+    if key in ("ja", "ja-jp"):
         return LANG_JA
+    if key in ("ko", "ko-kr"):
+        return LANG_KO
     return value
 
 

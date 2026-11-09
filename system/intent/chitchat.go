@@ -56,9 +56,10 @@ func matchChitchat(text string) *Result {
 			for _, p := range phrases {
 				// Whole-phrase match: "hi" must not match inside "this".
 				matches := containsPhrase(t, p)
-				// Japanese has no word separators: a social phrase inside a
-				// question must fall through to the agent (e.g. 何している？).
-				if lang == i18n.LangJA {
+				// Japanese has no word separators and Korean attaches endings to
+				// words: a social phrase inside a longer request must fall through
+				// to the agent (e.g. 何している？, 미안한데 불 좀 켜줘).
+				if lang == i18n.LangJA || lang == i18n.LangKO {
 					matches = t == strings.TrimRight(p, ".!?,。！？，")
 				}
 				if !matches {
