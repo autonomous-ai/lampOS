@@ -1,6 +1,6 @@
 ## 2026-11-09 — resume and report partial forget cleanup
 
-Ready for lamp-voice: no (#5803 is draft; native CI and two reads pending).
+Ready for lamp-voice: no (#5803 is draft; Tests' independent privacy read is pending).
 
 - Reconciled Queue #4710 and its continuation #5385. #4850 was closed by
   the PM as a duplicate: #5024 shipped the room-reminder policy in train
@@ -35,10 +35,17 @@ Ready for lamp-voice: no (#5803 is draft; native CI and two reads pending).
   42581991904 passed. ARM64 42581992034 built release binaries but its
   first test attempt stopped at 6,558 passed / 1 failed / 108 skipped:
   unchanged Skills repeat-pose fixture expected (3, 0, 3), saw (3, 0, 2).
-  New cleanup cases had not run. The failure is retained on the PR; a
-  single retry of the failed job is running on the same commit, with no
-  source edit, timeout increase or skip. Reviewer-three and Tests have
-  the READ ASK. No ready claim.
+  New cleanup cases had not run in that first attempt. The failure is
+  retained on the PR. Attempt 2 passed on the same commit: 14,787 passed,
+  108 skipped, and the remaining workflow stages succeeded. New cleanup
+  cases, the six tests that failed on the Mac, and the Skills fixture all
+  passed. No source edit, timeout increase or skip was used for the retry.
+- Reviewer-three gave READ-OK on `8addf65fb` after an independent 19-test
+  pass. Tests' second read remains required. The separate existing
+  `forget_my_face` / `face_and_memory` adapter drops partial cleanup
+  outcomes; its P2 is raised to the PM in Queue comment 6735574143. The PR
+  explicitly covers direct `forget_everything` results, not that adapter.
+  No lamp access, deployment or live spoken-response claim.
 - Docs checker: nine tests, 191 docs and 1,885 local links, zero broken.
   The grouped sanitizer sample remains recorded, but is not cold first
   use. An isolated fresh-process fixture passed 1/1: first 0.162282 ms,
