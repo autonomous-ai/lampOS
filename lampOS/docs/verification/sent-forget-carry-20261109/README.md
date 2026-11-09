@@ -70,3 +70,56 @@ Before lifting the HOLD, cover late completion/fallback, unadmitted forget,
 unknown-send accounting, multiple attempts, latest-origin selection and reused
 model call IDs. This one failing Engine case does not establish those controls,
 whole-suite success, real-model behavior or the separate acoustic stop target.
+
+## Additional Engine controls
+
+The unadmitted-forget control starts from words asking only for a send. The
+model proposes a face forget after the send completes, and the test waits
+until the refused call has actually appeared in a subsequent model request
+before cutting again. It requires no forget-runner admission or speech cut,
+retains the original receipt canaries, and still prevents a repeated write.
+
+The late-receipt control holds the original send beyond its modeled deadline,
+then waits for actual face-forget runner admission before releasing the send.
+Only the retained send timestamp is moved back to model expiry; this does not
+measure a real twenty-second timeout. Before release, the resumed request must
+say the send is unconfirmed. After the genuine receipt arrives, content-free
+status may become confirmed, but original argument/result/raw-call-ID canaries
+must remain absent and the write count must stay one. A note must not claim
+that discarded call/results accompany the words. The test waits for the real
+watch receiver to observe completion before the second interruption.
+
+These controls exercise controlled runner futures, not a real service or a
+physical lamp. The complete sent_write module returned nine passed and two failed in 3.17s
+(exit 101, no ignored cases). The primary regression still fails at its original
+argument canary. The late-receipt case fails at the raw call-ID canary after
+its one-write assertion; the same panic contains the argument and result
+canaries. The unadmitted-forget control passes. Raw output is retained at
+`/tmp/fourth-face-sent-write-controls-status-policy.log`. The exact final command was `cargo +1.96.0 test --offline -p lamp-voice
+--lib second_provider::tests::sent_write:: -j 2 -- --test-threads=1`, with the
+same cache/debug environment above. Formatting and strict Voice all-target
+Clippy also passed (exit codes 101 / 0 / 0); Clippy used
+`cargo +1.96.0 clippy --offline -p lamp-voice --all-targets -j 2 -- -D warnings`. These do not replace the additional fallback/multiple-attempt
+and latest-origin checks required for the production repair.
+
+## Independent native Linux evidence
+
+[ARM64 run42661995793](https://github.com/autonomous-ai/lampOS/actions/runs/42661995793)
+checked out exact `6c82603f93eb4f28c0e333b8575f694053cb2a46`, tree
+`0a6ec1e36553040ed7fb8360e6b6b7eee6c82e70`. Release compilation passed.
+The Engine case above executed and was the sole failure: both payload canaries
+were restored while the duplicate-send guard held. Nextest reported12,934
+passed, one failed and111 skipped, with2,034 tests not run after fail-fast;
+execution time272.587s, test step exit100. Later doc/own-harness/export stages
+were skipped. This is independent failure reproduction, not full-suite success.
+[Linux Clippy42662002329](https://github.com/autonomous-ai/lampOS/actions/runs/42662002329)
+passed whole-workspace strict all-target checks at the same source. Local raw
+logs are `/tmp/fourth-repro-arm64-42661995793-job.log` and
+`/tmp/fourth-repro-clippy-42662002329-job.log`.
+
+The remaining repair-specific checks include a private `services::send_state`
+fallback after admission, unresolved/asked/refused outcomes after forget,
+truthful content-free status after late success, and admission crossing a
+previously cloned receipt before publication. Existing multiple-attempt,
+latest-origin and reused-call-ID controls do not themselves include forget;
+they must continue passing and the redaction must remain bound to each attempt.
