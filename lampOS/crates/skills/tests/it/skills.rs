@@ -565,16 +565,17 @@ fn every_skill_folder_says_its_kind_and_version() {
             .filter(|skill| !skill.enabled)
             .map(|skill| skill.name.as_str())
             .collect::<Vec<_>>(),
-        ["bedtime-morning", "comfort-break"],
-        "every existing scene and skill retains its enabled default; Comfort break is on only by its [present] (#5207)"
+        ["comfort-break"],
+        "every existing scene and skill retains its enabled default; Comfort break is on only by its [present] (#5207); Bedtime and Morning is on since #5753"
     );
 }
 
 #[test]
 fn disabled_skills_enter_neither_tools_nor_body_metadata() {
     let dir = tempfile::tempdir().unwrap();
-    let bedtime = load(&skills_root().join("bedtime-morning")).unwrap();
-    assert!(!bedtime.enabled);
+    // Comfort break, disabled by its own file (on only by its `[present]`).
+    let core = load(&skills_root().join("comfort-break")).unwrap();
+    assert!(!core.enabled);
     let disabled = load(&skill_with(
         dir.path(),
         "disabled-body",
@@ -595,7 +596,7 @@ fn disabled_skills_enter_neither_tools_nor_body_metadata() {
     .unwrap();
     // Passing the full inventory directly must not advertise disabled
     // tools or include their body grant in the text-origin restriction.
-    let mut inventory = vec![bedtime, disabled];
+    let mut inventory = vec![core, disabled];
     assert_eq!(tools_file(&inventory), serde_json::json!({"tools":[]}));
     inventory.push(quiet);
     assert_eq!(

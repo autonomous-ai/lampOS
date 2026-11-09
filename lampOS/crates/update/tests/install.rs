@@ -2371,6 +2371,35 @@ fn the_product_reads_a_lone_known_face_and_a_carried_line_as_theirs() {
     }
 }
 
+/// Bedtime and Morning comes on in the product with its night caps (#5753):
+/// the skill installed enabled, and the output caps on in each part that
+/// keeps them, Actions (the store and the mixer), Skills (its `[limits]`)
+/// and the voice (the ring), so the light and volume stay under the night's
+/// ceilings from 21:00 to 06:00 (#2804's nights on lamp-06c1, 22-23 Oct).
+#[test]
+fn the_product_runs_bedtime_and_morning_with_its_night_caps() {
+    let mut lamp = Lamp::new(197, &[]);
+    lamp.install().unwrap();
+    let bedtime = lamp_skills::load(&lamp.on("/var/lib/lampOS/skills/bedtime-morning")).unwrap();
+    assert!(bedtime.enabled, "Bedtime and Morning is installed off");
+    assert!(bedtime.permissions.output_limits);
+    for name in [
+        "lamp-actions.service",
+        "lamp-skills.service",
+        "lamp-voice.service",
+    ] {
+        let unit = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1;
+        assert!(
+            section(unit, "Service").contains(&"Environment=LAMP_OUTPUT_CAPS=on"),
+            "{name} lacks LAMP_OUTPUT_CAPS=on"
+        );
+    }
+}
+
 /// #2860: the product sees who speaks, the eyes reading each face's speaking
 /// and the voice reading it, so a full update gives one lamp what the
 /// real-face run had.
@@ -2983,8 +3012,8 @@ fn an_install_puts_a_core_skills_changed_file_back_and_says_so() {
 }
 
 /// The first builder on #2585 (22:24): a disabled core skill turned on
-/// stays on through an install. Bedtime and Morning ships off; turned on by
-/// hand, the next install keeps it on and records it in lamp-skills' state
+/// stays on through an install. Comfort break ships off by its own file
+/// (Bedtime and Morning did before #5753); turned on by hand, the next install keeps it on and records it in lamp-skills' state
 /// folder, so an install with its file gone writes it turned on again.
 #[test]
 fn a_disabled_core_skill_turned_on_stays_on_through_an_install() {
@@ -2992,7 +3021,7 @@ fn a_disabled_core_skill_turned_on_stays_on_through_an_install() {
     lamp.install().unwrap();
     let state_dir = lamp.on("/var/lib/lampos-skills-state");
     fs::create_dir_all(&state_dir).unwrap();
-    let folder = lamp.on("/var/lib/lampOS/skills/bedtime-morning");
+    let folder = lamp.on("/var/lib/lampOS/skills/comfort-break");
     let toml = folder.join("skill.toml");
     let shipped = fs::read_to_string(&toml).unwrap();
     assert!(!lamp_skills::load(&folder).unwrap().enabled);
@@ -3002,7 +3031,7 @@ fn a_disabled_core_skill_turned_on_stays_on_through_an_install() {
     assert!(lamp_skills::load(&folder).unwrap().enabled);
     assert_eq!(
         fs::read_to_string(state_dir.join("on")).unwrap(),
-        "bedtime-morning\n"
+        "comfort-break\n"
     );
     // The choice is the record's, not only the file's.
     fs::remove_file(&toml).unwrap();
@@ -3011,7 +3040,7 @@ fn a_disabled_core_skill_turned_on_stays_on_through_an_install() {
 }
 
 #[test]
-fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
+fn the_installed_bedtime_skill_is_live_and_adds_no_function() {
     let mut lamp = Lamp::new(195, &[]);
     lamp.install().unwrap();
     let root = lamp.on("/var/lib/lampOS/skills");
@@ -3027,12 +3056,13 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     // product units' LAMP_NUDGES_PRESENT=on (#5207).
     // Sit back since its played check with a person (#5208, 4 Nov).
     // The FAQ, How to use the lamp, since #5790.
+    // Bedtime and Morning since its nights on lamp-06c1 (#5753).
     assert_eq!(installed.len(), 31);
     let bedtime = installed
         .iter()
         .find(|skill| skill.name == "bedtime-morning")
         .unwrap();
-    assert!(!bedtime.enabled);
+    assert!(bedtime.enabled);
     assert!(bedtime.tool.is_none());
     assert_eq!(bedtime.kind, lamp_skills::SkillKind::Core);
     assert_eq!(bedtime.version.as_deref(), Some("1.0.0"));
@@ -3052,7 +3082,8 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     );
     assert!(root.join("bedtime-morning/SKILL.md").is_file());
     // Inventory includes the disabled core and its grants; only live skills
-    // contribute functions. The twenty-two live skills (with music sway and
+    // contribute functions. The twenty-three live skills (with Bedtime and
+    // Morning, which declares none, since #5753) (with music sway and
     // watch you leave since #2834, Head pat and its wiggle, which declare
     // none, and Sit back, which shares wellbeing_nudges) offer Dance,
     // prepare_to_unplug, hidden at run time unless LAMP_UNPLUG=on, the
@@ -3067,9 +3098,10 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
         .find(|line| line.split_whitespace().next() == Some("bedtime-morning"))
         .unwrap();
     assert_eq!(
-        row.split_whitespace().take(4).collect::<Vec<_>>(),
-        ["bedtime-morning", "core", "1.0.0", "disabled;"]
+        row.split_whitespace().take(3).collect::<Vec<_>>(),
+        ["bedtime-morning", "core", "1.0.0"]
     );
+    assert!(!row.contains("disabled;"), "{row}");
     assert!(
         listed
             .lines()
@@ -3082,8 +3114,8 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     );
     let (live, errors) = lamp_skills::load_all(&root);
     assert!(errors.is_empty(), "{errors:?}");
-    assert_eq!(live.len(), 22);
-    assert!(live.iter().all(|skill| skill.name != bedtime.name));
+    assert_eq!(live.len(), 23);
+    assert!(live.iter().any(|skill| skill.name == bedtime.name));
     // Each core skill installed off is disabled on the lamp and adds no
     // function, its tool or not: the 5 above are all a session is told.
     for (name, _) in install::PRODUCT_SKILLS_OFF {
@@ -3101,13 +3133,7 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
         lamp_skills::tools_file(&installed),
         lamp_skills::tools_file(&live)
     );
-    // Even a caller that passes the disabled file directly cannot subscribe
-    // its triggers or advertise it beside the product's live tools.
-    assert!(
-        lamp_skills::Engine::new(vec![bedtime.clone()], true)
-            .topics()
-            .is_empty()
-    );
+    // Live, it adds no function of its own.
     assert_eq!(
         lamp_skills::tools_file(std::slice::from_ref(bedtime)),
         serde_json::json!({"tools":[]})
@@ -3115,7 +3141,7 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
 }
 
 #[test]
-fn product_routine_state_is_private_persistent_and_keeps_new_switches_off() {
+fn product_routine_state_is_private_persistent_and_its_switches_owned() {
     let mut lamp = Lamp::new(196, &[]);
     lamp.install().unwrap();
     for (unit, directory, variable, flag, path) in [
@@ -3163,13 +3189,14 @@ fn product_routine_state_is_private_persistent_and_keeps_new_switches_off() {
         assert!(Path::new(path).starts_with(format!("/var/lib/{directory}")));
     }
     // Night sleep is a skill (#940): Skills' routines and Expression's rest
-    // requests are on, each in its own unit only; the caps stay off.
+    // requests are on, each in its own unit only; Bedtime and Morning's
+    // night caps are on in Actions, Skills and the voice (#5753).
     for (unit, text) in install::PRODUCT {
         for line in section(text, "Service") {
             for (switch, owner) in [
                 ("LAMP_SKILL_ROUTINES", "lamp-skills.service"),
                 ("LAMP_REST_REQUESTS", "lamp-expression.service"),
-                ("LAMP_OUTPUT_CAPS", ""),
+                ("LAMP_OUTPUT_CAPS", "lamp-actions.service"),
             ] {
                 assert_eq!(
                     line == format!("Environment={switch}=on"),
@@ -3177,7 +3204,9 @@ fn product_routine_state_is_private_persistent_and_keeps_new_switches_off() {
                     "{unit}: {line}"
                 );
                 if line.contains(&format!("{switch}=on")) {
-                    assert_eq!(*unit, owner, "{line}");
+                    let caps = switch == "LAMP_OUTPUT_CAPS"
+                        && ["lamp-skills.service", "lamp-voice.service"].contains(unit);
+                    assert!(*unit == owner || caps, "{line}");
                 }
             }
         }
