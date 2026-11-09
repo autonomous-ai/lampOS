@@ -136,6 +136,25 @@ the original request/call identity. Missing or invalid spoken context
 refuses media. Written requests, Messages requests and Messages
 `speak=true` never create this context or grant playback.
 
+On the second voice route, an offer plays only when the spoken line that led
+to the call asks to play something (#5764,
+`lamp_voice::requested_audio::asks_to_play`). Some sentence of the line must
+start, past greetings and one lead-in such as "can you", "could I", "I'd like
+to" or "let's", with an ask: play, put on, put some or put something, turn
+on, start, hear, listen to, or Vietnamese "mở/bật/phát nhạc", "mở/bật/phát
+bài" or "cho tôi/mình/em nghe". A sentence with "don't", "not", "never",
+"no", "stop" or "đừng" does not ask. Otherwise Voice drops the offer and
+tells the model `{"error": NOT_ASKED_TO_PLAY}`: nothing plays, and it must
+not say it is playing. It is never told the skill's confirmation. This
+check is in code, so a skill's "only when explicitly asked" text is no longer
+the only check. On lamp-52e6 on 9 Nov, "Lamp, I listened to some relaxing music on
+the train this morning, it was really nice." got a `use_skill` call and the
+relaxing-music offer; it is refused now. It sits behind
+`LAMP_REQUESTED_AUDIO` with no switch of its own. The check is a word list:
+an ask in other words or another language is refused, and the person can say
+it plainly. The Live route has no line text when a call arrives and does not
+run this check yet.
+
 A typed direct skill call or translated `use_skill` call whose tool is named
 in catalog `body` metadata is refused before calling the Skills socket,
 whether requested audio is off or on. Ordinary typed non-body calls and
