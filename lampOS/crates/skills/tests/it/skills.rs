@@ -7986,9 +7986,6 @@ struct ToolProgram {
     /// [`ToolProgram::restart_voice`].
     heard: std::sync::Mutex<Option<lamp_bus::Publisher>>,
     _running: Running,
-    /// The body's gaze socket, bound as lamp-body binds it with a measured
-    /// `--gaze`; `None` for a body whose gaze is not measured (#5766's P2).
-    _gaze: Option<UnixDatagram>,
 }
 
 impl ToolProgram {
@@ -8032,22 +8029,6 @@ impl ToolProgram {
 
     /// As [`ToolProgram::with`], the program run with `env` set.
     fn with_env(name: &str, toml: &str, shows: &[(&str, &str)], env: &[(&str, &str)]) -> Self {
-        Self::start(name, toml, shows, env, true)
-    }
-
-    /// As [`ToolProgram::with`], beside a body with no measured gaze: its
-    /// gaze socket is not listened on, as lamp-body runs without `--gaze`.
-    fn without_gaze(name: &str, toml: &str) -> Self {
-        Self::start(name, toml, &[], &[], false)
-    }
-
-    fn start(
-        name: &str,
-        toml: &str,
-        shows: &[(&str, &str)],
-        env: &[(&str, &str)],
-        measured_gaze: bool,
-    ) -> Self {
         // Short: a socket's whole path has to fit in 103 bytes.
         let dir = tempfile::Builder::new()
             .prefix("tp")
@@ -8090,7 +8071,6 @@ impl ToolProgram {
         let mood = UnixDatagram::bind(root.join("mood.sock")).unwrap();
         mood.set_read_timeout(Some(Duration::from_millis(200)))
             .unwrap();
-        let gaze = measured_gaze.then(|| UnixDatagram::bind(root.join("gaze.sock")).unwrap());
         let tools = root.join("tools");
         let clock = Clock::at(&root);
         let running = Running(
@@ -8102,8 +8082,6 @@ impl ToolProgram {
                     root.join("bus").as_os_str(),
                     "--mood-socket".as_ref(),
                     root.join("mood.sock").as_os_str(),
-                    "--gaze-socket".as_ref(),
-                    root.join("gaze.sock").as_os_str(),
                     "--actions-socket".as_ref(),
                     root.join("actions.sock").as_os_str(),
                     "--tools-dir".as_ref(),
@@ -8137,7 +8115,6 @@ impl ToolProgram {
             voice,
             heard: std::sync::Mutex::new(None),
             _running: running,
-            _gaze: gaze,
         }
     }
 
@@ -8329,37 +8306,6 @@ body = { mood = "reading", for = "10s", toward = -0.5 }
         held.len() >= 4 && held.iter().all(|pose| *pose == turned),
         "{after:?}"
     );
-}
-
-/// #5766's P2: a body with no measured gaze (a factory lamp's, no `--gaze`)
-/// cannot turn its reading pose toward a place. A call that asks the turn
-/// is refused, visibly: the model is told the lamp can't turn to it and to
-/// ask the person to move the thing in front of the lamp, and no turned
-/// pose is asked of the body. The first, plain look still runs.
-#[test]
-fn a_turn_toward_a_place_is_refused_aloud_by_a_body_with_no_gaze() {
-    let point = r#"
-tool = "point_light"
-[choice]
-name = "toward"
-about = "Where."
-one_of = ["ahead", "left"]
-default = "ahead"
-[[do]]
-body = { mood = "reading", for = "10s" }
-say = "Say whether you can see it."
-[[do]]
-if_choice = ["left"]
-body = { mood = "reading", for = "10s", toward = -0.5 }
-"#;
-    let program = ToolProgram::without_gaze("point", point);
-    assert_eq!(program.call("point_light", "{}")["ok"], true);
-    let turned = r#"{"level":0,"mood":"reading","toward":-0.5}"#;
-    let left = program.call("point_light", r#"{"toward":"left"}"#);
-    assert_eq!(left["ok"], false, "{left}");
-    assert_eq!(left["error"], lamp_skills::CANNOT_TURN, "{left}");
-    let after = program.poses(Duration::from_secs(2));
-    assert!(after.iter().all(|pose| pose != turned), "{after:?}");
 }
 
 /// #4135: a `stand` step is a percent of the lamp's own stand, 1 to 100,
