@@ -26,7 +26,7 @@ say = { from = "onboarding" }
 
 # The walk reads this checked data once when Voice starts. Physical proof stays in Voice.
 [onboarding]
-order = ["where_you_sit", "who_you_are"]
+order = ["where_you_sit", "who_you_are", "touch", "how_you_sound"]
 reoffer_after_s = 86400
 # A step nobody tried (no words, push, tap or call): `later`, offered again this long after the walk, then once after reoffer_after_s (#3996).
 later_after_s = 1800
@@ -47,15 +47,15 @@ after_answers = 1
 words = "(If you said their name back or asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise call setup_step with step \"who_you_are\" now, before you say anything else: done once you know their name, skipped if they would rather not.)"
 
 [onboarding.steps.how_you_sound]
-first = "(Say only this, nothing before or after it: \"Now I'll learn how you call me. When I stop talking, say 'Hey Lamp' from your seat, the way you'd get my attention. I'll ask until I've heard you three times.\")"
-reoffer = "(Say only this, nothing before or after it: \"Now I'll learn how you call me. When I stop talking, say 'Hey Lamp' from your seat, the way you'd get my attention. I'll ask until I've heard you three times.\")"
-later_reoffer = "(Say only this, nothing before or after it: \"Earlier we skipped how you call me. Let's try it now.\")"
+first = "(Say only this, nothing before or after it: \"When you want me, say 'Hey Lamp' first. Try it now.\")"
+reoffer = "(Say only this, nothing before or after it: \"When you want me, say 'Hey Lamp' first. Try it now.\")"
+later_reoffer = "(Say only this, nothing before or after it: \"Earlier we skipped saying 'Hey Lamp'. Let's try it now.\")"
 skipped = "(Say only this, nothing before or after it: \"Okay, we'll skip how you call me for now.\")"
 
 [onboarding.steps.touch]
-first = "(Say only this, nothing before or after it: \"OK, next step. Tap the top of my head once, then let go.\")"
-reoffer = "(Say only this, nothing before or after it: \"One more thing: tap the top of my head once, then let go.\")"
-later_reoffer = "(Say only this, nothing before or after it: \"Earlier we skipped the tap on my head. Let's try it now.\")"
+first = "(Say only this, nothing before or after it: \"Try petting the top of my head.\")"
+reoffer = "(Say only this, nothing before or after it: \"One more thing: try petting the top of my head.\")"
+later_reoffer = "(Say only this, nothing before or after it: \"Earlier we skipped petting my head. Let's try it now.\")"
 skipped = "(Say only this, nothing before or after it: \"Okay, we'll skip the touch for now.\")"
 
 [onboarding.steps.privacy]
@@ -94,15 +94,15 @@ sit_turn = "(Say only this, nothing before or after it: \"I can see you at the e
 sit_done = "(Say only this, nothing before or after it: \"Got it, I can see you well there.\")"
 sit_failed = "(Say only this, nothing before or after it: \"I still can't see you well there. That's fine, you can turn me toward your seat later.\")"
 who_again = "(That was not their name. Ask exactly this: \"Sorry, what should I call you?\")"
-touch_remind = "(Say only this, nothing before or after it: \"I didn't feel that. Touch the very top of my head with your fingertip, once.\")"
-touch_done = "(Say only this, nothing before or after it: \"Got it, I felt that.\")"
+touch_remind = "(Say only this, nothing before or after it: \"I didn't feel that. Try petting the top of my head.\")"
+touch_done = "(Say only this, nothing before or after it: \"That feels nice.\")"
 touch_failed = "(Say only this, nothing before or after it: \"I didn't feel a tap this time. That's fine, you can redo the setup later. Just ask me to redo the setup.\")"
 privacy_done = "(Say only this, nothing before or after it: \"Got it, the switch closes my microphones.\")"
 privacy_done_camera = "(Say only this, nothing before or after it: \"Got it, the switch closes my microphones and my camera.\")"
 privacy_failed = "(Say only this, nothing before or after it: \"The switch check didn't finish. You can try it again later by redoing the setup. Just ask me to redo the setup.\")"
 near_again = "(Say only this, nothing before or after it: \"Got it. Say 'Hey Lamp' once more.\")"
-near_missed = "(Say only this, nothing before or after it: \"I didn't catch that. Say 'Hey Lamp' again, from your seat.\")"
-near_done = "(Say only this, nothing before or after it: \"Got it, that's three.\")"
+near_missed = "(Say only this, nothing before or after it: \"I didn't catch that. Say 'Hey Lamp' once more.\")"
+near_done = "(Say only this, nothing before or after it: \"Got it. Just say 'Hey Lamp' whenever you want me.\")"
 near_failed = "(Say only this, nothing before or after it: \"I couldn't learn how you call me this time. That's fine, you can redo the setup later. Just ask me to redo the setup.\")"
 sentence_first = "(Say only this, nothing before or after it: \"Now say any sentence to me, the way you'd talk to me.\")"
 sentence_louder = "(Say only this, nothing before or after it: \"Say another sentence from your seat, a little louder.\")"
