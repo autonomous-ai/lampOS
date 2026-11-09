@@ -4100,11 +4100,13 @@ impl Onboarding {
                 if name_only {
                     self.name_only(false, told);
                 }
-                // The step said is the step the record skipped (#3769).
+                // The step said is the step the record skipped (#3769),
+                // before the walk's closing line when it was the last step
+                // (the Reviewer-lead's P2 on #5809).
                 if outcome == Outcome::Skipped
                     && let Some(line) = self.definition.skipped(step)
                 {
-                    self.owed = Some(line.to_owned());
+                    self.owed_after = self.owed.replace(line.to_owned());
                 }
             } else if by_face && step == Step::WhoYouAre {
                 // Saved while another step was led, or before this one was
