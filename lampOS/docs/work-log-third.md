@@ -1,3 +1,39 @@
+## 2026-11-09 — native adapter green; context carry and resolved mail hold
+
+- #5874 `b7420fea1` exact-head ARM64 42616309383 passed 14,855 tests,
+  110 skipped; Linux Clippy 42616309349 and docs 42616309313 passed.
+  Checked head SHA and native summary. Second's supplemental read does
+  not count as independent. El started a read (6740573255); PM placement
+  and the other privacy read remain outstanding. Draft stays explicit.
+- Context's full original local gate: strict 14-package Clippy and workspace
+  build passed. Voice library 5,407 passed / 3 failed / 17 ignored. Two
+  unchanged wordless-call tests exceeded the Mac socket address bound;
+  their module passes 6/0 with `/tmp/q`. Revoked-scope retry request-count
+  failure passes unchanged alone. Module rerun 26/1 failed a different stop
+  request-count case, which also passes alone. Original failures retained;
+  no whole-module or full-suite all-pass claim, cause not established.
+- Committed context as `802a4d65f`, rebased all three explicit patches onto
+  train 754 `aaa34f618`. Range-diff is equal for all: El `05e6f6af3`, adapter
+  `c608e05e1`, context `71522a05b`. Carry checks include claim-evidence
+  integration and the new onboarding case; native context CI still awaits
+  publication. #5792 and #5856 remain open; preserve both pre-await actions
+  when composing them. Face audio cancellation is outside Third's boundary.
+- #5826: new 128 MiB Linux child caps addressed the PDF source finding.
+  Quoted filename semicolons still lost security/extension suffixes;
+  exact parser probes initially 1/2, then 3/0 after `a633b2450`. Unsupported
+  RFC2231 charsets still lost markers; `aab9b1421` now marks them, invalid
+  UTF-8 and NUL names unchecked. Exact final name helpers pass 4/0.
+  [READ-OK 6740593337](https://github.com/autonomous-ai/lampOS/pull/5826#issuecomment-6740593337)
+  lifts Third's source holds. No native limit, live account or lamp test
+  claimed; other reads, exact-head CI and product-unit acceptance remain.
+- #5863: Twelve accepted Third's send-evidence P2/P3. Second independently
+  reproduced the same-batch loss through Engine and added older-request
+  completion overwriting newer evidence. Readers withdrew their approvals;
+  new head and rereads remain pending. No live external write by Third.
+- Queue read through 6740650408 at 19:59 GMT+7. Latest lead direction:
+  promote at 07:00 tomorrow after tonight's fixes and acceptance. Third
+  has no lamp and makes no deployment or promote.
+
 ## 2026-11-09 — adapter draft and face-context regressions
 
 - Adapter published as draft [#5874](https://github.com/autonomous-ai/lampOS/pull/5874)
