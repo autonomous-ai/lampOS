@@ -734,9 +734,28 @@ listening. The person wins over each, as "Who wins" says.
   `turn.end` still ends that conversation.
 - **`turn.end`** sends `{"skill":"control","turn":"end","id":N}` with the id
   of this computer's latest begun turn. With no turn of its own it is
-  refused `busy`, "not this computer's turn", and the voice isn't asked;
-  with no id kept and a start asked that the voice hasn't begun yet,
-  `busy`, "this computer's turn has not begun yet". The
+  refused `busy`, "not this computer's turn", and the voice isn't asked.
+  **A start of its own the door hasn't seen begin** is ended first,
+  whatever earlier turn's id is kept (lamp-75c9, 9 Nov: a `turn.end` 2 s
+  after a `turn.start` sent the earlier turn's id and was refused "not this
+  computer's turn"). The door can't tell a start the voice still has
+  waiting from one whose prompt it is saying, or whose window it has just
+  opened (Second's P2 on #5870), so it never answers from its own view: it
+  writes `{"cancel":true}` on that start's own say-socket connection (as it
+  connects, if it hasn't yet), and the voice ends the start in whichever
+  phase it is: let go while it waits, with no cue and no window; its prompt
+  cut and its window never opened; or its window closed, a line the person
+  begins after it being theirs. The reply waits for the voice's answer to
+  the start, at most 2 s: `{"turn":"ended","started":N}` (the start's
+  request) once it is ended; `refused`, "the turn had already finished",
+  if it had; `refused`, "the voice did not say within 2 s whether it
+  ended", if no answer came (the cancel stands). The start's `done` is
+  `dropped`, "ended by this computer before it began", when the voice let
+  it go waiting, else `dropped: ended by the computer` (tests
+  `a_turn_end_ends_its_own_start_still_waiting`,
+  `a_turn_end_while_its_prompt_is_said_ends_the_turn_at_the_voice`; the
+  voice's `a_start_its_computer_cancels_ends_while_prompting_or_open`).
+  Otherwise the
   reply waits for the voice: `{"turn":"ended","started":18}` (the
   `turn.start` it ended) on `ended`; the voice's "not this computer's turn"
   is the same `busy`; anything else is `refused` with the voice's why. The

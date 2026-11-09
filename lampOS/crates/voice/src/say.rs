@@ -1074,6 +1074,14 @@ impl Ticket {
         }
     }
 
+    /// [`Self::own`] for a computer's turn's prompt, cut as the asker's own
+    /// say would be when its asker cancels the turn ([`CANCEL_LINE`]).
+    pub(crate) fn own_for(asker: &Ticket) -> (Self, mpsc::Receiver<Answer>) {
+        let (mut ticket, answered) = Self::own(asker.skill());
+        ticket.cancel = Arc::clone(&asker.cancel);
+        (ticket, answered)
+    }
+
     /// The voice began the turn at `at_us`. A client that has gone is
     /// nothing to the voice.
     pub fn begun(&self, at_us: u64) {
@@ -1102,6 +1110,13 @@ impl Drop for Ticket {
 #[cfg(test)]
 pub(crate) fn ticket_for_test(skill: &str) -> (Ticket, mpsc::Receiver<Answer>) {
     Ticket::own(skill)
+}
+
+/// The cancel its asker's [`CANCEL_LINE`] sets, for a test that cancels a
+/// ticket after the voice took it.
+#[cfg(test)]
+pub(crate) fn cancel_of_test(ticket: &Ticket) -> Cancel {
+    Arc::clone(&ticket.cancel)
 }
 
 /// A ticket whose asker has cancelled it ([`CANCEL_LINE`]), for a test of
@@ -2130,12 +2145,19 @@ fn serve_client(
                 let mut gone = matches!(request.words, Words::TurnStart { .. })
                     .then(|| Arc::new(AtomicBool::new(false)));
                 // Watched before the voice has it, so that a cancel sent at
-                // once is never missed. A turn is ended by `turn: "end"`,
-                // never by a cancel: its connection is not watched.
+                // once is never missed. A turn start's too: lamp-control
+                // cancels a start of its computer's not yet begun at the
+                // door, whether the voice still has it waiting, says its
+                // prompt or has just opened its window (Second's P2 on
+                // #5870); a begun one is ended by `turn: "end"`.
                 let cancel = Cancel::default();
-                if !matches!(request.words, Words::TurnStart { .. } | Words::TurnEnd(_)) {
-                    watch =
-                        watch_for_cancel(&stream, std::mem::take(&mut kept), Arc::clone(&cancel));
+                if !matches!(request.words, Words::TurnEnd(_)) {
+                    watch = watch_for_cancel(
+                        &stream,
+                        std::mem::take(&mut kept),
+                        Arc::clone(&cancel),
+                        gone.clone(),
+                    );
                 }
                 if ask
                     .send(Asked {
@@ -2176,6 +2198,7 @@ fn serve_client(
                             Ok(Answer::Done(outcome)) => break outcome,
                             Err(mpsc::RecvTimeoutError::Timeout) => {
                                 if let Some(gone) = gone.as_ref()
+                                    && watch.is_none()
                                     && asker_went(&stream)
                                 {
                                     gone.store(true, Ordering::Release);
@@ -2220,7 +2243,15 @@ impl CancelWatch {
 /// cancelled: another asker's, the person's turn and the voice's own words
 /// are never reached from here. A connection closed, an error or a line
 /// past [`MOST_LINE_BYTES`] ends the watch and cancels nothing.
-fn watch_for_cancel(stream: &UnixStream, rest: Vec<u8>, cancel: Cancel) -> Option<CancelWatch> {
+/// With `gone` (a turn start's), the connection closing is told there too:
+/// [`asker_went`] reads the connection, so it is never used beside a watch
+/// that could miss a cancel it took.
+fn watch_for_cancel(
+    stream: &UnixStream,
+    rest: Vec<u8>,
+    cancel: Cancel,
+    gone: Option<Arc<AtomicBool>>,
+) -> Option<CancelWatch> {
     let reader = stream.try_clone().ok()?;
     let answered = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let ended = Arc::clone(&answered);
@@ -2242,7 +2273,12 @@ fn watch_for_cancel(stream: &UnixStream, rest: Vec<u8>, cancel: Cancel) -> Optio
                     return;
                 }
                 match (&reader).read(&mut piece) {
-                    Ok(0) => return,
+                    Ok(0) => {
+                        if let Some(gone) = gone.as_ref() {
+                            gone.store(true, Ordering::Release);
+                        }
+                        return;
+                    }
                     Ok(read) => line.extend_from_slice(&piece[..read]),
                     Err(error)
                         if matches!(
@@ -2251,7 +2287,12 @@ fn watch_for_cancel(stream: &UnixStream, rest: Vec<u8>, cancel: Cancel) -> Optio
                                 | io::ErrorKind::TimedOut
                                 | io::ErrorKind::Interrupted
                         ) => {}
-                    Err(_) => return,
+                    Err(_) => {
+                        if let Some(gone) = gone.as_ref() {
+                            gone.store(true, Ordering::Release);
+                        }
+                        return;
+                    }
                 }
             }
         })
