@@ -916,8 +916,12 @@ other keys are `service_read`'s own for a fixed read: `count` (1 to 10),
 `query` (search words), `id`, `repo`, `calendar`, `project` and
 `workspace` (each 1 to 1,000 bytes); never `from` or `to`, nor a free-form
 read's `graphql`, `variables`, `path`, `params`, `tool` or `arguments`.
-`query` is searched for (Drive's `fullText contains`), never an order:
-Drive lists files newest first (`orderBy = modifiedTime desc`) and mail
+`query` is searched for, each word in a file's name or its text (Drive's
+`name contains` or `fullText contains`, a name's `_`, `-` and `.` splitting
+words), and comes back by relevance, as Drive refuses an order beside
+`fullText` (HTTP 400; lamp-3e83, 9 Nov: a file asked for by its name was
+never found). It is never an order: with no `query` Drive lists files newest
+first (`orderBy = modifiedTime desc`) and mail
 comes newest first, so a read of the latest leaves it out; an order or the
 latest alone ("order by modifiedTime desc", "newest") is refused
 (`service_read::ordering`, after a lamp's made skill read 0 files with
