@@ -1,3 +1,14 @@
+## 2026-11-09 12:33 ICT — resumed; first-update app wait
+
+Ready for release: no (app #129 needs review and #5667's paired lamp check).
+
+- Refreshed current lamp-voice, read the Queue continuation to #5385 and the intervening Fourth handoffs. #4848 was carried by Friday as #5326 and landed (`746b0e0245`); both old and carried reads are recorded. Closed #4782 per Faye's 4 November instruction because its off/on played acceptance never arrived. Branch retained; no activation or device change.
+- Built the explicitly assigned #5458 app half in an isolated checkout of autonomous-ai/ecm-sds-mobile. Draft PR #129, `1db3166c`, branch `fourth/setup-update-first-20261109`: typed status capability opt-in; visible update phases; new-run LAN marker required; 17-minute monotonic budget; no cloud early success; uncertain POST is not resubmitted. Old devices omit the new request field. Timed-out status transports close, and disposed pages start no further polling.
+- Source review caught a stale completion after current progress; fixed by requiring the completed response itself to have a run newer than baseline, with a regression. #5667 keeps setup alive; unexpected counter reset stays unconfirmed. Final independent source spot-check found no remaining P1/P2.
+- App gates: make gen completed, unrelated generated churn restored; formatting/diff checks clean. Focused tests 40 + 29 passed (69 distinct); final selected suite rerun 32 passed, final transport rerun 2 passed. Changed-file Flutter analyzer clean. Full Flutter analyzer exited 1 with 28 diagnostics in untouched files, not reported as a pass. Commands and limits are in the PR body.
+- Host mock status request through parsing and connection closure: first response 8.199 ms, maximum of 20 repeated responses 1.727 ms; 30 ms timeout closed in 40.672 ms. Five-second phase-display target after LAN polling begins is design only. No native iOS/Android build, live network/device measurement, lamp access, deployment or merge. Requested app reader and paired #5667 check on #5458 and Queue #5385.
+- Provider-queue forget cancellation remains a separate outstanding follow-up. The root tracked worktree is unchanged; inherited .harness/ and capture.pcap left alone.
+
 ## 2026-11-01 18:14 ICT — train 501 gates green; scoped source reads
 
 Ready for lamp-voice: no (#4848 needs TWO READS; #4782 needs its lamp replay).
