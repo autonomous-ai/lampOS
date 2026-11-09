@@ -1,3 +1,11 @@
+## 2026-11-09 22:20 ICT — interruption repair independently checked and carried
+
+Ready for lamp-voice: no. Third fixed #5878 at `7d6633bb85b634dfdc2a73681d9b2ac05b0d5f9d`. Independent exact-head source review confirms carried rounds clear before either admitted runner await, with post-return reset and stale-batch suppression retained. Native filters passed: interruption 3, face context 5, held forget 31, held rename 18, test after-forget 3, helper after-forget 9. Counts overlap; two runs ignored the existing manual measurement. Fourth's HOLD on 170cf2d1c9 is lifted in 6743626456; El retains its own disposition. Held interruption is a control, not independently demonstrated fail-first.
+
+The face-speech composition carries that repair as `9ea950e5fd`, with the six-file extension preserved byte-for-byte by stable patch ID. All three interruption cases pass in the composition. Full voice validation is now running. The superseded broad run was deliberately stopped: 28 completed groups, 1,934 passes, 2 failures, 12 ignores, not a full pass. Its unchanged Cloud Wi-Fi backoff test measured 420.572208 ms against 300 ms; Keeper's bus-root mode test returned 0770 against 02770. Causes are not established and focused reruns remain owed. Logs retain both failures and exit 130. No validation of the superseded source is represented as final-source coverage.
+
+Queue and own-PR sweep through 15:15:14 UTC found no new findings on #5856/#5858/#5861/#5865 or repair evidence on #5667. Train757 advanced integration to a1642b2333, touching control and onboarding; current carries need that base before publication. Photo carry qualification is delegated separately with a lean target. No device, acoustic, promotion or activation claim.
+
 ## 2026-11-09 21:57 ICT — face speech extension reproduced; context dependency HOLD retained
 
 Ready for lamp-voice: no. PM assigned face queued-speech cancellation at the same one-second acoustic bar (6740970251). Working branch `fourth/face-forget-speech-20261109`, checkout `/tmp/fourth-face-speech-20261109`, composes train756 `4342bcccc8`, #5856/#5858, #5792 and Third's #5874/#5878. The two overlapping admission sites retain both pre-await rename cleanup and speech cancellation. Production face change is only the two cancellation predicates; memory-only receipt classification is unchanged.
