@@ -59,8 +59,8 @@
 //!
 //! `look` at `face` and at `name` are not in this release, and refused as
 //! that. `joints`' `yaw` and `pitch` go as the holder's look, the same
-//! degrees from home; its `roll`, `shoulder` and `elbow` wait for the body's
-//! goal stream. Not routed yet, each refused with what it waits for: `play`
+//! degrees from home; its `roll`, `shoulder` and `elbow` as the holder's
+//! pose, on the same socket. Not routed yet, each refused with what it waits for: `play`
 //! and `sound` (a client's package,
 //! with the Store's packaging). State and events from the
 //! bus come in their own piece.
@@ -526,6 +526,7 @@ impl Lamp {
                 client: client.to_owned(),
                 re,
                 line: json!({ "look": look }).to_string(),
+                join: None,
             })
             .map_err(|_| not_here("the body's lease"))?;
         if let Some(follow) = &self.follow {
@@ -538,53 +539,78 @@ impl Lamp {
     /// the holder's look on the body's lease socket, said `"from":"home"`:
     /// the body takes its pose's offset off, so a standing lamp's stand pose
     /// doesn't move the frame (its `done` says where the head got to, from
-    /// home too). A joint
-    /// not named stays where it is now, as `get` `body` says it; with no
-    /// position heard in the last 15 s (the body stopped or restarted) it
-    /// is refused, never sent from an old one. `roll`,
-    /// `shoulder` and `elbow` wait for the body's own goal stream.
+    /// home too). The head's `roll` and the arm's `shoulder` and `elbow` go
+    /// as the holder's pose on the same socket (`{"pose":…}`, lamp-body's
+    /// `Posing`), in degrees as `get` `body` counts them: the roll from its
+    /// found home, the arm from the folded arm; the body takes a pose only
+    /// while it stands, inside the arm's window, and says `refused` with why
+    /// otherwise. A `joints` naming both sends both lines, and its one `done`
+    /// comes when both are answered ([`crate::body_lease::Join`]).
+    ///
+    /// When `yaw` or `pitch` is named, the other one not named stays where
+    /// it is now, as `get` `body` says it; with no position heard in the last
+    /// 15 s (the body stopped or restarted) it is refused, never sent from an
+    /// old one. An arm joint not named stays where the pose has it.
     fn joints(
         &self,
         client: &str,
         re: u64,
         targets: &crate::protocol::Joints,
     ) -> Result<Value, Error> {
-        if targets.roll.is_some() || targets.shoulder.is_some() || targets.elbow.is_some() {
-            return Err(waits_for(
-                "the body's goal stream for roll, shoulder and elbow; yaw and pitch go now",
-            ));
+        let head = targets.yaw.is_some() || targets.pitch.is_some();
+        let arm = targets.roll.is_some() || targets.shoulder.is_some() || targets.elbow.is_some();
+        let mut lines = Vec::new();
+        if head {
+            let now = |joint: &str| {
+                self.watch
+                    .as_ref()
+                    .and_then(|watch| watch.lock().ok().map(|watch| watch.state(StateKind::Body)))
+                    .and_then(|body| body["joints"][joint]["deg"].as_f64())
+                    .map(|deg| deg as f32)
+            };
+            let (Some(yaw), Some(pitch)) = (
+                targets.yaw.or_else(|| now("yaw")),
+                targets.pitch.or_else(|| now("pitch")),
+            ) else {
+                return Err(Error::new(
+                    ErrorCode::Refused,
+                    "name both yaw and pitch while the body has not said where it is in the last 15 s (get body)",
+                ));
+            };
+            lines.push(json!({"look": {"yaw": yaw, "pitch": pitch, "from": "home"}}).to_string());
         }
-        let now = |joint: &str| {
-            self.watch
-                .as_ref()
-                .and_then(|watch| watch.lock().ok().map(|watch| watch.state(StateKind::Body)))
-                .and_then(|body| body["joints"][joint]["deg"].as_f64())
-                .map(|deg| deg as f32)
-        };
-        let (Some(yaw), Some(pitch)) = (
-            targets.yaw.or_else(|| now("yaw")),
-            targets.pitch.or_else(|| now("pitch")),
-        ) else {
-            return Err(Error::new(
-                ErrorCode::Refused,
-                "name both yaw and pitch while the body has not said where it is in the last 15 s (get body)",
-            ));
-        };
+        if arm {
+            let mut pose = serde_json::Map::new();
+            for (name, degrees) in [
+                ("roll", targets.roll),
+                ("shoulder", targets.shoulder),
+                ("elbow", targets.elbow),
+            ] {
+                if let Some(degrees) = degrees {
+                    pose.insert(name.to_owned(), json!(degrees));
+                }
+            }
+            lines.push(json!({ "pose": pose }).to_string());
+        }
         let Some(looks) = &self.looks else {
             return Err(Error::new(
                 ErrorCode::Refused,
                 "the body's lease socket is not on here",
             ));
         };
-        looks
-            .send(crate::body_lease::Look {
-                client: client.to_owned(),
-                re,
-                line: json!({"look": {"yaw": yaw, "pitch": pitch, "from": "home"}}).to_string(),
-            })
-            .map_err(|_| not_here("the body's lease"))?;
+        let join = (lines.len() > 1).then(crate::body_lease::Join::default);
+        for line in lines {
+            looks
+                .send(crate::body_lease::Look {
+                    client: client.to_owned(),
+                    re,
+                    line,
+                    join: join.clone(),
+                })
+                .map_err(|_| not_here("the body's lease"))?;
+        }
         // As any look taken: a hand-follow ends.
-        if let Some(follow) = &self.follow {
+        if head && let Some(follow) = &self.follow {
             *follow.lock().expect("follower") = None;
         }
         Ok(json!({"to": "body"}))
@@ -2147,7 +2173,8 @@ mod tests {
 
     /// `joints`' yaw and pitch go as the holder's look (the same degrees
     /// from home); a joint not named stays where `get` `body` says it is;
-    /// roll and the arm wait for the body's goal stream.
+    /// roll and the arm go as the holder's pose, and one naming both sends
+    /// both lines under one join.
     #[test]
     fn joints_yaw_and_pitch_go_as_the_holders_look() {
         let (looks, mut looked) = tokio::sync::mpsc::unbounded_channel();
@@ -2200,20 +2227,40 @@ mod tests {
             serde_json::from_str::<Value>(&looked.try_recv().unwrap().line).unwrap(),
             json!({"look": {"yaw": 4.0, "pitch": 3.0, "from": "home"}})
         );
-        let error = lamp
-            .act(
-                "c_1",
-                15,
-                &joints(
-                    r#"{"id":15,"op":"joints","lease":"l_1","targets":{"roll":3},"within_ms":300}"#,
-                ),
-                0,
-            )
-            .unwrap_err();
+        // Only the arm: one pose line, no look, no join.
+        lamp.act(
+            "c_1",
+            15,
+            &joints(r#"{"id":15,"op":"joints","lease":"l_1","targets":{"roll":3,"shoulder":10},"within_ms":300}"#),
+            0,
+        )
+        .unwrap();
+        let pose = looked.try_recv().unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&pose.line).unwrap(),
+            json!({"pose": {"roll": 3.0, "shoulder": 10.0}})
+        );
+        assert!(pose.join.is_none() && looked.try_recv().is_err());
+        // The head and the elbow: a look and a pose, sharing one join.
+        lamp.act(
+            "c_1",
+            17,
+            &joints(r#"{"id":17,"op":"joints","lease":"l_1","targets":{"yaw":2,"pitch":1,"elbow":-5},"within_ms":300}"#),
+            0,
+        )
+        .unwrap();
+        let (look, pose) = (looked.try_recv().unwrap(), looked.try_recv().unwrap());
+        assert_eq!(
+            serde_json::from_str::<Value>(&look.line).unwrap(),
+            json!({"look": {"yaw": 2.0, "pitch": 1.0, "from": "home"}})
+        );
+        assert_eq!(
+            serde_json::from_str::<Value>(&pose.line).unwrap(),
+            json!({"pose": {"elbow": -5.0}})
+        );
         assert!(
-            error.why.contains("roll, shoulder and elbow"),
-            "{}",
-            error.why
+            look.join
+                .is_some_and(|join| pose.join.is_some_and(|other| Arc::ptr_eq(&join, &other)))
         );
         // The body not heard for 15 s (stopped or restarted): the unnamed
         // pitch is refused, never sent from where the head was before.
