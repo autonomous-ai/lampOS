@@ -312,7 +312,7 @@ fn run() -> Result<()> {
             let asked=std::env::var(lamp_voice::agent_tasks::ASKED_ENVIRONMENT).as_deref()==Ok("on");
             // LAMP_TASKS_QUESTIONS=on, with asked: a question for the staff is theirs, as a question task.
             let questions=asked&&std::env::var(lamp_voice::agent_tasks::QUESTIONS_ENVIRONMENT).as_deref()==Ok("on");
-            let place=lamp_voice::agent_tasks::Place{directory:"/nonexistent".into(),target:lamp_voice::agent_tasks::DEFAULT_TARGET.into(),who:false,lead_in,asked,accounts:false,machine_names:false,needs:None,staff_note:false,named_only:false,correct:false,sign_in:false,sign_in_app:false,questions,now:false,one_yes:false};
+            let place=lamp_voice::agent_tasks::Place{directory:"/nonexistent".into(),target:lamp_voice::agent_tasks::DEFAULT_TARGET.into(),who:false,lead_in,asked,accounts:false,machine_names:false,needs:None,staff_note:false,named_only:false,correct:false,sign_in:false,sign_in_app:false,questions,now:false,one_yes:false,reply_named:false};
             // With the switch, each session is told after the persona what a lamp's would be (#854).
             let note=lamp_voice::agent_tasks::session_note(&place).unwrap_or_default();
             let colour=lamp_gemini::Tool{name:"light_colour".into(),description:"Set the colour of your own light when you are asked to.".into(),parameters:Some(serde_json::json!({"type":"object","properties":{"colour":{"type":"string","enum":["white","warm","red","green","blue","purple"]}},"required":["colour"]})),silent:false};
