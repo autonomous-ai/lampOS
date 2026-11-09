@@ -380,6 +380,7 @@ async fn talk_about_music_gets_no_recording_and_the_model_is_told_so() {
             false,
         ),
         ("Lamp, what kind of music helps people relax?", false),
+        ("Lamp, play some relaxing music. Actually, don't.", false),
         ("Lamp, can you play some relaxing music?", true),
     ] {
         for wrapped in [false, true] {
