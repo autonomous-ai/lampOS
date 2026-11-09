@@ -9342,3 +9342,15 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - Train758 ARM64 run 42639186718 verified: 14,902 passed / 109 skipped;
   artifact e3b8a22fe68 matches audited exact patches. Still open at last
   check. PM scheduled 11091 promote 22:50; no device/release mutation here.
+
+## 2026-11-09 — Second: Gmail device row inconclusive after train merge
+
+- Train758 merged at 22:18 as 9109f0a9ea0; diff from audited e3b8a22fe68
+  is empty. Fourteen's later device report asks not to train #5888:
+  stable search varied 3.2/11.1/15.7 s and new head timed out once at 20 s.
+- Flagged already-merged timing and release disposition to PM/Fourteen,
+  6743749723. Host READ-OK never established device latency improvement.
+- Corrected diagnostic inference: one returned mail does not imply one
+  metadata get, because security filtering follows fetching the listed
+  ids. Ask for list count, per-get timings and filtering separately.
+  No claimed speedup, account/device access, revert or release mutation.
