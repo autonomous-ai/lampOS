@@ -1,3 +1,30 @@
+## 2026-11-09 — train 757 carries and follow-up reads
+
+- Prepared context 507fab1ff on a1642b233; all four patches range-diff
+  equal to the published 7d6633bb8 stack. Keeping context remote at the
+  standalone fix while El/Fourth reread and ARM64 42640206486 runs.
+  Exact fix-head Linux 42640206498 and docs 42640206540 passed.
+- Train757 local fmt/strict 14-package Clippy/workspace build/docs pass.
+  Focused cases total 163 passing, one manual timing ignored. The first
+  person_scope_seen run was 67/3: all three failed at UnixListener::bind
+  with sandbox PermissionDenied. The unchanged full filter passed 70/0
+  outside the sandbox. Logs retain both; no runtime fix was needed.
+- Adapter d3db5014f pushed on train757 with equal patch and format/docs
+  passed; combined branch gates contain identical adapter source. Native
+  42641983518 and Linux 42641983691 run. El's read carries; second
+  independent reader/PM placement remains. Comment 6743505129.
+- Fourth's scoped old-head HOLD 6743354806 confirms the same interruption
+  issue and no additional P1/P2. New fix already supplied in 6743268079;
+  neither reader's HOLD is silently lifted by passing tests.
+- Closed requested #5863 follow-up with source READ-OK 6743314052 at
+  47977686cc: attempt identity fixes reused call-ID suppression and docs
+  match journal tails. No new Cargo/live-service/device claim.
+- Supplemental #5890 onboarding clause check: exact-source helper 8/8,
+  rerun locally; comment 6743398532. Second retains formal review/docs
+  follow-up. Split chunks and word-overlap limits remain explicit.
+- Older #4641 ring stir and #5590 pressing touch await physical rows;
+  no local implementation work was taken from their lamp holders.
+
 ## 2026-11-09 — interrupted forget fix published
 
 - El's HOLD 6742634543 reproduced: cutting the awaited face or ordinary
