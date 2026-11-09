@@ -1113,6 +1113,10 @@ fn worker_command(
             role,
             var(crate::tools::schedule_asked::ENVIRONMENT).as_deref(),
         ))
+        .envs(skill_asked_worker_environment(
+            role,
+            var(crate::tools::skill_asked::ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_observe_worker_environment(
             role,
             var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
@@ -1685,6 +1689,17 @@ fn schedule_asked_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::tools::schedule_asked::ENVIRONMENT, "on"))
+}
+
+// A plain ask for a light scene or a light show calls its skill
+// (`tools::skill_asked`), passed the same narrow way: the exact `on`, to the
+// second route, whose chat can be made to call a function.
+fn skill_asked_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::tools::skill_asked::ENVIRONMENT, "on"))
 }
 
 // The clock's switch (#830), passed the same narrow way: the exact `on`, to
@@ -2653,6 +2668,13 @@ mod tests {
                         "LAMP_SCHEDULE_ASKED",
                         ["second"].as_slice(),
                     ),
+                    // A plain ask for a light scene or a light show calls
+                    // its skill: the second route alone.
+                    (
+                        skill_asked_worker_environment,
+                        "LAMP_SKILL_ASKED",
+                        ["second"].as_slice(),
+                    ),
                     // The observation pass, the route with a model (#1693 (2)).
                     (
                         memory_observe_worker_environment,
@@ -2898,6 +2920,7 @@ mod tests {
                     crate::remember::ROOM_SPEAKER_ENVIRONMENT,
                     crate::remember::asked::ENVIRONMENT,
                     crate::tools::schedule_asked::ENVIRONMENT,
+                    crate::tools::skill_asked::ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
@@ -3269,6 +3292,7 @@ mod tests {
                     "LAMP_SECOND_WRITTEN_WAIT=on",
                     "LAMP_SERVICES_TOLD=on",
                     "LAMP_SHORT_DONE=on",
+                    "LAMP_SKILL_ASKED=on",
                     "LAMP_STOP_WORDS_KEYTERM=on",
                     "LAMP_TASKS_NAMED_ASK=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",

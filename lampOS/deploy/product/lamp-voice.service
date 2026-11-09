@@ -419,6 +419,9 @@ Environment=LAMP_MEMORY_KEEP_ASKED=on
 # And a line that plainly asks for a timer or a reminder calls the function that sets it (lamp-4ace, 25 Oct:
 # "remind me in three minutes to call my sister" got "Three minutes, call your sister." and no call).
 Environment=LAMP_SCHEDULE_ASKED=on
+# And a line that is only a plain ask for a light scene or a light show calls its skill (lamp-52e6, 9 Nov: "movie
+# light" and "show me a light show" were answered in words and no call, and the light never changed).
+Environment=LAMP_SKILL_ASKED=on
 # A line is a known person's only when their own face was seen speaking it, else the room's (#3437, reviewer-three's
 # P1 and P2 on #3435): so what the memory keeps without being asked, and "forget everything about me", reach only
 # the person who said it.

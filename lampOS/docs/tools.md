@@ -297,6 +297,21 @@ and none of the skills' own (`crate::use_skill`):
   - **As a skill's call in every other way:** it waits for the Policy's hold,
     it never runs on a reply, its answer may ask for a look, and the request
     counts as one in which the lamp acted.
+- **A plain ask that must call its skill** (`LAMP_SKILL_ASKED=on`, the
+  second route, on in the product unit; #5744, #5745): a line that is only
+  "movie light", "reading light", "night light", "light show", "party
+  lights" and the like, beside a greeting, the lamp's name, "wait",
+  "please" or "show me a" (`tools::skill_asked::asks_for`), has its first
+  chat round sent with `tool_choice` naming `use_skill` and its `skill`
+  told only `light_scene` or `light_show`, when `use_skill` offers that
+  skill now; the scene or the show is still the model's. Any other word,
+  two asks, a skill not offered and a round after a call are asked as
+  before. On lamp-52e6 on 9 Nov (build 10883) both skills were offered with
+  lines naming those asks, and "Lamp, movie light." (2 of 2) and "Lamp,
+  show me a light show." (3 of 3) were answered in words with no call;
+  "reading light" and "light my book" did call. Host tests:
+  `a_plain_ask_for_a_scene_or_a_show_is_told_apart`,
+  `a_plain_ask_forces_its_skill_only_when_offered`.
 - **A skill installed or removed** changes no function's name, so each skill
   `use_skill` reaches is counted as `use_skill:<skill>` against what the
   session was given, and the session is renewed for it as for any change.
