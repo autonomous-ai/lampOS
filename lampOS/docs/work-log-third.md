@@ -1,3 +1,31 @@
+## 2026-11-09 — cleanup carry ready; adapter verification continues
+
+Ready for lamp-voice: yes for #5803 at `7fc6ca20e`; no for the separate
+uncommitted face-forget adapter.
+
+- #5803 is out of draft and NEXT TRAIN is posted in Queue comment
+  6737937503. Rebased on `3d8afb415`, it has the identical stable patch ID
+  as `8addf65fb`, approved independently by Reviewer-three and Tests.
+  It merges cleanly and has no new HOLD.
+- Fresh ARM64 run 42599743611 passed on attempt 1: 14,831 passed,
+  109 skipped, remaining workflow stages successful. Linux Clippy
+  42599743595 and docs 42599743650 also passed on `7fc6ca20e`.
+- Local carry gates passed: formatting, strict 14-package Clippy,
+  19 focused tests, workspace build and docs (192 files, 1,890 links,
+  zero broken). The first sandbox run was denied at UnixListener::bind;
+  the permitted retry passed with no source change. Historical host and
+  earlier native failures remain recorded, not relabelled as this run.
+- The adapter branch was unstacked onto `3d8afb415`; every authored
+  added/removed line remained identical. Final formatting and strict
+  14-package Clippy passed; all seven focused functional regressions pass.
+  The full serial package tests and workspace build are still running.
+- Fresh-process adapter timing passed: first 48,760 ns, repeated p95
+  2,285 ns, maximum 2,721 ns over 100 repeats. Boundary is adapter entry
+  to result only, excluding deletion/IPC/startup/model/device behavior.
+- Asked the first builder for the next no-device Third item (6737697578).
+  #3646 stays held under #5222 and Store's eventual rebase ownership.
+  No lamp access, deployment, live model or spoken-response claim.
+
 ## 2026-11-09 — face-forget adapter follow-up
 
 Ready for lamp-voice: no (regression and implementation in progress).
