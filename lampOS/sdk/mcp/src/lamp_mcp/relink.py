@@ -28,6 +28,11 @@ from websockets.exceptions import WebSocketException
 # update about a minute). The same as the SDK's `keep_connected`.
 PAUSES = (1.0, 2.0, 5.0, 10.0)
 
+# Events that answer one request on one connection (a `done` matches its
+# request's number, a `lease` its lease): never made again on a new
+# connection, whose request numbers start over (Second's P2 on #5830).
+REQUEST_SCOPED = ("done", "lease")
+
 
 class Relink:
     """A `Lamp` that connects again after the lamp restarts."""
@@ -41,6 +46,9 @@ class Relink:
         self._held: list[tuple[str, Any, list[str] | None]] = []
         self.connections = 1
         self.gave_up: BaseException | None = None
+        # Ends when the connection of the moment does: a wait for a request
+        # takes it when it asks, so it ends `closed` with its connection.
+        self.gone: asyncio.Future = asyncio.get_running_loop().create_future()
         self._task = asyncio.ensure_future(self._keep())
 
     @classmethod
@@ -56,7 +64,8 @@ class Relink:
         return getattr(self._lamp, name)
 
     def on(self, event: str, handler: Any, *, phrases: list[str] | None = None):
-        self._held.append((event, handler, phrases))
+        if event not in REQUEST_SCOPED:
+            self._held.append((event, handler, phrases))
         return self._lamp.on(event, handler, phrases=phrases)
 
     def off(self, event: str, handler: Any) -> None:
@@ -68,6 +77,8 @@ class Relink:
 
     async def close(self) -> None:
         self._task.cancel()
+        if not self.gone.done():
+            self.gone.set_result(None)
         await self._lamp.close()
 
     async def _keep(self) -> None:
@@ -82,6 +93,8 @@ class Relink:
                     break
                 except LampError:
                     continue
+            if not self.gone.done():
+                self.gone.set_result(None)
             failures = 0
             while True:
                 await asyncio.sleep(self._pauses[min(failures, len(self._pauses) - 1)])
@@ -98,6 +111,7 @@ class Relink:
                     break
                 failures += 1
             self._lamp = lamp
+            self.gone = asyncio.get_running_loop().create_future()
             self.connections += 1
             print(f"lamp-mcp: connected again ({self.connections})", file=sys.stderr, flush=True)
             for entry in list(self._held):

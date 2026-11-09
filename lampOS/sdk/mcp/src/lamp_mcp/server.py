@@ -228,6 +228,22 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     # Nine's nine/mcp-follow).
     follow_now: list = []
 
+    async def ended_on(ended: asyncio.Future, gone: asyncio.Future | None, timeout: float):
+        """`ended`'s result, or `asyncio.TimeoutError` after `timeout`. With
+        `gone` (the connection the request was sent on, `Relink.gone`), a
+        connection that ends first ends the wait `closed`: its `done` can't
+        come on another connection (Second's P2 on #5830)."""
+        if gone is None:
+            return await asyncio.wait_for(asyncio.shield(ended), timeout)
+        waiting = asyncio.ensure_future(asyncio.shield(ended))
+        done, _ = await asyncio.wait({waiting, gone}, timeout=timeout, return_when=asyncio.FIRST_COMPLETED)
+        if waiting in done:
+            return waiting.result()
+        waiting.cancel()
+        if gone in done:
+            raise ToolError("closed: the connection to the lamp closed before this ended; lamp-mcp connects again by itself")
+        raise asyncio.TimeoutError
+
     def held() -> list[str]:
         now = clock()
         for lease in [lease for lease, lapses in leases.items() if lapses <= now]:
@@ -311,6 +327,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             nonlocal asked
             asked = id_
 
+        gone = getattr(lamp, "gone", None)
         lamp.on("lease", follow)
         lamp.on("done", follow)
         try:
@@ -328,7 +345,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 # follow, once the head is there (docs/control.md, "Looking").
                 return f"{op} taken by the {sent['to']}; its lease lapses within {ACTION_LEASE_MS // 1000} s"
             try:
-                what, how, why_ended = await asyncio.wait_for(asyncio.shield(ended), ACTION_LEASE_MS / 1000)
+                what, how, why_ended = await ended_on(ended, gone, ACTION_LEASE_MS / 1000)
             except asyncio.TimeoutError:
                 # No `done` yet (the server sends it once actions reach the
                 # parts): the lease lapses by itself; it is never held open.
@@ -585,6 +602,9 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 if event.get("re") == asked and not ended.done():
                     ended.set_result(event)
 
+            # The connection it's sent on: a wait ends `closed` when that one
+            # ends, never on another connection's done (#5830's relink).
+            gone = getattr(lamp, "gone", None)
             lamp.on("done", heard)
             try:
                 fields = {"text": text, **({"rephrase": True} if rephrase else {})}
@@ -597,7 +617,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 if not wait:
                     return "taken: the lamp says it once the person isn't talking"
                 try:
-                    done = await asyncio.wait_for(asyncio.shield(ended), MOST_WAIT_S)
+                    done = await ended_on(ended, gone, MOST_WAIT_S)
                 except asyncio.TimeoutError:
                     return f"taken; not said within {MOST_WAIT_S} s"
                 if done.get("how") == "finished":
@@ -726,6 +746,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 if event.get("re") == asked and not ended.done():
                     ended.set_result(event)
 
+            gone = getattr(lamp, "gone", None)
             lamp.on("done", heard)
             try:
                 try:
@@ -735,7 +756,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 if not wait:
                     return "turn started: the lamp answers the person's next line"
                 try:
-                    done = await asyncio.wait_for(asyncio.shield(ended), MOST_WAIT_S)
+                    done = await ended_on(ended, gone, MOST_WAIT_S)
                 except asyncio.TimeoutError:
                     return "turn started; not ended yet"
                 return f"turn {done.get('how')}" + (f": {done['why']}" if done.get("why") else "")

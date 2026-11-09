@@ -32,7 +32,10 @@ Phrases and events' fields are logged as they are, and your MCP client may keep 
 **When the lamp restarts** (every update), lamp-mcp connects again by itself
 and makes its event subscriptions again, pausing 1, 2, 5, then 10 s while the
 lamp can't be reached. A tool called while the lamp is away answers `closed`;
-the next call after it is back works. Leases end with the restart; the next
+the next call after it is back works. A tool still waiting when the connection
+ends (`lamp_say` or `lamp_start_turn` with `wait`, a body tool) ends `closed` at
+once: the new connection numbers its requests from 1 again, so the old wait is
+never ended by another request's `done`. Leases end with the restart; the next
 body tool takes a new one. It stops trying, and says why once on stderr, when
 connecting again can't mend it: the computer was removed in the app (`unpaired`),
 or another lamp answers at the address. Then pair again and restart lamp-mcp.
