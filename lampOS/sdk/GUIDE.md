@@ -14,8 +14,8 @@ rather than copying them:
 **Status words** used throughout:
 
 - **works today:** on customer lamps, shown on a test lamp running a customer
-  build (10824, or 11048, the customer build since 9 Nov 2026), with the date;
-- **in today's build, lamp run pending:** in the customer build's code (11048),
+  build (10824, 11048, or 11091, the customer build since 9 Nov 2026, 23:01), with the date;
+- **in today's build, lamp run pending:** in the customer build's code (11091),
   not yet shown on a lamp;
 - **next build:** built and merged (or in review, with its pull request); comes
   with the next update;
@@ -188,9 +188,9 @@ refusals in the lamp's own words, and its status.
   fails with `code: why`. The words shown are copied from the lamp's code. `…` marks a part
   the lamp fills in, such as a number or a name.
 - **Status** has five words. *Works today* means shown on a test lamp on a customer
-  build (stable 10824, or 11048, stable since 9 Nov 2026), with the date. *In today's build, lamp run pending* means the code is
-  on customer lamps (11048) but no run shows it yet. *Next build* means it is on the
-  development branch, not in 11048. *In development* means the lamp refuses it today and says
+  build (stable 10824, 11048, or 11091, stable since 9 Nov 2026, 23:01), with the date. *In today's build, lamp run pending* means the code is
+  on customer lamps (11091) but no run shows it yet. *Next build* means it is on the
+  development branch, not in 11091. *In development* means the lamp refuses it today and says
   so. *Planned* means it is named in the protocol but nothing serves it yet.
 - **Every op but `pair` and `hello`** needs `hello` first on the connection (`no_hello`,
   "say hello first"). A missing grant is always `no_grant`, "not granted: …" with the grant's
@@ -317,9 +317,9 @@ pairing's current grants.
 
 | Python | JavaScript | MCP tool | What it does | Grant | Limits | Answer | Refusals | Status |
 |---|---|---|---|---|---|---|---|---|
-| `lamp.push_skill(folder)`; CLI `lamp skill push FOLDER` | `lamp.pushSkill(folder)` | `lamp_skill_push(folder)` | Op `skill.push`, in parts: checks the folder (as `lamp skill check`), packs it and puts it on the lamp | `skills` | package ≤ 1 MiB; 1–32 parts of ≤ 49,152 base64 chars; `name` `a-z0-9-` ≤ 64; 1 every 10 s and 20 an hour with the rates on; a skill may ask only `body`, `light`, `speak` and `look` (presence) | `{got: N}` for each part; the last `{skill: {name, version, sha256, on, held, asks, shown}}` | `refused` "skill push is not on this lamp" (customer lamps on stable 11048; the next build's product unit turns it on); `no_grant` "not granted: skills"; `busy` "your last push is still being installed"; `busy` "another computer is pushing a skill"; `rate` "skill.push: 1 each 10 s and 20 an hour" | next build (customer lamps refuse it today). Try it on the fake lamp (`lamp fake`); `lamp skill check` works offline anywhere |
-| `lamp.skills()`; CLI `lamp skill list` | `lamp.skills()` | `lamp_skills()` | Op `skill.list`: this computer's pushed skills | `skills` | one at a time for a computer; 6 a minute with the rates on | `[{name, version, sha256, on, held, pushed_at}, ...]` | `refused` "skill push is not on this lamp"; `busy` "this computer's last skill request is still with the lamp's skill helper"; `busy` "the lamp's skill helper is busy: try again" | next build |
-| `lamp.remove_skill(name)`; CLI `lamp skill remove NAME` | `lamp.removeSkill(name)` | `lamp_skill_remove(name)` | Op `skill.remove`: takes one of this computer's skills off the lamp | `skills` | as `skill.list` | ok | as `skill.list` | next build |
+| `lamp.push_skill(folder)`; CLI `lamp skill push FOLDER` | `lamp.pushSkill(folder)` | `lamp_skill_push(folder)` | Op `skill.push`, in parts: checks the folder (as `lamp skill check`), packs it and puts it on the lamp | `skills` | package ≤ 1 MiB; 1–32 parts of ≤ 49,152 base64 chars; `name` `a-z0-9-` ≤ 64; 1 every 10 s and 20 an hour with the rates on; a skill may ask only `body`, `light`, `speak` and `look` (presence) | `{got: N}` for each part; the last `{skill: {name, version, sha256, on, held, asks, shown}}` | `refused` "skill push is not on this lamp" (customer lamps on 11048 and older; 11091's product unit turns it on); `no_grant` "not granted: skills"; `busy` "your last push is still being installed"; `busy` "another computer is pushing a skill"; `rate` "skill.push: 1 each 10 s and 20 an hour" | in today's build (11091), lamp run pending on a customer lamp; push, list, remove and a revoke shown on a test lamp under this unit, 9 Nov 2026. Try it on the fake lamp (`lamp fake`); `lamp skill check` works offline anywhere |
+| `lamp.skills()`; CLI `lamp skill list` | `lamp.skills()` | `lamp_skills()` | Op `skill.list`: this computer's pushed skills | `skills` | one at a time for a computer; 6 a minute with the rates on | `[{name, version, sha256, on, held, pushed_at}, ...]` | `refused` "skill push is not on this lamp"; `busy` "this computer's last skill request is still with the lamp's skill helper"; `busy` "the lamp's skill helper is busy: try again" | in today's build (11091), lamp run pending |
+| `lamp.remove_skill(name)`; CLI `lamp skill remove NAME` | `lamp.removeSkill(name)` | `lamp_skill_remove(name)` | Op `skill.remove`: takes one of this computer's skills off the lamp | `skills` | as `skill.list` | ok | as `skill.list` | in today's build (11091), lamp run pending |
 
 ### Device, volume, air, stop
 
@@ -454,8 +454,8 @@ grant it needs. With every grant: 27 tools. With `light` alone: 6
   (proofs, keys, nonces and pins never; said text only as its length).
 
 **STATUS:** works with the fake lamp today (lamp-mcp's own 52 tests, and a
-listing run on 9 Nov). On a customer lamp (stable 11048) a tool is refused
-where the lamp refuses its op: `lamp_skill_push` ("skill push is not on this
+listing run on 9 Nov). On a customer lamp (stable 11091) a tool is refused
+where the lamp refuses its op: `lamp_skill_push` on 11048 and older ("skill push is not on this
 lamp"), `lamp_play` ("not routed yet: waits for client packages"),
 `lamp_joints` for roll, shoulder or elbow ("not routed yet" on the customer build; next build: the body's pose), `lamp_look` at a face or a name ("not in this release").
 No MCP run on a lamp by this section's writer today.
