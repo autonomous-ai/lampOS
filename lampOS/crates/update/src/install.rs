@@ -308,7 +308,8 @@ pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf
 /// `tests/install.rs` holds the two lists equal). Those not in
 /// [`PRODUCT_SKILLS_OFF`] keep their folders' own default: Bedtime and
 /// Morning disabled by its own `enabled = false` until its lamp comparison
-/// (#1672), Light show enabled since #5745, and Comfort break
+/// (#1672), Light show enabled since #5745, Light scenes and Point the
+/// light since #5744, and Comfort break
 /// by its own but on by its `[present]` with `LAMP_NUDGES_PRESENT=on`, which
 /// the product's skills units set (#5207); those of
 /// [`PRODUCT_SKILLS_OFF`] are installed disabled until their lamp checks,
@@ -370,10 +371,12 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // A light show a person asks for (#1679): on in the product since
     // #5745, its played row on lamp-52e6 with it (trials.sh's light-show).
     "light-show",
-    // Installed disabled ([`PRODUCT_SKILLS_OFF`]).
-    "light-out",
+    // Light scenes and Point the light (#1679, #5744): asked for by a
+    // person, never on their own, reached through `use_skill`.
     "light-scenes",
     "point-light",
+    // Installed disabled ([`PRODUCT_SKILLS_OFF`]).
+    "light-out",
     "pose",
     "smoky-air",
     "dusty-air",
@@ -392,20 +395,8 @@ pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
          until the light going out and coming back has been seen on a lamp: someone reading face \
          down at the desk must never lose their light",
     ),
-    // Two of #1679's three core skills, built and not yet tried on a lamp:
-    // each comes with the product once a lamp has played it with a person
-    // (the third, Light show, since #5745).
-    (
-        "light-scenes",
-        "not yet tried on a lamp (#1679), and its function would put a product session past its \
-         32 without `LAMP_USE_SKILL=on`, on in the product since #2826",
-    ),
-    (
-        "point-light",
-        "not yet tried on a lamp (#1679): its turn needs a lamp-body with `toward` and the lamp's \
-         `--gaze`, and its function would put a product session past its 32 without \
-         `LAMP_USE_SKILL=on`",
-    ),
+    // #1679's three core skills come with the product: Light show since
+    // #5745, Light scenes and Point the light since #5744.
     // #1684's two core skills, merged off (the first builder, #1722): a
     // trial puts them on by hand. Each comes with the product once the four
     // real traces are recorded on a lamp with an air sensor and its
@@ -598,9 +589,9 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("music-sway", "skill.toml"),
     skill_file!("music-sway", "SKILL.md"),
     skill_file!("music-sway", "moves/sway.json"),
-    skill_file_off!("light-scenes"),
+    skill_file!("light-scenes", "skill.toml"),
     skill_file!("light-scenes", "SKILL.md"),
-    skill_file_off!("point-light"),
+    skill_file!("point-light", "skill.toml"),
     skill_file!("point-light", "SKILL.md"),
     skill_file!("light-show", "skill.toml"),
     skill_file!("light-show", "SKILL.md"),
