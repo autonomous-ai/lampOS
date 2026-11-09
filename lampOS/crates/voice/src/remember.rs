@@ -1599,8 +1599,34 @@ pub fn forget_face_memory(
 pub(crate) fn face_and_memory(mut face: Value, memory: &Value) -> Value {
     let emptied =
         memory["forgotten"] == true || memory["note"] == json!("I was keeping nothing of them.");
-    if emptied {
+    let mut partial = memory.get("everything").is_some_and(|value| value != true);
+    // The internal forget may clear primary memory but leave related cleanup
+    // incomplete. Carry only its fixed outcomes, never arbitrary payloads.
+    for field in [
+        "room_memory_result",
+        "sound_consent_result",
+        "face_expression_consent_result",
+    ] {
+        if let Some(value) = memory.get(field) {
+            let state = match value.as_str() {
+                Some("cleared") => "cleared",
+                Some("kept") => "kept",
+                _ => "uncertain",
+            };
+            partial |= state != "cleared";
+            face[field] = json!(state);
+        }
+    }
+    // The inner memory call does not run the outer forget-everything steps
+    // for setup name, place, voice print, journal or reminders. Never promote
+    // its completion flag to an aggregate face-and-memory success claim.
+    if partial || face.get("note").is_some() {
+        face["everything"] = json!(false);
+    }
+    if emptied && !partial {
         face["memory"] = json!("forgotten too");
+    } else if emptied {
+        face["memory"] = json!(FACE_MEMORY_PARTIAL);
     } else {
         eprintln!(
             "lamp-voice: a face was forgotten, but its person's memory could not be emptied now"
@@ -1613,6 +1639,9 @@ pub(crate) fn face_and_memory(mut face: Value, memory: &Value) -> Value {
 /// What the model is told when the face went but the person's memory
 /// couldn't be emptied ([`face_and_memory`]).
 pub const FACE_MEMORY_KEPT: &str = "Their face is forgotten, but what they told you could not be forgotten just now. Tell them so; they can ask you to forget everything.";
+
+/// Primary memory is gone, but related cleanup was not fully confirmed.
+pub const FACE_MEMORY_PARTIAL: &str = "Their face and primary memory are forgotten, but not all related cleanup was confirmed. Tell them which fixed cleanup outcomes are kept or uncertain; do not say everything was forgotten.";
 
 /// "Forget everything about me", and their face with it: once the memory of
 /// the known person whose line it is was emptied (`told`, as the model hears
@@ -14544,6 +14573,174 @@ mod tests {
                 json!({"ok": true, "memory": FACE_MEMORY_KEPT}),
                 "{memory}"
             );
+        }
+    }
+
+    /// The face adapter must not turn a partial internal forget into a
+    /// complete success, including when primary memory was already empty.
+    #[test]
+    fn face_forget_cleanup_keeps_partial_results_and_only_fixed_states() {
+        for field in [
+            "room_memory_result",
+            "sound_consent_result",
+            "face_expression_consent_result",
+        ] {
+            for (value, expected) in [
+                (json!("kept"), "kept"),
+                (json!("uncertain"), "uncertain"),
+                (json!("private cleanup canary"), "uncertain"),
+                (json!({"path": "private cleanup canary"}), "uncertain"),
+                (Value::Null, "uncertain"),
+            ] {
+                for empty in [false, true] {
+                    let mut memory = json!({"forgotten": !empty, "everything": true,
+                        "private": "private cleanup canary"});
+                    if empty {
+                        memory["note"] = json!("I was keeping nothing of them.");
+                    }
+                    memory[field] = value.clone();
+                    let told = face_and_memory(json!({"ok": true}), &memory);
+                    assert_eq!(told["ok"], true);
+                    assert_ne!(told["memory"], "forgotten too", "{memory}");
+                    assert_eq!(told["everything"], false, "{memory}");
+                    assert_eq!(told[field], expected, "{memory}");
+                    assert!(!told.to_string().contains("private cleanup canary"));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn face_forget_cleanup_never_upgrades_an_explicit_partial_result() {
+        let mut memory = json!({"forgotten": true, "everything": false,
+            "room_memory_result": "cleared", "sound_consent_result": "cleared",
+            "face_expression_consent_result": "cleared"});
+        let told = face_and_memory(json!({"ok": true}), &memory);
+        assert_eq!(told["everything"], false);
+        assert_ne!(told["memory"], "forgotten too");
+        memory["everything"] = json!(true);
+        let told = face_and_memory(json!({"ok": true}), &memory);
+        assert!(told.get("everything").is_none());
+        assert_eq!(told["memory"], "forgotten too");
+        for field in [
+            "room_memory_result",
+            "sound_consent_result",
+            "face_expression_consent_result",
+        ] {
+            assert_eq!(told[field], "cleared");
+        }
+    }
+
+    #[test]
+    fn face_forget_cleanup_preserves_partial_face_and_malformed_completion() {
+        for face in [
+            json!({"ok": true, "everything": false}),
+            json!({"ok": true, "note": crate::known_faces::FORGOTTEN_SOME_KEPT_APART}),
+        ] {
+            let told = face_and_memory(
+                face.clone(),
+                &json!({"forgotten": true, "everything": true}),
+            );
+            assert_eq!(told["everything"], false);
+            assert_eq!(told["memory"], "forgotten too");
+            assert_eq!(told["note"], face["note"]);
+        }
+        for value in [json!("private completion canary"), json!({}), Value::Null] {
+            let told = face_and_memory(
+                json!({"ok": true}),
+                &json!({"forgotten": true, "everything": value}),
+            );
+            assert_eq!(told["everything"], false);
+            assert_eq!(told["memory"], FACE_MEMORY_PARTIAL);
+            assert!(!told.to_string().contains("private completion canary"));
+        }
+    }
+
+    #[test]
+    fn face_forget_cleanup_leaves_unreported_steps_absent() {
+        for memory in [
+            json!({"forgotten": true}),
+            json!({"forgotten": false, "note": "I was keeping nothing of them."}),
+        ] {
+            let told = face_and_memory(json!({"ok": true}), &memory);
+            assert_eq!(told["ok"], true);
+            assert_eq!(told["memory"], "forgotten too");
+            for field in [
+                "everything",
+                "room_memory_result",
+                "sound_consent_result",
+                "face_expression_consent_result",
+            ] {
+                assert!(told.get(field).is_none(), "{field}: {told}");
+            }
+        }
+    }
+
+    #[test]
+    fn face_forget_cleanup_cannot_confirm_memory_from_completion_alone() {
+        for mut memory in [
+            gone(),
+            json!({"forgotten": false, "note": "private refusal canary"}),
+        ] {
+            // Even a contradictory completion flag cannot replace evidence
+            // that primary memory was emptied. The face has its own receipt.
+            memory["everything"] = json!(true);
+            memory["sound_consent_result"] = json!("cleared");
+            let told = face_and_memory(json!({"ok": true}), &memory);
+            assert_eq!(told["ok"], true);
+            assert_eq!(told["memory"], FACE_MEMORY_KEPT);
+            assert!(told.get("everything").is_none());
+            assert_eq!(told["sound_consent_result"], "cleared");
+            assert!(told.get("room_memory_result").is_none());
+            assert!(told.get("face_expression_consent_result").is_none());
+            assert!(!told.to_string().contains("private refusal canary"));
+        }
+    }
+
+    /// Run in a fresh test process for first-use and repeated adapter costs;
+    /// excludes deletion, IPC, model response, and any device interaction.
+    #[test]
+    #[ignore = "manual adapter-only latency measurement"]
+    fn face_forget_cleanup_adapter_timing() {
+        let memory = json!({"forgotten": true, "everything": false,
+            "room_memory_result": "kept", "sound_consent_result": "uncertain",
+            "face_expression_consent_result": "cleared"});
+        let mut samples = Vec::new();
+        for _ in 0..101 {
+            let face = json!({"ok": true});
+            let began = std::time::Instant::now();
+            let told = std::hint::black_box(face_and_memory(face, &memory));
+            samples.push(began.elapsed().as_nanos());
+            assert_eq!(told["everything"], false);
+        }
+        let first = samples.remove(0);
+        samples.sort_unstable();
+        println!(
+            "face_forget_cleanup_timing {}",
+            json!({"boundary": "face_and_memory entry to adapted result",
+                "first_ns": first, "repeated_p95_ns": samples[94],
+                "repeated_max_ns": samples[99], "target_ns": 1_000_000})
+        );
+    }
+
+    /// The face adapter must not turn a partial memory cleanup into success.
+    #[test]
+    fn face_forget_cleanup_partial_memory_result_stays_partial() {
+        let memory = json!({
+            "forgotten": true, "everything": false,
+            "room_memory_result": "kept",
+            "sound_consent_result": "uncertain",
+            "face_expression_consent_result": "cleared"
+        });
+        let told = face_and_memory(json!({"ok": true}), &memory);
+        assert_eq!(told["everything"], false);
+        assert_ne!(told["memory"], "forgotten too");
+        for field in [
+            "room_memory_result",
+            "sound_consent_result",
+            "face_expression_consent_result",
+        ] {
+            assert_eq!(told[field], memory[field]);
         }
     }
 

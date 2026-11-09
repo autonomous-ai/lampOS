@@ -3407,8 +3407,22 @@ then use that person's scope:
   scope is the known person's, once the eyes answer that their face is
   forgotten, the voice runs their own `forget_everything` (`forget_all` in
   their scope, their rules too, never the room's; `remember::forget_face_memory`)
-  and the model hears `memory: "forgotten too"`, or that it could not be done
-  now. The face asked for is the known person's at the lamp, under the name
+  and the model hears `memory: "forgotten too"`, that primary memory could
+  not be emptied, or that primary memory is gone but related cleanup was
+  not fully confirmed. The face-result adapter preserves an explicit
+  `everything: false` and the fixed `room_memory_result`,
+  `sound_consent_result` and `face_expression_consent_result` outcomes when
+  the internal forget reports them. Only `cleared`, `kept` and `uncertain`
+  survive; unknown values become `uncertain`, never copied private text.
+  A non-cleared or malformed outcome prevents a complete-deletion claim,
+  even when primary memory was already empty. A successful memory receipt
+  cannot upgrade a partial face result or a note about old face records
+  kept apart. The adapter never adds `everything: true`: its inner memory
+  call does not perform the outer forget-everything steps for setup name,
+  place, voice print, setup journal or reminders. Missing cleanup fields
+  remain unreported. This adds no
+  deletion call and changes no scope, ordering or deadline.
+  The face asked for is the known person's at the lamp, under the name
   the eyes keep (their known file), whatever name the model wrote: on the
   second route without `LAMP_SECOND_FACE_NAME` the model is never told the
   name, and on lamp-c0a4 its guess matched nobody. A line naming nobody
