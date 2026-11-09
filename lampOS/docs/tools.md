@@ -300,10 +300,13 @@ and none of the skills' own (`crate::use_skill`):
   second route, on in the product unit; #5744, #5745): a line that is only
   "movie light", "reading light", "night light", "light show", "party
   lights" and the like, beside a greeting, the lamp's name, "wait",
-  "please" or "show me a" (`tools::skill_asked::asks_for`), has its first
+  "please" or a request said before it ("show me a", "can you", "I'd
+  like a"; `tools::skill_asked::asks_for`), has its first
   chat round sent with `tool_choice` naming `use_skill` and its `skill`
   told only `light_scene` or `light_show`, when `use_skill` offers that
-  skill now; the scene or the show is still the model's. Any other word,
+  skill now; the scene or the show is still the model's. A preference or
+  a question ("I like movie light", "do you like movie light?") is the
+  model's: "I", "like", "do" and "you" alone are no request. Any other word,
   two asks, a skill not offered and a round after a call are asked as
   before. On lamp-52e6 on 9 Nov (build 10883) both skills were offered with
   lines naming those asks, and "Lamp, movie light." (2 of 2) and "Lamp,
