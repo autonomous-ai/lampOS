@@ -15,6 +15,7 @@ request it took. It moves nothing, so it never stands in for a lamp check.
 
 from __future__ import annotations
 
+import array
 import asyncio
 import base64
 import datetime
@@ -26,6 +27,7 @@ import math
 import os
 import random
 import ssl
+import sys
 import tempfile
 import time
 import wave
@@ -161,7 +163,9 @@ def _frames_of(data: bytes) -> int | None:
 
 
 def _clip_refusal(data: bytes) -> str | None:
-    """Why lamp-control would refuse this clip, its format and length only."""
+    """Why lamp-control would refuse this clip, in sounds.rs `check_clip`'s
+    words and order: its format, its length, a file shorter than its header
+    says, then its loudness; None for one it keeps."""
     try:
         with wave.open(io.BytesIO(data)):
             pass
@@ -172,6 +176,39 @@ def _clip_refusal(data: bytes) -> str | None:
         return "not 16-bit mono PCM at 24000 Hz"
     if not 1 <= frames <= 24_000 * 30:
         return "not 1 to 720000 frames (30 s at most)"
+    with wave.open(io.BytesIO(data)) as read:
+        pcm = read.readframes(frames)
+    # Fewer bytes than the header's frames (an odd or an even count short):
+    # hound's samples end early.
+    if len(pcm) != 2 * frames:
+        return "a WAV file cut short"
+    return _clip_loudness_refusal(pcm)
+
+
+# The voice's loudness cap on a clip, as lamp-control's sounds.rs `check_clip`
+# holds it at upload: no sample past CLIP_PEAK_DBFS, and no 10 ms window
+# (CLIP_WINDOW frames, the last one shorter) louder than CLIP_LOUDEST_DBFS RMS.
+CLIP_PEAK_DBFS = -12.0
+CLIP_LOUDEST_DBFS = -30.0
+CLIP_WINDOW = 240
+
+
+def _clip_loudness_refusal(pcm: bytes) -> str | None:
+    samples = array.array("h", pcm)
+    if sys.byteorder == "big":
+        samples.byteswap()
+    full = 32_767.0
+    if max((abs(sample) for sample in samples), default=0) > full * 10 ** (CLIP_PEAK_DBFS / 20):
+        return f"a peak past {CLIP_PEAK_DBFS:g} dBFS"
+    loudest = max(
+        (
+            math.sqrt(sum(sample * sample for sample in samples[at : at + CLIP_WINDOW]) / len(samples[at : at + CLIP_WINDOW]))
+            for at in range(0, len(samples), CLIP_WINDOW)
+        ),
+        default=0.0,
+    )
+    if loudest > full * 10 ** (CLIP_LOUDEST_DBFS / 20):
+        return f"louder than {CLIP_LOUDEST_DBFS:g} dBFS RMS over 10 ms"
     return None
 
 
