@@ -179,7 +179,7 @@ fn every_event_from_the_bus_validates_against_the_schema() {
         ("humans/faces/tracked", json!({"faces": []}), 17 * S),
         ("room/stood_up", json!({"side": "left"}), 18 * S),
         ("room/stood_up", json!({}), 18 * S),
-        ("name/heard", json!({}), 19 * S),
+        ("name/heard", json!({"score": 0.94, "ago_ms": 75}), 19 * S),
         (
             "ears/classes",
             json!({"scores": {"music": 0.9, "door": 0.7}}),

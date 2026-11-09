@@ -124,7 +124,7 @@ await lamp.closed();
   | `person.facing` | `facing` | `look` |
   | `hand` | `seen`; when seen, `x`, `y` (the palm's centre, 0–1 from the left and top), `size` (the palm's width, 0–1 of the picture's), `open`, `confidence`. By edge, at most 4 a second; `seen: false` once, 1 s after the last hand | `look` |
   | `phrase.heard` | `phrase`: one you registered (`on(..., { phrases })`), never what else was said | `hear` |
-  | `name.heard` | | `hear` |
+  | `name.heard` | `score`: how sure the listener was, 0–1 to a hundredth (real calls 0.90 to 1.00; a sound like the name has reached 0.94–0.98, so a program acting on its own may want 0.99) | `hear` |
   | `sound.heard` | `class`, `score` | `sound` |
   | `touch` | `kind` (`tap`, `pet`, `hold`), `where` | none |
   | `button` | `press` (`press`, `long_press`) | none |
@@ -251,7 +251,7 @@ subscribe.
 | `person.facing` | `facing`: true or false | `{"ev":"person.facing","facing":true}` | someone turns to the lamp, or the last one turns away | `look` |
 | `person.stood_up` | `side`: `left`, `right` or `ahead`, when the room's watcher says | `{"ev":"person.stood_up","side":"left"}` | someone in view stands up | `look` |
 | `phrase.heard` | `phrase`: one of the phrases you registered | `{"ev":"phrase.heard","phrase":"good night lamp"}` | a finished line the lamp heard holds your phrase as whole words, ignoring case and punctuation. Only the phrase leaves the lamp | `hear` |
-| `name.heard` | none | `{"ev":"name.heard"}` | someone says the lamp's name | `hear` |
+| `name.heard` | `score` | `{"ev":"name.heard","score":0.97}` | someone says the lamp's name, or a sound like it | `hear` |
 | `sound.heard` | `class`: `music`, `laughter`, `door` or `footsteps`. `score`: 0.5–1, 2 places | `{"ev":"sound.heard","class":"door","score":0.72}` | a class's score rises past 0.5 (again only after it falls under). Never speech | `sound` |
 | `touch` | `kind`: `tap` (two or more taps are one tap) or `pet`. The schema also has `hold` and `where`, not sent yet | `{"ev":"touch","kind":"pet"}` | a tap or a pet on the lamp | none |
 | `button` | `press`: `long_press`. The schema also has `press`, not sent yet | `{"ev":"button","press":"long_press"}` | the button is held | none |
