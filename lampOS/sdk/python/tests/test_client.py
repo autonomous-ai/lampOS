@@ -1950,6 +1950,25 @@ def test_a_clip_is_uploaded_in_parts_played_listed_and_removed(tmp_path):
                     await lamp.sound("chime")
                 with pytest.raises(errors.BY_CODE["bad_request"], match="not a WAV"):
                     await lamp.upload_sound("bad", b"not a wav")
+                # The lamp's loudness cap, in its words (sounds.rs `check_clip`;
+                # lamp-75c9 refused a louder clip so, 9 Nov).
+                with pytest.raises(errors.BY_CODE["bad_request"]) as raised:
+                    await lamp.upload_sound("loud", _wav(0.5, level=1_100))
+                assert raised.value.why == "clip: louder than -30 dBFS RMS over 10 ms"
+                click = bytearray(_wav(0.5, level=0))
+                click[44:46] = (9_000).to_bytes(2, "little", signed=True)
+                with pytest.raises(errors.BY_CODE["bad_request"]) as raised:
+                    await lamp.upload_sound("click", bytes(click))
+                assert raised.value.why == "clip: a peak past -12 dBFS"
+                assert await lamp.sounds() == []
+                # A file shorter than its header says, by an odd or an even count
+                # of bytes: refused as sounds.rs's hound says, and the connection
+                # goes on (Reviewer-two's P2 on #5800).
+                for short in (1, 2):
+                    with pytest.raises(errors.BY_CODE["bad_request"]) as raised:
+                        await lamp.upload_sound("short", _wav(0.01, level=0)[:-short])
+                    assert raised.value.why == "clip: a WAV file cut short"
+                    assert await lamp.sounds() == []
 
     run(go())
 
