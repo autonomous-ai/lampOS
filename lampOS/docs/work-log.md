@@ -9184,3 +9184,20 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - New bounded carried-attempt bookkeeping resolves the reproduced P3;
   Third's stale journal quotation remains a docs follow-up. Host/scripted
   service scope only. Temporary tests removed, checkout/diff check clean.
+
+## 2026-11-09 — Second: consent retry switch-on HOLD
+
+- Supplemental HOLD #5884 794d0375be, comment 6742081150: actual helper
+  tests prove three old-yes replays undo a later local no. A 32-entry cache
+  evicts the face ask through unrelated room-sound false taps; corrupt
+  history is treated as empty; or consent writes before its retry receipt
+  fails, leaving an enabled yes and no receipt, later replayable after no.
+- Three fail-first tests 0/3 in 0.49 s, existing happy-path test passes in
+  0.36 s. Saved /tmp/second-5884-replay.rs and replay-final.log, removed;
+  checkout clean. Local filesystem/fault injection only. Jarvis retains
+  named privacy read and PM default-on gate. Queue notified separately.
+- Face rebase audit: #5878 e4869f92ed preserves all three dependency/context
+  patches exactly. #5874 5be5e3745d equals dd3f2c0f1 and carried 973f775cbca.
+- First reports 11048 promoted 21:01 despite pre-promote reconnect report.
+  Reiterated both exact-build failures and corrective #5873 ask on Queue
+  6741995391. No release/device mutation by Second.
