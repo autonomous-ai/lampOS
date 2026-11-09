@@ -1,3 +1,31 @@
+## 2026-11-09 — cleanup landed; adapter gate and fallback privacy hold
+
+- #5803 landed in train 752 at `429b1f3ba`; its producer and sanitizer
+  sources are byte-identical to the reviewed carry. Train ARM64, Linux
+  Clippy and docs gates passed. The adapter and context follow-ups remain
+  separate and are not ready for integration.
+- Adapter broad serial tests completed: 10,377 passed, 5 failed, 57 ignored
+  across 102 targets. Four unchanged macOS journal-retention failures remain.
+  Voice also observed two requests instead of one in `off_no_second_try_goes`;
+  unchanged isolated rerun passed, then its full 27-test module passed.
+  Cause unconfirmed; the original failure is retained. Formatting and strict
+  14-package Clippy and final workspace build passed. Adapter committed as
+  `b7420fea1` for draft CI and two privacy reads, not a readiness claim.
+- Context now has five prepared fail-first regressions, including El's
+  same-turn Marisol sequence. El's #5792 is carried as `65b96359b` with an
+  identical patch; PM confirmed Third owns this boundary (6739812875).
+  Production reset is still unchanged; no passing context test is claimed.
+- Took fallback privacy read of #5826 at `bee0274d3`. HOLD 6739696223:
+  PDF preflight does not bound actual parser/decompression/predictor
+  allocations; filename truncation and ignored continuations discard
+  security evidence; MIME PDF selection bypasses forbidden extensions.
+  Source and locked-dependency review only for the first two. An exact
+  selection-function Rust probe passed one and failed one for the third.
+  No real mail fetch, parser bomb, device action or deployment was run.
+- #5851 P3 was fixed and Third restated READ-OK on `cf0acbac9c`; its
+  independent reduced bookkeeping probes pass 2/0. Other readers own
+  lifting their holds. Queue read through 6739863002 at 19:18 GMT+7.
+
 ## 2026-11-09 — face-context assignment and baseline regressions
 
 Ready for lamp-voice: #5803 remains NEXT TRAIN. The separate adapter and
