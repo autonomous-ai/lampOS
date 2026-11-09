@@ -8608,3 +8608,17 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   failure. Third correctly keeps `everything: true` out of the inner-memory
   result, which cannot attest to the outer cleanup; product ownership stays
   with Third.
+
+## 2026-11-09 — Second: motion correlation HOLD lifted
+
+- READ-OK #5835 `e960a54133cbde626654a1930520853eaee05a15`.
+  Original independent real-TLS two-socket regression passes in 0.41 s;
+  clean-head full control suite passes 191 tests, serially. Connection identity
+  survives all pending outcomes and is stripped before exact-socket delivery.
+  Registration precedes dispatch, with withdrawal on send failure.
+- `cargo test -q -p lamp-control --no-fail-fast -- --test-threads=1` passed
+  from lampOS. Initial repo-root invocation failed camera configuration;
+  retained separately. No new independent P1/P2; known same-name matching
+  ambiguity remains. No device/latency or First default-change acceptance.
+- Removed the two completed #5819 probe worktrees after byte-for-byte saved
+  diff verification and checking no untracked files; proof hashes agree.
