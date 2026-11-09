@@ -368,14 +368,15 @@ mod kept {
     static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
     /// The newest requests a read answered in.
     static READ_IN: Mutex<VecDeque<u64>> = Mutex::new(VecDeque::new());
-    /// The last send's answer, by its request ([`super::sent_answer`]).
-    static SENT: Mutex<Option<(u64, Value)>> = Mutex::new(None);
+    /// The last send past the gate, by its request, with what it was told
+    /// once it was ([`super::send_state`]).
+    static SENT: Mutex<Option<(u64, Option<Value>)>> = Mutex::new(None);
     pub fn pending<R>(f: impl FnOnce(&mut Option<Pending>) -> R) -> R {
         f(&mut PENDING
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner()))
     }
-    pub fn sent<R>(f: impl FnOnce(&mut Option<(u64, Value)>) -> R) -> R {
+    pub fn sent<R>(f: impl FnOnce(&mut Option<(u64, Option<Value>)>) -> R) -> R {
         f(&mut SENT.lock().unwrap_or_else(|poisoned| poisoned.into_inner()))
     }
     pub fn read_in<R>(f: impl FnOnce(&mut VecDeque<u64>) -> R) -> R {
@@ -395,12 +396,12 @@ mod kept {
     thread_local! {
         static PENDING: RefCell<Option<Pending>> = const { RefCell::new(None) };
         static READ_IN: RefCell<VecDeque<u64>> = const { RefCell::new(VecDeque::new()) };
-        static SENT: RefCell<Option<(u64, Value)>> = const { RefCell::new(None) };
+        static SENT: RefCell<Option<(u64, Option<Value>)>> = const { RefCell::new(None) };
     }
     pub fn pending<R>(f: impl FnOnce(&mut Option<Pending>) -> R) -> R {
         PENDING.with(|cell| f(&mut cell.borrow_mut()))
     }
-    pub fn sent<R>(f: impl FnOnce(&mut Option<(u64, Value)>) -> R) -> R {
+    pub fn sent<R>(f: impl FnOnce(&mut Option<(u64, Option<Value>)>) -> R) -> R {
         SENT.with(|cell| f(&mut cell.borrow_mut()))
     }
     pub fn read_in<R>(f: impl FnOnce(&mut VecDeque<u64>) -> R) -> R {
@@ -639,25 +640,37 @@ pub fn may_send(name: &str, args: &Value, request: u64) -> bool {
             }))
 }
 
-/// What the services answered `request`'s send, as [`run`] had it before
-/// any route's fence (#5853): a cut turn's lease is no longer current, so
-/// the route's own answer to it says only that nothing ran, though the
-/// service sent the write. Only the last send's is kept.
-pub fn sent_answer(request: u64) -> Option<Value> {
+/// Where `request`'s send got to in [`run`], before any route's fence
+/// (#5853): a cut turn's lease is no longer current, so the route's own
+/// answer to it says only that nothing ran, though the service sent the
+/// write. Only the last send's is kept; `None` for a request whose send
+/// never reached the gate.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SendState {
+    /// Passed the gate and asked of the service, with no answer (yet).
+    Asked,
+    /// What it was told: the service's answer, or the gate's refusal.
+    Told(Value),
+}
+
+/// [`SendState`] of `request`'s send.
+pub fn send_state(request: u64) -> Option<SendState> {
     kept::sent(|sent| {
         sent.as_ref()
             .filter(|(of, _)| *of == request)
-            .map(|(_, told)| told.clone())
+            .map(|(_, told)| told.clone().map_or(SendState::Asked, SendState::Told))
     })
 }
 
-/// `told`, the services' answer to `request`'s `call`, kept for
-/// [`sent_answer`] when the call was a send (the gate gives every send its
-/// `send_id`).
-fn keep_sent(call: &ToolCall, request: u64, told: &Value) {
-    if given_send_id(call).is_some() {
-        kept::sent(|sent| *sent = Some((request, told.clone())));
-    }
+/// `request`'s send kept for [`send_state`]: asked, or told `told`.
+fn keep_send(request: u64, told: Option<&Value>) {
+    kept::sent(|sent| *sent = Some((request, told.cloned())));
+}
+
+/// [`keep_send`], for a test standing in for [`run`].
+#[cfg(test)]
+pub fn keep_send_for_test(request: u64, told: Option<&Value>) {
+    keep_send(request, told);
 }
 
 /// Whether [`gate`] takes `call` as a send: one with the model's id, or
@@ -1190,9 +1203,17 @@ pub fn run(
             if told["error"] == OTHER_VOICE {
                 ask_owner(&mut told);
             }
+            // A refused send is kept as refused, so it is never told as
+            // sent (#5853).
+            if send_id {
+                keep_send(request, Some(&told));
+            }
             return (told, true);
         }
     };
+    if send_id {
+        keep_send(request, None);
+    }
     let (mut told, answered) = ask(folder, &call, DEADLINE);
     if answered {
         let owner = owner.as_deref().unwrap_or_default();
@@ -1202,7 +1223,9 @@ pub fn run(
         if call.name == WRITE && told.get("sent").and_then(Value::as_bool) == Some(true) {
             ask_owner(&mut told);
         }
-        keep_sent(&call, request, &told);
+        if send_id {
+            keep_send(request, Some(&told));
+        }
         if call.name == READ && told.get("error").is_none() {
             read_answered(request);
             if let Ok(mut thread) = crate::thread::THREAD.lock() {
@@ -2676,12 +2699,12 @@ mod tests {
         );
     }
 
-    /// #5853: a send's answer is kept by its request, as the services gave
-    /// it, so a cut turn's words answered again learn it was sent; a
-    /// prepare's never. A send is a write with its id, or one while another
-    /// request's write waits.
+    /// #5853: a send is kept by its request as asked once past the gate,
+    /// then as told, a refusal too, so a cut turn's words answered again
+    /// learn whether it was sent. A send is a write with its id, or one
+    /// while another request's write waits.
     #[test]
-    fn a_sends_answer_is_kept_by_its_request_and_a_prepares_is_not() {
+    fn a_sends_state_is_kept_by_its_request() {
         let send = call(WRITE, json!({"service":"google_drive","send_id":"s1"}));
         let prepare = call(WRITE, json!({"service":"google_drive","title":"Notes"}));
         assert!(may_send(&send.name, &send.args, 11));
@@ -2699,14 +2722,17 @@ mod tests {
             "its own request"
         );
         kept::pending(|pending| *pending = None);
-        keep_sent(
-            &prepare,
-            11,
-            &json!({"read_back":"A file Notes","send_id":"s2"}),
+        assert_eq!(send_state(11), None, "never at the gate");
+        keep_send(11, None);
+        assert_eq!(send_state(11), Some(SendState::Asked));
+        keep_send(11, Some(&json!({"sent":true})));
+        assert_eq!(send_state(11), Some(SendState::Told(json!({"sent":true}))));
+        assert_eq!(send_state(12), None, "another request's");
+        keep_send(12, Some(&json!({"error": OTHER_VOICE})));
+        assert_eq!(
+            send_state(12),
+            Some(SendState::Told(json!({"error": OTHER_VOICE}))),
+            "a refusal is kept as told"
         );
-        assert_eq!(sent_answer(11), None);
-        keep_sent(&send, 11, &json!({"sent":true}));
-        assert_eq!(sent_answer(11), Some(json!({"sent":true})));
-        assert_eq!(sent_answer(12), None, "another request's");
     }
 }

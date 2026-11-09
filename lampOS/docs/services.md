@@ -787,9 +787,11 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
 - **A send cut while awaited is never answered as nothing done** (#5853,
   lamp-9adf, 9 Nov). On the second route a send's call runs to its answer
   even when a newer line cuts the turn, and the line that answers those
-  words again is given the send's call and the services' own answer
-  (`sent_answer`, kept by request in `run` before any route's fence), told
-  the write was sent, and runs no `service_write` in its turn
+  words again is given the send's call and where the services got to with
+  it (`send_state`, kept by request in `run` before any route's fence:
+  asked once past the gate, then told the service's answer or the gate's
+  refusal), told the write was sent unless it was refused, and runs no
+  `service_write` in its turn
   ([second-voice.md](second-voice.md), `LAMP_JOIN_CUT_WORDS`'s carried
   rounds).
 - **A plain send** (`says_send`): the words in lower case, everything but

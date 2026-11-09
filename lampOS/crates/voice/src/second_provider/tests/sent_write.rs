@@ -234,3 +234,128 @@ async fn a_send_cut_twice_before_its_answer_is_still_answered_as_sent() {
     );
     assert_eq!(said, ["It's in your Drive now."]);
 }
+
+/// The 9adf path itself (P3 on #5863): a scoped runner whose send the
+/// services made after the cut, its own answer fenced to "not running" as
+/// the cut turn's lease is no longer current (`tools::answer_inner`). The
+/// held line is told the services' own answer ([`crate::services::send_state`]),
+/// "sent", and runs no `service_write`.
+#[tokio::test]
+async fn a_send_fenced_after_the_cut_is_told_by_the_services_own_answer() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Go ahead and send it.".to_owned()), Ok(String::new())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        crate::services::WRITE,
+                        json!({"service": "google_drive", "send_id": "s1"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c2",
+                        crate::services::WRITE,
+                        json!({"service": "google_drive", "title": "Notes"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("It's in your Drive now."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let writes: Writes = Arc::default();
+    let seen = writes.clone();
+    let fenced = Arc::new(AtomicBool::new(false));
+    let fence = fenced.clone();
+    let (writing, written) = std::sync::mpsc::channel();
+    let plain: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) }));
+    let scoped: ScopedToolRunner = Arc::new(
+        move |request, _, name, args, lease: crate::memory_scope::ScopeLease| {
+            let writing = writing.clone();
+            let fence = fence.clone();
+            if name == crate::services::WRITE {
+                seen.lock().unwrap().push(args);
+            }
+            Box::pin(async move {
+                let _ = writing.send(());
+                tokio::time::sleep(Duration::from_millis(300)).await;
+                let sent = json!({"sent": true, "service": "google_drive"});
+                crate::services::keep_send_for_test(request, Some(&sent));
+                if lease.is_current() {
+                    sent
+                } else {
+                    fence.store(true, Ordering::SeqCst);
+                    crate::tools::unavailable()
+                }
+            })
+        },
+    );
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        plain,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .with_memory_scope(
+        lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+        Arc::new(crate::memory_scope::FaceCache::holding_gaps(None)),
+        scoped,
+        None,
+    );
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    loop {
+        if written.try_recv().is_ok() {
+            break;
+        }
+        let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+    }
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    let mut said = Vec::new();
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(5), engine.next())
+            .await
+            .expect("the held line's turn ends");
+        match event {
+            ProviderOutput::Transcript {
+                request: Some(2),
+                text,
+                ..
+            } if !text.is_empty() => said.push(text),
+            ProviderOutput::TurnComplete { request: 2, .. } => break,
+            _ => {}
+        }
+    }
+    assert!(
+        fenced.load(Ordering::SeqCst),
+        "the cut turn's answer was fenced"
+    );
+    let held = script.asked.lock().unwrap().get(1).cloned().unwrap();
+    assert!(
+        held.iter()
+            .any(|message| message.tool_call_id.as_deref() == Some("c1")
+                && message
+                    .words()
+                    .is_some_and(|told| told.contains("\"sent\":true"))),
+        "the services' own sent answer goes with the words: {held:?}"
+    );
+    assert!(
+        held.iter().any(|message| message.role == "system"
+            && message
+                .words()
+                .is_some_and(|note| note.contains("already sent"))),
+        "the model is told the write was sent: {held:?}"
+    );
+    assert_eq!(writes.lock().unwrap().len(), 1, "one write, the send");
+    assert_eq!(said, ["It's in your Drive now."]);
+}

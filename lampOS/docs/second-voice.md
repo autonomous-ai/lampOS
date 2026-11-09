@@ -4112,21 +4112,28 @@ after a take-over, but now for every turn:
   wordless line cut the turn, and the held line answering it, given no trace
   of the send, prepared a new write and read it back). The send runs on a
   task of its own (`sending`), so it reaches its answer after the cut, and
-  is kept with that answer (`SentWrite`) until its round is carried. The
-  line answering those words again, held or joined with new ones, waits for
-  the answer, at most `services::DEADLINE` (20 s) from when the send began,
-  and goes on from the send's call and result, with the note "their
+  is kept with that answer (`SentWrite`, by the send's own request) until
+  its round is carried, a turn given it ends (`sent_given_over`), or its
+  words are let go. The line answering those words again, held or joined
+  with new ones, finds it by any of the words' requests (`origins`), so
+  through any number of cuts: it waits for the answer with the words in
+  flight as its own, so a newer line cutting it meanwhile carries them and
+  finds the send in turn, at most `services::DEADLINE` (20 s) from when
+  the send began, and goes on from the send's call and result (once, even
+  if a line before it already carried them), with the note "their
   go-ahead already sent the write they asked for … do not call
   service_write again for it" (`SENT_WRITE_NOTE`); the journal says
   `request M: request N's service_write was sent before a newer line cut its
   answer; its sent result goes with its words`. The cut turn's own answer is
-  fenced to "not running" once its lease is stale, so the services' own
-  answer (`services::sent_answer`) is told instead. With no answer within
-  the bound, the note says it was sent and its result is not known
+  fenced to "not running" once its lease is stale, so where the services
+  got to with it (`services::send_state`) is told instead: their answer, or
+  the gate's refusal. Past the gate with no answer, or no answer within the
+  bound, the note says it was sent and its result is not known
   (`SENT_UNKNOWN_NOTE`), never that nothing was sent. In that line's turn a
   `service_write` is not run: it is told `ALREADY_SENT`, so no new
-  read-back follows. A send refused by the gate goes with its refusal only.
-  A line that lets the cut words go drops the kept send. Words answered again may
+  read-back follows; the mark ends with the turn. A send refused by the
+  gate, or answered "not running" before the services had it, goes with its
+  result only, never told as sent. Words answered again may
   still be searched again, but are written once (`WriteOwner`; lamp-06c1, 26 Oct,
   build 6963: one "remember my favourite planet is Saturn" was kept three
   times, by two empty held lines answering it again): the first request to

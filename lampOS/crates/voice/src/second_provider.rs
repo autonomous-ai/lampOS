@@ -1700,8 +1700,9 @@ struct Shared {
     /// cut before its round is carried ([`SentWrite`], #5853).
     sent_write: Mutex<Option<SentWrite>>,
     /// The request answering words whose own write was sent
-    /// ([`sent_with_words`]): no `service_write` runs in its turn (#5853).
-    write_sent_in: Mutex<Option<u64>>,
+    /// ([`sent_with_words`]), with the send's own request and whether no
+    /// `service_write` runs in its turn (#5853). Cleared as that turn ends.
+    write_sent_in: Mutex<Option<(u64, u64, bool)>>,
     /// The privacy generation one was opened under before any line
     /// ([`Engine::listening`]); `None` again when listening stops.
     warmed: Mutex<Option<u64>>,
@@ -8962,17 +8963,6 @@ async fn spoken(
                     }
                 }
             };
-            // Their go-ahead's write, sent while the cut turn still awaited
-            // it (#5853): its result goes with the words, never prepared
-            // again.
-            let mut rounds = rounds;
-            let sent_note = match sent_with_words(&shared, carried.request, request).await {
-                Some((round, note)) => {
-                    rounds.extend(round);
-                    note
-                }
-                None => None,
-            };
             eprintln!(
                 "lamp-voice second: request {request} is held, so request {}'s words, cut short by it, are answered in its place",
                 carried.request
@@ -8990,6 +8980,16 @@ async fn spoken(
                     earlier: carried.earlier.clone(),
                 },
             );
+            // Their go-ahead's write, sent while a cut turn still awaited it
+            // (#5853): its result goes with the words, never prepared again.
+            // Waited for with the words in flight, so a newer line that cuts
+            // this one meanwhile carries them, and the send's record with
+            // them.
+            let sent_note = match sent_with_words(&shared, &origins(&carried), request).await {
+                SentWith::Cut => return,
+                SentWith::Nothing => None,
+                SentWith::Told(note) => note,
+            };
             let lease = scope.clone();
             // Another person's words the carried ones kept, cut short in
             // their pause's grace (`LAMP_ENDPOINT_PAUSE_JOIN`): told first,
@@ -9142,7 +9142,7 @@ async fn spoken(
         .as_ref()
         .map(|carried| carried.earlier.clone())
         .unwrap_or_default();
-    let cut_from = carried.as_ref().map(|carried| carried.request);
+    let cut_from = carried.as_ref().map(origins).unwrap_or_default();
     let (text, carried, parts) = match carried {
         Some(carried) if name_refused(&shared, request, &carried) => {
             (text, Some(carried), vec![own])
@@ -9167,18 +9167,11 @@ async fn spoken(
         }
         None => (text, None, vec![own]),
     };
-    // Joined with words whose write their go-ahead sent while the cut turn
-    // still awaited it (#5853): its result goes with them. Any other send
-    // kept is let go with its line.
-    let (sent_round, sent_note) = match cut_from.filter(|_| carried.is_none()) {
-        Some(cut) => sent_with_words(&shared, cut, request)
-            .await
-            .unwrap_or_default(),
-        None => {
-            drop_sent_write(&shared, None);
-            (Vec::new(), None)
-        }
-    };
+    // Words let go, or none carried: a send kept for them goes too (#5853).
+    let joined_sent = !cut_from.is_empty() && carried.is_none();
+    if !joined_sent {
+        drop_sent_write(&shared, None);
+    }
     // Words cut short in their pause's grace and not joined to this line,
     // another person's: still answered, first, in this answer
     // (`LAMP_ENDPOINT_PAUSE_JOIN`, Sixth's P2 on #4916), as the asker comes
@@ -9398,7 +9391,8 @@ async fn spoken(
         })
         .flatten()
         .map(str::to_owned);
-    let notes = stopped
+    let cut_in_told = cut_in.len();
+    let mut notes: Vec<String> = stopped
         .into_iter()
         .chain(earlier)
         .chain(pushed)
@@ -9421,7 +9415,6 @@ async fn spoken(
         // Reviewer-lead's P2s on #5053).
         .chain(crate::keep_quietly::note_for(scope.as_ref(), request))
         .chain(opens)
-        .chain(sent_note.map(str::to_owned))
         // Last, right before the person's words: an acknowledgement asked
         // among the other notes was said only once in two on lamp-06c1
         // (30 Oct, #3997's cut-in proposal).
@@ -9443,7 +9436,7 @@ async fn spoken(
             said_by: request,
             unchecked: Vec::new(),
             memory_write_owner: memory_write_owner.clone(),
-            rounds: sent_round,
+            rounds: Vec::new(),
             // The earlier words told first stay with these, never joined:
             // a line that cuts this one short tells them again (Seventh's
             // P3 on #4916).
@@ -9454,6 +9447,18 @@ async fn spoken(
             },
         },
     );
+    // Joined with words whose write their go-ahead sent while a cut turn
+    // still awaited it (#5853): its result goes with them, its note before
+    // the cut-in's, which come last.
+    if joined_sent {
+        match sent_with_words(&shared, &cut_from, request).await {
+            SentWith::Cut => return,
+            SentWith::Nothing | SentWith::Told(None) => {}
+            SentWith::Told(Some(note)) => {
+                notes.insert(notes.len() - cut_in_told, note.to_owned());
+            }
+        }
+    }
     if let Some(heard) = &shared.words_heard {
         heard(request, &text);
     }
@@ -9640,9 +9645,10 @@ fn carry_round(shared: &Shared, request: u64, round: &[Message]) {
 
 /// A write's send under way in `request`'s turn (#5853): its call, when it
 /// began, and the services' answer once it came. Kept by [`sending`] until
-/// the turn carries the round ([`carry_round`]), so a newer line that cuts
-/// the turn while the send is still awaited finds what it did: the cut turn
-/// never finished the round that would have carried it.
+/// the turn carries the round ([`carry_round`]), a turn given it ends
+/// ([`sent_given_over`]) or its words are let go, so every newer line that
+/// cuts the words while the send is still awaited finds what it did: the
+/// cut turn never finished the round that would have carried it.
 struct SentWrite {
     request: u64,
     call: net::ToolCall,
@@ -9710,65 +9716,123 @@ fn drop_sent_write(shared: &Shared, request: Option<u64>) {
     }
 }
 
-/// The send `cut`'s turn made before a newer line cut it, for `request`,
-/// the line answering `cut`'s words again (#5853, lamp-9adf: the write was
+/// The requests whose words `carried` holds: its own and each part's. A
+/// send is kept by its own request, whichever line carries its words on
+/// (#5853, the HOLD on #5863: a second cut carried them as the first held
+/// line's).
+fn origins(carried: &Carried) -> Vec<u64> {
+    std::iter::once(carried.request)
+        .chain(carried.parts.iter().map(|part| part.request))
+        .collect()
+}
+
+/// What [`sent_with_words`] found.
+enum SentWith {
+    /// No send kept for the words.
+    Nothing,
+    /// A newer line cut `request` while it waited for the send's answer:
+    /// the words, and the send's record, are that line's now.
+    Cut,
+    /// The send's call and result went with the words; the note to tell,
+    /// if any.
+    Told(Option<&'static str>),
+}
+
+/// The send a cut turn made for words `request` now answers again, held
+/// or joined, their requests `origins` (#5853, lamp-9adf: the write was
 /// sent, the held line's model was given no trace of it, and prepared a new
-/// one). Its call and result, as [`carry_round`] would have carried them,
-/// and the note to tell; its answer waited for, bounded by the services'
-/// [`crate::services::DEADLINE`] from when it began. A send kept for
-/// another request is dropped, so it never reaches a later line. Sent or
-/// not known: `request`'s turn runs no `service_write` ([`sent_already`]).
-/// Refused (its answer an error of its own): only the result goes, as a
-/// finished round would.
-async fn sent_with_words(
-    shared: &Shared,
-    cut: u64,
-    request: u64,
-) -> Option<(Vec<Message>, Option<&'static str>)> {
-    let sent = shared.sent_write.lock().ok()?.take()?;
-    if sent.request != cut {
-        return None;
-    }
-    let mut told = sent.told;
+/// one). Called with the words in flight as `request`'s, so a newer line
+/// that cuts it while it waits carries them on. Its answer is waited for,
+/// bounded by [`crate::services::DEADLINE`] from when the send began; the
+/// record is only read, and stays until a turn given it ends
+/// ([`sent_given_over`]) or the words are let go. Its call and result go
+/// into the words' carried rounds, as [`carry_round`] would have carried
+/// them, once only. Sent, or passed the gate with no answer: the note, and
+/// `request`'s turn runs no `service_write` ([`sent_already`]). Refused, or
+/// never reaching the services: its result only, never told as sent.
+async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> SentWith {
+    let kept = shared.sent_write.lock().ok().and_then(|sent| {
+        sent.as_ref()
+            .filter(|sent| origins.contains(&sent.request))
+            .map(|sent| {
+                (
+                    sent.request,
+                    sent.call.clone(),
+                    sent.began,
+                    sent.told.clone(),
+                )
+            })
+    });
+    let Some((origin, call, began, mut told)) = kept else {
+        return SentWith::Nothing;
+    };
     let came = tokio::time::timeout_at(
-        sent.began + crate::services::DEADLINE,
+        began + crate::services::DEADLINE,
         told.wait_for(Option::is_some),
     )
     .await
     .ok()
     .and_then(Result::ok)
-    .and_then(|told| told.clone());
+    .map(|told| told.clone().unwrap_or_default());
+    if !still_holding(shared, request) {
+        return SentWith::Cut;
+    }
     // A cut turn's lease is no longer current, so its call's answer may be
     // fenced to "not running" after the services sent it: theirs is asked.
+    use crate::services::SendState;
     let unavailable = crate::tools::unavailable();
-    let came = match came {
-        Some(told) if told != unavailable => Some(told),
-        came => crate::services::sent_answer(cut).or(came),
+    let state = match came.clone().filter(|told| *told != unavailable) {
+        Some(told) => Some(SendState::Told(told)),
+        None => crate::services::send_state(origin),
     };
-    let (told, note) = match came {
-        Some(told) if told["sent"] == true => (told, Some(SENT_WRITE_NOTE)),
-        Some(told) if told != unavailable => (told, None),
-        came => (came.unwrap_or(unavailable), Some(SENT_UNKNOWN_NOTE)),
+    let (told, note) = match (state, came) {
+        (Some(SendState::Told(told)), _) if told["sent"] == true => (told, Some(SENT_WRITE_NOTE)),
+        (Some(SendState::Told(told)), _) => (told, None),
+        // Passed the gate, or no answer within the bound: sent, its result
+        // not known, never "nothing was sent".
+        (Some(SendState::Asked), _) | (None, None) => (unavailable, Some(SENT_UNKNOWN_NOTE)),
+        // Answered "not running" before the services had it: nothing sent.
+        (None, Some(told)) => (told, None),
     };
     eprintln!(
-        "lamp-voice second: request {request}: request {cut}'s {} was sent before a newer line cut its answer; {} goes with its words",
-        sent.call.name,
+        "lamp-voice second: request {request}: request {origin}'s {} was sent before a newer line cut its answer; {} goes with its words",
+        call.name,
         match note {
             Some(SENT_WRITE_NOTE) => "its sent result",
             Some(_) => "the send, its result not known,",
-            None => "its result",
+            None => "its result, not sent,",
         }
     );
-    if note.is_some()
-        && let Ok(mut sent_in) = shared.write_sent_in.lock()
-    {
-        *sent_in = Some(request);
+    if let Ok(mut sent_in) = shared.write_sent_in.lock() {
+        *sent_in = Some((request, origin, note.is_some()));
     }
-    let round = vec![
-        Message::assistant_calls(None, std::slice::from_ref(&sent.call)),
-        Message::tool(sent.call.id.clone(), told.to_string()),
-    ];
-    Some((round, note))
+    let carried = carried_rounds(shared, request)
+        .iter()
+        .any(|message| message.tool_call_id.as_deref() == Some(call.id.as_str()));
+    if !carried {
+        carry_round(
+            shared,
+            request,
+            &[
+                Message::assistant_calls(None, std::slice::from_ref(&call)),
+                Message::tool(call.id.clone(), told.to_string()),
+            ],
+        );
+    }
+    SentWith::Told(note)
+}
+
+/// `request`'s turn over: a send given to it ([`sent_with_words`]) is done
+/// with, its record dropped, and a later turn may write again (#5853).
+fn sent_given_over(shared: &Shared, request: u64) {
+    let given = shared
+        .write_sent_in
+        .lock()
+        .ok()
+        .and_then(|mut sent_in| sent_in.take_if(|(of, _, _)| *of == request));
+    if let Some((_, origin, _)) = given {
+        drop_sent_write(shared, Some(origin));
+    }
 }
 
 /// What `request`'s `name` call is told instead of running, when it is a
@@ -9779,7 +9843,7 @@ fn sent_already(shared: &Shared, request: u64, name: &str) -> Option<Value> {
         && shared
             .write_sent_in
             .lock()
-            .is_ok_and(|sent_in| *sent_in == Some(request)))
+            .is_ok_and(|sent_in| matches!(*sent_in, Some((of, _, true)) if of == request)))
     .then(|| serde_json::json!({ "error": ALREADY_SENT }))
 }
 
@@ -15568,6 +15632,7 @@ async fn answer(
     if let Ok(mut in_flight) = shared.in_flight.lock() {
         in_flight.take_if(|carried| carried.request == request);
     }
+    sent_given_over(shared, request);
     // A spoken line the turn ended without answering: what the model left
     // alone, the busy room's talk. Not one the route gave up itself, its
     // chat not begun in time: that was said to the lamp, and held as the
