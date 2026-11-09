@@ -18174,3 +18174,18 @@ fn a_lone_face_is_named_only_with_the_one_face_tracker_hearing_no_other_voice() 
     let heard = AtomicBool::new(true);
     assert!(!no_other_voice_known(Some(&heard)), "another voice heard");
 }
+
+/// The Reviewer-lead's P3 on #5714: only the route's own look is told the
+/// head did not move; a skill's look with no note, which may have moved the
+/// head (`look_for`), gets no such note, and a skill's note is kept as its own.
+#[test]
+fn only_the_routes_own_look_is_told_the_head_did_not_move() {
+    assert_eq!(
+        super::look_turn_note(false, None).as_deref(),
+        Some(super::HEAD_STILL_NOTE)
+    );
+    assert_eq!(super::look_turn_note(true, None), None);
+    let kept = super::look_turn_note(true, Some("the keys".into())).unwrap();
+    assert!(kept.contains("the keys"));
+    assert!(!kept.contains(super::HEAD_STILL_NOTE));
+}
