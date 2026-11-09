@@ -2254,15 +2254,23 @@ kept **unconfirmed**, until its person says yes at the lamp:
     five at most, as one remembered at the lamp keeps, and the remembering's
     own answers. A yes the store refuses (`full`)
     leaves it unconfirmed as it was.
-  - `{"photo_no":NAME}` deletes it (`{"let_go":true}`).
+  - `{"photo_no":NAME}` deletes it (`{"let_go":true}`); `{"let_go":false}`
+    when there was no such face, and `storage` when the deletion couldn't be
+    saved. The voice says "let go" only on `{"let_go":true}`.
   - **No answer:** once asked, a face not seen for 20 s, the meeting over,
     is let go (`photo::unanswered`, `MEETING_GAP_US`).
   - **"Forget my face"** deletes it too.
 - **Never confirmed:** deleted 30 days after it was added
   (`UNCONFIRMED_FOR_S`), looked at once a second. A `.from-photos` file that
   can't be read is removed, so no print sits out of that reach.
-- **The product reset** wipes `<people>.from-photos` with `people.json`
-  (`reset-plan-product.json`).
+- **A deletion not saved** (a no, a meeting's end, the 30 days, "forget my
+  face") deletes nothing: the face stays in memory as on disk, and the next
+  no, look or forget tries again (`photo::Unconfirmeds::let_go`, `expire`).
+- **Its staging copy** `<people>.from-photos.new`: a save writes it, then
+  renames it over the file. A write or rename that fails removes it, and one
+  a crash left is removed at the next start (`Unconfirmeds::open`).
+- **The product reset** wipes `<people>.from-photos` and
+  `<people>.from-photos.new` with `people.json` (`reset-plan-product.json`).
 - **The answers** are the voice's: `photos_off`, `not_a_name`, `unreadable`
   (no file, a link, too large, not a JPEG), `no_face`, `too_far`,
   `two_faces`, `known_as`, `full`, `not_here`, `not_asked`, `not_that_face`,
