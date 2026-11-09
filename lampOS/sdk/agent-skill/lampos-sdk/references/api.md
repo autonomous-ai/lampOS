@@ -16,6 +16,7 @@ naming every public call, tool, event and error code they have.
 | the lamp, grants, limits | `lamp.info`, `lamp.grants`, `lamp.limits` | `lamp.info`, `lamp.grants`, `lamp.limits` | in `lamp_state("lamp")` and the tool list |
 | close | `await lamp.close()`, or `async with` | `await lamp.close()` | — |
 | wait until it ends | `await lamp.wait_closed()` | `await lamp.closed()` | — |
+| keep running across the lamp's restarts (every update) | `await Lamp.keep_connected(setup)`: connects, runs `setup(lamp)`, connects again after each close; raises on what can't mend (`NotPaired`, `no_grant`, ...) | `await Lamp.keepConnected(setup, { signal })` | — (an agent's tools have no setup to keep: lamp-mcp's README says how it meets a restart) |
 | find lamps on this network | `await find()` (`lampos.discovery`, the `[find]` extra) | `await find()` | — |
 | any op of the schema | `await lamp.request(op, **fields)` (`on_id=` is told its id before it is sent) | `lamp.request(op, fields)` | — |
 

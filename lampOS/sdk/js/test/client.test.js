@@ -561,6 +561,91 @@ test('the camera example saves a picture and a frame, and says a refusal', async
   assert.ok(!existsSync(`${refused.cwd}/snapshot.jpg`));
 });
 
+// A fake lamp with this computer paired and no connection open yet.
+async function withPaired(options, body) {
+  const fake = await FakeLamp.start(options);
+  const keyring = new Keyring(folder());
+  try {
+    await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, name: 'test laptop', keyring });
+    await body(fake, keyring);
+  } finally { await fake.stop(); }
+}
+
+test('keepConnected carries a program across the lamp\'s restart', async () => {
+  await withPaired({ grants: ['body', 'look'] }, async (fake, keyring) => {
+    const arrivals = [];
+    const setups = [];
+    const stop = new AbortController();
+    const kept = Lamp.keepConnected(async (lamp) => {
+      setups.push(lamp);
+      // A lease held when the lamp goes: closing after it is quiet.
+      await lamp.lease('body').take();
+      await lamp.on('person.arrived', (event) => arrivals.push(event.count));
+    }, { keyring, pauses: [0.05, 0.1], signal: stop.signal });
+    for (const round of [1, 2, 3]) {
+      await until(() => fake.asked('subscribe').length >= round);
+      fake.emit('person.arrived', { count: round, near: 0.3 });
+      await until(() => arrivals.length >= round);
+      if (round < 3) fake.restart();
+    }
+    assert.deepEqual(arrivals, [1, 2, 3]);
+    assert.equal(new Set(setups).size, 3);
+    stop.abort();
+    await kept;
+  });
+});
+
+test('keepConnected stops at an abort that comes while it connects or pauses', async () => {
+  // Second's P2 on #5833: an abort while connect is on its way, or before a
+  // pause, is not missed: setup never runs and nothing stays open.
+  await withPaired({ grants: ['light'] }, async (fake, keyring) => {
+    const stop = new AbortController();
+    const connect = Lamp.connect;
+    let setups = 0;
+    Lamp.connect = async (...args) => {
+      const connection = await connect.call(Lamp, ...args);
+      stop.abort(); // aborted while the connection was being made
+      return connection;
+    };
+    try {
+      await Lamp.keepConnected(async (lamp) => { setups += 1; await lamp.light('green', 2, 1000); }, { keyring, signal: stop.signal });
+    } finally {
+      Lamp.connect = connect;
+    }
+    assert.equal(setups, 0);
+    assert.equal(fake.asked('light').length, 0);
+    await until(() => fake.wss.clients.size === 0);
+  });
+  // An abort during a failed connect: the pause after it doesn't wait out its 10 s.
+  const stop = new AbortController();
+  const connect = Lamp.connect;
+  Lamp.connect = async () => { stop.abort(); throw Object.assign(new Error('refused'), { code: 'ECONNREFUSED' }); };
+  const started = Date.now();
+  try {
+    await Lamp.keepConnected(() => {}, { keyring: new Keyring(folder()), pauses: [10], signal: stop.signal });
+  } finally {
+    Lamp.connect = connect;
+  }
+  assert.ok(Date.now() - started < 2000, `${Date.now() - started} ms`);
+});
+
+test('keepConnected stops on what connecting again can\'t mend', async () => {
+  await assert.rejects(Lamp.keepConnected(() => {}, { keyring: new Keyring(folder()) }), NotPaired);
+  await withPaired({ grants: ['light'] }, async (fake, keyring) => {
+    await assert.rejects(
+      Lamp.keepConnected(() => { throw new TypeError("the program's own mistake"); }, { keyring, pauses: [0.05] }),
+      TypeError,
+    );
+    // A subscription the lamp refuses (no `look` grant) comes out of it too,
+    // instead of connecting again and again.
+    await assert.rejects(
+      Lamp.keepConnected((lamp) => lamp.on('person.arrived', () => {}), { keyring, pauses: [0.05] }),
+      (error) => error instanceof LampError && error.code === 'no_grant',
+    );
+    assert.equal(fake.received.filter((r) => r.op === 'hello').length, 2);
+  });
+});
+
 test('the examples call only what the client has', async () => {
   const { readdirSync } = await import('node:fs');
   const examples = readdirSync(new URL('../examples/', import.meta.url)).filter((f) => f.endsWith('.js'));

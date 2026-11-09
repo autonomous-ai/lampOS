@@ -25,6 +25,11 @@ export function binaryFrame(message) {
 // Events that come with a request, never subscribed to: a camera stream's.
 const CAMERA_EVENTS = ['camera.frame', 'camera.ended'];
 
+// `keepConnected`'s pauses before connecting again, in seconds: the first after
+// a closed connection, then longer while the lamp can't be reached (a restart
+// takes a few seconds; an update about a minute).
+export const RECONNECT_PAUSES = Object.freeze([1, 2, 5, 10]);
+
 // The actions lamp-control answers `{"to":"body"}` with no `done` after
 // (docs/control.md): a wait for them ends at that answer. `say` and
 // `turn.start` answer `{"to":"voice"}` and their `done` does follow.
@@ -360,6 +365,65 @@ export class Lamp {
     } catch (error) { ws.close(); throw error; }
     if (!reply.ok) { ws.close(); throw fromReply(reply.error); }
     return new Lamp(ws, welcome, reply, frames);
+  }
+
+  /**
+   * Run a long-running program across the lamp's restarts (every update
+   * restarts it, and the connection closes). Connects, runs
+   * `await setup(lamp)` (subscribe, ask for leases, as after `connect`), and
+   * waits until the connection ends; then connects again and runs `setup`
+   * again on the new connection, after a pause that grows along `pauses`
+   * (seconds) while the lamp can't be reached and starts over once it can.
+   *
+   * Never resolves by itself: pass `signal` (an AbortSignal) to stop it.
+   * Rejects at once with what connecting again can't mend: no pairing
+   * (`NotPaired`), another lamp at the address (`WrongLamp`), a refusal of
+   * the hello (`unpaired`, revoked), and anything `setup` throws, a refused
+   * subscription it awaited (`no_grant`) included.
+   */
+  static async keepConnected(setup, { lamp, host, keyring, pauses = RECONNECT_PAUSES, signal } = {}) {
+    // An abort already fired doesn't fire again for a listener added later,
+    // so each step checks `signal.aborted` first (Second's P2 on #5833).
+    const pause = (seconds) => new Promise((resolve) => {
+      if (signal?.aborted) { resolve(); return; }
+      const timer = setTimeout(done, seconds * 1000);
+      function done() { clearTimeout(timer); signal?.removeEventListener('abort', done); resolve(); }
+      signal?.addEventListener('abort', done, { once: true });
+    });
+    let failures = 0;
+    while (!signal?.aborted) {
+      let connection;
+      try {
+        connection = await Lamp.connect(lamp, { host, keyring });
+      } catch (error) {
+        // `closed`: the lamp went while saying hello, as a restart does.
+        if (error instanceof LampError && error.code !== 'closed') throw error;
+        const wait = pauses[Math.min(failures, pauses.length - 1)];
+        if (debug.on()) process.stderr.write(`lampos .. not reached (${error.code ?? error.name}), again in ${wait} s\n`);
+        failures += 1;
+        await pause(wait);
+        continue;
+      }
+      failures = 0;
+      if (signal?.aborted) {
+        // Aborted while it connected: closed again, setup never run.
+        await connection.close().catch(() => {});
+        break;
+      }
+      const stop = () => connection.close();
+      signal?.addEventListener('abort', stop, { once: true });
+      try {
+        await setup(connection);
+        await connection.closed();
+      } catch (error) {
+        // The lamp went in the middle of setup: connect again.
+        if (!(error instanceof LampError) || error.code !== 'closed') throw error;
+      } finally {
+        signal?.removeEventListener('abort', stop);
+        await connection.close().catch(() => {});
+      }
+      if (!signal?.aborted) await pause(pauses[0]);
+    }
   }
 
   async close() {
