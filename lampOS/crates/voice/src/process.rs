@@ -1113,6 +1113,10 @@ fn worker_command(
             role,
             var(crate::tools::schedule_asked::ENVIRONMENT).as_deref(),
         ))
+        .envs(reminders_asked_worker_environment(
+            role,
+            var(crate::tools::reminders_asked::ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_observe_worker_environment(
             role,
             var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
@@ -1685,6 +1689,17 @@ fn schedule_asked_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::tools::schedule_asked::ENVIRONMENT, "on"))
+}
+
+// A plain question about the person's reminders calls list_reminders
+// (`tools::reminders_asked`), passed the same narrow way: the exact `on`, to
+// the second route, whose chat can be made to call a function.
+fn reminders_asked_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::tools::reminders_asked::ENVIRONMENT, "on"))
 }
 
 // The clock's switch (#830), passed the same narrow way: the exact `on`, to
@@ -2662,6 +2677,13 @@ mod tests {
                         "LAMP_SCHEDULE_ASKED",
                         ["second"].as_slice(),
                     ),
+                    // A plain question about the person's reminders calls
+                    // list_reminders: the second route alone.
+                    (
+                        reminders_asked_worker_environment,
+                        "LAMP_REMINDERS_ASKED",
+                        ["second"].as_slice(),
+                    ),
                     // The observation pass, the route with a model (#1693 (2)).
                     (
                         memory_observe_worker_environment,
@@ -2907,6 +2929,7 @@ mod tests {
                     crate::remember::ROOM_SPEAKER_ENVIRONMENT,
                     crate::remember::asked::ENVIRONMENT,
                     crate::tools::schedule_asked::ENVIRONMENT,
+                    crate::tools::reminders_asked::ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
@@ -3237,6 +3260,7 @@ mod tests {
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
                     "LAMP_RELAY_ROUTES=on",
                     "LAMP_REMARK_ABOUT_IT=on",
+                    "LAMP_REMINDERS_ASKED=on",
                     "LAMP_REST_THROUGH_SOUNDS=on",
                     "LAMP_SAME_SPEAKER_CARRIES=on",
                     "LAMP_SAME_VOICE_CALLER_ONLY=on",
