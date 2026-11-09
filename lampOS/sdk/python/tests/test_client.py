@@ -445,7 +445,7 @@ def test_a_waiting_look_ends_a_hand_follow_when_taken_not_at_its_done(tmp_path):
     another look is taken, so the SDK does too, before the wait for the
     body's `done`. A cancelled wait can't leave it following, a refused look
     leaves it be, and the fake's `joints` is held to the door's rules."""
-    from lampos.testing import JOINTS_WAIT
+    from lampos.testing import JOINTS_UNKNOWN, JOINTS_WAIT
 
     async def go():
         async with FakeLamp(grants=("body", "look")) as fake:
@@ -482,6 +482,12 @@ def test_a_waiting_look_ends_a_hand_follow_when_taken_not_at_its_done(tmp_path):
                     body = (await lamp.get("body"))["body"]["joints"]
                     done = await lamp.joints(lease, 300, wait=True, yaw=-3.0)
                     assert (done["yaw"], done["pitch"]) == (-3.0, body["pitch"]["deg"])
+                    # Unknown where the head is: name both, as the door says.
+                    fake.state["body"]["joints"]["pitch"]["deg"] = None
+                    with pytest.raises(errors.BY_CODE["refused"]) as raised:
+                        await lamp.joints(lease, 300, wait=True, yaw=-3.0)
+                    assert raised.value.why == JOINTS_UNKNOWN
+                    assert (await lamp.joints(lease, 300, wait=True, yaw=-3.0, pitch=1.0))["how"] == "finished"
 
     run(go())
 

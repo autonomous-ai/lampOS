@@ -1396,7 +1396,7 @@ test('a look or joints waits for the body\'s done and says when a conversation d
 // `done`. A refused look leaves it be, and the fake's `joints` is held to the
 // door's rules. test_client.py has the same.
 test('a waiting look ends a hand-follow when taken, not at its done', async () => {
-  const { JOINTS_WAIT } = await import('../src/testing.js');
+  const { JOINTS_UNKNOWN, JOINTS_WAIT } = await import('../src/testing.js');
   await withLamp({ grants: ['body', 'look'] }, async (lamp, fake) => {
     const following = await lamp.followHand().start();
     assert.ok(following.following);
@@ -1422,6 +1422,10 @@ test('a waiting look ends a hand-follow when taken, not at its done', async () =
       const body = (await lamp.get('body')).body.joints;
       const done = await lamp.joints(lease, 300, { yaw: -3 }, { wait: true });
       assert.deepEqual([done.yaw, done.pitch], [-3, body.pitch.deg]);
+      // Unknown where the head is: name both, as the door says.
+      fake.state.body.joints.pitch.deg = null;
+      await assert.rejects(lamp.joints(lease, 300, { yaw: -3 }, { wait: true }), (error) => error.why === JOINTS_UNKNOWN);
+      assert.equal((await lamp.joints(lease, 300, { yaw: -3, pitch: 1 }, { wait: true })).how, 'finished');
     }, { forMs: 5000 });
   });
 });
