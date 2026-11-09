@@ -9057,3 +9057,17 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - Tag-capable body implementation/physical integration remain separate;
   Linux Clippy/ARM64 pending at review, SDK/docs green. PR-body stale FIFO
   description and older gates flagged P3. No device action or own product edit.
+
+## 2026-11-09 — Second: send fix retains receipts but loses overflow identity
+
+- HOLD #5863 9d6edcbf02. Original same-batch duplicate and late older-receipt
+  probes now pass, as do joined-line and reversed-order controls. Baseline
+  six sent-write tests and 58 services tests pass.
+- Ninth-attempt probe fails: parser permits 64 calls, saved attempts cap at
+  eight, first successful Drive call is evicted, and its request-level sent
+  receipt is assigned to a refused Gmail call. No duplicate write escapes;
+  the remaining defect is false success attribution. Reported 6740815988.
+- Independent probes 4 passed / 1 failed in 1.88 s, actual Engine with
+  scripted service answers. Saved /tmp/second-5863-fixed-review-probes.rs
+  for rerun (with explicit no-success-on-refused-ID assertion), tests removed,
+  checkout clean. No live-service or device claim; HOLD not lifted.
