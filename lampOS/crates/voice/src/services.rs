@@ -18,7 +18,9 @@
 //!   next turn, the owner's first line since, said once the lamp's words
 //!   held the whole read-back ([`read_back_said`]) uncut and not talked
 //!   over, and a plain "send" ([`says_send`]); anything else cancels it.
-//!   One pending write at a time, dropped by any later line or turn.
+//!   One pending write at a time, dropped by any later line or turn. A line
+//!   held as the lamp's own words heard back is no line of the person's
+//!   ([`own_echo_held`]).
 //! - **After a read, nothing else in that request** ([`after_read`]), and
 //!   the read's words are kept nowhere in the thread
 //!   (`thread::Thread::private_for`); with others maybe in view, a read is
@@ -64,14 +66,21 @@ const MAX_ANSWER_BYTES: u64 = 16_384;
 /// The words, after fillers ([`FILLERS`]), that send a prepared write.
 /// Each has "send" or "gửi" in it (or "gởi", or "gui" without accents),
 /// and nothing that has more in it: "don't send it" is no send, and "do
-/// it" never sends.
-pub const SEND_WORDS: [&str; 15] = [
+/// it" never sends, nor "go ahead" alone. Speech-to-text may drop the last
+/// "it": on lamp-9adf on 9 Nov the owner's "Go ahead and send it." came as
+/// "Go ahead and send", and the write was prepared and read back again
+/// (#5846).
+pub const SEND_WORDS: [&str; 19] = [
     "send",
     "send it",
     "send that",
     "send the message",
     "send the email",
+    "send it now",
     "go ahead and send it",
+    "go ahead and send",
+    "go ahead send it",
+    "go ahead send",
     "gửi",
     "gửi đi",
     "gửi nó đi",
@@ -323,8 +332,18 @@ pub struct Pending {
     pub spoken_at: Option<Instant>,
     /// The read-back was cut, or a line began over it.
     pub cut: bool,
-    /// Lines the person began since the write was prepared.
+    /// The one line whose start alone marked the read-back cut
+    /// ([`voice_began`]): if it is held as the lamp's own echo
+    /// ([`own_echo_held`]), the read-back is not cut after all. `None` when
+    /// anything else cut it.
+    pub cut_by: Option<u64>,
+    /// Lines begun since the write was prepared, echoes included.
     pub lines: u32,
+    /// Lines held as the lamp's own echo since ([`own_echo_held`]), never a
+    /// person's: [`lines`](Self::lines) less these are the person's.
+    pub echoes: u32,
+    /// The latest request held as the lamp's echo, so none counts twice.
+    pub echoed: Option<u64>,
     /// The one later request the lamp spoke in since.
     pub other: Option<u64>,
     /// The request whose "send" had no voice print, in which the lamp asked
@@ -351,7 +370,10 @@ impl Pending {
             spoken_from: None,
             spoken_at: None,
             cut: false,
+            cut_by: None,
             lines: 0,
+            echoes: 0,
+            echoed: None,
             other: None,
             asked_again: None,
             began_clear: false,
@@ -445,6 +467,9 @@ pub fn said_in(pending: &mut Option<Pending>, request: u64, words: &str, now: In
         // its answer and the second "send" took 35 s, past SEND_WITHIN).
         kept.spoken_at = Some(now);
     } else if *kept.other.get_or_insert(request) != request {
+        eprintln!(
+            "lamp-voice: request {request}: a waiting write dropped: the lamp answered another request"
+        );
         *pending = None;
     }
 }
@@ -457,6 +482,7 @@ pub fn lamp_cut(request: u64) {
             && kept.request == request
         {
             kept.cut = true;
+            kept.cut_by = None;
         }
     });
 }
@@ -466,22 +492,58 @@ pub fn line_began(now: Instant) {
     kept::pending(|pending| began_in(pending, now));
 }
 
-/// [`line_began`] on `pending`: the first line after the write was
-/// prepared may send it, if it began once the read-back could have been
+/// [`line_began`] on `pending`: the person's first line after the write
+/// was prepared may send it, if it began once the read-back could have been
 /// said whole (each word [`WORD_TAKES`] at least); one said over it, or
-/// before any of it, marks it cut. A second line drops it.
+/// before any of it, marks it cut. A line held as the lamp's own echo
+/// ([`own_echo_held`]) is not the person's, whichever is told first, so a
+/// second line is not dropped here: [`gate`] cancels a send after a second
+/// person's line ([`person_lines`]), and [`PENDING_FOR`] and [`send_by`]
+/// bound how long it waits.
 pub fn began_in(pending: &mut Option<Pending>, now: Instant) {
     let Some(kept) = pending.as_mut() else {
         return;
     };
-    kept.lines += 1;
-    if kept.lines > 1 {
-        *pending = None;
-        return;
-    }
+    kept.lines = kept.lines.saturating_add(1);
     if !said_whole_by(kept, now) {
         kept.cut = true;
+        kept.cut_by = None;
     }
+}
+
+/// The line of `request` was held as the lamp's own words heard back
+/// (`second_provider`, `own_echo::Echo::Held`), told through the thread as
+/// [`line_began`] is: it is not counted toward the waiting write, and a cut
+/// its start alone made is undone, as it was the lamp's own sound.
+pub fn own_echo_held(request: u64) {
+    kept::pending(|pending| echo_held_in(pending, request));
+}
+
+/// [`own_echo_held`] on `pending`. Only a line after the one that prepared
+/// the write (or asked once more for its "send"), and each once.
+pub fn echo_held_in(pending: &mut Option<Pending>, request: u64) {
+    let Some(kept) = pending.as_mut() else {
+        return;
+    };
+    let after = kept.asked_again.unwrap_or(kept.request);
+    if request <= after || kept.echoed.is_some_and(|echoed| request <= echoed) {
+        return;
+    }
+    kept.echoed = Some(request);
+    kept.echoes = kept.echoes.saturating_add(1);
+    if kept.cut_by == Some(request) {
+        kept.cut = false;
+        kept.cut_by = None;
+    }
+    eprintln!(
+        "lamp-voice: request {request}: the lamp's echo, not counted toward the waiting write"
+    );
+}
+
+/// The person's lines since the write was prepared: those begun, less those
+/// held as the lamp's echo.
+fn person_lines(kept: &Pending) -> u32 {
+    kept.lines.saturating_sub(kept.echoes)
 }
 
 /// The words of `text` as a read-back is checked: lower case, letters and
@@ -549,7 +611,7 @@ pub fn send_awaited(words: &str) -> bool {
         && kept::pending(|pending| {
             pending
                 .as_ref()
-                .is_some_and(|kept| !kept.cut && kept.began_clear)
+                .is_some_and(|kept| !kept.cut && kept.began_clear && person_lines(kept) <= 1)
         })
 }
 
@@ -633,7 +695,17 @@ pub fn gate(
         Some((id, _)) => Some(id.as_str()),
         None => given_send_id(call),
     };
-    if send_id.is_none() && pending.as_ref().is_some_and(|kept| kept.request != request) {
+    if send_id.is_none()
+        && let Some(kept) = pending.as_ref().filter(|kept| kept.request != request)
+    {
+        let lines = person_lines(kept);
+        if lines > 1 {
+            eprintln!(
+                "lamp-voice: request {request}: a waiting write dropped: {lines} lines since its read-back"
+            );
+        } else {
+            eprintln!("lamp-voice: request {request}: a waiting write dropped: another call");
+        }
         *pending = None;
     }
     if !is_tool(&call.name) {
@@ -665,6 +737,11 @@ pub fn gate(
     let Some(send_id) = send_id else {
         // A new write replaces any other waiting: one at a time.
         *pending = None;
+        if call.name == WRITE && turn.words.is_some_and(says_send) {
+            eprintln!(
+                "lamp-voice: request {request}: a plain send with no write waiting: prepared anew"
+            );
+        }
         // The face says who is at the lamp, a voice only that it is the
         // same one: a write is prepared only for a line the owner's face
         // was seen saying.
@@ -682,7 +759,7 @@ pub fn gate(
         && (turn.previous == Some(kept.request)
             || (kept.asked_again.is_some() && turn.previous == kept.asked_again))
         && kept.other.is_none_or(|other| other == request)
-        && kept.lines <= 1
+        && person_lines(&kept) <= 1
         && kept.person == owner
         && now.saturating_duration_since(kept.at) <= PENDING_FOR
         && send_by(&kept).is_some_and(|by| now <= by)
@@ -705,7 +782,7 @@ pub fn gate(
                 kept.other.is_some_and(|other| other != request),
                 "the lamp answered another line between",
             ),
-            (kept.lines > 1, "more than one line since"),
+            (person_lines(&kept) > 1, "more than one line since"),
             (kept.person != owner, "another person"),
             (late(Some(kept.at), PENDING_FOR), "prepared too long ago"),
             (
@@ -738,6 +815,8 @@ pub fn gate(
                 asked_again: Some(request),
                 other: None,
                 lines: 0,
+                echoes: 0,
+                echoed: None,
                 ..kept
             });
             return Err(json!({ "error": NO_PRINT_YET, "next": SAY_IT_LONGER }));
@@ -990,21 +1069,31 @@ fn send_likeness(judge: &VoiceJudge, prepared: u64, request: u64, enrolled: bool
 /// before the read-back could have been said whole, marks the waiting
 /// write's read-back as talked over; `in_tail` says it began within the tail
 /// of the lamp's words ([`send_awaited`]).
-pub fn voice_began(over_the_lamps_voice: bool, in_tail: bool, now: Instant) {
+pub fn voice_began(request: u64, over_the_lamps_voice: bool, in_tail: bool, now: Instant) {
     kept::pending(|pending| {
-        voice_began_in(pending, over_the_lamps_voice, now);
+        voice_began_in(pending, request, over_the_lamps_voice, now);
         if let Some(kept) = pending.as_mut() {
             kept.began_clear = !over_the_lamps_voice && !in_tail;
         }
     });
 }
 
-/// [`voice_began`] on `pending`.
-pub fn voice_began_in(pending: &mut Option<Pending>, over_the_lamps_voice: bool, now: Instant) {
+/// [`voice_began`] on `pending`, for the line of `request`: the first line to
+/// mark the read-back cut is kept ([`Pending::cut_by`]), so its cut is undone
+/// if that line is held as the lamp's own echo ([`own_echo_held`]).
+pub fn voice_began_in(
+    pending: &mut Option<Pending>,
+    request: u64,
+    over_the_lamps_voice: bool,
+    now: Instant,
+) {
     let Some(kept) = pending.as_mut() else {
         return;
     };
     if over_the_lamps_voice || !said_whole_by(kept, now) {
+        kept.cut_by = (!kept.cut)
+            .then_some(request)
+            .or(kept.cut_by.filter(|by| *by == request));
         kept.cut = true;
     }
 }
@@ -1841,7 +1930,7 @@ mod tests {
         // With no word of when the line began: maybe an echo, so held.
         pending_for_test(Some(waiting()));
         assert!(!send_awaited("Send."));
-        voice_began(false, false, Instant::now());
+        voice_began(11, false, false, Instant::now());
         for said in ["Send.", "send it", "Hey Lamp, send it."] {
             assert!(send_awaited(said), "{said}");
         }
@@ -1855,7 +1944,7 @@ mod tests {
             (false, false, true),
         ] {
             pending_for_test(Some(waiting()));
-            voice_began(over, in_tail, Instant::now());
+            voice_began(11, over, in_tail, Instant::now());
             assert_eq!(send_awaited("Send."), awaited, "{over} {in_tail}");
         }
         pending_for_test(None);
@@ -1904,6 +1993,20 @@ mod tests {
             "oh no, don't send it",
             "hey, send it to Bob instead",
         ] {
+            assert!(!says_send(said), "{said}");
+        }
+        // lamp-9adf, 9 Nov (#5846): the owner's played "Go ahead and send
+        // it." heard by speech-to-text with its "it" dropped.
+        for said in [
+            "Go ahead and send",
+            "Go ahead and send.",
+            "go ahead, send it",
+            "Go ahead, send.",
+            "Send it now.",
+        ] {
+            assert!(says_send(said), "{said}");
+        }
+        for said in ["Go ahead.", "Yes, go ahead", "go ahead and do it"] {
             assert!(!says_send(said), "{said}");
         }
         assert!(SEND_WORDS.iter().all(|words| {
@@ -2225,16 +2328,16 @@ mod tests {
     fn a_line_begun_over_the_read_back_marks_it_cut() {
         let now = Instant::now();
         let mut pending = waiting(now);
-        voice_began_in(&mut pending, true, at(now));
+        voice_began_in(&mut pending, 11, true, at(now));
         assert!(pending.as_ref().unwrap().cut, "over the lamp's voice");
         let mut pending = Some(Pending::new("s1", 10, now, READ_BACK, "ann"));
         said_in(&mut pending, 10, READ_BACK, now);
         // 20 words take 8 s at 400 ms a word: begun at 7 s is over it.
-        voice_began_in(&mut pending, false, now + Duration::from_secs(7));
+        voice_began_in(&mut pending, 11, false, now + Duration::from_secs(7));
         assert!(pending.as_ref().unwrap().cut);
         let mut pending = Some(Pending::new("s1", 10, now, READ_BACK, "ann"));
         said_in(&mut pending, 10, READ_BACK, now);
-        voice_began_in(&mut pending, false, now + Duration::from_secs(12));
+        voice_began_in(&mut pending, 11, false, now + Duration::from_secs(12));
         assert!(!pending.as_ref().unwrap().cut);
     }
 
@@ -2301,9 +2404,22 @@ mod tests {
     #[test]
     fn any_later_line_or_turn_forgets_the_pending_write() {
         let now = Instant::now();
-        // A second line, whoever said it: gone.
+        // A second line, whoever said it: its send is cancelled, and the
+        // write forgotten.
         let mut pending = waiting(now);
         began_in(&mut pending, at(now));
+        let refused = gate(&mut pending, &send("s1"), 12, &heard("send", 10), at(now));
+        assert_eq!(refused.unwrap_err()["error"], CANCELLED);
+        assert_eq!(pending, None);
+        // So is the plain send the model gives no id: never prepared anew.
+        let mut pending = waiting(now);
+        if let Some(kept) = pending.as_mut() {
+            kept.service = "gmail".into();
+        }
+        began_in(&mut pending, at(now));
+        let plain = call(WRITE, json!({"service":"gmail","action":"send_mail"}));
+        let refused = gate(&mut pending, &plain, 12, &heard("send", 10), at(now));
+        assert_eq!(refused.unwrap_err()["error"], CANCELLED);
         assert_eq!(pending, None);
         // The lamp answering another request, then a third: gone.
         let mut pending = waiting(now);
@@ -2324,6 +2440,141 @@ mod tests {
         assert_eq!(pending, None);
         let refused = gate(&mut pending, &send("s1"), 12, &heard("send", 11), now);
         assert_eq!(refused.unwrap_err()["error"], NOTHING_WAITING);
+    }
+
+    /// A write prepared in request 96, its read-back said in full with the
+    /// lamp's "Go ahead and send it." at its end.
+    fn read_back_in_96(now: Instant) -> Option<Pending> {
+        let mut pending = Some(Pending::new("s1", 96, now, READ_BACK, "ann"));
+        if let Some(kept) = pending.as_mut() {
+            kept.service = "gmail".into();
+        }
+        said_in(&mut pending, 96, READ_BACK, now);
+        said_in(&mut pending, 96, " Go ahead and send it.", now);
+        pending
+    }
+
+    /// A line of `request` begun at `began`, its words told to the thread a
+    /// moment later; `echo`: held as the lamp's own (over its voice), told
+    /// before its words came (`Some(true)`) or after (`Some(false)`).
+    fn line(pending: &mut Option<Pending>, request: u64, began: Instant, echo: Option<bool>) {
+        voice_began_in(pending, request, echo.is_some(), began);
+        if echo == Some(true) {
+            echo_held_in(pending, request);
+        }
+        began_in(pending, began + Duration::from_secs(1));
+        if echo == Some(false) {
+            echo_held_in(pending, request);
+        }
+    }
+
+    /// The owner's plain "send" in `request`, as the model calls it: no id.
+    fn owners_send(
+        pending: &mut Option<Pending>,
+        request: u64,
+        at: Instant,
+    ) -> Result<ToolCall, Value> {
+        let plain = call(
+            WRITE,
+            json!({"service":"gmail","action":"send_mail","to":["ann@b.test"],"text":"Home by 7"}),
+        );
+        gate(
+            pending,
+            &plain,
+            request,
+            &heard("Go ahead and send it.", 96),
+            at,
+        )
+    }
+
+    /// lamp-29e7, 9 Nov (#5846): the lamp heard its own "go ahead and send
+    /// it" back over its voice, as request 97, held as its echo; the
+    /// owner's "Go ahead and send it." in 98 was then a second line, the
+    /// write dropped and prepared anew, read back and echoed again: "send"
+    /// five times. The echo is no line of the owner's, nor a cut of the
+    /// read-back, whichever the thread hears of first.
+    #[test]
+    fn the_lamps_echo_of_its_read_back_is_not_the_owners_line() {
+        let now = Instant::now();
+        for held_first in [false, true] {
+            let mut pending = read_back_in_96(now);
+            line(
+                &mut pending,
+                97,
+                now + Duration::from_secs(9),
+                Some(held_first),
+            );
+            line(&mut pending, 98, now + Duration::from_secs(14), None);
+            let sent = owners_send(&mut pending, 98, now + Duration::from_secs(16))
+                .unwrap_or_else(|told| panic!("held first {held_first}: {told}"));
+            assert_eq!(
+                sent.args,
+                json!({"service":"gmail","send_id":"s1","said":"send"}),
+                "held first {held_first}"
+            );
+            assert_eq!(pending, None, "sent once");
+        }
+        // Two echoes, then the owner's send: sent.
+        let mut pending = read_back_in_96(now);
+        line(&mut pending, 97, now + Duration::from_secs(9), Some(false));
+        line(&mut pending, 98, now + Duration::from_secs(11), Some(true));
+        line(&mut pending, 99, now + Duration::from_secs(14), None);
+        let sent = owners_send(&mut pending, 99, now + Duration::from_secs(16)).unwrap();
+        assert_eq!(sent.args["send_id"], "s1");
+    }
+
+    /// Only a line held as the lamp's echo is not counted, never a
+    /// person's: one between still cancels the send, an echo or none
+    /// before it; the line that prepared the write, or one told twice, is
+    /// no echo of its read-back; and a cut the echo did not make stays.
+    #[test]
+    fn a_persons_line_after_the_read_back_still_cancels_its_send() {
+        let now = Instant::now();
+        for echo_first in [false, true] {
+            let mut pending = read_back_in_96(now);
+            let mut request = 97;
+            if echo_first {
+                line(
+                    &mut pending,
+                    request,
+                    now + Duration::from_secs(9),
+                    Some(false),
+                );
+                request += 1;
+            }
+            line(&mut pending, request, now + Duration::from_secs(11), None);
+            line(
+                &mut pending,
+                request + 1,
+                now + Duration::from_secs(14),
+                None,
+            );
+            let refused = owners_send(&mut pending, request + 1, now + Duration::from_secs(16));
+            assert_eq!(
+                refused.unwrap_err()["error"],
+                CANCELLED,
+                "echo first {echo_first}"
+            );
+            assert_eq!(pending, None, "echo first {echo_first}");
+        }
+        // An echo told for the preparing line, or twice for one line.
+        let mut pending = read_back_in_96(now);
+        echo_held_in(&mut pending, 96);
+        line(&mut pending, 97, now + Duration::from_secs(9), Some(false));
+        echo_held_in(&mut pending, 97);
+        assert_eq!(pending.as_ref().unwrap().echoes, 1);
+        // A person's line begun over the read-back: cut, whatever echo
+        // follows; so too the lamp's answer cut.
+        let mut pending = read_back_in_96(now);
+        line(&mut pending, 97, now + Duration::from_secs(2), None);
+        line(&mut pending, 98, now + Duration::from_secs(9), Some(false));
+        assert!(pending.as_ref().unwrap().cut);
+        let mut pending = read_back_in_96(now);
+        line(&mut pending, 97, now + Duration::from_secs(9), Some(true));
+        lamp_cut_in_test(&mut pending, 96);
+        line(&mut pending, 98, now + Duration::from_secs(14), None);
+        let refused = owners_send(&mut pending, 98, now + Duration::from_secs(16));
+        assert_eq!(refused.unwrap_err()["error"], NOT_READ_BACK);
     }
 
     #[test]
