@@ -325,7 +325,11 @@ fn the_setup_intro_is_kept_as_said_only_when_its_committed_turn_was_heard_whole(
                 walk.tick(at, at, true, false, Some(face), true)
             })
             .expect("the intro");
-        assert_eq!(note, crate::onboarding::SIT_NOTE);
+        // The opener: the intro, then step one's ask.
+        assert!(
+            note.contains("Step one: sit where you usually sit, and look at me."),
+            "{note}"
+        );
         let mut test = Test::writing(&note);
         let bound = {
             let owner = test.reply.as_ref().unwrap().owner;
