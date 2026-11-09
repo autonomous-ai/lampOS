@@ -376,6 +376,16 @@ func TestServerMessageNeedsMentionOutsideOpenPlaces(t *testing.T) {
 		{"mention joins thread", event("5", "thread-1", "chan-1", true, "owner-1"), ""},
 		{"joined thread", event("6", "thread-1", "chan-1", false, "owner-1"), ""},
 		{"other person in joined thread", event("7", "thread-1", "chan-1", false, "someone"), "not from the owner"},
+		{"addressed to someone else in chosen channel", func() domain.MQTTDiscordEventCommand {
+			ev := event("10", "open-1", "", false, "owner-1")
+			ev.MentionsOthers = true
+			return ev
+		}(), needsMention},
+		{"addressed to someone else and the bot", func() domain.MQTTDiscordEventCommand {
+			ev := event("11", "open-1", "", true, "owner-1")
+			ev.MentionsOthers = true
+			return ev
+		}(), ""},
 		{"other person in chosen channel", event("8", "open-1", "", false, "someone"), "not from the owner"},
 	}
 	for _, s := range steps {

@@ -47,7 +47,7 @@ with the reason, never the text):
 - Discord is set up on the device (`discord_managed` and a `discord_user_id`).
 - The sender is `discord_user_id`.
 - A direct message (`guild_id` empty) is always fine. A server message must come from
-  `discord_guild_id` **and** mention the bot; the mention is removed from the text. The @mention is not needed in a channel listed in `discord_open_channels`, in a thread of such a channel, or in a thread where the owner has already mentioned the bot (`parent_channel_id` marks a thread). One new mention brings a thread back after a restart. The owner and server checks always apply.
+  `discord_guild_id` **and** mention the bot; the mention is removed from the text. The @mention is not needed in a channel listed in `discord_open_channels`, in a thread of such a channel, or in a thread where the owner has already mentioned the bot (`parent_channel_id` marks a thread). A message that addresses another person, a role or everyone (`mentions_others`) still needs its own mention. One new mention brings a thread back after a restart. The owner and server checks always apply.
 - The `event_id` was not seen in the last 5 minutes (the relay can redeliver).
 
 An accepted message becomes a normal chat turn on the active runtime, whichever it is:

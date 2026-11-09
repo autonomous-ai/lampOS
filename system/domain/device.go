@@ -346,7 +346,9 @@ type MQTTDiscordEventCommand struct {
 	AuthorUsername  string `json:"author_username"`
 	BotUserID       string `json:"bot_user_id"`
 	MentionsBot     bool   `json:"mentions_bot"`
-	Text            string `json:"text"`
+	// MentionsOthers is set when the message addresses another person, a role or everyone.
+	MentionsOthers bool   `json:"mentions_others,omitempty"`
+	Text           string `json:"text"`
 
 	// Enc and Sealed carry the sealed form: every field above is then inside Sealed
 	// (see discordrelay.Seal). WasSealed is set once the device has opened it.
