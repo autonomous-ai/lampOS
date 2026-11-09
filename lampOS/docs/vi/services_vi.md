@@ -846,6 +846,16 @@ by service: …" của nó được nói trên tham số `action`.
   sent, in the conversation's language." khi dịch vụ trả lời `sent: true`,
   nếu không thì "Say only that it was not sent, in the conversation's
   language." (nói bằng ngôn ngữ của cuộc trò chuyện).
+- **Một lần gửi bị cắt khi còn đang chờ không bao giờ được trả lời như thể
+  chưa làm gì** (#5853, lamp-9adf, 9/11). Trên tuyến thứ hai, lệnh gọi của
+  một lần gửi vẫn chạy đến khi có câu trả lời dù một câu mới hơn cắt lượt,
+  và câu trả lời lại những lời đó được đưa lệnh gọi của lần gửi cùng chỗ
+  dịch vụ đã làm tới (`send_state`, giữ theo yêu cầu trong `run` trước mọi
+  hàng rào của tuyến: đã hỏi khi qua cổng, rồi câu trả lời của dịch vụ hay
+  lời từ chối của cổng), được báo là lần ghi đã gửi trừ khi bị từ chối, và
+  không chạy `service_write` nào trong lượt đó
+  ([second-voice.md](../second-voice.md), các vòng được mang theo của
+  `LAMP_JOIN_CUT_WORDS`).
 - **Một câu gửi thuần** (`says_send`): các từ viết thường, mọi thứ trừ chữ
   cái, chữ số và `'` thành dấu cách, các từ đệm `yes`, `yeah`, `yep`, `ok`,
   `okay`, `sure`, `please`, `now`, `lamp`, `lampy`, `hey`, `hi`, `hello`,
