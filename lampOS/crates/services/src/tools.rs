@@ -90,10 +90,20 @@ fn catalog_at(offset_minutes: Option<i32>) -> Value {
         .map(|(code, actions)| format!("{code}: {actions}"))
         .collect();
     actions.push(format!("{mcp}: {}", writes::MCP_ACTIONS));
+    // Each service the lamp can link, by its name, once.
+    let mut names: Vec<&str> = Vec::new();
+    for service in catalog::SERVICES {
+        if !names.contains(&service.name) {
+            names.push(service.name);
+        }
+    }
     json!({"tools": [
         {
             "name": CONNECTED,
-            "description": "Which of the person's services (mail, calendar, documents, code, tasks) are linked to the lamp, and the account of each. Ask before saying a service isn't linked.",
+            "description": format!(
+                "Which of the person's services (mail, calendar, documents, code, tasks) are linked to the lamp, and the account of each. Ask before saying a service isn't linked. The lamp can link only: {}. If the person names a service not among them, say the lamp can't link it yet, and never give another reason.",
+                names.join(", ")
+            ),
             "parameters": {"type": "object", "properties": {}},
         },
         {
@@ -235,6 +245,16 @@ mod tests {
             );
         }
         assert!(writes.contains("gmail-app: send_mail {to, cc, subject, text}"));
+        // The names the lamp can link, each once, and what to say of another.
+        let connected = tools[0]["description"].as_str().unwrap();
+        assert!(connected.contains("The lamp can link only: Gmail, Gmail with Google sign-in, Google Calendar, Google Drive, Figma, GitHub,"));
+        assert_eq!(connected.matches("Figma").count(), 1);
+        assert!(
+            connected.contains("say the lamp can't link it yet, and never give another reason.")
+        );
+        // The voice puts its own rule (320 bytes) before this, within
+        // the 1,024 its link takes, and keeps only whole sentences.
+        assert!(connected.len() <= 600, "{}", connected.len());
         for tool in tools {
             let name = tool["name"].as_str().unwrap();
             assert!(name.len() <= 48);
