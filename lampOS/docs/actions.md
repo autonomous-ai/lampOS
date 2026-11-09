@@ -373,7 +373,9 @@ restored restrictions and refuses new caps; an explicit token removal works.
 Startup restores and applies the volume restriction before readiness.
 Effective volume is the minimum of the product ceiling and active caps.
 Every setter obeys it. Entry never raises a quieter mixer or unmutes it;
-release never restores a saved volume. The reply separates durable acceptance,
+release gives back only the level entry lowered, while the mixer still reads
+what the cap wrote (a volume change meanwhile stands; held in memory only,
+#5753). The reply separates durable acceptance,
 mixer readback and `output/caps` publication. Publishing does not prove ring
 output. Mixer failure keeps the restriction and retries no more often than
 once a second after the previous attempt. Successful `caps_get` reads are
