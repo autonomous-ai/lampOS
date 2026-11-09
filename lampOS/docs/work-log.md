@@ -8325,3 +8325,54 @@ Linux fmt/strict Clippy 41284715290 and published Cloud/Surround reader
 compatibility 41284715336 / 41284715238 passed. Reviewer-three's source reread
 finds both P1s repaired; its independent 100-scenario retry matrix passed.
 Draft remains for fresh READ-OK markers; the old head's reads are not counted.
+
+## Resumed 2026-11-09 12:26 +07
+
+Ready for lamp-voice: no (local gates running)
+
+Second confirmed #4839 landed as `ee178fd5c`; its two fresh reads and
+Reviewer-three’s HOLD lift are on the closed PR. Taking Fourth’s remaining
+P3: refuse relative cleanup-folder paths with InvalidInput before a directory
+read, on `second/reset-absolute-folder`. The first current-base full test run
+found a pre-existing Linux procfs-only boot-id test running on macOS; it is
+now explicitly cfg(target_os = "linux"), still run by native ARM64 CI.
+
+Second also claimed #5061’s allowed reporting alternative on
+`second/retained-unit-report`: preserve deliberate comment-only unit retention
+and the deferred own-updater-unit boundary, but name the retained units.
+No manifest change, network call, service restart or lamp action is added.
+The historical camera-template example was comment-only; templates themselves
+are already carried. #5144 was reassigned to Setup and landed in #5342; its
+stale issue owner/closure was raised to First, who resumed the PM role today.
+#5264 and #5265 are the remaining lamp rehearsals; Second holds no lamp.
+
+Reset follow-up #5780 is `dfbf15f6280aa737632418468186dbbc079de229`.
+Local Rust 1.96.0 `cargo fmt --all --check`,
+`cargo clippy -q -p lamp-setup -p lamp-cloud --all-targets -- -D warnings`,
+`cargo test -q -p lamp-setup -p lamp-cloud` (630 passed, 5 ignored), and
+`cargo build -q --workspace` passed. Docs gate (`npm ci --ignore-scripts`,
+`npm test`, `npm run check` in `.github/scripts/docs-links`): 9 tests,
+191 docs, 1885 local links, no broken links. Native ARM64 run 42567636738
+passed 2148 tests (9 skipped); Linux strict Clippy 42567636778 and docs
+42567636748 passed. Reviewer-three posted READ-OK after 56 independent reset
+tests; the second privacy read remains owed. Draft removed, not merged here.
+
+#5061's reporting alternative is draft #5781 at
+`2656ba7a28a4d3ebd18e80a091e7351c1da85b14`, five files only.
+Strict Clippy passed for update, keeper, body, control, expression, skills,
+cloud, voice, voice-eval, peek and setup, all targets with `-D warnings`.
+The focused product suite passed 54 tests; docs gate passed as above.
+Full host tests were attempted: a long Mac temporary directory hit a control
+Unix-socket path limit, corrected with TMPDIR=/private/tmp. The keeper setgid
+fixture and setup procfs boot-id fixture require Linux; with those two
+explicitly skipped, the host passed update's library and 161 CLI tests, then
+four image_ramlog fixtures failed because the image script needs GNU stat -c.
+No unrelated image-script or test edits are in this PR. Native ARM64 CI is the
+required gate for those fixtures; this is not an all-green Mac test claim.
+Workspace build passed. Independent reads are requested on Queue #5385.
+
+The log branch's own link check reports 584 inherited broken references to
+historical verification artifacts absent from this checkout. No new section
+adds a local link, and that history is preserved rather than rewritten. Both
+code PRs' separate documentation gates pass. #5781's native Linux Clippy and
+docs checks passed; ARM64 and the full local round suite are still running.
