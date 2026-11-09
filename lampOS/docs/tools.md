@@ -451,8 +451,7 @@ The switch declares two functions, `reports_stop` and `reports_state`
 unit sets it: a product lamp's chat request offers 40 of the lamp's own
 functions (`PRODUCT_FUNCTIONS`, `crates/update/tests/functions.rs`), the
 voice's own 21 with these two among them, the actions part's 17, Dance's
-`dance`, Pose's `set_pose` (#4135) and Light show's `light_show` (#5745),
-the skills' reached through `use_skill`. At the bound a core skill's function is never the one cut (the
+`dance` and Pose's `set_pose` (#4135). At the bound a core skill's function is never the one cut (the
 owner's rule, on #2614; [install.md](install.md)), and on the chat route
 neither is `reports_stop` nor any of the actions part's (the first builder,
 on #2644): the cut takes the second route's fetch, then its time
