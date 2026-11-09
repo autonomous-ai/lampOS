@@ -547,15 +547,46 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     if allowed("speak"):
 
         @server.tool()
-        async def lamp_say(text: str, rephrase: bool = False) -> str:
+        async def lamp_say(text: str, rephrase: bool = False, wait: bool = False) -> str:
             """Say a line in the lamp's own voice, at most 900 bytes of UTF-8 (the voice's own cap;
             about 900 Latin letters, fewer in other scripts), exactly as written, once the person isn't
             talking; `rephrase` lets the lamp say it in its own words instead, which also waits until the
             lamp isn't talking with someone, as before. It isn't said while the lamp is private, or in
-            quiet hours where this lamp has them set."""
+            quiet hours where this lamp has them set. Returns once the lamp has taken it; with `wait`,
+            once it has been said ("said") or not ("dropped: why"), 120 s at most."""
             words("text", text)
-            await act("say", text=text, rephrase=True if rephrase else None)
-            return "said"
+            limits.take("say")
+            ended: asyncio.Future = asyncio.get_running_loop().create_future()
+            asked: int | None = None
+
+            def note(id_: int) -> None:
+                nonlocal asked
+                asked = id_
+
+            def heard(event: dict) -> None:
+                if event.get("re") == asked and not ended.done():
+                    ended.set_result(event)
+
+            lamp.on("done", heard)
+            try:
+                fields = {"text": text, **({"rephrase": True} if rephrase else {})}
+                try:
+                    await lamp.request("say", on_id=note, **fields)
+                except LampError as error:
+                    raise refused(error) from error
+                # Taken is not said: the voice says it once the person isn't
+                # talking, or drops it (private, quiet hours, a stop).
+                if not wait:
+                    return "taken: the lamp says it once the person isn't talking"
+                try:
+                    done = await asyncio.wait_for(asyncio.shield(ended), MOST_WAIT_S)
+                except asyncio.TimeoutError:
+                    return f"taken; not said within {MOST_WAIT_S} s"
+                if done.get("how") == "finished":
+                    return "said"
+                return f"{done.get('how')}" + (f": {done['why']}" if done.get("why") else "")
+            finally:
+                lamp.off("done", heard)
 
         @server.tool()
         async def lamp_sound(name: str) -> str:

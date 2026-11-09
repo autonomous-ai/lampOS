@@ -187,6 +187,31 @@ def test_body_tools_in_a_row_reuse_the_held_lease_rather_than_be_refused_busy(tm
     run(go())
 
 
+def test_lamp_say_returns_when_taken_and_with_wait_once_said(tmp_path):
+    """`lamp_say` never says "said" before the lamp has said it: without
+    `wait` it returns at once as taken; with `wait`, at the say's `done`:
+    "said" when it finished, else how and why."""
+
+    async def go():
+        async with connected(tmp_path, auto_done=False) as (fake, _, session):
+            taken = await session.call_tool("lamp_say", {"text": "Build passed."})
+            assert text(taken).startswith("taken"), text(taken)
+            call = asyncio.create_task(session.call_tool("lamp_say", {"text": "Done.", "wait": True}))
+            while len(fake.asked("say")) < 2:
+                await asyncio.sleep(0.01)
+            await asyncio.sleep(0.2)
+            assert not call.done(), "a wait that ended before the say's done"
+            await fake.done([r["id"] for r in fake.requests if r["op"] == "say"][-1])
+            assert text(await call) == "said"
+            call = asyncio.create_task(session.call_tool("lamp_say", {"text": "Later.", "wait": True}))
+            while len(fake.asked("say")) < 3:
+                await asyncio.sleep(0.01)
+            await fake.done([r["id"] for r in fake.requests if r["op"] == "say"][-1], "dropped", "dropped: the lamp is private")
+            assert text(await call) == "dropped: dropped: the lamp is private"
+
+    run(go())
+
+
 def test_a_done_that_comes_before_its_answer_is_read_still_ends_the_tool(tmp_path):
     async def go():
         # The fake says `done` right after its answer.
