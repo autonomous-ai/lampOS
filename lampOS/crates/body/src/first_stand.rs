@@ -1263,6 +1263,39 @@ mod run {
 mod tests {
     use super::*;
 
+    /// #5759: every kept first-stand record (tests/fixtures/stores) reads
+    /// as its day's build wrote it. One a later build can't read is the
+    /// default, which asks again: a lamp that stood, or was stopped, would
+    /// ask to stand once more after an update.
+    #[test]
+    fn every_kept_record_reads_as_it_was_written() {
+        let folder = Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/stores"
+        ));
+        let stood = Record::read(&folder.join("first-stand-stood-2026-11-09.json"));
+        assert_eq!(stood.outcome, Some(Outcome::Stood));
+        assert_eq!(
+            (stood.asks, stood.shoulder, stood.elbow),
+            (1, Some(2633), Some(2603))
+        );
+        assert!(!stood.may_ask(u64::MAX));
+        let waiting = Record::read(&folder.join("first-stand-no-answer-2026-11-09.json"));
+        assert_eq!(waiting.outcome, Some(Outcome::NoAnswer));
+        assert_eq!(waiting.asks, 2);
+        assert_eq!(waiting.asked_at_unix_ms, Some(1_794_189_590_000));
+        let mut kept = 0;
+        for entry in fs::read_dir(folder).unwrap() {
+            let path = entry.unwrap().path();
+            let name = path.file_name().unwrap().to_string_lossy().into_owned();
+            if name.starts_with("first-stand-") {
+                assert_ne!(Record::read(&path), Record::default(), "{name}");
+                kept += 1;
+            }
+        }
+        assert!(kept >= 2, "{kept}");
+    }
+
     #[test]
     fn a_touch_held_a_second_after_a_release_is_the_yes() {
         let mut touches = Touches::new(HOLD_US);
