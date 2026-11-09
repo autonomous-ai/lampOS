@@ -1,3 +1,29 @@
+## 2026-11-09 — train 755 native success and train 756 integration
+
+- Train755 exact native success: adapter `5be5e3745`, ARM64 42629588910,
+  14,869 passed / 110 skipped; context `e4869f92e`, ARM64 42629594046,
+  14,877 passed / 111 skipped. Release builds, doc tests and artifacts pass.
+  Posted 6742224660 / 6742225179. El started the narrow context read
+  (6742180932), aiming around 22:15; PM placement/counting remains open.
+- Train756 `4342bcccc` then landed. Carried unchanged: adapter `67fc27f35`;
+  context `170cf2d1c` with El `5f60dacb5` and adapter `33dd74da1`.
+  All range-diffs equal, fmt/diff/docs pass. Current native runs are
+  42633295359 and 42633304754. Local context gate runs, including new-base
+  person_scope_seen coverage; full held_save filter follows separately.
+- Integration source check found no semantic conflict: carried-memory
+  scopes still refuse face forget/confirmation, both name clears precede
+  runner awaits, both context resets and stale-batch discard remain.
+  New Queue.line only filters fixed onboarding step labels; it cannot
+  copy old names/notes into generated speech. Setup-save deadline changes
+  apply only after an actual held save, not face-forget timing.
+- Closed the already-owned attachment review without expanding its audit:
+  author fixed both remaining payload cases at `bce7f43fe`. Existing exact
+  Q probes pass 6/6, strict Base64 completeness traced in source only.
+  READ-OK 6742152816 lifts Third's remaining hold; native/device acceptance
+  and Thirteen's skill-door review remain separate. No live account use.
+- User again asked to keep working. Continuing face integration and review
+  follow-through, with no new security audit or device action.
+
 ## 2026-11-09 — train 755 local gates complete
 
 - Context `e4869f92e` local gate exited 0: fmt, strict all-target Clippy
