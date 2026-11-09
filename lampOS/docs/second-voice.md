@@ -4148,8 +4148,11 @@ after a take-over, but now for every turn:
   if a line before it already carried them), with the note "their
   go-ahead already sent the write they asked for … do not call
   service_write again for it" (`SENT_WRITE_NOTE`); the journal says
-  `request M: request N's service_write was sent before a newer line cut its
-  answer; its sent result goes with its words`. The cut turn's own answer is
+  `request M: request N's K send tr(y|ies) began before a newer line cut its
+  answer; the sent one and each try's own result go with its words` (the
+  tail names what was told instead when no try is known sent: "a send whose
+  result is not known", "a send not known to have gone", or "their results,
+  none sent,"). The cut turn's own answer is
   fenced to "not running" once its lease is stale, so where the services
   got to with that very try (`services::send_state`, by its attempt id) is
   told instead: their answer, or the gate's refusal, never another try's.
