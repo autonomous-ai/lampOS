@@ -1196,7 +1196,8 @@ pub(crate) fn under_way_now() -> bool {
 /// that `line` does not say itself (#5809: answering a name, the model said
 /// "Step three:" before its own words, the walk's next line being step
 /// three). A step's own line, the walk's or the model's ask of it, keeps
-/// its step word; outside the walk nothing is dropped.
+/// its step word; the line's step word opening another ask is dropped with
+/// it; outside the walk nothing is dropped.
 pub(crate) fn model_words(text: String, line: &str, under_way: bool) -> String {
     if under_way {
         in_language::without_step_words(&text, line)
@@ -1233,6 +1234,34 @@ mod model_words_tests {
     #[test]
     fn the_walks_own_line_keeps_its_step_word() {
         let words = "Step three: Pet the top of my head.";
+        assert_eq!(model_words(words.into(), NOTE, true), words);
+    }
+
+    /// Tonight's B on 11091 (lamp-52e6, 9 Nov 21:46:42): the face yes's
+    /// reply made up a step three, 12 s before the walk's own.
+    #[test]
+    fn a_made_up_ask_under_the_walks_next_step_word_is_dropped_with_it() {
+        let line = format!("Yes, please. {NOTE}");
+        assert_eq!(
+            model_words(
+                "Step three: tell me one thing you'd like me to keep in mind for you.".into(),
+                &line,
+                true
+            ),
+            ""
+        );
+        assert_eq!(
+            model_words(
+                "I'll know you now, Walter. Step three: tell me one thing you'd like me to keep in mind for you.".into(),
+                &line,
+                true
+            ),
+            "I'll know you now, Walter."
+        );
+        // The walk's ask in the model's own words keeps its step word.
+        let words = "Step three: gently pet the top of my head.";
+        assert_eq!(model_words(words.into(), NOTE, true), words);
+        let words = "Step three: Pet the top of my head. Go ahead.";
         assert_eq!(model_words(words.into(), NOTE, true), words);
     }
 
