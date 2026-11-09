@@ -4133,10 +4133,11 @@ after a take-over, but now for every turn:
   wordless line cut the turn, and the held line answering it, given no trace
   of the send, prepared a new write and read it back). The send runs on a
   task of its own (`sending`), so it reaches its answer after the cut, and
-  is kept with that answer (`SentWrite`, by the send's own request, every
-  try of one batch, so a later try the gate refuses as nothing waiting never
-  hides the one that went; every try is carried with its own result, and the
-  note follows the one that went) until
+  is kept with that answer (`SentWrite`, by the send's own request and its
+  own attempt id (`send_attempt`), every try of one batch up to its bound
+  (`net::MOST_CALLS`, 64), refused tries let go first and never one that
+  went or may have gone, the newest 8 requests' (`SENDS_KEPT`); every try is
+  carried with its own result, and the note follows the one that went) until
   its round is carried, a turn given it ends (`sent_given_over`), or its
   words are let go. The line answering those words again, held or joined
   with new ones, finds it by any of the words' requests (`origins`), so
@@ -4150,9 +4151,9 @@ after a take-over, but now for every turn:
   `request M: request N's service_write was sent before a newer line cut its
   answer; its sent result goes with its words`. The cut turn's own answer is
   fenced to "not running" once its lease is stale, so where the services
-  got to with it (`services::send_state`) is told instead: their answer, or
-  the gate's refusal, kept per request (an older request's late answer never
-  overwrites a newer one's), the strongest of the request's tries. Past the gate
+  got to with that very try (`services::send_state`, by its attempt id) is
+  told instead: their answer, or the gate's refusal, never another try's.
+  Past the gate
   with no answer, the note says it was sent and its result is not known
   (`SENT_UNKNOWN_NOTE`); no answer within the bound and nothing at the
   services, that whether it went is not known (`SEND_NOT_KNOWN_NOTE`, its

@@ -58,7 +58,9 @@ async fn cut_again_while_writing(
         let writing = writing.clone();
         let sending = args.get("send_id").is_some();
         if name == crate::services::WRITE {
-            seen.lock().unwrap().push(args);
+            seen.lock()
+                .unwrap()
+                .push(crate::services::without_attempt(args));
         }
         Box::pin(async move {
             let _ = writing.send(());
@@ -275,9 +277,10 @@ async fn a_send_fenced_after_the_cut_is_told_by_the_services_own_answer() {
     let (writing, written) = std::sync::mpsc::channel();
     let plain: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) }));
     let scoped: ScopedToolRunner = Arc::new(
-        move |request, _, name, args, lease: crate::memory_scope::ScopeLease| {
+        move |_, _, name, args, lease: crate::memory_scope::ScopeLease| {
             let writing = writing.clone();
             let fence = fence.clone();
+            let marked = args.clone();
             if name == crate::services::WRITE {
                 seen.lock().unwrap().push(args);
             }
@@ -285,7 +288,7 @@ async fn a_send_fenced_after_the_cut_is_told_by_the_services_own_answer() {
                 let _ = writing.send(());
                 tokio::time::sleep(Duration::from_millis(300)).await;
                 let sent = json!({"sent": true, "service": "google_drive"});
-                crate::services::keep_send_for_test(request, Some(&sent));
+                crate::services::keep_send_for_test(&marked, Some(&sent));
                 if lease.is_current() {
                     sent
                 } else {
@@ -402,7 +405,7 @@ async fn a_refused_second_send_in_one_batch_never_hides_the_first() {
         let again = again.clone();
         let mut seen = seen.lock().unwrap();
         if name == crate::services::WRITE {
-            seen.push(args);
+            seen.push(crate::services::without_attempt(args));
         }
         let attempt = seen.len();
         Box::pin(async move {
@@ -547,10 +550,14 @@ async fn an_older_slow_send_finishing_late_never_hides_a_newer_one() {
     let seen = writes.clone();
     let late = Arc::new(tokio::sync::Notify::new());
     let (sending_s, s_under_way) = std::sync::mpsc::channel();
-    let runner: ToolRunner = Arc::new(move |request, _, name, args| {
+    let r_done = Arc::new(AtomicBool::new(false));
+    let r_finished = r_done.clone();
+    let runner: ToolRunner = Arc::new(move |_, _, name, args| {
         if name == crate::services::WRITE {
             seen.lock().unwrap().push(args.clone());
         }
+        let marked = args.clone();
+        let r_finished = r_finished.clone();
         let late = late.clone();
         let sending_s = sending_s.clone();
         let send_id = args["send_id"].as_str().map(str::to_owned);
@@ -560,7 +567,8 @@ async fn an_older_slow_send_finishing_late_never_hides_a_newer_one() {
                 Some("s0") => {
                     let _ = tokio::time::timeout(Duration::from_secs(3), late.notified()).await;
                     let told = json!({"sent": false, "error": "too slow"});
-                    crate::services::keep_send_for_test(request, Some(&told));
+                    crate::services::keep_send_for_test(&marked, Some(&told));
+                    r_finished.store(true, Ordering::SeqCst);
                     told
                 }
                 // S: sent, then fenced, R finishing in between.
@@ -568,7 +576,7 @@ async fn an_older_slow_send_finishing_late_never_hides_a_newer_one() {
                     let _ = sending_s.send(());
                     tokio::time::sleep(Duration::from_millis(200)).await;
                     let sent = json!({"sent": true, "service": "google_drive"});
-                    crate::services::keep_send_for_test(request, Some(&sent));
+                    crate::services::keep_send_for_test(&marked, Some(&sent));
                     late.notify_one();
                     tokio::time::sleep(Duration::from_millis(50)).await;
                     crate::tools::unavailable()
@@ -634,13 +642,7 @@ async fn an_older_slow_send_finishing_late_never_hides_a_newer_one() {
             _ => {}
         }
     }
-    assert_eq!(
-        crate::services::send_state(1),
-        Some(crate::services::SendState::Told(
-            json!({"sent": false, "error": "too slow"})
-        )),
-        "R finished after S"
-    );
+    assert!(r_done.load(Ordering::SeqCst), "R finished after S");
     let asked = script.asked.lock().unwrap();
     let held = asked.last().unwrap();
     assert!(
@@ -708,8 +710,9 @@ async fn a_ninth_send_try_never_takes_the_first_ones_receipt() {
     let writes: Writes = Arc::default();
     let seen = writes.clone();
     let (last, tried) = std::sync::mpsc::channel();
-    let runner: ToolRunner = Arc::new(move |request, _, name, args| {
+    let runner: ToolRunner = Arc::new(move |_, _, name, args| {
         let last = last.clone();
+        let marked = args.clone();
         if name == crate::services::WRITE {
             seen.lock().unwrap().push(args.clone());
         }
@@ -717,7 +720,7 @@ async fn a_ninth_send_try_never_takes_the_first_ones_receipt() {
         Box::pin(async move {
             if id == "s1" {
                 let sent = json!({"sent": true, "service": "google_drive"});
-                crate::services::keep_send_for_test(request, Some(&sent));
+                crate::services::keep_send_for_test(&marked, Some(&sent));
                 return sent;
             }
             if id == "wrong-8" {
