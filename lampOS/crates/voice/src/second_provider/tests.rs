@@ -8,6 +8,7 @@ mod checking_line;
 mod cut_to_a_person;
 mod decline_silent;
 mod dont_know;
+mod forget_speech;
 mod held_consent;
 mod held_forget;
 mod held_rename;
@@ -6739,15 +6740,14 @@ async fn the_end_of_the_lamps_words_is_told_as_they_are_sent() {
     assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
     let after = lamp_ipc::monotonic_us();
     let said = said.lock().unwrap().clone();
-    // Each of the script's packets is 1,500 samples: 62.5 ms at 24 kHz,
-    // played after the one before, though all are sent at once.
-    assert!(!said.is_empty());
-    for pair in said.windows(2) {
-        assert!(pair[1] >= pair[0] + 62_500, "{said:?}");
+    // Each 1,500-sample TTS packet is sent as 960 + 540 samples.
+    // Account each chunk, so cancelling the remainder preserves the tail
+    // of the first chunk. Both sentences still total 125 ms at 24 kHz.
+    assert_eq!(said.len(), 4, "{said:?}");
+    for (until, elapsed) in said.iter().zip([40_000, 62_500, 102_500, 125_000]) {
+        assert!(*until >= before + elapsed, "{said:?}");
+        assert!(*until <= after + elapsed, "{said:?}");
     }
-    let last = *said.last().unwrap();
-    assert!(last >= before + 62_500 * said.len() as u64, "{said:?}");
-    assert!(last <= after + 62_500 * said.len() as u64, "{said:?}");
 }
 
 /// #1712: a line the rule let out only as the conversation going on is

@@ -4463,9 +4463,38 @@ after a take-over, but now for every turn:
       normal context is composed again on the next turn. Face-only forgets retain their
       existing path. Tests are in `second_provider/tests/after_forget.rs`
       and `held_forget.rs`, with the prior acting-answer case in
-      `short_done.rs`; a lamp replay is still needed. This boundary
-      clears model context, not speech already queued: a pre-forget piece,
-      including one carried after a TTS `UNSAID`, can still be spoken.
+      `short_done.rs`; a lamp replay is still needed.
+    - **Admitting a forget cancels pending provider speech.** Before dispatching
+      an admitted memory forget, the route invalidates the old speech
+      generation. Pending TTS tasks, sentence packets, an unfinished packet,
+      a blocked output send and an `UNSAID` carry are dropped. Fresh speech
+      uses a new generation in the same request; no request interruption or
+      new wire message is sent. The engine filters invalidated speech still
+      in its own output channel. The confirmed held-forget path does the
+      same; locally held/refused calls and face-only forgets do not.
+      Replayable words in the wordless-cut buffers are cleared too. Existing
+      enqueued audio sample counts and conservative echo timing are retained,
+      since earlier audio can already be outside the provider. These estimates
+      can include cancelled provider-channel packets; they are not a delivery
+      receipt or proof that the speaker is idle. Cancellation does not wait for
+      TTS or deletion I/O. The host target is under 1 ms for ordinary
+      admission bookkeeping; host measurements do not establish device
+      latency.
+      **Limit:** audio already returned by the engine to the worker,
+      coordinator or speaker is outside this provider-only boundary. It can
+      still play. Cancelling that tail needs the coordinator and playback
+      owner's separate change; this does not claim speaker-level erasure.
+      The host fixture `coordinator/tests/forget_tail.rs` measures the
+      disjoint queues at actual forget-runner entry, immediately after
+      invalidation. With real engine output, credited IPC and reply chunking,
+      its maximum observed emitted/unplayed tail is **30,040 ms** when
+      saturated (960 worker frames, 719,280 coordinator frames, 240 unaccepted
+      and 480 accepted-but-unretired simulated speaker frames at 24 kHz).
+      The draining control leaves **130 ms** (960 worker, 1,920 IPC and 240
+      coordinator frames). These are two host scenarios with simulated
+      speaker retirement, not a physical speaker result or a global maximum.
+      The saturated result exceeds the agreed roughly-one-second threshold
+      for a separate coordinator/playback-owner follow-up.
     - **A stop:** the held answers go first, then the writer has up to
       150 ms to write them, then the open session closes
       (`remember::close_at_exit`).

@@ -70,6 +70,7 @@ pub mod policy;
 pub mod probe;
 mod second_try;
 mod services;
+mod speech_generation;
 pub mod speech_tags;
 pub mod wordless_call;
 pub mod worker;
@@ -1427,7 +1428,15 @@ struct Shared {
     )>,
     /// Audio packets sent by this process.
     sequence: AtomicU64,
-    out: mpsc::Sender<ProviderOutput>,
+    out: mpsc::Sender<speech_generation::Output>,
+    /// One current request's speech fence, shared with fixed preludes and cues
+    /// that may precede its model answer. Older retired requests cannot replace it.
+    speech_generation: Mutex<
+        Option<(
+            u64,
+            tokio::sync::watch::Sender<speech_generation::Generation>,
+        )>,
+    >,
     heed: Option<Heed>,
     /// [`Engine::opening`]: the rule told of a computer's turn.
     opened: Option<Opened>,
@@ -3370,6 +3379,38 @@ struct Written {
 }
 
 impl Shared {
+    /// Forget replayable words while retaining sample counts and echo timing:
+    /// audio already handed to the worker may still be at the speaker.
+    fn forget_pending_speech(&self, request: u64) {
+        if let Ok(mut written) = self.written.lock()
+            && written.request <= request
+        {
+            *written = Written {
+                request,
+                ..Written::default()
+            };
+        }
+        if let Ok(mut said) = self.said.lock()
+            && said.0 <= request
+        {
+            for piece in &mut said.1 {
+                piece.words = None;
+            }
+            said.2 = crate::not_speech::CallsLeftOut::new();
+        }
+        if let Ok(mut said) = self.lamp_said.lock()
+            && said.0 <= request
+        {
+            *said = (request, String::new());
+        }
+        if let Ok(mut whole) = self.said_whole.lock() {
+            whole.take_if(|of| *of <= request);
+        }
+        if let Ok(mut said) = self.wordless_said.lock() {
+            said.take_if(|said| said.request <= request);
+        }
+    }
+
     /// A piece of `request`'s answer handed to the saying half; the first of
     /// a newer request's starts the record afresh.
     fn wrote_piece(&self, request: u64, words: &str) {
@@ -4046,7 +4087,7 @@ impl Drop for Turn {
 /// The second route's protocol state: at most one turn at a time.
 pub struct Engine {
     shared: Arc<Shared>,
-    output: mpsc::Receiver<ProviderOutput>,
+    output: mpsc::Receiver<speech_generation::Output>,
     /// Events the engine itself says (`Started`, refusals); before any of
     /// the turn task's, so `Started` always precedes the turn's output.
     urgent: VecDeque<ProviderOutput>,
@@ -4136,6 +4177,7 @@ impl Engine {
                 said: Mutex::new((0, Vec::new(), crate::not_speech::CallsLeftOut::new())),
                 sequence: AtomicU64::new(0),
                 out,
+                speech_generation: Mutex::new(None),
                 heed: None,
                 opened: None,
                 verdicts: None,
@@ -7225,7 +7267,10 @@ impl Engine {
         loop {
             let event = match self.urgent.pop_front() {
                 Some(event) => event,
-                None => self.output.try_recv().ok()?,
+                None => match self.output.try_recv().ok()?.current() {
+                    Some(event) => event,
+                    None => continue,
+                },
             };
             if self.current_output(&event) {
                 return Some(event);
@@ -7246,7 +7291,16 @@ impl Engine {
         loop {
             let event = match self.urgent.pop_front() {
                 Some(event) => event,
-                None => self.output.recv().await.expect("the engine holds a sender"),
+                None => match self
+                    .output
+                    .recv()
+                    .await
+                    .expect("the engine holds a sender")
+                    .current()
+                {
+                    Some(event) => event,
+                    None => continue,
+                },
             };
             if self.current_output(&event) {
                 return event;
@@ -7414,9 +7468,42 @@ pub fn fault(error: &net::Error) -> Fault {
 }
 
 impl Shared {
+    fn speech_generation(
+        &self,
+        request: u64,
+    ) -> tokio::sync::watch::Sender<speech_generation::Generation> {
+        let mut current = self
+            .speech_generation
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if let Some((of, generation)) = current.as_ref()
+            && *of == request
+        {
+            return generation.clone();
+        }
+        let (generation, _) = tokio::sync::watch::channel(speech_generation::Generation::default());
+        if current.as_ref().is_none_or(|(of, _)| *of < request) {
+            *current = Some((request, generation.clone()));
+        }
+        generation
+    }
+
     /// False once the engine is gone; the task then just ends.
     async fn emit(&self, event: ProviderOutput) -> bool {
-        self.out.send(event).await.is_ok()
+        let generation = match &event {
+            ProviderOutput::Audio { request, .. }
+            | ProviderOutput::Transcript {
+                request: Some(request),
+                finished: false,
+                ..
+            } => Some(self.speech_generation(*request).borrow().clone()),
+            _ => None,
+        };
+        let output = match generation {
+            Some(generation) => speech_generation::Output::speech(event, generation),
+            None => event.into(),
+        };
+        self.out.send(output).await.is_ok()
     }
 
     /// Waits while `request`'s answer is kept back for its pause's grace
@@ -13095,6 +13182,8 @@ async fn answer(
         )
     });
     let (sentences, mut queued) = mpsc::channel(SENTENCES_AHEAD);
+    let generation = shared.speech_generation(request);
+    let mut changed = generation.subscribe();
     let spoke = AtomicBool::new(false);
     // The answer's own first audio went (not the announcement's).
     let answered = AtomicBool::new(false);
@@ -13121,6 +13210,7 @@ async fn answer(
         line: std::iter::once(&said)
             .chain(&notes)
             .fold(String::new(), |all, part| all + part),
+        generation,
     };
     let began = Instant::now();
     // The bounds below are on the runtime's clock, which a test can step.
@@ -13465,6 +13555,9 @@ async fn answer(
                     && let Some(scope) = scope.as_ref()
                 {
                     scope.release_held_keep(line, &HeldKeepYes(()));
+                }
+                if after_forget::is_memory_forget(&call.name) {
+                    queue.forget();
                 }
                 let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
@@ -15290,6 +15383,9 @@ async fn answer(
                     scope.mark_everything_asked(&EverythingShown(()));
                 }
                 ran_tool.store(true, Ordering::Relaxed);
+                if after_forget::is_memory_forget(&call.name) {
+                    queue.forget();
+                }
                 let mut answer = match (&shared.requested_audio, spoken) {
                     (Some((worker_boot, runner)), Some(turn)) if turn.captured => {
                         let context = lamp_msgs::RequestedAudioContext {
@@ -15689,163 +15785,197 @@ async fn answer(
         // #4338): said with the next piece, as one, so no sentence of the
         // answer is silently dropped.
         let mut carried: Option<String> = None;
-        while let Some((text, packets)) = queued.recv().await {
-            // Nothing of it goes out while its pause's grace keeps it back
-            // (`LAMP_ENDPOINT_PAUSE_JOIN`): a line begun meanwhile cuts it
-            // short unheard, and it says nothing more.
-            if !shared.kept_for_the_pause(request).await {
-                eprintln!(
-                    "lamp-voice second: request {request}: a line began in its pause's grace: none of its answer is said (LAMP_ENDPOINT_PAUSE_JOIN)"
-                );
-                return Err(Stop::Gone);
-            }
-            // Its words, kept for a piece said with the next (#4338).
-            let own = text.clone();
-            // The announcement is heard, not written: the coordinator reads
-            // an answer's opening words for its look ("Let me look.") and
-            // for the body's gesture, and they are the model's (#1075 on
-            // lamp-52e6: "My voice sounds… Let me look." took no look).
-            // Sentences come trimmed: each after the first is said after a
-            // space, so the lamp's words read "just now. Hmm," (#1014).
-            let answering = text != ANNOUNCEMENT;
-            // The announcement's time counts in what was heard, its words
-            // don't: they are never kept as the lamp's.
-            shared.said_piece(request, answering.then_some(text.as_str()));
-            if answering {
-                shared.took_piece(request);
-                words_out.fetch_add(text.split_whitespace().count(), Ordering::Relaxed);
-                whole.push(' ');
-                whole.push_str(&text);
-                let words = ProviderOutput::Transcript {
-                    request: Some(request),
-                    text: if std::mem::replace(&mut after, true) {
-                        format!(" {text}")
-                    } else {
-                        text
-                    },
-                    finished: false,
-                };
-                if !shared.emit(words).await {
-                    return Err(Stop::Gone);
-                }
-            }
-            // After a piece not said, this one is said with it, in order
-            // (#4338): its own speech, already started, is let go. The two
-            // go to the voice as the lamp's words, without the speech tags
-            // (`LAMP_SECOND_SPEECH_TAGS`) the pieces were given apart.
-            let (piece, mut packets) = match carried.take().filter(|_| answering) {
-                Some(unsaid) => {
-                    let joined = format!("{unsaid} {own}");
-                    eprintln!(
-                        "lamp-voice second: request {request}: the piece not said goes with the next one, as one piece ({} words)",
-                        joined.split_whitespace().count()
-                    );
-                    let speech = shared
-                        .services
-                        .speak_for(joined.clone(), net::Turn { request, heard_at });
-                    (joined, speech)
-                }
-                None => (
-                    own,
-                    futures_util::stream::unfold(packets, |mut packets| async move {
-                        packets.recv().await.map(|packet| (packet, packets))
-                    })
-                    .boxed(),
-                ),
-            };
-            let mut played = false;
-            while let Some(packet) = packets.next().await {
-                let samples = match packet {
-                    // Not started twice, and none of it played: kept for the
-                    // next piece (#4338). The announcement is never carried.
-                    Err(error) if services::unsaid(&error) && !played => {
-                        if answering {
-                            eprintln!(
-                                "lamp-voice second: request {request}: a piece of the answer could not be started twice; it is said with the next piece"
-                            );
-                            carried = Some(piece);
-                        }
-                        break;
+        loop {
+            let pieces = async {
+                while let Some((generation, text, packets)) = queued.recv().await {
+                    if !generation.current() {
+                        continue;
                     }
-                    packet => packet.map_err(|error| Stop::Failed(fault(&error)))?,
-                };
-                played = true;
-                for part in samples.chunks(PACKET_SAMPLES) {
-                    let audio = ProviderOutput::Audio {
-                        request,
-                        sequence: shared.sequence.fetch_add(1, Ordering::Relaxed) + 1,
-                        provider_event_at_us: monotonic_us(),
-                        source_frames: part.len(),
-                        source_offset: 0,
-                        samples: part.to_vec(),
-                    };
-                    // Its answer's first sound is handed on now: its words
-                    // are no longer carried, before the await a newer line's
-                    // cut could take them in, so words carried, joined and
-                    // unsaid never had a sample at the speaker (El's and
-                    // Fourteen's P3 on #3129).
-                    if answering
-                        && !answered.load(Ordering::Relaxed)
-                        && let Ok(mut in_flight) = shared.in_flight.lock()
-                    {
-                        in_flight.take_if(|carried| carried.request == request);
-                    }
-                    if !shared.emit(audio).await {
+                    // Nothing of it goes out while its pause's grace keeps it back
+                    // (`LAMP_ENDPOINT_PAUSE_JOIN`): a line begun meanwhile cuts it
+                    // short unheard, and it says nothing more.
+                    if !shared.kept_for_the_pause(request).await {
+                        eprintln!(
+                            "lamp-voice second: request {request}: a line began in its pause's grace: none of its answer is said (LAMP_ENDPOINT_PAUSE_JOIN)"
+                        );
                         return Err(Stop::Gone);
                     }
-                    shared.said_samples(request, part.len());
-                    spoke.store(true, Ordering::Relaxed);
-                    // The answer's, never the announcement's or a cue's.
-                    if answering && !answered.swap(true, Ordering::Relaxed) {
-                        if let Ok(mut last) = shared.answered_request.lock() {
-                            *last = Some(request);
-                        }
-                        // The air's note, if this request was given it, is
-                        // spent now its answer is heard.
-                        if let Some((_, heard)) = &shared.air {
-                            heard(request);
-                        }
-                        if let Some((_, heard)) = &shared.seems {
-                            heard(request);
-                        }
-                        // An answer to someone, or the lamp's own turn or a
-                        // reminder, which is no answer.
-                        room(|room| {
-                            if asked == Asker::Spoken {
-                                room.spoke(request, monotonic_us());
+                    // Its words, kept for a piece said with the next (#4338).
+                    let own = text.clone();
+                    // The announcement is heard, not written: the coordinator reads
+                    // an answer's opening words for its look ("Let me look.") and
+                    // for the body's gesture, and they are the model's (#1075 on
+                    // lamp-52e6: "My voice sounds… Let me look." took no look).
+                    // Sentences come trimmed: each after the first is said after a
+                    // space, so the lamp's words read "just now. Hmm," (#1014).
+                    let answering = text != ANNOUNCEMENT;
+                    // The announcement's time counts in what was heard, its words
+                    // don't: they are never kept as the lamp's.
+                    shared.said_piece(request, answering.then_some(text.as_str()));
+                    if answering {
+                        shared.took_piece(request);
+                        words_out.fetch_add(text.split_whitespace().count(), Ordering::Relaxed);
+                        whole.push(' ');
+                        whole.push_str(&text);
+                        let words = ProviderOutput::Transcript {
+                            request: Some(request),
+                            text: if std::mem::replace(&mut after, true) {
+                                format!(" {text}")
                             } else {
-                                room.spoke_unasked(request, monotonic_us());
-                            }
-                        });
-                        // Its own turn heard: news someone may reply to.
-                        if asked != Asker::Spoken
-                            && let Some(did) = &shared.did
+                                text
+                            },
+                            finished: false,
+                        };
+                        if shared
+                            .out
+                            .send(speech_generation::Output::speech(words, generation.clone()))
+                            .await
+                            .is_err()
                         {
-                            did(Did::Spoke(monotonic_us()));
-                        }
-                        reached(&times, |times| &mut times.audio);
-                        eprintln!(
-                            "lamp-voice second: request {request} first answer audio {} ms after the words were heard",
-                            began.elapsed().as_millis()
-                        );
-                        if asked == Asker::Spoken {
-                            worker::name_sounded(request);
+                            return Err(Stop::Gone);
                         }
                     }
-                    if let Ok(mut at) = shared.answered_at.lock() {
-                        *at = Some((shared.clock)());
+                    // After a piece not said, this one is said with it, in order
+                    // (#4338): its own speech, already started, is let go. The two
+                    // go to the voice as the lamp's words, without the speech tags
+                    // (`LAMP_SECOND_SPEECH_TAGS`) the pieces were given apart.
+                    let (piece, mut packets) = match carried.take().filter(|_| answering) {
+                        Some(unsaid) => {
+                            let joined = format!("{unsaid} {own}");
+                            eprintln!(
+                                "lamp-voice second: request {request}: the piece not said goes with the next one, as one piece ({} words)",
+                                joined.split_whitespace().count()
+                            );
+                            let speech = shared
+                                .services
+                                .speak_for(joined.clone(), net::Turn { request, heard_at });
+                            (joined, speech)
+                        }
+                        None => (
+                            own,
+                            futures_util::stream::unfold(packets, |mut packets| async move {
+                                packets.recv().await.map(|packet| (packet, packets))
+                            })
+                            .boxed(),
+                        ),
+                    };
+                    let mut played = false;
+                    while let Some(packet) = packets.next().await {
+                        let samples = match packet {
+                            // Not started twice, and none of it played: kept for the
+                            // next piece (#4338). The announcement is never carried.
+                            Err(error) if services::unsaid(&error) && !played => {
+                                if answering {
+                                    eprintln!(
+                                        "lamp-voice second: request {request}: a piece of the answer could not be started twice; it is said with the next piece"
+                                    );
+                                    carried = Some(piece);
+                                }
+                                break;
+                            }
+                            packet => packet.map_err(|error| Stop::Failed(fault(&error)))?,
+                        };
+                        played = true;
+                        for part in samples.chunks(PACKET_SAMPLES) {
+                            let audio = ProviderOutput::Audio {
+                                request,
+                                sequence: shared.sequence.fetch_add(1, Ordering::Relaxed) + 1,
+                                provider_event_at_us: monotonic_us(),
+                                source_frames: part.len(),
+                                source_offset: 0,
+                                samples: part.to_vec(),
+                            };
+                            // Its answer's first sound is handed on now: its words
+                            // are no longer carried, before the await a newer line's
+                            // cut could take them in, so words carried, joined and
+                            // unsaid never had a sample at the speaker (El's and
+                            // Fourteen's P3 on #3129).
+                            if answering
+                                && !answered.load(Ordering::Relaxed)
+                                && let Ok(mut in_flight) = shared.in_flight.lock()
+                            {
+                                in_flight.take_if(|carried| carried.request == request);
+                            }
+                            if shared
+                                .out
+                                .send(speech_generation::Output::speech(audio, generation.clone()))
+                                .await
+                                .is_err()
+                            {
+                                return Err(Stop::Gone);
+                            }
+                            shared.said_samples(request, part.len());
+                            spoke.store(true, Ordering::Relaxed);
+                            // The answer's, never the announcement's or a cue's.
+                            if answering && !answered.swap(true, Ordering::Relaxed) {
+                                if let Ok(mut last) = shared.answered_request.lock() {
+                                    *last = Some(request);
+                                }
+                                // The air's note, if this request was given it, is
+                                // spent now its answer is heard.
+                                if let Some((_, heard)) = &shared.air {
+                                    heard(request);
+                                }
+                                if let Some((_, heard)) = &shared.seems {
+                                    heard(request);
+                                }
+                                // An answer to someone, or the lamp's own turn or a
+                                // reminder, which is no answer.
+                                room(|room| {
+                                    if asked == Asker::Spoken {
+                                        room.spoke(request, monotonic_us());
+                                    } else {
+                                        room.spoke_unasked(request, monotonic_us());
+                                    }
+                                });
+                                // Its own turn heard: news someone may reply to.
+                                if asked != Asker::Spoken
+                                    && let Some(did) = &shared.did
+                                {
+                                    did(Did::Spoke(monotonic_us()));
+                                }
+                                reached(&times, |times| &mut times.audio);
+                                eprintln!(
+                                    "lamp-voice second: request {request} first answer audio {} ms after the words were heard",
+                                    began.elapsed().as_millis()
+                                );
+                                if asked == Asker::Spoken {
+                                    worker::name_sounded(request);
+                                }
+                            }
+                            if let Ok(mut at) = shared.answered_at.lock() {
+                                *at = Some((shared.clock)());
+                            }
+                            // Account each sent chunk before cancellation can drop the
+                            // remainder of a larger TTS packet.
+                            // Also kept for the echo's tail (`LAMP_SECOND_OWN_ECHO`).
+                            // And for a stop said just after it (`LAMP_SPOKEN_STOP_ENDS`).
+                            if answering
+                                && (shared.did.is_some()
+                                    || shared.own_echo
+                                    || shared.spoken_stop_ends)
+                            {
+                                let until = shared.said_through(part.len(), monotonic_us());
+                                if let Some(did) = &shared.did {
+                                    did(Did::Said(request, until));
+                                }
+                            }
+                        }
                     }
                 }
-                // Each packet's words, as long as it plays, after the one
-                // before it or from now.
-                // Also kept for the echo's tail (`LAMP_SECOND_OWN_ECHO`).
-                // And for a stop said just after it (`LAMP_SPOKEN_STOP_ENDS`).
-                if answering && (shared.did.is_some() || shared.own_echo || shared.spoken_stop_ends)
-                {
-                    let until = shared.said_through(samples.len(), monotonic_us());
-                    if let Some(did) = &shared.did {
-                        did(Did::Said(request, until));
-                    }
+                Ok::<(), Stop>(())
+            };
+            tokio::select! {
+                biased;
+                () = speech_generation::changed(&mut changed) => {
+                    // Dropping `pieces` drops a blocked output send, packet
+                    // remainder or joined UNSAID stream before the fresh reply.
+                    carried = None;
+                    whole.clear();
+                }
+                result = pieces => {
+                    result?;
+                    break;
                 }
             }
         }
@@ -16069,7 +16199,8 @@ struct Queue<'a> {
     speech: &'a mut JoinSet<()>,
     /// Said before the first sentence of the answer, if due.
     announcement: Option<Packets>,
-    sentences: mpsc::Sender<(String, Packets)>,
+    sentences: mpsc::Sender<(speech_generation::Generation, String, Packets)>,
+    generation: tokio::sync::watch::Sender<speech_generation::Generation>,
     /// Some of the answer itself is on its way.
     started: bool,
     /// Whose, and when its words were heard: for the journal's line when
@@ -16100,6 +16231,19 @@ impl Drop for Queue<'_> {
     }
 }
 impl Queue<'_> {
+    /// Admission is the boundary, before the deletion's potentially slow I/O.
+    /// The request continues, but none of its old pending speech may continue.
+    fn forget(&mut self) {
+        self.generation.borrow().invalidate();
+        self.generation
+            .send_replace(speech_generation::Generation::default());
+        self.speech.abort_all();
+        self.announcement = None;
+        self.started = false;
+        self.tags = self.shared.speech_tags.map(speech_tags::Tags::new);
+        self.shared.forget_pending_speech(self.request);
+    }
+
     async fn announce(&mut self) -> Result<(), Stop> {
         match self.announcement.take() {
             Some(packets) => self.send(ANNOUNCEMENT.to_owned(), packets).await,
@@ -16193,8 +16337,9 @@ impl Queue<'_> {
 
     async fn send(&mut self, text: String, packets: Packets) -> Result<(), Stop> {
         // Closed only when the saying half stopped; its error is the one kept.
+        let generation = self.generation.borrow().clone();
         self.sentences
-            .send((text, packets))
+            .send((generation, text, packets))
             .await
             .map_err(|_| Stop::Gone)
     }
@@ -16774,12 +16919,12 @@ mod requested_audio_tests {
                 };
                 // Generation completion does not drop the request's owner. A
                 // still-queued offer can be delivered until that owner is revoked.
-                engine.shared.out.try_send(event()).unwrap();
+                engine.shared.out.try_send(event().into()).unwrap();
                 assert!(matches!(
                     engine.try_output(),
                     Some(ProviderOutput::RequestedAudio { .. })
                 ));
-                engine.shared.out.try_send(event()).unwrap();
+                engine.shared.out.try_send(event().into()).unwrap();
                 engine
                     .turn
                     .as_ref()
@@ -16815,22 +16960,22 @@ mod requested_audio_tests {
         };
         engine.begin(7, 3);
         engine.urgent.clear();
-        engine.shared.out.try_send(event()).unwrap();
+        engine.shared.out.try_send(event().into()).unwrap();
         assert!(matches!(
             engine.try_output(),
             Some(ProviderOutput::RequestedAudio { .. })
         ));
-        engine.shared.out.try_send(event()).unwrap();
+        engine.shared.out.try_send(event().into()).unwrap();
         engine.begin(8, 3);
         engine.urgent.clear();
         assert!(engine.try_output().is_none());
-        engine.shared.out.try_send(event()).unwrap();
+        engine.shared.out.try_send(event().into()).unwrap();
         engine.begin(7, 4);
         engine.urgent.clear();
         assert!(engine.try_output().is_none());
         engine.begin(7, 3);
         engine.urgent.clear();
-        engine.shared.out.try_send(event()).unwrap();
+        engine.shared.out.try_send(event().into()).unwrap();
         engine.retire_through(7);
         assert!(engine.try_output().is_none());
     }

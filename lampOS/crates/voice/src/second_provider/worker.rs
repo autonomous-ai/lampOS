@@ -20788,7 +20788,7 @@ mod tests {
                     idle: true,
                 },
             ] {
-                engine.shared.out.try_send(event).unwrap();
+                engine.shared.out.try_send(event.into()).unwrap();
                 let pending = engine.try_output().unwrap();
                 assert!(
                     gate.send_or_discard(&engine, NOW, &pending, |event| worker
@@ -20827,11 +20827,14 @@ mod tests {
             engine
                 .shared
                 .out
-                .try_send(ProviderOutput::RequestedAudio {
-                    request,
-                    session: 1,
-                    offer,
-                })
+                .try_send(
+                    ProviderOutput::RequestedAudio {
+                        request,
+                        session: 1,
+                        offer,
+                    }
+                    .into(),
+                )
                 .unwrap();
             // This is the event held outside Engine when the worker has no
             // credit. The later retry must not trust that earlier dequeue.
