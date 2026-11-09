@@ -130,7 +130,9 @@ yes is to that session (`Launch::session`, absent when none was named;
 a store holding such a task is schema 5). After the yes and the machines
 preflight, `Cli::reply_named` lists that computer's sessions with `harness
 ps --machine <id> --all --json`, the ones stopped this week too, within
-the read bound. A row fits when its name or its folder's last part is
+the launch's bound (60 s), not the 10 s read bound: on lamp-c0a4 on 9 Nov
+that list of the person's Mac took 4.5 to 10 s, and two hand-overs said
+yes to twice ended `sessions_timeout` at 10 s. A row fits when its name or its folder's last part is
 the words said, compared on letters and digits only ("Docs-Update",
 "docs update"); when no row is that, a row where each word said begins
 one of the name's or folder's words, in order (three letters or more in
@@ -141,13 +143,16 @@ session's name, which for one the lamp started is `lamp-<hex>`, or its
 id): the words said, less the ones that only say which one ("the", "one",
 "session", "earlier", "that", … `NOT_THE_WORK`), against each row's
 `asks` and `about` (never its name or folder, which only the rule above
-reads, so "client api" never finds "Fix the API client"). A word said is held when a row's word is the
-same, or one begins the other and the shorter has four letters or more
-("book" for "books.py"; "app" only for "app"). Rows holding at least half
-of the words and the most of them fit, live ones before stopped ones, so
-"the book program one" finds the session whose `about` is "I wrote
-books.py, a short command-line program for keeping a reading list", and
-two as good are `session_ambiguous`. Harness fills `asks` (the last two
+reads, so "client api" never finds "Fix the API client"). A word said is
+held when a row's word is the same, or the same with one of the endings
+s, es, ed, ing, er or ers (`ENDINGS`: "book" for "books.py", "test" for
+"tests", never "testament" or "notebook", the Reviewer-lead's P2 on #5784
+at de9bebdb41). A row fits only when it holds every one of those words,
+so "the payroll dashboard one" never finds a weather dashboard on
+"dashboard" alone (Reviewer-three's P2 on #5784 at 3d90e56736). Live rows
+come before stopped ones, so "the book program one" finds the session
+whose `about` is "I wrote books.py, a short command-line program for
+keeping a reading list", and two that fit are `session_ambiguous`. Harness fills `asks` (the last two
 prompts) and `about` (the last recaps) only for a live session with a
 finished turn, within 3 s, for the first 40 rows; a stopped row, or one
 with no turn ended yet, is found by its name or folder alone. A session
@@ -188,7 +193,11 @@ refusal), and nothing is started new in any case:
   `session`; blank is none, and words over 128 bytes or with a control
   character prepare nothing and the model is told to ask which session.
   The answer's `where`, which the read-back says, is "<who>, in the
-  session "…" on <computer>, not a new one". The session is kept with the
+  session "…" on <computer>, not a new one", and its `next` is
+  `session_next`, never only "Shall I start it?": say who will do it and
+  where, as `where` says it, and ask whether to start it there, so the
+  person hears the session before their yes (the Reviewer-lead's P2 on
+  #5784 at de9bebdb41). The session is kept with the
   task waiting for its yes. With `LAMP_TASKS_ONE_YES`, a yes in the turn
   that prepared it never starts a task for a named session, whatever the
   read-back said: which session a line said can't be told from its words

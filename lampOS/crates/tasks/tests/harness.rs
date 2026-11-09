@@ -570,7 +570,7 @@ fn with_route_the_router_is_asked_first_and_its_pick_is_the_tasks_agent() {
         let outcome = rig.cli().launch(&launch());
         (outcome, verbs(&rig), rig)
     };
-    let sent = json!({"decided":"session","id":AGENT,"name":"Fix login","machine":"daniel-pc","confidence":0.82,"reason":"same work","sent":{"state":"queued"}});
+    let sent = json!({"decided":"session","id":AGENT,"name":"Fix login","machine":"desk-pc","confidence":0.82,"reason":"same work","sent":{"state":"queued"}});
     let (outcome, called, rig) = routed(step(sent));
     assert_eq!(
         outcome,
@@ -678,16 +678,45 @@ fn with_route_the_router_is_asked_first_and_its_pick_is_the_tasks_agent() {
 
 /// One `harness ps --json` row, as Harness gives it.
 fn ps_row(id: &str, name: &str, state: &str, folder: Option<&str>) -> Value {
-    json!({"name":name,"id":id,"agent":"Claude Code","machine":"daniel-pc","state":state,
+    json!({"name":name,"id":id,"agent":"Claude Code","machine":"desk-pc","state":state,
         "folder":folder,"branch":null,"startedBy":"person","yours":false,"self":false,
         "lastActive":"2026-11-09T05:00:00.000Z","asks":[],"about":"older work"})
 }
 
 fn worked_row(id: &str, name: &str, state: &str, asks: &[&str], about: &str) -> Value {
-    let mut row = ps_row(id, name, state, Some("/home/daniel/harnesses/lamp-tasks"));
+    let mut row = ps_row(id, name, state, Some("/home/person/harnesses/lamp-tasks"));
     row["asks"] = json!(asks);
     row["about"] = json!(about);
     row
+}
+
+/// #5535: the sessions are listed within the launch's bound, not the read
+/// bound. On lamp-c0a4 on 9 Nov, `ps --all` of the person's Mac took up to
+/// 10 s, and a hand-over said yes to twice ended `sessions_timeout`.
+#[test]
+fn with_reply_named_a_slow_session_list_waits_for_the_launch_bound() {
+    let mut rig = Rig::new();
+    rig.config.reply_named = true;
+    rig.config.route = true;
+    rig.config.engines_ready = true;
+    rig.config.read_timeout = Duration::from_secs(3);
+    rig.config.launch_timeout = Duration::from_secs(12);
+    let rows = json!([ps_row(AGENT, "docs", "idle", None)]);
+    let mut ps = step(json!({"you":null,"machine":"desk-pc","harnesses":rows,"next":[]}));
+    ps["delay_ms"] = json!(5000);
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"route":{"default":true},
+        "ps":ps,
+        "reply":step(json!({"ok":true,"name":"x","id":AGENT,"message":"m1","state":"queued"}))
+    }));
+    let mut request = launch();
+    request.session = Some("docs".into());
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Joined {
+            agent_id: AGENT.into()
+        }
+    );
 }
 
 /// #5535, the owner on 9 Nov: a person remembers what a session worked on,
@@ -705,7 +734,7 @@ fn with_reply_named_a_session_is_found_by_what_it_worked_on() {
         let id = rows[0]["id"].as_str().unwrap().to_owned();
         rig.plan(json!({
             "machines":{"default":true},"new":{"default":true},"route":{"default":true},
-            "ps":step(json!({"you":null,"machine":"daniel-pc","harnesses":rows,"next":[]})),
+            "ps":step(json!({"you":null,"machine":"desk-pc","harnesses":rows,"next":[]})),
             "reply":step(json!({"ok":true,"name":"x","id":id,"message":"m1","state":"queued"}))
         }));
         let mut request = launch();
@@ -789,17 +818,17 @@ fn with_reply_named_a_session_is_found_by_what_it_worked_on() {
         pick("the book program", json!([busy])),
         (not_sent("session_busy"), None)
     );
-    // A stopped one that fits as well or better never wins over a live one.
+    // A stopped one that fits as well never wins over a live one.
     let old = worked_row(
         OTHER,
         "lamp-7f8a8dcb047b88eeca3ea3b8b634b420",
         "stopped",
         &["Write a book program for my reading list."],
-        "I wrote a reading list program with book ratings.",
+        "I wrote a reading list program.",
     );
     assert_eq!(
         pick(
-            "the book program reading list ratings",
+            "the book program reading list",
             json!([books.clone(), old.clone()])
         )
         .0,
@@ -810,6 +839,51 @@ fn with_reply_named_a_session_is_found_by_what_it_worked_on() {
     assert_eq!(
         pick("the book program", json!([old])),
         (not_sent("session_stopped"), None)
+    );
+    // Every word of the work, not half (Reviewer-three's P2 on #5784 at
+    // 3d90e56736): no payroll work, nothing sent to the weather session.
+    let dashboard = worked_row(
+        AGENT,
+        "lamp-a17b",
+        "idle",
+        &["Build a weather dashboard"],
+        "I built the weather dashboard",
+    );
+    assert_eq!(
+        pick("the payroll dashboard one", json!([dashboard.clone()])),
+        (not_sent("session_not_found"), None)
+    );
+    assert_eq!(
+        pick("the weather dashboard one", json!([dashboard])).0,
+        LaunchOutcome::Joined {
+            agent_id: AGENT.into()
+        }
+    );
+    // A word with an ending is the word; a longer word is not (the
+    // Reviewer-lead's P2 on #5784 at de9bebdb41).
+    let tests = worked_row(
+        AGENT,
+        "lamp-c3d4",
+        "idle",
+        &["Fix the failing tests"],
+        "I fixed two tests in the notebook.",
+    );
+    assert_eq!(
+        pick("the test fix", json!([tests])).0,
+        LaunchOutcome::Joined {
+            agent_id: AGENT.into()
+        }
+    );
+    let testament = worked_row(
+        AGENT,
+        "lamp-e5f6",
+        "idle",
+        &["Summarize the testament"],
+        "I read the notebook.",
+    );
+    assert_eq!(
+        pick("the test note", json!([testament])),
+        (not_sent("session_not_found"), None)
     );
 }
 
@@ -832,7 +906,7 @@ fn with_reply_named_a_named_session_is_typed_into_and_never_started_new() {
         rig.config.engines_ready = true;
         rig.plan(json!({
             "machines":{"default":true},"new":{"default":true},"route":{"default":true},
-            "ps":step(json!({"you":null,"machine":"daniel-pc","harnesses":rows,"next":[]})),
+            "ps":step(json!({"you":null,"machine":"desk-pc","harnesses":rows,"next":[]})),
             "reply":reply
         }));
         let mut request = launch();
@@ -843,12 +917,12 @@ fn with_reply_named_a_named_session_is_typed_into_and_never_started_new() {
     let took =
         |id: &str| step(json!({"ok":true,"name":"x","id":id,"message":"m1","state":"queued"}));
     let rows = json!([
-        ps_row(AGENT, "Docs-Update", "idle", Some("/home/daniel/work/site")),
+        ps_row(AGENT, "Docs-Update", "idle", Some("/home/person/work/site")),
         ps_row(
             OTHER,
             "login fix",
             "working",
-            Some("/home/daniel/work/auth/")
+            Some("/home/person/work/auth/")
         ),
     ]);
     let (outcome, called, rig) = named("docs update", rows.clone(), took(AGENT));
