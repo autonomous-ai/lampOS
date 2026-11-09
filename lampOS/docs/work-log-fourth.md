@@ -1,3 +1,13 @@
+## 2026-11-09 18:47 ICT — all four drafts CI-green; external gates remain
+
+Ready for lamp-voice: no. No merge, promotion or device access. All available source slices are published; required privacy reads, contract decisions and authorized device evidence remain outside this checkout.
+
+- Peek #5861 `9e9c62609`: ARM64 42607897597 passed 14,837 selected tests / 109 skipped, including all new mode/unit/executable/SSE cases. Linux clippy/docs pass; Second's exact-head READ-OK and independent 30-test pass remain the one completed external read.
+- Neutral photo #5865 `248b92d2a`: ARM64 42609907340 passed 1,871 selected tests / eight skipped, including all eight photo controls. Linux clippy/docs pass. Second's supplemental server-side READ-OK (6739177253) includes independent eight-test execution, with mapping first/max 17 microseconds and delayed-reply boundary 61 ms on that host; these are distinct from Fourth's measurements. It does not clear capture-origin, consent or skill holds.
+- Provider #5856 and playback #5858 remain CI-green with their previously recorded 10,494 and 10,748 selected tests. Requested El's available read slot for provider (6739242270), subject to PM placement; Reviewer-three remains the assigned reader. TWO READS and actual playback/acoustic acceptance remain outstanding.
+- Read-only merge-tree checks against current `19ee3d51ac` succeeded for all four exact heads; no merge commit or worktree mutation resulted. All local source gates are done. Removed the owned idle 7 GB target after confirming no live process referenced it; source checkouts and all verification logs remain. Available disk increased from 12 to 18 GiB. Future local fixes need rebuilt artifacts.
+- Consolidated heads, tests, reads, cache cleanup and remaining owners on Queue 6739308665. App #129 remains unchanged; paired lamp #5667 is still `47017c360` with Reviewer-two's initial-active-state P2 HOLD, ahead of the assigned tomorrow sitting. The original user worktree remains tracked-clean with inherited untracked files untouched.
+
 ## 2026-11-09 18:36 ICT — playback CI and neutral-photo draft
 
 Ready for lamp-voice: no. Published privacy slices still require their readers and documented tester gates. No device access.
