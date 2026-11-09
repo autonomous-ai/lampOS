@@ -37,6 +37,7 @@ struct Seen {
 
 struct Server {
     url: String,
+    key: String,
     seen: Arc<Mutex<Vec<Seen>>>,
     connections: Arc<AtomicUsize>,
     /// Requests the lamp let go of before they were answered.
@@ -44,7 +45,7 @@ struct Server {
 }
 
 impl Server {
-    /// A server saying `plan`, taking at most `most` connections, and then
+    /// A server saying `plan`, taking at most `most` authenticated chat connections, then
     /// refusing any more as a port nobody listens on does.
     async fn saying(plan: Vec<Says>, most: Option<usize>) -> Self {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -53,26 +54,54 @@ impl Server {
         let connections: Arc<AtomicUsize> = Arc::default();
         let let_go: Arc<AtomicUsize> = Arc::default();
         let plan = Arc::new(plan);
+        static NEXT_KEY: AtomicUsize = AtomicUsize::new(0);
+        let key = format!(
+            "second-try-{}-{}",
+            listener.local_addr().unwrap().port(),
+            NEXT_KEY.fetch_add(1, Ordering::Relaxed)
+        );
         let (saw, count, gone) = (seen.clone(), connections.clone(), let_go.clone());
+        let expected_key = key.clone();
         tokio::spawn(async move {
+            // Local model-discovery probes can reach this listener too. Only
+            // authenticated chat requests consume its plan/connection budget.
+            // Bound concurrent initial reads so an idle probe cannot hold up
+            // the next chat or leave an unbounded collection of readers.
+            let mut reading = tokio::task::JoinSet::new();
             let mut taken = 0;
             while most.is_none_or(|most| taken < most) {
-                let Ok((socket, _)) = listener.accept().await else {
-                    return;
-                };
-                taken += 1;
-                let connection = count.fetch_add(1, Ordering::SeqCst);
-                tokio::spawn(serving(
-                    socket,
-                    connection,
-                    plan.clone(),
-                    saw.clone(),
-                    gone.clone(),
-                ));
+                tokio::select! {
+                    biased;
+                    result = reading.join_next(), if !reading.is_empty() => {
+                        let Some(Ok(Some((socket, body)))) = result else { continue; };
+                        taken += 1;
+                        let connection = count.fetch_add(1, Ordering::SeqCst);
+                        tokio::spawn(serving(
+                            socket, connection, plan.clone(), saw.clone(), gone.clone(),
+                            expected_key.clone(), body,
+                        ));
+                    }
+                    accepted = listener.accept() => {
+                        let Ok((mut socket, _)) = accepted else { return; };
+                        if reading.len() >= 16 {
+                            continue;
+                        }
+                        let key = expected_key.clone();
+                        reading.spawn(async move {
+                            let body = tokio::time::timeout(
+                                Duration::from_secs(2), request(&mut socket, &key),
+                            ).await.ok()??;
+                            Some((socket, body))
+                        });
+                    }
+                }
             }
+            // Dropping the listener preserves the refusal semantics once the
+            // valid connection budget is reached. JoinSet drops pending probes.
         });
         Self {
             url,
+            key,
             seen,
             connections,
             let_go,
@@ -112,7 +141,7 @@ impl Server {
 }
 
 /// One request's head and body, or `None` once the lamp has closed.
-async fn request(socket: &mut tokio::net::TcpStream) -> Option<String> {
+async fn request(socket: &mut tokio::net::TcpStream, key: &str) -> Option<String> {
     let mut read = Vec::new();
     let mut buffer = [0; 8192];
     loop {
@@ -121,10 +150,32 @@ async fn request(socket: &mut tokio::net::TcpStream) -> Option<String> {
             return None;
         }
         read.extend_from_slice(&buffer[..n]);
+        if read.len() > 64 * 1024 {
+            return None;
+        }
         let text = String::from_utf8_lossy(&read);
         let Some(ends) = text.find("\r\n\r\n") else {
             continue;
         };
+        let mut headers = text[..ends].lines();
+        if headers.next() != Some("POST /chat/completions HTTP/1.1") {
+            return None;
+        }
+        let authorization = format!("Bearer {key}");
+        let mut authorized = false;
+        for header in headers {
+            if let Some((name, value)) = header.split_once(':')
+                && name.eq_ignore_ascii_case("authorization")
+            {
+                if authorized || value.trim() != authorization {
+                    return None;
+                }
+                authorized = true;
+            }
+        }
+        if !authorized {
+            return None;
+        }
         let length: usize = text[..ends]
             .lines()
             .find_map(|line| {
@@ -133,8 +184,12 @@ async fn request(socket: &mut tokio::net::TcpStream) -> Option<String> {
                     .and_then(|n| n.trim().parse().ok())
             })
             .unwrap_or(0);
-        if read.len() >= ends + 4 + length {
-            return Some(text[ends + 4..].to_owned());
+        let body_end = (ends + 4).checked_add(length)?;
+        if body_end > 64 * 1024 {
+            return None;
+        }
+        if read.len() >= body_end {
+            return Some(text[ends + 4..body_end].to_owned());
         }
     }
 }
@@ -172,8 +227,11 @@ async fn serving(
     plan: Arc<Vec<Says>>,
     seen: Arc<Mutex<Vec<Seen>>>,
     let_go: Arc<AtomicUsize>,
+    key: String,
+    first: String,
 ) {
-    while let Some(body) = request(&mut socket).await {
+    let mut next = Some(first);
+    while let Some(body) = next.take() {
         let index = {
             let mut seen = seen.lock().unwrap();
             seen.push(Seen { connection, body });
@@ -191,6 +249,7 @@ async fn serving(
             if socket.write_all(chunk.as_bytes()).await.is_err() {
                 return;
             }
+            next = request(&mut socket, &key).await;
             continue;
         }
         let (wait, answer) = match says {
@@ -234,6 +293,7 @@ async fn serving(
                 return;
             }
         }
+        next = request(&mut socket, &key).await;
     }
 }
 
@@ -344,7 +404,7 @@ impl Lamp {
             Net::new(
                 config_at(
                     &format!("second-try-{name}"),
-                    "k-second-try",
+                    &server.key,
                     &server.url,
                     &server.url,
                 ),
@@ -988,7 +1048,7 @@ async fn a_request_says_which_connection_it_went_on_and_how_far_it_got() {
         None,
     )
     .await;
-    let chat = net::Chat::with(&server.url, "m", "k", Arc::new(Vec::new)).unwrap();
+    let chat = net::Chat::with(&server.url, "m", &server.key, Arc::new(Vec::new)).unwrap();
     let asked = [Message::user("hello")];
     let silent = Duration::from_millis(150);
 
@@ -1023,7 +1083,7 @@ async fn a_request_says_which_connection_it_went_on_and_how_far_it_got() {
 #[tokio::test]
 async fn a_second_try_opens_its_own_connection_and_says_how_it_went() {
     let server = Server::saying(vec![Says::Words(Duration::ZERO, "Hello."); 3], None).await;
-    let chat = net::Chat::with(&server.url, "m", "k", Arc::new(Vec::new)).unwrap();
+    let chat = net::Chat::with(&server.url, "m", &server.key, Arc::new(Vec::new)).unwrap();
     let asked = [Message::user("hello")];
     for tries in 1..=2 {
         let opening: Arc<Mutex<Vec<net::Opening>>> = Arc::default();
@@ -1209,4 +1269,140 @@ async fn on_the_products_times_only_the_second_try_is_new() {
     near(ended, limit);
     assert_eq!(tries.len(), 1, "asked, and none offered");
     assert!(lines.is_empty(), "{lines:?}");
+}
+
+/// Raw traffic keeps these controls independent of the engine/client behavior.
+async fn fixture_socket(server: &Server) -> tokio::net::TcpStream {
+    tokio::time::timeout(
+        Duration::from_secs(2),
+        tokio::net::TcpStream::connect(server.url.strip_prefix("http://").unwrap()),
+    )
+    .await
+    .unwrap()
+    .unwrap()
+}
+
+async fn fixture_probe(server: &Server, line: &str, key: &str) {
+    let mut socket = fixture_socket(server).await;
+    let probe = format!(
+        "{line} HTTP/1.1\r\nHost: fixture\r\nAuthorization: Bearer {key}\r\nContent-Length: 0\r\n\r\n"
+    );
+    socket.write_all(probe.as_bytes()).await.unwrap();
+    let mut byte = [0];
+    let closed = tokio::time::timeout(Duration::from_secs(2), socket.read(&mut byte))
+        .await
+        .unwrap();
+    assert!(
+        matches!(closed, Ok(0)) || closed.is_err(),
+        "probe received a response"
+    );
+}
+
+async fn fixture_chat(socket: &mut tokio::net::TcpStream, server: &Server, body: &str) -> String {
+    let request = format!(
+        "POST /chat/completions HTTP/1.1\r\nHost: fixture\r\nAuthorization: Bearer {}\r\nContent-Length: {}\r\n\r\n{body}",
+        server.key,
+        body.len()
+    );
+    socket.write_all(request.as_bytes()).await.unwrap();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        let mut response = Vec::new();
+        loop {
+            let mut bytes = [0; 1024];
+            let n = socket.read(&mut bytes).await.unwrap();
+            assert!(n > 0, "chat closed before its answer");
+            response.extend_from_slice(&bytes[..n]);
+            assert!(response.len() < 16 * 1024);
+            if response.ends_with(b"data: [DONE]\n\n") {
+                return String::from_utf8(response).unwrap();
+            }
+        }
+    })
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn foreign_and_idle_probes_do_not_consume_the_only_chat_connection() {
+    let server = Server::saying(
+        vec![
+            Says::Words(Duration::ZERO, "First."),
+            Says::Words(Duration::ZERO, "Again."),
+        ],
+        Some(1),
+    )
+    .await;
+    let idle = fixture_socket(&server).await;
+    let mut partial = fixture_socket(&server).await;
+    partial
+        .write_all(b"GET /v1/models HTTP/1.1\r\n")
+        .await
+        .unwrap();
+    fixture_probe(&server, "GET /v1/models", &server.key).await;
+    fixture_probe(&server, "POST /wrong-path", &server.key).await;
+    fixture_probe(&server, "POST /chat/completions", "foreign-key").await;
+    assert_eq!(server.requests(), 0);
+    assert_eq!(server.opened(), 0);
+    let mut chat = fixture_socket(&server).await;
+    assert!(
+        fixture_chat(&mut chat, &server, "{}")
+            .await
+            .contains("First.")
+    );
+    // A genuine duplicate is still counted, on the same kept connection.
+    assert!(
+        fixture_chat(&mut chat, &server, "{}")
+            .await
+            .contains("Again.")
+    );
+    assert_eq!(server.requests(), 2);
+    assert_eq!(server.opened(), 1);
+    {
+        let seen = server.seen.lock().unwrap();
+        assert_eq!(seen[0].connection, seen[1].connection);
+    }
+    assert!(
+        tokio::net::TcpStream::connect(server.url.strip_prefix("http://").unwrap())
+            .await
+            .is_err()
+    );
+    drop((idle, partial));
+}
+
+#[tokio::test]
+async fn a_probe_between_chats_leaves_the_next_plan_and_connection_available() {
+    let server = Server::saying(
+        vec![
+            Says::Words(Duration::ZERO, "First."),
+            Says::Words(Duration::ZERO, "Second."),
+        ],
+        Some(2),
+    )
+    .await;
+    let mut first = fixture_socket(&server).await;
+    assert!(
+        fixture_chat(&mut first, &server, "{}")
+            .await
+            .contains("First.")
+    );
+    fixture_probe(&server, "GET /v1/models", &server.key).await;
+    assert_eq!(server.requests(), 1);
+    assert_eq!(server.opened(), 1);
+    let mut second = fixture_socket(&server).await;
+    assert!(
+        fixture_chat(&mut second, &server, "{}")
+            .await
+            .contains("Second.")
+    );
+    assert_eq!(server.requests(), 2);
+    assert_eq!(server.opened(), 2);
+    server.last_two_are_the_same_on_two_connections();
+    let closed = Server::saying(Vec::new(), Some(0)).await;
+    tokio::task::yield_now().await;
+    assert!(
+        tokio::net::TcpStream::connect(closed.url.strip_prefix("http://").unwrap())
+            .await
+            .is_err()
+    );
+    assert_eq!(closed.opened(), 0);
 }
