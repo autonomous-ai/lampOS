@@ -70,6 +70,13 @@ const NAME_WAIT_US: u64 = 2 * FACE_SAVE_WAIT_US;
 /// does not end the step meanwhile: on Fifth's A/B runs (5 Nov) it closed
 /// 15 s after the read-back while the yes came 13.4 s after the close.
 pub(crate) const FACE_SAVE_HELD_US: u64 = 45_000_000;
+/// A held face save let go before its yes ([`face_save_let_go`]): "who you
+/// are" closes no later than this after the let-go, once quiet, unless the
+/// person answers the lamp's retry meanwhile. The lamp's "Look toward me and
+/// say it again" comes about 10 s after the let-go, and the face wait from
+/// its words alone closed the step about 25 s after it (Fifth's row 6 on
+/// 10441, #5139); the bar is 20 s.
+const LET_GO_CLOSE_US: u64 = 20_000_000;
 
 pub const NUDGE_ENVIRONMENT: &str = "LAMP_ONBOARDING_NUDGE";
 /// The walk's done line also names a few things to try first, once per
@@ -809,6 +816,10 @@ struct Answers {
     /// read-back ([`face_save_held`]): the face wait does not end the step
     /// within [`FACE_SAVE_HELD_US`] of it.
     save_held_us: Option<u64>,
+    /// When a held face save was let go before its yes
+    /// ([`face_save_let_go`]): the step closes by [`LET_GO_CLOSE_US`] after
+    /// it unless the person answers again meanwhile.
+    let_go_us: Option<u64>,
     /// The model reported "who you are" done while a face save was held:
     /// the step ends done, the name only, once the hold is over unless the
     /// face is saved first.
@@ -3038,6 +3049,14 @@ impl Onboarding {
                 })
                 || led.heard.name_us.is_some_and(|at| {
                     now_us.saturating_sub(at.max(led.lamp_said_us.unwrap_or(0))) >= NAME_WAIT_US
+                })
+                // A save let go before its yes: the lamp's own retry line
+                // ("Look toward me and say it again") does not push the
+                // close past the let-go's bound; an answer to it does.
+                || led.heard.let_go_us.is_some_and(|at| {
+                    now_us.saturating_sub(at) >= LET_GO_CLOSE_US
+                        && led.heard.face_answered_us.is_none_or(|yes| yes <= at)
+                        && led.heard.name_us.is_none_or(|name| name <= at)
                 }))
         {
             eprintln!(
@@ -3799,6 +3818,13 @@ impl Onboarding {
                             "the held face save was let go"
                         }
                     );
+                    // A new hold clears an earlier let-go; a let-go counts
+                    // only for a hold that was on.
+                    if held {
+                        led.heard.let_go_us = None;
+                    } else if led.heard.save_held_us.is_some() {
+                        led.heard.let_go_us = Some(now_us);
+                    }
                     led.heard.save_held_us = held.then_some(now_us);
                 }
                 continue;
@@ -7287,6 +7313,69 @@ mod tests {
             Some(NEAR_MIDDLE),
         );
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+    }
+
+    /// #5139 (b), Fifth's row 6 on 10441 (Queue #5385): hold at 08:02:29,
+    /// let go at 08:02:39, the lamp's "Look toward me and say it again" ten
+    /// seconds on, and the step closed 08:02:49 + 15 s, about 25 s after the
+    /// let-go. It closes within [`LET_GO_CLOSE_US`] of the let-go, still
+    /// only once the room is quiet; a yes to the retry gets its full wait.
+    #[test]
+    fn a_let_go_face_save_closes_who_you_are_within_20_s() {
+        let fifths = |name: &str| {
+            let mut room = named_with_a_face(name);
+            room.walk.heard("Yes, please.", room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            face_save_held(&room.walk.file);
+            room.walk.lamp_said(room.at);
+            room.wait(10 * S, Some(NEAR_MIDDLE));
+            // The hold let go as the lamp answers a correction.
+            face_save_let_go(&room.walk.file);
+            room.walk.lamp_said(room.at);
+            room.said = room.at;
+            let dropped = room.at;
+            room.wait(10 * S, Some(NEAR_MIDDLE));
+            // "Look toward me and say it again", about 3 s long.
+            for _ in 0..3 {
+                room.walk.lamp_said(room.at);
+                room.said = room.at;
+                room.wait(S, Some(NEAR_MIDDLE));
+            }
+            (room, dropped)
+        };
+
+        // Nobody answers: done, the name only, by the drop + 20 s.
+        let (mut room, dropped) = fifths("face-let-go-fifth");
+        room.wait(dropped + 20 * S - room.at - S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None, "the retry is real");
+        room.wait(S + S / 4, Some(NEAR_MIDDLE));
+        assert_eq!(
+            room.outcome(Step::WhoYouAre),
+            Some(Outcome::Done),
+            "closed by the drop + 20 s"
+        );
+        assert!(room.walk.kept().owner.is_none());
+
+        // Someone talking at the bound is not cut off: it closes once
+        // the room has been quiet for the short bar.
+        let (mut room, dropped) = fifths("face-let-go-talking");
+        room.wait(dropped + 19 * S - room.at, Some(NEAR_MIDDLE));
+        room.said = room.at;
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None, "mid-sentence");
+        room.wait(START_QUIET_US, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+
+        // A yes to the retry is answered: the face wait runs from it, and
+        // the save it brings is kept.
+        let (mut room, dropped) = fifths("face-let-go-yes");
+        room.walk.heard("Yes.", room.at);
+        room.wait(dropped + 20 * S - room.at + 2 * S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None, "the yes waits");
+        face_saved(&room.walk.file, Some("Marie"));
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert_eq!(room.walk.kept().owner.as_deref(), Some("Marie"));
     }
 
     /// #5139 fix 3 (a tester's lamp-0c4e, 3 Nov): "who you are" done with
