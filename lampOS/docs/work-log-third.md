@@ -11,18 +11,25 @@ Ready for lamp-voice: no
   content-free outcomes and preserved through the forget sanitizer.
   Current source still had the original omission. No additional calls,
   retries, scopes or deadlines; added bookkeeping target below 1 ms.
-- Code and English docs are in place. Focused checks passed: two real
-  socket/file cleanup cases (including lost/malformed receipts and both
-  consent failures), 16 after-forget tests, and the existing known-person
-  room-cleanup test. An initial consent test used an unknown caller and
-  correctly hit the existing privacy refusal; the fixture now uses a known
-  person. Strict Clippy, broader dependency tests and workspace build are
-  running. Two reads remain Reviewer-three and Tests.
-- Docs checker: nine tests passed, 191 docs and 1,885 local links, zero
-  broken. Host debug sanitizer timing, three fields, first 0.062368 ms,
-  repeated p50 0.007126 ms / p95 0.007420 ms / max 0.010846 ms (1,000
-  samples). This measures sanitizer entry to outcome only, not file/IPC
-  cleanup, process startup, model response or a lamp. No device claim.
+- Code and English docs are in place, rebased cleanly on train 742
+  `6167fe37a`. Focused cleanup tests passed 2, after-forget tests 16, and
+  the existing known-person room cleanup test 1. Formatting and strict
+  Clippy for Voice and 13 dependents passed before and after rebase.
+- The first broad parallel run stopped in 10 unchanged Body startup
+  fixtures (534 passed). On the rebased serial run Body's library passed
+  all 551, plus its binary/integration targets. Keeper then exposed this
+  Mac's temporary-directory group stripping set-group-ID (0770 instead
+  of 02770). A standalone reproduction matched; the exact library test
+  passed with a group-owned temporary directory (1/1, 0.06 s). No project
+  source was changed for either host issue. Original failures are retained.
+- The serial broad run continues: 33 completed targets, 1,918 passed,
+  one Keeper failure as explained, nine ignored at this checkpoint.
+  Workspace build and native CI remain pending; no PR-ready claim.
+- Docs checker: nine tests, 191 docs and 1,885 local links, zero broken.
+  Host debug sanitizer first 0.062368 ms, repeated p50 0.007126 ms /
+  p95 0.007420 ms / max 0.010846 ms (1,000 samples). Boundary is sanitizer
+  entry to outcome only, not deletion/IPC, startup, model or lamp latency.
+  Required reads remain Reviewer-three and Tests. No device access.
 - #4099 closure recommended to the PM using Mobile's app/lamp PASS on
   3 Nov (4099/6594483187); build number and raw `can` were not captured.
 - Fourteen's 10824 receipt records a real stable self-switch from 10686,
