@@ -8622,3 +8622,20 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   ambiguity remains. No device/latency or First default-change acceptance.
 - Removed the two completed #5819 probe worktrees after byte-for-byte saved
   diff verification and checking no untracked files; proof hashes agree.
+
+## 2026-11-09 — Second: wordless wake reader queue HOLD
+
+- HOLD #5845 `ab4ad2bc251e506f591885c7a22acfa6e0fdf015`: the new
+  name/heard subscriber drains only for an empty called transcript. Ordinary
+  worded calls accumulate indefinitely in its finite event socket queue.
+  A later sure hearing can be dropped and rejected using only older scores.
+- Native actual-bus probe fills after 18 hearings on this Mac (detects actual
+  backpressure; capacity is platform-dependent), drops the following 1.0
+  hearing and returns 0.95. Paired control drains each of 25 prior hearings,
+  delivers the 1.0 hearing and returns 1.0. Both finish under 0.01 s. Initial
+  probe used an invalid publisher name; corrected before the demonstrated
+  failure. Proof/control saved under /tmp/second-5845-queue*.
+- Existing `cargo test -q -p lamp-voice wordless`: 21 pass;
+  `cargo test -q -p lamp-body name_in::`: 3 pass. No other P1/P2 in body or
+  process switch propagation. Switch remains off; no device or frequency
+  claim. Owner asked to drain independently with bounded retention/lifecycle.
