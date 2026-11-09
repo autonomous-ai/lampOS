@@ -394,15 +394,21 @@ impl Pending {
 #[cfg(not(test))]
 mod kept {
     use super::Pending;
+    use serde_json::Value;
     use std::{collections::VecDeque, sync::Mutex};
     /// The one write waiting for its "send", for both voice routes.
     static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
     /// The newest requests a read answered in.
     static READ_IN: Mutex<VecDeque<u64>> = Mutex::new(VecDeque::new());
+    /// The last send's answer, by its request ([`super::sent_answer`]).
+    static SENT: Mutex<Option<(u64, Value)>> = Mutex::new(None);
     pub fn pending<R>(f: impl FnOnce(&mut Option<Pending>) -> R) -> R {
         f(&mut PENDING
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner()))
+    }
+    pub fn sent<R>(f: impl FnOnce(&mut Option<(u64, Value)>) -> R) -> R {
+        f(&mut SENT.lock().unwrap_or_else(|poisoned| poisoned.into_inner()))
     }
     pub fn read_in<R>(f: impl FnOnce(&mut VecDeque<u64>) -> R) -> R {
         f(&mut READ_IN
@@ -416,13 +422,18 @@ mod kept {
 #[cfg(test)]
 mod kept {
     use super::Pending;
+    use serde_json::Value;
     use std::{cell::RefCell, collections::VecDeque};
     thread_local! {
         static PENDING: RefCell<Option<Pending>> = const { RefCell::new(None) };
         static READ_IN: RefCell<VecDeque<u64>> = const { RefCell::new(VecDeque::new()) };
+        static SENT: RefCell<Option<(u64, Value)>> = const { RefCell::new(None) };
     }
     pub fn pending<R>(f: impl FnOnce(&mut Option<Pending>) -> R) -> R {
         PENDING.with(|cell| f(&mut cell.borrow_mut()))
+    }
+    pub fn sent<R>(f: impl FnOnce(&mut Option<(u64, Value)>) -> R) -> R {
+        SENT.with(|cell| f(&mut cell.borrow_mut()))
     }
     pub fn read_in<R>(f: impl FnOnce(&mut VecDeque<u64>) -> R) -> R {
         READ_IN.with(|cell| f(&mut cell.borrow_mut()))
@@ -715,6 +726,45 @@ fn given_send_id(call: &ToolCall) -> Option<&str> {
         .then(|| call.args.get("send_id").and_then(Value::as_str))
         .flatten()
         .filter(|id| !id.is_empty())
+}
+
+/// Whether a `name` call with `args` in `request` may send a write: one with
+/// the model's `send_id`, or a plain write while another request's write
+/// waits for its "send" ([`waiting_send`], judged on the words in [`run`]).
+/// The second route keeps such a call's answer for words a newer line cuts
+/// before their turn is done (#5853).
+pub fn may_send(name: &str, args: &Value, request: u64) -> bool {
+    name == WRITE
+        && (args
+            .get("send_id")
+            .and_then(Value::as_str)
+            .is_some_and(|id| !id.is_empty())
+            || kept::pending(|pending| {
+                pending
+                    .as_ref()
+                    .is_some_and(|kept| kept.request != request && !kept.service.is_empty())
+            }))
+}
+
+/// What the services answered `request`'s send, as [`run`] had it before
+/// any route's fence (#5853): a cut turn's lease is no longer current, so
+/// the route's own answer to it says only that nothing ran, though the
+/// service sent the write. Only the last send's is kept.
+pub fn sent_answer(request: u64) -> Option<Value> {
+    kept::sent(|sent| {
+        sent.as_ref()
+            .filter(|(of, _)| *of == request)
+            .map(|(_, told)| told.clone())
+    })
+}
+
+/// `told`, the services' answer to `request`'s `call`, kept for
+/// [`sent_answer`] when the call was a send (the gate gives every send its
+/// `send_id`).
+fn keep_sent(call: &ToolCall, request: u64, told: &Value) {
+    if given_send_id(call).is_some() {
+        kept::sent(|sent| *sent = Some((request, told.clone())));
+    }
 }
 
 /// Whether [`gate`] takes `call` as a send: one with the model's id, or
@@ -1287,6 +1337,7 @@ pub fn run(
         if call.name == WRITE && told.get("sent").and_then(Value::as_bool) == Some(true) {
             ask_owner(&mut told);
         }
+        keep_sent(&call, request, &told);
         if call.name == READ && told.get("error").is_none() {
             read_answered(request);
             if let Ok(mut thread) = crate::thread::THREAD.lock() {
@@ -3001,5 +3052,39 @@ mod tests {
             Some(a),
             "A's own line: A's"
         );
+    }
+
+    /// #5853: a send's answer is kept by its request, as the services gave
+    /// it, so a cut turn's words answered again learn it was sent; a
+    /// prepare's never. A send is a write with its id, or one while another
+    /// request's write waits.
+    #[test]
+    fn a_sends_answer_is_kept_by_its_request_and_a_prepares_is_not() {
+        let send = call(WRITE, json!({"service":"google_drive","send_id":"s1"}));
+        let prepare = call(WRITE, json!({"service":"google_drive","title":"Notes"}));
+        assert!(may_send(&send.name, &send.args, 11));
+        assert!(!may_send(&prepare.name, &prepare.args, 11));
+        assert!(!may_send(READ, &json!({"send_id":"s1"}), 11));
+        kept::pending(|pending| {
+            *pending = Some(Pending {
+                service: "google_drive".into(),
+                ..Pending::new("s1", 10, Instant::now(), "A file Notes", "ann")
+            });
+        });
+        assert!(may_send(&prepare.name, &prepare.args, 11), "a write waits");
+        assert!(
+            !may_send(&prepare.name, &prepare.args, 10),
+            "its own request"
+        );
+        kept::pending(|pending| *pending = None);
+        keep_sent(
+            &prepare,
+            11,
+            &json!({"read_back":"A file Notes","send_id":"s2"}),
+        );
+        assert_eq!(sent_answer(11), None);
+        keep_sent(&send, 11, &json!({"sent":true}));
+        assert_eq!(sent_answer(11), Some(json!({"sent":true})));
+        assert_eq!(sent_answer(12), None, "another request's");
     }
 }
