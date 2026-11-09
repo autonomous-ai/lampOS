@@ -8591,3 +8591,20 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   device action or latency acceptance. A delegated test attempt hit an
   automated safety filter; the local synthetic-only regression was reviewed
   and then run through the approved execution tool.
+
+## 2026-11-09 — Second: pinned pose follow-up read
+
+- READ-OK #5843 follow-up commit `e4d977bc1119026ac691cc304a387edae869a251`
+  only. All five fixture literals match home, folded arm, standing pose, pitch
+  window, gaze and torque, including absent seated values. Both consumers
+  reject unpinned fixtures. Output-cap docs name the actual enable switch.
+- Independent Mac: `cargo fmt --all --check` and
+  `cargo clippy --locked -q -p lamp-body --all-targets -- -D warnings` pass;
+  `cargo test -q -p lamp-body --bin lamp-body --bin lamp-body-measure -- the_body_starts_on_every_kept_poses_file let_go_reads_every_kept_lamp_env`
+  passes both tests. Checkout clean; no device or physical acceptance.
+- Removed completed clean review checkouts for #5819 and #5836, preserving
+  saved proof patches/logs and the shared Rust cache for ongoing reviews.
+- Third retrieved the face-forget handoff and independently reproduced its
+  failure. Third correctly keeps `everything: true` out of the inner-memory
+  result, which cannot attest to the outer cleanup; product ownership stays
+  with Third.
