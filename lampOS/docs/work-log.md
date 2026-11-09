@@ -8962,3 +8962,15 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   prompted-turn failure is unresolved. Stock begun-turn/mute numbers match
   supplied evidence; requested preserving them and qualifying the future
   claim. Exact guide tests 7 passed, diff clean; no device action.
+
+## 2026-11-09 — Second: combined MCP reconnect repair
+
+- READ-OK #5873 9eb644f9dc718f422d2df13939f7f5fa95ae3276. Original
+  actual MCP/Relink/TLS start-turn and say probes now return closed for old
+  request 1, despite new connection's unrelated say reusing 1 and finishing.
+  Full exact-head MCP suite: 60 passed in 8.53 s; diff clean, checkout clean.
+- Request-scoped done/lease callbacks are not replayed; captured connection
+  closure bounds speech, start-turn and body-lease waits. No device claim.
+- #5835 still HOLD at b74fa1e. Merge-tree composition conflicts in server.py;
+  requested retaining ended_on with its motion-specific timeout. Actual
+  rebased head must pass the move-id-2/new-say-id-2 collision before clearance.
