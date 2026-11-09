@@ -9372,3 +9372,18 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   helper-response fallback remains low-risk hardening, not demonstrated
   bypass. No device/account access. Temporary probes removed, checkout
   clean; /tmp/second-5884-cas-probes.rs and .log retain failures.
+
+## 2026-11-09 — Second: train759 reconnect repair verified
+
+- Train759 df8a9dea9e on 9109f0a9ea0 retains #5881 exactly, all 11 #5863
+  commits exactly, and #5873 runtime/tests exactly (adjacent GUIDE context
+  only). MCP patch IDs independently match. Comment 6744016019.
+- Exact extracted train source MCP suite 61 passed in 8.67 s. Original
+  actual MCP/Relink/TLS say and start-turn id1 collision probes both pass:
+  old waits return closed, unrelated new id1 completion cannot finish them.
+- Source/logs /private/tmp/second-train759-source and
+  /tmp/second-train759-{mcp,say,turn}.log. No device/release clearance;
+  ARM64 still running. #5835 separate motion HOLD needs its actual rebase.
+- #5884 author accepted all new boundaries: no-op explicit intent rotates,
+  none removed in favor of durable initialization/unknown read, withdrawal
+  retry identity captured while locked. New implementation still pending.
