@@ -9503,3 +9503,8 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - #5904 head`c9c4f929436fe800fd670f303e3f9af02b887b4c` base`ef13e80e48e258452baa01bcd083657a60f60024`: #5899a86577c30170→10ea5bcc373exact; #5898fbce1d09b7d→b6b9e26b96c edits preserved/headingcontextonly; #5879de77e7cab295→c9c4f929436exact. Auditagent readall; rootspotchecked#5898range and combinedguide. Exactguidetests7passed. Comment6745945814.
 - First default-on#5879read6745775251 is in; Fifth train-build first-ask rows owed. ARM6442658414913 pending, no deviceclaim.
 - Existing guide summary disagreement (skillpush summarynextbuild vs detailed11091available/lamprunpending) flaggedblue#5899comment6745939610. Present inoriginalPR, nottrainregression; noHOLD.
+
+## 9 November 2026: Peek rebase scoped read
+
+- #5861 READ-OK restated`2c91ce8df582798a87b75d733eaad0855a671376`, comment6746007059. Exactrange-diff=9e9c6260965; Peek andofficeunitunchanged. Fresh cargo test -q -p lamp-peek -- --test-threads=2:30passed(15unit,1officeunit,14HTTP/SSE),exit0; HTTP/SSEtarget5.10s. /tmp/second-5861-rebase-peek.log; cleancheckout.
+- No newindividual latencyorLinux effective-accountclaim. Secondprivacyread, inheritedgroups/drop-ins/historyinspection, deploymentandstalled-filesystem/activeSSEacceptance separate. Ownissues5061/5264/5265/5144 have no newcomments inlatestread.
