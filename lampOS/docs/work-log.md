@@ -8866,3 +8866,18 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   control matches them. HOLD remains. Combined MCP reconnect follow-up
   was reported ready locally, but its named remote branch is not available
   yet. Taking Nine's explicit #5835 rebase read at b74fa1eed9 next.
+
+## 2026-11-09 — Second: two requested rebase reads
+
+- READ-OK #5835 b74fa1eed92098b1895427d48963c050cd7349fd, motion patch
+  only. Control code unchanged; resolved MCP/Python paths checked. Fresh
+  MCP 59 passed, Python 154 distinct passes and one CLI skip, JavaScript
+  93 distinct passes and two CAD skips, including exact repository fixtures.
+  Separate MCP reconnect integration HOLD remains, including motion waits.
+- READ-OK #5847 9212a07af7de27313513dbf5838941e4e15fba0a. Batch indices
+  move with the admitted calls after named-decline retry; consuming remove
+  and truncate sites remain consistent. Native claims 44 passed and focused
+  forget 3 passed. Clean checkout; no new full-suite or device claim.
+- Taking Friday's requested #5419 fix read at 31cc82d762, rerunning the
+  original bicycle/tea reproduction. First invocation from repository root
+  missed camera build environment; corrected to lampOS workspace root.
