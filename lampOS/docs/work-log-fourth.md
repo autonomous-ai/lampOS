@@ -1,4 +1,4 @@
-## 2026-11-10 05:53 ICT — letter-A replacement draft published
+## 2026-11-10 05:47 ICT — letter-A replacement draft published
 
 Published #5925 at 079f95a44a36b43211ab595497565dd0afef5fe2 on fourth/keep-letter-a-20261110, retaining Friday's original 2f906bb0ba unchanged on current a226. Exact six-file commit includes code, Engine/unit controls, three behavior docs and verification receipt. Both independent source/evidence audits found no additional blocker. Checkout clean; final docs check 192 documents, 1,898 links, zero broken. Fresh READ ASK to Thirteen and Second is 6753523945; original PR notification is 6753524476. Original branch untouched, switch off, lamp gate separate.
 
