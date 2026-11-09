@@ -1,3 +1,13 @@
+## 2026-11-09 18:03 ICT — provider and playback drafts published
+
+Ready for lamp-voice: no. Both privacy slices remain draft for TWO READS, CI and their documented lamp gates. No device access.
+
+- Provider cancellation [#5856](https://github.com/autonomous-ai/lampOS/pull/5856), `df4c2ea8a`: current-base full voice library 5,393 passed / 15 ignored; Mac fmt, strict clippy, workspace build and docs passed. Linux clippy passed; ARM64 continues. Earlier broad-sweep failures and interruption remain recorded.
+- Playback extension [#5858](https://github.com/autonomous-ai/lampOS/pull/5858), `4ea13ebf1`, is stacked on #5856. Mac fmt, strict voice/audio clippy, workspace build, docs and 30 focused tests passed. Full voice library: 5,407 passed / one failed / 15 ignored. The unchanged connection-pool test expected three TCP connections and saw four; its exact isolated rerun passed. This is not a full-green claim. Linux CI has started; Linux-only speaker-loop checks and acoustic acceptance remain unverified.
+- Matched real Engine/IPC/coordinator fixtures retain the 30,040/130 ms to zero old-tail result, with simulated speaker drop/ACK only. PR bodies include exact ACK, partial write, lost/refused ACK, shutdown and same-request fresh-output checks, plus the tester procedure. Reviewer-three and PM have been asked for TWO READS and second-reader confirmation.
+- Removed the inactive provider target cache after checking no owned jobs used it. Source and failed/successful logs remain; one playback cache is retained for review fixes. App #129 and its paired tomorrow lamp check remain unchanged.
+- Continuing assigned #5262 sessions-only Peek source/unit/tests while external gates run. No device installation authorized or attempted.
+
 ## 2026-11-09 17:44 ICT — current-base cut checks pass; full voice suites running
 
 Ready for lamp-voice: no. Provider and playback slices remain uncommitted pending the changed-package full voice gates, Linux CI and privacy reads. No device work.
