@@ -1,3 +1,25 @@
+## 2026-11-09 — train 755 carry and return to lamp behavior
+
+- User asked why the work had become cybersecurity-heavy for a small lamp.
+  Returned focus to face-forget product behavior; no further attachment
+  audit expansion. Passed the remaining malformed-payload observations to
+  Fourteen/remaining reader in 6741763464. Unsupported-charset case is
+  fixed at `b1b6ae2c1`; no new overall READ-OK asserted.
+- Completed #5865 neutral photo receipt read in 6741764047: no P1/P2,
+  eight actual Cloud/socket tests passed at `248b92d2a`. Injected 50 ms
+  response measured 75 ms host command-to-envelope. No real photo/device.
+- Carried own branches onto train 755 `c917d3193`: adapter `5be5e3745`,
+  context `e4869f92e` with El `93894742d` and adapter `973f775cb`.
+  Range-diff equality for every patch. Formatting/diff/docs pass;
+  both exact-head native runs and local context integration gate running.
+  Previous native successes remain evidence for their previous SHAs.
+- Source-only merge-tree with Fourth #5856 has only the two known
+  admission conflicts. Both pending-rename clear and speech cut must stay
+  before runner awaits; after-return context changes merge cleanly.
+  Coordinated in 6741830567. No merge into another builder's branch.
+- Own PRs remain draft for independent reads/dependencies; El's adapter
+  read carries unchanged. No lamp, deployment, promotion or live account use.
+
 ## 2026-11-09 — context native green and review corrections
 
 - Context #5878 exact `09444cb49`: ARM64 42623144133 passed 14,872 tests,
