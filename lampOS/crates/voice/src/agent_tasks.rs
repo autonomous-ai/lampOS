@@ -2041,12 +2041,39 @@ fn name_forms(pending: &Pending) -> Vec<Vec<String>> {
     forms
 }
 
-/// `words` with every run of words that is one of `forms` left out.
-fn without_forms(words: Vec<String>, forms: &[Vec<String>]) -> Vec<String> {
-    let mut kept = Vec::with_capacity(words.len());
+/// `words` with the first run of words that is one of `forms` left out:
+/// the name the read-back gives who will do it. A later form is a word of
+/// the read-back's own ("Codex will uninstall the codecs" says "codecs"
+/// back, the Reviewer-lead's P3 on #5785's READ-OK).
+fn without_first_form(words: Vec<String>, forms: &[Vec<String>]) -> Vec<String> {
+    for at in 0..words.len() {
+        if let Some(form) = forms.iter().find(|form| words[at..].starts_with(form)) {
+            let mut kept = words;
+            kept.drain(at..at + form.len());
+            return kept;
+        }
+    }
+    words
+}
+
+/// The words that address one of the staff in a task ("ask Codex to …",
+/// "have Claude Code …"): only a form right after one of them is the
+/// agent's name in the task's own words.
+const ADDRESSING: [&str; 5] = ["ask", "have", "tell", "get", "let"];
+
+/// The task's `words` with each form of the name left out only where it
+/// addresses the agent, right after one of [`ADDRESSING`]: "uninstall the
+/// codecs" keeps "codecs", which the read-back must then say (the
+/// Reviewer-lead's P3 on #5785's READ-OK: stripping it everywhere let
+/// "Codex will uninstall it" start that task on one yes).
+fn without_address(words: Vec<String>, forms: &[Vec<String>]) -> Vec<String> {
+    let mut kept: Vec<String> = Vec::with_capacity(words.len());
     let mut at = 0;
     while at < words.len() {
-        if let Some(form) = forms.iter().find(|form| words[at..].starts_with(form)) {
+        let addressed = kept
+            .last()
+            .is_some_and(|before| ADDRESSING.contains(&before.as_str()));
+        if addressed && let Some(form) = forms.iter().find(|form| words[at..].starts_with(form)) {
             at += form.len();
         } else {
             kept.push(words[at].clone());
@@ -2076,9 +2103,11 @@ fn before_the_question(line: &str) -> &str {
 /// question ("Shall I start it?") never stand for a task word: "Code" in
 /// "Claude Code" is not the "code" of "Delete the code", and the question's
 /// "start" is not the "start" of "Start the server" (the Reviewer-lead's
-/// P3 on #5609's READ-OK). The name's words are left out of the task's too,
-/// so "Ask Claude Code to fix the tests" needs "ask", "fix" and "tests"
-/// read back beside the name, which `named` already holds. A read-back that
+/// P3 on #5609's READ-OK). In the task's words the name is left out only
+/// where it addresses the agent ([`without_address`]), so "Ask Claude Code
+/// to fix the tests" needs "ask", "fix" and "tests" read back beside the
+/// name, which `named` already holds, and "uninstall the codecs" still
+/// needs "codecs" said back. A read-back that
 /// is one question alone ("Shall Claude Code fix the tests?") reads back
 /// nothing, which costs a second yes. Only the one-yes rule
 /// ([`yes_in_the_same_turn`]) reads it.
@@ -2097,8 +2126,8 @@ fn reads_back(line: &str, pending: &Pending) -> bool {
             !name.is_empty() && joined.contains(&name)
         });
     let forms = name_forms(pending);
-    let said = without_forms(plain_words(before_the_question(line)), &forms);
-    let task_words = without_forms(
+    let said = without_first_form(plain_words(before_the_question(line)), &forms);
+    let task_words = without_address(
         plain_words(question_of(&pending.text).unwrap_or(&pending.text)),
         &forms,
     );
@@ -3600,6 +3629,38 @@ pub(crate) mod tests {
                 ),
                 "{text} / {line}"
             );
+        }
+        // The Reviewer-lead's P3 on #5785's READ-OK: a form of the name
+        // that is the task's own word, not who it is asked of, still has to
+        // be said back. Only "ask Codex to …" addresses Codex.
+        let codex = |text: &str| Pending {
+            text: text.into(),
+            who: "Codex",
+            ..moon(at)
+        };
+        for (text, line, said) in [
+            (
+                "Uninstall the codecs",
+                "Codex will uninstall it. Shall I start it?",
+                false,
+            ),
+            (
+                "Uninstall the codecs",
+                "Codex will uninstall the codecs. Shall I start it?",
+                true,
+            ),
+            (
+                "Ask Codex to uninstall the codecs",
+                "I'll ask Codex to uninstall it. Shall I?",
+                false,
+            ),
+            (
+                "Ask Codex to uninstall the codecs",
+                "I'll ask Codex to uninstall the codecs. Shall I?",
+                true,
+            ),
+        ] {
+            assert_eq!(reads_back(line, &codex(text)), said, "{text} / {line}");
         }
     }
 

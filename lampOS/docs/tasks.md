@@ -2500,9 +2500,13 @@ tasks flags; it needs only the tasks part):
     (the Reviewer-lead's P2s on #5609). Before, half the content words,
     then all but one, and then near forms were enough, and the unheard
     part started. The words of the name and the closing question never
-    stand for a task word: the name's forms (those the name check uses)
-    are left out of the line and of the task, and so is the line's last
-    sentence when it ends with "?". "Delete the code" read back as "Claude
+    stand for a task word: the first of the name's forms in the line
+    (those the name check uses) is left out of it, and so is the line's
+    last sentence when it ends with "?". In the task a form is left out
+    only where it addresses the agent, right after "ask", "have", "tell",
+    "get" or "let", so "Uninstall the codecs" read back as "Codex will
+    uninstall it" is refused and "Codex will uninstall the codecs" is not
+    (the Reviewer-lead's P3 on #5785's READ-OK). "Delete the code" read back as "Claude
     Code will delete it. Shall I start it?" (the name's "Code") and "Start
     the server" read back as "Claude Code will stark the server. Shall I
     start it?" (the question's "start") are refused. A task that names the
