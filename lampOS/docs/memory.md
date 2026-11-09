@@ -575,6 +575,17 @@ nobody at the lamp. On lamp-3e83 (#4584) 30 looks had none with one face,
 and on lamp-a0ae (2 Nov) far faces 0.02 to 0.06 wide came and went beside
 the owner. Such a face is still tracked, and still read speaking.
 
+**A face turned away and back is still theirs** (`LAMP_FACE_REFOUND=on`
+with `LAMP_FACE_KNOWN_HOLD=on`, both on in the product's eyes, the
+re-found face since the memory owner's call, C65; [eyes.md](eyes.md), "The
+followed id"): a face back on a new passing id is recognised at its first
+look, not up to 2 s later, and the eyes say which lost id it follows, so a
+line across the turn is one face's ([second-voice.md](second-voice.md)).
+Their name moves to the new id only by a print read as theirs (at least
+0.363 to the eyes' own print of them); before that print the line waits up
+to 1 s past its end, then is the room's. Someone else sitting where they
+were is never given their memory on the link alone.
+
 **A line of theirs no face was seen speaking, their face the one face in
 view** (`LAMP_PERSON_SCOPE_ONE_FACE=on`, on in the product; the launch
 testers' item 1 on #3997): on lamp-220c on 30 Oct the owner's face was in 17
