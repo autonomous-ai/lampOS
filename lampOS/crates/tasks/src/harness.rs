@@ -3286,7 +3286,8 @@ fn words_of(text: &str) -> Vec<String> {
 /// when its name or its folder's last part is the words said, or, when no
 /// row is that, when each word said begins one of its words, in order
 /// ("docs" fits "Docs-Update"; "api" never fits "rapid-prototype": the
-/// Reviewer-lead's P2 on #5779). Of those that fit, one live session is
+/// Reviewer-lead's P2 on #5779), or, when none is, by what it worked on
+/// ([`by_its_work`]). Of those that fit, one live session is
 /// the one; a stopped one is said to be stopped; more than one live is
 /// asked about, never guessed.
 fn named_session(bytes: &[u8], session: &str) -> Named {
@@ -3323,12 +3324,21 @@ fn named_session(bytes: &[u8], session: &str) -> Named {
         .iter()
         .filter(|row| names(row).contains(&said))
         .collect();
-    let fits = if exact.is_empty() && said.chars().count() >= 3 {
+    let fits: Vec<&Value> = if exact.is_empty() && said.chars().count() >= 3 {
         rows.iter()
             .filter(|row| parts(row).iter().any(|part| begins(part)))
             .collect()
     } else {
         exact
+    };
+    // No name or folder is it: what the person said is what the session
+    // worked on ("the book program one"), found in what it was asked and
+    // what it says it did (the owner, 9 Nov: a person remembers the work,
+    // never a session's name or id).
+    let fits = if fits.is_empty() {
+        by_its_work(rows, &said_words)
+    } else {
+        fits
     };
     let gone = |row: &&Value| {
         matches!(
@@ -3347,6 +3357,86 @@ fn named_session(bytes: &[u8], session: &str) -> Named {
         },
         _ => Named::Refused("session_ambiguous"),
     }
+}
+
+/// Words that say which session, not what it did: "the one from before",
+/// "my earlier session", "that thing you did".
+const NOT_THE_WORK: [&str; 40] = [
+    "a", "an", "the", "one", "ones", "session", "sessions", "my", "your", "our", "that", "this",
+    "which", "where", "who", "in", "on", "of", "for", "to", "with", "about", "from", "earlier",
+    "before", "last", "previous", "other", "did", "do", "made", "was", "is", "it", "you", "we",
+    "i", "thing", "work", "and",
+];
+
+/// Whether a word said stands for a word of a session's work: the same
+/// word, or one begins the other and the shorter has four letters or more
+/// ("book" for "books", "program" for "programs"; "app" is only "app").
+fn same_word(said: &str, word: &str) -> bool {
+    let (short, long) = if said.len() <= word.len() {
+        (said, word)
+    } else {
+        (word, said)
+    };
+    short == long || (short.chars().count() >= 4 && long.starts_with(short))
+}
+
+/// The sessions whose work is what the person said (#5535): each row's
+/// `asks` and `about` against the words said that name work
+/// ([`NOT_THE_WORK`] left out). Its name and folder are not read here: a
+/// name is matched only as [`named_session`] matches it, word starts in
+/// order, so "client api" never finds "Fix the API client". A row holds a word said when one of its
+/// words is the same word ([`same_word`]). Only rows holding at least half
+/// of those words, and the most of them, fit; two rows holding the most
+/// both fit, so they are asked about, never guessed. A stopped row counts
+/// only when no live one fits, so a live session is never passed over for
+/// an older one.
+fn by_its_work<'a>(rows: &'a [Value], said_words: &[String]) -> Vec<&'a Value> {
+    let work: Vec<&str> = said_words
+        .iter()
+        .map(String::as_str)
+        .filter(|word| !NOT_THE_WORK.contains(word))
+        .collect();
+    if work.is_empty() {
+        return Vec::new();
+    }
+    let held = |row: &Value| -> usize {
+        let mut text: Vec<String> = Vec::new();
+        text.extend(words_of(row["about"].as_str().unwrap_or_default()));
+        for ask in row["asks"].as_array().into_iter().flatten() {
+            text.extend(words_of(ask.as_str().unwrap_or_default()));
+        }
+        work.iter()
+            .filter(|said| text.iter().any(|word| same_word(said, word)))
+            .count()
+    };
+    let needed = work.len().div_ceil(2);
+    let scored: Vec<(usize, &Value)> = rows
+        .iter()
+        .map(|row| (held(row), row))
+        .filter(|(count, _)| *count >= needed)
+        .collect();
+    let live = |row: &Value| {
+        !matches!(
+            row["state"].as_str(),
+            Some("stopped" | "failed" | "offline")
+        )
+    };
+    // The live ones holding the most; with none live, the stopped ones,
+    // which are said to be stopped.
+    let any_live = scored.iter().any(|(_, row)| live(row));
+    let Some(best) = scored
+        .iter()
+        .filter(|(_, row)| live(row) == any_live)
+        .map(|(count, _)| *count)
+        .max()
+    else {
+        return Vec::new();
+    };
+    scored
+        .into_iter()
+        .filter(|(count, row)| *count == best && live(row) == any_live)
+        .map(|(_, row)| row)
+        .collect()
 }
 
 /// Whether `harness reply --json` took the words for `agent_id`: queued in

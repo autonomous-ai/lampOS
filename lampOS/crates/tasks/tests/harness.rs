@@ -683,6 +683,136 @@ fn ps_row(id: &str, name: &str, state: &str, folder: Option<&str>) -> Value {
         "lastActive":"2026-11-09T05:00:00.000Z","asks":[],"about":"older work"})
 }
 
+fn worked_row(id: &str, name: &str, state: &str, asks: &[&str], about: &str) -> Value {
+    let mut row = ps_row(id, name, state, Some("/home/daniel/harnesses/lamp-tasks"));
+    row["asks"] = json!(asks);
+    row["about"] = json!(about);
+    row
+}
+
+/// #5535, the owner on 9 Nov: a person remembers what a session worked on,
+/// never its name ("lamp-b1287be5…") or id. With no name or folder fitting,
+/// the session is found by its work (`asks`, `about`); two as good are
+/// asked about, never guessed; a live one is never passed over for a
+/// stopped one; words that only say "which one" find nothing.
+#[test]
+fn with_reply_named_a_session_is_found_by_what_it_worked_on() {
+    let pick = |session: &str, rows: Value| {
+        let mut rig = Rig::new();
+        rig.config.reply_named = true;
+        rig.config.route = true;
+        rig.config.engines_ready = true;
+        let id = rows[0]["id"].as_str().unwrap().to_owned();
+        rig.plan(json!({
+            "machines":{"default":true},"new":{"default":true},"route":{"default":true},
+            "ps":step(json!({"you":null,"machine":"daniel-pc","harnesses":rows,"next":[]})),
+            "reply":step(json!({"ok":true,"name":"x","id":id,"message":"m1","state":"queued"}))
+        }));
+        let mut request = launch();
+        request.session = Some(session.into());
+        let outcome = rig.cli().launch(&request);
+        let replied_to = rig
+            .calls()
+            .iter()
+            .find(|call| call["args"][0] == "reply")
+            .map(|call| call["args"][3].as_str().unwrap().to_owned());
+        (outcome, replied_to)
+    };
+    let books = worked_row(
+        AGENT,
+        "lamp-b1287be53f02104bd6a17de348f1afde",
+        "idle",
+        &["Write a short book program."],
+        "I wrote books.py, a short command-line program for keeping a reading list.",
+    );
+    let weather = worked_row(
+        OTHER,
+        "lamp-e8a0b789c7047e25824836509849649b",
+        "idle",
+        &["Research free weather APIs and build a small weather app."],
+        "I built weather.py, which shows tomorrow's forecast.",
+    );
+    let rows = json!([books.clone(), weather.clone()]);
+    for said in [
+        "the book program one",
+        "the reading list",
+        "the session that wrote books.py",
+    ] {
+        assert_eq!(
+            pick(said, rows.clone()),
+            (
+                LaunchOutcome::Joined {
+                    agent_id: AGENT.into()
+                },
+                Some(AGENT.into())
+            ),
+            "{said}"
+        );
+    }
+    let weather_first = json!([weather.clone(), books.clone()]);
+    assert_eq!(
+        pick("the weather app", weather_first.clone()).0,
+        LaunchOutcome::Joined {
+            agent_id: OTHER.into()
+        }
+    );
+    // Nothing of its work, or only words that say "which one".
+    assert_eq!(
+        pick("the billing dashboard", rows.clone()),
+        (not_sent("session_not_found"), None)
+    );
+    assert_eq!(
+        pick("the one from before", rows.clone()),
+        (not_sent("session_not_found"), None)
+    );
+    // Two sessions as good: asked about.
+    let twin = worked_row(
+        OTHER,
+        "lamp-cc366a4c7b85ee72036f1f5418cda0d5",
+        "idle",
+        &["Add a book search."],
+        "I added search to the book program.",
+    );
+    assert_eq!(
+        pick("the book program", json!([books.clone(), twin])),
+        (not_sent("session_ambiguous"), None)
+    );
+    // Busy: said busy, nothing typed.
+    let busy = worked_row(
+        AGENT,
+        "lamp-b1287be53f02104bd6a17de348f1afde",
+        "working",
+        &["Write a short book program."],
+        "",
+    );
+    assert_eq!(
+        pick("the book program", json!([busy])),
+        (not_sent("session_busy"), None)
+    );
+    // A stopped one that fits as well or better never wins over a live one.
+    let old = worked_row(
+        OTHER,
+        "lamp-7f8a8dcb047b88eeca3ea3b8b634b420",
+        "stopped",
+        &["Write a book program for my reading list."],
+        "I wrote a reading list program with book ratings.",
+    );
+    assert_eq!(
+        pick(
+            "the book program reading list ratings",
+            json!([books.clone(), old.clone()])
+        )
+        .0,
+        LaunchOutcome::Joined {
+            agent_id: AGENT.into()
+        }
+    );
+    assert_eq!(
+        pick("the book program", json!([old])),
+        (not_sent("session_stopped"), None)
+    );
+}
+
 /// #5535, `serve --reply-named`: a launch that names a session is typed
 /// into that session with `harness reply` (`joined`), found among the
 /// computer's sessions (`ps --all`) by name or folder, however it is said.
