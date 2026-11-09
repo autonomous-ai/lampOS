@@ -9328,3 +9328,17 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 - #5878 7d6633bb85 is a substantive follow-up atop unchanged 170cf stack:
   drops carried rounds at both forget admissions before awaiting deletion.
   Source/dependency audit only; El's read/HOLD is separate.
+
+## 2026-11-09 — Second: onboarding streaming HOLD supersedes helper result
+
+- Reviewer-lead HOLD #5890 1c77d7ea30: the normal first-piece split at four
+  words drops "Step three: tell me" but speaks its trailing fragment.
+  My whole-sentence tests missed the production composition. I treated
+  chunk splitting as a stated ceiling without checking its frequency in
+  the normal first-piece path; that was insufficient for this UX fix.
+- Acknowledged P2 and superseded "only docs pending", 6743674327. Twelve
+  now has PM's named next-head read. No overlapping final clearance; piece
+  handling regression and docs required before readiness.
+- Train758 ARM64 run 42639186718 verified: 14,902 passed / 109 skipped;
+  artifact e3b8a22fe68 matches audited exact patches. Still open at last
+  check. PM scheduled 11091 promote 22:50; no device/release mutation here.
