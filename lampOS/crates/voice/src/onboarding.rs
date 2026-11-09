@@ -5053,9 +5053,19 @@ fn reading_with(
             "yes" | "yeah" | "yep" | "yup" | "sure" | "no" | "nope" | "nah"
         )
     }) || yes_phrase_at(&words, 0, more).is_some();
+    // In the read-back (`more` given), a "…n't" before a yes word is a no:
+    // "That isn't right.", "Didn't get it right." confirmed a wrong name (the
+    // Reviewer-lead's P2 on #5768). "Yes, you didn't miss a letter." stays a
+    // yes, and elsewhere "I didn't catch that." still asks again.
+    let negated = !more.is_empty() && {
+        let (rest, _) = without_yes_phrases(&words, more);
+        rest.iter()
+            .position(|word| word.ends_with("n't"))
+            .is_some_and(|at| rest[at..].iter().any(|word| YES.contains(word)))
+    };
     in_language::Reading {
-        agrees: agrees(&words, more),
-        refuses: refuses(&words),
+        agrees: agrees(&words, more) && !negated,
+        refuses: refuses(&words) || negated,
         names_someone: names_someone(text, &words),
         hello_yes: hello_yes(&words),
         about_hello: words
@@ -8412,6 +8422,8 @@ mod tests {
             "You got it!",
             "Yep, that's me.",
             "Exactly right.",
+            // A "…n't" after the yes word is no no (Jarvis on #5677).
+            "Yes, you didn't miss a letter.",
         ]
         .into_iter()
         .enumerate()
@@ -8697,6 +8709,14 @@ mod tests {
                 "That's a shame.",
                 "You got it backwards.",
                 "You got it mixed up.",
+                // A "…n't" before a yes word is a no to the read-back (the
+                // Reviewer-lead's P2 on #5768).
+                "That isn't right.",
+                "Isn't right.",
+                "Wasn't correct.",
+                "Didn't get it right.",
+                "That doesn't sound right.",
+                "That's not right.",
             ]
             .into_iter()
             .map(|answer| (answer, "Walter, did I get that right?", answer)),
