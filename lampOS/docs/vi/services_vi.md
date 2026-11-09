@@ -645,6 +645,29 @@ là một dòng tối đa 200, tối đa 20 người nhận hoặc người tham
 một `local@domain.tld` thuần. Google Drive và Ahrefs không có ghi ("the lamp
 only reads …").
 
+Mô hình được nói về `service_write`, trước tiên trong mô tả của nó
+(`WRITE_RULE`, rồi đến luật mà mọi hàm dịch vụ đều có, ở dưới):
+"Only when the person asks you, now, to send or post something; an ask to
+draft, write, compose or reply to a mail or message is one. No draft is
+saved; nothing goes before they say send: say so. Call it first without
+send_id: it sends nothing and gives a read_back. Say that read_back in full,
+word for word, then ask them to say "go ahead and send it" to send it. Call
+it again with its send_id only if their very next words are that; anything
+else cancels it. Never say a read-back yourself: only one this call gave in
+the same turn, and a new write, or the same one asked again, needs a new
+call. Never say you can't use their services: refuse only for a reason a
+call gave."
+
+Một yêu cầu soạn nháp thư là một yêu cầu gửi nó: Gmail không có nháp (chỉ có
+`send_mail`), nên một yêu cầu như vậy được chuẩn bị và đọc lại như mọi lệnh
+ghi, và không gì được lưu thành nháp. Trên lamp-29e7 ngày 9 tháng 11, "Draft a
+new email for me" bị từ chối mà không có lệnh gọi nào ("I cannot touch your
+mail") và, khi được hỏi tại sao, "Because I'm a lamp."; luật không nói gì về
+nháp, cũng không nói lý do của một lời từ chối đến từ đâu. Toàn bộ luật cùng
+luật chung là 998 trong 1,024 byte của mô tả, chừa 25 byte cho lời riêng của
+`lamp-services` cho hàm ghi: chỉ những câu trọn vẹn, nên danh sách "action,
+by service: …" của nó được nói trên tham số `action`.
+
 ### Cổng gửi của giọng nói
 
 `crates/voice/src/services.rs` giữ các luật riêng của nó, bất kể
