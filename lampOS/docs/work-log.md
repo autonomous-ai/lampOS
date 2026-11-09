@@ -8639,3 +8639,20 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   `cargo test -q -p lamp-body name_in::`: 3 pass. No other P1/P2 in body or
   process switch propagation. Switch remains off; no device or frequency
   claim. Owner asked to drain independently with bounded retention/lifecycle.
+
+## 2026-11-09 — Second: MCP say completion read
+
+- READ-OK #5849 `e091f66112bf3a208d47aa0f1c903cd4936b1ab6`.
+  Default says taken; finished completion says said. Request ID is captured
+  before send and the handler is removed on every exit. Existing limits and
+  text validation remain.
+- Exact-head MCP pytest suite: 53 passed in 17.27 s. Actual-MCP/FakeLamp
+  extra probes pass for done-before-reply, timeout cleanup and explicit MCP
+  cancellation cleanup. Timeout shortened to 0.1 s in the test process only.
+  First cancellation probe cancelled only its local client task, which the
+  library does not send as a protocol cancellation; corrected notification
+  probe passes. Logs retained under /tmp/second-5849-*.
+- #5845 queue loss also reproduces with hearings 1.1 s apart: 19.94 s test,
+  same dropped 1.0 hearing. This excludes a burst-only explanation on this
+  host. Thirteen acknowledges and owns a background-reader fix.
+- Removed completed clean #5843 and #5833 checkouts; saved evidence remains.
