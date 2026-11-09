@@ -1,3 +1,7 @@
+## 2026-11-09 18:59 ICT — tested artifact handoff verified
+
+Verified the published playback, Peek and photo CI archives for the eventual tester handoff: each has exactly 51 binaries plus SHA256SUMS, every digest matches and every binary has an ELF64 little-endian AArch64 header. No binary executed, installed or committed. [Receipt](verification/fourth-ci-artifacts-20261109/receipt.json) pins the archive/binary hashes, artifact/run IDs and actual CI merge commits. Those merge trees match independent merge-tree previews against `19ee3d51ac`. These are seven-day CI artifacts, not signed releases, assembled kits, device approval or physical acceptance. The tester still owns kit assembly and the required approval/slot/verdict.
+
 ## 2026-11-09 18:47 ICT — all four drafts CI-green; external gates remain
 
 Ready for lamp-voice: no. No merge, promotion or device access. All available source slices are published; required privacy reads, contract decisions and authorized device evidence remain outside this checkout.
