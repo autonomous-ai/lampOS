@@ -2337,6 +2337,17 @@ pub fn serve(
         );
         crate::tools::schedule_asked::force()
     });
+    // A line that is only a plain question about the person's reminders must
+    // call list_reminders (`LAMP_REMINDERS_ASKED`).
+    let list = crate::tools::reminders_asked::on().then(|| {
+        eprintln!(
+            "lamp-voice second: a line that is only a plain question about the person's reminders must call {} in its first round ({})",
+            crate::tools::reminders_asked::LIST,
+            crate::tools::reminders_asked::ENVIRONMENT
+        );
+        crate::tools::reminders_asked::force()
+    });
+    let set = first_force(set, list);
     let net = match first_force(named, first_force(remember, first_force(keep, set))) {
         Some(force) => net.forcing(force),
         None => net,

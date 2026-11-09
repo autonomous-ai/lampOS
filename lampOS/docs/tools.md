@@ -331,6 +331,23 @@ seconds. `set_reminder` is reserved for a requested clock time; a relative
 duration must not be rounded into its minute-only `HH:MM` field. See the
 [relative-time examples and lamp check](schedule.md#relative-time-follow-up-on-the-lamp).
 
+A plain question about the person's reminders must read them
+(`LAMP_REMINDERS_ASKED=on`, the second route, on in the product unit): a
+line that is only "what reminders do I have", "do I have any reminders",
+"what are my reminders", "list my reminders" and the like, beside a
+greeting, the lamp's name, "please", "can you", "tell me" or a day
+(`tools::reminders_asked::asks_for_reminders`), has its first chat round
+sent with `tool_choice` naming `list_reminders`, when it is declared. Any
+other word (a set, a cancel, a delete, a move, a timer, "do you like
+reminders?"), `list_reminders` not declared and a round after a call are
+asked as before. On lamp-52e6 on 9 Nov (build 10972) "Lamp, what reminders
+do I have?" was answered in words with no call in 2 of 8 asks, memory
+telling nothing; the journal tagged those lines with
+`attention::about_its_work`, which takes any line with "reminder" in it and
+so is too wide to force a call on. Host tests:
+`a_plain_question_about_reminders_is_told_apart`,
+`a_plain_question_forces_list_reminders_only_when_offered`.
+
 Actions validates arguments before IPC, owns Schedule's CAS guards, and calls
 the socket selected by `LAMP_SCHEDULE_SOCKET` (enabled default
 `/run/lampos-schedule/call.sock`). Text is 1–300 UTF-8 bytes without controls;
