@@ -8727,3 +8727,17 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   direct services tests assumed each echo was counted. No new runtime
   reproduction claimed. Support failing closed with counted identities and
   a regression. Third owns the assigned second read after the fix.
+
+## 2026-11-09 — Second: reconnect generation fix read
+
+- READ-OK standalone #5830 `809e2d43a3230726f7ba5f610f849092cf0c34a3`.
+  Original turn-generation probe returns closed on originating disconnect;
+  replacement request's done cannot complete it. Request-scoped done/lease
+  handlers are not replayed and existing waits capture per-connection gone.
+- Full MCP 57 passed in 17.96 s. Original offline-start and cancellation-
+  during-replay probes pass again; zero cancelled phrase handlers remain.
+  Checkout/diff checks clean. No product edit or device action.
+- Train #5852 e613efc425 remains HOLD: new #5849 speech wait is absent from
+  this standalone head and must use the disconnect-aware helper when
+  combined. Asked owners for the combined head and kept the original
+  speech-generation probe for its verification.
