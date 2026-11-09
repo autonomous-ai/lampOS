@@ -73,7 +73,7 @@ use std::io::{BufRead as _, BufReader, Write as _};
 use std::net::Shutdown;
 use std::os::unix::net::{UnixDatagram, UnixStream};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
 
 use lamp_msgs::{Claim, Light, LightPattern, LightRequest, PatternKind, Priority};
@@ -96,6 +96,10 @@ pub const SAY_CANCEL: &str = r#"{"cancel":true}"#;
 pub const STOPPED_BY_ASKER: &str = "stopped by its asker";
 /// The longest the door's lock waits to write a cancel to the voice.
 const SAY_CANCEL_WITHIN: Duration = Duration::from_millis(100);
+/// The longest a `turn.end` for a start not yet begun waits for the voice to
+/// say what became of it, once cancelled on its connection: the voice's loop
+/// takes a cancel at its next pass, tens of ms.
+pub const TURN_CANCEL_WITHIN: Duration = Duration::from_secs(2);
 
 /// The says each client still waits on, by client and then by the say's
 /// own number: the connection to the voice once it is open. A say no
@@ -115,6 +119,9 @@ pub const NO_TURNS: &str = "the voice here doesn't take turns from a computer";
 pub const NO_MUTE: &str = "the voice here doesn't take a computer's mute";
 /// A `turn.end` with no turn of this computer's to end, the voice's words.
 pub const NOT_THIS_TURN: &str = "not this computer's turn";
+/// The `done` of a computer's `turn.start` its own `turn.end` dropped
+/// before the voice began it.
+pub const ENDED_BEFORE_BEGUN: &str = "ended by this computer before it began";
 /// A `listen.set` asked while this computer's last is still with the voice.
 pub const MUTE_BEING_TAKEN: &str = "this computer's mute is still being taken by the voice";
 
@@ -272,6 +279,17 @@ struct Turn {
     /// Let go once it began: a begun turn is ended by its `turn.end` or
     /// the person, as before.
     waiting: Option<UnixStream>,
+    /// The request that started it, for `turn.end`'s answer.
+    re: u64,
+    /// Ended by its own computer's `turn.end` before the door saw it begin:
+    /// cancelled at the voice on its own connection, which the voice
+    /// answers whether it still waited, said its prompt or had just opened
+    /// its window.
+    ended: bool,
+    /// The `turn.end`s waiting for its final answer, told it when it comes.
+    told: Vec<mpsc::Sender<(&'static str, Option<String>)>>,
+    /// The voice said `begun`: from then on a `turn.end` ends it by its id.
+    begun: bool,
 }
 
 /// A computer's begun turn: the voice's id for it, and the request that
@@ -912,7 +930,14 @@ impl Lamp {
                 .turns
                 .entry(client.to_owned())
                 .or_default()
-                .push(Turn { seq, waiting: None });
+                .push(Turn {
+                    seq,
+                    waiting: None,
+                    re,
+                    ended: false,
+                    begun: false,
+                    told: Vec::new(),
+                });
             seq
         };
         let (voice, events, client) = (self.voice.clone(), self.events.clone(), client.to_owned());
@@ -925,6 +950,7 @@ impl Lamp {
                     voice.begun.insert(client.clone(), Begun { id, re });
                     if let Some(turn) = voice.turn(&client, seq) {
                         turn.waiting = None;
+                        turn.begun = true;
                     }
                 }
             };
@@ -935,15 +961,19 @@ impl Lamp {
                     // Kept with the start while it waits; gone meanwhile, its
                     // computer's start is let go at once.
                     let kept = stream.try_clone().ok();
+                    // Ended by its own `turn.end` before it connected:
+                    // cancelled at once on its connection, and its answer
+                    // read as any other's.
                     let waits = match voice.lock().expect("voice").turn(&client, seq) {
-                        Some(turn) => {
+                        Some(turn) if !turn.ended => {
                             turn.waiting = kept;
                             true
                         }
-                        None => false,
+                        _ => false,
                     };
                     if !waits {
-                        let _ = stream.shutdown(Shutdown::Both);
+                        let _ = stream.set_write_timeout(Some(SAY_CANCEL_WITHIN));
+                        let _ = writeln!(&stream, "{SAY_CANCEL}");
                     }
                     let _ = stream.set_read_timeout(Some(SAY_ANSWER_WITHIN));
                     outcome_with(BufReader::new(stream), begun)
@@ -963,14 +993,35 @@ impl Lamp {
             });
             // Answered: no longer a start waiting. Its id, if it began,
             // stays for a `turn.end` while its conversation may go on.
-            {
+            let (ended, told) = {
                 let mut voice = voice.lock().expect("voice");
+                let (ended, told) = match voice.turn(&client, seq) {
+                    Some(turn) => (turn.ended, std::mem::take(&mut turn.told)),
+                    None => (false, Vec::new()),
+                };
                 if let Some(turns) = voice.turns.get_mut(&client) {
                     turns.retain(|turn| turn.seq != seq);
                     if turns.is_empty() {
                         voice.turns.remove(&client);
                     }
                 }
+                (ended, told)
+            };
+            // Cancelled by its own computer while the voice still had it
+            // waiting: said so in the door's words. Once the voice had
+            // taken it (its prompt said, its window opened), the voice's.
+            let (how, why) = if ended
+                && how == "dropped"
+                && why
+                    .as_deref()
+                    .is_some_and(|why| why.ends_with(STOPPED_BY_ASKER))
+            {
+                ("dropped", Some(ENDED_BEFORE_BEGUN.to_owned()))
+            } else {
+                (how, why)
+            };
+            for tell in told {
+                let _ = tell.send((how, why.clone()));
             }
             let mut done = json!({"ev": "done", "re": re, "how": how});
             if let Some(why) = why {
@@ -990,20 +1041,58 @@ impl Lamp {
             return Err(not_here("the voice"));
         };
         let begun = {
-            let voice = self.voice.lock().expect("voice");
+            let mut voice = self.voice.lock().expect("voice");
+            // A start of this computer's still waiting for the voice: ended
+            // here, before it began, by shutting its say-socket connection,
+            // which drops it at the voice (no cue, no window), as a computer
+            // gone does. Checked first: an earlier turn's id, kept past its
+            // end, must not take its place (lamp-75c9, 9 Nov: `turn.end` 2 s
+            // after a `turn.start` was refused "not this computer's turn").
+            if let Some(turns) = voice.turns.get_mut(client) {
+                let mut ending = Vec::new();
+                for turn in turns.iter_mut().filter(|turn| !turn.ended && !turn.begun) {
+                    // Cancelled on its own connection; not yet connected, its
+                    // thread cancels it as it connects.
+                    if let Some(waiting) = turn.waiting.as_ref() {
+                        let _ = waiting.set_write_timeout(Some(SAY_CANCEL_WITHIN));
+                        let _ = writeln!(&*waiting, "{SAY_CANCEL}");
+                    }
+                    turn.ended = true;
+                    let (tell, told) = mpsc::channel();
+                    turn.told.push(tell);
+                    ending.push((turn.re, told));
+                }
+                if let Some(&(started, _)) = ending.last() {
+                    // Answered only once the voice said what became of each:
+                    // never from the door's own view, which can't tell a
+                    // start still waiting from one whose prompt is said.
+                    return Ok(Reply::Later(Box::new(move || {
+                        for (_, told) in ending {
+                            match told.recv_timeout(TURN_CANCEL_WITHIN) {
+                                Ok(("finished", _)) => {
+                                    return Err(Error::new(
+                                        ErrorCode::Refused,
+                                        "the turn had already finished",
+                                    ));
+                                }
+                                Ok(_) => {}
+                                Err(_) => {
+                                    return Err(Error::new(
+                                        ErrorCode::Refused,
+                                        format!(
+                                            "the voice did not say within {} s whether it ended",
+                                            TURN_CANCEL_WITHIN.as_secs()
+                                        ),
+                                    ));
+                                }
+                            }
+                        }
+                        Ok(json!({"turn": "ended", "started": started}))
+                    })));
+                }
+            }
             match voice.begun.get(client) {
                 Some(begun) => *begun,
-                // Asked and not begun: the voice has no id for it yet.
-                None if voice
-                    .turns
-                    .get(client)
-                    .is_some_and(|turns| !turns.is_empty()) =>
-                {
-                    return Err(Error::new(
-                        ErrorCode::Busy,
-                        "this computer's turn has not begun yet",
-                    ));
-                }
                 None => return Err(Error::new(ErrorCode::Busy, NOT_THIS_TURN)),
             }
         };
@@ -2774,10 +2863,6 @@ mod tests {
             line,
             json!({"skill": "control", "turn": "start", "text": "Shall we go over today's list?", "expires_in_ms": 30000})
         );
-        // Asked and not begun: no id to end it by yet.
-        let early = lamp.reply("c_1", 4, &end, 0).unwrap_err();
-        assert_eq!(early.code, ErrorCode::Busy);
-        assert_eq!(early.why, "this computer's turn has not begun yet");
         say(&turn, r#"{"event":"begun","at_us":5,"id":7}"#);
         for _ in 0..300 {
             if begun_id(&lamp, "c_1") == Some(7) {
@@ -3089,6 +3174,182 @@ mod tests {
             json!({"mute": "nothing_held"})
         );
         assert_eq!(told.lock().unwrap().len(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// lamp-75c9, 9 Nov: a `turn.end` sent while the computer's own
+    /// `turn.start` still waits for the voice ends that start. An earlier
+    /// turn's id, kept past its end, is never sent in its place (the voice
+    /// refused it "not this computer's turn"). Second's P2 on #5870: the
+    /// door can't tell a start still waiting from one whose prompt the voice
+    /// is saying, so it cancels the start on its own connection and answers
+    /// only once the voice said what became of it: let go while it waited
+    /// (the door's words), ended while its prompt was said (the voice's),
+    /// and refused if it had already finished. A later `turn.end` never
+    /// takes its place in a begun turn's.
+    #[test]
+    fn a_turn_end_ends_its_own_start_still_waiting() {
+        let dir = dir("turn-end-waiting");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let (events, told) = kept();
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        let end = op(r#"{"id":5,"op":"turn.end"}"#);
+        // A first turn begins and ends: its id stays, as for a conversation.
+        lamp.act("c_1", 2, &op(r#"{"id":2,"op":"turn.start"}"#), 0)
+            .unwrap();
+        let (first, _) = accepted(&listener);
+        say(&first, r#"{"event":"begun","at_us":5,"id":7}"#);
+        for _ in 0..300 {
+            if begun_id(&lamp, "c_1") == Some(7) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        say(&first, r#"{"outcome":"dropped","why":"not answered"}"#);
+        until_told(&told, 1);
+        // Each case: a start, `turn.end` while the door hasn't seen it
+        // begin, its cancel read at the voice, and the voice's answer.
+        let mut case = |re: u64, voice: &str| {
+            lamp.act(
+                "c_1",
+                re,
+                &op(&format!(r#"{{"id":{re},"op":"turn.start"}}"#)),
+                0,
+            )
+            .unwrap();
+            let (start, _) = accepted(&listener);
+            std::thread::sleep(Duration::from_millis(50));
+            let answer = later(lamp.reply("c_1", 5, &end, 0));
+            let mut cancel = String::new();
+            BufReader::new(&start).read_line(&mut cancel).unwrap();
+            assert_eq!(cancel.trim_end(), SAY_CANCEL);
+            // Not answered from the door's own view: it waits for the voice.
+            std::thread::sleep(Duration::from_millis(50));
+            assert!(!answer.is_finished(), "answered before the voice said");
+            say(&start, voice);
+            untouched(&listener);
+            answer.join().unwrap()
+        };
+        // Still waiting at the voice: let go, in the door's words.
+        assert_eq!(
+            case(3, r#"{"outcome":"dropped","why":"stopped by its asker"}"#).unwrap(),
+            json!({"turn": "ended", "started": 3})
+        );
+        until_told(&told, 2);
+        assert_eq!(
+            told.lock().unwrap()[1],
+            (
+                "c_1".to_owned(),
+                json!({"ev": "done", "re": 3, "how": "dropped", "why": ENDED_BEFORE_BEGUN})
+            )
+        );
+        // Its prompt being said: the voice ended it, in its words.
+        assert_eq!(
+            case(4, r#"{"outcome":"dropped","why":"ended by the computer"}"#).unwrap(),
+            json!({"turn": "ended", "started": 4})
+        );
+        until_told(&told, 3);
+        assert_eq!(
+            told.lock().unwrap()[2],
+            (
+                "c_1".to_owned(),
+                json!({"ev": "done", "re": 4, "how": "dropped", "why": "dropped: ended by the computer"})
+            )
+        );
+        // Already finished: not ended by this `turn.end`, and said so.
+        let finished = case(6, r#"{"outcome":"spoken"}"#).unwrap_err();
+        assert!(
+            finished.why.contains("already finished"),
+            "{}",
+            finished.why
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Second's native reproduction on #5870, with the voice's own say
+    /// socket and turns: a `turn.end` while the start's prompt is said, its
+    /// `begun` not yet come (the window opens only once the prompt is
+    /// heard whole). Before, the door answered "ended" from its own view
+    /// while the voice kept the turn: the prompt's end then opened its
+    /// window and the person's next line was taken as the turn's. Now the
+    /// voice ends it, cuts its prompt, and the door answers only then.
+    #[test]
+    fn a_turn_end_while_its_prompt_is_said_ends_the_turn_at_the_voice() {
+        use lamp_voice::control_turn::{ControlTurns, ENDED_BY_COMPUTER};
+        use lamp_voice::say::{Outcome, Recordings, Says};
+        let now = lamp_ipc::monotonic_us;
+        let dir = dir("turn-end-prompt");
+        let path = dir.join("say.sock");
+        let mut says = Says::serve(&path, None, &dir, Recordings::none()).unwrap();
+        let (events, told) = kept();
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        lamp.act(
+            "c_1",
+            3,
+            &op(r#"{"id":3,"op":"turn.start","prompt":"Tell me one thing."}"#),
+            0,
+        )
+        .unwrap();
+        // The voice's loop takes it and begins saying its prompt.
+        let ticket = (0..300)
+            .find_map(|_| {
+                says.poll(now());
+                let taken = says.take_turn_start(now());
+                if taken.is_none() {
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                taken
+            })
+            .map(|(prompt, _, ticket)| {
+                assert_eq!(prompt.as_deref(), Some("Tell me one thing."));
+                ticket
+            })
+            .expect("the voice took the start");
+        let mut turns = ControlTurns::default();
+        let said = turns.prompt(ticket);
+        said.begun(now());
+        turns.tick(now(), None, false, true);
+        assert!(turns.going_on());
+        // Answered now or later, the voice's view is what is checked.
+        let answer = match lamp.reply("c_1", 5, &op(r#"{"id":5,"op":"turn.end"}"#), 0) {
+            Ok(Reply::Now(with)) => std::thread::spawn(move || Ok(with)),
+            reply => later(reply),
+        };
+        // The cancel reaches the voice on the start's connection.
+        for _ in 0..300 {
+            says.poll(now());
+            if said.stopped_by_asker() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(said.stopped_by_asker(), "its prompt is cut with it");
+        // In the coordinator's order, a line offered before the pass's tick
+        // (Second's P2 at e1db6ae37e): a cancelled turn takes none.
+        assert!(
+            !turns.admitted(1, now()),
+            "a line was taken as the cancelled turn's"
+        );
+        turns.tick(now(), None, false, true);
+        assert!(!turns.going_on(), "the voice still has the turn");
+        assert_eq!(
+            answer.join().unwrap().unwrap(),
+            json!({"turn": "ended", "started": 3})
+        );
+        // The prompt's own end opens no window; the person's line is theirs.
+        said.answer(Outcome::Dropped("cut".into()));
+        turns.tick(now(), None, false, true);
+        assert!(!turns.admitted(2, now()));
+        until_told(&told, 1);
+        assert_eq!(
+            told.lock().unwrap()[0],
+            (
+                "c_1".to_owned(),
+                json!({"ev": "done", "re": 3, "how": "dropped", "why": format!("dropped: {ENDED_BY_COMPUTER}")})
+            )
+        );
+        drop(says);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
