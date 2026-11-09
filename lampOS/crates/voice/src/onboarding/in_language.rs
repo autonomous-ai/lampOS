@@ -1757,6 +1757,14 @@ pub(super) fn without_step_words(text: &str, line: &str) -> String {
             }]);
         for counter in words {
             let words = counter.said(language);
+            if let Some(at) = line.find(&words) {
+                // The line's own step: kept only with its own ask after it;
+                // a step word opening some other ask goes with that ask
+                // (tonight's B: "Step three: tell me one thing..." 12 s
+                // before the walk's "Step three: pet the top of my head.").
+                text = without_other_asks(&text, &words, clause(&line[at + words.len()..]));
+                continue;
+            }
             if line.contains(words.trim_end()) {
                 continue;
             }
@@ -1767,6 +1775,63 @@ pub(super) fn without_step_words(text: &str, line: &str) -> String {
         }
     }
     text
+}
+
+/// The clause `text` opens with: up to its first sentence end, kept.
+fn clause(text: &str) -> &str {
+    let end = text
+        .char_indices()
+        .find(|(_, c)| matches!(c, '.' | '!' | '?' | '。' | '！' | '？'))
+        .map_or(text.len(), |(at, c)| at + c.len_utf8());
+    &text[..end]
+}
+
+/// Its words, lowercased; a clause written without spaces (Japanese,
+/// Chinese) by its letters.
+fn words_of(clause: &str) -> Vec<String> {
+    let clause = clause.to_lowercase();
+    let words: Vec<String> = clause
+        .split_whitespace()
+        .map(|word| word.trim_matches(|c: char| !c.is_alphanumeric()).to_owned())
+        .filter(|word| !word.is_empty())
+        .collect();
+    if words.len() > 1 {
+        return words;
+    }
+    clause
+        .chars()
+        .filter(|c| c.is_alphanumeric())
+        .map(String::from)
+        .collect()
+}
+
+/// `text` with each `step` word whose clause is not `ask` dropped with that
+/// clause. A clause is `ask` when at least half its words are `ask`'s, so the
+/// model's own wording of the walk's ask keeps it.
+// ponytail: a word-overlap test, not meaning; an ask reworded past half its
+// words is dropped, the walk's next poll asks it again.
+fn without_other_asks(text: &str, step: &str, ask: &str) -> String {
+    let asked = words_of(ask);
+    let mut kept = String::new();
+    let mut rest = text;
+    while let Some(at) = rest.find(step) {
+        kept.push_str(&rest[..at]);
+        let after = &rest[at + step.len()..];
+        let own = clause(after);
+        let words = words_of(own);
+        let same = words.iter().filter(|word| asked.contains(word)).count();
+        if words.is_empty() || same * 2 >= words.len() {
+            kept.push_str(&rest[at..at + step.len() + own.len()]);
+        } else if kept.ends_with(' ') && after[own.len()..].is_empty() {
+            kept.truncate(kept.trim_end().len());
+        }
+        rest = &after[own.len()..];
+        if kept.is_empty() || kept.ends_with(' ') {
+            rest = rest.trim_start();
+        }
+    }
+    kept.push_str(rest);
+    kept
 }
 
 /// "All done!" opening the walk's done line, with the owner's name when
