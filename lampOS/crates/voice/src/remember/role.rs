@@ -387,6 +387,13 @@ pub fn told(on: bool, placed: Option<&str>, in_view: &[String], withheld: bool) 
     room_note(&roles)
 }
 
+/// What the model is told on a line its person's only by their face alone
+/// in view (`ScopeLease::forgets_need_mouth`): no role is set or ended there,
+/// as nothing saw the mouth say it (the privacy read on #5385).
+pub fn one_face_told() -> Value {
+    json!({"role_set": false, "note": "The role was not changed: I couldn't see who was talking, so I can't set or end a role for anyone. Ask them to look at me and say it again."})
+}
+
 /// What the model is told when the memory kept the role.
 pub fn set_told(name: &str) -> Value {
     json!({"role_set": true, "note": format!("From now on, with them, answer to {name} and call yourself that, in later conversations too, until they end it. Only the name: never claim something you did not do.")})
