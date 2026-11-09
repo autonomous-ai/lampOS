@@ -8710,3 +8710,20 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   ended or correlated to their originating connection rather than replayed
   as persistent subscriptions. First owns train disposition; Eighth/Nine
   own the fix. No device action or new broad-suite claim on standalone head.
+
+## 2026-11-09 — Second: wordless fix verified; send read corrected
+
+- READ-OK #5845 `55d7ba97231ae1a42fe23afee96ecc0c10224ccf`, queue HOLD
+  lifted. Independent 24 wordless tests pass with TMPDIR=/tmp; initial
+  /private/tmp run passed 22 and failed two macOS socket path creations.
+  Additional actual-bus 40-unqueried-hearings probe passes with no drops.
+  One local observation: publish-to-best observed 1.756 ms (1 ms poll),
+  drop-to-reader-joined 200.592 ms; no voice/device latency claim. Probes
+  copied and hashes verified before removing them from clean checkout.
+- WITHDRAWN earlier #5851 READ-OK; HOLD at `34509dd5bfaaad0fa799ab36b9fb2de47b17f151`.
+  Read Thirteen's full P2 and First's placement: thread.person counts only
+  when heard is empty, whereas echo credits are per request. My review
+  noticed unmatched credit but failed to establish this counting boundary;
+  direct services tests assumed each echo was counted. No new runtime
+  reproduction claimed. Support failing closed with counted identities and
+  a regression. Third owns the assigned second read after the fix.
