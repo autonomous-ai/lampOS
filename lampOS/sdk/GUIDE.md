@@ -13,10 +13,10 @@ rather than copying them:
 
 **Status words** used throughout:
 
-- **works today:** on customer lamps (the customer build, 10824), shown on a
-  test lamp running that build, with the date;
-- **in today's build, lamp run pending:** in the customer build's code, not yet
-  shown on a lamp;
+- **works today:** on customer lamps, shown on a test lamp running a customer
+  build (10824, or 11048, the customer build since 9 Nov 2026), with the date;
+- **in today's build, lamp run pending:** in the customer build's code (11048),
+  not yet shown on a lamp;
 - **next build:** built and merged (or in review, with its pull request); comes
   with the next update;
 - **in development:** being built: what exists is said;
@@ -187,10 +187,10 @@ refusals in the lamp's own words, and its status.
   `NoGrantError`, ...) and rejects in JavaScript (`err.code`, `err.why`). In MCP the tool
   fails with `code: why`. The words shown are copied from the lamp's code. `…` marks a part
   the lamp fills in, such as a number or a name.
-- **Status** has five words. *Works today* means shown on a test lamp on the customer
-  build (stable 10824), with the date. *In today's build, lamp run pending* means the code is
-  on customer lamps but no run on 10824 shows it yet. *Next build* means it is on the
-  development branch, not in 10824. *In development* means the lamp refuses it today and says
+- **Status** has five words. *Works today* means shown on a test lamp on a customer
+  build (stable 10824, or 11048, stable since 9 Nov 2026), with the date. *In today's build, lamp run pending* means the code is
+  on customer lamps (11048) but no run shows it yet. *Next build* means it is on the
+  development branch, not in 11048. *In development* means the lamp refuses it today and says
   so. *Planned* means it is named in the protocol but nothing serves it yet.
 - **Every op but `pair` and `hello`** needs `hello` first on the connection (`no_hello`,
   "say hello first"). A missing grant is always `no_grant`, "not granted: …" with the grant's
@@ -317,7 +317,7 @@ pairing's current grants.
 
 | Python | JavaScript | MCP tool | What it does | Grant | Limits | Answer | Refusals | Status |
 |---|---|---|---|---|---|---|---|---|
-| `lamp.push_skill(folder)`; CLI `lamp skill push FOLDER` | `lamp.pushSkill(folder)` | `lamp_skill_push(folder)` | Op `skill.push`, in parts: checks the folder (as `lamp skill check`), packs it and puts it on the lamp | `skills` | package ≤ 1 MiB; 1–32 parts of ≤ 49,152 base64 chars; `name` `a-z0-9-` ≤ 64; 1 every 10 s and 20 an hour with the rates on; a skill may ask only `body`, `light`, `speak` and `look` (presence) | `{got: N}` for each part; the last `{skill: {name, version, sha256, on, held, asks, shown}}` | `refused` "skill push is not on this lamp" (stable 10824's customer lamps; the next build's product unit turns it on); `no_grant` "not granted: skills"; `busy` "your last push is still being installed"; `busy` "another computer is pushing a skill"; `rate` "skill.push: 1 each 10 s and 20 an hour" | next build (customer lamps refuse it today). Try it on the fake lamp (`lamp fake`); `lamp skill check` works offline anywhere |
+| `lamp.push_skill(folder)`; CLI `lamp skill push FOLDER` | `lamp.pushSkill(folder)` | `lamp_skill_push(folder)` | Op `skill.push`, in parts: checks the folder (as `lamp skill check`), packs it and puts it on the lamp | `skills` | package ≤ 1 MiB; 1–32 parts of ≤ 49,152 base64 chars; `name` `a-z0-9-` ≤ 64; 1 every 10 s and 20 an hour with the rates on; a skill may ask only `body`, `light`, `speak` and `look` (presence) | `{got: N}` for each part; the last `{skill: {name, version, sha256, on, held, asks, shown}}` | `refused` "skill push is not on this lamp" (customer lamps on stable 11048; the next build's product unit turns it on); `no_grant` "not granted: skills"; `busy` "your last push is still being installed"; `busy` "another computer is pushing a skill"; `rate` "skill.push: 1 each 10 s and 20 an hour" | next build (customer lamps refuse it today). Try it on the fake lamp (`lamp fake`); `lamp skill check` works offline anywhere |
 | `lamp.skills()`; CLI `lamp skill list` | `lamp.skills()` | `lamp_skills()` | Op `skill.list`: this computer's pushed skills | `skills` | one at a time for a computer; 6 a minute with the rates on | `[{name, version, sha256, on, held, pushed_at}, ...]` | `refused` "skill push is not on this lamp"; `busy` "this computer's last skill request is still with the lamp's skill helper"; `busy` "the lamp's skill helper is busy: try again" | next build |
 | `lamp.remove_skill(name)`; CLI `lamp skill remove NAME` | `lamp.removeSkill(name)` | `lamp_skill_remove(name)` | Op `skill.remove`: takes one of this computer's skills off the lamp | `skills` | as `skill.list` | ok | as `skill.list` | next build |
 
@@ -378,7 +378,7 @@ with `Z` (`2026-10-27T08:40:01Z`): convert it to local time yourself. `welcome`,
   delivered, though the lamp heard the line. Don't build on it until it's marked fixed.
 - `name.heard`: no fields on the customer build: the lamp's name was called. Grant `hear`.
   Works today (9 Nov 2026). A sound like the name can wake the lamp, so a `name.heard` may
-  come with nobody calling; next build (#5836) adds `score` (0–1, how sure the listener was;
+  come with nobody calling; 11048 adds `score` (0–1, how sure the listener was;
   real calls score 0.90 to 1.00), so a program that acts on its own can ask for more, e.g.
   `if event.get("score", 0) >= 0.99`.
 - `sound.heard`: `class` (`knock`, `music`, ...), `score`. Grant `sound`. In today's build,
@@ -454,7 +454,7 @@ grant it needs. With every grant: 27 tools. With `light` alone: 6
   (proofs, keys, nonces and pins never; said text only as its length).
 
 **STATUS:** works with the fake lamp today (lamp-mcp's own 52 tests, and a
-listing run on 9 Nov). On a customer lamp (stable 10824) a tool is refused
+listing run on 9 Nov). On a customer lamp (stable 11048) a tool is refused
 where the lamp refuses its op: `lamp_skill_push` ("skill push is not on this
 lamp"), `lamp_play` ("not routed yet: waits for client packages"),
 `lamp_joints` for roll, shoulder or elbow (in development: "not routed yet"), `lamp_look` at a face or a name ("not in this release").
@@ -471,7 +471,7 @@ The lamp restarts on every update, which closes each connection. Plain
 | lamp-mcp | — | — | the server itself | connects again after the lamp restarts and makes its event subscriptions again. A tool called while the lamp is away answers `closed`; the next one works | **next build** (in review). Run: `lamp_events` answered on 3 connections across 2 restarts |
 | today, by hand | `await lamp.wait_closed()` then connect again | `await lamp.closed()` | restart lamp-mcp | — | works today (10824, 9 Nov 2026) |
 
-Python, in review:
+Python:
 ```python
 async def setup(lamp):
     await lamp.on("person.arrived", greet)
@@ -765,12 +765,12 @@ Events as they came to the SDK, with nothing removed but secrets:
 ```json
 {"ev": "name.heard", "at": "2026-11-09T07:54:02Z"}
 ```
-on the customer build's lamp-control (10824), and with the score (next build, #5836):
+on the customer build's lamp-control (10824), and with the score (11048, lamp run pending):
 ```json
 {"ev": "name.heard", "at": "2026-11-09T08:55:45Z", "score": 1.0}
 ```
 
-`body.state` (next build), in the shape the lamp sends it, `at` in UTC (one joint shown):
+`body.state` (11048, lamp run pending), in the shape the lamp sends it, `at` in UTC (one joint shown):
 ```json
 {"ev":"body.state","at":"2026-10-30T08:40:00Z","joints":{"yaw":{"deg":-25.8,"counts":1722,"goal_deg":-22.9,"load":0.1,"moving":true,"temp_c":41}},"lamp":{"light":{"on":true,"colour":"warm","level":3},"talking":false,"private":false}}
 ```
@@ -794,7 +794,7 @@ Last verified 9 Nov 2026, on a test lamp running the customer build (10824).
 | Look ahead or to an angle; joints yaw and pitch | works today (9 Nov 2026) | |
 | Your own `move` | works today (9 Nov 2026) | |
 | Events: the name called (`name.heard`) | works today (9 Nov 2026) | about 1.9 s after the line ends |
-| `name.heard` says how sure it is (`score`) | next build (#5836) | a `name.heard` can come with nobody calling today |
+| `name.heard` says how sure it is (`score`) | in today's build (11048), lamp run pending | on 10824 a `name.heard` came with no score, and could come with nobody calling |
 | Leases, and the person coming first | works today (9 Nov 2026) | |
 | Turns: start a turn | works today (9 Nov 2026) | the lamp's own model answers the turn |
 | Turns: end a turn, the program's own mute | in today's build, lamp run pending | ending a turn that hasn't begun yet is refused `busy`; `stop()` drops it |
@@ -803,17 +803,17 @@ Last verified 9 Nov 2026, on a test lamp running the customer build (10824).
 | Follow a hand | in today's build, lamp run pending | the follow loop runs on the lamp |
 | Camera snapshot and stream | works today (9 Nov 2026) | about 2 frames a second at about 320 px today |
 | Volume | works today (9 Nov 2026) | set, step and read; `volume.changed` not yet shown |
-| A new motion replaces the one playing | next build | the customer build refuses `busy` with `retry_ms` |
-| A look on a resting lamp says `clamped` | next build | the customer build may answer `cut_short` |
-| `body.state`: where each joint is, live | next build | 12.5 a second |
-| Skill push on customer lamps | next build (#5819; push, list, remove and a revoke shown on a test lamp under the next build's unit, 9 Nov 2026) | stable 10824 refuses "skill push is not on this lamp" |
+| A new motion replaces the one playing | in today's build (11048), lamp run pending | 10824 refused `busy` with `retry_ms` |
+| A look on a resting lamp says `clamped` | in today's build (11048), lamp run pending | 10824 may answer `cut_short` |
+| `body.state`: where each joint is, live | in today's build (11048), lamp run pending | 12.5 a second |
+| Skill push on customer lamps | next build (#5819; push, list, remove and a revoke shown on a test lamp under the next build's unit, 9 Nov 2026) | stable 11048 refuses "skill push is not on this lamp" |
 | A move from poses (`move_poses`) | next build (#5817) | the lamp plays the move today |
 | Knowing when a motion ended (`wait=True`) | next build, lamp run pending | today it returns when the lamp takes it |
 | Reconnecting across the lamp's restarts | next build (#5833) | `keep_connected` |
 | `joints` for roll, shoulder, elbow | in development | refused "not routed yet" today |
 | The microphone stream, with the owner's consent | in development (draft #5839) | built and tested off the lamp; its lamp check is pending |
-| `look` and `joints` with `wait=True` return the body's own answer | next build (#5837, in review) | so a program sees when a conversation came first |
-| lamp-mcp's `lamp_say` waits until the line is said | next build (#5849, in review) | today it answers when the voice takes the line |
+| `look` and `joints` with `wait=True` return the body's own answer | in today's build (11048), lamp run pending | so a program sees when a conversation came first |
+| lamp-mcp's `lamp_say` waits until the line is said | in today's build (11048), lamp run pending | 10824 answered when the voice took the line; across a reconnect the wait can answer `said` wrongly until #5873 |
 | A brain hearing the person and owning the turn | planned | |
 | A partner's brain installed on an edition lamp | planned | |
 | `play` a recorded move by name | in development | refused "not routed yet: waits for client packages"; send it as `move` |
