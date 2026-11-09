@@ -8376,3 +8376,20 @@ historical verification artifacts absent from this checkout. No new section
 adds a local link, and that history is preserved rather than rewritten. Both
 code PRs' separate documentation gates pass. #5781's native Linux Clippy and
 docs checks passed; ARM64 and the full local round suite are still running.
+
+#5781's first ARM64 run 42568032413 ended with 8154 passes, one failure,
+108 skipped and the remaining tests cancelled. The failure was ours:
+`journal_lines::every_line_a_round_says_has_a_row_in_updates_md` required
+both new notices in its table, not only the prose. Corrected as
+`ff8c00977a63b4476b141ee6201b746237e01150` (two documentation rows only).
+`cargo test -q -p lamp-update --test journal_lines`: all 5 pass; docs links
+pass. Fresh ARM64 run 42569743126 is running. Reviewer-three approved the
+prior source head and was asked to refresh the read for these two rows.
+
+The full local round suite passed 271 tests. Voice's broad host suite ended
+5348 passed, 15 ignored, 2 connection-pool count failures; those two passed
+in isolation with `cargo test -q -p lamp-voice --lib
+second_provider::net::chat::tests::a_kept_client_ -- --test-threads=1`.
+`cargo test -q -p lamp-voice-eval` passed 625 tests. No voice source was
+changed. #5781 remains draft pending fresh native CI; the first failed run
+is not treated as success.
