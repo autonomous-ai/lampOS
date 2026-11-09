@@ -476,7 +476,7 @@ J-A-N-E?"; nobody calls a person by the spelling of their name). With
 the nudge off (the product), the second route also tells the model this
 beside the person's own line, for that turn only, when the line spells their
 name ("W a l t e r.", "W-A-L-T-E-R", "It's W, A, L, T, E, R.", "Walter, W A
-L T E R.", "My name is Walter, W-A-L-T-E-R.", "It's spelled W A L T E R.", "Sorry, it's W A L T E R.", "No, it's W A L T E R.",
+L T E R.", "My name is Walter, W-A-L-T-E-R.", "It's spelled W A L T E R.", "Sorry, it's W A L T E R.", "No, it's W A L T E R.", "No, J O E.", "Nope, it's W A L T E R.",
 read as the nudge's fallback reads a spelled name, below; after a word the
 letters win, so "Jane, J A Y N E." is told "Jayne", the person's own
 spelling, accents kept as spoken: "Z o ë" is told "Zoë") while
@@ -486,7 +486,7 @@ outcome in the onboarding file): `(They spelled
 right?" Never say its letters.)` (`onboarding::spelled_name_note`,
 `second_provider::Engine::noting_a_spelled_name`; #5580 row 2: on a real
 lamp with product settings the model read "W a l t e r." back as "spelled
-out: W-A-L-T-E-R"). A name said plainly, two letters (initials), more than 20 letters, a digit
+out: W-A-L-T-E-R"). A combining mark before any letter is dropped. A name said plainly, "No." or "No, thanks.", two letters (initials), more than 20 letters, a letter with more than two combining marks, a digit
 among the letters, a line with "?", a line in another language (the owner's language, `LAMP_LANGUAGE_FILE`), or the nudge on is
 told nothing; the walk's file is read only for a line that spells a name.
 The Live route is not told it. Then it asks "May I remember your face, so I know you
