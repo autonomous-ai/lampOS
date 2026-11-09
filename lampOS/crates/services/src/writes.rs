@@ -68,6 +68,92 @@ pub const ACTIONS: &[(&str, &str)] = &[
 /// What an MCP service writes, for the tools' description.
 pub const MCP_ACTIONS: &str = "call {tool, arguments}";
 
+/// What one write needs a link to allow: the service, its action, what it
+/// does in the person's words, and the scopes any one of which allows it.
+pub struct Allowed {
+    pub code: &'static str,
+    pub action: &'static str,
+    pub what: &'static str,
+    pub scopes: &'static [&'static str],
+}
+
+/// The scopes a write needs, from each service's own docs (Gmail's
+/// `users.messages.send`, Calendar's `events.insert`). Only Google's links
+/// list their scopes in this form; a scope is matched whole or as the name
+/// after `https://www.googleapis.com/auth/`. Google Drive's are with its
+/// writes (#5825).
+pub const SCOPES: &[Allowed] = &[
+    Allowed {
+        code: "gmail",
+        action: "send_mail",
+        what: "send mail",
+        scopes: GMAIL_SEND,
+    },
+    Allowed {
+        code: "gmail-app",
+        action: "send_mail",
+        what: "send mail",
+        scopes: GMAIL_SEND,
+    },
+    Allowed {
+        code: "google_calendar",
+        action: "create_event",
+        what: "add calendar events",
+        scopes: &["calendar", "calendar.events", "calendar.events.owned"],
+    },
+];
+
+const GMAIL_SEND: &[&str] = &[
+    "gmail.send",
+    "gmail.compose",
+    "gmail.modify",
+    "https://mail.google.com/",
+];
+
+/// A scope as the table names it: Google's short name, or the whole scope.
+fn short_scope(scope: &str) -> &str {
+    let scope = scope.trim();
+    scope
+        .strip_prefix("https://www.googleapis.com/auth/")
+        .unwrap_or(scope)
+        .trim_end_matches('/')
+}
+
+/// What `args`' write on `code` would do, when `entry` is a sign-in that
+/// lists its scopes and none of them allows it; else `None`. An app
+/// password, a personal key or a link with no scopes listed is not checked.
+pub fn scope_missing(code: &str, args: &Value, entry: &Entry) -> Option<&'static str> {
+    if !entry.oauth() || entry.scopes.is_empty() {
+        return None;
+    }
+    let action = text(args, "action")?;
+    let allowed = SCOPES
+        .iter()
+        .find(|allowed| allowed.code == code && allowed.action == action)?;
+    let held = |needed: &str| {
+        entry
+            .scopes
+            .iter()
+            .any(|scope| short_scope(scope) == short_scope(needed))
+    };
+    (!allowed.scopes.iter().any(|needed| held(needed))).then_some(allowed.what)
+}
+
+/// What a write on `code` does, for a refusal that doesn't name its action.
+pub fn what_written(code: &str) -> &'static str {
+    SCOPES
+        .iter()
+        .find(|allowed| allowed.code == code)
+        .map_or("make this change", |allowed| allowed.what)
+}
+
+/// Whether a 401 or 403's body says the link's scopes are too few, in
+/// Google's words for it.
+pub fn scope_refused(body: &[u8]) -> bool {
+    let body = String::from_utf8_lossy(body);
+    body.contains("ACCESS_TOKEN_SCOPE_INSUFFICIENT") || body.contains("insufficientPermissions")
+}
+
 /// An MCP service's write, checked and read back: `tool` is the service's
 /// own listing of it, which is a write (`mcp::is_read` false).
 pub fn prepare_mcp(

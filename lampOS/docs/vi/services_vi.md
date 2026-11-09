@@ -419,8 +419,11 @@ giữ gì.
 - **Scope** nó cần từ Google: `gmail.readonly` cho profile, danh sách (có
   `q`) và từng lần lấy, và `gmail.send` cho một lần gửi (`gmail.modify` hoặc
   `https://mail.google.com/` bao cả hai). IMAP không được dùng vì nó chỉ nhận
-  `https://mail.google.com/`. Một token thiếu scope mà lệnh gọi cần nhận 403:
-  "Gmail refused the lamp's link: it may need linking again in the app".
+  `https://mail.google.com/`. Một lần gửi mà các scope được liệt kê của liên
+  kết không cho phép bị từ chối trước khi đọc lại, và một lần gửi Google từ
+  chối vì scope cũng được nói như vậy ("Scope một lần ghi cần", trong phần
+  Ghi). Một lần đọc thiếu scope nó cần nhận 403: "Gmail refused the lamp's
+  link: it may need linking again in the app".
 - **Làm mới:** qua backend, như mọi liên kết OAuth ([Làm mới](#làm-mới)).
 
 **Một đăng nhập Google chỉ-gửi (`gmail-app`):** đăng nhập Google cho Gmail
@@ -547,7 +550,8 @@ bị từ chối trước khi đọc lại, `reads::calendar_time`). Một yêu 
 chỉ qua HTTPS, đến các host của chính dịch vụ, không theo chuyển hướng, 5 s để
 kết nối, tổng cộng 15 s, và đọc tối đa 1 MiB câu trả lời. Một mã lỗi được nói
 rõ ràng: 401 hoặc 403 "<Service> refused the lamp's link: it may need linking
-again in the app", 404 "has no such item", 429 "is busy: try again in a
+again in the app" (401 hoặc 403 của một lần ghi nói scope của nó không đủ thì
+được nói cách làm: "Scope một lần ghi cần", trong phần Ghi), 404 "has no such item", 429 "is busy: try again in a
 while", còn lại "answered with an error". Token và refresh token được xoá khỏi
 mọi câu trả lời (mọi cách viết, thuần hay mã hoá URL).
 
@@ -660,6 +664,34 @@ văn bản tối đa 3,000 ký tự (giữ dấu xuống dòng), một tiêu đ�
 là một dòng tối đa 200, tối đa 20 người nhận hoặc người tham dự, mỗi người là
 một `local@domain.tld` thuần. Google Drive và Ahrefs không có ghi ("the lamp
 only reads …").
+
+**Scope một lần ghi cần** (`writes::SCOPES`). Khi một liên kết là một lần
+đăng nhập (có access token, `auth_type` không phải `pat`) mà danh sách
+`scopes` không rỗng, một `service_write` không có `send_id` được kiểm tra với
+nó trước khi bất cứ gì được chuẩn bị hay giữ, và trước khi hỏi dịch vụ bất cứ
+gì. Một trong các scope sau cho phép lần ghi, mỗi scope khớp nguyên vẹn hoặc
+theo tên sau `https://www.googleapis.com/auth/` (tài liệu của chính các dịch
+vụ: `users.messages.send`, `events.insert`):
+
+| Dịch vụ | Action | Bất kỳ scope nào trong |
+|---|---|---|
+| `gmail`, `gmail-app` | `send_mail` | `gmail.send`, `gmail.compose`, `gmail.modify`, `https://mail.google.com/` |
+| `google_calendar` | `create_event` | `calendar`, `calendar.events`, `calendar.events.owned` |
+
+Chỉ liên kết của Google liệt kê scope theo dạng này, nên không dịch vụ nào
+khác có trong bảng (phần ghi của Google Drive, với kiểm tra riêng, là #5825).
+Không có scope nào trong số đó thì lệnh gọi thất bại với "<Service> is linked
+without permission to <what>: link it again in the app (Skills, then
+Connectors) and allow it." (`serve::NO_PERMISSION`, sau dấu hai chấm),
+`<what>` là "send mail" hoặc "add calendar events": không gì được giữ, không
+gì được gọi. Một mật khẩu ứng dụng, một khoá cá nhân (`pat`) hoặc một liên kết
+không liệt kê scope thì không bị kiểm tra, như trước.
+
+Ở lần "send", một 401 hoặc 403 mà nội dung nói scope của token không đủ, theo
+cách Google nói (`ACCESS_TOKEN_SCOPE_INSUFFICIENT` hoặc
+`insufficientPermissions`, `writes::scope_refused`), được nói cùng những lời
+đó sau "not sent: " (với một dịch vụ không có trong bảng, `<what>` là "make
+this change"). Mọi 401 hoặc 403 khác giữ lời của nó.
 
 ### Cổng gửi của giọng nói
 
@@ -849,6 +881,14 @@ phần "Một kỹ năng tự tạo đọc dịch vụ".
 Một lệnh gọi đến dịch vụ chưa liên kết thất bại với "<Service> isn't linked
 to this lamp yet. It can be linked in the app: Skills, then Connectors."
 (`serve::NOT_LINKED`), để đèn nói chỗ liên kết, không chỉ nói là chưa có.
+
+Một lệnh gọi nêu một dịch vụ mà đèn không có connector (không có mã trong
+catalogue) thất bại với "The lamp can't link <name> yet. The services it can
+link are in the app: Skills, then Connectors." (`serve::CANT_LINK`, sau câu
+đầu). `<name>` là tên lệnh gọi đưa ra, chỉ được nói khi nó tối đa 40 ký tự,
+toàn chữ cái, chữ số, khoảng trắng, `-` hoặc `_`; mọi tên khác, hoặc không có
+tên, được nói là "that service". Mô tả của `services_connected` nêu các dịch
+vụ đèn liên kết được ("Ba hàm của giọng nói").
 
 ## Một kỹ năng tự tạo đọc dịch vụ (đề xuất #5288, `LAMP_SKILL_READS`, bật trong sản phẩm)
 
@@ -1148,7 +1188,13 @@ mục kỹ năng), được định tuyến đến `call.sock` của nó và kh�
 không bao giờ lấy từ thư mục của executive hay của một kỹ năng.
 
 - **`services_connected {}`**: `{"connected": [{"service", "name",
-  "account", "expired"}], "writes": <LAMP_SERVICES_WRITE>}`.
+  "account", "expired"}], "writes": <LAMP_SERVICES_WRITE>}`. Mô tả của nó nêu
+  mỗi dịch vụ đèn liên kết được, theo tên trong catalogue, mỗi tên một lần
+  ("The lamp can link only: Gmail, Gmail with Google sign-in, Google
+  Calendar, …, Notion."), và bảo mô hình: "If the person names a service not
+  among them, say the lamp can't link it yet, and never give another
+  reason." Nó tối đa 600 byte, để quy tắc riêng của giọng nói vừa trước nó
+  trong 1,024 byte mà liên kết nhà cung cấp nhận.
 - **`service_read {service, what, …}`**: `what` và các đối số của nó như
   trong bảng ở trên; câu trả lời được trích dẫn, rút gọn còn ai gửi và về
   việc gì khi chủ đèn có thể không ở một mình. Một lần đọc đầy đủ còn cần câu
@@ -1301,7 +1347,13 @@ chưa, không gọi gì), lần gửi của nó chỉ qua API, một token bị 
 nói là "Google refused the Gmail sign-in", và việc gia hạn dưới mã riêng
 của nó; thư bảo mật được phát hiện và bỏ
 trọn; câu trả lời được trích dẫn và dưới mức trần của giọng nói; một lần ghi
-bị từ chối khi tắt, được đọc lại đầy đủ và gửi một lần trong hai phút; luật
+bị từ chối khi tắt, được đọc lại đầy đủ và gửi một lần trong hai phút; một
+lần gửi hay một sự kiện mà scope được liệt kê của liên kết không cho phép bị
+từ chối bằng lời rõ ràng, không gì được giữ hay gọi, một lần được cho phép
+được đọc lại, một lần gửi Google từ chối vì scope được nói cùng lời đó và mọi
+403 khác giữ lời riêng, một liên kết không liệt kê scope (mật khẩu ứng dụng,
+khoá cá nhân) không bị kiểm tra, và một dịch vụ đèn không liên kết được thì
+được nói như vậy, một tên độc hại được nói là "that service"; luật
 đọc/ghi MCP, host được ghim của nó, một liên kết trên host khác không bao giờ
 được gọi, một tool ghi được đọc lại trọn và gọi một lần khi gửi; yêu cầu làm
 mới giống V1; người hỏi được nhận biết qua cgroup của họ. `-p lamp-cloud`
