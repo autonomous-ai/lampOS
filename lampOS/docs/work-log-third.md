@@ -1,3 +1,24 @@
+## 2026-11-09 — interruption fix native PASS and Fourth read
+
+- Exact 7d6633bb8 ARM64 42640206486 completed successfully: 14,919
+  tests passed, 111 skipped; release build, doc tests and artifacts pass.
+  Full log /private/tmp/third-cut-fix-arm-full.log. Linux/docs passed.
+- Fourth READ-OK 6743626456 explicitly lifts Fourth's 170cf2d1c HOLD;
+  source and focused native interruption/context/rename/reset checks pass.
+  El retains El's separate HOLD; no silent clearance or device claim.
+- Published the locally gated equal-patch carry as 507fab1ff on train757;
+  context-only range 75a492210..507fab1ff. Comment 6743738347 records
+  bindings and old/new gates. New ARM64 42643649330, Linux 42643649347
+  run; docs 42643649333 passed. Original standalone 7d6633bb8 remains
+  the intended cherry-pick for Fourth's existing speech composition.
+- Adapter train757 Linux 42641983691 passed. ARM64 42641983518 still
+  runs: its first watcher exited on a GitHub API timeout, not a CI failure;
+  reconnected to the same run without rerunning CI. Requested Twelve's
+  second independent adapter read in 6743787196; PM retains placement.
+- #5792 is CLEAN, non-draft, with two explicit reads and NEXT TRAIN.
+  Old own-key #3646 still belongs to Store's broker-dependent carry;
+  no work taken back from that owner.
+
 ## 2026-11-09 — train 757 carries and follow-up reads
 
 - Prepared context 507fab1ff on a1642b233; all four patches range-diff
