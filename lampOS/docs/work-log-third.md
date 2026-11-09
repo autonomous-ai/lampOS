@@ -31,9 +31,14 @@ Ready for lamp-voice: no (#5803 is draft; native CI and two reads pending).
   Linux procfs, and four image-journal fixtures use GNU stat options that
   this Mac rejects, leaving missing retention folders/counts. Exact names
   and evidence are in the task's verification record. Workspace build
-  passed on both local bases. Native ARM64 42581992034 and Linux Clippy
-  42581991921 are running on the PR head; docs 42581991904 passed.
-  Reviewer-three and Tests have the READ ASK. No ready claim.
+  passed on both local bases. Linux Clippy 42581991921 and docs
+  42581991904 passed. ARM64 42581992034 built release binaries but its
+  first test attempt stopped at 6,558 passed / 1 failed / 108 skipped:
+  unchanged Skills repeat-pose fixture expected (3, 0, 3), saw (3, 0, 2).
+  New cleanup cases had not run. The failure is retained on the PR; a
+  single retry of the failed job is running on the same commit, with no
+  source edit, timeout increase or skip. Reviewer-three and Tests have
+  the READ ASK. No ready claim.
 - Docs checker: nine tests, 191 docs and 1,885 local links, zero broken.
   The grouped sanitizer sample remains recorded, but is not cold first
   use. An isolated fresh-process fixture passed 1/1: first 0.162282 ms,
@@ -41,6 +46,9 @@ Ready for lamp-voice: no (#5803 is draft; native CI and two reads pending).
   samples). Boundary is sanitizer entry to outcome only, not deletion/IPC,
   startup, model or lamp latency; the broader gate was running alongside.
   Required reads remain Reviewer-three and Tests. No device access.
+- Independent source READ-OK on Second's #5780 at `dfbf15f62`, after
+  reading all three files, caller/deletion context and exact-head native
+  checks. No new local test run on that PR head or device action claimed.
 - #4099 closure recommended to the PM using Mobile's app/lamp PASS on
   3 Nov (4099/6594483187); build number and raw `can` were not captured.
 - Fourteen's 10824 receipt records a real stable self-switch from 10686,
