@@ -359,3 +359,120 @@ async fn a_send_fenced_after_the_cut_is_told_by_the_services_own_answer() {
     assert_eq!(writes.lock().unwrap().len(), 1, "one write, the send");
     assert_eq!(said, ["It's in your Drive now."]);
 }
+
+/// The HOLD on #5863 (Third): one batch sends, then tries the same send
+/// again, which the gate refuses as nothing waiting, and the cut lands
+/// during that second try. The held line is still given the send that
+/// went, told it was sent, and runs no `service_write`.
+#[tokio::test]
+async fn a_refused_second_send_in_one_batch_never_hides_the_first() {
+    let send = |id: &str| {
+        call(
+            id,
+            crate::services::WRITE,
+            json!({"service": "google_drive", "send_id": "s1"}),
+        )
+    };
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Go ahead and send it.".to_owned()), Ok(String::new())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![send("c1"), send("duplicate")])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c2",
+                        crate::services::WRITE,
+                        json!({"service": "google_drive", "title": "Notes"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("It's in your Drive now."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let writes: Writes = Arc::default();
+    let seen = writes.clone();
+    let (again, tried) = std::sync::mpsc::channel();
+    let runner: ToolRunner = Arc::new(move |_, _, name, args| {
+        let again = again.clone();
+        let mut seen = seen.lock().unwrap();
+        if name == crate::services::WRITE {
+            seen.push(args);
+        }
+        let attempt = seen.len();
+        Box::pin(async move {
+            if attempt == 1 {
+                return json!({"sent": true, "service": "google_drive", "next": crate::services::SENT_NEXT});
+            }
+            let _ = again.send(());
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            json!({"error": crate::services::NOTHING_WAITING})
+        })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    // Until the second try is under way, its refusal not yet come.
+    loop {
+        if tried.try_recv().is_ok() {
+            break;
+        }
+        let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+    }
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    let mut said = Vec::new();
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(5), engine.next())
+            .await
+            .expect("the held line's turn ends");
+        match event {
+            ProviderOutput::Transcript {
+                request: Some(2),
+                text,
+                ..
+            } if !text.is_empty() => said.push(text),
+            ProviderOutput::TurnComplete { request: 2, .. } => break,
+            _ => {}
+        }
+    }
+    let held = script.asked.lock().unwrap().get(1).cloned().unwrap();
+    assert!(
+        held.iter()
+            .any(|message| message.tool_call_id.as_deref() == Some("c1")
+                && message
+                    .words()
+                    .is_some_and(|told| told.contains("\"sent\":true"))),
+        "the send that went goes with the words: {held:?}"
+    );
+    assert!(
+        held.iter().any(|message| message.role == "system"
+            && message
+                .words()
+                .is_some_and(|note| note.contains("already sent"))),
+        "the model is told the write was sent: {held:?}"
+    );
+    assert_eq!(
+        *writes.lock().unwrap(),
+        [
+            json!({"service": "google_drive", "send_id": "s1"}),
+            json!({"service": "google_drive", "send_id": "s1"}),
+        ],
+        "the batch's two sends, and no third call: nothing prepared again"
+    );
+    assert_eq!(said, ["It's in your Drive now."]);
+}
