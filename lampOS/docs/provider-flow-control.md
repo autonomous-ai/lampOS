@@ -168,9 +168,12 @@ coordinator cut controls. Matched host simulations at `38654f37c` reduce old aud
 buckets from 30,040 ms saturated and 130 ms draining to zero. Actual Engine
 admission to modelled drop/ACK is 1,788/1,946 us saturated and 1,656/1,786 us
 draining. Speaker cut/ACK is scripted simulation (`acoustic=false`), not a
-hardware measurement or worst-case bound. The workspace build is still running;
-no pass is claimed. Linux speaker-helper and actual speaker-loop tests have not run;
-acoustic acceptance remains pending. See [second voice](second-voice.md) for
+hardware measurement or worst-case bound. The Mac workspace build passed.
+At source head `4ea13ebf1a`, [Linux ARM64 CI run 42605683226](https://github.com/autonomous-ai/lampOS/actions/runs/42605683226)
+passed 10,748 selected tests with 62 skipped, including the Linux speaker
+helpers and actual speaker-loop ALSA-null reset-before-ACK case. Linux clippy
+also passed. These checks establish control ordering, not acoustic acceptance;
+the physical one-second gate remains pending. See [second voice](second-voice.md) for
 exact reproduction commands and the remaining device plan.
 A reset acknowledgment measures a local control boundary, not last audible
 speech. The device goal is at most one second from admitted forget to old words
