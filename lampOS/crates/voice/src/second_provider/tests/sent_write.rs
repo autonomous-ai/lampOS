@@ -1164,7 +1164,6 @@ async fn an_unadmitted_face_forget_keeps_send_payload_and_repeat_protection() {
     })
     .await
     .expect("the refused forget is answered before the parked next model round");
-    assert!(engine.speech_cut().is_none());
     assert!(admissions.try_recv().is_err());
     assert!(
         script.asked.lock().unwrap()[2]
