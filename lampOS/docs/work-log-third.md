@@ -1,3 +1,23 @@
+## 2026-11-09 — face-forget adapter follow-up
+
+Ready for lamp-voice: no (regression and implementation in progress).
+
+- Taking PM assignment Queue 5385/6735889315: preserve content-free
+  partial cleanup outcomes through `face_and_memory`, in a separate PR.
+  Branch `third/face-forget-outcomes-1109` starts on the carried #5803
+  at `7fc6ca20e`, itself based on `3d8afb415`. No extra deletion calls,
+  scope, context-reset policy, device actions or switch changes.
+- Second stopped the competing proposal and offered an uncommitted
+  adapter patch. Its temporary path is on another machine; requested a
+  reachable handoff before reuse. Third added an independent regression
+  for the Reviewer-three failure and is running it against the old adapter.
+- Added adapter bookkeeping target: under 1 ms, measured separately from
+  deletion, IPC, model and device response. No device latency claim.
+- #5803 now has both Reviewer-three and Tests READ-OK on `8addf65fb`.
+  Its rebase to `7fc6ca20e` has identical stable patch ID; carry gates are
+  running before push/readiness. Existing native failure and successful
+  retry remain in the preceding entry.
+
 ## 2026-11-09 — resume and report partial forget cleanup
 
 Ready for lamp-voice: no (#5803 is draft; Tests' independent privacy read is pending).
