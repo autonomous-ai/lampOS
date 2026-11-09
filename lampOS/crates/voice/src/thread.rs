@@ -734,6 +734,14 @@ impl Thread {
         self.heard_done = finished;
     }
 
+    /// The line of `request` was held as the lamp's own words heard back
+    /// (`second_provider`, `own_echo`): a write waiting for its "send" does
+    /// not count it as the person's (`crate::services`), as [`Self::person`]
+    /// counts each line begun.
+    pub fn own_echo_held(&mut self, request: u64) {
+        crate::services::own_echo_held(request);
+    }
+
     /// The words heard in the line `request` answers, as far as the thread
     /// knows them: its exchange's, once the lamp has begun answering it,
     /// else what has been heard since the last answer, within the time an

@@ -8418,7 +8418,7 @@ impl Heeding {
             over_the_lamps_voice,
         } = heard
         {
-            self.tell_a_waiting_write(over_the_lamps_voice);
+            self.tell_a_waiting_write(request, over_the_lamps_voice);
         }
         self.printing(request, heard);
     }
@@ -8426,11 +8426,16 @@ impl Heeding {
     /// A line began: a write waiting for its "send" is timed from here, not
     /// from when its words come, and told if it began within the tail of the
     /// lamp's words (`crate::services`).
-    fn tell_a_waiting_write(&self, over_the_lamps_voice: bool) {
+    fn tell_a_waiting_write(&self, request: u64, over_the_lamps_voice: bool) {
         let in_tail = self.said_until_us.is_some_and(|until_us| {
             monotonic_us() <= until_us.saturating_add(super::own_echo::TAIL_US)
         });
-        crate::services::voice_began(over_the_lamps_voice, in_tail, std::time::Instant::now());
+        crate::services::voice_began(
+            request,
+            over_the_lamps_voice,
+            in_tail,
+            std::time::Instant::now(),
+        );
     }
 
     /// A spoken line's sound, for the same-voice check: judged only if it
@@ -8455,7 +8460,7 @@ impl Heeding {
                     crate::untied_going_on::in_grace(monotonic_us(), until_us)
                 }))
             .then_some(request);
-            self.tell_a_waiting_write(over_the_lamps_voice);
+            self.tell_a_waiting_write(request, over_the_lamps_voice);
         }
         if matches!(heard, Heard::BeganOverTheWaitSound) {
             self.began_over = None;
