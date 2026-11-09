@@ -8393,3 +8393,14 @@ second_provider::net::chat::tests::a_kept_client_ -- --test-threads=1`.
 `cargo test -q -p lamp-voice-eval` passed 625 tests. No voice source was
 changed. #5781 remains draft pending fresh native CI; the first failed run
 is not treated as success.
+
+Final native result: #5781 at ff8c00977a is green. ARM64 42569743126:
+14,766 passed, 108 skipped, doc tests and own-harness checks passed. Linux
+Clippy 42569743151 and docs 42569743104 passed. Reviewer-three refreshed
+READ-OK on this exact head after independently passing all five journal-line
+tests. Draft removed, remaining independent review requested. #5780 is also
+non-draft and green with one of its two privacy reads. Neither is merged by
+Second, and no device was accessed. The original worktree remains clean.
+
+Ready for lamp-voice: gates passed; remaining independent reads owed on
+#5780 and #5781. Device rehearsals #5264/#5265 remain unverified by Second.
