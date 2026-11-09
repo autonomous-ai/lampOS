@@ -8666,3 +8666,13 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   No full SDK or whole-doc-link rerun for this narrow read. P3: retain
   “in review” beside reconnect's “next build” while #5833/#5830 stay open.
   Initial pull ref was not yet available; fetched the named source branch.
+
+## 2026-11-09 — Second: declined-round claim evidence read
+
+- READ-OK #5847 `2f4abe3be24af3815c70b9baccfce7b0cfbb49af` under its
+  “Reviewer-three or any voice reader” request while Reviewer-three handles
+  urgent #5809. Declined retry exits before turn_called insertion; terminal
+  decline returns there too. Later carry_round cannot reintroduce that round.
+- `cargo test -q -p lamp-voice --lib action_claim`: 43 passed, including both
+  new declined-round cases and worded variants. Diff check clean; checkout
+  clean. No full voice-suite, independent fail-first or device run claimed.
