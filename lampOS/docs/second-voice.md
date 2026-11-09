@@ -2623,7 +2623,8 @@ When the coordinator switches (below):
     name.
 
 - **A role a person gave the lamp** (`LAMP_MEMORY_ROLE=on`, the memory
-  owner's design, 6 Nov; off in every unit; [memory.md](memory.md) has the
+  owner's design, 6 Nov; on in the product, the memory owner's call of 9 Nov;
+  [memory.md](memory.md) has the
   whole rule): the line goes right after the character, before the time, so
   it is not outweighed by the fixed "You are Lamp" (`config.rs`) as a role
   kept only in the thread was once the thread's twelve exchanges or ten
@@ -5296,7 +5297,9 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   (`one_face_refused`, before any hold) and by the memory route
   (`ScopeLease::forgets_need_mouth`, after the late look), and
   `forget_asker` gives such a line no asker. So are a correction
-  (`remember` with `replaces`), `keep_rule`, `list_rules`, and
+  (`remember` with `replaces`), `keep_rule`, `list_rules`, `set_role` and
+  `end_role` (the privacy read on #5385, also in
+  `remember::role_for_guarded`), and
   `cancel_reminder` / `snooze_reminder` unless `LAMP_ONE_FACE_REMINDERS` is
   on, and the line has no services owner outside the private room
   (`services::owner_of`). The memory owner, 16:49 on

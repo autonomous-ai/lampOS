@@ -2036,7 +2036,8 @@ passed. Tests: the notes' exact texts in `remember::tests`.
 
 - **A role a person gives the lamp** (the memory owner's design, 6 Nov,
   `LAMP_MEMORY_ROLE=on`, with the Days client only, the second route only;
-  off unless set, off in every unit). "You are Harry Potter" makes the lamp
+  off unless set, on in the product since the memory owner's call of 9
+  Nov). "You are Harry Potter" makes the lamp
   answer to that name and call itself that with that person, across
   conversations and days, until they end it ("be yourself", "stop being
   Harry", "you're Lamp again", "stop role-playing", "thôi đóng vai đi"). The
@@ -2053,7 +2054,13 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   (an older build's row, or one written around the voice) is never held or
   told. The gate is `remember`'s: written (`role_set`, `role_end`)
   only in the scope of the line's own placed seen speaker, its lease
-  current, never a held, carried or room line. A role asked by someone not
+  current, never a held, carried or room line. Nor a line its person's only
+  by their face alone in view with `LAMP_PERSON_SCOPE_ONE_FACE_READS`
+  (`ScopeLease::forgets_need_mouth`, the privacy read on #5385): there
+  `set_role` and `end_role` are in `ONE_FACE_REFUSED`, refused by both
+  runners and again by `remember::role_for_guarded`, so a guest off camera
+  with the owner's face silent in view ends or replaces no role; seen
+  speaking, they run as theirs. A role asked by someone not
   placed is told for that conversation only and never written; an unplaced
   `end_role` changes no one's kept role. An end the memory did not write
   keeps the role held and tells the model it failed, so it never says
