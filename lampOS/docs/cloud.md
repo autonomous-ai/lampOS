@@ -2166,9 +2166,8 @@ backend's side, to be confirmed by them). The rest is in
 
 Once per lamp setup, the app is told the walk ended, so it opens Skills. Off
 unless `LAMP_APP_ONBOARDING_DONE=on` exactly, with `LAMP_CLOUD=on` and a
-state folder (`STATE_DIRECTORY`); off in the product unit until Backend and
-Mobile confirm the backend relays a new `data` kind to the app (the design on
-#1711).
+state folder (`STATE_DIRECTORY`); on in the product unit, the lead's call on
+9 Nov (the design on #1711).
 
 - **What.** One unasked `data` reply on `fd_channel`, in V1's envelope, as
   `harness.sign_in.state` is pushed:
