@@ -20,6 +20,7 @@ import os
 import re
 import socket
 import ssl
+import sys
 import unicodedata
 import warnings
 from collections import defaultdict
@@ -27,7 +28,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from websockets.asyncio.client import ClientConnection, connect as ws_connect
-from websockets.exceptions import ConnectionClosed
+from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from . import debug, errors, schema
 from .errors import BY_CODE, LampError, NotPaired, WrongLamp, from_reply
@@ -162,6 +163,11 @@ def binary_frame(message: bytes) -> dict:
 
 # Events that come with a request, never subscribed to: a camera stream's.
 CAMERA_EVENTS = ("camera.frame", "camera.ended")
+
+# `keep_connected`'s pauses before connecting again, in seconds: the first
+# after a closed connection, then longer while the lamp can't be reached (a
+# restart takes a few seconds; an update about a minute).
+RECONNECT_PAUSES = (1.0, 2.0, 5.0, 10.0)
 
 class Subscription:
     """What `Lamp.on` returns: an awaitable, not a future. Awaited, it raises
@@ -448,6 +454,62 @@ class Lamp:
             await ws.close()
             raise from_reply(reply.get("error", {}))
         return cls(ws, welcome, reply)
+
+    @classmethod
+    async def keep_connected(
+        cls,
+        setup: Callable[["Lamp"], Any],
+        lamp: str | None = None,
+        *,
+        host: str | None = None,
+        keyring: Keyring | None = None,
+        pauses: tuple[float, ...] = RECONNECT_PAUSES,
+    ) -> None:
+        """Run a long-running program across the lamp's restarts (every update
+        restarts it, and the connection closes). Connects, runs
+        `await setup(lamp)` (subscribe, ask for leases, as after `connect`),
+        and waits until the connection ends; then connects again and runs
+        `setup` again on the new connection, after a pause that grows along
+        `pauses` while the lamp can't be reached and starts over once it can.
+
+        Never returns by itself: cancel it to stop. Raises at once what
+        connecting again can't mend: no pairing (`NotPaired`), another lamp
+        at the address (`WrongLamp`), a refusal of the hello (`unpaired`,
+        revoked), and anything `setup` raises or a subscription's refusal
+        (`no_grant`) that nobody awaited."""
+        failures = 0
+        while True:
+            unreachable: BaseException | None = None
+            try:
+                connection = await cls.connect(lamp, host=host, keyring=keyring)
+            except LampError as error:
+                # `closed`: the lamp went while saying hello, as a restart does.
+                if error.code != "closed":
+                    raise
+                unreachable = error
+            except (OSError, asyncio.TimeoutError, WebSocketException, EOFError) as error:
+                unreachable = error
+            if unreachable is not None:
+                wait = pauses[min(failures, len(pauses) - 1)]
+                if debug.on():
+                    print(f"lampos .. not reached ({type(unreachable).__name__}), again in {wait:g} s", file=sys.stderr, flush=True)
+                failures += 1
+                await asyncio.sleep(wait)
+                continue
+            failures = 0
+            try:
+                result = setup(connection)
+                if inspect.isawaitable(result):
+                    await result
+                await connection.wait_closed()
+            except LampError as error:
+                # The lamp went in the middle of setup: connect again.
+                if error.code != "closed":
+                    raise
+            finally:
+                # Quiet when the lamp has gone already: its leases went with it.
+                await connection.close()
+            await asyncio.sleep(pauses[0])
 
     async def __aenter__(self) -> "Lamp":
         return self

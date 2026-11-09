@@ -463,7 +463,7 @@ The lamp restarts on every update, which closes each connection. Plain
 
 | call | Python | JS | MCP | what it does | status |
 |---|---|---|---|---|---|
-| keep running | `await Lamp.keep_connected(setup)` | `await Lamp.keepConnected(setup, { signal })` | — | connects, runs `setup(lamp)` (subscribe, take leases), and connects again after each close, pausing 1, 2, 5, then 10 s while the lamp can't be reached; stops at once on `NotPaired`, `WrongLamp`, a refused hello, `no_grant`, or an error in `setup` | **next build** (in review). Run on the customer build's lamp-control across 2 restarts: Python 3 connections; JS 3 setups, each within a second of the lamp being back |
+| keep running | `await Lamp.keep_connected(setup)` | `await Lamp.keepConnected(setup, { signal })` | — | connects, runs `setup(lamp)` (subscribe, take leases), and connects again after each close, pausing 1, 2, 5, then 10 s while the lamp can't be reached; stops at once on `NotPaired`, `WrongLamp`, a refused hello, `no_grant`, or an error in `setup` | **next build** (#5833). Run on the customer build's lamp-control across 2 restarts: Python 3 connections; JS 3 setups, each within a second of the lamp being back |
 | lamp-mcp | — | — | the server itself | connects again after the lamp restarts and makes its event subscriptions again. A tool called while the lamp is away answers `closed`; the next one works | **next build** (in review). Run: `lamp_events` answered on 3 connections across 2 restarts |
 | today, by hand | `await lamp.wait_closed()` then connect again | `await lamp.closed()` | restart lamp-mcp | — | works today (10824, 9 Nov 2026) |
 
@@ -804,7 +804,7 @@ Last verified 9 Nov 2026, on a test lamp running the customer build (10824).
 | Skill push on customer lamps | next build (in review) | refused "skill push is not on this lamp" today |
 | A move from poses (`move_poses`) | next build (#5817) | the lamp plays the move today |
 | Knowing when a motion ended (`wait=True`) | next build, lamp run pending | today it returns when the lamp takes it |
-| Reconnecting across the lamp's restarts | next build (in review) | `keep_connected` |
+| Reconnecting across the lamp's restarts | next build (#5833) | `keep_connected` |
 | `joints` for roll, shoulder, elbow | in development | refused "not routed yet" today |
 | The microphone stream, with the owner's consent | in development | built and tested off the lamp |
 | A brain hearing the person and owning the turn | planned | |
