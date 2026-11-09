@@ -262,6 +262,64 @@ pub fn never_read(code: &str) -> Option<&'static str> {
     (code == "gmail-app").then_some(GMAIL_APP_NO_READS)
 }
 
+/// Google Drive's per-file scope, the one the product's Drive link holds
+/// (with openid and userinfo, on purpose): under it Drive's `files.list`
+/// shows only files the app made or the owner chose with a picker.
+pub const DRIVE_FILE_SCOPE: &str = "https://www.googleapis.com/auth/drive.file";
+
+/// Drive's scopes that see every file, either of which makes an empty list
+/// a truly empty Drive.
+const DRIVE_WIDE_SCOPES: [&str; 2] = [
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/drive.readonly",
+];
+
+/// The services' own note on an empty Drive `files` read under
+/// [`DRIVE_FILE_SCOPE`] alone: on lamp-9adf on 9 Nov, "what files are in my
+/// Google Drive?" got 0 files and the model guessed the Drive was empty or
+/// the lamp's access didn't reach it.
+pub const DRIVE_CHOSEN_ONLY: &str = "Nothing found. The lamp sees only Google Drive files it made or that were chosen for it. Say so in a few words.";
+
+/// [`DRIVE_CHOSEN_ONLY`] naming the app's button (#5424), with
+/// `LAMP_DRIVE_PICKER_HINT=on`.
+pub const DRIVE_CHOSEN_ONLY_IN_APP: &str = "Nothing found. The lamp sees only Google Drive files it made or that the owner chose in the app: Google Drive, then Choose files for the lamp. Say so in a few words.";
+
+/// The note an empty read's answer carries, if any: only a `google_drive`
+/// `files` read (with or without `query`) that found no file, on a link
+/// whose scopes hold [`DRIVE_FILE_SCOPE`] and none of
+/// [`DRIVE_WIDE_SCOPES`]. `in_app` names the app's button.
+pub fn drive_empty_note(
+    code: &str,
+    args: &Value,
+    entry: &Entry,
+    items: &[Value],
+    in_app: bool,
+) -> Option<&'static str> {
+    if code != "google_drive" || text(args, "what") != Some("files") {
+        return None;
+    }
+    // Drive answers `{"files": []}`; a lone `{}` is no file either.
+    if !items
+        .iter()
+        .all(|item| item.as_object().is_some_and(Map::is_empty))
+    {
+        return None;
+    }
+    // A scope list may come as one space-separated string.
+    let scopes: Vec<&str> = entry
+        .scopes
+        .iter()
+        .flat_map(|scope| scope.split_whitespace())
+        .collect();
+    let chosen_only = scopes.contains(&DRIVE_FILE_SCOPE)
+        && !DRIVE_WIDE_SCOPES.iter().any(|wide| scopes.contains(wide));
+    chosen_only.then_some(if in_app {
+        DRIVE_CHOSEN_ONLY_IN_APP
+    } else {
+        DRIVE_CHOSEN_ONLY
+    })
+}
+
 /// The lamp's own zone's IANA name, as the system has it now; nothing when
 /// it names none.
 fn zone_here() -> Option<String> {

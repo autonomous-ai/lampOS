@@ -185,6 +185,9 @@ pub struct Services<H, M> {
     /// `LAMP_SKILL_READS=on`: `lamp-skills` may call the tools' socket, for
     /// `service_read` alone ([`Services::skill_tool`]).
     pub skill_reads: bool,
+    /// `LAMP_DRIVE_PICKER_HINT=on`: an empty Drive read's note names the
+    /// app's "Choose files for the lamp" ([`reads::drive_empty_note`]).
+    pub drive_picker_hint: bool,
     pub desk: Desk,
 }
 
@@ -214,6 +217,7 @@ impl<H: Http, M: Mail> Services<H, M> {
             backend,
             write_on,
             skill_reads: false,
+            drive_picker_hint: false,
             desk: Desk::default(),
         }
     }
@@ -221,6 +225,12 @@ impl<H: Http, M: Mail> Services<H, M> {
     /// With `LAMP_SKILL_READS` as `on` gives it.
     pub fn with_skill_reads(mut self, on: bool) -> Self {
         self.skill_reads = on;
+        self
+    }
+
+    /// With `LAMP_DRIVE_PICKER_HINT` as `on` gives it.
+    pub fn with_drive_picker_hint(mut self, on: bool) -> Self {
+        self.drive_picker_hint = on;
         self
     }
 
@@ -681,7 +691,21 @@ impl<H: Http, M: Mail> Services<H, M> {
             }
             Plan::Http { method, url, body } => {
                 let text = self.call(service, &entry, method, url, body, false).await?;
-                Ok(reads::quoted(service.name, reads::items(&text)))
+                let items = reads::items(&text);
+                let note = reads::drive_empty_note(
+                    service.code,
+                    args,
+                    &entry,
+                    &items,
+                    self.drive_picker_hint,
+                );
+                let mut answer = reads::quoted(service.name, items);
+                // The services' own words beside the quoted data, never in
+                // it, and not `note`, which the voice sets on every read.
+                if let Some(note) = note {
+                    answer["why_empty"] = json!(note);
+                }
+                Ok(answer)
             }
         }
     }
@@ -1297,6 +1321,95 @@ mod tests {
 
     fn read_line(args: Value) -> String {
         json!({"op":"call","name":"service_read","args":args}).to_string()
+    }
+
+    /// lamp-9adf, 9 Nov: under the product's `drive.file` link Drive lists
+    /// only files the app made or the owner chose, and an empty list was
+    /// guessed an empty Drive. An empty `files` read says why, in the
+    /// services' own words beside the quoted data; the app's button is
+    /// named only with `LAMP_DRIVE_PICKER_HINT=on`.
+    #[test]
+    fn an_empty_drive_read_under_drive_file_says_why() {
+        let file_only = json!([
+            "openid",
+            reads::DRIVE_FILE_SCOPE,
+            "https://www.googleapis.com/auth/userinfo.email"
+        ]);
+        let wide = json!([
+            reads::DRIVE_FILE_SCOPE,
+            "https://www.googleapis.com/auth/drive.readonly"
+        ]);
+        let note = |body: &str, scopes: &Value, picker: bool, args: Value| -> Value {
+            let dir = tempfile::tempdir().unwrap();
+            let services = services(dir.path(), body, false).with_drive_picker_hint(picker);
+            run(services.admin(&set_line(
+                "google_drive",
+                json!({"auth_type":"oauth","access_token":"t","scopes":scopes}),
+            )));
+            let answer = run(services.tool(&read_line(args)));
+            assert_eq!(answer["ok"], true, "{answer}");
+            answer["result"]["why_empty"].clone()
+        };
+        let listed = json!({"service":"google_drive","what":"files"});
+        let searched = json!({"service":"google_drive","what":"files","query":"budget"});
+        for args in [&listed, &searched] {
+            for body in [r#"{"files":[]}"#, "{}"] {
+                assert_eq!(
+                    note(body, &file_only, false, args.clone()),
+                    reads::DRIVE_CHOSEN_ONLY,
+                    "{args} {body}"
+                );
+                assert_eq!(
+                    note(body, &file_only, true, args.clone()),
+                    reads::DRIVE_CHOSEN_ONLY_IN_APP,
+                    "{args} {body}"
+                );
+            }
+            // A link that sees every file: an empty list is an empty Drive.
+            for picker in [false, true] {
+                assert_eq!(
+                    note(r#"{"files":[]}"#, &wide, picker, args.clone()),
+                    Value::Null
+                );
+                assert_eq!(
+                    note(
+                        r#"{"files":[]}"#,
+                        &json!(["https://www.googleapis.com/auth/drive"]),
+                        picker,
+                        args.clone()
+                    ),
+                    Value::Null
+                );
+            }
+            // A file found: no note.
+            assert_eq!(
+                note(
+                    r#"{"files":[{"id":"f1","name":"Budget plan"}]}"#,
+                    &file_only,
+                    true,
+                    args.clone()
+                ),
+                Value::Null
+            );
+        }
+        // The off words name no button; the on words name it.
+        assert!(!reads::DRIVE_CHOSEN_ONLY.contains("Choose files"));
+        assert!(
+            reads::DRIVE_CHOSEN_ONLY_IN_APP
+                .contains("Google Drive, then Choose files for the lamp")
+        );
+        // Only a Drive `files` read: another empty read carries none.
+        let dir = tempfile::tempdir().unwrap();
+        let services = services(dir.path(), r#"{"items":[]}"#, false).with_drive_picker_hint(true);
+        run(services.admin(&set_line(
+            "google_calendar",
+            json!({"auth_type":"oauth","access_token":"t","scopes":file_only}),
+        )));
+        let answer = run(services.tool(&read_line(
+            json!({"service":"google_calendar","what":"events"}),
+        )));
+        assert_eq!(answer["ok"], true, "{answer}");
+        assert_eq!(answer["result"]["why_empty"], Value::Null, "{answer}");
     }
 
     #[test]

@@ -34,6 +34,11 @@ pub const WRITE_ENVIRONMENT: &str = "LAMP_SERVICES_WRITE";
 /// `lamp-skills.service` may call the tools' socket too, for `service_read`
 /// alone.
 pub const SKILL_READS_ENVIRONMENT: &str = "LAMP_SKILL_READS";
+/// The switch naming the app's "Choose files for the lamp" (#5424) in an
+/// empty Google Drive read's note, read by this program: off unless `on`.
+/// Off, the note says only that the lamp sees the files it made or that
+/// were chosen for it.
+pub const DRIVE_PICKER_HINT_ENVIRONMENT: &str = "LAMP_DRIVE_PICKER_HINT";
 
 /// Whether a switch is on, as `var` gives it.
 pub fn on(var: Option<&str>) -> bool {

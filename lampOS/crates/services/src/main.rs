@@ -5,8 +5,8 @@
 //! voice's) or `--enable`: off, it opens no socket and exits at once, so its
 //! unit stays inactive.
 use lamp_services::{
-    ENVIRONMENT, SKILL_READS_ENVIRONMENT, WRITE_ENVIRONMENT, mail::Gmail, net::Https, on,
-    refresh::Backend, serve, store, tools,
+    DRIVE_PICKER_HINT_ENVIRONMENT, ENVIRONMENT, SKILL_READS_ENVIRONMENT, WRITE_ENVIRONMENT,
+    mail::Gmail, net::Https, on, refresh::Backend, serve, store, tools,
 };
 use std::{
     fs, io,
@@ -83,9 +83,12 @@ fn main() -> ExitCode {
     if skill_reads {
         say("a made skill's reads on: lamp-skills may read, never write");
     }
+    // An empty Drive read names the app's button for chosen files (#5424).
+    let drive_picker_hint = on(std::env::var(DRIVE_PICKER_HINT_ENVIRONMENT).ok().as_deref());
     let services = Arc::new(
         serve::Services::new(store::Store(store), Https, Gmail, backend, write_on)
-            .with_skill_reads(skill_reads),
+            .with_skill_reads(skill_reads)
+            .with_drive_picker_hint(drive_picker_hint),
     );
     let tools_dir = run.join("tools");
     let opened = (|| -> io::Result<(UnixListener, UnixListener)> {
