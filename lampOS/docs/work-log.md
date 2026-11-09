@@ -9041,3 +9041,19 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   not replace its independent privacy reads or erase documented Mac failures.
 - #5873 1cc3ff2cc7 ARM64 and SDK checks now green; train754 checks are
   green too. Both still open at this check; no merge or device action here.
+
+## 2026-11-09 — Second: reminders audit and pose correlation fix
+
+- Read-only 10824 to 10972 audit independently pins Actions commits and
+  confirms an additional service_write tool-description change 2cb3d4cbb6.
+  Equal 47-tool counts do not prove equal prompt bytes. Strength session
+  snapshots are distinct from per-line hits; no causal claim or device run.
+  Findings sent to First/Twelve/Fifth on Queue 6740608075.
+- READ-OK #5855 476dbbe4ce, lifting dc164e78aa HOLD: older bodies admit one
+  outstanding pose, so the actual Posing refusal cannot overtake it.
+  Tag-capable replies match tags, including capability arriving after an
+  initial untagged pose. Full control 186 passed; two independent probes
+  passed, removed clean. Refusal bookkeeping 18.792 us, host only.
+- Tag-capable body implementation/physical integration remain separate;
+  Linux Clippy/ARM64 pending at review, SDK/docs green. PR-body stale FIFO
+  description and older gates flagged P3. No device action or own product edit.
