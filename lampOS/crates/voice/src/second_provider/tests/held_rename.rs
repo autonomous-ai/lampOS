@@ -7,7 +7,7 @@ use super::*;
 use crate::known_faces::{REMEMBER, Said};
 use crate::memory_scope::FaceCache;
 use crate::speaking_faces::{SpeakingFaces, known_face_of};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 /// What the model does on a turn: says a line, or calls the face save
 /// with these arguments and then says a line.
@@ -15,6 +15,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 enum Lamp {
     Says(&'static str),
     Saves(Value, &'static str),
+    /// Calls this tool with these arguments, then says a line.
+    Calls(&'static str, Value, &'static str),
 }
 
 /// One spoken turn: what they say, what the model does, and whose faces
@@ -37,6 +39,21 @@ struct Ran {
     sent: Vec<Value>,
     /// What each chat round was asked.
     asked: Vec<Vec<Message>>,
+    /// How many memory forgets the runner finished.
+    forgot: usize,
+}
+
+/// How the turn at this index is cut once its memory forget has finished
+/// in the runner and waits there to return (Reviewer-three on #5792).
+#[derive(Clone, Copy, PartialEq)]
+enum Cut {
+    /// Nothing cut: every turn runs through.
+    None,
+    /// Its scope is revoked, then the forget's answer is let go: the turn
+    /// returns at the scope check after the await.
+    Revoked(usize),
+    /// The turn is stopped, dropping its future mid-await.
+    Dropped(usize),
 }
 
 /// The turns, with the switch on or off. The runner answers a save as the
@@ -44,6 +61,11 @@ struct Ran {
 /// `replace` is sent to the eyes only on a yes by its guards
 /// (`known_faces::rename_agreed`), else refused for want of it.
 async fn run(turns: &[Turn], on: bool) -> Ran {
+    run_cut(turns, on, Cut::None).await
+}
+
+/// [`run`], with one turn cut ([`Cut`]) while its forget waits to return.
+async fn run_cut(turns: &[Turn], on: bool, cut: Cut) -> Ran {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     // Request numbers of their own: lines seen are the process's.
     let first = 19_000 + 100 * NEXT.fetch_add(1, Ordering::Relaxed);
@@ -59,6 +81,13 @@ async fn run(turns: &[Turn], on: bool) -> Ran {
                 };
                 chats.push_back(vec![
                     Ok(ChatEvent::ToolCalls(vec![call("c1", REMEMBER, args)])),
+                    Ok(ChatEvent::Done),
+                ]);
+                chats.push_back(vec![text(line), Ok(ChatEvent::Done)]);
+            }
+            Lamp::Calls(name, args, line) => {
+                chats.push_back(vec![
+                    Ok(ChatEvent::ToolCalls(vec![call("c1", name, args.clone())])),
                     Ok(ChatEvent::Done),
                 ]);
                 chats.push_back(vec![text(line), Ok(ChatEvent::Done)]);
@@ -80,7 +109,16 @@ async fn run(turns: &[Turn], on: bool) -> Ran {
     let judged = window.clone();
     let sent: Arc<Mutex<Vec<Value>>> = Arc::default();
     let eyes_sent = sent.clone();
+    let forgot = Arc::new(AtomicUsize::new(0));
+    let release = Arc::new(tokio::sync::Notify::new());
+    let (forgets, released) = (forgot.clone(), release.clone());
     let runner: ScopedToolRunner = Arc::new(move |_, _, name, args, _| {
+        // A forget is done here; with a cut, its answer waits to be let go.
+        let held = crate::remember::is_forget(&name) && cut != Cut::None;
+        if crate::remember::is_forget(&name) {
+            forgets.fetch_add(1, Ordering::SeqCst);
+        }
+        let released = released.clone();
         let said = judged.lock().unwrap().clone();
         let new_name = args["name"].as_str().unwrap_or_default().to_owned();
         let told = if name != REMEMBER {
@@ -98,7 +136,12 @@ async fn run(turns: &[Turn], on: bool) -> Ran {
         } else {
             json!({"error": crate::known_faces::NOT_AGREED})
         };
-        Box::pin(async move { told })
+        Box::pin(async move {
+            if held {
+                released.notified().await;
+            }
+            told
+        })
     });
     let path = std::env::temp_dir().join(format!("held-rename-{}-{first}", std::process::id()));
     let cache = Arc::new(FaceCache::default());
@@ -178,12 +221,53 @@ async fn run(turns: &[Turn], on: bool) -> Ran {
         engine.submit(audio(request, 1));
         tokio::time::sleep(Duration::from_millis(40)).await;
         engine.submit(end(request));
-        turn(&mut engine).await;
+        match cut {
+            Cut::Revoked(index) | Cut::Dropped(index) if index == at => {
+                tokio::time::timeout(Duration::from_secs(5), async {
+                    while forgot.load(Ordering::SeqCst) == 0 {
+                        tokio::select! {
+                            _ = engine.next() => {}
+                            () = tokio::time::sleep(Duration::from_millis(5)) => {}
+                        }
+                    }
+                })
+                .await
+                .expect("the forget reached the runner");
+                if matches!(cut, Cut::Revoked(_)) {
+                    engine
+                        .turn
+                        .as_ref()
+                        .unwrap()
+                        .memory_scope
+                        .as_ref()
+                        .unwrap()
+                        .revoke();
+                    release.notify_one();
+                    tokio::time::timeout(
+                        Duration::from_secs(5),
+                        &mut engine.turn.as_mut().unwrap().task,
+                    )
+                    .await
+                    .expect("the revoked turn returns")
+                    .unwrap();
+                } else {
+                    // Dropped mid-await: its answer is never let go.
+                    engine.stop_through(request);
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                }
+                engine.retire_through(request);
+                engine.urgent.clear();
+                while engine.output.try_recv().is_ok() {}
+            }
+            _ => {
+                turn(&mut engine).await;
+            }
+        }
         done.store(true, Ordering::Release);
         frame = feeder.join().unwrap();
         engine.retire_through(request);
         let lamp_said = match lamp {
-            Lamp::Says(line) | Lamp::Saves(_, line) => line,
+            Lamp::Says(line) | Lamp::Saves(_, line) | Lamp::Calls(_, _, line) => line,
         };
         before.push(((*said).to_owned(), (*lamp_said).to_owned()));
     }
@@ -191,7 +275,20 @@ async fn run(turns: &[Turn], on: bool) -> Ran {
     let _ = std::fs::remove_file(&path);
     let asked = script.asked.lock().unwrap().clone();
     let sent = sent.lock().unwrap().clone();
-    Ran { sent, asked }
+    Ran {
+        sent,
+        asked,
+        forgot: forgot.load(Ordering::SeqCst),
+    }
+}
+
+/// Every message of a chat that names Marisol, whole as sent.
+fn marisol_in(asked: &[Message]) -> Vec<String> {
+    asked
+        .iter()
+        .map(|message| serde_json::to_string(message).unwrap())
+        .filter(|message| message.contains("Marisol"))
+        .collect()
 }
 
 fn renamed() -> Vec<Value> {
@@ -495,4 +592,145 @@ async fn a_rename_the_trigger_asks_is_held_and_a_yes_renames_and_a_no_does_not()
         ("No, keep Tove.", Lamp::Says("Okay, Tove it is."), &["f1"]),
     ];
     assert_eq!(run(&no, true).await.sent, Vec::<Value>::new());
+}
+
+/// The rename asked, dropped by an unrelated turn, and the model's forget
+/// of the proposed name held and asked about; their yes runs it, and the
+/// session's next turn asks their name.
+fn held_forget() -> [Turn; 4] {
+    [
+        ASKS,
+        (
+            "I no longer want that new name.",
+            Lamp::Calls(
+                crate::remember::FORGET,
+                json!({"about": "Marisol"}),
+                "Shall I forget that proposed name?",
+            ),
+            &["f1"],
+        ),
+        ("Yes.", Lamp::Says("Forgotten."), &["f1"]),
+        ("What's my name, Lamp?", Lamp::Says("Tove."), &["f1"]),
+    ]
+}
+
+/// The rename asked, then a turn whose own words ask to forget the
+/// proposed name: the model's forget runs on that call, and the session's
+/// next turn asks their name.
+fn called_forget() -> [Turn; 3] {
+    [
+        ASKS,
+        (
+            "Please forget the name Marisol.",
+            Lamp::Calls(
+                crate::remember::FORGET,
+                json!({"about": "Marisol"}),
+                "Forgotten.",
+            ),
+            &["f1"],
+        ),
+        ("What's my name, Lamp?", Lamp::Says("Tove."), &["f1"]),
+    ]
+}
+
+/// The rename asked, then "Forget my face.": the model's
+/// `forget_my_face` runs, and the session's next turn says hello (Jarvis on
+/// #5792).
+fn face_forget() -> [Turn; 3] {
+    [
+        ASKS,
+        (
+            "Forget my face.",
+            Lamp::Calls(crate::known_faces::FORGET, json!({}), "Done."),
+            &["f1"],
+        ),
+        ("Hello, Lamp.", Lamp::Says("Hello."), &["f1"]),
+    ]
+}
+
+/// The session's next turn, after the forget: its whole prompt never names
+/// the proposal.
+fn next_never_told(ran: &Ran, why: &str) {
+    assert_eq!(ran.sent, Vec::<Value>::new(), "{why}");
+    assert_eq!(ran.forgot, 1, "{why}: the forget ran once");
+    let next = ran.asked.last().expect("the next turn was asked");
+    assert!(
+        next.iter().any(|message| {
+            matches!(
+                message.content.as_ref().and_then(Value::as_str),
+                Some("What's my name, Lamp?" | "Hello, Lamp.")
+            )
+        }),
+        "{why}: the last chat is the next turn's: {next:?}"
+    );
+    assert_eq!(marisol_in(next), Vec::<String>::new(), "{why}, next turn");
+}
+
+/// Reviewer-three on #5586: the proposed name a held memory forget clears
+/// is never told again. Neither that yes's chat (started clean at the
+/// forget) nor the session's next turn names the proposal, in any part of
+/// its prompt.
+#[tokio::test]
+async fn a_forgotten_proposed_name_is_never_told_again() {
+    for on in [false, true] {
+        let ran = run(&held_forget(), on).await;
+        // The yes's chat: started clean at the forget that ran.
+        let yes_chat = ran
+            .asked
+            .iter()
+            .find(|asked| {
+                asked
+                    .iter()
+                    .any(|message| message.content.as_ref().and_then(Value::as_str) == Some("Yes."))
+            })
+            .expect("the yes was asked");
+        assert!(
+            yes_chat.iter().any(|message| {
+                message
+                    .content
+                    .as_ref()
+                    .and_then(Value::as_str)
+                    .is_some_and(|content| content.starts_with("A memory forget call has run"))
+            }),
+            "on {on}: the held forget did not run: {yes_chat:?}"
+        );
+        assert_eq!(
+            marisol_in(yes_chat),
+            Vec::<String>::new(),
+            "on {on}, yes turn"
+        );
+        next_never_told(&ran, &format!("on {on}"));
+        let ran = run(&called_forget(), on).await;
+        next_never_told(&ran, &format!("on {on}, called"));
+    }
+}
+
+/// Jarvis on #5792: "Forget my face." after the rename was asked ends it
+/// too; the next turn is never told the proposal.
+#[tokio::test]
+async fn a_forgotten_face_ends_the_asked_rename() {
+    for on in [false, true] {
+        let ran = run(&face_forget(), on).await;
+        next_never_told(&ran, &format!("on {on}, forget_my_face"));
+    }
+}
+
+/// Reviewer-three on #5792: a forget admitted and finished in the runner,
+/// whose turn is then revoked before its answer returns, or dropped while
+/// it waits, still ends the asked rename: the session's next turn is never
+/// told the proposal. Their yes to a held forget, and the model's own call.
+#[tokio::test]
+async fn a_forget_cut_at_its_return_still_ends_the_asked_rename() {
+    for on in [false, true] {
+        for (turns, at, how) in [
+            (held_forget().to_vec(), 2, "held"),
+            (called_forget().to_vec(), 1, "called"),
+            (face_forget().to_vec(), 1, "forget_my_face"),
+        ] {
+            let ran = run_cut(&turns, on, Cut::Revoked(at)).await;
+            next_never_told(&ran, &format!("on {on}, {how}, revoked at its return"));
+            let ran = run_cut(&turns, on, Cut::Dropped(at)).await;
+            next_never_told(&ran, &format!("on {on}, {how}, dropped mid-await"));
+        }
+    }
 }

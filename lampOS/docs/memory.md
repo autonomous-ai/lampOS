@@ -3389,7 +3389,10 @@ then use that person's scope:
   told the face is still B and nothing was renamed; a turn not proven
   theirs (two faces, another voice) is told only that no rename has run,
   without B; one proven someone else's is told nothing. So the lamp never
-  says it changed. The memory's own side of a
+  says it changed. A forget (`forget`, `forget_everything` or
+  `forget_my_face`) ends both the held rename and the note once it is let
+  run, before it is awaited, on that turn and every later one, even if the
+  turn is then revoked or dropped: the proposed name is discarded too. The memory's own side of a
   rename (`LAMP_MEMORY_STABLE_ID`) is unchanged. Off, everything is as
   before.
 - **With nobody known**, or without eyes, every line to the memory is
