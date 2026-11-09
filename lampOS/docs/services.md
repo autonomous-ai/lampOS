@@ -824,7 +824,11 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   words again is given the send's call and where the services got to with
   it (`send_state`, kept by request in `run` before any route's fence:
   asked once past the gate, then told the service's answer or the gate's
-  refusal), told the write was sent unless it was refused, and runs no
+  refusal; kept per request, the newest 8 (`SENDS_KEPT`), so an older
+  request's slow send finishing later never overwrites a newer one's; within
+  a request the strongest try, so a later try's refusal never hides a write
+  sent), told the write was sent unless it was
+  refused, and runs no
   `service_write` in its turn
   ([second-voice.md](second-voice.md), `LAMP_JOIN_CUT_WORDS`'s carried
   rounds).
