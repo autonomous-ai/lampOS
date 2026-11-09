@@ -2231,6 +2231,21 @@ order is kept. A written turn is the same from the chat on.
     lamp said" (or "… in a busy room; the model is not told …"), "only
     the lamp's name was said, and the model is told so", and "… no words
     of it came back: asked as the name".
+  - With `LAMP_NAME_WORDLESS_BAR=on` (#5385), that line with no words is
+    asked as the name only when lamp-name heard the name in it at 0.99 or
+    more (`second_provider::wordless_call`: its own `name/heard`
+    subscriber, the best hearing that began from 1.5 s before the line's
+    first sound to its end). Under 0.99, or with no hearing said in full
+    (the call came from `name/rising` alone), it is left as a sound: no
+    chat is asked and nothing is answered, and the journal says "only the
+    lamp's name, and no words of it came back: lamp-name heard it at
+    0.941, under 0.99: not answered as a call (LAMP_NAME_WORDLESS_BAR)".
+    A line with words is judged as before at any score. On lamp-75c9 on
+    9 Nov a line the body's own move opened was heard as the name at 0.941
+    with no words and answered as a call; on lamp-c0a4, 82 real calls
+    scored 0.901 to 1.000 (median 0.964) and 4 had no words back, 3 of
+    them under 0.99: the rule costs about 3 bare calls in 82. Test:
+    `a_wordless_call_under_the_bar_is_not_answered_with_the_switch`.
 - **In a busy room, a line going on waits for the Policy**
   (`LAMP_GOING_ON_ASKS=on`, with the rule and the bus, #1522; #1712, item
   4): a line the rule would let out only as a conversation going on, and

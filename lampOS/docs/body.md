@@ -1143,6 +1143,16 @@ it a call changes nothing the body writes (test
   seen before or during it ends it, and the gaze has them. It takes the place
   of a shift at rest, never of another gesture.
 - It never searches: one glance, then it lets it go.
+- With `LAMP_NAME_WORDLESS_BAR=on` in its environment (#5385), only a
+  hearing at 0.99 or more is a call (`name_in::bar_from`). The body cannot
+  know whether words follow a hearing (the voice knows about 1.7 s later),
+  and on lamp-75c9 a hearing at 0.941 in the body's own move's sound, with
+  no words, turned and glanced. A real call under 0.99 still gets the
+  voice's own listening, which lifts the head from early in the line
+  (0.45 s into it on lamp-52e6, before the name is heard), so the first
+  thing seen is not later; only the glance with nobody in view, and the
+  two seconds a call adds while the voice rests, are left out. Off, as
+  before. Test: `with_the_wordless_bar_only_a_sure_hearing_is_a_call`.
 
 On lamp-52e6 on 2026-10-14, with calls published by hand and nobody in view
 ([verification](verification/look-at-name-lamp-52e6-20261014/)): standing,
