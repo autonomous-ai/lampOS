@@ -305,9 +305,10 @@ pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf
 /// The skills every lamp receives: each a folder of `lampOS/skills/`, put in
 /// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
 /// Every core skill is one (the owner: core skills are always installed;
-/// `tests/install.rs` holds the two lists equal). Twenty-one keep their
-/// folders' own default: twenty enabled, Bedtime and Morning disabled by its
-/// own `enabled = false` until its lamp comparison (#1672), and Comfort break
+/// `tests/install.rs` holds the two lists equal). Those not in
+/// [`PRODUCT_SKILLS_OFF`] keep their folders' own default: Bedtime and
+/// Morning disabled by its own `enabled = false` until its lamp comparison
+/// (#1672), Light show enabled since #5745, and Comfort break
 /// by its own but on by its `[present]` with `LAMP_NUDGES_PRESENT=on`, which
 /// the product's skills units set (#5207); those of
 /// [`PRODUCT_SKILLS_OFF`] are installed disabled until their lamp checks,
@@ -366,11 +367,13 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // yes after the lamp check on lamp-06c1 (29 Oct).
     "head-pat",
     "head-pat-wiggle",
+    // A light show a person asks for (#1679): on in the product since
+    // #5745, its played row on lamp-52e6 with it (trials.sh's light-show).
+    "light-show",
     // Installed disabled ([`PRODUCT_SKILLS_OFF`]).
     "light-out",
     "light-scenes",
     "point-light",
-    "light-show",
     "pose",
     "smoky-air",
     "dusty-air",
@@ -389,8 +392,9 @@ pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
          until the light going out and coming back has been seen on a lamp: someone reading face \
          down at the desk must never lose their light",
     ),
-    // #1679's three core skills, built and not yet tried on a lamp: each
-    // comes with the product once lamp-4ace has played it with a person.
+    // Two of #1679's three core skills, built and not yet tried on a lamp:
+    // each comes with the product once a lamp has played it with a person
+    // (the third, Light show, since #5745).
     (
         "light-scenes",
         "not yet tried on a lamp (#1679), and its function would put a product session past its \
@@ -401,11 +405,6 @@ pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
         "not yet tried on a lamp (#1679): its turn needs a lamp-body with `toward` and the lamp's \
          `--gaze`, and its function would put a product session past its 32 without \
          `LAMP_USE_SKILL=on`",
-    ),
-    (
-        "light-show",
-        "not yet tried on a lamp (#1679), and its function would put a product session past its \
-         32 without `LAMP_USE_SKILL=on`, on in the product since #2826",
     ),
     // #1684's two core skills, merged off (the first builder, #1722): a
     // trial puts them on by hand. Each comes with the product once the four
@@ -603,7 +602,7 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("light-scenes", "SKILL.md"),
     skill_file_off!("point-light"),
     skill_file!("point-light", "SKILL.md"),
-    skill_file_off!("light-show"),
+    skill_file!("light-show", "skill.toml"),
     skill_file!("light-show", "SKILL.md"),
     skill_file!("light-show", "shows/calm.toml"),
     skill_file!("light-show", "shows/music.toml"),
