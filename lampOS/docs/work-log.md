@@ -9210,3 +9210,19 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   matches exact-11048 failure; waiting turn shares the issue. Flagged
   contradictory name.heard first clause for named docs reviewer. No
   replacement docs READ-OK or device claim.
+
+## 2026-11-09 — Second: assigned consent read and next candidate replay
+
+- First formally placed Second as #5884's second privacy reader. Author
+  accepts all three HOLDs and is replacing recent-ID cache with CAS;
+  Jarvis requires every local change to rotate the revision to avoid ABA.
+- Posted design checks 6742281386: read value/revision under the same
+  serialization boundary, durable initial/recovery tokens, no automatic
+  app resubmission of an old tap with a refreshed token. Implementation
+  remains unposted/unverified; HOLD stays.
+- Posted mutation inventory 6742332737: helper, storage reconciliation,
+  redo/skip, forget-everything, reset, coherent cloud snapshots and local
+  read-before-mutate. Read-only eyes/ears retain fail-closed file semantics.
+- New promote candidate 11091 / 4342bcccc8 still fails both unchanged
+  MCP/Relink/TLS say/turn reconnect probes against exact extracted source.
+  Notified PM/Nine on Queue 6742330495. #5873 still open. No deploy/merge.
