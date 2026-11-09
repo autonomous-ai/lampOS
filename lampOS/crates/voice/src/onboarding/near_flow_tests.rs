@@ -106,6 +106,7 @@ impl Store {
         // PARKED (#4080): these tests keep the three-call bar and the
         // sentence part tested; `teaching` is the shipped step.
         walk.near.three_calls = true;
+        walk.counted = false;
         walk.drain_storage_for_test(now);
         walk
     }
@@ -823,13 +824,13 @@ fn a_call_after_a_prompt_said_with_a_gap_is_a_try() {
 /// was judged says the first line again.
 #[test]
 fn each_call_prompt_answers_the_last_try_and_only_the_first_explains() {
-    assert!(NEAR_FIRST.contains("say 'Hey Lamp'"), "{NEAR_FIRST}");
+    assert!(NEAR_FIRST.contains("start with 'Hey Lamp'"), "{NEAR_FIRST}");
     assert!(
         NEAR_AGAIN.contains("\"Got it. Say 'Hey Lamp' once more.\""),
         "{NEAR_AGAIN}"
     );
     assert!(
-        NEAR_MISSED.contains("\"I didn't catch that. Say 'Hey Lamp' once more.\""),
+        NEAR_MISSED.contains("\"I didn't catch that. Wait a moment, then say 'Hey Lamp' again.\""),
         "{NEAR_MISSED}"
     );
     let store = Store::new(None);
@@ -1979,7 +1980,11 @@ fn a_later_re_offer_of_how_you_sound_begins_with_the_call_part() {
     assert!(walk.desired.near_call_tries.is_empty());
     walk.desired.steps.remove(Step::HowYouSound.name());
     let first = play(&mut walk, 200 * S, 1_760_000_200_000, 6);
-    assert!(first.words.contains("say 'Hey Lamp'"), "{}", first.words);
+    assert!(
+        first.words.contains("start with 'Hey Lamp'"),
+        "{}",
+        first.words
+    );
     assert!(!first.words.contains("sentence"), "{}", first.words);
 }
 
