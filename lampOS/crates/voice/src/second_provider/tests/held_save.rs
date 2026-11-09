@@ -32,7 +32,9 @@ async fn run_at_setup(
     two_faces_at: Option<usize>,
     open: bool,
 ) -> Vec<Value> {
-    run_full(turns, two_faces_at, None, Some(open)).await.0
+    run_full(turns, two_faces_at, None, Some(open), false)
+        .await
+        .0
 }
 
 /// As [`run`], with the eyes refusing the save on the yes with `refused`,
@@ -42,16 +44,18 @@ async fn run_with(
     two_faces_at: Option<usize>,
     refused: Option<&'static str>,
 ) -> (Vec<Value>, Vec<Vec<Message>>) {
-    run_full(turns, two_faces_at, refused, None).await
+    run_full(turns, two_faces_at, refused, None, false).await
 }
 
 /// As [`run_with`], with "who you are" open or not as `setup` says, else
-/// as the environment's walk file says (none here).
+/// as the environment's walk file says (none here), and with the eyes'
+/// speaking read on (`LAMP_EYES_SPEAKING`) when `sight`.
 async fn run_full(
     turns: &[(&'static str, Lamp)],
     two_faces_at: Option<usize>,
     refused: Option<&'static str>,
     setup: Option<bool>,
+    sight: bool,
 ) -> (Vec<Value>, Vec<Vec<Message>>) {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     // Request numbers of their own: lines seen are the process's.
@@ -126,6 +130,13 @@ async fn run_full(
         .reading_said_from(Arc::new(move || reading.lock().unwrap().clone()));
     if let Some(open) = setup {
         engine = engine.reading_setup_from(Arc::new(move || open));
+    }
+    if sight {
+        let path = std::env::temp_dir().join(format!("held-save-{}-{first}", std::process::id()));
+        engine = engine.confirming_forgets_by_sight(
+            Arc::new(crate::speaking_faces::SpeakingFaces::default()),
+            path,
+        );
     }
     engine.memory_camera(true, 1);
     let mut before: Vec<(String, String)> = Vec::new();
@@ -306,6 +317,38 @@ async fn a_correction_a_face_question_or_a_second_face_keeps_nothing() {
     assert_eq!(sent, Vec::<Value>::new());
 }
 
+/// The lead's call of 9 Nov: with the eyes' speaking read on, the yes to
+/// the face keeps it though no face was seen saying it (the owner may not
+/// face the lamp), held or with no call at setup. Only a second face seen
+/// speaking the yes refuses, and the model is told why.
+#[tokio::test]
+async fn with_the_speaking_read_an_unseen_yes_keeps_the_face() {
+    let held = [
+        NAME_LINE,
+        ("Yes, that's my name.", Lamp::Says(FACE_QUESTION)),
+        ("Yes.", Lamp::Says("Got it.")),
+    ];
+    let (sent, _) = run_full(&held, None, None, None, true).await;
+    assert_eq!(sent, kept(), "held");
+    let at_setup = [
+        NO_CALL_NAME_LINE,
+        ("Yes. That's my name.", Lamp::Says(FACE_QUESTION)),
+        ("Yes.", Lamp::Says("Thanks, Walter.")),
+    ];
+    let (sent, _) = run_full(&at_setup, None, None, Some(true), true).await;
+    assert_eq!(sent, kept(), "at setup");
+    for (turns, setup) in [(&held, None), (&at_setup, Some(true))] {
+        let (sent, asked) = run_full(turns, Some(2), None, setup, true).await;
+        assert_eq!(sent, Vec::<Value>::new(), "two faces: {setup:?}");
+        assert!(
+            notes(asked.last().unwrap())
+                .iter()
+                .any(|note| note.contains("a second face seen at the yes")),
+            "{asked:?}"
+        );
+    }
+}
+
 /// (d): the model also calls the save after the yes: kept exactly once.
 #[tokio::test]
 async fn a_model_call_after_the_held_save_keeps_it_once() {
@@ -344,7 +387,7 @@ async fn a_held_save_that_keeps_nothing_is_told_to_the_model() {
 }
 
 /// A plain yes whose held save is dropped all the same (here a second
-/// face seen at the yes; the speaking gate's drop takes the same path):
+/// face seen at the yes):
 /// the model is told why, so it makes up no reason of its own (Fifth's
 /// run B on #5415, lamp-52e6, 5 Nov).
 #[tokio::test]
@@ -385,7 +428,14 @@ const NO_CALL_YES: (&str, Lamp) = (
 /// face, with the name said back at its start or its end.
 #[tokio::test]
 async fn at_setup_a_yes_to_the_read_back_with_no_call_asks_the_face_question() {
-    let (sent, asked) = run_full(&[NO_CALL_NAME_LINE, NO_CALL_YES], None, None, Some(true)).await;
+    let (sent, asked) = run_full(
+        &[NO_CALL_NAME_LINE, NO_CALL_YES],
+        None,
+        None,
+        Some(true),
+        false,
+    )
+    .await;
     assert_eq!(sent, Vec::<Value>::new());
     assert!(asks_the_face(asked.last().unwrap()), "{asked:?}");
     for read_back in [
@@ -499,7 +549,14 @@ async fn at_setup_a_model_call_after_the_yes_keeps_it_once() {
 /// runs nothing the model did not call.
 #[tokio::test]
 async fn past_setup_a_yes_to_the_read_back_with_no_call_keeps_nothing() {
-    let (sent, asked) = run_full(&[NO_CALL_NAME_LINE, NO_CALL_YES], None, None, Some(false)).await;
+    let (sent, asked) = run_full(
+        &[NO_CALL_NAME_LINE, NO_CALL_YES],
+        None,
+        None,
+        Some(false),
+        false,
+    )
+    .await;
     assert_eq!(sent, Vec::<Value>::new());
     assert!(!asks_the_face(asked.last().unwrap()), "{asked:?}");
     let sent = run_at_setup(

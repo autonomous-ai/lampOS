@@ -1520,15 +1520,16 @@ With the switch:
     model is told the face is kept, or, when the eyes keep nothing, that it
     was not kept and why, and a model call after it gets
     `ALREADY_KEPT`, never a second save. A correction, a spelling, another
-    name, a no, a new save call, a second face seen speaking the yes (or,
-    where the eyes read speaking, the speaker not seen saying it), a line
-    held by a face's gap, another session or 45 s (`HELD_SAVE_FOR`) drops
-    it (lamp-52e6, 5 Nov, #5391's check: "Walter. Have I got that
-    right?" "Yes, that's my name." made no call and kept no face). A
-    plain yes dropped for the second face or the speaker not seen saying
-    it is told to the model as a face not kept, and why, so it makes up no
-    reason of its own (lamp-52e6, 5 Nov, Fifth's run B on #5415: "I need
-    to know who you are first"). With nothing held, while "who you are"
+    name, a no, a new save call, a second face seen speaking the yes, a
+    line held by a face's gap, another session or 45 s (`HELD_SAVE_FOR`)
+    drops it (lamp-52e6, 5 Nov, #5391's check: "Walter. Have I got that
+    right?" "Yes, that's my name." made no call and kept no face). A yes
+    no face was seen saying, even with no face in view, still runs it
+    (the lead, 9 Nov: the owner may not face the lamp; when the eyes then
+    find no face, the model is told it was not kept, and why). A plain
+    yes dropped for the second face is told to the model as a face not
+    kept, and why, so it makes up no reason of its own (lamp-52e6, 5 Nov,
+    Fifth's run B on #5415: "I need to know who you are first"). With nothing held, while "who you are"
     is still open and no face was kept in the last 45 s, a plain yes to
     the name the lamp's last answer said back, the name the person's line
     before gave (`known_faces::read_back_name`), has the model told to ask
