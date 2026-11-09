@@ -2311,7 +2311,10 @@ def test_the_volume_needs_the_speak_grant(tmp_path):
 # arguments, the event it waits for (said once it has subscribed), the ops it exists to send, and the
 # one refusal it may print: `look` at a face is not in this release
 # (docs/control.md), so follow.py asks and is told so. A new example needs its
-# row, so none is left untried. One that saves files runs in the test's own
+# row, so none is left untried. It is a smoke test: a long-running example is
+# stopped once it has sent its ops, so it shows the example starts and asks
+# what it is for, not that it ends well (a camera's saved file, say). One that
+# saves files runs in the test's own
 # folder instead (WRITES_FILES), so nothing is left in the repository.
 WRITES_FILES = {"camera.py"}
 EXAMPLE_RUNS = {
@@ -2344,7 +2347,10 @@ def test_every_example_runs_against_a_fake_lamp_and_sends_what_it_is_for(tmp_pat
     nudges = {
         "air": lambda fake: fake.set_air(pm2_5=41.0, co2_ppm=1350, feel="stuffy"),
         "arrived": lambda fake: fake.emit("person.arrived", count=1, near=0.3),
-        "hand": lambda fake: fake.emit_hand_track(hand_track("wave", seconds=1.0)),
+        # Paced as a lamp says them, as the JS test does: all at once, the
+        # track's last `seen: false` can land before the example waits for a
+        # hand, and it waits on for one (Python 3.10 CI on #5864).
+        "hand": lambda fake: fake.emit_hand_track(hand_track("wave", seconds=1.0), realtime=True),
         "phrase": lambda fake: fake.emit("phrase.heard", phrase="good night lamp"),
     }
 
@@ -2358,21 +2364,25 @@ def test_every_example_runs_against_a_fake_lamp_and_sends_what_it_is_for(tmp_pat
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
             )
             said = asyncio.ensure_future(ran.communicate())
-            deadline = asyncio.get_running_loop().time() + 15
-            if nudge:
-                while not fake.asked("subscribe") and not said.done():
-                    assert asyncio.get_running_loop().time() < deadline, name
-                    await asyncio.sleep(0.01)
-                await nudges[nudge](fake)
-            while not all(fake.asked(op) for op in ops) and not said.done():
-                if asyncio.get_running_loop().time() > deadline:
-                    break
-                await asyncio.sleep(0.02)
-            # A moment for what it prints after its last op, then it is stopped.
-            if not said.done():
-                await asyncio.sleep(0.5)
-            if not said.done():
-                ran.send_signal(signal.SIGTERM)
+            try:
+                deadline = asyncio.get_running_loop().time() + 15
+                if nudge:
+                    while not fake.asked("subscribe") and not said.done():
+                        assert asyncio.get_running_loop().time() < deadline, name
+                        await asyncio.sleep(0.01)
+                    await nudges[nudge](fake)
+                while not all(fake.asked(op) for op in ops) and not said.done():
+                    if asyncio.get_running_loop().time() > deadline:
+                        break
+                    await asyncio.sleep(0.02)
+                # A moment for what it prints after its last op, then it is stopped.
+                if not said.done():
+                    await asyncio.sleep(0.5)
+            finally:
+                # Stopped however this ends, so a failed check leaves no example
+                # running (Reviewer-two's P3 on #5834).
+                if ran.returncode is None:
+                    ran.send_signal(signal.SIGTERM)
             out = (await said)[0].decode()
             assert "Traceback" not in out, (name, out)
             assert ("not now" not in out) if not refusal else (refusal[0] in out), (name, out)

@@ -16,7 +16,10 @@ const folder = () => mkdtempSync(join(tmpdir(), 'lampos-test-'));
 // the event it waits for (said once it has subscribed), the ops it exists to
 // send, and the one refusal it may print: `look` at a face is not in this
 // release (docs/control.md), so follow.js asks and is told so. A new example
-// needs its row, so none is left untried. One that saves files runs in the
+// needs its row, so none is left untried. It is a smoke test: a long-running
+// example is stopped once it has sent its ops, so it shows the example starts
+// and asks what it is for, not that it ends well (a camera's saved file, say).
+// One that saves files runs in the
 // test's own folder instead (WRITES_FILES), so nothing is left in the
 // repository. test_client.py has the same.
 const WRITES_FILES = new Set(['camera.js']);
@@ -62,18 +65,23 @@ test('every example runs against a fake lamp and sends what it is for', async ()
       const exited = new Promise((resolve) => child.on('close', (code, signal) => resolve({ code, signal })));
       let done = false;
       exited.then(() => { done = true; });
-      const deadline = Date.now() + 15_000;
-      if (nudge) {
-        while (!fake.asked('subscribe').length && !done) {
-          assert.ok(Date.now() < deadline, name);
-          await sleep(10);
+      try {
+        const deadline = Date.now() + 15_000;
+        if (nudge) {
+          while (!fake.asked('subscribe').length && !done) {
+            assert.ok(Date.now() < deadline, name);
+            await sleep(10);
+          }
+          await nudges[nudge](fake);
         }
-        await nudges[nudge](fake);
+        while (!ops.every((op) => fake.asked(op).length) && !done && Date.now() < deadline) await sleep(20);
+        // A moment for what it prints after its last op, then it is stopped.
+        if (!done) await sleep(500);
+      } finally {
+        // Stopped however this ends, so a failed check leaves no example
+        // running (Reviewer-two's P3 on #5834).
+        if (!done) child.kill('SIGTERM');
       }
-      while (!ops.every((op) => fake.asked(op).length) && !done && Date.now() < deadline) await sleep(20);
-      // A moment for what it prints after its last op, then it is stopped.
-      if (!done) await sleep(500);
-      if (!done) child.kill('SIGTERM');
       const { code, signal } = await exited;
       assert.ok(!/Error|at file:/.test(out.replace(refusal ?? '\0', '')), `${name}: ${out}`);
       assert.ok(refusal ? out.includes(refusal) : !out.includes('not now'), `${name}: ${out}`);
