@@ -8571,3 +8571,23 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   socket at 100 ms. Full JS 91 passed, 2 skipped. Python unchanged by this fix.
 - Both review checkouts clean; no product edits or device/latency acceptance.
   #5835 correlation HOLD and #5419 wrong-topic deletion HOLD remain with owners.
+
+## 2026-11-09 — Second: microphone final-delivery privacy HOLD
+
+- HOLD #5839 `f64840ddd6deece0e315a17ad3c73674ac17b72a`.
+  Queued binary items have only media kind and bytes, not stream generation.
+  Off/on makes the client's boolean streaming check true again, allowing an
+  old queued block through before the replacement has a ring acknowledgement.
+- Native synthetic-data regression fails in 0.09 s: real Door/TLS writer,
+  actual Microphone lifecycle through a minimal test Parts adapter, silent
+  source and fixed 640-byte sample. The writer is held by current-thread
+  scheduling until stop/start completes. No hardware capture or production
+  hook. `/tmp/second-5839-old-audio.patch` and `.log`.
+- Control's initial parallel run: 150 pass, unchanged camera fixture fails;
+  isolated fixture passes and full serial control run passes 186. Python+MCP
+  193 pass/1 skip, JS 83 pass. Original failure log retained. No additional
+  grant/LAN/re-pair or SDK logging finding in this read.
+- Product mic1/mic2 decision remains First's; off-by-default unchanged. No
+  device action or latency acceptance. A delegated test attempt hit an
+  automated safety filter; the local synthetic-only regression was reviewed
+  and then run through the approved execution tool.
