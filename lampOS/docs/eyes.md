@@ -2148,7 +2148,8 @@ looking.
 
 ### A face from a photo (`--photo-dir`, faces from a photo)
 
-Off unless `lamp-eyes --photo-dir ABSOLUTE_PATH` is given, which needs the
+Off unless `lamp-eyes --photo-dir ABSOLUTE_PATH` is given (the product unit
+gives `--photo-dir /run/lampos-photos` since 9 Nov, #5750), which needs the
 recogniser (`--recogniser`, `--people`, `--who-socket`). On a lamp the
 folder is `/run/lampos-photos` (`lampos`'s, 0700), made at boot by the
 product's tmpfiles and belonging to neither the eyes' unit nor lamp-cloud's
