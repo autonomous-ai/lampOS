@@ -5,7 +5,7 @@ import { Lamp } from 'lampos';
 
 const lamp = await Lamp.connect();
 await lamp.on('phrase.heard', async () => {
-  await lamp.light('warm', 1, 30_000, 'breathe');
+  await lamp.light('warm', 2, 30_000, 'breathe'); // a breath needs level 2 or up
   await lamp.gesture('nod');
 }, { phrases: ['good night lamp'] });
 await lamp.closed();

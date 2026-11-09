@@ -4,6 +4,10 @@ when they leave, it lets go and the lamp's own life comes back.
 Needs the `look` grant (faces), and takes a body lease only while someone is
 there. A hand on the lamp's head or a conversation takes the body back, and
 this waits for the next arrival.
+
+Not yet on a lamp: lamp-control refuses `look` at a face in this release ("not
+in this release: look at a face or a name", docs/control.md), so today this
+prints that refusal and tries again 10 s later.
 """
 
 import asyncio
