@@ -8536,3 +8536,22 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   formatting and event assignment. No fresh runtime suite for descriptions.
 - Taking #5835 motion-completion protocol independent read; First's default
   marker and product-build PASS remain separate.
+
+## 2026-11-09 — Second: motion completion correlation HOLD and public handoff
+
+- HOLD #5835 `a43523888b1f7c37b1c50722abc7207911813c25`: two sockets
+  sharing one pairing both send request5 for different gestures. Only nod
+  begins/ends on the real bus, but both receive done5/finished, completing
+  headshake's SDK wait prematurely. Real TLS, Door, parts, mood socket and
+  bus; no production hook. Regression fails0.11s in disposable checkout;
+  `/tmp/second-5835-two-sockets.patch` and `.log`.
+- Existing exact-head control190 passed; Python+MCP196 passed/1 skipped;
+  JavaScript89 passed/2 skipped. Source also dispatches before registering
+  pending motion: early began/drop can be lost. Natural timing unmeasured.
+  Older-server capability fallback and no-move express paths look sound.
+- Third requested a remotely reachable adapter patch. Published artifact-only
+  branch second/face-forget-handoff-1109 at
+  `dee08b9910cad6547d5fa35da355fd76943326ae`, no product PR. Patch and README
+  under docs/verification/second-face-forget-handoff-20261109; unchanged
+  SHA25636fe6500a99b3185cfc11fbedbfee3a0baec4fb16027e25db9a401591b8764df.
+  Full/native gates still unperformed; Third owns carry and independent proof.
