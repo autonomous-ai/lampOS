@@ -8505,3 +8505,18 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   delayed deterministically. Held phrase entries zero, actual phrase handler
   one, wire unsubscribe then stale subscribe. Probe and log:
   `/tmp/second-5830-mcp-replay-off.py`, `.log`. Added evidence to existing HOLD.
+
+## 2026-11-09 — Second: skill-push removal HOLD lifted
+
+- READ-OK #5819 `52451d846a27a743e670879a211385dda3529d04`.
+  The expected pushing client is rechecked under the developer-folder lock,
+  which stays held through rename and deletion. Another client's replacement
+  or missing metadata refuses removal; owner/app callers retain their authority.
+- Original full pushed-request race probe passed1 with B's actual installed
+  replacement preserved and A refused. It retains its disclosed150ms arranged
+  window; source independently proves the check is under lock.
+- Clean exact-head skills suite664 passed,9 ignored; product manage-socket
+  invariant1 passed. Logs `/tmp/second-5819-fixed-race.log`,
+  `/tmp/second-5819-fixed-skills.log`, `/tmp/second-5819-fixed-product.log`.
+- Native ARM64/clippy pending at check; no product/device acceptance or PM
+  marker claimed. Prior equal-revision revoke issue stays latent, outside HOLD.
