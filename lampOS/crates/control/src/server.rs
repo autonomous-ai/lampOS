@@ -493,6 +493,12 @@ impl Shared {
                 }
                 Out::Heard(text) => {
                     let mut heard = Vec::new();
+                    // Counted, never the words (ten's phrase.heard finding on
+                    // lamp-75c9, 9 Nov): how many computers listen for phrases
+                    // and with how many phrases between them, and how many
+                    // phrases were told in this line.
+                    let mut listening = 0usize;
+                    let mut phrases = 0usize;
                     for open in self.open.lock().expect("open").values() {
                         if open.client.is_none()
                             || !open.grants.contains(&Grant::Hear)
@@ -500,6 +506,8 @@ impl Shared {
                         {
                             continue;
                         }
+                        listening += 1;
+                        phrases += open.phrases.len();
                         for phrase in phrases_in(&text, &open.phrases) {
                             if open.outbox.send(serde_json::json!({"ev": "phrase.heard", "at": at, "phrase": phrase})).is_ok()
                                 && let Some(client) = &open.client
@@ -508,6 +516,11 @@ impl Shared {
                             }
                         }
                     }
+                    eprintln!(
+                        "lamp-control: a finished line heard ({} words): {listening} listening for {phrases} phrases, {} told",
+                        crate::protocol::phrase_words(&text).len(),
+                        heard.len()
+                    );
                     // The kind alone: never the phrase, nor what was said.
                     self.journal_events(&heard, &serde_json::json!("phrase.heard"), now);
                 }
@@ -1375,6 +1388,10 @@ pub fn watch_bus(
         let sent = sent.clone();
         let clock = shared.clone();
         std::thread::spawn(move || {
+            // A payload that can't be read is passed over, said once per
+            // topic so a lamp shows why its events stopped (ten's
+            // phrase.heard finding on lamp-75c9, 9 Nov).
+            let mut unread_said = false;
             // What `watch` last read from this topic, and when: a state
             // message that says the same is passed over here, not handed on
             // (lamp-75c9's idle CPU was `voice/privacy`'s hundred a second),
@@ -1383,8 +1400,17 @@ pub fn watch_bus(
             loop {
                 match subscriber.recv(Duration::from_secs(1)) {
                     Ok(Some(message)) => {
-                        let Ok(payload) = message.json() else {
-                            continue;
+                        let payload = match message.json() {
+                            Ok(payload) => payload,
+                            Err(error) => {
+                                if !unread_said {
+                                    unread_said = true;
+                                    eprintln!(
+                                        "lamp-control: {topic}: a message not read, passed over: {error}"
+                                    );
+                                }
+                                continue;
+                            }
                         };
                         // When it came, not when the runtime gets to it: a
                         // runtime held up (a slow save) mustn't make a lease

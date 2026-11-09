@@ -375,8 +375,12 @@ with `Z` (`2026-10-27T08:40:01Z`): convert it to local time yourself. `welcome`,
   `seen: false` once, 1 s after the hand is gone. Never the picture or whose hand. Grant
   `look`. In development: the lamp doesn't track hands yet, so none comes.
 - `phrase.heard`: `phrase`, one this computer registered; never what else was said. Grant
-  `hear`. **A known bug on the customer build (9 Nov):** a subscribed phrase was not
-  delivered, though the lamp heard the line. Don't build on it until it's marked fixed.
+  `hear`. **On the customer build (9 Nov) a subscribed phrase is often not delivered:** the
+  phrase is matched against the recognizer's own words, and those can differ from what was
+  said ("Goodnight" for "good night", "lamps" for "lamp"). The next build matches both
+  (shown on a test lamp, 10 Nov 2026). Even then a phrase matches only the words the
+  recognizer writes, so pick short phrases of common words (two or three), and register
+  the variants you expect.
 - `name.heard`: the lamp's name was called; no fields on 10824, and `score` on 11048. Grant `hear`.
   Works today (9 Nov 2026). A sound like the name can wake the lamp, so a `name.heard` may
   come with nobody calling; 11048 adds `score` (0–1, how sure the listener was;
@@ -487,14 +491,14 @@ await Lamp.keep_connected(setup)
 - **Subscribe** to the events you want: `await lamp.on("person.arrived", handler)` (Python), `await lamp.on('person.arrived', handler)` (JS). The SDK sends one `subscribe` for the connection and calls your handler for each event. `lamp.off(event, handler)` unsubscribes once the last handler is gone. Lower level: `lamp.subscribe(events, phrases)` / `lamp.unsubscribe(events)`. MCP: `lamp_events` (poll with `since`, `wait_s`) and `lamp_wait_for`.
 - **An event** is one JSON message with `ev`, e.g. `{"ev": "person.arrived", "count": 1, "near": 0.3, "at": "2026-11-09T08:45:17Z"}`. Events about the room carry `at`, **in UTC** (it ends in `Z`). `welcome`, `lease` and `done` may not carry it.
 - **Each event needs its grant**: `person.*`, `hand`: `look`; `phrase.heard`, `name.heard`: `hear`; `sound.heard`: `sound`; `air.changed`: `air`; `volume.changed`: `speak`; `touch`, `button`, `lamp.changed`: none. Subscribing without the grant is refused `no_grant`, naming it.
-- **Phrases.** `phrase.heard` needs the phrases to listen for: at most 16 across a program's connections, each at most 64 characters and of 8 letters at least, and at most 6 changes a minute. Matching is on the lamp: lowercase words, the phrase as a run of words inside what was said. The program is told which of its phrases was heard, never what else was said. These caps are the `hear` grant's privacy bound.
+- **Phrases.** `phrase.heard` needs the phrases to listen for: at most 16 across a program's connections, each at most 64 characters and of 8 letters at least, and at most 6 changes a minute. Matching is on the lamp, against the recognizer's words: lowercase, apostrophes dropped, the phrase as a run of whole words inside the line, whether the recognizer joins or splits them ("goodnight" / "good night"), and with one "s" more on the heard last word ("lamps" for the phrase "lamp"; the next build). Register the singular to catch both. Anything else the recognizer writes differently is a miss, so register the variants you expect. The program is told which of its phrases was heard, never what else was said. These caps are the `hear` grant's privacy bound.
 - **What a program can't subscribe to:** the lamp's internal topics. Inside the lamp, its parts talk over a local message bus (`docs/bus.md`): the eyes, the voice, the body, the light each publish their own topics. That bus never leaves the lamp, and a program never joins it. `lamp-control` reads the topics it needs and turns them into the events above, so a program sees a curated, granted view. A program can't publish to the bus either.
 - **Delivery:** one program connection receives each event it subscribed to, as it happens; nothing is queued for a program that isn't connected. A program that reconnects subscribes again.
 
 | event | status |
 |---|---|
 | `name.heard` | **works today** (verified 9 Nov 2026, a computer received it on the customer build) |
-| `phrase.heard` | **known bug (9 Nov):** on the customer build a subscribed phrase was not delivered, though the lamp heard the line. A fix is in development. Reproduced as working on a development host; the cause on the lamp is being traced. Don't build on it until it's marked fixed |
+| `phrase.heard` | **next build** (a test lamp, 10 Nov 2026: one played line told three of a computer's phrases). The customer build misses a phrase when the recognizer joins its words ("Goodnight") or adds an "s" to its last word ("lamps"); the next build matches both (register the singular). A phrase still matches only the recognizer's words, so keep phrases short and register the variants you expect |
 | `lamp.changed`, `touch`, `button`, `person.*`, `hand`, `sound.heard`, `air.changed`, `volume.changed`, `body.state` | see "Every function" and "Each part of the lamp" |
 
 **The planned topics for a brain** (planned): a brain on the lamp gets the same events through its own local socket, plus, with the owner's consent, the lines the person speaks to the lamp while the brain holds the conversation lease.
@@ -801,7 +805,7 @@ Last verified 10 Nov 2026, on a test lamp running a customer build: 10824 unless
 | Turns: start a turn | works today (9 Nov 2026) | the lamp's own model answers the turn |
 | Turns: end a turn, the program's own mute | works today (9 Nov 2026) | on build 10824 a begun turn ended in 31 ms; the mute held in 62 ms and lifted in 8 ms, a second hold or lift answering `held` / `nothing_held`. Ending a turn that hasn't begun yet is refused `busy` on 10824; `stop()` drops a start still queued, not one whose prompt is being said. A fix is in review (#5870) |
 | Events: arrival, a tap, the rest | in today's build, lamp run pending | |
-| `phrase.heard` | in today's build, lamp run pending | a known bug on the customer build (9 Nov): a subscribed phrase was not delivered, though the lamp heard the line; don't build on it until it's marked fixed; the fix is in development |
+| `phrase.heard` | next build (delivered on a test lamp, 10 Nov 2026) | on the customer build a phrase is missed when the recognizer writes it joined ("Goodnight") or with an "s" on its last word ("lamps"); the next build matches both; matching is on the recognizer's words, so register short phrases and their variants |
 | Follow a hand | in development: the lamp doesn't track hands yet, and its body doesn't follow one yet | the door is in; nothing on the lamp publishes `humans/hands/tracked`, and lamp-body refuses a hold that says `follow` (the lease ends `released`) |
 | Camera snapshot and stream | works today (9 Nov 2026) | about 2 frames a second at about 320 px today |
 | Volume | works today (9 Nov 2026) | set, step and read; `volume.changed` not yet shown |
