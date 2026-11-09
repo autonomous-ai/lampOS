@@ -31,6 +31,7 @@ from lampos.client import SAY_MAX_BYTES
 from mcp.server.fastmcp import FastMCP, Image
 from mcp.server.fastmcp.exceptions import ToolError
 from pydantic import AnyUrl
+from .relink import Relink
 
 # The body's clips an agent is offered: the schema's `examples`, which leave
 # out `idle`, the lamp's own life, and `scanning`, a room sweep (CLAUDE.md
@@ -895,9 +896,12 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         for event in streamed:
             try:
                 await lamp.on(event, heard_any)
-            except LampError:
-                # An event the lamp doesn't say yet is left out, not fatal.
-                lamp.off(event, heard_any)
+            except LampError as error:
+                # The lamp away (`closed`, a restart): kept, so it is made
+                # again on the next connection (Second's P2 on #5830). An
+                # event the lamp doesn't say yet is left out, not fatal.
+                if error.code != "closed":
+                    lamp.off(event, heard_any)
 
     @server.resource("lamp://events", mime_type="application/json")
     async def events_stream() -> dict:
@@ -948,8 +952,13 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
 
 
 async def serve(lamp_id: str | None, client: str | None) -> None:
-    async with await Lamp.connect(lamp_id) as lamp:
-        await build(lamp, client=client).run_stdio_async()
+    # Connected again by itself after the lamp restarts (every update), so an
+    # agent's tools keep working for as long as lamp-mcp runs (`relink.py`).
+    lamp = await Relink.connect(lamp_id)
+    try:
+        await build(lamp, client=client).run_stdio_async()  # type: ignore[arg-type]
+    finally:
+        await lamp.close()
 
 
 def main(argv: list[str] | None = None) -> None:
