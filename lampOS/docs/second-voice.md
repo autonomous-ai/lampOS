@@ -4555,9 +4555,14 @@ after a take-over, but now for every turn:
       runs do not establish a worst-case deadline. The Mac workspace build
       also passed on that source.
 
-      Linux speaker-helper and actual speaker-loop tests have **not run**.
-      Run the `speech_cut` filter on Linux to include those tests. The real-loop
-      null-device test checks control-to-physical-reset receipt ordering and
+      At source head `4ea13ebf1a`, [Linux ARM64 CI run 42605683226](https://github.com/autonomous-ai/lampOS/actions/runs/42605683226)
+      passed **10,748 selected tests, 62 skipped**, including the Linux speaker
+      helpers and actual speaker-loop ALSA-null reset-before-ACK case. Linux
+      clippy also passed. The Mac full voice-library run had 5,407 passed,
+      15 ignored and one unchanged TCP-pool test failure; that test passed its
+      isolated rerun. The Mac full run is not claimed green.
+      Run the `speech_cut` filter on Linux to reproduce the speaker cases.
+      The real-loop null-device test checks control-to-physical-reset receipt ordering and
       duplicate acknowledgment, not retained audible PCM. An ALSA null sink
       alone cannot establish held device-tail removal. The remaining fixture
       and device checks must distinguish accepted-but-unplayed PCM from
