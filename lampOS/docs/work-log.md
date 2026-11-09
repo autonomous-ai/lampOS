@@ -8520,3 +8520,19 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   `/tmp/second-5819-fixed-skills.log`, `/tmp/second-5819-fixed-product.log`.
 - Native ARM64/clippy pending at check; no product/device acceptance or PM
   marker claimed. Prior equal-revision revoke issue stays latent, outside HOLD.
+
+## 2026-11-09 — Second: optional name score and UTC descriptions
+
+- READ-OK #5836 `e4faafb5621d1a793c1dece3e931b398e93766b2`.
+  Traced listener peak score through Watch and the existing paired/subscribed
+  Hear-grant gate. Finite numeric scores clamp0–1 and round to hundredths;
+  absent/malformed values omitted. Optional field adds no words or identity.
+  Exact-head control suite181 passed; all three schema copies byte-identical.
+  Initial cargo invocation at repo root had no workspace; corrected lampOS/
+  run passed. No device/false-wake/latency acceptance claim.
+- READ-OK #5838 `4e56c68fb04fa4c4b07935fdafbfabc0575705d9`.
+  Recursively compared parsed parent/head schemas: exactly two description
+  values changed; all three copies identical. Verified exact-head UTC server
+  formatting and event assignment. No fresh runtime suite for descriptions.
+- Taking #5835 motion-completion protocol independent read; First's default
+  marker and product-build PASS remain separate.
