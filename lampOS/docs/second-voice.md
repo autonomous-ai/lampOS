@@ -4430,8 +4430,14 @@ after a take-over, but now for every turn:
       outcomes of calls already run. It carries no earlier exchanges,
       memory notes, injected personal names, tool arguments or results,
       reasoning, per-turn notes, or picture. A confirmed held forget before
-      round 1 uses the same boundary. Locally held or refused calls do not
-      clear the context. Custom character-file text remains configuration.
+      round 1 uses the same boundary. Earlier tool rounds retained for a
+      later turn are cleared at admission, before awaiting either the held
+      or ordinary forget call, alongside the pending rename. Cutting or
+      dropping the turn during that await cannot leave those rounds for
+      the next turn. The after-return reset still rebuilds the current
+      turn's local messages with fixed outcomes. Calls held or refused
+      before admission do not clear the context. Custom character-file
+      text remains configuration.
       Calls left in that model batch are not run: their arguments came from
       the old context. The next round may plan the remaining work afresh,
       and is told not to repeat calls already run. Partial deletion and
