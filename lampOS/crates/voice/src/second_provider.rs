@@ -13086,7 +13086,7 @@ async fn answer(
                     call.name
                 );
                 call_statuses.push(after_forget::status(&call.name, &result));
-                if after_forget::is_memory_forget(&call.name) {
+                if crate::remember::is_forget(&call.name) {
                     messages = after_forget::context(
                         &shared.after_forget_instruction,
                         &words,
@@ -14969,7 +14969,7 @@ async fn answer(
                     );
                 }
                 call_statuses.push(after_forget::status(&call.name, &answer.told));
-                if after_forget::is_memory_forget(&call.name) {
+                if crate::remember::is_forget(&call.name) {
                     messages = after_forget::context(
                         &shared.after_forget_instruction,
                         &words,
