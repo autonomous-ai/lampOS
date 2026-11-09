@@ -997,7 +997,11 @@ once", "not told: <kết quả của cổng>" hoặc "not told (<lý do>)". Tắ
 soạn và kiểm tra skill: môi trường của chúng vốn bị xoá sạch, và thiếu nó thì
 công tắc ở đó là tắt trên lamp-9adf ngày 4/11),
 `made_skill::brief` cho qua một yêu cầu nêu đúng một dịch vụ liên kết có việc
-đọc cố định và không có từ ghi nào ("send", "reply", "add", "post", "schedule", ...);
+đọc cố định và không có từ ghi nào ("send", "reply", "add", "post", "schedule", ...),
+kể cả dạng có "s" của mỗi từ ("schedules", "posts", "forwards"), vì model của
+giọng nói hay viết skill như vậy ("a skill that checks my calendar and
+schedules a meeting", dòng test của #5719 trên lamp-9adf; trừ "marks", thường là
+thứ được đọc hơn);
 những yêu cầu còn lại được báo đúng giới hạn của chúng, bằng lời nói với người
 dùng (bảng của tester, 6/11: "a skill is limited with no reason"), không bao giờ
 là `NOT_A_SERVICE`, vì câu đó nói không skill nào dùng được dịch vụ, điều sai
@@ -1008,13 +1012,13 @@ more."), và một dịch vụ không có gì cho kỹ năng tự tạo đọc, 
 `NOT_READABLE` ("... can read one linked service, but not that one."). Câu nào
 cũng kết thúc bằng "You can ask me for it yourself any time." Việc xin chính skill
 không phải là ghi: các từ trước "skill" chỉ để xin nó ("create me a new skill
-that ...", "add a skill to ...") được bỏ ra trước. "Schedule", "post" và "book"
+that ...", "add a skill to ...") được bỏ ra trước. "Schedule", "post" và "book" (cả "schedules", "posts", "books")
 đứng sau "my", "the", "tomorrow's", "latest", "last" hay "newest" là thứ được
 đọc, dù sau đó là gì ("read me my schedule on my calendar"), trừ khi "say" hay
 "saying" theo sau mà không có lời xin đọc nào ("latest post: say hi on
 Facebook"). Đứng sau "tomorrow", "today", "day", "calendar", "facebook" hay
 "page" thì chúng chỉ là thứ được đọc khi đứng sau một từ xin đọc ("read",
-"tell", "what", "show", "check": "read me my Facebook post about the sale"),
+"tell", "what", "show", "check", hay "reads", "tells", "shows", "checks": "read me my Facebook post about the sale"),
 hoặc ở cuối yêu cầu hay trước "from" hoặc "of" ("my latest Facebook post"),
 còn lại là động từ ("tomorrow book the room", "my calendar book the room",
 "tomorrow book for me a table"; các P3 của El trên #5690 và các P2 trên #5696).

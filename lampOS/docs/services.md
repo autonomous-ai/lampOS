@@ -975,7 +975,10 @@ otherwise cleared, and without it the switch was off there on lamp-9adf
 on 4 Nov),
 `made_skill::brief` lets a request through that names one linked service
 with a fixed read and no write word ("send", "reply", "add", "post", "schedule",
-...). The rest are told their own limit, in the person's words (the testers'
+...), each in its "s" form too ("schedules", "posts", "forwards"), as the
+voice's model often words a skill ("a skill that checks my calendar and
+schedules a meeting", #5719's row on lamp-9adf; not "marks", more often the
+thing read). The rest are told their own limit, in the person's words (the testers'
 sheet, 6 Nov: "a skill is limited with no reason"), never `NOT_A_SERVICE`,
 which says no skill can use a service and is false with the switch on:
 a write is `NOT_A_WRITE` ("Not possible yet: a skill can read one linked
@@ -986,13 +989,14 @@ and a service with nothing a made skill reads, such as Notion, is
 ends "You can ask me for it yourself any time." Asking for
 the skill itself is no write: words before "skill" that only ask for it
 ("create me a new skill that ...", "add a skill to ...") are left out
-first. "Schedule", "post" and "book" after "my", "the", "tomorrow's",
+first. "Schedule", "post" and "book" (and "schedules", "posts", "books") after "my", "the", "tomorrow's",
 "latest", "last" or "newest" are the thing read, whatever follows
 ("read me my schedule on my calendar"), unless "say" or "saying" follows
 with nothing asked to be read ("latest post: say hi on
 Facebook"). After "tomorrow", "today", "day", "calendar", "facebook" or
 "page" they are the thing read only after a word asking to be read
-("read", "tell", "what", "show", "check": "read me my Facebook post about
+("read", "tell", "what", "show", "check", or "reads", "tells", "shows",
+"checks": "read me my Facebook post about
 the sale"), or at the request's end or before "from" or "of" ("my latest
 Facebook post"), else a verb ("tomorrow book the room", "my calendar book
 the room", "tomorrow book for me a table"; El's P3s on #5690 and P2s on

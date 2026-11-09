@@ -178,15 +178,44 @@ const SERVICE_CODES: [(&str, &str); 20] = [
 /// Words of a request that would write, send or change something: a made
 /// skill only reads (writes are not ruled yet).
 /// ("posts" is left out: a Page's posts are read.)
-const WRITE_WORDS: [&str; 21] = [
-    "send", "sends", "draft", "drafts", "reply", "replies", "write", "writes", "add", "adds",
-    "post", "create", "creates", "forward", "delete", "mark", "archive", "invite", "book",
-    "schedule", "put",
+/// With each verb's "s" form too, as the voice's model often words a
+/// skill: "a skill that checks my calendar and schedules a meeting" (#5719's
+/// row on lamp-9adf). Not "marks", more often the thing read.
+const WRITE_WORDS: [&str; 29] = [
+    "send",
+    "sends",
+    "draft",
+    "drafts",
+    "reply",
+    "replies",
+    "write",
+    "writes",
+    "add",
+    "adds",
+    "post",
+    "posts",
+    "create",
+    "creates",
+    "forward",
+    "forwards",
+    "delete",
+    "deletes",
+    "mark",
+    "archive",
+    "archives",
+    "invite",
+    "invites",
+    "book",
+    "books",
+    "schedule",
+    "schedules",
+    "put",
+    "puts",
 ];
 
 /// Write words that are also things read: "my schedule", "my latest
 /// Facebook post", "the book titles" (El's P3 on #5679).
-const ALSO_A_THING: [&str; 3] = ["schedule", "post", "book"];
+const ALSO_A_THING: [&str; 6] = ["schedule", "schedules", "post", "posts", "book", "books"];
 
 /// Words before one of [`ALSO_A_THING`] that make it the thing read,
 /// whatever follows: "my schedule on my calendar", "the latest post on
@@ -212,7 +241,9 @@ const A_THING_BEFORE: [&str; 2] = ["from", "of"];
 /// last post saying we are open, read it to me"), not a post to write
 /// ("latest post: say hi on Facebook"). With none, "my latest post saying
 /// sale on Facebook" can't be told from that write, so it is one.
-const ASKED_TO_READ: [&str; 6] = ["read", "reads", "tell", "what", "show", "check"];
+const ASKED_TO_READ: [&str; 9] = [
+    "read", "reads", "tell", "tells", "what", "show", "shows", "check", "checks",
+];
 
 /// Words after one of [`ALSO_A_THING`] that make it a verb after one of
 /// [`MAYBE_A_THING_AFTER`] in a new clause, even with a read asked for
@@ -319,7 +350,7 @@ fn read_of(request: &str) -> Result<(&'static str, Option<&'static str>), &'stat
             && !(ALSO_A_THING.contains(word) && a_thing(&words, at))
             // "put" writes to a service only when one is named after it:
             // "put the count on the light" is the lamp's own.
-            && (*word != "put" || puts_to_a_service(&words, at))
+            && (!["put", "puts"].contains(word) || puts_to_a_service(&words, at))
     });
     if writes {
         return Err(NOT_A_WRITE);
@@ -2658,6 +2689,12 @@ light = { dim = 1 }
             "show me my calendar schedule a week ahead",
             "read me the facebook post it showed me",
             "read me today and tomorrow schedule on my calendar",
+            // The "s" forms, as the voice's model words a skill (#5719's
+            // row): a thing read stays a read.
+            "a skill that checks my calendar schedules for today",
+            "a skill that reads me my latest Facebook posts",
+            "a skill that tells me the books in my Google Drive",
+            "read me the files in my Google Drive and puts the count on the light",
         ] {
             assert!(brief_with(request, true).is_ok(), "{request}");
         }
@@ -2727,6 +2764,16 @@ light = { dim = 1 }
             "what's on my calendar, then tomorrow book me a room",
             "check my calendar and tomorrow schedule the meeting",
             "check facebook and today post my photo",
+            // #5719's row on lamp-9adf: the voice's model asked with the
+            // verbs' "s" forms, which were read as things.
+            "a skill that checks my calendar and schedules a meeting tomorrow",
+            "a skill that posts a photo on Facebook every morning",
+            "a skill that books a table on my calendar every Friday",
+            "a skill that forwards my latest mail to the team",
+            "a skill that deletes my last email",
+            "a skill that invites Sam on my calendar",
+            "a skill that archives my mail",
+            "a skill that puts my mail in Google Drive",
         ] {
             assert_eq!(brief_with(request, true), Err(NOT_A_WRITE), "{request}");
         }
