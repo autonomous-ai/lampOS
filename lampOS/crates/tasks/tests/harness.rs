@@ -575,7 +575,8 @@ fn with_route_the_router_is_asked_first_and_its_pick_is_the_tasks_agent() {
     assert_eq!(
         outcome,
         LaunchOutcome::Joined {
-            agent_id: AGENT.into()
+            agent_id: AGENT.into(),
+            session: None,
         }
     );
     assert_eq!(called, ["machines", "route"]);
@@ -690,6 +691,18 @@ fn worked_row(id: &str, name: &str, state: &str, asks: &[&str], about: &str) -> 
     row
 }
 
+/// A join with how its session is known left out: what the tests of which
+/// session was found compare.
+fn bare(outcome: LaunchOutcome) -> LaunchOutcome {
+    match outcome {
+        LaunchOutcome::Joined { agent_id, .. } => LaunchOutcome::Joined {
+            agent_id,
+            session: None,
+        },
+        outcome => outcome,
+    }
+}
+
 /// #5535: the sessions are listed within the launch's bound, not the read
 /// bound. On lamp-c0a4 on 9 Nov, `ps --all` of the person's Mac took up to
 /// 10 s, and a hand-over said yes to twice ended `sessions_timeout`.
@@ -712,9 +725,10 @@ fn with_reply_named_a_slow_session_list_waits_for_the_launch_bound() {
     let mut request = launch();
     request.session = Some("docs".into());
     assert_eq!(
-        rig.cli().launch(&request),
+        bare(rig.cli().launch(&request)),
         LaunchOutcome::Joined {
-            agent_id: AGENT.into()
+            agent_id: AGENT.into(),
+            session: None,
         }
     );
 }
@@ -769,7 +783,7 @@ fn with_reply_named_a_session_is_found_by_what_it_worked_on() {
         }));
         let mut request = launch();
         request.session = Some(session.into());
-        let outcome = rig.cli().launch(&request);
+        let outcome = bare(rig.cli().launch(&request));
         let replied_to = rig
             .calls()
             .iter()
@@ -801,7 +815,8 @@ fn with_reply_named_a_session_is_found_by_what_it_worked_on() {
             pick(said, rows.clone()),
             (
                 LaunchOutcome::Joined {
-                    agent_id: AGENT.into()
+                    agent_id: AGENT.into(),
+                    session: None,
                 },
                 Some(AGENT.into())
             ),
@@ -812,7 +827,8 @@ fn with_reply_named_a_session_is_found_by_what_it_worked_on() {
     assert_eq!(
         pick("the weather app", weather_first.clone()).0,
         LaunchOutcome::Joined {
-            agent_id: OTHER.into()
+            agent_id: OTHER.into(),
+            session: None,
         }
     );
     // Nothing of its work, or only words that say "which one".
@@ -885,7 +901,8 @@ fn with_reply_named_a_session_is_found_by_what_it_worked_on() {
     assert_eq!(
         pick("the weather dashboard one", json!([dashboard])).0,
         LaunchOutcome::Joined {
-            agent_id: AGENT.into()
+            agent_id: AGENT.into(),
+            session: None,
         }
     );
     // A word with an ending is the word; a longer word is not (the
@@ -900,7 +917,8 @@ fn with_reply_named_a_session_is_found_by_what_it_worked_on() {
     assert_eq!(
         pick("the test fix", json!([tests])).0,
         LaunchOutcome::Joined {
-            agent_id: AGENT.into()
+            agent_id: AGENT.into(),
+            session: None,
         }
     );
     let testament = worked_row(
@@ -930,9 +948,89 @@ fn with_reply_named_a_session_is_found_by_what_it_worked_on() {
     assert_eq!(
         pick("the user tax session", json!([user_tax])).0,
         LaunchOutcome::Joined {
-            agent_id: AGENT.into()
+            agent_id: AGENT.into(),
+            session: None,
         }
     );
+}
+
+/// #5535, the Reviewer-lead's P2 on #5784 at 71bf964baa: the session a
+/// named hand-over joined is kept with it, so the voice can say which one
+/// took the work and a wrong join is heard at once. Its own name, never a
+/// lamp-made `lamp-<hex>` one, else its folder's last part when it has no
+/// name, and the first thing it was asked, cut at a word. A routed join
+/// keeps none.
+#[test]
+fn with_reply_named_the_joined_session_is_kept_by_its_name_and_first_ask() {
+    let joined = |session: &str, rows: Value| -> Value {
+        let mut rig = Rig::new();
+        rig.config.reply_named = true;
+        rig.config.route = true;
+        rig.config.engines_ready = true;
+        let id = rows[0]["id"].as_str().unwrap().to_owned();
+        rig.plan(json!({
+            "machines":{"default":true},"new":{"default":true},"route":{"default":true},
+            "ps":step(json!({"you":null,"machine":"desk-pc","harnesses":rows,"next":[]})),
+            "reply":step(json!({"ok":true,"name":"x","id":id,"message":"m1","state":"queued"}))
+        }));
+        let mut request = launch();
+        request.session = Some(session.into());
+        let outcome = serde_json::to_value(rig.cli().launch(&request)).unwrap();
+        assert_eq!(outcome["kind"], "joined", "{outcome}");
+        outcome
+    };
+    // A lamp-made name says nothing: what it was asked does.
+    let books = worked_row(
+        AGENT,
+        "lamp-b1287be53f02104bd6a17de348f1afde",
+        "idle",
+        &["  Write a short\nbook program.  ", "Add a search."],
+        "I wrote books.py.",
+    );
+    assert_eq!(
+        joined("the book program one", json!([books]))["session"],
+        json!({"ask":"Write a short book program."})
+    );
+    // Its own name, and its first ask.
+    let mut docs = ps_row(AGENT, "Docs-Update", "idle", Some("/home/person/work/site"));
+    docs["asks"] = json!(["Update the setup page"]);
+    assert_eq!(
+        joined("docs update", json!([docs]))["session"],
+        json!({"name":"Docs-Update","ask":"Update the setup page"})
+    );
+    // No name: its folder's last part; nothing asked yet: no ask.
+    let site = ps_row(AGENT, "", "idle", Some("/home/person/work/site/"));
+    assert_eq!(
+        joined("site", json!([site]))["session"],
+        json!({"name":"site"})
+    );
+    // A long first ask is cut at a word, to at most 80 characters.
+    let long = "Rewrite the reading list program so that every book keeps its author, its year and a short note of what the person thought";
+    let wordy = worked_row(AGENT, "lamp-a17b", "idle", &[long], "");
+    let ask = joined("the reading list", json!([wordy]))["session"]["ask"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(ask.chars().count() <= 80, "{ask}");
+    assert!(ask.ends_with('…'), "{ask}");
+    assert!(
+        long.starts_with(ask.trim_end_matches('…').trim_end()),
+        "{ask}"
+    );
+    assert!(
+        long[ask.trim_end_matches('…').len()..].starts_with(' '),
+        "{ask}"
+    );
+    // The router's join: no session kept.
+    let mut rig = Rig::new();
+    rig.config.route = true;
+    rig.plan(
+        json!({"machines":{"default":true},"new":{"default":true},"route":step(
+            json!({"decided":"session","id":AGENT,"name":"Fix login","sent":{"state":"queued"}})
+        )}),
+    );
+    let routed = serde_json::to_value(rig.cli().launch(&launch())).unwrap();
+    assert_eq!(routed, json!({"kind":"joined","agent_id":AGENT}));
 }
 
 /// #5535, `serve --reply-named`: a launch that names a session is typed
@@ -959,7 +1057,7 @@ fn with_reply_named_a_named_session_is_typed_into_and_never_started_new() {
         }));
         let mut request = launch();
         request.session = Some(session.into());
-        let outcome = rig.cli().launch(&request);
+        let outcome = bare(rig.cli().launch(&request));
         (outcome, verbs(&rig), rig)
     };
     let took =
@@ -977,7 +1075,8 @@ fn with_reply_named_a_named_session_is_typed_into_and_never_started_new() {
     assert_eq!(
         outcome,
         LaunchOutcome::Joined {
-            agent_id: AGENT.into()
+            agent_id: AGENT.into(),
+            session: None,
         }
     );
     assert_eq!(called, ["machines", "ps", "reply"]);
@@ -1001,13 +1100,15 @@ fn with_reply_named_a_named_session_is_typed_into_and_never_started_new() {
     assert_eq!(
         named("Site", rows.clone(), took(AGENT)).0,
         LaunchOutcome::Joined {
-            agent_id: AGENT.into()
+            agent_id: AGENT.into(),
+            session: None,
         }
     );
     assert_eq!(
         named("docs", rows.clone(), took(AGENT)).0,
         LaunchOutcome::Joined {
-            agent_id: AGENT.into()
+            agent_id: AGENT.into(),
+            session: None,
         }
     );
     // Busy, asking, or only stopped: not sent, never new.
@@ -1031,7 +1132,8 @@ fn with_reply_named_a_named_session_is_typed_into_and_never_started_new() {
     assert_eq!(
         named("docs", both, took(AGENT)).0,
         LaunchOutcome::Joined {
-            agent_id: AGENT.into()
+            agent_id: AGENT.into(),
+            session: None,
         }
     );
     // None fits, or two live ones do: asked about, never guessed.
@@ -1089,7 +1191,8 @@ fn with_reply_named_a_named_session_is_typed_into_and_never_started_new() {
     assert_eq!(
         named("api cli", worded.clone(), took(AGENT)).0,
         LaunchOutcome::Joined {
-            agent_id: AGENT.into()
+            agent_id: AGENT.into(),
+            session: None,
         }
     );
     assert_eq!(

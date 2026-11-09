@@ -196,10 +196,15 @@ pub enum LaunchOutcome {
         agent_id: String,
     },
     /// The task's words were typed into a session the person already had,
-    /// which Harness's router chose (`serve --route`): its agent is that
-    /// session, which the lamp never closes.
+    /// which Harness's router chose (`serve --route`) or the person named
+    /// (`serve --reply-named`): its agent is that session, which the lamp
+    /// never closes.
     Joined {
         agent_id: String,
+        /// Which of the person's sessions it is, as they would know it, for
+        /// one they named ([`Cli::reply_named`]); none for the router's.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        session: Option<JoinedSession>,
     },
     Pending {
         creation_id: String,
@@ -210,6 +215,20 @@ pub enum LaunchOutcome {
     Uncertain {
         code: String,
     },
+}
+
+/// The person's own session a named hand-over was typed into, as they
+/// would know it: its name, or its folder's last part when it has none,
+/// never a lamp-made `lamp-<hex>` one, and the first thing it was asked, cut
+/// at a word. Kept on the task so the voice says which session took the
+/// work and a wrong join is heard at once (the Reviewer-lead's P2 on #5784
+/// at 71bf964baa). At least one is there.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct JoinedSession {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ask: Option<String>,
 }
 
 /// How closing one harness this lamp started went (#1390).
@@ -1073,7 +1092,10 @@ impl Cli {
                     "tasks: {}: routed to a session already there, in {ms} ms",
                     launch.name
                 );
-                Some(LaunchOutcome::Joined { agent_id })
+                Some(LaunchOutcome::Joined {
+                    agent_id,
+                    session: None,
+                })
             }
             Routed::Busy => {
                 eprintln!(
@@ -1130,9 +1152,9 @@ impl Cli {
             self.config.launch_timeout,
         );
         seen.took(&listed);
-        let agent_id = match listed {
+        let (agent_id, joined) = match listed {
             Ok(reply) if reply.success => match named_session(&reply.stdout, session) {
-                Named::Idle(agent_id) => agent_id,
+                Named::Idle(agent_id, joined) => (agent_id, joined),
                 Named::Refused(code) => {
                     eprintln!(
                         "tasks: {}: the named session: {code}, not sent",
@@ -1173,7 +1195,10 @@ impl Cli {
                     "tasks: {}: typed into the named session, in {ms} ms",
                     launch.name
                 );
-                LaunchOutcome::Joined { agent_id }
+                LaunchOutcome::Joined {
+                    agent_id,
+                    session: joined,
+                }
             }
             // Taken by Harness, and an answer that can't say for this
             // session: the words may be there, so never asked again (the
@@ -3269,8 +3294,9 @@ fn route_answer(bytes: &[u8]) -> Routed {
 /// What `harness ps --all --json` says of the session the person named.
 #[derive(Debug, PartialEq, Eq)]
 enum Named {
-    /// One live session fits and it is idle: its id.
-    Idle(String),
+    /// One live session fits and it is idle: its id, and how the person
+    /// would know it.
+    Idle(String, Option<JoinedSession>),
     /// Why nothing is typed.
     Refused(&'static str),
 }
@@ -3368,12 +3394,70 @@ fn named_session(bytes: &[u8], session: &str) -> Named {
         [] if fits.is_empty() => Named::Refused("session_not_found"),
         [] => Named::Refused("session_stopped"),
         [row] => match (row["id"].as_str(), row["state"].as_str()) {
-            (Some(id), Some("idle")) if agent_id(id) => Named::Idle(id.to_owned()),
+            (Some(id), Some("idle")) if agent_id(id) => {
+                Named::Idle(id.to_owned(), joined_session(row))
+            }
             (Some(id), _) if agent_id(id) => Named::Refused("session_busy"),
             _ => Named::Refused("sessions_failed"),
         },
         _ => Named::Refused("session_ambiguous"),
     }
+}
+
+/// The most characters of a joined session's first ask kept on its task
+/// ([`JoinedSession`]): enough to know the work by, never the whole of it.
+const MOST_JOINED_ASK_CHARS: usize = 80;
+
+/// Whether a session's name is one the lamp made (`lamp-` and hex, as
+/// `engine::task_label` makes them): it names no work the person knows.
+fn lamp_made(name: &str) -> bool {
+    name.strip_prefix("lamp-")
+        .is_some_and(|rest| !rest.is_empty() && rest.chars().all(|c| c.is_ascii_hexdigit()))
+}
+
+/// How the person would know a `harness ps` row ([`JoinedSession`]): its
+/// name, or, with none, its folder's last part, never a lamp-made one; a
+/// lamp-made session's folder is the lamp's target folder, the same for
+/// every task it hands over, so it tells nothing apart. And the first thing
+/// it was asked, on one line, cut at a word to [`MOST_JOINED_ASK_CHARS`]
+/// with "…". None when it has neither.
+fn joined_session(row: &Value) -> Option<JoinedSession> {
+    let flat = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let name = flat(row["name"].as_str().unwrap_or_default());
+    let name = if name.is_empty() {
+        row["folder"]
+            .as_str()
+            .and_then(|folder| folder.trim_end_matches('/').rsplit('/').next())
+            .map(flat)
+            .unwrap_or_default()
+    } else {
+        name
+    };
+    let name = (!name.is_empty() && !lamp_made(&name)).then_some(name);
+    let ask = row["asks"]
+        .as_array()
+        .and_then(|asks| asks.first())
+        .and_then(Value::as_str)
+        .map(flat)
+        .filter(|ask| !ask.is_empty())
+        .map(|ask| cut_at_word(&ask, MOST_JOINED_ASK_CHARS));
+    (name.is_some() || ask.is_some()).then_some(JoinedSession { name, ask })
+}
+
+/// `text` whole when it is at most `most` characters, else cut at the last
+/// space that leaves room for "…" (at a character when it has none), and
+/// "…": at most `most` characters either way.
+fn cut_at_word(text: &str, most: usize) -> String {
+    if text.chars().count() <= most {
+        return text.to_owned();
+    }
+    // `most` characters: a space at the last of them still leaves room.
+    let kept: String = text.chars().take(most).collect();
+    let cut = match kept.rfind(' ').filter(|at| *at > 0) {
+        Some(at) => kept[..at].to_owned(),
+        None => kept.chars().take(most.saturating_sub(1)).collect(),
+    };
+    format!("{}…", cut.trim_end())
 }
 
 /// Words that say which session, not what it did: "the one from before",
