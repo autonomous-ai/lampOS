@@ -340,7 +340,9 @@ Pinned in `tests/it/app_contract.rs` with the stand-in helper.
 
 Off unless `LAMP_PHOTO_FACES=on`, with the photo folder
 (`LAMP_EYES_PHOTO_DIR`, the folder given to `lamp-eyes --photo-dir`) and
-the eyes' request socket (`LAMP_EYES_WHO_SOCKET`).
+the eyes' request socket (`LAMP_EYES_WHO_SOCKET`). On in the product
+since 9 Nov (#5750): lamp-cloud's, the eyes' and the voice's product units
+set all of it, pinned by `crates/update/tests/install.rs`.
 
 - **The folder is `/run/lampos-photos`**, `lampos`'s at 0700, made at boot
   by the product's tmpfiles (`deploy/product/lampos.conf`), and lamp-cloud's
@@ -352,8 +354,9 @@ the eyes' request socket (`LAMP_EYES_WHO_SOCKET`).
   restart: then read-only to lamp-cloud under `ProtectSystem=strict`, and
   every `faces.add_photo` failed until lamp-cloud restarted (reviewer-two
   and Reviewer-lead on #2263, Mobile on lamp-0c89).
-- **A lamp switching it on** sets both units, each in a drop-in. lamp-cloud's
-  takes the three variables:
+- **A lamp switching it on** without the product units (a lamp-4ace or a
+  moved lamp) sets both units, each in a drop-in. lamp-cloud's takes the
+  three variables:
 
       [Service]
       Environment=LAMP_PHOTO_FACES=on

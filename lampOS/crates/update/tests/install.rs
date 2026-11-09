@@ -2351,6 +2351,65 @@ fn the_product_refences_a_ledger_ahead_of_its_store() {
     );
 }
 
+/// A face from the app's photo is on in the product (#5750): lamp-cloud
+/// writes the app's photo into the folder made at boot, the eyes read it
+/// from there, and the voice asks its person once at the lamp. Each needs
+/// the others, so all three are pinned together; the eyes' speaker id
+/// (`LAMP_PHOTO_SPEAKER`) stays off until the voice's yes carries one.
+#[test]
+fn the_product_takes_a_face_from_the_apps_photo_in_all_three_parts() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap_or_else(|| panic!("no {name}"))
+            .1
+    };
+    let cloud = section(unit("lamp-cloud.service"), "Service");
+    for on in [
+        "Environment=LAMP_PHOTO_FACES=on",
+        "Environment=LAMP_EYES_PHOTO_DIR=/run/lampos-photos",
+        "Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock",
+    ] {
+        assert!(cloud.contains(&on), "lamp-cloud.service lacks {on}");
+    }
+    let voice = section(unit("lamp-voice.service"), "Service");
+    assert!(voice.contains(&"Environment=LAMP_PHOTO_FACES=on"));
+    assert!(voice.contains(&"Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock"));
+    let eyes = section(unit("lamp-eyes.service"), "Service");
+    let start: Vec<&str> = eyes
+        .iter()
+        .filter_map(|line| line.strip_prefix("ExecStart="))
+        .collect();
+    assert_eq!(start.len(), 1, "{start:?}");
+    let words: Vec<&str> = start[0].split_whitespace().collect();
+    assert!(
+        words
+            .windows(2)
+            .any(|pair| pair == ["--photo-dir", "/run/lampos-photos"]),
+        "lamp-eyes.service lacks --photo-dir /run/lampos-photos"
+    );
+    assert!(
+        words
+            .windows(2)
+            .any(|pair| pair == ["--who-socket", "/run/lampos-eyes/who.sock"])
+    );
+    assert!(
+        !eyes
+            .iter()
+            .any(|line| line.starts_with("Environment=LAMP_PHOTO_SPEAKER=")),
+        "lamp-eyes.service sets LAMP_PHOTO_SPEAKER"
+    );
+    let tmpfiles = install::TMPFILES;
+    assert!(
+        tmpfiles
+            .lines()
+            .any(|line| line.split_whitespace().collect::<Vec<_>>()
+                == ["d", "/run/lampos-photos", "0700", "lampos", "lampos", "-"]),
+        "lampos.conf does not make /run/lampos-photos"
+    );
+}
+
 /// #2860: the product sees who speaks, the eyes reading each face's speaking
 /// and the voice reading it, so a full update gives one lamp what the
 /// real-face run had.
