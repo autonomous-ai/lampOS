@@ -4085,13 +4085,48 @@ mod tests {
                 let read = started_by(unit, poses)
                     .unwrap_or_else(|why| panic!("{name}: {why}"))
                     .unwrap_or_else(|| panic!("{name}: read as help"));
-                let home = poses
-                    .split_whitespace()
-                    .skip_while(|word| *word != "--home")
-                    .nth(1)
-                    .and_then(home_of);
-                assert_eq!(read.home, home, "{name}");
-                assert_eq!(read.gaze.is_some(), poses.contains("--gaze "), "{name}");
+                // Written out by hand, not read back through the parser's own
+                // helpers: a reader that changes what a kept number means fails.
+                let (home, stand, pitch_window, gaze) = match name.as_str() {
+                    "lamp-env-06c1-by-hand-2026-10-16" => (
+                        [1772, 2057, 2034],
+                        Some(([2050, 2059], [1772, 2057, 2034, 2657, 2602])),
+                        (1670, 1995),
+                        Some([782, 557]),
+                    ),
+                    "lamp-env-fc4b-factory-2026-10-30" => (
+                        [1817, 2085, 2028],
+                        Some(([2048, 1946], [1772, 2085, 2028, 2621, 2558])),
+                        (1740, 2030),
+                        Some([755, 555]),
+                    ),
+                    "lamp-env-standing-2026-11-09" => (
+                        [1772, 2057, 2034],
+                        Some(([2050, 2059], [1772, 2057, 2034, 2657, 2602])),
+                        (1740, 2030),
+                        None,
+                    ),
+                    "lamp-env-stood-swept-2026-11-09" => (
+                        [1772, 2057, 2034],
+                        Some(([2050, 2059], [1772, 2057, 2034, 2633, 2603])),
+                        (1740, 2030),
+                        None,
+                    ),
+                    "measured-env-seated-2026-11-09" => {
+                        ([1772, 2057, 2034], None, (1740, 2030), None)
+                    }
+                    _ => panic!("{name}: a kept poses file with no numbers pinned here"),
+                };
+                assert_eq!(read.home, Some(home), "{name}");
+                assert_eq!(
+                    read.standing
+                        .map(|standing| (standing.folded, standing.pose)),
+                    stand,
+                    "{name}"
+                );
+                assert_eq!(read.pitch_window, Some(pitch_window), "{name}");
+                assert_eq!(read.gaze.map(|gaze| gaze.turn), gaze, "{name}");
+                assert!(read.torque_on, "{name}");
             }
         }
     }
