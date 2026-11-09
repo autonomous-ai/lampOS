@@ -9354,3 +9354,21 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   metadata get, because security filtering follows fetching the listed
   ids. Ask for list count, per-get timings and filtering separately.
   No claimed speedup, account/device access, revert or release mutation.
+
+## 2026-11-09 — Second: revised app consent still HOLD
+
+- #5884 ead2bcfd268 HOLD, 6743900952. Existing helper change tests
+  62 passed / 165 filtered in 2.91 s. Three independent actual-helper
+  probes fail in 0.14 s: local no while already off does not rotate;
+  app no while already off returns done with unchanged rev; missing
+  app-revs.json revives initial none after a real yes/local withdrawal.
+  All permit older app yes to enable consent afterward.
+- Local mutation audit confirmed spoken no/redo/forget reach the no-bump
+  absent-file helper. Source-only P2 retry race 6743911697: withdrawal
+  releases lock before reading bytes for Owed, allowing it to capture a
+  newer yes and remove it on retry. Capture original identity under lock.
+- Reset holds and bumps through each removal, retains revision state,
+  including absent yes. Cloud audit found no blocking issue; malformed
+  helper-response fallback remains low-risk hardening, not demonstrated
+  bypass. No device/account access. Temporary probes removed, checkout
+  clean; /tmp/second-5884-cas-probes.rs and .log retain failures.
