@@ -1,0 +1,24 @@
+# From 22:10, nobody: the light dims at 22:50 (2400 s) and goes out at
+# 22:55 (2700 s). At 23:10 (3600 s) the eyes see the view change
+# (`stirred`): in quiet hours nothing comes back, the light stays out
+# (the reviewer's P2 on #5765: a television or a sleeper in view). Someone
+# sits down at 3700 s.
+clock = "22:10"
+
+[[expect]]
+at = "2400s"
+within = "1s"
+call = "light"
+args = { dim = 2, for_ms = 300000, until = "ends" }
+
+[[expect]]
+at = "2700s"
+within = "1s"
+call = "light"
+args = { out = true, over_ms = 60000, until = "ends" }
+
+[[expect]]
+at = "3700s"
+within = "1s"
+call = "ends"
+

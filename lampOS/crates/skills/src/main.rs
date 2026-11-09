@@ -1057,6 +1057,7 @@ fn serve(
         body_requests: options.body_requests,
         ends: RefCell::new(HashMap::new()),
         stirs: RefCell::new(HashMap::new()),
+        quiets: RefCell::new(HashMap::new()),
         local_time: options.local_time.clone(),
         trust_clock: options.trust_clock,
         clock_waiting: Cell::new(false),
@@ -1285,6 +1286,10 @@ fn serve(
                 *runner.permissions.borrow_mut() = skills
                     .iter()
                     .map(|skill| (skill.name.clone(), skill.permissions.clone()))
+                    .collect();
+                *runner.quiets.borrow_mut() = skills
+                    .iter()
+                    .filter_map(|skill| Some((skill.name.clone(), skill.quiet_window()?)))
                     .collect();
                 if let Some(counting) = &counting {
                     *runner.runs.borrow_mut() = skills
@@ -1752,6 +1757,8 @@ struct Runner {
     /// By skill, the run with a dim held a while, told each stir
     /// (`room/presence`'s `stirred`, #5746).
     stirs: RefCell<HashMap<String, mpsc::Sender<()>>>,
+    /// By skill, its `[quiet]`, for a held run's stirs (#5746).
+    quiets: RefCell<HashMap<String, (u16, u16)>>,
     /// The lamp's local time, for quiet hours.
     local_time: Option<Arc<lamp_local_time::LocalTime>>,
     trust_clock: bool,
@@ -2527,7 +2534,21 @@ fn start(
         .then(|| {
             let (stir, stirred) = mpsc::channel();
             runner.stirs.borrow_mut().insert(skill.clone(), stir);
-            stirred
+            // The quiet check of a service read's (`Seen::quiet`): the lamp's
+            // quiet hours and the skill's own; not known, quiet. Read as each
+            // stir comes, on this program's clock.
+            let local = runner.local_time.clone();
+            let own = runner.quiets.borrow().get(&skill).copied();
+            let quiet: Quiet = Box::new(move || {
+                local.as_ref().is_none_or(|local| {
+                    let minute = local.minute_of_day(clock::unix_ms());
+                    lamp_local_time::quiet_hours(minute)
+                        || own.is_some_and(|(from, to)| {
+                            lamp_local_time::QuietWindow { from, to }.contains(minute)
+                        })
+                })
+            });
+            (stirred, quiet)
         });
     std::thread::spawn(move || {
         // A light relative to the person's, or never brighter than it, is
@@ -3661,6 +3682,12 @@ fn dropped(gesture: &BodyGesture) -> String {
 /// waking stretch (its catalogue's `alive` stretch) is not a skill's to ask.
 const MORNING_STRETCH: &str = "stretching";
 
+/// Whether it is quiet hours now, for a held run's stirs (#5746).
+type Quiet = Box<dyn Fn() -> bool + Send>;
+
+/// A held run's stirs and its quiet hours (#5746).
+type Stirs = (mpsc::Receiver<()>, Quiet);
+
 /// How often a run whose light is out looks for a stir (#5746): the light
 /// comes back to its dim within this of the eyes saying it.
 const STIR_LOOK: Duration = Duration::from_millis(250);
@@ -3706,11 +3733,7 @@ fn perform(
     // Told once the body and the light are made, and, for a dim held until
     // its trigger ends, told that end.
     // And, with a dim held a while, told each stir after its out (#5746).
-    (made, end, stir): (
-        mpsc::Sender<()>,
-        Option<mpsc::Receiver<()>>,
-        Option<mpsc::Receiver<()>>,
-    ),
+    (made, end, stir): (mpsc::Sender<()>, Option<mpsc::Receiver<()>>, Option<Stirs>),
 ) -> String {
     if calls == [Call::PrepareUnplug] {
         let _ = made.send(());
@@ -3922,6 +3945,7 @@ fn perform(
     // there, the reviewer's P2 on #5765) brings the dim back, from the
     // light before the run, and its while again (#5746).
     let mut ended = false;
+    let mut stirs = 0u32;
     if !later.is_empty()
         && let Some(end) = end.as_ref()
     {
@@ -3959,7 +3983,9 @@ fn perform(
                 hold.as_secs(),
                 said[from..].join("; ")
             );
-            let Some(stir) = stir.as_ref() else { break };
+            let Some((stir, quiet)) = stir.as_ref() else {
+                break;
+            };
             // Stirs said before the out, or while it faded, are not for it.
             while stir.try_recv().is_ok() {}
             loop {
@@ -3971,25 +3997,74 @@ fn perform(
                         break 'dim;
                     }
                 }
-                if stir.try_recv().is_ok() {
-                    while stir.try_recv().is_ok() {}
-                    said.push("stirred after the out: the dim again".into());
-                    eprintln!("lamp-skills: skill:{skill}: stirred after the out: the dim again");
-                    if let Some(glow) = glow.as_mut() {
-                        glow.from(before.clone());
-                    }
-                    changed.left = before.clone();
-                    act(
-                        &first,
-                        sockets,
-                        bus,
-                        asker,
-                        &mut changed,
-                        &mut played,
-                        &mut glow,
-                        &mut said,
+                if stir.try_recv().is_err() {
+                    continue;
+                }
+                while stir.try_recv().is_ok() {}
+                // Never a light coming on in quiet hours (the reviewer's P2
+                // on #5765: a television or a sleeper in view all night).
+                if quiet() {
+                    eprintln!(
+                        "lamp-skills: skill:{skill}: stirred after the out in quiet hours: left out"
                     );
+                    continue;
+                }
+                stirs += 1;
+                said.push("stirred after the out: the dim again".into());
+                eprintln!("lamp-skills: skill:{skill}: stirred after the out: the dim again");
+                if let Some(glow) = glow.as_mut() {
+                    glow.from(before.clone());
+                }
+                changed.left = before.clone();
+                act(
+                    &first,
+                    sockets,
+                    bus,
+                    asker,
+                    &mut changed,
+                    &mut played,
+                    &mut glow,
+                    &mut said,
+                );
+                if stirs <= lamp_skills::STIRS_CYCLED {
                     continue 'dim;
+                }
+                // Past its stirs: the dim stays, until the trigger ends or
+                // quiet hours begin, which put it out.
+                said.push(format!(
+                    "stirred {stirs} times: the dim held until the trigger ends or quiet hours"
+                ));
+                eprintln!(
+                    "lamp-skills: skill:{skill}: stirred {stirs} times: the dim held until the trigger ends or quiet hours"
+                );
+                loop {
+                    match clock::recv_timeout(end, STIR_LOOK) {
+                        Err(mpsc::RecvTimeoutError::Timeout) => {}
+                        _ => {
+                            ended = true;
+                            said.push("held until its trigger ended".into());
+                            break 'dim;
+                        }
+                    }
+                    while stir.try_recv().is_ok() {}
+                    if quiet() {
+                        let from = said.len();
+                        act(
+                            &later,
+                            sockets,
+                            bus,
+                            asker,
+                            &mut changed,
+                            &mut played,
+                            &mut glow,
+                            &mut said,
+                        );
+                        eprintln!(
+                            "lamp-skills: skill:{skill}: quiet hours began in the held dim: {}",
+                            said[from..].join("; ")
+                        );
+                        break 'dim;
+                    }
                 }
             }
         }
@@ -5757,6 +5832,7 @@ mod tests {
             body_requests: false,
             ends: RefCell::default(),
             stirs: RefCell::default(),
+            quiets: RefCell::default(),
             looks: RefCell::default(),
             unplug: RefCell::default(),
             local_time: None,
@@ -6114,6 +6190,7 @@ mod tests {
                     body_requests: false,
                     ends: RefCell::default(),
                     stirs: RefCell::default(),
+                    quiets: RefCell::default(),
                     unplug: RefCell::default(),
                     local_time: None,
                     trust_clock: false,
@@ -6194,6 +6271,7 @@ mod tests {
             body_requests: false,
             ends: RefCell::default(),
             stirs: RefCell::default(),
+            quiets: RefCell::default(),
             unplug: RefCell::default(),
             local_time: None,
             trust_clock: false,

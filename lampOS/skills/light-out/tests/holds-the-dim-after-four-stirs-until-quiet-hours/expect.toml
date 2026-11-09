@@ -1,0 +1,72 @@
+# From 20:50, nobody: the dim at 21:30 (2400 s), out at 2700 s. Three
+# stirs after the out (2800, 3200, 3600 s) each bring the dim back and the
+# out five minutes later; the fourth (4000 s) brings the dim back and it
+# stays (Fifth's call on #5765: a reader is never left dark), until
+# the lamp's quiet hours begin at 22:00 (4200 s): out. Someone at 4300 s.
+clock = "20:50"
+
+[[expect]]
+at = "2400s"
+within = "1s"
+call = "light"
+args = { dim = 2, for_ms = 300000, until = "ends" }
+
+[[expect]]
+at = "2700s"
+within = "1s"
+call = "light"
+args = { out = true, over_ms = 60000, until = "ends" }
+
+[[expect]]
+at = "2800s"
+within = "1s"
+call = "light"
+args = { dim = 2, for_ms = 300000, until = "ends" }
+
+[[expect]]
+at = "3100s"
+within = "1s"
+call = "light"
+args = { out = true, over_ms = 60000, until = "ends" }
+
+[[expect]]
+at = "3200s"
+within = "1s"
+call = "light"
+args = { dim = 2, for_ms = 300000, until = "ends" }
+
+[[expect]]
+at = "3500s"
+within = "1s"
+call = "light"
+args = { out = true, over_ms = 60000, until = "ends" }
+
+[[expect]]
+at = "3600s"
+within = "1s"
+call = "light"
+args = { dim = 2, for_ms = 300000, until = "ends" }
+
+[[expect]]
+at = "3900s"
+within = "1s"
+call = "light"
+args = { out = true, over_ms = 60000, until = "ends" }
+
+[[expect]]
+at = "4000s"
+within = "1s"
+call = "light"
+args = { dim = 2, for_ms = 300000, until = "ends" }
+
+[[expect]]
+at = "4200s"
+within = "1s"
+call = "light"
+args = { out = true, over_ms = 60000, until = "ends" }
+
+[[expect]]
+at = "4300s"
+within = "1s"
+call = "ends"
+

@@ -15039,3 +15039,181 @@ fn light_out_dims_five_minutes_then_goes_out_and_anyone_in_the_dim_brings_it_bac
         );
     }
 }
+
+/// Light-out run by the program on a stepped clock, its run beginning at
+/// `local_minute` of the lamp's day, with the person's light white at 4.
+struct LightOutRun {
+    _dir: tempfile::TempDir,
+    _running: Running,
+    clock: Clock,
+    requests: lamp_bus::Subscriber,
+    presence: lamp_bus::Publisher,
+    nobody_s: u32,
+}
+
+impl LightOutRun {
+    /// Every 2 s for `seconds`, the eyes' value, nobody, the first stirred
+    /// if `stir`, and what was asked of the ring meanwhile.
+    fn run(&mut self, seconds: u32, stir: bool) -> Vec<LightRequest> {
+        let mut asked = Vec::new();
+        for step in 0..seconds / 2 {
+            let now = lamp_msgs::RoomPresence {
+                someone: false,
+                nobody_s: self.nobody_s,
+                by: None,
+                stirred: stir && step == 0,
+            };
+            self.presence.publish_json(1, &now).unwrap();
+            self.nobody_s += 2;
+            self.clock.skip(Duration::from_secs(2));
+            while let Some(message) = self.requests.recv(Duration::from_millis(20)).unwrap() {
+                asked.push(message.parse().unwrap());
+            }
+        }
+        while let Some(message) = self.requests.recv(ONE_PASS).unwrap() {
+            asked.push(message.parse().unwrap());
+        }
+        asked
+    }
+}
+
+fn light_out_from(local_minute: u16) -> LightOutRun {
+    use lamp_msgs::RoomPresence;
+    let dir = tempfile::Builder::new()
+        .prefix("ls")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    copy(
+        &skills_root().join("light-out"),
+        &root.join("skills/light-out"),
+    );
+    let bus = Bus::new(root.join("bus")).unwrap();
+    let requests = bus.subscribe(LightRequest::TOPIC, "ring").unwrap();
+    let presence = bus
+        .publisher_declared(RoomPresence::TOPIC, &RoomPresence::declaration(), "eyes")
+        .unwrap();
+    bus.publisher_declared(Light::TOPICS[1], &Light::declaration(), "ring")
+        .unwrap()
+        .publish_json(1, &Light::new(true, "white", 4).unwrap())
+        .unwrap();
+    bus.publisher_declared(VoiceState::TOPIC, &VoiceState::declaration(), "voice")
+        .unwrap()
+        .publish_json(
+            1,
+            &VoiceState {
+                state: lamp_msgs::Voice::Resting,
+            },
+        )
+        .unwrap();
+    let clock = Clock::at(root);
+    let minute = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        / 60
+        % 1_440;
+    let offset = (i64::from(local_minute) - minute as i64 + 1_440 + 720) % 1_440 - 720;
+    let running = Running(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args([
+                "--dir".as_ref(),
+                root.join("skills").as_os_str(),
+                "--bus-root".as_ref(),
+                root.join("bus").as_os_str(),
+                "--boot-id".as_ref(),
+                OsStr::new("boot-test"),
+                "--utc-offset-minutes".as_ref(),
+                OsStr::new(&offset.to_string()),
+            ])
+            .args(clock.args())
+            .env("LAMP_LIGHT_REQUESTS", "on")
+            .env("LAMP_SKILLS_ASK", "skip")
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty() {
+        assert!(Instant::now() < deadline, "light-out was never loaded");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    LightOutRun {
+        _dir: dir,
+        _running: running,
+        clock,
+        requests,
+        presence,
+        nobody_s: 2_396,
+    }
+}
+
+/// The reviewer's P2 on #5765 at 1ff10565b9, and Fifth's call on it: a
+/// run's stirs after the out bring the dim back three times; the fourth
+/// leaves it at the dim, never out again, until quiet hours begin, which
+/// put it out. The run starts at 21:20, the lamp's local time, before its
+/// quiet hours (22:00).
+#[test]
+fn light_out_stirs_three_times_then_holds_the_dim_until_quiet_hours() {
+    let mut lamp = light_out_from(21 * 60 + 20);
+    let dim = Light::new(true, "white", 2).unwrap();
+    let first = |asked: &[LightRequest]| asked.first().map(|request| request.light.clone());
+    assert_eq!(
+        first(&lamp.run(6, false)),
+        Some(dim.clone()),
+        "the dim at forty minutes"
+    );
+    let out = lamp.run(310, false);
+    assert!(out.iter().any(|request| !request.light.on), "{out:?}");
+    // Three stirs, each the dim again and the out five minutes later.
+    for stir in 1..=3 {
+        let again = lamp.run(2, true);
+        assert_eq!(
+            first(&again),
+            Some(dim.clone()),
+            "stir {stir}: the dim again"
+        );
+        let out = lamp.run(310, false);
+        assert!(
+            out.iter().any(|request| !request.light.on),
+            "stir {stir}: out again: {out:?}"
+        );
+    }
+    // The fourth: the dim, and it stays past its five minutes (still
+    // before 22:00).
+    let again = lamp.run(2, true);
+    assert_eq!(first(&again), Some(dim.clone()), "the fourth stir: the dim");
+    let held = lamp.run(400, false);
+    assert!(
+        held.iter().all(|request| request.light.on),
+        "the dim held, no fourth out: {held:?}"
+    );
+    // Quiet hours begin (22:00): the held dim goes out.
+    let quiet = lamp.run(800, false);
+    assert!(
+        quiet
+            .iter()
+            .any(|request| !request.light.on && request.fade_ms == Some(60_000)),
+        "quiet hours began: out: {quiet:?}"
+    );
+}
+
+/// The reviewer's P2 on #5765 at 1ff10565b9: a stir in quiet hours brings
+/// nothing back. The run starts at 21:50; out at 21:55; a stir at 22:01.
+#[test]
+fn light_out_takes_no_stir_in_quiet_hours() {
+    let mut lamp = light_out_from(21 * 60 + 50);
+    let dim = Light::new(true, "white", 2).unwrap();
+    let asked = lamp.run(6, false);
+    assert_eq!(
+        asked.first().map(|request| request.light.clone()),
+        Some(dim)
+    );
+    let out = lamp.run(310, false);
+    assert!(out.iter().any(|request| !request.light.on), "{out:?}");
+    lamp.run(420, false);
+    let night = lamp.run(30, true);
+    assert!(
+        night.iter().all(|request| !request.light.on),
+        "a stir at 22:0x: left out: {night:?}"
+    );
+}

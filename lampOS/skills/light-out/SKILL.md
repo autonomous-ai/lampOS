@@ -17,7 +17,9 @@ chose, which the lamp keeps. While it is dim, a movement in view (a page
 turned by someone reading with their head down) brings it back as well, so
 it never puts out the light on a reader. After the light has gone out,
 a movement in view brings it back to the dim, not the full light, and it
-waits five minutes again before it goes out. It does the same if the lamp stops
+waits five minutes again before it goes out. After a few such movements it
+stays dim until someone comes back or the night begins, and at night a
+movement never brings the light back. It does the same if the lamp stops
 looking (the privacy switch, a mute): it never puts the light out on someone
 it cannot see.
 

@@ -130,7 +130,15 @@ after its fade, the view changing is a *stir*: `room/presence` still says
 nobody, with `stirred: true` for 3 s (`RoomPresence::STIRRED_FOR`), and
 light-out brings its dim back, not the full light, and its five minutes
 again, then the out (a reader the dim missed is never left at the ember;
-the lead's head-down reader). At any other time the eyes never count it,
+the lead's head-down reader). Three stirs in a run cycle so; the fourth
+brings the dim back and it **stays**, never out again, until the run ends
+(a face, a word, a touch, the keep rule) or quiet hours begin, which put it
+out (`STIRS_CYCLED`, Fifth's call on #5765 over a cap that leaves the light
+out: a reader must never be left dark, and a false stir only keeps a dim
+light on). A stir in quiet hours (the lamp's, 22:00 to 07:00, or the
+skill's own `[quiet]`, the check a service read makes; a clock not known is
+quiet) brings nothing back: never a light coming on beside a television, a
+pet or someone asleep in view (the reviewer's P2 on #5765 at 1ff10565b9). At any other time the eyes never count it,
 so movement alone never resets the forty minutes. *How the eyes know what
 shows:* the ring's own words, nothing new on the bus. The ring says a
 request's light `light/reached` after it eases in and after each renewal
@@ -197,7 +205,7 @@ a reader with their head down not darkened, is owed. A test holds the install's 
 |---|---|---|
 | When | `nobody_s` above 2399: nobody for 40 minutes (#5746, was 10) | Faces miss someone reading face down or turned to a second screen; a reader can sit 30 minutes and more without the eyes finding their face. A light that goes out on someone still working is the failure that reads as a machine, so it waits long, and a touch or a pet counts as someone as well as a face or a word. Messages' 5 minutes is its own line on the same signal |
 | How | First the light two steps dimmer, held five minutes (`light = { dim = 2, for = "5m", until = "ends" }`), then the light shown, off, asked of the ring over a minute (`light = { out = true, over = "60s", until = "ends" }`) | A living thing lets the light go slowly: the dim is a soft cue to anyone still there, and the out is "like falling asleep, never snapping off" (the owner). Out is the ember. The out comes only if the dim was held its five minutes (`for` on a dim, [skills.md](skills.md)) |
-| Stirred after the out | While the out shows, after its fade, the eyes seeing the view change (`stirred`, nobody still there) bring the dim back at once, not the full light, and its five minutes again, then the out (the reviewer's P2 on #5765) | The lead's head-down reader is never left at the ember: a page turned after the out is enough |
+| Stirred after the out | While the out shows, after its fade, the eyes seeing the view change (`stirred`, nobody still there) bring the dim back at once, not the full light, and its five minutes again, then the out (the reviewer's P2 on #5765); the fourth stir in a run leaves the dim on until the run ends or quiet hours begin; none in quiet hours (22:00 to 07:00, and its own 23:00 to 06:00) | The lead's head-down reader is never left at the ember: a page turned after the out is enough. Never a light coming on at night |
 | Back | The moment someone is there: the first `someone` (a face at the eyes' next look, at most 600 ms with nobody in view, a voice heard, a touch or a pet, or, during the dim, the view changing) ends the skill's ask, in the dim before anything goes out, and the ring shows the person's own light again, waking over about half a second | The person's light was never touched: the colour and level they chose, kept across a restart with `LAMP_LIGHT_KEEP=on` |
 | Once | Once each time the desk is left (`rearm = "ends"`) | It never goes out again until someone came back |
 | Not in a turn | Only while `voice/state` is `resting`; forty minutes that come while the lamp speaks (a reminder into an empty room) wait up to an hour for it to rest (`wait = "1h"`) | |
@@ -306,12 +314,14 @@ heard, so `someone` comes back and the skill's ask ends with it.
   the dim giving the light back with nothing out, and a stir after the out
   bringing the dim back and the out again five minutes later
   (`light_out_dims_five_minutes_then_goes_out_and_anyone_in_the_dim_brings_it_back`).
-- `skills/light-out/tests/`, eight cases written by a script in the format
+- `skills/light-out/tests/`, ten cases written by a script in the format
   `lamp-bus record` writes, `room/presence` every 2 s (each good for 3 s;
   half the eyes' once a second, so the forty minutes are half the lines):
   the dim at forty minutes, out five later and back when someone sits down;
   back at once when the view changes in the dim, nothing out; the dim back
-  when the view changes after the out, out again five minutes later; waiting for
+  when the view changes after the out, out again five minutes later; no
+  stir taken in quiet hours; the dim held after four stirs until quiet
+  hours put it out; waiting for
   the lamp to finish speaking; the night waited out to 06:00; nothing at
   night; back when the eyes stop looking in the dim; on when asked to keep
   the light on.
@@ -360,9 +370,12 @@ On a lamp with the switches above, the office empty, nothing played:
   `skill:light-out`: a skill of that name is the only one whose light the
   view changes.
 - A dark room's own noise, or a screen in view, can stir the light back to
-  its dim after the out; it then goes out again five minutes later. That
-  is the safe way to be wrong, and its cost (a dim, then out, again) is for
-  the row to measure.
+  its dim after the out; it then goes out again five minutes later, three
+  times, and after the fourth it stays dim until someone comes or quiet
+  hours begin. That is the safe way to be wrong, and its cost (a dim light
+  left on in an empty room until 22:00) is for the row to measure. The
+  out's own comparison starts fresh at each out, so a screen is never
+  learned as noise across them; the cap is what ends the cycle.
 - A restart of `lamp-skills` while the light is out lets the ask lapse
   within 15 s (the light comes back) and dims it again at its first
   `room/presence`, out five minutes later. A restart of the eyes begins the count of nobody

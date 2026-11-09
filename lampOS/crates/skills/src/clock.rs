@@ -81,6 +81,15 @@ pub fn now_us() -> u64 {
     lamp_ipc::monotonic_us().saturating_add(SKIPPED_US.load(Ordering::SeqCst))
 }
 
+/// The wall clock in ms since 1970, with what a test skipped (#5746: a
+/// held run's quiet hours follow a test's skips as its waits do).
+pub fn unix_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64)
+        .saturating_add(SKIPPED_US.load(Ordering::SeqCst) / 1_000)
+}
+
 /// How long a poll for something else waits: no longer than a slice while
 /// a test drives the clock, so that a skip is taken in at once.
 pub fn poll(wait: Duration) -> Duration {

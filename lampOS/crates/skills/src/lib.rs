@@ -1850,6 +1850,11 @@ pub struct Skill {
 }
 
 impl Skill {
+    /// Its `[quiet]`, local minutes from and to (#5746: a held run reads it).
+    pub fn quiet_window(&self) -> Option<(u16, u16)> {
+        self.quiet
+    }
+
     pub fn is_routine(&self) -> bool {
         self.limits.is_some()
             || self
@@ -9029,6 +9034,7 @@ fn replay_skill(
             stop.as_deref().unwrap_or("none")
         ));
     }
+    let own_quiet = skill.quiet;
     let mut engine = Engine::new(vec![skill], true);
     let messages = read_recordings(recording)?;
     let first_us = messages.first().map_or(0, |message| message.header.at_us);
@@ -9113,8 +9119,29 @@ fn replay_skill(
     for message in messages {
         let at_us = message.header.at_us;
         due(&mut made, &mut later, at_us - first_us);
+        // The case's local minute; none without a `clock`, which is quiet,
+        // as the program's not known is.
+        let quiet = clock_ms
+            .map(|clock_ms| ((clock_ms + (at_us - first_us) / 1_000) / 60_000 % 1_440) as u16)
+            .is_none_or(|minute| {
+                lamp_local_time::quiet_hours(minute)
+                    || own_quiet.is_some_and(|(from, to)| {
+                        lamp_local_time::QuietWindow { from, to }.contains(minute)
+                    })
+            });
+        // A dim held past its stirs goes out as quiet hours begin.
+        if later.held
+            && quiet
+            && let Some((_, _, after)) = later.again.take()
+        {
+            let at = at_us - first_us;
+            made.extend(after.into_iter().map(|call| Made { at_us: at, call }));
+            later.held = false;
+        }
         if message.header.topic == RoomPresence::TOPIC
             && later.due.is_none()
+            && !later.held
+            && !quiet
             && let Some((dim, for_us, after)) = later.again.clone()
             && serde_json::from_slice::<Value>(&message.payload)
                 .is_ok_and(|presence| presence["stirred"] == json!(true))
@@ -9124,7 +9151,12 @@ fn replay_skill(
                 at_us: at,
                 call: dim,
             });
-            later.due = Some((at + for_us, after));
+            later.stirs += 1;
+            if later.stirs <= STIRS_CYCLED {
+                later.due = Some((at + for_us, after));
+            } else {
+                later.held = true;
+            }
         }
         // The clock told again at every message, as a live host tells it
         // (`clock_in_with_trust`), so a trigger's `during` window, which
@@ -9158,7 +9190,17 @@ fn replay_skill(
 struct Later {
     due: Option<(u64, Vec<Call>)>,
     again: Option<(Call, u64, Vec<Call>)>,
+    /// The stirs taken back to the dim, and whether the dim is held past
+    /// [`STIRS_CYCLED`] of them.
+    stirs: u32,
+    held: bool,
 }
+
+/// The stirs a run takes back to the dim and on to the out again; past them
+/// it stays at the dim until its trigger ends or quiet hours begin (#5746,
+/// Fifth's call on #5765: a reader must never be left dark; a false stir
+/// only keeps a dim light on).
+pub const STIRS_CYCLED: u32 = 3;
 
 /// In a watch's case, the eyes' known file from `at` on: the name of the
 /// known person at the lamp, or with no `name`, nobody known there.
