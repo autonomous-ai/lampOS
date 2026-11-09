@@ -8993,3 +8993,14 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   #5817 additionally registers curious examples in existing test harnesses.
   Jarvis explicitly lifted #5848 HOLD on 7c13f34c3; remaining consent P3
   belongs before switch-on. No train tests or merge performed here.
+
+## 2026-11-09 — Second: reconnect and guide rebases
+
+- READ-OK #5873 1cc3ff2cc7: reconnect patch unchanged, base SDK changed.
+  Reran full MCP 60 passed in 8.34 s and both original actual TLS collision
+  probes: old request 1 returns closed, never new request 1's completion.
+- READ-OK #5850 c5dc3beba7: turn-end row restored to base, its added plan
+  row removed; two other plan rows only moved. Guide 7 passed in 0.04 s.
+- #5835/#5870/#5871 held heads unchanged. No device action. Own issue checks
+  confirm #5061 awaits First's physical comparison or waiver; #5264/#5265
+  remain device-gated and #5144 owner/closure reconciliation remains with PM.
