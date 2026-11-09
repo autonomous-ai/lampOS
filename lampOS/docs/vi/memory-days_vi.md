@@ -739,7 +739,8 @@ nhiều nhất tám điều, và không quên gì khi có nhiều hơn), không 
 hình có thể chứa lời người khác nói ngoài khung hình.
 
 **Cả việc đọc, với công tắc riêng; việc quên cần thấy miệng nói**
-(`LAMP_PERSON_SCOPE_ONE_FACE_READS=on`, tắt ở mọi nơi, #5522; lời «áp dụng
+(`LAMP_PERSON_SCOPE_ONE_FACE_READS=on`, bật trong bản sản phẩm theo quyết
+định của người phụ trách ký ức ngày 9/11, #5522; lời «áp dụng
 luôn đi» của người phụ trách ký ức lúc 16:43 trên #5385, PM hiểu là cho việc
 lưu và việc nhớ lại, không cho việc quên, và lời của người phụ trách ký ức lúc
 16:49: «tạm thời chưa cho xóa nếu ko detect đc mở miệng»). Khi
