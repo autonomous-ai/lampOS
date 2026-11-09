@@ -262,13 +262,14 @@ pub fn plan(code: &str, args: &Value, entry: &Entry, now: i64) -> Result<Plan, S
         return Ok(Plan::Mail(match what {
             "recent" => MailAsk::Recent(count(args)),
             "search" => MailAsk::Search(words(args, "query", what)?.to_owned(), count(args)),
-            // A UID over IMAP; Gmail's own id with a Google sign-in.
+            // Over IMAP a UID, the inbox's or All Mail's (`all41`, from a
+            // search); Gmail's own id with a Google sign-in.
             "message" => {
                 let id = needed(args, "id", what)?;
                 let fits = if entry.oauth() {
                     mail::api_id_ok(id)
                 } else {
-                    id.parse::<u32>().is_ok()
+                    mail::imap_id_ok(id)
                 };
                 if !fits {
                     return Err("a mail's id is the one a list gave".into());
@@ -1079,6 +1080,18 @@ mod tests {
             Plan::Mail(MailAsk::Search("from:mom".into(), COUNT_MOST))
         );
         assert!(plan("gmail", &json!({"what":"message","id":"x"}), &entry(), 0).is_err());
+        // Over IMAP an inbox UID or an All Mail one a search gave.
+        for (id, fits) in [
+            ("41", true),
+            ("all41", true),
+            ("all", false),
+            ("allx", false),
+            ("+41", false),
+            ("all+41", false),
+        ] {
+            let planned = plan("gmail", &json!({"what":"message","id":id}), &entry(), 0);
+            assert_eq!(planned.is_ok(), fits, "{id}");
+        }
     }
 
     #[test]

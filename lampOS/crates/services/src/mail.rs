@@ -1,8 +1,10 @@
-//! Gmail on the lamp: a small IMAP client (LOGIN, EXAMINE INBOX, UID SEARCH,
+//! Gmail on the lamp: a small IMAP client (LOGIN, LIST, EXAMINE, UID SEARCH,
 //! UID FETCH of headers and text, LOGOUT) over TLS to `imap.gmail.com:993`,
 //! and SMTP over TLS to `smtp.gmail.com:465` (AUTH PLAIN or LOGIN, one
-//! message). The mailbox is only ever opened with EXAMINE, read-only, and
-//! every body is fetched with `BODY.PEEK`, so reading marks nothing read.
+//! message). `recent` reads the inbox; `search` reads All Mail, as Gmail's
+//! own search does (the mailbox LIST flags `\All`, else the inbox). A
+//! mailbox is only ever opened with EXAMINE, read-only, and every body is
+//! fetched with `BODY.PEEK`, so reading marks nothing read.
 //!
 //! One-time codes and security mails (sign-in codes, password resets,
 //! sign-in alerts, verification) are never returned: [`is_security_mail`].
@@ -90,7 +92,8 @@ pub enum MailAsk {
     Recent(usize),
     /// Gmail's own search words (`X-GM-RAW`), at most this many.
     Search(String, usize),
-    /// One mail by its id (its UID over IMAP, Gmail's own id over the
+    /// One mail by its id (over IMAP its UID in the inbox, or
+    /// [`ALL_MAIL_ID`] and its UID in All Mail; Gmail's own id over the
     /// REST API), with its text.
     Message(String),
 }
@@ -876,6 +879,88 @@ pub struct Imap<S> {
     tag: u32,
 }
 
+/// Before a UID from All Mail in a mail's id over IMAP (`all41`); a bare
+/// UID (`41`) is the inbox's. A UID names a mail only within its mailbox,
+/// so the id carries which one, and `message` opens that one again.
+pub const ALL_MAIL_ID: &str = "all";
+
+/// A mail's id over IMAP: whether its UID is All Mail's, and the UID.
+fn imap_id(id: &str) -> Option<(bool, u32)> {
+    let (in_all, uid) = match id.strip_prefix(ALL_MAIL_ID) {
+        Some(uid) => (true, uid),
+        None => (false, id),
+    };
+    if uid.is_empty() || !uid.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    Some((in_all, uid.parse().ok()?))
+}
+
+/// Whether `id` is one an IMAP list gives.
+pub fn imap_id_ok(id: &str) -> bool {
+    imap_id(id).is_some()
+}
+
+/// An IMAP quoted string's text, from just after its opening quote, and
+/// what follows its closing quote.
+fn imap_unquoted(text: &str) -> Option<(String, &str)> {
+    let mut out = String::new();
+    let mut chars = text.char_indices();
+    while let Some((at, c)) = chars.next() {
+        match c {
+            '\\' => out.push(chars.next()?.1),
+            '"' => return Some((out, &text[at + 1..])),
+            c => out.push(c),
+        }
+    }
+    None
+}
+
+/// The mailbox a `LIST` response names when it is flagged `\All` (RFC
+/// 6154), as the server spells it: modified UTF-7, sent back unchanged,
+/// so a localized name (`[Gmail]/T&HqU-t c&HqM- th&AbA-`) opens as
+/// `[Gmail]/All Mail` does. The name may come quoted, as an atom or as a
+/// literal.
+fn all_mail_name(response: &Response) -> Option<String> {
+    if !response.text.get(..7)?.eq_ignore_ascii_case("* LIST ") {
+        return None;
+    }
+    let (flags, rest) = response.text[7..].strip_prefix('(')?.split_once(')')?;
+    let flagged = |name: &str| {
+        flags
+            .split_whitespace()
+            .any(|flag| flag.eq_ignore_ascii_case(name))
+    };
+    if !flagged("\\All") || flagged("\\Noselect") || flagged("\\NonExistent") {
+        return None;
+    }
+    // The hierarchy delimiter: one quoted character, or NIL.
+    let rest = rest.trim_start();
+    let rest = match rest.strip_prefix('"') {
+        Some(quoted) => imap_unquoted(quoted)?.1,
+        None => rest
+            .get(..3)
+            .filter(|nil| nil.eq_ignore_ascii_case("NIL"))
+            .map(|_| &rest[3..])?,
+    };
+    let name = rest.trim();
+    let name = if name == "{}" {
+        String::from_utf8(response.literals.last()?.1.clone()).ok()?
+    } else if let Some(quoted) = name.strip_prefix('"') {
+        let (name, after) = imap_unquoted(quoted)?;
+        if !after.trim().is_empty() {
+            return None;
+        }
+        name
+    } else if !name.is_empty() && !name.contains([' ', '(', ')', '{', '"', '\\']) {
+        name.to_owned()
+    } else {
+        return None;
+    };
+    // Only a name EXAMINE carries quoted (modified UTF-7 always is).
+    imap_quoted(&name).is_some().then_some(name)
+}
+
 /// An IMAP quoted string, or `None` for text that one can't carry (a line
 /// break, a NUL, anything not ASCII).
 fn imap_quoted(text: &str) -> Option<String> {
@@ -1041,6 +1126,17 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
             .map_err(|_| Failure::Unreached)
     }
 
+    /// LIST "" "*": the name of All Mail, the mailbox flagged `\All`, or
+    /// none when no mailbox is (the account shows no All Mail over IMAP)
+    /// or the LIST is refused.
+    pub async fn all_mail(&mut self) -> Result<Option<String>, Failure> {
+        match self.run("LIST \"\" \"*\"", None).await {
+            Ok(listed) => Ok(listed.iter().find_map(all_mail_name)),
+            Err(Failure::Refused) => Ok(None),
+            Err(_) => Err(Failure::Unreached),
+        }
+    }
+
     /// UID SEARCH: every UID found, oldest first. `words` are Gmail's own
     /// search (`X-GM-RAW`); none is every mail.
     pub async fn search(&mut self, words: Option<&str>) -> Result<Vec<u32>, Failure> {
@@ -1141,7 +1237,9 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
     }
 }
 
-/// A whole read: login, EXAMINE INBOX, the search or the one mail, logout.
+/// A whole read: login, the mailbox opened read-only (`recent` the inbox;
+/// `search` All Mail, else the inbox; `message` the one its id names), the
+/// search or the one mail, logout.
 pub async fn read_mail<S: AsyncRead + AsyncWrite + Unpin>(
     stream: S,
     user: &str,
@@ -1151,21 +1249,45 @@ pub async fn read_mail<S: AsyncRead + AsyncWrite + Unpin>(
     let mut imap = Imap::new(stream);
     imap.greet().await?;
     imap.login(user, pass).await?;
-    imap.examine("INBOX").await?;
     let items = match ask {
         MailAsk::Recent(most) => {
+            imap.examine("INBOX").await?;
             let uids = imap.search(None).await?;
             let newest = &uids[uids.len().saturating_sub(*most)..];
             imap.fetch(newest, PREVIEW_FETCH, PREVIEW_MOST).await?
         }
         MailAsk::Search(words, most) => {
+            let all = imap.all_mail().await?;
+            imap.examine(all.as_deref().unwrap_or("INBOX")).await?;
             let uids = imap.search(Some(words)).await?;
             let newest = &uids[uids.len().saturating_sub(*most)..];
-            imap.fetch(newest, PREVIEW_FETCH, PREVIEW_MOST).await?
+            let mut items = imap.fetch(newest, PREVIEW_FETCH, PREVIEW_MOST).await?;
+            if all.is_some() {
+                for item in &mut items {
+                    item.id = format!("{ALL_MAIL_ID}{}", item.id);
+                }
+            }
+            items
         }
         MailAsk::Message(id) => {
-            let uid = id.parse().map_err(|_| Failure::Unreached)?;
-            imap.fetch(&[uid], MESSAGE_FETCH, TEXT_MOST).await?
+            let (in_all, uid) = imap_id(id).ok_or(Failure::Unreached)?;
+            let mailbox = if in_all {
+                imap.all_mail().await?
+            } else {
+                Some("INBOX".to_owned())
+            };
+            match mailbox {
+                Some(mailbox) => {
+                    imap.examine(&mailbox).await?;
+                    let mut items = imap.fetch(&[uid], MESSAGE_FETCH, TEXT_MOST).await?;
+                    for item in &mut items {
+                        item.id.clone_from(id);
+                    }
+                    items
+                }
+                // All Mail no longer shown over IMAP: no such mail here.
+                None => Vec::new(),
+            }
         }
     };
     imap.logout().await;
@@ -1409,15 +1531,15 @@ pub fn api_profile_url() -> Result<String, String> {
 }
 
 /// The ids of the inbox's newest mails, at most `most`, or of those Gmail's
-/// own search `words` finds in it (`users.messages.list`).
+/// own search `words` finds in all mail (`users.messages.list`): a search
+/// names no label, as Gmail's own search, and Spam and Trash stay out
+/// (`includeSpamTrash` is left at its default, false).
 pub fn api_list_url(words: Option<&str>, most: usize) -> Result<String, String> {
-    let mut query = vec![
-        ("labelIds", "INBOX".to_owned()),
-        ("maxResults", most.clamp(1, LIST_MOST).to_string()),
-    ];
-    if let Some(words) = words {
-        query.push(("q", words.to_owned()));
-    }
+    let most = ("maxResults", most.clamp(1, LIST_MOST).to_string());
+    let query = match words {
+        None => vec![("labelIds", "INBOX".to_owned()), most],
+        Some(words) => vec![most, ("q", words.to_owned())],
+    };
     api_url(&["messages"], &query)
 }
 
@@ -1792,6 +1914,182 @@ mod tests {
         assert_eq!(tidy("abcdef", 3), "abc…");
     }
 
+    /// A UID FETCH's answer for one mail, tagged `tag`.
+    fn fetched(tag: &str, uid: u32, from: &str, subject: &str, text: &str) -> String {
+        let header = format!("From: {from}\r\nSubject: {subject}\r\nDate: Mon, 2 Nov 2026\r\n\r\n");
+        format!(
+            "* 1 FETCH (UID {uid} BODY[HEADER.FIELDS (FROM SUBJECT DATE CONTENT-TYPE CONTENT-TRANSFER-ENCODING)] {{{}}}\r\n{header} BODY[TEXT]<0> {{{}}}\r\n{text})\r\n{tag} OK done\r\n",
+            header.len(),
+            text.len()
+        )
+    }
+
+    /// Gmail's LIST of a Vietnamese account: All Mail is `[Gmail]/Tất cả
+    /// thư`, in modified UTF-7.
+    const LIST_VI: &str = "* LIST (\\HasNoChildren) \"/\" \"INBOX\"\r\n\
+        * LIST (\\HasChildren \\Noselect) \"/\" \"[Gmail]\"\r\n\
+        * LIST (\\HasNoChildren \\Trash) \"/\" \"[Gmail]/Th&APk-ng r&AOE-c\"\r\n\
+        * LIST (\\All \\HasNoChildren) \"/\" \"[Gmail]/T&HqU-t c&HqM- th&AbA-\"\r\n";
+
+    /// One read against a script, and all the client sent.
+    fn scripted_read(
+        ask: MailAsk,
+        replies: Vec<String>,
+    ) -> (Result<Vec<MailItem>, Failure>, String) {
+        let (client, server) = duplex(1 << 16);
+        run(async {
+            let server = tokio::spawn(scripted(server, "* OK Gimap ready\r\n", replies));
+            let items = read_mail(client, "a@b.c", "pw", &ask).await;
+            (items, server.await.unwrap())
+        })
+    }
+
+    /// The owner's 9 Nov: an order number's search found the mail in the
+    /// inbox but never an archived one, which Gmail's own search finds in
+    /// All Mail. A search reads All Mail (found by its `\All` flag, its
+    /// name localized), `recent` the inbox, and `message` the mailbox its
+    /// id names.
+    #[test]
+    fn imap_search_reads_all_mail_and_recent_the_inbox() {
+        let all = "\"[Gmail]/T&HqU-t c&HqM- th&AbA-\"";
+        let (items, heard) = scripted_read(
+            MailAsk::Search("4417".into(), 5),
+            vec![
+                "A1 OK\r\n".into(),
+                format!("{LIST_VI}A2 OK listed\r\n"),
+                "A3 OK [READ-ONLY] examined\r\n".into(),
+                "* SEARCH 7\r\nA4 OK\r\n".into(),
+                fetched("A5", 7, "Shop", "Order 4417 shipped", "On its way"),
+                "A6 OK\r\n".into(),
+            ],
+        );
+        let items = items.unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id, "all7");
+        assert_eq!(items[0].subject, "Order 4417 shipped");
+        let lines: Vec<&str> = heard.lines().collect();
+        assert_eq!(lines[1], "A2 LIST \"\" \"*\"");
+        assert_eq!(lines[2], format!("A3 EXAMINE {all}"));
+        assert_eq!(lines[3], "A4 UID SEARCH X-GM-RAW \"4417\"");
+        assert!(lines[4].starts_with("A5 UID FETCH 7 (UID BODY.PEEK[HEADER.FIELDS"));
+        // The search's id reads the same mail, in the same mailbox.
+        let (items, heard) = scripted_read(
+            MailAsk::Message("all7".into()),
+            vec![
+                "A1 OK\r\n".into(),
+                format!("{LIST_VI}A2 OK listed\r\n"),
+                "A3 OK [READ-ONLY] examined\r\n".into(),
+                fetched("A4", 7, "Shop", "Order 4417 shipped", "On its way"),
+                "A5 OK\r\n".into(),
+            ],
+        );
+        let items = items.unwrap();
+        assert_eq!(items[0].id, "all7");
+        assert_eq!(items[0].text, "On its way");
+        let lines: Vec<&str> = heard.lines().collect();
+        assert_eq!(lines[1], "A2 LIST \"\" \"*\"");
+        assert_eq!(lines[2], format!("A3 EXAMINE {all}"));
+        assert!(lines[3].starts_with("A4 UID FETCH 7 ("));
+        assert!(lines[3].contains("BODY.PEEK[TEXT]<0.65536>"));
+        // `recent` stays the inbox, with no LIST.
+        let (items, heard) = scripted_read(
+            MailAsk::Recent(3),
+            vec![
+                "A1 OK\r\n".into(),
+                "A2 OK [READ-ONLY] examined\r\n".into(),
+                "* SEARCH 40 41\r\nA3 OK\r\n".into(),
+                fetched("A4", 41, "Mom", "Dinner", "See you at 7"),
+                "A5 OK\r\n".into(),
+            ],
+        );
+        assert_eq!(items.unwrap()[0].id, "41");
+        let lines: Vec<&str> = heard.lines().collect();
+        assert_eq!(lines[1], "A2 EXAMINE \"INBOX\"");
+        assert_eq!(lines[2], "A3 UID SEARCH ALL");
+        assert!(!heard.contains("LIST"));
+        // An inbox UID reads from the inbox, with no LIST.
+        let (items, heard) = scripted_read(
+            MailAsk::Message("41".into()),
+            vec![
+                "A1 OK\r\n".into(),
+                "A2 OK [READ-ONLY] examined\r\n".into(),
+                fetched("A3", 41, "Mom", "Dinner", "See you at 7"),
+                "A4 OK\r\n".into(),
+            ],
+        );
+        assert_eq!(items.unwrap()[0].id, "41");
+        assert_eq!(heard.lines().nth(1), Some("A2 EXAMINE \"INBOX\""));
+        assert!(!heard.contains("LIST"));
+        // An All Mail id when All Mail is no longer shown: no such mail,
+        // and no other mailbox's mail of that UID.
+        let (items, heard) = scripted_read(
+            MailAsk::Message("all7".into()),
+            vec![
+                "A1 OK\r\n".into(),
+                "* LIST (\\HasNoChildren) \"/\" \"INBOX\"\r\nA2 OK\r\n".into(),
+                "A3 OK\r\n".into(),
+            ],
+        );
+        assert_eq!(items.unwrap(), Vec::new());
+        assert!(!heard.contains("EXAMINE") && !heard.contains("FETCH"));
+    }
+
+    #[test]
+    fn all_mail_is_found_by_its_flag_however_its_name_comes() {
+        let name = |text: &str, literal: Option<&str>| {
+            all_mail_name(&Response {
+                text: text.to_owned(),
+                literals: literal
+                    .map(|bytes| vec![("x".to_owned(), bytes.as_bytes().to_vec())])
+                    .unwrap_or_default(),
+            })
+        };
+        assert_eq!(
+            name(
+                "* LIST (\\All \\HasNoChildren) \"/\" \"[Gmail]/All Mail\"",
+                None
+            )
+            .as_deref(),
+            Some("[Gmail]/All Mail")
+        );
+        assert_eq!(
+            name(
+                "* list (\\HasNoChildren \\all) \"/\" \"[Gmail]/T&HqU-t c&HqM- th&AbA-\"",
+                None
+            )
+            .as_deref(),
+            Some("[Gmail]/T&HqU-t c&HqM- th&AbA-")
+        );
+        // Quoted with escapes, an atom, a literal, a NIL delimiter.
+        assert_eq!(
+            name("* LIST (\\All) \"\\\\\" \"Mail \\\"all\\\"\"", None).as_deref(),
+            Some("Mail \"all\"")
+        );
+        assert_eq!(
+            name("* LIST (\\All) NIL AllMail", None).as_deref(),
+            Some("AllMail")
+        );
+        assert_eq!(
+            name("* LIST (\\All) \"/\" {}", Some("[Gmail]/Alle Nachrichten")).as_deref(),
+            Some("[Gmail]/Alle Nachrichten")
+        );
+        // Not All Mail, not selectable, or a name EXAMINE can't carry.
+        assert_eq!(name("* LIST (\\HasNoChildren) \"/\" \"INBOX\"", None), None);
+        assert_eq!(
+            name("* LIST (\\All \\Noselect) \"/\" \"[Gmail]/All\"", None),
+            None
+        );
+        assert_eq!(
+            name("* LIST (\\All) \"/\" {}", Some("All\r\nA9 DELETE INBOX")),
+            None
+        );
+        assert_eq!(name("* LIST (\\All) \"/\" \"unclosed", None), None);
+        assert_eq!(
+            name("* LSUB (\\All) \"/\" \"[Gmail]/All Mail\"", None),
+            None
+        );
+    }
+
     #[test]
     fn imap_reads_read_only_and_never_marks_a_mail() {
         let (client, server) = duplex(1 << 16);
@@ -1799,16 +2097,19 @@ mod tests {
             "From: Mom <mom@home.test>\r\nSubject: Dinner\r\nDate: Mon, 2 Nov 2026\r\n\r\n";
         let text = "See you at 7";
         let fetch = format!(
-            "* 1 FETCH (UID 41 BODY[HEADER.FIELDS (FROM SUBJECT DATE CONTENT-TYPE CONTENT-TRANSFER-ENCODING)] {{{}}}\r\n{header} BODY[TEXT]<0> {{{}}}\r\n{text})\r\nA4 OK done\r\n",
+            "* 1 FETCH (UID 41 BODY[HEADER.FIELDS (FROM SUBJECT DATE CONTENT-TYPE CONTENT-TRANSFER-ENCODING)] {{{}}}\r\n{header} BODY[TEXT]<0> {{{}}}\r\n{text})\r\nA5 OK done\r\n",
             header.len(),
             text.len()
         );
+        // No mailbox flagged `\All` (All Mail hidden from IMAP): a search
+        // reads the inbox, as before.
         let replies = vec![
             "A1 OK logged in\r\n".to_owned(),
-            "* 3 EXISTS\r\nA2 OK [READ-ONLY] examined\r\n".to_owned(),
-            "* SEARCH 41\r\nA3 OK\r\n".to_owned(),
+            "* LIST (\\HasNoChildren) \"/\" \"INBOX\"\r\n* LIST (\\HasNoChildren \\Sent) \"/\" \"[Gmail]/Sent Mail\"\r\nA2 OK\r\n".to_owned(),
+            "* 3 EXISTS\r\nA3 OK [READ-ONLY] examined\r\n".to_owned(),
+            "* SEARCH 41\r\nA4 OK\r\n".to_owned(),
             fetch,
-            "* BYE\r\nA5 OK\r\n".to_owned(),
+            "* BYE\r\nA6 OK\r\n".to_owned(),
         ];
         let (items, heard) = run(async {
             let server = tokio::spawn(scripted(server, "* OK Gimap ready\r\n", replies));
@@ -1829,10 +2130,11 @@ mod tests {
         assert_eq!(items[0].text, "See you at 7");
         let lines: Vec<&str> = heard.lines().collect();
         assert_eq!(lines[0], "A1 LOGIN \"a@b.c\" \"pass word\"");
-        assert_eq!(lines[1], "A2 EXAMINE \"INBOX\"");
-        assert_eq!(lines[2], "A3 UID SEARCH X-GM-RAW \"from:mom\"");
-        assert!(lines[3].starts_with("A4 UID FETCH 41 (UID BODY.PEEK[HEADER.FIELDS"));
-        assert!(lines[3].contains("BODY.PEEK[TEXT]<0.4096>"));
+        assert_eq!(lines[1], "A2 LIST \"\" \"*\"");
+        assert_eq!(lines[2], "A3 EXAMINE \"INBOX\"");
+        assert_eq!(lines[3], "A4 UID SEARCH X-GM-RAW \"from:mom\"");
+        assert!(lines[4].starts_with("A5 UID FETCH 41 (UID BODY.PEEK[HEADER.FIELDS"));
+        assert!(lines[4].contains("BODY.PEEK[TEXT]<0.4096>"));
         assert!(
             !heard.contains("SELECT") && !heard.contains("STORE") && !heard.contains("BODY[TEXT]")
         );
