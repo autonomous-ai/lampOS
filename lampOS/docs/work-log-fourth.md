@@ -1,3 +1,11 @@
+## 2026-11-10 05:53 ICT — letter-A replacement draft published
+
+Published #5925 at 079f95a44a36b43211ab595497565dd0afef5fe2 on fourth/keep-letter-a-20261110, retaining Friday's original 2f906bb0ba unchanged on current a226. Exact six-file commit includes code, Engine/unit controls, three behavior docs and verification receipt. Both independent source/evidence audits found no additional blocker. Checkout clean; final docs check 192 documents, 1,898 links, zero broken. Fresh READ ASK to Thirteen and Second is 6753523945; original PR notification is 6753524476. Original branch untouched, switch off, lamp gate separate.
+
+Separate remaining controller passed with every source hash unchanged: exact retry diagnostics one each, integration 279 passed/six ignored, binaries/examples eleven passed, docs zero cases, workspace build passed in 122.722 s. The full native failure remains 5,463 passed/two failed/16 ignored; it was not rerun. Current CI ARM 42714858341, Clippy 42714858449 and Docs 42714858550 are watched separately, with explicit qualification of both previously failed identities required.
+
+Second's #5924 reports an instrumented foreign GET /v1/models fixture reproduction and isolated test-only repair 0a35f1421. That does not establish the source of Fourth's uninstrumented failures. A focused independent source read found genuine duplicate chat counting and keepalive coverage preserved, with bounded initial readers; root spot-check pending. No fixture change folded into the A carry, no production retry or device claim. Log-only diff check; no new links.
+
 ## 2026-11-10 05:44 ICT — A guard full native failure retained; separate checks continue
 
 The A-only carry's guarded full Voice library run ended with 5,463 passed, two failed and 16 ignored, 689.30 s body (748.755 s command), exit 101. Both a_head_in_time_and_a_slow_first_word_send_no_second_try and a_head_and_nothing_after_it_sends_no_second_try counted two HTTP requests instead of one. These identities differ from the earlier combined playback retry failures. The test module and HTTP client are unchanged from a226; their scripted no-tool turns do not exercise keep-at-once coverage. The extra requests' cause is unproven. All five guarded source/document hashes stayed unchanged.
