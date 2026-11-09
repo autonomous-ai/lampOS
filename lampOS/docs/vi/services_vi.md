@@ -822,7 +822,8 @@ by service: …" của nó được nói trên tham số `action`.
   với request của nó khi lời của nó được báo (`Thread::line_heard` →
   `line_began(Some(request))`, `heard`, giữ 8 id mới nhất). Số câu của người
   nói là số đếm lớn hơn trừ số tiếng vọng, và một tiếng vọng chỉ được trừ cho
-  một request đã được đếm kèm id, mỗi request một lần (giữ 8 cái mới nhất):
+  một request đã được đếm kèm id, và chỉ một lần: dấu đi cùng id trong 8 id
+  mới nhất, nên tiếng vọng lặp lại không bao giờ được trừ lần nữa:
   một câu thread chưa từng đếm (một mảnh nối vào câu đang nói, hoặc không có
   chữ cái hay chữ số) không trừ câu nào của người nói, nên một câu của người
   nói và câu gửi sau một tiếng vọng không được đếm vẫn là hai câu, và bị hủy. Trên lamp-29e7 ngày 9/11, chính câu "go
