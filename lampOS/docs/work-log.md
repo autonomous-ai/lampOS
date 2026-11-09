@@ -9022,14 +9022,22 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 
 ## 2026-11-09 — Second: cross-request send receipt hold
 
-- #5863 held0d5a30d8aa has another receipt-loss ordering: an older detached
+- #5863 held 0d5a30d8aa has another receipt-loss ordering: an older detached
   send can finish after a newer send and overwrite services' global slot.
   Gate/network/server tracing confirms distinct sends can overlap.
 - Actual Engine/scoped fixture with explicit store order Told(11), Told(10),
-  stale-scope unavailable for11: request12 recovery loses11's sent receipt,
+  stale-scope unavailable for 11: request 12 recovery loses 11's sent receipt,
   calls it not sent, and runs another service_write. Expected regression
-  failure in0.63s. Scripted receipt interleaving, not live concurrent network
+  failure in 0.63 s. Scripted receipt interleaving, not live concurrent network
   evidence. Saved /tmp/second-5863-old-receipt.patch and .log; removed clean.
 - Opposite same-batch receipt order control (refusal then success) passes
-  in0.32s with no new prepare. Scripted answers only; preserves the needed
+  in 0.32 s with no new prepare. Scripted answers only; preserves the needed
   success-over-refusal ordering while the author fixes both retention cases.
+
+## 2026-11-09 — Second: native CI receipts
+
+- Independently checked #5874 ARM64 run 42616309383: exact b7420fea1e head,
+  success, downloaded log reports 14,855 passed / 110 skipped. This does
+  not replace its independent privacy reads or erase documented Mac failures.
+- #5873 1cc3ff2cc7 ARM64 and SDK checks now green; train754 checks are
+  green too. Both still open at this check; no merge or device action here.
