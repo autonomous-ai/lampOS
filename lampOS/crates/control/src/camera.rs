@@ -45,6 +45,48 @@ pub const RATE_OVER: Duration = Duration::from_secs(2);
 /// go as they come, not on a clock of their own.
 const LOOK_EVERY: Duration = Duration::from_millis(20);
 
+/// A stream's `fps`: the frames it may send, on a schedule a gap apart
+/// rather than a gap after the last one sent. A camera at the rate asked
+/// sends its frames about a gap apart, some a hair early: a gap after the
+/// last one sent dropped each of those and sent the next, a third of the
+/// camera's frames lost (16 a second of a 25 fps camera at `fps: 25`,
+/// lamp-75c9 9 Nov). So a frame may go up to half a gap before it is due,
+/// never within half a gap of the last one sent, and each one sent puts the
+/// next due a gap on, from no earlier than half a gap before it went: a
+/// stream that sent nothing for a while is owed no burst. In any one
+/// second a stream sends `fps` frames, and one more at most.
+struct Pace {
+    gap: Duration,
+    due: Option<std::time::Instant>,
+    last: Option<std::time::Instant>,
+}
+
+impl Pace {
+    fn new(fps: u8) -> Self {
+        Self {
+            gap: Duration::from_secs(1) / u32::from(fps.max(1)),
+            due: None,
+            last: None,
+        }
+    }
+
+    /// Whether a frame at `now` may go.
+    fn ready(&self, now: std::time::Instant) -> bool {
+        let half = self.gap / 2;
+        self.due.is_none_or(|due| now + half >= due)
+            && self
+                .last
+                .is_none_or(|last| now.saturating_duration_since(last) >= half)
+    }
+
+    /// A frame went at `now`.
+    fn sent(&mut self, now: std::time::Instant) {
+        let floor = now.checked_sub(self.gap / 2).unwrap_or(now);
+        self.due = Some(self.due.map_or(now, |due| due.max(floor)) + self.gap);
+        self.last = Some(now);
+    }
+}
+
 /// The source's rate, for `fps_now`: when each new frame of the eyes was
 /// first seen, whichever stream saw it, and the last one's time on the file,
 /// so a frame two streams see counts once, and a slow stream's skipped
@@ -425,10 +467,9 @@ fn run(
     rate: &Rate,
     tell: &dyn Fn(Value),
 ) {
-    // At most `fps` a second: a new frame sooner than this after the last
-    // one sent waits for the next look.
-    let least_gap = Duration::from_millis(1_000 / u64::from(fps));
-    let mut sent_at: Option<std::time::Instant> = None;
+    // At most `fps` a second: a new frame before it is due waits for the
+    // next look.
+    let mut pace = Pace::new(fps);
     let mut last: Option<SystemTime> = None;
     let mut fresh_at = std::time::Instant::now();
     let mut marked_at = None;
@@ -453,12 +494,9 @@ fn run(
                     tell(json!({"ev": "camera.ended", "why": MARK_NOT_SHOWN}));
                     return;
                 }
-                if shown == Shown::Yes
-                    && last != Some(frame.modified)
-                    && sent_at.is_none_or(|at| at.elapsed() >= least_gap)
-                {
+                if shown == Shown::Yes && last != Some(frame.modified) && pace.ready(now) {
                     last = Some(frame.modified);
-                    sent_at = Some(now);
+                    pace.sent(now);
                     let mut event = frame.json();
                     event["ev"] = json!("camera.frame");
                     event["fps_now"] = json!(rate.now());
@@ -500,8 +538,8 @@ fn run_fast(
     tell: &dyn Fn(Value),
 ) {
     let _ = reader.set_read_timeout(Some(FAST_WAIT));
-    let least_gap = Duration::from_millis(1_000 / u64::from(fps));
-    let (mut sent_at, mut marked_at) = (None::<std::time::Instant>, None);
+    let mut pace = Pace::new(fps);
+    let mut marked_at = None;
     let mut fresh_at = std::time::Instant::now();
     let ended = |why: &str| {
         running.store(false, Ordering::SeqCst);
@@ -535,7 +573,7 @@ fn run_fast(
         let now = std::time::Instant::now();
         fresh_at = now;
         rate.saw(SystemTime::now(), now);
-        if length > CAMERA_FRAME_MAX || sent_at.is_some_and(|at| at.elapsed() < least_gap) {
+        if length > CAMERA_FRAME_MAX || !pace.ready(now) {
             continue;
         }
         // The mark is on the ring before the picture leaves, as the ring
@@ -554,7 +592,7 @@ fn run_fast(
         if !running.load(Ordering::SeqCst) {
             return;
         }
-        sent_at = Some(now);
+        pace.sent(now);
         let header = json!({
             "ev": "camera.frame", "bytes": length, "width": width, "height": height,
             "fps_now": rate.now(),
@@ -677,6 +715,87 @@ mod tests {
                 .why
                 .contains("not shown on the ring")
         );
+    }
+
+    /// Arrivals `period` apart, every other one `early` before it is due,
+    /// as a camera's frames come: how many of them `fps` sends.
+    fn paced(
+        fps: u8,
+        period: Duration,
+        early: Duration,
+        count: u32,
+    ) -> (u32, Vec<std::time::Instant>) {
+        let start = std::time::Instant::now();
+        let mut pace = Pace::new(fps);
+        let mut sent = Vec::new();
+        for at in 0..count {
+            let now = start + period * at - if at % 2 == 1 { early } else { Duration::ZERO };
+            if pace.ready(now) {
+                pace.sent(now);
+                sent.push(now);
+            }
+        }
+        (sent.len() as u32, sent)
+    }
+
+    #[test]
+    fn a_camera_at_the_rate_asked_sends_every_frame_though_some_come_a_hair_early() {
+        // 25 fps for 10 s, every other frame 1 ms early: all 250, where a
+        // gap after the last sent kept 2 in 3 (16 a second, lamp-75c9).
+        let (sent, _) = paced(25, Duration::from_millis(40), Duration::from_millis(1), 250);
+        assert_eq!(sent, 250);
+    }
+
+    #[test]
+    fn a_slower_rate_asked_is_kept_over_time_and_never_bursts() {
+        for fps in [2u8, 5, 10, 20] {
+            let (sent, times) = paced(
+                fps,
+                Duration::from_millis(40),
+                Duration::from_millis(3),
+                250,
+            );
+            // 10 s of a 25 fps camera: `fps` a second, give or take one.
+            let want = u32::from(fps) * 10;
+            assert!((want - 1..=want + 1).contains(&sent), "fps {fps}: {sent}");
+            // Never two closer than half a gap.
+            let half = Duration::from_secs(1) / u32::from(fps) / 2;
+            assert!(
+                times.windows(2).all(|pair| pair[1] - pair[0] >= half),
+                "fps {fps}"
+            );
+            // In any one second, `fps` and one more at most.
+            for (at, first) in times.iter().enumerate() {
+                let within = times[at..]
+                    .iter()
+                    .take_while(|t| **t - *first < Duration::from_secs(1))
+                    .count();
+                assert!(
+                    within <= usize::from(fps) + 1,
+                    "fps {fps}: {within} in a second"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_stream_that_sent_nothing_for_a_while_is_owed_one_frame_not_many() {
+        let start = std::time::Instant::now();
+        let mut pace = Pace::new(10);
+        pace.sent(start);
+        // Nothing for 5 s, then frames 40 ms apart: one goes at once, then
+        // about a gap apart, not the 50 a schedule from 0 would owe.
+        let back = start + Duration::from_secs(5);
+        let mut sent = 0;
+        for at in 0..25u32 {
+            let now = back + Duration::from_millis(40) * at;
+            if pace.ready(now) {
+                pace.sent(now);
+                sent += 1;
+            }
+        }
+        // 1 s of frames at `fps: 10`: 10, and one more at most.
+        assert!((10..=11).contains(&sent), "{sent}");
     }
 
     #[test]
