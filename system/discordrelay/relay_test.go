@@ -1,9 +1,12 @@
 package discordrelay
 
 import (
+	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -63,12 +66,19 @@ func (g *fakeGateway) sentCount() int { g.mu.Lock(); defer g.mu.Unlock(); return
 type fakeUplink struct {
 	mu      sync.Mutex
 	replies [][2]string
+	threads [][4]string
 	typing  []string
 }
 
 func (u *fakeUplink) Reply(ch, text string, _ bool) error {
 	u.mu.Lock()
 	u.replies = append(u.replies, [2]string{ch, text})
+	u.mu.Unlock()
+	return nil
+}
+func (u *fakeUplink) ReplyInThread(ch, msg, name, text string, _ bool) error {
+	u.mu.Lock()
+	u.threads = append(u.threads, [4]string{ch, msg, name, text})
 	u.mu.Unlock()
 	return nil
 }
@@ -409,4 +419,96 @@ func TestJoinedThreadsAreBounded(t *testing.T) {
 	if len(r.joined) != maxJoinedThreads || r.joined[0] != "thread-1" {
 		t.Fatalf("len=%d first=%s", len(r.joined), r.joined[0])
 	}
+}
+
+func TestGuestGetsModelAnswerNeverTheAgent(t *testing.T) {
+	gw, up := &fakeGateway{}, &fakeUplink{}
+	r := newTestRelay(gw, up)
+	r.cfg.DiscordGuestUserIDs = []string{"guest-1"}
+	var asked atomic.Value
+	r.guestModel = func(_ context.Context, text string) (string, error) {
+		asked.Store(text)
+		return "hi guest", nil
+	}
+	ev := domain.MQTTDiscordEventCommand{
+		EventID: "g1", DiscordUserID: "guest-1", GuildID: "guild-1", ChannelID: "chan-1",
+		BotUserID: "bot-1", MentionsBot: true, Text: "<@bot-1> hello",
+	}
+	if got := r.Handle(ev); got != "" {
+		t.Fatalf("Handle = %q", got)
+	}
+	waitFor(t, "guest reply", func() bool { return up.replyCount() == 1 })
+	if asked.Load() != "hello" {
+		t.Fatalf("asked %v", asked.Load())
+	}
+	if r.IsOriginRun("") || len(r.runs) != 0 {
+		t.Fatal("a guest message must not start an agent turn")
+	}
+
+	noMention := ev
+	noMention.EventID, noMention.MentionsBot = "g2", false
+	if got := r.Handle(noMention); got == "" {
+		t.Fatal("a guest always needs a mention")
+	}
+	elsewhere := ev
+	elsewhere.EventID, elsewhere.GuildID = "g3", "guild-2"
+	if got := r.Handle(elsewhere); got == "" {
+		t.Fatal("a guest is heard only in the connected server")
+	}
+	dm := ev
+	dm.EventID, dm.GuildID = "g4", ""
+	if got := r.Handle(dm); got == "" {
+		t.Fatal("a guest cannot DM the bot")
+	}
+	stranger := ev
+	stranger.EventID, stranger.DiscordUserID = "g5", "stranger"
+	if got := r.Handle(stranger); got != "not from the owner" {
+		t.Fatalf("stranger: %q", got)
+	}
+}
+
+func TestGuestHourlyLimit(t *testing.T) {
+	r := newTestRelay(&fakeGateway{}, &fakeUplink{})
+	for i := 0; i < guestRateLimit; i++ {
+		if !r.allowGuest("g") {
+			t.Fatalf("call %d refused", i)
+		}
+	}
+	if r.allowGuest("g") {
+		t.Fatal("limit not applied")
+	}
+	if !r.allowGuest("other") {
+		t.Fatal("limit must be per guest")
+	}
+}
+
+func TestThreadDirective(t *testing.T) {
+	cases := []struct{ in, title, rest string }{
+		{"[[thread: Trip plan]]\nDay one", "Trip plan", "Day one"},
+		{"plain answer", "", "plain answer"},
+		{"see [[thread: x]] later", "", "see [[thread: x]] later"},
+	}
+	for _, c := range cases {
+		if title, rest := splitThreadDirective(c.in); title != c.title || rest != c.rest {
+			t.Errorf("%q: %q %q", c.in, title, rest)
+		}
+	}
+}
+
+func TestFinishOpensThreadAndJoinsIt(t *testing.T) {
+	up := &fakeUplink{}
+	r := newTestRelay(&fakeGateway{}, up)
+	r.addRun("run-1", "chan-1", false, "msg-1")
+	r.Finish("run-1", "[[thread: Plan]] Here it is")
+	waitFor(t, "thread reply", func() bool { up.mu.Lock(); defer up.mu.Unlock(); return len(up.threads) == 1 })
+	if got := up.threads[0]; got != [4]string{"chan-1", "msg-1", "Plan", "Here it is"} {
+		t.Fatalf("thread = %v", got)
+	}
+	if !slices.Contains(r.joined, "msg-1") {
+		t.Fatal("the new thread must count as joined")
+	}
+
+	r.addRun("run-2", "thread-9", false, "")
+	r.Finish("run-2", "[[thread: Plan]] Inside a thread")
+	waitFor(t, "plain reply", func() bool { return up.replyCount() == 1 })
 }

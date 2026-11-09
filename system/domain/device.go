@@ -185,6 +185,9 @@ type AddChannelRequest struct {
 	// DiscordOpenChannels lists server channels where the owner need not @mention
 	// the bot. Nil leaves the saved list alone; an empty list clears it.
 	DiscordOpenChannels []string `json:"discord_open_channels,omitempty"`
+	// DiscordGuestUserIDs lists people who may @mention the bot and get a restricted
+	// answer. Nil leaves the saved list alone; an empty list clears it.
+	DiscordGuestUserIDs []string `json:"discord_guest_user_ids,omitempty"`
 
 	// WhatsappUserID is the operator's E.164 phone number (permitted DM caller).
 	WhatsappUserID string `json:"whatsapp_user_id"`
@@ -583,14 +586,8 @@ func (r *MQTTAddChannelCommand) ToRequest() AddChannelRequest {
 		req.DiscordManaged, _ = cfg["managed"].(bool)
 		req.DiscordGuildID, _ = cfg["guild_id"].(string)
 		req.DiscordUserID, _ = cfg["user_id"].(string)
-		if raw, ok := cfg["open_channels"].([]any); ok {
-			req.DiscordOpenChannels = make([]string, 0, len(raw))
-			for _, v := range raw {
-				if id, ok := v.(string); ok && id != "" {
-					req.DiscordOpenChannels = append(req.DiscordOpenChannels, id)
-				}
-			}
-		}
+		req.DiscordOpenChannels = stringList(cfg["open_channels"])
+		req.DiscordGuestUserIDs = stringList(cfg["guest_user_ids"])
 	case ChannelSlack:
 		req.SlackBotToken, _ = cfg["bot_token"].(string)
 		req.SlackAppToken, _ = cfg["app_token"].(string)
@@ -1600,4 +1597,19 @@ type MQTTVoiceInputModeAck struct {
 	Status string              `json:"status"`
 	Error  string              `json:"error,omitempty"`
 	Data   *VoiceInputModeData `json:"data,omitempty"`
+}
+
+// stringList reads a JSON array of non-empty strings; nil when the value is not an array.
+func stringList(v any) []string {
+	raw, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		if s, ok := item.(string); ok && s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }

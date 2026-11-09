@@ -163,3 +163,8 @@ Presync scripts for Hermes and PicoClaw also strip Discord settings on every run
   chat entry points, and the channel reconcile re-applies "Discord handled by the relay" to the
   new runtime.
 - Telegram, Slack, WhatsApp and iMessage are unchanged.
+
+
+**People other than the owner.** Someone in `discord_guest_user_ids` who @mentions the bot in the connected server gets a short answer from a direct model call, limited to 10 an hour each. The message never reaches the agent, so a guest has no tools, memory, connected accounts or device control, and each message stands alone. It counts toward the owner's usage.
+
+**Threads.** In a server channel the agent can begin a reply with `[[thread: title]]`. The device removes that text and sends `thread_message_id` and `thread_name` with `discord_reply`, and the reply goes in a new thread on the owner's message. If the thread cannot be opened, the reply stays in the channel.

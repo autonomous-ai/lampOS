@@ -13,6 +13,7 @@
 package discordrelay
 
 import (
+	"context"
 	"log/slog"
 	"slices"
 	"strings"
@@ -65,6 +66,8 @@ type Uplink interface {
 	// Reply sends the finished reply text for a Discord channel; sealed when the
 	// message it answers arrived sealed.
 	Reply(channelID, text string, sealed bool) error
+	// ReplyInThread is Reply, in a new thread opened on messageID.
+	ReplyInThread(channelID, messageID, threadName, text string, sealed bool) error
 	// Typing shows the typing indicator in a Discord channel; sealed as above.
 	Typing(channelID string, sealed bool) error
 }
@@ -82,6 +85,8 @@ type Relay struct {
 	// joined holds the threads the owner has @mentioned the bot in, oldest first.
 	// It lives in memory: after a restart one new @mention brings a thread back.
 	joined []string
+	// guestCalls holds each guest's recent answers, for the hourly limit.
+	guestCalls map[string][]time.Time
 
 	inFlight chan struct{}
 
@@ -89,12 +94,15 @@ type Relay struct {
 	idleWait   time.Duration
 	idlePoll   time.Duration
 	typingTick time.Duration
+	guestModel func(ctx context.Context, text string) (string, error)
 }
 
 type run struct {
 	channelID string
 	sealed    bool
 	at        time.Time
+	// threadOn is the message a new thread may be opened on; empty when not allowed.
+	threadOn string
 }
 
 // ProviderSet wires the relay into the server.
@@ -108,7 +116,7 @@ func ProvideRelay(cfg *config.Config, gw domain.AgentGateway) *Relay {
 // New builds a Relay. The uplink is installed later with SetUplink, once the MQTT
 // side exists.
 func New(cfg *config.Config, gw Gateway) *Relay {
-	return &Relay{
+	r := &Relay{
 		cfg:        cfg,
 		gw:         gw,
 		runs:       make(map[string]run),
@@ -117,7 +125,10 @@ func New(cfg *config.Config, gw Gateway) *Relay {
 		idleWait:   idleWait,
 		idlePoll:   idlePoll,
 		typingTick: typingInterval,
+		guestCalls: make(map[string][]time.Time),
 	}
+	r.guestModel = r.callGuestModel
+	return r
 }
 
 // SetUplink installs the transport used for replies and typing signals.
@@ -157,6 +168,9 @@ func (r *Relay) Handle(ev domain.MQTTDiscordEventCommand) string {
 	if r.seenBefore(ev.EventID) {
 		return "duplicate"
 	}
+	if r.isGuest(ev.DiscordUserID) {
+		return r.handleGuest(ev)
+	}
 	in := Inbound{
 		AuthorID:    ev.DiscordUserID,
 		BotUserID:   ev.BotUserID,
@@ -183,10 +197,18 @@ func (r *Relay) Handle(ev domain.MQTTDiscordEventCommand) string {
 	}
 
 	reqID, runID := r.gw.NextChatRunID()
-	r.addRun(runID, ev.ChannelID, ev.WasSealed)
+	threadOn := ""
+	if ev.GuildID != "" && ev.ParentChannelID == "" {
+		threadOn = ev.EventID
+	}
+	r.addRun(runID, ev.ChannelID, ev.WasSealed, threadOn)
 	// The via marker also tells a runtime that merges concurrent messages into a running
 	// turn to keep this one separate, so its reply is never shared with another message.
-	turn := domain.AppendVia(TurnText(ev.AuthorUsername, ev.DiscordUserID, text), domain.ViaDiscord)
+	body := TurnText(ev.AuthorUsername, ev.DiscordUserID, text)
+	if threadOn != "" {
+		body += threadHint
+	}
+	turn := domain.AppendVia(body, domain.ViaDiscord)
 	go r.send(reqID, runID, ev.ChannelID, ev.WasSealed, turn)
 	return ""
 }
@@ -288,7 +310,7 @@ func (r *Relay) Finish(runID, text string) {
 	if !ok {
 		return
 	}
-	text = strings.TrimSpace(text)
+	title, text := splitThreadDirective(strings.TrimSpace(text))
 	if text == "" {
 		return
 	}
@@ -297,7 +319,16 @@ func (r *Relay) Finish(runID, text string) {
 		return
 	}
 	go func() {
-		if err := up.Reply(origin.channelID, text, origin.sealed); err != nil {
+		var err error
+		if title != "" && origin.threadOn != "" {
+			// A thread opened on a message takes that message's id, so later
+			// messages there count as a joined thread.
+			r.joinThread(origin.threadOn)
+			err = up.ReplyInThread(origin.channelID, origin.threadOn, title, text, origin.sealed)
+		} else {
+			err = up.Reply(origin.channelID, text, origin.sealed)
+		}
+		if err != nil {
 			slog.Error("discord relay: reply not sent", "component", "discord-relay", "run_id", runID, "error", err)
 			return
 		}
@@ -305,7 +336,7 @@ func (r *Relay) Finish(runID, text string) {
 	}()
 }
 
-func (r *Relay) addRun(runID, channelID string, sealed bool) {
+func (r *Relay) addRun(runID, channelID string, sealed bool, threadOn string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	cutoff := time.Now().Add(-runTTL)
@@ -314,7 +345,7 @@ func (r *Relay) addRun(runID, channelID string, sealed bool) {
 			delete(r.runs, k)
 		}
 	}
-	r.runs[runID] = run{channelID: channelID, sealed: sealed, at: time.Now()}
+	r.runs[runID] = run{channelID: channelID, sealed: sealed, at: time.Now(), threadOn: threadOn}
 }
 
 func (r *Relay) take(runID string) (run, bool) {

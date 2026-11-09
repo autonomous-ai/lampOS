@@ -110,6 +110,9 @@ type Config struct {
 	// DiscordOpenChannels lists server channels where the owner need not @mention
 	// the bot.
 	DiscordOpenChannels []string `json:"discord_open_channels,omitempty" yaml:"discordOpenChannels,omitempty"`
+	// DiscordGuestUserIDs lists people who may @mention the bot and get a restricted
+	// answer: no agent, tools, memory or device access.
+	DiscordGuestUserIDs []string `json:"discord_guest_user_ids,omitempty" yaml:"discordGuestUserIDs,omitempty"`
 
 	// WhatsappUserID is the E.164 phone number permitted to DM the device's
 	// WhatsApp account.
