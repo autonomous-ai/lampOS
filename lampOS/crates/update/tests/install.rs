@@ -4214,9 +4214,10 @@ fn the_product_plays_a_light_show_when_asked() {
 /// Watch you leave is a core skill on in the product (#2834): installed
 /// on, out of `PRODUCT_SKILLS_OFF`, and the eyes say `room/stood_up`
 /// (`LAMP_ACTIVITY=place`, by place only), which it reads. Music sway is
-/// installed off: it reads the ears' sound classes, which no product unit
-/// turns on and whose YAMNet install doesn't ship, so on it would never
-/// sway. Both stay quiet at night by their own `[quiet]`.
+/// installed off until its lamp row after a full update is seen: it reads
+/// the ears' sound classes, on in the product since #5748
+/// (`the_product_ears_score_room_sounds_for_music_sway`). Both stay quiet
+/// at night by their own `[quiet]`.
 #[test]
 fn watch_you_leave_is_on_and_music_sway_off_in_the_product() {
     for skill in ["music-sway", "watch-you-leave"] {
@@ -4250,9 +4251,26 @@ fn watch_you_leave_is_on_and_music_sway_off_in_the_product() {
     // the sitter by face print, which waits for its privacy read (eyes.md).
     assert!(set(eyes, "Environment=LAMP_ACTIVITY=place"));
     assert!(eyes.contains("--recogniser"));
-    // Music sway's topic: no product unit asks the ears for classes.
-    let ears = include_str!("../../../deploy/product/lamp-ears.service");
-    assert!(!ears.contains("LAMP_EARS_CLASSES"));
+}
+
+/// The product's ears score room sounds (#5748, the lead's ask, 9 Nov), on
+/// the privacy route and with the model's absolute path, so music sway has
+/// `ears/classes` to read.
+#[test]
+fn the_product_ears_score_room_sounds_for_music_sway() {
+    let ears = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-ears.service")
+        .unwrap()
+        .1;
+    let service = section(ears, "Service");
+    for line in [
+        "Environment=LAMP_EARS_CLASSES=on",
+        "Environment=LAMP_PRIVACY_CONTROLS=on",
+        "Environment=LAMP_EARS_CLASSES_MODEL=/opt/lampOS/ears/models/yamnet.onnx",
+    ] {
+        assert!(service.contains(&line), "the ears lack {line}");
+    }
 }
 
 /// Light scenes and Point the light come with the product (#5744): out of
