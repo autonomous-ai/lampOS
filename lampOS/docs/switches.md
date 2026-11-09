@@ -890,7 +890,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `lamp-tasks --push-watch` | Nothing you'd notice: the lamp hears that a task on your computer is done as it ends, not at its next check. |
 | `LAMP_LEDGER_REFENCE` | A lamp whose timers stopped ringing after a restore rings them again, or says it couldn't set one. |
 | `LAMP_SERVICES_SPOTIFY` | Link your Spotify in the app; the lamp tells you, its owner, what is playing when you ask. |
-| `LAMP_SERVICES_PLAYBACK` | With the Spotify skill from the Store, ask the lamp to play a song, artist or playlist, pause, or skip, and your Spotify does it on your phone or speaker. |
+| `LAMP_SERVICES_PLAYBACK` | With the Store's Spotify skill, ask the lamp to play, pause or skip your Spotify. |
 
 ## What the census found
 
