@@ -8911,3 +8911,16 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   setup distinguished from default enablement and untested volume event.
 - Taking supplemental provider-parent #5856 df4c2ea8a read; El's separate
   independent read remains active. No code changes or device actions.
+
+## 2026-11-09 — Second: provider parent and guide fold reads
+
+- Supplemental READ-OK #5856 df4c2ea8afa5777dff685d91cddf086810fa4b1b.
+  Admission sites and cancellation/generation ordering read; independent
+  audit agrees. Native cancellation 9, held-forget 25 and raw-output scope
+  3 passed. Local one-sentence/no-task bookkeeping: first 14.625 us,
+  1000 repeats median 1.25 us, p99 2.709 us, max 8.5 us. Not device latency.
+  Engine-returned events remain outside this parent; #5858 separate.
+- READ-OK #5850 43da2ca24360710aa316ffc6ea73b0b92b41a497, requested
+  docs fold. Four removed status updates match base rows byte-for-byte;
+  other reviewed updates unchanged. Guide 7 passed, diff clean.
+- All product/review checkouts clean; no device action or own product edits.
