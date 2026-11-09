@@ -396,7 +396,9 @@ giữ gì.
   (`/gmail/v1/users/me/messages?maxResults=<count>&q=<words>`, không nhãn,
   nên một thư đã lưu trữ hoặc gắn nhãn nằm ngoài hộp thư đến cũng được tìm
   thấy; Spam và Trash vẫn bị loại, `includeSpamTrash` để mặc định là false),
-  rồi lấy từng thư với
+  rồi lấy từng thư, mọi lần lấy cùng lúc (mỗi lần là một lần đọc web riêng,
+  một kết nối mới; lần lượt từng cái thì một danh sách đầy mất khoảng 12 s
+  trên đèn), các câu trả lời được đọc theo thứ tự của danh sách, với
   `format=metadata` (From, Subject, Date) và đoạn xem trước ngắn của Gmail
   (các thực thể HTML được đọc), 300 ký tự của nó. `message {id}` (id riêng
   của Gmail mà một danh sách đưa ra: chữ và số, tối đa 64) lấy thư với

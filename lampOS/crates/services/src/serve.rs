@@ -622,10 +622,21 @@ impl<H: Http, M: Mail> Services<H, M> {
             };
             let mut items = Vec::new();
             let gone = format!("{} has no such item", service.name);
-            for id in ids {
+            // Every mail's get at once, not one after another: each is a
+            // web read of its own (a new connection and TLS handshake, as
+            // `net::Https` makes them), about a second on the lamp, and a
+            // search in all mail fills its list more often than the inbox
+            // did (9adf's 9 Nov: "Agoda" answered in 11.9 s). Their answers
+            // are read in the list's order, as before.
+            let urls = ids
+                .iter()
+                .map(|id| mail::api_message_url(id, whole))
+                .collect::<Result<Vec<_>, _>>()?;
+            let answers = all(urls.into_iter().map(&get).collect()).await;
+            for (id, answer) in ids.into_iter().zip(answers) {
                 // A mail deleted between the list and its get is left out
                 // of a list's read, not the read's end (El's P3 on #5120).
-                let text = match get(mail::api_message_url(&id, whole)?).await {
+                let text = match answer {
                     Err(why) if !whole && why == gone => continue,
                     answer => answer?,
                 };
@@ -873,6 +884,36 @@ fn listed<'t>(tools: &'t [Value], tool: &str, name: &str) -> Result<&'t Value, S
         .ok_or_else(|| {
             format!("{name} has no tool {tool}: service_read with what \"tools\" lists them")
         })
+}
+
+/// Every future in `futures` run at once on this task, their outputs in
+/// their own order (a small `join_all`: a read's few gets, at most
+/// `mail::LIST_MOST`, so each wake polls the ones still running).
+async fn all<F: std::future::Future>(futures: Vec<F>) -> Vec<F::Output> {
+    use std::task::Poll;
+    let mut running: Vec<_> = futures.into_iter().map(|f| Some(Box::pin(f))).collect();
+    let mut outputs: Vec<Option<F::Output>> = running.iter().map(|_| None).collect();
+    std::future::poll_fn(|cx| {
+        let mut waiting = false;
+        for (slot, output) in running.iter_mut().zip(outputs.iter_mut()) {
+            if let Some(future) = slot {
+                match future.as_mut().poll(cx) {
+                    Poll::Ready(done) => {
+                        *output = Some(done);
+                        *slot = None;
+                    }
+                    Poll::Pending => waiting = true,
+                }
+            }
+        }
+        if waiting {
+            Poll::Pending
+        } else {
+            Poll::Ready(())
+        }
+    })
+    .await;
+    outputs.into_iter().flatten().collect()
 }
 
 /// Which door a socket is.
@@ -1620,6 +1661,8 @@ mod tests {
     #[derive(Default)]
     struct FakeGmailApi {
         calls: Mutex<Vec<Call>>,
+        /// Mail gets under way now, and the most there were at once.
+        gets: Mutex<(usize, usize)>,
     }
 
     impl FakeGmailApi {
@@ -1670,7 +1713,21 @@ mod tests {
                 .url
                 .strip_prefix("https://gmail.googleapis.com/gmail/v1/users/me/")
                 .unwrap_or("");
-            match path.split('?').next().unwrap_or("") {
+            let path = path.split('?').next().unwrap_or("");
+            if path.starts_with("messages/") && path != "messages/send" {
+                // A get takes a while (a web read of its own): it is under
+                // way over a few turns of the runtime.
+                {
+                    let mut gets = self.gets.lock().unwrap();
+                    gets.0 += 1;
+                    gets.1 = gets.1.max(gets.0);
+                }
+                for _ in 0..3 {
+                    tokio::task::yield_now().await;
+                }
+                self.gets.lock().unwrap().0 -= 1;
+            }
+            match path {
                 "profile" => reply(200, json!({"emailAddress":"me@work.test"})),
                 // A list naming a mail deleted since ("18a9": no such item).
                 "messages" if call.url.contains("q=gone") => {
@@ -1877,6 +1934,27 @@ mod tests {
                 .iter()
                 .any(|call| call.url.ends_with("/messages?labelIds=INBOX&maxResults=5"))
         );
+    }
+
+    /// 9adf's 9 Nov: a search in all mail ("Agoda") answered in 11.9 s, its
+    /// mails got one after another, each a web read of its own. A list's
+    /// mails are got all at once, and still read in the list's order.
+    #[test]
+    fn a_gmail_list_gets_its_mails_at_once_in_its_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = api_services(dir.path(), false);
+        run(services.admin(&oauth_gmail("planted-gmail-4710")));
+        let answer = run(services.tool(&read_line(
+            json!({"service":"gmail","what":"search","query":"from:mom"}),
+        )));
+        assert_eq!(answer["ok"], true, "{answer}");
+        // The list's three mails (18b7, 18a1, 18a2), all under way at once.
+        assert_eq!(services.http.gets.lock().unwrap().1, 3);
+        let quoted = answer["result"]["quoted"].as_array().unwrap();
+        assert_eq!(quoted.len(), 3, "{answer}");
+        assert_eq!(quoted[0]["id"], "18b7");
+        assert_eq!(quoted[1]["id"], "18a1");
+        assert_eq!(quoted[2], mail::SECURITY_LEFT_OUT, "{answer}");
     }
 
     #[test]
