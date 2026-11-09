@@ -8951,3 +8951,14 @@ One-face/carried fences remain intact. Continuing the Queue loop.
   and three speaker helpers. No new runtime rerun or device claim.
 - Awaiting authors' held fixes while auditing train 753's retention of the
   already-read patches. No Second product PR besides NEVER MERGE fixtures.
+
+## 2026-11-09 — Second: train retention and waiting-turn guide boundary
+
+- Read-only train753 audit at 4af1b43004 found the #5862/#5860/#5854/#5833
+  patches retained, with only README/context differences. No new suite or
+  integration-clearance claim; train still open at audit time.
+- HOLD #5871 24a14817f294e81d2e5ff5785c448a279b54257b on two claims
+  that waiting-turn cancellation is fixed in the next build, while #5870's
+  prompted-turn failure is unresolved. Stock begun-turn/mute numbers match
+  supplied evidence; requested preserving them and qualifying the future
+  claim. Exact guide tests 7 passed, diff clean; no device action.
