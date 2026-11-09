@@ -704,6 +704,8 @@ impl FixtureProvider {
                 Some(
                     Control::StartCapture
                     | Control::ConnectReference { .. }
+                    | Control::ProviderSpeechCutApplied { .. }
+                    | Control::CutSpeech { .. }
                     | Control::NameGrant { .. },
                 ) => {
                     return Err(invalid("invalid fixture provider control"));

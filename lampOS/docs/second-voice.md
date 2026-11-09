@@ -4468,9 +4468,121 @@ after a take-over, but now for every turn:
       ([memory.md](memory.md)); this does not add a context reset.
       Tests are in `second_provider/tests/after_forget.rs`
       and `held_forget.rs`, with the prior acting-answer case in
-      `short_done.rs`; a lamp replay is still needed. This boundary
-      clears model context, not speech already queued: a pre-forget piece,
-      including one carried after a TTS `UNSAID`, can still be spoken.
+      `short_done.rs`; a lamp replay is still needed.
+    - **Admitting a forget cancels pending provider speech.** Before dispatching
+      an admitted memory forget, the route invalidates the old speech
+      generation. Pending TTS tasks, sentence packets, an unfinished packet,
+      a blocked output send and an `UNSAID` carry are dropped. Fresh speech
+      uses a new generation in the same request. This provider-local layer
+      needs no request interruption or wire message of its own. The engine filters invalidated speech still
+      in its own output channel. The confirmed held-forget path does the
+      same; locally held/refused calls and face-only forgets do not.
+      Replayable words in the wordless-cut buffers are cleared too. Existing
+      enqueued audio sample counts and conservative echo timing are retained,
+      since earlier audio can already be outside the provider. These estimates
+      can include cancelled provider-channel packets; they are not a delivery
+      receipt or proof that the speaker is idle. Cancellation does not wait for
+      TTS or deletion I/O. The host target is under 1 ms for ordinary
+      admission bookkeeping; host measurements do not establish device
+      latency.
+      **Limit:** audio already returned by the engine to the worker,
+      coordinator or speaker is outside this provider-only boundary. It can
+      still play. Cancelling that tail needs the coordinator and playback
+      owner's separate change; this does not claim speaker-level erasure.
+      The host fixture `coordinator/tests/forget_tail.rs` measures the
+      disjoint queues at actual forget-runner entry, immediately after
+      invalidation. With real engine output, credited IPC and reply chunking,
+      its maximum observed emitted/unplayed tail is **30,040 ms** when
+      saturated (960 worker frames, 719,280 coordinator frames, 240 unaccepted
+      and 480 accepted-but-unretired simulated speaker frames at 24 kHz).
+      The draining control leaves **130 ms** (960 worker, 1,920 IPC and 240
+      coordinator frames). These are two host scenarios with simulated
+      speaker retirement, not a physical speaker result or a global maximum.
+      The saturated result exceeds the agreed roughly-one-second threshold
+      for a separate coordinator/playback-owner follow-up.
+    - **Downstream forget cut (separate extension, device validation pending).** The
+      9 November assignment extends the fence into the coordinator and speaker.
+      Its target is old words stopped within **1 second of admitted forget**,
+      while the clean reply continues under the same request and turn owner.
+      The provider-only measurements above remain the baseline; they are not
+      results for this extension.
+
+      The internal control contract uses two inclusive watermarks. A
+      `ProviderSpeechCut` carries the request, last old provider `Audio.sequence`
+      and monotonic admission time. The coordinator validates the live request,
+      discards old queued reply PCM and fences late old provider packets. It
+      sends `CutSpeech { owner, through }` using the last old **speaker chunk**
+      sequence. Provider packet and speaker chunk sequences are different spaces;
+      neither watermark grants authority. Zero means no earlier packet.
+      Fresh speaker chunks wait for matching `SpeechCutApplied`; only then may
+      `ProviderSpeechCutApplied` release the provider's continuation. The local
+      acknowledgment deadline is **250 ms**, with failure handled as failure,
+      never as permission to play through an unconfirmed cut. This is a control
+      deadline, not a measured acoustic bound or another cloud round.
+
+      The speaker checks its installed snapshot's owner, microphone permission
+      and freshness before the physical drop. It uses existing `Speaker::stop`
+      (PCM drop and prepare), playback reset receipts and reference re-priming.
+      It discards a partial pending chunk and late socket chunks through the
+      cutoff before writing them. A repeated or older same-owner cut does not
+      stop fresh PCM; a stale-owner cut cannot stop its successor. A failed drop
+      gets no success acknowledgment. Existing accepted-write receipts remain
+      evidence of acceptance; reset/discard is neither `SpeechDrained` nor
+      `SpeechRetired`, nor proof of what a person heard.
+
+      These messages are private to children launched from the same `lamp-voice`
+      executable, not a new independently versioned service API. The deployment
+      contract requires matching coordinator/provider/speaker code; old workers
+      do not understand these new control variants. Supported updates install
+      immutable `/opt/lampOS/<part>/<sha256>/` releases with a `current` symlink;
+      Linux `current_exe()` resolves the running executable in that release.
+      Its workers are not independently updated. This relies on the supported
+      release lifecycle, not descriptor pinning, a hash handshake or general
+      version negotiation; manually replacing that executable is unsupported.
+
+      **Host evidence and remaining validation:** from the `lampOS` root,
+      `cargo fmt --all --check` and
+      `cargo clippy -p lamp-voice -p lamp-audio --all-targets -- -D warnings`
+      pass on Mac. Focused Mac tests pass **30** cases: `speech_cut` 12,
+      `forget_tail` 6, `forget_speech` 9 and `music_scope` 3. Reproduce with
+      `cargo test -p lamp-voice --lib speech_cut`,
+      `cargo test -p lamp-voice --lib forget_tail -- --nocapture`,
+      `cargo test -p lamp-voice --lib forget_speech` and
+      `cargo test -p lamp-voice --lib music_scope`.
+      `forget_tail` includes the provider-only baseline and coordinator cut
+      controls; it is not solely the baseline measurement filter. The two
+      matched before/after host simulations pass at `38654f37c`: saturated
+      old audio falls from **30,040 ms to zero** across all five disjoint
+      buckets; draining falls from **130 ms to zero**. Actual Engine admission
+      to modelled speaker drop/ACK measures **1,788/1,946 us** saturated and
+      **1,656/1,786 us** draining. The speaker and cut/ACK are scripted host
+      simulation (`acoustic=false`), not hardware measurements. These observed
+      runs do not establish a worst-case deadline. The Mac workspace build
+      also passed on that source.
+
+      At source head `4ea13ebf1a`, [Linux ARM64 CI run 42605683226](https://github.com/autonomous-ai/lampOS/actions/runs/42605683226)
+      passed **10,748 selected tests, 62 skipped**, including the Linux speaker
+      helpers and actual speaker-loop ALSA-null reset-before-ACK case. Linux
+      clippy also passed. The Mac full voice-library run had 5,407 passed,
+      15 ignored and one unchanged TCP-pool test failure; that test passed its
+      isolated rerun. The Mac full run is not claimed green.
+      Run the `speech_cut` filter on Linux to reproduce the speaker cases.
+      The real-loop null-device test checks control-to-physical-reset receipt ordering and
+      duplicate acknowledgment, not retained audible PCM. An ALSA null sink
+      alone cannot establish held device-tail removal. The remaining fixture
+      and device checks must distinguish accepted-but-unplayed PCM from
+      unaccepted chunks, and admission-to-drop acknowledgment from reference
+      readiness and fresh output. Mac tests do not establish acoustic latency
+      or satisfy the device gate.
+
+      With an authorized lamp and pinned build, repeat first-use and repeated
+      same-request scenes that actually leave old speech pending before an
+      admitted memory forget. Measure admission to last audible old sample,
+      test a slow/stalled downstream path, then verify the fresh reply and
+      reference recovery. Record the exact scene, build, queue evidence and
+      timing boundary. If the model never produces old pending speech before
+      that forget, mark the scene **NOT EXERCISED**, not PASS. Host reset
+      acknowledgment alone does not satisfy the one-second acoustic goal.
     - **A stop:** the held answers go first, then the writer has up to
       150 ms to write them, then the open session closes
       (`remember::close_at_exit`).

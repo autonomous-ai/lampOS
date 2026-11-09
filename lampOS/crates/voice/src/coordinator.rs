@@ -83,6 +83,7 @@ use requested_media::RequestedMedia;
 mod second;
 mod service;
 mod speaker_tone;
+mod speech_cut;
 use camera::{OptionalCamera, PreparedCamera, service_camera};
 use early_end::{EarlyEnd, Heard as HeardAfterEnd};
 use endpoint::EndpointRig;
@@ -3691,12 +3692,35 @@ fn service_provider_control(
     remaining: &mut usize,
     trace: &mut SessionState,
 ) -> Result<bool> {
+    service_provider_control_inner(channel, cloud, remaining, trace, None)
+}
+
+fn service_provider_control_inner(
+    channel: &mut Channel,
+    cloud: &mut CloudAvailability,
+    remaining: &mut usize,
+    trace: &mut SessionState,
+    mut cut: Option<&mut Option<crate::speech_cut::ProviderCut>>,
+) -> Result<bool> {
     while *remaining > 0 {
         let Some(event) = channel.receive::<WorkerEvent>()? else {
             return Ok(true);
         };
         *remaining -= 1;
         match event {
+            WorkerEvent::ProviderSpeechCut { cut: received } => {
+                let Some(slot) = cut.as_deref_mut() else {
+                    return Err(
+                        io::Error::other("speech cut from unsupported provider route").into(),
+                    );
+                };
+                if slot.as_ref().is_none_or(|old| {
+                    received.request > old.request
+                        || (received.request == old.request && received.through > old.through)
+                }) {
+                    *slot = Some(received);
+                }
+            }
             WorkerEvent::ProviderLink { link } => {
                 let at = monotonic_us();
                 cloud.observe(link, at)?;
@@ -3724,8 +3748,33 @@ fn service_provider_control(
 trait SpeakerControlIo {
     fn next_speaker_event(&mut self) -> io::Result<Option<WorkerEvent>>;
     fn publish_speaker_snapshot(&mut self, snapshot: Snapshot) -> io::Result<()>;
+    fn speech_cut_applied(
+        &mut self,
+        _provider: BootId,
+        _cut: crate::speech_cut::ProviderCut,
+    ) -> io::Result<()> {
+        Err(io::Error::other(
+            "speech cut acknowledgement has no provider",
+        ))
+    }
 }
 impl SpeakerControlIo for Rig {
+    fn speech_cut_applied(
+        &mut self,
+        provider: BootId,
+        cut: crate::speech_cut::ProviderCut,
+    ) -> io::Result<()> {
+        if self.provider.boot == provider {
+            self.provider
+                .channels
+                .control
+                .send(Control::ProviderSpeechCutApplied {
+                    request: cut.request,
+                    through: cut.through,
+                })?;
+        }
+        Ok(())
+    }
     fn next_speaker_event(&mut self) -> io::Result<Option<WorkerEvent>> {
         self.speaker.channels.control.receive()
     }
@@ -3750,6 +3799,7 @@ fn latch_invitation_sounded(
     }
 }
 
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 fn service_speaker_control(
     io: &mut impl SpeakerControlIo,
@@ -3763,11 +3813,55 @@ fn service_speaker_control(
     trace: &mut SessionState,
     lapsed: &mut Option<TurnOwner>,
 ) -> Result<bool> {
+    service_speaker_control_inner(
+        io,
+        owner,
+        reply,
+        speaker_pending,
+        playback_mask,
+        snapshot,
+        last_publish,
+        remaining,
+        trace,
+        lapsed,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn service_speaker_control_inner(
+    io: &mut impl SpeakerControlIo,
+    owner: &mut Controller,
+    reply: &mut Option<Reply>,
+    speaker_pending: &mut Option<PendingSpeaker>,
+    playback_mask: &mut PlaybackMask,
+    snapshot: &mut Snapshot,
+    last_publish: &mut u64,
+    remaining: &mut usize,
+    trace: &mut SessionState,
+    lapsed: &mut Option<TurnOwner>,
+    mut cuts: Option<&mut speech_cut::State>,
+) -> Result<bool> {
     while *remaining > 0 {
         let Some(event) = io.next_speaker_event()? else {
             return Ok(true);
         };
         *remaining -= 1;
+        if let Some(cuts) = cuts.as_deref_mut()
+            && cuts.speaker_event(
+                &event,
+                io,
+                owner,
+                reply,
+                speaker_pending,
+                playback_mask,
+                snapshot,
+                last_publish,
+                trace,
+            )?
+        {
+            continue;
+        }
         match event {
             WorkerEvent::Playback {
                 owner: written_owner,
@@ -7309,6 +7403,7 @@ fn conversation_with_gate_inner(
     // (#1178), to be cut right after the speaker's reports are read.
     let mut speaker_lapsed: Option<TurnOwner> = None;
     let mut speaker_sequence = 0u64;
+    let mut speech_cuts = speech_cut::State::default();
     let mut hand_cancelled_through: Option<u64> = None;
     // The privacy start window (`PRIVACY_START_STALE_US`) counts from here,
     // the loop's start, not the prologue's: the privacy worker's
@@ -8305,11 +8400,15 @@ fn conversation_with_gate_inner(
             trace,
         )?;
         let mut provider_control_budget = 16;
-        let mut provider_control_empty = service_provider_control(
-            &mut rig.provider.channels.control,
+        let mut provider_control_empty = speech_cut::provider_control(
+            rig,
             &mut cloud,
             &mut provider_control_budget,
             trace,
+            &mut speech_cuts,
+            reply,
+            speaker_sequence,
+            owner,
         )?;
         apply_submission_gate(
             &cloud,
@@ -8341,7 +8440,7 @@ fn conversation_with_gate_inner(
             gap_cut_utterance = true;
         }
         let mut speaker_control_budget = 32;
-        service_speaker_control(
+        service_speaker_control_inner(
             rig,
             owner,
             reply,
@@ -8352,6 +8451,7 @@ fn conversation_with_gate_inner(
             &mut speaker_control_budget,
             trace,
             &mut speaker_lapsed,
+            Some(&mut speech_cuts),
         )?;
         latch_invitation_sounded(
             reply,
@@ -8377,11 +8477,15 @@ fn conversation_with_gate_inner(
         // Render reference still goes directly between the audio workers.
         let mut provider_slice = ProviderSlice::new(monotonic_us());
         while provider_control_empty {
-            provider_control_empty = service_provider_control(
-                &mut rig.provider.channels.control,
+            provider_control_empty = speech_cut::provider_control(
+                rig,
                 &mut cloud,
                 &mut provider_control_budget,
                 trace,
+                &mut speech_cuts,
+                reply,
+                speaker_sequence,
+                owner,
             )?;
             apply_submission_gate(
                 &cloud,
@@ -8400,6 +8504,9 @@ fn conversation_with_gate_inner(
                 break;
             };
             output_flow.received()?;
+            if speech_cuts.discards(rig.provider.boot, &event) {
+                continue;
+            }
             if hand::cancelled_output(&event, hand_cancelled_through) {
                 continue;
             }
@@ -9885,7 +9992,7 @@ fn conversation_with_gate_inner(
                     // Control and PCM travel independently. Recheck the original
                     // write receipts after reading this candidate, with the same
                     // finite tick budget; exhaustion keeps the input pending.
-                    if !service_speaker_control(
+                    if !service_speaker_control_inner(
                         rig,
                         owner,
                         reply,
@@ -9896,6 +10003,7 @@ fn conversation_with_gate_inner(
                         &mut speaker_control_budget,
                         trace,
                         &mut speaker_lapsed,
+                        Some(&mut speech_cuts),
                     )? {
                         latch_invitation_sounded(
                             reply,
@@ -10555,11 +10663,15 @@ fn conversation_with_gate_inner(
                     // Recheck priority immediately before admitting a new owner.
                     // A coalesced recovery is a session change even when its outage
                     // observation never fitted in the priority socket.
-                    provider_control_empty = service_provider_control(
-                        &mut rig.provider.channels.control,
+                    provider_control_empty = speech_cut::provider_control(
+                        rig,
                         &mut cloud,
                         &mut provider_control_budget,
                         trace,
+                        &mut speech_cuts,
+                        reply,
+                        speaker_sequence,
+                        owner,
                     )?;
                     apply_submission_gate(
                         &cloud,
@@ -10882,11 +10994,15 @@ fn conversation_with_gate_inner(
                     if let Some((given_up, opening)) = resumed {
                         // Whether the provider can take the successor now,
                         // checked as for any new input.
-                        provider_control_empty = service_provider_control(
-                            &mut rig.provider.channels.control,
+                        provider_control_empty = speech_cut::provider_control(
+                            rig,
                             &mut cloud,
                             &mut provider_control_budget,
                             trace,
+                            &mut speech_cuts,
+                            reply,
+                            speaker_sequence,
+                            owner,
                         )?;
                         apply_submission_gate(
                             &cloud,
@@ -11461,11 +11577,15 @@ fn conversation_with_gate_inner(
             rig.publish(snapshot)?;
             last_publish = clock;
         }
-        provider_control_empty = service_provider_control(
-            &mut rig.provider.channels.control,
+        provider_control_empty = speech_cut::provider_control(
+            rig,
             &mut cloud,
             &mut provider_control_budget,
             trace,
+            &mut speech_cuts,
+            reply,
+            speaker_sequence,
+            owner,
         )?;
         apply_submission_gate(
             &cloud,
@@ -11577,7 +11697,7 @@ fn conversation_with_gate_inner(
             rig.publish(snapshot)?;
             last_publish = monotonic_us();
         }
-        let notice_attempt = if hold_for_line.is_some() {
+        let notice_attempt = if hold_for_line.is_some() || speech_cuts.waiting() {
             None
         } else {
             dispatch_speaker_chunk(
@@ -11630,7 +11750,8 @@ fn conversation_with_gate_inner(
             reply.as_ref().map_or(0, |current| current.pcm.len()),
             &mut rig.provider.channels.control,
         )?;
-        if let Some(current) = reply.as_mut()
+        if !speech_cuts.waiting()
+            && let Some(current) = reply.as_mut()
             && current.settled(&speaker_pending)
         {
             let turn = current.owner.turn();
@@ -17319,6 +17440,7 @@ mod tests {
     mod endpoint_session;
     mod failure_notice;
     mod fixture_at;
+    mod forget_tail;
     mod hand_controls;
     mod holding_answer;
     mod pilot_faults;
@@ -17337,6 +17459,7 @@ mod tests {
     mod sleep_name;
     mod speaker_lapse;
     mod speaker_tone;
+    mod speech_cut;
     mod startup_cues;
     mod termination;
     mod tool_look;

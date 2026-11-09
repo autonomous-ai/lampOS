@@ -2292,3 +2292,74 @@ this projection's narrower explicit budgets, followed by authoritative serde
 seeds. Retain complete original bytes and copy only selected facts. No new JSON
 parser, State store, dependency, missing-file inference, filesystem reader or
 shared privileged framework is introduced. See the [projection profile](ordinary-product-context.md).
+
+## Forget cancels pending provider speech (Fourth, 9 November 2026)
+
+V1's `hal/drivers/voice/tts/device_input_gate.py` uses a generation counter
+and wakes its queue when cancelling deferred speech. Keep that cancellation
+invariant: clearing a deque alone cannot stop a worker already waiting on
+speech or output capacity. Do not port its threads or device gate into the
+Rust voice route. The existing bounded sentence channels, owned TTS task set
+and request authority remain the owners here. A per-answer generation and
+cancellable wait invalidate old provider speech while the same request makes
+its clean reply. No new wire message or speaker authority is introduced.
+
+The newer wordless-cut replay buffers also hold pending words; forget clears
+those copies. Audio already returned to the worker remains outside this
+provider-local change. Sample and echo timing are conservative enqueued
+estimates, retained rather than claiming the speaker stopped. Host tests and
+the downstream tail measurement are not an acoustic or device acceptance run.
+
+## Extend the forget fence through existing playback ownership (9 November 2026)
+
+The provider-local fixture found 30,040 ms of already-emitted/unplayed audio
+under saturation and 130 ms in its draining control. Those are disjoint host
+queue measurements with simulated speaker retirement, not acoustic results.
+The PM assigned the coordinator/playback extension after that baseline, with
+old words stopped within one second of admitted forget as the device goal.
+
+Keep the provider generation cancellation described above and the existing
+turn owner. Reuse priority worker control channels, monotonic packet/chunk
+sequences, `Speaker::stop`'s physical drop/prepare, accepted playback receipts,
+`SpeechPlayback::reset` and the reference prime barrier. Extend cancellation
+across those boundaries instead of making a new turn, granting playback
+permission through a cut message, draining obsolete speech, or introducing
+another device writer. V1's deferred-speech generation gate supplies the
+cancellation invariant; it does not supply proof that this Rust device queue
+has stopped, so its thread/queue implementation is not copied.
+
+The provider's inclusive `Audio.sequence` watermark and the speaker's inclusive
+chunk watermark are separate. The coordinator holds fresh speaker chunks until
+`SpeechCutApplied`, then acknowledges the provider fence. The local control
+acknowledgment budget is 250 ms. Failure or timeout must not release an
+unconfirmed continuation. The speaker validates the live installed authority,
+filters pending and late old chunks, and acknowledges only after a successful
+physical reset. Duplicate cuts do not discard fresh same-owner audio; old-owner
+cuts cannot affect the successor. Preserve accepted receipts while clearing
+completion debt: discard is not successful drain/retirement or acoustic silence.
+
+This is an internal matching-build contract between children of the same voice
+executable, not a public cross-version service protocol. Supported updates use
+immutable `/opt/lampOS/<part>/<sha256>/` releases and a `current` symlink.
+Linux `current_exe()` resolves the running release; children use that executable
+and are not independently updated. This relies on the supported release
+lifecycle, not descriptor pinning, a hash handshake or version negotiation.
+Manual replacement of that executable is outside this deployment contract. No new dependency, cloud round, microphone permission or playback
+authority is introduced.
+
+Mac formatting and strict clippy for `lamp-voice` and `lamp-audio`, all targets,
+pass. Focused Mac tests pass 30 cases: speech_cut 12, forget_tail 6,
+forget_speech 9 and music_scope 3. At `38654f37c`, matched host simulations reduce old audio across five
+buckets from 30,040 ms saturated and 130 ms draining to zero. Actual Engine
+admission to modelled speaker drop/ACK is 1,788/1,946 us saturated and
+1,656/1,786 us draining. The speaker and cut/ACK are scripted, acoustic=false;
+these observations are not hardware timings or worst-case bounds. The Mac
+workspace build also passed. Linux speaker-helper and real speaker-loop tests have not
+run, and acoustic acceptance remains pending. Reproduction commands and the
+authorized-device plan are in [second voice](second-voice.md), under
+“Downstream forget cut”. A helper holding synthetic PCM demonstrates only its
+injected stop boundary; a null sink does not retain real queued playback. Keep
+host admission-to-drop acknowledgment distinct from measured last audible old
+sample. The model must actually produce pending old speech in the same request
+before admitted forget; otherwise the lamp scene is NOT EXERCISED. No extension
+latency, acoustic success or device acceptance is claimed by this entry.
