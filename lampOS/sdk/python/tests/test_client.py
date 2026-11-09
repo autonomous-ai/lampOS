@@ -316,6 +316,69 @@ def test_greet_a_person_who_arrives(tmp_path):
     run(go())
 
 
+def test_keep_connected_carries_a_program_across_the_lamps_restart(tmp_path):
+    """The lamp restarts on every update and the connection closes: a program
+    under `keep_connected` connects again, runs its setup again, and hears
+    the next arrival."""
+
+    async def go():
+        async with FakeLamp(grants=("body", "look")) as fake:
+            ring = await paired(fake, tmp_path)
+            arrivals = asyncio.Queue()
+            setups = []
+
+            async def setup(lamp):
+                setups.append(lamp)
+                # A lease held when the lamp goes: closing after it is quiet.
+                await lamp.lease("body").take()
+                await lamp.on("person.arrived", arrivals.put_nowait)
+
+            kept = asyncio.ensure_future(Lamp.keep_connected(setup, keyring=ring, pauses=(0.05, 0.1)))
+            try:
+                for round_ in (1, 2, 3):
+                    while len(fake.asked("subscribe")) < round_:
+                        await asyncio.sleep(0.01)
+                    await fake.emit("person.arrived", count=round_, near=0.3)
+                    assert (await asyncio.wait_for(arrivals.get(), 5))["count"] == round_
+                    if round_ < 3:
+                        await fake.restart()
+                assert len(setups) == 3 and len({id(lamp) for lamp in setups}) == 3
+                assert not kept.done()
+            finally:
+                kept.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await kept
+
+    run(go())
+
+
+def test_keep_connected_stops_on_what_connecting_again_cant_mend(tmp_path):
+    """No pairing, and an error in the program's own setup, end it at once;
+    it doesn't retry them."""
+
+    async def go():
+        with pytest.raises(NotPaired):
+            await asyncio.wait_for(Lamp.keep_connected(lambda lamp: None, keyring=Keyring(tmp_path / "none")), 5)
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = await paired(fake, tmp_path / "a")
+
+            async def setup(lamp):
+                raise ValueError("the program's own mistake")
+
+            with pytest.raises(ValueError):
+                await asyncio.wait_for(Lamp.keep_connected(setup, keyring=ring, pauses=(0.05,)), 5)
+            # A subscription the lamp refuses (no `look` grant) comes out of
+            # it too, instead of connecting again and again.
+            with pytest.raises(LampError) as refused:
+                await asyncio.wait_for(
+                    Lamp.keep_connected(lambda lamp: lamp.on("person.arrived", print), keyring=ring, pauses=(0.05,)), 5
+                )
+            assert refused.value.code == "no_grant"
+            assert [r["op"] for r in fake.received].count("hello") == 2
+
+    run(go())
+
+
 def test_phrases_go_with_their_subscription_and_events_carry_only_the_phrase(tmp_path):
     async def go():
         async with FakeLamp(grants=("body", "light", "speak", "hear")) as fake:

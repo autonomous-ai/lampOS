@@ -381,6 +381,13 @@ export class FakeLamp {
     for (const ws of this.wss.clients) if (this.subscribed.get(ws)?.has(event)) ws.send(frame);
   }
 
+  // The lamp restarts, as on every update: each connection closes (1012,
+  // "service restart"), and pairings stay. A program connects again
+  // (`Lamp.keepConnected`).
+  restart() {
+    for (const ws of this.wss.clients) ws.close(1012, 'the lamp restarts');
+  }
+
   // The ring shows a computer's light while it lasts.
   show(request) {
     this.shown = { light: { on: true, colour: request.colour, level: request.level }, until: this.clock() + request.for_ms };

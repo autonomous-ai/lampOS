@@ -529,6 +529,13 @@ class FakeLamp:
         self.turns = {client: started for client, started in self.turns.items() if started != re}
         await self._send_done(re, {"how": how} if why is None else {"how": how, "why": why})
 
+    async def restart(self) -> None:
+        """The lamp restarts, as on every update: each connection closes
+        (1012, "service restart"), and pairings stay. A program connects
+        again (`Lamp.keep_connected`)."""
+        for ws in list(self._connections):
+            await ws.close(1012, "the lamp restarts")
+
     async def hand_on_head(self) -> None:
         """A hand on the head lifts every computer's mute, as the voice does:
         each is told with a `done` `cut_short` on the listen.set that held it."""

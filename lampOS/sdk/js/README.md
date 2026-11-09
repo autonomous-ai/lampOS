@@ -211,8 +211,23 @@ await lamp.closed();
   (`moveRefusal`, its words).
 
 **When the lamp restarts** (every update), the connection closes and
-`lamp.closed()` resolves: a long-running program connects again, for
-example in a loop with a few seconds' pause.
+`lamp.closed()` resolves. A long-running program runs under
+`Lamp.keepConnected(setup)` instead: it connects, runs `await setup(lamp)`
+(subscribe, take leases), waits for the connection to end, then connects
+again and runs `setup` again, pausing 1, 2, 5, then 10 s while the lamp
+can't be reached. It rejects at once on what connecting again can't mend (no
+pairing, another lamp at the address, a revoked computer, a refused
+subscription such as `no_grant`) and on anything `setup` throws; pass an
+`AbortSignal` as `signal` to stop it.
+
+```js
+await Lamp.keepConnected(async (lamp) => {
+  await lamp.on('person.arrived', greet);
+});
+```
+
+`fake.restart()` closes every connection as a lamp's restart does, to test
+it.
 
 **Seeing every frame:** with `LAMPOS_LOG=debug`, every frame to and from the
 lamp is printed to stderr, one line each (`lampos -> {...}` sent, `lampos <-
@@ -359,6 +374,7 @@ hours when it sets them (off by default; a lamp sets its own window, said in
 | call | parameters | resolves with |
 |---|---|---|
 | `Lamp.pair(code, host, { pin, port = 7731, name, keyring })` | `code`: the owner's 8-digit pairing code. `host`: the lamp's address. `pin`: the certificate's SHA-256 the app shows, 64 hex. `port`: 7731. `name`: this computer's name in the app, 1–64 characters, default the host name. `keyring`: default `new Keyring()` (`LAMPOS_HOME`, else `~/.config/lampos`) | the pairing (`lamp`, `client`, `grants`, …) |
+| `Lamp.keepConnected(setup, { lamp, host, keyring, pauses, signal })` | `setup(lamp)`: called (and awaited) on each new connection. `pauses`: seconds before connecting again (`[1, 2, 5, 10]`), longer while the lamp can't be reached. `signal`: an `AbortSignal` that stops it | resolves only once `signal` aborts; rejects with `NotPaired`, `WrongLamp`, a hello's or subscription's refusal, or what `setup` threw. "When the lamp restarts" |
 | `Lamp.connect(lamp, { host, keyring })` | `lamp`: a paired lamp's id, or `undefined` for the only one paired. `host`: an address to use instead of the kept one | a `Lamp`, after hello |
 | `lamp.info`, `lamp.grants`, `lamp.limits` | | the lamp's id and name, this computer's grants, the lamp's limits: each rate as `{most, within_ms}` windows (`joints`, `motion`, `light`, `say`, `express`, …), `hold_max_ms` (a light's longest `for_ms`, 30000), `lease_max_ms` (the longest one lease take or renewal asks for, 600000), `say_max_bytes` (the longest say's text in UTF-8 bytes, 900) and `quiet_hours` (`{from, to}`, or `off`, the default). There is no ceiling on renewing a lease, and a say is counted in bytes (older lamps also sent `take_max_ms` and `say_max_chars`). By default the rates are off: `rates: "off"`, and only the `refused` and `phrases` windows (a lamp run with `--rates default` gives every class). The fake lamp sends the same as a lamp with its rates off |
 | `lamp.close()` | | lets go of every lease, then closes |
