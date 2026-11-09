@@ -1577,8 +1577,12 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `forget` removes, from the call, the words heard in its line (a typed
     text's own words) and what the session did just before (`Recent`):
     `AsCalled` (a recalled `source_id` with `LAMP_MEMORY_FORGET_ALL`, the
-    model's own `about` with `LAMP_MEMORY_FORGET_ABOUT`), `Named(words)`
-    or `Last`. The guard (`remember::named_forget`, run in
+    model's own `about` with `LAMP_MEMORY_FORGET_ABOUT` when nothing was
+    heard or its words were heard in the part of the line that asks to
+    forget), `Named(words)` or `Last`. An `about` never said is dropped
+    and the forget is bare (C35: on lamp-06c1, 9 Nov, build 10824, "Lamp,
+    forget that." came with a 2-word `about`, ran as called and forgot the
+    scarf with no which-question). The guard (`remember::named_forget`, run in
     `tools::run_call_with_scope` for spoken turns and in `messages` for
     texts) sends a `Named` pick as `forget {about, heard_named}`.
   - **What names a thing** (`remember::named_subject`): the last sentence
@@ -1636,7 +1640,19 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     nothing is removed and the model is told to ask once which thing
     (`remember::FORGET_UNCLEAR`, `ForgetPick::Unclear`). Only a plainly
     bare line ("forget that", "forget what I just said") takes the last
-    kept thing.
+    kept thing, and only when this session's last keep or recall in their
+    scope gave something within `HELD_FORGET_FOR`, or a follow-up was just
+    asked of them. Otherwise (a new session, a minute gone) nothing is
+    removed, never their newest keep on a guess (C35). With one thing or
+    more shown, the model asks which (`remember::forget_which`), and the
+    journal says `lamp-voice provider: a bare forget is not run: nothing
+    was given just before and N shown could be meant, asked which`. With
+    nothing shown, it asks what to forget
+    (`remember::forget_nothing_mentioned`), and the journal says
+    `lamp-voice provider: a bare forget is not run: nothing was given just
+    before and nothing was shown, asked what`. Tests: `remember::tests`
+    `a_made_up_about_on_lamp_forget_that_is_dropped_and_the_forget_is_bare`
+    and `a_bare_forget_with_nothing_just_given_never_takes_the_newest_keep`.
     With nothing heard, the model's own `about`, if it gave one, names it.
   - **What is removed:** what the asker's own scope keeps and what was
     noticed of them (`kept` with `observations`) that has every one of
