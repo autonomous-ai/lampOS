@@ -2058,6 +2058,25 @@ fn forget_said_told(answer: Option<&Value>) -> String {
     }
 }
 
+/// Only a confirmed receipt proves that the room cleanup finished. An old
+/// server's refusal is known to keep it; missing or malformed replies are uncertain.
+fn forget_said_result(answer: Option<&Value>) -> &'static str {
+    match answer {
+        Some(answer) if answer["ok"] == true && answer["removed"].as_u64().is_some() => "cleared",
+        Some(answer) if answer["ok"] == false && answer["error"] == "unknown_op" => "kept",
+        _ => "uncertain",
+    }
+}
+
+/// Fixed step names and states only: no path, person id, error text or memory.
+/// A later successful step must never upgrade an earlier partial result.
+fn note_forget_cleanup(told: &mut Value, field: &str, state: &str) {
+    told[field] = json!(state);
+    if state != "cleared" {
+        told["everything"] = json!(false);
+    }
+}
+
 /// The most days a recall's span names, both ends counted: the memory's
 /// own bound (#2176).
 const SPAN_DAYS: u64 = 14;
@@ -9459,7 +9478,7 @@ impl DaysClient {
             }
             // And the room's lines they were seen saying (#2849), once their
             // own are gone: removed, or kept by an older memory, journalled
-            // with counts only. What they are told is as before either way.
+            // with counts only. The result also names this content-free cleanup outcome.
             if call.name == FORGET_EVERYTHING
                 && answer["ok"] == true
                 && let Some(speaker) = person
@@ -9470,6 +9489,11 @@ impl DaysClient {
                     .checked_sub(started.elapsed())
                     .and_then(|left| bounded_exchange_scoped(&self.socket, &said, left, lease));
                 eprintln!("lamp-voice provider: {}", forget_said_told(answer.as_ref()));
+                note_forget_cleanup(
+                    &mut told,
+                    "room_memory_result",
+                    forget_said_result(answer.as_ref()),
+                );
                 // The room's lines may have named what went, though their
                 // own memory held nothing (Reviewer-two, 02:45 on #3609).
                 if let Some(request) = asked_in
@@ -9482,23 +9506,34 @@ impl DaysClient {
             // face seems: "a forget or the reset wipes it" (the lead on
             // #2110), whoever asked.
             if call.name == FORGET_EVERYTHING {
-                for consent in [
-                    self.room_sounds.clone(),
-                    crate::onboarding::face_expressions_beside(&self.room_sounds),
+                for (field, consent) in [
+                    ("sound_consent_result", self.room_sounds.clone()),
+                    (
+                        "face_expression_consent_result",
+                        crate::onboarding::face_expressions_beside(&self.room_sounds),
+                    ),
                 ] {
-                    match std::fs::remove_file(&consent) {
-                        Ok(()) => eprintln!(
-                            "lamp-voice provider: forget everything removed {}",
-                            consent.display()
-                        ),
-                        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-                        Err(error) => eprintln!(
-                            "lamp-voice provider: forget everything could not remove {}: {error}",
-                            consent.display()
-                        ),
-                    }
+                    let state = match std::fs::remove_file(&consent) {
+                        Ok(()) => {
+                            eprintln!(
+                                "lamp-voice provider: forget everything removed {}",
+                                consent.display()
+                            );
+                            "cleared"
+                        }
+                        Err(error) if error.kind() == io::ErrorKind::NotFound => "cleared",
+                        Err(error) => {
+                            eprintln!(
+                                "lamp-voice provider: forget everything could not remove {}: {error}",
+                                consent.display()
+                            );
+                            "uncertain"
+                        }
+                    };
+                    note_forget_cleanup(&mut told, field, state);
                 }
             }
+
             let (told, ids) = if call.name == REMEMBER && told["remembered"] == true {
                 let Some(id) = answer["id"]
                     .as_u64()
@@ -27845,10 +27880,159 @@ mod tests {
             std::fs::remove_file(&socket).unwrap();
         }
 
+        #[test]
+        fn forget_cleanup_reports_lost_and_malformed_room_receipts() {
+            type Reply = fn(&Value) -> Value;
+            let cases: [(&str, usize, Reply, &str, bool); 5] = [
+                (
+                    "cleanup-room-lost",
+                    1,
+                    |_| json!({"ok":true,"removed":3}),
+                    "uncertain",
+                    true,
+                ),
+                (
+                    "cleanup-room-storage",
+                    2,
+                    |request| {
+                        if request["op"] == "forget_all" {
+                            json!({"ok":true,"removed":3})
+                        } else {
+                            json!({"ok":false,"error":"storage","message":"private canary"})
+                        }
+                    },
+                    "uncertain",
+                    true,
+                ),
+                (
+                    "cleanup-room-malformed",
+                    2,
+                    |request| {
+                        if request["op"] == "forget_all" {
+                            json!({"ok":true,"removed":3})
+                        } else {
+                            json!({"ok":true,"removed":"private canary"})
+                        }
+                    },
+                    "uncertain",
+                    true,
+                ),
+                (
+                    "cleanup-room-zero",
+                    2,
+                    |request| json!({"ok":true,"removed":if request["op"] == "forget_all" {3} else {0}}),
+                    "cleared",
+                    true,
+                ),
+                (
+                    "cleanup-room-empty",
+                    2,
+                    |request| {
+                        if request["op"] == "forget_all" {
+                            json!({"ok":true,"removed":0})
+                        } else {
+                            json!({"ok":false,"error":"storage"})
+                        }
+                    },
+                    "uncertain",
+                    false,
+                ),
+            ];
+            for (name, requests, reply, expected, forgotten) in cases {
+                let (socket, served) = memory(name, requests, reply);
+                let folder = socket.with_extension("cleanup");
+                std::fs::create_dir(&folder).unwrap();
+                let mut client = speaking_client(&socket, true);
+                client.room_sounds = folder.join("room-sounds.json");
+                client.forget_all.store(true, Ordering::Release);
+                let (told, answered) = client.run_at(
+                    &call(FORGET_EVERYTHING, json!({})),
+                    Duration::from_secs(2),
+                    NOW,
+                    None,
+                    Some("p-be9688998f085098"),
+                );
+                assert!(answered, "{name}: {told}");
+                assert_eq!(told["forgotten"], forgotten);
+                assert_eq!(told["room_memory_result"], expected);
+                assert_eq!(told["everything"], expected == "cleared");
+                // Missing consent files are already cleared; they cannot turn
+                // a failed room step back into a complete deletion claim.
+                assert_eq!(told["sound_consent_result"], "cleared");
+                assert_eq!(told["face_expression_consent_result"], "cleared");
+                assert!(!told.to_string().contains("private canary"));
+                assert!(!told.to_string().contains("p-be9688998f085098"));
+                assert_eq!(served.join().unwrap().len(), requests);
+                drop(client);
+                std::fs::remove_file(socket).unwrap();
+                std::fs::remove_dir(folder).unwrap();
+            }
+        }
+
+        #[test]
+        fn forget_cleanup_reports_each_consent_failure_and_still_clears_the_other() {
+            for (name, failed) in [
+                ("cleanup-sound", "sound_consent_result"),
+                ("cleanup-face", "face_expression_consent_result"),
+            ] {
+                let (socket, served) = memory(name, 1, |_| json!({"ok":true,"removed":3}));
+                let folder = socket.with_extension("cleanup");
+                std::fs::create_dir(&folder).unwrap();
+                let sound = folder.join("room-sounds.json");
+                let face = crate::onboarding::face_expressions_beside(&sound);
+                let mut client = speaking_client(&socket, false);
+                client.room_sounds = sound.clone();
+                client.forget_all.store(true, Ordering::Release);
+                for (field, path) in [
+                    ("sound_consent_result", &sound),
+                    ("face_expression_consent_result", &face),
+                ] {
+                    if field == failed {
+                        std::fs::create_dir(path).unwrap();
+                    } else {
+                        std::fs::write(path, b"private canary").unwrap();
+                    }
+                }
+                let (told, answered) = client.run_at(
+                    &call(FORGET_EVERYTHING, json!({})),
+                    Duration::from_secs(2),
+                    NOW,
+                    None,
+                    Some("p-be9688998f085098"),
+                );
+                assert!(answered, "{told}");
+                assert_eq!(told["forgotten"], true);
+                assert_eq!(told["everything"], false);
+                assert!(
+                    told.get("room_memory_result").is_none(),
+                    "unattempted step: {told}"
+                );
+                for (field, path) in [
+                    ("sound_consent_result", &sound),
+                    ("face_expression_consent_result", &face),
+                ] {
+                    assert_eq!(
+                        told[field],
+                        if field == failed {
+                            "uncertain"
+                        } else {
+                            "cleared"
+                        }
+                    );
+                    assert_eq!(path.exists(), field == failed);
+                }
+                assert!(!told.to_string().contains("private canary"));
+                assert!(!told.to_string().contains(folder.to_str().unwrap()));
+                assert_eq!(served.join().unwrap().len(), 1);
+                drop(client);
+                std::fs::remove_file(socket).unwrap();
+                std::fs::remove_dir_all(folder).unwrap();
+            }
+        }
+
         /// A known person's forget everything, answered `ok`, also sends
-        /// `forget_said` with their id; what they are told is as without
-        /// the switch, whether the memory removed the room's lines or, an
-        /// older one, answered `unknown_op` (nothing more removed). Off, or
+        /// `forget_said` with their id; the result distinguishes confirmed
+        /// room cleanup from an older server's refusal. Off, or
         /// with their own forget refused, it is not sent.
         #[test]
         fn a_known_persons_forget_everything_also_forgets_what_they_said_in_the_room() {
@@ -27897,7 +28081,17 @@ mod tests {
                 };
                 let (told, answered) = forget(&socket, true);
                 assert!(answered, "{name}");
-                assert_eq!(told, off, "{name}");
+                let mut expected = off.clone();
+                let state = if said["ok"] == true {
+                    "cleared"
+                } else {
+                    "kept"
+                };
+                expected["room_memory_result"] = json!(state);
+                if state != "cleared" {
+                    expected["everything"] = json!(false);
+                }
+                assert_eq!(told, expected, "{name}");
                 assert_eq!(
                     served.join().unwrap(),
                     [

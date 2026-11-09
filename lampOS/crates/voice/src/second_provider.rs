@@ -71,6 +71,7 @@ pub mod probe;
 mod second_try;
 mod services;
 pub mod speech_tags;
+pub mod wordless_call;
 pub mod worker;
 
 pub use second_try::{CHAT_SECOND_TRY_ENVIRONMENT, ChatTold, SECOND_TRY_AFTER, second_try_on};
@@ -1687,6 +1688,10 @@ struct Shared {
     /// lamp-name's near hearings, for a line's first word
     /// ([`Engine::hearing_the_name_near`]).
     name_near: Option<NameNear>,
+    /// `LAMP_NAME_WORDLESS_BAR=on`: lamp-name's best hearing in a line, for
+    /// one marked as only the name whose words came back empty
+    /// ([`Engine::holding_a_wordless_call`]).
+    wordless_bar: Option<wordless_call::BestHeard>,
     /// With `name_near`, a first word said as a sentence of its own is the
     /// name by its near hearing alone ([`Engine::taking_the_name_as_a_sentence`]).
     name_as_a_sentence: bool,
@@ -4198,6 +4203,7 @@ impl Engine {
                 name_refused: Mutex::new(None),
                 one_speaker: None,
                 name_near: None,
+                wordless_bar: None,
                 name_as_a_sentence: false,
                 own_echo: false,
                 spare: Mutex::new(None),
@@ -4982,6 +4988,18 @@ impl Engine {
     pub fn hearing_the_name_near(mut self, near: NameNear) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.name_near = Some(near);
+        }
+        self
+    }
+
+    /// `LAMP_NAME_WORDLESS_BAR=on` (#5385): a line marked as only the
+    /// lamp's name whose words came back empty is asked as the name only
+    /// when `best` says lamp-name heard it there at
+    /// [`wordless_call::BAR`] or more; under it, it is left as a sound.
+    /// Without it, as before. Before any turn only.
+    pub fn holding_a_wordless_call(mut self, best: wordless_call::BestHeard) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.wordless_bar = Some(best);
         }
         self
     }
@@ -8374,6 +8392,24 @@ async fn spoken(
     // often does: asked as the name the coordinator heard, or it would go
     // unanswered as a sound (#1712).
     let called = marks.called.load(Ordering::Acquire);
+    // With `LAMP_NAME_WORDLESS_BAR=on` (#5385), only on a sure hearing: a
+    // call heard under the bar with no words is no call, and is left as a
+    // sound, as a line with no words and no call is.
+    let called = match &shared.wordless_bar {
+        Some(best) if called && text.trim().is_empty() => {
+            let best = best(said.lock().map_or((0, 0), |said| *said));
+            let answered = wordless_call::answered(best);
+            if !answered {
+                eprintln!(
+                    "lamp-voice second: request {request}: only the lamp's name, and no words of it came back: {}, under {}: not answered as a call (LAMP_NAME_WORDLESS_BAR)",
+                    wordless_call::scored(best),
+                    wordless_call::BAR
+                );
+            }
+            answered
+        }
+        _ => called,
+    };
     let text = if called && text.trim().is_empty() {
         eprintln!(
             "lamp-voice second: request {request}: only the lamp's name was said, and no words of it came back: asked as the name"
@@ -14170,16 +14206,6 @@ async fn answer(
             }
             let first_calls = !called_earlier;
             called_earlier |= !calls.is_empty();
-            // Where this batch starts in the claim evidence, and how many of
-            // its entries were taken out since: a call's own entry is found
-            // by its place, never by its name (#5326).
-            let batch_start = turn_called.len();
-            let mut batch_dropped = 0;
-            turn_called.extend(
-                calls
-                    .iter()
-                    .map(|call| (call.name.clone(), call.args.clone())),
-            );
             if calls.iter().any(|call| call.name == NOT_FOR_ME) {
                 let named = heard
                     && shared
@@ -14216,6 +14242,20 @@ async fn answer(
                 }
                 continue;
             }
+            // Only calls that go on to run back a claim: a round declined
+            // above and asked once more ran none, so none of it is kept
+            // (Reviewer-three's after-merge P2 on #5215: `[not_for_me,
+            // set_timer]` then "Timer set." was said with nothing set).
+            // Where this batch starts in the claim evidence, and how many of
+            // its entries were taken out since: a call's own entry is found
+            // by its place, never by its name (#5326).
+            let batch_start = turn_called.len();
+            let mut batch_dropped = 0;
+            turn_called.extend(
+                calls
+                    .iter()
+                    .map(|call| (call.name.clone(), call.args.clone())),
+            );
             // A look asked by its own call (#1712): the coordinator takes the
             // turn's full look, and the turn ends here; its picture comes in
             // the look turn after it. Only in a turn someone spoke.

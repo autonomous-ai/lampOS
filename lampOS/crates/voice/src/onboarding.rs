@@ -70,6 +70,13 @@ const NAME_WAIT_US: u64 = 2 * FACE_SAVE_WAIT_US;
 /// does not end the step meanwhile: on Fifth's A/B runs (5 Nov) it closed
 /// 15 s after the read-back while the yes came 13.4 s after the close.
 pub(crate) const FACE_SAVE_HELD_US: u64 = 45_000_000;
+/// A held face save let go before its yes ([`face_save_let_go`]): "who you
+/// are" closes no later than this after the let-go, once quiet, unless the
+/// person answers the lamp's retry meanwhile. The lamp's "Look toward me and
+/// say it again" comes about 10 s after the let-go, and the face wait from
+/// its words alone closed the step about 25 s after it (Fifth's row 6 on
+/// 10441, #5139); the bar is 20 s.
+const LET_GO_CLOSE_US: u64 = 20_000_000;
 
 pub const NUDGE_ENVIRONMENT: &str = "LAMP_ONBOARDING_NUDGE";
 /// The walk's done line also names a few things to try first, once per
@@ -461,12 +468,22 @@ pub struct Progress {
     /// [`FACE_EXPRESSIONS`]) was last redone, in Unix seconds: a redo of the
     /// step or of the whole walk (#5500). A yes the owner gave in the app
     /// (`"by":"app"`, `lamp_msgs::consent`) is kept by the voice's starts and
-    /// writes, unlike one with no `done` behind it, but only while it is
-    /// newer than this and than a later "no" at the lamp, so a redo takes it
-    /// back as it takes back a spoken one. Kept through a redo of the whole
-    /// walk; a reset wipes it with the file. An older build reads past it.
+    /// writes, unlike one with no `done` behind it, until the write that
+    /// first changes this time or keeps a new "no" at the lamp, which takes
+    /// it back as it takes back a spoken one, whatever the clocks say
+    /// (`storage::take_back`). Kept through a redo of the whole walk; a
+    /// reset wipes it with the file. An older build reads past it.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub yes_redone_at_unix_s: BTreeMap<String, u64>,
+    /// How many times each yes another part reads was taken back at the
+    /// lamp, by a "no" kept or a redo ([`Self::took_back`]), counted up
+    /// and never down: the write that first changes it takes back an app
+    /// yes (`storage::take_back`), so a second "no" or redo in the same
+    /// second as the first, or after the clock stepped back, is seen too
+    /// (Jarvis's P3 on #5848). Kept through a redo of the whole walk; a
+    /// reset wipes it with the file. An older build reads past it.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub yes_taken_back: BTreeMap<String, u64>,
     /// When the walk first handed out its done line, in Unix ms: the app is
     /// told once from it (`lamp_msgs::OnboardingPending::done_at_unix_ms`,
     /// lamp-cloud's `onboarding.done`). Set once, kept through a redo of a
@@ -485,6 +502,7 @@ impl Progress {
         let mut redone = Self {
             tries_said: self.tries_said,
             harness_line: self.harness_line,
+            yes_taken_back: self.yes_taken_back.clone(),
             done_at_unix_ms: self.done_at_unix_ms,
             ..Self::default()
         };
@@ -503,6 +521,16 @@ impl Progress {
                 .duration_since(std::time::UNIX_EPOCH)
                 .map_or(0, |since| since.as_secs());
             self.yes_redone_at_unix_s.insert(step.to_owned(), now);
+            self.took_back(step);
+        }
+    }
+
+    /// `step`'s yes, if it is one another part reads, taken back at the
+    /// lamp once more, by a "no" or a redo ([`Self::yes_taken_back`]).
+    fn took_back(&mut self, step: &str) {
+        if [ROOM_SOUNDS, FACE_EXPRESSIONS].contains(&step) {
+            let count = self.yes_taken_back.entry(step.to_owned()).or_default();
+            *count = count.saturating_add(1);
         }
     }
 }
@@ -511,8 +539,8 @@ impl Progress {
 /// as [`told_ids`] gives them.
 const MOST_TOLD_IDS: usize = 2;
 
-/// [`Progress::yes_redone_at_unix_s`]' bound: the two yeses, and room for a
-/// later build's.
+/// [`Progress::yes_redone_at_unix_s`]' and [`Progress::yes_taken_back`]'
+/// bound: the two yeses, and room for a later build's.
 const MOST_YES_REDONE: usize = 8;
 
 fn is_zero(value: &u8) -> bool {
@@ -648,6 +676,7 @@ impl Progress {
         }
         if self.face_again_names.len() > MOST_TOLD_IDS
             || self.yes_redone_at_unix_s.len() > MOST_YES_REDONE
+            || self.yes_taken_back.len() > MOST_YES_REDONE
             || !self
                 .face_again_names
                 .iter()
@@ -809,6 +838,10 @@ struct Answers {
     /// read-back ([`face_save_held`]): the face wait does not end the step
     /// within [`FACE_SAVE_HELD_US`] of it.
     save_held_us: Option<u64>,
+    /// When a held face save was let go before its yes
+    /// ([`face_save_let_go`]): the step closes by [`LET_GO_CLOSE_US`] after
+    /// it unless the person answers again meanwhile.
+    let_go_us: Option<u64>,
     /// The model reported "who you are" done while a face save was held:
     /// the step ends done, the name only, once the hold is over unless the
     /// face is saved first.
@@ -3038,6 +3071,14 @@ impl Onboarding {
                 })
                 || led.heard.name_us.is_some_and(|at| {
                     now_us.saturating_sub(at.max(led.lamp_said_us.unwrap_or(0))) >= NAME_WAIT_US
+                })
+                // A save let go before its yes: the lamp's own retry line
+                // ("Look toward me and say it again") does not push the
+                // close past the let-go's bound; an answer to it does.
+                || led.heard.let_go_us.is_some_and(|at| {
+                    now_us.saturating_sub(at) >= LET_GO_CLOSE_US
+                        && led.heard.face_answered_us.is_none_or(|yes| yes <= at)
+                        && led.heard.name_us.is_none_or(|name| name <= at)
                 }))
         {
             eprintln!(
@@ -3480,6 +3521,9 @@ impl Onboarding {
             .filter(|_| outcome == Outcome::NotAvailable || later_offers > 0)
             .and_then(|kept| kept.offered_at_unix_s);
         self.desired.tried.retain(|tried| tried != step.name());
+        if outcome == Outcome::Skipped {
+            self.desired.took_back(step.name());
+        }
         self.desired.steps.insert(
             step.name().to_owned(),
             Kept {
@@ -3799,6 +3843,13 @@ impl Onboarding {
                             "the held face save was let go"
                         }
                     );
+                    // A new hold clears an earlier let-go; a let-go counts
+                    // only for a hold that was on.
+                    if held {
+                        led.heard.let_go_us = None;
+                    } else if led.heard.save_held_us.is_some() {
+                        led.heard.let_go_us = Some(now_us);
+                    }
                     led.heard.save_held_us = held.then_some(now_us);
                 }
                 continue;
@@ -7289,6 +7340,69 @@ mod tests {
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
     }
 
+    /// #5139 (b), Fifth's row 6 on 10441 (Queue #5385): hold at 08:02:29,
+    /// let go at 08:02:39, the lamp's "Look toward me and say it again" ten
+    /// seconds on, and the step closed 08:02:49 + 15 s, about 25 s after the
+    /// let-go. It closes within [`LET_GO_CLOSE_US`] of the let-go, still
+    /// only once the room is quiet; a yes to the retry gets its full wait.
+    #[test]
+    fn a_let_go_face_save_closes_who_you_are_within_20_s() {
+        let fifths = |name: &str| {
+            let mut room = named_with_a_face(name);
+            room.walk.heard("Yes, please.", room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            face_save_held(&room.walk.file);
+            room.walk.lamp_said(room.at);
+            room.wait(10 * S, Some(NEAR_MIDDLE));
+            // The hold let go as the lamp answers a correction.
+            face_save_let_go(&room.walk.file);
+            room.walk.lamp_said(room.at);
+            room.said = room.at;
+            let dropped = room.at;
+            room.wait(10 * S, Some(NEAR_MIDDLE));
+            // "Look toward me and say it again", about 3 s long.
+            for _ in 0..3 {
+                room.walk.lamp_said(room.at);
+                room.said = room.at;
+                room.wait(S, Some(NEAR_MIDDLE));
+            }
+            (room, dropped)
+        };
+
+        // Nobody answers: done, the name only, by the drop + 20 s.
+        let (mut room, dropped) = fifths("face-let-go-fifth");
+        room.wait(dropped + 20 * S - room.at - S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None, "the retry is real");
+        room.wait(S + S / 4, Some(NEAR_MIDDLE));
+        assert_eq!(
+            room.outcome(Step::WhoYouAre),
+            Some(Outcome::Done),
+            "closed by the drop + 20 s"
+        );
+        assert!(room.walk.kept().owner.is_none());
+
+        // Someone talking at the bound is not cut off: it closes once
+        // the room has been quiet for the short bar.
+        let (mut room, dropped) = fifths("face-let-go-talking");
+        room.wait(dropped + 19 * S - room.at, Some(NEAR_MIDDLE));
+        room.said = room.at;
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None, "mid-sentence");
+        room.wait(START_QUIET_US, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+
+        // A yes to the retry is answered: the face wait runs from it, and
+        // the save it brings is kept.
+        let (mut room, dropped) = fifths("face-let-go-yes");
+        room.walk.heard("Yes.", room.at);
+        room.wait(dropped + 20 * S - room.at + 2 * S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None, "the yes waits");
+        face_saved(&room.walk.file, Some("Marie"));
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert_eq!(room.walk.kept().owner.as_deref(), Some("Marie"));
+    }
+
     /// #5139 fix 3 (a tester's lamp-0c4e, 3 Nov): "who you are" done with
     /// the name only, by the wait, the give-up or the model's report, says
     /// that what the lamp remembers waits for a face; on a lamp that keeps
@@ -7712,8 +7826,9 @@ mod tests {
         assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE);
         let mut redone = room.walk.desired.redone();
         assert!(redone.tries_said);
-        // The yeses' redo time aside (#5500, its own test below).
+        // The yeses' redo time and count aside (#5500, its own test below).
         redone.yes_redone_at_unix_s.clear();
+        redone.yes_taken_back.clear();
         assert_eq!(
             redone,
             Progress {
@@ -8129,12 +8244,28 @@ mod tests {
             kept.yes_redone_at_unix_s,
             room.walk.desired.yes_redone_at_unix_s
         );
+        // Each redo and each "no" of a yes step counts once more (Jarvis's
+        // P3 on #5848), kept across a save and a read and a whole redo.
+        assert_eq!(kept.yes_taken_back, room.walk.desired.yes_taken_back);
+        assert_eq!(kept.yes_taken_back[FACE_EXPRESSIONS], 1);
+        room.walk
+            .finish(Step::FaceExpressions, Outcome::Skipped, None, room.at);
+        assert_eq!(room.walk.desired.yes_taken_back[FACE_EXPRESSIONS], 2);
+        let whole = room.walk.desired.redone();
+        assert_eq!(whole.yes_taken_back[FACE_EXPRESSIONS], 3);
+        assert_eq!(whole.yes_taken_back[ROOM_SOUNDS], 1);
         let old: Progress = serde_json::from_str(r#"{"steps":{}}"#).unwrap();
         assert!(old.yes_redone_at_unix_s.is_empty());
+        assert!(old.yes_taken_back.is_empty());
         assert!(
             !serde_json::to_string(&Progress::default())
                 .unwrap()
                 .contains("yes_redone")
+        );
+        assert!(
+            !serde_json::to_string(&Progress::default())
+                .unwrap()
+                .contains("yes_taken_back")
         );
     }
 

@@ -464,7 +464,8 @@ owner also turns it on and off in the app (`consent.set`, [cloud.md](cloud.md),
 "The two yeses from the app"): root's change helper writes the same file
 with `"by":"app"`, which the eyes ignore, and removes it for an off; the
 voice's starts and writes keep that yes until a redo or a "no" at the lamp
-after it. Without the ask or the app (the
+after it, taken back when the voice first writes it, whatever the clocks
+say. Without the ask or the app (the
 product's units set neither yet), a test lamp's yes is written by hand, as
 root:
 `printf '{"face_expressions":"yes"}' > /var/lib/lampOS/consent/face-expressions.json`,

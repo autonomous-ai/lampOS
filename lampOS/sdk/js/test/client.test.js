@@ -561,6 +561,91 @@ test('the camera example saves a picture and a frame, and says a refusal', async
   assert.ok(!existsSync(`${refused.cwd}/snapshot.jpg`));
 });
 
+// A fake lamp with this computer paired and no connection open yet.
+async function withPaired(options, body) {
+  const fake = await FakeLamp.start(options);
+  const keyring = new Keyring(folder());
+  try {
+    await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, name: 'test laptop', keyring });
+    await body(fake, keyring);
+  } finally { await fake.stop(); }
+}
+
+test('keepConnected carries a program across the lamp\'s restart', async () => {
+  await withPaired({ grants: ['body', 'look'] }, async (fake, keyring) => {
+    const arrivals = [];
+    const setups = [];
+    const stop = new AbortController();
+    const kept = Lamp.keepConnected(async (lamp) => {
+      setups.push(lamp);
+      // A lease held when the lamp goes: closing after it is quiet.
+      await lamp.lease('body').take();
+      await lamp.on('person.arrived', (event) => arrivals.push(event.count));
+    }, { keyring, pauses: [0.05, 0.1], signal: stop.signal });
+    for (const round of [1, 2, 3]) {
+      await until(() => fake.asked('subscribe').length >= round);
+      fake.emit('person.arrived', { count: round, near: 0.3 });
+      await until(() => arrivals.length >= round);
+      if (round < 3) fake.restart();
+    }
+    assert.deepEqual(arrivals, [1, 2, 3]);
+    assert.equal(new Set(setups).size, 3);
+    stop.abort();
+    await kept;
+  });
+});
+
+test('keepConnected stops at an abort that comes while it connects or pauses', async () => {
+  // Second's P2 on #5833: an abort while connect is on its way, or before a
+  // pause, is not missed: setup never runs and nothing stays open.
+  await withPaired({ grants: ['light'] }, async (fake, keyring) => {
+    const stop = new AbortController();
+    const connect = Lamp.connect;
+    let setups = 0;
+    Lamp.connect = async (...args) => {
+      const connection = await connect.call(Lamp, ...args);
+      stop.abort(); // aborted while the connection was being made
+      return connection;
+    };
+    try {
+      await Lamp.keepConnected(async (lamp) => { setups += 1; await lamp.light('green', 2, 1000); }, { keyring, signal: stop.signal });
+    } finally {
+      Lamp.connect = connect;
+    }
+    assert.equal(setups, 0);
+    assert.equal(fake.asked('light').length, 0);
+    await until(() => fake.wss.clients.size === 0);
+  });
+  // An abort during a failed connect: the pause after it doesn't wait out its 10 s.
+  const stop = new AbortController();
+  const connect = Lamp.connect;
+  Lamp.connect = async () => { stop.abort(); throw Object.assign(new Error('refused'), { code: 'ECONNREFUSED' }); };
+  const started = Date.now();
+  try {
+    await Lamp.keepConnected(() => {}, { keyring: new Keyring(folder()), pauses: [10], signal: stop.signal });
+  } finally {
+    Lamp.connect = connect;
+  }
+  assert.ok(Date.now() - started < 2000, `${Date.now() - started} ms`);
+});
+
+test('keepConnected stops on what connecting again can\'t mend', async () => {
+  await assert.rejects(Lamp.keepConnected(() => {}, { keyring: new Keyring(folder()) }), NotPaired);
+  await withPaired({ grants: ['light'] }, async (fake, keyring) => {
+    await assert.rejects(
+      Lamp.keepConnected(() => { throw new TypeError("the program's own mistake"); }, { keyring, pauses: [0.05] }),
+      TypeError,
+    );
+    // A subscription the lamp refuses (no `look` grant) comes out of it too,
+    // instead of connecting again and again.
+    await assert.rejects(
+      Lamp.keepConnected((lamp) => lamp.on('person.arrived', () => {}), { keyring, pauses: [0.05] }),
+      (error) => error instanceof LampError && error.code === 'no_grant',
+    );
+    assert.equal(fake.received.filter((r) => r.op === 'hello').length, 2);
+  });
+});
+
 test('the examples call only what the client has', async () => {
   const { readdirSync } = await import('node:fs');
   const examples = readdirSync(new URL('../examples/', import.meta.url)).filter((f) => f.endsWith('.js'));
@@ -827,9 +912,27 @@ test('a fake like lamp-control refuses what it does not route yet', async () => 
 test('the fake checks the lease before the routing refusal', async () => {
   const { LAMP_CONTROL_REFUSES } = await import('../src/testing.js');
   await withLamp({ grants: schema.grants, refuses: LAMP_CONTROL_REFUSES }, async (lamp) => {
-    await assert.rejects(lamp.look('face'), (error) => error.code === 'no_lease');
+    await assert.rejects(lamp.play('wave'), (error) => error.code === 'no_lease');
     await lamp.withLease(['body'], async () => {
-      await assert.rejects(lamp.look('face'), (error) => error.code === 'refused' && error.why === "the body's lease socket is not on here");
+      await assert.rejects(lamp.play('wave'), (error) => error.code === 'refused' && error.why === 'not routed yet: waits for client packages');
+    });
+  });
+});
+
+// As lamp-control on stable 10824 (parts.rs `joints`, the product lamp-body's
+// lease socket): a look ahead or at an angle is taken, joints naming only yaw
+// and pitch go, and one naming roll, shoulder or elbow is refused whole in its
+// words; face and name stay "not in this release".
+test('the fake takes look and yaw and pitch as a stable lamp does', async () => {
+  const { JOINTS_WAIT, LAMP_CONTROL_REFUSES } = await import('../src/testing.js');
+  await withLamp({ grants: schema.grants, refuses: LAMP_CONTROL_REFUSES }, async (lamp) => {
+    await lamp.withLease(['body'], async (lease) => {
+      assert.equal((await lamp.look({ yaw: 5, pitch: 2 })).to, 'body');
+      assert.equal((await lamp.joints(lease, 300, { yaw: -3, pitch: 1 })).to, 'body');
+      for (const joint of ['roll', 'shoulder', 'elbow']) {
+        await assert.rejects(lamp.joints(lease, 300, { yaw: 0, [joint]: 1 }), (error) => error.code === 'refused' && error.why === JOINTS_WAIT);
+      }
+      await assert.rejects(lamp.look('face'), (error) => error.code === 'refused' && error.why === 'not in this release: look at a face or a name');
     });
   });
 });
@@ -1025,8 +1128,10 @@ test('followHand lets go on a lamp that takes the look without following', async
 test('a look at the hand needs the body\'s lease socket, as other looks do', async () => {
   // lamp-control without --lease-socket refuses every look, `hand` too
   // (parts.rs: "the body's lease socket"), and followHand lets go of its lease.
-  const { LAMP_CONTROL_REFUSES } = await import('../src/testing.js');
-  await withLamp({ grants: ['body', 'look'], refuses: LAMP_CONTROL_REFUSES }, async (lamp, fake) => {
+  // No product unit runs without it since stable 10824; LAMP_CONTROL_REFUSES
+  // takes look, so this lamp is named here.
+  const noLeaseSocket = { look: "the body's lease socket is not on here" };
+  await withLamp({ grants: ['body', 'look'], refuses: noLeaseSocket }, async (lamp, fake) => {
     await lamp.withLease(['body'], async () => {
       for (const at of ['ahead', 'hand']) {
         await assert.rejects(lamp.look(at), (error) => error instanceof byCode.refused && /lease socket/.test(error.message));
@@ -1396,7 +1501,7 @@ test('a look or joints waits for the body\'s done and says when a conversation d
 // `done`. A refused look leaves it be, and the fake's `joints` is held to the
 // door's rules. test_client.py has the same.
 test('a waiting look ends a hand-follow when taken, not at its done', async () => {
-  const { JOINTS_WAIT } = await import('../src/testing.js');
+  const { JOINTS_UNKNOWN, JOINTS_WAIT } = await import('../src/testing.js');
   await withLamp({ grants: ['body', 'look'] }, async (lamp, fake) => {
     const following = await lamp.followHand().start();
     assert.ok(following.following);
@@ -1422,6 +1527,59 @@ test('a waiting look ends a hand-follow when taken, not at its done', async () =
       const body = (await lamp.get('body')).body.joints;
       const done = await lamp.joints(lease, 300, { yaw: -3 }, { wait: true });
       assert.deepEqual([done.yaw, done.pitch], [-3, body.pitch.deg]);
+      // Unknown where the head is: name both, as the door says.
+      fake.state.body.joints.pitch.deg = null;
+      await assert.rejects(lamp.joints(lease, 300, { yaw: -3 }, { wait: true }), (error) => error.why === JOINTS_UNKNOWN);
+      assert.equal((await lamp.joints(lease, 300, { yaw: -3, pitch: 1 }, { wait: true })).how, 'finished');
     }, { forMs: 5000 });
+  });
+});
+
+// The same poses give the same frames in both SDKs: this digest is
+// test_client.py's too.
+const POSES_CASES = [[[{"pitch":10},{"pitch":-5,"yaw":8}],400],[[{"yaw":1}],0],[[{"shoulder":20,"elbow":-12.5},{"roll":-2.25,"pitch":3}],250],[[{"roll":0.5},{"roll":0.5},{"roll":0.5}],0]];
+const POSES_DIGEST = 'e35bf686207b90cb4ba49373a765e63f0beeaade9e4b63165e8c09e0ae5ae765';
+
+test('poses become a move the body plays, eased there and back, as Python makes it', async () => {
+  const { createHash } = await import('node:crypto');
+  const { posesToFrames } = await import('../src/index.js');
+  const { COUNTS_PER_DEGREE, moveWhy } = await import('../src/moves.js');
+  const made = POSES_CASES.map(([poses, holdMs]) => posesToFrames(poses, { holdMs }));
+  assert.equal(createHash('sha256').update(JSON.stringify(made)).digest('hex'), POSES_DIGEST);
+  const frames = made[0];
+  assert.equal(moveWhy(50, frames), null);
+  // Up is positive for pitch, as get('body') and joints count it: fewer counts.
+  const up = [-Math.round(10 * COUNTS_PER_DEGREE), 0, 0, 0, 0];
+  const at = frames.findIndex((frame) => JSON.stringify(frame) === JSON.stringify(up));
+  assert.deepEqual(frames.slice(at, at + 9), Array(9).fill(up));
+  assert.ok((made[1].length - 1) * 50 >= 1500);
+  assert.equal(made[3].length - 1, 4 * 8);
+});
+
+test('poses a move cannot make are refused with the joint, before sending', async () => {
+  const { posesToFrames } = await import('../src/index.js');
+  for (const [poses, words] of [
+    [[], 'at least one pose'],
+    [[{}], 'name at least one of pitch, roll, yaw, shoulder, elbow'],
+    [[{ nose: 3 }], "'nose' is not a joint"],
+    [[{ pitch: true }], 'pitch must be a number of degrees'],
+    [[{ pitch: NaN }], 'pitch must be a number of degrees'],
+    [[{ pitch: 40 }], 'pitch 40° is farther than a move may take it, 17.6° either way'],
+    [[{ yaw: -14 }], 'yaw -14° is farther than a move may take it, 13.2° either way'],
+    [Array(12).fill({ shoulder: 30, elbow: -30 }), "longer than a move's 10000"],
+  ]) {
+    assert.throws(() => posesToFrames(poses), (error) => error instanceof LampError && error.code === 'bad_request' && error.message.includes(words), words);
+  }
+  assert.throws(() => posesToFrames([{ yaw: 2 }], { holdMs: -1 }), /holdMs/);
+  await withLamp({}, async (lamp, fake) => {
+    await lamp.withLease(['body'], async () => {
+      await assert.rejects(lamp.movePoses([{ pitch: 40 }]), /farther than a move may take it/);
+      assert.deepEqual(fake.asked('move'), []);
+      await lamp.movePoses([{ pitch: 10 }, { yaw: -8 }], { holdMs: 200 });
+    }, { forMs: 5000 });
+    const sent = fake.asked('move');
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].step_ms, 50);
+    assert.deepEqual(sent[0].frames, posesToFrames([{ pitch: 10 }, { yaw: -8 }], { holdMs: 200 }));
   });
 });

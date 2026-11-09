@@ -1883,6 +1883,8 @@ fn second_route_worker_environment(
         lamp_msgs::NameHeard::NEAR_ENVIRONMENT,
         // The name said as a sentence of its own, with the near hearing (#5277).
         crate::second_provider::NAME_AS_A_SENTENCE_ENVIRONMENT,
+        // A wordless call only on a sure hearing (#5385).
+        crate::second_provider::wordless_call::ENVIRONMENT,
         crate::second_provider::OWN_ECHO_ENVIRONMENT,
         crate::second_provider::FACE_NAME_ENVIRONMENT,
         crate::second_provider::STT_WARM_ENVIRONMENT,
@@ -2193,6 +2195,7 @@ mod tests {
             crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT,
             lamp_msgs::NameHeard::NEAR_ENVIRONMENT,
             crate::second_provider::NAME_AS_A_SENTENCE_ENVIRONMENT,
+            crate::second_provider::wordless_call::ENVIRONMENT,
             crate::second_provider::OWN_ECHO_ENVIRONMENT,
             crate::second_provider::FACE_NAME_ENVIRONMENT,
             crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
@@ -3027,6 +3030,7 @@ mod tests {
                     || name == crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT
                     || name == lamp_msgs::NameHeard::NEAR_ENVIRONMENT
                     || name == crate::second_provider::NAME_AS_A_SENTENCE_ENVIRONMENT
+                    || name == crate::second_provider::wordless_call::ENVIRONMENT
                     || name == crate::second_provider::OWN_ECHO_ENVIRONMENT
                     || name == crate::second_provider::FACE_NAME_ENVIRONMENT
                     || name == crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT
@@ -3210,6 +3214,7 @@ mod tests {
                     "LAMP_NAME_SECOND_SIGN=on",
                     "LAMP_NAME_START_USUAL=on",
                     "LAMP_NAME_STAYS_IN_ITS_LINE=on",
+                    "LAMP_NAME_WORDLESS_BAR=on",
                     "LAMP_NOT_FOR_ME_WORDS=on",
                     "LAMP_NO_WORDS_AGAIN=on",
                     "LAMP_ONE_AS_LAMP=on",

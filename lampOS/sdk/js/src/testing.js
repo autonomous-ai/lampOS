@@ -21,6 +21,7 @@ import { join } from 'node:path';
 import { WebSocketServer } from 'ws';
 import * as schema from './schema.js';
 import { HELLO, b64, pinOf, proof, unb64 } from './keys.js';
+import { MOVE_FRAMES_MIN, MOVE_STEP_MS, moveWhy } from './moves.js';
 
 // As lamp-control stamps it (server.rs `rfc3339_utc`): UTC, to the second, ending `Z`.
 const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -42,12 +43,13 @@ export const LOOK_WAITS = {
 // lamp does now. `lamp fake` does.
 // lamp-control's words for `joints` naming roll, shoulder or elbow (parts.rs).
 export const JOINTS_WAIT = "not routed yet: waits for the body's goal stream for roll, shoulder and elbow; yaw and pitch go now";
+// And for a `joints` leaving out yaw or pitch while the body hasn't said where it is.
+export const JOINTS_UNKNOWN = 'name both yaw and pitch while the body has not said where it is in the last 15 s (get body)';
 export const LAMP_CONTROL_REFUSES = Object.freeze({
-  // No product unit passes --lease-socket yet (docs/control.md).
-  look: "the body's lease socket is not on here",
-  joints: "not routed yet: waits for a goal stream on the body's lease socket",
   play: 'not routed yet: waits for client packages',
 });
+// `look` and `joints` are not in it: the product lamp-body opens its lease socket (stable 10824 and later), so a
+// lamp takes a look, and `joints` at yaw and pitch, refusing roll, shoulder and elbow with JOINTS_WAIT (above).
 // A light's pattern, as lamp-control checks it before the ring (lamp_msgs'
 // LightPattern::check, with the breath's low at 1): the least level each is
 // seen at, and the words it refuses with.
@@ -138,46 +140,9 @@ function clipLoudnessRefusal(data, read) {
   return undefined;
 }
 
-// A move, as lamp-body's `moves::check` holds it (crates/body/src/moves.rs): head
-// pitch, head roll, base yaw, shoulder, elbow, in counts from rest and counts a
-// second. The Python SDK's skillcheck has the same.
-export const MOVE_STEP_MS = [40, 1000];
-export const MOVE_LASTS_MS = [1500, 10000];
-// A computer's move: 2 frames at the least (lamp-control's protocol.rs
-// FRAMES_MIN); its most are the body's check's (10 s at a 40 ms step, 251).
-export const MOVE_FRAMES_MIN = 2;
-export const MOVE_FARTHEST = [200, 200, 150, 350, 350];
-export const MOVE_FASTEST = [900, 1300, 1000, 800, 800];
-
-// Rust's `{:.0}`, as the body prints a speed: a half rounds to the even neighbour.
-function roundHalfEven(value) {
-  const floor = Math.floor(value);
-  const part = value - floor;
-  if (part !== 0.5) return Math.round(value);
-  return floor % 2 === 0 ? floor : floor + 1;
-}
-
-// Why the body refuses a move of these steps and frames, in its words, at its
-// first problem; null for one it plays.
-export function moveWhy(stepMs, frames) {
-  if (stepMs < MOVE_STEP_MS[0] || stepMs > MOVE_STEP_MS[1]) return `step_ms ${stepMs} is not from 40 to 1000`;
-  const lasts = Math.max(frames.length - 1, 0) * stepMs;
-  if (lasts < MOVE_LASTS_MS[0] || lasts > MOVE_LASTS_MS[1]) return `it lasts ${lasts} ms, not 1500 to 10000`;
-  const rest = (frame) => Array.isArray(frame) && frame.length === 5 && frame.every((count) => count === 0);
-  if (!frames.length || !rest(frames[0]) || !rest(frames.at(-1))) return 'it does not begin and end at nothing';
-  const step = stepMs / 1000;
-  for (let at = 1; at < frames.length; at++) {
-    for (let joint = 0; joint < 5; joint++) {
-      const after = frames[at][joint];
-      if (Math.abs(after) > MOVE_FARTHEST[joint]) return `frame ${at} takes joint ${joint} ${after} counts, farther than ${MOVE_FARTHEST[joint]}`;
-      const speed = Math.abs(after - frames[at - 1][joint]) / step;
-      if (speed > MOVE_FASTEST[joint] + 2 / step) {
-        return `frame ${at} asks joint ${joint} for ${roundHalfEven(speed)} counts a second, faster than ${MOVE_FASTEST[joint]}`;
-      }
-    }
-  }
-  return null;
-}
+// A move's bounds and the body's check of it live in moves.js, which the
+// client uses too; they are exported from here as before.
+export { MOVE_FARTHEST, MOVE_FASTEST, MOVE_FRAMES_MIN, MOVE_LASTS_MS, MOVE_STEP_MS, moveWhy } from './moves.js';
 
 // lamp-control's refusal of a computer's `move` (protocol.rs), in its words, as
 // `bad_request`: its own shape first, then the body's check; null for one it takes.
@@ -410,6 +375,13 @@ export class FakeLamp {
   emit(event, fields = {}) {
     const frame = JSON.stringify({ ev: event, at: now(), ...fields });
     for (const ws of this.wss.clients) if (this.subscribed.get(ws)?.has(event)) ws.send(frame);
+  }
+
+  // The lamp restarts, as on every update: each connection closes (1012,
+  // "service restart"), and pairings stay. A program connects again
+  // (`Lamp.keepConnected`).
+  restart() {
+    for (const ws of this.wss.clients) ws.close(1012, 'the lamp restarts');
   }
 
   // The ring shows a computer's light while it lasts.
@@ -816,8 +788,12 @@ export class FakeLamp {
         const { targets } = request;
         if (['roll', 'shoulder', 'elbow'].some((joint) => joint in targets)) return this.refuse(ws, id, 'refused', JOINTS_WAIT);
         const now = this.state.body.joints;
+        const yaw = targets.yaw ?? now.yaw.deg;
+        const pitch = targets.pitch ?? now.pitch.deg;
+        // The door's words when the body hasn't said where it is.
+        if (yaw === null || yaw === undefined || pitch === null || pitch === undefined) return this.refuse(ws, id, 'refused', JOINTS_UNKNOWN);
         this.stopFollowing(ws);
-        return this.lookDone(ws, id, targets.yaw ?? now.yaw.deg, targets.pitch ?? now.pitch.deg);
+        return this.lookDone(ws, id, yaw, pitch);
       }
       case 'gesture':
       case 'move':

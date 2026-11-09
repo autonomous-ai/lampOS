@@ -13138,6 +13138,45 @@ async fn only_the_lamps_name_is_told_so_and_asked_as_the_name_with_no_words() {
     );
 }
 
+/// `LAMP_NAME_WORDLESS_BAR=on` (#5385, the first builder's rule): a line
+/// marked as only the lamp's name whose words came back empty, heard under
+/// 0.99 (lamp-75c9's 0.941 in its own move's sound, or none said in full),
+/// is not asked: no turn, no answer. At 0.99 or more it is asked as the
+/// name, as before; a line with words is asked as it is whatever the score;
+/// and without the switch the wordless line is asked as the name.
+#[tokio::test]
+async fn a_wordless_call_under_the_bar_is_not_answered_with_the_switch() {
+    let called = Message::system(crate::provider_worker::CALLED_NOTE);
+    let barred = |best: Option<f32>| {
+        move |engine: Engine| engine.holding_a_wordless_call(Arc::new(move |_: (u64, u64)| best))
+    };
+    // (1) Under the bar, no words: nothing asked.
+    for best in [Some(0.941), Some(0.989), None] {
+        assert!(
+            asked_with("", barred(best), start(1), true, false)
+                .await
+                .is_empty(),
+            "{best:?}"
+        );
+    }
+    // (2) Off: asked as the name, as before.
+    let off = asked_with("", |engine| engine, start(1), true, false).await;
+    assert_eq!(off[0][off[0].len() - 2], called, "{:?}", off[0]);
+    assert_eq!(off[0].last(), Some(&Message::user(super::CALLED_WORDS)));
+    // (3) Under the bar, with words: asked as said, told it was a call.
+    let worded = asked_with("Lamp", barred(Some(0.941)), start(1), true, false).await;
+    assert_eq!(worded[0][worded[0].len() - 2], called, "{:?}", worded[0]);
+    assert_eq!(worded[0].last(), Some(&Message::user("Lamp")));
+    let asked = "Lamp, what time is it?";
+    let whole = asked_with(asked, barred(Some(0.941)), start(1), true, false).await;
+    assert_eq!(whole[0].last(), Some(&Message::user(asked)));
+    // (4) At the bar or over, no words: asked as the name, as before.
+    for best in [0.99, 1.0] {
+        let sure = asked_with("", barred(Some(best)), start(1), true, false).await;
+        assert_eq!(sure, off, "{best}");
+    }
+}
+
 /// A line marked as only the lamp's name (`Called`) whose words came back
 /// as a whole line is asked as it is, without the call's note (lamp-4ace,
 /// 25 Oct: "Nice. And what was my sister's name again?" was told it was only

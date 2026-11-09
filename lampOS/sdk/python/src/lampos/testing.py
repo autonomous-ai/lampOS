@@ -86,12 +86,15 @@ LOOK_WAITS = {
 # lamp does now. `lamp fake` does.
 # lamp-control's words for `joints` naming roll, shoulder or elbow (parts.rs).
 JOINTS_WAIT = "not routed yet: waits for the body's goal stream for roll, shoulder and elbow; yaw and pitch go now"
+# And for a `joints` leaving out yaw or pitch while the body hasn't said where it is.
+JOINTS_UNKNOWN = "name both yaw and pitch while the body has not said where it is in the last 15 s (get body)"
 LAMP_CONTROL_REFUSES = {
-    # No product unit passes --lease-socket yet (docs/control.md).
-    "look": "the body's lease socket is not on here",
-    "joints": "not routed yet: waits for a goal stream on the body's lease socket",
     "play": "not routed yet: waits for client packages",
 }
+
+# `look` and `joints` are not in it: the product lamp-body opens its lease
+# socket (stable 10824 and later), so a lamp takes a look, and `joints` at yaw
+# and pitch, refusing roll, shoulder and elbow with JOINTS_WAIT (above).
 
 
 # `express`'s feelings and their moves, as lamp-control's feelings.rs.
@@ -572,6 +575,13 @@ class FakeLamp:
         self.turns = {client: started for client, started in self.turns.items() if started != re}
         await self._send_done(re, {"how": how} if why is None else {"how": how, "why": why})
 
+    async def restart(self) -> None:
+        """The lamp restarts, as on every update: each connection closes
+        (1012, "service restart"), and pairings stay. A program connects
+        again (`Lamp.keep_connected`)."""
+        for ws in list(self._connections):
+            await ws.close(1012, "the lamp restarts")
+
     async def hand_on_head(self) -> None:
         """A hand on the head lifts every computer's mute, as the voice does:
         each is told with a `done` `cut_short` on the listen.set that held it."""
@@ -956,8 +966,14 @@ class FakeLamp:
                 await self._refuse(ws, id_, "refused", JOINTS_WAIT)
                 return
             now = self.state["body"]["joints"]
+            yaw, pitch = targets.get("yaw", now["yaw"]["deg"]), targets.get("pitch", now["pitch"]["deg"])
+            if yaw is None or pitch is None:
+                # The door's words when the body hasn't said where it is.
+                self.requests.remove(request)
+                await self._refuse(ws, id_, "refused", JOINTS_UNKNOWN)
+                return
             self.stop_following(ws)
-            await self._look_done(ws, id_, targets.get("yaw", now["yaw"]["deg"]), targets.get("pitch", now["pitch"]["deg"]))
+            await self._look_done(ws, id_, yaw, pitch)
         elif op == "volume":
             # As lamp-control through lamp-actions' app calls: a level, the
             # voice's 20-point step within its floor of 10 and ceiling of 100,
