@@ -652,6 +652,17 @@ tính và bị bỏ, không mã, không vị trí, chỉ khi bật công tắc h
 như trước. Các ngưỡng 0,6 và 0,70 lấy từ bản ghi trên lamp-06c1 (3/11); một người thật đứng
 sau chủ đèn 1 m vẫn chưa được thử.
 
+**Một khuôn mặt quay đi rồi quay lại vẫn là của họ** (`LAMP_FACE_REFOUND=on`
+cùng `LAMP_FACE_KNOWN_HOLD=on`, cả hai bật trong mắt của bản sản phẩm, khuôn mặt
+tìm lại từ quyết định của người phụ trách bộ nhớ, C65; [eyes.md](../eyes.md), "The
+followed id"): một khuôn mặt quay lại với mã tạm mới được nhận ra ngay lần nhìn
+đầu, không phải tới 2 giây sau, và mắt nói nó nối tiếp mã đã mất nào, nên một câu
+nói qua lúc quay đầu là của một khuôn mặt ([second-voice.md](../second-voice.md)).
+Tên họ chỉ chuyển sang mã mới khi một dấu mặt được đọc là của họ (ít nhất 0,363 so
+với dấu mặt mắt đã đọc của họ); trước dấu mặt đó, câu chờ tối đa 1 giây sau khi
+kết thúc, rồi thuộc về cả phòng. Người khác ngồi vào chỗ họ không bao giờ nhận bộ
+nhớ của họ chỉ nhờ mối nối.
+
 Với `LAMP_PERSON_SCOPE_ONE_FACE=on` (bật trong bản sản phẩm; mục 1 của nhóm
 thử nghiệm ra mắt trên #3997): trên lamp-220c ngày 30/10, mặt chủ đèn có trong
 17 lần nhìn của một câu nhưng không lần nào đọc là đang nói, nên với

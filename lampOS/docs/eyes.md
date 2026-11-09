@@ -771,7 +771,7 @@ this room" until someone asks to be recognised.
   remembered, and at the first look after someone is remembered at the
   lamp, so the known file names them within one look, not two seconds
   later (#3108; `who::recognise_due`). With `LAMP_FACE_REFOUND=on` (off
-  unless set, #4486) a check is also due at once when the near face's
+  unless set, #4486; on in the product unit since C65) a check is also due at once when the near face's
   passing id is not among the ids a print was read for (the newest 16), so
   a face turned away and back, which comes back with a new id, is known in
   its first look. A face too small to be near has no near id and forces
@@ -1135,7 +1135,9 @@ times in a day and a half, and a line said while the file named nobody,
 with their face still in view, is the room's.
 
 **The followed id** (#4885), only with both `LAMP_FACE_KNOWN_HOLD=on` and
-`LAMP_FACE_REFOUND=on` (off unless set; `bus_out::follows_from_environment`).
+`LAMP_FACE_REFOUND=on` (off unless set, both on in the product unit,
+`LAMP_FACE_REFOUND` since C65, the memory owner's call;
+`bus_out::follows_from_environment`).
 A face turned away and back usually comes back on a new passing id, and the
 hold, which needs the match's id, let them go. With both on:
 
@@ -1149,7 +1151,12 @@ hold, which needs the match's id, let them go. With both on:
   face whose new id follows the id at the match (`who::Held::follow`), a
   print of that face at least 0.30 alike to the held person makes the new
   id the match's (`who::Held::carry`), and the known face beside the known
-  file is rewritten to it with the name as it was. Until such a print, the
+  file is rewritten to it with the name as it was. A new id always comes
+  after a look with a near face but not the match's id, so that print must
+  first read at least 0.363 (`SAME_PERSON`) to the eyes' own print of them
+  (`who::Held::printed`, #5546): someone else beside their lost id, alike
+  enough to their kept prints, is still let go
+  (`a_followed_id_after_its_gap_carries_only_a_print_read_as_theirs`). Until such a print, the
   new id is another id: seen but not printed (turned, too small), it lets
   them go at once and the known file is removed, as before the followed id,
   so their name never goes on an id no print has shown is theirs (the

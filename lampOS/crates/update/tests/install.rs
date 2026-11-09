@@ -2384,7 +2384,9 @@ fn the_product_sees_who_speaks() {
 /// #4710: the memory owner's yes (4 Nov), after Sixth's lamp-52e6 check,
 /// to leaving the head's own moves out of the speaking read (#4558). The
 /// known hold (#4493) is on since #5522: a miss no longer empties the known
-/// file with the face still in view. The re-found face (#4486) stays off.
+/// file with the face still in view. The re-found face (#4486) is on beside
+/// it (C65, the memory owner's call): a face back on a new id is recognised
+/// at once, and the followed id (#4885) is said for the second voice.
 #[test]
 fn the_product_reads_speaking_on_steady_looks() {
     let (_, eyes) = install::PRODUCT
@@ -2395,15 +2397,10 @@ fn the_product_reads_speaking_on_steady_looks() {
     for on in [
         "Environment=LAMP_EYES_SPEAKING_STEADY=on",
         "Environment=LAMP_FACE_KNOWN_HOLD=on",
+        "Environment=LAMP_FACE_REFOUND=on",
     ] {
         assert!(service.contains(&on), "lamp-eyes.service lacks {on}");
     }
-    assert!(
-        !service
-            .iter()
-            .any(|line| line.starts_with("Environment=LAMP_FACE_REFOUND=")),
-        "lamp-eyes.service sets LAMP_FACE_REFOUND"
-    );
 }
 
 /// #2176 row 3: a rename keeps the person's memory, so the eyes and the
