@@ -11,10 +11,18 @@ Ready for lamp-voice: no
   content-free outcomes and preserved through the forget sanitizer.
   Current source still had the original omission. No additional calls,
   retries, scopes or deadlines; added bookkeeping target below 1 ms.
-- Code and injected-failure tests are being made, with English memory and
-  second-voice docs. Two reads remain Reviewer-three and Tests. The first
-  focused Rust compilation is running. Docs checker: nine tests passed,
-  191 docs and 1,885 local links, zero broken. No lamp or latency result yet.
+- Code and English docs are in place. Focused checks passed: two real
+  socket/file cleanup cases (including lost/malformed receipts and both
+  consent failures), 16 after-forget tests, and the existing known-person
+  room-cleanup test. An initial consent test used an unknown caller and
+  correctly hit the existing privacy refusal; the fixture now uses a known
+  person. Strict Clippy, broader dependency tests and workspace build are
+  running. Two reads remain Reviewer-three and Tests.
+- Docs checker: nine tests passed, 191 docs and 1,885 local links, zero
+  broken. Host debug sanitizer timing, three fields, first 0.062368 ms,
+  repeated p50 0.007126 ms / p95 0.007420 ms / max 0.010846 ms (1,000
+  samples). This measures sanitizer entry to outcome only, not file/IPC
+  cleanup, process startup, model response or a lamp. No device claim.
 - #4099 closure recommended to the PM using Mobile's app/lamp PASS on
   3 Nov (4099/6594483187); build number and raw `can` were not captured.
 - Fourteen's 10824 receipt records a real stable self-switch from 10686,
