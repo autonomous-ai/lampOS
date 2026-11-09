@@ -233,7 +233,11 @@ pub fn newest(path: &Path, now: SystemTime) -> Result<Frame, String> {
 pub struct Camera {
     sight: PathBuf,
     private: Private,
-    streams: HashMap<String, Arc<AtomicBool>>,
+    /// Each client's stream: its turn, and whether it runs. Each `on` is a
+    /// new turn, so a frame made by a stream that ended is never taken for
+    /// the one that replaced it.
+    streams: HashMap<String, (u64, Arc<AtomicBool>)>,
+    turns: u64,
     /// The ring's mark, and its word that it drew it; none, no camera at
     /// all (it is never seen unmarked).
     mark: Option<(Mark, Drawn)>,
@@ -248,6 +252,7 @@ impl Camera {
             sight,
             private,
             streams: HashMap::new(),
+            turns: 0,
             mark: None,
             rate: Arc::default(),
             fast: None,
@@ -321,7 +326,10 @@ impl Camera {
         let (mark, drawn) = self.mark()?.clone();
         let fps = fps.unwrap_or(FPS_DEFAULT).clamp(1, FPS_MOST);
         let running = Arc::new(AtomicBool::new(true));
-        self.streams.insert(client.to_owned(), running.clone());
+        self.turns += 1;
+        let turn = self.turns;
+        self.streams
+            .insert(client.to_owned(), (turn, running.clone()));
         let (sight, private, client) =
             (self.sight.clone(), self.private.clone(), client.to_owned());
         let rate = self.rate.clone();
@@ -356,7 +364,7 @@ impl Camera {
             };
             match fast {
                 Some((reader, sink, size)) => {
-                    let send = |frame: &[u8]| sink(&client, frame);
+                    let send = |frame: &[u8]| sink(&client, turn, frame);
                     run_fast(
                         reader,
                         size,
@@ -366,11 +374,11 @@ impl Camera {
                         &marked,
                         &rate,
                         &send,
-                        &|event| events(&client, event),
+                        &|event| events(&client, with_turn(event, turn)),
                     );
                 }
                 None => run(&sight, fps, &running, &private, &marked, &rate, &|event| {
-                    events(&client, event)
+                    events(&client, with_turn(event, turn))
                 }),
             }
         });
@@ -382,17 +390,18 @@ impl Camera {
         })
     }
 
-    /// Whether `client`'s stream runs now.
-    pub fn streaming(&self, client: &str) -> bool {
+    /// Whether `client`'s stream of `turn` runs now: not after it ended,
+    /// and not for a stream started after it.
+    pub fn streaming(&self, client: &str, turn: u64) -> bool {
         self.streams
             .get(client)
-            .is_some_and(|running| running.load(Ordering::SeqCst))
+            .is_some_and(|(now, running)| *now == turn && running.load(Ordering::SeqCst))
     }
 
     /// Ends `client`'s stream, if any, without an event: its own `off`,
     /// `stop` or going.
     pub fn end(&mut self, client: &str) {
-        if let Some(running) = self.streams.remove(client) {
+        if let Some((_, running)) = self.streams.remove(client) {
             running.store(false, Ordering::SeqCst);
         }
     }
@@ -545,6 +554,19 @@ fn run_fast(
         });
         send(&binary_frame(&header, &jpeg));
     }
+}
+
+/// The internal field a `camera.frame` event carries its stream's turn in,
+/// for the writer to hold it to that stream ([`Camera::streaming`]) and take
+/// off before it goes: a computer never sees it.
+pub const TURN_FIELD: &str = "_stream_turn";
+
+/// A `camera.frame` event with its stream's turn; any other as it is.
+fn with_turn(mut event: Value, turn: u64) -> Value {
+    if event["ev"] == "camera.frame" {
+        event[TURN_FIELD] = json!(turn);
+    }
+    event
 }
 
 #[cfg(test)]
@@ -703,7 +725,7 @@ mod tests {
         let got: Arc<Mutex<Vec<Vec<u8>>>> = Arc::default();
         let into = got.clone();
         let sink: Sink = Arc::default();
-        let _ = sink.set(Arc::new(move |client: &str, frame: &[u8]| {
+        let _ = sink.set(Arc::new(move |client: &str, _turn: u64, frame: &[u8]| {
             assert_eq!(client, "c_1");
             into.lock().unwrap().push(frame.to_vec());
         }));
@@ -730,6 +752,56 @@ mod tests {
             (Some("camera.frame"), Some(640))
         );
         assert_eq!(&frame[4 + length..], JPEG);
+    }
+
+    #[test]
+    fn a_frame_goes_only_with_the_very_stream_that_made_it() {
+        // banana, 9 Nov: a frame the first stream queued must not go through
+        // a stream started after it, before that one's mark is drawn. Each
+        // `on` is a turn of its own, and the writer asks for that turn.
+        let sight = dir().join("sight.jpg");
+        std::fs::write(&sight, JPEG).unwrap();
+        let mut camera =
+            Camera::new(sight, Arc::new(|| false)).marking(Arc::new(|_, _| {}), drawn_now());
+        let events: Events = Arc::new(|_, _| {});
+        camera
+            .stream("c_1", true, None, None, events.clone())
+            .unwrap();
+        let first = camera.streams["c_1"].0;
+        assert!(camera.streaming("c_1", first));
+        // Off, then on again, while a frame of the first is still queued.
+        camera
+            .stream("c_1", false, None, None, events.clone())
+            .unwrap();
+        assert!(!camera.streaming("c_1", first));
+        camera
+            .stream("c_1", true, None, None, events.clone())
+            .unwrap();
+        let second = camera.streams["c_1"].0;
+        assert_ne!(first, second);
+        assert!(!camera.streaming("c_1", first), "the first stream's frame");
+        assert!(camera.streaming("c_1", second));
+        // On again while one runs is a new turn too.
+        camera
+            .stream("c_1", true, None, None, events.clone())
+            .unwrap();
+        assert!(!camera.streaming("c_1", second));
+        let third = camera.streams["c_1"].0;
+        // Never another client's, and not once it ends.
+        assert!(!camera.streaming("c_2", third));
+        camera.end("c_1");
+        assert!(!camera.streaming("c_1", third));
+    }
+
+    #[test]
+    fn a_frame_event_carries_its_streams_turn_for_the_writer_alone() {
+        // The writer holds a slow-path picture to the stream that made it and
+        // takes the turn off before it goes (server.rs); nothing else is
+        // marked.
+        let frame = with_turn(json!({"ev": "camera.frame", "jpeg": "…"}), 7);
+        assert_eq!(frame[TURN_FIELD], 7);
+        let ended = with_turn(json!({"ev": "camera.ended", "why": "x"}), 7);
+        assert!(ended.get(TURN_FIELD).is_none());
     }
 
     #[test]

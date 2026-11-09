@@ -38,9 +38,10 @@ pub trait Parts {
     /// Ends `client`'s camera stream, and nothing else of it: its pairing
     /// no longer grants the camera (Thirteen's P2 on #4521).
     fn camera_end(&mut self, _client: &str) {}
-    /// Whether `client` has a camera stream running now: a frame already
-    /// queued for it goes only then (Thirteen's P3 on #4521).
-    fn camera_streaming(&self, _client: &str) -> bool {
+    /// Whether `client`'s camera stream of `turn` runs now: a frame already
+    /// queued for it goes only then (Thirteen's P3 on #4521), and only while
+    /// the very stream that made it runs, never one that replaced it.
+    fn camera_streaming(&self, _client: &str, _turn: u64) -> bool {
         false
     }
     /// Does `op` for `client`, as [`Parts::act`], where the reply may wait
