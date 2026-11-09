@@ -1706,7 +1706,11 @@ With the switch:
     it changed, without the old name, which can't be shown to whoever
     is speaking. A turn proven someone else's (faces seen saying it while
     the eyes know who is in view and none is the asker's, or another
-    known face alone in view) is told nothing. The eyes read who said
+    known face alone in view) is told nothing. A forget (`forget`,
+    `forget_everything` or `forget_my_face`) ends the held rename and this
+    note once it is let run, before it is awaited, on that turn and every
+    later one, even if the turn is then revoked or dropped
+    (`held_rename::forgot`). The eyes read who said
     each line while the note waits. The only wait left on a yes is the eyes' own (`DEADLINE`, 6
     s; about 2 s on 29e7), under the wait sound. Off, everything is byte
     for byte as before. Tests: `known_faces::tests::the_29e7_yeses_to_a_rename_are_agreed_by_their_guards`,
