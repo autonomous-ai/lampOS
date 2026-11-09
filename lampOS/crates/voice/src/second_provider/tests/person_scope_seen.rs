@@ -3488,6 +3488,56 @@ async fn with_reads_rules_are_never_kept_listed_or_forgotten() {
     }
 }
 
+/// The privacy read on #5385 (before `LAMP_MEMORY_ROLE` went on in the
+/// product): on a one-face-read line no role is set or ended. A guest off
+/// camera, with the owner's face silent and alone in view, saying "Be
+/// yourself again" or "You are Harry Potter now" would end or replace the
+/// owner's standing role, which every later session of theirs is told.
+/// Seen speaking it, the same calls run as theirs.
+#[tokio::test]
+async fn with_reads_a_role_is_never_set_or_ended() {
+    let a = crate::remember::person_id("A");
+    for (what, words, name, args) in [
+        (
+            "reads-end-role",
+            "Be yourself again.",
+            crate::remember::role::END_ROLE,
+            json!({}),
+        ),
+        (
+            "reads-set-role",
+            "You are Harry Potter now.",
+            crate::remember::role::SET_ROLE,
+            json!({"name": "Harry Potter"}),
+        ),
+    ] {
+        assert!(one_face_refuses(name, &args, false), "{what}");
+        let got = one_face_reading(
+            what,
+            words,
+            one_call(name, args.clone()),
+            vec![("f1", false)],
+            None,
+            Voice::One,
+        )
+        .await;
+        assert!(got.calls.is_empty(), "{what}: never run: {:?}", got.calls);
+        assert!(refused_by_one_face(&got), "{what}: told why");
+        let seen = format!("{what}-seen");
+        let got = one_face_reading(
+            &seen,
+            words,
+            one_call(name, args),
+            vec![("f1", true)],
+            None,
+            Voice::One,
+        )
+        .await;
+        assert_eq!(got.calls, [Some(a.clone())], "{what}: seen speaking: A's");
+        assert!(!refused_by_one_face(&got), "{what}: seen speaking");
+    }
+}
+
 /// The privacy read's P2 on #5592: a reminder's cancel or snooze on a
 /// one-face-read line is refused, unless `LAMP_ONE_FACE_REMINDERS` is on
 /// (its cancel risk accepted by the memory owner on 4 Nov). Listing stays.

@@ -10697,7 +10697,10 @@ impl DaysClient {
     /// a keep: written only in the scope of the line's own known person, its
     /// lease still current, never a held or carried line. A role asked by
     /// someone not placed is told for this conversation only and never
-    /// written. A set needs a short name ([`role::name_like`]), heard as one
+    /// written. Nor is anything set or ended on a line its person's only by
+    /// their face alone in view (`ScopeLease::forgets_need_mouth`), as the
+    /// runners refuse it too (`ONE_FACE_REFUSED`; the privacy read on
+    /// #5385). A set needs a short name ([`role::name_like`]), heard as one
     /// in the line ([`role::heard_sets`]). Done, the held role changes at
     /// once; an end the memory did not write keeps it and says so.
     fn role_for_guarded(
@@ -10709,6 +10712,13 @@ impl DaysClient {
     ) -> (Value, bool) {
         if !scope_current(lease) {
             return (gone(), false);
+        }
+        if lease.is_some_and(crate::memory_scope::ScopeLease::forgets_need_mouth) {
+            eprintln!(
+                "lamp-voice provider: a {} on a line whose mouth was not seen was not run (LAMP_MEMORY_ROLE)",
+                call.name
+            );
+            return (role::one_face_told(), true);
         }
         let until = Instant::now() + deadline.min(crate::tools::ASK_DEADLINE);
         let placed = lease
@@ -26337,6 +26347,54 @@ mod tests {
                 json!({"op":"role_end","person":person}),
             ]
         );
+        role::set_on_for_test(false);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// The privacy read on #5385: a line its person's only by their face
+    /// alone in view with reads (`ScopeLease::forgets_need_mouth`) sets and
+    /// ends no role, the owner's held one kept as it was, and no request
+    /// reaches the memory; the same words on their seen line still do.
+    #[test]
+    fn with_the_role_switch_a_one_face_line_sets_and_ends_no_role() {
+        let _one = crate::provider_worker::tests::one_thread();
+        role::set_on_for_test(true);
+        let (socket, served) = memory("role-one-face", 1, role_memory);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let name = "Olivia Role One Face";
+        let person = person_id(name);
+        role::hold(&person, Some("Sherlock".to_owned()));
+        let lone = role_lease(905, crate::memory_scope::ScopeSnapshot::of(name));
+        let lone_lease = lone.lease();
+        assert!(lone_lease.read_by_one_face());
+        assert!(lone_lease.forgets_need_mouth());
+        heard_now("Be yourself again");
+        let (told, answered) = client.role_for_guarded(
+            &call(role::END_ROLE, json!({})),
+            FIRST_READ,
+            Some(&person),
+            Some(&lone_lease),
+        );
+        assert!(answered);
+        assert_eq!(told, role::one_face_told());
+        assert_eq!(role::cached(&person).as_deref(), Some("Sherlock"));
+        heard_now("You are Harry Potter now");
+        let set = call(role::SET_ROLE, json!({"name":"Harry Potter"}));
+        let (told, _) = client.role_for_guarded(&set, FIRST_READ, Some(&person), Some(&lone_lease));
+        assert_eq!(told, role::one_face_told());
+        assert_eq!(role::cached(&person).as_deref(), Some("Sherlock"));
+        // Seen speaking: theirs, as before.
+        let seen = role_lease(906, crate::memory_scope::ScopeSnapshot::of(name));
+        let (told, _) =
+            client.role_for_guarded(&set, FIRST_READ, Some(&person), Some(&seen.lease()));
+        assert_eq!(told, role::set_told("Harry Potter"));
+        assert_eq!(role::cached(&person).as_deref(), Some("Harry Potter"));
+        assert_eq!(
+            served.join().unwrap(),
+            [json!({"op":"role_set","person":person,"name":"Harry Potter"})]
+        );
+        role::forgot(Some(&person));
         role::set_on_for_test(false);
         drop(client);
         std::fs::remove_file(&socket).unwrap();
