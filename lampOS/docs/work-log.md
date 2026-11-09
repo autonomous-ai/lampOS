@@ -9486,3 +9486,8 @@ One-face/carried fences remain intact. Continuing the Queue loop.
 
 - #5903 READ-OK `df646e7939b37ecf7a70dee8e701922702b7e48f`, comment6745623967. Exact inverse of landed907d81d4d65b24c8c08e89258f9dbb4a97a6bdb4 (#5888), matching stable patch IDd0d127182deb1ceb46f8e37064b82630b857cb1b. Sequential metadata gets restored, EN/VI docs reverted, unrelated behavior untouched.
 - Services78passed0.79s; two adapted independent actual Services/FakeGmailApi probes passed0.12s: no overlapping delayed gets/list order and cancellation drops one active request. Both commands exit0. /tmp/second-5903-{services,probes}.log; temporary source removed, checkoutclean. Device rollback rationale is Fourteen's two20s timeouts; my earlier host read never established device speedup and these tests do not diagnose Google/device latency. CI/train gate separate.
+
+## 9 November 2026: motion guide's requested read
+
+- #5896 ONE READ READ-OK `1cefed3bfc4cbb5ec6bd70ed4ad7857cc9b2accd`, comment6745670700. Exact guide tests7passed0.04s. Checked stock11048 code889a3af0a0: REST_SLACK24,4096/360 counts/degree, stopped_off>0.5degree; Python gesture/move remain ENDS_AT_REPLY while look/joints await done.
+- Docs preserve Ten's physical evidence attribution, distinguish unplayed express and future motion done. Rebase note: preserve landed#5892 table intro/body.state/name rows, no restoration of blanket10824 heading. No runtime/device change.
