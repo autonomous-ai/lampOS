@@ -199,7 +199,7 @@ fn turns_it_does_not_answer_go_on_byte_for_byte_as_off() {
         fn() -> Vec<net::Result<ChatEvent>>,
         fn(&str) -> Value,
     );
-    let cases: [Case; 9] = [
+    let cases: [Case; 11] = [
         ("failed", DENTIST, || calling(&["remember"]), failed),
         ("not kept", DENTIST, || calling(&["remember"]), not_kept),
         ("already kept", DENTIST, || calling(&["remember"]), already),
@@ -215,6 +215,21 @@ fn turns_it_does_not_answer_go_on_byte_for_byte_as_off() {
             // the call did not keep.
             "a further ask the call did not keep",
             "Remember that my dentist is on Tuesday and explain gravity to me",
+            || calling(&["remember"]),
+            kept,
+        ),
+        (
+            // Thirteen's P3 on #5565: a question made only of common words,
+            // heard with no "?".
+            "a question made only of common words",
+            "Remember that my dentist is on Tuesday where is it",
+            || calling(&["remember"]),
+            kept,
+        ),
+        (
+            // Thirteen's P3 on #5565: a "not" the kept text dropped.
+            "a negation the call did not keep",
+            "Remember that my dentist is not on Tuesday.",
             || calling(&["remember"]),
             kept,
         ),
