@@ -748,6 +748,10 @@ struct OwedNote {
     /// The line and what was being asked when it was handed out
     /// ([`Onboarding::asking`]).
     line: Option<(String, Asking)>,
+    /// The line was the closing: kept nameless, so one owed again is named
+    /// when said ([`Onboarding::closing_line`]), never with a face forgotten
+    /// since (Reviewer-three's HOLD on #5809).
+    closing: Option<String>,
     /// Handed out this loop, not yet bound to a turn.
     bindable: bool,
     turn: Option<(BootId, u64)>,
@@ -2491,7 +2495,10 @@ impl Onboarding {
         if again {
             self.owed_note.unsaid += 1;
             self.owed_note.again = true;
-            self.owed = Some(line);
+            match self.owed_note.closing.take() {
+                Some(done) => self.closing = Some(done),
+                None => self.owed = Some(line),
+            }
         }
     }
 
@@ -2936,11 +2943,12 @@ impl Onboarding {
             self.lamp_spoke_last && self.owed.as_deref() == Some(skill::PREFERENCES_HELLO);
         let can_speak = can_speak
             && !(self.owed_note.again
-                && self.owed.is_some()
+                && (self.owed.is_some() || self.closing.is_some())
                 && !hello_after_lamp
                 && quiet_us < START_QUIET_US);
         self.owed_note.bindable = false;
         let owed = self.owed.clone().or_else(|| self.closing_line());
+        let closing = self.owed.is_none().then(|| self.closing.clone()).flatten();
         let note = self.tick_led(now_us, quiet_us, can_speak, paused, face, still)?;
         self.owed_note.again = false;
         if owed.as_ref() == Some(&note) {
@@ -2949,6 +2957,7 @@ impl Onboarding {
                 self.owed_note.unsaid = 0;
             }
             self.owed_note.line = Some((note.clone(), self.asking()));
+            self.owed_note.closing = closing;
             self.owed_note.bindable = true;
             self.owed_note.turn = None;
         }
@@ -7213,6 +7222,59 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
         assert_eq!(room.walk.desired.owner, None);
+        let notes = room.wait(4 * S, Some(NEAR_MIDDLE));
+        assert_eq!(notes, [skill::PREFERENCES_DONE], "{notes:?}");
+    }
+
+    /// Reviewer-three's HOLD on #5809: "All done, Mia!" handed out but
+    /// never played, then the owner's face forgotten: the closing said
+    /// again names nobody, never the forgotten name.
+    #[test]
+    fn an_unsaid_closing_said_again_after_a_face_forgotten_leaves_its_name_out() {
+        let mut room = Room::new("closing-unsaid-forgotten");
+        room.walk.definition = two_steps();
+        room.walk
+            .finish(Step::WhereYouSit, Outcome::Done, None, room.at);
+        room.walk.desired.owner = Some("Mia".into());
+        room.walk
+            .finish(Step::WhoYouAre, Outcome::Done, None, room.at);
+        room.walk.owed = None;
+        room.walk.owed_after = None;
+        let mut said = None;
+        for _ in 0..16 {
+            room.at += S / 4;
+            room.walk.drain_storage_for_test(room.at);
+            said = room.walk.tick(
+                room.at,
+                START_QUIET_US,
+                true,
+                false,
+                Some(NEAR_MIDDLE),
+                true,
+            );
+            if said.is_some() {
+                break;
+            }
+        }
+        let said = said.expect("the closing is handed out");
+        assert!(said.contains("Mia"), "{said}");
+        let (boot, turn) = (BootId::new([3; 16]).unwrap(), room.at + 1);
+        assert!(room.walk.bind_opener(boot, turn));
+        room.walk
+            .invitation_finished(boot, turn, Delivery::Unsaid, room.at);
+        face_forgotten(&room.walk.file);
+        for _ in 0..50 {
+            room.at += READ_EVERY_US;
+            room.walk.drain_storage_for_test(room.at);
+            room.walk
+                .tick(room.at, START_QUIET_US, false, false, None, true);
+            if room.walk.desired.owner.is_none() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert_eq!(room.walk.desired.owner, None);
+        room.said = room.at;
         let notes = room.wait(4 * S, Some(NEAR_MIDDLE));
         assert_eq!(notes, [skill::PREFERENCES_DONE], "{notes:?}");
     }
