@@ -1,6 +1,6 @@
 ## 2026-11-09 — resume and report partial forget cleanup
 
-Ready for lamp-voice: no
+Ready for lamp-voice: no (#5803 is draft; native CI and two reads pending).
 
 - Reconciled Queue #4710 and its continuation #5385. #4850 was closed by
   the PM as a duplicate: #5024 shipped the room-reminder policy in train
@@ -11,10 +11,12 @@ Ready for lamp-voice: no
   content-free outcomes and preserved through the forget sanitizer.
   Current source still had the original omission. No additional calls,
   retries, scopes or deadlines; added bookkeeping target below 1 ms.
-- Code and English docs are in place, rebased cleanly on train 742
-  `6167fe37a`. Focused cleanup tests passed 2, after-forget tests 16, and
-  the existing known-person room cleanup test 1. Formatting and strict
-  Clippy for Voice and 13 dependents passed before and after rebase.
+- [#5803](https://github.com/autonomous-ai/lampOS/pull/5803) is draft at
+  `8addf65fb`, review base `f84505707`. Every authored added/removed line
+  is identical to the broad-tested patch on `6167fe37a`. Final focused
+  cleanup tests passed 2, after-forget tests 16, and the existing known-
+  person room cleanup test 1. Formatting, strict Clippy for Voice and
+  13 dependents, workspace build and docs checks passed on the review base.
 - The first broad parallel run stopped in 10 unchanged Body startup
   fixtures (534 passed). On the rebased serial run Body's library passed
   all 551, plus its binary/integration targets. Keeper then exposed this
@@ -28,8 +30,10 @@ Ready for lamp-voice: no
   failures are unchanged host-platform cases: Setup unconditionally reads
   Linux procfs, and four image-journal fixtures use GNU stat options that
   this Mac rejects, leaving missing retention folders/counts. Exact names
-  and evidence are in the task's verification record. Workspace build is
-  running; native CI and the two reads remain pending. No ready claim.
+  and evidence are in the task's verification record. Workspace build
+  passed on both local bases. Native ARM64 42581992034 and Linux Clippy
+  42581991921 are running on the PR head; docs 42581991904 passed.
+  Reviewer-three and Tests have the READ ASK. No ready claim.
 - Docs checker: nine tests, 191 docs and 1,885 local links, zero broken.
   The grouped sanitizer sample remains recorded, but is not cold first
   use. An isolated fresh-process fixture passed 1/1: first 0.162282 ms,
