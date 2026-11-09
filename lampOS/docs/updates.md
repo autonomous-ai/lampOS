@@ -653,6 +653,16 @@ each under the quiet rule. A round
    "the channel cannot be reached", not a round held for good (#830). One
    lookup runs at a time: while one that ran over has not ended, a round
    starts none and says "an earlier name lookup has not ended".
+   **A busy channel is asked again.** Every file a round reads, the
+   manifest and each part's files alike, is asked for again after 2, 5 and
+   10 s when the channel answered 5xx or gave no answer and nothing of the
+   file had come yet, each wait only if it ends within the file's own
+   900 s (`fetch::AGAIN_AFTER`, `again_while_busy`). On 9 Nov from 12:30
+   GitHub's release downloads answered 504 to about six tries in ten, and
+   since a round needs every file, lamp-74ff refused five rounds in a row,
+   each on another file (the lead's proposal on #1711). A missing file
+   (404), any other answer, or a file cut short half way refuses as before:
+   its bytes are already written, and its SHA-256 check throws them away.
 3. **The build.** The envelope's key fingerprint must be the lamp's and
    its signature must match the manifest's bytes. Then, before anything
    else of the manifest is read, its `min_updater`: one above this
@@ -1295,6 +1305,7 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `the settings writer refreshed has proved itself (its back ended well): the copy before is removed` | a refreshed writer's first `back` ended well |
 | `the settings writer refreshed is put back (its back failed): the copy before is the writer again` | a refreshed writer's first `back` failed |
 | `the settings writer refreshed is put back (its first apply failed): the copy before is the writer again, and this lamp-update may be asked to be it again` | a refreshed writer's first `apply` failed: the build is refused, the writer is not (#5539) |
+| `lamp-update: <why>; asking again in N s` | the channel answered 5xx or gave no answer before any of a file came: it is asked for again after 2, 5 and then 10 s, within the file's own time; the round goes on if a later try brings it |
 | `the settings writer could not be put back or proved (…): …` | either of those two asked of the unit, and it failed |
 | `the settings writer's back failed in a run that began before it was refreshed: the next back judges it` | the failed `back` may be the copy before's, so nothing is put back for it |
 | **The journal** (`acting`, at the round's start) | |
