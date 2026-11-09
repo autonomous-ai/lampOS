@@ -91,6 +91,13 @@ const LOOK_EVERY_US: u64 = 20_000;
 /// heard as the name. The prompt is offered again under [`MOST_REOFFERS`].
 /// The detector's own allowance, `crate::activity::CALL_BEFORE_US`.
 const OVER_PROMPT_MS: u64 = crate::activity::CALL_BEFORE_US / 1_000;
+/// A name heard beginning while the lamp speaks its prompt, or this soon
+/// after the prompt's end, is the lamp's own "Hey Lamp" or its echo
+/// (lamp-52e6, 9 Nov: hits at 0.96 to 0.997 over and 1.1 s after the
+/// lamp's own prompt): never a call, nor a gap that offers the prompt again.
+/// Only a hearing begun after it is judged on its score. lamp-voice has no
+/// echo tail of its own; this is lamp-body's `first_stand::ECHO_TAIL_US`.
+const ECHO_TAIL_MS: u64 = 1_500;
 /// A prompt cut before it played whole (someone spoke over it), or answered
 /// over its last word ([`OVER_PROMPT_MS`]), is offered again with its own
 /// number, this many times in a step at most.
@@ -1220,8 +1227,10 @@ impl Onboarding {
                 .seen
                 .iter()
                 .filter_map(|seen| match seen {
-                    Seen::Hearing(hearing, heard_ms) if hearing.score >= SCORE => {
-                        call_began_ms(hearing, *heard_ms, listening.ended_ms)
+                    Seen::Hearing(hearing, _)
+                        if hearing.score >= SCORE && !own_hearing(hearing, listening.ended_ms) =>
+                    {
+                        Some(hearing.began_ms)
                     }
                     _ => None,
                 })
@@ -1258,13 +1267,17 @@ impl Onboarding {
                 _ => None,
             })
             .collect();
-        // A name begun over the prompt's last word ([`OVER_PROMPT_MS`]).
+        // The lamp's own name heard over or just after its prompt
+        // ([`ECHO_TAIL_MS`]): no call, and no gap of the person's.
+        let own_heard = self.near.seen.iter().any(|seen| {
+            matches!(seen, Seen::Hearing(hearing, _) if own_hearing(hearing, listening.ended_ms))
+        });
+        let calls_heard = heard
+            .iter()
+            .any(|(after_ms, _)| *after_ms >= ECHO_TAIL_MS as i64);
+        // A line begun over the prompt's last word ([`OVER_PROMPT_MS`]); a
+        // detector's hearing there is the lamp's own ([`ECHO_TAIL_MS`]).
         let early = self.near.seen.iter().any(|seen| match seen {
-            Seen::Hearing(hearing, heard_ms) => {
-                hearing.began_ms < listening.ended_ms
-                    && hearing.score >= SCORE
-                    && call_began_ms(hearing, *heard_ms, listening.ended_ms).is_some()
-            }
             // Its words came after the prompt, so only its start says it
             // was over the last word.
             Seen::Said(line) => {
@@ -1275,11 +1288,12 @@ impl Onboarding {
         });
         // A call caught only as text is a try too (#3923; Seventh's P3 3 on
         // #4192).
-        if !heard.is_empty() || !said.is_empty() {
+        if calls_heard || !said.is_empty() {
             self.mark_tried(Step::HowYouSound);
         }
-        let (hearings, said_lines, levels, mut spoke, spoiled) = self.near.take_evidence();
-        if listening.gapped && heard.is_empty() && said.is_empty() {
+        let (mut hearings, said_lines, levels, mut spoke, spoiled) = self.near.take_evidence();
+        hearings.retain(|hearing| !own_hearing(hearing, listening.ended_ms));
+        if listening.gapped && !own_heard && !calls_heard && said.is_empty() {
             self.give_prompt_back(false, listening.prompt, GAPPED, now_us);
             return;
         }
@@ -1545,6 +1559,12 @@ impl Onboarding {
 /// hearing, sent at `heard_ms`, came after the end). None for one begun
 /// earlier. A name begun before the end is never measured: the prompt is
 /// offered again (`near_judge`).
+/// A hearing begun before the prompt's end plus [`ECHO_TAIL_MS`]: the
+/// lamp's own voice.
+fn own_hearing(hearing: &Hearing, ended_ms: u64) -> bool {
+    hearing.began_ms < ended_ms.saturating_add(ECHO_TAIL_MS)
+}
+
 fn call_began_ms(hearing: &Hearing, heard_ms: u64, ended_ms: u64) -> Option<u64> {
     if hearing.began_ms >= ended_ms {
         Some(hearing.began_ms)
