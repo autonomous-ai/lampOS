@@ -137,6 +137,13 @@ const LINGER_US: u64 = 2_000_000;
 const FRESH_MS: u64 = 700;
 /// "Touch": no touch on the head this long after the ask has failed.
 const TOUCH_GIVE_UP_US: u64 = 60_000_000;
+/// "Touch": a remind not yet said this long after the ask is said on the
+/// short bar ([`START_QUIET_US`]), not [`GUIDE_EVERY_US`]: room noise opens
+/// wordless turns that keep 8 s of quiet from ever coming (lamp-52e6, 9 Nov).
+const TOUCH_REMIND_BY_US: u64 = 20_000_000;
+/// "Touch": a remind that still could not be said holds the fail this much
+/// past [`TOUCH_GIVE_UP_US`] at most, so the step stays bounded.
+const TOUCH_REMIND_GRACE_US: u64 = 10_000_000;
 /// "Touch" done (#4080): the walk steps aside (`walk` false on
 /// `onboarding/pending`) this long after the latest head touch felt, so the
 /// lamp's own pet response (Head pat wiggle: 2 s after the hand lifts) may
@@ -3202,7 +3209,14 @@ impl Onboarding {
                 self.finish(step, Outcome::Done, None, now_us);
                 self.owed = self.definition.words.touch_done.clone();
                 self.pet_response_until_us = Some(now_us + PET_RESPONSE_US);
-            } else if now_us.saturating_sub(asked_us) >= TOUCH_GIVE_UP_US {
+            } else if now_us.saturating_sub(asked_us)
+                >= TOUCH_GIVE_UP_US
+                    + if led.guided_us == Some(asked_us) {
+                        TOUCH_REMIND_GRACE_US
+                    } else {
+                        0
+                    }
+            {
                 // No touch felt after the one reminder: failed, said, and the
                 // walk moves on (#4080, the lead's rule; it was `later`, #3996).
                 if self.touch_later {
@@ -3212,7 +3226,12 @@ impl Onboarding {
                     self.finish(step, Outcome::Failed, None, now_us);
                     self.owed = self.definition.words.touch_failed.clone();
                 }
-            } else if can_speak && quiet_us >= GUIDE_EVERY_US && led.guided_us == Some(asked_us) {
+            } else if can_speak
+                && (quiet_us >= GUIDE_EVERY_US
+                    || (now_us.saturating_sub(asked_us) >= TOUCH_REMIND_BY_US
+                        && quiet_us >= START_QUIET_US))
+                && led.guided_us == Some(asked_us)
+            {
                 led.guided_us = Some(now_us);
                 self.records
                     .push(json!({"kind":"onboarding_guide","step":step.name(),"at_us":now_us}));
@@ -9739,6 +9758,21 @@ mod tests {
         );
         assert_eq!(room.outcome(Step::Touch), Some(Outcome::Failed));
         assert_eq!(room.walk.take_gesture(), None);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// lamp-52e6, 9 Nov: room noise opens a wordless turn every 7 s, so
+    /// 8 s of quiet never comes; the remind is still said before the fail.
+    #[test]
+    fn a_noisy_room_still_hears_the_touch_remind_before_the_fail() {
+        let (mut room, _says, root) = at_touch("noisy");
+        let mut notes = Vec::new();
+        for _ in 0..10 {
+            room.said = room.at;
+            notes.extend(room.wait(7 * S, Some(NEAR_MIDDLE)));
+        }
+        assert_eq!(notes[..2], [TOUCH_REMIND, TOUCH_FAILED]);
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Failed));
         std::fs::remove_dir_all(root).unwrap();
     }
 
