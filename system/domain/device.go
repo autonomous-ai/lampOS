@@ -1357,6 +1357,8 @@ type ConfigPublicResponse struct {
 	SlackUserID              string   `json:"slack_user_id"`
 	DiscordGuildID           string   `json:"discord_guild_id"`
 	DiscordUserID            string   `json:"discord_user_id"`
+	DiscordOpenChannels      []string `json:"discord_open_channels"`
+	DiscordGuestUserIDs      []string `json:"discord_guest_user_ids"`
 	WhatsappUserID           string   `json:"whatsapp_user_id"`
 	BluebubblesServerURL     string   `json:"bluebubbles_server_url"`
 	BluebubblesUserAddress   string   `json:"bluebubbles_user_address"`
@@ -1447,6 +1449,9 @@ type UpdateConfigRequest struct {
 
 	DiscordGuildID string `json:"discord_guild_id"`
 	DiscordUserID  string `json:"discord_user_id"`
+	// Nil leaves the saved list alone; an empty list clears it.
+	DiscordOpenChannels []string `json:"discord_open_channels,omitempty"`
+	DiscordGuestUserIDs []string `json:"discord_guest_user_ids,omitempty"`
 
 	WhatsappUserID string `json:"whatsapp_user_id"`
 

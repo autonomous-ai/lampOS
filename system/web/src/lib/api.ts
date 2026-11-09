@@ -243,6 +243,8 @@ export interface WifiProvisionBody {
   discord_managed?: boolean;
   discord_guild_id?: string;
   discord_user_id?: string;
+  discord_open_channels?: string[];
+  discord_guest_user_ids?: string[];
   bluebubbles_server_url?: string;
   bluebubbles_password?: string;
   bluebubbles_user_address?: string;
@@ -305,6 +307,8 @@ export interface DeviceConfig {
   slack_user_id: string;
   discord_guild_id: string;
   discord_user_id: string;
+  discord_open_channels?: string[] | null;
+  discord_guest_user_ids?: string[] | null;
   bluebubbles_server_url: string;
   bluebubbles_user_address: string;
   bluebubbles_caller_context: string;

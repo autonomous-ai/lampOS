@@ -90,6 +90,11 @@ function sameWakeLook(a: WakeLook, b: WakeLook): boolean {
   return a.effect === b.effect && a.speed === b.speed && a.color.every((c, i) => c === b.color[i]);
 }
 
+// Discord ids are numbers; anything else in the box is a separator or a typo.
+function parseDiscordIds(value: string): string[] {
+  return [...new Set(value.split(/[\s,]+/).filter((id) => /^\d+$/.test(id)))];
+}
+
 export function SettingsPanel({ activeSection }: { activeSection: SettingsSectionId }): React.JSX.Element {
   const [loadingCfg, setLoadingCfg] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -167,6 +172,8 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
   const [slackUserId, setSlackUserId] = useState("");
   const [discordGuildId, setDiscordGuildId] = useState("");
   const [discordUserId, setDiscordUserId] = useState("");
+  const [discordOpenChannels, setDiscordOpenChannels] = useState("");
+  const [discordGuests, setDiscordGuests] = useState("");
   const [bluebubblesServerUrl, setBluebubblesServerUrl] = useState("");
   const [bluebubblesPassword, setBluebubblesPassword] = useState("");
   const [bluebubblesUserAddress, setBluebubblesUserAddress] = useState("");
@@ -218,6 +225,7 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
     channel: ChannelType;
     teleUserId: string; slackUserId: string;
     discordGuildId: string; discordUserId: string;
+    discordOpenChannels: string; discordGuests: string;
     bluebubblesServerUrl: string; bluebubblesUserAddress: string;
     bluebubblesCallerContext: string;
     mqttEndpoint: string; mqttPort: string; mqttUsername: string;
@@ -311,6 +319,8 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
         setSlackUserId(cfg.slack_user_id ?? "");
         setDiscordGuildId(cfg.discord_guild_id ?? "");
         setDiscordUserId(cfg.discord_user_id ?? "");
+        setDiscordOpenChannels((cfg.discord_open_channels ?? []).join(", "));
+        setDiscordGuests((cfg.discord_guest_user_ids ?? []).join(", "));
         setMqttEndpoint(cfg.mqtt_endpoint ?? "");
         setMqttPort(cfg.mqtt_port ? String(cfg.mqtt_port) : "");
         setMqttUsername(cfg.mqtt_username ?? "");
@@ -397,6 +407,8 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
           slackUserId: cfg.slack_user_id ?? "",
           discordGuildId: cfg.discord_guild_id ?? "",
           discordUserId: cfg.discord_user_id ?? "",
+          discordOpenChannels: (cfg.discord_open_channels ?? []).join(", "),
+          discordGuests: (cfg.discord_guest_user_ids ?? []).join(", "),
           bluebubblesServerUrl: cfg.bluebubbles_server_url ?? "",
           bluebubblesUserAddress: cfg.bluebubbles_user_address ?? "",
           bluebubblesCallerContext: cfg.bluebubbles_caller_context ?? "",
@@ -496,6 +508,8 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
     slackUserId !== baseline.slackUserId ||
     discordGuildId !== baseline.discordGuildId ||
     discordUserId !== baseline.discordUserId ||
+    discordOpenChannels !== baseline.discordOpenChannels ||
+    discordGuests !== baseline.discordGuests ||
     mqttEndpoint !== baseline.mqttEndpoint ||
     mqttPort !== baseline.mqttPort ||
     mqttUsername !== baseline.mqttUsername ||
@@ -620,6 +634,8 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
       } else if (channel === "discord") {
         body.discord_guild_id = discordGuildId;
         body.discord_user_id = discordUserId;
+        body.discord_open_channels = parseDiscordIds(discordOpenChannels);
+        body.discord_guest_user_ids = parseDiscordIds(discordGuests);
       } else if (channel === "imessage") {
         body.bluebubbles_server_url = bluebubblesServerUrl;
         body.bluebubbles_user_address = bluebubblesUserAddress;
@@ -651,7 +667,7 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
         tapChime, tapLightOn, tapLook, voiceInputMode,
         channel,
         teleUserId, slackUserId,
-        discordGuildId, discordUserId,
+        discordGuildId, discordUserId, discordOpenChannels, discordGuests,
         bluebubblesServerUrl, bluebubblesUserAddress,
         bluebubblesCallerContext,
         mqttEndpoint, mqttPort, mqttUsername,
@@ -680,7 +696,7 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
   }, [
     activeSection, baseline, checkWifi,
     channel, teleToken, teleUserId, slackBotToken, slackAppToken, slackUserId,
-    discordGuildId, discordUserId,
+    discordGuildId, discordUserId, discordOpenChannels, discordGuests,
     bluebubblesServerUrl, bluebubblesPassword, bluebubblesUserAddress,
     bluebubblesCallerContext,
     ssid, password, adminPassword, llmUrl,
@@ -903,6 +919,8 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
               slackUserId={slackUserId} setSlackUserId={setSlackUserId}
               discordGuildId={discordGuildId} setDiscordGuildId={setDiscordGuildId}
               discordUserId={discordUserId} setDiscordUserId={setDiscordUserId}
+              discordOpenChannels={discordOpenChannels} setDiscordOpenChannels={setDiscordOpenChannels}
+              discordGuests={discordGuests} setDiscordGuests={setDiscordGuests}
               bluebubblesServerUrl={bluebubblesServerUrl} setBluebubblesServerUrl={setBluebubblesServerUrl}
               bluebubblesPassword={bluebubblesPassword} setBluebubblesPassword={setBluebubblesPassword}
               bluebubblesUserAddress={bluebubblesUserAddress} setBluebubblesUserAddress={setBluebubblesUserAddress}

@@ -1,7 +1,7 @@
 import { SettingsSelect } from "@/components/SettingsSelect";
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, ExternalLink, MessageSquare, AlertTriangle } from "lucide-react";
-import { C, LockedField, SectionCard } from "@/components/setup/shared";
+import { C, Field, LockedField, SectionCard } from "@/components/setup/shared";
 import { SecretUpdateField } from "@/components/SecretUpdateField";
 import { getAgentRuntime } from "@/lib/api";
 import type { ChannelType } from "@/types";
@@ -13,6 +13,7 @@ export function ChannelSection({
   teleToken, setTeleToken, teleUserId, setTeleUserId,
   slackBotToken, setSlackBotToken, slackAppToken, setSlackAppToken, slackUserId, setSlackUserId,
   discordGuildId, setDiscordGuildId, discordUserId, setDiscordUserId,
+  discordOpenChannels, setDiscordOpenChannels, discordGuests, setDiscordGuests,
   bluebubblesServerUrl, setBluebubblesServerUrl,
   bluebubblesPassword, setBluebubblesPassword,
   bluebubblesUserAddress, setBluebubblesUserAddress,
@@ -29,6 +30,8 @@ export function ChannelSection({
   slackUserId: string; setSlackUserId: (v: string) => void;
   discordGuildId: string; setDiscordGuildId: (v: string) => void;
   discordUserId: string; setDiscordUserId: (v: string) => void;
+  discordOpenChannels: string; setDiscordOpenChannels: (v: string) => void;
+  discordGuests: string; setDiscordGuests: (v: string) => void;
   bluebubblesServerUrl: string; setBluebubblesServerUrl: (v: string) => void;
   bluebubblesPassword: string; setBluebubblesPassword: (v: string) => void;
   bluebubblesUserAddress: string; setBluebubblesUserAddress: (v: string) => void;
@@ -91,6 +94,11 @@ export function ChannelSection({
         <>
           <LockedField lockedInitially={channelLoaded.discordGuildId} label="Guild ID" id="discord_guild_id" value={discordGuildId} onChange={setDiscordGuildId} placeholder="123456789" />
           <LockedField lockedInitially={channelLoaded.discordUserId} label="User ID" id="discord_user_id" value={discordUserId} onChange={setDiscordUserId} placeholder="123456789" />
+          <Field label="Channels that don't need an @mention" id="discord_open_channels" value={discordOpenChannels} onChange={setDiscordOpenChannels} placeholder="Channel IDs, separated by commas" />
+          <Field label="Other people who can use the bot" id="discord_guest_user_ids" value={discordGuests} onChange={setDiscordGuests} placeholder="Discord user IDs, separated by commas" />
+          <p style={{ fontSize: 12, color: C.textMuted, margin: "4px 0 16px" }}>
+            They must @mention the bot in your connected server and get up to 10 answers an hour. They can't use your agent, memory, accounts or device. Their answers count toward your usage.
+          </p>
         </>
       )}
       {channel === "imessage" && (

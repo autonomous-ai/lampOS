@@ -31,7 +31,8 @@ const (
 
 // isGuest reports whether the author is on the owner's guest list. The owner is never a guest.
 func (r *Relay) isGuest(authorID string) bool {
-	return authorID != "" && authorID != r.cfg.DiscordUserID && slices.Contains(r.cfg.DiscordGuestUserIDs, authorID)
+	_, guests := r.cfg.DiscordAccessLists()
+	return authorID != "" && authorID != r.cfg.DiscordUserID && slices.Contains(guests, authorID)
 }
 
 // handleGuest answers a guest with a direct model call. The turn never reaches the

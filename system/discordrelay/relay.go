@@ -221,13 +221,14 @@ func (r *Relay) noMentionNeeded(ev domain.MQTTDiscordEventCommand) bool {
 	if ev.GuildID == "" || ev.MentionsOthers {
 		return false
 	}
-	if slices.Contains(r.cfg.DiscordOpenChannels, ev.ChannelID) {
+	open, _ := r.cfg.DiscordAccessLists()
+	if slices.Contains(open, ev.ChannelID) {
 		return true
 	}
 	if ev.ParentChannelID == "" {
 		return false
 	}
-	if slices.Contains(r.cfg.DiscordOpenChannels, ev.ParentChannelID) {
+	if slices.Contains(open, ev.ParentChannelID) {
 		return true
 	}
 	r.mu.Lock()

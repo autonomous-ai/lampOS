@@ -156,6 +156,6 @@ Script presync của Hermes và PicoClaw cũng gỡ cấu hình Discord mỗi l�
 - Telegram, Slack, WhatsApp và iMessage không đổi.
 
 
-**Người khác ngoài chủ thiết bị.** Người có trong `discord_guest_user_ids` khi mention bot trong server đã kết nối sẽ nhận câu trả lời ngắn từ một lệnh gọi model trực tiếp, tối đa 10 lần mỗi giờ cho mỗi người. Tin nhắn không bao giờ đến agent, nên khách không có công cụ, bộ nhớ, tài khoản đã kết nối hay quyền điều khiển thiết bị, và mỗi tin nhắn là độc lập. Lượt dùng tính vào mức sử dụng của chủ thiết bị.
+**Người khác ngoài chủ thiết bị.** Người có trong `discord_guest_user_ids` khi mention bot trong server đã kết nối sẽ nhận câu trả lời ngắn từ một lệnh gọi model trực tiếp, tối đa 10 lần mỗi giờ cho mỗi người. Chủ thiết bị đặt danh sách này và các kênh mở trên trang Settings của chính thiết bị, trong phần kênh Discord. Tin nhắn không bao giờ đến agent, nên khách không có công cụ, bộ nhớ, tài khoản đã kết nối hay quyền điều khiển thiết bị, và mỗi tin nhắn là độc lập. Lượt dùng tính vào mức sử dụng của chủ thiết bị.
 
 **Thread.** Trong kênh của server, agent có thể bắt đầu câu trả lời bằng `[[thread: tiêu đề]]`. Thiết bị gỡ phần này và gửi `thread_message_id`, `thread_name` cùng `discord_reply`; câu trả lời được đăng trong thread mới trên tin nhắn của chủ thiết bị. Nếu không mở được thread, câu trả lời vẫn ở trong kênh.

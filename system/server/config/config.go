@@ -637,6 +637,13 @@ func (c *Config) SetLLMModel(key string) error {
 	})
 }
 
+// DiscordAccessLists returns the open channels and guest ids under the config mutex.
+func (c *Config) DiscordAccessLists() (openChannels, guestUserIDs []string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.DiscordOpenChannels, c.DiscordGuestUserIDs
+}
+
 // LLMModelKey returns LLMModel under the config mutex. Use this in goroutines
 // that read LLMModel concurrently with WithLockSave paths.
 func (c *Config) LLMModelKey() string {
