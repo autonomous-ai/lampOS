@@ -66,26 +66,51 @@ pub fn known_face_of(known: &Path) -> PathBuf {
     PathBuf::from(beside)
 }
 
-/// Beside the known file (`--known-file`): `-unsure`, an empty file there
-/// while the one known is held with no print read as theirs since a gap
-/// (`LAMP_FACE_KNOWN_UNSURE=on`, [`Unprinted::Unsure`], #5738). The voice
-/// waits for it to go before it ties a line to them.
+/// Beside the known file (`--known-file`): `-unsure`, the known file's
+/// words moved there (and its face to `-unsure-face`, [`known_face_of`] of
+/// it) while the one known is held with no print read as theirs since a gap
+/// (`LAMP_FACE_KNOWN_UNSURE=on`, [`Unprinted::Unsure`], #5738). The known
+/// file is gone meanwhile, so every reader of it (the voices, memory, the
+/// cloud, the skills) sees nobody known; only the second voice reads the
+/// held name here, and waits for a print before it ties a line to them.
 pub fn known_unsure_of(known: &Path) -> PathBuf {
     let mut beside = known.as_os_str().to_owned();
     beside.push("-unsure");
     PathBuf::from(beside)
 }
 
-/// Marks the hold unsure ([`known_unsure_of`]), written before the known
-/// file's time is renewed, so the voice never reads a renewed name without
-/// it.
-pub fn mark_unsure(known: &Path) {
-    let _ = std::fs::write(known_unsure_of(known), b"");
+/// An unsure check ([`Unprinted::Unsure`]): the known file and its face
+/// move to [`known_unsure_of`], the name first, so no reader of the known
+/// file sees the name held; already unsure, both renewed as
+/// [`renew_known`] renews the known file. No known file, nothing to hold.
+pub fn hold_unsure(known: &Path) {
+    let unsure = known_unsure_of(known);
+    if !unsure.exists() {
+        if std::fs::rename(known, &unsure).is_err() {
+            return;
+        }
+        let _ = std::fs::rename(known_face_of(known), known_face_of(&unsure));
+    }
+    renew_known(&unsure);
+    renew_known(&known_face_of(&unsure));
 }
 
-/// A print decided: the hold is sure again, or the name is gone.
+/// The held face's passing id while unsure ([`hold_unsure`]), for a print
+/// that keeps them on it.
+pub fn unsure_face(known: &Path) -> Option<String> {
+    std::fs::read_to_string(known_face_of(&known_unsure_of(known)))
+        .ok()
+        .map(|face| face.trim().to_owned())
+        .filter(|face| !face.is_empty())
+}
+
+/// A print decided: the hold is sure again, or the name is gone. Always
+/// after the known file is written or removed, so the second voice, seeing
+/// the mark go, reads the decision, never the file before it.
 pub fn clear_unsure(known: &Path) {
-    let _ = std::fs::remove_file(known_unsure_of(known));
+    let unsure = known_unsure_of(known);
+    let _ = std::fs::remove_file(known_face_of(&unsure));
+    let _ = std::fs::remove_file(unsure);
 }
 
 /// The name of the one known at the lamp (`--known-file`), replaced whole,
@@ -96,11 +121,11 @@ pub fn clear_unsure(known: &Path) {
 /// without it, the name alone, as before.
 pub fn keep_known(path: &Path, name: Option<&str>, id: Option<&str>, face: Option<&str>) {
     let beside = known_face_of(path);
-    // A match, a print's carry or a let-go: whatever was unsure is decided.
-    clear_unsure(path);
     let Some(name) = name else {
         let _ = std::fs::remove_file(&beside);
         let _ = std::fs::remove_file(path);
+        // A let-go: whatever was unsure is decided, after the remove.
+        clear_unsure(path);
         return;
     };
     // The name first, then the face (the reviewer on #2008). The voice reads
@@ -115,6 +140,9 @@ pub fn keep_known(path: &Path, name: Option<&str>, id: Option<&str>, face: Optio
             let _ = std::fs::remove_file(&beside);
         }
     }
+    // A match or a print's keep: whatever was unsure is decided, after the
+    // write (the Reviewer-lead's P2 on #5743).
+    clear_unsure(path);
 }
 
 /// A held check (a miss within [`KNOWN_HOLD`]): the known file's words and
@@ -4670,29 +4698,43 @@ mod tests {
         assert_eq!(ask_of(br#"{"visits_yes":"A","photo_yes":"A"}"#), None);
     }
 
+    /// #5738, the Reviewer-lead's P2s on #5743: an unsure hold moves the
+    /// known file and its face aside, so a reader of the known file sees
+    /// nobody while it lasts; a print that keeps them writes it back, and
+    /// any write or remove of it ends the hold only after it is done.
+    #[test]
+    fn an_unsure_hold_moves_the_known_file_aside_until_a_print() {
+        let known = file("known-unsure").with_file_name("known");
+        let unsure = known_unsure_of(&known);
+        assert_eq!(unsure.file_name().unwrap(), "known-unsure");
+        keep_known(&known, Some("Lan"), None, Some("f3"));
+        hold_unsure(&known);
+        assert!(!known.exists() && !known_face_of(&known).exists());
+        assert_eq!(std::fs::read_to_string(&unsure).unwrap(), "Lan\n");
+        assert_eq!(unsure_face(&known).as_deref(), Some("f3"));
+        // Held unsure again: renewed where it is.
+        hold_unsure(&known);
+        assert!(!known.exists() && unsure.exists());
+        // A print keeps them: written back, then the hold ends.
+        keep_known(&known, Some("Lan"), None, unsure_face(&known).as_deref());
+        assert_eq!(std::fs::read_to_string(&known).unwrap(), "Lan\n");
+        assert_eq!(
+            std::fs::read_to_string(known_face_of(&known)).unwrap(),
+            "f3\n"
+        );
+        assert!(!unsure.exists() && !known_face_of(&unsure).exists());
+        // A let-go while unsure: nothing left.
+        hold_unsure(&known);
+        keep_known(&known, None, None, None);
+        assert!(!known.exists() && !unsure.exists() && !known_face_of(&unsure).exists());
+        // Nothing known: nothing to hold.
+        hold_unsure(&known);
+        assert!(!unsure.exists());
+    }
+
     /// The known name, and while speaking is judged its face's passing id
     /// beside it: both 0600, the face gone with no face, both gone with no
     /// name.
-    /// #5738: the unsure mark beside the known file goes with any write of
-    /// it (a match, a carry, a let-go) and with a held print.
-    #[test]
-    fn the_unsure_mark_goes_with_a_print_or_a_let_go() {
-        let known = file("known-unsure").with_file_name("known");
-        let mark = known_unsure_of(&known);
-        assert_eq!(mark.file_name().unwrap(), "known-unsure");
-        keep_known(&known, Some("Lan"), None, Some("f3"));
-        mark_unsure(&known);
-        assert!(mark.exists());
-        keep_known(&known, Some("Lan"), None, Some("f3"));
-        assert!(!mark.exists());
-        mark_unsure(&known);
-        keep_known(&known, None, None, None);
-        assert!(!mark.exists());
-        mark_unsure(&known);
-        clear_unsure(&known);
-        assert!(!mark.exists());
-    }
-
     #[test]
     fn the_known_face_is_kept_beside_the_known_name_and_goes_with_it() {
         use std::os::unix::fs::PermissionsExt;

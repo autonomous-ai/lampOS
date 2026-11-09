@@ -1165,6 +1165,11 @@ hold, which needs the match's id, let them go. With both on:
 
 With either switch off nothing is followed and no `follows` is said.
 
+
+Off, nothing changes: each miss lets go, as before. The lamp check: on
+lamp-52e6, the lead's face from a seat with the switch on and off, the
+score in the journal, the known file held and `who` naming them.
+
 **Unsure until a print** (#5738), only with `LAMP_FACE_KNOWN_UNSURE=on` and
 the hold on (off unless set; `who::known_unsure_on`). A check with no
 print, within the 4 s bound, no longer lets the one known go for a near face
@@ -1173,29 +1178,34 @@ near: both hold them **unsure** (`who::Held::unprinted`). Sure stays only
 for their own id in every look since, with nothing unsure since the last
 print.
 
-- **Marked beside the known file.** An unsure check writes `known-unsure`
-  (empty, `who::known_unsure_of`) before it renews the known file's time.
-  A print decides: a match, a held print or a carry makes it sure again,
-  and a let-go removes the name; either way the mark goes
-  (`who::keep_known`, `who::clear_unsure`).
+- **The known file moved aside.** An unsure check moves the known file to
+  `known-unsure` and its face to `known-unsure-face` (`who::hold_unsure`,
+  the name first), renewed there while it lasts. Every reader of the known
+  file (the first voice's name note, memory's person, the cloud's
+  tellable names, the skills, the second voice's face cache) sees nobody
+  known, as when the hold let go; only the second voice reads the hold.
+- **A print decides.** A match writes the known file as ever; a held print
+  writes it back with the name and the face held (or the carried id); a
+  let-go removes it. Only after that write or remove do the hold's files go
+  (`who::keep_known`, `who::clear_unsure`), so the voice, seeing them go,
+  reads the decision. A held print counts at the hold's own bar
+  (`HOLD_LIKENESS`, 0.30, `who::Held::printed_theirs`); after a gap such a
+  print keeps them only once `who::Held::printed` read the same face at
+  `SAME_PERSON` (0.363), on their id or a followed one.
 - **Checked every half second.** While unsure with a near face, a check is
   due every 0.5 s (`who::recognise_due_unsure`), not every 2 s, so a print
   comes within the voice's wait.
-- **The voice waits for it.** A line ending while the mark is fresh (3 s,
-  as the known file) is tied to no one until it goes, at most 1 s past
-  the line's end (`speaking_faces::known_once_printed`): then the known
-  file as it stands, theirs only if a print kept them; still unsure at the
-  bound, the room's ([second-voice.md](second-voice.md)). So their face
-  back near after a gap is not let go before a print reads it, and neither
-  a voice off camera with nobody near nor a far face on their passing id
-  (the Reviewer-lead's P3s on #5546) gets their name from the hold alone.
+- **The second voice waits for it.** A line ending while `known-unsure` is
+  fresh (3 s, as the known file) is tied to no one until it goes, at most
+  1 s past the line's end (`speaking_faces::known_once_printed`): then the
+  known file as it stands, theirs only if a print wrote it back; still
+  unsure at the bound, the room's ([second-voice.md](second-voice.md)). A
+  line begun while unsure was admitted as nobody's and stays the room's
+  unless the late keeper finds their face.
 
-Off, nothing changes. The lamp check: on lamp-52e6, the #5546 row
-(row-5546i): A's lines after a gap to A with miss-cold 0, C's to the room.
-
-Off, nothing changes: each miss lets go, as before. The lamp check: on
-lamp-52e6, the lead's face from a seat with the switch on and off, the
-score in the journal, the known file held and `who` naming them.
+With `LAMP_FACE_KNOWN_UNSURE` off, nothing changes. The lamp check: on lamp-52e6, row-5738a (from
+row-5546i): A's lines after a gap to A with miss-cold 0, the swap and C's
+lines to the room.
 
 ### Atomic face repair store (inactive)
 
