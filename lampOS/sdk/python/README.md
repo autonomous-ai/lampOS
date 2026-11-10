@@ -433,7 +433,7 @@ fake refuses `joints` naming `roll`, `shoulder` or `elbow` with
 
 | call | parameters | grant |
 |---|---|---|
-| `lamp.on(event, handler, *, phrases=None)` | `event`: one of the schema's events (below), or `lease` or `done`. `handler(event)`: a function or coroutine. `phrases`: with `phrase.heard` only, up to 16 for the computer, each of 64 characters at most and 8 letters at least. Changing the phrases is 6 a minute | the event's. Returns a `Subscription`: `await` it to get the lamp's refusal |
+| `lamp.on(event, handler, *, phrases=None)` | `event`: one of the schema's events (below), or `lease` or `done`. `handler(event)`: a function or coroutine; one that raises is logged with its traceback on the `lampos` logger (stderr by default) and the connection goes on. `phrases`: with `phrase.heard` only, up to 16 for the computer, each of 64 characters at most and 8 letters at least. Changing the phrases is 6 a minute | the event's. Returns a `Subscription`: `await` it to get the lamp's refusal |
 | `lamp.off(event, handler)` | as `on` | unsubscribes once the event's last handler is gone |
 | `await lamp.subscribe(events, phrases=None)`, `await lamp.unsubscribe(events)` | a list of events | each event's |
 | `await lamp.get(*states)` | `presence` (needs `look`), `light`, `mood`, `lamp`, `air` (needs `air`), `device` (needs `device`), `body` (needs `body`) | the states asked, by those names |
