@@ -90,7 +90,7 @@ fn a_skill_made_by_voice_is_checked_packed_and_kept() {
         made.description,
         "When the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most \
          once every 12 hours. It starts on its own, at most 3 times a day, one an hour with the \
-         lamp's other nudges, never from 22:00 to 08:00, and rests till morning if ignored twice."
+         lamp's other nudges, and rests till morning if ignored twice."
     );
     assert_eq!(made.uses.spoken(), "its light and whether it is talking");
     let bytes = fs::read(&made.package).unwrap();
@@ -760,19 +760,92 @@ fn a_face_a_getting_up_and_a_clock_made_skill_are_packed_and_kept() {
         )
         .unwrap_or_else(|refused| panic!("{name}: {refused:?}"));
         assert_eq!(made.name, name);
-        // Each starts on its own, with the nudges' manners (#6066 (a)).
+        // Each starts on its own, with the nudges' manners (#6066 (a)); a
+        // time asked for (the clock's minute) runs as said, no quiet hours.
+        let night = if name == "night-droop" {
+            ""
+        } else {
+            "never from 22:00 to 08:00, "
+        };
         assert_eq!(
             made.description,
             format!(
                 "{said} It starts on its own, at most 3 times a day, one an hour with the \
-                 lamp's other nudges, never from 22:00 to 08:00, and rests till morning if \
-                 ignored twice."
+                 lamp's other nudges, {night}and rests till morning if ignored twice."
             ),
             "{name}"
         );
         assert!(made.uses.body, "{name}");
     }
     assert_eq!(tars(&keeping.directory).len(), 3);
+}
+
+/// The coordinator's ruling on #6103: a time the person names (a `during`
+/// of at most 3 hours) runs as said, night or not, with no quiet hours. The
+/// evening dim, 22:00-22:30, made, put on and run by the real engine at
+/// 22:10, dims; the same skill all day (00:00-23:59) keeps the night quiet
+/// and does nothing at 22:10.
+#[test]
+fn a_made_evening_dim_runs_at_ten_past_ten() {
+    const S: u64 = 1_000_000;
+    // A day's 22:10, UTC, the lamp's offset 0.
+    const AT_22_10_MS: u64 = 20_000 * 86_400_000 + (22 * 60 + 10) * 60_000;
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    let runs_at_ten_past = |toml: &str, name: &str| {
+        let made = keep(
+            &answer(toml, name),
+            false,
+            &format!("s1:{name}:1"),
+            &keeping,
+        )
+        .unwrap();
+        let now = now_ms();
+        goes_on(&keeping.directory, &made.sha256, now).unwrap();
+        install_made_at(
+            &skills,
+            None,
+            &keeping.directory,
+            &made.sha256,
+            std::time::Duration::from_millis(200),
+            now + 1,
+        )
+        .unwrap();
+        let on = skills.join(name);
+        let installed = fs::read_to_string(on.join("skill.toml")).unwrap();
+        let mut engine = lamp_skills::Engine::new(vec![lamp_skills::load(&on).unwrap()], true);
+        engine.clock(0, 0, AT_22_10_MS);
+        let mut ran = false;
+        for at in 0..120u64 {
+            let mut runs = engine.tick(at * S);
+            runs.extend(engine.observe(
+                "voice/state",
+                at * S,
+                br#"{"state":"resting"}"#,
+                Some(2_000),
+            ));
+            ran |= runs.iter().any(|run| {
+                run.events
+                    .iter()
+                    .any(|event| event.stage == lamp_msgs::SkillStage::Triggered)
+            });
+        }
+        (ran, installed, made.description)
+    };
+    let (ran, installed, said) = runs_at_ten_past(TOML, "evening-dim");
+    assert!(!installed.contains("[quiet]"), "{installed}");
+    assert!(!said.contains("never from"), "{said}");
+    assert!(ran, "{installed}");
+    let all_day = TOML.replace(
+        "from = \"22:00\", to = \"22:30\"",
+        "from = \"00:00\", to = \"23:59\"",
+    );
+    let (ran, installed, said) = runs_at_ten_past(&all_day, "all-day-dim");
+    assert!(installed.contains("[quiet]"), "{installed}");
+    assert!(said.contains("never from 22:00 to 08:00"), "{said}");
+    assert!(!ran, "{installed}");
 }
 
 /// #6070, the Reviewer-lead's P2: a made skill on a face coming into view

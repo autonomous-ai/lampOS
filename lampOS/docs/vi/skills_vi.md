@@ -92,8 +92,12 @@ sau:
      #6103): `most_a_day` vào 1-6, `[budget]` luôn là `wellbeing` với
      `per_hour` 1-2 (không khóa nào khác), và `[rest] after_ignored` vào
      1-3 (0 hay âm thành 1); `[quiet]` luôn là 22:00-08:00, chỉ bỏ khi
-     `during` của trigger nằm trọn trong 08:00-22:00, nên `during` cả ngày
-     hay ban đêm vẫn giữ nó. Các mức sàn của #6062 và #6070
+     `during` của trigger nằm trọn trong 08:00-22:00 hoặc dài nhiều nhất 3
+     giờ, là giờ người dùng tự nói, chạy đúng như đã nói dù là ban đêm (phán
+     quyết của điều phối viên trên #6103: "dim the light at ten",
+     22:00-22:30, chạy lúc 22:10; kiểm thử
+     `a_made_evening_dim_runs_at_ten_past_ten`); `during` rộng hơn, như cả
+     ngày, vẫn giữ nó. Các mức sàn của #6062 và #6070
      (`made_skill::say_paced`: một giờ cho câu nói, một phút vắng mặt cho
      khuôn mặt, một phút cho việc đứng dậy) cũng áp dụng. Mỗi cái được nói
      lại đúng như đã đặt: "… It starts on its own, at most 3 times a day,
