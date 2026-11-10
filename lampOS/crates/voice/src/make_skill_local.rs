@@ -126,26 +126,28 @@ fn system_with(reads: bool) -> String {
     let services = services(reads);
     let triggers = made_skill::TRIGGER_MEANINGS;
     let gestures = made_skill::gesture_names();
+    let (more, cant_yet) = (made_skill::MORE_STEPS, made_skill::CANT_YET);
     format!(
         "You write skills for a lamp. Answer exactly as the request says, with the two fenced \
          blocks and nothing else. Use only the keys and values the request names, written as \
          in this example, which the lamp's check takes:\n\n{EXAMPLE}\n\nThe example shows \
          the form only: never answer with it. A reminder at a time or every so often is the \
          lamp's own timer, not a skill; a skill runs at a time only each day, by the clock \
-         trigger below. Make what the request \
-         asks with the light, the head or a short line it says, or a read as below, on \
-         one of the triggers below. To speak, a skill has speak = true in \
-         [permissions], cooldown = \"1h\" or longer, and one [[do]] step say = {{ text = \
+         trigger below. A skill made on this lamp may do whatever the lamp can do: make what \
+         the request asks with the light, the head, a few exact words it says, its hum, or a \
+         read as below, on one of the triggers below. {more} To speak, a skill has speak = \
+         true in [permissions], cooldown = \"1h\" or longer, and one [[do]] step say = {{ text = \
          \"Welcome back!\" }}: the exact words, one or two short sentences, no quotes, in the \
          language the person asked in, said as written. Its one sound is a soft hum: a [[do]] \
          step cue = \"hum\", paced as a say, in place of a say; it has no other sound and no \
          sound file. When it runs is one \
          [trigger] table (never [[trigger]]; coming to the desk is room/presence, never the \
-         faces): {triggers} A body step is one gesture, one of: {gestures}. A skill can't hear \
-         what is said, nor who someone is: a request \
-         that needs words or a sound heard, or anything else a skill here can't sense or do, \
-         is answered with one line and no blocks: {cannot} then one short sentence said to \
-         the person, in plain words, why, ending with what to ask instead when there is one; \
+         faces): {triggers} A body step is one gesture, one of: {gestures}. A skill can't yet \
+         hear what is said, know who someone is, send a message or write to a service: a \
+         request that needs one, or anything else no step or trigger here does, is answered \
+         with one line and no blocks: {cannot} then one short sentence said to the person, \
+         beginning \"{cant_yet}\" and naming what in plain words, never a rule, ending with \
+         what to ask instead when there is one; \
          for a reminder at a time or every so often: \"Ask me for a reminder instead, like 'remind \
          me every hour to stand up'.\" Never stand something \
          else in for it, and add no time of day the request didn't name. When a part of the \
@@ -199,9 +201,9 @@ fn services(reads: bool) -> String {
 pub fn tool() -> lamp_gemini::Tool {
     lamp_gemini::Tool {
         name: made_skill::MAKE.into(),
-        description: "Make a new skill for the lamp: something the lamp then does by itself with \
-             its light, its head or a few exact words it says, at a time each day, when someone comes or goes, a face comes \
-             into view, someone gets up, or when it is resting (\"make me a skill that dims the light at 10 pm\"). Call it only when the \
+        description: "Make a new skill for the lamp: something the lamp then does by itself, \
+             whatever the lamp can do (its light, its head, a few exact words it says, its hum, a read of a linked service), at a time each day, when someone comes or goes, a face comes \
+             into view, someone gets up, pats its head, the air gets stuffy, or when it is resting (\"make me a skill that dims the light at 10 pm\"). Call it only when the \
              person asks for a skill to be made. In the same breath, before you call it, say in a \
              few words that you'll make it now. The skill is made, checked, kept and put on the \
              lamp at once: then say exactly the line you are told, nothing more."

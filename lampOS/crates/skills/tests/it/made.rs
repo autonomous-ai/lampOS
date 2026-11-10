@@ -186,6 +186,36 @@ fn a_made_skill_that_does_more_than_it_declares_or_may_is_not_kept() {
         made.description
     );
     assert_eq!(tars(&keeping.directory).len(), 2);
+    // Past the old cap (#6066): the camera granted and a hello, which the
+    // checker takes, kept and said back with the camera named.
+    let camera = TOML
+        .replace("light = true\n", "light = true\ncamera = true\n")
+        .replace("policy = \"nudge\"", "policy = \"hello\"");
+    let made = keep(&answer(&camera, "night-look"), false, "s1:12:1", &keeping).unwrap();
+    assert!(made.uses.camera);
+    assert!(
+        made.description.contains(", as a hello, using the camera."),
+        "{}",
+        made.description
+    );
+    // A step lamp-skills' own check takes only in a skill a person asks for
+    // by its function, a look or a stand, is still refused by that check,
+    // with its lines for a repair.
+    for step in ["look = true", "stand = 60"] {
+        let asked = TOML
+            .replace(
+                "light = true\n",
+                "light = true\nbody = true\ncamera = true\n",
+            )
+            .replace("light = { dim = 1 }", step);
+        let refused = keep(&answer(&asked, "night-ask"), false, "s1:13:1", &keeping).unwrap_err();
+        assert_eq!(refused.0, lamp_voice::made_skill::NOT_PASSED, "{step}");
+        assert!(
+            refused.1.is_some_and(|lines| lines.contains("tool")),
+            "{step}"
+        );
+    }
+    assert_eq!(tars(&keeping.directory).len(), 3);
 }
 
 /// At most five made skills are kept: the sixth lets the oldest go, its
