@@ -23,6 +23,8 @@
   "camera": {
     "model": "USB UVC camera: components.md names a ZV A016 V4 (78° field of view), wiring.md an IMX307",
     "field_of_view_deg": 78,
+    "measured_field_of_view_deg": 128,
+    "field_of_view_note": "78 is the part's datasheet figure (components.md); about 128 across is what the gaze was measured on, lamp-4ace: 250 counts of base yaw moved the scene 110 of the picture's 320 half-width pixels (docs/body.md, --gaze 727,553). A pinhole model at 78 puts a face at the same picture position about twice as near the middle as the lamp's own gaze table does.",
     "modes": [
       { "width": 1920, "height": 1080, "fps": 30, "format": "MJPG", "source": "docs: wiring.md" },
       { "width": 1280, "height": 960, "format": "MJPG", "source": "code: lamp-camera (types.rs), the mode the lamp uses" }
