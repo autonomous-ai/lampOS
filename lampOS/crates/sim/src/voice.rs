@@ -78,10 +78,12 @@ fn say(mut stream: UnixStream) -> std::io::Result<()> {
         "{}",
         json!({"event": "begun", "at_us": lamp_ipc::monotonic_us(), "id": 1})
     )?;
-    match asked["text"].as_str() {
-        Some(text) => speak(text, &cancelled),
-        // A cue or a clip: a short while of sound.
-        None => wait(Duration::from_millis(600), &cancelled),
+    match (asked["text"].as_str(), asked["clip"].as_str()) {
+        (Some(text), _) => speak(text, &cancelled),
+        // A computer's clip, played by the host: the door gives the path of a clip it checked.
+        (None, Some(clip)) => play(clip, &cancelled),
+        // The lamp's own hum: a short while of sound.
+        (None, None) => wait(Duration::from_millis(600), &cancelled),
     }
     if cancelled.load(Ordering::SeqCst) {
         writeln!(
@@ -100,6 +102,23 @@ fn wait(long: Duration, cancelled: &AtomicBool) {
     let end = std::time::Instant::now() + long;
     while std::time::Instant::now() < end && !cancelled.load(Ordering::SeqCst) {
         thread::sleep(Duration::from_millis(20));
+    }
+}
+
+/// Plays the clip at `path` on the host: the first of the host's players that
+/// starts, else a silent wait; cut off when `cancelled`.
+fn play(path: &str, cancelled: &AtomicBool) {
+    let engines: [(&str, &[&str]); 4] = [
+        ("paplay", &[path]),
+        ("aplay", &["-q", path]),
+        ("afplay", &[path]),
+        (
+            "ffplay",
+            &["-nodisp", "-autoexit", "-loglevel", "quiet", path],
+        ),
+    ];
+    if !speak_with(&engines, "", cancelled) {
+        wait(Duration::from_millis(600), cancelled);
     }
 }
 
@@ -266,6 +285,37 @@ mod tests {
             started.elapsed() < Duration::from_secs(3),
             "{:?}",
             started.elapsed()
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_clip_is_handed_to_the_player_as_its_path() {
+        let _one_at_a_time = crate::FAKE_PROGRAM
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let dir = scratch("clip");
+        std::fs::create_dir_all(&dir).unwrap();
+        let engine = dir.join("player.sh");
+        let args = dir.join("args");
+        std::fs::write(
+            &engine,
+            format!("#!/bin/sh\necho \"$@\" > {}\n", args.display()),
+        )
+        .unwrap();
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&engine, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        let never = AtomicBool::new(false);
+        assert!(speak_with(
+            &[(engine.to_str().unwrap(), &["-q", "/clips/a.wav"])],
+            "",
+            &never
+        ));
+        assert_eq!(
+            std::fs::read_to_string(&args).unwrap().trim(),
+            "-q /clips/a.wav"
         );
         let _ = std::fs::remove_dir_all(&dir);
     }
