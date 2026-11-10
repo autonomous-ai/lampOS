@@ -96,6 +96,27 @@ slider is a joint's degrees from its home, the same `body.state`,
 panel sets each joint's zero and direction against the real lamp, for
 lamp.model.json.
 
+## Check a lamp against the fake: conformance
+
+`conformance/conformance.js` runs the same twelve steps (state, light, gestures,
+looks, a lease, `say`, `stop`, and the refusals for a bad colour, level, gesture
+name and a look without a lease) through the public SDK only, and prints for each
+whether it was taken, the refusal's code, the reply's field names and the time it
+took. It never touches a lamp's internals, so it runs against any lamp: a real
+one, the virtual desktop lamp, or the SDK's own fake.
+
+```sh
+node conformance/conformance.js            # the paired lamp (LAMPOS_HOME)
+node conformance/conformance.js --fake     # the SDK's fake
+node conformance/conformance.js --compare  # the paired lamp against the fake; exit 1 if a step differs
+```
+
+A step differs when it was taken by one and refused by the other, refused with
+another code, or answered with other fields; times are shown, never compared. A
+step needing a grant the lamp did not give is skipped. A look on a resting lamp
+ends `cut_short` on a real body, which the fake does not do, so that step is listed
+as an expected difference.
+
 ## Pair with a real lamp
 
 Run the command as `npx --no-install lampos …` (or from `node_modules/.bin`),
