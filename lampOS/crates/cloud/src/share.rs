@@ -42,6 +42,11 @@ const REASON_MOST: usize = 300;
 
 pub const NOT_MADE_HERE: &str = "only a skill made on this lamp can be shared";
 pub const NOT_ON: &str = "turn the skill on before sharing it";
+/// A pushed skill that sees the camera's picture, before the owner said yes to it.
+pub const PUSHED_HELD: &str =
+    "say yes to the skill seeing the picture before sharing it: it is held until then";
+/// What an upload says of a skill a computer pushed ("made with the SDK").
+pub const MADE_WITH_SDK: &str = "sdk";
 pub const BAD_AUTHOR: &str =
     "the name shown with it is a first name: at most 32 letters, on one line";
 pub const BAD_ID: &str = "that is not a shared skill's id";
@@ -139,6 +144,44 @@ pub fn made_here_and_on(places: &crate::skills::Places, name: &str) -> Result<Pa
         return Err(NOT_ON.to_owned());
     }
     Ok(places.folder.join(name))
+}
+
+/// The folder of `name` when it can be shared: a skill made on this lamp
+/// and on ([`made_here_and_on`]), or a skill a paired computer pushed that
+/// is on and not held for the owner's yes to its seeing the picture. Never
+/// an installed or core skill; a pushed one is refused, with its reason,
+/// when it does not load, is off, or is held. A name that is no pushed
+/// skill's gets the first answer.
+pub fn shareable(places: &crate::skills::Places, name: &str) -> Result<PathBuf, String> {
+    let first = match made_here_and_on(places, name) {
+        Ok(folder) => return Ok(folder),
+        Err(first) => first,
+    };
+    if !lamp_skills::package::skill_name_ok(name) {
+        return Err(first);
+    }
+    // The same rows the page lists, judged by the same test, so Share and
+    // the row cannot disagree: a pushed skill (a real folder with its
+    // `.pushed.json`, never a link) that loads, is on, and, when it asks the
+    // picture, has the owner's yes.
+    let off = crate::skills::read_off(&places.off);
+    let Some(row) = crate::skills::pushed_rows(places, off.as_ref())
+        .into_iter()
+        .find(|row| row.name == name)
+    else {
+        return Err(first);
+    };
+    if let Some(why) = row.why.as_ref().filter(|_| !row.loads) {
+        return Err(format!("the skill did not load: {why}"));
+    }
+    // Off, or not known to be on (the off file unreadable): not shared.
+    if row.off != Some(false) {
+        return Err(NOT_ON.to_owned());
+    }
+    if row.camera_allowed == Some(false) {
+        return Err(PUSHED_HELD.to_owned());
+    }
+    Ok(crate::skills::pushed_dir(places).join(name))
 }
 
 /// `SKILL.md` with `made: here` and its maker (`made_by`) taken out of its
@@ -295,9 +338,14 @@ pub(crate) fn seen(
     read
 }
 
-/// A `multipart/form-data` body: `file` (the package), then `author` when
-/// given. The boundary and the body.
-pub fn multipart(file_name: &str, tar: &[u8], author: Option<&str>) -> (String, Vec<u8>) {
+/// A `multipart/form-data` body: `file` (the package), then `author` and
+/// `made_with` when given. The boundary and the body.
+pub fn multipart(
+    file_name: &str,
+    tar: &[u8],
+    author: Option<&str>,
+    made_with: Option<&str>,
+) -> (String, Vec<u8>) {
     let boundary = format!("lamp-share-{:016x}", seed(tar));
     let mut body = Vec::with_capacity(tar.len() + 512);
     body.extend_from_slice(
@@ -312,6 +360,14 @@ pub fn multipart(file_name: &str, tar: &[u8], author: Option<&str>) -> (String, 
         body.extend_from_slice(
             format!(
                 "--{boundary}\r\nContent-Disposition: form-data; name=\"author\"\r\n\r\n{author}\r\n"
+            )
+            .as_bytes(),
+        );
+    }
+    if let Some(made_with) = made_with {
+        body.extend_from_slice(
+            format!(
+                "--{boundary}\r\nContent-Disposition: form-data; name=\"made_with\"\r\n\r\n{made_with}\r\n"
             )
             .as_bytes(),
         );
@@ -504,7 +560,7 @@ pub fn share(
 ) -> Result<Value, String> {
     let name = name(data)?;
     let author = author(data)?;
-    let folder = made_here_and_on(places, &name)?;
+    let folder = shareable(places, &name)?;
     if data.get("preview").and_then(Value::as_bool) == Some(true) {
         let (sha256, files) = seen(&folder, scratch, || {})?;
         return Ok(json!({ "preview": {"name": name, "sha256": sha256, "files": files} }));
@@ -517,7 +573,13 @@ pub fn share(
     if lamp_skills::package::sha256_hex(&tar) != seen {
         return Err(CHANGED.to_owned());
     }
-    let (boundary, body) = multipart(&file_name, &tar, author.as_deref());
+    // A folder a computer pushed holds `.pushed.json` (a dot file: never in
+    // the package); the upload says so beside `author`, in a field of its
+    // own and not in `lamp-skill.json`, which the Store refuses a new key in.
+    let made_with = fs::symlink_metadata(folder.join(lamp_skills::PUSHED_FROM))
+        .is_ok_and(|file| file.is_file())
+        .then_some(MADE_WITH_SDK);
+    let (boundary, body) = multipart(&file_name, &tar, author.as_deref(), made_with);
     let (status, reply) = exchange(
         store,
         (

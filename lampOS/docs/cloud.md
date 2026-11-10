@@ -133,7 +133,7 @@ lamp says so.
 | `chat.send` (`{"message", "session_id", "speak"}`) | with `LAMP_MESSAGES=on`: acked with `{"run_id", "session_id"}` and put on `chat/in`; the answer goes out after it as `chat.event`s, in V1's shapes ([messages.md](messages.md)). Refused at once when nothing on the lamp takes texts, and for a photo or a file, which aren't read yet. Without the switch, V1's "not on this lamp" |
 | `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued", "by", "held", "at"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`), how many reports wait, and how the newest choice was made: `by` is `voice` (only ever a stop), `app` or `setup` (`null` for a choice kept before these were), `held` is true for a voice's stop from a line whose answer was held, and `at` is when (as `since`), so the app's row can say "Stopped by voice at 3 pm" (#1880). A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
 | `consent.get` (`{}`), `consent.set` (`{"face_expressions": bool}` or `{"room_sounds": bool}`, exactly one) | with `LAMP_APP_CONSENT=on` (#5500, "The two yeses from the app" below): the owner's face expressions yes and, on a lamp with no privacy slide only (`lamp-cloud`'s own `LAMP_PRIVACY_CONTROLS=no-slide`), the room sounds yes, both off until a yes. `consent.get` reads the files and answers at once, `{"face_expressions": bool}` on a slide lamp, `{"face_expressions": bool, "room_sounds": bool}` on one with none. `consent.set` is handed to root's helper, which writes or removes the file and answers at once; `success` carries the same shape as `consent.get`, read after it. Refused at once, before the helper: no key, two keys, a key this lamp lacks (room sounds on a slide lamp: "room sounds is not on this lamp: it has a privacy slide"), a value not `true` or `false`. Listed in `can` only with the switch; without it, V1's "not on this lamp" |
-| `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Without the switch, V1's "not on this lamp" |
+| `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`, and `pushed` for a skill a paired computer pushed), whether it can be removed or turned off, and what it may use in plain words. Without the switch, V1's "not on this lamp" |
 | `skills.install` (`{"url", "sha256", "name", "version"}`, all but `url` optional) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_STORE=on` and the separate Store public key ("Installing from the Skills Store" below): a Skills Store catalogue entry, passed to root's manage helper, which fetches the package over HTTPS and installs it only when it is signed with the Store's key (never a core skill or a core skill's name; `lamp-cloud` writes and fetches nothing); the reply is `skills.list`'s, read after it. Without the Store switch or a valid key, V1's "not on this lamp" |
 | `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder), on a lamp installed before #2429 only after `lamp-update install` once; the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
 | `skills.share` (`{"name", "author"?, "sha256"}`, or `{"name", "preview": true}`) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_SHARE=on`, an account base with a host and the lamp's key ("A made skill sent to the Skills Store" below, fourteen-P13): a skill made here and on, packed and sent for the Store's review, `{"sent": {"id", "name", "version", "review_status"}}`; with `"preview": true`, nothing sent, its files' text as it would leave and the package's `sha256`, both from one copy of the skill taken once, so a skill made again meanwhile can't pair one text with another package (Mobile's P2 on #4965). A send must give that `sha256`: without it, "show what would be sent first, then send that"; with another, as when the skill was made again since, "the skill changed since you looked: look again before sending", and nothing sent (the Reviewer-lead's P2 on #4948). Without them, "not on this lamp" |
@@ -823,7 +823,13 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   for an installable skill whose `SKILL.md` front matter says `made: here`,
   what a skill a person makes on the lamp by talking to it carries (the
   first builder's 17:21: its own group, "Made on this lamp", removable);
-  `installed` for any other. A core skill that says `made: here` is still
+  `installed` for any other. **`pushed`** is a skill a paired computer pushed
+  (`lamp skill push`) that sits in `/var/lib/lampOS/skills-dev` beside the lamp's
+  folder with its `.pushed.json`, read from there (never a link, never a name the
+  lamp's own folder has): shown with `can_remove` and `can_turn_off` false, and
+  `camera_allowed` the owner's yes to its seeing the picture (null when it asks
+  none). It is what `skills.share` also takes, when it is on, loads, and is not
+  held. A core skill that says `made: here` is still
   core. Nothing writes `made: here` yet: the lamp skill creator will, when
   it makes one.
 - **`sha256`** (#2801): for a skill put on from a package (from the Skills
@@ -1176,6 +1182,16 @@ since 30 Oct.
   files pack to the same bytes. `name` must be a skill made on this lamp (`made:
   here`, the page's `made_here` group) that is on; else "only a skill made
   on this lamp can be shared" or "turn the skill on before sharing it".
+  **Or a skill a paired computer pushed** (`lamp skill push`, in
+  `/var/lib/lampOS/skills-dev` beside the lamp's folder, with its
+  `.pushed.json`): shared when it loads, is on, and, if it sees the
+  camera's picture, the owner said yes to it (else "say yes to the skill
+  seeing the picture before sharing it: it is held until then"); never an
+  installed or core skill. The upload then carries a `made_with` form field,
+  `sdk`, beside `author` (not in `lamp-skill.json`, which the Store refuses
+  an unknown key in); an upload of a skill made here has none. The package
+  is still packed again unsigned, and no dot file travels (`.pushed.json`
+  and the owner's `.yes.json` stay on the lamp).
   `author`, when given, is a first name: trimmed, at most 32 characters, on
   one line; empty means none. The skill's folder is copied to a fresh
   folder in `lamp-cloud`'s own `/tmp` (`PrivateTmp=yes`), without its dot

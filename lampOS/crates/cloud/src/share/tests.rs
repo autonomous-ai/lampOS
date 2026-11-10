@@ -190,14 +190,21 @@ fn the_package_is_the_skills_own_files_and_not_made_here_on_another_lamp() {
 
 #[test]
 fn the_multipart_body_carries_the_file_and_the_author_when_given() {
-    let (boundary, body) = multipart("water-1.0.0.tar", b"TAR", Some("Lan"));
+    let (boundary, body) = multipart("water-1.0.0.tar", b"TAR", Some("Lan"), None);
     let text = String::from_utf8(body).unwrap();
     assert!(text.starts_with(&format!("--{boundary}\r\n")));
     assert!(text.contains("name=\"file\"; filename=\"water-1.0.0.tar\"\r\nContent-Type: application/x-tar\r\n\r\nTAR\r\n"));
     assert!(text.contains("name=\"author\"\r\n\r\nLan\r\n"));
     assert!(text.ends_with(&format!("--{boundary}--\r\n")));
-    let (_, body) = multipart("w.tar", b"TAR", None);
-    assert!(!String::from_utf8(body).unwrap().contains("author"));
+    let (_, body) = multipart("w.tar", b"TAR", None, None);
+    let text = String::from_utf8(body).unwrap();
+    assert!(!text.contains("author") && !text.contains("made_with"));
+    // A pushed skill says it was made with the SDK, beside the author.
+    let (boundary, body) = multipart("w.tar", b"TAR", Some("Lan"), Some("sdk"));
+    let text = String::from_utf8(body).unwrap();
+    assert!(text.contains("name=\"made_with\"\r\n\r\nsdk\r\n"));
+    assert!(text.contains("name=\"author\"\r\n\r\nLan\r\n"));
+    assert!(text.ends_with(&format!("--{boundary}--\r\n")));
 }
 
 #[test]
@@ -474,4 +481,116 @@ fn a_sent_answer_with_no_id_is_unread_not_sent() {
         ),
         Err(UNREAD.into())
     );
+}
+
+/// A skill pushed from a computer, in the pushed folder beside the lamp's
+/// own (`skills-dev`), with its `.pushed.json`.
+fn pushed(places: &crate::skills::Places, name: &str, toml: &str) -> std::path::PathBuf {
+    let dev = places.folder.with_file_name("skills-dev");
+    fs::create_dir_all(&dev).unwrap();
+    skill(
+        &crate::skills::Places {
+            folder: dev.clone(),
+            ..places.clone()
+        },
+        name,
+        "Wave",
+        "",
+        toml,
+    );
+    fs::write(
+        dev.join(name).join(".pushed.json"),
+        r#"{"computer":"laptop","client":"c_1","sha256":"ab","at_unix_ms":1}"#,
+    )
+    .unwrap();
+    dev.join(name)
+}
+
+#[test]
+fn a_pushed_skill_that_is_on_can_be_shared_and_a_held_or_off_one_cannot() {
+    let places = places("share-pushed");
+    let wave = pushed(&places, "wave", MADE);
+    assert_eq!(shareable(&places, "wave"), Ok(wave.clone()));
+    // Off: the owner turned it off.
+    fs::write(&places.off, "wave\n").unwrap();
+    assert_eq!(shareable(&places, "wave"), Err(NOT_ON.into()));
+    fs::remove_file(&places.off).unwrap();
+    // A skill that sees the picture is held until the owner says yes to it.
+    let seen = pushed(
+        &places,
+        "watch",
+        "format = 2\nkind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\nbody = true\ncamera = true",
+    );
+    assert_eq!(shareable(&places, "watch"), Err(PUSHED_HELD.into()));
+    fs::write(
+        places.folder.with_file_name("skills-dev").join(".yes.json"),
+        r#"[{"name":"watch","client":"c_1","sha256":"ab"}]"#,
+    )
+    .unwrap();
+    assert_eq!(shareable(&places, "watch"), Ok(seen));
+    // The page's row and Share agree: Share takes exactly the pushed rows
+    // that load, are on, and are not held for the picture.
+    for row in crate::skills::pushed_rows(&places, crate::skills::read_off(&places.off).as_ref()) {
+        assert_eq!(
+            shareable(&places, &row.name).is_ok(),
+            row.loads && row.off == Some(false) && row.camera_allowed != Some(false),
+            "{}",
+            row.name
+        );
+    }
+    // A skill that is not in either folder is refused as before, and the
+    // lamp's own installed skills still are.
+    assert_eq!(
+        shareable(&places, "nobody"),
+        Err(crate::skills::NOT_A_NAME.into())
+    );
+    skill(&places, "tutor", "Desk tutor", "", MADE);
+    assert_eq!(shareable(&places, "tutor"), Err(NOT_MADE_HERE.into()));
+    // A name that is no skill's name never reaches a path.
+    assert!(shareable(&places, "../skills").is_err());
+    // A pushed folder that is a link to a folder elsewhere is no pushed
+    // skill: nothing outside `skills-dev` is ever packed.
+    let outside = places.folder.with_file_name("outside");
+    fs::create_dir_all(&outside).unwrap();
+    fs::copy(wave.join("SKILL.md"), outside.join("SKILL.md")).unwrap();
+    fs::copy(wave.join("skill.toml"), outside.join("skill.toml")).unwrap();
+    fs::copy(wave.join(".pushed.json"), outside.join(".pushed.json")).unwrap();
+    std::os::unix::fs::symlink(
+        &outside,
+        places.folder.with_file_name("skills-dev").join("linked"),
+    )
+    .unwrap();
+    assert_eq!(
+        shareable(&places, "linked"),
+        Err(crate::skills::NOT_A_NAME.into())
+    );
+}
+
+#[test]
+fn a_pushed_skill_goes_with_made_with_sdk_and_a_made_one_does_not() {
+    let places = places("share-made-with");
+    pushed(&places, "wave", MADE);
+    skill(&places, "water", "Water", "made: here\n", MADE);
+    for (name, field) in [("wave", true), ("water", false)] {
+        let (store, seen) = store(
+            201,
+            r#"{"status":1,"data":{"id":"s1","name":"x","version":"1.0.0","review_status":"pending","owner":"x"}}"#,
+        );
+        share(
+            &store,
+            &places,
+            &json!({"name": name, "sha256": previewed(&places, name, "mw-seen")}),
+            &scratch("mw"),
+        )
+        .unwrap();
+        let (_, body) = seen.recv().unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert_eq!(
+            body.contains("name=\"made_with\"\r\n\r\nsdk\r\n"),
+            field,
+            "{name}"
+        );
+        // Whatever the skill's folder holds as dot files never travels.
+        assert!(!body.contains(".pushed.json") && !body.contains(".yes.json"));
+    }
 }
