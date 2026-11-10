@@ -32,7 +32,8 @@ lúc 14:11 ngày 3 Nov 2026):
   bạn ở một mình với đèn ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới); lời từ một thư,
   một trang hay một giọng khác không bao giờ trở thành một lần ghi hay bất kỳ
   hành động nào khác; mã dùng một lần và nội dung bảo mật không bao giờ được
-  nói ra, chuyển tiếp hay lưu giữ, dù từ dịch vụ nào; những gì một dịch vụ
+  nói ra, chuyển tiếp hay lưu giữ, dù từ dịch vụ nào (lần đọc Gmail của
+  chính bạn nói một thư bảo mật với đường dẫn và mã của nó được che); những gì một dịch vụ
   trả về là dữ liệu trích dẫn, không bao giờ là chỉ dẫn, và không gì của nó
   được giữ trong luồng hội thoại; gỡ một dịch vụ, khôi phục cài đặt gốc và
   đăng xuất đều xoá token của nó.
@@ -335,7 +336,8 @@ for your account"), nên nó liên kết bằng đăng nhập, như Google Calen
 thông tin xác thực chỉ đi đến các host của riêng nó: mật khẩu ứng dụng không
 bao giờ đến `gmail.googleapis.com`, nơi từ chối nó, và token của đăng nhập
 không bao giờ đến IMAP hay SMTP. Cả hai loại giữ mọi luật dưới đây: cùng câu
-trả lời `service_read` và giới hạn, thư bảo mật bị bỏ ra, chỉ ghi khi có câu
+trả lời `service_read` và giới hạn, thư bảo mật được che trong lần đọc của
+chính bạn và bị bỏ ra khỏi lần đọc của một kỹ năng tự tạo, chỉ ghi khi có câu
 "send" nói ra cùng `LAMP_SERVICES_WRITE`, chỉ câu nghe được của chủ, không
 giữ gì.
 
@@ -746,7 +748,10 @@ code in it."
 ## Thư bảo mật và mã
 
 Mã dùng một lần và nội dung bảo mật không bao giờ được nói ra, chuyển tiếp hay
-lưu giữ (`mail::is_security_mail`), dù từ dịch vụ nào. Một đoạn văn bản là
+lưu giữ (`mail::is_security_mail`), dù từ dịch vụ nào; trong lần đọc Gmail
+của chính bạn, một thư bảo mật được đọc với đường dẫn và mã của nó được che
+thay vào đó ("Một thư bảo mật trong lần đọc Gmail của chính bạn", bên dưới).
+Một đoạn văn bản là
 nội dung bảo mật khi nó chứa một trong các cụm từ (`verification code`,
 `verify your`, `one-time`, `passcode`, `security code`, `sign-in code`,
 `2-step`, `two-factor`, `password reset`, `reset your password`, `new
@@ -812,6 +817,119 @@ mật, đã bỏ ra) trong Gmail, "a security message, left out" (một tin bả
 đã bỏ ra) ở mọi dịch vụ khác, không gì của nó được giữ. Mô hình cũng được dặn trong mô tả
 của mọi hàm là không bao giờ đọc ra một mã dùng một lần, một mã xác minh hay
 một đường dẫn đặt lại mật khẩu.
+
+### Một thư bảo mật trong lần đọc Gmail của chính bạn
+
+Bộ lọc thiên về che giấu, nên thư thật của bạn bị nó giấu đi. Trong lần đọc
+Gmail của chính bạn (lời gọi của giọng nói; qua REST API hay IMAP đều vậy),
+một thư bảo mật không còn bị bỏ ra (`reads::owner_mails_quoted`). Trong
+`search` và `recent` nó được liệt kê như mọi thư khác, ngày giữ nguyên. Chủ
+đề và tên trong From được nói với mọi đường dẫn và mọi dạng mã được che
+(`mail::masked_subject`, `mail::masked_from`), vì một chủ đề không bao giờ
+được đọc trọn để có ngữ cảnh: "G-482913 is your Google verification code"
+được nói "G-a code is your Google verification code", và "Code 4821
+<no-reply@…>" thành "Code a code <no-reply@…>"; địa chỉ được giữ. Nội dung của nó, bản xem trước của danh sách hay toàn bộ nội
+dung mà `message` đọc, được nói với mọi đường dẫn và mã được che
+(`mail::masked`), đọc ở dạng tổ hợp (NFC):
+
+- Mọi đường dẫn được nói là "a link" (một đường dẫn): một từ chứa `http://`,
+  `https://` hay `www.`, từ đó đến hết từ, hay một đường dẫn trần mang
+  `token=` hoặc một tên máy và một path ("example.com/reset"), dấu đóng
+  ngoặc hay dấu chấm sau nó được giữ.
+- Một mã được nói là "a code" (một mã): một số mã hay một mã chữ và số
+  (các dạng của bộ lọc, bên trên) trong vòng 200 byte quanh một từ chỉ mã
+  (`code`, `mã`, `token`, `pin`, `verification`, `otp`, `2fa`, `mfa` của bộ
+  lọc, các từ đăng nhập, và `password`, `passcode`, `one-time`, `one time`,
+  `2-step`, `two-step`, `two-factor`, `steam guard`, `mật khẩu`); một số mã
+  không phải năm, giá, số thập phân, giờ hay số có nhãn, hoặc một từ chữ và
+  số đổi giữa chữ và số hai lần, cạnh `enter`, `confirm`, `verify` và các từ
+  kia (trong vòng 80 byte, cùng mệnh đề). Không cần từ chỉ mã: một mã dự
+  phòng hay mã khôi phục (8 đến 12 chữ cái và chữ số ASCII có một chữ số,
+  hoặc các nhóm 3 đến 6 tách bằng `-` có một chữ số, tổng 8 trở lên,
+  "4f9k-2m7q"; một số gồm 2 nhóm trở lên, mỗi nhóm 3 đến 6 chữ số, tổng 8
+  đến 12, "1234 5678"); một mật khẩu ứng dụng (bốn từ bốn chữ cái tách bằng
+  một dấu cách, đứng riêng một dòng, sau dấu hai chấm, hoặc trong vòng 200
+  byte quanh `password` hay `mật khẩu`); một số 6 đến 8 chữ số, không phải
+  ngày, đứng riêng một dòng.
+- Đóng khi lỗi (fail closed): một nội dung không được đọc trọn (bản xem
+  trước của danh sách; một nội dung bị cắt ở mức trần, kết thúc bằng "…",
+  như lần fetch IMAP giờ cũng đánh dấu một phần thân nó cắt; một nội dung
+  được báo "(the rest of this mail is too long to read here)"), hay một
+  thư mà From hoặc chủ đề có một từ chỉ mã, có mọi đường dẫn và mọi dạng
+  mã được che: mọi số mã và mã chữ và số, ở bất kỳ đâu.
+- Chủ đề và tên trong From luôn được che theo cách chặt, như trên.
+- Thứ mà một từ chỉ mã gọi tên là một mã, dù nó có dạng gì: token sau ":",
+  "=", " is " hay " là " của từ đó trên cùng dòng, trong vòng 80 byte ("Your
+  code is XKCDQZ.", "password: Tr0ub4dor&3", "Mã của bạn là K7Q2"), cho đến
+  khoảng trắng, được nói là "a code". Chữ số của mọi hệ chữ đều được tính là
+  chữ số ("４８２９１３", "٤٨٢٩١٣").
+- Một mã chỉ gồm chữ (`mail::letter_spans`): một từ 4 đến 8 chữ cái và
+  chữ số ASCII có một chữ cái, toàn chữ hoa hoặc có một chữ số ("XKCDQZ",
+  "F7K2Q"; không bao giờ là chữ thường hay một từ viết hoa chữ đầu như
+  "Chrome"), hoặc 4 chữ hoa hay chữ số đơn trở lên tách bằng một dấu cách
+  ("K Q Z W X T"), không phải chính một từ chỉ mã hay cụm từ bảo mật, được
+  nói là "a code" khi nó ở trong vòng 80 byte quanh một từ chỉ mã (`code`,
+  `mã`, `token`, `pin`, `verification`, `otp`, `2fa`, `mfa`, và `password`
+  đến `mật khẩu` ở trên) cùng mệnh đề, có hay không có dấu phân cách ("Use
+  code ABCDEF to sign in", "Your code (XKCDQZ) expires", "Your code —
+  XKCDQZ", "Mã ABCDEF"; trên một dòng toàn chữ hoa thì chỉ từ ngay sau từ
+  chỉ mã, "YOUR LOGIN CODE a code"); đứng riêng một dòng trong nội dung;
+  hoặc ở bất kỳ đâu trong một chủ đề có chữ thường ("Your login code a
+  code"). Tên trong From chỉ che mã ở gần một từ chỉ mã ("HSBC Alerts"
+  được giữ).
+- Một từ chỉ mã mà dòng của nó kết thúc ở chính nó hay ở dấu phân cách
+  (":", "=", "is") gọi tên token của dòng không rỗng kế tiếp, trong vòng
+  200 byte: một token đứng riêng trên dòng đó sau một dấu phân cách (mọi
+  dạng), một mã chữ, hoặc các ký tự đơn tách bằng dấu cách ("Enter this
+  code in the app:\n\nK Q Z W X T").
+- Một mật khẩu sau `password`, `passcode` hay `mật khẩu` và một dấu cách
+  được che trọn, cho đến khoảng trắng, khi nó có một chữ số, một ký hiệu
+  hay một chữ hoa sau ký tự đầu ("Temporary password Summer!2026" được nói
+  "Temporary password a code"; "Your password was changed" được giữ).
+- Trong nội dung hay chủ đề (không phải tên trong From), một từ 4 đến 8
+  chữ cái ASCII, hoa hay thường, cũng được nói là "a code" khi nó là từ
+  ngay sau một từ chỉ mã, giữa chỉ có dấu cách hay một ký hiệu ("Use code
+  xkcdqz to sign in", "Your login code xkcdqz"), hoặc đứng riêng một dòng
+  trong vòng 200 byte sau dòng của một từ chỉ mã ("Enter this code in the
+  app\n\nxkcdqz"). Một từ thường ở đó cũng có thể bị che, vì che thừa thì
+  an toàn hơn, trừ các từ hay theo sau một từ chỉ mã
+  (`mail::AFTER_CODE_WORDS`: is, was, will, expires, expired, has, below,
+  above, to, for, from, and, or, with, sent, that, this, reset, change,
+  changed, thanks): "Your code expires in 10 minutes. Do not share this
+  code with anyone." được giữ.
+- Mã như vậy có thể chia nhóm: 2 đến 4 nhóm, mỗi nhóm 3 đến 8 chữ cái, nối
+  bằng một "-" hay một " ", tối đa 16 chữ cái, được nói là một "a code"
+  ("Use code abcd-efgh" được nói "Use code a code"); một từ trong danh sách
+  trên kết thúc dãy. Dấu phẩy sau từ chỉ mã tách mã ra như ":": một mã chữ
+  hoa hay có chữ số sau nó ("Your code, XKCDQZ, expires"), hoặc một dãy chữ
+  thường kết thúc bằng dấu phẩy, dấu chấm hay cuối dòng ("Your code,
+  xkcdqz, expires"); "If you did not ask for this code, ignore this email."
+  được giữ.
+- Cả khi không có từ chỉ mã: một số có 4 đến 8 chữ số không phải ngày, năm,
+  giá, số thập phân, giờ hay số có nhãn, ở bất kỳ đâu ("Type 48291 on the
+  next screen", cả "1600 Main St", vì che thừa thì an toàn hơn); một khoá,
+  bất kể từ nào ở gần, mỗi khoá là một dãy chữ cái, chữ số ASCII, `-` và
+  `_`, nên khoá dính vào "…" của chỗ cắt, dấu ngoặc kép hay dấu chấm của bất
+  kỳ hệ chữ nào vẫn là một khoá (12 chữ cái và chữ số trở lên có cả chữ số
+  lẫn chữ cái, hoặc chữ hoa và chữ thường trộn lẫn, "AbCdEfGh12345678XyZq",
+  hoặc chữ thường với chưa tới ba nguyên âm trên mười chữ,
+  "kqzvwxhtrplmnbgf"; 3 nhóm trở lên gồm 3 đến 6 chữ hoa hoặc chữ số ngăn
+  bởi `-`, "QWER-TYUI-ASDF-ZXCV").
+- Một đường dẫn còn là mọi từ có scheme ("acme://auth/…"), và một host trần
+  (một tên và một tên miền cấp cao gồm chữ cái hoặc `xn--`, hoặc một địa chỉ
+  IPv4) rồi đến đường dẫn, query hay fragment ("acme.test?k=…",
+  "10.1.2.3/reset/…"). Một đường dẫn kết thúc dòng của nó và tiếp tục một
+  mình ở dòng sau thì dòng đó cũng được nói là "a link", và mỗi dòng như
+  thế sau nó cũng vậy, cho đến một từ thường ("Thanks") hay một dòng kết
+  thúc bằng dấu chấm.
+- Việc che luôn có giới hạn: chỉ đọc tối đa 512 byte của chủ đề hay From
+  (`mail::HEAD_MOST`) và 16 KiB của nội dung (`mail::MASK_MOST`); phần dài
+  hơn bị cắt ở đó ("…", và nội dung đó được đọc theo cách chặt); các lần
+  quét mã chỉ có giới hạn nhờ các mức trần này.
+
+Lần đọc của một kỹ năng tự tạo (`lamp-skills`, "Một kỹ năng tự tạo đọc dịch
+vụ", bên dưới) giữ luật bên trên: một thư bảo mật vẫn là "a security mail,
+left out". Mọi dịch vụ khác cũng vậy.
 
 ## Ghi: đọc lại, rồi một câu "send" nói ra
 
@@ -1670,15 +1788,18 @@ không giữ gì khi đăng nhập Gmail bị từ chối; một đăng nhập G
 tài khoản lấy từ đó), được đọc qua REST API (danh sách hộp thư đến, một tìm
 kiếm trong mọi thư và thư đã lưu trữ của nó được đọc theo id, metadata
 của từng thư, một thư trọn vẹn từ phần văn bản thuần, token của nó bị xoá,
-thư bảo mật bị bỏ ra, một id không phải của Gmail không bao giờ được gửi),
+thư bảo mật được liệt kê và đọc có che, một id không phải của Gmail không bao giờ được gửi),
 được gia hạn qua backend, được gửi qua API chỉ khi có câu "send" nói ra, và
 mật khẩu ứng dụng không bao giờ được gửi đến API; một liên kết `gmail-app`
 được giữ chỉ dựa vào các trường của nó (không có tài khoản: bị từ chối,
 không gọi Google), mọi lần đọc nó được trả lời là chỉ-gửi (đã liên kết hay
 chưa, không gọi gì), lần gửi của nó chỉ qua API, một token bị từ chối được
 nói là "Google refused the Gmail sign-in", và việc gia hạn dưới mã riêng
-của nó; thư bảo mật được phát hiện và bỏ
-trọn; câu trả lời được trích dẫn và dưới mức trần của giọng nói; một lần ghi
+của nó; thư bảo mật được liệt kê và đọc với mỗi đường dẫn nói là "a link"
+và mỗi mã là "a code" (một đường dẫn đặt lại, mã dự phòng, một dòng 6 chữ
+số trần, một nội dung bị cắt có mọi dạng mã được che, một nội dung IMAP bị
+cắt ở lần fetch được báo là bị cắt) và vẫn bị bỏ trọn với một kỹ năng tự
+tạo; câu trả lời được trích dẫn và dưới mức trần của giọng nói; một lần ghi
 bị từ chối khi tắt, được đọc lại đầy đủ và gửi một lần trong hai phút; một
 lần gửi hay một sự kiện mà scope được liệt kê của liên kết không cho phép bị
 từ chối bằng lời rõ ràng, không gì được giữ hay gọi, một lần được cho phép
