@@ -790,6 +790,18 @@ pub const CONVERSATION_CARRIED_SAVES_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARR
 /// failed though the facts were stored. `on`, and nothing else; off, a
 /// carried line is as before, byte for byte.
 pub const CONVERSATION_CARRIED_MEMORY_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIED_MEMORY";
+/// A line with no words of its own (a cough, a knock, a sound read as a
+/// line) that cut short a line a known person's own face was seen saying,
+/// and is carried for that person's conversation, answers those words in
+/// their scope, not held: their memory note and reads, a keep written at
+/// once, a correction or forget run, as on the line they said it in
+/// (`memory_scope::ScopeLease::answer_words_seen`). lamp-06c1, build 11091,
+/// 10 Nov rerun, S1: "Lamp. Actually, my bike is blue now." was seen
+/// spoken, cut by a 0-word line, and answered as that carried line, so the
+/// lamp said it had nothing about the bike's colour and blue was never
+/// kept. Words of the held line's own, or any part of them not seen said
+/// by the same face, take nothing. `on`, and nothing else; off, as before.
+pub const HELD_WORDS_SEEN_ENVIRONMENT: &str = "LAMP_HELD_WORDS_SEEN";
 /// A known person's keep on a line no face was seen speaking is theirs when
 /// their known face was the one face in every look of it and no other voice
 /// was heard since the conversation began (the launch testers' item 1 on
@@ -1853,6 +1865,10 @@ struct Shared {
     /// A carried line is read and kept as its person's, forgets refused
     /// (`LAMP_CONVERSATION_CARRIED_MEMORY`, [`Engine::reading_carried`]).
     carried_memory: bool,
+    /// A carried 0-word line answering words their own face was seen saying
+    /// answers them in their scope (`LAMP_HELD_WORDS_SEEN`,
+    /// [`Engine::answering_held_words_seen`]).
+    held_words_seen: bool,
     /// Who was seen saying a known person's line is kept for its services
     /// write (`LAMP_SERVICES`, [`Engine::keeping_sight_for_services`]).
     services_sight: bool,
@@ -2903,6 +2919,45 @@ struct Carried {
     /// so a line that cuts these short in turn does not lose them again
     /// (Seventh's P3 on #4916). Empty for any other words.
     earlier: Vec<Part>,
+}
+
+/// The known person whose own face was seen saying every part of `parts`
+/// ([`crate::memory_scope::seen_line`]), the same one for all; `None` for
+/// none, or any part unseen or another's.
+fn seen_saying(parts: &[Part]) -> Option<String> {
+    let mut seen = parts
+        .iter()
+        .map(|part| crate::memory_scope::seen_line(part.request));
+    let first = seen.next()??;
+    seen.all(|person| person.as_deref() == Some(first.as_str()))
+        .then_some(first)
+}
+
+#[cfg(test)]
+mod seen_saying_tests {
+    use super::*;
+
+    /// S1, 10 Nov rerun: the words of a line her own face was seen saying
+    /// are hers; a chain is only when every part was seen said by her.
+    #[test]
+    fn words_are_seen_said_only_when_every_part_was_by_the_same_face() {
+        let part = |request| Part {
+            request,
+            text: "my bike is blue now".into(),
+            at: Instant::now(),
+            lines: 1,
+        };
+        let (a, b, unseen, other) = (9_201, 9_202, 9_203, 9_204);
+        crate::memory_scope::mark_seen_line(a, Some("p-a"));
+        crate::memory_scope::mark_seen_line(b, Some("p-a"));
+        crate::memory_scope::mark_seen_line(other, Some("p-b"));
+        assert_eq!(seen_saying(&[part(a)]).as_deref(), Some("p-a"));
+        assert_eq!(seen_saying(&[part(a), part(b)]).as_deref(), Some("p-a"));
+        assert_eq!(seen_saying(&[part(a), part(unseen)]), None);
+        assert_eq!(seen_saying(&[part(a), part(other)]), None);
+        assert_eq!(seen_saying(&[part(unseen)]), None);
+        assert_eq!(seen_saying(&[]), None);
+    }
 }
 
 /// Which request first tried `remember`, `forget` or `forget_everything`
@@ -4298,6 +4353,7 @@ impl Engine {
                 carries: None,
                 carried_saves: false,
                 carried_memory: false,
+                held_words_seen: false,
                 services_sight: false,
                 past_silent: None,
                 one_face: None,
@@ -4611,6 +4667,17 @@ impl Engine {
     pub fn reading_carried(mut self, on: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.carried_memory = on;
+        self
+    }
+
+    /// A line with no words of its own, carried for a known person's
+    /// conversation, that answers in its place words their own face was
+    /// seen saying in the line it cut short answers them in their scope, as
+    /// that line would have (`LAMP_HELD_WORDS_SEEN=on`,
+    /// `ScopeLease::answer_words_seen`). Off, as before.
+    pub fn answering_held_words_seen(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.held_words_seen = on;
         self
     }
 
@@ -7966,6 +8033,8 @@ async fn spoken(
     // Taken by the one-face rule and read as theirs
     // (`LAMP_PERSON_SCOPE_ONE_FACE_READS`, [`Engine::reading_by_one_face`]).
     let mut read_by_one_face = false;
+    // Marked below only when their own face is seen saying it.
+    crate::memory_scope::mark_seen_line(request, None);
     if let Some(scope) = scope.as_ref()
         && let Some(person) = scope
             .scope()
@@ -8155,6 +8224,12 @@ async fn spoken(
                         "lamp-voice second: request {request}: {note}: told and kept as theirs"
                     );
                 }
+                // Their own face seen saying it: a 0-word line that cuts it
+                // short may answer its words as theirs (`LAMP_HELD_WORDS_SEEN`).
+                crate::memory_scope::mark_seen_line(
+                    request,
+                    (theirs && !carried && !speakers.is_empty()).then_some(person.as_str()),
+                );
                 note.filter(|_| !theirs)
             }
             None => shared
@@ -9210,6 +9285,19 @@ async fn spoken(
                 SentWith::Told(note) => note,
             };
             let lease = scope.clone();
+            // A 0-word line carried for the person whose own face was seen
+            // saying every part of these words answers them in their scope
+            // (`LAMP_HELD_WORDS_SEEN`, S1, 10 Nov rerun).
+            if empty
+                && shared.held_words_seen
+                && let Some(lease) = lease.as_ref()
+                && let Some(person) = seen_saying(&carried.parts)
+                && lease.answer_words_seen(&person)
+            {
+                eprintln!(
+                    "lamp-voice second: request {request}: no words of its own, it answers words their own face was seen saying: told and kept as theirs (LAMP_HELD_WORDS_SEEN)"
+                );
+            }
             // Another person's words the carried ones kept, cut short in
             // their pause's grace (`LAMP_ENDPOINT_PAUSE_JOIN`): told first,
             // and the line's keep is the room's (Seventh on #4916).

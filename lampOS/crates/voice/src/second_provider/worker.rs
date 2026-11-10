@@ -3206,6 +3206,16 @@ pub fn serve(
             );
             engine = engine.reading_carried(true);
         }
+        // A 0-word line that cut a line their own face was seen saying
+        // answers its words in their scope (S1, 10 Nov rerun).
+        if std::env::var(crate::second_provider::HELD_WORDS_SEEN_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a 0-word line answering words their own face was seen saying answers them in their scope (LAMP_HELD_WORDS_SEEN)"
+            );
+            engine = engine.answering_held_words_seen(true);
+        }
     }
     // Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`, #2377): a held
     // forget's yes counts only from the held person's face seen saying it.

@@ -1121,3 +1121,21 @@ lamp.
 Ý tưởng quan sát có liên kết nguồn, chép đúng lời của người nói, là sự thật
 kèm trích dẫn nguyên văn của thiết kế Tiers
 ([memory-tiers.md](../memory-tiers.md)), ở đây không dùng mô hình.
+
+## Lời đã thấy nói, trả lời thay cho một câu không có lời, vẫn là của người nói (`LAMP_HELD_WORDS_SEEN`)
+
+Trên lamp-06c1 (chạy lại 10/11, bản 11091, S1), câu «Lamp. Actually, my
+bike is blue now.» (yêu cầu 83) được thấy chính khuôn mặt cô ấy nói, nhưng
+một câu không có lời (84) cắt ngang trước khi trả lời, và 84 rồi 85 trả lời
+lời đó thay cho 83. 84 và 85 là câu được mang theo (không khuôn mặt nào được
+thấy nói một câu không có lời), nên câu trả lời không có ghi chú bộ nhớ,
+không đọc bộ nhớ, và việc giữ phải chờ một lời «có»: lamp nói không biết gì
+về màu xe đạp, và màu xanh không được giữ. Khi bật `LAMP_HELD_WORDS_SEEN`
+(mặc định tắt cho đến khi kiểm tra trên lamp), mỗi câu được thấy chính khuôn
+mặt người đó nói được đánh dấu (`memory_scope::mark_seen_line`; thu hẹp về
+phòng thì xóa dấu). Một câu không có lời của riêng nó, trả lời thay cho lời
+mà mọi phần đều được thấy cùng một khuôn mặt nói, và chính nó được mang theo
+trọn vẹn cho cuộc nói chuyện của người đó, sẽ trả lời trong phạm vi của
+người đó, không bị giữ (`ScopeLease::answer_words_seen`): đọc bộ nhớ, giữ
+ngay, sửa hoặc quên đều chạy, như ở câu gốc. Chi tiết ở
+[memory.md](../memory.md).

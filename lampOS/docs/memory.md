@@ -914,6 +914,31 @@ memory. Risk, accepted with the switch: a guest off camera while P's face
 sits silent and alone in view, no other face or voice shown, is told P's
 recall and may add a keep to P's memory.
 
+**Words seen said, answered in a 0-word line's place, stay theirs**
+(`LAMP_HELD_WORDS_SEEN=on`, off by default until its lamp check). On
+lamp-06c1 (10 Nov rerun, build 11091, S1) "Lamp. Actually, my bike is blue
+now." (request 83) was seen spoken by her face and told her memory (the red
+bike), but a 0-word line (84) cut it before its chat began, and 84, then 85,
+answered its words in their place (`LAMP_JOIN_CUT_WORDS`). 84 and 85 were
+carried lines (no face is seen speaking a line with no words), so the answer
+had no memory note and no reads, and its keep would wait for a yes: the
+lamp said "I didn't have anything about your bike's colour before", and
+blue was never kept. With the switch, each line their own face is seen
+saying is marked with whose face it was (`memory_scope::mark_seen_line`; a
+narrow takes it off). A line with no words of its own that answers, in its
+place, words every part of which the same person's face was seen saying
+(`second_provider::seen_saying`), and that is itself carried in full for
+that person's conversation (their own face in view, no other, not a
+keep-only carry, not held by a gap), answers them in their scope, not held,
+as the line they said them in would have (`ScopeLease::answer_words_seen`):
+their memory note and reads, a keep written at once, a correction or forget
+run, and the exchange journalled. Words of the held line's own, or any part
+not seen said by that face, change nothing. A later narrow still makes it
+the room's. Tests: `memory_scope`'s
+`a_held_line_answering_words_seen_said_is_answered_in_their_scope` and
+`a_line_seen_spoken_is_marked_until_a_narrow`, and
+`second_provider::seen_saying_tests`.
+
 The old request and response shapes remain accepted. `recall` now selects
 by FTS5 rank and still returns the selected raw entries in chronological
 order; it does not return observations. New operations are:
