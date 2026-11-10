@@ -7071,3 +7071,38 @@ fn a_build_without_the_same_voice_check_still_installs() {
         "{said:?}"
     );
 }
+
+/// Who was here reaches a lamp by the Store, not the product's install
+/// (#5751, the first builder's ruling of 9 Nov): the product already runs
+/// what it reads, the room's presence and one function for every skill, and
+/// keeps it to times only, with no "someone the lamp knows" and no names.
+#[test]
+fn the_product_runs_who_was_heres_reads_with_times_only() {
+    let unit = |name: &str| {
+        let text = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1;
+        section(text, "Service")
+    };
+    assert!(
+        unit("lamp-eyes.service").contains(&"Environment=LAMP_PRESENCE=on"),
+        "the eyes lack LAMP_PRESENCE=on"
+    );
+    assert!(
+        unit("lamp-voice.service").contains(&"Environment=LAMP_USE_SKILL=on"),
+        "the voice lacks LAMP_USE_SKILL=on"
+    );
+    for line in unit("lamp-skills.service") {
+        for closed in ["LAMP_WHO_WAS_HERE_KNOWN=", "LAMP_WHO_WAS_HERE_NAMES="] {
+            assert!(!line.contains(&format!("Environment={closed}")), "{line}");
+        }
+    }
+    let why = install::NOT_PRODUCT_SKILLS
+        .iter()
+        .find(|(name, _)| *name == "who-was-here")
+        .unwrap()
+        .1;
+    assert!(why.contains("the Store"), "who-was-here's reason: {why}");
+}
