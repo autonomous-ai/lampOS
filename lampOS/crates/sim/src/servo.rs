@@ -49,6 +49,8 @@ const LOAD_PER_SPEED: f64 = 30.0;
 const AMBIENT: f64 = 28.0;
 const HEAT: f64 = 0.4;
 const COOL: f64 = 1.0 / 120.0;
+/// The longest a single step moves and warms the servos, in seconds.
+const MOST_STEP: f64 = 0.25;
 /// The top acceleration when the register says none, counts a second squared.
 const TOP_ACCEL: f64 = 20_000.0;
 
@@ -205,8 +207,10 @@ impl Servo {
             0
         };
         // It warms with its load and cools toward the room.
-        self.heat +=
-            (f64::from(load) / 1_000.0 * HEAT * 120.0 * COOL - (self.heat - AMBIENT) * COOL) * dt;
+        // Toward where this load settles, exactly (not a step of `COOL * dt`, which
+        // overshoots for a `dt` of 120 s or more).
+        let settles = AMBIENT + f64::from(load) / 1_000.0 * HEAT * 120.0;
+        self.heat += (settles - self.heat) * (1.0 - (-COOL * dt).exp());
         self.regs[reg::TEMPERATURE] = self.heat.round().clamp(0.0, 255.0) as u8;
         self.put(reg::LOAD, &load.to_le_bytes());
         self.last = before;
@@ -246,6 +250,9 @@ impl Bus {
 
     /// `dt` seconds pass.
     pub fn step(&mut self, dt: f64) {
+        // A process that was stopped (a laptop asleep) hands the whole gap over:
+        // the servos move and warm for at most this long, as one tick of a lamp would.
+        let dt = dt.min(MOST_STEP);
         for (servo, slot) in self.servos.iter_mut().zip(self.pose.iter()) {
             servo.step(dt);
             slot.store(servo.position(), std::sync::atomic::Ordering::Relaxed);
@@ -469,5 +476,20 @@ mod tests {
             load(yaw)
         );
         assert!(shoulder.regs[reg::TEMPERATURE] > yaw.regs[reg::TEMPERATURE]);
+    }
+
+    #[test]
+    fn a_long_gap_neither_overshoots_the_heat_nor_throws_the_servo() {
+        // One step of an hour (the exact update) settles at the load's own
+        // temperature and never passes it, however long the gap.
+        let mut servo = Servo::new(1, 2000, 0, 4095);
+        servo.heat = 80.0;
+        servo.step(3_600.0);
+        assert!(servo.heat < 40.0 && servo.heat >= AMBIENT, "{}", servo.heat);
+        // The bus hands a stalled process's gap over in steps no longer than MOST_STEP.
+        let mut bus = Bus::new([2028, 2048, 1946, 2085, 1817], [(0, 4095); 5]);
+        let before = bus.servos[0].position;
+        bus.step(3_600.0);
+        assert!((bus.servos[0].position - before).abs() < 1.0);
     }
 }
