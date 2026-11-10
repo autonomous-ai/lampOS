@@ -1445,7 +1445,13 @@ def test_lamp_ring_lights_the_ring_in_a_computers_own_colours(tmp_path):
             assert not (await session.call_tool("lamp_ring", {"rgb": "#0000ff"})).isError
             asked = fake.asked("light")
             assert asked[0]["pixels"][0] == "#ff0000" and asked[0]["brightness"] == 50 and asked[0]["for_ms"] == 30000
-            assert asked[1]["rgb"] == "#0000ff"
+            assert asked[1]["rgb"] == "#0000ff" and "fade_ms" not in asked[1]
+            # How slowly the ring comes into the light, for either form (the SDK's `fade_ms`).
+            assert not (await session.call_tool("lamp_ring", {"rgb": "#00ff00", "fade_ms": 5_000})).isError
+            assert not (await session.call_tool("lamp_ring", {"pixels": pixels, "fade_ms": 2_000})).isError
+            asked = fake.asked("light")
+            assert asked[2]["rgb"] == "#00ff00" and asked[2]["fade_ms"] == 5_000
+            assert asked[3]["pixels"][0] == "#ff0000" and asked[3]["fade_ms"] == 2_000
             for wrong in ({}, {"rgb": "#0000ff", "pixels": pixels}, {"pixels": pixels[:31]}):
                 assert (await session.call_tool("lamp_ring", wrong)).isError, wrong
 

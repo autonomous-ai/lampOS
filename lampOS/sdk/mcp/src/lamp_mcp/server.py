@@ -581,18 +581,20 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             rgb: str | None = None,
             brightness: int = 100,
             for_ms: int = 10_000,
+            fade_ms: int | None = None,
         ) -> dict:
             """Light the ring in your own colours for at most 30 s: `pixels`, one "#rrggbb" per pixel from
             pixel 0 around the ring (the lamp's count, `ring_pixels` in the answer), or `rgb`, one "#rrggbb"
-            for the whole ring; `brightness` 0 to 100. A turn's face, the privacy marks and the person's own
+            for the whole ring; `brightness` 0 to 100; `fade_ms` how slowly the ring comes into the light
+            (the lamp takes 1000 to 60000). A turn's face, the privacy marks and the person's own
             light stay over it; at night the lamp dims it."""
             if (pixels is None) == (rgb is None):
                 raise ToolError("bad_request: give pixels or rgb, one of them")
             try:
                 if pixels is not None:
-                    await lamp.ring(pixels, for_ms=min(for_ms, 30_000), brightness=brightness)
+                    await lamp.ring(pixels, for_ms=min(for_ms, 30_000), brightness=brightness, fade_ms=fade_ms)
                 else:
-                    await lamp.light_rgb(rgb, for_ms=min(for_ms, 30_000), brightness=brightness)
+                    await lamp.light_rgb(rgb, for_ms=min(for_ms, 30_000), brightness=brightness, fade_ms=fade_ms)
             except LampError as error:
                 raise refused(error) from error
             return {"lit_ms": min(for_ms, 30_000), "ring_pixels": lamp.ring_pixels}
