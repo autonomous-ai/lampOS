@@ -2257,7 +2257,9 @@ kept **unconfirmed**, until its person says yes at the lamp:
   no, look or forget tries again (`photo::Unconfirmeds::let_go`, `expire`).
 - **Its staging copy** `<people>.from-photos.new`: a save writes it, then
   renames it over the file. A write or rename that fails removes it, and one
-  a crash left is removed at the next start (`Unconfirmeds::open`).
+  a crash left is removed at the next start (`Unconfirmeds::open`). One that
+  can't be removed then is tried again on every look, about once a second,
+  whether or not any face from a photo is kept (`expire`).
 - **The product reset** wipes `<people>.from-photos` and
   `<people>.from-photos.new` with `people.json` (`reset-plan-product.json`).
 - **The answers** are the voice's: `photos_off`, `not_a_name`, `unreadable`
