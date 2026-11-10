@@ -2129,15 +2129,15 @@ gone ([switches.md](switches.md)). What happens:
    both, its first two skills were refused for a trigger field and a light
    step the check didn't know. Its answer must be exactly two fenced
    blocks, `skill.toml` and `SKILL.md`, at most 8 KiB each.
-4. **Held to what a made skill may use: the cap lifted** (#6066). The
-   cap came from #1685 (deehw, 20 Oct): voice only, at a time when a
-   computer's agent wrote the skill. It held a made skill to `light`,
-   `body` and a few presence topics, `[ask] policy` only `nudge`, and
-   refused speaking, messages, the look, known faces, actions and every
-   other topic. On #6066 it was lifted by the lead's principle, which the
-   first builder confirmed (19:44, 10 Nov): **a skill a person makes on
-   their own lamp may do whatever the lamp can do.** Sharing it to the
-   Store is where it is reviewed. So `made_skill::capped` now takes:
+4. **Held to what a made skill may use: the cap lifted** (#6066). This was
+   the first builder's cap of 19 Oct, lifted on 10 Nov by #6066 (the first
+   builder's yes, 19:44, and review, 20:14): **a skill a person makes on
+   their own lamp may do whatever the lamp can do**, under four rules
+   (below). The cap held a made skill to `light`, `body` and a few
+   presence topics, `[ask] policy` only `nudge`, and refused speaking,
+   messages, the look, known faces, actions and every other topic.
+   Sharing it to the Store is where it is reviewed. So
+   `made_skill::capped` now takes:
    - `kind` installable, with a version, and no function for the model
      (`tool`): it runs by itself;
    - any `[permissions]` and `[ask]` that `lamp-skills`' own pack check
@@ -2148,20 +2148,72 @@ gone ([switches.md](switches.md)). What happens:
      `reminder` or `news`. A core grant, a write to a service or a step
      its runtime doesn't take is refused by that check, not by the cap.
    - Only #6062's say stays this cap's (below).
-   **What stays**, and only this:
+   **The four rules** (the first builder's review on #6066):
+   - **Manners by default** (`made_skill::mannered`, inside
+     `made_skill::paced`): a made skill that starts itself (a `[trigger]`,
+     no `tool`) is given the built-in nudges' manners by the lamp, never
+     refused for lacking them: `most_a_day = 3`, `[quiet]` 22:00-08:00,
+     `[budget] group = "wellbeing"` with `per_hour = 1`, so it shares the
+     wellbeing nudges' one an hour, and `[rest] after_ignored = 2` (rests
+     till morning after two runs nobody noticed), as `skills/sip-of-water`
+     has them. The model is told to set none of them unless the request
+     asks for more in its own words; whatever it writes is clamped, never
+     refused (Thirteen's and App Only's P2 on #6103): `most_a_day` to 1-6,
+     `[budget]` always `wellbeing` with `per_hour` 1-2 (no other key), and
+     `[rest] after_ignored` to 1-3 (0 or less is 1); `[quiet]` is always
+     22:00-08:00, left out only when the trigger's `during` lies wholly
+     within 08:00-22:00, so an all-day or a night `during` keeps it. The
+     floors of #6062 and #6070 (`made_skill::say_paced`: a say's hour, a
+     face's minute away, a getting up's minute) apply too. Each manner is
+     said back as set: "… It starts on its own, at most 3 times a day, one
+     an hour with the lamp's other nudges, never from 22:00 to 08:00, and
+     rests till morning if ignored twice." (`made_skill::manners_plainly`;
+     one in a shape the lamp couldn't set is unsaid and repaired). A made
+     skill installs into the lamp's skills folder, not the pushed folder,
+     so it may join the group. Tests:
+     `a_self_starting_made_skill_is_given_manners_not_refused`,
+     `a_made_skills_manners_are_clamped_to_their_bounds`,
+     `the_night_stays_quiet_unless_its_window_is_within_the_day`, and
+     `a_made_face_skill_greets_once_through_a_glance_away` (lamp-skills'
+     engine).
+   - **A grant no step uses is dropped** by the lamp, not refused (App
+     Only's P2 on #6103): no step of a made skill sends a message or takes
+     the camera's picture, so `messages`, `camera` and format 1's `look`
+     are taken out of its `[permissions]` before it is checked and packed,
+     and the say-back names only what a step does. An ask to send a
+     message is answered "I can't do that yet: sending a message".
+     `known_faces` or `who` is said as "knowing who is in view"; every
+     linked service a skill reads is kept (`Uses::reads`, a list) and each
+     one not linked is asked for (`made_skill::needs_link`).
+   - **For made skills only:** a skill added from a file
+     (`made_skill::capped_added`) keeps the cap from before #6066: the
+     light, the head, the made-skill topics and its note, nothing more.
+   - **No unattended sends or writes from a trigger:** a step that sends
+     a message or writes to a service, or a write in `services`, stays
+     "I can't do that yet" (below); a send or write never goes around the
+     send gate's read-back.
+   - **The camera and reads stay the owner's:** a look or a service read
+     runs only while the privacy switch is off and for the owner alone,
+     as `lamp-skills` and `lamp-services` already gate them
+     ([services.md](services.md)); a skill never reads one person's
+     memory to another.
+   - **No memory writes:** a made skill has no step that writes the
+     lamp's memory, and none is added.
+
+   **What else stays**, and only this:
    - **The lamp's hardware safety:** the body's bounds, heat and load
      stops, a hand on the head, the volume ceiling. They apply to
      everything on the lamp, below any skill.
    - **Said back before it goes on** (`made_skill::plainly`): when it
-     runs and every step, and the outbound steps and the camera or
-     microphone named in the same sentence: "When someone pats its head,
-     it nods, using the camera.", "…, it nods, and it may send a message
-     to your phone.", "…, listening with the microphone." It checks that
-     the skill matches the ask; it isn't a permission gate.
-   - **The privacy rules:** a linked service's read stays the owner's
-     alone, behind its gate ([services.md](services.md)); a skill never
-     reads one person's memory to another; a send or write goes through
-     the send gate's read-back, never around it.
+     runs and every step, the outbound steps and the camera or microphone
+     named in the same sentence, and that it starts on its own and how
+     often: "When someone pats its head, it nods, knowing who is in view.
+     It starts on its own, at most 3 times a day, …", "…, listening with
+     the microphone." A grant no step uses is dropped first (above), so
+     only what a step does is named. What the lamp
+     says once it is on puts what it uses before that last sentence
+     (`made_skill::on_line`). It checks that the skill matches the ask;
+     it isn't a permission gate.
    - **What the runtime can't do yet** is answered "I can't do that yet:"
      and what, never refused by a rule, and never repaired away
      (`made_skill::CANT_YET`; said as it is, without "I couldn't make

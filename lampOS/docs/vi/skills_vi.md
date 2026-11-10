@@ -60,14 +60,14 @@ sau:
    trigger và từng cử chỉ theo tên; và cách nó nói (dưới đây, #6055, #6062: `speak = true`, cooldown từ một giờ trở lên, và một `say = { text = "Welcome back!" }` đúng nguyên văn, bằng ngôn ngữ người dùng đã hỏi). Câu trả lời phải đúng hai khối có rào,
    `skill.toml` và `SKILL.md`, mỗi khối tối đa 8 KiB.
 4. **Giới hạn những gì kỹ năng tạo ra được dùng: đã bỏ giới hạn** (#6066).
-   Giới hạn này có từ #1685 (deehw, 20/10): chỉ qua giọng nói, vào lúc
-   agent của máy tính viết kỹ năng. Nó giữ kỹ năng tạo ra ở `light`,
-   `body` và vài chủ đề hiện diện, `[ask] policy` chỉ `nudge`, và từ chối
-   nói, tin nhắn, cái nhìn, khuôn mặt quen, hành động và mọi chủ đề khác.
-   Trên #6066 giới hạn được bỏ theo nguyên tắc của trưởng nhóm, người xây
-   dựng đầu tiên xác nhận (19:44, 10/11): **kỹ năng một người tạo trên đèn
-   của chính họ được làm bất cứ gì đèn làm được.** Chia sẻ lên Store là nơi
-   nó được duyệt. Vì vậy `made_skill::capped` nay nhận:
+   Đây là giới hạn của người xây dựng đầu tiên ngày 19/10, được bỏ ngày
+   10/11 bởi #6066 (người xây dựng đầu tiên đồng ý lúc 19:44 và duyệt lúc
+   20:14): **kỹ năng một người tạo trên đèn của chính họ được làm bất cứ gì
+   đèn làm được**, theo bốn quy tắc (dưới đây). Giới hạn đó giữ kỹ năng tạo
+   ra ở `light`, `body` và vài chủ đề hiện diện, `[ask] policy` chỉ
+   `nudge`, và từ chối nói, tin nhắn, cái nhìn, khuôn mặt quen, hành động và
+   mọi chủ đề khác. Chia sẻ lên Store là nơi nó được duyệt. Vì vậy
+   `made_skill::capped` nay nhận:
    - `kind` là installable, có phiên bản, và không có hàm cho mô hình
      (`tool`): nó tự chạy;
    - mọi `[permissions]` và `[ask]` mà bước kiểm tra đóng gói của chính
@@ -78,20 +78,71 @@ sau:
      hay `news`. Quyền lõi, việc ghi vào dịch vụ hay bước mà runtime không
      nhận bị bước kiểm tra đó từ chối, không phải giới hạn này.
    - Chỉ quy tắc `say` của #6062 còn là của giới hạn này (dưới đây).
-   **Những gì còn giữ**, và chỉ những điều này:
+   **Bốn quy tắc** (người xây dựng đầu tiên duyệt trên #6066):
+   - **Mặc định có chừng mực** (`made_skill::mannered`, trong
+     `made_skill::paced`): kỹ năng tạo ra tự khởi động (có `[trigger]`,
+     không có `tool`) được đèn gán chừng mực của các lời nhắc có sẵn, không
+     bao giờ bị từ chối vì thiếu chúng: `most_a_day = 3`, `[quiet]`
+     22:00-08:00, `[budget] group = "wellbeing"` với `per_hour = 1`, nên nó
+     chia chung một lần mỗi giờ với các lời nhắc wellbeing, và
+     `[rest] after_ignored = 2` (nghỉ đến sáng sau hai lần chạy không ai để
+     ý), như `skills/sip-of-water`. Mô hình được dặn không đặt cái nào trong
+     số đó trừ khi yêu cầu tự nói muốn nhiều hơn; cái nó viết bị kẹp vào
+     giới hạn, không bao giờ bị từ chối (P2 của Thirteen và App Only trên
+     #6103): `most_a_day` vào 1-6, `[budget]` luôn là `wellbeing` với
+     `per_hour` 1-2 (không khóa nào khác), và `[rest] after_ignored` vào
+     1-3 (0 hay âm thành 1); `[quiet]` luôn là 22:00-08:00, chỉ bỏ khi
+     `during` của trigger nằm trọn trong 08:00-22:00, nên `during` cả ngày
+     hay ban đêm vẫn giữ nó. Các mức sàn của #6062 và #6070
+     (`made_skill::say_paced`: một giờ cho câu nói, một phút vắng mặt cho
+     khuôn mặt, một phút cho việc đứng dậy) cũng áp dụng. Mỗi cái được nói
+     lại đúng như đã đặt: "… It starts on its own, at most 3 times a day,
+     one an hour with the lamp's other nudges, never from 22:00 to 08:00,
+     and rests till morning if ignored twice."
+     (`made_skill::manners_plainly`; cái ở dạng đèn không đặt được thì không
+     nói được và được sửa). Kỹ năng tạo ra được cài vào thư mục kỹ năng của
+     đèn, không phải thư mục pushed, nên được vào nhóm. Kiểm thử:
+     `a_self_starting_made_skill_is_given_manners_not_refused`,
+     `a_made_skills_manners_are_clamped_to_their_bounds`,
+     `the_night_stays_quiet_unless_its_window_is_within_the_day`, và
+     `a_made_face_skill_greets_once_through_a_glance_away` (engine của
+     lamp-skills).
+   - **Quyền không bước nào dùng bị đèn bỏ đi**, không bị từ chối (P2 của
+     App Only trên #6103): không bước nào của kỹ năng tạo ra gửi tin nhắn
+     hay lấy ảnh camera, nên `messages`, `camera` và `look` của format 1
+     được bỏ khỏi `[permissions]` trước khi kiểm tra và đóng gói, và câu
+     nói lại chỉ nêu điều một bước làm. Yêu cầu gửi tin nhắn được trả lời
+     "I can't do that yet: sending a message". `known_faces` hay `who` được
+     nói là "knowing who is in view"; mọi dịch vụ liên kết kỹ năng đọc đều
+     được giữ (`Uses::reads`, một danh sách) và mỗi dịch vụ chưa liên kết
+     đều được hỏi (`made_skill::needs_link`).
+   - **Chỉ cho kỹ năng tạo ra:** kỹ năng thêm từ tệp
+     (`made_skill::capped_added`) giữ giới hạn trước #6066: đèn, đầu, các
+     chủ đề của kỹ năng tạo ra và ghi chú của nó, không gì hơn.
+   - **Không gửi hay ghi khi không có người từ một trigger:** bước gửi tin
+     nhắn hay ghi vào dịch vụ, hoặc việc ghi trong `services`, vẫn là "I
+     can't do that yet" (dưới đây); việc gửi hay ghi không bao giờ vòng qua
+     bước đọc lại của cổng gửi.
+   - **Camera và việc đọc vẫn là của chủ đèn:** cái nhìn hay việc đọc dịch
+     vụ chỉ chạy khi công tắc riêng tư tắt và chỉ cho chủ đèn, như
+     `lamp-skills` và `lamp-services` đã chặn ([services.md](../services.md));
+     kỹ năng không bao giờ đọc ký ức của người này cho người khác.
+   - **Không ghi ký ức:** kỹ năng tạo ra không có bước nào ghi vào ký ức
+     của đèn, và không thêm bước nào như vậy.
+
+   **Những gì khác còn giữ**, và chỉ những điều này:
    - **An toàn phần cứng của đèn:** giới hạn của thân, ngắt khi nóng và
      quá tải, tay đặt trên đầu, mức âm lượng tối đa. Chúng áp dụng cho mọi
      thứ trên đèn, bên dưới mọi kỹ năng.
    - **Nói lại trước khi bật** (`made_skill::plainly`): khi nào chạy và mọi
-     bước, cùng các bước gửi ra ngoài và việc dùng camera hay micro được nêu
-     trong cùng câu: "When someone pats its head, it nods, using the
-     camera.", "…, it nods, and it may send a message to your phone.",
-     "…, listening with the microphone." Nó kiểm tra kỹ năng khớp với yêu
-     cầu; đây không phải cổng cấp quyền.
-   - **Các quy tắc riêng tư:** việc đọc một dịch vụ liên kết vẫn chỉ dành
-     cho chủ đèn, sau cổng của nó ([services.md](../services.md)); kỹ năng
-     không bao giờ đọc ký ức của người này cho người khác; việc gửi hay ghi
-     đi qua bước đọc lại của cổng gửi, không bao giờ vòng qua nó.
+     bước, các bước gửi ra ngoài và việc dùng camera hay micro được nêu
+     trong cùng câu, và việc nó tự khởi động cùng tần suất: "When someone
+     pats its head, it nods, knowing who is in view. It starts on its own,
+     at most 3 times a day, …", "…, listening with the microphone." Quyền
+     không bước nào dùng bị bỏ trước (ở trên), nên chỉ điều một bước làm
+     được nêu. Câu đèn nói khi bật đặt những gì nó
+     dùng trước câu cuối đó (`made_skill::on_line`). Nó kiểm tra kỹ năng
+     khớp với yêu cầu; đây không phải cổng cấp quyền.
    - **Điều runtime chưa làm được** được trả lời "I can't do that yet:" và
      điều đó, không bao giờ bị từ chối vì một quy tắc, và không bị sửa mất
      (`made_skill::CANT_YET`; nói nguyên như vậy, không có "I couldn't make
