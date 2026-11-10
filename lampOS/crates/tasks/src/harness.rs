@@ -90,6 +90,9 @@ const ENVIRONMENT: &[&str] = &[
     // The update hold (`LAMP_HARNESS_HOLD_UPDATES`, crate::hold, #5229).
     crate::hold::DISABLE,
     crate::hold::ENV_FILE,
+    // Where Harness finds the lamp's own Hermes' sessions
+    // (`LAMP_HERMES_ON_LAMP`, crate::hold::HERMES_HOME, #5978).
+    crate::hold::HERMES_HOME,
 ];
 
 /// The agents a target may name. `opencode` since Harness 0.4.2 names it
@@ -206,6 +209,17 @@ pub enum LaunchOutcome {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         session: Option<JoinedSession>,
     },
+    /// `LAMP_HERMES_ON_LAMP` (#5978): as [`Self::Joined`], into a session
+    /// the person named that was found on another machine than the
+    /// launch's own: a hand-over to the lamp's own target looks among the
+    /// computers' sessions too ([`SessionMachines`]). The task is followed
+    /// there ([`JoinedOn`]).
+    JoinedOn {
+        agent_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        session: Option<JoinedSession>,
+        on: JoinedOn,
+    },
     Pending {
         creation_id: String,
     },
@@ -215,6 +229,51 @@ pub enum LaunchOutcome {
     Uncertain {
         code: String,
     },
+}
+
+/// The machine a named session was found on, when it is not the launch's
+/// own (#5978): its target's alias, its machine, and the engine that
+/// target names. The task is shown, watched and closed there, and told as
+/// that machine's.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct JoinedOn {
+    pub alias: String,
+    pub machine_id: String,
+    pub engine: EngineKind,
+}
+
+/// The machines a named hand-over to the lamp's own target looks among
+/// for the session (#5978, `LAMP_HERMES_ON_LAMP`): the lamp's own first,
+/// then each computer target's, by alias, with its engine. Kept by
+/// lamp-tasks from its targets as it reads them.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SessionMachines {
+    pub lamp: Option<String>,
+    pub computers: Vec<(String, String, EngineKind)>,
+}
+
+impl SessionMachines {
+    /// From the targets: the lamp's own ([`crate::runtime::LAMP_TARGET`],
+    /// Hermes) and every other on a computer (not a cloud agent), each
+    /// machine once.
+    pub fn from_targets(targets: &BTreeMap<String, Target>) -> Self {
+        let lamp = targets
+            .get(crate::runtime::LAMP_TARGET)
+            .filter(|target| target.engine == EngineKind::Hermes)
+            .map(|target| target.machine_id.clone());
+        let mut computers: Vec<(String, String, EngineKind)> = Vec::new();
+        for (alias, target) in targets {
+            if Some(&target.machine_id) == lamp.as_ref()
+                || target.engine.cloud()
+                || computers.iter().any(|(_, id, _)| *id == target.machine_id)
+            {
+                continue;
+            }
+            computers.push((alias.clone(), target.machine_id.clone(), target.engine));
+        }
+        Self { lamp, computers }
+    }
 }
 
 /// The person's own session a named hand-over was typed into, as they
@@ -595,6 +654,10 @@ pub struct CliConfig {
     /// Each Harness call's journal line ([`call_line`]) is also kept here,
     /// for a test to read; it always goes to stderr, the unit's journal.
     pub calls: Option<Arc<Mutex<Vec<String>>>>,
+    /// `LAMP_HERMES_ON_LAMP` (#5978): the machines a named hand-over to the
+    /// lamp's own target looks among ([`SessionMachines`]). `None`: only
+    /// the launch's own machine, as before.
+    pub session_machines: Option<Arc<Mutex<SessionMachines>>>,
     /// After each `harness start` that succeeded, Harness's `/api/health`
     /// is asked, with no credential, in a thread of its own, and one line
     /// journaled ([`crate::hold::watch_health`], #5229). Set with the update
@@ -663,6 +726,7 @@ impl CliConfig {
             new_folder_only: None,
             journal: None,
             calls: None,
+            session_machines: None,
             health_after_start: false,
         }
     }
@@ -1136,37 +1200,85 @@ impl Cli {
         let not_sent = |code: &str| LaunchOutcome::NotSent { code: code.into() };
         let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
         let began = Instant::now();
-        let listed = self.run(
-            &[
-                "ps".into(),
-                "--machine".into(),
-                launch.target.machine_id.clone().into(),
-                "--all".into(),
-                "--json".into(),
-            ],
-            // The launch's own bound, not the 10 s read bound: on
-            // lamp-c0a4 on 9 Nov, `ps --all` of the person's Mac took 4.5 to
-            // 10 s, and two hand-overs a person had said yes to twice ran
-            // out at 10 s (`sessions_timeout`). The reply below gets what is
-            // left of the same bound.
-            self.config.launch_timeout,
-        );
-        seen.took(&listed);
-        let (agent_id, joined) = match listed {
-            Ok(reply) if reply.success => match named_session(&reply.stdout, session) {
-                Named::Idle(agent_id, joined) => (agent_id, joined),
-                Named::Refused(code) => {
-                    eprintln!(
-                        "tasks: {}: the named session: {code}, not sent",
-                        launch.name
-                    );
-                    return not_sent(code);
+        // The machines looked among: the launch's own, and with the lamp's
+        // own target (#5978) each computer's too.
+        let mut machines: Vec<(String, Option<JoinedOn>)> =
+            vec![(launch.target.machine_id.clone(), None)];
+        if let Some(shared) = &self.config.session_machines
+            && let Ok(known) = shared.lock()
+            && launch.target.engine == EngineKind::Hermes
+            && known.lamp.as_ref() == Some(&launch.target.machine_id)
+        {
+            for (alias, machine_id, engine) in &known.computers {
+                machines.push((
+                    machine_id.clone(),
+                    Some(JoinedOn {
+                        alias: alias.clone(),
+                        machine_id: machine_id.clone(),
+                        engine: *engine,
+                    }),
+                ));
+            }
+        }
+        let mut found: Vec<(Named, Option<JoinedOn>)> = Vec::new();
+        let mut unread: Option<String> = None;
+        for (machine_id, on) in machines {
+            let left = self.config.launch_timeout.saturating_sub(began.elapsed());
+            // Another machine's list may not take the reply's own floor.
+            if on.is_some() && left < REPLY_FLOOR * 2 {
+                unread.get_or_insert("sessions_timeout".to_owned());
+                continue;
+            }
+            let listed = self.run(
+                &[
+                    "ps".into(),
+                    "--machine".into(),
+                    machine_id.into(),
+                    "--all".into(),
+                    "--json".into(),
+                ],
+                // The launch's own bound, not the 10 s read bound: on
+                // lamp-c0a4 on 9 Nov, `ps --all` of the person's Mac took 4.5 to
+                // 10 s, and two hand-overs a person had said yes to twice ran
+                // out at 10 s (`sessions_timeout`). The reply below gets what is
+                // left of the same bound, and each other machine what is left.
+                left,
+            );
+            seen.took(&listed);
+            let code = match listed {
+                Ok(reply) if reply.success => {
+                    found.push((named_session(&reply.stdout, session), on));
+                    continue;
                 }
-            },
-            Ok(_) => return not_sent("sessions_failed"),
-            Err(error) if error.code == "cancelled" => return not_sent("cancelled"),
-            Err(error) => return not_sent(&format!("sessions_{}", error.code)),
+                Ok(_) => "sessions_failed".to_owned(),
+                Err(error) if error.code == "cancelled" => return not_sent("cancelled"),
+                Err(error) => format!("sessions_{}", error.code),
+            };
+            // The launch's own machine unread: nothing typed, as before.
+            if on.is_none() {
+                return not_sent(&code);
+            }
+            unread.get_or_insert(code);
+        }
+        let (agent_id, joined, on) = match chosen_session(found) {
+            Ok((Named::Idle(agent_id, joined), on)) => (agent_id, joined, on),
+            Ok((Named::Refused(code), _)) | Err(code) => {
+                // Nowhere fits while a computer couldn't be read: said as
+                // that, not as no such session.
+                let code = match unread.as_deref() {
+                    Some(unread) if code == "session_not_found" => unread.to_owned(),
+                    _ => code.to_owned(),
+                };
+                eprintln!(
+                    "tasks: {}: the named session: {code}, not sent",
+                    launch.name
+                );
+                return not_sent(&code);
+            }
         };
+        let machine_id = on
+            .as_ref()
+            .map_or(launch.target.machine_id.clone(), |on| on.machine_id.clone());
         let left = self.config.launch_timeout.saturating_sub(began.elapsed());
         // A list that took nearly the whole bound leaves the reply no time
         // to answer, and a reply cut short may have typed: under
@@ -1179,7 +1291,7 @@ impl Cli {
             &[
                 "reply".into(),
                 "--machine".into(),
-                launch.target.machine_id.clone().into(),
+                machine_id.into(),
                 agent_id.clone().into(),
                 "--json".into(),
                 "--".into(),
@@ -1192,12 +1304,20 @@ impl Cli {
         match reply {
             Ok(reply) if reply.success && replied(&reply.stdout, &agent_id) => {
                 eprintln!(
-                    "tasks: {}: typed into the named session, in {ms} ms",
-                    launch.name
+                    "tasks: {}: typed into the named session{}, in {ms} ms",
+                    launch.name,
+                    if on.is_some() { " on a computer" } else { "" }
                 );
-                LaunchOutcome::Joined {
-                    agent_id,
-                    session: joined,
+                match on {
+                    Some(on) => LaunchOutcome::JoinedOn {
+                        agent_id,
+                        session: joined,
+                        on,
+                    },
+                    None => LaunchOutcome::Joined {
+                        agent_id,
+                        session: joined,
+                    },
                 }
             }
             // Taken by Harness, and an answer that can't say for this
@@ -2659,6 +2779,7 @@ fn dispatch_line(launch: &Launch, outcome: &LaunchOutcome, seen: &Seen, took: Du
     let state = match outcome {
         LaunchOutcome::Created { .. } => "accepted".to_owned(),
         LaunchOutcome::Joined { .. } => "joined".to_owned(),
+        LaunchOutcome::JoinedOn { .. } => "joined on another machine".to_owned(),
         LaunchOutcome::Pending { .. } => "pending".to_owned(),
         LaunchOutcome::NotSent { code } => format!("not_sent {code}"),
         LaunchOutcome::Uncertain { code } => format!("uncertain {code}"),
@@ -3401,6 +3522,32 @@ fn named_session(bytes: &[u8], session: &str) -> Named {
             _ => Named::Refused("sessions_failed"),
         },
         _ => Named::Refused("session_ambiguous"),
+    }
+}
+
+/// Which machine's session a named hand-over goes into (#5978), from what
+/// each machine's list said, the launch's own first (`None`): a fit there
+/// (anything but `session_not_found`) is the answer, so a session on the
+/// lamp wins over one on a computer, and the lamp's own rules (stopped,
+/// busy, a live and a stopped one by their work) hold there. Else one
+/// computer with a fit is its answer, and more than one is
+/// `session_ambiguous`, never guessed. None anywhere: `session_not_found`.
+fn chosen_session(
+    found: Vec<(Named, Option<JoinedOn>)>,
+) -> Result<(Named, Option<JoinedOn>), &'static str> {
+    let fits = |named: &Named| *named != Named::Refused("session_not_found");
+    let mut found = found.into_iter();
+    match found.next() {
+        Some(own) if fits(&own.0) => return Ok(own),
+        Some(_) => {}
+        None => return Err("session_not_found"),
+    }
+    let mut elsewhere: Vec<(Named, Option<JoinedOn>)> =
+        found.filter(|(named, _)| fits(named)).collect();
+    match elsewhere.len() {
+        0 => Err("session_not_found"),
+        1 => Ok(elsewhere.remove(0)),
+        _ => Err("session_ambiguous"),
     }
 }
 

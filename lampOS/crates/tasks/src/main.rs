@@ -212,9 +212,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             every: SET_UP_LOOK_EVERY,
             from_machines,
             engines: engines_from_machines,
+            // The work folder is under `lampos`'s (Harness's) home.
             lamp: hermes_on_lamp
                 .then(|| std::env::var_os("HOME").map(PathBuf::from))
-                .flatten(),
+                .flatten()
+                .map(lamp_tasks::runtime::LampSide::new),
         }),
         sign_in_by_code,
         app_socket,

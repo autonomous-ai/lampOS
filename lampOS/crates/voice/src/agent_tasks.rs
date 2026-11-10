@@ -384,6 +384,38 @@ pub(crate) const LAMP_TARGET: &str = "lamp";
 /// Whether the tasks part last said it has the lamp's own target.
 static LAMP_THERE: AtomicBool = AtomicBool::new(false);
 
+/// Whether the tasks part has the lamp's own target now: as last read; a
+/// test sets its own, on its own thread.
+fn lamp_there() -> bool {
+    #[cfg(test)]
+    if let Some(there) = tests::LAMP_THERE_HERE.with(std::cell::Cell::get) {
+        return there;
+    }
+    LAMP_THERE.load(Ordering::Relaxed)
+}
+
+/// Whether a hand-over goes to the lamp's own Hermes (#5978): `where`
+/// `"lamp"`, or, while the lamp has its target, anything but `where`
+/// `"computer"` or an agent named (`who`), which go to a computer as
+/// before. Without the lamp's target, only `where` `"lamp"`, which the
+/// tasks part then refuses as no such target.
+fn on_the_lamp_now(args: &Value, there: bool) -> bool {
+    let said = |key: &str| {
+        args.get(key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|said| !said.is_empty())
+    };
+    match said("where") {
+        Some(LAMP_TARGET) => true,
+        Some(_) => false,
+        None => there && said("who").is_none(),
+    }
+}
+
+/// `start_agent_task`'s `where` while the lamp has its own target (#5978).
+const WHERE: &str = "Where the work is done. Hand over work that takes longer than a quick answer: writing code or files, research across pages, a job of several steps. Leave it out and it goes into an earlier session of theirs that fits by its name or its work, the lamp's own first, else to a new one here on the lamp, done by the lamp's own Hermes. \"computer\" only when they name their computer (\"on my computer\", \"on the Mac\"): then it goes there, as when they name an agent on it. \"lamp\" when they say \"on the lamp\" or \"do it yourself\". The task is said back and starts on their yes, as always.";
+
 /// Whether the targets answer has the lamp's own target, Hermes.
 fn lamp_in(answer: &Value) -> bool {
     answer.get("ok") == Some(&json!(true))
@@ -408,7 +440,7 @@ static READING: OnceLock<()> = OnceLock::new();
 /// The functions a session is told of: with [`WHO_FLAG`], for the staff as
 /// last read.
 pub fn tools(place: &Place) -> Vec<Tool> {
-    declared_on(place, &staff_now(place), LAMP_THERE.load(Ordering::Relaxed))
+    declared_on(place, &staff_now(place), lamp_there())
 }
 
 fn staff_now(place: &Place) -> Vec<Member> {
@@ -671,6 +703,8 @@ const TASK_COMPLETE: &str =
 const TASK_SHORT: &str =
     "The work, in the person's own words. A short ask is enough: the agent works out the details.";
 
+/// The tools as declared without the lamp's own target, as tests compare.
+#[cfg(test)]
 fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
     declared_on(place, staff, false)
 }
@@ -801,8 +835,8 @@ fn declared_on(place: &Place, staff: &[Member], lamp: bool) -> Vec<Tool> {
     if lamp {
         start_parameters["properties"]["where"] = json!({
             "type": "string",
-            "enum": [LAMP_TARGET],
-            "description": "\"lamp\" only if the person asks for the work to be done here on the lamp itself (\"on the lamp\", \"do it yourself\"). Leave it out otherwise: their computer does it."
+            "enum": [LAMP_TARGET, "computer"],
+            "description": WHERE
         });
     }
     let mut tools = vec![
@@ -2503,8 +2537,10 @@ fn run_for(
                 .map_or((place.target.as_str(), CLAUDE_CODE), |member| {
                     (member.alias.as_str(), member.kind.name)
                 });
-            // Asked for on the lamp itself (#5978): Hermes there.
-            if call.args.get("where").and_then(Value::as_str) == Some(LAMP_TARGET) {
+            // The lamp's own Hermes (#5978): asked for on the lamp, or by
+            // default while the tasks part has it, unless the person named
+            // their computer or an agent on it.
+            if on_the_lamp_now(&call.args, lamp_there()) {
                 (target, who) = (LAMP_TARGET, HERMES);
             }
             // Devin's cloud has no sessions of the person's to name (the
@@ -2580,15 +2616,6 @@ fn run_for(
                     Missing::Unread => {}
                 }
             }
-            // No computer there: the tasks part prepared it on the lamp
-            // itself, and says so (#5978).
-            if prepared
-                .as_ref()
-                .is_some_and(|answer| answer.get("target") == Some(&json!(LAMP_TARGET)))
-            {
-                sent_to = LAMP_TARGET.to_owned();
-                who = HERMES;
-            }
             match prepared {
                 Some(answer) if answer.get("ok") == Some(&json!(true)) => {
                     let (Some(id), Some(digest)) = (
@@ -2647,6 +2674,12 @@ fn run_for(
                     });
                     let place_said = if cloud {
                         format!("{who}, in Devin's cloud")
+                    } else if let Some(session) = session.filter(|_| sent_to == LAMP_TARGET) {
+                        // Looked for on the lamp first, then the computers
+                        // (#5978): where it is found is said once it is.
+                        format!(
+                            "the session \"{session}\", on the lamp or, found only there, on their computer, not a new one"
+                        )
                     } else if let Some(session) = session {
                         // The read-back says who, and where it goes (#5535).
                         format!(
@@ -3242,6 +3275,12 @@ fn nonce() -> u128 {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    std::thread_local! {
+        /// Whether the tasks part has the lamp's own target, for a test on
+        /// this thread only ([`super::lamp_there`], #5978).
+        pub(crate) static LAMP_THERE_HERE: std::cell::Cell<Option<bool>> =
+            const { std::cell::Cell::new(None) };
+    }
     /// A last step or an ask never brings a folder or a username to the
     /// model (the reviewer-lead's P2 on #5118).
     #[test]
@@ -8473,12 +8512,14 @@ pub(crate) mod tests {
 
     /// #5978: the lamp's own target (`lamp`, Hermes) is never one of the
     /// staff, and `start_agent_task` offers `where` only while the tasks
-    /// part has it. Asked for on the lamp, the work is prepared there; with
-    /// no computer there, the tasks part prepares it on the lamp and the
-    /// model is told so; asked for on a lamp with no target of its own,
-    /// nothing goes to a computer instead.
+    /// part has it, saying long work is handed over, an earlier session
+    /// first, else a new one on the lamp unless they name their computer.
+    /// With it, a hand-over naming nothing goes to the lamp; `where`
+    /// `"computer"` or an agent named goes to the computer as before.
+    /// Without it, nothing changes, and one asked for on the lamp is said
+    /// not set up, never handed to a computer instead.
     #[test]
-    fn work_goes_to_the_lamp_itself_only_when_asked_or_told_so() {
+    fn new_work_goes_to_the_lamp_unless_a_computer_is_named() {
         let _one = ONE_AT_A_TIME
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -8498,35 +8539,54 @@ pub(crate) mod tests {
                 .into_iter()
                 .find(|tool| tool.name == START)
                 .unwrap()
-                .parameters
-                .unwrap()
         };
-        assert_eq!(start(false)["properties"].get("where"), None);
-        assert_eq!(start(true)["properties"]["where"]["enum"], json!(["lamp"]));
         assert_eq!(
-            declared(&off, &[]),
-            declared_on(&off, &[], false),
-            "off: as before"
+            start(false).parameters.unwrap()["properties"].get("where"),
+            None
         );
+        let on = start(true);
+        assert!(on.validate().is_ok());
+        let said = on.parameters.unwrap()["properties"]["where"].clone();
+        assert_eq!(said["enum"], json!(["lamp", "computer"]));
+        assert_eq!(said["description"], WHERE);
+        for words in [
+            "longer than a quick answer",
+            "writing code or files, research across pages, a job of several steps",
+            "an earlier session of theirs that fits by its name or its work, the lamp's own first",
+            "a new one here on the lamp, done by the lamp's own Hermes",
+            "\"computer\" only when they name their computer",
+            "\"on the lamp\" or \"do it yourself\"",
+            "starts on their yes",
+        ] {
+            assert!(WHERE.contains(words), "{words}");
+        }
+        assert_eq!(declared(&off, &[]), declared_on(&off, &[], false));
+        for (args, there, lamp) in [
+            (json!({}), true, true),
+            (json!({"where":"lamp"}), true, true),
+            (json!({"where":"computer"}), true, false),
+            (json!({"who":"Codex"}), true, false),
+            (json!({}), false, false),
+            (json!({"where":"lamp"}), false, true),
+        ] {
+            assert_eq!(on_the_lamp_now(&args, there), lamp, "{args} {there}");
+        }
 
         let directory = std::env::temp_dir().join(format!("agent-lamp-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).unwrap();
         let status =
             json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let prepared = json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1});
         let seen = tasks_part(
             &directory,
             vec![
                 ("request.sock", status.clone()),
-                (
-                    "request.sock",
-                    json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1}),
-                ),
+                ("request.sock", prepared.clone()),
                 ("request.sock", status.clone()),
-                (
-                    "request.sock",
-                    json!({"ok":true,"id":8,"prepared_digest":"abd","revision":1,"target":"lamp"}),
-                ),
+                ("request.sock", prepared.clone()),
+                ("request.sock", status.clone()),
+                ("request.sock", prepared),
                 ("request.sock", status),
                 ("request.sock", json!({"ok":false,"error":"target"})),
             ],
@@ -8537,39 +8597,40 @@ pub(crate) mod tests {
             name: START.into(),
             args,
         };
-        let asked = run(
-            &at,
-            &call(json!({"task":"Write a poem","where":"lamp"})),
-            3,
-            true,
-            PEER_WAIT,
-        )
-        .0;
-        assert_eq!(asked["where"], "Hermes on the lamp", "{asked}");
-        let instead = run(
-            &at,
-            &call(json!({"task":"Write a poem"})),
-            4,
-            true,
-            PEER_WAIT,
-        )
-        .0;
-        assert_eq!(instead["where"], "Hermes on the lamp", "{instead}");
-        let none = run(
-            &at,
-            &call(json!({"task":"Write a poem","where":"lamp"})),
-            5,
-            true,
-            PEER_WAIT,
-        )
-        .0;
+        let run_with = |there: bool, args: Value, request: u64| {
+            LAMP_THERE_HERE.with(|here| here.set(Some(there)));
+            let told = run(&at, &call(args), request, true, PEER_WAIT).0;
+            LAMP_THERE_HERE.with(|here| here.set(None));
+            told
+        };
+        let lamp = run_with(true, json!({"task":"Write a poem"}), 3);
+        assert_eq!(lamp["where"], "Hermes on the lamp", "{lamp}");
+        let computer = run_with(true, json!({"task":"Write a poem","where":"computer"}), 4);
+        assert_eq!(
+            computer["where"], "Claude Code on the office computer",
+            "{computer}"
+        );
+        let before = run_with(false, json!({"task":"Write a poem"}), 5);
+        assert_eq!(
+            before["where"], "Claude Code on the office computer",
+            "{before}"
+        );
+        let none = run_with(false, json!({"task":"Write a poem","where":"lamp"}), 6);
         assert_eq!(none, json!({"error": LAMP_NOT_SET_UP}));
-        let targets: Vec<Value> = (0..6)
+        let targets: Vec<Value> = (0..8)
             .map(|_| seen.recv_timeout(PEER_WAIT).unwrap())
             .filter(|line| line["op"] == "prepare")
             .map(|line| line["target"].clone())
             .collect();
-        assert_eq!(targets, [json!("lamp"), json!("office"), json!("lamp")]);
+        assert_eq!(
+            targets,
+            [
+                json!("lamp"),
+                json!("office"),
+                json!("office"),
+                json!("lamp")
+            ]
+        );
         *PENDING.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
     }

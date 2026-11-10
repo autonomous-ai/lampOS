@@ -2,7 +2,8 @@
 //! module. Transcript observations and qualified speech receipts are separate.
 use crate::{
     harness::{
-        Closed, EngineKind, JoinedSession, Launch, LaunchOutcome, Observation, Target, prompt_fits,
+        Closed, EngineKind, JoinedOn, JoinedSession, Launch, LaunchOutcome, Observation, Target,
+        prompt_fits,
     },
     protocol::{MAX_PAGE_SIZE, MAX_REPLY_BYTES, Request},
     store::{MAX_STATE_BYTES, Store},
@@ -93,7 +94,12 @@ fn persistence_kept<P: Persistence>(persistence: &P) -> Option<String> {
 /// 5: a task's launch may name the session the person asked for (#5535,
 /// `serve --reply-named`). Only a state holding such a task is written as
 /// 5, by the same rule.
-const SCHEMA: u32 = 5;
+///
+/// 6: a task's dispatch may name another machine than its launch's, the
+/// one its named session was found on (`joined_on`, #5978): a build before
+/// would follow it on the wrong machine. Only a state holding such a task
+/// is written as 6, by the same rule.
+const SCHEMA: u32 = 6;
 /// The oldest `schema` this build reads and writes: a state with no Devin
 /// task.
 const OLDEST_SCHEMA: u32 = 1;
@@ -223,6 +229,10 @@ struct Dispatch {
     /// 71bf964baa). Absent otherwise; a store without it reads as before.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     joined: Option<JoinedSession>,
+    /// The machine that session was found on, when not the launch's own
+    /// (#5978, [`JoinedOn`]): the task is followed and told there.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    joined_on: Option<JoinedOn>,
 }
 impl Dispatch {
     fn prepared() -> Self {
@@ -235,8 +245,36 @@ impl Dispatch {
             creation_id: None,
             code: None,
             joined: None,
+            joined_on: None,
         }
     }
+}
+
+/// The machine a task is followed on: the one its named session was found
+/// on (#5978), else its launch's.
+fn machine_of(task: &Task) -> &str {
+    task.dispatch
+        .joined_on
+        .as_ref()
+        .map_or(&task.launch.target.machine_id, |on| &on.machine_id)
+}
+
+/// The engine a task is told as: its joined machine's target's (#5978),
+/// else its launch's.
+fn engine_of(task: &Task) -> EngineKind {
+    task.dispatch
+        .joined_on
+        .as_ref()
+        .map_or(task.launch.target.engine, |on| on.engine)
+}
+
+/// The alias a task is told by: its joined machine's target's (#5978),
+/// else the one it was prepared for.
+fn alias_of(task: &Task) -> &str {
+    task.dispatch
+        .joined_on
+        .as_ref()
+        .map_or(&task.target_alias, |on| &on.alias)
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -705,6 +743,9 @@ impl State {
         self.tasks
             .iter()
             .map(|task| {
+                if task.dispatch.joined_on.is_some() {
+                    return 6;
+                }
                 if task.launch.session.is_some() {
                     return 5;
                 }
@@ -1131,9 +1172,6 @@ pub struct Engine<P: Persistence> {
     /// a `prepare` it refuses is refused at once. Empty without the
     /// switch, and then nothing is refused from it.
     readiness: BTreeMap<String, crate::readiness::Computer>,
-    /// `LAMP_HERMES_ON_LAMP` (#5978): the lamp's own target may be used
-    /// ([`Engine::lamp_on`]).
-    lamp: bool,
     state: State,
     last_clock: Clock,
     failed: bool,
@@ -1153,38 +1191,10 @@ impl<P: Persistence> Engine<P> {
         self.close_told = on;
     }
 
-    /// `LAMP_HERMES_ON_LAMP` (#5978): with it, a `prepare` for a computer
-    /// goes to the lamp's own target ([`crate::runtime::LAMP_TARGET`],
-    /// Hermes) only when there is one and every computer target is known
-    /// offline, or there is none; one asking for the lamp by its alias goes
-    /// there. Computers come first: one not known offline is never passed
-    /// over. Off: as before.
-    pub fn lamp_on(&mut self, on: bool) {
-        self.lamp = on;
-    }
-
-    /// The target a `prepare` asking for `asked` goes to ([`Self::lamp_on`]).
-    fn target_for(&self, asked: &str) -> String {
-        let lamp = crate::runtime::LAMP_TARGET;
-        let there = self.lamp
-            && self
-                .targets
-                .get(lamp)
-                .is_some_and(|target| target.engine == EngineKind::Hermes);
-        let no_computer = self
-            .targets
-            .keys()
-            .filter(|alias| alias.as_str() != lamp)
-            .all(|alias| {
-                self.readiness
-                    .get(alias)
-                    .is_some_and(|known| known.offline())
-            });
-        if there && asked != lamp && no_computer {
-            lamp.to_owned()
-        } else {
-            asked.to_owned()
-        }
+    /// The targets hand-overs use now (#5978: the machines a named
+    /// session is looked for on, [`crate::harness::SessionMachines`]).
+    pub fn targets(&self) -> &BTreeMap<String, Target> {
+        &self.targets
     }
 
     pub fn open(
@@ -1357,7 +1367,6 @@ impl<P: Persistence> Engine<P> {
             no_harness: false,
             names: BTreeMap::new(),
             readiness: BTreeMap::new(),
-            lamp: false,
         })
     }
 
@@ -1702,8 +1711,6 @@ impl<P: Persistence> Engine<P> {
                         "That preparation request ID was already used.",
                     ));
                 }
-                // No computer there but the lamp's own (#5978).
-                let target = &self.target_for(target);
                 let target_value = self
                     .targets
                     .get(target)
@@ -1993,6 +2000,15 @@ impl<P: Persistence> Engine<P> {
                 "The launch is not the current committed attempt.",
             ));
         }
+        // Found on another machine (#5978): a join, followed there.
+        let (outcome, joined_on) = match outcome {
+            LaunchOutcome::JoinedOn {
+                agent_id,
+                session,
+                on,
+            } => (LaunchOutcome::Joined { agent_id, session }, Some(on)),
+            outcome => (outcome, None),
+        };
         let mut next = self.state.clone();
         let at = next_audit(&mut next, now)?;
         let reused = match &outcome {
@@ -2051,6 +2067,7 @@ impl<P: Persistence> Engine<P> {
                 task.dispatch.state = DispatchState::Accepted;
                 task.dispatch.agent_id = Some(id);
                 task.dispatch.joined = session;
+                task.dispatch.joined_on = joined_on;
                 task.closable = false;
             }
             LaunchOutcome::Pending { creation_id: id } if creation_id(&id) => {
@@ -2232,7 +2249,7 @@ impl<P: Persistence> Engine<P> {
                 }
                 Some(Settled {
                     task_id: task.id,
-                    engine: task.launch.target.engine.bus_name(),
+                    engine: engine_of(task).bus_name(),
                     state: newest.data.state.clone(),
                     ago_ms,
                 })
@@ -2250,10 +2267,10 @@ impl<P: Persistence> Engine<P> {
                 let age = watched_age(task, now)?;
                 Some(Watched {
                     task_id: task.id,
-                    machine_id: task.launch.target.machine_id.clone(),
+                    machine_id: machine_of(task).to_owned(),
                     agent_id: task.dispatch.agent_id.clone()?,
                     // As the target file names it; the same words as `new`.
-                    engine: task.launch.target.engine.bus_name(),
+                    engine: engine_of(task).bus_name(),
                     accepted_ago_ms: age,
                 })
             })
@@ -2297,8 +2314,8 @@ impl<P: Persistence> Engine<P> {
                 });
                 Some(Recent {
                     task_id: task.id,
-                    engine: task.launch.target.engine.bus_name(),
-                    target: task.target_alias.clone(),
+                    engine: engine_of(task).bus_name(),
+                    target: alias_of(task).to_owned(),
                     watched,
                     settled: newest.map(|seen| seen.data.state.clone()),
                     settled_ago_ms,
@@ -2337,7 +2354,7 @@ impl<P: Persistence> Engine<P> {
         let told = &task.observations.last().expect("a told answer").data;
         let job = CloseJob {
             task_id: task.id,
-            machine_id: task.launch.target.machine_id.clone(),
+            machine_id: machine_of(task).to_owned(),
             agent_id: task.dispatch.agent_id.clone().expect("accepted task"),
             answer: told.answer.clone(),
             asked: told.ask.clone(),
@@ -2401,7 +2418,7 @@ impl<P: Persistence> Engine<P> {
         let job = ObservationJob {
             task_id: task.id,
             request_id: read.request_id,
-            machine_id: task.launch.target.machine_id.clone(),
+            machine_id: machine_of(task).to_owned(),
             agent_id: task.dispatch.agent_id.clone().expect("accepted task"),
         };
         self.save(next)?;
@@ -2695,17 +2712,12 @@ fn receipt_body(state: &State, request: &Request) -> Result<Value, Error> {
                 .iter()
                 .find(|t| t.prepare_request_id == guard.request_id)
                 .ok_or_else(storage)?;
-            // Prepared for the lamp's own target instead (#5978): said, so
-            // the voice says where it goes.
-            let lamp = task.target_alias == crate::runtime::LAMP_TARGET;
-            if task.launch.prompt != *text || (task.target_alias != *target && !lamp) {
+            if task.launch.prompt != *text || task.target_alias != *target {
                 return Err(storage());
             }
-            let mut body = json!({"id":task.id,"prepared_digest":task.prepared_digest,"label":task.launch.name,"expires_monotonic_ms":task.expires_monotonic_ms});
-            if task.target_alias != *target {
-                body["target"] = task.target_alias.clone().into();
-            }
-            Ok(body)
+            Ok(
+                json!({"id":task.id,"prepared_digest":task.prepared_digest,"label":task.launch.name,"expires_monotonic_ms":task.expires_monotonic_ms}),
+            )
         }
         Request::Confirm {
             id,
@@ -3545,6 +3557,63 @@ mod tests {
         let older: Dispatch = serde_json::from_value(dispatch).unwrap();
         assert_eq!(older.joined, None);
         assert!(!serde_json::to_string(&older).unwrap().contains("joined"));
+    }
+
+    /// #5978: a named session found on another machine than the launch's
+    /// (`JoinedOn`): the task is followed there, told as that machine's
+    /// target and engine, never closed, and stored as schema 6, which the
+    /// build before refuses rather than follow it on the wrong machine.
+    #[test]
+    fn a_session_joined_on_another_machine_is_followed_there() {
+        let (mut engine, memory) = opened();
+        let id = queued(&mut engine, 0);
+        engine.begin_launch(&clock(0)).unwrap().unwrap();
+        let on = JoinedOn {
+            alias: "laptop".into(),
+            machine_id: "f".repeat(32),
+            engine: EngineKind::Claude,
+        };
+        engine
+            .finish_launch(
+                id,
+                LaunchOutcome::JoinedOn {
+                    agent_id: AGENT.into(),
+                    session: None,
+                    on: on.clone(),
+                },
+                &clock(0),
+            )
+            .unwrap();
+        let task = &engine.state.tasks[0];
+        assert_eq!(task.dispatch.state, DispatchState::Accepted);
+        assert_eq!(task.dispatch.joined_on, Some(on));
+        assert!(!task.closable);
+        assert_eq!(stored(&memory).schema, 6);
+        let watched = engine.watched(&clock(0));
+        assert_eq!(watched[0].machine_id, "f".repeat(32));
+        assert_eq!(watched[0].engine, "claude");
+        let job = request_read(&mut engine, id, 1);
+        assert_eq!(job.machine_id, "f".repeat(32));
+        // Not joined elsewhere: the launch's own machine, schema as before.
+        let (mut plain, memory) = opened();
+        let id = queued(&mut plain, 0);
+        plain.begin_launch(&clock(0)).unwrap().unwrap();
+        plain
+            .finish_launch(
+                id,
+                LaunchOutcome::Joined {
+                    agent_id: AGENT.into(),
+                    session: None,
+                },
+                &clock(0),
+            )
+            .unwrap();
+        assert!(stored(&memory).schema < 6);
+        let job = request_read(&mut plain, id, 1);
+        assert_eq!(
+            job.machine_id,
+            plain.state.tasks[0].launch.target.machine_id
+        );
     }
 
     /// A follow-up the router typed into a session an earlier task of the
@@ -4654,7 +4723,10 @@ mod tests {
         )
         .unwrap();
         let kept = engine.summary()["set_aside"].as_str().unwrap().to_owned();
-        assert!(kept.starts_with("tasks.sqlite3.newer-6-"), "{kept}");
+        assert!(
+            kept.starts_with(&format!("tasks.sqlite3.newer-{}-", SCHEMA + 1)),
+            "{kept}"
+        );
         drop(engine);
         let mut engine = Engine::open(
             memory.clone(),
@@ -5035,7 +5107,7 @@ mod tests {
         accepted(&mut engine, 0);
         let mut newer: Value =
             serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
-        newer["schema"] = json!(6);
+        newer["schema"] = json!(SCHEMA + 1);
         newer["tasks"][0]["dispatch"]["state"] = json!("a_state_from_later");
         let bytes = serde_json::to_vec(&newer).unwrap();
         let memory = Memory::default();
@@ -5049,7 +5121,10 @@ mod tests {
         )
         .expect("a newer store is set aside, not refused");
         let kept = engine.set_aside().unwrap().to_owned();
-        assert!(kept.starts_with("tasks.sqlite3.newer-6-"), "{kept}");
+        assert!(
+            kept.starts_with(&format!("tasks.sqlite3.newer-{}-", SCHEMA + 1)),
+            "{kept}"
+        );
         assert_eq!(
             memory.0.borrow().kept,
             [(kept, bytes)],
@@ -6062,7 +6137,7 @@ mod tests {
         assert_eq!(
             (SCHEMA, vocabulary.as_str()),
             (
-                5,
+                6,
                 "dispatch: prepared queued attempting accepted pending not_sent uncertain cancelled invalidated; \
                  read: requested attempting finished failed; speech: claimed spoken uncertain; \
                  close: attempting closed refused left failed; engine: codex claude opencode devin devin-cloud hermes"

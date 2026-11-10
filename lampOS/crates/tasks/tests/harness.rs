@@ -2,9 +2,9 @@
 //! remote agent, credentials or provider is invoked by these tests.
 use lamp_tasks::harness::{
     AccountMachine, CLOSE_BUDGET, CLOSE_READ_TIMEOUT, Cli, CliConfig, Closed, Ended, EngineKind,
-    EngineRow, Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED,
-    PS_STDOUT_LIMIT, SignIn, Target, WATCH_LINE_LIMIT, WatchEnd, WatchEvent, WatchLine,
-    iso_unix_ms, parse_auth_status, parse_engines, parse_machines, parse_ps, parse_wait,
+    EngineRow, JoinedOn, Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED,
+    PS_STDOUT_LIMIT, SessionMachines, SignIn, Target, WATCH_LINE_LIMIT, WatchEnd, WatchEvent,
+    WatchLine, iso_unix_ms, parse_auth_status, parse_engines, parse_machines, parse_ps, parse_wait,
     parse_watch_line,
 };
 use lamp_tasks::runtime::{HarnessSwitches, NEW_FOLDER_FILE, targets_from_machines};
@@ -113,6 +113,7 @@ impl Rig {
             new_folder_only: None,
             journal: None,
             calls: None,
+            session_machines: None,
             health_after_start: false,
             user_runtime_root: root.path().join("run-user"),
         };
@@ -4567,4 +4568,200 @@ fn a_watch_line_is_read_for_its_event_only() {
         assert_eq!(read.name(), event);
         assert_eq!(read.settled(), !matches!(event, "started" | "working"));
     }
+}
+
+/// #5978, `LAMP_HERMES_ON_LAMP`: a named hand-over to the lamp's own
+/// target (Hermes on the lamp's machine) looks for the session on the lamp
+/// and on each computer: one on the lamp wins a tie with a computer's, the
+/// lamp's own rules first (a stopped one there is said stopped); one only
+/// on a computer is typed into there and said so (`joined_on`); two
+/// computers that both fit are asked about. A hand-over to a computer, the
+/// person having named it, looks on that computer alone.
+#[test]
+fn a_named_session_is_looked_for_on_the_lamp_first_then_the_computers() {
+    const LAPTOP: &str = "fedcba9876543210fedcba9876543210";
+    const DESK: &str = "abababababababababababababababab";
+    let lamp_launch = || {
+        let mut request = launch();
+        request.target.engine = EngineKind::Hermes;
+        request.target.project = "/var/lib/lampos-hermes/lamp-tasks".into();
+        request.session = Some("docs".into());
+        request
+    };
+    let ps = |rows: Value| step(json!({"you":null,"machine":"m","harnesses":rows,"next":[]}));
+    let took =
+        |id: &str| step(json!({"ok":true,"name":"x","id":id,"message":"m1","state":"queued"}));
+    let run = |request: Launch, each: Vec<Value>, computers: &[(&str, &str)], reply: &str| {
+        let mut rig = Rig::new();
+        rig.config.reply_named = true;
+        rig.config.session_machines = Some(Arc::new(Mutex::new(SessionMachines {
+            lamp: Some(MACHINE.into()),
+            computers: computers
+                .iter()
+                .map(|(alias, id)| ((*alias).into(), (*id).into(), EngineKind::Claude))
+                .collect(),
+        })));
+        rig.plan(json!({
+            "machines":{"default":true},"ps":{"each":each},"reply":took(reply)
+        }));
+        let outcome = rig.cli().launch(&request);
+        let calls: Vec<Value> = rig
+            .calls()
+            .iter()
+            .map(|call| call["args"].clone())
+            .collect();
+        (outcome, calls)
+    };
+    let docs = |id: &str, state: &str| json!([ps_row(id, "docs", state, None)]);
+    let none = json!([]);
+    // Both fit: the lamp's.
+    let (outcome, calls) = run(
+        lamp_launch(),
+        vec![ps(docs(AGENT, "idle")), ps(docs(OTHER, "idle"))],
+        &[("office", LAPTOP)],
+        AGENT,
+    );
+    assert!(
+        matches!(&outcome, LaunchOutcome::Joined { agent_id, .. } if agent_id == AGENT),
+        "{outcome:?}"
+    );
+    assert_eq!(
+        calls[1],
+        json!(["ps", "--machine", MACHINE, "--all", "--json"])
+    );
+    assert_eq!(
+        calls[2],
+        json!(["ps", "--machine", LAPTOP, "--all", "--json"])
+    );
+    assert_eq!(calls[3][2], MACHINE);
+    // Only on a computer: typed there, and followed there.
+    let (outcome, calls) = run(
+        lamp_launch(),
+        vec![ps(none.clone()), ps(docs(OTHER, "idle"))],
+        &[("office", LAPTOP)],
+        OTHER,
+    );
+    match outcome {
+        LaunchOutcome::JoinedOn { agent_id, on, .. } => {
+            assert_eq!(agent_id, OTHER);
+            assert_eq!(
+                on,
+                JoinedOn {
+                    alias: "office".into(),
+                    machine_id: LAPTOP.into(),
+                    engine: EngineKind::Claude,
+                }
+            );
+        }
+        outcome => panic!("{outcome:?}"),
+    }
+    assert_eq!(
+        calls[3],
+        json!([
+            "reply",
+            "--machine",
+            LAPTOP,
+            OTHER,
+            "--json",
+            "--",
+            "Inspect the authored fixture"
+        ])
+    );
+    // A stopped one on the lamp and a live one on a computer: the lamp's
+    // rule first, nothing typed.
+    let (outcome, _) = run(
+        lamp_launch(),
+        vec![ps(docs(AGENT, "stopped")), ps(docs(OTHER, "idle"))],
+        &[("office", LAPTOP)],
+        OTHER,
+    );
+    assert_eq!(
+        outcome,
+        LaunchOutcome::NotSent {
+            code: "session_stopped".into()
+        }
+    );
+    // Two computers both fit, none on the lamp: asked about.
+    let (outcome, calls) = run(
+        lamp_launch(),
+        vec![
+            ps(none.clone()),
+            ps(docs(OTHER, "idle")),
+            ps(docs(AGENT, "idle")),
+        ],
+        &[("office", LAPTOP), ("desk", DESK)],
+        OTHER,
+    );
+    assert_eq!(
+        outcome,
+        LaunchOutcome::NotSent {
+            code: "session_ambiguous".into()
+        }
+    );
+    assert!(!calls.iter().any(|call| call[0] == "reply"), "{calls:?}");
+    // Nowhere: not found.
+    let (outcome, _) = run(
+        lamp_launch(),
+        vec![ps(none.clone()), ps(none.clone())],
+        &[("office", LAPTOP)],
+        OTHER,
+    );
+    assert_eq!(
+        outcome,
+        LaunchOutcome::NotSent {
+            code: "session_not_found".into()
+        }
+    );
+    // A machine named (a computer's target, not the lamp's): that one only.
+    let mut computer = lamp_launch();
+    computer.target.engine = EngineKind::Codex;
+    let (outcome, calls) = run(
+        computer,
+        vec![ps(docs(AGENT, "idle")), ps(docs(OTHER, "idle"))],
+        &[("office", LAPTOP)],
+        AGENT,
+    );
+    assert!(
+        matches!(outcome, LaunchOutcome::Joined { .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(calls.iter().filter(|call| call[0] == "ps").count(), 1);
+}
+
+/// #5978: the machines a named hand-over to the lamp looks among, from
+/// the targets: the lamp's own (Hermes) apart, each computer once, no cloud
+/// agent.
+#[test]
+fn the_session_machines_come_from_the_targets() {
+    let target = |id: char, engine: EngineKind| Target {
+        machine_id: id.to_string().repeat(32),
+        project: "~/harnesses/lamp-tasks".into(),
+        engine,
+    };
+    let targets = BTreeMap::from([
+        ("lamp".to_owned(), target('a', EngineKind::Hermes)),
+        ("office".to_owned(), target('b', EngineKind::Claude)),
+        ("office-codex".to_owned(), target('b', EngineKind::Codex)),
+        (
+            "devin".to_owned(),
+            Target {
+                project: String::new(),
+                ..target('c', EngineKind::DevinCloud)
+            },
+        ),
+        ("laptop".to_owned(), target('d', EngineKind::Codex)),
+    ]);
+    let machines = SessionMachines::from_targets(&targets);
+    assert_eq!(machines.lamp, Some("a".repeat(32)));
+    assert_eq!(
+        machines.computers,
+        [
+            ("laptop".to_owned(), "d".repeat(32), EngineKind::Codex),
+            ("office".to_owned(), "b".repeat(32), EngineKind::Claude),
+        ]
+    );
+    // No lamp target: no lamp, the computers as they are.
+    let mut without = targets.clone();
+    without.remove("lamp");
+    assert_eq!(SessionMachines::from_targets(&without).lamp, None);
 }

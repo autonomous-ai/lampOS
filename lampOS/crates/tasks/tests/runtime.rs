@@ -10,7 +10,8 @@ use lamp_tasks::{
     progress::SETTLED_FOR_MS,
     readiness::{Computer, engines_path, read_engines},
     runtime::{
-        Adapter, Clock, Config, EnginesLane, SetUpLater, WaitLane, request, serve_with_adapter,
+        Adapter, Clock, Config, EnginesLane, LampSide, SetUpLater, WaitLane, request,
+        serve_with_adapter,
     },
     store::Store,
 };
@@ -78,6 +79,8 @@ impl Clock for Injected {
 }
 #[derive(Default)]
 struct Counts {
+    /// Each machine a task was shown on, in order (#5978).
+    shown_on: Mutex<Vec<String>>,
     launches: AtomicUsize,
     reads: AtomicUsize,
     listings: AtomicUsize,
@@ -231,8 +234,17 @@ struct Script {
 impl Script {
     /// What `show` finds, however long it took.
     fn shown(&self, machine: &str, id: &str) -> Result<Observation, String> {
-        // Read on the machine the task was started on.
-        assert_eq!(machine, "0123456789abcdef0123456789abcdef");
+        // Read on the machine the task was started on: the scripted one,
+        // or the lamp's own (#5978).
+        assert!(
+            machine == "0123456789abcdef0123456789abcdef" || machine == "a".repeat(32),
+            "{machine}"
+        );
+        self.counts
+            .shown_on
+            .lock()
+            .unwrap()
+            .push(machine.to_owned());
         assert_eq!(id, AGENT);
         if let Some(answer) = self.counts.plain.lock().unwrap().clone() {
             return Ok(Observation {
@@ -2168,7 +2180,7 @@ fn the_lamp_is_a_target_with_hermes_only_when_on_and_installed_there() {
 
     let home = tempfile::tempdir().unwrap();
     let (mut s, _) = engines_running(true);
-    s.config.set_up_later.as_mut().unwrap().lamp = Some(home.path().to_owned());
+    s.config.set_up_later.as_mut().unwrap().lamp = Some(LampSide::new(home.path().to_owned()));
     office_engines(&s, Ok(vec![row("claude", Some(true), Some(true))]));
     // On, Hermes not found on the lamp: left out.
     lamp_engines(
@@ -2180,25 +2192,48 @@ fn the_lamp_is_a_target_with_hermes_only_when_on_and_installed_there() {
     );
     s.start();
     targets_until(&s, office.clone());
-    // Installed there: the lamp is a target, its folder made.
+    // Installed there: the lamp is a target, its folder made under
+    // Harness's home, 0700.
     lamp_engines(&s, vec![row("hermes", Some(true), None)]);
     targets_until(&s, both);
-    assert!(home.path().join("harnesses/lamp-tasks/lamp").is_dir());
-    // The office computer online: it does the work, as before.
+    let folder = fs::metadata(home.path().join("harnesses/lamp-tasks/lamp")).unwrap();
+    assert!(folder.is_dir());
+    assert_eq!(folder.permissions().mode() & 0o7777, 0o700);
+    // A computer asked for: it does the work, as before.
     let prepared = prepared_until(&s, None);
     assert_eq!(prepared.get("target"), None, "{prepared}");
-    // Asked for the lamp: the lamp, though a computer is online.
-    let asked = prepared_for(&s, "lamp", |answer| answer["ok"] == true);
-    assert_eq!(asked.get("target"), None, "{asked}");
-    // No computer online: the lamp, and the answer says so.
-    s.counts.machines.lock().unwrap()[1].status = Some("offline".into());
-    let instead = prepared_for(&s, "office", |answer| answer["target"] == "lamp");
-    assert_eq!(instead["ok"], true, "{instead}");
-    let id = instead["id"].as_u64().unwrap();
+    // The lamp asked for: the lamp, whatever the computers.
+    let lamp = prepared_for(&s, "lamp", |answer| answer["ok"] == true);
+    let id = lamp["id"].clone();
     let task = s.ask(json!({"op":"get_task","id":id}));
     assert_eq!(task["target"]["engine"], "hermes", "{task}");
+    assert_eq!(task["target"]["machine_id"], "a".repeat(32));
     assert_eq!(task["target"]["project"], "~/harnesses/lamp-tasks/lamp");
     assert_eq!(task["task"]["target_alias"], "lamp");
+    // The computer asleep: a hand-over asked of it is refused, never moved
+    // to the lamp quietly.
+    s.counts.machines.lock().unwrap()[1].status = Some("offline".into());
+    prepared_for(&s, "office", |answer| answer["error"] == "computer_offline");
+    // The lamp's task is followed as a computer's: started, shown on the
+    // lamp's own machine, its answer read.
+    s.counts.idle.store(true, Ordering::SeqCst);
+    let confirm = json!({"op":"confirm","guard":s.guard(),"id":id,"prepared_digest":lamp["prepared_digest"],"session_id":s.status()["summary"]["session_id"]});
+    assert_eq!(s.trusted(confirm)["ok"], true);
+    s.wait(&id, |v| v["task"]["dispatch"]["state"] == "accepted");
+    assert_eq!(
+        s.ask(json!({"op":"observe","guard":s.guard(),"id":id}))["ok"],
+        true
+    );
+    let task = s.wait(&id, |v| {
+        v["observations"].as_array().is_some_and(|v| !v.is_empty())
+    });
+    let observation = task["observations"][0]["id"].clone();
+    let observed = s.ask(json!({"op":"get_observation","id":id,"observation_id":observation}));
+    assert_eq!(
+        observed["data"]["answer"], "Lumi, Sunny and Archie.",
+        "{observed}"
+    );
+    assert_eq!(*s.counts.shown_on.lock().unwrap(), ["a".repeat(32)]);
 }
 
 /// #5199: an engine not found on that computer (`installed` null with
@@ -2766,7 +2801,8 @@ fn a_store_set_aside_is_said_until_its_file_is_gone() {
     s.stop();
     let mut store = released(&s);
     let mut newer: Value = serde_json::from_slice(&store.load().unwrap().unwrap()).unwrap();
-    newer["schema"] = json!(6);
+    // One past the engine's `SCHEMA` (6 since #5978's `joined_on`).
+    newer["schema"] = json!(7);
     store.commit(&serde_json::to_vec(&newer).unwrap()).unwrap();
     drop(store);
     s.start();
@@ -2786,7 +2822,7 @@ fn a_store_set_aside_is_said_until_its_file_is_gone() {
         "Tasks set aside a store from a newer build; its tasks are not followed"
     );
     let kept = kept.expect("the kept file is named");
-    assert!(kept.starts_with("tasks.sqlite3.newer-6-"), "{kept}");
+    assert!(kept.starts_with("tasks.sqlite3.newer-7-"), "{kept}");
     // Restarted: the store opens well now, and the kept file is still said.
     s.stop();
     drop(released(&s));
