@@ -522,15 +522,16 @@ def test_a_look_or_joints_waits_for_the_bodys_done_and_says_when_a_conversation_
                     assert (aimed["how"], aimed["yaw"], aimed["pitch"]) == ("finished", -4.0, 2.0)
                     # Without `wait`, only the door's answer, as before.
                     assert (await lamp.joints(lease, 300, yaw=1.0))["to"] == "body"
-                    # A conversation suspends the lease: the door still takes
-                    # the look, and the body's `done` says it was dropped.
+                    # A conversation suspends the lease: the door refuses a
+                    # body op as the suspension it is (session.rs), not as
+                    # "take a lease first" nor "another computer".
                     await fake.lease_event(lease.id, "suspended", "conversation")
                     while lease.state != "suspended":
                         await asyncio.sleep(0.01)
-                    dropped = await lamp.joints(lease, 300, wait=True, yaw=-13.0)
-                    assert (dropped["how"], dropped["why"]) == ("dropped", "the body is not held")
-                    dropped = await lamp.look(yaw=3, pitch=1, wait=True)
-                    assert (dropped["how"], dropped["why"]) == ("dropped", "the body is not held")
+                    with pytest.raises(errors.BY_CODE["busy"], match="suspended while someone talks"):
+                        await lamp.joints(lease, 300, wait=True, yaw=-13.0)
+                    with pytest.raises(errors.BY_CODE["busy"], match="your lease on the body is suspended"):
+                        await lamp.look(yaw=3, pitch=1, wait=True)
                     await fake.lease_event(lease.id, "held")
                     while lease.state != "held":
                         await asyncio.sleep(0.01)
@@ -541,6 +542,26 @@ def test_a_look_or_joints_waits_for_the_bodys_done_and_says_when_a_conversation_
             assert fake.asked("joints")[0] == {"lease": "l_1", "targets": {"pitch": 2.0, "yaw": -4.0}, "within_ms": 300}
 
     run(go())
+
+def test_a_look_taken_just_before_a_conversation_is_dropped_by_the_body_in_its_done(tmp_path):
+    """The race the door cannot see: a look taken, then the conversation
+    suspends the lease before the body answers: the body's `done` says it was
+    dropped (body_lease.rs `done_of`), and the program's wait ends with it."""
+    async def go():
+        async with FakeLamp(grants=("body", "look"), auto_done=False) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                async with lamp.lease("body", for_ms=5000) as lease:
+                    waiting = asyncio.ensure_future(lamp.look(yaw=3, pitch=1, wait=True))
+                    while not fake.asked("look"):
+                        await asyncio.sleep(0.01)
+                    await fake.lease_event(lease.id, "suspended", "conversation")
+                    await fake.done(fake.requests[-1]["id"], "dropped", "the body is not held")
+                    dropped = await waiting
+                    assert (dropped["how"], dropped["why"]) == ("dropped", "the body is not held")
+
+    run(go())
+
 
 def test_a_waiting_look_ends_a_hand_follow_when_taken_not_at_its_done(tmp_path):
     """Reviewer-two's P2 on #5837: lamp-control ends a hand-follow as soon as

@@ -1123,6 +1123,20 @@ class FakeLamp:
             if not held or (op == "joints" and request["lease"] not in held):
                 await self._refuse(ws, id_, "no_lease", "take a body lease first")
                 return
+            # A lease a conversation suspended is still this computer's: the
+            # door refuses the op as the suspension it is (session.rs), and
+            # only a body op taken before the suspension is dropped by the
+            # body, in its `done` (`fake.done(re, "dropped", ...)`).
+            if all(self.leases[l].get("state") == "suspended" for l in held):
+                await self._refuse(
+                    ws,
+                    id_,
+                    "busy",
+                    "suspended while someone talks to the lamp"
+                    if op == "joints"
+                    else "your lease on the body is suspended while someone talks to the lamp: it is yours again when they stop",
+                )
+                return
         if op in self.refuses:
             await self._refuse(ws, id_, "refused", self.refuses[op])
             return

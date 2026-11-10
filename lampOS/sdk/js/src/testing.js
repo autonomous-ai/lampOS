@@ -883,6 +883,14 @@ export class FakeLamp {
     if (LEASE_OPS.has(op)) {
       const held = [...this.leases].filter(([, h]) => h.ws === ws && h.parts.includes('body')).map(([l]) => l);
       if (!held.length || (op === 'joints' && !held.includes(request.lease))) return this.refuse(ws, id, 'no_lease', 'take a body lease first');
+      // A lease a conversation suspended is still this computer's: the door
+      // refuses the op as the suspension it is (session.rs); only a body op
+      // taken before the suspension is dropped by the body, in its `done`.
+      if (held.every((l) => this.leases.get(l).state === 'suspended')) {
+        return this.refuse(ws, id, 'busy', op === 'joints'
+          ? 'suspended while someone talks to the lamp'
+          : 'your lease on the body is suspended while someone talks to the lamp: it is yours again when they stop');
+      }
     }
     if (op in this.refuses) return this.refuse(ws, id, 'refused', this.refuses[op]);
     this.requests.push(request);
