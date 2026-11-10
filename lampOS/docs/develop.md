@@ -9,22 +9,23 @@ A developer's quick-start, for decision 1, developers first. It covers:
 The protocol itself is [control.md](control.md). The skill format is
 [skill-format.md](skill-format.md).
 
-**What runs today.** Customer lamps run the stable build, **11372** since
-10 Nov, 16:40. The table below was last checked row by row on **10824**
-(lamp-voice `65991c7229`), except skill push, which works from 11091 on and
-is marked so. Everything below works there, except what this table marks. The full list, with what to do instead, is in
+**What runs today.** Customer lamps run the stable build, **11450**
+(lamp-voice `135bc417d4`, promoted 10 Nov). The table below was brought to 11450
+from the git history of that commit (what is in it and what is not); a row was
+last tried on a lamp on 10824, skill push on 11091 and a head tap on 11372.
+Everything below works there, except what this table marks. The full list, with what to do instead, is in
 [sdk/README.md](../sdk/README.md#on-a-customer-lamp-today).
 
-| step | on a customer lamp (stable 10824) |
+| step | on a customer lamp (stable 11450) |
 |---|---|
 | The fake lamp, the SDKs, `lamp-mcp`, `lamp skill check` | on your computer; the SDKs aren't on PyPI or npm yet, so install from a checkout |
 | lamp-control on the lamp | on every lamp, off until the owner turns developer access on in the app |
 | Pairing through the app | works; pass the lamp's address with `--host` (no lamp announces itself by mDNS yet) |
-| Events, states, `light`, `say`, `sound`, `volume`, `express`, `gesture`, `move` | works. A motion asked while the last one sent through lamp-control plays is refused `busy` with `retry_ms` on 10824; the next stable replaces it instead |
-| `look` at `ahead`, an angle or a `hand`, under a body lease | works; on a resting lamp a look may end `cut_short` just short of its target (fixed on lamp-voice, #5711, for the next stable) |
+| Events, states, `light`, `say`, `sound`, `volume`, `express`, `gesture`, `move` | works. A motion asked while another plays replaces it (10824 and older refused it `busy` with `retry_ms`). A head tap or pet is a `touch` event. `wait=True` on `gesture`, `move` and `express` returns when the lamp takes the motion; the next build ends it at the body's `done` |
+| `look` at `ahead`, an angle or a `hand`, under a body lease | works; on a resting lamp a look ends `finished` or `clamped` with where the head stopped (on 10824 it could end `cut_short`) |
 | `look` at `face` | next build (one turn toward the face in view) |
 | `look` at `name` | not in this release (the lamp has no sound direction) |
-| `joints` | `yaw` and `pitch` only |
+| `joints` | all five joints: `roll`, `shoulder` and `elbow` as the body's pose, only while the lamp stands (11048 and older: `yaw` and `pitch` only) |
 | `play` | refused: "not routed yet: waits for client packages" |
 | `camera.snapshot`, `camera.stream` | works, local network only (not the fast frame path) |
 | `skill.push`, `lamp skill push/list/remove` | works from 11091 on (the product unit passes `--manage-socket`), onto the developer's own lamp, with a yes at the lamp; refused on 10824 and older: "skill push is not on this lamp". No route to the Store from the SDK yet |
@@ -61,7 +62,7 @@ It answers as a lamp does today. `gesture`, `move` and `express` are taken
 light: `{"to": "body", "move": "glad-lift", "light": true}`), and `say`
 and `sound` (`hum`, the lamp's own short hum) with `{"to": "voice"}` and
 their `done`. `look` at `ahead`, `hand` or an angle is taken, and `joints`
-naming only `yaw` and `pitch`, as a customer lamp (stable 10824) takes them.
+naming only `yaw` and `pitch`, as stable 10824 took them.
 `play`, and `joints` naming `roll`, `shoulder` or `elbow`, are refused in
 lamp-control's own words ("not routed yet: waits for …").
 `--everything` answers every op instead.
