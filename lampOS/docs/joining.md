@@ -461,7 +461,8 @@ dependency had to be found by hand. Decided: yes, but as follows.
   on it, carries only that task's code, docs and verification folder.
   `lamp-<name>` keeps the log and nothing a lamp runs.
 - **Ready is a pull request** from `<name>/<task>` into `lamp-voice` that is
-  not a draft. Its body, in this order: `Closes #<issue>`; its kind (off
+  not a draft. Its body, in this order: `Part of #<issue>` (never
+  `Closes`, `Fixes` or `Resolves`, below); its kind (off
   unless set, a lamp's own folder, or changes every lamp's default); the
   switch and the test that shows nothing changes without it; the
   verification folder; the gate as run, with counts. No attribution.
@@ -500,9 +501,12 @@ dependency had to be found by hand. Decided: yes, but as follows.
   again. One that will not be taken is closed with the reason.
 - **The builder watches its own pull requests** and answers their comments
   itself; a person is asked only for hands at a lamp or for permissions.
-- **A merge does not close the issue.** GitHub acts on `Closes #N` only for
-  merges into the default branch (`main`), and every pull request here
-  merges into `lamp-voice`. An issue is done when its fix is **on stable**:
+- **A merge does not close the issue.** Since 10 Nov `lamp-voice` is the
+  repository's default branch, so GitHub would close an issue at the merge
+  of any pull request or commit that says `Closes`, `Fixes` or
+  `Resolves #N`. So a pull request's body and every commit message say
+  `Part of #N` only, whatever a generic agent note says (the lead's rule,
+  10 Nov). An issue is done when its fix is **on stable**:
   the builder posts a close-ask with its evidence, and the PM closes the
   issue at the promote that carries it, naming the stable build and what
   was and was not delivered; the Queue gives the next task.
@@ -600,8 +604,9 @@ writes.
   from 2026-10-28. Each was continued when it reached GitHub's comment
   limit; #4710 opened on 2026-10-31. No priority labels.
 - **Questions and answers** are comments on the issue they are about.
-- **Pull requests** say `Closes #N` (closed by hand at the merge, above) or
-  `Part of #N`. No GitHub Project is needed.
+- **Pull requests** say `Part of #N`, never a closing keyword (above); the
+  PM closes the issue at the promote that carries its fix. No GitHub
+  Project is needed.
 
 **Claiming an issue.** Take only an issue labelled `builder:<name>` with
 your own name (`fifth-P8`, above). Skip any issue already `status:taken`. Add
