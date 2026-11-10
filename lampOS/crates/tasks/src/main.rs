@@ -13,7 +13,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
     let command = args
         .next()
-        .ok_or("usage: lamp-tasks serve [--enable ...] | request --socket ABS")?;
+        .ok_or("usage: lamp-tasks serve [--enable ...] | request --socket ABS | skill list | skill call NAME [JSON]")?;
     if command == "request" {
         if args.next().as_deref() != Some("--socket") {
             return Err("request requires --socket ABS".into());
@@ -248,6 +248,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() {
+    // `lamp-tasks skill ...` (#5978): the lamp's own Hermes calling the
+    // lamp's skill tools. A short client, one JSON line out, no service.
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().map(String::as_str) == Some("skill") {
+        let (line, status) = lamp_tasks::skill_call::run(
+            std::path::Path::new(lamp_tasks::skill_call::TOOLS_DIR),
+            &args[1..],
+        );
+        println!("{line}");
+        std::process::exit(status);
+    }
     // Its log lines never block it or end it, and its last ones reach the
     // journal (`lamp_ipc::log_relay`).
     let _log = lamp_ipc::log_relay::guard();
