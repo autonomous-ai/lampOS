@@ -197,7 +197,8 @@ byte, and a frozen note is reused as it opened. An older memory refuses the
 field (`deny_unknown_fields`), so the voice sends it only with its switch on.
 
 With `role:true` on `session_open` (the voice's `LAMP_MEMORY_ROLE`, off by
-default; the memory owner's design, 6 Nov), the answer also carries
+default, on in the product since the memory owner's call of 9 Nov; their
+design, 6 Nov), the answer also carries
 `"role"`: the name of the role that known person asked the lamp to play, or
 `null`. It is read with the open, never by a request of its own; the
 room's is always `null`. `role_set {person, name}` keeps it (`{ok:true}`),

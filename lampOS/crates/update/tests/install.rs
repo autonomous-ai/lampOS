@@ -2334,6 +2334,28 @@ fn the_product_keeps_tastes_first_marks_maybes_and_leaves_newer_first_off() {
     );
 }
 
+/// A role a seen person gives the lamp lasts with them until they end it
+/// (`LAMP_MEMORY_ROLE`, #5545): a short name kept per known face, read once
+/// with their session's open, and never told as whose on a turn not placed
+/// as theirs. The memory owner's call, 9 Nov. It acts only with Days memory
+/// on the second route, both set beside it.
+#[test]
+fn the_product_keeps_a_role_a_seen_person_gives() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_MEMORY_ROLE=on",
+        "Environment=LAMP_MEMORY_DAYS=on",
+        "Environment=LAMP_VOICE_ROUTE=second",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// A delivery ledger fenced ahead of its store is re-fenced at the voice's
 /// start in the product (#5560, its played row on lamp-52e6 on 8 Nov), so a
 /// lamp whose store was put back rings its new timers again.
