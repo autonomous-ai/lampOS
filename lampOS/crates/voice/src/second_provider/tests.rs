@@ -10204,6 +10204,150 @@ async fn words_cut_short_by_a_line_let_out_are_let_go() {
     );
 }
 
+/// #5961 (lamp-52e6, 10 Nov 09:5x, core w3): an 8-word ask still being
+/// searched for is cut by a 1-word line let out, with no face seen in a busy
+/// room, so the two are not joined; the second line's chat gives
+/// `b_rounds`. What was said for request 2, and every chat asked, with
+/// `LAMP_CUT_ASK_ANSWERED` `on` or not.
+async fn cut_ask_then(
+    on: bool,
+    b_rounds: Vec<Vec<net::Result<ChatEvent>>>,
+) -> (Vec<String>, Vec<Vec<Message>>) {
+    let mut chats: VecDeque<Vec<net::Result<ChatEvent>>> = [vec![
+        Ok(ChatEvent::ToolCalls(vec![call(
+            "c1",
+            "web_search",
+            json!({"query": "weather"}),
+        )])),
+        Ok(ChatEvent::Done),
+    ]]
+    .into();
+    chats.extend(b_rounds);
+    // In request 1's place, if it is answered there.
+    chats.push_back(vec![text("Sunny in Hanoi."), Ok(ChatEvent::Done)]);
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Hold on, what is the weather in Hanoi?".to_owned()),
+                Ok("Yeah.".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(chats),
+        ..Script::default()
+    });
+    let (searching, searched) = std::sync::mpsc::channel();
+    // Only request 1's search waits: its answer is never heard.
+    let runner: ToolRunner = Arc::new(move |_, _, _, args| {
+        let searching = searching.clone();
+        Box::pin(async move {
+            if args["query"] == "weather" {
+                let _ = searching.send(());
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            }
+            json!({"results": []})
+        })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .heeding(Arc::new(|_, _, _, _, _| None))
+    .joining_cut_words(Arc::new(|_, _| {
+        Joined::Not("no face seen; a busy room".to_owned())
+    }))
+    .answering_cut_words_a_decline_leaves(on);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    loop {
+        if searched.try_recv().is_ok() {
+            break;
+        }
+        let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+    }
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    let mut said = Vec::new();
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+            .await
+            .expect("the turn ends");
+        match event {
+            ProviderOutput::Transcript {
+                request: Some(2),
+                text,
+                ..
+            } if !text.is_empty() => said.push(text),
+            ProviderOutput::TurnComplete { request: 2, .. } => break,
+            _ => {}
+        }
+    }
+    let asked = script.asked.lock().unwrap().clone();
+    (said, asked)
+}
+
+/// #5961: the 1-word line let out only declines (`not_for_me`), so the
+/// person's 8-word ask it cut short is answered in its place, as a held
+/// line's would be; never dropped silently.
+#[tokio::test]
+async fn an_ask_cut_by_a_line_that_only_declines_is_answered_in_its_place() {
+    let declines = || {
+        vec![vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c2",
+                NOT_FOR_ME,
+                json!({}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]]
+    };
+    let (said, asked) = cut_ask_then(true, declines()).await;
+    assert_eq!(said, ["Sunny in Hanoi."], "{asked:?}");
+    assert_eq!(asked.len(), 3, "{asked:?}");
+    assert_eq!(
+        asked[2].last().unwrap(),
+        &Message::user("Hold on, what is the weather in Hanoi?")
+    );
+    // Without the switch, as before: the ask is let go, nothing said.
+    let (said, asked) = cut_ask_then(false, declines()).await;
+    assert!(said.is_empty(), "{said:?}");
+    assert_eq!(asked.len(), 2, "{asked:?}");
+}
+
+/// #5961's control: the line let out calls a real tool, so it is answered
+/// itself and the words it cut short are let go, as before.
+#[tokio::test]
+async fn an_ask_cut_by_a_line_that_calls_a_tool_is_let_go() {
+    let (said, asked) = cut_ask_then(
+        true,
+        vec![
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c2",
+                    "web_search",
+                    json!({"query": "yeah"}),
+                )])),
+                Ok(ChatEvent::Done),
+            ],
+            vec![text("Here you go."), Ok(ChatEvent::Done)],
+        ],
+    )
+    .await;
+    assert_eq!(said, ["Here you go."], "{asked:?}");
+    assert_eq!(asked.len(), 3, "{asked:?}");
+    let ask = Message::user("Hold on, what is the weather in Hanoi?");
+    assert!(
+        asked.iter().skip(1).all(|chat| chat.last() != Some(&ask)),
+        "{asked:?}"
+    );
+}
+
 /// What the chat was asked for `second`, a line that cut `first` short
 /// while `first`'s answer was still searching, begun `gap` after `first`
 /// ended, with `same` telling whether one person said both

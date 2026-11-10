@@ -176,6 +176,8 @@ Environment=LAMP_ENDPOINT_UNFINISHED_BELOW=0.5
 Environment=LAMP_ENDPOINT_UNSURE_MS=1200
 Environment=LAMP_SECOND_UNFINISHED_WAIT=on
 Environment=LAMP_JOIN_CUT_WORDS=on
+# An ask cut short by a line let out that the model only declines is answered in its place (#5961).
+Environment=LAMP_CUT_ASK_ANSWERED=on
 Environment=LAMP_REPLY_END_REACH=on
 # Its own voice heard back, a cut-in told as one, words said once, and a reply that is not for it.
 Environment=LAMP_SECOND_OWN_ECHO=on
