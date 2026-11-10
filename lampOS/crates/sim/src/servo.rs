@@ -486,10 +486,21 @@ mod tests {
         servo.heat = 80.0;
         servo.step(3_600.0);
         assert!(servo.heat < 40.0 && servo.heat >= AMBIENT, "{}", servo.heat);
-        // The bus hands a stalled process's gap over in steps no longer than MOST_STEP.
-        let mut bus = Bus::new([2028, 2048, 1946, 2085, 1817], [(0, 4095); 5]);
-        let before = bus.servos[0].position;
+    }
+
+    #[test]
+    fn a_long_gap_moves_a_servo_for_one_tick_not_the_whole_gap() {
+        // Torque on, a far goal, a speed cap of 1,000 counts a second: an hour's gap
+        // is handed over in steps no longer than MOST_STEP, so the servo moves at
+        // most speed * MOST_STEP (+ a count), not the 2,000 counts to its goal.
+        let mut bus = bus();
+        bus.feed(&request(1, WRITE, &[reg::TORQUE as u8, 1]));
+        bus.feed(&request(1, WRITE, &[reg::GOAL_VELOCITY as u8, 0xe8, 0x03]));
+        bus.feed(&request(1, WRITE, &[reg::GOAL as u8, 0xa0, 0x0f]));
+        assert_eq!(bus.servos()[0].goal(), 4000);
+        let before = f64::from(bus.servos()[0].position());
         bus.step(3_600.0);
-        assert!((bus.servos[0].position - before).abs() < 1.0);
+        let moved = f64::from(bus.servos()[0].position()) - before;
+        assert!(moved > 0.0 && moved <= 1_000.0 * MOST_STEP + 1.0, "{moved}");
     }
 }
