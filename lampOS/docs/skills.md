@@ -2162,7 +2162,11 @@ gone ([switches.md](switches.md)). What happens:
      `[budget]` always `wellbeing` with `per_hour` 1-2 (no other key), and
      `[rest] after_ignored` to 1-3 (0 or less is 1); `[quiet]` is always
      22:00-08:00, left out only when the trigger's `during` lies wholly
-     within 08:00-22:00, so an all-day or a night `during` keeps it. The
+     within 08:00-22:00 or is at most 3 hours long, a time the person asked
+     for in their own words, which runs as said, night or not (the
+     coordinator's ruling on #6103: "dim the light at ten", 22:00-22:30,
+     runs at 22:10; test `a_made_evening_dim_runs_at_ten_past_ten`); a
+     wider one, such as all day, keeps it. The
      floors of #6062 and #6070 (`made_skill::say_paced`: a say's hour, a
      face's minute away, a getting up's minute) apply too. Each manner is
      said back as set: "… It starts on its own, at most 3 times a day, one
