@@ -79,6 +79,7 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `rgb` | string | one `#rrggbb` for the whole ring | none | | |
 | | `brightness` | integer | 0 to 100 of the given colours, under the ring's own ceiling | 100 | | |
 | | `for_ms` | integer | milliseconds; more than 30000 lights 30000 | 10000 | | |
+| | `fade_ms` | integer | how slowly the ring comes into the light; the lamp takes 1000 to 60000 and refuses the rest | none | | |
 | `lamp_say` | `text` | string, required | words, at most 900 UTF-8 bytes, the voice's own cap (the lamp refuses more, so lamp-mcp does too), said exactly as written once the person isn't talking | — | speak | no |
 | | `rephrase` | boolean | `true`: the lamp says it in its own words instead | `false` | | |
 | | `wait` | boolean | false: returns once the lamp has taken the line ("taken"); true: once it was said ("said") or not (`dropped` with the voice's why), 120 s at most | false | | |
@@ -110,6 +111,11 @@ tool's schema says `"additionalProperties": false`, and a call such as
 Before, it lit the default 10 s. A call missing an argument the tool
 needs is refused the same way, `bad_request: lamp_light needs colour`, never
 in the validator's words. `serverInfo.version` is lamp-mcp's own.
+
+**Not tools, on purpose:** the camera and microphone *streams* (`camera.stream`, `microphone.stream`). A stream is
+dozens of events a second (a JPEG, or 50 audio blocks of 20 ms), which a model can't read as they come and which would
+fill the events window of the last 200 in seconds; and the microphone's is off by default and the owner's to switch on.
+Use `lamp_camera_snapshot` for a picture; a program that wants the streams uses the SDKs (`camera_stream`, `microphone_stream`).
 
 `lamp_joints` aims named joints once; it is not a 20 Hz stream. `play` needs a
 skill package; `sound` plays `hum` or a clip the computer uploaded. With the
