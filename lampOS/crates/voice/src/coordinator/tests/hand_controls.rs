@@ -3683,6 +3683,7 @@ fn walk_for_the_next_loop(ended: &[&str]) -> PathBuf {
                 framing: None,
                 offered_at_unix_s: None,
                 later_offers: 0,
+                ended_at_unix_ms: None,
             },
         );
     }

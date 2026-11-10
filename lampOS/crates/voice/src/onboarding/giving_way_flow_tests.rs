@@ -61,6 +61,7 @@ impl Store {
                     framing: None,
                     offered_at_unix_s: None,
                     later_offers: 0,
+                    ended_at_unix_ms: None,
                 },
             );
         }
@@ -773,6 +774,7 @@ fn left_for_later_and_offered_again(walk: &mut Onboarding) {
                 framing: None,
                 offered_at_unix_s: None,
                 later_offers: 0,
+                ended_at_unix_ms: None,
             },
         );
     }
