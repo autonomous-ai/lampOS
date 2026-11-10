@@ -798,9 +798,10 @@ một mình trong khung, không nghe thấy giọng khác, sẽ được nghe `r
 và chuỗi hội thoại của họ. **Việc ghi cũng xảy ra:** ghi lượt trao đổi vào hồ
 sơ của họ là phần «việc lưu được tính» của chủ đèn, nên lời của khách có thể
 được ghi như của họ, và việc nhớ lại theo ngày cùng việc trích xuất ban đêm
-(nếu có lúc được bật) có thể coi đó là lời của họ. `LAMP_SAME_VOICE_CONFIRMS`,
-khi bật, chỉ coi giọng khách là giọng thứ hai khi cuộc trò chuyện đã có dấu
-giọng để so; nếu khách là giọng đầu tiên thì không gì phân biệt được. Phán
+(nếu có lúc được bật) có thể coi đó là lời của họ. `LAMP_SAME_VOICE_CONFIRMS`
+(bật trong bản sản phẩm từ 10/11) không bao giờ coi giọng khách là giọng thứ
+hai: nó chỉ xác nhận, nên một giọng giống họ được coi là của họ, còn giọng khác
+không thay đổi gì ([same-voice.md](../same-voice.md), «One way only»). Phán
 quyết của trưởng nhóm trên #5522 nói một mặt một mình không bao giờ tính cho
 việc đọc; điều này dựa trên lời của người phụ trách ký ức lúc 16:43 và cách
 hiểu của PM lúc 16:46, nên trưởng nhóm xác nhận trước khi bật công tắc. Tắt công tắc thì quy tắc một mặt
@@ -830,6 +831,46 @@ cho thấy liên kết này. Chính câu ghi nhớ không vào nhật ký, như 
 nên dòng mang từ ấy là câu trả lời sau nó. Ký ức từ chối các trường này (một
 bản cũ, hoặc bản hiện tại từ chối người giữ ấy) nhận lại dòng một lần nữa không
 có chúng, được ghi lại như trước.
+
+**Câu mà chính giọng họ xác nhận** (`LAMP_SAME_VOICE_CONFIRMS=on`, bật trong
+bản sản phẩm từ 10/11, theo quyết định bật của người phụ trách ký ức): một câu
+không thấy mặt nào nói, mặt quen của họ là mặt duy nhất trong khung, có dấu
+giọng đạt 0,45 trở lên so với trung bình của từ 3 dấu giọng trở lên lấy từ
+những câu chỉ thấy mặt họ nói (chỉ giữ trong RAM), được coi như thấy mặt họ nói
+câu đó: việc ghi, việc đọc và các kiểm tra «thấy nói» là của họ, như với câu
+thấy miệng họ nói. Lời «có» cho một lệnh quên đang chờ vẫn cần mặt họ. Câu được
+đánh dấu `LineSeen::by_voice`, nên không bao giờ được tính là thấy mặt chủ đèn
+nói câu đó cho việc gửi, việc đọc đầy đủ hay dấu giọng đã đăng ký của dịch vụ
+liên kết. Giọng không bao giờ kết thúc, giữ lại hay mang tiếp một cuộc trò
+chuyện, và việc mang tiếp qua một mặt im lặng vẫn không hoạt động bên cạnh nó.
+Rủi ro đã biết, chấp nhận khi bật: một giọng giống họ (người thân) ngoài khung
+hình khi họ ngồi im một mình trong khung sẽ được ghi và đọc như của họ
+([same-voice.md](../same-voice.md), «One way only»).
+
+Một yêu cầu quên toàn bộ của đúng người đã được nghe và xác nhận, khi trả
+thành công, xóa các dấu giọng xác nhận trong RAM; quên mặt thành công xóa dấu
+của đúng người bị xóa. Cả bộ chạy thường lẫn bộ chạy âm thanh tùy chọn đều giữ
+định danh trước khi gọi công cụ và xử lý biên nhận trước các kiểm tra phạm vi
+và đầu ra sau đó. Từ chối, thất bại hay yêu cầu chưa được cho phép không xóa
+dấu. Thế hệ được chụp ngay khi Engine bắt đầu xử lý Start, trước callback;
+quan sát chậm từ thế hệ cũ không thể học hay xác nhận lại sau khi quên, kể cả
+khi các câu mới đã học lại người ấy. Đây là hàng rào RAM, tách biệt với dấu
+giọng đăng ký lâu dài của dịch vụ.
+
+Sự kiện hợp lệ `memory/forgot` cũng xóa đúng bộ đệm Engine đó: gồm xóa từ ứng
+dụng và xóa đã hoàn tất nhưng mất biên nhận công cụ. Một bộ đọc bus kiểm tra
+mỗi 500 ms khi bus khả dụng, kể cả khi xác nhận và tóm tắt tắt; không phụ thuộc công tắc
+tóm tắt. Id người xóa dấu của người đó và đổi thế hệ; person null xóa tất cả.
+Id phòng `everyone` và phạm vi quy tắc không xóa dấu cá nhân. Trước khi sự
+kiện được nhận và xử lý, dấu cũ có thể vẫn dùng được; không hứa ngắt nguyên
+tử giữa các tiến trình hay phát lại sự kiện bus bị mất. Mỗi lần kiểm tra xử lý
+tối đa tám thông báo; lịch chạy và hàng đợi có thể làm việc xóa chậm hơn một
+khoảng kiểm tra.
+
+Lượt cập nhật cũng phải cài `lamp-same-voice` và mô hình của nó. Chỉ bật công
+tắc không cung cấp các tệp này; thiếu chúng thì không thể xác nhận giọng.
+Việc sửa cài đặt qua lượt cập nhật là phụ thuộc triển khai riêng, không nằm
+trong thay đổi xóa bộ đệm này.
 
 **Lời nhắc của họ trên câu như vậy** (`LAMP_ONE_FACE_REMINDERS=on`, bật trong
 bản sản phẩm, quyết định của người phụ trách ký ức ngày 4/11): việc ghi nhớ
@@ -1129,6 +1170,12 @@ lamp.
 Ý tưởng quan sát có liên kết nguồn, chép đúng lời của người nói, là sự thật
 kèm trích dẫn nguyên văn của thiết kế Tiers
 ([memory-tiers.md](../memory-tiers.md)), ở đây không dùng mô hình.
+
+### Chuyển sự kiện quên cho lệnh ghi chờ và xác nhận giọng
+
+Khi bus khả dụng, worker second luôn đăng ký sự kiện quên, kể cả khi xác nhận giọng và tóm tắt đều tắt. Mỗi lô đọc tối đa tám thông điệp đúng một lần. Lệnh ghi chờ của toàn bộ lô được hủy trước: id người, `everyone` hoặc null hủy chúng; phạm vi quy tắc và thông điệp sai định dạng không hủy. Một tác vụ blocking được await sau đó dọn tóm tắt nếu bật và hủy đúng bộ đệm xác nhận của Engine. Quên một người chỉ xóa dấu của người đó và chặn quan sát đang chờ; null xóa tất cả; `everyone` và quy tắc không xóa dấu cá nhân. Thay đổi xác nhận độc lập này không chứa mã hay công tắc đăng ký giọng lúc thiết lập.
+
+Ranh giới đầu gồm khóa lệnh ghi chờ và lời gọi ghi log hiện có; mục tiêu p95 trên host không tải là dưới 1 ms, chưa đo cho head này, không phải giới hạn cứng khi khóa hoặc nơi nhận log bị chặn. Khóa tóm tắt và dọn xác nhận chạy ngoài reactor. Bộ đọc chỉ trả lại sau khi hoàn tất nên lô sau có thể phải chờ; chu kỳ 500 ms không phải hạn hoàn tất. `Thread::forget` vẫn giữ lần dọn lệnh ghi chờ sau đó. Tác vụ blocking lỗi làm listener dừng. `shutdown_background` không chờ tác vụ đang chạy; tiến trình thoát có thể ngắt nó. Không hứa phát lại sự kiện hay ngắt nguyên tử bền vững giữa các tiến trình.
 
 ## Lời đã thấy nói, trả lời thay cho một câu không có lời, vẫn là của người nói (`LAMP_HELD_WORDS_SEEN`)
 

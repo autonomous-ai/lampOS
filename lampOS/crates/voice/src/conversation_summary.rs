@@ -380,9 +380,16 @@ pub fn memory_forgot_from(
     summaries: &Mutex<Summaries>,
     thread: &Mutex<crate::thread::Thread>,
 ) -> usize {
-    let forgotten = forgot.forgotten(now_us);
+    memory_forgotten_from(&forgot.forgotten(now_us), summaries, thread)
+}
+
+fn memory_forgotten_from(
+    forgotten: &[Option<String>],
+    summaries: &Mutex<Summaries>,
+    thread: &Mutex<crate::thread::Thread>,
+) -> usize {
     // A role went with its person's everything (`LAMP_MEMORY_ROLE`).
-    for person in &forgotten {
+    for person in forgotten {
         crate::remember::role::forgot(person.as_deref());
     }
     let forgets = forgotten
@@ -410,16 +417,14 @@ pub fn memory_forgot(forgot: &mut crate::bus_out::ForgotIn, now_us: u64) -> usiz
     memory_forgot_from(forgot, now_us, &SUMMARIES, &crate::thread::THREAD)
 }
 
-/// Memory's forgets since the last look, with the running summary off
-/// ([`on`]): no thread or note is touched here, as before, but any that
-/// reaches the conversation ([`memory_forgot_talk`]) still drops the write
-/// waiting for its send, and with it what the next turn would be told of
-/// it (`crate::services::forget_waiting`; Reviewer-two's HOLD on #5968 at
-/// `8c1cbd4268`: the forget reached the write only through the summary's
-/// reader). How many there were.
+/// Drain memory forgets even with summaries disabled: pending writes still expire.
 pub fn memory_forgot_waiting(forgot: &mut crate::bus_out::ForgotIn, now_us: u64) -> usize {
-    let forgets = forgot
-        .forgotten(now_us)
+    memory_forgotten_waiting(&forgot.forgotten(now_us))
+}
+
+/// Apply an already-drained batch without touching the thread or running notes.
+pub(crate) fn memory_forgotten_waiting(forgotten: &[Option<String>]) -> usize {
+    let forgets = forgotten
         .iter()
         .filter(|person| memory_forgot_talk(person.as_deref()))
         .count();
@@ -427,6 +432,11 @@ pub fn memory_forgot_waiting(forgot: &mut crate::bus_out::ForgotIn, now_us: u64)
         crate::services::forget_waiting();
     }
     forgets
+}
+
+/// Apply an already-drained batch to this process's thread and notes.
+pub(crate) fn memory_forgotten(forgotten: &[Option<String>]) -> usize {
+    memory_forgotten_from(forgotten, &SUMMARIES, &crate::thread::THREAD)
 }
 
 /// The scope's note, while it is under [`crate::thread::REMEMBERED_FOR`]

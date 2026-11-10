@@ -399,6 +399,13 @@ Environment=LAMP_SERVICES=on
 # (MOST_UNREADY), and every send stays refused as before.
 Environment=LAMP_SAME_VOICE_MODEL=/opt/lampOS/voice/current/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx
 Environment=LAMP_SAME_VOICE_FOR=services
+# CAM++ one way only (the memory owner's decision, 4 Nov; switched on 10 Nov): the known person's own voice,
+# learnt in RAM from 4 lines their face alone was seen saying, confirms a line no face was seen speaking as
+# theirs while their known face is the one face in view (cosine 0.45 or over against the mean of 3 or more of
+# their prints). It reads the services' prints, so every line is printed, linked or not; it never ends, holds,
+# splits or carries a conversation, and a line only their voice confirmed never counts as their face seen saying
+# it for a linked service's send, full read or enrolled print (docs/same-voice.md, "One way only").
+Environment=LAMP_SAME_VOICE_CONFIRMS=on
 # A made skill reads a linked service to its owner alone (#5288, #5303): the made-skill brief lets one read
 # through, passed to the provider and second routes. Played on lamp-9adf 5 Nov.
 Environment=LAMP_SKILL_READS=on

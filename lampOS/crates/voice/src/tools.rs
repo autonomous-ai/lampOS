@@ -1685,6 +1685,38 @@ pub fn run_call(
     run_call_with_scope(route, call, request, heard, None)
 }
 
+/// The Engine's own confirmation cache follows a successful heard deletion.
+/// This is separate from the persisted services enrollment. The runner already
+/// checked authority; the original admitted identity survives face deletion.
+pub(crate) fn forget_confirmation_voice(
+    owner: &crate::same_voice::OwnerVoice,
+    name: &str,
+    face_person: Option<&str>,
+    heard: bool,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    told: &Value,
+) {
+    if !heard || told.get("error").is_some() {
+        return;
+    }
+    if name == crate::remember::FORGET_EVERYTHING {
+        if let Some(lease) = lease
+            && lease.everything_marked()
+            && (told["forgotten"] == true || told["note"] == "I was keeping nothing of them.")
+            && let Some(person) = lease.admitted_person()
+        {
+            owner.forget_person(person);
+        }
+    } else if name == crate::known_faces::FORGET
+        && told["ok"] == true
+        && let Some(person) = face_person
+    {
+        // On a room line the eyes only accept the requested name when its
+        // normalized person matches the face actually seen saying that line.
+        owner.forget_person(person);
+    }
+}
+
 pub fn run_call_scoped(
     route: &Route,
     call: &ToolCall,
@@ -2613,6 +2645,7 @@ mod tests {
                 speakers: vec![speaker.to_owned()],
                 known: crate::speaking_faces::known_with_face(&known),
                 enrollment: None,
+                by_voice: false,
             })
         };
         seen(request, "f2");
