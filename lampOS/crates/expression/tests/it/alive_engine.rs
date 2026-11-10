@@ -591,6 +591,34 @@ fn someone_working_close_and_still_under_it_has_a_still_lamp() {
     assert!(named(&output, "breathing"));
 }
 
+/// #5955 (the lead, 10 Nov): with no work light in the catalogue, as in
+/// the product, someone close and still under the light keeps the breath
+/// and drift going: the layer never stills for work.
+#[test]
+fn with_no_work_light_someone_close_and_still_keeps_it_breathing() {
+    let mut value = catalogue();
+    value.alive.as_mut().unwrap().work = None;
+    let mut lamp = Lamp::new(value);
+    lamp.run(2 * SECOND, |_, _| {});
+    lamp.faces = Some(vec![face(0.35, 0.3, 0.3)]);
+    lamp.run(40 * SECOND, |output, _| {
+        assert!(!named(output, "still for work"));
+    });
+    let output = lamp.last(TICK);
+    assert!(named(&output, "breathing"));
+    assert_ne!(asked(&output), BodyOffsets::ZERO);
+}
+
+/// The product's catalogue has no work light (#5955).
+#[test]
+fn the_product_catalogue_has_no_work_light() {
+    let product = Catalogue::from_json(include_str!(
+        "../../../../deploy/product/settings/expression.json"
+    ))
+    .unwrap();
+    assert!(product.alive.as_ref().unwrap().work.is_none());
+}
+
 #[test]
 fn a_close_face_that_moves_is_not_someone_working() {
     let mut lamp = Lamp::new(catalogue());

@@ -20,7 +20,7 @@ Astro); mood as the style of the same move, never as added randomness
 (Anki, Luxo Jr.); and a body that moves plainly and little while someone
 works under the light (Apple's ELEGNT).
 
-- Taken: all four, as written below.
+- Taken: all four, as written below; the last one is optional since #5955 (the lead, 10 Nov: the breath and drift go on with someone working close and still), and the product leaves it out.
 
 **The ring breathes and blinks already.** At rest the ring shows "a slow,
 dim, warm breath (5.2 s)" and, with `LAMP_RING_EYE=on`, blinks every 7 to
@@ -66,10 +66,10 @@ changed):
 
 | | When | What the body is asked |
 |---|---|---|
-| Breath | The voice resting, the body free (no hold, no concentration, fresh joints), and nobody working under the light | The head lifts and settles with the ring's breath: 0 to 0.03 rad (about 20 counts, 1.7 degrees) over 5.2 s; while Mood runs, at the lamp's one breath Mood keeps, the ring's too (#1670, [ring-choreography.md](ring-choreography.md#the-lamps-one-breath-1670)) |
+| Breath | The voice resting, the body free (no hold, no concentration, fresh joints), and, with a work light in the catalogue, nobody working under the light | The head lifts and settles with the ring's breath: 0 to 0.03 rad (about 20 counts, 1.7 degrees) over 5.2 s; while Mood runs, at the lamp's one breath Mood keeps, the ring's too (#1670, [ring-choreography.md](ring-choreography.md#the-lamps-one-breath-1670)) |
 | Drift | As the breath | Every 30 to 90 s (not on a beat), the head eases over 3 s to a new small lift (0 to 0.035 rad, about 23 counts) and tilt (up to 0.02 rad either way), and stays there until the next |
 | Coming in and going out | When the breath may begin or must stop | Over 0.35 s (the catalogue's `blend_us`); over the 4 s of settling when it falls asleep |
-| Still for work | A face of at least 0.04 of the picture (about a fifth of it each way) whose middle has stayed within 0.05 of the picture for 5 s; held 30 s after (a head bent over work is often no face) | Nothing from this layer: the body moves plainly and little |
+| Still for work (only with `work` in the catalogue; the product has none, #5955) | A face of at least 0.04 of the picture (about a fifth of it each way) whose middle has stayed within 0.05 of the picture for 5 s; held 30 s after (a head bent over work is often no face) | Nothing from this layer: the body moves plainly and little |
 | Falling asleep | 23:00 to 06:00 local time, the voice resting, the body free, and the eyes reporting nobody for 15 minutes | Over 4 s, everything else gives way to the sleeping pose: the head bowed 0.023 rad (15 counts, all lamp-4ace's down reach allows) |
 | Asleep | Until woken | Only a slow breath: the head lifts 0.015 rad (10 counts) over 9 s. No clip begins: a bang, talk in the room, the voice listening are not answered by Expression |
 | Stirring | With `LAMP_REST_THROUGH_SOUNDS=on`, asleep for the night: its counted name (#4285, see below) | The head rises 0.04 rad (about 26 counts, 2.3 degrees) from its bow over 0.4 s, eased, from the next tick; held while its answer is awaited, 5 s from the last counted name, then back down over 2 s. Its answer begins a full wake from where the stir holds the head |
@@ -291,7 +291,7 @@ catalogue is read (`crates/expression/src/alive.rs`):
 | `breath.period_us`, `breath.inhale` | 5,200,000; head pitch -0.03 | 2 to 20 s; the head only, at most 0.06 rad, 0.06 rad/s and 0.12 rad/s² at the largest energy |
 | `drift.every_us`, `drift.move_us` | 30 to 90 s; 3 s | waits of 5 to 600 s, moves of 1 to 10 s |
 | `drift.low`, `drift.high` | pitch -0.035 to 0, roll -0.02 to 0.02 | the head only, zero between them, within 0.06 rad and the same speed and acceleration as the breath at the quickest energy |
-| `work.face_area`, `still`, `still_us`, `hold_us` | 0.04, 0.05, 5 s, 30 s | (0, 1], (0, 0.5], 1 to 60 s, at most 600 s |
+| `work.face_area`, `still`, `still_us`, `hold_us` (optional: absent, no work gate; the product leaves it out, #5955) | 0.04, 0.05, 5 s, 30 s | (0, 1], (0, 0.5], 1 to 60 s, at most 600 s |
 | `sleep.night` | `[1380, 360]`: 23:00 to 06:00 | minutes of the local day, past midnight allowed |
 | `sleep.name_requires_speech` | omitted (`false`) | `true` requires corroborating person speech for a sleeping name; First enables it after the compatibility minute |
 | `sleep.nobody_us`, `settle_us` | 15 minutes; 4 s | 1 minute to 2 hours; 1 to 10 s |
@@ -309,7 +309,7 @@ not more life.
 | `voice/progress` (or `voice/timing`) | The voice | Resting or not; thinking or speaking wakes it |
 | `body/joint_states` | The body | Fresh joints, as every request needs |
 | `attention/concentration` | Its owner | Explicit concentration stops it all, as before |
-| `humans/faces/tracked` | The eyes | Nobody there, someone working close and still, the first face of the morning |
+| `humans/faces/tracked` | The eyes | Nobody there, someone working close and still (with a work light only), the first face of the morning |
 | `name/heard` | The name listener | Waking |
 | `voice/activity` | The voice's validated person-speech detector | Corroborates a sleeping name only with `sleep.name_requires_speech: true` |
 | `controls/gesture` | Controls | Waking, by an enabled tap or stroke. New to Expression |
@@ -429,7 +429,7 @@ and out within 0.35 s, leaving exactly the listening posture; over 15
 minutes, nine or more drifts, each 33 to 93 s from the last, with no tick
 asking more than 0.75 milliradians of pitch more than the tick before
 (0.4 of roll), also across the hour where the ring's phase jumps; a face
-close and still stops the layer, and a moving one does not; asleep after
+close and still stops the layer, and a moving one does not; with no work light (the product, #5955) a close, still face keeps the breath going, and the product's catalogue has none; asleep after
 15 minutes of nobody at 23:30, into the pose in exactly 4 s, under a
 milliradian a tick; not asleep by day, with the eyes silent, without the
 time of day, or with someone passing every ten minutes; a bang and talk
