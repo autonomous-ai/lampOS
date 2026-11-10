@@ -2466,7 +2466,7 @@ key (its unit's `LoadCredential=key`), so it forwards Hermes' requests and
 adds the key itself (`lamp_cloud::hermes_llm`).
 
 - **Off** unless `LAMP_HERMES_ON_LAMP=on` in lamp-cloud's environment (the
-  product unit doesn't set it yet), and only while lamp-cloud runs
+  product's `lamp-cloud.service` sets it, with lamp-tasks', #5978), and only while lamp-cloud runs
   (`LAMP_CLOUD=on`).
 - **Where:** `127.0.0.1:7741`, loopback only, and a peer that isn't loopback
   is never answered. 7741 is used by no other lampOS part and by neither of
