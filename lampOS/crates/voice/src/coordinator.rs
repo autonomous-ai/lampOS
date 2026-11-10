@@ -12682,12 +12682,13 @@ fn conversation_with_gate_inner(
                 snapshot = now_state;
                 last_publish = monotonic_us();
             }
-            // An add-on's quoted line is the second route's alone: there its
-            // turn is asked with no functions (#2530 part 2). The Live
+            // An add-on's quoted line, and a made skill's words (#6062), are
+            // the second route's alone: there the turn is asked with no
+            // functions (#2530 part 2). The Live
             // session's functions are declared once, so it never takes one.
             if let Some(why) = quoted_refused(quoted, &rig.provider.role) {
                 eprintln!(
-                    "lamp-voice: the add-on {}'s say is refused: {why}",
+                    "lamp-voice: the skill {}'s quoted say is refused: {why}",
                     ticket.skill()
                 );
                 ticket.answer(crate::say::Outcome::Refused(why.into()));
