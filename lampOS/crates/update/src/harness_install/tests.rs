@@ -1566,7 +1566,7 @@ fn versions_are_compared_as_dotted_numbers() {
 /// nothing asked, nothing started.
 #[test]
 fn an_equal_newer_or_unknown_version_is_left_alone() {
-    for version in [Some(product::VERSION), Some("0.5.100"), Some("1.0.0"), None] {
+    for version in [Some(product::VERSION), Some("0.6.10"), Some("1.0.0"), None] {
         let lamp = Lamp::new();
         lamp.harness_there();
         installed_at(&lamp, version, 1);
