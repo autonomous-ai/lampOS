@@ -5229,6 +5229,19 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
     run_in(file, call, installed_order())
 }
 
+#[cfg(test)]
+pub(crate) fn redo_for_setup_test(file: &Path, step: &str) -> (Value, bool) {
+    run_in(
+        file,
+        &ToolCall {
+            id: "setup-redo-test".into(),
+            name: REDO.into(),
+            args: json!({"step": step}),
+        },
+        None,
+    )
+}
+
 /// The installed skill's `order`, read once per worker as it starts
 /// ([`crate::tools::take`]) and kept, never re-read on each redo (the
 /// Reviewer-lead's P3 on #5521): Voice reads its skill once per start too.
@@ -5386,7 +5399,14 @@ fn answer(file: &Path, call: &ToolCall, order: Option<&[Step]>) -> (Value, bool)
         }
         _ => return (crate::tools::unavailable(), false),
     };
-    match post(file, &line) {
+    let posted = if call.name == REDO
+        && (line["redo"] == true || line["redo_step"] == Step::WhoYouAre.name())
+    {
+        crate::setup_voice::post_redo(file, || post(file, &line))
+    } else {
+        post(file, &line)
+    };
+    match posted {
         Ok(()) => (json!({"ok": true}), true),
         Err(_) => (
             json!({"error": "I could not note that just now. Go on all the same."}),

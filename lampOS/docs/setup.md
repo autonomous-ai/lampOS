@@ -111,7 +111,10 @@ faces from photos not yet confirmed (`people.json.from-photos`, only with
 (`/var/lib/lampos-eyes/set-aside`, #1505), a labelled session's face reads
 (`seems.log`), the glance log (`glance.log`) and the owner's voice print for
 the linked services' sends (`owner-voice.json`, and `owner-voice.json.new`
-half written) in the same folder, tasks
+half written) in the same folder, the owner's voice prints kept at setup
+(`/var/lib/lampOS/voice/onboarding/setup-voice.json`, and `setup-voice.json.new`
+half written, `LAMP_SAME_VOICE_ENROLS_AT_SETUP`, C115; wiped with the
+onboarding folder below), tasks
 `/var/lib/lampos-tasks/store` and their targets (`targets.json` beside it), the
 skills' state `/var/lib/lampos-skills-state` (daily routine claims included),
 the pushed skills and the owner's yes to them `/var/lib/lampOS/skills-dev`, the
@@ -147,7 +150,14 @@ per-lamp facts (the servos' daily load and temperature peaks in
 `/var/lib/lampos-body/peaks`, #4501, among them), and physical privacy.
 
 Onboarding uses `/var/lib/lampOS/voice/onboarding/progress.json`; the privacy
-checkpoint and transient handoff files share its root-owned 0700 directory.
+checkpoint, transient handoff files and the owner's voice prints kept at setup
+(`setup-voice.json`, root's 0600, prints only, never sound;
+`LAMP_SAME_VOICE_ENROLS_AT_SETUP`, [same-voice.md](same-voice.md)) share its
+root-owned 0700 directory. Besides a reset, `setup-voice.json` goes with the
+owner's "forget everything", a face forgotten, a redo of "who you are", a walk
+that keeps no prints, a start that finds another owner's, and a start with the
+switch off where the voice's second worker runs the attention rules
+(`LAMP_ATTENTION`); a start without them leaves it.
 The room sounds yes (#1722 item 1) is `/var/lib/lampOS/consent/room-sounds.json`,
 0640 root:lampos so lamp-ears can read it, and the face expressions yes
 (`LAMP_FACE_EXPRESSIONS_ASK`) is `/var/lib/lampOS/consent/face-expressions.json`
@@ -1354,3 +1364,11 @@ run" above), and the ten customer lamps, each set up through the app on
 Wi-Fi by the hardware team before it was reset and packed (the lead,
 #1711, 30 Oct). What a section still lacks on a lamp, it says itself ("Not
 shown on a lamp: …").
+
+### Memory forget delivery in the second worker
+
+The worker subscribes to memory forgets whenever its bus is available, even when enrollment and conversation summaries are off. Each poll drains at most eight messages once. Pending service writes for the whole validated batch retire before summary locks or enrollment storage cleanup. A person, `everyone`, or a whole-memory forget clears pending writes; rules scopes and malformed messages do not. Enrollment handles person and whole-memory forgets, preserving an unrelated enrolled owner.
+
+One awaited blocking job handles summaries and the actual Engine enrollment instance. Enrollment retains its existing atomic lock, generation fence, and storage ordering. The reactor does not wait synchronously on that storage lock. The next batch waits for this job; the 500 ms poll is not a cleanup deadline. A failed blocking job ends this listener. Worker shutdown uses `shutdown_background`: it does not join an already-running blocking job; process exit may interrupt cleanup. The fast retirement target is p95 below 1 ms without I/O; measurement and combined confirmation qualification are pending.
+
+The fast boundary ends after the existing pending-write mutex and logging call return; contention or a stalled log sink can exceed the unloaded target. Summary cleanup still calls `Thread::forget`, including its later pending-write cleanup. Setup generations and persistence retire under the existing enrollment lock in the blocking job, not at the earlier pending-write boundary.

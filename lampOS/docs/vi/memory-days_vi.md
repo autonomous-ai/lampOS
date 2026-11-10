@@ -1121,3 +1121,36 @@ lamp.
 Ý tưởng quan sát có liên kết nguồn, chép đúng lời của người nói, là sự thật
 kèm trích dẫn nguyên văn của thiết kế Tiers
 ([memory-tiers.md](../memory-tiers.md)), ở đây không dùng mô hình.
+
+### Quên dấu giọng được giữ từ bước thiết lập
+
+Với `LAMP_SAME_VOICE_ENROLS_AT_SETUP=on` (mặc định tắt), sự kiện hợp lệ
+`memory/forgot` cũng vô hiệu hóa lô dấu giọng đang chờ của bước thiết lập,
+kể cả khi tóm tắt hội thoại tắt. Mỗi lần quên một người đổi thế hệ và bỏ các
+câu đang chờ trước khi truy cập tệp, nên kết quả tìm chủ cũ đến muộn không
+thể ghi chúng trở lại RAM hay `setup-voice.json`.
+
+Dấu đã lưu của đúng người bị xóa; dấu đã lưu hợp lệ của người khác được giữ.
+`person: null` xóa tất cả; id phòng `everyone` và phạm vi quy tắc không tác
+động. Lô đang chờ chỉ biết id mặt tạm thời, nên quên người khác cũng bỏ lô
+đang chờ một cách thận trọng, nhưng giữ dấu đã lưu hợp lệ của chủ khác.
+Nếu tệp thiếu, hỏng hoặc không đọc được thì không thể xác nhận chủ khác;
+hệ thống thử dọn tệp thay vì tin dữ liệu chưa xác minh.
+
+Một bộ đọc bus xử lý tối đa tám sự kiện mỗi lần kiểm tra 500 ms. Khi có
+đăng ký giọng từ thiết lập, chỉ một tác vụ chặn xử lý lô rồi trả lại bộ đọc
+trước lô kế tiếp; chờ khóa và I/O tệp không chặn vòng chạy bất đồng bộ một
+luồng của voice. Lịch chạy, hàng đợi, khóa và ổ đĩa có thể kéo dài thời gian
+quá một khoảng kiểm tra. Khi tắt, hệ thống không chờ tác vụ dọn đang chạy;
+không bảo đảm hoàn tất trước khi tiến trình thoát. Xóa tệp là cố gắng hết
+mức: lỗi được ghi nhật ký,
+nhưng tệp có thể còn nếu unlink thất bại. Đây không phải ngắt nguyên tử giữa
+các tiến trình hay bảo đảm xóa bền vững khi lưu trữ lỗi.
+
+### Chuyển sự kiện quên trong worker second
+
+Worker đăng ký sự kiện quên khi bus khả dụng, kể cả khi đăng ký giọng nói và tóm tắt hội thoại tắt. Mỗi lần kiểm tra đọc tối đa tám thông điệp đúng một lần. Các lệnh ghi dịch vụ đang chờ của toàn bộ lô hợp lệ bị hủy trước khi lấy khóa tóm tắt hoặc xử lý lưu trữ đăng ký. Quên một người, `everyone`, hoặc toàn bộ bộ nhớ hủy lệnh ghi chờ; phạm vi quy tắc và thông điệp sai định dạng không làm vậy. Đăng ký xử lý quên một người hoặc toàn bộ, giữ nguyên chủ sở hữu khác.
+
+Một tác vụ blocking được await xử lý tóm tắt và đúng đối tượng đăng ký của Engine. Khóa nguyên tử, hàng rào thế hệ và thứ tự lưu trữ của đăng ký được giữ nguyên. Reactor không chờ đồng bộ khóa lưu trữ này. Lô tiếp theo phải chờ tác vụ; chu kỳ 500 ms không phải hạn hoàn tất. Nếu tác vụ blocking lỗi, listener dừng. Worker dùng `shutdown_background`: không chờ tác vụ blocking đã chạy; tiến trình thoát có thể ngắt việc dọn. Mục tiêu p95 cho hủy lệnh ghi là dưới 1 ms khi không có I/O; chưa đo và chưa xác nhận tích hợp với xác nhận giọng nói.
+
+Ranh giới nhanh kết thúc sau khi khóa lệnh ghi chờ và lời gọi ghi log hiện có trả về; tranh chấp khóa hoặc nơi nhận log bị chặn có thể vượt mục tiêu khi không tải. Dọn tóm tắt vẫn gọi `Thread::forget`, gồm lần dọn lệnh ghi chờ sau đó. Thế hệ và dữ liệu đăng ký bị hủy dưới khóa đăng ký hiện có trong tác vụ blocking, không phải ở ranh giới hủy lệnh ghi chờ trước đó.

@@ -851,6 +851,78 @@ and passes `--same-voice-confirms BAR` after the model's path):
   loose to tell them from another voice. A line the voice confirmed is never
   learnt from, so the voice never vouches for itself. Another known person
   starts it afresh, and so does a restart of the voice. Nothing is written.
+- **Kept from setup, with `LAMP_SAME_VOICE_ENROLS_AT_SETUP=on`** (C115,
+  `crates/voice/src/setup_voice.rs`; off unless set, off everywhere). While
+  the walk leads "who you are", each line one face alone was seen speaking,
+  the one face in view through it, has its print held in RAM with that
+  face's passing id, read in a thread of its own so the step waits for
+  nothing. Once the step ends with a face saved as the owner (the
+  onboarding file's `owner`, their face as the eyes' known file says now),
+  the prints of that face alone, at most 4, are kept in `setup-voice.json`
+  beside the walk's progress (the onboarding folder, root's 0700, wiped
+  whole by the reset plan), a root-owned 0600 file written whole, prints
+  only, never sound. A guest's lines, lines no face was seen speaking, and
+  everything held when no face was saved, go. Each voice start gives them
+  back to the known person's own prints for the owner the onboarding file
+  still names, so with 3 or more kept the owner's first line is judged
+  from the start; with fewer, the first lines seen said by them make up the
+  rest as before. The owner's "forget everything" removes the file and the
+  prints in RAM, whatever the switch says (`setup_voice::forget_with_everything`),
+  and the prints still held for the step: a line whose print is waited for
+  across the forget holds none, and the step's end decides and writes under
+  the same lock, so it never writes them back. The file is also removed when
+  the active enrollment worker successfully posts a redo of "who you are"
+  or the whole walk, when the open step is first heard, when the step ends
+  with nothing kept, at a start
+  that finds another owner's (or none named), when a face is forgotten
+  (`setup_voice::owner_face_gone`, the walk's owner mark gone), and at a
+  start with the switch off (`setup_voice::switched_off`) where the worker
+  runs the attention rules (`LAMP_ATTENTION`); a start without them leaves
+  it ([second-voice.md](second-voice.md)). A line of the walk whose print
+  comes only after the step was settled holds none, so it never replaces
+  the prints kept (Reviewer-two's P2 on #5582); "who you are" open again,
+  and a step that ends keeping nothing, also empty the known person's own
+  prints in RAM, not the file alone. Each spoken line snapshots an atomic
+  enrollment generation as the first operation when the Engine processes its
+  Start, before callbacks, locks or speech recognition. It carries that token
+  to the background reader instead of adopting a newer walk after delayed
+  speech recognition. Events still queued upstream are outside this boundary.
+  A line admitted before settlement, forget or redo cannot join the new walk. The reader
+  also captures the forget and settlement generations before reading
+  whether the step is open, then validates them before clearing or holding
+  prints. An old
+  open observation arriving after settlement cannot replace the saved
+  batch; one arriving after a forget cannot restore it. The settler keeps
+  the same admission generation and checks it while waiting and under the
+  lines lock before draining or writing. A pre-forget owner observation
+  cannot take a newer walk's prints or clear its settling flag. Forget
+  releases that flag so a fresh walk can settle independently, even if the
+  old owner callback has not returned. Posting a validated owner-step or
+  whole-walk redo holds the same lock through the existing mailbox write
+  and invalidates the old generation only after that write succeeds.
+  Failed posts, refused requests and unrelated step redos keep the batch.
+  This tool-side file I/O adds no I/O to heard. This check stays
+  off the immediate reader handoff path. Start adds only an atomic load,
+  without taking the enrollment lock; the later handoff reuses that token.
+  Validated `memory/forgot` events also retire the held setup batch, even
+  with conversation summaries off. Every person forget advances setup's
+  generation and clears pending lines before file I/O, so a delayed owner
+  lookup cannot save them afterward. Stored prints for a valid unrelated
+  owner remain; matching prints are cleared in RAM and their file is removed.
+  A null person clears all. The room id `everyone` and rules scopes do nothing.
+  Pending batches use passing face IDs, so an unrelated person's forget also
+  discards pending enrollment conservatively, while preserving valid unrelated
+  persisted prints. A missing, malformed or unreadable stored owner cannot
+  establish that exception and receives conservative cleanup.
+  One bus reader handles at most eight events per 500 ms poll. With setup
+  active, one blocking job handles a batch and returns the same reader before
+  another batch starts; file I/O and lock waits do not block the worker's
+  single-threaded async runtime. Scheduling, backlog, lock waits and disk I/O
+  can extend the delay beyond one poll. Shutdown does not join an already
+  running blocking cleanup; completion before process exit is not guaranteed.
+  Removal remains best effort: errors
+  are logged and a failed unlink may leave the file. This is not an atomic
+  cross-process cutoff or a durable deletion guarantee after a storage error.
 - **A confirm.** A line admitted as the known person's that no face was seen
   speaking, their known face the one face in view through it, whose print
   scores the bar or over against their kept prints, is taken as seen said
