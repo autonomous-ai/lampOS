@@ -115,6 +115,10 @@ node conformance/conformance.js --fake     # the SDK's fake
 node conformance/conformance.js --compare  # the paired lamp against the fake; exit 1 if a step differs
 ```
 
+Against a real lamp the script acts: `say hello` speaks aloud, `gesture nod` and the
+looks move the body (a resting lamp stands up first), and `light green` changes the ring for a
+second and a half. Run it where that is welcome, or with `--fake`.
+
 A step differs when it was taken by one and refused by the other, refused with
 another code, or answered with other fields; times are shown, never compared. A
 step needing a grant the lamp did not give is skipped. A look on a resting lamp
