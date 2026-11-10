@@ -291,3 +291,27 @@ A current-base carry and focused/workspace verification follow separately.
 ### Corrected acknowledgement-path timing
 
 A separate optimized standalone probe measures the corrected acknowledgement path itself, with identical source before and after except its final slot. On “Keeping it on until ten, as requested, thanks.”, the first result changes from nonclaim to LightKept. First / median / p99 / maximum elapsed time: before 134.517 / 95.543 / 174.901 / 371.834 us; after 140.293 / 41.186 / 92.161 / 165.070 us, over first use and 1,000 repeats. Thread CPU median/p99/max: before 96.050/170.064/265.174 us, after 41.663/85.923/139.334 us. This path stays below 1 ms in this sample; it does not erase the earlier mixed-prefix elapsed maximum failure or establish a device bound. Native compilation ran concurrently; no scheduling cause is inferred. Source hashes and commands: `/tmp/fourth-matcher-ack-timing-receipt.json`; logs and source `/tmp/fourth-matcher-ack-timing-{before,candidate}.{rs,log}`. The candidate prefix matches the frozen current production prefix.
+
+## Train-768 carry: current-base gates
+
+The completed combined patch was committed as 959bf6d699, then carried to
+3a8f37d0b106053e5e65f81c03a7a1f518bc5005 on
+75da83b3447dbd233a952b67d7effee652104277. All six authored commits are
+range-diff equal; all five changed files retain exactly the same hashes.
+The upstream Voice diff only locks and documents one shared-state test fixture;
+no Voice production change intervenes. Camera scheduling and docs changed in
+other parts of the workspace. The full Voice pass above remains bound to its
+train-767 source; it was not repeated merely to restate the result.
+
+Current-base workspace formatting passed in 19.296 s and strict all-target
+Clippy in 143.927 s. All 54 matcher/Engine controls passed, zero failed/ignored
+(2.70 s body; 173.606 s command). The changed upstream fixture
+`second_provider::worker::tests::a_forget_confirmation_cannot_reenter_the_next_turns_history`
+passed once with `--exact --test-threads=1` (0.02 s body; 1.722 s command).
+Workspace build passed in 105.902 s; all guarded hashes remained identical.
+Exact commands, source hashes and logs are in
+`/tmp/fourth-matcher-train768-native-receipt.json` and its stage logs.
+Docs pass 192 documents / 1,899 local links / zero broken. Fresh published-head
+ARM/Linux CI and both readers remain required. The elapsed target miss, the
+missing exact GO-159 replies and the authorized lamp replay remain open;
+WORDED stays off.
