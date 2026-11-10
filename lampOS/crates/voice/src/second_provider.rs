@@ -6615,6 +6615,9 @@ impl Engine {
             ProviderInput::Onboarding { request, .. } => {
                 crate::sleep_asked::mark_onboarding(request);
             }
+            // The walk under way or not (#5931): this process's own, read
+            // as the model's words are said ([`crate::onboarding::model_words`]).
+            ProviderInput::WalkUnderWay { on, .. } => crate::onboarding::set_under_way(on),
             // Begun in a computer's turn: the rule takes its line as a call,
             // as a tap's, whenever its words are judged.
             ProviderInput::TurnOpened { request, .. } => {

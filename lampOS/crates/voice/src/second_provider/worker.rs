@@ -262,6 +262,11 @@ impl Gate {
                 request,
                 privacy_generation,
             }
+            | ProviderInput::WalkUnderWay {
+                request,
+                privacy_generation,
+                ..
+            }
             | ProviderInput::WokenByName {
                 request,
                 privacy_generation,
