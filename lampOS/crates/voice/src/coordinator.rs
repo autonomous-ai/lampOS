@@ -14518,7 +14518,9 @@ fn play_exact_line(
     if !says.exact_waiting(at_us) {
         return Ok(None);
     }
-    let decided = crate::say::may_play_exact(now_is);
+    // A skill's step's line (#5999) also waits for the quiet its priority
+    // bought it as a say; a computer's or the unplug's does not.
+    let decided = crate::say::may_play_exact_after(now_is, says.exact_quiet_us());
     match decided {
         crate::say::ExactNow::Wait(_) => return Ok(None),
         crate::say::ExactNow::Refuse(why) => {

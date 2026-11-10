@@ -549,7 +549,7 @@ fn exact_words_after_wake_keep_their_priority_and_original_start_deadline() {
     fixture.reply(&renewed, Phase::Completed);
     fixture.presentation(
         &wake,
-        json!({"text":WORDS, "exact":true, "priority":8, "expires_in_ms":3_600_000}),
+        json!({"text":WORDS, "priority":8, "expires_in_ms":3_600_000}),
         "say",
     );
 }

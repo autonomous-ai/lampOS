@@ -79,6 +79,9 @@
 //!   whose words they were; every line the voice plays without the model,
 //!   an exact or a cached text, goes on `voice/line` as it begins, and a
 //!   reply when its words are whole.
+//!   With `"quiet": true` (#5999, a skill's fixed line) it also waits, as a
+//!   say, while anyone is heard and for its priority's quiet since the last
+//!   turn ([`may_play_exact_after`]).
 //! - **A paired computer's clip** (the local leader's 3 Nov, lamp-control's
 //!   `sound` of a clip it keeps): in place of the words, `clip` is the
 //!   absolute path of a WAV under lamp-control's clips folder
@@ -205,6 +208,15 @@ pub const URGENT_FROM: u8 = 8;
 pub const QUIET_US: u64 = crate::task_news::QUIET_US;
 /// Quiet since the last turn before an urgent say.
 pub const URGENT_QUIET_US: u64 = 1_000_000;
+
+/// The quiet since the last turn a say at `priority` waits for.
+fn quiet_for(priority: u8) -> u64 {
+    if priority >= URGENT_FROM {
+        URGENT_QUIET_US
+    } else {
+        QUIET_US
+    }
+}
 /// How long a client has to send its whole line, from when it was taken:
 /// one deadline for the line, not for each read, so that a client sending
 /// a little at a time cannot keep a place among [`MOST_WAITING`] (the
@@ -468,6 +480,9 @@ pub struct Request {
     /// place of a hello and the name only (#5207, Welcome back's day's
     /// first hello, "what's first today?").
     pub question: bool,
+    /// An exact line that waits, as a say does, for nobody heard and the
+    /// quiet its priority buys since the last turn (#5999, a skill's step).
+    pub quiet: bool,
     /// For `voice/line` (#4209): who asked, and what it was once rendered.
     pub line: LineMeta,
 }
@@ -540,6 +555,10 @@ struct Wire {
     /// asks (#6062).
     #[serde(default)]
     made: bool,
+    /// With `exact`: a skill's step's line (#5999) also waits for the quiet
+    /// a say at its priority waits for ([`may_play_exact_after`]).
+    #[serde(default)]
+    quiet: bool,
     #[serde(default)]
     unplug_request: Option<String>,
     #[serde(default)]
@@ -697,6 +716,7 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
             who: false,
             question: false,
             line: Default::default(),
+            quiet: false,
         });
     }
     let words = if let Some(clip) = wire.clip {
@@ -835,6 +855,9 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
             return Err("by: a name of 1 to 64 characters, no control characters".into());
         }
     }
+    if wire.quiet && !matches!(words, Words::Exact(_)) {
+        return Err("quiet goes only with exact".into());
+    }
     let priority = wire.priority.unwrap_or(NORMAL_PRIORITY);
     if priority > 9 {
         return Err("priority is 0 to 9".into());
@@ -857,6 +880,7 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
             by: wire.by,
             said: None,
         },
+        quiet: wire.quiet,
     })
 }
 
@@ -942,6 +966,7 @@ fn parse_turn(skill: String, turn: TurnWire, wire: Wire) -> Result<Request, Stri
         who: false,
         question: false,
         line: Default::default(),
+        quiet: false,
     })
 }
 
@@ -987,6 +1012,7 @@ fn parse_listen(skill: String, on: bool, wire: &Wire) -> Result<Request, String>
         who: false,
         question: false,
         line: Default::default(),
+        quiet: false,
     })
 }
 
@@ -1621,6 +1647,7 @@ impl Says {
                 who: false,
                 question: false,
                 line: Default::default(),
+                quiet: false,
             },
             answer,
             read_at_us: expires_at_us.saturating_sub(60_000_000),
@@ -1653,6 +1680,7 @@ impl Says {
                 who: false,
                 question: false,
                 line: Default::default(),
+                quiet: false,
             },
             answer,
             read_at_us: 0,
@@ -1716,6 +1744,26 @@ impl Says {
         (says, answered)
     }
 
+    /// For a test of the voice's loop: one skill's step's exact line at
+    /// `priority`, asked `quiet` (#5999), rendered already.
+    #[cfg(test)]
+    pub(crate) fn quiet_exact_for_test(
+        skill: &str,
+        samples: Vec<i16>,
+        priority: u8,
+    ) -> (Self, mpsc::Receiver<Answer>) {
+        let (mut says, answered) = Self::words_for_test(
+            skill,
+            Words::ExactSound {
+                samples,
+                text: None,
+            },
+            priority,
+        );
+        says.waiting[0].request.quiet = true;
+        (says, answered)
+    }
+
     /// [`Self::note_for_test`] for any `words`.
     #[cfg(test)]
     pub(crate) fn words_for_test(
@@ -1738,6 +1786,7 @@ impl Says {
                 who: false,
                 question: false,
                 line: Default::default(),
+                quiet: false,
             },
             answer,
             read_at_us: 0,
@@ -2018,13 +2067,16 @@ impl Says {
 
     /// The quiet the next say needs since the last turn, if one waits.
     pub fn quiet_needed_us(&self) -> Option<u64> {
-        self.next_index().map(|index| {
-            if self.waiting[index].request.priority >= URGENT_FROM {
-                URGENT_QUIET_US
-            } else {
-                QUIET_US
-            }
-        })
+        self.next_index()
+            .map(|index| quiet_for(self.waiting[index].request.priority))
+    }
+
+    /// The quiet the next exact line needs since the last turn: none
+    /// unless it was asked `quiet` (#5999, a skill's step).
+    pub fn exact_quiet_us(&self) -> Option<u64> {
+        let index = self.next_of(|request| matches!(request.words, Words::ExactSound { .. }))?;
+        let request = &self.waiting[index].request;
+        request.quiet.then(|| quiet_for(request.priority))
     }
 
     /// Take the next say to begin it at `now_us`: its written turn, its
@@ -2715,7 +2767,9 @@ impl Recordings {
 
     /// A paired computer's exact `text` rendered now, never kept, or why not.
     /// A fixed line (the unplug lines, #5777's P3) is said in the owner's
-    /// words, kept or rendered now, as a text's are; English as written.
+    /// words, kept or rendered now, as a text's are; English as written, and
+    /// a fixed line in English kept once rendered (#5999's P3: a head pat's
+    /// line on an English lamp is never a network render twice).
     pub fn rendered<'a>(&self, text: &'a str) -> Result<(Vec<i16>, &'a str), String> {
         let cache = self
             .cache
@@ -2726,6 +2780,9 @@ impl Recordings {
                 .kept(owners)
                 .map_or_else(|| cache.render_once(owners), Ok)
                 .map(|samples| (samples, owners)),
+            None if crate::language::is_fixed(text) => {
+                cache.samples(text).map(|samples| (samples, text))
+            }
             None => cache.render_once(text).map(|samples| (samples, text)),
         }
     }
@@ -3037,6 +3094,23 @@ pub fn may_play_exact(now: &SoundNow) -> ExactNow {
         return ExactNow::Wait("a reminder is said first");
     }
     ExactNow::Play
+}
+
+/// [`may_play_exact`] for a line asked `quiet` (#5999, a skill's step:
+/// Dusty air's nudge, a head pat's line): `quiet_us`, the quiet its
+/// priority buys, also holds it as it holds a say, while anyone is heard,
+/// the lamp speaks, or the last turn is nearer than that. None: as
+/// [`may_play_exact`].
+pub fn may_play_exact_after(now: &SoundNow, quiet_us: Option<u64>) -> ExactNow {
+    match (may_play_exact(now), quiet_us) {
+        (ExactNow::Play, Some(_)) if now.listening || now.speaking => {
+            ExactNow::Wait("someone is speaking")
+        }
+        (ExactNow::Play, Some(quiet)) if now.since_turn_us < quiet => {
+            ExactNow::Wait("the lamp spoke a moment ago")
+        }
+        (decided, _) => decided,
+    }
 }
 
 /// Whether the shutdown's last words ([`is_last_words`]) play now: unless
@@ -3800,6 +3874,39 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    /// #5999's P3: on an English lamp a fixed line asked exact (a head pat's)
+    /// is rendered once and kept, so the next pat plays it with no render;
+    /// other exact words are rendered each time and never kept.
+    #[test]
+    fn an_english_fixed_exact_line_is_kept_once_rendered() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let dir = std::env::temp_dir().join(format!("lamp-say-exact-en-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let renders = Arc::new(AtomicUsize::new(0));
+        let counted = renders.clone();
+        let english = Recordings::none().with_cache(Some(Arc::new(tts_cache::TtsCache::new(
+            dir.clone(),
+            "Rachel",
+            crate::language::SPEECH_MODEL,
+            "en",
+            Box::new(move |_: &str| {
+                counted.fetch_add(1, Ordering::Relaxed);
+                Ok(vec![7; 2_400])
+            }),
+        ))));
+        let pat = "Hehe, that tickles.";
+        assert!(crate::language::is_fixed(pat));
+        for _ in 0..2 {
+            assert_eq!(english.rendered(pat).unwrap().1, pat);
+        }
+        assert_eq!(renders.load(Ordering::Relaxed), 1, "kept once rendered");
+        for _ in 0..2 {
+            english.rendered("Build passed.").unwrap();
+        }
+        assert_eq!(renders.load(Ordering::Relaxed), 3, "other words never kept");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     /// #3697: the shutdown's line, warmed at start, reaches the voice as a
     /// sound from the cache with no further render (no network), as the
     /// shutdown asks for it. The helper is this test's own user here.
@@ -3975,6 +4082,7 @@ mod tests {
                     who: false,
                     question: false,
                     line: Default::default(),
+                    quiet: false,
                 },
                 answer,
                 read_at_us: expires_at_us.saturating_sub(60_000_000),
@@ -4070,6 +4178,7 @@ mod tests {
                 who: false,
                 question: false,
                 line: Default::default(),
+                quiet: false,
             }
         );
         let text =
@@ -4434,6 +4543,7 @@ mod tests {
                 who: false,
                 question: false,
                 line: Default::default(),
+                quiet: false,
             }
         );
         assert_eq!(
