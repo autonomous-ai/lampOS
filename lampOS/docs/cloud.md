@@ -119,6 +119,7 @@ lamp says so.
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
 | `system.info`'s `onboarding_done_at` | when the lamp's setup walk ended, in Unix ms (#5812): the voice's `onboarding/pending` heartbeat's `done_at_unix_ms`, said whenever it is known, so an app that missed `onboarding.done` opens Skills on its page's open if it hasn't for that `at`. No field while unknown: a walk not ended, a lamp set up before it was dated, or the voice not running ("Setup done, told to the app" below) |
 | `system.info`'s `onboarding_done_supported` | `true` while `LAMP_APP_ONBOARDING_DONE=on` (with a state folder): this lamp will send `onboarding.done`, so the app may wait for it (Mobile's ask on #5824). No field otherwise: an older lamp, or the switch off, never sends it, so the app doesn't wait ("Setup done, told to the app" below) |
+| `system.info`'s `onboarding_step_supported` | `true` with the same switch: this lamp sends `onboarding.step` as each walk step ends (#5979). No field otherwise ("Each setup step, told to the app" below) |
 | `system.info`'s `account` | `signed_out` while this lamp's login is no longer accepted (`LAMP_SIGNED_OUT=on`, "Signed out" below). No field otherwise, read as before: an older lamp, the switch off, and a lamp signed in all say none |
 | `system.info`'s `reset` | whether the reset button's 5 s hold takes this lamp back into setup (#2937): `hold` when `/etc/lampOS/controls/controls-pins.json` names a `reset` line (a product lamp), `none` when not (a lamp moved from V1, whose pins never carry one: its way back is the hotspot, [setup.md](setup.md)). No field when the pins can't be read; the app reads a missing field as before, the hold. The app keeps the last one it heard, for a lamp it can't ask |
 | `volume.get`, `volume.set` (`{"volume": 0..100}`) | through `lamp-actions`' socket (`volume_level`, `volume_to`, `actions.md`), its only writer: `{"volume", "raw", "max_volume"}`, a set read back |
@@ -2201,6 +2202,43 @@ Tests: `online::tests::the_walks_end_is_told_once_and_kept_after_the_ack`,
 `without_a_date_or_the_switch_the_walks_end_is_not_told`,
 `onboarding_done::tests`, `answer::tests::the_kinds_this_lamp_has_are_answered_by_its_parts`,
 and `app_contract.rs`'s `system.info` row.
+
+## Each setup step, told to the app (#5979, `onboarding.step`)
+
+As each step of the setup walk ends, the app is told, once. Behind
+`onboarding.done`'s switch, `LAMP_APP_ONBOARDING_DONE=on` with a state folder.
+
+- **What.** One unasked `data` reply on `fd_channel` per step, as
+  `onboarding.done` is pushed:
+  `{"type":"data","kind":"onboarding.step","status":"success","data":{"step":"touch","outcome":"done","at":<unix ms>,"walk_id":<unix ms>},"device":"lamp",...}`.
+  `step` is one of `where_you_sit`, `who_you_are`, `touch`, `how_you_sound`;
+  `outcome` is the walk's own: `done`, `skipped`, `failed` (touch with no
+  touch felt, how you sound after its near-call misses) or `not_available`
+  (no touch pads). `at` is the step's end. No names, no words: `data` holds
+  these four keys only.
+- **When.** From `onboarding/pending`'s `walk_id` and `steps_ended`
+  ([onboarding.md](onboarding.md)), read at most once a second on the tick,
+  only while connected, after `onboarding.done`'s look
+  (`crate::onboarding_step`). Each step's end, `(step, at)`, once per
+  `walk_id`: what was tried is written to `$STATE_DIRECTORY/onboarding-step`
+  (`{"walk_id", "steps": [{"step", "at"}]}`), so a restart doesn't send it
+  again. A new `walk_id`, a redo of the whole walk, starts it over. A redo of
+  one step keeps the `walk_id`; the step's new end is a new `at`, sent
+  again, and the app replaces that step's mark with it (Mobile on #5979).
+- **Best effort** (the lead's rule on #5979). Tried once: one the client
+  doesn't take is not tried again, and nothing waits for the broker's ack.
+  An end first looked at more than 2 minutes after it (ended while offline)
+  is let go. It never holds `onboarding.done`, which keeps its own
+  kept-until-acked rule; the app never waits on a step event. The journal
+  says `onboarding.step: <step> handed to the client, walk <walk_id>`, or
+  `not handed to the client, not tried again`.
+- **Will it come.** `system.info`'s `onboarding_step_supported: true` beside
+  `onboarding_done_supported`, with the switch on.
+
+Tests: `online::tests::each_walk_step_is_told_once_beside_the_walks_end`,
+`without_the_switch_no_walk_step_is_told`, `onboarding_step::tests`,
+`answer::tests::the_kinds_this_lamp_has_are_answered_by_its_parts`, and
+`app_contract.rs`'s `system.info` row.
 
 ## The two yeses from the app (#5500, `consent.get`, `consent.set`)
 

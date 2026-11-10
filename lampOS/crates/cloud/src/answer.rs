@@ -179,6 +179,12 @@ pub trait Lamp {
         None
     }
 
+    /// The setup walk's id and its steps ended, from the voice's
+    /// `onboarding/pending` heartbeat (#5979): none without an id.
+    fn onboarding_steps(&self) -> Option<(u64, Vec<lamp_msgs::OnboardingStepEnded>)> {
+        None
+    }
+
     /// lamp-voice's app-make socket, for a skill typed in the owner's app
     /// (`LAMP_APP_MAKE_SKILL=on` with the skills page, #2813,
     /// `crate::make_skill`).
@@ -466,6 +472,9 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             // with the switch on (and a state folder); none otherwise.
             if lamp.onboarding_done().is_some() {
                 info["onboarding_done_supported"] = json!(true);
+                // And `onboarding.step` as each walk step ends (#5979),
+                // behind the same switch.
+                info["onboarding_step_supported"] = json!(true);
             }
             some(info)
         }
@@ -840,6 +849,8 @@ pub mod tests {
         /// What `onboarding` says, and the switch's file (#5812).
         pub onboarding: Option<u64>,
         pub onboarding_done: Option<std::path::PathBuf>,
+        /// What `onboarding_steps` says (#5979).
+        pub onboarding_steps: Option<(u64, Vec<lamp_msgs::OnboardingStepEnded>)>,
     }
 
     impl Lamp for Fake {
@@ -937,6 +948,9 @@ pub mod tests {
         }
         fn onboarding_done(&self) -> Option<std::path::PathBuf> {
             self.onboarding_done.clone()
+        }
+        fn onboarding_steps(&self) -> Option<(u64, Vec<lamp_msgs::OnboardingStepEnded>)> {
+            self.onboarding_steps.clone()
         }
         fn make_skill(&self) -> Option<std::path::PathBuf> {
             self.make_skill.clone()
@@ -1209,6 +1223,9 @@ pub mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(told["onboarding_done_supported"], true);
+        // #5979: `onboarding_step_supported` beside it, with the same switch.
+        assert_eq!(told["onboarding_step_supported"], true);
+        assert!(info.get("onboarding_step_supported").is_none(), "{info}");
         // #2937: a lamp that can't tell its reset says nothing of it; one
         // that can says hold or none.
         assert!(info.get("reset").is_none(), "{info}");
