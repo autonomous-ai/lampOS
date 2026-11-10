@@ -50,6 +50,11 @@ Environment=LAMP_FACE_KNOWN_HOLD=on
 # with the hold above a new id beside the held one's said on humans/faces/tracked as following it (#4885, #5081):
 # the memory owner's call (C65). The name moves to the new id only by a print read as theirs (who::Held::printed).
 Environment=LAMP_FACE_REFOUND=on
+# The fast camera stream (#5894, #5956, #6027): a paired computer with the camera grant gets the camera's own frames
+# (about 21 of 25 a second at 640x480, lamp-75c9 10 Nov) at /run/lampos-eyes/frames.sock instead of the eyes' two a
+# second. The socket takes only lamp-control.service, and a stream's end stops its writer at once. Off for any
+# lamp whose unit is not this one.
+Environment=LAMP_EYES_FAST_STREAM=on
 # How the near face seems, on humans/seems for Mood's LAMP_MOOD_SEEMS (#1671, #2799): Google's
 # Blendshape V2 from Face Mesh V2's points, both placed by install (models.json). FER+ (`--seems`)
 # never runs here: its training pictures are for research only. Nothing is read without the
