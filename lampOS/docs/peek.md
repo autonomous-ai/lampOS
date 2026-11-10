@@ -367,7 +367,8 @@ Environment=LAMP_PEEK=monitor
 - **A session cookie, in memory only:** `peek_session=<64 hex>; HttpOnly;
   SameSite=Strict; Path=/`, a random value, not the code. It opens every
   view and the stream. Sessions end after 12 hours, when peek stops or
-  restarts (nothing is written), or when the switch goes off. At most 4 are
+  restarts (nothing is written), or when the switch goes off; a stream
+  already open ends with its session, checked before each push. At most 4 are
   open; a fifth code gets 429 and is kept for when one ends.
 - A used, expired or unknown code gets 401: "This link was used or is out of
   date: get a new one in the app." Without a session, every view gets 401 and

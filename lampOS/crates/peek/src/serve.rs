@@ -564,20 +564,31 @@ fn now_unix_ms() -> u64 {
 }
 
 /// The one page's stream: a push now, then every [`PUSH_EVERY`], for as
-/// long as the page is open.
+/// long as the page is open; in monitor mode, only while the session that
+/// opened it lasts, read before each push as the guard reads it.
 async fn events(
     State(served): State<Arc<Served>>,
+    headers: HeaderMap,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
-    let pushes = stream::unfold((served, 0u32), |(served, count)| async move {
-        if count > 0 {
-            tokio::time::sleep(PUSH_EVERY).await;
-        }
-        let events = push(&served, count).await;
-        Some((
-            stream::iter(events.into_iter().map(Ok)),
-            (served, count.wrapping_add(1)),
-        ))
-    });
+    let session = cookie(&headers, monitor::SESSION_COOKIE).unwrap_or_default();
+    let pushes = stream::unfold(
+        (served, session, 0u32),
+        |(served, session, count)| async move {
+            if count > 0 {
+                tokio::time::sleep(PUSH_EVERY).await;
+            }
+            if let Some(monitor) = &served.peek.monitor
+                && !monitor.gate().admits(&session, Instant::now())
+            {
+                return None;
+            }
+            let events = push(&served, count).await;
+            Some((
+                stream::iter(events.into_iter().map(Ok)),
+                (served, session, count.wrapping_add(1)),
+            ))
+        },
+    );
     Sse::new(pushes.flatten())
 }
 
