@@ -1,3 +1,45 @@
+## 2026-11-10 — admission latency follow-up and onboarding review
+
+- Published #5935 at `1c3057ec6eca72b168d6e5a5707d412e3f4d079e` on
+  current `4d86f6f0d`. Original eight commits remain range-diff equal;
+  runtime integration is a9eb, with only joining-policy docs above it.
+  Both changed Rust files are byte-equal across the final docs-only rebase.
+- Removed the eager sweep of receipt locks/payloads during forget admission.
+  The shared epoch invalidates publication immediately; guarded registration,
+  completion and recovery scrub old content, or eviction drops it. This is
+  no immediate RAM-zeroization promise. Truthful send status and repeat
+  protection remain. No new I/O or task; indirect publication-lock contention
+  and clearing carried rounds remain possible.
+- Busy-content-lock control failed first, then passed. Added Fourth's
+  completed/evicted receipt already copied by a recovery waiting on another
+  try. Final focused: 21 passed, including 20 functional controls plus the
+  host diagnostic. Saturated 512-receipt / 2.5 MiB host debug admission:
+  prior p95 1.881 ms / max 1.972 ms; final p95 1.336 µs / max 2.200 µs.
+  Meets <1 ms for this uncontended entry-to-return measurement only, not
+  device, acoustic, carried-round or contended latency.
+- Fmt and strict Voice + 13 Clippy passed; workspace build 1m 45s;
+  binary/integration 280 passed / six ARM64-release-only cases ignored;
+  doc-test command passed (none defined). Docs checker 9 passed and
+  192 docs / 1,899 links / zero broken.
+- Broad Voice: 5,482 passed / nine failed / 18 ignored, 481.17s.
+  Eight motor process timeouts and one reminder handshake passed individually
+  with the same binary and limits. Broad run stays failed. Extraction also
+  ran the nested fixture alone, which adds no evidence. Raw logs and exact
+  boundaries are in the [verification record](https://github.com/autonomous-ai/lampOS/blob/1c3057ec6eca72b168d6e5a5707d412e3f4d079e/lampOS/docs/verification/forget-send-ledger-20261110/README.md).
+- Earlier native ARM 42734894351 passed 14,959 / 112 skipped on the
+  a9eb+0036 merge tree, equal to the rebased pre-follow-up baseline, not the
+  new latency change. Fresh ARM 42740406810 and Linux 42740406766 are
+  running; docs 42740406869 passed. Second/Fourth rereads requested in
+  6756914073; draft until those and native gates qualify the final source.
+- Independent onboarding review: HOLD on #5937 because raw INVITE asked
+  the model rather than the fixed own-line route. #5945 `02ede79f4` wraps
+  it correctly; exact-source parser probe 2 passed, dispatch traced and
+  existing generic no-chat Engine regression read. Lifted my P2 in
+  6756771265, with explicit limits (no full PR/device test). Reported its
+  Clippy failure in 6756824916: use `std::slice::from_ref` in the new test.
+  Missing translations and eligibility-vs-audible timing remain follow-ups.
+- No deployment, SSH, live-account operation or lamp measurement by Third.
+
 ## 2026-11-10 — forget/send recovery repair published for independent review
 
 - Resumed on current context carry #5913 `b0e70d9540`, based on
