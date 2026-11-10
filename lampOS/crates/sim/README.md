@@ -35,6 +35,11 @@ Camera and microphone are off unless asked for. `LAMP_SIM_CAMERA` and
 pictures and sound only as on a real lamp: never while the lamp is private,
 never with more than one person in view, only while the ring shows the mark.
 
+`tools/lamp-sim-check.sh BIN_DIR` starts it, pairs the Python SDK's CLI and the
+JS SDK, runs the JS SDK's tour unchanged and a Python round trip, ends the lamp
+and checks that nothing is left running: the SDKs against the virtual lamp with
+no special mode.
+
 ## What is real and what stands in
 
 | | |
