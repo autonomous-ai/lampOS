@@ -1041,20 +1041,15 @@ mod tests {
         assert!(told.get("name").is_none(), "{told}");
     }
 
-    /// A skill naming a linked service is refused in the person's own
-    /// words, shown in the app as they are (the read of #5290).
+    /// A skill naming a linked service is no longer refused here by a
+    /// word list (the owner, 10 Nov): it is briefed, and the lamp's model
+    /// answers what no made skill can do with `cannot:` in plain words.
     #[test]
-    fn a_skill_using_a_service_is_refused_in_plain_words() {
+    fn a_skill_using_a_service_goes_to_the_model() {
         let dir = folder("service");
-        let refused = begin(
-            dir.as_path(),
-            "a skill that checks my calendar every evening",
-            "r1",
-            NOW,
-        )
-        .unwrap_err();
-        assert_eq!(refused, made_skill::NOT_A_SERVICE);
-        assert!(!refused.contains("Say so"), "{refused}");
+        let words = "a skill that checks my calendar every evening";
+        let brief = begin(dir.as_path(), words, "r1", NOW).unwrap();
+        assert_eq!(made_skill::request_of(&brief), words);
     }
 
     /// One at a time, a request id each, the words within the voice's own

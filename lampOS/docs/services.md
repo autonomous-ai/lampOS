@@ -114,7 +114,7 @@ connected apps.
 | `LAMP_SERVICES=on` | `lamp-cloud` (with `LAMP_CLOUD=on`), `lamp-voice` and `lamp-services` | `lamp-cloud` answers the app's `connector.*` and `services.list` with V1's "not on this lamp: <kind>" and puts nothing in `can`; the voice declares none of the three functions and routes none; `lamp-services` opens no socket and exits |
 | `LAMP_SERVICES_WRITE=on` (on in the product's `lamp-services.service`) | `lamp-services` | `service_write` answers "writing to services is off on this lamp", and nothing is prepared or sent; reads are as before |
 | `LAMP_SERVICES_TOLD=on` (#5523) | `lamp-voice`'s two routes, with `LAMP_SERVICES=on` | The owner's line is told nothing of what is linked: the model knows only the three functions and asks `services_connected` when it thinks to ("The voice is told what is linked", below) |
-| `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and a request to make a skill naming a service is answered `NOT_A_SERVICE` ("A made skill's read", below) |
+| `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and the making model is told to answer a request for a skill naming a service with `cannot:` ("A made skill's read", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
 the line, so `LAMP_SECOND_SPEAKING_FACE=on` and `LAMP_EYES_SPEAKING=on` in
@@ -954,18 +954,18 @@ for the Policy's decision as the executive's are, with
 `LAMP_SKILL_READS` off (the default; the product sets it on), made skills reach no
 service at all: a made skill's step that names a services function is never
 said plainly, and a made skill's own function of that name is refused
-(`made_skill::plainly`, `made_skill::capped`). A request to make a skill
-that names any linked service (mail and a calendar: "mail", "email", "e-mail",
-"gmail", "inbox", "calendar"; a service's own name, as a whole word: Notion,
-Figma, GitHub, Asana, Ahrefs, Facebook, Slack, HubSpot, Amplitude, "gdrive";
-and "google drive", "linear app", "monday com" as phrases, since "drive",
-"linear" and "monday" are plain words too) is never handed to the model:
-`made_skill::brief` answers it with `NOT_A_SERVICE`, "Not possible yet: a
-skill can't use your mail, calendar or other services, even ones already
-linked. You can ask me for it yourself any time.", words to the person, as the
-app shows them as they are. It names no place to link a service: on lamp-9adf on 4
+(`made_skill::plainly`, `made_skill::capped`). No word list in `lamp-voice` decides whether a request to make a skill
+names a linked service (the owner, 10 Nov: "quăng cho deepseek hết đi,
+đừng if else"): the making model's system prompt
+(`make_skill_local::services`) says a skill can't use the person's mail,
+calendar or any other linked service yet, even one already linked, and a
+request that needs one is answered `cannot: Not possible yet: a skill
+can't use your mail, calendar or other services, even ones already
+linked. You can ask me for it yourself any time.`, said and shown to the
+person as it is. It names no place to link a service: on lamp-9adf on 4
 Nov the model told the owner to link a calendar that was already linked
-(#5288, where skills that read a service are planned). With it on, see the next
+(#5288, where skills that read a service are planned). Whatever the model
+answers, the cap refuses a made skill's `services`. With it on, see the next
 section.
 
 A call to a service that isn't linked fails with "<Service> isn't linked to
@@ -1172,49 +1172,27 @@ passes the exact `on` to its two routes' workers, `provider` and `second`,
 whose `make_skill` briefs and checks the skill: their environment is
 otherwise cleared, and without it the switch was off there on lamp-9adf
 on 4 Nov),
-`made_skill::brief` lets a request through that names one linked service
-with a fixed read and no write word ("send", "reply", "add", "post", "schedule",
-...). The rest are told their own limit, in the person's words (the testers'
-sheet, 6 Nov: "a skill is limited with no reason"), never `NOT_A_SERVICE`,
-which says no skill can use a service and is false with the switch on:
-a write is `NOT_A_WRITE` ("Not possible yet: a skill can read one linked
-service, but it can't send, write or change anything there."), two services
-are `ONE_SERVICE` ("... can read only one linked service, not two or more."),
-and a service with nothing a made skill reads, such as Notion, is
-`NOT_READABLE` ("... can read one linked service, but not that one."). Each
-ends "You can ask me for it yourself any time." Asking for
-the skill itself is no write: words before "skill" that only ask for it
-("create me a new skill that ...", "add a skill to ...") are left out
-first. "Schedule", "post" and "book" after "my", "the", "tomorrow's",
-"latest", "last" or "newest" are the thing read, whatever follows
-("read me my schedule on my calendar"), unless "say" or "saying" follows
-with nothing asked to be read ("latest post: say hi on
-Facebook"). After "tomorrow", "today", "day", "calendar", "facebook" or
-"page" they are the thing read only after a word asking to be read
-("read", "tell", "what", "show", "check": "read me my Facebook post about
-the sale"), or at the request's end or before "from" or "of" ("my latest
-Facebook post"), else a verb ("tomorrow book the room", "my calendar book
-the room", "tomorrow book for me a table"; El's P3s on #5690 and P2s on
-#5696). There, "a", "an", "me", "it", "the" or "my" right after them
-makes them a verb even with a read asked for earlier, when "and", "then"
-or "also" comes between that read and them ("check my calendar and
-tomorrow schedule a meeting"); with none between, it says which one is
-read ("read me my Facebook post a week ago"; the first builder's HOLD on
-#5719). The "s" of "let's" is no "'s" ("let's post a
-photo on Facebook"; the first builder's P3s on #5696). With "say" or "saying", a word asking to be read anywhere in the
-request keeps it a read ("the last post saying we are open, read it to
-me"); with none, it is a post to write. It began on lamp-9adf on 4 Nov at 23:51,
-where "create a skill that reads my calendar" was refused. "Put" writes only with
-a service named after it, or "in", "on", "into" or "to" "my drive" ("put
-the count on the light" is the lamp's own). A write after them still counts. A calendar's
-step is given whole (today, or tomorrow when it says "tomorrow"), as are
-mail's (`recent`) and Drive's (`files`, newest first, `query` only words
-to search); for any other service the brief lists its reads but the
-whole texts and free-form reads (`spoken::whats`) and the model picks
-one. Its time of day is the request's: the brief gives the trigger's
-`during` as an example, "a time of day as its during = { from = \"08:00\",
-to = \"08:30\" }" (Thirteen's P3 on #5303), as the light-and-head brief
-does. The made skill is
+every request to make a skill is briefed, and the making model judges it
+by the rules its system prompt says in plain words
+(`make_skill_local::services`; the owner, 10 Nov: decisions go to the
+model, not to Rust word lists, which until then sorted writes, two
+services and unreadable ones by words such as "send", "post", "book" or
+"schedule"). A skill reads at most one linked service and only reads it,
+never sending, writing, posting, booking, scheduling, deleting or
+changing anything there. Each service a skill can read is listed with
+its one step (`made_skill::read_steps`, from this crate's catalogue and
+`spoken::not_readable`): a calendar's given whole (today, or tomorrow
+when tomorrow is asked), as are mail's (`recent`) and Drive's (`files`,
+newest first, `query` only words to search); any other's reads listed
+but whole texts and free-form reads (`spoken::whats`), for the model to
+pick one. A request to send, write or change anything in a service, to
+read two or more, or to read one not listed (named in the prompt,
+`made_skill::unreadable_names`: Notion, Slack, Ahrefs, ...) is answered
+`cannot:` with one short sentence saying what a skill can do instead,
+ending "You can ask me for it yourself any time." (the testers' sheet,
+6 Nov: "a skill is limited with no reason"), told to the person as the
+model says it. Its time of day is the request's: the prompt gives a
+read's `during` only for a time the request names. The made skill is
 held to `services = { <service> = "read" }` (`made_skill::capped`: any
 other services entry is refused, "it asks to use linked services other
 than by reading one that has something to read, which a made skill

@@ -2120,17 +2120,32 @@ gone ([switches.md](switches.md)). What happens:
    Widening this is the lead's call. The one widening (proposal #5288's
    read half, `LAMP_SKILL_READS=on` in `lamp-voice` and
    `lamp-skills-manage@`, on in the product units): `services` naming one linked
-   service with a fixed read as `"read"`, and `speak` for saying it. A
-   request that names one such service and no write word is briefed with
-   that service's one read step (a calendar's or mail's given whole; any
-   other service's reads listed but whole texts and free-form reads), its
-   time of day the request's (the trigger's `during` shown as `HH:MM`,
+   service with a fixed read as `"read"`, and `speak` for saying it. No
+   word list decides whether a request asks for one, writes or names two
+   (the owner, 10 Nov: "quăng cho deepseek hết đi, đừng if else"): every
+   request gets the same brief, which with reads on adds one line pointing to a read,
+   and the making model's system prompt (`make_skill_local::services`)
+   says the rules in plain words. A skill reads at most one linked service
+   and only reads it, never sending, writing, posting, booking, scheduling,
+   deleting or changing anything there; each readable service is listed
+   with its one step (`made_skill::read_steps`, from `lamp-services`'
+   catalogue: a calendar's, mail's and Drive's given whole, any other's
+   reads listed but whole texts and free-form reads); a request to write,
+   to read two or more services or one not listed (those named,
+   `made_skill::unreadable_names`: Notion, Slack, Ahrefs, ...) is answered
+   `cannot:` with one short sentence saying what a skill can do, ending
+   "You can ask me for it yourself any time.", and the model never names a
+   place to link one. Its
+   time of day is the request's (the trigger's `during` shown as `HH:MM`,
    only for a time the request names: lamp-9adf's played check, 5 Nov,
    was made with a shown 08:00 to 08:30 it never named), and what it does
    is said with the service, what it reads and the condition, "when
    you're alone with the lamp, it reads you tomorrow's Google Calendar:
-   how many events, then each time and title." Off, any request that
-   names a service is `NOT_A_SERVICE`, as before ([services.md](services.md),
+   how many events, then each time and title." Off, the prompt says a
+   skill can't use any linked service, and a request for one is answered
+   `cannot: Not possible yet: a skill can't use your mail, calendar or other
+   services, even ones already linked. You can ask me for it yourself any
+   time.` Either way the cap holds whatever is kept ([services.md](services.md),
    "A made skill's read"). Kept, a skill whose step reads a service not
    linked now (`services_connected`, asked once, at most 500 ms) is still
    kept, and the make tells it: by voice, `needs_link` in the make's
@@ -2185,8 +2200,8 @@ gone ([switches.md](switches.md)). What happens:
      lamp says; the model is told to say it leaving nothing out, not to
      sum it up. Refused, and repaired once as a check's refusal is
      (`PLAIN_ONLY`'s line; with reads on it goes on with `PLAIN_OR_READ`:
-     for a read of a linked service, only one `[[do]]` step, the brief's
-     read step exactly as the brief gives it. On lamp-9adf, 5 Nov 13:26,
+     for a read of a linked service, only one `[[do]]` step, that
+     service's read step exactly as the system prompt lists it. On lamp-9adf, 5 Nov 13:26,
      an app make of "Read me my latest email when I sit down at my desk."
      was refused twice, the repair told only lights and gestures):
      - any top-level part but `kind`, `version`, `needs`, `format`,
@@ -2318,9 +2333,14 @@ Tests:
   `lamp-voice: a skill made here wasn't kept in N ms: <why>`, the lamp's
   own words, never the request; lamp-74ff's app make said no reason) and
   `the_models_cannot_reason_is_told_never_journaled` (#5985: told in full,
-  journaled as `MODELS_CANNOT_JOURNALED`).
+  journaled as `MODELS_CANNOT_JOURNALED`), and
+  `the_system_prompt_carries_the_rules_of_a_read` (one service at most,
+  read only, the listed steps, `cannot:` otherwise; off, none).
 - `made_skill::tests`: the brief within 1,300 bytes (so its repair fits the
-  tasks part's 2,000), exactly two files, the
+  tasks part's 2,000), `every_request_is_briefed_and_the_model_judges_it`
+  (a service, a write or two services are briefed, never refused by a
+  word list), `the_read_steps_are_the_catalogues_readable_services`,
+  exactly two files, the
   cap, each wider use refused, the card marked, nothing kept without the
   checker, `a_kept_skill_goes_on_at_once_by_its_sha256_with_no_yes`,
   `only_a_fresh_mark_lets_a_kept_skill_go_on` and

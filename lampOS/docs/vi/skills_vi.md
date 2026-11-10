@@ -61,17 +61,30 @@ sau:
    Mở rộng giới hạn này là quyết định của trưởng nhóm. Lần mở rộng duy nhất
    (nửa "đọc" của đề xuất #5288, `LAMP_SKILL_READS=on` trong `lamp-voice` và
    `lamp-skills-manage@`, bật trong các unit sản phẩm): `services` nêu một dịch vụ
-   liên kết có việc đọc cố định là `"read"`, cùng `speak` để nói nó. Một yêu cầu nêu
-   đúng một dịch vụ như vậy và không có từ ghi nào được đưa vào brief với
-   bước đọc duy nhất của dịch vụ đó (bước của lịch hay thư được cho trọn; với
-   dịch vụ khác, các việc đọc của nó được liệt kê trừ những việc trả về toàn
-   văn và dạng tự do), thời điểm trong ngày là của yêu cầu (`during` của
+   liên kết có việc đọc cố định là `"read"`, cùng `speak` để nói nó. Không danh sách
+   từ nào quyết định một yêu cầu có xin dịch vụ, có ghi hay nêu hai dịch vụ
+   (chủ đèn, 10/11: "quăng cho deepseek hết đi, đừng if else"): mọi yêu cầu
+   nhận cùng một brief, khi bật đọc thì thêm một dòng chỉ đến việc đọc, và system
+   prompt của mô hình tạo kỹ năng (`make_skill_local::services`) nói các luật
+   bằng lời dễ hiểu. Một kỹ năng đọc tối đa một dịch vụ liên kết và chỉ đọc nó,
+   không bao giờ gửi, ghi, đăng, đặt chỗ, lên lịch, xoá hay thay đổi gì ở đó;
+   mỗi dịch vụ đọc được được liệt kê cùng bước duy nhất của nó
+   (`made_skill::read_steps`, từ catalogue của `lamp-services`: bước của lịch,
+   thư và Drive được cho trọn, dịch vụ khác thì liệt kê các việc đọc trừ toàn
+   văn và dạng tự do); một yêu cầu ghi, đọc hai dịch vụ trở lên hay một dịch
+   vụ không có trong danh sách (được nêu tên, `made_skill::unreadable_names`:
+   Notion, Slack, Ahrefs, ...) được trả lời `cannot:` với một câu ngắn nói kỹ
+   năng làm được gì, kết thúc bằng "You can ask me for it yourself any time.",
+   và mô hình không bao giờ nêu chỗ liên kết dịch vụ. Thời điểm trong ngày là của yêu cầu (`during` của
    trigger chỉ ghi dạng `HH:MM`, và chỉ khi yêu cầu nêu giờ: lần thử trên
    lamp-9adf ngày 5/11 đã tạo skill với 08:00 đến 08:30 được nêu làm ví dụ,
    dù yêu cầu không hề nói giờ), và câu "có" nói ra của nó nêu dịch vụ, thứ nó đọc và điều kiện, "when
    you're alone with the lamp, it reads you tomorrow's Google Calendar: how
-   many events, then each time and title." Khi tắt, mọi yêu cầu nêu một dịch
-   vụ là `NOT_A_SERVICE`, như trước. Khi đã giữ, một kỹ năng có bước đọc một
+   many events, then each time and title." Khi tắt, prompt nói kỹ
+   năng không dùng được dịch vụ liên kết nào, và một yêu cầu cần dịch vụ được
+   trả lời `cannot: Not possible yet: a skill can't use your mail, calendar or
+   other services, even ones already linked. You can ask me for it yourself
+   any time.` Dù thế nào, cap vẫn giữ những gì được giữ lại. Khi đã giữ, một kỹ năng có bước đọc một
    dịch vụ chưa liên kết lúc đó (`services_connected`, hỏi một lần, tối đa
    500 ms) vẫn được giữ, và việc tạo báo điều đó: tạo bằng giọng nói,
    `needs_link` trong câu trả lời của việc tạo và một câu nói trước lời hỏi,
@@ -138,7 +151,8 @@ sau:
      chỉ `dim`) hoặc một cử chỉ (`nod`, `curious`) đều bị từ chối, và được
      sửa một lần như lỗi của bước kiểm tra (dòng của `PLAIN_ONLY`; khi bật
      đọc, thêm `PLAIN_OR_READ`: với kỹ năng đọc một dịch vụ đã liên kết,
-     chỉ một bước `[[do]]`, đúng bước đọc như bản tóm tắt đưa ra. Trên
+     chỉ một bước `[[do]]`, đúng bước đọc của dịch vụ đó như system
+     prompt liệt kê. Trên
      lamp-9adf, 13:26 ngày 5/11, một lần tạo từ ứng dụng "Read me my latest
      email when I sit down at my desk." bị từ chối hai lần vì lần sửa chỉ
      được dặn đèn và cử chỉ). Trên lamp-0c89, mô hình của đèn
@@ -231,7 +245,12 @@ phần tasks, kỹ năng được tạo và được bật ngay mà không cần
 `lamp-voice: a skill made here wasn't kept in N ms: <lý do>` bằng lời của
 đèn, không bao giờ là lời của người dùng;
 `the_models_cannot_reason_is_told_never_journaled`: #5985, lý do được báo
-đầy đủ, nhật ký chỉ ghi `MODELS_CANNOT_JOURNALED`), `made_skill::tests`, và
+đầy đủ, nhật ký chỉ ghi `MODELS_CANNOT_JOURNALED`;
+`the_system_prompt_carries_the_rules_of_a_read`: tối đa một dịch vụ, chỉ đọc,
+các bước được liệt kê, ngoài ra là `cannot:`; khi tắt, không dịch vụ nào),
+`made_skill::tests` (kể cả `every_request_is_briefed_and_the_model_judges_it`:
+dịch vụ, việc ghi hay hai dịch vụ đều được soạn brief, không bị danh sách từ
+từ chối; và `the_read_steps_are_the_catalogues_readable_services`), và
 `crates/skills/tests/it/made.rs` với `lamp-skills` thật.
 
 ## Gõ trong ứng dụng (#2813, `LAMP_APP_MAKE_SKILL=on`, bật trong sản phẩm)

@@ -117,7 +117,7 @@ dịch vụ.
 | `LAMP_SERVICES=on` | `lamp-cloud` (với `LAMP_CLOUD=on`), `lamp-voice` và `lamp-services` | `lamp-cloud` trả lời `connector.*` và `services.list` của ứng dụng bằng câu của V1 "not on this lamp: <kind>" và không ghi gì vào `can`; giọng nói không khai báo hàm nào trong ba hàm và không định tuyến hàm nào; `lamp-services` không mở socket nào và thoát |
 | `LAMP_SERVICES_WRITE=on` (bật trong `lamp-services.service` của sản phẩm) | `lamp-services` | `service_write` trả lời "writing to services is off on this lamp", và không gì được chuẩn bị hay gửi; việc đọc vẫn như trước |
 | `LAMP_SERVICES_TOLD=on` (#5523) | hai tuyến của `lamp-voice`, với `LAMP_SERVICES=on` | Câu của chủ đèn không được báo gì về các dịch vụ đã liên kết: mô hình chỉ biết ba hàm và chỉ hỏi `services_connected` khi nó nghĩ tới ("Giọng nói được báo những gì đã liên kết", bên dưới) |
-| `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và một yêu cầu tạo kỹ năng nêu một dịch vụ được trả lời `NOT_A_SERVICE` ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
+| `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và mô hình tạo kỹ năng được dặn trả lời `cannot:` cho một yêu cầu tạo kỹ năng nêu một dịch vụ ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
 được thấy đang nói câu đó, nên cần `LAMP_SECOND_SPEAKING_FACE=on` và
@@ -986,18 +986,18 @@ dịch vụ được giữ chờ quyết định của Policy như các lệnh c
 `LAMP_POLICY_HOLDS_ACTIONS=on` (`policy_holds::holds`). Khi `LAMP_SKILL_READS`
 tắt (mặc định; sản phẩm bật nó), kỹ năng tự tạo không chạm đến dịch vụ nào cả: một bước của kỹ năng tự tạo nêu một hàm dịch vụ
 không bao giờ được nói thẳng ra, và một hàm riêng cùng tên của kỹ năng tự tạo
-bị từ chối (`made_skill::plainly`, `made_skill::capped`). Một yêu cầu tạo
-kỹ năng có nêu bất kỳ dịch vụ liên kết nào (thư và lịch: "mail", "email",
-"e-mail", "gmail", "inbox", "calendar"; tên riêng của dịch vụ, là một từ
-nguyên vẹn: Notion, Figma, GitHub, Asana, Ahrefs, Facebook, Slack, HubSpot,
-Amplitude, "gdrive"; và "google drive", "linear app", "monday com" dưới dạng
-cụm từ, vì "drive", "linear" và "monday" cũng là từ thường) không bao giờ được
-giao cho mô hình: `made_skill::brief` trả lời bằng `NOT_A_SERVICE`, "Not
-possible yet: a skill can't use your mail, calendar or other services, even
-ones already linked. You can ask me for it yourself any time.", là lời nói với
-người dùng, vì app hiện đúng nguyên văn. Nó không nêu chỗ liên kết dịch vụ: trên lamp-9adf
-ngày 4/11 mô hình bảo chủ liên kết một lịch đã được liên kết (#5288, nơi các
-skill đọc dịch vụ được lên kế hoạch). Khi bật, xem
+bị từ chối (`made_skill::plainly`, `made_skill::capped`). Không danh sách từ nào trong `lamp-voice` quyết định một yêu cầu tạo kỹ năng
+có nêu dịch vụ liên kết hay không (chủ đèn, 10/11: "quăng cho deepseek hết
+đi, đừng if else"): system prompt của mô hình tạo kỹ năng
+(`make_skill_local::services`) nói một kỹ năng chưa dùng được thư, lịch hay
+bất kỳ dịch vụ liên kết nào khác của người dùng, kể cả dịch vụ đã liên kết, và
+một yêu cầu cần đến dịch vụ được trả lời `cannot: Not possible yet: a skill
+can't use your mail, calendar or other services, even ones already linked.
+You can ask me for it yourself any time.`, nói và hiển thị đúng nguyên văn cho
+người dùng. Nó không nêu chỗ liên kết dịch vụ: trên lamp-9adf ngày 4/11 mô
+hình bảo chủ liên kết một lịch đã được liên kết (#5288, nơi các skill đọc dịch
+vụ được lên kế hoạch). Dù mô hình trả lời gì, cap vẫn từ chối `services` của
+kỹ năng tự tạo. Khi bật, xem
 phần "Một kỹ năng tự tạo đọc dịch vụ".
 
 Một lệnh gọi đến dịch vụ chưa liên kết thất bại với "<Service> isn't linked
@@ -1204,47 +1204,27 @@ once", "not told: <kết quả của cổng>" hoặc "not told (<lý do>)". Tắ
 `on` cho các worker của hai route, `provider` và `second`, nơi `make_skill`
 soạn và kiểm tra skill: môi trường của chúng vốn bị xoá sạch, và thiếu nó thì
 công tắc ở đó là tắt trên lamp-9adf ngày 4/11),
-`made_skill::brief` cho qua một yêu cầu nêu đúng một dịch vụ liên kết có việc
-đọc cố định và không có từ ghi nào ("send", "reply", "add", "post", "schedule", ...);
-những yêu cầu còn lại được báo đúng giới hạn của chúng, bằng lời nói với người
-dùng (bảng của tester, 6/11: "a skill is limited with no reason"), không bao giờ
-là `NOT_A_SERVICE`, vì câu đó nói không skill nào dùng được dịch vụ, điều sai
-khi công tắc bật: một lần ghi là `NOT_A_WRITE` ("Not possible yet: a skill can
-read one linked service, but it can't send, write or change anything there."),
-hai dịch vụ là `ONE_SERVICE` ("... can read only one linked service, not two or
-more."), và một dịch vụ không có gì cho kỹ năng tự tạo đọc, như Notion, là
-`NOT_READABLE` ("... can read one linked service, but not that one."). Câu nào
-cũng kết thúc bằng "You can ask me for it yourself any time." Việc xin chính skill
-không phải là ghi: các từ trước "skill" chỉ để xin nó ("create me a new skill
-that ...", "add a skill to ...") được bỏ ra trước. "Schedule", "post" và "book"
-đứng sau "my", "the", "tomorrow's", "latest", "last" hay "newest" là thứ được
-đọc, dù sau đó là gì ("read me my schedule on my calendar"), trừ khi "say" hay
-"saying" theo sau mà không có lời xin đọc nào ("latest post: say hi on
-Facebook"). Đứng sau "tomorrow", "today", "day", "calendar", "facebook" hay
-"page" thì chúng chỉ là thứ được đọc khi đứng sau một từ xin đọc ("read",
-"tell", "what", "show", "check": "read me my Facebook post about the sale"),
-hoặc ở cuối yêu cầu hay trước "from" hoặc "of" ("my latest Facebook post"),
-còn lại là động từ ("tomorrow book the room", "my calendar book the room",
-"tomorrow book for me a table"; các P3 của El trên #5690 và các P2 trên #5696).
-Ở đó, "a", "an", "me", "it", "the" hay "my" ngay sau chúng biến chúng thành
-động từ, kể cả khi đã có lời xin đọc trước đó, nếu giữa lời xin đọc đó và chúng
-có "and", "then" hay "also" ("check my calendar and tomorrow schedule a
-meeting"); nếu không có, nó chỉ ra thứ nào được đọc ("read me my Facebook post
-a week ago"; HOLD của first builder trên #5719). Chữ "s" của "let's" không phải "'s" ("let's post a photo on
-Facebook"; các P3 của first builder trên #5696).
-Với "say" hay "saying", một từ xin đọc ở bất kỳ đâu trong yêu cầu giữ nó là
-việc đọc ("the last post saying we are open, read it to me"); không có từ nào
-thì đó là một bài cần đăng. Luật này bắt đầu từ lamp-9adf lúc 23:51 ngày 4/11, khi
-"create a skill that reads my calendar" bị từ chối. "Put" chỉ là ghi khi có một
-dịch vụ được nêu sau nó, hoặc "in", "on", "into" hay "to" "my drive" ("put the
-count on the light" là việc của chính lamp). Một
-lần ghi đứng sau chúng vẫn tính. Bước của lịch được cho
-trọn (hôm nay, hoặc ngày mai khi yêu cầu nói "tomorrow"), bước của thư (`recent`)
-và của Drive (`files`, mới nhất trước, `query` chỉ là từ để tìm) cũng vậy; với dịch vụ khác, brief liệt kê các việc đọc của nó trừ việc đọc
-toàn văn và dạng tự do (`spoken::whats`) và mô hình chọn một. Thời điểm trong
-ngày là của yêu cầu: brief chỉ đưa `during` của trigger làm ví dụ, "a time of
-day as its during = { from = \"08:00\", to = \"08:30\" }" (P3 của Thirteen
-trên #5303), như brief đèn-và-đầu. Kỹ năng tự tạo bị giữ ở
+mọi yêu cầu tạo kỹ năng đều được soạn brief, và mô hình tạo kỹ năng tự phán
+đoán theo các luật mà system prompt của nó nói bằng lời dễ hiểu
+(`make_skill_local::services`; chủ đèn, 10/11: quyết định giao cho mô hình,
+không phải danh sách từ trong Rust, thứ mà trước đó phân loại việc ghi, hai
+dịch vụ và dịch vụ không đọc được theo các từ như "send", "post", "book" hay
+"schedule"). Một kỹ năng đọc tối đa một dịch vụ liên kết và chỉ đọc nó, không
+bao giờ gửi, ghi, đăng, đặt chỗ, lên lịch, xoá hay thay đổi gì ở đó. Mỗi dịch
+vụ mà kỹ năng đọc được được liệt kê cùng bước duy nhất của nó
+(`made_skill::read_steps`, từ catalogue của crate này và
+`spoken::not_readable`): bước của lịch được cho trọn (hôm nay, hoặc ngày mai
+khi yêu cầu hỏi ngày mai), bước của thư (`recent`) và của Drive (`files`, mới
+nhất trước, `query` chỉ là từ để tìm) cũng vậy; với dịch vụ khác, các việc đọc
+của nó được liệt kê trừ việc đọc toàn văn và dạng tự do (`spoken::whats`) để
+mô hình chọn một. Một yêu cầu gửi, ghi hay thay đổi bất cứ gì trong một dịch
+vụ, đọc hai dịch vụ trở lên, hay đọc một dịch vụ không có trong danh sách (được
+nêu tên trong prompt, `made_skill::unreadable_names`: Notion, Slack, Ahrefs,
+...) được trả lời `cannot:` với một câu ngắn nói kỹ năng làm được gì thay vào
+đó, kết thúc bằng "You can ask me for it yourself any time." (bảng của tester,
+6/11: "a skill is limited with no reason"), báo cho người dùng đúng như mô hình
+nói. Thời điểm trong ngày là của yêu cầu: prompt chỉ cho việc đọc
+`during` khi yêu cầu nêu giờ. Kỹ năng tự tạo bị giữ ở
 `services = { <service> = "read" }` (`made_skill::capped`: mọi mục services
 khác bị từ chối, "it asks to use linked services other than by reading one
 that has something to read, which a made skill can't"), và câu "có" nói ra
