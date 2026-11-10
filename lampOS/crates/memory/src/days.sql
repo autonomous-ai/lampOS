@@ -230,3 +230,21 @@ CREATE TABLE IF NOT EXISTS service_records_forgot (
     person TEXT PRIMARY KEY,
     at_unix_ms INTEGER NOT NULL
 );
+-- Service contacts (the voice's LAMP_SERVICE_CONTACTS, beside
+-- LAMP_SERVICE_RECORDS, the connector records plan, PR 1c;
+-- `service_contacts.rs`): the owner's mail contacts, one address a name,
+-- keyed by the name folded (lower case, without accents). The voice saves
+-- one only for an address in a mail read-back the owner confirmed with a
+-- send, named from their own words or their draft's greeting. Kept until
+-- forgotten, as the records are: forget everything, forget the person and a
+-- forget about a thing remove rows. Older builds pass this table over;
+-- `user_version` stays 1.
+CREATE TABLE IF NOT EXISTS service_contacts (
+    person TEXT NOT NULL REFERENCES people(person),
+    name_key TEXT NOT NULL,
+    name TEXT NOT NULL,
+    address TEXT NOT NULL,
+    saved_unix_ms INTEGER NOT NULL,
+    changed_unix_ms INTEGER NOT NULL,
+    PRIMARY KEY(person,name_key)
+);

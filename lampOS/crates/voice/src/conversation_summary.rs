@@ -386,6 +386,9 @@ pub fn memory_forgot_from(
         crate::remember::role::forgot(person.as_deref());
         // And the service records the voice holds (`LAMP_SERVICE_RECORDS`).
         crate::service_records::forgot(person.as_deref());
+        // And the mail contacts planned for a waiting write
+        // (`LAMP_SERVICE_CONTACTS`).
+        crate::service_contacts::forgot(person.as_deref());
     }
     let forgets = forgotten
         .iter()

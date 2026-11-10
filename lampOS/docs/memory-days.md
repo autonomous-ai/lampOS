@@ -688,6 +688,36 @@ stored by the voice as metadata and a masked excerpt only; the store keeps
 what it is given. An older memory answers `unknown_op` to the three
 operations, so the voice sends them only with its switch on.
 
+## Service contacts (`service_contact`, the voice's `LAMP_SERVICE_CONTACTS`)
+
+The voice's `LAMP_SERVICE_CONTACTS` (off by default, beside
+`LAMP_SERVICE_RECORDS`; the connector records plan, PR 1c) keeps the
+owner's mail contacts in `service_contacts(person, name_key, name, address,
+saved_unix_ms, changed_unix_ms)`, keyed `(person, name_key)`, `name_key`
+being the name lower case, without accents, its words joined by one space.
+Created `IF NOT EXISTS`, `user_version` unchanged.
+
+- `service_contact {person, name, address, at_unix_ms}` saves one:
+  `{ok:true,kept}` with `new`, `same` (that address was kept), or `replaced`
+  (another address was kept for that name, and is no longer). `name` is 1 to
+  64 bytes of letters, spaces, hyphens and apostrophes (`bad_name`);
+  `address` one mail address, kept lower case (`bad_address`). The voice
+  sends it only after the owner confirmed a read-back naming that address.
+- `service_contacts {person, name?}` lists them by name, or the one of
+  `name` (none, or one).
+- `service_contacts_forget {person, about}` removes the contacts with every
+  key word of any subject of `about` in their name, their address or the
+  words "contact", "address", "email" and "mail", compared as the records'
+  forget compares them; one-letter words ("Octavia's" gives an "s") are
+  passed over: `{ok:true,removed}`.
+
+Only a known person (`p-` id) has contacts (`bad_person` otherwise). Kept
+until forgotten: no expiry, tidy or nightly pass reads this table;
+`forget_all` and `forget_person` remove them (counted in `removed`). At
+most 2,000 a person, the one changed longest ago going first past it. An
+older memory answers `unknown_op`, so the voice sends them only with its
+switch on.
+
 ## Storage and migration
 
 `<dir>/memory-days.sqlite3` holds raw exchanges, explicit kept facts,

@@ -1077,6 +1077,10 @@ fn worker_command(
             role,
             var(crate::service_records::ENVIRONMENT).as_deref(),
         ))
+        .envs(service_contacts_worker_environment(
+            role,
+            var(crate::service_contacts::ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_early_words_worker_environment(
             role,
             var(crate::early_words::ENVIRONMENT).as_deref(),
@@ -1443,6 +1447,17 @@ fn service_records_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::service_records::ENVIRONMENT, "on"))
+}
+
+// Service contacts (the connector records plan, PR 1c), passed the same
+// narrow way as the records they need: the exact `on`, to the second route
+// alone.
+fn service_contacts_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::service_contacts::ENVIRONMENT, "on"))
 }
 
 // A remember of what is kept already (#2176), passed the same narrow way:
@@ -2633,6 +2648,12 @@ mod tests {
                         "LAMP_SERVICE_RECORDS",
                         ["second"].as_slice(),
                     ),
+                    // Service contacts: the second route alone.
+                    (
+                        service_contacts_worker_environment,
+                        "LAMP_SERVICE_CONTACTS",
+                        ["second"].as_slice(),
+                    ),
                     // So does keeping a fact as heard (#2176).
                     (
                         memory_keep_heard_worker_environment,
@@ -3011,6 +3032,7 @@ mod tests {
                     crate::remember::PROFILE_ENVIRONMENT,
                     crate::remember::role::ENVIRONMENT,
                     crate::service_records::ENVIRONMENT,
+                    crate::service_contacts::ENVIRONMENT,
                     crate::remember::heard::ENVIRONMENT,
                     crate::keep_quietly::ENVIRONMENT,
                     crate::remember::REMEMBER_ONCE_ENVIRONMENT,
@@ -3384,6 +3406,7 @@ mod tests {
                     "LAMP_SECOND_WEATHER=on",
                     "LAMP_SECOND_WRITTEN_WAIT=on",
                     "LAMP_SERVICES_TOLD=on",
+                    "LAMP_SERVICE_CONTACTS=on",
                     "LAMP_SERVICE_RECORDS=on",
                     "LAMP_SHORT_DONE=on",
                     "LAMP_SKILL_ASKED=on",

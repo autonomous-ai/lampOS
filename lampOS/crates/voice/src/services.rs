@@ -219,6 +219,21 @@ pub fn tools(folder: &Path) -> Vec<Tool> {
                     .and_then(Value::as_object_mut)
             {
                 properties.remove("said");
+                // A name alone is filled in from the owner's saved
+                // contacts (`LAMP_SERVICE_CONTACTS`).
+                if crate::service_contacts::on()
+                    && let Some(to) = properties.get_mut("to").and_then(Value::as_object_mut)
+                {
+                    let said = to
+                        .get("description")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_owned();
+                    to.insert(
+                        "description".into(),
+                        json!(format!("{said} {}", crate::service_contacts::TO_NOTE).trim()),
+                    );
+                }
             }
             tool
         })
@@ -1537,7 +1552,7 @@ pub fn run(
         other_seen,
     };
     let gated = kept::pending(|pending| gate(pending, call, request, &turn, now));
-    let call = match gated {
+    let mut call = match gated {
         Ok(call) => call,
         Err(told) => {
             eprintln!(
@@ -1564,6 +1579,17 @@ pub fn run(
             }
             return (told, true);
         }
+    };
+    // A mail's names filled in from the owner's saved contacts, before it
+    // is prepared (`LAMP_SERVICE_CONTACTS`): the read-back says the
+    // address. A name with none saved prepares nothing.
+    let filled = if call.name == WRITE && !send_id {
+        match crate::service_contacts::fill(owner.as_deref(), &mut call.args) {
+            Ok(filled) => filled,
+            Err(told) => return (told, true),
+        }
+    } else {
+        Vec::new()
     };
     // The waiting write this sends, whose record its answer settles.
     let sends = call
@@ -1596,12 +1622,28 @@ pub fn run(
         }
     }
     if answered {
+        if call.name == WRITE && !send_id && crate::service_contacts::on() {
+            // The contacts its send would save, named only from the
+            // owner's own lines or the draft's greeting.
+            let lines = owner
+                .as_deref()
+                .map(|owner| owner_lines(owner, request, now))
+                .unwrap_or_default();
+            crate::service_contacts::plan(owner.as_deref(), &call.args, &filled, &lines, &mut told);
+        }
         let owner = owner.as_deref().unwrap_or_default();
         kept::pending(|pending| {
             self::answered(pending, &call, request, &mut told, Instant::now(), owner);
         });
         if send_id {
             keep_send_of(attempt, sends.as_deref(), Got::Answered(&told));
+            // The read-back confirmed and sent: its contacts saved
+            // (`LAMP_SERVICE_CONTACTS`).
+            if told.get("sent").and_then(Value::as_bool) == Some(true)
+                && let Some(sends) = &sends
+            {
+                crate::service_contacts::sent(sends);
+            }
         }
         if call.name == READ {
             // Its record from the whole answer, before any brief: the
@@ -1638,6 +1680,25 @@ pub fn run(
         return (crate::tools::unavailable(), false);
     }
     (told, answered)
+}
+
+/// The owner's own lines of the last ten minutes, and the line heard in
+/// `request` (`thread::Thread::heard_for`): where a mail contact's name may come from
+/// (`LAMP_SERVICE_CONTACTS`), never the lamp's words or a service's.
+fn owner_lines(owner: &str, request: u64, now: Instant) -> Vec<String> {
+    crate::thread::THREAD
+        .lock()
+        .map(|thread| {
+            let mut lines: Vec<String> = thread
+                .recent_for(Some(owner), now, Duration::from_secs(600), 8)
+                .into_iter()
+                .map(|recent| recent.person)
+                .filter(|said| !said.is_empty())
+                .collect();
+            lines.extend(thread.heard_for(request, now));
+            lines
+        })
+        .unwrap_or_default()
 }
 
 /// Why the gate refused a call that was no send, for its record

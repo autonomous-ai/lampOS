@@ -2081,6 +2081,53 @@ the store's side in [memory-days](memory-days.md)):
 - **Off**, nothing is kept or written, and the receipts are kept exactly as
   before.
 
+## Service contacts (`LAMP_SERVICE_CONTACTS`, off unless set)
+
+With `LAMP_SERVICE_CONTACTS=on` and `LAMP_SERVICE_RECORDS=on` (the second
+route only, with the Days memory; the connector records plan, PR 1c), the
+addresses of the owner's Gmail mails are saved as contacts, one address a
+name, kept until forgotten (`crates/voice/src/service_contacts.rs`; the
+store's side in [memory-days](memory-days.md)). On lamp-3e83 on 10 Nov a
+spelled address was read back and confirmed, and a minute later the lamp
+said it had no address for that friend.
+
+- **Saved only from a confirmed read-back.** The contacts a mail would save
+  are planned at its read-back and saved only when that write's send went
+  (`sent:true`). An address misheard and read back, then corrected,
+  cancelled or let go, is never saved; nor is a mail whose send failed.
+- **Named only by the owner.** The name comes from the owner's own lines of
+  the last ten minutes ("send it to Octavia", "email my friend Octavia",
+  "gửi mail cho Mai") or from the greeting of the draft ("Hi Octavia,",
+  "Chào chị Mai,"), never from the lamp's words or a service's read: a mail
+  someone else sent names no contact. With several addresses, a name goes
+  to the address whose own part holds it (Octavia, `octavia@…`); one
+  address takes the greeting's name, or the one name the owner said. An
+  address with no such name is not saved.
+- **Used in the mail step.** `service_write`'s `to` is told that a name
+  alone is filled in. Before the services prepare a mail, each name alone in
+  `to` or `cc` is replaced with its saved address (a lookup of at most
+  400 ms on the local socket), so the read-back says the address and the
+  send gate is unchanged. A name with none saved prepares nothing, and the
+  model is told to ask for the address, spelled (`NO_CONTACT`); the memory
+  not answering the same (`NO_CONTACTS_NOW`), never a guess.
+- **Never replaced silently.** An address for a name that has another saved
+  adds a sentence to the read-back: "For Octavia I have … saved, not ….
+  Sending this saves … for Octavia instead; if you meant …, say so." The
+  read-back check holds the whole of it. Only a confirmed send replaces the
+  saved address; anything else keeps it. With the memory not answering, an
+  address is not planned at all.
+- **Whose.** The owner's memory id alone, as the services' owner check
+  (`OWNER_ONLY`) gives it.
+- **Never slows the reply.** A save is written by a thread of its own, at
+  most three tries; the journal says how many were saved and replaced, and
+  each try's outcome, never a name or an address.
+- **Forget.** Forget everything takes the person's contacts in the memory
+  and any planned for a waiting write; "forget Octavia's address" takes
+  that contact through the forget-about path, and the answer counts it and
+  says mail already sent stays sent.
+- **Off** (or with `LAMP_SERVICE_RECORDS` off), nothing is saved, looked up
+  or filled in, and a mail is prepared exactly as before.
+
 ## The voice is told what is linked (`LAMP_SERVICES_TOLD`, #5523, off unless set)
 
 A marketing tester linked a service in the app's Connectors on 6 Nov and

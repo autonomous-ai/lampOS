@@ -1685,6 +1685,29 @@ pub(crate) fn records_forgotten(told: (Value, bool), records: Option<u64>) -> (V
     }
 }
 
+/// A forget about's answer `told` with the mail contacts it removed too
+/// (`LAMP_SERVICE_CONTACTS`): none, as it was; some, how many, and that
+/// nothing already sent is undone. Never a name or an address.
+pub(crate) fn contacts_forgotten(told: (Value, bool), contacts: Option<u64>) -> (Value, bool) {
+    let Some(contacts) = contacts.filter(|contacts| *contacts > 0) else {
+        return told;
+    };
+    let (mut answer, answered) = told;
+    let note = format!(
+        "{contacts} saved mail address(es) are forgotten too: a name alone no longer fills them in. Mail already sent stays sent: forgetting does not undo it."
+    );
+    if answer["forgotten"] == true {
+        answer["contacts"] = json!(contacts);
+        answer["contacts_note"] = json!(note);
+        (answer, answered)
+    } else {
+        (
+            json!({"forgotten": true, "contacts": contacts, "note": note}),
+            true,
+        )
+    }
+}
+
 /// The Days memory's socket, when this worker has the Days client: where
 /// the service records are written (`crate::service_records`).
 #[cfg(not(test))]
@@ -9946,6 +9969,7 @@ impl DaysClient {
                 && let Some(person) = person
             {
                 role::forgot(Some(person));
+                crate::service_contacts::forgot(Some(person));
             }
             if call.name == FORGET_EVERYTHING && crate::rules::on() {
                 let rules = json!({"op":"forget_all","person":crate::rules::scope(person)});
@@ -10230,8 +10254,51 @@ impl DaysClient {
         named: bool,
     ) -> (Value, bool) {
         let records = self.forget_records_about(about, person, until);
+        let contacts = self.forget_contacts_about(about, person, until);
         let told = self.forget_kept_about(about, person, until, lease, named);
-        records_forgotten(told, records)
+        contacts_forgotten(records_forgotten(told, records), contacts)
+    }
+
+    /// `LAMP_SERVICE_CONTACTS`: a known person's mail contacts about
+    /// `about` removed in the memory (`service_contacts_forget`), with the
+    /// switch on or off: how many went, `None` with no known person or no
+    /// answer.
+    /// The contacts the voice planned for their waiting writes go too.
+    fn forget_contacts_about(
+        &self,
+        about: &Value,
+        person: Option<&str>,
+        until: Instant,
+    ) -> Option<u64> {
+        // Asked with the switch off too: contacts saved while it was on stay
+        // in the memory until forgotten (Thirteen's P2 on #6122). An older
+        // memory answers `unknown_op`, and none are said removed.
+        let person = person.filter(|person| lamp_msgs::known::is_person_id(person))?;
+        let words: Vec<Vec<String>> = about_subjects(about.as_str()?.trim())
+            .into_iter()
+            .map(|(_, words)| words)
+            .collect();
+        if words.is_empty() {
+            return None;
+        }
+        let left = until
+            .checked_duration_since(Instant::now())
+            .filter(|left| !left.is_zero())?;
+        let answer = bounded_exchange(
+            &self.socket,
+            &json!({"op":"service_contacts_forget","person":person,"about":words}),
+            left,
+        )?;
+        let removed = answer["removed"]
+            .as_u64()
+            .filter(|_| answer["ok"] == true)?;
+        if removed > 0 {
+            crate::service_contacts::forgot_about(person);
+        }
+        eprintln!(
+            "lamp-voice provider: a forget about removed {removed} mail contacts (LAMP_SERVICE_CONTACTS)"
+        );
+        Some(removed)
     }
 
     /// `LAMP_SERVICE_RECORDS`: a known person's service records about
@@ -17632,6 +17699,41 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
     }
 
+    /// A contact saved while `LAMP_SERVICE_CONTACTS` was on is still
+    /// forgotten with it off: the forget about asks the memory to remove it,
+    /// and the model is told how many went (Thirteen's P2 on #6122).
+    #[test]
+    fn a_forget_about_with_the_contacts_switch_off_still_removes_the_saved_ones() {
+        const OWNER: &str = "p-0123456789abcdef";
+        crate::service_records::on_for_test(false);
+        crate::service_contacts::on_for_test(false);
+        let (socket, served) = memory(
+            "contacts-forget-about-off",
+            2,
+            |request| match request["op"].as_str() {
+                Some("service_contacts_forget") => json!({"ok":true,"removed":1}),
+                Some("forget_mark") => json!({"ok":true}),
+                Some("kept") => json!({"ok":true,"entries":[]}),
+                _ => json!({"ok":false}),
+            },
+        );
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_about.store(true, Ordering::Release);
+        let (told, answered) = client.run_at(
+            &call(FORGET, json!({"about":"Octavia's address"})),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            Some(OWNER),
+        );
+        assert!(answered, "{told}");
+        served.join().unwrap();
+        // The removed count is the memory's answer to the contacts forget.
+        assert_eq!(told["contacts"], 1, "{told}");
+        drop(client);
+        let _ = std::fs::remove_file(&socket);
+    }
+
     /// The same for forget everything: the person's waiting record goes
     /// before the forget is sent, so one whose answer is lost (it may have
     /// emptied the memory) leaves nothing to write after it; answered, the
@@ -23447,11 +23549,13 @@ mod tests {
             std::env::temp_dir().join(format!("lamp-remember-{name}-{}.sock", std::process::id()));
         let _ = std::fs::remove_file(&socket);
         let listener = UnixListener::bind(&socket).unwrap();
-        // With the records switch off on this test's thread, the forget
-        // about's own records forget (sent whatever the switch, Thirteen's
-        // P2 on #6073) is answered but neither counted nor given back, so
-        // the forget tests written before it read what they did.
+        // With the records (or contacts) switch off on this test's thread,
+        // the forget about's own records (or contacts) forget, sent whatever
+        // the switch (Thirteen's P2 on #6073 and #6122), is answered but
+        // neither counted nor given back, so the forget tests written before
+        // it read what they did.
         let records_on = crate::service_records::on();
+        let contacts_on = crate::service_contacts::on();
         let served = std::thread::spawn(move || {
             let mut read = Vec::new();
             while read.len() < requests {
@@ -23462,7 +23566,9 @@ mod tests {
                     .unwrap();
                 let request: Value = serde_json::from_str(&line).unwrap();
                 let wrote = stream.write_all(format!("{}\n", answer(&request)).as_bytes());
-                if !records_on && request["op"] == "service_records_forget" {
+                if (!records_on && request["op"] == "service_records_forget")
+                    || (!contacts_on && request["op"] == "service_contacts_forget")
+                {
                     // An answer the test's fake never meant for it may be
                     // let go unread.
                     continue;

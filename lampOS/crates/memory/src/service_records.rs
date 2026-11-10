@@ -94,7 +94,7 @@ fn owner_only(person: &Person) -> Result<()> {
 }
 
 /// `text` lower case, without accents, for a forget's match.
-fn folded(text: &str) -> String {
+pub(crate) fn folded(text: &str) -> String {
     text.nfd()
         .filter(|c| !('\u{300}'..='\u{36f}').contains(c))
         .collect::<String>()
@@ -127,7 +127,7 @@ fn singular(word: &str) -> String {
 }
 
 /// Whether `word` is one of `words`, or its plural or singular.
-fn has_word(words: &[&str], word: &str) -> bool {
+pub(crate) fn has_word(words: &[&str], word: &str) -> bool {
     let word = singular(word);
     words.iter().any(|said| singular(said) == word)
 }
