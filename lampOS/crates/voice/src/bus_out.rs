@@ -29,8 +29,8 @@
 use crate::ring_wire::RingPhase;
 use lamp_bus::{Bus, Publisher};
 use lamp_msgs::{
-    LinkFault, Room, RoomState, Speech, TurnVerdict, Voice, VoiceLink, VoiceRemarked, VoiceState,
-    VoiceTurn,
+    LineBy, LineSource, LinkFault, Room, RoomState, SaidLine, Speech, TurnVerdict, Voice,
+    VoiceLink, VoiceRemarked, VoiceState, VoiceTurn,
 };
 use std::{
     io,
@@ -1062,12 +1062,21 @@ pub fn link_state(
     }
 }
 
+/// How long a reply's last piece may stand with no reply playing before it
+/// is told as cut.
+pub const REPLY_STALE_US: u64 = 3_000_000;
+
 pub struct BusOut {
     onboarding: Option<Publisher>,
     last_onboarding: Option<(lamp_msgs::OnboardingPending, u64)>,
     state: Publisher,
     heard: Publisher,
     said: Publisher,
+    /// `voice/line` (#4209): each line the lamp says, once.
+    line: Publisher,
+    /// The reply whose pieces are being gathered into its line, and the
+    /// words so far.
+    replying: Option<(u64, String, u64)>,
     health: Publisher,
     /// `voice/link`, with [`LINK_ENVIRONMENT`].
     link: Option<Publisher>,
@@ -1128,6 +1137,8 @@ impl BusOut {
             state: bus.publisher_declared(VoiceState::TOPIC, &VoiceState::declaration(), SOURCE)?,
             heard: bus.publisher_declared(heard, &Speech::declaration(), SOURCE)?,
             said: bus.publisher_declared(said, &Speech::declaration(), SOURCE)?,
+            line: bus.publisher_declared(SaidLine::TOPIC, &SaidLine::declaration(), SOURCE)?,
+            replying: None,
             health: bus.publisher_declared(
                 lamp_msgs::Diagnostic::TOPIC,
                 &lamp_msgs::Diagnostic::declaration(),
@@ -1221,6 +1232,9 @@ impl BusOut {
         // were, before and after every sentence.
         let _ = self.heard.alive();
         let _ = self.said.alive();
+        // And the line stream, silent between lines the same way (run14b,
+        // 75c9, 10 Nov: "no publisher is alive" around every line).
+        let _ = self.line.alive();
     }
 
     /// The report said now, whatever was said last (#2231, the reviewer on
@@ -1347,6 +1361,94 @@ impl BusOut {
         let _ = self
             .said
             .publish_json(now_us, &speech(Some(request), text, finished));
+        // The line it makes: told when it has played ([`Self::reply_ended`]),
+        // or, cut, when the next reply begins or it goes stale (#4209).
+        if self
+            .replying
+            .as_ref()
+            .is_some_and(|(held, _, _)| *held != request)
+        {
+            self.flush_reply(true, now_us);
+        }
+        let held = self
+            .replying
+            .get_or_insert_with(|| (request, String::new(), now_us));
+        held.1.push_str(text);
+        held.2 = now_us;
+        let _ = finished;
+    }
+
+    /// The reply to `request` has played out: told as its line, `cut` if
+    /// it was talked over or stopped before its end (its words are then
+    /// what the model wrote, not what was heard).
+    pub fn reply_ended(&mut self, request: u64, cut: bool, now_us: u64) {
+        if self
+            .replying
+            .as_ref()
+            .is_some_and(|(held, _, _)| *held == request)
+        {
+            self.flush_reply(cut, now_us);
+        }
+    }
+
+    /// A reply that never ended cleanly (cancelled): told cut once no piece
+    /// has come for [`REPLY_STALE_US`] and none is playing.
+    pub fn settle(&mut self, replying: bool, now_us: u64) {
+        if !replying
+            && self
+                .replying
+                .as_ref()
+                .is_some_and(|(_, _, last)| now_us.saturating_sub(*last) >= REPLY_STALE_US)
+        {
+            self.flush_reply(true, now_us);
+        }
+    }
+
+    /// The reply being gathered, told as the line it is, if it has words.
+    fn flush_reply(&mut self, cut: bool, now_us: u64) {
+        let Some((request, words, _)) = self.replying.take() else {
+            return;
+        };
+        let words = words.trim();
+        if words.is_empty() {
+            return;
+        }
+        let line = SaidLine {
+            text: words.to_owned(),
+            by: LineBy::Lamp,
+            source: LineSource::Reply,
+            app: None,
+            request: Some(request),
+            cut,
+        };
+        let _ = self.line.publish_json(now_us, &line);
+    }
+
+    /// A line played without the model: a computer's or a skill's exact
+    /// words, a cached phrase, a recording (#4209). `app` is the computer's
+    /// or the skill's name. Told as it begins to play; an empty one is none.
+    pub fn line_played(
+        &mut self,
+        text: &str,
+        by: LineBy,
+        source: LineSource,
+        app: Option<&str>,
+        now_us: u64,
+    ) {
+        self.flush_reply(true, now_us);
+        let text = text.trim();
+        if text.is_empty() {
+            return;
+        }
+        let line = SaidLine {
+            text: text.to_owned(),
+            by,
+            source,
+            app: app.map(str::to_owned),
+            request: None,
+            cut: false,
+        };
+        let _ = self.line.publish_json(now_us, &line);
     }
 }
 
@@ -2363,6 +2465,144 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    /// Every line the lamp says is one `voice/line`, once (#4209): a reply
+    /// when its words are whole, in the pieces' order and without a
+    /// function's name written as words; a reply cut short is told when the
+    /// next one begins; a person's words are never on it.
+    #[test]
+    fn a_reply_is_one_line_when_whole_and_never_a_persons_words() {
+        let (bus, root) = bus("line-reply");
+        let mut out = BusOut::on(&bus).unwrap();
+        let mut lines = bus
+            .subscribe_typed("voice/line", "l", lamp_msgs::SaidLine::TYPE)
+            .unwrap();
+        out.input_started(1);
+        out.heard("What is my name?", true, 1);
+        out.said(1, "Your name", false, 2);
+        out.said(1, " is Sam.", true, 3);
+        out.reply_ended(1, false, 3);
+        // Cut short: told cut when the next answer begins.
+        out.said(2, "It is", false, 4);
+        out.said(3, "Yes?", false, 5);
+        out.said(3, " not_for", false, 6);
+        out.said(3, "_me{}", false, 7);
+        out.said(3, " Noon.", true, 8);
+        out.reply_ended(3, true, 9);
+        // Never played and never ended: cut once stale, not before.
+        out.said(4, "Gone.", true, 10);
+        out.settle(false, 11);
+        out.settle(true, 10 + REPLY_STALE_US);
+        out.settle(false, 10 + REPLY_STALE_US);
+        let mut got = Vec::new();
+        while let Some(message) = lines.recv(Duration::from_millis(100)).unwrap() {
+            let line: lamp_msgs::SaidLine = message.parse().unwrap();
+            got.push((
+                line.text,
+                line.by,
+                line.source,
+                line.app,
+                line.request,
+                line.cut,
+            ));
+        }
+        use lamp_msgs::{LineBy::Lamp, LineSource::Reply};
+        assert_eq!(
+            got,
+            [
+                (
+                    "Your name is Sam.".to_owned(),
+                    Lamp,
+                    Reply,
+                    None,
+                    Some(1),
+                    false
+                ),
+                ("It is".to_owned(), Lamp, Reply, None, Some(2), true),
+                ("Yes? Noon.".to_owned(), Lamp, Reply, None, Some(3), true),
+                ("Gone.".to_owned(), Lamp, Reply, None, Some(4), true),
+            ]
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// A line the voice plays without the model (a computer's or a skill's
+    /// exact words, a cached phrase, a recording) is told with who had it
+    /// said (#4209).
+    #[test]
+    fn a_line_played_without_the_model_is_told_with_who_had_it_said() {
+        use lamp_msgs::{LineBy, LineSource};
+        let (bus, root) = bus("line-played");
+        let mut out = BusOut::on(&bus).unwrap();
+        let mut lines = bus
+            .subscribe_typed("voice/line", "l", lamp_msgs::SaidLine::TYPE)
+            .unwrap();
+        out.line_played(
+            "Build passed.",
+            LineBy::Computer,
+            LineSource::Exact,
+            Some("desk-wave"),
+            1,
+        );
+        out.line_played(
+            "Time to stand up.",
+            LineBy::Skill,
+            LineSource::Exact,
+            Some("stand-up"),
+            2,
+        );
+        out.line_played(
+            "Going to sleep now.",
+            LineBy::Lamp,
+            LineSource::Cached,
+            None,
+            3,
+        );
+        out.line_played("", LineBy::Lamp, LineSource::Cached, None, 4);
+        let mut got = Vec::new();
+        while let Some(message) = lines.recv(Duration::from_millis(100)).unwrap() {
+            let line: lamp_msgs::SaidLine = message.parse().unwrap();
+            got.push((
+                line.text,
+                line.by,
+                line.source,
+                line.app,
+                line.request,
+                line.cut,
+            ));
+        }
+        assert_eq!(
+            got,
+            [
+                (
+                    "Build passed.".to_owned(),
+                    LineBy::Computer,
+                    LineSource::Exact,
+                    Some("desk-wave".to_owned()),
+                    None,
+                    false
+                ),
+                (
+                    "Time to stand up.".to_owned(),
+                    LineBy::Skill,
+                    LineSource::Exact,
+                    Some("stand-up".to_owned()),
+                    None,
+                    false
+                ),
+                (
+                    "Going to sleep now.".to_owned(),
+                    LineBy::Lamp,
+                    LineSource::Cached,
+                    None,
+                    None,
+                    false
+                ),
+            ],
+            "an empty line is none"
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn a_silent_stream_is_not_taken_for_a_voice_that_has_gone() {
         let root = std::path::PathBuf::from(format!("/tmp/lvb-alive-{}", std::process::id()));
@@ -2373,6 +2613,9 @@ mod tests {
         let mut heard = bus
             .subscribe_typed("voice/heard", "h", Speech::TYPE)
             .unwrap();
+        let mut line = bus
+            .subscribe_typed("voice/line", "l", lamp_msgs::SaidLine::TYPE)
+            .unwrap();
         // Nothing is said for four leases, and the state is told as it
         // would be once a second on a lamp, here every 100 ms.
         for tick in 0..12u64 {
@@ -2380,6 +2623,8 @@ mod tests {
             std::thread::sleep(Duration::from_millis(100));
             assert!(heard.recv(Duration::from_millis(1)).unwrap().is_none());
             assert!(!heard.source_gone(), "tick {tick}");
+            assert!(line.recv(Duration::from_millis(1)).unwrap().is_none());
+            assert!(!line.source_gone(), "line, tick {tick}");
         }
         // Without it, the lease runs out.
         std::thread::sleep(Duration::from_millis(700));

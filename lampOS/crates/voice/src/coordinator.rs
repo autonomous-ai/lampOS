@@ -11704,6 +11704,9 @@ fn conversation_with_gate_inner(
             let played_whole = matches!(current.cloud.outcome, Some(RequestOutcome::Complete))
                 && current.delivery_outcome() == "audio_written_unscored"
                 && !sound_finished;
+            if let Some(bus) = bus_out.as_mut() {
+                bus.reply_ended(turn, !played_whole, monotonic_us());
+            }
             holding_answer.settled(turn, played_whole, monotonic_us());
             if let Some((kind, why)) = look_note.settled(turn, played_whole, monotonic_us()) {
                 record(
@@ -11836,6 +11839,7 @@ fn conversation_with_gate_inner(
             clock,
         );
         if let Some(bus) = bus_out.as_mut() {
+            bus.settle(reply.is_some(), monotonic_us());
             tell_voice_of_turn(
                 bus,
                 snapshot,
@@ -12924,6 +12928,7 @@ fn conversation_with_gate_inner(
                 reply,
                 rig.playout_start_now(),
                 trace,
+                bus_out.as_mut(),
                 |state| rig.publish(state),
             )? {
                 snapshot = now_state;
@@ -12941,6 +12946,7 @@ fn conversation_with_gate_inner(
                 &mut submission_draining,
                 rig.playout_start_now(),
                 trace,
+                bus_out.as_mut(),
                 |state| rig.publish(state),
             )? {
                 snapshot = now_state;
@@ -14401,6 +14407,7 @@ fn play_exact_line(
     reply: &mut Option<Reply>,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
+    bus: Option<&mut crate::bus_out::BusOut>,
     publish: impl FnMut(Snapshot) -> io::Result<()>,
 ) -> Result<Option<Snapshot>> {
     if !says.exact_waiting(at_us) {
@@ -14441,10 +14448,26 @@ fn play_exact_line(
         publish,
     )?;
     ticket.begun(monotonic_us());
+    tell_line(bus, &ticket);
     if let Some(current) = reply.as_mut() {
         current.say = Some(ticket);
     }
     Ok(Some(snapshot))
+}
+
+/// The line a ticket plays, on `voice/line` as it begins (#4209): an exact
+/// line's words and who had them said, or a cached phrase. A clip or a
+/// sound has none.
+fn tell_line(bus: Option<&mut crate::bus_out::BusOut>, ticket: &crate::say::Ticket) {
+    if let (Some(bus), Some(line)) = (bus, ticket.spoken_line()) {
+        bus.line_played(
+            &line.text,
+            line.by,
+            line.source,
+            line.app.as_deref(),
+            monotonic_us(),
+        );
+    }
 }
 
 /// A skill's sound asked for, if one waits: played now as a turn of the
@@ -14465,6 +14488,7 @@ fn play_skill_sound(
     submission_draining: &mut bool,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
+    bus: Option<&mut crate::bus_out::BusOut>,
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
 ) -> Result<Option<Snapshot>> {
     let Some((samples, ticket)) = says.take_sound(at_us) else {
@@ -14509,6 +14533,7 @@ fn play_skill_sound(
     )?;
     says.sound_played(at_us);
     ticket.begun(monotonic_us());
+    tell_line(bus, &ticket);
     if let Some(current) = reply.as_mut() {
         current.say = Some(ticket);
     }

@@ -739,6 +739,69 @@ impl VoiceRemarked {
     }
 }
 
+/// Who had the lamp say a line (`voice/line`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LineBy {
+    /// The lamp's own words: its answers, its fixed phrases.
+    Lamp,
+    /// A paired computer's `say`, word for word.
+    Computer,
+    /// A skill's `say`.
+    Skill,
+}
+
+/// Where a line's words came from (`voice/line`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LineSource {
+    /// The model's answer: the provider's transcript of it.
+    Reply,
+    /// Words as sent, rendered straight through the speech service.
+    Exact,
+    /// A fixed line played from the speech cache.
+    Cached,
+    /// A line recorded at build time.
+    Recording,
+}
+
+/// A line the lamp says (`voice/line`, #4209): once, when it begins to play
+/// (a reply: when it has played to its end or been cut). The lamp's own words, or the
+/// words a computer or a skill had it say, never a person's.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SaidLine {
+    pub text: String,
+    pub by: LineBy,
+    pub source: LineSource,
+    /// The computer's name (its pairing's) or the skill's, when `by` says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app: Option<String>,
+    /// The request this answers, as `voice/said` numbers it, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request: Option<u64>,
+    /// A reply that was cut short (talked over, stopped, or the voice
+    /// went on): `text` is what the model wrote, which the lamp may not
+    /// have said in full. Absent when the line played to its end.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub cut: bool,
+}
+
+impl SaidLine {
+    pub const TYPE: &str = "lamp_msgs/SaidLine";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "voice/line";
+
+    /// One a line, as it begins: no period is promised.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+}
+
+/// The lamp's lines (`voice/line`), apart from the first topics.
+pub fn line_topics() -> Vec<(&'static str, Declaration)> {
+    vec![(SaidLine::TOPIC, SaidLine::declaration())]
+}
+
 /// The voice's turns' verdicts (#1155), apart from the first topics.
 pub fn turn_topics() -> Vec<(&'static str, Declaration)> {
     vec![(VoiceTurn::TOPIC, VoiceTurn::declaration())]
@@ -2003,6 +2066,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(arrival_topics())
         .chain(turn_topics())
         .chain(tone_topics())
+        .chain(line_topics())
         .chain(skill_ask_topics())
         .chain(addon_topics())
         .chain(privacy_topics())
@@ -2360,6 +2424,84 @@ mod tests {
         assert_eq!(
             declaration_of(VoiceTurn::TOPIC),
             Some(VoiceTurn::declaration())
+        );
+    }
+
+    /// A line the lamp says (`voice/line`, #4209): its words, who had it say
+    /// them, and where they came from. The lamp's own words only: never a
+    /// person's. Its own topic, known by name.
+    #[test]
+    fn a_line_the_lamp_says_names_who_had_it_say_them() {
+        round_trip(
+            &SaidLine {
+                text: "Good morning.".into(),
+                by: LineBy::Lamp,
+                source: LineSource::Reply,
+                app: None,
+                request: Some(7),
+                cut: false,
+            },
+            "{\"text\":\"Good morning.\",\"by\":\"lamp\",\"source\":\"reply\",\"request\":7}",
+        );
+        round_trip(
+            &SaidLine {
+                text: "It is a long".into(),
+                by: LineBy::Lamp,
+                source: LineSource::Reply,
+                app: None,
+                request: Some(8),
+                cut: true,
+            },
+            "{\"text\":\"It is a long\",\"by\":\"lamp\",\"source\":\"reply\",\"request\":8,\"cut\":true}",
+        );
+        round_trip(
+            &SaidLine {
+                text: "Build passed.".into(),
+                by: LineBy::Computer,
+                source: LineSource::Exact,
+                app: Some("desk-wave".into()),
+                request: None,
+                cut: false,
+            },
+            "{\"text\":\"Build passed.\",\"by\":\"computer\",\"source\":\"exact\",\"app\":\"desk-wave\"}",
+        );
+        for (source, word) in [
+            (LineSource::Reply, "reply"),
+            (LineSource::Exact, "exact"),
+            (LineSource::Cached, "cached"),
+            (LineSource::Recording, "recording"),
+        ] {
+            round_trip(
+                &SaidLine {
+                    text: "x".into(),
+                    by: LineBy::Skill,
+                    source,
+                    app: Some("reminder".into()),
+                    request: None,
+                    cut: false,
+                },
+                &format!(
+                    "{{\"text\":\"x\",\"by\":\"skill\",\"source\":\"{word}\",\"app\":\"reminder\"}}"
+                ),
+            );
+        }
+        assert!(
+            serde_json::from_str::<SaidLine>(
+                "{\"text\":\"x\",\"by\":\"person\",\"source\":\"reply\"}"
+            )
+            .is_err(),
+            "a person is never who had the lamp say a line"
+        );
+        assert_eq!(SaidLine::declaration().kind, Kind::Event);
+        assert_eq!(line_topics(), [(SaidLine::TOPIC, SaidLine::declaration())]);
+        assert!(
+            first_topics()
+                .iter()
+                .all(|(topic, _)| *topic != SaidLine::TOPIC)
+        );
+        assert_eq!(
+            declaration_of(SaidLine::TOPIC),
+            Some(SaidLine::declaration())
         );
     }
 

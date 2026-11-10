@@ -794,6 +794,7 @@ fn take_sound(
         &mut false,
         PlayoutStart::default(),
         trace,
+        None,
         |_| Ok(()),
     )
     .unwrap()
@@ -1097,6 +1098,7 @@ fn take_exact(
         reply,
         PlayoutStart::default(),
         trace,
+        None,
         |_| Ok(()),
     )
     .unwrap()
