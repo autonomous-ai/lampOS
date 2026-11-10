@@ -1,0 +1,319 @@
+name: lampOS Harness pin
+
+# The Harness pin follows Harness's releases by itself (#5957 part 1; the
+# first builder, 10 Nov 23:14 on #6059: the workflow file alone, opened with
+# the workflow's own token).
+#
+# Once a day, it reads Harness's CDN manifest. When its `cli.version` is newer
+# than the build's pin (`product::VERSION`), it:
+#   1. copies the CLI manifest, Harness's installer and the four manifests the
+#      installer reads (the Node runtime, tmux, grid and hn) into
+#      `lampOS/deploy/harness/`, after checking every linux-arm64 file they
+#      name against its sha256 (and size, where the manifest gives one);
+#   2. updates `harness_install/product.rs`'s `include_bytes!` paths and
+#      constants, and the pinned version's lines in `docs/install.md`;
+#   3. runs lamp-update's `harness_install` tests (the constants against their
+#      files), then installs that pinned Harness in an ARM64 container from
+#      those copies served on 127.0.0.1, as a lamp's one-shot does, and checks
+#      `harness version` and `harness --help`;
+#   4. opens one PR onto lamp-voice for a reader, closing an older pin PR it
+#      opened before.
+# It never merges anything. The PR merges only after its lamp row in
+# `docs/lamp-runs.md` passes ("Each Harness pin move", #5957 (b)), and it reaches
+# stable only on a promote after that.
+#
+# A PR opened with this workflow's own GITHUB_TOKEN starts no `pull_request`
+# workflows, so step 3 runs here, before the PR is opened. The PR's own CI
+# (ARM64, clippy) starts on its first push by a person (an empty commit will do).
+#
+# Scheduled workflows run from the default branch (lamp-voice).
+on:
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: lampos-harness-pin
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  pin:
+    if: github.repository == 'autonomous-ai/lampOS'
+    name: lampOS — move the Harness pin to Harness's newest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: lamp-voice
+
+      - name: Read Harness's manifests; copy a newer pin
+        id: pin
+        run: |
+          python3 -I - <<'PY'
+          import datetime, hashlib, json, os, pathlib, re, sys, urllib.request
+
+          ROOT = pathlib.Path("lampOS")
+          PRODUCT = ROOT / "crates/update/src/harness_install/product.rs"
+          INSTALL_RS = ROOT / "crates/update/src/install.rs"
+          DEPLOY = ROOT / "deploy/harness"
+          DOC = ROOT / "docs/install.md"
+          INCLUDE = "../../../../deploy/harness/"
+          ARCH = "linux-arm64"
+          src = PRODUCT.read_text()
+
+          def out(**values):
+              with open(os.environ["GITHUB_OUTPUT"], "a") as file:
+                  for key, value in values.items():
+                      file.write(f"{key}={value}\n")
+
+          def fail(why):
+              print(f"::error::{why}")
+              sys.exit(1)
+
+          def const(name):
+              found = re.search(rf'pub const {name}: &str =\s*"([^"]+)";', src)
+              if not found:
+                  fail(f"product.rs has no {name}")
+              return found.group(1)
+
+          def plain(version):
+              found = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", version)
+              return tuple(map(int, found.groups())) if found else None
+
+          def fetch(url, most):
+              if not url.startswith("https://"):
+                  fail(f"not https: {url}")
+              with urllib.request.urlopen(url, timeout=120) as answer:
+                  data = answer.read(most + 1)
+              if len(data) > most:
+                  fail(f"over {most} bytes: {url}")
+              return data
+
+          def sha(data):
+              return hashlib.sha256(data).hexdigest()
+
+          def checked(what, entry):
+              # A file a manifest names: fetched and held to its sha256 (and size).
+              data = fetch(entry["url"], 256 << 20)
+              if sha(data) != entry["sha256"]:
+                  fail(f"{what}: {entry['url']} is not sha256 {entry['sha256']}")
+              if "size" in entry and len(data) != entry["size"]:
+                  fail(f"{what}: {entry['url']} is not {entry['size']} bytes")
+              print(f"{what}: {entry['url']} checked ({len(data)} bytes)")
+
+          pinned = const("VERSION")
+          origin = const("ORIGIN")
+          cli_bytes = fetch(origin, 1 << 20)
+          cli = json.loads(cli_bytes)["cli"]
+          newest = cli["version"]
+          if plain(newest) is None or plain(pinned) is None:
+              fail(f"not plain versions: pinned {pinned}, Harness's {newest}")
+          if plain(newest) <= plain(pinned):
+              print(f"Harness {newest} is not newer than the pin {pinned}: nothing to do")
+              out(changed="false")
+              sys.exit(0)
+          print(f"Harness {newest} is newer than the pin {pinned}")
+          for name in ("cli", "notify"):
+              checked(f"cli.{name}", cli[name])
+
+          installer_origin = re.search(
+              r'pub const HARNESS_INSTALLER: &str = "([^"]+)";', INSTALL_RS.read_text()
+          ).group(1)
+          installer = fetch(installer_origin, 1 << 20)
+          if not installer.startswith(b"#!/bin/sh"):
+              fail("Harness's installer does not start #!/bin/sh")
+
+          # The four manifests, as product.rs names them: (env, old file, origin).
+          entries = re.findall(
+              r'env: "([A-Z_]+)",\s*path: "[^"]+",\s*bytes: include_bytes!\("'
+              + re.escape(INCLUDE)
+              + r'([^"]+)"\),\s*sha256: "[0-9a-f]{64}",\s*origin: "([^"]+)",',
+              src,
+          )
+          if len(entries) != 4:
+              fail(f"product.rs names {len(entries)} manifests, not 4")
+          # Each manifest's file name, from its own version.
+          names = {
+              "HARNESS_RUNTIME_METADATA_URL": ("runtime-node", lambda d: d["node"][ARCH]),
+              "HARNESS_TMUX_METADATA_URL": ("runtime-tmux", lambda d: d["tmux"][ARCH]),
+              "HARNESS_GRID_METADATA_URL": ("runtime-grid", lambda d: d["grid"][ARCH]),
+              "HARNESS_TUI_MANIFEST_URL": ("tui", lambda d: d["builds"][ARCH]),
+          }
+          new_files = {}
+          for env, old, url in entries:
+              if env not in names:
+                  fail(f"an unknown manifest in product.rs: {env}")
+              prefix, entry_of = names[env]
+              data = fetch(url, 1 << 20)
+              manifest = json.loads(data)
+              entry = entry_of(manifest)
+              version = entry.get("version") or manifest.get("version")
+              if not version or not re.fullmatch(r"[0-9A-Za-z.\-]+", version):
+                  fail(f"{env}: no plain version")
+              checked(env, entry)
+              new_files[env] = (old, f"{prefix}-{version}.metadata.json", data)
+
+          cli_file = f"cli-{newest}.metadata.json"
+          installer_file = f"cli-install-{sha(installer)[:8]}.sh"
+          old_cli = re.search(r'deploy/harness/(cli-[^"]+\.metadata\.json)"', src).group(1)
+          old_installer = re.search(r'deploy/harness/(cli-install-[^"]+\.sh)"', src).group(1)
+
+          # The copies, byte for byte; the old ones go.
+          written = {cli_file: cli_bytes, installer_file: installer}
+          for _, new, data in new_files.values():
+              written[new] = data
+          for name, data in written.items():
+              (DEPLOY / name).write_bytes(data)
+          for old in [old_cli, old_installer] + [old for old, _, _ in new_files.values()]:
+              if old not in written:
+                  (DEPLOY / old).unlink()
+
+          # product.rs: each include path and its constant.
+          def swap(pattern, repl, text, what):
+              text, count = re.subn(pattern, repl, text, count=1)
+              if count != 1:
+                  fail(f"product.rs: {what} not found")
+              return text
+
+          src = swap(re.escape(INCLUDE + old_cli), INCLUDE + cli_file, src, "MANIFEST's path")
+          src = swap(r'(pub const MANIFEST_SHA256: &str =\s*")[0-9a-f]{64}"',
+                     rf'\g<1>{sha(cli_bytes)}"', src, "MANIFEST_SHA256")
+          src = swap(r'(pub const VERSION: &str = ")[^"]+"', rf'\g<1>{newest}"', src, "VERSION")
+          src = swap(re.escape(INCLUDE + old_installer), INCLUDE + installer_file, src,
+                     "INSTALLER's path")
+          src = swap(r'(pub const INSTALLER_SHA256: &str =\s*")[0-9a-f]{64}"',
+                     rf'\g<1>{sha(installer)}"', src, "INSTALLER_SHA256")
+          for env, (old, new, data) in new_files.items():
+              src = swap(
+                  r'(env: "' + env + r'",\s*path: "[^"]+",\s*bytes: include_bytes!\("'
+                  + re.escape(INCLUDE) + r')' + re.escape(old) + r'("\),\s*sha256: ")[0-9a-f]{64}"',
+                  rf'\g<1>{new}\g<2>{sha(data)}"', src, f"{env}'s entry")
+          PRODUCT.write_text(src)
+
+          # docs/install.md: the pinned version's own lines, and the copy's date.
+          doc = DOC.read_text()
+          today = datetime.date.today()
+          for pattern, repl in [
+              (re.escape(f"deploy/harness/{old_cli}"), f"deploy/harness/{cli_file}"),
+              (re.escape(f"when it named {pinned};"), f"when it named {newest};"),
+              (re.escape(f"`Harness {pinned} is the pinned version`"),
+               f"`Harness {newest} is the pinned version`"),
+              (r"copied on \d{1,2} [A-Z][a-z]{2} \d{4}",
+               f"copied on {today.day} {today.strftime('%b')} {today.year}"),
+          ]:
+              doc, count = re.subn(pattern, repl, doc)
+              if count < 1:
+                  fail(f"docs/install.md: no line matches {pattern}")
+          DOC.write_text(doc)
+
+          serve = {"HARNESS_METADATA_URL": cli_file}
+          for env, (_, new, _) in new_files.items():
+              serve[env] = new
+          out(changed="true", pinned=pinned, newest=newest, installer=installer_file,
+              serve=" ".join(f"{env}={name}" for env, name in serve.items()))
+          PY
+
+      - name: lamp-update's harness_install tests
+        if: steps.pin.outputs.changed == 'true'
+        working-directory: lampOS
+        run: cargo test --locked -p lamp-update --lib harness_install
+
+      - uses: docker/setup-qemu-action@v3
+        if: steps.pin.outputs.changed == 'true'
+        with:
+          platforms: arm64
+
+      - name: Install the pinned Harness on ARM64, from its copies on 127.0.0.1
+        if: steps.pin.outputs.changed == 'true'
+        env:
+          SERVE: ${{ steps.pin.outputs.serve }}
+          INSTALLER: ${{ steps.pin.outputs.installer }}
+          NEWEST: ${{ steps.pin.outputs.newest }}
+        run: |
+          set -eu
+          python3 -I -m http.server 8765 --bind 127.0.0.1 --directory lampOS/deploy/harness \
+            >/dev/null 2>&1 &
+          server=$!
+          trap 'kill "$server"' EXIT
+          envs=""
+          for pair in $SERVE; do
+            envs="$envs -e ${pair%%=*}=http://127.0.0.1:8765/${pair#*=}"
+          done
+          # As a lamp's one-shot runs it: `sh <file>`, unattended, no terminal.
+          # shellcheck disable=SC2086
+          docker run --rm --platform linux/arm64 --network host \
+            -v "$PWD/lampOS/deploy/harness:/kit:ro" $envs \
+            -e INSTALLER="$INSTALLER" -e NEWEST="$NEWEST" \
+            ubuntu:24.04 sh -euc '
+              apt-get update -qq
+              DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+                ca-certificates curl tar tmux procps >/dev/null
+              useradd -m harness-on
+              su harness-on -s /bin/sh -c "env -u HARNESS_INSTALL_ATTENDED \
+                HARNESS_METADATA_URL=$HARNESS_METADATA_URL \
+                HARNESS_RUNTIME_METADATA_URL=$HARNESS_RUNTIME_METADATA_URL \
+                HARNESS_TMUX_METADATA_URL=$HARNESS_TMUX_METADATA_URL \
+                HARNESS_GRID_METADATA_URL=$HARNESS_GRID_METADATA_URL \
+                HARNESS_TUI_MANIFEST_URL=$HARNESS_TUI_MANIFEST_URL \
+                sh /kit/$INSTALLER </dev/null"
+              said=$(su harness-on -s /bin/sh -c "~/.local/bin/harness version")
+              echo "harness version: $said"
+              case "$said" in *"$NEWEST"*) ;; *) echo "not $NEWEST" >&2; exit 1 ;; esac
+              su harness-on -s /bin/sh -c "~/.local/bin/harness --help" >/dev/null
+            '
+
+      - name: Open the pin PR
+        if: steps.pin.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PINNED: ${{ steps.pin.outputs.pinned }}
+          NEWEST: ${{ steps.pin.outputs.newest }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -eu
+          branch="ci/harness-pin-$NEWEST"
+          if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+            echo "a PR for $NEWEST is open already: nothing to do"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          git add -A lampOS/deploy/harness lampOS/crates/update/src/harness_install/product.rs \
+            lampOS/docs/install.md
+          git commit -q -m "lampOS: the Harness pin moves to $NEWEST, copied by CI (#5957)"
+          git push -q origin "$branch"
+          body=$(cat <<EOF
+          The Harness pin moves from $PINNED to $NEWEST, copied by \`lampos-harness-pin.yml\` (#5957 part 1).
+
+          **Copied:** Harness's CLI manifest, its installer and the four manifests the installer reads, into \`lampOS/deploy/harness/\`, with \`harness_install/product.rs\`'s paths and SHA-256s and the pinned version's lines in \`docs/install.md\`.
+
+          **Checked in the workflow's run** ($RUN):
+          - every linux-arm64 file those manifests name, against its sha256 (and size);
+          - \`cargo test --locked -p lamp-update --lib harness_install\`;
+          - the pinned install on ARM64 from those copies on 127.0.0.1: \`harness version\` says $NEWEST, and \`harness --help\` runs.
+
+          **Before it merges:**
+          - this PR was opened with the workflow's own token, so its own CI hasn't started yet: a push (an empty commit will do) starts ARM64 and clippy;
+          - a reader's READ-OK;
+          - **its lamp row passes:** "Each Harness pin move" in \`docs/lamp-runs.md\` (#5957 (b)). The lamp moves from $PINNED to $NEWEST in one update round, its sign-in still holds, and one hand-over and one follow-up go through.
+
+          It reaches stable only on a promote after that.
+
+          Part of #5957
+          EOF
+          )
+          gh pr create --base lamp-voice --head "$branch" \
+            --title "lampOS: the Harness pin moves to $NEWEST, copied by CI (#5957)" --body "$body"
+          # An older pin PR from this workflow is superseded.
+          gh pr list --state open --search 'head:ci/harness-pin-' --json number,headRefName \
+            --jq ".[] | select(.headRefName != \"$branch\") | .number" |
+            while read -r older; do
+              gh pr close "$older" --comment "Superseded by the pin PR for Harness $NEWEST." \
+                --delete-branch
+            done
