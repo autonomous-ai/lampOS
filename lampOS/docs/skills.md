@@ -2427,7 +2427,11 @@ gone ([switches.md](switches.md)). What happens:
    - **The say-back, whole** (`made_skill::write_plainly`): when it runs,
      where it goes, every recipient, every text quoted in full ("it mails
      mai@example.com from your Gmail, subject “Leaving”, saying “I'm
-     leaving now.”"), how often, its manners, and last
+     leaving now.”"; a GitHub write "opens an issue “Left” on mai/notes on
+     GitHub, saying “I left.”; anyone who can see that repo can see it",
+     `made_skill::SEEN_WITH_THE_REPO`, so the yes covers a public
+     destination, its visibility being read only at the approval), how
+     often, its manners, and last
      `made_skill::WAITS_FOR_YES`, " It waits for you to agree before it
      sends anything." It ends on no word to repeat and has no "yes" in it.
      Said whole, up to 1,400 characters (`MOST_WRITE_PLAIN_CHARS`), never
@@ -2799,6 +2803,7 @@ Tests:
 - `made_skill::tests` for a write (#6066):
   `a_write_is_carried_only_with_its_switch`,
   `a_writes_say_back_is_whole_and_ends_on_its_wait`,
+  `a_github_writes_say_back_says_who_can_see_it_before_the_yes`,
   `a_writes_words_and_recipients_are_the_requests_own`;
   `skill_write_yes::tests` (a later heard yes approves once; an echo, the
   make's own request, an unheard, stale or other id, or the Live route

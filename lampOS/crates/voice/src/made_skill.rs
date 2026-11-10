@@ -2846,6 +2846,12 @@ fn and_list(items: &[String]) -> String {
     }
 }
 
+/// Said of every GitHub write before its yes, so the yes covers who may
+/// see it: the repository's visibility is read only at the approval
+/// (`lamp_services::skill_writes`), which says again "anyone can see" for
+/// a public one.
+pub const SEEN_WITH_THE_REPO: &str = "anyone who can see that repo can see it";
+
 /// A write step (#6066) in plain words, whole: where it goes, every
 /// recipient, and every text quoted in full, as `lamp-skills` sends it
 /// (`lamp_skills::service_write`). None for a write the lamp can't send.
@@ -2890,12 +2896,12 @@ fn write_plainly(step: &toml::Value) -> Option<String> {
             said + &saying
         }
         ("github", "comment") => format!(
-            "comments on issue {} in {} on GitHub{saying}",
+            "comments on issue {} on {} on GitHub{saying}; {SEEN_WITH_THE_REPO}",
             content.get("number")?,
             text("repo")?
         ),
         ("github", _) => format!(
-            "opens an issue {} in {} on GitHub{saying}",
+            "opens an issue {} on {} on GitHub{saying}; {SEEN_WITH_THE_REPO}",
             quoted("title")?,
             text("repo")?
         ),
@@ -7702,6 +7708,37 @@ light = { colour = "green", level = 3, for = "20s" }
             plainly(WRITE_TOML).unwrap_err().0,
             cant_yet(SENDS_ON_ITS_OWN)
         );
+        set_writes_here(None);
+    }
+
+    /// A GitHub write's say-back names its repository and who can see what
+    /// it posts there before the yes, an issue and a comment alike, so the
+    /// yes covers a public destination.
+    #[test]
+    fn a_github_writes_say_back_says_who_can_see_it_before_the_yes() {
+        set_writes_here(Some(true));
+        for (write, said_where) in [
+            (
+                "write = { service = \"github\", action = \"create_issue\", repo = \"mai/notes\", \
+                 title = \"Left\", text = \"I left.\" }",
+                "opens an issue “Left” on mai/notes on GitHub, saying “I left.”; ",
+            ),
+            (
+                "write = { service = \"github\", action = \"comment\", repo = \"mai/notes\", \
+                 number = 7, text = \"I left.\" }",
+                "comments on issue 7 on mai/notes on GitHub, saying “I left.”; ",
+            ),
+        ] {
+            let toml = WRITE_TOML
+                .replace("gmail = \"write\"", "github = \"write\"")
+                .replace(WRITE_TOML.lines().last().unwrap(), write);
+            let said = plainly(&mannered(&toml)).unwrap();
+            assert!(
+                said.contains(&format!("{said_where}{SEEN_WITH_THE_REPO}")),
+                "{said}"
+            );
+            assert!(said.ends_with(WAITS_FOR_YES), "{said}");
+        }
         set_writes_here(None);
     }
 

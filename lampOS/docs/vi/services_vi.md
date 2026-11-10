@@ -1980,7 +1980,9 @@ toàn bộ):
   đọc; repository, team, project hay tệp là cái yêu cầu nêu. Mọi thứ khác
   quay lại mô hình tạo kỹ năng để sửa (`made_skill::write_from_request`).
 - **Nói lại trọn vẹn**, mọi người nhận và toàn bộ nội dung trích nguyên,
-  khi nào và bao lâu một lần, kết thúc bằng "It waits for you to agree
+  với lần ghi GitHub thì repository của nó và "anyone who can see that
+  repo can see it" (để lời đồng ý bao gồm cả repo công khai), khi nào và
+  bao lâu một lần, kết thúc bằng "It waits for you to agree
   before it sends anything." (`made_skill::WAITS_FOR_YES`): không có từ để
   lặp lại, không có "yes".
 - **Lời đồng ý.** Khi kỹ năng đã bật, nội dung chính xác các lần ghi của

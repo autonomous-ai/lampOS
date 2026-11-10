@@ -356,7 +356,11 @@ sau:
    - **Nói lại trọn vẹn** (`made_skill::write_plainly`): khi nào chạy, gửi
      đi đâu, mọi người nhận, mọi đoạn văn trích nguyên ("it mails
      mai@example.com from your Gmail, subject “Leaving”, saying “I'm
-     leaving now.”"), bao lâu một lần, cách cư xử của nó, và cuối cùng
+     leaving now.”"; một lần ghi GitHub là "opens an issue “Left” on
+     mai/notes on GitHub, saying “I left.”; anyone who can see that repo
+     can see it", `made_skill::SEEN_WITH_THE_REPO`, để lời đồng ý bao gồm
+     cả một nơi công khai, vì mức hiển thị chỉ được đọc lúc đồng ý), bao
+     lâu một lần, cách cư xử của nó, và cuối cùng
      `made_skill::WAITS_FOR_YES`, " It waits for you to agree before it
      sends anything." Nó không kết thúc bằng một từ để lặp lại và không có
      "yes". Nói trọn, tối đa 1.400 ký tự (`MOST_WRITE_PLAIN_CHARS`), không
@@ -724,6 +728,7 @@ các bước được liệt kê, ngoài ra là `cannot:`; khi tắt, không d�
 #6066), các test ghi của #6066 (`made_skill::tests`:
 `a_write_is_carried_only_with_its_switch`,
 `a_writes_say_back_is_whole_and_ends_on_its_wait`,
+`a_github_writes_say_back_says_who_can_see_it_before_the_yes`,
 `a_writes_words_and_recipients_are_the_requests_own`;
 `skill_write_yes::tests`; `own_echo::yes_tests`;
 `skill_writes_told::tests`), `made_skill::tests` (kể cả `every_request_is_briefed_and_the_model_judges_it`:

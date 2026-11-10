@@ -1926,8 +1926,9 @@ whole):
   spoken; a repository, team, project or file is one the request names.
   Anything else goes back to the making model for repair
   (`made_skill::write_from_request`).
-- **Said back whole**, every recipient and the whole text quoted, when
-  and how often, ending "It waits for you to agree before it sends
+- **Said back whole**, every recipient and the whole text quoted, for a
+  GitHub write its repository and "anyone who can see that repo can see
+  it" (so the yes covers a public one), when and how often, ending "It waits for you to agree before it sends
   anything." (`made_skill::WAITS_FOR_YES`): no word to repeat, no "yes".
 - **The yes.** Once the skill is on, its writes' exact contents wait in
   the voice's memory for 120 s (`crate::skill_write_yes`). An agreement
