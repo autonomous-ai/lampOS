@@ -2254,9 +2254,9 @@ fn trigger_named(trigger: &toml::Table) -> String {
 /// Six triggers are said: someone comes to the desk (or comes back, after
 /// it was empty a while), the desk is left, the lamp goes quiet, a face
 /// comes into view (after none, or none for a while), someone at the desk
-/// gets up, and a time of day, each day; each with its `for`, `rearm`,
-/// `during` and `cooldown` (said after the steps) as lamp-skills counts
-/// them for that topic.
+/// gets up, and a time of day, each day or on named days of the week; each
+/// with its `for`, `rearm`, `during` and `cooldown` (said after the steps)
+/// as lamp-skills counts them for that topic.
 fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Table), String> {
     // The keys a trigger said may have; any other is named.
     let unknown = |trigger: &toml::Table| {
@@ -2271,6 +2271,7 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
             "when",
             "absent_for",
             "above",
+            "days",
         ];
         let unknown: Vec<&String> = trigger
             .keys()
@@ -2348,6 +2349,10 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
     {
         return Err(its("above"));
     }
+    // `days` only on a time of day, its one window's days (#6066).
+    if trigger.contains_key("days") && topic.0 != Some(CLOCK_TOPIC) {
+        return Err(its("days, only on a time of day"));
+    }
     let above = trigger.get("above").and_then(|line| match line {
         toml::Value::Integer(line) => Some(*line as f64),
         toml::Value::Float(line) => Some(*line),
@@ -2357,8 +2362,8 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
         // Each day at a time (lamp-skills' own clock, `clock/local`): the
         // built-in daily triggers' shape, known local time held once
         // (`rearm`) in a window of one minute, so it runs once at that
-        // minute; never a window's while, nor a week's day (lamp-skills
-        // has none).
+        // minute; on its `days` alone when it names them (#6066, as
+        // lamp-skills reads them, [`weekdays`]); never a window's while.
         (lasting, absent) if topic.0 == Some(CLOCK_TOPIC) => {
             let at = (topic.1 == Some("known")
                 && topic.2 == Some(toml::Value::Boolean(true))
@@ -2371,7 +2376,13 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
                 .ok_or_else(|| {
                     its("test, rearm and during: known = true, rearm = \"ends\", during of one minute")
                 })?;
-            return Ok((format!("Every day at {at}"), trigger));
+            let every = match trigger.get("days") {
+                Some(days) => weekdays(days)
+                    .map(every_day_of)
+                    .map_err(|why| its(&format!("days: {why}")))?,
+                None => "Every day".to_owned(),
+            };
+            return Ok((format!("{every} at {at}"), trigger));
         }
         // A face comes into view (`humans/faces/tracked` with no field
         // test: any face, never whose), once each time (`appears`, or
@@ -2503,6 +2514,73 @@ fn one_minute(during: &toml::Value) -> Option<String> {
     (end == (start + 1) % (24 * 60)).then(|| from.to_owned())
 }
 
+/// The names a clock trigger's `days` takes, Monday first, as lamp-skills
+/// reads them (`lamp_skills::daily::Weekdays`, #6066), and each day said.
+const DAY_NAMES: [(&str, &str); 7] = [
+    ("mon", "Monday"),
+    ("tue", "Tuesday"),
+    ("wed", "Wednesday"),
+    ("thu", "Thursday"),
+    ("fri", "Friday"),
+    ("sat", "Saturday"),
+    ("sun", "Sunday"),
+];
+
+/// A trigger's `days`, a bit a day, Monday the lowest, held as
+/// lamp-skills holds them (`Weekdays::parse`, #6066): one name or a list
+/// of `mon` to `sun`, `weekdays` (Monday to Friday) and `weekend`
+/// (Saturday and Sunday); a day named twice is the same day; an empty
+/// list, any other name or a value that isn't one is refused, in words a
+/// repair is told.
+fn weekdays(days: &toml::Value) -> Result<u8, String> {
+    let names: Vec<&toml::Value> = match days {
+        toml::Value::Array(names) => names.iter().collect(),
+        name => vec![name],
+    };
+    if names.is_empty() {
+        return Err("it names no day".to_owned());
+    }
+    let mut bits = 0u8;
+    for name in names {
+        let name = name.as_str().unwrap_or_default();
+        bits |= match name {
+            "weekdays" => 0b001_1111,
+            "weekend" => 0b110_0000,
+            _ => match DAY_NAMES.iter().position(|(day, _)| *day == name) {
+                Some(index) => 1 << index,
+                None => {
+                    return Err(format!(
+                        "{} is not mon to sun, weekdays or weekend",
+                        named(name)
+                    ));
+                }
+            },
+        };
+    }
+    Ok(bits)
+}
+
+/// [`weekdays`]' days in plain words: "Every day", "Every weekday",
+/// "Every Saturday and Sunday", "Every Wednesday and Friday".
+fn every_day_of(bits: u8) -> String {
+    match bits {
+        0b111_1111 => return "Every day".to_owned(),
+        0b001_1111 => return "Every weekday".to_owned(),
+        _ => {}
+    }
+    let days: Vec<&str> = DAY_NAMES
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| bits & (1 << index) != 0)
+        .map(|(_, (_, day))| *day)
+        .collect();
+    match days.split_last() {
+        Some((last, [])) => format!("Every {last}"),
+        Some((last, rest)) => format!("Every {} and {last}", rest.join(", ")),
+        None => "Every day".to_owned(),
+    }
+}
+
 /// The longest [`plainly`] says: one breath, and with [`left_out`]'s
 /// words still within [`MOST_DESCRIPTION_CHARS`], so nothing is cut. 240
 /// since #6066, room for an outbound or camera step named after the steps.
@@ -2551,12 +2629,20 @@ macro_rules! more_trigger_meanings {
 pub const SAYABLE_TRIGGERS: &str = concat!(
     "One [trigger] table, one of: ",
     trigger_meanings!(),
-    " Beside it only for, cooldown, rearm = \"ends\", during."
+    " Beside it only for, cooldown, rearm = \"ends\", during, days."
 );
 
 /// The triggers [`plainly`] says, each with what it means, for the making
-/// model's system prompt (`make_skill_local`).
-pub const TRIGGER_MEANINGS: &str = concat!(trigger_meanings!(), more_trigger_meanings!());
+/// model's system prompt (`make_skill_local`), and a time's days (#6066),
+/// which a repair is told only when they are its trouble ([`weekdays`]'
+/// own words name every day), so its lines keep within
+/// [`MOST_REPAIR_BYTES`].
+pub const TRIGGER_MEANINGS: &str = concat!(
+    trigger_meanings!(),
+    " On some days only, add days = [\"wed\", \"fri\"] (mon to sun, \"weekdays\", \
+     \"weekend\").",
+    more_trigger_meanings!()
+);
 
 /// The steps, `[ask]` and grants a made skill may have beyond the light,
 /// gesture, say and hum the brief names (#6066), for the making model's
@@ -5805,6 +5891,115 @@ light = { colour = "green", level = 3, for = "20s" }
         );
     }
 
+    /// #6066: a time on named days of the week, as lamp-skills reads
+    /// `days`, is kept and said with its days ("every Wednesday and Friday
+    /// at 3:17 in the morning", refused on lamp-9adf staging 11625).
+    #[test]
+    fn a_time_on_named_weekdays_is_kept_and_said_with_its_days() {
+        let clock = "topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
+                     during = { from = \"03:17\", to = \"03:18\" }\n";
+        for (days, every) in [
+            ("[\"wed\", \"fri\"]", "Every Wednesday and Friday"),
+            ("[\"fri\", \"wed\", \"fri\"]", "Every Wednesday and Friday"),
+            ("\"sun\"", "Every Sunday"),
+            (
+                "[\"mon\", \"wed\", \"sat\"]",
+                "Every Monday, Wednesday and Saturday",
+            ),
+            ("\"weekdays\"", "Every weekday"),
+            ("[\"weekend\"]", "Every Saturday and Sunday"),
+            ("[\"weekdays\", \"weekend\"]", "Every day"),
+            ("[\"weekdays\", \"mon\"]", "Every weekday"),
+        ] {
+            let text = made_with(&format!("{clock}days = {days}\n"), "light = { dim = 1 }");
+            assert!(capped_with(&text, false).is_ok(), "{text}");
+            assert!(
+                paced(&text).contains(&format!("\ndays = {days}\n")),
+                "{days}"
+            );
+            assert_eq!(
+                plainly_with(&text, false).unwrap(),
+                format!("{every} at 03:17, it dims the light a step. It starts on its own."),
+                "{days}"
+            );
+        }
+        // #6103's quiet rule holds as for a time each day: a weekday time
+        // the request names runs as said, a night one the model chose alone
+        // keeps 22:00-08:00 quiet, one within the day needs none.
+        for (request, during, kept_quiet) in [
+            (
+                "every Wednesday and Friday at 3:17 in the morning, dim the light",
+                "03:17",
+                false,
+            ),
+            (
+                "on Wednesdays and Fridays, dim the light at night",
+                "03:17",
+                true,
+            ),
+            ("on Wednesdays and Fridays, dim the light", "09:00", false),
+            (
+                "every Wednesday and Friday at 10 pm, dim the light",
+                "22:00",
+                false,
+            ),
+        ] {
+            let asked = asked_windows(request);
+            let quiet = |days: &str| {
+                let minute = one_minute_after(during);
+                let text = paced_asked(
+                    &made_with(
+                        &format!(
+                            "topic = \"clock/local\"\nfield = \"known\"\nequals = true\n\
+                             rearm = \"ends\"\nduring = {{ from = \"{during}\", to = \
+                             \"{minute}\" }}\n{days}"
+                        ),
+                        "light = { dim = 1 }",
+                    ),
+                    &asked,
+                );
+                let table: toml::Table = toml::from_str(&text).unwrap();
+                assert!(manners_kept(&table, &asked), "{text}");
+                assert!(said_mannered(&text, &asked).is_ok(), "{text}");
+                table.contains_key("quiet")
+            };
+            assert_eq!(quiet(""), kept_quiet, "{request}");
+            assert_eq!(
+                quiet("days = [\"wed\", \"fri\"]\n"),
+                kept_quiet,
+                "{request}"
+            );
+        }
+        // One that speaks, as the voice makes it: its hour and its manners
+        // set, said with its days.
+        let request = "every Wednesday and Friday at 3:17 in the morning, say time to take out \
+                       the bins";
+        let asked = asked_windows(request);
+        let text = paced_asked(
+            &made_with(
+                &format!("{clock}days = [\"wed\", \"fri\"]\n"),
+                "say = { text = \"Time to take out the bins.\" }",
+            )
+            .replace("body = true\n", "body = true\nspeak = true\n"),
+            &asked,
+        );
+        assert!(capped_with(&text, false).is_ok(), "{text}");
+        let said = said_mannered(&text, &asked).unwrap();
+        assert!(
+            said.starts_with(
+                "Every Wednesday and Friday at 03:17, it says “Time to take out the bins.”, at \
+                 most once an hour."
+            ),
+            "{said}"
+        );
+    }
+
+    /// The minute after `HH:MM`, as `HH:MM`.
+    fn one_minute_after(at: &str) -> String {
+        let minutes = minutes(at).unwrap();
+        hhmm((minutes + 1) % (24 * 60))
+    }
+
     /// #6070, the Reviewer-lead's P2, by #6066's rule (a): a made skill on a
     /// face coming into view, a gesture or a light alone, runs only after
     /// seeing none for a minute, set and never refused: missing or shorter
@@ -5905,9 +6100,10 @@ light = { colour = "green", level = 3, for = "20s" }
     /// What lamp-skills would run otherwise than said, or that reads who
     /// someone is, is refused: a face by a field or a list (a name, a known
     /// face), a face held while in view, a getting up held a while, a time
-    /// over a window or on a week's day (lamp-skills has none).
+    /// over a window, a day of the week lamp-skills doesn't name, or days
+    /// on anything but a time.
     #[test]
-    fn a_face_by_who_a_window_or_a_weekday_is_refused() {
+    fn a_face_by_who_a_window_or_an_unknown_day_is_refused() {
         let part =
             |trigger: &str| match plainly_with(&made_with(trigger, "light = { dim = 1 }"), false) {
                 Err(Refused(why, Some(lines))) => {
@@ -5957,9 +6153,30 @@ light = { colour = "green", level = 3, for = "20s" }
                 "{trigger}"
             );
         }
+        // `days` as lamp-skills reads them (#6066), and only on a time.
+        for (days, why) in [
+            (
+                "[\"wednesday\"]",
+                "wednesday is not mon to sun, weekdays or weekend.",
+            ),
+            ("[\"Wed\"]", "Wed is not mon to sun"),
+            ("\"weekly\"", "weekly is not mon to sun"),
+            ("[]", "it names no day."),
+            ("[\"mon\", 3]", "another is not mon to sun"),
+            ("[\"mon\", \"a b\"]", "another is not mon to sun"),
+        ] {
+            let said = part(&format!("{clock}rearm = \"ends\"\n{at}days = {days}\n"));
+            assert!(
+                said.starts_with(&format!("{clocked}, its days: {why}")),
+                "{days}: {said}"
+            );
+        }
         assert!(
-            part(&format!("{clock}rearm = \"ends\"\n{at}days = [\"mon\"]\n"))
-                .starts_with(&format!("{clocked}, keys days."))
+            part(
+                "topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+                 days = [\"mon\"]\n"
+            )
+            .contains("its days, only on a time of day")
         );
         assert!(
             part("topic = \"voice/state\"\nfield = \"state\"\nabove = 0\n").contains("its above")
@@ -6073,6 +6290,10 @@ light = { colour = "green", level = 3, for = "20s" }
         assert!(TRIGGER_MEANINGS.contains("when = \"appears\", absent_for = \"5m\""));
         assert!(SAYABLE_TRIGGERS.contains(trigger_meanings!()));
         assert!(TRIGGER_MEANINGS.contains("\"controls/pet\", \"ended\", equals false"));
+        assert!(TRIGGER_MEANINGS.contains(
+            "}. On some days only, add days = [\"wed\", \"fri\"] (mon to sun, \"weekdays\", \
+             \"weekend\"). Also: a pat"
+        ));
     }
 
     /// The person hears why a make failed in plain words, with what to try:

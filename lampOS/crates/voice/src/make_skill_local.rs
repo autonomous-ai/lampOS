@@ -132,8 +132,8 @@ fn system_with(reads: bool) -> String {
          blocks and nothing else. Use only the keys and values the request names, written as \
          in this example, which the lamp's check takes:\n\n{EXAMPLE}\n\nThe example shows \
          the form only: never answer with it. A reminder at a time or every so often is the \
-         lamp's own timer, not a skill; a skill runs at a time only each day, by the clock \
-         trigger below. A skill made on this lamp may do whatever the lamp can do: make what \
+         lamp's own timer, not a skill; a skill runs at a time only each day or on named \
+         days of the week, by the clock trigger below. A skill made on this lamp may do whatever the lamp can do: make what \
          the request asks with the light, the head, a few exact words it says, its hum, or a \
          read as below, on one of the triggers below. {more} To speak, a skill has speak = \
          true in [permissions], cooldown = \"1h\" or longer, and one [[do]] step say = {{ text = \
@@ -1475,6 +1475,13 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                      one of: nod, headshake, ",
                     made_skill::TRIGGER_MEANINGS
                 )),
+                "{system}"
+            );
+            // #6066: a time on named days of the week, in lamp-skills' form.
+            assert!(
+                system
+                    .contains("a skill runs at a time only each day or on named days of the week")
+                    && system.contains("add days = [\"wed\", \"fri\"] (mon to sun"),
                 "{system}"
             );
         }
