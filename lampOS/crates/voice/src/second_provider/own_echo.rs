@@ -166,6 +166,37 @@ fn own_in_order(heard: &[&str], answer: &[String]) -> Vec<bool> {
     own
 }
 
+/// Whether `line` began while the lamp's answer `said` could be heard, or
+/// within [`TAIL_US`] after its words would have played to their end.
+fn began_within(line: &Line<'_>, said: &Said<'_>) -> bool {
+    line.over_the_lamps_voice
+        || line.began_us != 0
+            && said.until_us != 0
+            && line.began_us <= said.until_us.saturating_add(TAIL_US)
+}
+
+/// Whether `line` began within the lamp's answer `said` or its tail
+/// ([`began_within`]) and shares at least one word with it. The lamp's own
+/// words heard back may be all of such a line, however few ("Yes.", "Send
+/// it.": too short to hold, [`HELD_LEAST`]), so a waiting write's send on it
+/// needs the asker's voice (`services::Turn::in_echo_tail`, Thirteen's
+/// option 1 on #6009). Judged whether or not `LAMP_SECOND_OWN_ECHO` is on.
+pub(super) fn in_tail_with_its_words(line: &Line<'_>, said: Option<&Said<'_>>) -> bool {
+    let Some(said) = said.filter(|said| {
+        said.request != 0 && said.request < line.request && !said.words.trim().is_empty()
+    }) else {
+        return false;
+    };
+    if !began_within(line, said) {
+        return false;
+    }
+    let answer = keys(said.words);
+    line.heard
+        .split_whitespace()
+        .map(super::word_key)
+        .any(|word| !word.is_empty() && answer.contains(&word))
+}
+
 /// Judge `line` against the lamp's answer `said`.
 pub(super) fn judge(line: &Line<'_>, said: Option<&Said<'_>>) -> Echo {
     let request = line.request;
@@ -198,10 +229,7 @@ pub(super) fn judge(line: &Line<'_>, said: Option<&Said<'_>>) -> Echo {
     if !echo && cut.is_none() {
         return Echo::Answered(None);
     }
-    let within = line.over_the_lamps_voice
-        || line.began_us != 0
-            && said.until_us != 0
-            && line.began_us <= said.until_us.saturating_add(TAIL_US);
+    let within = began_within(line, said);
     let guard = if !within {
         Some("it began after the lamp's words and their 1.5 s tail")
     } else if line.called || crate::attention::called_by_name_on(line.heard, true) {
@@ -685,6 +713,37 @@ mod tests {
                 Some(&read_back)
             ),
             Echo::Answered(Some(_))
+        ));
+    }
+
+    /// Thirteen's option 1 on #6009: a line begun within the tail or over
+    /// the lamp's voice with any of its words, however short, is marked so
+    /// a send on it needs the asker's voice; one past the tail, with no
+    /// word of when it began, or with none of the lamp's words, is not.
+    #[test]
+    fn a_line_in_the_tail_with_the_lamps_words_is_marked_however_short() {
+        let read_back = Said {
+            words: "Send an email to Bob saying hi. Say 'yes, send it' to send it.",
+            ..said()
+        };
+        for (heard, began_us, over, marked) in [
+            ("Yes.", UNTIL_US + 300_000, false, true),
+            ("Send it.", UNTIL_US + 300_000, false, true),
+            ("Yes, send it.", UNTIL_US + 300_000, false, true),
+            ("Yes.", 0, true, true),
+            ("Okay.", UNTIL_US + 300_000, false, false),
+            ("Yes.", UNTIL_US + TAIL_US + 100_000, false, false),
+            ("Yes.", 0, false, false),
+        ] {
+            assert_eq!(
+                in_tail_with_its_words(&line(heard, began_us, over), Some(&read_back)),
+                marked,
+                "{heard} {began_us} {over}"
+            );
+        }
+        assert!(!in_tail_with_its_words(
+            &line("Yes.", UNTIL_US + 300_000, false),
+            None
         ));
     }
 }

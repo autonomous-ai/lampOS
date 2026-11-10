@@ -8866,6 +8866,14 @@ async fn spoken(
             (false, Some(kept))
         }
     };
+    // A line begun over the lamp's voice or within its tail, with any of
+    // its words, may be its own words heard back however short ("Yes.",
+    // "Send it."): a waiting write's send on it needs the asker's voice
+    // (`services::Turn::in_echo_tail`, Thirteen's option 1 on #6009),
+    // whether or not `LAMP_SECOND_OWN_ECHO` is on.
+    if !empty && !held && !echoed && in_echo_tail_of(&shared, request, &text, &said, &marks) {
+        crate::services::line_in_echo_tail(request);
+    }
     // The rule judges this very line (`carried_past_silent_undone`).
     let heed_ran = shared.heed.is_some() && !echoed && !empty && !held;
     let mut heeded = match &shared.heed {
@@ -11278,10 +11286,42 @@ fn own_echo_of(
     said: &Mutex<(u64, u64)>,
     marks: &Marks,
 ) -> own_echo::Echo {
+    against_the_lamps_answer(shared, request, heard, said, marks, own_echo::judge)
+}
+
+/// [`own_echo::in_tail_with_its_words`] for `request`'s words `heard`, as
+/// [`own_echo_of`] reads the line and the lamp's latest answer.
+fn in_echo_tail_of(
+    shared: &Shared,
+    request: u64,
+    heard: &str,
+    said: &Mutex<(u64, u64)>,
+    marks: &Marks,
+) -> bool {
+    against_the_lamps_answer(
+        shared,
+        request,
+        heard,
+        said,
+        marks,
+        own_echo::in_tail_with_its_words,
+    )
+}
+
+/// `judge` on `request`'s line `heard` and the lamp's latest answer so far,
+/// with when its words sent would have played to their end.
+fn against_the_lamps_answer<R>(
+    shared: &Shared,
+    request: u64,
+    heard: &str,
+    said: &Mutex<(u64, u64)>,
+    marks: &Marks,
+    judge: impl FnOnce(&own_echo::Line<'_>, Option<&own_echo::Said<'_>>) -> R,
+) -> R {
     let began_us = said.lock().map_or(0, |said| said.0);
     let answer = shared.lamp_said.lock().ok().map(|said| said.clone());
     let until_us = shared.said_until_us.load(Ordering::Relaxed);
-    own_echo::judge(
+    judge(
         &own_echo::Line {
             request,
             heard,

@@ -23,7 +23,9 @@ at 14:11 on 3 Nov 2026):
   the whole text), then the lamp says "Say 'yes, send it' to send it."; the
   model decides whether the answer confirms or cancels, in any words (the
   owner, 10 Nov), and sends with the write's `send_id` within two minutes,
-  whoever says it; no word list in the lamp decides it.
+  whoever says it; no word list in the lamp decides it. Only an answer begun
+  within the lamp's words' 1.5 s echo tail, sharing any of them, must be in
+  the asker's voice, so the lamp's own words heard back never send.
 - **The guards**: only the owner's own heard line reaches a service
   ("Who can use them", below); a token goes only to its own service's hosts,
   over HTTPS, no redirect followed; scheduled runs reach no service, and
@@ -1183,14 +1185,18 @@ or plain-cancel match in the lamp decides it any more (`agrees_to_send`,
 `says_cancel`, `CANCEL_WORDS`, `cancel_waiting` and the lamp's own "Okay,
 cancelled." are gone). The lamp checks only structure: the write's own
 `send_id`, a later request than the read-back's, at most two minutes, and a
-read-back not cut or talked over.
+read-back not cut or talked over. One voice check stays, for a line begun
+in the echo tail of the lamp's words with any of them (Thirteen's option 1
+on #6009, below): there the asker's voice; anywhere else, whoever says it.
 
 - **Only a heard line** reaches a service at all, read or write; anything
   else is `NOT_HEARD`, and any waiting write is forgotten. **Only the owner's
   line** reads or prepares a write ("Who can use them", above): any other is
   `OWNER_ONLY`, and any waiting write is forgotten. The one exception is the
   send of a write already waiting: the model's call with its `send_id` sends
-  it whoever answered (a known other too, or a line no known face holds).
+  it whoever answered (a known other too, or a line no known face holds),
+  but a line begun in the lamp's echo tail with its words, which must be in
+  the asker's voice (below).
 - **Writes only on the second route.** There a `service_write`, with or
   without `send_id`, is passed to the rules below; on the Live route it is
   told `NO_SEND_HERE`, "Not done: on this voice I don't send or post to
@@ -1241,7 +1247,8 @@ read-back not cut or talked over.
   Bob" are the model's to judge. It doesn't matter whether it is the very
   next line (a line the lamp never answered may come between), whether the lamp's
   words held the read-back word for word (`read_back_said` is now only the
-  owner-voice ask's check), or who says it. Otherwise the model is told
+  owner-voice ask's check), or who says it, but in the lamp's echo tail
+  (below). Otherwise the model is told
   `CANCELLED`, "Not sent, and cancelled: a send needs the waiting write's
   own send_id, in a later turn than its read-back, within two minutes. Say
   it was not sent." The journal names each check that failed ("a send
@@ -1258,6 +1265,34 @@ read-back not cut or talked over.
   model is told `NOT_READ_BACK`, "Not sent, and cancelled: the read-back was
   cut off before they agreed. Say it was not sent, and that they can ask
   again." A refused send forgets the id either way.
+- **In the lamp's echo tail, the asker's voice** (Thirteen's option 1 on
+  #6009). A send in a line begun over the lamp's voice or within 1.5 s
+  (`own_echo::TAIL_US`) after its latest words would have played to their
+  end, and sharing at least one word with them
+  (`own_echo::in_tail_with_its_words`, judged on the second route as the
+  line's words come, whether or not `LAMP_SECOND_OWN_ECHO` is on, and kept
+  with the waiting write: `services::line_in_echo_tail`,
+  `Pending.echo_tail`, `Turn.in_echo_tail`), may be the lamp's own words
+  heard back, however short: "Yes." or "Send it." is too short for
+  `own_echo` to hold (`HELD_LEAST`, 3). Such a send goes only when the
+  line's voice is the asker's: `Turn.alike`, against the asker's enrolled
+  print (`VoiceAsk::Owner`) or else the line that prepared the write
+  (`VoiceAsk::Alike`), at `same_voice::SERVICES_SAME_FROM` (0.55) or over,
+  waiting up to 800 ms for a print, and no other face seen saying it
+  (`Turn.other_seen`). A known other voice or another face cancels it,
+  `OTHER_VOICE`: "Not sent, and cancelled: I send only when the voice
+  saying "send" is the one that asked for it. Say it was not sent." With no
+  print yet (a line too short), the write waits for one more try, once: the
+  model is told `NO_PRINT_YET`, "Not sent yet: I couldn't hear whose voice
+  that was.", with `SAY_IT_LONGER` as what to say next (ask them to say "go
+  ahead and send it", and send again only if they agree); the lamp's asking
+  is no other request (`Pending.asked_again`), and a second send with no
+  print is `OTHER_VOICE`. In the private room the voice is taken as the
+  asker's (`alike` 1.0, no voice or face asked), as the owner accepted on
+  6 Nov. A line begun past the tail, or with none of the lamp's words, is
+  held to no voice: whoever says it agrees, and no print is waited for. The
+  journal says "a send begun in the lamp's echo tail; its voice beside
+  request N's: cosine 0.62" (or "no print"), a score only.
 - **A send with nothing waiting** (none prepared, or already sent or
   cancelled) sends nothing, and the model is told `NOTHING_WAITING`, "Not
   sent: no write waits for a send. None was prepared, or it was already sent
@@ -1344,11 +1379,17 @@ read-back not cut or talked over.
   judged by `own_echo` as any line of the lamp's: within its 1.5 s tail the
   room returning "Yes, send it." is held, and "Um, yes, send it." (an ASR
   filler) has its own run taken out, so the model gets "Um," and never the
-  lamp's agreement; with no voice check left on the send, this is what keeps
-  the lamp from sending on its own echo. A person who says the phrase word
-  for word right on the lamp's last word is held once and says it again
-  (lamp-3e83, 10 Nov); one who adds a word ("Okay, yes, send it.") reaches
-  the model as "Okay,", and one who begins after the tail as said.
+  lamp's agreement. A shorter echo, "Yes." or "Send it.", is not held
+  (`own_echo` holds a line of 3 of its words or more, `HELD_LEAST`, and takes
+  out runs of 2 or more, `STRIP_RUN`) and reaches the model whole; what
+  keeps the lamp from sending on it is the send's voice check in the tail
+  ("In the lamp's echo tail, the asker's voice", above): the lamp's own
+  voice is not the asker's, and no print twice cancels. A person who says
+  the phrase word for word right on the lamp's last word is held once and
+  says it again (lamp-3e83, 10 Nov); one who adds a word ("Okay, yes, send
+  it.") reaches the model as "Okay,", and the send then goes in the asker's
+  voice; one who begins after the tail reaches it as said, and the send goes
+  whoever says it.
 - **After a send** the model is told one fixed line: "Say only that it was
   sent, in the conversation's language." when the service answered
   `sent: true`; "Say only that the file was made in their Google Drive,
@@ -1368,7 +1409,7 @@ read-back not cut or talked over.
   the write they asked for (or, for a draft, saved it)". The
   owner is no longer asked, after a send, whether the lamp may learn their
   voice (`owner_voice::ask_after_send` is no longer called): a send is held
-  to no voice.
+  to no voice past the lamp's echo tail.
 - **A send cut while awaited is never answered as nothing done** (#5853,
   lamp-9adf, 9 Nov). On the second route a send's call runs to its answer
   even when a newer line cuts the turn, and the line that answers those

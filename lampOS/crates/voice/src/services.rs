@@ -18,11 +18,13 @@
 //!   confirmed or cancelled is the model's to judge, never a word list (the
 //!   owner, 10 Nov): the same write is sent by a call with its `send_id` in
 //!   a later request, within [`PENDING_FOR`], its read-back not cut or
-//!   talked over, whoever says it; any other send cancels it. A Gmail draft
-//!   (`save_draft`, [`Pending::draft`]) goes the same way, saved, never
-//!   sent. One pending write at a time, dropped by another call or the lamp
-//!   answering a second other request. A line held as the lamp's own words
-//!   heard back is no line of the person's ([`own_echo_held`]).
+//!   talked over, whoever says it, but a line begun in the echo tail of the
+//!   lamp's words with any of them, which needs the asker's voice
+//!   ([`Turn::in_echo_tail`], [`OTHER_VOICE`]); any other send cancels it. A
+//!   Gmail draft (`save_draft`, [`Pending::draft`]) goes the same way, saved,
+//!   never sent. One pending write at a time, dropped by another call or the
+//!   lamp answering a second other request. A line held as the lamp's own
+//!   words heard back is no line of the person's ([`own_echo_held`]).
 //! - **After a read, nothing else in that request** ([`after_read`]), and
 //!   the read's words are kept nowhere in the thread
 //!   (`thread::Thread::private_for`); with others maybe in view, a read is
@@ -108,6 +110,15 @@ pub const NOTHING_WAITING: &str = "Not sent: no write waits for a send. None was
 /// What the model is told when a send came but the read-back was cut: by a
 /// line or a Stop, or talked over ([`Pending::cut`]).
 pub const NOT_READ_BACK: &str = "Not sent, and cancelled: the read-back was cut off before they agreed. Say it was not sent, and that they can ask again.";
+/// What the model is told when a send on a line begun in the echo tail of
+/// the lamp's words, with any of them ([`Turn::in_echo_tail`]), is not in
+/// the voice that asked for the write, or another face was seen saying it.
+pub const OTHER_VOICE: &str = "Not sent, and cancelled: I send only when the voice saying \"send\" is the one that asked for it. Say it was not sent.";
+/// What the model is told when such a send had no voice print to compare
+/// (a line too short): the write still waits, for one more try.
+pub const NO_PRINT_YET: &str = "Not sent yet: I couldn't hear whose voice that was.";
+/// What the model is told to say then.
+pub const SAY_IT_LONGER: &str = "Ask them, in the conversation's language, to say \"go ahead and send it\" (in Vietnamese \"ừ, gửi đi giúp tôi\"), and nothing else. Call service_write again with the same send_id only if they agree.";
 /// What the model is told when a services call comes in a request not
 /// heard live at the lamp: a scheduled run, a skill's or the lamp's own
 /// request, a text. Nothing is called.
@@ -334,12 +345,30 @@ pub struct Pending {
     /// tail, not over its voice ([`voice_began`]). False until told, so with
     /// no hearing hook to tell it an agreement is held as before.
     pub began_clear: bool,
+    /// The request whose send had no voice print, in which the lamp asked
+    /// once more ([`SAY_IT_LONGER`]): its words are no other request's, and
+    /// the next line may still send.
+    pub asked_again: Option<u64>,
+    /// A send had no voice print and the lamp asked once more for the words
+    /// ([`NO_PRINT_YET`]): once only.
+    pub print_asked: bool,
+    /// The newest line requests since, at most [`IDS_KEPT`], begun over the
+    /// lamp's voice or within its echo tail with any of its words
+    /// ([`line_in_echo_tail`]): a send in one needs the asker's voice
+    /// ([`Turn::in_echo_tail`]).
+    pub echo_tail: VecDeque<u64>,
     /// A Gmail draft (`save_draft`): saved, never sent; its read-back asks
     /// for "save it" ([`SAVE_READ_BACK_NEXT`]).
     pub draft: bool,
 }
 
 impl Pending {
+    /// Whether the line of `request` began in the echo tail of the lamp's
+    /// words, with any of them ([`line_in_echo_tail`]).
+    pub fn in_echo_tail(&self, request: u64) -> bool {
+        self.echo_tail.contains(&request)
+    }
+
     /// A write just prepared in `request`, by `person`.
     pub fn new(send_id: &str, request: u64, at: Instant, read_back: &str, person: &str) -> Self {
         Self {
@@ -360,6 +389,9 @@ impl Pending {
             echoes: 0,
             other: None,
             began_clear: false,
+            asked_again: None,
+            print_asked: false,
+            echo_tail: VecDeque::new(),
             draft: false,
         }
     }
@@ -457,6 +489,10 @@ pub fn said_in(pending: &mut Option<Pending>, request: u64, words: &str, now: In
         }
         kept.spoken_from.get_or_insert(now);
         kept.spoken_at = Some(now);
+    } else if kept.asked_again == Some(request) {
+        // The lamp asking once more for the words ([`NO_PRINT_YET`]): no
+        // other request, so the line after it may still send.
+        kept.spoken_at = Some(now);
     } else if *kept.other.get_or_insert(request) != request {
         eprintln!(
             "lamp-voice: request {request}: a waiting write dropped: the lamp answered another request"
@@ -501,6 +537,30 @@ pub fn lamp_cut(request: u64) {
 /// How many line requests a waiting write keeps, begun and held as echoes.
 const IDS_KEPT: usize = 8;
 
+/// The line of `request` began over the lamp's voice or within the echo
+/// tail of its words, and shares any of them (`second_provider`,
+/// `own_echo::in_tail_with_its_words`): the lamp's own words heard back may
+/// be all of it, however short, so a waiting write's send in it needs the
+/// asker's voice ([`Turn::in_echo_tail`], Thirteen's option 1 on #6009).
+pub fn line_in_echo_tail(request: u64) {
+    kept::pending(|pending| echo_tail_in(pending, request));
+}
+
+/// [`line_in_echo_tail`] on `pending`: a line after the one that prepared
+/// the write, each once.
+pub fn echo_tail_in(pending: &mut Option<Pending>, request: u64) {
+    let Some(kept) = pending.as_mut() else {
+        return;
+    };
+    if request <= kept.request || kept.echo_tail.contains(&request) {
+        return;
+    }
+    if kept.echo_tail.len() == IDS_KEPT {
+        kept.echo_tail.pop_front();
+    }
+    kept.echo_tail.push_back(request);
+}
+
 /// A person's line began. With no `request` (`thread::Thread::person`, both
 /// routes: the thread hears no request with a person's words), counted and
 /// never taken off as an echo; with its `request` (`Thread::line_heard`, the
@@ -514,12 +574,14 @@ pub fn line_began(request: Option<u64>, now: Instant) {
 }
 
 /// [`line_began`] with `request` on `pending`: a line after the one that
-/// prepared the write, each once.
+/// prepared the write (or asked once more), each once.
 pub fn line_heard_in(pending: &mut Option<Pending>, request: u64) {
     let Some(kept) = pending.as_mut() else {
         return;
     };
-    if request <= kept.request || kept.heard_ids.iter().any(|(id, _)| *id == request) {
+    if request <= kept.asked_again.unwrap_or(kept.request)
+        || kept.heard_ids.iter().any(|(id, _)| *id == request)
+    {
         return;
     }
     kept.heard = kept.heard.saturating_add(1);
@@ -737,6 +799,18 @@ pub struct Turn<'a> {
     /// (`speaking_faces`, `remember::speaker_of`): positive evidence the
     /// owner said it, needed to prepare a write and for a full read.
     pub seen_owner: bool,
+    /// This line began over the lamp's voice or within the echo tail of its
+    /// words, and shares any of them ([`line_in_echo_tail`]): it may be the
+    /// lamp's own words heard back, so a send in it needs the asker's voice.
+    pub in_echo_tail: bool,
+    /// How alike the voice of this line and the asker's sound
+    /// ([`VoiceAsk::Alike`] with the line that prepared the waiting write, or
+    /// [`VoiceAsk::Owner`] with the asker's enrolled print), when both prints
+    /// are known; asked only for a send [`in_echo_tail`](Self::in_echo_tail).
+    pub alike: Option<f32>,
+    /// Another face than the asker's was seen speaking through this line;
+    /// asked only for a send [`in_echo_tail`](Self::in_echo_tail).
+    pub other_seen: bool,
 }
 
 /// The non-empty `send_id` the model gave a write, if any.
@@ -878,6 +952,14 @@ pub fn without_attempt(mut args: Value) -> Value {
 /// its read-back not cut ([`Pending::cut`]), in a later request than the
 /// prepare. Whoever says it, and whether or not the lamp's words held the
 /// whole read-back. It goes to the service the write was prepared for.
+///
+/// Only a send in a line begun over the lamp's voice or within the echo tail
+/// of its words, with any of them ([`Turn::in_echo_tail`]), is held to the
+/// asker's voice (Thirteen's option 1 on #6009): such a line may be the
+/// lamp's own "Yes." or "Send it." heard back, too short for `own_echo` to
+/// hold. It needs [`Turn::alike`] at `same_voice::SERVICES_SAME_FROM` or
+/// over and no other face seen saying it, else [`OTHER_VOICE`] cancels it;
+/// with no print yet it waits for one more try ([`NO_PRINT_YET`]).
 pub fn gate(
     pending: &mut Option<Pending>,
     call: &ToolCall,
@@ -962,6 +1044,31 @@ pub fn gate(
     if kept.cut {
         eprintln!("lamp-voice: request {request}: a send cancelled: its read-back was cut");
         return Err(json!({ "error": NOT_READ_BACK }));
+    }
+    // In the echo tail of the lamp's words, with any of them, the line may be
+    // the lamp's own heard back: the asker's voice says it is theirs, a known
+    // other voice or another face seen saying it cancels it, and no print yet
+    // keeps it for one more try. Past the tail, whoever says it agrees.
+    if turn.in_echo_tail {
+        match turn.alike {
+            _ if turn.other_seen => return Err(json!({ "error": OTHER_VOICE })),
+            Some(alike) if alike >= crate::same_voice::SERVICES_SAME_FROM => {}
+            Some(_) => return Err(json!({ "error": OTHER_VOICE })),
+            None if !kept.print_asked => {
+                *pending = Some(Pending {
+                    asked_again: Some(request),
+                    print_asked: true,
+                    other: None,
+                    lines: 0,
+                    heard: 0,
+                    heard_ids: VecDeque::new(),
+                    echoes: 0,
+                    ..kept
+                });
+                return Err(json!({ "error": NO_PRINT_YET, "next": SAY_IT_LONGER }));
+            }
+            None => return Err(json!({ "error": OTHER_VOICE })),
+        }
     }
     // Sent exactly as prepared, to its own service.
     call.args = json!({ "service": kept.service, "send_id": kept.send_id, "said": "send" });
@@ -1145,6 +1252,8 @@ pub(crate) fn seen_saying_owner(request: u64, owner: &str) -> (bool, bool) {
 /// (`same_voice::Voices`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VoiceAsk {
+    /// `Voices::alike`: how alike two lines sound.
+    Alike(u64, u64),
     /// `Voices::likeness_so_far`: how like the conversation's voice a line is.
     Conversation(u64),
     /// How like the owner's enrolled print a line is
@@ -1215,6 +1324,43 @@ fn judged(judge: &VoiceJudge, ask: VoiceAsk) -> Option<f32> {
     }
 }
 
+/// How like the asker's voice the send's line `request` sounds: against the
+/// asker's enrolled print when they have one (`enrolled`,
+/// [`VoiceAsk::Owner`]), its cosine said in the journal; else against the
+/// line that prepared the write, `prepared` ([`VoiceAsk::Alike`]).
+fn send_likeness(judge: &VoiceJudge, prepared: u64, request: u64, enrolled: bool) -> Option<f32> {
+    if !enrolled {
+        return judged(judge, VoiceAsk::Alike(prepared, request));
+    }
+    let likeness = judged(judge, VoiceAsk::Owner(request));
+    eprintln!(
+        "lamp-voice: request {request}: owner print: the send's cosine {}",
+        likeness.map_or("unknown".into(), |likeness| format!("{likeness:.2}"))
+    );
+    likeness
+}
+
+/// [`Turn::alike`] for a send in `request` of the write prepared in
+/// `prepared`: asked only for a line [`in_echo_tail`](Turn::in_echo_tail),
+/// so past the tail no voice is judged nor waited for. In the private room
+/// it is 1.0 and no voice is asked: the owner accepted on 6 Nov that a TV, a
+/// call or a recording can be taken as them (docs/services.md).
+fn send_alike(
+    judge: Option<&VoiceJudge>,
+    prepared: Option<u64>,
+    request: u64,
+    in_echo_tail: bool,
+    private_room: bool,
+    enrolled: bool,
+) -> Option<f32> {
+    match (judge, prepared) {
+        _ if !in_echo_tail => None,
+        _ if private_room => Some(1.0),
+        (Some(judge), Some(prepared)) => send_likeness(judge, prepared, request, enrolled),
+        _ => None,
+    }
+}
+
 /// A line began, as the second route hears it (`Heeding::hear`), at `now`:
 /// earlier than its words come. One begun over the lamp's own voice, or
 /// before the read-back could have been said whole, marks the waiting
@@ -1279,8 +1425,9 @@ pub fn run(
     let send_id = given_send_id(call).is_some();
     // With the owner's enrolled print (`LAMP_SAME_VOICE_FOR=services`,
     // `crate::owner_voice`), a read in full is held to it; without one, to
-    // the conversation's voice. A send is held to no voice: whoever agrees
-    // sends what waits (the owner, 10 Nov).
+    // the conversation's voice. A send is held to no voice, whoever agrees
+    // sends what waits (the owner, 10 Nov), but in a line begun in the echo
+    // tail of the lamp's words with any of them: there to the asker's.
     let enrolled = private_room
         || owner
             .as_deref()
@@ -1293,11 +1440,53 @@ pub fn run(
             .filter(|_| heard)
             .is_some_and(|owner| seen_saying_owner(request, owner).0)
     };
+    // The waiting write: the line that prepared it, who asked, and whether
+    // this line began in the echo tail of the lamp's words with any of them.
+    let (prepared, asker, echo_tail) = kept::pending(|pending| {
+        pending.as_ref().map_or((None, None, false), |kept| {
+            (
+                Some(kept.request),
+                Some(kept.person.clone()),
+                kept.in_echo_tail(request),
+            )
+        })
+    });
+    let in_echo_tail = send_id && heard && echo_tail;
+    let asker_enrolled = private_room
+        || asker
+            .as_deref()
+            .is_some_and(|asker| crate::owner_voice::enrolled(asker).is_some());
+    let alike = send_alike(
+        judge.as_ref(),
+        prepared,
+        request,
+        in_echo_tail,
+        private_room,
+        asker_enrolled,
+    );
+    if let (Some(prepared), true) = (prepared, in_echo_tail) {
+        // A score only, never a print: what the send's voice check saw.
+        eprintln!(
+            "lamp-voice: request {request}: a send begun in the lamp's echo tail; its voice beside request {prepared}'s: {}",
+            alike.map_or_else(
+                || "no print".to_owned(),
+                |alike| format!("cosine {alike:.2}")
+            )
+        );
+    }
+    let other_seen = in_echo_tail
+        && !private_room
+        && asker
+            .as_deref()
+            .is_some_and(|asker| seen_saying_owner(request, asker).1);
     let turn = Turn {
         heard,
         owner: owner.as_deref(),
         sends: judge.is_some(),
         seen_owner,
+        in_echo_tail,
+        alike,
+        other_seen,
     };
     let gated = kept::pending(|pending| gate(pending, call, request, &turn, now));
     let call = match gated {
@@ -1662,6 +1851,7 @@ mod tests {
             owner: Some("ann"),
             sends: true,
             seen_owner: true,
+            ..Turn::default()
         }
     }
 
@@ -2165,6 +2355,158 @@ mod tests {
         assert_eq!(passed.args["said"], "send");
         assert_eq!(passed.args["send_id"], "s1");
         assert_eq!(pending, None, "sent once, then forgotten");
+    }
+
+    /// Thirteen's option 1 on #6009: a send in a line begun in the echo tail
+    /// of the lamp's words, with any of them, goes only in the asker's voice
+    /// with no other face seen saying it; a known other voice or another face
+    /// cancels it, and no print waits for one more try, once. Past the tail,
+    /// any voice sends, as the owner settled.
+    #[test]
+    fn a_send_begun_in_the_echo_tail_needs_the_askers_voice() {
+        let now = Instant::now();
+        let tail = |alike, other_seen| Turn {
+            in_echo_tail: true,
+            alike,
+            other_seen,
+            ..heard()
+        };
+        for (why, alike, other_seen) in [
+            ("a different voice", Some(0.40), false),
+            ("the asker's voice, another face seen", Some(0.9), true),
+            ("no print, another face seen", None, true),
+        ] {
+            let mut pending = waiting(now);
+            let refused = gate(
+                &mut pending,
+                &send("s1"),
+                11,
+                &tail(alike, other_seen),
+                at(now),
+            );
+            assert_eq!(refused.unwrap_err()["error"], OTHER_VOICE, "{why}");
+            assert_eq!(pending, None, "{why}: cancelled");
+        }
+        // The asker's voice, at the bar or over it.
+        for alike in [crate::same_voice::SERVICES_SAME_FROM, 0.9] {
+            let mut pending = waiting(now);
+            let sent = gate(
+                &mut pending,
+                &send("s1"),
+                11,
+                &tail(Some(alike), false),
+                at(now),
+            )
+            .expect("the asker's voice sends");
+            assert_eq!(sent.args["said"], "send");
+            assert_eq!(pending, None);
+        }
+        // No print: one more try, the write kept; the lamp's asking is no
+        // other request; a second with no print is cancelled.
+        let mut pending = waiting(now);
+        let asked = gate(&mut pending, &send("s1"), 11, &tail(None, false), at(now)).unwrap_err();
+        assert_eq!(asked["error"], NO_PRINT_YET);
+        assert_eq!(asked["next"], SAY_IT_LONGER);
+        assert_eq!(pending.as_ref().unwrap().asked_again, Some(11), "kept");
+        said_in(
+            &mut pending,
+            11,
+            "Please say go ahead and send it.",
+            at(now),
+        );
+        assert_eq!(pending.as_ref().unwrap().other, None, "no other request");
+        let mut again = pending.clone();
+        let refused = gate(&mut again, &send("s1"), 12, &tail(None, false), at(now));
+        assert_eq!(refused.unwrap_err()["error"], OTHER_VOICE);
+        let sent = gate(
+            &mut pending,
+            &send("s1"),
+            12,
+            &tail(Some(0.8), false),
+            at(now),
+        );
+        assert_eq!(
+            sent.expect("the asker's voice then sends").args["said"],
+            "send"
+        );
+        // Past the tail: no voice is judged, whatever is known of it.
+        for (alike, other_seen) in [(None, false), (Some(0.1), false), (None, true)] {
+            let mut pending = waiting(now);
+            let turn = Turn {
+                alike,
+                other_seen,
+                ..heard()
+            };
+            let sent = gate(&mut pending, &send("s1"), 11, &turn, at(now));
+            assert_eq!(sent.expect("past the tail, any voice").args["said"], "send");
+        }
+    }
+
+    /// The send's voice is asked only in the echo tail, never waited for past
+    /// it; in the private room it is 1.0 with no voice asked (the owner's
+    /// acceptance of 6 Nov), so the asker's "send" there always goes.
+    #[test]
+    fn the_sends_voice_is_asked_only_in_the_tail_and_the_private_room_is_alike() {
+        let asked = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let judge: VoiceJudge = {
+            let asked = asked.clone();
+            std::sync::Arc::new(move |ask| {
+                asked.lock().unwrap().push(ask);
+                match ask {
+                    VoiceAsk::Alike(..) => Some(0.45),
+                    VoiceAsk::Owner(_) => Some(0.82),
+                    VoiceAsk::Conversation(_) => None,
+                }
+            })
+        };
+        let judge = Some(&judge);
+        assert_eq!(send_alike(judge, Some(10), 11, false, false, false), None);
+        assert!(
+            asked.lock().unwrap().is_empty(),
+            "past the tail: none asked"
+        );
+        assert_eq!(
+            send_alike(judge, Some(10), 11, true, false, false),
+            Some(0.45)
+        );
+        assert_eq!(asked.lock().unwrap().pop(), Some(VoiceAsk::Alike(10, 11)));
+        assert_eq!(
+            send_alike(judge, Some(10), 11, true, false, true),
+            Some(0.82)
+        );
+        assert_eq!(asked.lock().unwrap().pop(), Some(VoiceAsk::Owner(11)));
+        assert_eq!(send_alike(judge, Some(10), 11, true, true, true), Some(1.0));
+        assert_eq!(send_alike(None, Some(10), 11, true, true, false), Some(1.0));
+        assert!(
+            asked.lock().unwrap().is_empty(),
+            "the private room: none asked"
+        );
+        let now = Instant::now();
+        let mut pending = waiting(now);
+        let turn = Turn {
+            in_echo_tail: true,
+            alike: send_alike(None, Some(10), 11, true, true, true),
+            ..heard()
+        };
+        let sent = gate(&mut pending, &send("s1"), 11, &turn, at(now));
+        assert_eq!(sent.expect("the private room sends").args["said"], "send");
+    }
+
+    /// A line is marked as begun in the echo tail once, only after the
+    /// write's own request, and only while a write waits.
+    #[test]
+    fn a_line_in_the_echo_tail_is_marked_on_the_waiting_write() {
+        let now = Instant::now();
+        let mut pending = waiting(now);
+        for request in [9, 10, 11, 11, 12] {
+            echo_tail_in(&mut pending, request);
+        }
+        let kept = pending.as_ref().unwrap();
+        assert_eq!(kept.echo_tail, VecDeque::from([11, 12]));
+        assert!(kept.in_echo_tail(11) && !kept.in_echo_tail(13));
+        let mut none = None;
+        echo_tail_in(&mut none, 11);
+        assert_eq!(none, None);
     }
 
     /// Thirteen's P2 on #6009: the request after the read-back answered
@@ -3000,6 +3342,7 @@ mod tests {
             owner: owner.as_deref(),
             sends: true,
             seen_owner: false,
+            ..Turn::default()
         };
         let mut pending = None;
         assert_eq!(
