@@ -1,0 +1,26 @@
+
+running 2 tests
+requested_audio::tests::a_later_scratch_that_retracts_the_recording_ask --- FAILED
+requested_audio::tests::a_changed_mind_retracts_the_recording_ask --- FAILED
+
+failures:
+
+---- requested_audio::tests::a_later_scratch_that_retracts_the_recording_ask stdout ----
+
+thread 'requested_audio::tests::a_later_scratch_that_retracts_the_recording_ask' (108594660) panicked at crates/voice/src/requested_audio.rs:395:9:
+assertion failed: !asks_to_play("Play some music. Scratch that.")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- requested_audio::tests::a_changed_mind_retracts_the_recording_ask stdout ----
+
+thread 'requested_audio::tests::a_changed_mind_retracts_the_recording_ask' (108594659) panicked at crates/voice/src/requested_audio.rs:401:9:
+assertion failed: !asks_to_play("Play some music. I changed my mind.")
+
+
+failures:
+    requested_audio::tests::a_changed_mind_retracts_the_recording_ask
+    requested_audio::tests::a_later_scratch_that_retracts_the_recording_ask
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 5529 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

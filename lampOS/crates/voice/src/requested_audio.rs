@@ -99,6 +99,13 @@ const NOT: &[&str] = &[
     "dung",
     "thoi",
 ];
+/// Exact whole-word retractions anywhere in the line override an earlier
+/// request. Do not reject an unrelated use of "scratch" or "changed" alone.
+const RETRACTIONS: &[&[&str]] = &[
+    &["forget", "it"],
+    &["scratch", "that"],
+    &["changed", "my", "mind"],
+];
 /// The recording noun must be the requested object, not a word in a later
 /// clause ("turn on the light so I can read sheet music" is not an ask).
 const AUDIO: &[&str] = &[
@@ -230,7 +237,7 @@ fn audio_object(mut words: &[String]) -> bool {
 /// to play something (#5764). Some sentence of it must start, past greetings
 /// ([`BEFORE`]) and at most one lead-in ([`LEAD_INS`]), with an ask
 /// ([`ASKS`]) with a recording object ([`audio_object`]). No word of the
-/// whole line may be one of [`NOT`], and "forget it" retracts the ask.
+/// whole line may be one of [`NOT`], and [`RETRACTIONS`] override the ask.
 /// On lamp-52e6 on 9 Nov, "Lamp, I
 /// listened to some relaxing music on the train this morning, it was really
 /// nice." got a `use_skill` call to the relaxing-music skill: talk about
@@ -243,9 +250,11 @@ fn audio_object(mut words: &[String]) -> bool {
 pub fn asks_to_play(said: &str) -> bool {
     let whole = crate::known_faces::folded_words(said);
     if whole.iter().any(|word| NOT.contains(&word.as_str()))
-        || whole
-            .windows(2)
-            .any(|words| starts_with_words(words, &["forget", "it"]))
+        || RETRACTIONS.iter().any(|phrase| {
+            whole
+                .windows(phrase.len())
+                .any(|words| starts_with_words(words, phrase))
+        })
     {
         return false;
     }
@@ -386,6 +395,47 @@ mod tests {
         assert_eq!(checked.sha256, format!("{:x}", Sha256::digest(&bytes)));
         assert_ne!(checked.sha256, read_sound(&file).unwrap().sha256);
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    // A later explicit retraction overrides the earlier recording request.
+    #[test]
+    fn a_later_scratch_that_retracts_the_recording_ask() {
+        assert!(!asks_to_play("Play some music. Scratch that."));
+        assert!(asks_to_play("Scratch the chair. Play some music."));
+    }
+
+    #[test]
+    fn a_changed_mind_retracts_the_recording_ask() {
+        assert!(!asks_to_play("Play some music. I changed my mind."));
+        assert!(!asks_to_play("Play some music; I've changed my mind."));
+        assert!(asks_to_play("I changed my playlist. Play some music."));
+    }
+
+    #[test]
+    #[ignore = "manual host admission latency diagnostic"]
+    fn recording_retraction_admission_latency() {
+        let cases = [
+            ("Play some music. Scratch that.", false),
+            ("Play some music. I changed my mind.", false),
+            ("I changed my playlist. Play some music.", true),
+            ("Now play the second recording.", true),
+        ];
+        let mut samples = Vec::with_capacity(256);
+        for index in 0..256 {
+            let (words, expected) = cases[index % cases.len()];
+            let started = std::time::Instant::now();
+            let admitted = asks_to_play(words);
+            samples.push(started.elapsed());
+            assert_eq!(admitted, expected, "{words}");
+        }
+        let first = samples[0];
+        samples.sort_unstable();
+        let p95 = samples[samples.len() * 95 / 100];
+        let maximum = *samples.last().unwrap();
+        eprintln!(
+            "recording admission, 256 calls: first {first:?}, p95 {p95:?}, max {maximum:?}; input allocation excluded, folding and phrase checks included"
+        );
+        assert!(maximum < std::time::Duration::from_millis(1));
     }
 
     /// #5764: case on3a's two lines talk about music and ask nothing; the
