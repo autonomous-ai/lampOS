@@ -2124,8 +2124,8 @@ gone ([switches.md](switches.md)). What happens:
    on someone being there, named as an example of the form, "never answer
    with it") and told
    that a reminder at a time or every so often is the lamp's own timer,
-   not a skill, while a skill runs at a time only each day, by the clock
-   trigger; each trigger it may have and each gesture by name; and how it speaks (below, #6055, #6062: `speak = true`, a cooldown of an hour or more, and one `say = { text = "Welcome back!" }` of the exact words in the language the person asked in): on lamp-9adf on 2 Nov, before
+   not a skill, while a skill runs at a time only each day or on named
+   days of the week, by the clock trigger; each trigger it may have and each gesture by name; and how it speaks (below, #6055, #6062: `speak = true`, a cooldown of an hour or more, and one `say = { text = "Welcome back!" }` of the exact words in the language the person asked in): on lamp-9adf on 2 Nov, before
    both, its first two skills were refused for a trigger field and a light
    step the check didn't know. Its answer must be exactly two fenced
    blocks, `skill.toml` and `SKILL.md`, at most 8 KiB each.
@@ -2466,12 +2466,16 @@ gone ([switches.md](switches.md)). What happens:
      face coming into view, `humans/faces/tracked` with no field and
      `when = "appears"`; someone getting up, `room/stood_up`, `sitting_s`
      above 0; every day at 22:00, `clock/local`, `known`, `true`,
-     `rearm = "ends"`, `during = { from = "22:00", to = "22:01" }`. The
+     `rearm = "ends"`, `during = { from = "22:00", to = "22:01" }`; beside
+     it only `for`, `cooldown`, `rearm`, `during` and `days`. The
      part named is cut to 110 bytes. On lamp-74ff, 10 Nov 17:39, an app make of "glow green
      when I come back to my desk" was written on the faces, as the built-in
      welcome back is, and refused twice, its repair told only the keys a
      trigger may have. The making model's system prompt says the same
-     meanings before it writes (`TRIGGER_MEANINGS`), with "coming to the
+     meanings before it writes (`TRIGGER_MEANINGS`), and a time's days
+     (#6066: "On some days only, add days = ["wed", "fri"] (mon to sun,
+     "weekdays", "weekend")", which a repair is told only in a `days`
+     refusal's own words, so its lines keep within 735 bytes), with "coming to the
      desk is room/presence, never the faces", and the brief says "coming
      to the desk is room/presence". Any other
      part's refusal goes on with `PLAIN_ONLY`; with reads on, with
@@ -2513,13 +2517,29 @@ gone ([switches.md](switches.md)). What happens:
          the desk gets up". The eyes say it again each time the sitter's
          face comes back and is lost rising, so `paced` sets its `cooldown`
          to at least `"1m"` (#6070): "…, at most once a minute";
-       - **a time each day** (`clock/local`, lamp-skills' own clock, as
-         its daily triggers are written): `field = "known"`,
-         `equals = true`, `rearm = "ends"` and a `during` of exactly one
-         minute, `{ from = "22:00", to = "22:01" }` (`HH:MM`; 23:59 to
-         00:00 too), no `for`, `absent_for` or `when = "appears"`: "Every
-         day at 22:00". Any longer window, a time not `HH:MM`, or a day of
-         the week (`days`, which lamp-skills has no form of) is refused;
+       - **a time each day, or on named days of the week**
+         (`clock/local`, lamp-skills' own clock, as its daily triggers are
+         written): `field = "known"`, `equals = true`, `rearm = "ends"` and
+         a `during` of exactly one minute, `{ from = "22:00", to = "22:01" }`
+         (`HH:MM`; 23:59 to 00:00 too), no `for`, `absent_for` or
+         `when = "appears"`: "Every day at 22:00". It may carry `days`
+         (#6066) in lamp-skills' own form, read as `Weekdays::parse` reads
+         it (`made_skill::weekdays`): one name or a nonempty list of `"mon"`
+         to `"sun"`, `"weekdays"` and `"weekend"`, a day named twice one
+         day; it runs only on those days and is said with them, Monday
+         first: "Every Wednesday and Friday at 03:17", "Every Sunday at
+         07:00", "Every weekday at 07:00", "Every Saturday and Sunday at
+         09:00" (all seven: "Every day"). Any longer window, a time not
+         `HH:MM`, an empty `days`, a name lamp-skills doesn't take
+         (`"wednesday"`, `"Wed"`: "its days: wednesday is not mon to sun,
+         weekdays or weekend", so a repair is told the names) or `days` on any other trigger is refused. On lamp-9adf
+         staging 11625, 11 Nov 02:11, a weekday made by voice was refused.
+         Its manners are a time each day's (#6103): `days` changes none of
+         them, so a weekday time the request names runs as said, one in
+         22:00-08:00 the model chose alone keeps `[quiet]`, and one within
+         08:00-22:00 needs none.
+         Tests: `a_time_on_named_weekdays_is_kept_and_said_with_its_days`,
+         `a_face_by_who_a_window_or_an_unknown_day_is_refused`;
        - `above` on any other trigger;
      - a step other than one light (`colour`, `level`, `for`, or `dim`
        alone), one gesture or one say of exact words as above. A gesture is any of
