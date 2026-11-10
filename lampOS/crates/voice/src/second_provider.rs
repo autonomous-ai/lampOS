@@ -8851,19 +8851,17 @@ async fn spoken(
     let asked_by_the_lamp = marked
         && text.chars().any(char::is_alphanumeric)
         && shared.asked.as_ref().is_some_and(|asked| asked(request));
-    // So too the plain "send" a prepared write waits for: the read-back asked
-    // for it (`services::send_awaited`), and its plain cancel (#5958,
-    // `services::cancel_awaited`).
-    let send_awaited =
-        marked && (crate::services::send_awaited(&text) || crate::services::cancel_awaited(&text));
-    let answers = asked_by_the_lamp || send_awaited;
+    // So too the answer a prepared write's read-back asked for, whatever it
+    // says: the model judges it (`services::answer_awaited`).
+    let answer_awaited = marked && crate::services::answer_awaited(&text);
+    let answers = asked_by_the_lamp || answer_awaited;
     if asked_by_the_lamp {
         eprintln!(
             "lamp-voice second: request {request}: a short sound with a word in it, right after the lamp's own question, in a conversation going on: judged as a line"
         );
-    } else if send_awaited {
+    } else if answer_awaited {
         eprintln!(
-            "lamp-voice second: request {request}: a short sound that is the send or cancel a waiting write asked for: judged as a line"
+            "lamp-voice second: request {request}: a short sound that is the answer a waiting write's read-back asked for: judged as a line"
         );
     }
     let held = marked && !answers;
@@ -10184,27 +10182,22 @@ const SENDS_KEPT: usize = 8;
 /// sent ([`sent_already`]): nothing runs, so no new read-back follows.
 const ALREADY_SENT: &str = "Not run: the write their go-ahead asked for was already sent (or, for a draft, saved). Do not prepare it again; confirm only that it was sent (or, for a draft, saved).";
 
-/// A new attempt id for `call` of `request` when it is a write's send
+/// A new attempt id for `call` when it is a write's send
 /// ([`crate::services::may_send`]), and its arguments marked with it
 /// ([`crate::services::ATTEMPT`]), so the services keep its receipt as its
 /// own (#5853). Any other call: none, and its arguments as they are.
 #[cfg(test)]
-fn send_attempt(
-    shared: &Shared,
-    request: u64,
-    call: &net::ToolCall,
-) -> (Option<SendAttempt>, Value) {
+fn send_attempt(shared: &Shared, call: &net::ToolCall) -> (Option<SendAttempt>, Value) {
     let epoch = shared.send_content_epoch.load(Ordering::Acquire);
-    send_attempt_in_context(shared, request, call, epoch)
+    send_attempt_in_context(shared, call, epoch)
 }
 
 fn send_attempt_in_context(
     shared: &Shared,
-    request: u64,
     call: &net::ToolCall,
     epoch: u64,
 ) -> (Option<SendAttempt>, Value) {
-    if !crate::services::may_send(&call.name, &call.args, request) {
+    if !crate::services::may_send(&call.name, &call.args) {
         return (None, call.args.clone());
     }
     let attempt = shared.send_attempts.fetch_add(1, Ordering::Relaxed) + 1;
@@ -11330,6 +11323,7 @@ fn own_echo_of(
             began_us,
             over_the_lamps_voice: marks.over_the_lamps_voice,
             called: marks.called.load(Ordering::Acquire),
+            write_waits: crate::services::write_waits(),
         },
         answer
             .as_ref()
@@ -13316,7 +13310,7 @@ async fn run_tool_in_context(
     }
     // A send runs to its answer even if a newer line cuts the turn, its
     // receipt kept as its own (#5853).
-    let (attempt, args) = send_attempt_in_context(shared, request, call, epoch);
+    let (attempt, args) = send_attempt_in_context(shared, call, epoch);
     let running: BoxFuture<'static, Value> = match (&shared.scoped_tools, scope) {
         (Some(run), Some(scope)) => run(request, heard, call.name.clone(), args, scope.clone()),
         (Some(_), None) => Box::pin(std::future::ready(crate::tools::unavailable())),
@@ -13842,24 +13836,6 @@ async fn answer(
     let own = written
         .then(|| crate::onboarding::own_words(&said).map(str::to_owned))
         .flatten();
-    // A plain cancel of a write waiting for its "send" (#5958): the write is
-    // forgotten and the lamp says so itself, with no chat, so the model never
-    // weighs "cancel that" against the lamp's reminders.
-    // So too a plain "go ahead" right after the read-back (#5962): the lamp
-    // asks itself for the plain send, and the write waits. Only for a turn
-    // still current (Thirteen's P3 on #5967: a dropped turn never takes the
-    // write and says nothing), and by the one who asked.
-    let cancelled = (heard
-        && own.is_none()
-        && scope.as_ref().is_none_or(|scope| scope.is_current()))
-    .then(|| {
-        let owner = crate::services::speaker_of(scope.as_ref());
-        let now = Instant::now();
-        crate::services::cancel_waiting(request, &said, owner.as_deref(), now)
-            .or_else(|| crate::services::nudge_waiting(request, &said, owner.as_deref(), now))
-    })
-    .flatten();
-    let own = own.or(cancelled.map(str::to_owned));
     // A chat begun on the early words was asked without the held forget's
     // result, or that its yes did not count, so it does not stand for
     // round 1.
@@ -13928,15 +13904,9 @@ async fn answer(
             return Err(Stop::Gone);
         }
         if let Some(words) = own {
-            if cancelled.is_some() {
-                eprintln!(
-                    "lamp-voice second: request {request} answered a waiting write; the lamp's own words are said, no chat asked"
-                );
-            } else {
-                eprintln!(
-                    "lamp-voice second: request {request} is the onboarding walk's own line; its words are said, no chat asked"
-                );
-            }
+            eprintln!(
+                "lamp-voice second: request {request} is the onboarding walk's own line; its words are said, no chat asked"
+            );
             shared.emit(ProviderOutput::OwnWordsSaid { request }).await;
             queue.push(words).await?;
             return Ok(());
@@ -15960,7 +15930,7 @@ async fn answer(
                         {
                             Some(scope) => {
                                 let (attempt, args) =
-                                    send_attempt_in_context(shared, request, call, context_epoch);
+                                    send_attempt_in_context(shared, call, context_epoch);
                                 let running = runner(
                                     context.clone(),
                                     lamp_gemini::ToolCall {

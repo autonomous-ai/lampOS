@@ -1361,9 +1361,9 @@ impl<H: Http, M: Mail> Services<H, M> {
             pending.link = writes::link_of(&entry);
             let read_back = pending.read_back.clone();
             let next = if matches!(pending.action, Action::Draft(_)) {
-                "Nothing is saved yet. Read read_back to the person in full; save the draft only if their next words say save or send."
+                "Nothing is saved yet. Read read_back to the person in full; save the draft only if they agree, in any words."
             } else {
-                "Nothing is sent yet. Read read_back to the person in full; send only if their next words say send."
+                "Nothing is sent yet. Read read_back to the person in full; send only if they agree, in any words."
             };
             let send_id = self.desk.hold(pending, Instant::now());
             return Ok(json!({
