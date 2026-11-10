@@ -179,8 +179,11 @@ refusal), and nothing is started new in any case:
   more live ones fit, or, found by its work, a live one and a stopped one;
   never guessed); `session_stopped` (only a stopped
   one fits); `session_busy` (working, asking the person something, or
-  still starting); the reply's refusal (`reply_off`, `reply_not_idle`,
-  `reply_not_running`, `reply_failed`); `sessions_failed` or
+  still starting); `session_closed` (the reply's `NOT_RUNNING`: Harness
+  says it was closed or stopped; nothing is started on its own, the first
+  builder's ruling on #5784's follow-up, until a released `harness resume`,
+  openharness#3606, is pinned by #5957); the reply's other refusals
+  (`reply_off`, `reply_not_idle`, `reply_failed`); `sessions_failed` or
   `sessions_<code>` when the list can't be read, `sessions_timeout` too
   when it leaves the reply under 1 s of the launch bound (`REPLY_FLOOR`).
 - **Uncertain:** a reply that started and gave no answer, or one Harness
@@ -194,7 +197,8 @@ refusal), and nothing is started new in any case:
 - **Tests:** `tests/harness.rs`
   `with_reply_named_a_named_session_is_typed_into_and_never_started_new`,
   `with_reply_named_a_session_is_found_by_what_it_worked_on`,
-  `with_reply_named_the_joined_session_is_kept_by_its_name_and_first_ask`;
+  `with_reply_named_the_joined_session_is_kept_by_its_name_and_first_ask`,
+  `with_reply_named_a_closed_session_is_told_closed_and_nothing_new_starts`;
   `engine::tests::a_store_with_a_named_session_is_written_as_schema_five`,
   `engine::tests::a_joined_sessions_name_and_first_ask_are_kept_and_listed`.
 - **The voice's side** (off unless `LAMP_TASKS_REPLY_NAMED=on`, the
@@ -224,7 +228,11 @@ refusal), and nothing is started new in any case:
   the tasks part. Without the switch the parameter isn't offered, and one
   the model sends anyway is dropped. Task news tells
   `session_busy` (and `reply_not_idle`) with the `failed_busy` words, as a
-  busy routed pick; the other codes above are told as a plain failure.
+  busy routed pick; `session_closed` and `session_stopped` with the
+  `failed_closed` words, which have the lamp say "That session is closed.
+  Open it in the Harness app and ask me again, or I can start a new one in
+  the same project." (the first builder's ruling on #5784's follow-up);
+  the other codes above are told as a plain failure.
   Work said yes to that joined a session is told once, at once, within
   10 minutes of the hand-over on this boot (`<store>:<task>:joined`, beside
   its later finish): with the `joined` words, naming the session by its
@@ -236,6 +244,7 @@ refusal), and nothing is started new in any case:
   `agent_tasks::tests::a_task_for_a_named_session_never_starts_on_one_yes`,
   `agent_tasks::tests::another_session_is_a_correction_and_devins_cloud_takes_none`,
   `task_news::tests::a_busy_named_session_is_told_as_busy_and_its_other_ends_as_a_failure`,
+  `task_news::tests::a_closed_named_session_is_told_how_to_open_it_again`,
   `task_news::tests::work_that_joined_an_earlier_session_names_that_session_once`.
 
 `--progress` (off unless set; #732, the second builder, 2026-10-15) reads

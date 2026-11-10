@@ -1680,6 +1680,10 @@ fn note_failed(
         // A session the person named that is busy (#5535, `serve
         // --reply-named`) is told as a busy routed one.
         Some("agent_busy" | "session_busy" | "reply_not_idle") => Some(&words.failed_busy),
+        // A named session that is closed or only stopped (#5535, the first
+        // builder's ruling on #5784's follow-up): how to open it again, or
+        // a new one in the same project; nothing is started on its own.
+        Some("session_closed" | "session_stopped") => Some(&words.failed_closed),
         _ => None,
     };
     if let Some(line) = refused
@@ -3319,13 +3323,36 @@ mod tests {
         for code in [
             "session_not_found",
             "session_ambiguous",
-            "session_stopped",
             "reply_off",
             "reply_named_off",
         ] {
             assert_eq!(
                 note_failed(&own(), &task("claude", json!([])), false, Some(code)),
                 plain,
+                "{code}"
+            );
+        }
+    }
+
+    /// `serve --reply-named` (#5535), the first builder's ruling on #5784's
+    /// follow-up: a named session that is closed (`session_closed`, Harness's
+    /// `NOT_RUNNING`) or only stopped (`session_stopped`) is told with the
+    /// plain line of how to open it again or start a new one, never as a
+    /// plain failure; one the lamp can't be sure of is told as before.
+    #[test]
+    fn a_closed_named_session_is_told_how_to_open_it_again() {
+        const LINE: &str = "That session is closed. Open it in the Harness app and ask me again, or I can start a new one in the same project.";
+        let plain = note_failed(&own(), &task("claude", json!([])), false, None);
+        for code in ["session_closed", "session_stopped"] {
+            let told = note_failed(&own(), &task("claude", json!([])), false, Some(code));
+            assert!(
+                told.as_deref().is_some_and(|told| told.contains(LINE)),
+                "{code}: {told:?}"
+            );
+            assert_ne!(told, plain, "{code}");
+            assert_eq!(
+                note_failed(&own(), &task("claude", json!([])), true, Some(code)),
+                note_failed(&own(), &task("claude", json!([])), true, None),
                 "{code}"
             );
         }

@@ -1193,8 +1193,9 @@ impl Cli {
     /// started in its place, so each other end is not sent, with why:
     /// `session_not_found`, `session_ambiguous` (more than one live one
     /// fits, or, by its work, a live one and a stopped one), `session_stopped` (only a stopped one fits), `session_busy`
-    /// (working, or asking the person something), the reply's refusal
-    /// (`reply_off`, `reply_not_idle`, `reply_not_running`, `reply_failed`),
+    /// (working, or asking the person something), `session_closed` (the
+    /// reply's `NOT_RUNNING`: Harness says it was closed or stopped), the
+    /// reply's other refusals (`reply_off`, `reply_not_idle`, `reply_failed`),
     /// or `sessions_…` when the list can't be read. A reply that started and
     /// gave no answer, or one Harness took whose answer can't be read or
     /// names another session, may have typed, so it is uncertain
@@ -1328,7 +1329,16 @@ impl Cli {
             // Reviewer-lead's P3 on #5779).
             Ok(reply) if reply.success => uncertain("reply_uncertain"),
             // Refused, or its machine did not take the words: nothing typed.
-            Ok(reply) => not_sent(reply_refusal(&reply.stdout)),
+            // A session Harness says was closed or stopped (`NOT_RUNNING`)
+            // has its own reason, `session_closed`, so the lamp tells the
+            // person to open it in the Harness app or ask for a new one;
+            // nothing is started on its own (the first builder's ruling on
+            // #5784's follow-up). A released `harness resume`
+            // (openharness#3606) replaces this later, behind #5957's pin.
+            Ok(reply) => not_sent(match reply_refusal(&reply.stdout) {
+                "reply_not_running" => "session_closed",
+                refused => refused,
+            }),
             Err(error) if error.code == "cancelled" => uncertain("cancelled"),
             // Started, and stopped before it answered: it may have typed.
             Err(error) if error.spawned => uncertain("reply_uncertain"),
