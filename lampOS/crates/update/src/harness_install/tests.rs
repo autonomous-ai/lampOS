@@ -2396,3 +2396,17 @@ fn a_kept_copy_already_there_stops_nothing() {
         "{lines:?}"
     );
 }
+
+/// The one-shot (Harness's install, then Hermes's) yields to the lamp's own
+/// services, as lamp-update does: on lamp-c0a4 on 10 Nov a Hermes install at
+/// the default priority stalled lamp-controls' privacy reading (#5978).
+#[test]
+fn the_one_shot_runs_below_the_lamps_services() {
+    let lines: Vec<&str> = TEXT.lines().collect();
+    for wanted in ["Nice=10", "IOSchedulingClass=idle", "CPUWeight=20"] {
+        assert!(
+            lines.contains(&wanted),
+            "{wanted} missing from the one-shot"
+        );
+    }
+}
