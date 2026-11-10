@@ -117,6 +117,7 @@ dịch vụ.
 |---|---|---|
 | `LAMP_SERVICES=on` | `lamp-cloud` (với `LAMP_CLOUD=on`), `lamp-voice` và `lamp-services` | `lamp-cloud` trả lời `connector.*` và `services.list` của ứng dụng bằng câu của V1 "not on this lamp: <kind>" và không ghi gì vào `can`; giọng nói không khai báo hàm nào trong ba hàm và không định tuyến hàm nào; `lamp-services` không mở socket nào và thoát |
 | `LAMP_SERVICES_WRITE=on` (bật trong `lamp-services.service` của sản phẩm) | `lamp-services` | `service_write` trả lời "writing to services is off on this lamp", và không gì được chuẩn bị hay gửi; việc đọc vẫn như trước |
+| `LAMP_CALENDAR_EDITS=on` (tắt trong sản phẩm cho đến lần kiểm tra trên đèn) | `lamp-services`, cùng `LAMP_SERVICES_WRITE=on` | `update_event` và `delete_event` của `service_write` trả lời "changing or cancelling a calendar event is off on this lamp" trước khi bất cứ gì được đọc, giữ hay gửi, và `tools.json` chỉ liệt kê `create_event` cho Google Calendar ("Đổi hoặc huỷ một sự kiện lịch", bên dưới) |
 | `LAMP_SERVICES_TOLD=on` (#5523) | hai tuyến của `lamp-voice`, với `LAMP_SERVICES=on` | Câu của chủ đèn không được báo gì về các dịch vụ đã liên kết: mô hình chỉ biết ba hàm và chỉ hỏi `services_connected` khi nó nghĩ tới ("Giọng nói được báo những gì đã liên kết", bên dưới) |
 | `LAMP_SKILL_WRITES=on` (#6066; tắt trong mọi unit sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) | Kỹ năng tự tạo không ghi vào dịch vụ nào: kỹ năng có bước `write` hay quyền `"write"` không được nạp, và `lamp-services` từ chối `skill_write` và `skill_write_approve` ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) |
 | `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và mô hình tạo kỹ năng được dặn trả lời `cannot:` cho một yêu cầu tạo kỹ năng nêu một dịch vụ ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
@@ -1115,7 +1116,7 @@ vụ: `users.messages.send`, `events.insert`), `https://www.googleapis.com/auth/
 | Dịch vụ | Action | Bất kỳ scope nào trong |
 |---|---|---|
 | `gmail`, `gmail-app` | `send_mail` | `…/gmail.send`, `…/gmail.compose`, `…/gmail.modify`, `https://mail.google.com/` |
-| `google_calendar` | `create_event` | `…/calendar`, `…/calendar.events`, `…/calendar.events.owned` |
+| `google_calendar` | `create_event`, `update_event`, `delete_event` | `…/calendar`, `…/calendar.events`, `…/calendar.events.owned` |
 
 `writes::scope_allows` tách mỗi mục `scopes` theo khoảng trắng (một danh sách
 giữ thành một chuỗi cách nhau bởi dấu cách được đọc như nhau) và khớp mỗi
@@ -1126,7 +1127,8 @@ ghi scope theo dạng này, nên không dịch vụ nào khác có trong bảng.
 Không có scope nào trong số đó thì lệnh gọi thất bại với "<Service> is linked
 without permission to <what>: link it again in the app (Skills, then
 Connectors) and allow it." (`serve::NO_PERMISSION`, sau dấu hai chấm),
-`<what>` là "send mail" hoặc "add calendar events": không gì được giữ, không
+`<what>` là "send mail", "add calendar events", "change calendar events"
+hoặc "delete calendar events": không gì được giữ, không
 gì được gọi. Một mật khẩu ứng dụng, một khoá cá nhân (`pat`) hoặc một liên kết
 không ghi lại scope thì không bị kiểm tra, như trước.
 
@@ -1135,6 +1137,53 @@ cách Google nói (`ACCESS_TOKEN_SCOPE_INSUFFICIENT` hoặc
 `insufficientPermissions`, `writes::scope_refused`), được nói cùng những lời
 đó sau "not sent: " (với một dịch vụ không có trong bảng, `<what>` là "make
 this change"). Mọi 401 hoặc 403 khác giữ lời của nó.
+
+### Đổi hoặc huỷ một sự kiện lịch (`LAMP_CALENDAR_EDITS`)
+
+Tắt trừ khi `LAMP_CALENDAR_EDITS=on` và `LAMP_SERVICES_WRITE=on` trong
+`lamp-services` (tắt trong sản phẩm cho đến lần kiểm tra trên đèn). Khi bật,
+các action của Google Calendar trong `tools.json` thêm `update_event
+{event_id, title, start, end, text, calendar}` và `delete_event {event_id,
+calendar}` (`writes::CALENDAR_EDITS`), và `service_write` nhận một
+`event_id`: id mà một lần đọc lịch hoặc một lần tạo đưa ra (một
+`create_event` đã xác nhận giờ trả lời `{"sent": true, "service",
+"event_id"}`). Mô tả của hàm ghi liệt kê Google Calendar là `create_event,
+update_event, delete_event: see event_id` (`writes::CALENDAR_ACTIONS_SHORT`),
+và mô tả riêng của `event_id` nêu cả ba cùng các trường của chúng: mô tả hàm
+ghi không còn chỗ cho chúng trong 1.024 byte mà liên kết của nó nhận.
+
+- **Scope.** `events.patch` và `events.delete` của Google nhận cùng các scope
+  như `events.insert`, nên liên kết Calendar của ứng dụng, giữ
+  `calendar.events`, cho phép cả hai mà không cần đồng ý lại (bảng trên). Một
+  liên kết không có scope nào trong đó bị từ chối trước khi hỏi Google bất cứ
+  gì, như một lần tạo.
+- **Đọc lại từ sự kiện như nó đang là.** Không có `send_id`, đèn trước hết
+  đọc đúng sự kiện đó (`GET /calendar/v3/calendars/<calendar>/events/<id>`,
+  trong danh sách đọc của Calendar), rồi đọc lại tiêu đề và giờ hiện tại, điều
+  gì thay đổi và ai được báo: "Change the event "Hamburger party" on your
+  Google Calendar (primary), now from … to …: move it to … to …. Its guests,
+  …, are told by email. Seen by whoever your calendar is shared with." hoặc
+  "Delete the event "Hamburger party", now from … to …, from your Google
+  Calendar (primary). … The lamp can't bring it back." Chữ của chính sự kiện
+  là dữ liệu của dịch vụ, giữ thành một dòng tối đa 200 ký tự.
+- **Rồi gửi như mọi lần ghi**: giữ 120 s, gửi một lần khi `"said":"send"`,
+  qua cùng cổng của giọng nói (thấy chủ đèn nói, lời đọc lại được nói đầy đủ,
+  "send" là câu ngay sau). Lần gửi là một `PATCH
+  …/events/<id>?sendUpdates=all` chỉ mang những gì thay đổi (`summary`,
+  `start` và `end` cùng nhau, `description`), hoặc một `DELETE
+  …/events/<id>?sendUpdates=all` không có nội dung; cả hai đều có trong danh
+  sách ghi của Calendar (`catalog.rs`) và không gì khác.
+- **Giới hạn.** `event_id` và `calendar` là id trong đường dẫn (không `/`,
+  `\`, `?`, `#`, tối đa 256 byte); một lần dời giờ đưa cả start và end, mỗi
+  cái có độ lệch UTC của chính đèn; một `update_event` cần ít nhất một thay
+  đổi.
+- **Đã mất trong Google.** Khi sự kiện đã bị xoá, hoặc bị đổi như vậy, ngay
+  trong Google, lần đọc hoặc lần gửi của nó nhận 404 hoặc 410, hoặc sự kiện
+  đọc ra `"status":"cancelled"`. Mỗi trường hợp trả lời `writes::EVENT_GONE`:
+  "That event is no longer on the Google Calendar: it was deleted or changed
+  there, and nothing was changed. Say it's no longer there, and offer to
+  create it again with create_event." (sau "not sent: " ở một lần gửi). Không
+  gì được giữ.
 
 Mô hình được nói về `service_write`, trước tiên trong mô tả của nó
 (`WRITE_RULE`, rồi đến luật mà mọi hàm dịch vụ đều có, ở dưới):

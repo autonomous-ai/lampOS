@@ -68,11 +68,18 @@ fn offset(minutes: i32) -> String {
 
 /// The three functions, with the lamp's own offset now.
 pub fn catalog() -> Value {
-    catalog_at(offset_here())
+    catalog_for(offset_here(), false)
 }
 
 /// The three functions, the time fields' example at `offset_minutes`.
+#[cfg(test)]
 fn catalog_at(offset_minutes: Option<i32>) -> Value {
+    catalog_for(offset_minutes, false)
+}
+
+/// The three functions, Google Calendar's edits listed when `edits`
+/// (`LAMP_CALENDAR_EDITS=on`).
+fn catalog_for(offset_minutes: Option<i32>, edits: bool) -> Value {
     // The MCP services read and write alike: named once, together.
     let mcp = catalog::SERVICES
         .iter()
@@ -87,7 +94,12 @@ fn catalog_at(offset_minutes: Option<i32>) -> Value {
     whats.push(format!("{mcp}: tools, call {{tool, arguments}}"));
     let mut actions: Vec<String> = writes::ACTIONS
         .iter()
-        .map(|(code, actions)| format!("{code}: {actions}"))
+        .map(|(code, actions)| match *code {
+            "google_calendar" if edits => {
+                format!("{code}: {}", writes::CALENDAR_ACTIONS_SHORT)
+            }
+            _ => format!("{code}: {actions}"),
+        })
         .collect();
     actions.push(format!("{mcp}: {}", writes::MCP_ACTIONS));
     // Each service the lamp can link, by its name, once.
@@ -97,7 +109,7 @@ fn catalog_at(offset_minutes: Option<i32>) -> Value {
             names.push(service.name);
         }
     }
-    json!({"tools": [
+    let mut tools = json!({"tools": [
         {
             "name": CONNECTED,
             "description": format!(
@@ -172,14 +184,32 @@ fn catalog_at(offset_minutes: Option<i32>) -> Value {
                 "required": ["service", "action"],
             },
         },
-    ]})
+    ]});
+    if edits {
+        // The calendar's actions with their fields: the write's description
+        // has no room for them (1,024 bytes).
+        let calendar = writes::ACTIONS
+            .iter()
+            .find(|(code, _)| *code == "google_calendar")
+            .map_or("", |(_, actions)| actions);
+        tools["tools"][2]["parameters"]["properties"]["event_id"] = string(&format!(
+            "A calendar event's id, as a read or a create gave it. google_calendar actions: {calendar}, {}.",
+            writes::CALENDAR_EDITS
+        ));
+    }
+    tools
 }
 
 /// Write `tools.json` in `dir` whole (beside, then renamed), readable by
 /// the voice.
 pub fn write(dir: &Path) -> io::Result<()> {
+    write_for(dir, false)
+}
+
+/// [`write`], Google Calendar's edits listed when `edits`.
+pub fn write_for(dir: &Path, edits: bool) -> io::Result<()> {
     let fresh = dir.join(".tools.json");
-    fs::write(&fresh, catalog().to_string())?;
+    fs::write(&fresh, catalog_for(offset_here(), edits).to_string())?;
     fs::set_permissions(&fresh, fs::Permissions::from_mode(0o644))?;
     fs::rename(&fresh, dir.join(CATALOG_FILE))
 }
@@ -292,5 +322,40 @@ mod tests {
         let read: Value =
             serde_json::from_slice(&fs::read(dir.path().join(CATALOG_FILE)).unwrap()).unwrap();
         assert_eq!(read, catalog);
+    }
+
+    /// Calendar's edits are offered only with `LAMP_CALENDAR_EDITS` on,
+    /// with the event's id to name, and still fit what the voice takes.
+    #[test]
+    fn calendar_edits_are_offered_only_with_their_switch() {
+        let off = catalog_for(Some(420), false);
+        assert!(!off.to_string().contains("update_event"));
+        assert!(!off.to_string().contains("event_id"));
+        assert!(!off.to_string().contains("delete_event"));
+        let on = catalog_for(Some(420), true);
+        let write = &on["tools"][2];
+        let description = write["description"].as_str().unwrap();
+        assert!(
+            description.contains(
+                "google_calendar: create_event, update_event, delete_event: see event_id"
+            ),
+            "{description}"
+        );
+        // Each action's fields, in event_id's own description.
+        let event_id = write["parameters"]["properties"]["event_id"]["description"]
+            .as_str()
+            .unwrap();
+        assert!(
+            event_id.contains(
+                "google_calendar actions: create_event {title, start, end, calendar, attendees, text}, update_event {event_id, title, start, end, text, calendar}, delete_event {event_id, calendar}."
+            ),
+            "{event_id}"
+        );
+        assert!(description.len() <= 1_024, "{}", description.len());
+        assert!(write["parameters"].to_string().len() <= 4_096);
+        let dir = tempfile::tempdir().unwrap();
+        write_for(dir.path(), true).unwrap();
+        let read = fs::read_to_string(dir.path().join(CATALOG_FILE)).unwrap();
+        assert!(read.contains("delete_event {event_id, calendar}"));
     }
 }

@@ -238,6 +238,9 @@ pub struct Services<H, M> {
     pub signed_out: AtomicBool,
     /// Held while a skill's write is counted against the bounds.
     skill_send: Mutex<()>,
+    /// `LAMP_CALENDAR_EDITS=on`: a Google Calendar event may be changed or
+    /// cancelled by its id, read back and sent as any write.
+    pub calendar_edits: bool,
     pub desk: Desk,
 }
 
@@ -340,6 +343,7 @@ impl<H: Http, M: Mail> Services<H, M> {
             not_approved: AtomicUsize::new(0),
             signed_out: AtomicBool::new(false),
             skill_send: Mutex::new(()),
+            calendar_edits: false,
             desk: Desk::default(),
         }
     }
@@ -390,6 +394,12 @@ impl<H: Http, M: Mail> Services<H, M> {
         door == Door::Tools
             && (self.skill_reads || self.skill_writes)
             && from_asker(cgroup, SKILLS_ASKER_CGROUP)
+    }
+
+    /// With `LAMP_CALENDAR_EDITS` as `on` gives it.
+    pub fn with_calendar_edits(mut self, on: bool) -> Self {
+        self.calendar_edits = on;
+        self
     }
 
     /// With `LAMP_SKILL_READS` as `on` gives it.
@@ -890,9 +900,14 @@ impl<H: Http, M: Mail> Services<H, M> {
         body: Option<Body>,
         write: bool,
     ) -> Result<String, String> {
+        let event = writes::names_event(service.code, &url);
         let reply = self
             .send_with_token(service, entry, method, url, body, write)
             .await?;
+        // One event's own, deleted or changed so in Google itself.
+        if event && matches!(reply.status, 404 | 410) {
+            return Err(writes::EVENT_GONE.into());
+        }
         Self::answer(service, entry, &reply, write)
     }
 
@@ -1310,6 +1325,14 @@ impl<H: Http, M: Mail> Services<H, M> {
         }
         let args = &self.gmail_args(args);
         let Some(send_id) = args.get("send_id").and_then(Value::as_str) else {
+            let edit = args
+                .get("service")
+                .and_then(Value::as_str)
+                .and_then(|asked| self.named(asked))
+                .is_some_and(|service| writes::is_calendar_edit(service.code, args));
+            if edit && !self.calendar_edits {
+                return Err(writes::EDITS_OFF.into());
+            }
             let (service, entry) = self.linked(args).await?;
             // Refused before it is prepared or held, and nothing is asked of
             // the service, when the link's own scopes don't allow it.
@@ -1318,6 +1341,20 @@ impl<H: Http, M: Mail> Services<H, M> {
             }
             let mut pending = if service.mcp.is_some() {
                 self.mcp_prepare(service, &entry, args).await?
+            } else if writes::is_calendar_edit(service.code, args) {
+                // Read back from the event as Google has it now; one gone
+                // is told so here, before anything is held.
+                let url = writes::event_read(args)?;
+                let text = self
+                    .call(service, &entry, Method::Get, url, None, false)
+                    .await?;
+                let current: Value = serde_json::from_str(&text)
+                    .map_err(|_| format!("{} answered with an error", service.name))?;
+                // Bound to the account it was read as, as every write.
+                writes::Pending {
+                    account: entry.account(),
+                    ..writes::prepare_edit(args, &current)?
+                }
             } else {
                 writes::prepare(service.code, args, &entry)?
             };
@@ -1400,6 +1437,8 @@ impl<H: Http, M: Mail> Services<H, M> {
         // and link.
         let mut made = None;
         let mut answer = json!({"sent": true, "service": service.name});
+        // An event a write made: its id, so it can be changed or cancelled later.
+        let mut event_id = None;
         match pending.action {
             // `gmail-app` is a Google sign-in only: never over SMTP.
             Action::Mail(out) if entry.oauth() || service.code == "gmail-app" => {
@@ -1442,9 +1481,17 @@ impl<H: Http, M: Mail> Services<H, M> {
                 answer = json!({"sent": false, "saved": true, "service": service.name});
             }
             Action::Http { method, url, body } => {
-                self.call(service, &entry, method, url, Some(Body::Json(body)), true)
+                // A DELETE carries no body.
+                let body = Some(body).filter(|body| !body.is_null()).map(Body::Json);
+                let text = self
+                    .call(service, &entry, method, url, body, true)
                     .await
                     .map_err(|why| format!("not sent: {why}"))?;
+                // The event's id, so it can be changed or cancelled later.
+                event_id = (service.code == "google_calendar")
+                    .then(|| serde_json::from_str::<Value>(&text).ok())
+                    .flatten()
+                    .and_then(|made| made.get("id").and_then(Value::as_str).map(str::to_owned));
             }
             Action::Upload {
                 url,
@@ -1481,6 +1528,9 @@ impl<H: Http, M: Mail> Services<H, M> {
                     return Err(format!("{} answered that the call failed", service.name));
                 }
             }
+        }
+        if let Some(event_id) = event_id {
+            answer["event_id"] = json!(event_id);
         }
         if let Some(made) = made {
             answer["made"] = made;
@@ -4752,5 +4802,284 @@ mod tests {
         assert!(entry.oauth() && entry.refresh && entry.refresh_token == "r-1");
         assert_eq!(entry.account(), "boss@company.test");
         assert_eq!(services.http.calls().len(), 1);
+    }
+
+    /// Google Calendar answering each call in turn with its status and
+    /// body (200 `{}` once they run out); every call kept.
+    #[derive(Default)]
+    struct FakeCalendar {
+        answers: Mutex<std::collections::VecDeque<(u16, String)>>,
+        calls: Mutex<Vec<Call>>,
+    }
+
+    impl Http for FakeCalendar {
+        async fn send(&self, call: Call) -> Result<Reply, String> {
+            self.calls.lock().unwrap().push(call);
+            let (status, body) = self
+                .answers
+                .lock()
+                .unwrap()
+                .pop_front()
+                .unwrap_or((200, "{}".into()));
+            Ok(Reply {
+                status,
+                body: body.into_bytes(),
+                ..Reply::default()
+            })
+        }
+    }
+
+    impl FakeCalendar {
+        fn answer(&self, status: u16, body: &str) {
+            self.answers
+                .lock()
+                .unwrap()
+                .push_back((status, body.to_owned()));
+        }
+        fn calls(&self) -> Vec<Call> {
+            self.calls.lock().unwrap().clone()
+        }
+    }
+
+    /// Calendar linked by a Google sign-in holding `scope`, writes on and
+    /// its edits as `edits`.
+    fn calendar(
+        dir: &std::path::Path,
+        scope: &str,
+        edits: bool,
+    ) -> Services<FakeCalendar, FakeMail> {
+        let services = Services::new(
+            Store(dir.join("s")),
+            FakeCalendar::default(),
+            FakeMail::default(),
+            None,
+            true,
+        )
+        .with_calendar_edits(edits);
+        let (answer, _) = run(services.admin(&set_line(
+            "google_calendar",
+            json!({"auth_type":"oauth","access_token":"planted-calendar","expires_in":3600,
+                   "scopes":[scope]}),
+        )));
+        assert_eq!(answer["ok"], true, "{answer}");
+        services
+    }
+
+    const EVENTS_SCOPE: &str = "https://www.googleapis.com/auth/calendar.events";
+
+    /// The party as Google has it.
+    const PARTY: &str = r#"{"id":"ev1","status":"confirmed","summary":"Hamburger party","start":{"dateTime":"2026-11-12T18:00:00+07:00"},"end":{"dateTime":"2026-11-12T19:00:00+07:00"},"attendees":[{"email":"octavia@b.test"}]}"#;
+
+    fn edit(args: Value) -> String {
+        let mut args = args;
+        args["service"] = json!("google_calendar");
+        json!({"op":"call","name":"service_write","args":args}).to_string()
+    }
+
+    fn send_line(id: &str, said: &str) -> String {
+        json!({"op":"call","name":"service_write",
+               "args":{"service":"google_calendar","send_id":id,"said":said}})
+        .to_string()
+    }
+
+    /// lamp-3e83, 10 Nov: an event the lamp made could not be changed.
+    /// Moved, then cancelled, by its id: the event is read first and the
+    /// change read back from it; nothing is changed until "send", and then
+    /// once, as Google's own PATCH and DELETE of that event.
+    #[test]
+    fn an_event_is_moved_then_cancelled_by_its_id_after_a_read_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = calendar(dir.path(), EVENTS_SCOPE, true);
+        services.http.answer(200, PARTY);
+        let moved = run(
+            services.tool(&edit(json!({"action":"update_event","event_id":"ev1",
+            "start":"2026-11-12T20:00:00+07:00","end":"2026-11-12T21:00:00+07:00"}))),
+        );
+        assert_eq!(moved["ok"], true, "{moved}");
+        let read_back = moved["result"]["read_back"].as_str().unwrap();
+        for part in [
+            "\"Hamburger party\"",
+            "2026-11-12T18:00:00+07:00",
+            "2026-11-12T20:00:00+07:00 to 2026-11-12T21:00:00+07:00",
+            "octavia@b.test",
+        ] {
+            assert!(read_back.contains(part), "{part}: {read_back}");
+        }
+        assert_eq!(moved["result"]["sent"], false);
+        // Only the event was read: nothing changed yet.
+        let calls = services.http.calls();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].method, Method::Get);
+        assert_eq!(
+            calls[0].url,
+            "https://www.googleapis.com/calendar/v3/calendars/primary/events/ev1"
+        );
+        // Anything but "send" cancels it, and nothing is changed.
+        let id = moved["result"]["send_id"].as_str().unwrap().to_owned();
+        let cancelled = run(services.tool(&send_line(&id, "yes")));
+        assert_eq!(cancelled["result"]["cancelled"], true, "{cancelled}");
+        assert_eq!(services.http.calls().len(), 1);
+        // Asked again and sent on "send": one PATCH of that event alone.
+        services.http.answer(200, PARTY);
+        let moved = run(
+            services.tool(&edit(json!({"action":"update_event","event_id":"ev1",
+            "start":"2026-11-12T20:00:00+07:00","end":"2026-11-12T21:00:00+07:00"}))),
+        );
+        let id = moved["result"]["send_id"].as_str().unwrap().to_owned();
+        services.http.answer(200, r#"{"id":"ev1"}"#);
+        let sent = run(services.tool(&send_line(&id, "send")));
+        assert_eq!(sent["result"]["sent"], true, "{sent}");
+        assert_eq!(sent["result"]["event_id"], "ev1");
+        let calls = services.http.calls();
+        assert_eq!(calls.len(), 3);
+        assert_eq!(calls[2].method, Method::Patch);
+        assert_eq!(
+            calls[2].url,
+            "https://www.googleapis.com/calendar/v3/calendars/primary/events/ev1?sendUpdates=all"
+        );
+        let body: Value = serde_json::from_slice(calls[2].body.as_ref().unwrap()).unwrap();
+        assert_eq!(
+            body,
+            json!({"start":{"dateTime":"2026-11-12T20:00:00+07:00"},
+                   "end":{"dateTime":"2026-11-12T21:00:00+07:00"}})
+        );
+        // Sent once only.
+        assert!(
+            run(services.tool(&send_line(&id, "send")))["error"]
+                .as_str()
+                .unwrap()
+                .contains("nothing is waiting")
+        );
+        // Cancelled: read back, then one DELETE with no body.
+        services.http.answer(200, PARTY);
+        let gone = run(services.tool(&edit(json!({"action":"delete_event","event_id":"ev1"}))));
+        assert_eq!(gone["ok"], true, "{gone}");
+        let read_back = gone["result"]["read_back"].as_str().unwrap();
+        assert!(
+            read_back.starts_with("Delete the event \"Hamburger party\""),
+            "{read_back}"
+        );
+        assert!(read_back.contains("octavia@b.test"), "{read_back}");
+        assert_eq!(services.http.calls().len(), 4);
+        let id = gone["result"]["send_id"].as_str().unwrap().to_owned();
+        services.http.answer(204, "");
+        let sent = run(services.tool(&send_line(&id, "send")));
+        assert_eq!(sent["result"]["sent"], true, "{sent}");
+        let calls = services.http.calls();
+        assert_eq!(calls.len(), 5);
+        assert_eq!(calls[4].method, Method::Delete);
+        assert_eq!(
+            calls[4].url,
+            "https://www.googleapis.com/calendar/v3/calendars/primary/events/ev1?sendUpdates=all"
+        );
+        assert_eq!(calls[4].body, None);
+    }
+
+    /// The event was deleted in Google, or changed so: told so in words
+    /// that offer to make it again, whether found gone on its read, said
+    /// cancelled by Google, or gone by the time of the send.
+    #[test]
+    fn an_event_gone_from_google_is_told_so_and_nothing_held() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = calendar(dir.path(), EVENTS_SCOPE, true);
+        let delete = edit(json!({"action":"delete_event","event_id":"ev1"}));
+        for (status, body) in [
+            (404, r#"{"error":{"code":404,"message":"Not Found"}}"#),
+            (
+                410,
+                r#"{"error":{"code":410,"message":"Resource has been deleted"}}"#,
+            ),
+            (200, r#"{"id":"ev1","status":"cancelled"}"#),
+        ] {
+            services.http.answer(status, body);
+            let answer = run(services.tool(&delete));
+            assert_eq!(answer["error"], writes::EVENT_GONE, "{status}: {answer}");
+            assert!(!services.desk.waiting(), "{status}");
+        }
+        // Read, then deleted in Google before the "send".
+        services.http.answer(200, PARTY);
+        let moved = run(
+            services.tool(&edit(json!({"action":"update_event","event_id":"ev1",
+            "title":"Burger night"}))),
+        );
+        let id = moved["result"]["send_id"].as_str().unwrap().to_owned();
+        services.http.answer(410, "{}");
+        let sent = run(services.tool(&send_line(&id, "send")));
+        assert!(
+            sent["error"].as_str().unwrap().contains(writes::EVENT_GONE),
+            "{sent}"
+        );
+        // Every call was the one event's, never another.
+        for call in services.http.calls() {
+            assert!(call.url.contains("/events/ev1"), "{}", call.url);
+        }
+    }
+
+    /// `calendar.events`, what the app's Calendar link holds, allows the
+    /// edits as it allows create; a read-only link is told and never held,
+    /// and Google is not asked.
+    #[test]
+    fn the_calendar_links_scope_covers_its_edits() {
+        let dir = tempfile::tempdir().unwrap();
+        for scope in [
+            EVENTS_SCOPE,
+            "https://www.googleapis.com/auth/calendar",
+            "https://www.googleapis.com/auth/calendar.events.owned",
+        ] {
+            let services = calendar(dir.path(), scope, true);
+            for action in ["update_event", "delete_event"] {
+                services.http.answer(200, PARTY);
+                let answer = run(services.tool(&edit(
+                    json!({"action":action,"event_id":"ev1","title":"Burger night"}),
+                )));
+                assert_eq!(answer["ok"], true, "{scope} {action}: {answer}");
+            }
+        }
+        let services = calendar(
+            dir.path(),
+            "https://www.googleapis.com/auth/calendar.readonly",
+            true,
+        );
+        for (action, what) in [
+            ("update_event", "change calendar events"),
+            ("delete_event", "delete calendar events"),
+        ] {
+            let answer = run(services.tool(&edit(
+                json!({"action":action,"event_id":"ev1","title":"Burger night"}),
+            )));
+            assert_eq!(
+                answer["error"],
+                format!("Google Calendar is linked without permission to {what}: {NO_PERMISSION}"),
+                "{action}"
+            );
+            assert!(!services.desk.waiting());
+        }
+        assert!(services.http.calls().is_empty());
+    }
+
+    /// `LAMP_CALENDAR_EDITS` off: an edit is refused before anything is
+    /// read or held, and an event is still added as before.
+    #[test]
+    fn calendar_edits_are_refused_with_their_switch_off() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = calendar(dir.path(), EVENTS_SCOPE, false);
+        for action in ["update_event", "delete_event"] {
+            let answer = run(services.tool(&edit(
+                json!({"action":action,"event_id":"ev1","title":"Burger night"}),
+            )));
+            assert_eq!(
+                answer,
+                json!({"ok":false,"error":writes::EDITS_OFF}),
+                "{action}"
+            );
+        }
+        assert!(services.http.calls().is_empty());
+        assert!(!services.desk.waiting());
+        let create = run(
+            services.tool(&edit(json!({"action":"create_event","title":"Dentist",
+            "start":"2026-11-10T09:00:00+07:00","end":"2026-11-10T10:00:00+07:00"}))),
+        );
+        assert_eq!(create["ok"], true, "{create}");
+        assert!(services.desk.waiting());
     }
 }
