@@ -778,6 +778,61 @@ lamp-06c1 on 28 Oct "redo the touch step" reached a redo with no step and
 reopened every step). Skipping one step is `setup_step … skipped`; skipping
 the rest is that for each step.
 
+### The owner's voice at setup (C115)
+
+With `LAMP_SAME_VOICE_ENROLS_AT_SETUP=on`, beside `LAMP_SAME_VOICE_CONFIRMS`
+on the second route (off unless set, off everywhere), "who you are" also
+gives the owner's voice ([same-voice.md](same-voice.md), "One way only").
+No step or line is added and the step waits for nothing: each line heard
+while the step is open is read in a thread of its own
+(`setup_voice::SetupVoice::heard_at`). A line one face alone was seen
+speaking, the one face in view, has its CAM++ print held in RAM; once the
+step ends with that face saved as the owner (`owner` in this file), up to
+4 of its prints are kept in `setup-voice.json` beside this file, prints
+only. A guest's face, a line no face was seen speaking, or a step that ends
+with no face saved keeps none. A whole reset wipes it with the folder; the
+owner's "forget everything" removes it too ([memory.md](memory.md)).
+It never outlives its owner's walk: the file is removed when "who you are"
+is successfully posted for redo (alone or with the whole walk) in the
+active enrollment worker, when an open step is first heard or loaded, when
+the step ends with nothing kept, at a start that finds another owner's or
+none named, when a face is forgotten (the `owner` mark goes), and at a start
+with the switch off where the voice runs its attention rules (`LAMP_ATTENTION`;
+a start without them leaves it). A redo and a step that keep nothing also
+empty the owner's prints in RAM, and a print that comes only after the step
+was settled is dropped, never replacing those kept. A spoken line captures
+its enrollment generation at Engine Start processing, before callbacks or
+speech recognition, and retains it through the reader handoff. A line already
+admitted before settlement, forget or redo cannot join the new walk even if
+its final speech recognition arrives later. Events still queued upstream are
+outside this boundary. The same fence covers
+an onboarding-file read begun before settlement or forget: a delayed
+"step open" observation cannot clear the saved batch or restore a forgotten
+print. Settlement also retains its original generation: an owner observation
+begun before forget cannot drain or save a fresh walk's batch, or clear its
+settling state. Forget lets the fresh walk start its own settler without
+waiting for the old callback to return. An accepted whole-walk or "who you
+are" redo posts its existing mailbox message under the same enrollment lock
+and invalidates the former batch before releasing it. A refused redo, failed
+post or redo of another step preserves that batch. The existing file I/O
+stays on the tool path; the immediate heard handoff still takes no lock.
+App `memory/forgot` notifications also invalidate pending enrollment before
+its old owner lookup can publish. Matching/all persisted prints are removed;
+valid unrelated stored ownership is preserved. The single notification reader
+uses one awaited blocking job for setup's disk work, even with summaries off;
+the existing 500 ms poll is not a cleanup deadline. Unlink failures are logged
+and may leave the file; see [same-voice.md](same-voice.md) for the exact scope
+and conservative handling of unreadable ownership.
+A redo by someone whose lines are
+never seen alone leaves no former
+owner's prints that their "forget everything" could no longer reach.
+
+**Consent (open question for the onboarding owner).** The walk asks only
+"May I remember your face, so I know you next time?"; no line covers the
+voice, so this build adds no spoken step and keeps the enrolment behind the
+switch, off. Whether the face's yes may cover the voice, or the walk needs
+its own words for it, is the onboarding owner's to decide.
+
 ## Where it is kept
 
 `LAMP_ONBOARDING_FILE` (JSON, mode 0600, written whole and renamed): each

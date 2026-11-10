@@ -3188,6 +3188,9 @@ fn refresh_owner(file: Option<&Path>, socket: Option<&Path>) {
                     return;
                 }
                 crate::onboarding::owner_gone(file, &owner);
+                // Their prints kept at setup go with the mark
+                // (`crate::setup_voice`, the app's face removal too).
+                crate::setup_voice::owner_face_gone(file);
             }
             None
         }

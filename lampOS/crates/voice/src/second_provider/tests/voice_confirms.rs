@@ -18,6 +18,7 @@ fn confirms(bar: f32, print: Option<[f32; 3]>) -> VoiceConfirms {
     VoiceConfirms {
         owner: Arc::new(OwnerVoice::new(bar)),
         print_of: Arc::new(move |_| print.map(|print| print.to_vec())),
+        setup: None,
     }
 }
 
@@ -160,4 +161,212 @@ fn their_voice_is_learnt_only_from_lines_seen_spoken_by_them_alone() {
     assert!(fresh.owner.learn(PERSON, 99, OWN.to_vec()));
     assert_eq!(confirm(Some(&fresh), 51, &[], true), vec![FACE.to_owned()]);
     assert_eq!(fresh.owner.known(PERSON), OWNER_LEAST_PRINTS);
+}
+
+/// A line already spoken in the old walk must not enter a redo merely
+/// because its STT finishes late. Synthetic eyes/prints, real Engine and
+/// validated redo mailbox post; the progress write models its consumer.
+#[tokio::test]
+async fn a_setup_line_waiting_for_stt_cannot_enrol_in_a_redone_walk() {
+    setup_line_across_redo(false).await;
+}
+
+#[tokio::test]
+async fn a_setup_start_keeps_its_generation_across_an_early_clock_callback() {
+    setup_line_across_redo(true).await;
+}
+
+async fn setup_line_across_redo(early: bool) {
+    use crate::memory_scope::FaceCache;
+    use crate::speaking_faces::{SpeakingFaces, known_face_of};
+    use std::os::unix::fs::MetadataExt;
+    let dir = std::env::temp_dir().join(format!(
+        "setup-start-gap-{early}-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let progress = dir.join("onboarding.json");
+    std::fs::write(&progress, r#"{"steps":{}}"#).unwrap();
+    let store = crate::owner_voice::Store {
+        path: dir.join(crate::setup_voice::FILE),
+        uid: std::fs::metadata(&progress).unwrap().uid(),
+    };
+    let owner = Arc::new(OwnerVoice::new(CONFIRM_BAR));
+    let journal = Arc::new(Mutex::new(Vec::<String>::new()));
+    let logged = journal.clone();
+    let setup = Arc::new(crate::setup_voice::SetupVoice::new(
+        progress.clone(),
+        store,
+        owner.clone(),
+        Arc::new(move |line| logged.lock().unwrap().push(line.to_owned())),
+        crate::setup_voice::Timing {
+            print_within: Duration::from_millis(400),
+            settle_within: Duration::from_secs(5),
+            every: Duration::from_millis(5),
+        },
+    ));
+    crate::setup_voice::register(
+        crate::owner_voice::Store {
+            path: dir.join(crate::setup_voice::FILE),
+            uid: std::fs::metadata(&progress).unwrap().uid(),
+        },
+        Some(setup.clone()),
+    );
+    let gate = Arc::new(FinishGate::default());
+    let script = Arc::new(Script {
+        heard: Mutex::new(VecDeque::from([
+            Ok("My name is Linh.".into()),
+            Ok("I am still Linh.".into()),
+        ])),
+        chats: Mutex::new(VecDeque::from([
+            vec![text("Hello."), Ok(ChatEvent::Done)],
+            vec![text("Hello again."), Ok(ChatEvent::Done)],
+        ])),
+        finish_gate: Some(gate.clone()),
+        ..Script::default()
+    });
+    let eyes = Arc::new(SpeakingFaces::default());
+    eyes.look(
+        Instant::now(),
+        Some((("setup-gap", 0), &lamp_msgs::Faces { faces: vec![] })),
+    );
+    std::thread::sleep(Duration::from_millis(20));
+    let known = dir.join("known");
+    std::fs::write(&known, "Linh").unwrap();
+    std::fs::write(known_face_of(&known), "f1\n").unwrap();
+    let cache = Arc::new(FaceCache::default());
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine
+        .confirming_by_voice(VoiceConfirms {
+            owner,
+            setup: Some(setup),
+            print_of: Arc::new(|_| Some(OWN.to_vec())),
+        })
+        .with_memory_scope(
+            lamp_turn_owner::BootId::new([30; 16]).unwrap(),
+            cache.clone(),
+            Arc::new(|_, _, _, _, _| Box::pin(async { json!({"ok":true}) })),
+            Some(Arc::new(|_| "SYSTEM".to_owned().into())),
+        )
+        .seeing_who_speaks(eyes.clone(), known.clone())
+        .resuming_after_wordless_cut_ins(early)
+        .announcing(false);
+    engine.memory_camera(true, 1);
+    cache.replace(
+        cache.begin_refresh(),
+        crate::known_faces::FaceObservation::read(&known),
+    );
+    // Install after camera/cache setup so the first invocation belongs to
+    // actual spoken Start processing. The callback uses no Engine clock.
+    let fired = Arc::new(AtomicBool::new(false));
+    if early {
+        let fired = fired.clone();
+        let progress = progress.clone();
+        Arc::get_mut(&mut engine.shared).unwrap().clock = Arc::new(move || {
+            if !fired.swap(true, Ordering::SeqCst) {
+                let told = crate::onboarding::redo_for_setup_test(&progress, "who_you_are");
+                assert_eq!(told.0["ok"], true);
+                assert!(
+                    std::fs::read_to_string(crate::onboarding::mailbox_of(&progress))
+                        .unwrap()
+                        .contains("who_you_are")
+                );
+                std::fs::write(&progress, r#"{"steps":{}}"#).unwrap();
+            }
+            Instant::now()
+        });
+    }
+    let done = Arc::new(AtomicBool::new(false));
+    let stopped = done.clone();
+    let feeder = std::thread::spawn(move || {
+        let mut frame = 1;
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while !stopped.load(Ordering::SeqCst) && Instant::now() < deadline {
+            eyes.look(
+                Instant::now(),
+                Some((
+                    ("setup-gap", frame),
+                    &lamp_msgs::Faces {
+                        faces: vec![lamp_msgs::Face {
+                            id: "f1".into(),
+                            xmin: 0.1,
+                            ymin: 0.1,
+                            xmax: 0.3,
+                            ymax: 0.4,
+                            confidence: 1.0,
+                            yaw: None,
+                            facing: None,
+                            follows: None,
+                            speaking: Some(lamp_msgs::Speaking {
+                                state: lamp_msgs::SpeakingState::Yes,
+                                score: 0.9,
+                                from: None,
+                            }),
+                        }],
+                    },
+                )),
+            );
+            frame += 1;
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    });
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    for request in [45_400, 45_401] {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        tokio::time::sleep(Duration::from_millis(40)).await;
+        engine.submit(end(request));
+        tokio::time::timeout(Duration::from_secs(2), gate.entered.notified())
+            .await
+            .unwrap();
+        if request == 45_400 && !early {
+            let told = crate::onboarding::redo_for_setup_test(&progress, "who_you_are");
+            assert_eq!(told.0["ok"], true);
+            assert!(
+                std::fs::read_to_string(crate::onboarding::mailbox_of(&progress))
+                    .unwrap()
+                    .contains("who_you_are")
+            );
+            std::fs::write(&progress, r#"{"steps":{}}"#).unwrap();
+        }
+        gate.resume.notify_one();
+        tokio::time::timeout(Duration::from_secs(2), turn(&mut engine))
+            .await
+            .unwrap();
+        let until = Instant::now() + Duration::from_secs(2);
+        while !journal
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|line| line.contains(&format!("request {request}:")))
+            && Instant::now() < until
+        {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        engine.retire_through(request);
+    }
+    let lines = journal.lock().unwrap().clone();
+    // Release all held work before asserting, including on the failing head.
+    crate::setup_voice::owner_face_gone(&progress);
+    done.store(true, Ordering::SeqCst);
+    feeder.join().unwrap();
+    std::fs::remove_dir_all(dir).unwrap();
+    assert_eq!(fired.load(Ordering::SeqCst), early, "early clock callback");
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("request 45401: its print held")),
+        "fresh control: {lines:?}"
+    );
+    assert!(
+        lines.iter().any(|line| line.contains("request 45400:")),
+        "old reader must finish: {lines:?}"
+    );
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.contains("request 45400: its print held")),
+        "pre-redo audio entered the fresh walk: {lines:?}"
+    );
 }

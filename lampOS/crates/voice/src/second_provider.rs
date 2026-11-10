@@ -431,6 +431,7 @@ struct SpokenTurn {
     privacy_generation: u64,
     captured: bool,
     enrollment_generation: crate::remember_speaker::Generation,
+    setup_generation: Option<u64>,
 }
 
 // The background room-speaker publish must use the request's existing proof;
@@ -1896,6 +1897,9 @@ pub type PrintOf = Arc<dyn Fn(u64) -> Option<Vec<f32>> + Send + Sync>;
 pub struct VoiceConfirms {
     pub owner: Arc<crate::same_voice::OwnerVoice>,
     pub print_of: PrintOf,
+    /// The owner's voice enrolled at setup
+    /// (`LAMP_SAME_VOICE_ENROLS_AT_SETUP`, [`crate::setup_voice`]); none, off.
+    pub setup: Option<Arc<crate::setup_voice::SetupVoice>>,
 }
 
 /// `LAMP_SAME_VOICE_CONFIRMS` (the memory owner's decision of 4 Nov: CAM++
@@ -6136,6 +6140,14 @@ impl Engine {
                 heard_of_cut,
                 ..
             } => {
+                // Fence setup enrollment before callbacks or waits can span
+                // a redo. Events still queued upstream are not admitted yet.
+                let setup_generation = self
+                    .shared
+                    .voice_confirms
+                    .as_ref()
+                    .and_then(|confirms| confirms.setup.as_ref())
+                    .map(|setup| setup.generation());
                 if self.shared.wordless_resumes
                     && let Ok(mut kept) = self.shared.heard_of_cut.lock()
                 {
@@ -6513,6 +6525,7 @@ impl Engine {
                             privacy_generation,
                             captured: false,
                             enrollment_generation: crate::remember_speaker::generation(),
+                            setup_generation,
                         },
                         lease,
                         marks.clone(),
@@ -7923,6 +7936,27 @@ async fn spoken(
     } else {
         None
     };
+    // `LAMP_SAME_VOICE_ENROLS_AT_SETUP`: while the walk leads "who you
+    // are", the line's print may be the owner's to keep; read in a thread of
+    // its own with the Start token, so nothing here waits
+    // (`setup_voice::SetupVoice::heard_at`).
+    if let (Some(confirms), Some((eyes, known))) =
+        (shared.voice_confirms.as_ref(), shared.speaking.as_ref())
+        && let (Some(setup), Some(generation)) = (confirms.setup.as_ref(), turn.setup_generation)
+    {
+        setup.heard_at(
+            generation,
+            request,
+            crate::setup_voice::Sight::of(
+                setup.onboarding().to_owned(),
+                eyes.clone(),
+                known.clone(),
+                begun,
+                finishing,
+            ),
+            confirms.print_of.clone(),
+        );
+    }
     if enrollment_allowed && let Some(lease) = scope.as_ref() {
         crate::speaking_faces::saw_line_scoped(
             crate::speaking_faces::LineSeen {

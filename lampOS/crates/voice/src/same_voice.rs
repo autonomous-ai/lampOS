@@ -162,6 +162,15 @@ pub const SERVICES_SAME_FROM: f32 = 0.55;
 /// A score under it does nothing, and no score ends, holds or splits a
 /// conversation ([`Voices::confirming_only`]). Off unless set.
 pub const CONFIRMS_ENVIRONMENT: &str = "LAMP_SAME_VOICE_CONFIRMS";
+/// `on` exactly, beside [`CONFIRMS_ENVIRONMENT`]: the owner's voice is
+/// enrolled at setup (`crate::setup_voice`, C115). While the walk leads
+/// "who you are", the prints of the lines one face alone was seen
+/// speaking, the one face in view, are held in RAM; once the step ends with
+/// that face saved as the owner, theirs (at most [`OWNER_PRINTS`]) are kept
+/// on the lamp, and each voice start gives them back to [`OwnerVoice`], so
+/// the owner's voice is known from their first line. Only prints, never
+/// sound. Off unless set: off, nothing is held, kept or read.
+pub const ENROLS_AT_SETUP_ENVIRONMENT: &str = "LAMP_SAME_VOICE_ENROLS_AT_SETUP";
 /// The cosine against the known person's own prints a line needs to be
 /// confirmed as theirs ([`CONFIRMS_ENVIRONMENT`]): a number over 0 and at
 /// most 1, else [`CONFIRM_BAR`].
@@ -834,6 +843,23 @@ impl OwnerVoice {
             _ => *kept = Some((person.to_owned(), vec![(request, print)])),
         }
         true
+    }
+
+    /// Forget every print kept, whoever's: the owner's "forget everything"
+    /// with their prints from setup (`crate::setup_voice`).
+    pub fn forget(&self) {
+        if let Ok(mut kept) = self.kept.lock() {
+            *kept = None;
+        }
+    }
+
+    /// Forget only the matching person's cached prints in one locked operation.
+    pub(crate) fn forget_person(&self, person: &str) {
+        if let Ok(mut kept) = self.kept.lock()
+            && kept.as_ref().is_some_and(|(of, _)| of == person)
+        {
+            *kept = None;
+        }
     }
 
     /// How many of `person`'s prints are kept.
