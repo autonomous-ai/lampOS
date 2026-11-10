@@ -20,6 +20,7 @@ pub mod reg {
     pub const LIMITS: usize = 9;
     pub const HOMING_OFFSET: usize = 31;
     pub const TORQUE: usize = 40;
+    pub const ACCELERATION: usize = 41;
     pub const GOAL: usize = 42;
     pub const GOAL_VELOCITY: usize = 46;
     pub const POSITION: usize = 56;
@@ -33,6 +34,21 @@ pub mod reg {
 
 /// The STS3215's model number.
 const MODEL_NUMBER: u16 = 777;
+/// Gravity load the arm holds at its worst, in 0.1% of the drive, for the shoulder
+/// and the elbow (uncalibrated: the 75c9 readings are to come), and the load a
+/// joint shows for every 1,000 counts a second squared it speeds up at and for every
+/// 1,000 counts a second it moves at.
+const GRAVITY: [f64; 5] = [0.0, 300.0, 150.0, 0.0, 0.0];
+const LOAD_PER_ACCEL: f64 = 5.0;
+const LOAD_PER_SPEED: f64 = 30.0;
+/// The temperature a servo rests at, degrees, how fast it heats with its load
+/// (degrees a second at a full load) and how fast it cools (a fraction a second).
+const AMBIENT: f64 = 28.0;
+const HEAT: f64 = 0.4;
+const COOL: f64 = 1.0 / 120.0;
+/// The top acceleration when the register says none, counts a second squared.
+const TOP_ACCEL: f64 = 20_000.0;
+
 /// Counts a second when the goal velocity register says none (the servo's own
 /// top speed, about 0.7 turn a second).
 const TOP_SPEED: f64 = 3_000.0;
@@ -44,6 +60,12 @@ pub struct Servo {
     regs: [u8; 256],
     position: f64,
     last: f64,
+    /// Counts a second now, signed.
+    velocity: f64,
+    /// Degrees Celsius, a float behind the temperature register.
+    heat: f64,
+    /// Where it is at rest folded, the zero of the arm's gravity angle.
+    folded: f64,
 }
 
 impl Servo {
@@ -54,6 +76,9 @@ impl Servo {
             regs: [0; 256],
             position: f64::from(position),
             last: f64::from(position),
+            velocity: 0.0,
+            heat: AMBIENT,
+            folded: f64::from(position),
         };
         servo.put(reg::MODEL, &MODEL_NUMBER.to_le_bytes());
         servo.put(reg::LIMITS, &min.to_le_bytes());
@@ -61,7 +86,7 @@ impl Servo {
         servo.put(reg::GOAL, &position.to_le_bytes());
         servo.put(reg::POSITION, &position.to_le_bytes());
         servo.regs[reg::VOLTAGE] = 120;
-        servo.regs[reg::TEMPERATURE] = 32;
+        servo.regs[reg::TEMPERATURE] = AMBIENT as u8;
         servo
     }
 
@@ -99,18 +124,49 @@ impl Servo {
         }
     }
 
-    /// `dt` seconds pass: with torque on it turns toward its goal at its speed.
+    /// The acceleration it may use, counts a second squared: the register's
+    /// 100 counts a second squared a step, none meaning the top.
+    fn accel(&self) -> f64 {
+        match self.regs[reg::ACCELERATION] {
+            0 => TOP_ACCEL,
+            a => f64::from(a) * 100.0,
+        }
+    }
+
+    /// The gravity load the joint holds at `position`, in 0.1% of the drive:
+    /// the arm holds most when its link is level, nothing when it hangs down.
+    fn gravity(&self, index: usize) -> f64 {
+        let turned = (self.position - self.folded) * std::f64::consts::TAU / 4096.0;
+        GRAVITY[index] * turned.sin().abs().max(0.15)
+    }
+
+    /// `dt` seconds pass: with torque on it speeds up toward its goal at its
+    /// acceleration and speed cap, and slows to arrive at it, and its load and
+    /// heat follow what it did.
     fn step(&mut self, dt: f64) {
         let before = self.position;
+        let before_velocity = self.velocity;
         if self.torque() && dt > 0.0 {
             let (min, max) = (
                 f64::from(self.word(reg::LIMITS)),
                 f64::from(self.word(reg::LIMITS + 2)),
             );
             let goal = f64::from(self.goal()).clamp(min.min(max), max.max(min));
-            let reach = self.speed() * dt;
             let gap = goal - self.position;
-            self.position += gap.clamp(-reach, reach);
+            let accel = self.accel();
+            // The speed it may have and still stop at the goal.
+            let wanted = gap.signum() * self.speed().min((2.0 * accel * gap.abs()).sqrt());
+            self.velocity += (wanted - self.velocity).clamp(-accel * dt, accel * dt);
+            let reach = self.velocity * dt;
+            // Never past the goal.
+            self.position += if reach.abs() >= gap.abs() && reach.signum() == gap.signum() {
+                self.velocity = 0.0;
+                gap
+            } else {
+                reach
+            };
+        } else {
+            self.velocity = 0.0;
         }
         let velocity = if dt > 0.0 {
             (self.position - before) / dt
@@ -118,6 +174,11 @@ impl Servo {
             0.0
         };
         let moving = velocity.abs() >= 1.0;
+        let accelerating = if dt > 0.0 {
+            (self.velocity - before_velocity) / dt
+        } else {
+            0.0
+        };
         let position = self.position();
         self.put(reg::POSITION, &position.to_le_bytes());
         let magnitude = velocity.abs().round().min(32_767.0) as u16;
@@ -128,14 +189,22 @@ impl Servo {
         };
         self.put(reg::VELOCITY, &signed.to_le_bytes());
         self.regs[reg::MOVING] = u8::from(moving);
-        // A held servo shows a little load, a moving one more (0.1% units).
-        let load: u16 = if moving {
-            220
-        } else if self.torque() {
-            40
+        // What a servo shows: gravity on the arm, the push of speeding up, a little
+        // for moving, and the little a held one shows (0.1% units).
+        let index = usize::from(self.id.saturating_sub(1)).min(4);
+        let load: u16 = if self.torque() {
+            (40.0
+                + self.gravity(index)
+                + accelerating.abs() / 1_000.0 * LOAD_PER_ACCEL
+                + velocity.abs() / 1_000.0 * LOAD_PER_SPEED)
+                .min(1_000.0) as u16
         } else {
             0
         };
+        // It warms with its load and cools toward the room.
+        self.heat +=
+            (f64::from(load) / 1_000.0 * HEAT * 120.0 * COOL - (self.heat - AMBIENT) * COOL) * dt;
+        self.regs[reg::TEMPERATURE] = self.heat.round().clamp(0.0, 255.0) as u8;
         self.put(reg::LOAD, &load.to_le_bytes());
         self.last = before;
     }
@@ -346,5 +415,48 @@ mod tests {
         let mut packet = request(3, PING, &[]);
         *packet.last_mut().unwrap() ^= 1;
         assert!(bus.feed(&packet).is_empty());
+    }
+
+    #[test]
+    fn it_speeds_up_by_its_acceleration_and_stops_at_the_goal_without_overshooting() {
+        let mut bus = bus();
+        bus.feed(&request(1, WRITE, &[reg::TORQUE as u8, 1]));
+        bus.feed(&request(1, WRITE, &[reg::ACCELERATION as u8, 10]));
+        bus.feed(&request(1, WRITE, &[reg::GOAL_VELOCITY as u8, 0xe8, 0x03]));
+        bus.feed(&request(1, WRITE, &[reg::GOAL as u8, 0xd0, 0x08]));
+        // 1,000 counts a second squared: after 0.1 s it has moved 5 counts, not 100.
+        bus.step(0.1);
+        let early = i32::from(bus.servos()[0].position()) - 2000;
+        assert!((1..=10).contains(&early), "{early}");
+        let mut last = bus.servos()[0].position();
+        for _ in 0..400 {
+            bus.step(0.05);
+            let now = bus.servos()[0].position();
+            assert!(now >= last && now <= 2256, "{now}");
+            last = now;
+        }
+        assert_eq!(bus.servos()[0].position(), 2256);
+    }
+
+    #[test]
+    fn the_arm_shows_a_gravity_load_the_base_does_not_and_it_warms_under_it() {
+        let mut bus = bus();
+        for id in [1u8, 2] {
+            bus.feed(&request(id, WRITE, &[reg::TORQUE as u8, 1]));
+        }
+        // The shoulder raised a quarter turn from where it was found: level link.
+        bus.feed(&request(2, WRITE, &[reg::GOAL as u8, 0x34, 0x0c]));
+        for _ in 0..2_000 {
+            bus.step(0.05);
+        }
+        let (yaw, shoulder) = (&bus.servos()[0], &bus.servos()[1]);
+        let load = |s: &Servo| u16::from_le_bytes([s.regs[reg::LOAD], s.regs[reg::LOAD + 1]]);
+        assert!(
+            load(shoulder) > load(yaw) + 100,
+            "{} {}",
+            load(shoulder),
+            load(yaw)
+        );
+        assert!(shoulder.regs[reg::TEMPERATURE] > yaw.regs[reg::TEMPERATURE]);
     }
 }
