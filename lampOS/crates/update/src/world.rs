@@ -123,7 +123,7 @@ impl Systemd for Systemctl {
             Command::new("systemctl")
                 .args([
                     "show",
-                    "--property=Id,ActiveState,SubState,MainPID,NRestarts,Result,ConditionResult",
+                    "--property=Id,ActiveState,SubState,MainPID,NRestarts,Result,ConditionResult,StatusText",
                     "--",
                 ])
                 .args(units),
@@ -535,6 +535,7 @@ pub fn parse_show(text: &str) -> Vec<UnitState> {
                 "NRestarts" => unit.restarts = value.parse().unwrap_or(0),
                 "Result" => unit.result = value.to_owned(),
                 "ConditionResult" => unit.condition = value.to_owned(),
+                "StatusText" => unit.status = value.to_owned(),
                 _ => {}
             }
         }
@@ -972,7 +973,7 @@ mod tests {
 
     #[test]
     fn systemctl_show_is_read_unit_by_unit() {
-        let text = "Id=lamp-voice.service\nActiveState=active\nSubState=running\nMainPID=812\nNRestarts=2\n\nId=lamp-body.service\nActiveState=activating\nSubState=auto-restart\nMainPID=0\nNRestarts=1\n";
+        let text = "Id=lamp-voice.service\nActiveState=active\nSubState=running\nMainPID=812\nNRestarts=2\n\nId=lamp-body.service\nActiveState=activating\nSubState=auto-restart\nMainPID=0\nNRestarts=1\nStatusText=held, nothing moves: a fold failed\n";
         let units = parse_show(text);
         assert_eq!(units.len(), 2);
         assert_eq!(units[0].unit, "lamp-voice.service");
@@ -980,6 +981,8 @@ mod tests {
         assert!(units[0].running());
         assert_eq!(units[1].sub, "auto-restart");
         assert!(!units[1].running());
+        assert_eq!(units[0].held(), None);
+        assert_eq!(units[1].held(), Some("a fold failed"));
     }
 
     #[test]

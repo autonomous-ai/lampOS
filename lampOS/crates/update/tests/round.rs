@@ -251,6 +251,11 @@ struct FakeSystemd {
     crashing: Vec<String>,
     /// Starts rejected by an unmet condition: systemctl succeeds, unit stays inactive.
     condition_skipped: Vec<String>,
+    /// Each unit's `StatusText`, kept across its restarts as a held body's
+    /// kept unplug request is (#5777).
+    status: BTreeMap<String, String>,
+    /// Units held from their next restart on (#6113).
+    held_at_restart: Vec<String>,
     /// Explicit manager facts, independent of the filesystem classifier.
     setup_properties: Option<String>,
     remove_setup_marker_on_query: bool,
@@ -379,6 +384,7 @@ impl Systemd for FakeSystemd {
                     restarts: running.restarts,
                     result: running.result,
                     condition: running.condition,
+                    status: self.status.get(unit).cloned().unwrap_or_default(),
                 }
             })
             .collect())
@@ -398,6 +404,9 @@ impl Systemd for FakeSystemd {
             return self.applier.as_mut().map_or(Ok(()), |applier| applier());
         }
         self.restarted_at.push((unit.to_owned(), self.now.get()));
+        if self.held_at_restart.iter().any(|name| name == unit) {
+            self.status.insert(unit.to_owned(), HELD_STATUS.into());
+        }
         self.unreachable |= self.unreachable_after_restart;
         self.failing += std::mem::take(&mut self.failing_after_restart);
         self.start(unit);
@@ -620,6 +629,8 @@ impl Lamp {
             lines_asked: Vec::new(),
             crashing: Vec::new(),
             condition_skipped: Vec::new(),
+            status: BTreeMap::new(),
+            held_at_restart: Vec::new(),
             setup_properties: None,
             remove_setup_marker_on_query: false,
             unreachable_after_restart: false,
@@ -1927,6 +1938,67 @@ fn a_part_its_own_condition_skips_at_the_restart_keeps_the_build() {
     assert_eq!(lamp.systemd.units["lamp-body.service"].active, "inactive");
     assert!(lamp.state()["refused"].as_array().is_none_or(Vec::is_empty));
     // A part that fails at the same restart still puts the build back.
+    let mut lamp = Lamp::new();
+    lamp.systemd.crashing.push("lamp-body.service".into());
+    lamp.publish(2, &[("lamp-body", "body 2")], &[]);
+    assert!(matches!(lamp.round(), Outcome::RolledBack { .. }));
+}
+
+/// What a lamp-body held after a failed unplug fold tells systemd (#5777).
+const HELD_STATUS: &str =
+    "held, nothing moves: startup motion inhibited: unplug request r1 is still kept";
+
+/// #6113: a body held before the update, up and still after a failed unplug
+/// fold, is held after it too, with systemd calling it active. Putting the
+/// build back would fix nothing: the build is kept, and the round says held.
+#[test]
+fn a_body_held_before_the_update_keeps_the_build_and_says_held() {
+    let mut lamp = Lamp::new();
+    lamp.systemd
+        .status
+        .insert("lamp-body.service".into(), HELD_STATUS.into());
+    lamp.publish(2, &[("lamp-body", "body 2")], &[]);
+    let outcome = lamp.round();
+    assert_eq!(outcome.kind(), "held", "{outcome}");
+    assert_eq!(outcome.sequence(), Some(2));
+    assert!(
+        outcome
+            .to_string()
+            .contains("held: lamp-body.service held, nothing moves: startup motion inhibited"),
+        "{outcome}"
+    );
+    assert_eq!(lamp.state()["installed"]["sequence"], 2);
+    assert!(lamp.state()["refused"].as_array().is_none_or(Vec::is_empty));
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("held, nothing moves")),
+        "{:?}",
+        lamp.said
+    );
+    assert!(
+        lamp.read("/var/lib/lampos-update/log.jsonl")
+            .contains("\"event\":\"held\"")
+    );
+}
+
+/// #6113: held only after the switch is this build's doing, as far as the
+/// round can tell: put back, as a part not well is. A body not held that
+/// the new build breaks is put back as before.
+#[test]
+fn a_body_held_or_broken_only_after_the_update_is_put_back() {
+    let mut lamp = Lamp::new();
+    lamp.systemd
+        .held_at_restart
+        .push("lamp-body.service".into());
+    lamp.publish(2, &[("lamp-body", "body 2")], &[]);
+    let outcome = lamp.round();
+    let Outcome::RolledBack { why, .. } = &outcome else {
+        panic!("{outcome:?}");
+    };
+    assert!(why.contains("held, nothing moves"), "{why}");
+    assert_eq!(lamp.state()["refused"][0]["sequence"], 2);
+
     let mut lamp = Lamp::new();
     lamp.systemd.crashing.push("lamp-body.service".into());
     lamp.publish(2, &[("lamp-body", "body 2")], &[]);
@@ -3261,6 +3333,7 @@ fn update_unit(active: &str, sub: &str) -> UnitState {
         restarts: 0,
         result: String::new(),
         condition: String::new(),
+        status: String::new(),
     }
 }
 

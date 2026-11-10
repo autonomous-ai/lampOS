@@ -753,6 +753,7 @@ fn status(outcome: &Outcome) -> u8 {
     match outcome {
         Outcome::UpToDate(_)
         | Outcome::Switched(_)
+        | Outcome::Held { .. }
         | Outcome::SelfSwitched { .. }
         | Outcome::Climbs { .. }
         | Outcome::Would(_)

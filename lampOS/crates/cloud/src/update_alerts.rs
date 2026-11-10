@@ -109,7 +109,8 @@ impl Stage {
 /// does not know, are told as none.
 fn told_as(outcome: &str) -> Option<Stage> {
     match outcome {
-        "switched" => Some(Stage::Done),
+        // Kept with lamp-body held as it was before (#6113): done.
+        "switched" | "held" => Some(Stage::Done),
         "self-switched" => Some(Stage::SelfSwitched),
         "self-confirmed" => Some(Stage::SelfConfirmed),
         "self-put-back" => Some(Stage::SelfPutBack),
@@ -736,6 +737,7 @@ mod tests {
         );
         for (outcome, want) in [
             ("switched", Some(Stage::Done)),
+            ("held", Some(Stage::Done)),
             ("self-switched", Some(Stage::SelfSwitched)),
             ("self-confirmed", Some(Stage::SelfConfirmed)),
             ("self-put-back", Some(Stage::SelfPutBack)),
