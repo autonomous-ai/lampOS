@@ -3575,7 +3575,8 @@ fn list_sha256(wants: &[Want]) -> String {
 
 /// What goes into a part's new folder: what is beside its binary now,
 /// each from the build if the build carries it, else from the old folder;
-/// and the binary. A folder that is not there is installed afresh (V1's
+/// the tools install puts beside it that the build carries; and the
+/// binary. A folder that is not there is installed afresh (V1's
 /// lesson: a missing installation is a reinstall, not an error).
 fn wants_of(
     config: &Config,
@@ -3586,6 +3587,18 @@ fn wants_of(
     let old_folder = program.folder();
     let mut names = BTreeSet::from([program.binary.clone()]);
     names.extend(models.keys().map(|name| (*name).to_owned()));
+    // The tools install puts beside this binary, when the build carries
+    // them: a folder made before one shipped gets it at the next round, not
+    // only at an install (lamp-same-voice on lamp-06c1, 10 Nov).
+    names.extend(
+        crate::install::BESIDE
+            .iter()
+            .chain(crate::install::BESIDE_IF_CARRIED)
+            .filter(|(owner, _)| *owner == program.binary)
+            .flat_map(|(_, tools)| tools.iter())
+            .filter(|tool| files.contains_key(**tool))
+            .map(|tool| (*tool).to_owned()),
+    );
     if let Ok(entries) = fs::read_dir(config.on(&old_folder)) {
         for entry in entries {
             let entry = entry.map_err(|error| format!("{old_folder}: {error}"))?;
@@ -4138,4 +4151,91 @@ fn conditions(text: &str) -> Vec<&str> {
         .map(str::trim)
         .filter(|line| line.starts_with("Condition"))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config(root: &Path) -> Config {
+        Config {
+            root: root.to_owned(),
+            units: "/etc/systemd/system/".into(),
+            records: "/var/lib/lampos-update/".into(),
+            channel: "lamp-voice".into(),
+            channel_url: "https://channel.test/".into(),
+            key: [0; 32],
+            lamp: "lamp-06c1".into(),
+            apply: false,
+            quiet_wait: Duration::ZERO,
+            watch: Duration::ZERO,
+            keep_free: 0,
+            self_switch: false,
+            running: None,
+            updater: manifest::UPDATER,
+            models: false,
+            models_file: false,
+            settings: false,
+            product_settings: false,
+            image: false,
+            writer_from: None,
+        }
+    }
+
+    fn file(name: &str) -> manifest::File {
+        manifest::File {
+            name: name.into(),
+            sha256: manifest::sha256_hex(name.as_bytes()),
+            size: 1,
+        }
+    }
+
+    /// A lamp whose voice folder was made before the voice's same-voice
+    /// check shipped took every round after it with only what was already
+    /// beside the voice, so the check never arrived (lamp-06c1 on build
+    /// 11091, 10 Nov): a round puts a tool the build carries beside its part,
+    /// as install does.
+    #[test]
+    fn a_round_puts_a_carried_tool_beside_its_part() {
+        let folder = tempfile::tempdir().unwrap();
+        let build = "a".repeat(64);
+        let old = folder.path().join(format!("opt/lampOS/voice/{build}"));
+        fs::create_dir_all(&old).unwrap();
+        fs::write(old.join("lamp-voice"), "voice 1").unwrap();
+        fs::write(old.join("lamp-turn-end"), "turn-end 1").unwrap();
+        let carried = [
+            file("lamp-voice"),
+            file("lamp-turn-end"),
+            file("lamp-same-voice"),
+            file("lamp-body-measure"),
+        ];
+        let files: BTreeMap<&str, &manifest::File> = carried
+            .iter()
+            .map(|file| (file.name.as_str(), file))
+            .collect();
+        let program = Program {
+            builds: "/opt/lampOS/voice/".into(),
+            build,
+            binary: "lamp-voice".into(),
+            linked: true,
+        };
+        let wants = wants_of(&config(folder.path()), &files, &BTreeMap::new(), &program).unwrap();
+        let names: Vec<&str> = wants.iter().map(|want| want.name.as_str()).collect();
+        assert_eq!(names, ["lamp-same-voice", "lamp-turn-end", "lamp-voice"]);
+        assert!(
+            wants
+                .iter()
+                .all(|want| matches!(&want.source, Source::Build(_)))
+        );
+
+        // A build without it still makes the folder, without it.
+        let older: BTreeMap<&str, &manifest::File> = files
+            .iter()
+            .filter(|(name, _)| **name != "lamp-same-voice")
+            .map(|(name, file)| (*name, *file))
+            .collect();
+        let wants = wants_of(&config(folder.path()), &older, &BTreeMap::new(), &program).unwrap();
+        let names: Vec<&str> = wants.iter().map(|want| want.name.as_str()).collect();
+        assert_eq!(names, ["lamp-turn-end", "lamp-voice"]);
+    }
 }
