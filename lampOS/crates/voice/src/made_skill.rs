@@ -84,8 +84,12 @@ const PUT_ON_WAIT: Duration = Duration::from_secs(8);
 const PACK_WITHIN: Duration = Duration::from_secs(20);
 /// The most of either file taken from an answer.
 const MOST_FILE_BYTES: usize = 8 * 1024;
-/// The most of a description said: what it does, and what was left out.
-const MOST_DESCRIPTION_CHARS: usize = 400;
+/// The most of a description said: what it does, how often it starts on its
+/// own (#6066), and what was left out.
+const MOST_DESCRIPTION_CHARS: usize = 640;
+const _: () = assert!(
+    MOST_PLAIN_CHARS + MOST_MANNERS_CHARS + MOST_CANNOT_CHARS + 40 <= MOST_DESCRIPTION_CHARS
+);
 /// How an answer begins that makes nothing: what was asked is more than a
 /// made skill can sense or do.
 pub const CANNOT: &str = "cannot:";
@@ -448,7 +452,7 @@ pub struct Uses {
     pub speak: bool,
     /// The linked service it reads to the owner alone, by its code, with
     /// [`READS_ENVIRONMENT`] on (#5288): never one it writes to.
-    pub reads: Option<String>,
+    pub reads: Vec<String>,
     /// It may send a short text to the person's phone (`messages`): an
     /// outbound step, named when it is said back (#6066).
     pub messages: bool,
@@ -477,8 +481,9 @@ impl Uses {
         if self.speak {
             parts.push("its voice".to_owned());
         }
-        if let Some(service) = &self.reads {
-            parts.push(format!("reading your {}", service_name(service)));
+        if !self.reads.is_empty() {
+            let names: Vec<&str> = self.reads.iter().map(|code| service_name(code)).collect();
+            parts.push(format!("reading your {}", names.join(" and ")));
         }
         if self.light {
             parts.push("its light".to_owned());
@@ -536,8 +541,12 @@ impl Uses {
 
     fn json(&self) -> Value {
         let mut uses = json!({"light": self.light, "body": self.body, "topics": self.topics, "speak": self.speak});
-        if let Some(service) = &self.reads {
-            uses["reads"] = json!(service);
+        // One read as its code, as an entry kept before #6066 reads; more
+        // as a list (Thirteen's P3 on #6103).
+        match self.reads.as_slice() {
+            [] => {}
+            [service] => uses["reads"] = json!(service),
+            services => uses["reads"] = json!(services),
         }
         // The grants beyond the light, the body and the voice, only when
         // given, so an entry kept before #6066 reads the same.
@@ -573,7 +582,10 @@ impl Uses {
             body: uses["body"] == true,
             topics: strings("topics"),
             speak: uses["speak"] == true,
-            reads: uses["reads"].as_str().map(str::to_owned),
+            reads: match uses["reads"].as_str() {
+                Some(service) => vec![service.to_owned()],
+                None => strings("reads"),
+            },
             messages: uses["messages"] == true,
             camera: uses["camera"] == true,
             known_faces: uses["known_faces"] == true,
@@ -597,21 +609,27 @@ fn service_name(code: &str) -> &str {
 /// reads it. Empty when nothing is missing; `None` when it can't be told,
 /// and nothing is said of it.
 pub fn needs_link(uses: &Uses, linked: impl FnOnce() -> Option<Vec<String>>) -> Option<Vec<Value>> {
-    let Some(code) = uses.reads.as_deref() else {
-        return Some(Vec::new());
-    };
-    let linked = linked()?;
-    let alike = |linked: &str| {
-        linked == code
-            || matches!(
-                (code, linked),
-                ("gmail", "gmail-app") | ("gmail-app", "gmail")
-            )
-    };
-    if linked.iter().any(|linked| alike(linked)) {
+    if uses.reads.is_empty() {
         return Some(Vec::new());
     }
-    Some(vec![json!({"code": code, "name": service_name(code)})])
+    let linked = linked()?;
+    // Every read not linked now, each asked for (Thirteen's P3 on #6103).
+    let needs = uses
+        .reads
+        .iter()
+        .filter(|code| {
+            let alike = |linked: &str| {
+                linked == code.as_str()
+                    || matches!(
+                        (code.as_str(), linked),
+                        ("gmail", "gmail-app") | ("gmail-app", "gmail")
+                    )
+            };
+            !linked.iter().any(|linked| alike(linked))
+        })
+        .map(|code| json!({"code": code, "name": service_name(code)}))
+        .collect();
+    Some(needs)
 }
 
 /// What the voice's model is asked to tell of [`needs_link`]'s services,
@@ -641,7 +659,7 @@ pub fn needs_link_ask(needs: &[Value]) -> Option<String> {
 
 /// A made skill's `skill.toml` taken as one may be written: installable,
 /// with a version, and no function for the model (`tool`): it runs by
-/// itself. Since #6066 (the lead's principle: a skill a person makes on
+/// itself. Since #6066 (the first builder's rule: a skill a person makes on
 /// their own lamp may do whatever the lamp can do) its `[permissions]` and
 /// `[ask]` are whatever `lamp-skills` takes for an installable skill: the
 /// light, the body, the voice, any topic, messages, the camera, known
@@ -883,8 +901,154 @@ fn says_aloud(table: &toml::Table) -> bool {
 /// minute ([`LEAST_STOOD_UP_COOLDOWN_SECS`]). Its `[trigger]` table's lines
 /// are changed in place, so what is checked, said plainly and packed is the
 /// same text. Anything else, or a skill that can't be read, is given back
-/// as it came.
+/// as it came. Then every skill that starts itself is given the runtime's
+/// manners ([`mannered`], #6066 (a)): both the floors and the manners apply.
 pub fn paced(text: &str) -> String {
+    mannered(&say_paced(text))
+}
+
+/// The manners a made skill that starts itself is given by the lamp, never
+/// refused (#6066 (a), the first builder's review, 20:14): the built-in
+/// nudges' own (`skills/sip-of-water`): at most [`MANNERS_MOST_A_DAY`] runs a
+/// day, never in [`MANNERS_QUIET`]'s hours, one an hour in the nudges'
+/// `[budget]` group ([`MANNERS_GROUP`]) and a `[rest]` until morning after
+/// [`MANNERS_RESTS_AFTER`] runs nobody noticed.
+pub const MANNERS_MOST_A_DAY: u32 = 3;
+/// The quiet hours a made skill is given: the nudges' night.
+pub const MANNERS_QUIET: (&str, &str) = ("22:00", "08:00");
+/// The `[budget]` group a made skill joins, one run an hour with it: the
+/// wellbeing nudges', so a made skill never adds to how often the lamp
+/// speaks up unasked.
+pub const MANNERS_GROUP: &str = "wellbeing";
+/// Ignored this many runs in a row, a made skill rests until morning.
+pub const MANNERS_RESTS_AFTER: u32 = 2;
+
+/// A made skill that starts itself (a `[trigger]` table, no `tool`) with the
+/// runtime's manners set where it has none of its own (#6066 (a)):
+/// `most_a_day`, `[quiet]` (left out when its trigger names a time of its
+/// own, `during`, which is the person's ask), `[budget]` and `[rest]`. One
+/// it has, the person's ask for more, is kept, and [`plainly`] says it.
+/// Added as lines, so what is checked, said and packed is one text; a skill
+/// that can't be read, or doesn't start itself, is given back as it came.
+pub fn mannered(text: &str) -> String {
+    let Ok(table) = toml::from_str::<toml::Table>(text) else {
+        return text.to_owned();
+    };
+    let Some(trigger) = table.get("trigger").and_then(toml::Value::as_table) else {
+        return text.to_owned();
+    };
+    if table.contains_key("tool") {
+        return text.to_owned();
+    }
+    // Each manner the lamp's, bounded (Thirteen's and App Only's P2 on
+    // #6103): what the skill wrote is clamped, never refused, so the
+    // model can't choose a skill that speaks up more than the nudges do.
+    let integer = |key: &str, of: Option<&toml::Value>| {
+        of.and_then(|table| table.get(key))
+            .and_then(toml::Value::as_integer)
+    };
+    let most_a_day = table
+        .get("most_a_day")
+        .and_then(toml::Value::as_integer)
+        .unwrap_or(MANNERS_MOST_A_DAY.into())
+        .clamp(1, MANNERS_MOST_A_DAY_AT_MOST.into());
+    let per_hour = integer("per_hour", table.get("budget"))
+        .unwrap_or(1)
+        .clamp(1, MANNERS_PER_HOUR_AT_MOST.into());
+    let after_ignored = integer("after_ignored", table.get("rest"))
+        .unwrap_or(MANNERS_RESTS_AFTER.into())
+        .clamp(1, MANNERS_RESTS_AFTER_AT_MOST.into());
+    // The night stays quiet unless the skill runs only within the day.
+    let quiet = !trigger.get("during").is_some_and(within_day);
+    // A grant no step uses is dropped (App Only's P2 on #6103): no step of
+    // a made skill sends a message or takes the camera's picture, so
+    // neither is kept, and the say-back names only what a step does.
+    let unused = ["messages", "camera", "look"];
+    let mut kept = Vec::new();
+    let mut part: Option<String> = None;
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            part = Some(
+                trimmed
+                    .trim_matches(|c| c == '[' || c == ']')
+                    .trim()
+                    .to_owned(),
+            );
+        }
+        let key = trimmed
+            .split_once('=')
+            .map(|(key, _)| key.trim().trim_matches('"'));
+        let dropped = match (part.as_deref(), key) {
+            (Some("quiet" | "budget" | "rest"), _) => true,
+            (None, Some("most_a_day" | "quiet" | "budget" | "rest")) => true,
+            (Some("permissions"), Some(key)) => unused.contains(&key),
+            _ => false,
+        };
+        if !dropped {
+            kept.push(line);
+        }
+    }
+    let mut mannered = format!(
+        "most_a_day = {most_a_day}\n{}\n",
+        kept.join("\n").trim_end()
+    );
+    if quiet {
+        let (from, to) = MANNERS_QUIET;
+        mannered.push_str(&format!("\n[quiet]\nfrom = \"{from}\"\nto = \"{to}\"\n"));
+    }
+    mannered.push_str(&format!(
+        "\n[budget]\ngroup = \"{MANNERS_GROUP}\"\nper_hour = {per_hour}\n\n[rest]\nafter_ignored = {after_ignored}\n"
+    ));
+    // Taken when it reads as the same skill with its manners as set; a
+    // skill written otherwise (a manner inline) is given back as it came,
+    // and a manner past its bound is then unsaid ([`manners_plainly`]), so
+    // the repair writes it plainly.
+    let as_set = |set: &toml::Table| {
+        set.get("most_a_day").and_then(toml::Value::as_integer) == Some(most_a_day)
+            && integer("per_hour", set.get("budget")) == Some(per_hour)
+            && set
+                .get("budget")
+                .and_then(|budget| budget.get("group"))
+                .and_then(toml::Value::as_str)
+                == Some(MANNERS_GROUP)
+            && integer("after_ignored", set.get("rest")) == Some(after_ignored)
+            && set.contains_key("quiet") == quiet
+            && !set
+                .get("permissions")
+                .and_then(toml::Value::as_table)
+                .is_some_and(|granted| unused.iter().any(|key| granted.contains_key(*key)))
+    };
+    match toml::from_str::<toml::Table>(&mannered) {
+        Ok(set) if as_set(&set) => mannered,
+        _ => text.to_owned(),
+    }
+}
+
+/// The most runs a day a made skill may ask for (Thirteen's bound on #6103).
+pub const MANNERS_MOST_A_DAY_AT_MOST: u32 = 6;
+/// The most runs an hour its group may give it.
+pub const MANNERS_PER_HOUR_AT_MOST: u32 = 2;
+/// The most runs nobody noticed before it rests.
+pub const MANNERS_RESTS_AFTER_AT_MOST: u32 = 3;
+
+/// The day a made skill may run in with no quiet hours: 08:00 to 22:00,
+/// [`MANNERS_QUIET`]'s other side.
+const DAY: (u32, u32) = (8 * 60, 22 * 60);
+
+/// Whether a trigger's `during` lies wholly within [`DAY`], never across
+/// midnight.
+fn within_day(during: &toml::Value) -> bool {
+    let at = |key: &str| {
+        let (hours, minutes) = during.get(key)?.as_str()?.split_once(':')?;
+        let (hours, minutes): (u32, u32) = (hours.parse().ok()?, minutes.parse().ok()?);
+        (hours < 24 && minutes < 60).then_some(hours * 60 + minutes)
+    };
+    matches!((at("from"), at("to")), (Some(from), Some(to)) if DAY.0 <= from && from < to && to <= DAY.1)
+}
+
+/// [`paced`]'s limits on speaking (#6062).
+fn say_paced(text: &str) -> String {
     let Ok(table) = toml::from_str::<toml::Table>(text) else {
         return text.to_owned();
     };
@@ -977,7 +1141,7 @@ const SOUNDS: [(&str, &str); 1] = [("hum", "hums softly")];
 /// `sound` file, a path.
 const SOUND_NOT_SHIPPED: &str = "I can't do that yet: a sound other than its soft hum";
 
-/// How the lamp answers what it can't do yet (#6066, the lead's principle):
+/// How the lamp answers what it can't do yet (#6066, the first builder's rule):
 /// "I can't do that yet:" and what, never a refusal by a rule. Each one is
 /// build work.
 pub const CANT_YET: &str = "I can't do that yet:";
@@ -1055,6 +1219,11 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
     let Some(version) = table.get("version").and_then(|version| version.as_str()) else {
         return Err(Refused::new("it's missing its version number"));
     };
+    // A skill added from a file keeps the cap from before #6066 (App
+    // Only's P2 on #6103): the lift is for a skill made on the lamp only.
+    if added {
+        return added_held(table, version);
+    }
     // Its `[ask]`, as `lamp-skills` takes any (#6066): a nudge, a hello,
     // news or a reminder, each said back ([`plainly`]).
     let mut uses = Uses::default();
@@ -1108,10 +1277,7 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
                     if services.values().any(|how| how.as_str() != Some("read")) {
                         return Err(Refused::new(cant_yet("writing to a linked service")));
                     }
-                    uses.reads = services
-                        .iter()
-                        .find(|(_, how)| how.as_str() == Some("read"))
-                        .map(|(service, _)| service.clone());
+                    uses.reads = services.keys().cloned().collect();
                 }
                 // Any other key is lamp-skills' check's to take or refuse:
                 // a core grant, an add-on's, or a word it doesn't know.
@@ -1162,7 +1328,7 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
                 "it would say something without asking for its voice (speak = true)",
             ));
         }
-        if uses.speak && says.is_empty() && cues.is_empty() && uses.reads.is_none() {
+        if uses.speak && says.is_empty() && cues.is_empty() && uses.reads.is_empty() {
             return Err(Refused::new(
                 "it asks for its voice but never says anything; a made skill asks for its voice \
                  only with a say step or its hum",
@@ -1188,6 +1354,53 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
                     "it would speak when the lamp is resting at night, maybe to an empty room; \
                      drop its say step, or have it run between 07:00 and 22:00",
                 ));
+            }
+        }
+    }
+    Ok((version.to_owned(), uses))
+}
+
+/// [`held`] for a skill added from a file ([`capped_added`]): the cap
+/// before #6066, unchanged (App Only's P2 on #6103): the light, the head,
+/// [`TOPICS`] and its note (`speak`), nothing more.
+fn added_held(table: &toml::Table, version: &str) -> Result<(String, Uses), Refused> {
+    let mut uses = Uses::default();
+    if let Some(permissions) = table.get("permissions") {
+        let Some(permissions) = permissions.as_table() else {
+            return Err(Refused::new("the lamp couldn't tell what it would use"));
+        };
+        for (key, value) in permissions {
+            match (key.as_str(), value) {
+                ("light", toml::Value::Boolean(on)) => uses.light = *on,
+                ("body", toml::Value::Boolean(on)) => uses.body = *on,
+                ("topics", toml::Value::Array(topics)) => {
+                    for topic in topics {
+                        match topic.as_str() {
+                            Some(topic) if TOPICS.contains(&topic) => {
+                                if !uses.topics.iter().any(|kept| kept == topic) {
+                                    uses.topics.push(topic.to_owned());
+                                }
+                            }
+                            _ => {
+                                return Err(Refused::new(
+                                    "it asks to read more than a made skill may",
+                                ));
+                            }
+                        }
+                    }
+                }
+                ("actions", toml::Value::Array(actions)) if actions.is_empty() => {}
+                ("speak", toml::Value::Boolean(_)) => {}
+                (
+                    "look" | "camera" | "messages" | "known_faces" | "who" | "actions" | "services"
+                    | "output_limits",
+                    _,
+                ) => {
+                    return Err(Refused::new(
+                        "it asks to use more than the light and the head, which a made skill can't",
+                    ));
+                }
+                _ => return Err(Refused::new("the lamp couldn't tell what it would use")),
             }
         }
     }
@@ -1376,9 +1589,9 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
     if let Some(said) = written_plainly(table) {
         return Ok(said);
     }
-    // Only what is said below, or changes nothing that runs: a `[[while]]`,
-    // a `[quiet]`, a budget or any other key would run otherwise than the
-    // words (Thirteen's P2 on #5042).
+    // Only what is said below, or changes nothing that runs: a `[[while]]`
+    // or any other key would run otherwise than the words (Thirteen's P2 on
+    // #5042). The manners are said since #6066 ([`manners_plainly`]).
     let parts = [
         "kind",
         "version",
@@ -1389,6 +1602,11 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
         "ask",
         "do",
         "tool",
+        "most_a_day",
+        "active",
+        "quiet",
+        "budget",
+        "rest",
     ];
     let extras: Vec<&String> = table
         .keys()
@@ -1513,6 +1731,97 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
     if said.chars().count() > MOST_PLAIN_CHARS {
         return Err(too_long());
     }
+    // That it starts on its own, and how often (#6066 (a)): a sentence of
+    // its own, at most [`MOST_MANNERS_CHARS`], beside what it does.
+    said.push_str(&manners_plainly(table)?);
+    Ok(said)
+}
+
+/// The most [`manners_plainly`] says: each part at its longest.
+const MOST_MANNERS_CHARS: usize = 220;
+
+/// That a made skill starts on its own, and how often, as [`plainly`] says
+/// it after what it does (#6066 (a)): " It starts on its own, at most 3
+/// times a day, one an hour with the lamp's other nudges, never from 22:00
+/// to 08:00, and rests till morning if ignored twice." Each of
+/// `most_a_day`, `[active]`, `[quiet]`, `[budget]` and `[rest]` it has is
+/// said, as `lamp-skills` takes it; one in another shape is unsaid.
+fn manners_plainly(table: &toml::Table) -> Result<String, Unsaid> {
+    let unsaid = |part: &str| Unsaid::of(format!("parts {part}"));
+    let mut parts = Vec::new();
+    if let Some(most) = table.get("most_a_day") {
+        parts.push(
+            match most.as_integer().ok_or_else(|| unsaid("most_a_day"))? {
+                1 => "once a day".to_owned(),
+                // Past [`mannered`]'s bound only in a shape it couldn't
+                // set: unsaid, so the repair writes it plainly.
+                most @ 2..=6 => format!("at most {most} times a day"),
+                _ => return Err(unsaid("most_a_day")),
+            },
+        );
+    }
+    if let Some(budget) = table.get("budget") {
+        let group = budget.get("group").and_then(toml::Value::as_str);
+        let per_hour = budget.get("per_hour").and_then(toml::Value::as_integer);
+        let others = budget
+            .as_table()
+            .is_some_and(|budget| budget.keys().all(|key| key == "group" || key == "per_hour"));
+        parts.push(match (group, per_hour, others) {
+            (Some(MANNERS_GROUP), Some(1), true) => {
+                "one an hour with the lamp's other nudges".to_owned()
+            }
+            (Some(MANNERS_GROUP), Some(2), true) => {
+                "two an hour with the lamp's other nudges".to_owned()
+            }
+            _ => return Err(unsaid("budget")),
+        });
+    }
+    let hours = |part: &str| -> Result<Option<(String, String)>, Unsaid> {
+        let Some(hours) = table.get(part) else {
+            return Ok(None);
+        };
+        let at = |key: &str| {
+            hours
+                .get(key)
+                .and_then(toml::Value::as_str)
+                .filter(|at| {
+                    at.len() == 5
+                        && at.as_bytes()[2] == b':'
+                        && at.replacen(':', "", 1).chars().all(|c| c.is_ascii_digit())
+                })
+                .map(str::to_owned)
+        };
+        match (at("from"), at("to")) {
+            (Some(from), Some(to)) => Ok(Some((from, to))),
+            _ => Err(unsaid(part)),
+        }
+    };
+    if let Some((from, to)) = hours("active")? {
+        parts.push(format!("only from {from} to {to}"));
+    }
+    if let Some((from, to)) = hours("quiet")? {
+        parts.push(format!("never from {from} to {to}"));
+    }
+    if let Some(rest) = table.get("rest") {
+        let ignored = rest
+            .get("after_ignored")
+            .and_then(toml::Value::as_integer)
+            .ok_or_else(|| unsaid("rest"))?;
+        parts.push(match ignored {
+            1 => "rests till morning if ignored once".to_owned(),
+            2 => "rests till morning if ignored twice".to_owned(),
+            3 => "rests till morning if ignored 3 times".to_owned(),
+            _ => return Err(unsaid("rest")),
+        });
+    }
+    let said = match parts.as_slice() {
+        [] => format!("{MANNERS_BEGIN}."),
+        [one] => format!("{MANNERS_BEGIN}, {one}."),
+        [rest @ .., last] => format!("{MANNERS_BEGIN}, {}, and {last}.", rest.join(", ")),
+    };
+    if said.chars().count() > MOST_MANNERS_CHARS {
+        return Err(unsaid("of its manners, too long"));
+    }
     Ok(said)
 }
 
@@ -1598,7 +1907,7 @@ fn ask_plainly(table: &toml::Table) -> Result<&'static str, Unsaid> {
 }
 
 /// What a made skill reaches beyond the lamp, or sees and hears, named
-/// after what it does (#6066, the lead's principle: said back before it goes
+/// after what it does (#6066, the first builder's rule: said back before it goes
 /// on): ", using the camera", ", listening with the microphone", ", and it
 /// may send a message to your phone". From its `[permissions]`, so a grant
 /// is named whether or not a step uses it.
@@ -1624,6 +1933,10 @@ fn reaches_plainly(table: &toml::Table) -> String {
     }
     if listens {
         said.push_str(", listening with the microphone");
+    }
+    // Known faces or who is at the lamp (Thirteen's P3 on #6103).
+    if given("known_faces") || given("who") {
+        said.push_str(", knowing who is in view");
     }
     if given("messages") {
         said.push_str(", and it may send a message to your phone");
@@ -3305,8 +3618,20 @@ pub fn on_line(made: &Made) -> String {
     } else {
         format!(", using {uses}")
     };
-    format!("I made {name}, and it's on: {does}{using}.")
+    // What it uses goes with what it does, before how often it starts on
+    // its own (#6066 (a)), its own sentence.
+    match does.split_once(MANNERS_BEGIN) {
+        Some((what, manners)) => format!(
+            "I made {name}, and it's on: {}{using}. {}{manners}.",
+            what.trim_end_matches('.'),
+            MANNERS_BEGIN.trim_start()
+        ),
+        None => format!("I made {name}, and it's on: {does}{using}."),
+    }
 }
+
+/// How [`manners_plainly`]'s sentence begins.
+const MANNERS_BEGIN: &str = " It starts on its own";
 
 /// What the voice's model is told to say of a made skill: `line`'s
 /// content in the language of the conversation, every part of it (what it
@@ -3528,6 +3853,12 @@ fn cut_chars(text: &str, most: usize) -> String {
 mod tests {
     use super::*;
 
+    /// What a made skill does, as [`plainly`] says it, before how often it
+    /// starts on its own.
+    fn does(said: &str) -> &str {
+        said.split(MANNERS_BEGIN).next().unwrap_or(said)
+    }
+
     const TOML: &str = r#"kind = "installable"
 version = "1.0.0"
 needs = ["light"]
@@ -3692,7 +4023,7 @@ light = { dim = 1 }
     #[test]
     fn a_read_skill_is_held_to_one_service_read_and_said_with_its_condition() {
         let (_, uses) = capped_with(READ_TOML, true).unwrap();
-        assert_eq!(uses.reads.as_deref(), Some("google_calendar"));
+        assert_eq!(uses.reads, ["google_calendar"]);
         assert!(uses.speak);
         assert_eq!(
             uses.spoken(),
@@ -3727,11 +4058,11 @@ light = { dim = 1 }
                 "service = \"google_drive\", what = \"files\", query = \"taxes\"",
             );
         let (_, uses) = capped_with(&drive, true).unwrap();
-        assert_eq!(uses.reads.as_deref(), Some("google_drive"));
+        assert_eq!(uses.reads, ["google_drive"]);
         assert!(uses.spoken().contains("reading your Google Drive"));
         let said = plainly_with(&drive, true).unwrap();
         assert!(
-            said.ends_with(
+            does(&said).ends_with(
                 "it reads you Google Drive's files: how many, then each name, never the text."
             ),
             "{said}"
@@ -3770,7 +4101,7 @@ light = { dim = 1 }
         assert_eq!(
             plainly_with(READ_TOML, true).unwrap(),
             "When the lamp goes quiet, between 21:00 and 21:30, when you're alone with the lamp, \
-             it reads you tomorrow's Google Calendar: how many events, then each time and title."
+             it reads you tomorrow's Google Calendar: how many events, then each time and title. It starts on its own."
         );
         assert!(plainly_with(READ_TOML, false).is_err());
         let mail = READ_TOML
@@ -3781,7 +4112,7 @@ light = { dim = 1 }
             );
         let said = plainly_with(&mail, true).unwrap();
         assert!(
-            said.ends_with("each sender and subject, never the text."),
+            does(&said).ends_with("each sender and subject, never the text."),
             "{said}"
         );
         // The longest trigger's words still fit, said whole.
@@ -3853,7 +4184,7 @@ light = { dim = 1 }
                 body: false,
                 topics: vec!["voice/state".into()],
                 speak: false,
-                reads: None,
+                reads: Vec::new(),
                 ..Uses::default()
             }
         );
@@ -3921,7 +4252,7 @@ light = { dim = 1 }
         ] {
             let text = TOML.replace("policy = \"nudge\"", &format!("policy = \"{policy}\""));
             assert!(capped(&text).is_ok(), "{policy}");
-            assert!(plainly(&text).unwrap().ends_with(said), "{policy}");
+            assert!(does(&plainly(&text).unwrap()).ends_with(said), "{policy}");
         }
         let unversioned = TOML.replace("version = \"1.0.0\"\n", "");
         assert!(capped(&unversioned).unwrap_err().0.contains("version"));
@@ -3965,7 +4296,7 @@ say = { text = "Welcome back!" }
     fn a_made_skill_may_say_its_exact_words() {
         for reads in [false, true] {
             let (_, uses) = capped_with(HELLO, reads).unwrap();
-            assert!(uses.speak && !uses.light && uses.reads.is_none());
+            assert!(uses.speak && !uses.light && uses.reads.is_empty());
             assert_eq!(
                 uses.spoken(),
                 "its voice and whether someone is at the desk"
@@ -3973,7 +4304,7 @@ say = { text = "Welcome back!" }
             assert_eq!(
                 plainly_with(HELLO, reads).unwrap(),
                 "When someone has been at the desk for 5 seconds, it says “Welcome back!”, at \
-                 most once an hour."
+                 most once an hour. It starts on its own."
             );
         }
         // Two short sentences, a comma and "it's", in any language, are
@@ -4005,7 +4336,7 @@ say = { text = "Welcome back!" }
         assert_eq!(
             plainly(&both).unwrap(),
             "When someone has been at the desk for 5 seconds, it glows warm at level 3 for 20 \
-             seconds, then nods, then says “Welcome back!”, at most once an hour."
+             seconds, then nods, then says “Welcome back!”, at most once an hour. It starts on its own."
         );
     }
 
@@ -4086,7 +4417,7 @@ say = { text = "Welcome back!" }
         ] {
             let text = HELLO.replace("speak = true\n", &format!("speak = true\n{wider}\n"));
             assert!(capped(&text).is_ok(), "{wider}");
-            assert!(plainly(&text).unwrap().ends_with(named), "{wider}");
+            assert!(does(&plainly(&text).unwrap()).ends_with(named), "{wider}");
         }
     }
 
@@ -4129,13 +4460,12 @@ say = { text = "Welcome back!" }
             }
         }
         assert!(
-            plainly(&paced(&HELLO.replace("cooldown = \"1h\"\n", "")))
-                .unwrap()
+            does(&plainly(&paced(&HELLO.replace("cooldown = \"1h\"\n", ""))).unwrap())
                 .ends_with("at most once an hour.")
         );
         // A skill that never speaks is given back as it came.
-        assert_eq!(paced(TOML), TOML);
-        assert_eq!(paced(HELLO), HELLO);
+        assert_eq!(say_paced(TOML), TOML);
+        assert_eq!(say_paced(HELLO), HELLO);
         let resting = HELLO
             .replace("topics = [\"room/presence\"]", "topics = [\"voice/state\"]")
             .replace(
@@ -4175,16 +4505,28 @@ say = { text = "Welcome back!" }
                         "{text}"
                     );
                     capped(&paced).unwrap();
+                    // The night kept quiet unless it runs within 08-22.
+                    let night = if from < "08:00" {
+                        "never from 22:00 to 08:00, "
+                    } else {
+                        ""
+                    };
                     assert_eq!(
                         plainly(&paced).unwrap(),
                         format!(
                             "When the lamp goes quiet, between {from} and {to}, it says \
-                             “Welcome back!”, at most once an hour."
+                             “Welcome back!”, at most once an hour. It starts on its own, at \
+                             most 3 times a day, one an hour with the lamp's other nudges, \
+                             {night}and rests till morning if ignored twice."
                         )
                     );
                 }
                 None => {
-                    assert_eq!(paced, text, "an all-night window is left for the cap");
+                    assert_eq!(
+                        say_paced(&text),
+                        text,
+                        "an all-night window is left for the cap"
+                    );
                     let refused = capped(&paced).unwrap_err();
                     assert!(refused.0.contains("drop its say step"), "{}", refused.0);
                 }
@@ -4200,11 +4542,11 @@ say = { text = "Welcome back!" }
         let hum = HELLO.replace("say = { text = \"Welcome back!\" }", "cue = \"hum\"");
         for reads in [false, true] {
             let (_, uses) = capped_with(&hum, reads).unwrap();
-            assert!(uses.speak && !uses.light && uses.reads.is_none());
+            assert!(uses.speak && !uses.light && uses.reads.is_empty());
             assert_eq!(
                 plainly_with(&hum, reads).unwrap(),
                 "When someone has been at the desk for 5 seconds, it hums softly, at most once \
-                 an hour."
+                 an hour. It starts on its own."
             );
         }
         let both = hum
@@ -4221,7 +4563,7 @@ say = { text = "Welcome back!" }
         assert_eq!(
             plainly(&both).unwrap(),
             "When someone has been at the desk for 5 seconds, it glows warm at level 3 for 20 \
-             seconds, then nods, then hums softly, at most once an hour."
+             seconds, then nods, then hums softly, at most once an hour. It starts on its own."
         );
         // Paced as a say is (#6062): a missing cooldown is set to an hour.
         let unpaced = hum.replace("cooldown = \"1h\"\n", "");
@@ -4357,12 +4699,12 @@ say = { text = "Welcome back!" }
         assert_eq!(
             plainly(&good_night).unwrap(),
             "When the lamp has been quiet for a minute, between 22:00 and 22:30, it dims the \
-             light a step, at most once an hour."
+             light a step, at most once an hour. It starts on its own."
         );
         assert_eq!(
             plainly(TOML).unwrap(),
             "When the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at \
-             most once every 12 hours."
+             most once every 12 hours. It starts on its own."
         );
         let back = r#"[trigger]
 topic = "room/presence"
@@ -4380,7 +4722,7 @@ body = { gesture = "nod" }
         assert_eq!(
             plainly(back).unwrap(),
             "When someone has been at the desk for 5 seconds, it glows cyan at level 3 for 20 \
-             seconds, then nods, at most once an hour."
+             seconds, then nods, at most once an hour. It starts on its own."
         );
         let left = back
             .replace(
@@ -4477,13 +4819,27 @@ body = { gesture = "nod" }
             "parts while",
             false,
         );
+        // The manners a person asked for are said since #6066 (a); one in
+        // another shape is unsaid.
+        assert!(
+            plainly(&format!(
+                "{TOML}\n[quiet]\nfrom = \"21:00\"\nto = \"08:00\"\n"
+            ))
+            .unwrap()
+            .ends_with(" It starts on its own, never from 21:00 to 08:00.")
+        );
+        assert!(
+            plainly(&TOML.replace("version = ", "most_a_day = 1\nversion = "))
+                .unwrap()
+                .ends_with(" It starts on its own, once a day.")
+        );
         refused(
-            &format!("{TOML}\n[quiet]\nfrom = \"21:00\"\nto = \"08:00\"\n"),
+            &format!("{TOML}\n[quiet]\nfrom = \"9 pm\"\nto = \"08:00\"\n"),
             "parts quiet",
             false,
         );
         refused(
-            &TOML.replace("version = ", "most_a_day = 1\nversion = "),
+            &TOML.replace("version = ", "most_a_day = \"3\"\nversion = "),
             "parts most_a_day",
             false,
         );
@@ -4597,7 +4953,7 @@ light = { colour = "green", level = 3, for = "20s" }
         assert_eq!(
             plainly_with(&fixed, false).unwrap(),
             "When someone has been back at the desk for 3 seconds, after it was empty for 5 \
-             minutes, it glows green at level 3 for 20 seconds, at most once every 20 minutes."
+             minutes, it glows green at level 3 for 20 seconds, at most once every 20 minutes. It starts on its own."
         );
     }
 
@@ -4622,7 +4978,11 @@ light = { colour = "green", level = 3, for = "20s" }
         let kept_and_said = |trigger: &str, step: &str, said: &str| {
             let text = made_with(trigger, step);
             assert!(capped_with(&text, false).is_ok(), "{text}");
-            assert_eq!(plainly_with(&text, false).unwrap(), said, "{step}");
+            assert_eq!(
+                plainly_with(&text, false).unwrap(),
+                format!("{said} It starts on its own."),
+                "{step}"
+            );
         };
         let pet = "topic = \"controls/pet\"\nfield = \"ended\"\nequals = false\nrearm = \"ends\"\n";
         let air = "topic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1200\nfor = \"10m\"\n";
@@ -4688,19 +5048,20 @@ light = { colour = "green", level = 3, for = "20s" }
         assert!(capped_with(&camera, false).unwrap().1.camera);
         assert_eq!(
             plainly_with(&camera, false).unwrap(),
-            "When someone pats its head, it nods, using the camera."
+            "When someone pats its head, it nods, using the camera. It starts on its own."
         );
         let looks = camera.replace("body = { gesture = \"nod\" }", "look = true");
         assert_eq!(
             plainly_with(&looks, false).unwrap(),
-            "When someone pats its head, it takes a look with the camera."
+            "When someone pats its head, it takes a look with the camera. It starts on its own."
         );
         let sends = made_with(pet, "body = { gesture = \"nod\" }")
             .replace("body = true\n", "body = true\nmessages = true\n");
         assert!(capped_with(&sends, false).unwrap().1.messages);
         assert_eq!(
             plainly_with(&sends, false).unwrap(),
-            "When someone pats its head, it nods, and it may send a message to your phone."
+            "When someone pats its head, it nods, and it may send a message to your phone. It starts \
+             on its own."
         );
         // A step no runtime has yet: a send, a move of its own. Said as
         // what the lamp can't do yet, before the check, never repaired.
@@ -4719,6 +5080,176 @@ light = { colour = "green", level = 3, for = "20s" }
         }
     }
 
+    /// #6066 (a), the first builder's review: a made skill that starts
+    /// itself is given the nudges' manners, never refused for lacking
+    /// them; the say-back names that it starts on its own and how often. A
+    /// grant no step uses is dropped (App Only's P2 on #6103). A skill a
+    /// tool starts is left as it came.
+    #[test]
+    fn a_self_starting_made_skill_is_given_manners_not_refused() {
+        let pet = "topic = \"controls/pet\"\nfield = \"ended\"\nequals = false\nrearm = \"ends\"\n";
+        let wide = made_with(pet, "body = { gesture = \"nod\" }").replace(
+            "body = true\n",
+            "body = true\ncamera = true\nmessages = true\nknown_faces = true\n",
+        );
+        let mannered = paced(&wide);
+        let table: toml::Table = toml::from_str(&mannered).unwrap();
+        assert_eq!(table["most_a_day"].as_integer(), Some(3));
+        assert_eq!(table["quiet"]["from"].as_str(), Some("22:00"));
+        assert_eq!(table["quiet"]["to"].as_str(), Some("08:00"));
+        assert_eq!(table["budget"]["group"].as_str(), Some(MANNERS_GROUP));
+        assert_eq!(table["budget"]["per_hour"].as_integer(), Some(1));
+        assert_eq!(table["rest"]["after_ignored"].as_integer(), Some(2));
+        // No step sends or takes the picture: both grants dropped, not
+        // refused; knowing who is in view said (Thirteen's P3).
+        let granted = table["permissions"].as_table().unwrap();
+        assert!(!granted.contains_key("camera") && !granted.contains_key("messages"));
+        let (_, uses) = capped_with(&mannered, false).unwrap();
+        assert!(!uses.camera && !uses.messages);
+        assert_eq!(
+            plainly_with(&mannered, false).unwrap(),
+            "When someone pats its head, it nods, knowing who is in view. It starts on its own, \
+             at most 3 times a day, one an hour with the lamp's other nudges, never from 22:00 \
+             to 08:00, and rests till morning if ignored twice."
+        );
+        // Set once: pacing again changes nothing.
+        assert_eq!(paced(&mannered), mannered);
+        // Started by its tool alone, it isn't started by the lamp.
+        let tool = "tool = \"dim_now\"\n[[do]]\nlight = { dim = 1 }\n";
+        assert_eq!(super::mannered(tool), tool);
+    }
+
+    /// Thirteen's and App Only's P2 on #6103: each manner the model writes
+    /// is clamped to its bound, never refused, and said as set.
+    #[test]
+    fn a_made_skills_manners_are_clamped_to_their_bounds() {
+        let pet = "topic = \"controls/pet\"\nfield = \"ended\"\nequals = false\nrearm = \"ends\"\n";
+        let nod = made_with(pet, "body = { gesture = \"nod\" }");
+        let set = |head: &str, tail: &str| {
+            let text = paced(&format!("{head}{nod}{tail}"));
+            capped_with(&text, false).unwrap();
+            (
+                toml::from_str::<toml::Table>(&text).unwrap(),
+                plainly_with(&text, false).unwrap(),
+            )
+        };
+        // most_a_day: 1 to 6.
+        for (asked, kept, said) in [
+            (50, 6, "at most 6 times a day"),
+            (6, 6, "at most 6 times a day"),
+            (0, 1, "once a day"),
+            (-3, 1, "once a day"),
+        ] {
+            let (table, plain) = set(&format!("most_a_day = {asked}\n"), "");
+            assert_eq!(table["most_a_day"].as_integer(), Some(kept), "{asked}");
+            assert!(plain.contains(said), "{plain}");
+        }
+        // [budget]: always the nudges' group, 1 or 2 an hour.
+        for (asked, kept, said) in [
+            (
+                "group = \"mine\"\nper_hour = 30\n",
+                2,
+                "two an hour with the lamp's other nudges",
+            ),
+            (
+                "group = \"wellbeing\"\nper_hour = 0\n",
+                1,
+                "one an hour with the lamp's other nudges",
+            ),
+            (
+                "group = \"mine\"\nper_hour = 1\ngap = \"5m\"\n",
+                1,
+                "one an hour",
+            ),
+        ] {
+            let (table, plain) = set("", &format!("\n[budget]\n{asked}"));
+            assert_eq!(table["budget"]["group"].as_str(), Some(MANNERS_GROUP));
+            assert_eq!(
+                table["budget"]["per_hour"].as_integer(),
+                Some(kept),
+                "{asked}"
+            );
+            assert!(plain.contains(said), "{plain}");
+        }
+        // [rest] after_ignored: 1 to 3, 0 or less is 1.
+        for (asked, kept, said) in [
+            (1000, 3, "ignored 3 times"),
+            (0, 1, "ignored once"),
+            (-1, 1, "ignored once"),
+        ] {
+            let (table, plain) = set("", &format!("\n[rest]\nafter_ignored = {asked}\n"));
+            assert_eq!(
+                table["rest"]["after_ignored"].as_integer(),
+                Some(kept),
+                "{asked}"
+            );
+            assert!(plain.contains(said), "{plain}");
+        }
+        // [quiet] the nudges' night, whatever was written.
+        let (table, plain) = set("", "\n[quiet]\nfrom = \"03:00\"\nto = \"04:00\"\n");
+        assert_eq!(table["quiet"]["from"].as_str(), Some("22:00"));
+        assert!(plain.contains("never from 22:00 to 08:00"), "{plain}");
+    }
+
+    /// Thirteen's P2 on #6103: the night stays quiet unless the trigger runs
+    /// only within 08:00-22:00; an all-day window keeps it.
+    #[test]
+    fn the_night_stays_quiet_unless_its_window_is_within_the_day() {
+        let pet = "topic = \"controls/pet\"\nfield = \"ended\"\nequals = false\nrearm = \"ends\"\n";
+        let quiet = |during: &str| {
+            let text = paced(&made_with(
+                &format!("{pet}during = {{ {during} }}\n"),
+                "body = { gesture = \"nod\" }",
+            ));
+            toml::from_str::<toml::Table>(&text)
+                .unwrap()
+                .contains_key("quiet")
+        };
+        assert!(quiet("from = \"00:00\", to = \"23:59\""));
+        assert!(quiet("from = \"21:00\", to = \"23:00\""));
+        assert!(quiet("from = \"07:00\", to = \"09:00\""));
+        assert!(quiet("from = \"20:00\", to = \"09:00\""));
+        assert!(!quiet("from = \"08:00\", to = \"22:00\""));
+        assert!(!quiet("from = \"12:00\", to = \"13:00\""));
+    }
+
+    /// A skill added from a file keeps the cap from before #6066 (App
+    /// Only's P2 on #6103), and every service a made skill reads is asked
+    /// to be linked (Thirteen's P3).
+    #[test]
+    fn a_skill_from_a_file_keeps_the_old_cap_and_every_read_is_asked_for() {
+        let tool = "kind = \"installable\"\nversion = \"1.0.0\"\ntool = \"glow_back\"\n\
+                    [permissions]\nlight = true\n[[do]]\nlight = { colour = \"cyan\" }\n";
+        assert!(capped_added(tool).is_ok());
+        for wider in [
+            "camera = true",
+            "messages = true",
+            "known_faces = true",
+            "who = true",
+        ] {
+            let text = tool.replace("light = true\n", &format!("light = true\n{wider}\n"));
+            assert!(
+                capped_added(&text)
+                    .unwrap_err()
+                    .0
+                    .contains("more than the light and the head"),
+                "{wider}"
+            );
+        }
+        let both = READ_TOML.replace(
+            "google_calendar = \"read\"",
+            "google_calendar = \"read\", google_drive = \"read\"",
+        );
+        let (_, uses) = capped_with(&both, true).unwrap();
+        assert_eq!(uses.reads.len(), 2);
+        assert_eq!(Uses::of_json(&uses.json()), uses);
+        let needs = needs_link(&uses, || Some(vec!["google_drive".into()])).unwrap();
+        assert_eq!(needs.len(), 1);
+        assert_eq!(needs[0]["code"], "google_calendar");
+        let needs = needs_link(&uses, || Some(Vec::new())).unwrap();
+        assert_eq!(needs.len(), 2);
+    }
+
     /// A face coming into view (never whose), someone at the desk getting
     /// up, and a time each day are said as lamp-skills runs them, and kept.
     #[test]
@@ -4726,7 +5257,10 @@ light = { colour = "green", level = 3, for = "20s" }
         let kept_and_said = |trigger: &str, step: &str, said: &str| {
             let text = made_with(trigger, step);
             assert!(capped_with(&text, false).is_ok(), "{text}");
-            assert_eq!(plainly_with(&text, false).unwrap(), said);
+            assert_eq!(
+                plainly_with(&text, false).unwrap(),
+                format!("{said} It starts on its own.")
+            );
         };
         let face = "topic = \"humans/faces/tracked\"\nwhen = \"appears\"\n";
         kept_and_said(
@@ -4798,7 +5332,9 @@ light = { colour = "green", level = 3, for = "20s" }
         assert_eq!(
             plainly_with(&paced(&made_with(face, greeting)), false).unwrap(),
             "When the lamp sees a face, after seeing none for a minute, it lifts its head and \
-             arm in a greeting."
+             arm in a greeting. It starts on its own, at most 3 times a day, one an hour with \
+             the lamp's other nudges, never from 22:00 to 08:00, and rests till morning if \
+             ignored twice."
         );
         // `rearm` alone, or `"present"` beside it: appears, so the minute
         // counts.
@@ -4845,13 +5381,15 @@ light = { colour = "green", level = 3, for = "20s" }
             assert!(table["trigger"].get("absent_for").is_none());
             capped_with(&paced(&text), false).unwrap();
         }
-        // Other triggers, silent, are given back as they came.
+        // Other triggers, silent, keep their own floors: only the manners
+        // are set, the night kept quiet around a time past 22:00.
         let clock = made_with(
             "topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
              during = { from = \"22:00\", to = \"22:01\" }\n",
             "light = { dim = 1 }",
         );
-        assert_eq!(paced(&clock), clock);
+        assert_eq!(say_paced(&clock), clock);
+        assert!(paced(&clock).contains("[quiet]"));
     }
 
     /// What lamp-skills would run otherwise than said, or that reads who
@@ -4947,7 +5485,7 @@ light = { colour = "green", level = 3, for = "20s" }
         ] {
             assert_eq!(
                 said(gesture).unwrap(),
-                format!("When someone comes to the desk, it {saying}.")
+                format!("When someone comes to the desk, it {saying}. It starts on its own.")
             );
         }
         for refused in ["moonwalk", "idle", "dip", "tilt_left", "Nod"] {
@@ -4981,16 +5519,16 @@ light = { colour = "green", level = 3, for = "20s" }
         assert_eq!(
             plainly(&back("when = \"appears\"\nabsent_for = \"10m\"\n")).unwrap(),
             "When someone comes back to the desk after it was empty for 10 minutes, it glows \
-             green at level 2 for 20 seconds."
+             green at level 2 for 20 seconds. It starts on its own."
         );
         assert_eq!(
             plainly(&back("when = \"appears\"\n")).unwrap(),
-            "When someone comes to the desk, it glows green at level 2 for 20 seconds."
+            "When someone comes to the desk, it glows green at level 2 for 20 seconds. It starts on its own."
         );
         assert_eq!(
             plainly(&back("when = \"present\"\nfor = \"5s\"\n")).unwrap(),
             "When someone has been at the desk for 5 seconds, it glows green at level 2 for 20 \
-             seconds."
+             seconds. It starts on its own."
         );
         let part = |toml: &str| match plainly_with(toml, false) {
             Err(Refused(_, Some(lines))) => lines,
@@ -5410,7 +5948,7 @@ light = { colour = "green", level = 3, for = "20s" }
                 body: false,
                 topics: vec!["room/presence".into()],
                 speak: false,
-                reads: None,
+                reads: Vec::new(),
                 ..Uses::default()
             },
             package,
@@ -5959,7 +6497,7 @@ light = { colour = "green", level = 3, for = "20s" }
     fn a_made_skill_needs_linked_only_the_service_it_reads_not_linked() {
         let reads = |code: &str| Uses {
             speak: true,
-            reads: Some(code.to_owned()),
+            reads: vec![code.to_owned()],
             ..Default::default()
         };
         let linked = |codes: &[&str]| Some(codes.iter().map(|code| (*code).to_owned()).collect());
@@ -6010,7 +6548,7 @@ light = { colour = "green", level = 3, for = "20s" }
             description: "Reads your latest mail at eight.".into(),
             uses: Uses {
                 speak: true,
-                reads: Some("gmail".into()),
+                reads: vec!["gmail".into()],
                 ..Default::default()
             },
             package: "morning-mail.tar".into(),

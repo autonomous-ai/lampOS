@@ -142,11 +142,14 @@ fn system_with(reads: bool) -> String {
          step cue = \"hum\", paced as a say, in place of a say; it has no other sound and no \
          sound file. When it runs is one \
          [trigger] table (never [[trigger]]; coming to the desk is room/presence, never the \
-         faces): {triggers} A body step is one gesture, one of: {gestures}. A skill can't yet \
+         faces): {triggers} A body step is one gesture, one of: {gestures}. Set none of \
+         most_a_day, [quiet], [budget] or [rest] unless the request asks for more in its own \
+         words: the lamp sets them. A skill can't yet \
          hear what is said, know who someone is, send a message or write to a service: a \
          request that needs one, or anything else no step or trigger here does, is answered \
          with one line and no blocks: {cannot} then one short sentence said to the person, \
-         beginning \"{cant_yet}\" and naming what in plain words, never a rule, ending with \
+         beginning \"{cant_yet}\" and naming what in plain words (\"{cant_yet} sending a \
+         message.\"), never a rule, ending with \
          what to ask instead when there is one; \
          for a reminder at a time or every so often: \"Ask me for a reminder instead, like 'remind \
          me every hour to stand up'.\" Never stand something \
@@ -1041,7 +1044,7 @@ light = { dim = 1 }
             format!(
                 "{} Ask nothing about putting it on.",
                 made_skill::in_their_language(
-                    "I made evening dim, and it's on: when the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most once every 12 hours, using its light and whether it is talking."
+                    "I made evening dim, and it's on: when the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most once every 12 hours, using its light and whether it is talking. It starts on its own, at most 3 times a day, one an hour with the lamp's other nudges, never from 22:00 to 08:00, and rests till morning if ignored twice."
                 )
             )
         );
@@ -1236,7 +1239,9 @@ light = { dim = 1 }
         assert_eq!(
             told["description"],
             "When the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at \
-             most once every 12 hours. The maker notes what it couldn't do: dimming slowly.",
+             most once every 12 hours. It starts on its own, at most 3 times a day, one an hour \
+             with the lamp's other nudges, never from 22:00 to 08:00, and rests till morning if ignored twice. The maker \
+             notes what it couldn't do: dimming slowly.",
             "{told}"
         );
         assert!(!told.to_string().contains("10 pm"), "{told}");
@@ -1667,7 +1672,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             description: "Reads your latest mail at eight.".into(),
             uses: made_skill::Uses {
                 speak: true,
-                reads: reads.map(str::to_owned),
+                reads: reads.map(str::to_owned).into_iter().collect(),
                 ..Default::default()
             },
             package: PathBuf::from("morning-mail.tar"),
