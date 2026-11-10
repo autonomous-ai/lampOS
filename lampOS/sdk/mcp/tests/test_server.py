@@ -694,6 +694,26 @@ def test_an_action_handed_to_a_part_ends_at_once(tmp_path):
     run(go())
 
 
+def test_every_time_argument_says_its_unit_in_the_tool_description(tmp_path):
+    """The desk-app friction log, 10 Nov: the tools mix `for_ms`, `seconds`, `wait_s` and `timeout_s`, and an agent
+    guessed `seconds` for a light. Each such tool says its unit, so a guess is one read away."""
+
+    async def go():
+        async with connected(tmp_path) as (_, _, session):
+            tools = {t.name: t for t in (await session.list_tools()).tools}
+            for name, argument, unit in (
+                ("lamp_light", "for_ms", "milliseconds"),
+                ("lamp_ring", "for_ms", "milliseconds"),
+                ("lamp_events", "wait_s", "seconds"),
+                ("lamp_wait_for", "timeout_s", "seconds"),
+                ("lamp_follow_hand", "seconds", "seconds"),
+            ):
+                if name in tools:  # a tool that is offered only with its grant
+                    assert argument in tools[name].description and unit in tools[name].description, name
+
+    run(go())
+
+
 def test_a_lamp_without_look_is_not_promised_who_is_there(tmp_path):
     """blue's P3 on #3802."""
 
