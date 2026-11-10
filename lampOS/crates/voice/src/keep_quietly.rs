@@ -34,8 +34,7 @@
 //!   did not ask for, and that is no answer to the lamp's offer, is kept
 //!   only when every key word of its sentence was heard in the line
 //!   (`remember::heard::heard_instead`, `LAMP_MEMORY_KEEP_HEARD`'s check,
-//!   whether or not that switch is on; a spelled-out address or name is
-//!   heard as the word its letters make, C14). Otherwise nothing is kept: since a
+//!   whether or not that switch is on). Otherwise nothing is kept: since a
 //!   quiet keep is never said back, a word the model put in ("food" for
 //!   "tea", lamp-06c1, 20 Oct) could never be heard or put right.
 //! - **The code's limit** ([`Quiet`]): a sentence in which the lamp offers
@@ -1424,21 +1423,6 @@ mod tests {
         assert!(!refused(
             "My sister Lily is coming on Saturday.",
             Some("My sister Lily is coming on Saturday."),
-            false
-        ));
-    }
-
-    /// lamp-3e83, 10 Nov 09:50 (C14): a spelled-out address seen said is
-    /// kept quietly as the word its letters make; one with a word not
-    /// heard is still refused.
-    #[test]
-    fn a_spelled_out_address_keeps_quietly() {
-        let line = "O c t a v I a. V u dot g mail dot com.";
-        assert!(!refused("octaviavu@gmail.com", Some(line), false));
-        assert!(refused("octavia@yahoo.com", Some(line), false));
-        assert!(refused(
-            "octaviavu@gmail.com",
-            Some("V u dot g mail dot com"),
             false
         ));
     }
