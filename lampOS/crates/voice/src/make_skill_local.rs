@@ -312,22 +312,41 @@ pub fn make_kept(
     chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
     from: &str,
 ) -> Result<Made, Refused> {
+    let (made, line) = made_and_journaled(request, brief, keeping, chat, from);
+    eprintln!("{line}");
+    made
+}
+
+/// [`make_kept`]'s make, and the journal's line for it ([`kept_line`]).
+fn made_and_journaled(
+    request: &str,
+    brief: String,
+    keeping: &Keeping,
+    chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
+    from: &str,
+) -> (Result<Made, Refused>, String) {
     let began = std::time::Instant::now();
     let chat = Arc::new(chat);
-    let kept = |answer: Result<String, String>| match answer {
-        // The maker's own example is never kept: refused as the check
-        // refuses, so it goes back to the model once.
-        Ok(text) if is_example(&text) => {
-            eprintln!("lamp-voice: a skill made here: the model gave back the example");
-            Err(Refused(
-                "it gave back the lamp's own example, not what was asked".into(),
-                Some(EXAMPLE_GIVEN_BACK.into()),
-            ))
-        }
-        Ok(text) => made_skill::keep(&text, false, from, keeping),
-        Err(why) => {
-            eprintln!("lamp-voice: a skill made here: the model didn't answer: {why}");
-            Err(Refused("the lamp's model didn't answer".into(), None))
+    // Whether the last answer was the model's own `cannot:`: its reason is
+    // never journaled ([`kept_line`]).
+    let models_cannot = std::cell::Cell::new(false);
+    let kept = |answer: Result<String, String>| {
+        models_cannot.set(matches!(&answer, Ok(text) if made_skill::says_cannot(text)));
+        match answer {
+            // The maker's own example is never kept: refused as the check
+            // refuses, so it goes back to the model once.
+            Ok(text) if is_example(&text) => {
+                eprintln!("lamp-voice: a skill made here: the model gave back the example");
+                Err(Refused(
+                    "it gave back the lamp's own example, not what was asked".into(),
+                    Some(EXAMPLE_GIVEN_BACK.into()),
+                ))
+            }
+            Ok(text) => made_skill::keep(&text, false, from, keeping),
+            Err(why) => {
+                eprintln!("lamp-voice: a skill made here: the model didn't answer: {why}");
+                Err(Refused("the lamp's model didn't answer".into(), None))
+            }
         }
     };
     let mut made = kept(ask(Arc::clone(&chat), brief));
@@ -339,18 +358,24 @@ pub fn make_kept(
         eprintln!("lamp-voice: a skill made here: the check's lines go back to the model once");
         made = kept(ask(chat, repair));
     }
-    eprintln!("{}", kept_line(&made, began.elapsed().as_millis()));
-    made
+    let line = kept_line(&made, models_cannot.get(), began.elapsed().as_millis());
+    (made, line)
 }
 
 /// The journal's line for a make that took `ms`: kept, or not kept and
 /// why, in the lamp's own plain words ([`Refused`]'s first part, never the
 /// person's request, nor the check's lines with the model's files). On
 /// lamp-74ff an app make "wasn't kept in 1848 ms" and the journal never
-/// said why: it was only in the root-only `app.json` (#5977).
-fn kept_line(made: &Result<Made, Refused>, ms: u128) -> String {
+/// said why: it was only in the root-only `app.json` (#5977). The model's
+/// own `cannot:` reason (`models_cannot`) may echo the person's words, so
+/// only that it said so is journaled (Second's HOLD on #5985).
+fn kept_line(made: &Result<Made, Refused>, models_cannot: bool, ms: u128) -> String {
     match made {
         Ok(_) => format!("lamp-voice: a skill made here was kept in {ms} ms"),
+        Err(_) if models_cannot => format!(
+            "lamp-voice: a skill made here wasn't kept in {ms} ms: {}",
+            made_skill::MODELS_CANNOT_JOURNALED
+        ),
         Err(Refused(why, _)) => {
             format!("lamp-voice: a skill made here wasn't kept in {ms} ms: {why}")
         }
@@ -963,7 +988,7 @@ light = { dim = 1 }
             Some("skill.toml: unknown field `secret`".into()),
         ));
         assert_eq!(
-            kept_line(&refused, 1848),
+            kept_line(&refused, false, 1848),
             "lamp-voice: a skill made here wasn't kept in 1848 ms: it doesn't pass the lamp's check"
         );
         let (root, keeping) = keeping("journal");
@@ -976,7 +1001,7 @@ light = { dim = 1 }
             "local:1:1",
         );
         assert_eq!(served.join().unwrap(), 1);
-        let line = kept_line(&made, 12);
+        let line = kept_line(&made, false, 12);
         assert_eq!(line, "lamp-voice: a skill made here was kept in 12 ms");
         assert!(!line.contains("10 pm"), "{line}");
         let _ = std::fs::remove_dir_all(&root);
@@ -1019,6 +1044,38 @@ light = { dim = 1 }
         );
         assert_eq!(served.join().unwrap(), 1);
         assert!(made_skill::entries(&keeping.directory).is_empty());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Second's HOLD on #5985: the model's `cannot:` reason may echo the
+    /// person's words; it is told to the person in full, and the journal
+    /// says only that the model said no made skill can do it.
+    #[test]
+    fn the_models_cannot_reason_is_told_never_journaled() {
+        let (root, keeping) = keeping("cannot-journal");
+        let (url, served) = service(vec![(
+            200,
+            "cannot: a skill can't know when PRIVATE-DETAIL-7 calls you.".to_owned(),
+        )]);
+        let (made, line) = made_and_journaled(
+            "glow when PRIVATE-DETAIL-7 calls",
+            made_skill::brief("glow when PRIVATE-DETAIL-7 calls").unwrap(),
+            &keeping,
+            chat_at(url),
+            "local:1:1",
+        );
+        assert_eq!(served.join().unwrap(), 1);
+        let Err(Refused(why, _)) = &made else {
+            panic!("{made:?}")
+        };
+        assert!(why.contains("PRIVATE-DETAIL-7"), "told in full: {why}");
+        assert!(!line.contains("PRIVATE-DETAIL-7"), "{line}");
+        assert!(
+            line.ends_with(made_skill::MODELS_CANNOT_JOURNALED),
+            "{line}"
+        );
+        assert!(made_skill::says_cannot("Cannot: no."));
+        assert!(!made_skill::says_cannot("cannot: no.\n```toml\n```"));
         let _ = std::fs::remove_dir_all(&root);
     }
 
