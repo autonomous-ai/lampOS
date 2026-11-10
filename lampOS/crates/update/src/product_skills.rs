@@ -904,8 +904,8 @@ mod tests {
             run(&shipped_on, Some(&build_on), ""),
             (false, String::new())
         );
-        // A person turned it on (the app or a voice: lamp-skills' set, kept
-        // in ON): on.
+        // A person turned it on (the app's turn-on, kept in ON even when
+        // its file was already on): on.
         assert_eq!(
             run(&shipped_on, Some(&build_on), "x\n"),
             (true, "x\n".into())

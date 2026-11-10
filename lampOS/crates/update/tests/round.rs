@@ -2722,13 +2722,97 @@ fn the_apps_off_and_on_hold_through_a_round_and_a_restart() {
     build_with_product_skills(&mut lamp, 3, "voice 1", &checks, &product);
     assert_eq!(lamp.round(), Outcome::Switched(3), "{:?}", lamp.said);
     assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), dance_off);
-    assert_eq!(fs::read_to_string(state_dir.join("on")).unwrap(), "");
+    // Reminders' turn-on is the person's too, kept though its file is on.
+    assert_eq!(
+        fs::read_to_string(state_dir.join("on")).unwrap(),
+        "reminders\n"
+    );
     assert_eq!(
         fs::read_to_string(state_dir.join("off")).unwrap(),
         "dance\n"
     );
     let (running, off) = restarted(&lamp);
     assert_eq!((running, off), (names("reminders"), names("dance")));
+}
+
+/// #5744's readers: the app's off then on of a core skill the build shipped
+/// on is the person's choice, kept in `on` though its file never changed,
+/// so the next build that ships it off leaves it on. One no one touched
+/// goes off with that build. Off again in the app, it stays off.
+#[test]
+fn the_apps_off_then_on_outlives_the_next_build_shipping_it_off() {
+    let repo = |path: &str| {
+        fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../skills")
+                .join(path),
+        )
+        .unwrap()
+    };
+    let off = |text: &str| format!("{}{text}", lamp_update::install::OFF_LINE);
+    let (dance_on, reminders_on) = (repo("dance/skill.toml"), repo("reminders/skill.toml"));
+    let (dance_off, reminders_off) = (off(&dance_on), off(&reminders_on));
+    let (dance_md, reminders_md) = (repo("dance/SKILL.md"), repo("reminders/SKILL.md"));
+    let shipped_on = [
+        ("dance/skill.toml", dance_on.as_str()),
+        ("dance/SKILL.md", dance_md.as_str()),
+        ("reminders/skill.toml", reminders_on.as_str()),
+        ("reminders/SKILL.md", reminders_md.as_str()),
+    ];
+    let mut lamp = Lamp::new().with_skills(&skills_with_checks("1", ""), &[]);
+    for (path, text) in &shipped_on {
+        lamp.put_skill_file(path, text);
+    }
+    lamp.record_as_installs(&shipped_on);
+    let state_dir = lamp.root.join("var/lib/lampos-skills-state");
+    fs::create_dir_all(&state_dir).unwrap();
+    let names = |text: &str| -> Vec<String> { text.lines().map(str::to_owned).collect() };
+
+    assert_eq!(app_turns(&lamp, "off", "dance"), "turned dance off");
+    assert_eq!(app_turns(&lamp, "on", "dance"), "turned dance on");
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), dance_on);
+    assert_eq!(fs::read_to_string(state_dir.join("on")).unwrap(), "dance\n");
+
+    let product = bundle(&[
+        ("dance/skill.toml", dance_off.as_str()),
+        ("dance/SKILL.md", dance_md.as_str()),
+        ("reminders/skill.toml", reminders_off.as_str()),
+        ("reminders/SKILL.md", reminders_md.as_str()),
+    ]);
+    build_with_product_skills(
+        &mut lamp,
+        2,
+        "voice 1",
+        &skills_with_checks("2", ""),
+        &product,
+    );
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), dance_on);
+    assert_eq!(
+        lamp.skill_file("reminders/skill.toml").unwrap(),
+        reminders_off
+    );
+    assert_eq!(fs::read_to_string(state_dir.join("on")).unwrap(), "dance\n");
+    assert_eq!(restarted(&lamp), (names("dance"), vec![]));
+
+    // Off again in the app: off, out of `on`, and off through a round.
+    assert_eq!(app_turns(&lamp, "off", "dance"), "turned dance off");
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), dance_off);
+    assert_eq!(fs::read_to_string(state_dir.join("on")).unwrap(), "");
+    build_with_product_skills(
+        &mut lamp,
+        3,
+        "voice 1",
+        &skills_with_checks("3", ""),
+        &product,
+    );
+    assert_eq!(lamp.round(), Outcome::Switched(3), "{:?}", lamp.said);
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), dance_off);
+    assert_eq!(fs::read_to_string(state_dir.join("on")).unwrap(), "");
+    assert_eq!(
+        fs::read_to_string(state_dir.join("off")).unwrap(),
+        "dance\n"
+    );
 }
 
 /// The guard stays the net: a skill of the person's that the new
