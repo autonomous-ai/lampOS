@@ -4,7 +4,7 @@
 // on it. The twin, the SDK and lamp-mcp then see a lamp like any other.
 //
 //   node examples/twin/virtual-lamp.js [--lamp-sim PATH] [--bin-dir DIR] [--dir DIR]
-//        [--port N] [--twin-port N] [--glb PATH] [--camera=always] [--microphone] [--no-open]
+//        [--port N] [--twin-port N] [--glb PATH] [--camera=always] [--microphone] [--no-open] [--browser]
 //
 // --lamp-sim PATH   the lamp-sim binary (default: `lamp-sim` on the PATH)
 // --bin-dir DIR     where lamp-body and lamp-control are (default: beside lamp-sim)
@@ -12,12 +12,14 @@
 // --port N          the lamp's door, on 127.0.0.1 (default 7731)
 // --twin-port N     the twin's page (default 8737)
 // --glb PATH        the rigged CAD for the twin (default: the repository's, which needs `git lfs pull`)
+// --browser         open the default browser's tab, not a window of its own (the default is a
+//                   chromeless Chrome/Chromium/Edge window, the browser's own tab when none is installed)
 // It pairs a fresh keyring under DIR/sdk each start (the lamp makes a new
 // certificate then); to drive the lamp from your own program too, run it with
 // LAMPOS_HOME=DIR/sdk. Ctrl-C stops the twin and the lamp.
 import { spawn } from 'node:child_process';
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readSync, rmSync } from 'node:fs';
-import { createConnection } from 'node:net';
+import { createConnection, createServer } from 'node:net';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,7 +32,7 @@ export function parseArguments(args) {
   const out = { flags: [] };
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === '--no-open' || arg === '--microphone' || arg.startsWith('--camera=')) out.flags.push(arg);
+    if (arg === '--no-open' || arg === '--browser' || arg === '--microphone' || arg.startsWith('--camera=')) out.flags.push(arg);
     else if (arg.startsWith('--') && args[i + 1] !== undefined) out[arg.slice(2)] = args[++i];
     else throw new Error(`unknown argument ${arg}`);
   }
@@ -43,6 +45,13 @@ export function pairingFrom(text) {
   if (typeof given.code !== 'string' || typeof given.pin !== 'string') throw new Error('no pairing code in what lamp-sim printed');
   return { code: given.code, pin: given.pin };
 }
+
+// Whether nothing listens on `port` of 127.0.0.1 now.
+export const portFree = (port) => new Promise((resolve) => {
+  const probe = createServer();
+  probe.once('error', () => resolve(false));
+  probe.listen(port, '127.0.0.1', () => probe.close(() => resolve(true)));
+});
 
 async function listening(port, timeoutMs) {
   const until = Date.now() + timeoutMs;
@@ -67,9 +76,35 @@ function outputOf(program, args) {
   });
 }
 
-function openBrowser(url) {
+// A chromeless window (`--app`) when a Chromium-based browser is installed, else the default browser.
+const APP_BROWSERS = {
+  linux: ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser', 'microsoft-edge'],
+  darwin: ['Google Chrome', 'Chromium', 'Microsoft Edge'],
+  win32: ['chrome', 'msedge'],
+};
+
+export function appCommands(url, platform = process.platform) {
+  const flags = [`--app=${url}`, '--window-size=1100,720'];
+  const browsers = APP_BROWSERS[platform] ?? [];
+  if (platform === 'darwin') return browsers.map((name) => ['open', ['-na', name, '--args', ...flags]]);
+  if (platform === 'win32') return browsers.map((name) => ['cmd', ['/c', 'start', '', name, ...flags]]);
+  return browsers.map((name) => [name, flags]);
+}
+
+function spawned(program, args) {
+  return new Promise((resolve) => {
+    const child = spawn(program, args, { stdio: 'ignore', detached: true });
+    child.on('error', () => resolve(false));
+    // A program that is not there fails at once; one that is keeps running (or hands over and exits 0).
+    child.on('exit', (code) => resolve(code === 0));
+    setTimeout(() => { child.unref(); resolve(true); }, 800);
+  });
+}
+
+async function openBrowser(url, { window = true } = {}) {
+  if (window) for (const [program, args] of appCommands(url)) if (await spawned(program, args)) return;
   const [program, ...rest] = process.platform === 'darwin' ? ['open'] : process.platform === 'win32' ? ['cmd', '/c', 'start', ''] : ['xdg-open'];
-  try { spawn(program, [...rest, url], { stdio: 'ignore', detached: true }).on('error', () => {}).unref(); } catch { /* the URL is printed anyway */ }
+  await spawned(program, [...rest, url]);
 }
 
 // Whether `path` is a glTF file (a clone without `git lfs pull` has a pointer text in its place).
@@ -87,12 +122,16 @@ export async function start(options, log = console.log) {
   const dir = options.dir ?? join(homedir(), '.lampsim', 'virtual');
   const port = Number(options.port ?? 7731);
   const binDir = options['bin-dir'] ? ['--bin-dir', options['bin-dir']] : [];
+  // Both ports are taken before anything starts, so a busy one says so instead of ending in a stack.
+  for (const [what, number] of [['the lamp\'s door', port], ['the twin\'s page', Number(options['twin-port'] ?? 8737)]]) {
+    if (!(await portFree(number))) throw new Error(`${what} port ${number} is in use on 127.0.0.1: give another ${what.includes('door') ? '--port' : '--twin-port'}`);
+  }
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   chmodSync(dir, 0o700);
   const children = [];
   const stop = () => { for (const child of children) child.kill('SIGTERM'); };
   try {
-    const lamp = spawn(lampSim, ['run', dir, ...binDir, '--listen', `127.0.0.1:${port}`, ...options.flags.filter((f) => f !== '--no-open')], { stdio: ['ignore', 'inherit', 'inherit'] });
+    const lamp = spawn(lampSim, ['run', dir, ...binDir, '--listen', `127.0.0.1:${port}`, ...options.flags.filter((f) => f !== '--no-open' && f !== '--browser')], { stdio: ['ignore', 'inherit', 'inherit'] });
     children.push(lamp);
     const ended = new Promise((_, reject) => lamp.on('close', (code) => reject(new Error(`lamp-sim ended (${code})`))));
     ended.catch(() => {});
@@ -117,7 +156,7 @@ export async function start(options, log = console.log) {
       twin.on('close', (code) => reject(new Error(`the twin ended (${code})`)));
     });
     log(`the virtual lamp: ${url}`);
-    if (!options.flags.includes('--no-open')) openBrowser(url);
+    if (!options.flags.includes('--no-open')) openBrowser(url, { window: !options.flags.includes('--browser') }).catch(() => {});
     // Rejects when the lamp or the twin ends; a caller that stops them itself need not look.
     const closed = Promise.race([ended, new Promise((_, reject) => twin.on('close', () => reject(new Error('the twin ended'))))]);
     closed.catch(() => {});

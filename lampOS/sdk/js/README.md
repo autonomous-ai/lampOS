@@ -141,7 +141,8 @@ node examples/twin/virtual-lamp.js --lamp-sim ../../target/debug/lamp-sim
 Options: `--bin-dir DIR` (where `lamp-body` and `lamp-control` are, default beside `lamp-sim`),
 `--dir DIR` (the lamp's folder, short and private, default `~/.lampsim/virtual`), `--port N` (the
 lamp's door on 127.0.0.1, default 7731), `--twin-port N` (default 8737), `--camera=always` and
-`--microphone` (the host's, off unless given), `--no-open`. It pairs afresh under `DIR/sdk` at each
+`--microphone` (the host's, off unless given), `--no-open`, `--browser` (a tab of the default browser instead of the
+window of its own the twin opens in where Chrome, Chromium or Edge is installed). It pairs afresh under `DIR/sdk` at each
 start (the lamp makes a new certificate then); to drive the lamp from your own program too, run it
 with `LAMPOS_HOME=DIR/sdk`. Linux for now (the real `lamp-body` runs only there).
 
