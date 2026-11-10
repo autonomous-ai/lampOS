@@ -1715,7 +1715,7 @@ struct Shared {
     own_echo: bool,
     spare: Mutex<Option<Kept>>,
     spares: AtomicU64,
-    /// The last send try's attempt id ([`send_attempt`], #5853).
+    /// The last send try's attempt id ([`send_attempt_in_context`], #5853).
     send_attempts: AtomicU64,
     /// The send tries [`sent_with_words`] put in carried rounds, by attempt
     /// id, the newest [`crate::services::RECEIPTS_KEPT`]: a call id alone
@@ -1747,6 +1747,8 @@ struct Shared {
     /// The spoken request being answered and its words, until any of its
     /// answer is heard or its turn ends.
     in_flight: Mutex<Option<Carried>>,
+    /// Changed under in_flight at admitted forget; receipt handles keep their birth epoch.
+    send_content_epoch: Arc<AtomicU64>,
     /// The last request whose answer was heard.
     answered_request: Mutex<Option<u64>>,
     /// A spoken request's words whose turn ended before any of its answer
@@ -2879,6 +2881,8 @@ struct Carried {
     /// from them, never searching again from nothing (#5026, lamp-0529,
     /// 3 Nov: two searches and a page lost to a 0-word line).
     rounds: Vec<Message>,
+    /// Epoch of these copied tool rounds, preserved by carried snapshots.
+    rounds_epoch: u64,
     /// Another person's words, cut short in their pause's grace and not
     /// joined to these (`LAMP_ENDPOINT_PAUSE_JOIN`), oldest first: told
     /// first, never joined, in the answer of whichever line answers these,
@@ -2961,6 +2965,7 @@ impl Carried {
             unchecked: Vec::new(),
             memory_write_owner: WriteOwner::default(),
             rounds: Vec::new(),
+            rounds_epoch: 0,
             earlier: Vec::new(),
         }
     }
@@ -4248,6 +4253,7 @@ impl Engine {
                 wait_sound_only: Mutex::new(None),
                 look_note: Mutex::new(None),
                 in_flight: Mutex::new(None),
+                send_content_epoch: Arc::new(AtomicU64::new(0)),
                 answered_request: Mutex::new(None),
                 cut: Mutex::new(None),
                 held_last: Mutex::new(None),
@@ -9085,7 +9091,7 @@ async fn spoken(
             let refused = !empty && name_refused(&shared, request, &carried);
             // Only the carried words again keep their write's owner; joined
             // with new words, the line may ask for a write of its own.
-            let (words, said_by, parts, owner, rounds) = if empty || refused {
+            let (words, said_by, parts, owner, rounds, rounds_epoch) = if empty || refused {
                 unsay_carried(&shared, request, &carried);
                 (
                     carried.text(),
@@ -9093,6 +9099,7 @@ async fn spoken(
                     carried.parts.clone(),
                     carried.memory_write_owner.clone(),
                     carried.rounds.clone(),
+                    carried.rounds_epoch,
                 )
             } else {
                 // While the join waits for a print, the carried words are
@@ -9118,7 +9125,7 @@ async fn spoken(
                 }
                 match joined {
                     (joined, None, parts) => {
-                        (joined, request, parts, WriteOwner::default(), Vec::new())
+                        (joined, request, parts, WriteOwner::default(), Vec::new(), 0)
                     }
                     (_, Some(carried), _) => {
                         unsay_carried(&shared, request, &carried);
@@ -9128,6 +9135,7 @@ async fn spoken(
                             carried.parts,
                             carried.memory_write_owner,
                             carried.rounds,
+                            carried.rounds_epoch,
                         )
                     }
                 }
@@ -9146,6 +9154,7 @@ async fn spoken(
                     unchecked: Vec::new(),
                     memory_write_owner: owner.clone(),
                     rounds,
+                    rounds_epoch,
                     earlier: carried.earlier.clone(),
                 },
             );
@@ -9606,6 +9615,7 @@ async fn spoken(
             unchecked: Vec::new(),
             memory_write_owner: memory_write_owner.clone(),
             rounds: Vec::new(),
+            rounds_epoch: 0,
             // The earlier words told first stay with these, never joined:
             // a line that cuts this one short tells them again (Seventh's
             // P3 on #4916).
@@ -9802,18 +9812,21 @@ fn told_earlier(
 /// A finished chat round of `request` (its calls and their results), kept
 /// with its words in flight so a held line answering them again goes on
 /// from it (#5026).
-fn carry_round(shared: &Shared, request: u64, round: &[Message]) {
+fn carry_round(shared: &Shared, request: u64, epoch: u64, round: &[Message]) {
     if let Ok(mut in_flight) = shared.in_flight.lock()
-        && let Some(carried) = in_flight
-            .as_mut()
-            .filter(|carried| carried.request == request)
+        && let Some(carried) = in_flight.as_mut().filter(|carried| {
+            carried.request == request
+                && carried.rounds_epoch == epoch
+                && epoch == shared.send_content_epoch.load(Ordering::Acquire)
+                && epoch != u64::MAX
+        })
     {
         carried.rounds.extend_from_slice(round);
     }
 }
 
 /// A write's send under way in `request`'s turn (#5853): its call, when it
-/// began, its attempt id ([`send_attempt`]) and the route's answer once it
+/// began, its attempt id ([`send_attempt_in_context`]) and the route's answer once it
 /// came. Every try of a request is kept, up to a batch's
 /// [`net::MOST_CALLS`], refusals let go first, so a later try (the gate's
 /// refusal of a write already sent) never hides the one that went (Third's
@@ -9826,10 +9839,58 @@ fn carry_round(shared: &Shared, request: u64, round: &[Message]) {
 struct SentWrite {
     request: u64,
     attempt: u64,
-    call: net::ToolCall,
+    content: Arc<Mutex<SendContent>>,
     began: tokio::time::Instant,
     told: tokio::sync::watch::Receiver<Option<Value>>,
 }
+
+/// A receipt's display payload is separate from its send accounting. Handles
+/// may outlive ledger eviction or a wait, so they retain the shared epoch.
+struct SendContent {
+    call: Option<net::ToolCall>,
+    epoch: u64,
+    current: Arc<AtomicU64>,
+    answered: tokio::sync::watch::Sender<Option<Value>>,
+}
+
+impl SendContent {
+    fn redact_if_old(&mut self) {
+        if self.epoch != self.current.load(Ordering::Acquire) || self.epoch == u64::MAX {
+            self.call = None;
+            self.answered.send_modify(|told| {
+                *told = told.as_ref().map(send_outcome_only);
+            });
+        }
+    }
+
+    fn finish(&mut self, told: Value) {
+        self.redact_if_old();
+        let told = if self.call.is_none() {
+            send_outcome_only(&told)
+        } else {
+            told
+        };
+        self.answered.send_replace(Some(told));
+    }
+}
+
+/// No old ID, arguments, service name, error detail or response body survives.
+fn send_outcome_only(told: &Value) -> Value {
+    if *told == crate::tools::unavailable() {
+        crate::tools::unavailable()
+    } else {
+        serde_json::json!({"sent": told["sent"] == true})
+    }
+}
+
+/// Captured before constructing the runner, including synchronous runner work.
+struct SendAttempt {
+    id: u64,
+    epoch: u64,
+}
+
+const SENT_REDACTED_NOTE: &str = "(For you to know: their earlier write was already sent. Its details were forgotten. Confirm only that it was sent; do not reconstruct its contents or call service_write again for it.)";
+const SEND_REDACTED_REFUSED_NOTE: &str = "(For you to know: the earlier write was not sent. Its details were forgotten; do not reconstruct or describe them.)";
 
 /// Told the model answering words again whose own write their go-ahead
 /// sent (#5853), beside the send's call and result.
@@ -9847,13 +9908,28 @@ const SEND_NOT_KNOWN: &str = "Not run: whether the write their go-ahead asked fo
 const SENDS_KEPT: usize = 8;
 /// What a `service_write` is told in a turn answering words whose write was
 /// sent ([`sent_already`]): nothing runs, so no new read-back follows.
-const ALREADY_SENT: &str = "Not run: the write their go-ahead asked for was already sent. Do not prepare it again; say what was done.";
+const ALREADY_SENT: &str = "Not run: the write their go-ahead asked for was already sent. Do not prepare it again; confirm only that it was sent.";
 
 /// A new attempt id for `call` of `request` when it is a write's send
 /// ([`crate::services::may_send`]), and its arguments marked with it
 /// ([`crate::services::ATTEMPT`]), so the services keep its receipt as its
 /// own (#5853). Any other call: none, and its arguments as they are.
-fn send_attempt(shared: &Shared, request: u64, call: &net::ToolCall) -> (Option<u64>, Value) {
+#[cfg(test)]
+fn send_attempt(
+    shared: &Shared,
+    request: u64,
+    call: &net::ToolCall,
+) -> (Option<SendAttempt>, Value) {
+    let epoch = shared.send_content_epoch.load(Ordering::Acquire);
+    send_attempt_in_context(shared, request, call, epoch)
+}
+
+fn send_attempt_in_context(
+    shared: &Shared,
+    request: u64,
+    call: &net::ToolCall,
+    epoch: u64,
+) -> (Option<SendAttempt>, Value) {
     if !crate::services::may_send(&call.name, &call.args, request) {
         return (None, call.args.clone());
     }
@@ -9862,7 +9938,7 @@ fn send_attempt(shared: &Shared, request: u64, call: &net::ToolCall) -> (Option<
     if let Some(marked) = args.as_object_mut() {
         marked.insert(crate::services::ATTEMPT.into(), attempt.into());
     }
-    (Some(attempt), args)
+    (Some(SendAttempt { id: attempt, epoch }), args)
 }
 
 /// Whether a kept try was answered and did not go: the first let go.
@@ -9874,13 +9950,13 @@ fn refused(sent: &SentWrite) -> bool {
 }
 
 /// `running`, `call` of `request`'s turn: a write's send (`attempt` from
-/// [`send_attempt`]) is run on a task of its own, so it goes on to its
+/// [`send_attempt_in_context`]) is run on a task of its own, so it goes on to its
 /// answer if a newer line cuts the turn, and kept in [`Shared::sent_write`]
 /// with that answer (`told_of`) once it comes (#5853). Any other call:
 /// `running` as it is.
 fn sending<T: Send + 'static>(
     shared: &Shared,
-    (request, attempt): (u64, Option<u64>),
+    (request, attempt): (u64, Option<SendAttempt>),
     call: &net::ToolCall,
     running: BoxFuture<'static, T>,
     told_of: fn(&T) -> Value,
@@ -9889,6 +9965,18 @@ fn sending<T: Send + 'static>(
         return running;
     };
     let (answered, told) = tokio::sync::watch::channel(None);
+    let content = Arc::new(Mutex::new(SendContent {
+        call: Some(call.clone()),
+        epoch: attempt.epoch,
+        current: shared.send_content_epoch.clone(),
+        answered,
+    }));
+    // Same ordering as forget admission: in_flight, ledger, receipt. A runner
+    // constructed before forget cannot register fresh display content afterward.
+    let publication = shared.in_flight.lock().ok();
+    if let Ok(mut state) = content.lock() {
+        state.redact_if_old();
+    }
     if let Ok(mut sent) = shared.sent_write.lock() {
         // The newest requests': an older request's tries go first, never a
         // newer one's for an older one's (Second's trace on #5863).
@@ -9917,16 +10005,19 @@ fn sending<T: Send + 'static>(
         if fits {
             sent.push(SentWrite {
                 request,
-                attempt,
-                call: call.clone(),
+                attempt: attempt.id,
+                content: content.clone(),
                 began: tokio::time::Instant::now(),
                 told,
             });
         }
     }
+    drop(publication);
     let task = tokio::spawn(async move {
         let out = running.await;
-        let _ = answered.send(Some(told_of(&out)));
+        if let Ok(mut content) = content.lock() {
+            content.finish(told_of(&out));
+        }
         out
     });
     Box::pin(async move {
@@ -9996,7 +10087,7 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
                     (
                         sent.request,
                         sent.attempt,
-                        sent.call.clone(),
+                        sent.content.clone(),
                         sent.began,
                         sent.told.clone(),
                     )
@@ -10009,7 +10100,7 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
     };
     // Each try's answer, waited for within its own bound.
     let mut answers = Vec::new();
-    for (_, attempt, call, began, mut told) in kept {
+    for (_, attempt, content, began, mut told) in kept {
         let came = tokio::time::timeout_at(
             began + crate::services::DEADLINE,
             told.wait_for(Option::is_some),
@@ -10018,11 +10109,16 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
         .ok()
         .and_then(Result::ok)
         .map(|told| told.clone().unwrap_or_default());
-        answers.push((attempt, call, came));
+        answers.push((attempt, content, came));
     }
-    if !still_holding(shared, request) {
+    // Serialize the final payload decision and publication with admission.
+    // Never hold this guard while waiting for a runner or receipt.
+    let Ok(mut publication) = shared.in_flight.lock() else {
         return SentWith::Cut;
-    }
+    };
+    let Some(held) = publication.as_mut().filter(|held| held.request == request) else {
+        return SentWith::Cut;
+    };
     // Each try with its own result (Second's HOLD on #5863: never another
     // try's): the route's answer, or, fenced to "not running" as a cut
     // turn's lease is no longer current, where the services got to with
@@ -10031,7 +10127,11 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
     let unavailable = crate::tools::unavailable();
     let tries: Vec<Try> = answers
         .into_iter()
-        .map(|(attempt, call, came)| {
+        .map(|(attempt, content, came)| {
+            let call = content.lock().ok().and_then(|mut content| {
+                content.redact_if_old();
+                content.call.clone()
+            });
             let own = came.clone().filter(|told| *told != unavailable);
             let (told, got) = match (own, crate::services::send_state(attempt), came) {
                 (Some(told), _, _) => (told, Got::Told),
@@ -10041,6 +10141,11 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
                 // Answered "not running" before the services had it.
                 (None, None, Some(told)) => (told, Got::Told),
             };
+            let told = if call.is_none() {
+                send_outcome_only(&told)
+            } else {
+                told
+            };
             Try {
                 attempt,
                 call,
@@ -10049,15 +10154,31 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
             }
         })
         .collect();
+    let redacted = tries.iter().any(|tried| tried.call.is_none());
+    let confirmed = tries
+        .iter()
+        .any(|tried| tried.got == Got::Told && tried.told["sent"] == true);
+    let asked = tries.iter().any(|tried| tried.got == Got::Asked);
+    let unknown = tries.iter().any(|tried| tried.got == Got::Unknown);
     let note = if tries
         .iter()
         .any(|tried| tried.got == Got::Told && tried.told["sent"] == true)
     {
-        Some(SENT_WRITE_NOTE)
-    } else if tries.iter().any(|tried| tried.got == Got::Asked) {
-        Some(SENT_UNKNOWN_NOTE)
-    } else if tries.iter().any(|tried| tried.got == Got::Unknown) {
+        Some(if redacted {
+            SENT_REDACTED_NOTE
+        } else {
+            SENT_WRITE_NOTE
+        })
+    } else if asked {
+        Some(if redacted {
+            SEND_NOT_KNOWN_NOTE
+        } else {
+            SENT_UNKNOWN_NOTE
+        })
+    } else if unknown {
         Some(SEND_NOT_KNOWN_NOTE)
+    } else if redacted {
+        Some(SEND_REDACTED_REFUSED_NOTE)
     } else {
         None
     };
@@ -10067,15 +10188,19 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
         if tries.len() == 1 { "y" } else { "ies" },
         match note {
             Some(SENT_WRITE_NOTE) => "the sent one and each try's own result",
+            Some(SENT_REDACTED_NOTE) => "only confirmation of the earlier send",
+            Some(SEND_REDACTED_REFUSED_NOTE) => "only the earlier refusal",
             Some(SENT_UNKNOWN_NOTE) => "a send whose result is not known",
             Some(_) => "a send not known to have gone",
             None => "their results, none sent,",
         }
     );
-    let instead = match note {
-        Some(SEND_NOT_KNOWN_NOTE) => Some(SEND_NOT_KNOWN),
-        Some(_) => Some(ALREADY_SENT),
-        None => None,
+    let instead = if confirmed || asked && !redacted {
+        Some(ALREADY_SENT)
+    } else if asked || unknown {
+        Some(SEND_NOT_KNOWN)
+    } else {
+        None
     };
     if let Ok(mut sent_in) = shared.write_sent_in.lock() {
         *sent_in = Some((request, origin, instead));
@@ -10085,18 +10210,22 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
     // attempt was, and its call id is still in the rounds. The call id
     // alone may be a finished round's other call's, a clock's `call_0`
     // before a send's `call_0` (the P3 on #5863).
-    let rounds = carried_rounds(shared, request);
+    let visible: Vec<_> = tries
+        .iter()
+        .filter_map(|tried| tried.call.as_ref().map(|call| (tried, call)))
+        .collect();
     let carried = shared.carried_attempts.lock().is_ok_and(|attempts| {
-        tries.iter().all(|tried| {
+        visible.iter().all(|(tried, call)| {
             attempts.contains(&tried.attempt)
-                && rounds
+                && held
+                    .rounds
                     .iter()
-                    .any(|message| message.tool_call_id.as_deref() == Some(tried.call.id.as_str()))
+                    .any(|message| message.tool_call_id.as_deref() == Some(call.id.as_str()))
         })
     });
     if !carried {
         if let Ok(mut attempts) = shared.carried_attempts.lock() {
-            for tried in &tries {
+            for (tried, _) in &visible {
                 if !attempts.contains(&tried.attempt) {
                     if attempts.len() >= crate::services::RECEIPTS_KEPT {
                         attempts.pop_front();
@@ -10105,15 +10234,13 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
                 }
             }
         }
-        let calls: Vec<net::ToolCall> = tries.iter().map(|tried| tried.call.clone()).collect();
-        let round: Vec<Message> = std::iter::once(Message::assistant_calls(None, &calls))
-            .chain(
-                tries
-                    .iter()
-                    .map(|tried| Message::tool(tried.call.id.clone(), tried.told.to_string())),
-            )
-            .collect();
-        carry_round(shared, request, &round);
+        let calls: Vec<net::ToolCall> = visible.iter().map(|(_, call)| (*call).clone()).collect();
+        held.rounds.push(Message::assistant_calls(None, &calls));
+        held.rounds.extend(
+            visible
+                .iter()
+                .map(|(tried, call)| Message::tool(call.id.clone(), tried.told.to_string())),
+        );
     }
     SentWith::Told(note)
 }
@@ -10122,7 +10249,7 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
 /// result, and how far it is known to have got.
 struct Try {
     attempt: u64,
-    call: net::ToolCall,
+    call: Option<net::ToolCall>,
     told: Value,
     got: Got,
 }
@@ -10166,9 +10293,36 @@ fn sent_already(shared: &Shared, request: u64, name: &str) -> Option<Value> {
     Some(serde_json::json!({ "error": instead }))
 }
 
-/// `request`'s carried rounds dropped at forget admission, before its
-/// runner is awaited: a cut during deletion must not carry earlier results
-/// into the resumed request (#4848, #5878).
+/// Admission invalidates retained tool content even across copied handles,
+/// late registration and completion. Accounting and human words remain.
+fn forget_carried_context(shared: &Shared) {
+    let Ok(mut in_flight) = shared.in_flight.lock() else {
+        return;
+    };
+    // Every earlier display payload belongs to the previous context. This
+    // also invalidates handles no longer present in the bounded ledger.
+    let _ = shared
+        .send_content_epoch
+        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |epoch| {
+            Some(epoch.saturating_add(1))
+        });
+    let epoch = shared.send_content_epoch.load(Ordering::Acquire);
+    if let Some(carried) = in_flight.as_mut() {
+        carried.rounds.clear();
+        carried.rounds_epoch = epoch;
+    }
+    if let Ok(sent) = shared.sent_write.lock() {
+        for sent in sent.iter() {
+            if let Ok(mut content) = sent.content.lock() {
+                content.redact_if_old();
+            }
+        }
+    }
+}
+
+/// Drop this request's rounds again after the forget returns. Admission has
+/// already invalidated old producers; this keeps the completed forget batch
+/// out of the resumed context without advancing the epoch a second time.
 fn drop_carried_rounds(shared: &Shared, request: u64) {
     if let Ok(mut in_flight) = shared.in_flight.lock()
         && let Some(carried) = in_flight
@@ -10195,11 +10349,16 @@ fn carried_rounds(shared: &Shared, request: u64) -> Vec<Message> {
         .unwrap_or_default()
 }
 
-fn put_in_flight(shared: &Shared, carried: Carried) {
+fn put_in_flight(shared: &Shared, mut carried: Carried) {
     if let Ok(mut asked) = shared.asked_last.lock() {
         *asked = Some(asked.map_or(carried.request, |last| last.max(carried.request)));
     }
     if let Ok(mut in_flight) = shared.in_flight.lock() {
+        let epoch = shared.send_content_epoch.load(Ordering::Acquire);
+        if carried.rounds_epoch != epoch || epoch == u64::MAX {
+            carried.rounds.clear();
+        }
+        carried.rounds_epoch = epoch;
         *in_flight = Some(carried);
     }
 }
@@ -10296,6 +10455,7 @@ fn waiting_chain(request: u64, marks: &Marks, carried: &Carried, own: Part) -> C
         // question of their own to search for.
         memory_write_owner: WriteOwner::default(),
         rounds: Vec::new(),
+        rounds_epoch: 0,
         ..chain
     }
 }
@@ -12743,6 +12903,18 @@ async fn run_tool(
     call: &net::ToolCall,
     scope: Option<&crate::memory_scope::ScopeLease>,
 ) -> Value {
+    let epoch = shared.send_content_epoch.load(Ordering::Acquire);
+    run_tool_in_context(shared, request, heard, call, scope, epoch).await
+}
+
+async fn run_tool_in_context(
+    shared: &Shared,
+    request: u64,
+    heard: bool,
+    call: &net::ToolCall,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+    epoch: u64,
+) -> Value {
     // A memory call on a line held only by a gap runs for no one, however
     // it was asked: not declared to it, and refused if written anyway.
     if memory_refused(scope, &call.name) {
@@ -12763,7 +12935,7 @@ async fn run_tool(
     }
     // A send runs to its answer even if a newer line cuts the turn, its
     // receipt kept as its own (#5853).
-    let (attempt, args) = send_attempt(shared, request, call);
+    let (attempt, args) = send_attempt_in_context(shared, request, call, epoch);
     let running: BoxFuture<'static, Value> = match (&shared.scoped_tools, scope) {
         (Some(run), Some(scope)) => run(request, heard, call.name.clone(), args, scope.clone()),
         (Some(_), None) => Box::pin(std::future::ready(crate::tools::unavailable())),
@@ -13365,6 +13537,7 @@ async fn answer(
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
         }
+        let mut context_epoch = shared.send_content_epoch.load(Ordering::Acquire);
         let told = told_whole(shared, scope.as_ref());
         // Building it can wait on the memory service: a request revoked
         // meanwhile is not asked with what was read for it.
@@ -13476,7 +13649,7 @@ async fn answer(
                 // they asked to forget it.
                 if crate::remember::is_forget(&call.name) {
                     held_rename::forgot(shared, request);
-                    drop_carried_rounds(shared, request);
+                    forget_carried_context(shared);
                 }
                 let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
@@ -13488,6 +13661,7 @@ async fn answer(
                 );
                 call_statuses.push(after_forget::status(&call.name, &result));
                 if crate::remember::is_forget(&call.name) {
+                    context_epoch = shared.send_content_epoch.load(Ordering::Acquire);
                     messages = after_forget::context(
                         &shared.after_forget_instruction,
                         &words,
@@ -15314,7 +15488,7 @@ async fn answer(
                 // #5792). Run or failed, they asked to forget it.
                 if crate::remember::is_forget(&call.name) {
                     held_rename::forgot(shared, request);
-                    drop_carried_rounds(shared, request);
+                    forget_carried_context(shared);
                 }
                 let mut answer = match (&shared.requested_audio, spoken) {
                     (Some((worker_boot, runner)), Some(turn)) if turn.captured => {
@@ -15331,7 +15505,8 @@ async fn answer(
                             .filter(|scope| audio_scope_current(scope, &context))
                         {
                             Some(scope) => {
-                                let (attempt, args) = send_attempt(shared, request, call);
+                                let (attempt, args) =
+                                    send_attempt_in_context(shared, request, call, context_epoch);
                                 let running = runner(
                                     context.clone(),
                                     lamp_gemini::ToolCall {
@@ -15362,7 +15537,15 @@ async fn answer(
                         answer
                     }
                     _ => crate::tools::ToolAnswer::plain(
-                        run_tool(shared, request, heard, call, scope.as_ref()).await,
+                        run_tool_in_context(
+                            shared,
+                            request,
+                            heard,
+                            call,
+                            scope.as_ref(),
+                            context_epoch,
+                        )
+                        .await,
                     ),
                 };
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
@@ -15393,6 +15576,7 @@ async fn answer(
                 }
                 call_statuses.push(after_forget::status(&call.name, &answer.told));
                 if crate::remember::is_forget(&call.name) {
+                    context_epoch = shared.send_content_epoch.load(Ordering::Acquire);
                     messages = after_forget::context(
                         &shared.after_forget_instruction,
                         &words,
@@ -15543,7 +15727,7 @@ async fn answer(
             if forgot_this_round {
                 drop_carried_rounds(shared, request);
             } else {
-                carry_round(shared, request, &messages[round_at..]);
+                carry_round(shared, request, context_epoch, &messages[round_at..]);
             }
             // Held: nothing more of the turn is said, as on the Live route,
             // where none of a held turn's sound is let out. What the model

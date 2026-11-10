@@ -1,0 +1,109 @@
+
+running 12 tests
+second_provider::tests::sent_write::a_late_send_result_after_forget_updates_status_without_restoring_payload --- FAILED
+....... 8/12
+second_provider::tests::sent_write::a_send_then_cut_forget_then_cut_never_restores_payload_or_repeats_send --- FAILED
+second_provider::tests::sent_write::a_services_fallback_after_admitted_forget_keeps_status_without_private_payload --- FAILED
+..
+failures:
+
+---- second_provider::tests::sent_write::a_late_send_result_after_forget_updates_status_without_restoring_payload stdout ----
+lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 9 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 2 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 1 send try began before a newer line cut its answer; a send not known to have gone go with its words
+lamp-voice second: request 2 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called forget_my_face
+lamp-voice second: request 2: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 3 goes on from request 2: its 10 ms of sound go first
+lamp-voice second: request 3: speech to text opened in 0 ms, 20 ms of the line's sound waiting
+lamp-voice second: request 3 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 3 is held, so request 2's words, cut short by it, are answered in its place
+lamp-voice second: request 3: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 3 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 3 chat round 1 first event in 0 ms
+lamp-voice second: request 3 chat round 1 called service_write
+lamp-voice second: request 3 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 3 chat round 2 first event in 0 ms
+lamp-voice second: request 3 first piece to the voice 0 ms after the words were heard, 7 words
+lamp-voice second: request 3 first answer audio 2 ms after the words were heard
+
+thread 'second_provider::tests::sent_write::a_late_send_result_after_forget_updates_status_without_restoring_payload' (106051711) panicked at crates/voice/src/second_provider/tests/sent_write.rs:1385:9:
+private-send-call-id-canary restored after interrupted forget: [[{"role":"system","content":"SYSTEM"},{"role":"system","content":"(For you to know: their go-ahead already sent the write they asked for; its service_write call and result are given with their words. Say in a few words what was done; do not call service_write again for it.)"},{"role":"user","content":"Go ahead and send it, then forget my face."},{"role":"assistant","tool_calls":[{"function":{"arguments":"{\"send_id\":\"private-send-argument-canary\",\"service\":\"google_drive\"}","name":"service_write"},"id":"private-send-call-id-canary","type":"function"}]},{"role":"tool","content":"{\"detail\":\"private-send-result-canary\",\"sent\":true,\"service\":\"google_drive\"}","tool_call_id":"private-send-call-id-canary"}],[{"role":"system","content":"SYSTEM"},{"role":"system","content":"(For you to know: their go-ahead already sent the write they asked for; its service_write call and result are given with their words. Say in a few words what was done; do not call service_write again for it.)"},{"role":"user","content":"Go ahead and send it, then forget my face."},{"role":"assistant","tool_calls":[{"function":{"arguments":"{\"send_id\":\"private-send-argument-canary\",\"service\":\"google_drive\"}","name":"service_write"},"id":"private-send-call-id-canary","type":"function"}]},{"role":"tool","content":"{\"detail\":\"private-send-result-canary\",\"sent\":true,\"service\":\"google_drive\"}","tool_call_id":"private-send-call-id-canary"},{"role":"assistant","tool_calls":[{"function":{"arguments":"{\"service\":\"google_drive\",\"text\":\"New copy\",\"title\":\"Notes\"}","name":"service_write"},"id":"repeat-send","type":"function"}]},{"role":"tool","content":"{\"error\":\"Not run: the write their go-ahead asked for was already sent. Do not prepare it again; say what was done.\"}","tool_call_id":"repeat-send"}]]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- second_provider::tests::sent_write::a_send_then_cut_forget_then_cut_never_restores_payload_or_repeats_send stdout ----
+lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 9 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 2 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called forget_my_face
+lamp-voice second: request 2: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 3 goes on from request 2: its 10 ms of sound go first
+lamp-voice second: request 3: speech to text opened in 0 ms, 20 ms of the line's sound waiting
+lamp-voice second: request 3 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 3 is held, so request 2's words, cut short by it, are answered in its place
+lamp-voice second: request 3: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 3 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 3 chat round 1 first event in 0 ms
+lamp-voice second: request 3 chat round 1 called service_write
+lamp-voice second: request 3 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 3 chat round 2 first event in 0 ms
+lamp-voice second: request 3 first piece to the voice 0 ms after the words were heard, 7 words
+lamp-voice second: request 3 first answer audio 1 ms after the words were heard
+
+thread 'second_provider::tests::sent_write::a_send_then_cut_forget_then_cut_never_restores_payload_or_repeats_send' (106051954) panicked at crates/voice/src/second_provider/tests/sent_write.rs:1043:9:
+private-send-argument-canary restored after interrupted forget: [[{"role":"system","content":"SYSTEM"},{"role":"system","content":"(For you to know: their go-ahead already sent the write they asked for; its service_write call and result are given with their words. Say in a few words what was done; do not call service_write again for it.)"},{"role":"user","content":"Go ahead and send it, then forget my face."},{"role":"assistant","tool_calls":[{"function":{"arguments":"{\"send_id\":\"private-send-argument-canary\",\"service\":\"google_drive\"}","name":"service_write"},"id":"sent-private","type":"function"}]},{"role":"tool","content":"{\"detail\":\"private-send-result-canary\",\"sent\":true,\"service\":\"google_drive\"}","tool_call_id":"sent-private"}],[{"role":"system","content":"SYSTEM"},{"role":"system","content":"(For you to know: their go-ahead already sent the write they asked for; its service_write call and result are given with their words. Say in a few words what was done; do not call service_write again for it.)"},{"role":"user","content":"Go ahead and send it, then forget my face."},{"role":"assistant","tool_calls":[{"function":{"arguments":"{\"send_id\":\"private-send-argument-canary\",\"service\":\"google_drive\"}","name":"service_write"},"id":"sent-private","type":"function"}]},{"role":"tool","content":"{\"detail\":\"private-send-result-canary\",\"sent\":true,\"service\":\"google_drive\"}","tool_call_id":"sent-private"},{"role":"assistant","tool_calls":[{"function":{"arguments":"{\"service\":\"google_drive\",\"text\":\"New copy\",\"title\":\"Notes\"}","name":"service_write"},"id":"repeat-send","type":"function"}]},{"role":"tool","content":"{\"error\":\"Not run: the write their go-ahead asked for was already sent. Do not prepare it again; say what was done.\"}","tool_call_id":"repeat-send"}]]
+
+---- second_provider::tests::sent_write::a_services_fallback_after_admitted_forget_keeps_status_without_private_payload stdout ----
+lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 9 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 1 send try began before a newer line cut its answer; a send not known to have gone go with its words
+lamp-voice second: request 2 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called forget_my_face
+lamp-voice second: request 2: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 3 goes on from request 2: its 10 ms of sound go first
+lamp-voice second: request 3: speech to text opened in 0 ms, 20 ms of the line's sound waiting
+lamp-voice second: request 3 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 3 is held, so request 2's words, cut short by it, are answered in its place
+lamp-voice second: request 3: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 3 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 3 chat round 1 first event in 0 ms
+lamp-voice second: request 3 chat round 1 called service_write
+lamp-voice second: request 3 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 3 chat round 2 first event in 0 ms
+lamp-voice second: request 3 first piece to the voice 0 ms after the words were heard, 7 words
+lamp-voice second: request 3 first answer audio 2 ms after the words were heard
+
+thread 'second_provider::tests::sent_write::a_services_fallback_after_admitted_forget_keeps_status_without_private_payload' (106051955) panicked at crates/voice/src/second_provider/tests/sent_write.rs:1621:9:
+private-send-call-id-canary restored after interrupted forget: [[{"role":"system","content":"SYSTEM"},{"role":"system","content":"(For you to know: their go-ahead already sent the write they asked for; its service_write call and result are given with their words. Say in a few words what was done; do not call service_write again for it.)"},{"role":"user","content":"Go ahead and send it, then forget my face."},{"role":"assistant","tool_calls":[{"function":{"arguments":"{\"send_id\":\"private-send-argument-canary\",\"service\":\"google_drive\"}","name":"service_write"},"id":"private-send-call-id-canary","type":"function"}]},{"role":"tool","content":"{\"detail\":\"private-send-result-canary\",\"sent\":true,\"service\":\"google_drive\"}","tool_call_id":"private-send-call-id-canary"}],[{"role":"system","content":"SYSTEM"},{"role":"system","content":"(For you to know: their go-ahead already sent the write they asked for; its service_write call and result are given with their words. Say in a few words what was done; do not call service_write again for it.)"},{"role":"user","content":"Go ahead and send it, then forget my face."},{"role":"assistant","tool_calls":[{"function":{"arguments":"{\"send_id\":\"private-send-argument-canary\",\"service\":\"google_drive\"}","name":"service_write"},"id":"private-send-call-id-canary","type":"function"}]},{"role":"tool","content":"{\"detail\":\"private-send-result-canary\",\"sent\":true,\"service\":\"google_drive\"}","tool_call_id":"private-send-call-id-canary"},{"role":"assistant","tool_calls":[{"function":{"arguments":"{\"service\":\"google_drive\",\"text\":\"New copy\",\"title\":\"Notes\"}","name":"service_write"},"id":"repeat-send","type":"function"}]},{"role":"tool","content":"{\"error\":\"Not run: the write their go-ahead asked for was already sent. Do not prepare it again; say what was done.\"}","tool_call_id":"repeat-send"}]]
+
+
+failures:
+    second_provider::tests::sent_write::a_late_send_result_after_forget_updates_status_without_restoring_payload
+    second_provider::tests::sent_write::a_send_then_cut_forget_then_cut_never_restores_payload_or_repeats_send
+    second_provider::tests::sent_write::a_services_fallback_after_admitted_forget_keeps_status_without_private_payload
+
+test result: FAILED. 9 passed; 3 failed; 0 ignored; 0 measured; 5479 filtered out; finished in 2.80s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`
