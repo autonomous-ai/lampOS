@@ -56,7 +56,8 @@ sau:
    trong 25 giây khi có người ở đó, được gọi rõ là ví dụ về hình thức,
    "never answer with it") và được dặn rằng lời nhắc vào một giờ hay cứ
    mỗi khoảng thời gian là bộ hẹn giờ của đèn, không phải kỹ năng, còn kỹ
-   năng chỉ chạy vào một giờ mỗi ngày bằng trigger đồng hồ; được nêu từng
+   năng chỉ chạy vào một giờ mỗi ngày hoặc vào những ngày trong tuần được
+   nêu tên, bằng trigger đồng hồ; được nêu từng
    trigger và từng cử chỉ theo tên; và cách nó nói (dưới đây, #6055, #6062: `speak = true`, cooldown từ một giờ trở lên, và một `say = { text = "Welcome back!" }` đúng nguyên văn, bằng ngôn ngữ người dùng đã hỏi). Câu trả lời phải đúng hai khối có rào,
    `skill.toml` và `SKILL.md`, mỗi khối tối đa 8 KiB.
 4. **Giới hạn những gì kỹ năng tạo ra được dùng: đã bỏ giới hạn** (#6066).
@@ -455,13 +456,29 @@ sau:
      `absent_for`: "When someone sitting at the desk gets up" (mắt nói lại
      mỗi lần khuôn mặt người ngồi quay lại rồi mất khi nhô lên, nên `paced`
      đặt `cooldown` ít nhất `"1m"`, #6070: "…, at most once a minute"); **một giờ
-     mỗi ngày** (`clock/local`, như các trigger hằng ngày của lamp-skills):
+     mỗi ngày, hoặc vào những ngày trong tuần được nêu tên** (`clock/local`,
+     như các trigger hằng ngày của lamp-skills):
      `field = "known"`, `equals = true`, `rearm = "ends"` và `during` đúng
      một phút, `{ from = "22:00", to = "22:01" }` (`HH:MM`; cả 23:59 tới
      00:00), không có `for`, `absent_for` hay `when = "appears"`: "Every day
-     at 22:00". Khung dài hơn, giờ không theo `HH:MM`, hay ngày trong tuần
-     (`days`, lamp-skills không có dạng nào cho nó) bị từ chối; `above` ở
-     trigger khác cũng vậy. Cử chỉ là bất kỳ clip nào của thân mà
+     at 22:00". Nó có thể mang `days` (#6066) đúng dạng của lamp-skills,
+     đọc như `Weekdays::parse` đọc (`made_skill::weekdays`): một tên hoặc
+     một danh sách không rỗng gồm `"mon"` đến `"sun"`, `"weekdays"` và
+     `"weekend"`, một ngày nêu hai lần vẫn là một ngày; nó chỉ chạy vào
+     những ngày đó và được nói kèm các ngày, thứ Hai trước: "Every
+     Wednesday and Friday at 03:17", "Every Sunday at 07:00", "Every
+     weekday at 07:00", "Every Saturday and Sunday at 09:00" (đủ bảy ngày:
+     "Every day"). Khung dài hơn, giờ không theo `HH:MM`, `days` rỗng, tên
+     lamp-skills không nhận (`"wednesday"`, `"Wed"`: "its days: wednesday
+     is not mon to sun, weekdays or weekend", để lần sửa được nghe các tên), hay `days` ở trigger khác bị từ chối;
+     `above` ở trigger khác cũng vậy. Trên lamp-9adf staging 11625, 02:11
+     ngày 11/11, một ngày trong tuần tạo bằng giọng nói đã bị từ chối.
+     Phép lịch sự của nó như của một giờ mỗi ngày (#6103): `days` không đổi
+     điều gì, nên một giờ trong tuần mà yêu cầu nêu chạy đúng như nói, một
+     giờ trong 22:00-08:00 do mô hình tự chọn vẫn giữ `[quiet]`, và một giờ
+     trong 08:00-22:00 thì không cần.
+     Kiểm thử: `a_time_on_named_weekdays_is_kept_and_said_with_its_days`,
+     `a_face_by_who_a_window_or_an_unknown_day_is_refused`. Cử chỉ là bất kỳ clip nào của thân mà
      `lamp_skills::gesture_known` nhận (mọi clip trong
      `lamp_body::clips::ALL` trừ `idle`), một cử chỉ mỗi bước, nói theo việc
      nó làm (`made_skill::GESTURES`): nod "nods", headshake "shakes its
@@ -501,12 +518,16 @@ sau:
      hình là `humans/faces/tracked`, không có field, `when = "appears"`;
      có người đứng dậy là `room/stood_up`, `sitting_s` trên 0; mỗi ngày lúc
      22:00 là `clock/local`, `known`, `true`, `rearm = "ends"`,
-     `during = { from = "22:00", to = "22:01" }`. Phần được nêu tên bị cắt
+     `during = { from = "22:00", to = "22:01" }`; bên cạnh chỉ có `for`,
+     `cooldown`, `rearm`, `during` và `days`. Phần được nêu tên bị cắt
      ở 110 byte. Trên lamp-74ff, 17:39 ngày
      10/11, một lần tạo từ ứng dụng "glow green when I come back to my
      desk" được viết trên khuôn mặt như kỹ năng chào mừng có sẵn, và bị từ
      chối hai lần vì lần sửa chỉ được nói các khóa được phép. System prompt
      của mô hình tạo nói các nghĩa này trước khi viết (`TRIGGER_MEANINGS`),
+     và các ngày của một giờ (#6066: "On some days only, add days = ["wed",
+     "fri"] (mon to sun, "weekdays", "weekend")", lần sửa chỉ được nói điều
+     này qua lời của lỗi `days`, để các dòng của nó vẫn trong 735 byte),
      kèm "coming to the desk is room/presence, never the faces", và bản
      hướng dẫn nói "coming to the desk is room/presence". Lỗi của phần khác kèm dòng của `PLAIN_ONLY`; khi bật
      đọc, thêm `PLAIN_OR_READ`: với kỹ năng đọc một dịch vụ đã liên kết,
