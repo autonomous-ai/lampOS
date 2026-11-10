@@ -3109,6 +3109,25 @@ impl Onboarding {
         }
     }
 
+    /// [`Self::tick`]'s note as the coordinator begins it: a fixed line
+    /// ("Say only this: ...") is the walk's own line ([`own_line`]), said as
+    /// written with no chat (#5999: the model reworded or refused the walk's
+    /// lines, and scene A's face question was not said word for word). An
+    /// "Ask exactly this" note tells the model how to take the answer, and
+    /// stays the model's.
+    pub fn tick_line(
+        &mut self,
+        now_us: u64,
+        quiet_us: u64,
+        can_speak: bool,
+        paused: bool,
+        face: Option<Framing>,
+        still: bool,
+    ) -> Option<String> {
+        self.tick(now_us, quiet_us, can_speak, paused, face, still)
+            .map(own_line)
+    }
+
     /// Call every loop. `quiet_us` is how long nothing has been said to the
     /// lamp or by it; `can_speak` that it may begin a turn of its own now;
     /// `face` the near face; `still` that the head is still and no hand is
@@ -7361,6 +7380,67 @@ mod tests {
             "{notes:?}"
         );
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+    }
+
+    /// Every fixed line the walk begins ("Say only this: ...") is its own
+    /// line, said as written with no chat (#5999: the model reworded or
+    /// refused the walk's lines, and scene A's face question was not said
+    /// word for word). An "Ask exactly this" note, which tells the model
+    /// how to take the answer, stays the model's.
+    #[test]
+    fn the_walks_fixed_lines_go_out_as_its_own_lines() {
+        // As the coordinator begins them: `tick_line`, a quarter second apart.
+        fn lines(room: &mut Room, for_us: u64) -> Vec<String> {
+            let mut lines = Vec::new();
+            let until = room.at + for_us;
+            while room.at < until {
+                room.walk.drain_storage_for_test(room.at);
+                let quiet = room.at - room.said;
+                if let Some(line) =
+                    room.walk
+                        .tick_line(room.at, quiet, true, false, Some(NEAR_MIDDLE), true)
+                {
+                    let (boot, turn) = (BootId::new([3; 16]).unwrap(), room.at + 1);
+                    if room.walk.bind_opener(boot, turn) {
+                        room.walk
+                            .invitation_finished(boot, turn, Delivery::Whole, room.at);
+                    }
+                    lines.push(line);
+                    room.said = room.at;
+                }
+                room.at += S / 4;
+            }
+            lines
+        }
+        let own = |lines: &[String]| -> Vec<Option<String>> {
+            lines
+                .iter()
+                .map(|line| own_words(line).map(str::to_owned))
+                .collect()
+        };
+        let mut room = Room::new("fixed-lines-own");
+        room.walk.face_kept = true;
+        assert_eq!(
+            own(&lines(&mut room, 7 * S)),
+            [
+                Some("Sit where you usually sit, and look at me.".to_owned()),
+                Some("There you are. I can see you.".to_owned())
+            ]
+        );
+        // "Ask exactly this": the model's, to take the name and read it back.
+        assert_eq!(lines(&mut room, 20 * S), [WHO_NOTE]);
+        room.walk.heard("My name is Walter.", room.at);
+        room.walk.lamp_said(room.at);
+        room.walk.lamp_words("Walter, did I get that right?");
+        room.walk.heard("Yes. That's my name.", room.at);
+        room.walk.lamp_said(room.at);
+        room.walk.lamp_words("Yes, that's your name settled, then.");
+        assert_eq!(
+            own(&lines(&mut room, S)),
+            [Some(
+                "May I remember your face, so I know you next time?".to_owned()
+            )]
+        );
     }
 
     /// The walk's face question and its yes end the step once the face is

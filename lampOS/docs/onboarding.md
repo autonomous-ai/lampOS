@@ -353,12 +353,26 @@ prompt counts as played, and its try window opens, only on its words played
 whole or with a gap; one cut or unsaid is offered again with the same words
 and spends nothing, as before. The Live route's model still reads the fixed
 note after the mark. An older file's words not of the fixed form are not
-marked and stay the model's. Every other fixed line (the call prompts, the
-step's done, failed, skipped and later lines, and the other steps') still
-goes to the model as above. Tests:
+marked and stay the model's. Tests:
 `onboarding::near_flow_tests::the_sentence_prompts_are_the_walks_own_lines`,
 `second_provider::tests::a_walk_owned_onboarding_line_is_said_in_its_words_and_never_asked_of_the_model`,
 `onboarding::skill::tests::a_walk_owned_line_carries_its_exact_words_and_only_a_fixed_line_is_marked`.
+
+**Every fixed line the walk begins is its own** (#5999: on lamp-52e6 the
+model reworded or refused the walk's lines, and scene A's face question was
+not said word for word). The coordinator begins the walk's notes through
+`Onboarding::tick_line`, which marks every note of the fixed form
+(`(Say only this, nothing before or after it: "…")`) as the walk's own line:
+the intro and step one's ask, the steps' done, failed, skipped and later
+lines, the walk's face question (`FACE_ASK`), the name-only line, the
+closing. Each is said in its words with no chat, as the sentence prompts
+above; its written note still stays in the conversation's history beside
+the lamp's words, so the face question's yes still runs the setup save
+(`Thread::names_window`). An "Ask exactly this" note (`who_you_are`'s ask
+and its read-back, preferences, the room sounds and faces asks, the face
+question asked again) tells the model how to take the answer, so it stays
+the model's. Test:
+`onboarding::tests::the_walks_fixed_lines_go_out_as_its_own_lines`.
 
 **The walk's last words name a few things to try** (#5316, the first
 customers' stage 2 on #5296), with `LAMP_ONBOARDING_FIRST_TRIES=on` exactly
