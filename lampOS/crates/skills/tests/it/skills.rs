@@ -482,7 +482,8 @@ fn head_pats_response_is_chosen_in_its_file() {
 /// The owner, 19 Oct: core skills are always on the lamp, as a phone's own
 /// apps; the rest are installed. Desk tutor and its marks wait for the full
 /// look in the product. The four wellbeing nudges are core since 25 Oct
-/// (the owner: "do all of them"), and Sit back since #5208. Every one says its version.
+/// (the owner: "do all of them"), Sit back since #5208, and the FAQ since
+/// #5790. Every one says its version.
 #[test]
 fn every_skill_folder_says_its_kind_and_version() {
     let skills: Vec<_> = lamp_skills::load_each(&skills_root())
@@ -503,6 +504,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "comfort-break",
             "dance",
             "dusty-air",
+            "faq",
             "feelings",
             "head-pat",
             "head-pat-wiggle",

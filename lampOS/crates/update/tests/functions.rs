@@ -31,6 +31,9 @@ const CHAT: &str = "chat: ";
 /// Each skill a chat request reaches through `use_skill`
 /// (`LAMP_USE_SKILL=on` in the product since #2826), by its own name.
 const REACHED: &str = "reached: ";
+/// Each skill whose line `use_skill`'s section names alone or leaves out,
+/// past its bound (`lamp_voice::use_skill::SECTION_MOST_BYTES`).
+const CUT: &str = "cut: ";
 /// What a chat request with those functions is told to say to "I'm
 /// unplugging you" (#4595): `app`, `plug`, or `none` with
 /// `prepare_to_unplug` offered.
@@ -48,7 +51,8 @@ const UNPLUG: &str = "unplug: ";
 /// actions part's 17 and the skills' 1: `use_skill`, which reaches every
 /// skill's function (`LAMP_USE_SKILL=on` since #2826; Dance's `dance`,
 /// Pose's `set_pose` and the wellbeing skills' `[stop]`, `wellbeing_nudges`,
-/// were 3 before it), before the search and the look. However many skills
+/// were 3 before it; the FAQ's `lamp_help` since #5790), before the
+/// search and the look. However many skills
 /// are installed, the skills' stay 1. The test prints this split. A change
 /// to it is a change to what every session is told: say in its pull
 /// request what is left out past the bound, if anything.
@@ -117,6 +121,11 @@ fn the_product_voice_s_functions_in_a_process_of_their_own() {
             }
         }
     }
+    let skills = lamp_voice::tools::skill_tools(&settings);
+    let (named, left) = lamp_voice::use_skill::cut(lamp_voice::use_skill::offered(&skills));
+    for skill in named.iter().chain(&left) {
+        println!("{CUT}{skill}");
+    }
     let told = lamp_voice::without_a_tool::for_declared(&chat, settings.shutdown_from_app);
     let unplug = if told.contains(lamp_voice::without_a_tool::NO_UNPLUG_APP) {
         "app"
@@ -139,6 +148,7 @@ struct Product {
     left_out: Vec<String>,
     chat: Vec<String>,
     reached: Vec<String>,
+    cut: Vec<String>,
     unplug: Vec<String>,
 }
 
@@ -219,6 +229,7 @@ fn product_with(extra: &[(&str, &str)]) -> Product {
         left_out: found(LEFT_OUT),
         chat: found(CHAT),
         reached: found(REACHED),
+        cut: found(CUT),
         unplug: found(UNPLUG),
     }
 }
@@ -288,6 +299,20 @@ fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
     }
 }
 
+/// Every product skill's whole line is in `use_skill`'s section (#5790):
+/// the model calls a skill from its line, so one cut to its name alone, or
+/// left out, past the section's bound is one it no longer knows when to
+/// call. The FAQ (`lamp_help`) among them, reached through `use_skill`.
+#[test]
+fn every_product_skill_s_line_is_whole_in_use_skill_s_section() {
+    let Product { reached, cut, .. } = product_with(&[]);
+    assert!(cut.is_empty(), "cut from use_skill's lines: {cut:?}");
+    assert!(
+        reached.iter().any(|name| name == "lamp_help"),
+        "{reached:?}"
+    );
+}
+
 /// Migrate's #4595, option (b) (the first builder, 22:1x on 30 Oct): a
 /// product lamp offers no `prepare_to_unplug` (`LAMP_UNPLUG` unset). With
 /// `LAMP_SHUTDOWN` on in the product since the button's check on a product
@@ -334,7 +359,7 @@ fn a_product_chat_request_offers_dance_at_the_bound() {
             .any(|name| name == lamp_voice::second_provider::net::search::FETCH),
         "{chat:?}"
     );
-    assert_eq!(skill_tools, ["dance", "set_pose"]);
+    assert_eq!(skill_tools, ["dance", "lamp_help", "set_pose"]);
     assert!(
         chat.iter().any(|name| name == lamp_voice::use_skill::NAME),
         "{chat:?}"
@@ -390,7 +415,7 @@ fn with_reports_on_dance_stays_at_the_bound() {
         reached,
         ..
     } = product_with(&[(lamp_voice::reports_stop::ENVIRONMENT, "on")]);
-    assert_eq!(skill_tools, ["dance", "set_pose"]);
+    assert_eq!(skill_tools, ["dance", "lamp_help", "set_pose"]);
     assert!(
         chat.len() > lamp_gemini::MAX_TOOLS && chat.len() <= lamp_voice::second_provider::MAX_TOOLS,
         "{chat:?}"

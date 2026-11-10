@@ -23,6 +23,7 @@ pub mod addon;
 pub mod clock;
 pub mod daily;
 pub mod glow;
+pub mod knowledge;
 pub mod known;
 pub mod limits;
 pub mod package;
@@ -223,6 +224,9 @@ struct SkillFile {
     ask: Option<AskFile>,
     /// A function the model may call, which runs the steps.
     tool: Option<String>,
+    /// A file of the skill's folder whose section the choice names is told
+    /// to the tool's call after its note (#5790, [`knowledge`]).
+    knowledge: Option<String>,
     /// The tool's one argument the model picks from named values.
     choice: Option<ChoiceFile>,
     /// The tool's one argument that is yes or no.
@@ -1682,6 +1686,7 @@ fn addon_file(file: &SkillFile, no_triggers: bool) -> Result<(), String> {
         (file.again.is_some(), "[again]"),
         (file.still.is_some(), "still"),
         (file.history.is_some(), "[history]"),
+        (file.knowledge.is_some(), "knowledge"),
         (file.search.is_some(), "[search]"),
         (file.stop.is_some(), "[stop]"),
         (file.watch.is_some(), "[watch]"),
@@ -1817,6 +1822,9 @@ pub struct Skill {
     /// With `[history]`: how far back a call is told who was at the lamp
     /// (#1685), and in what words (#940).
     pub history: Option<visits::History>,
+    /// With `knowledge`: the product knowledge a call is told, the section
+    /// its choice names (#5790, [`knowledge`]).
+    pub knowledge: Option<knowledge::Knowledge>,
     /// Local minutes of the day, from and to, when it never starts itself.
     quiet: Option<(u16, u16)>,
     /// The most runs it starts itself a local day.
@@ -4542,6 +4550,60 @@ fn manifest(
             })
         }
     };
+    // Product knowledge (#5790, the core FAQ): a person asks, so a tool
+    // alone starts it; its choice names the section told, with a default
+    // for a call that names none; its one say is the note the section
+    // follows, the same for every call.
+    let knowledge = match &file.knowledge {
+        None => None,
+        Some(name) => {
+            if file.tool.is_none() || !triggers.is_empty() {
+                return Err(
+                    "knowledge is told to a tool's call: in a skill started by its tool alone"
+                        .into(),
+                );
+            }
+            let Some(choice) = file
+                .choice
+                .as_ref()
+                .filter(|choice| choice.default.is_some())
+            else {
+                return Err(
+                    "knowledge goes with a [choice] with a default: its words name the sections"
+                        .into(),
+                );
+            };
+            // A tool's say is a note (a say table is refused with a tool).
+            let notes: Vec<(bool, &str)> = steps
+                .iter()
+                .filter_map(|(only, step)| match step {
+                    Step::Call(Call::Say(note)) => Some((only.is_none(), note.as_str())),
+                    _ => None,
+                })
+                .collect();
+            let [(true, note)] = notes.as_slice() else {
+                return Err("knowledge goes with one say, a note, in every call".into());
+            };
+            // Nothing in it is anyone's, and the answer is bounded here,
+            // at load, whole: a `[history]` record told beside it is about
+            // people and grows with the visits, so the two together could
+            // pass what the link carries (Reviewer-three on #5822).
+            if history.is_some() {
+                return Err(
+                    "knowledge is the same words for everyone: not with [history], which is told who was here"
+                        .into(),
+                );
+            }
+            let looks = steps
+                .iter()
+                .any(|(_, step)| *step == Step::Call(Call::Look));
+            let loaded = knowledge::read(dir, name, &choice.one_of)?;
+            if let Some(why) = loaded.too_long(note, looks) {
+                return Err(why);
+            }
+            Some(loaded)
+        }
+    };
     // The words the voice says for a `say = { from = ... }` are the skill
     // whose say it is (#940): checked here as the voice checks them, and
     // only in a skill with that say.
@@ -4623,6 +4685,7 @@ fn manifest(
         still,
         search,
         history,
+        knowledge,
         quiet,
         most_a_day: file.most_a_day,
         active,
@@ -6569,6 +6632,42 @@ impl Engine {
             .collect()
     }
 
+    /// A `knowledge` skill's calls (#5790): its note followed by the section
+    /// the call's choice names (or its default), and whether each skill
+    /// that section names is on this lamp now: installed and enabled, and
+    /// not turned off or snoozed. One installed disabled is not among
+    /// the engine's skills, so it is told as not on this lamp.
+    fn told_knowledge(
+        &self,
+        skill: &Skill,
+        calls: Vec<Call>,
+        args: &Value,
+        now_us: u64,
+    ) -> Vec<Call> {
+        let (Some(knowledge), Some(choice)) = (&skill.knowledge, &skill.choice) else {
+            return calls;
+        };
+        let topic = args[&choice.name]
+            .as_str()
+            .or(choice.default.as_deref())
+            .unwrap_or_default();
+        let Some(section) = knowledge.section(topic) else {
+            return calls;
+        };
+        let here = |name: &str| match self.skills.iter().find(|other| other.name == name) {
+            None => knowledge::Here::Missing,
+            Some(_) if self.stopped(name, now_us) => knowledge::Here::Off,
+            Some(_) => knowledge::Here::On,
+        };
+        calls
+            .into_iter()
+            .map(|call| match call {
+                Call::Say(note) => Call::Say(knowledge::told(&note, section, here)),
+                other => other,
+            })
+            .collect()
+    }
+
     fn local_minute(&self, now_us: u64) -> Option<u16> {
         let (offset, at_us, unix_ms) = self.clock?;
         let ms = i128::from(unix_ms) + (i128::from(now_us) - i128::from(at_us)) / 1_000;
@@ -8306,9 +8405,14 @@ impl Engine {
                 format!("the model called {name} with {args}"),
                 None,
             )],
-            calls: self.told_history(
+            calls: self.told_knowledge(
                 skill,
-                calls(&self.latest, &self.picked, skill, None, now_us, args, None),
+                self.told_history(
+                    skill,
+                    calls(&self.latest, &self.picked, skill, None, now_us, args, None),
+                    now_us,
+                ),
+                args,
                 now_us,
             ),
             ask: None,

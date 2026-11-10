@@ -3,6 +3,7 @@
 mod addon;
 mod call_wait;
 mod daily_engine;
+mod faq;
 mod format;
 mod journal_output;
 mod made;
