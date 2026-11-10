@@ -23,6 +23,7 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
         || crate::tools::SCHEDULE_NAMES.contains(&name)
         || crate::agent_tasks::is_tool(name)
         || crate::known_faces::is_tool(name)
+        || crate::rules::is_tool(name)
         || matches!(
             name,
             "light_on"
@@ -192,6 +193,29 @@ pub(super) fn context(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Thirteen's P2-1 on #5942: a rule's and a face's forget keep their
+    /// built-in names and outcomes, which alone back a forget said done
+    /// (`action_claim::forgot_in`).
+    #[test]
+    fn a_rule_or_face_forget_keeps_its_name_and_outcome() {
+        let kept = status(
+            crate::rules::FORGET_RULE,
+            &json!({"forgotten": true, "note": "Stop following it from now on."}),
+        );
+        assert_eq!(
+            kept,
+            json!({"tool": crate::rules::FORGET_RULE, "outcome": {"forgotten": true}})
+        );
+        let kept = status(
+            crate::known_faces::FORGET,
+            &json!({"error": crate::known_faces::NOT_THEIRS}),
+        );
+        assert_eq!(
+            kept,
+            json!({"tool": crate::known_faces::FORGET, "outcome": {"error": true}})
+        );
+    }
 
     #[test]
     fn cleanup_outcome_status_timing() {

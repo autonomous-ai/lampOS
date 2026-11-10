@@ -68,6 +68,24 @@
 //! line the person asked as a question ([`asked_as_a_question`]), whose
 //! reply may tell a true state ("The light stays on until ten."); the
 //! strict lines judge every turn (the first builder's read of #5588).
+//!
+//! **Forgets said done** (C88, B-G23, with [`ENVIRONMENT`] alone): on a
+//! line that asks to forget (`remember::asks_to_forget`), a reply whose
+//! first sentence says something was forgotten ([`forget_claim`]: "I've
+//! forgotten the thing about your umbrella.", "Okay, forgotten.") is a
+//! claim too ([`Claim::Forgot`]), held and judged the same way. It stands
+//! only when a forget ran in the turn and removed something ([`forgot_in`]:
+//! a memory forget whose outcome says `forgotten`, `everything` or its face
+//! forgotten, a face's forget its `ok` with no `error`, a rule's its
+//! `forgotten`). On lamp-06c1 (10 Nov,
+//! build 11091, request 30) "Lamp, forget that." with the face still was
+//! answered "I've forgotten the thing about your umbrella." with
+//! `calls=none`: `forget` was offered, the model never called it, and the
+//! umbrella stayed kept. Asked again ([`FORGET_NOTE`]), the model calls
+//! `forget`, whose own answer says what to tell them (a one-face line's: "I'll
+//! forget that when I can see you say it."); a second claim is said as
+//! [`NOT_DONE_LINE`]. Only the first sentence that says more than a lead
+//! ("Okay.") is judged: a forget said done in a later one is a known gap.
 
 /// Where the second worker reads the switch. `on` only.
 pub const ENVIRONMENT: &str = "LAMP_ACTION_CLAIM_CHECKED";
@@ -145,6 +163,11 @@ pub fn beside_calls_note(kind: Claim) -> String {
 /// #5215): the calls that ran did run, and are not to be made again.
 pub const LIMIT_NOTE: &str = "(For you to know: your last reply said something would hold until a time or for a length of time, but no function called in this turn carries that time, so it will not, and those words were not said. The functions that did run: do not call them again. If a function can do it at that time, call it now; the lamp says the result itself. If not, say plainly what was done, without that time.)";
 
+/// Told before the round asked again after a forget said done with nothing
+/// forgotten in the turn ([`Claim::Forgot`]). Never "no function was
+/// called": a forget that ran and removed nothing is not to be run again.
+pub const FORGET_NOTE: &str = "(For you to know: your last reply said something was forgotten, but nothing was forgotten in this turn, and those words were not said. If they asked you to forget something and forget has not run in this turn, call forget now; its answer says what to tell them. If it ran and forgot nothing, or you cannot, say plainly that it was not forgotten, as its answer told you, and never that it was.)";
+
 /// Said when the round asked again claims again with no call.
 pub const NOT_DONE_LINE: &str = "Sorry, I didn't do that. Could you ask me again?";
 
@@ -163,6 +186,10 @@ pub enum Claim {
     /// the light on until ten."): a light call, a Schedule set or a kept
     /// rule makes it.
     LightKept,
+    /// Something said forgotten on a line that asks to forget
+    /// ([`forget_claim`]): only a forget that removed something
+    /// ([`forgot_in`]) makes it, never a call by its name.
+    Forgot,
 }
 
 impl Claim {
@@ -181,6 +208,9 @@ impl Claim {
                     || Self::Schedule.made_by(name)
                     || name == crate::rules::KEEP_RULE
             }
+            // A forget makes it only by its outcome ([`forgot_in`]): a
+            // refused or empty one removed nothing (Thirteen's P2-1 on #5942).
+            Self::Forgot => false,
         }
     }
 
@@ -192,6 +222,7 @@ impl Claim {
             Self::Schedule => "a timer or a reminder",
             Self::ReminderTime => "a reminder",
             Self::LightKept => "keeping the light on or off until a time",
+            Self::Forgot => "a forget",
         }
     }
 
@@ -203,6 +234,7 @@ impl Claim {
             Self::Schedule => "timer or reminder",
             Self::ReminderTime => "reminder time",
             Self::LightKept => "light kept",
+            Self::Forgot => "forget",
         }
     }
 }
@@ -370,6 +402,169 @@ pub fn claim_as(reply: &str, ended: bool, worded: bool) -> Option<Option<Claim>>
         (_, Some(Some(kind))) => Some(Some(kind)),
         (Some(None), Some(None)) => Some(None),
         _ => None,
+    }
+}
+
+/// [`claim_as`], and with `forget` (the line asks to forget) a forget said
+/// done ([`forget_claim`], [`Claim::Forgot`]) too. Without `forget` this is
+/// [`claim_as`] exactly.
+pub fn claim_on(reply: &str, ended: bool, worded: bool, forget: bool) -> Option<Option<Claim>> {
+    let found = claim_as(reply, ended, worded);
+    if !forget || matches!(found, Some(Some(_))) {
+        return found;
+    }
+    match (found, forget_claim(reply, ended)) {
+        (_, Some(true)) => Some(Some(Claim::Forgot)),
+        (Some(None), Some(false)) => Some(None),
+        _ => None,
+    }
+}
+
+/// [`stands`], and a forget said done ([`Claim::Forgot`]) only with
+/// `forgot` (a forget removed something in the turn, [`forgot_in`]).
+pub fn stands_on<'a>(
+    kind: Claim,
+    reply: &str,
+    read: bool,
+    calls: impl IntoIterator<Item = (&'a str, &'a serde_json::Value)>,
+    forgot: bool,
+) -> bool {
+    if kind == Claim::Forgot {
+        return forgot;
+    }
+    stands(kind, reply, read, calls)
+}
+
+/// Whether a forget run in the turn removed something, by the outcomes the
+/// turn keeps of its calls (`after_forget::status`): a memory forget's
+/// `forgotten`, `everything` or `face_forgotten` true, a face's forget
+/// (`forget_my_face`) its `ok` true with no `error`, a rule's forget
+/// (`forget_rule`) its `forgotten` true. A refused forget ("forgotten":
+/// false, a one-face line's included; a face's `NOT_SEEN` or `NOT_THEIRS`),
+/// a rule forget that removed nothing, or an error removed nothing.
+pub fn forgot_in(statuses: &[serde_json::Value]) -> bool {
+    statuses.iter().any(|status| {
+        let outcome = &status["outcome"];
+        match status["tool"].as_str() {
+            Some(crate::remember::FORGET | crate::remember::FORGET_EVERYTHING) => {
+                ["forgotten", "everything", "face_forgotten"]
+                    .iter()
+                    .any(|field| outcome[field] == true)
+            }
+            Some(crate::known_faces::FORGET) => {
+                outcome["ok"] == true && outcome.get("error").is_none()
+            }
+            Some(crate::rules::FORGET_RULE) => outcome["forgotten"] == true,
+            _ => false,
+        }
+    })
+}
+
+/// Whether `name` is a forget whose outcome [`forgot_in`] reads: a memory
+/// forget, a face's or a rule's.
+pub fn is_forget(name: &str) -> bool {
+    matches!(
+        name,
+        crate::remember::FORGET
+            | crate::remember::FORGET_EVERYTHING
+            | crate::known_faces::FORGET
+            | crate::rules::FORGET_RULE
+    )
+}
+
+/// The words a forget said done opens with, anywhere in its clause: "I've
+/// forgotten …", "I forgot …". Lower case, straight apostrophes.
+const FORGOT_SAID: &[&[&str]] = &[
+    &["i've", "forgotten"],
+    &["i", "have", "forgotten"],
+    &["i've", "now", "forgotten"],
+    &["i", "forgot"],
+    &["mình", "đã", "quên"],
+    &["tôi", "đã", "quên"],
+    &["đã", "quên", "rồi"],
+    &["quên", "rồi"],
+];
+
+/// The words a forget said done is when they open its clause: "Forgotten.",
+/// "It's forgotten.", "Consider it forgotten.", "Đã quên."
+const FORGOT_OPENS: &[&[&str]] = &[
+    &["forgotten"],
+    &["it's", "forgotten"],
+    &["that's", "forgotten"],
+    &["it's", "been", "forgotten"],
+    &["that's", "been", "forgotten"],
+    &["consider", "it", "forgotten"],
+    &["đã", "quên"],
+];
+
+/// A word after a forget's words that says nothing went ("I forgot nothing",
+/// "I forgot to …").
+const FORGOT_NOTHING: &[&str] = &["nothing", "anything", "none", "no", "to"];
+
+/// The words a sentence may be only of and still say nothing ("Okay.",
+/// "Sure thing!"): the next sentence is judged.
+const LEAD_WORDS: &[&str] = &[
+    "okay", "ok", "sure", "alright", "all", "right", "done", "got", "it", "yes", "yeah", "of",
+    "course", "no", "problem", "thing", "there", "you", "go", "dạ", "vâng", "được", "rồi",
+];
+
+/// Whether `reply`, on a line that asks to forget, says something was
+/// forgotten: its first sentence with more than lead words ([`LEAD_WORDS`])
+/// has, in one clause, a forget said done ([`FORGOT_SAID`], or
+/// [`FORGOT_OPENS`] opening the clause), not followed by a word that says
+/// nothing went ([`FORGOT_NOTHING`]), and the sentence does not end in a
+/// '?'. "I'll forget that when I can see you say it.", "I haven't forgotten
+/// it." and "I forgot nothing." say nothing was. `None` until that sentence
+/// ends (`ended`: no more text comes).
+pub fn forget_claim(reply: &str, ended: bool) -> Option<bool> {
+    let text = normalised(reply);
+    let mut rest = text.as_str();
+    loop {
+        let (sentence, mark, after) = match rest.find(['.', '!', '?']) {
+            Some(at) => (&rest[..at], rest[at..].chars().next(), &rest[at + 1..]),
+            None if ended => (rest, None, ""),
+            None => return None,
+        };
+        let words = |part: &'_ str| -> Vec<String> {
+            part.split(|c: char| !(c.is_alphanumeric() || c == '\''))
+                .filter(|word| !word.is_empty())
+                .map(str::to_owned)
+                .collect()
+        };
+        let all = words(sentence);
+        if all.iter().all(|word| LEAD_WORDS.contains(&word.as_str())) {
+            // Only a lead so far: the next sentence says, or nothing.
+            if after.trim().is_empty() {
+                return ended.then_some(false);
+            }
+            rest = after;
+            continue;
+        }
+        if mark == Some('?') {
+            return Some(false);
+        }
+        let said = sentence
+            .split([',', ';', ':', '\u{2014}', '\u{2013}'])
+            .map(words)
+            .any(|clause| {
+                let opens = FORGOT_OPENS.iter().map(|run| (run, true));
+                let anywhere = FORGOT_SAID.iter().map(|run| (run, false));
+                opens.chain(anywhere).any(|(run, at_start)| {
+                    let last = clause.len().saturating_sub(run.len());
+                    let starts = if at_start { 0..=0 } else { 0..=last };
+                    clause.len() >= run.len()
+                        && starts.into_iter().any(|at| {
+                            clause[at..at + run.len()]
+                                .iter()
+                                .zip(run.iter())
+                                .all(|(word, want)| word == want)
+                                && clause
+                                    .get(at + run.len())
+                                    .is_none_or(|next| !FORGOT_NOTHING.contains(&next.as_str()))
+                        })
+                })
+            });
+        return Some(said);
     }
 }
 
@@ -1214,6 +1409,121 @@ fn worded_claim(text: &str, ended: bool) -> Option<Option<Claim>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// C88: a forget said done, and what says nothing went.
+    #[test]
+    fn a_forget_said_done_is_read_from_its_first_sentence() {
+        for reply in [
+            "I've forgotten the thing about your umbrella.",
+            "Okay, I've forgotten that.",
+            "Okay. Forgotten.",
+            "Got it, it's forgotten!",
+            "Olivia, I forgot it.",
+            "Mình đã quên chuyện đó rồi.",
+        ] {
+            assert_eq!(forget_claim(reply, true), Some(true), "{reply}");
+            assert_eq!(
+                claim_on(reply, true, false, true),
+                Some(Some(Claim::Forgot)),
+                "{reply}"
+            );
+            // Not on a line that does not ask to forget.
+            assert_ne!(
+                claim_on(reply, true, false, false),
+                Some(Some(Claim::Forgot))
+            );
+        }
+        for reply in [
+            "I'll forget that when I can see you say it.",
+            "I haven't forgotten it.",
+            "I forgot nothing.",
+            "I couldn't find anything about your umbrella, so I forgot nothing.",
+            "Forgotten? Not yet.",
+            "Nothing was forgotten: which thing do you mean?",
+            "Okay.",
+        ] {
+            assert_eq!(forget_claim(reply, true), Some(false), "{reply}");
+        }
+        // Undecided while its first sentence goes on.
+        assert_eq!(forget_claim("I've forgotten", false), None);
+        assert_eq!(forget_claim("Okay.", false), None);
+        assert_eq!(forget_claim("Okay. I'll forget", false), None);
+        assert_eq!(forget_claim("Okay. I'll forget that.", false), Some(false));
+    }
+
+    /// C88: a forget said done stands only beside a forget that removed
+    /// something, or a face's or a rule's forget.
+    #[test]
+    fn a_forget_said_done_stands_by_what_was_forgotten() {
+        let status = |forgotten: bool| serde_json::json!({"tool": crate::remember::FORGET, "outcome": {"forgotten": forgotten}});
+        assert!(!forgot_in(&[]));
+        assert!(!forgot_in(&[status(false)]));
+        assert!(forgot_in(&[status(false), status(true)]));
+        assert!(!forgot_in(&[
+            serde_json::json!({"tool": "recall", "outcome": {"forgotten": true}})
+        ]));
+        let none = serde_json::Value::Null;
+        let reply = "I've forgotten it.";
+        assert!(!stands_on(
+            Claim::Forgot,
+            reply,
+            false,
+            [("recall", &none)],
+            false
+        ));
+        assert!(stands_on(Claim::Forgot, reply, false, [], true));
+        // A face's or a rule's forget never backs it by its name alone
+        // (Thirteen's P2-1 on #5942): only by what it answered.
+        for name in [crate::known_faces::FORGET, crate::rules::FORGET_RULE] {
+            assert!(!Claim::Forgot.made_by(name), "{name}");
+            assert!(
+                !stands_on(Claim::Forgot, reply, false, [(name, &none)], false),
+                "{name}"
+            );
+        }
+    }
+
+    /// Thirteen's P2-1 on #5942: a face's forget removed something only with
+    /// `ok` and no `error`, a rule's only with `forgotten: true`; a refused
+    /// or empty one ("which one?") removed nothing.
+    #[test]
+    fn a_face_or_rule_forget_backs_a_forget_only_when_it_removed_something() {
+        // As `after_forget::status` keeps a call's outcome.
+        let kept = |name: &str, outcome: serde_json::Value| serde_json::json!({"tool": name, "outcome": outcome});
+        let face = crate::known_faces::FORGET;
+        let rule = crate::rules::FORGET_RULE;
+        assert!(forgot_in(&[kept(face, serde_json::json!({"ok": true}))]));
+        // Refused (`NOT_SEEN`, `NOT_THEIRS`): an error and no `ok`.
+        assert!(!forgot_in(&[kept(
+            face,
+            serde_json::json!({"error": true})
+        )]));
+        assert!(!forgot_in(&[kept(
+            face,
+            serde_json::json!({"ok": true, "error": true})
+        )]));
+        assert!(!forgot_in(&[kept(face, serde_json::json!({"ok": false}))]));
+        assert!(forgot_in(&[kept(
+            rule,
+            serde_json::json!({"forgotten": true})
+        )]));
+        // Nothing removed: `which()`, no `forgotten`.
+        assert!(!forgot_in(&[kept(rule, serde_json::json!({}))]));
+        assert!(!forgot_in(&[kept(rule, serde_json::json!({"ok": true}))]));
+        assert!(!forgot_in(&[kept(
+            rule,
+            serde_json::json!({"forgotten": false})
+        )]));
+        // Another call's `ok` or `forgotten` is no forget.
+        assert!(!forgot_in(&[kept(
+            "light_on",
+            serde_json::json!({"ok": true})
+        )]));
+        assert!(!forgot_in(&[kept(
+            "other_call",
+            serde_json::json!({"forgotten": true})
+        )]));
+    }
 
     /// #5215: the lines are the executive's own, each once, so a line it
     /// says after a real call and one the model copies are the same words.
