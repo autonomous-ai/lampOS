@@ -18,10 +18,11 @@ máy tính không còn tạo kỹ năng nữa (first builder, 3/11, trên Queue)
 "Lamp, tạo cho tôi một kỹ năng làm đèn dịu đi lúc 10 giờ tối." Diễn ra như
 sau:
 
-1. **Hai hàm của riêng giọng nói.** `make_skill(request)` và
-   `put_on_made_skill` là của giọng nói, khai báo một lần và đi tới
-   `Route::MakeLocal`, có hay không có phần tasks; phần tasks không bao giờ
-   khai báo chúng, và kỹ năng không bao giờ được giao cho máy tính.
+1. **Hàm của riêng giọng nói.** `make_skill(request)` là của giọng nói,
+   khai báo một lần và đi tới `Route::MakeLocal`, có hay không có phần
+   tasks; phần tasks không bao giờ khai báo nó, và kỹ năng không bao giờ
+   được giao cho máy tính. Không còn `put_on_made_skill` từ #5977: kỹ năng
+   đã tạo được bật ngay khi được giữ (bước 8).
    `make_skill` tạo ngay, không đọc lại: mô hình nói vài chữ rằng nó đang
    tạo, và người dùng chờ. Công tắc chỉ được đưa cho worker của tuyến thứ
    hai (`process.rs`), worker này giữ cấu hình chat như khi nó khởi động,
@@ -142,17 +143,26 @@ sau:
      của chính nó về điều được yêu cầu.
    - **Điều không kỹ năng nào làm được.** Mô hình được dặn rằng khi yêu cầu
      cần nghe lời nói hay âm thanh, hoặc bất cứ điều gì kỹ năng tạo ra không
-     cảm nhận hay làm được, thì trả lời `cannot:` cùng lý do, không bao giờ
-     thay bằng thứ khác, và không thêm giờ trong ngày mà yêu cầu không nêu.
-     Câu trả lời như vậy, không có khối nào, là trọn vẹn (không hỏi lại như
-     câu bị cắt) và được nói là không tạo được, "a skill can't do that: "
-     cùng lý do của mô hình (tối đa 120 ký tự, `made_skill::CANNOT`); không
-     giữ gì. Khi một phần của yêu cầu không làm được ("dim slowly over a
+     cảm nhận hay làm được, thì trả lời `cannot:` rồi một câu ngắn nói với
+     người dùng, bằng lời dễ hiểu, vì sao, kết thúc bằng điều nên nhờ thay
+     thế nếu có (với lời nhắc vào một giờ hay đều đặn: "Ask me for a
+     reminder instead, like 'remind me every hour to stand up'."), không bao
+     giờ thay bằng thứ khác, và không thêm giờ trong ngày mà yêu cầu không
+     nêu. Câu trả lời như vậy, không có khối nào, là trọn vẹn (không hỏi lại
+     như câu bị cắt) và được báo là không tạo được với đúng lý do đó (#5977;
+     chủ đèn, 10/11: "phải nói rõ tại sao không được"): ứng dụng hiển thị nó
+     là `why`, và giọng nói nói "I couldn't make that: " rồi lý do. Lý do
+     tối đa 240 ký tự (`made_skill::CANNOT`), cắt ở cuối câu, hoặc nếu không
+     thì ở cuối một từ, không bao giờ cắt giữa từ và không bao giờ có "…"
+     (trên lamp-74ff một lý do cắt ở 120 ký tự kết thúc bằng "beyond s…");
+     không giữ gì. Nhật ký cũng ghi: `lamp-voice: a skill made here wasn't
+     kept in N ms: <lý do>` (#5977), lời của đèn hay của mô hình, không bao
+     giờ là lời nhờ của người dùng. Khi một phần của yêu cầu không làm được ("dim slowly over a
      minute"), mô hình làm phần còn lại và thêm một dòng ngoài các khối bắt
      đầu bằng `left out:` (`made_skill::LEFT_OUT`); đèn nói dòng đó sau câu
      kỹ năng làm gì, trong một khung cố định như ghi chú của người tạo ("The
      maker notes what it couldn't do: …", một mệnh đề, bỏ dấu ngoặc kép, tối
-     đa 120 ký tự), nên lời "có" cũng là đồng ý với phần bị bỏ (#5041). Hai
+     đa 120 ký tự), nên người dùng nghe cả phần bị bỏ (#5041). Hai
      dấu hiệu `cannot:` và `left out:` được đọc không phân biệt hoa thường.
 6. **Giữ lại, không cài.** Gói nằm trong thư mục riêng của giọng nói,
    `/var/lib/lampOS/voice/made-skills` (0700, người dùng của giọng nói),
@@ -171,50 +181,35 @@ sau:
    Một câu trả lời không qua thì được nói là không tạo được ("the skill
    couldn't be made: …"), không có từ kỹ thuật, và không giữ gì. Các tệp
    không bao giờ được đọc ra.
-7. **Nói ra, và hỏi.** Khi đã giữ, mô hình được báo tên, kỹ năng làm gì
-   (được nói rõ như trên) và sẽ dùng gì ("đèn của nó và việc nó có đang nói
-   hay không"), và được dặn hỏi đúng từng chữ "Shall I put it on the lamp?"
-   trong cùng câu trả lời. Lúc đó nó chưa được ghi là đã hỏi (P2 của
-   Reviewer-lead trên #4914): chỉ khi một lời "có" đến ngay sau một câu trả
-   lời của đèn có nói câu hỏi đó, trong vòng 120 giây, `put_on_made_skill`
-   mới ghi nó là đã hỏi (`made_skill::asked_in_answer`, quy tắc của #4880)
-   rồi cài đúng SHA-256 đó. Nó được ghi giờ lúc có lời "có", không phải lúc
-   câu trả lời bắt đầu (`make_skill_local::asked_at_yes`). Một lời "có" sau
-   khi bị nói chen hoặc sau một câu hỏi khác thì không cài gì.
-   - Một kỹ năng mà lời hỏi bị cắt là "chưa kể". Khi chỉ có một kỹ năng như
-     vậy, giữ trong `UNTOLD_WITHIN` (10 phút), tuyến thứ hai nhắc mô hình,
-     và mô hình nói nó làm gì rồi hỏi (`make_skill_local::untold_note`).
-   - Khi một kỹ năng đã được hỏi, lời "có" chỉ cài nó khi đèn chưa nói gì
-     từ lúc hỏi, hoặc câu trả lời cuối của đèn chính là câu hỏi: lời "có"
-     cho một câu hỏi khác ("For ten minutes?") không cài gì
-     (`make_skill_local::yes_is_to_the_ask`, P2 của Reviewer-lead trên
-     #4971), và mô hình được dặn hỏi lại đúng từng chữ. Câu hỏi được nhận dù
-     viết hoa hay nằm giữa câu (`made_skill::says_the_ask`).
-8. **Cài khi người dùng nói "có" thành tiếng** (quyết định của trưởng nhóm,
-   20/10 08:37 trên #1711: lời đồng ý bằng giọng nói gắn với SHA-256, một
-   ngoại lệ của quy định 18:33 chỉ cho kỹ năng tạo trên đèn; ứng dụng không
-   phải xác nhận thêm). Khi người dùng đồng ý, mô hình gọi
-   `put_on_made_skill`:
-   - chỉ lời "có" nói thành tiếng mới tính; gõ chữ hay câu do đèn tự viết
-     thì không cài gì;
-   - chỉ một lời "có" rõ ràng (`known_faces::plain_agreement`): "No, not
-     yet" mà mô hình hiểu nhầm là "có" thì không cài gì;
-   - chỉ lời hỏi mới nhất, trong vòng 120 giây;
-   - giọng nói chỉ gửi cho helper quản lý SHA-256 của kỹ năng đó
-     (`{"install_made": SHA256}`), helper chỉ cài đúng các byte đó và kiểm
-     lại giới hạn;
-   - helper cũng tự kiểm tra lời hỏi theo đồng hồ của chính nó
-     (`made_skill::waiting`): chỉ kỹ năng được hỏi gần nhất, trong vòng 120
-     giây và chưa được cài, mới được cài, nên một SHA-256 đã lưu không bao
-     giờ được cài về sau bằng bất kỳ đường nào; lời hỏi mới nhất được xét
-     trước: khi nó đã được cài hoặc đồng hồ lùi về trước nó thì không có gì
-     chờ, và một lời hỏi cũ hơn không bao giờ thế chỗ;
-   - trên tuyến thứ hai, khi một kỹ năng đang chờ, mỗi yêu cầu được nhắc
-     (`made_skill::waiting_note`);
-   - không có helper thì người dùng nghe là không cài được; helper không
-     trả lời trong 8 giây thì nghe là đang cài;
-   - không bao giờ chạy khi chưa bật `LAMP_MAKE_SKILL`: khi tắt, hai hàm đó
-     không thuộc về ai.
+7. **Nói ra, không hỏi** (#5977; chủ đèn, 10/11: kỹ năng đã tạo được bật
+   mà không cần lời "có" nói thành tiếng; nút MAKE IT của ứng dụng và lời
+   nhờ bằng giọng nói chính là lời hỏi). Khi đã giữ, kỹ năng được bật ngay
+   (bước 8), và mô hình được báo tên, đã bật hay chưa, kỹ năng làm gì (được
+   nói rõ như trên) và dùng gì ("đèn của nó và việc nó có đang nói hay
+   không"), và được dặn nói đúng một câu ngắn, không hỏi gì về việc bật:
+   "I made evening dim, and it's on." (`made_skill::on_line`), hoặc khi
+   không bật được, "I made it but couldn't put it on: <lý do>."
+   (`made_skill::not_on_line`, kèm `not_on` trong câu trả lời). Câu "Shall
+   I put it on the lamp?" không bao giờ được nói, không có lời hỏi nào được
+   xếp hàng, và không gì chờ lời "có": các quy tắc của #4880, #4914 và
+   #4971 về lời hỏi đã bỏ theo. Lời nhờ tạo kỹ năng của chính người dùng
+   vẫn là lời hỏi.
+8. **Bật ngay** (`made_skill::put_on`): giọng nói đánh dấu kỹ năng đã giữ
+   để bật (`goes_on_at_unix_ms`, `made_skill::goes_on`) theo đồng hồ của
+   nó, rồi chỉ gửi cho helper quản lý SHA-256 của kỹ năng đó
+   (`{"install_made": SHA256}`); helper chỉ cài đúng các byte đó, kiểm lại
+   giới hạn, và chỉ trong vòng 30 giây sau dấu (`GOES_ON_WITHIN`, theo đồng
+   hồ của chính helper, `made_skill::going_on`), nên một SHA-256 đã lưu
+   không bao giờ được cài về sau bằng bất kỳ đường nào. Chờ helper tối đa
+   8 giây. Helper trả lời xong thì kỹ năng được ghi `on`; nếu không, nó vẫn
+   tắt và lý do được ghi cạnh nó là `not_on`, bằng lời rõ ràng: không với
+   tới helper ("the lamp's skills couldn't be reached"), helper không trả
+   lời trong 8 giây ("the lamp didn't say in time whether it is on"), một
+   kỹ năng cùng tên được bật bằng cách khác ("a skill called evening dim is
+   already on the lamp"), hoặc bị từ chối vì lý do khác ("the lamp's check
+   didn't let it on"). Không bao giờ chạy khi chưa bật `LAMP_MAKE_SKILL`.
+   Việc gỡ một kỹ năng đã tạo (gỡ trong ứng dụng, hoặc `{"off": NAME}`) vẫn
+   như cũ.
 9. **Thời gian chờ** (P3 của Reviewer-lead trên #4914): lời gọi giữ lượt tối
    đa 30 giây một lần hỏi; với một lần thử lại sau lỗi và một lần sửa sau khi
    bị từ chối, nhiều nhất khoảng 120 giây.
@@ -222,42 +217,52 @@ sau:
 Gỡ một kỹ năng tạo ra bằng giọng nói sẽ đến sau.
 
 Kiểm thử: `make_skill_local::tests` (kể cả
+`a_good_answer_is_kept_and_put_on_with_no_yes`,
+`a_kept_skill_not_put_on_is_said_with_why_and_stays_off`,
 `with_no_tasks_part_a_skill_is_made_and_put_on_by_voice`: trên đèn không có
-phần tasks, kỹ năng được tạo, được hỏi và được cài bằng một lời "có" nói
-thành tiếng), `made_skill::tests`, và `crates/skills/tests/it/made.rs` với
-`lamp-skills` thật.
+phần tasks, kỹ năng được tạo và được bật ngay mà không cần lời "có", và
+`the_journal_says_why_a_make_was_not_kept`: #5977, nhật ký ghi
+`lamp-voice: a skill made here wasn't kept in N ms: <lý do>` bằng lời của
+đèn, không bao giờ là lời của người dùng), `made_skill::tests`, và
+`crates/skills/tests/it/made.rs` với `lamp-skills` thật.
 
 ## Gõ trong ứng dụng (#2813, `LAMP_APP_MAKE_SKILL=on`, bật trong sản phẩm)
 
-Cùng người tạo đó, từ chữ gõ trong ứng dụng; chỉ được cài như trên, bằng một
-lời "có" nói ở đèn. Cần `LAMP_MAKE_SKILL=on` và dịch vụ nói (`LAMP_SAY=on`) để
-hỏi thành tiếng; thiếu một trong hai thì socket của ứng dụng không chạy
+Cùng người tạo đó, từ chữ gõ trong ứng dụng; được bật như trên, ngay, không cần
+lời "có" nói thành tiếng (#5977; nút MAKE IT của ứng dụng là lời hỏi). Cần
+`LAMP_MAKE_SKILL=on` và dịch vụ nói (`LAMP_SAY=on`) để nói thành tiếng điều nó
+đã tạo; thiếu một trong hai thì socket của ứng dụng không chạy
 (`crate::app_make`). Không hỏi phần tasks nào, và không cần phần tasks.
 
 - `{"make": {"words", "request_id"}}`: chữ thành cùng bản hướng dẫn (tối đa
   480 byte) và được mô hình của đèn tạo ngay trên một luồng riêng
   (`make_skill_local::make_kept`, `app_make::make_here`), được ghi là tạo từ
-  `local:app:<ms>:1`: `making`, rồi `kept`, hoặc `not_kept` kèm lý do.
+  `local:app:<ms>:1`: `making`, rồi `on`, hoặc `not_kept` kèm lý do.
 - `{"ready": {}}`: `{"ready": true}` ngay, vì đèn tự tạo; `lamp-cloud` ghi
   `skills.make` vào `can` chỉ cần có công tắc, nên nút "Make a skill" của ứng
   dụng hiện ngay.
-- Khi đã giữ, đèn nói thành tiếng qua dịch vụ nói, vào lúc thích hợp trong
-  vòng một giờ: "I made the skill you typed in the app." cùng việc nó làm,
-  rồi đúng câu "Shall I put it on the lamp?". Chỉ một lời "có" ngay sau câu
-  đó mới cài kỹ năng; không gì từ ứng dụng cài được nó.
-- `{"made": {"request_id"}}`: trạng thái của lời nhờ từ ứng dụng: `making`,
-  `kept`, `asked`, `on`, `left_off` hoặc `not_kept` kèm `why` (lời rõ ràng
-  của người tạo).
+- Khi đã giữ, kỹ năng được bật ngay qua helper quản lý, như bằng giọng nói,
+  rồi đèn nói một câu ngắn qua dịch vụ nói, vào lúc thích hợp trong vòng một
+  giờ (`app_make::say_line`): "I made evening dim, and it's on.", hoặc "I
+  made it but couldn't put it on: <lý do>.". Không hỏi gì, không chờ lời
+  "có".
+- `{"made": {"request_id"}}`: trạng thái của lời nhờ từ ứng dụng: `making`
+  (đang tạo, hoặc đã giữ và đang bật), `on`, hoặc `not_kept` kèm `why` (lời
+  rõ ràng của người tạo, "it couldn't be put on: …" khi helper không bật,
+  hoặc "it wasn't put on" khi giữ hơn 30 phút mà chưa bật). Lời nhờ mới
+  không bao giờ là `kept`, `asked` hay `left_off`; chỉ lời nhờ trước #5977
+  chưa được đồng ý mới còn là `left_off`.
 
-Kiểm thử: `app_make::tests`, kể cả trên đèn không có phần tasks: lời nhờ gõ
-được tạo, được giữ, được hỏi thành tiếng và được cài bằng lời "có" nói ngay
-sau câu hỏi đó.
+Kiểm thử: `app_make::tests`, kể cả `made_here_goes_on_at_once_with_no_ask_said`
+(trên đèn không có phần tasks: lời nhờ gõ được tạo, được giữ và được bật
+ngay, câu nói ra là câu "it's on") và
+`made_here_and_not_put_on_says_why_and_tells_the_app`.
 
 ## Kỹ năng viết trong ứng dụng (`LAMP_SKILL_WRITTEN=on`, tắt)
 
 Tắt nếu không đặt `LAMP_SKILL_WRITTEN=on` trong unit của `lamp-voice`, cùng
-`LAMP_MAKE_SKILL=on` (thư mục kỹ năng tự tạo và `put_on_made_skill`) và
-dịch vụ nói (`LAMP_SAY=on`, để hỏi thành tiếng); và trong unit của
+`LAMP_MAKE_SKILL=on` (thư mục kỹ năng tự tạo và việc bật nó) và
+dịch vụ nói (`LAMP_SAY=on`, để nói thành tiếng); và trong unit của
 `lamp-cloud`, cùng trang kỹ năng, cho `skills.write` của ứng dụng
 ([cloud.md](../cloud.md), "A skill written in the app"). First builder
 duyệt trên Queue (3/11, 14:33). Người dùng tự viết một kỹ năng bằng lời
@@ -299,9 +304,8 @@ hình nào viết hay viết lại một chữ (`made_skill::Written`,
 3. **Kiểm và giữ như một kỹ năng tự tạo** (`made_skill::keep_written`):
    tên trùng một kỹ năng trên đèn (`/var/lib/lampOS/skills/NAME`, hoặc được
    đẩy lên, `/var/lib/lampOS/skills-dev/NAME`) thì bị từ chối; một kỹ năng
-   đang giữ cùng tên mà chưa bật, đã được hỏi hay chưa, được thay bằng cái
-   mới, cùng gói và lời hỏi của nó (lời "không" không để lại dấu vết, nên bản
-   sửa gửi sau đó được nhận ngay, và một lời "có" muộn không bật gì cả); rồi giới hạn (`written_capped`:
+   đang giữ cùng tên mà chưa bật được thay bằng cái mới, cùng gói và dấu bật
+   của nó, nên bản sửa gửi sau đó được nhận ngay; rồi giới hạn (`written_capped`:
    đúng hình dạng đó, ghi chú đóng khung như trên và trong cùng các giới
    hạn), `lamp-skills pack`, và cùng cách giữ, tối đa năm kỹ năng tự tạo,
    tạo từ `written:app:<ms>:1`. Câu trả lời của một mô hình không bao giờ
@@ -309,24 +313,21 @@ hình nào viết hay viết lại một chữ (`made_skill::Written`,
 4. **Nói bằng lời dễ hiểu** (`plainly`, mở rộng chỉ cho dạng này): "When
    you ask for it (WHEN), the lamp follows the instructions you wrote:
    INSTRUCTIONS…", `when` cắt còn 60 ký tự và hướng dẫn còn 70, mỗi cái ở
-   ranh giới một từ. Khi đã giữ, đèn hỏi thành tiếng qua các lời hỏi riêng
-   của dịch vụ nói, vào lúc thích hợp: "I kept the skill you wrote in the
-   app, NAME. When you ask … Shall I put it on the lamp?"
-   (`app_make::written_ask_line`). Nó dùng "its voice".
-5. **Chỉ cài khi người dùng nói "có" thành tiếng**, như kỹ năng tự tạo:
-   lời hỏi được ghi giờ khi nói trọn, và chỉ một lời "có" rõ ràng trong 120
-   giây mới cài theo SHA-256 (`put_on_made_skill`). Helper quản lý kiểm lại
-   giới hạn (`made_skill::put_on_cap`: của kỹ năng viết khi có hàm, nếu
-   không thì của kỹ năng tự tạo) và `made: here`. Trước lời "có" đó không
-   có gì trong thư mục kỹ năng, nên hàm của nó không được khai báo cho mô
-   hình nào. `skills.made` báo cho ứng dụng `making`, `kept`, `asked`, `on`,
-   `left_off` hoặc `not_kept` (kèm lý do, trong đó có tên đã dùng), với
+   ranh giới một từ. Nó dùng "its voice".
+5. **Bật ngay, không cần lời "có" nói thành tiếng** (#5977; chủ đèn,
+   10/11), như kỹ năng tự tạo: theo SHA-256 qua helper quản lý
+   (`made_skill::put_on`), helper kiểm lại giới hạn
+   (`made_skill::put_on_cap`: của kỹ năng viết khi có hàm, nếu không thì
+   của kỹ năng tự tạo) và `made: here`. Rồi đèn nói qua dịch vụ nói, vào
+   lúc thích hợp, "I made NAME, and it's on." (`made_skill::on_line`), hoặc
+   lý do không bật được. `skills.made` báo cho ứng dụng `making`, `on` hoặc
+   `not_kept` (kèm lý do, trong đó có tên đã dùng hay việc bật thất bại), với
    `"written": true`; trang kỹ năng hiển thị nó trong "Made on this lamp"
    với `"written": true`, không bao giờ như một kỹ năng từ Store.
 
 Kiểm thử: `made_skill::tests::a_written_skill_*`,
 `app_make::tests::a_written_skill_*`,
-`made::a_written_skill_passes_the_real_checker_and_is_put_on_only_when_asked`
+`made::a_written_skill_passes_the_real_checker_and_is_put_on_only_once_marked`
 của lamp-skills, và `make_skill::tests::a_written_skill_is_handed_to_the_voice_as_written`
 cùng `written_fields_are_held_as_lamp_voice_holds_them` của `lamp-cloud`.
 
@@ -400,13 +401,14 @@ giờ có tên, lời hay tệp của một kỹ năng.
 - **Người tạo nằm trên thẻ** (`made_skill::Maker`). Khi đóng gói, giọng nói
   ghi `made_by: voice` hoặc `made_by: app` (lời nhờ từ ứng dụng có `from` là
   `local:app:…`) cạnh `made: here` trong `SKILL.md`, bên trong gói, nên
-  SHA-256 và lời đồng ý bao gồm nó; dòng `made` hay `made_by` do mô hình viết
+  SHA-256 dùng để bật nó cũng bao gồm nó; dòng `made` hay `made_by` do mô hình viết
   bị bỏ. Gói chia sẻ được bỏ dấu này cùng `made: here`.
 - **Lời nhờ tạo kỹ năng, bằng giọng nói và từ ứng dụng, trong
   `lamp-voice`** (`made_counts`). Socket của ứng dụng nhận thêm
   `{"counts": {}}` và trả `{"made_by_voice": {"kept", "on", "refused",
   "left_off"}, "made_by_app": {...}}`, là tổng cộng dồn theo người tạo.
-  `kept`, `on` và `left_off` đọc từ chỉ mục kỹ năng tự tạo, mỗi kỹ năng đếm
+  `kept`, `on` và `left_off` (đã giữ mà không bật được, `not_on` của nó;
+  hoặc đã được hỏi trước #5977 mà không được đồng ý) đọc từ chỉ mục kỹ năng tự tạo, mỗi kỹ năng đếm
   một lần theo SHA-256, dưới người tạo mà `from` của nó cho biết
   (`local:app:…` hoặc `written:app:…` là của ứng dụng, `local:…` là của
   giọng nói); `refused` (lời nhờ không tạo được gì) được cộng vào một biến
@@ -452,8 +454,9 @@ gói mang chữ ký của Store ("add it from the Skill Store"), gói có `run.p
 hay tệp nào khác ngoài `skill.toml` và `SKILL.md`, và tên đã có trên đèn.
 Sau đó, qua socket app-make (`{"upload": {"skill_md", "skill_toml"?}}`, một
 dòng tối đa 64 KiB, chỉ nhận khi `lamp-voice` bật công tắc và có dịch vụ
-say để hỏi; và `{"added": {"sha256"}}`, trạng thái `kept`, `asked`, `on`,
-`left_off` hay `none`, mà `lamp-cloud` hỏi mỗi 5 giây, tối đa 2 giờ). Cùng
+say để nói ra; và `{"added": {"sha256"}}`, trạng thái `kept` (đang bật),
+`on`, `left_off` (đã giữ mà không bật được; hoặc đã hỏi trước #5977) hay
+`none`, mà `lamp-cloud` hỏi mỗi 5 giây, tối đa 2 giờ). Cùng
 một lần tải lên gửi lại khi nó còn đang xử lý sẽ nhập vào lần đang chạy
 (trả lời `starting`, một kết quả cho cả hai), không bao giờ là `BUSY`; và
 những lần đang xử lý được giữ trong thư mục trạng thái của `lamp-cloud`
@@ -480,10 +483,12 @@ năng), nên sau khi khởi động lại nó được hỏi tiếp và ứng d�
    cạnh các kỹ năng tự tạo với `"added": "file"`, tối đa năm (tự tạo hoặc
    thêm). Trên trang kỹ năng (`skills.list`) nó thuộc nhóm tạo trên đèn, có
    `"uploaded": true`, không bao giờ là của Store.
-6. **Hỏi thành tiếng, chỉ bật khi có tiếng "có"**: qua dịch vụ say, "A skill
-   called NAME was added in the app from a file, not from the Skills
-   Store." cùng lời của `plainly`, rồi đúng câu "Shall I put it on the
-   lamp?". Không gì từ ứng dụng bật được nó.
+6. **Bật ngay, không cần lời "có" nói thành tiếng** (#5977; chủ đèn,
+   10/11): sau khi socket trả lời `kept`, nó được bật qua helper quản lý
+   (`made_skill::put_on`), rồi được nói qua dịch vụ say: "I added NAME from
+   a file, not from the Skills Store, and it's on."
+   (`upload_skill::on_line`), hoặc "I added a skill from a file but
+   couldn't put it on: <lý do>." (`upload_skill::not_on_line`).
 7. **Helper quản lý kiểm tra lại** (`install_made`): thẻ có `added: file`
    theo `capped_added`, và không bao giờ thay chỗ kỹ năng nào, kể cả kỹ
    năng tự tạo.
