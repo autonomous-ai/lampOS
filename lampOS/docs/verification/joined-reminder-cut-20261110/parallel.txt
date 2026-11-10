@@ -1,0 +1,37 @@
+
+running 180 tests
+................................i...................................................... 87/180
+............................................i.................i.... 154/180
+reminders::transport::tests::lost_wait_ownership_drop_retains_claim_until_fixture_exit --- FAILED
+.........................
+failures:
+
+---- reminders::transport::tests::lost_wait_ownership_drop_retains_claim_until_fixture_exit stdout ----
+
+thread 'reminders::transport::tests::lost_wait_ownership_drop_retains_claim_until_fixture_exit' (107307605) panicked at crates/voice/src/reminders/transport.rs:1079:9:
+wait-parent: 
+running 1 test
+test reminders::transport::tests::claim_retention_boundary_fixture ... FAILED
+
+failures:
+
+failures:
+    reminders::transport::tests::claim_retention_boundary_fixture
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5490 filtered out; finished in 10.24s
+
+
+
+thread 'reminders::transport::tests::claim_retention_boundary_fixture' (107307719) panicked at crates/voice/src/reminders/transport.rs:973:13:
+claim-retention fixture did not complete its bounded handshake
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    reminders::transport::tests::lost_wait_ownership_drop_retains_claim_until_fixture_exit
+
+test result: FAILED. 176 passed; 1 failed; 3 ignored; 0 measured; 5311 filtered out; finished in 48.50s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

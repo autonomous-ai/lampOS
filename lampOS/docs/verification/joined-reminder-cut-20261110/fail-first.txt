@@ -1,0 +1,23 @@
+
+running 1 test
+lamp-voice schedule-consumer: reminder id 1 delivery 1: due, offered to the voice (attempt 1, late)
+lamp-voice: the reminder was cut after 27200 of its 32000 samples had played: counted as said, not offered again
+lamp-voice schedule-consumer: reminder id 1 delivery 1: said; its completion is kept, to be acknowledged
+lamp-voice schedule-consumer: reminder id 1 delivery 1: due, offered to the voice (attempt 1, late, 1 more as late in the same line)
+lamp-voice: the reminder was cut after 27200 of its 32000 samples had played: counted as said, not offered again
+lamp-voice schedule-consumer: reminder id 1 delivery 1: said; its completion is kept, to be acknowledged
+lamp-voice schedule-consumer: reminder id 2 delivery 1: said in one line with another late one; its completion is kept, to be acknowledged
+
+thread 'coordinator::tests::reminders::a_cut_joined_reminder_does_not_complete_its_unplayed_tail' (107141884) panicked at crates/voice/src/coordinator/tests/reminders.rs:2346:13:
+the unplayed final joined item was durably completed by an aggregate 85% cut: [Complete { token: PreparedToken { key: DeliveryKey { store_id: "0123456789abcdef0123456789abcdef", id: 1, delivery: 1 }, attempt: 1, correlation: Correlation { consumer_session: "roundtrip-1", sequence: 1 } }, proof: QualifiedCompletion { correlation: Correlation { consumer_session: "roundtrip-1", sequence: 1 }, owner_boot: [27, 84, 163, 10, 221, 118, 57, 174, 129, 20, 53, 20, 107, 105, 207, 233], turn: 1, microphone_generation: 1, provider_session: 1, playback_sequence: 1, final_epoch: 0, final_frame: 27200, retired_generations: 1 } }]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+coordinator::tests::reminders::a_cut_joined_reminder_does_not_complete_its_unplayed_tail --- FAILED
+
+failures:
+
+failures:
+    coordinator::tests::reminders::a_cut_joined_reminder_does_not_complete_its_unplayed_tail
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5488 filtered out; finished in 7.17s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`
