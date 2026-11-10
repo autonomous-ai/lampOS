@@ -1322,3 +1322,67 @@ fn monitor_mode_an_open_stream_ends_with_its_session() {
     let (status, _, body) = rig.ask_as("lamp-test.local", "GET", "/bus", &with, "");
     assert_eq!(status, 401, "{body}");
 }
+
+/// A session that ends while a push is still reading its sections ends the
+/// stream at once, and nothing that push read is sent (reviewer-two's HOLD
+/// on 8dc2f76e74): the units are read slowly, returning a row of their own
+/// one second after the session's end.
+#[test]
+fn monitor_mode_a_session_ending_during_a_read_sends_nothing_read_after() {
+    let monitor = monitor_names();
+    let opened = Instant::now() - SESSION_LASTS + Duration::from_secs(2);
+    let end = opened + SESSION_LASTS;
+    let session = {
+        let mut gate = monitor.gate();
+        let code = gate.issue(opened).unwrap();
+        match gate.redeem(&code, opened).unwrap() {
+            Redeemed::Session(session) => session,
+            other => panic!("{other:?}"),
+        }
+    };
+    let rig = Rig::built(
+        "mon-read",
+        None,
+        Arc::new(move || {
+            thread::sleep((end + Duration::from_secs(1)).saturating_duration_since(Instant::now()));
+            vec![UnitRow {
+                id: "after-expiry.service".into(),
+                active: "active".into(),
+                sub: "running".into(),
+                ..UnitRow::default()
+            }]
+        }),
+        Some((monitor, conn("192.168.1.20:50000", "192.168.1.5:80"))),
+    );
+    let with = format!("Cookie: peek_session={session}\r\n");
+    let mut stream = TcpStream::connect(("127.0.0.1", rig.port)).unwrap();
+    stream.set_read_timeout(Some(WAIT)).unwrap();
+    write!(
+        stream,
+        "GET /events HTTP/1.1\r\nHost: lamp-test.local\r\nConnection: close\r\n{with}\r\n"
+    )
+    .unwrap();
+    let mut reader = BufReader::new(stream);
+    let (mut text, mut line) = (String::new(), String::new());
+    loop {
+        line.clear();
+        match reader.read_line(&mut line) {
+            Ok(0) => break,
+            Ok(_) => text.push_str(&line),
+            Err(error) => panic!("the stream outlived its session: {error}"),
+        }
+    }
+    let ended = Instant::now();
+    assert!(text.starts_with("HTTP/1.1 200"), "{text}");
+    assert!(
+        !text.contains("after-expiry.service"),
+        "a read finished after the session's end was sent: {text}"
+    );
+    assert!(
+        ended < end + Duration::from_millis(500),
+        "the stream waited for the read past its session's end by {:?}",
+        ended - end
+    );
+    let (status, _, body) = rig.ask_as("lamp-test.local", "GET", "/bus", &with, "");
+    assert_eq!(status, 401, "{body}");
+}

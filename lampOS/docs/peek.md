@@ -368,7 +368,9 @@ Environment=LAMP_PEEK=monitor
   SameSite=Strict; Path=/`, a random value, not the code. It opens every
   view and the stream. Sessions end after 12 hours, when peek stops or
   restarts (nothing is written), or when the switch goes off; a stream
-  already open ends with its session, checked before each push. At most 4 are
+  already open ends with its session, checked before each push and again
+  before a push's sections are sent; a push still reading when the session
+  ends is dropped there and sends nothing. At most 4 are
   open; a fifth code gets 429 and is kept for when one ends.
 - A used, expired or unknown code gets 401: "This link was used or is out of
   date: get a new one in the app." Without a session, every view gets 401 and
@@ -479,6 +481,12 @@ own, and asks for it over HTTP:
     the code posted once sets the cookie, which opens every view; posted
     again it is 401; the token's form opens nothing; after a restart the
     cookie gets 401.
+  - `monitor_mode_an_open_stream_ends_with_its_session`: an open `/events`
+    ends when its session does; then `/bus` with the cookie is 401.
+  - `monitor_mode_a_session_ending_during_a_read_sends_nothing_read_after`:
+    units read slowly, returning a row of their own 1 s after the session's
+    end; the stream ends within 500 ms of the end without that row, and
+    `/bus` is 401.
   - `monitor::tests`: a code works once; on a fake clock it is good at
     4:59 and refused at 5:00; a fifth browser is refused and sessions end at
     12 h; a new gate (a restart) knows no session or code; the LAN and
