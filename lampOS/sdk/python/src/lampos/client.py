@@ -47,7 +47,7 @@ KEEPALIVE_S = 20.0
 # Ended at their answer by a lamp-control that doesn't say `motion_done` in
 # hello's limits (from before #4209): it hands them to the body and says
 # nothing back.
-ENDS_AT_REPLY = frozenset({"gesture", "move", "express"})
+ENDS_AT_REPLY = frozenset({"gesture", "move", "express", "play"})
 # A phrase's floor in letters and digits, lamp-control's PHRASE_MIN_LETTERS.
 # The SDK's check is a pre-check: it may let through what the lamp refuses,
 # never the other way.
@@ -698,8 +698,8 @@ class Lamp:
         here then, even if the wait is cancelled (Reviewer-two's P2 on #5837).
         `request` takes the next id before it first yields, so this is it."""
         id_ = self._next_id
-        # A lamp that says `motion_done` ends `gesture`, `move` and an
-        # express's move with a `done` once the body says what became of
+        # A lamp that says `motion_done` ends `gesture`, `move`, `play` (a move, by another
+        # name) and an express's move with a `done` once the body says what became of
         # them; on one that doesn't, their wait ends at the answer, so none
         # is kept for them.
         at_reply = op in ENDS_AT_REPLY and not self.limits.get("motion_done")
@@ -946,8 +946,13 @@ class Lamp:
         frames = poses_to_frames(poses, step_ms=POSES_STEP_MS, hold_ms=hold_ms)
         return await self.move(frames, POSES_STEP_MS, wait=wait)
 
-    async def play(self, name: str, *, wait: bool = False) -> dict:
-        return await self._act("play", wait, name=name)
+    async def play(self, name: str, *, skill: str | None = None, wait: bool = False) -> dict:
+        """Play a move recorded in a skill this computer pushed (its
+        `moves/NAME.json`, kept when `push_skill` installed it), as a `move`
+        of the same frames is played: the same body lease, caps and answer.
+        `skill` says which when two of your skills have the name; the lamp
+        refuses an ambiguous name, naming them."""
+        return await self._act("play", wait, name=name, skill=skill)
 
     async def joints(self, lease: Lease, within_ms: int, *, wait: bool = False, **targets: float) -> dict:
         """Aim the joints named, in degrees, under `lease`. Its answer when the
@@ -1217,7 +1222,19 @@ class Lamp:
                 parts=len(parts),
                 data=data,
             )
-        return reply.get("skill", {})
+        skill = reply.get("skill", {})
+        # What the lamp kept of the package's `moves/` for `play` (a lamp
+        # that has it): `{"kept": [...], "left_out": [{"name", "why"}]}`. A
+        # lamp that doesn't say gets the check's own: the moves it would
+        # refuse, with `kept` None (not known here).
+        if "moves" in reply:
+            return {**skill, "moves": reply["moves"]}
+        left = [
+            {"name": w.split(":", 1)[0].removeprefix("moves/").removesuffix(".json"), "why": w.split(": ", 1)[1]}
+            for w in report.warnings
+            if w.startswith("moves/")
+        ]
+        return {**skill, "moves": {"kept": None, "left_out": left}} if left else skill
 
     async def skills(self) -> list[dict]:
         """This computer's own pushed skills."""

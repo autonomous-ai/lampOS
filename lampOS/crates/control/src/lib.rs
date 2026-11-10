@@ -31,6 +31,7 @@ pub mod pairing;
 pub mod parts;
 pub mod protocol;
 pub mod push;
+pub mod pushed_moves;
 pub mod rate;
 pub mod runs;
 pub mod server;

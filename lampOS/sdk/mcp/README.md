@@ -14,7 +14,7 @@ claude mcp add lamp -- lamp-mcp
 **On a customer lamp today (stable 11450, promoted 10 Nov, lamp-voice `135bc417d4`):** lamp-control is on every lamp,
 and answers once the owner turns on developer access in the app. Five gaps,
 and what to do ([more](../README.md#on-a-customer-lamp-today)):
-- **Play and a look at a face:** `lamp_play` is refused, "not routed yet: waits for client packages", and so is `lamp_look` at `face` or `name`, "not in this release". Send a recorded move as `lamp_move`; look at `ahead` or an angle.
+- **Play and a look at a face:** `lamp_play` is refused, "not routed yet: waits for client packages" (from the next build it plays a move recorded in a pushed skill's `moves/`), and so is `lamp_look` at `face` or `name`, "not in this release". Send a recorded move as `lamp_move`; look at `ahead` or an angle.
 - **A motion's end:** `lamp_gesture` and `lamp_move` return when the lamp takes the motion, not when it ends (the next build ends it at the body's `done`, where hello's `limits` say `motion_done`).
 - **Limp and pose:** the body's limp and hold-a-pose can't be reached from a computer.
 - **No mDNS:** `lamp pair` without `--host` finds nothing. Give `--host lamp-xxxx.local` (the lamp's host name) or its IP address; the pairing keeps it.
@@ -78,7 +78,8 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `frames` | list of lists of integers, required | each 5 joint offsets in counts (pitch, roll, yaw, shoulder, elbow), the first and last all 0; the body checks it | — | | |
 | `lamp_move_poses` | `poses` | list of objects, required | each the joints it turns in degrees from the standing pose: `pitch` (up positive), `roll`, `yaw` (right positive), `shoulder`, `elbow` (up positive), at most pitch and roll 114.3°, yaw 114.3°, shoulder and elbow 87.9° at most before sending (what any lamp may take; the lamp's own reach is the body's and the door refuses past it with the reach in its words: pitch and roll 17.6°, yaw 22.0° (13.2° on 11091), shoulder and elbow 30.8° on a lamp as shipped, 90% of the hardware's range on a dev lamp, and the anti-tip rule still holds); eased there and back at 80% of the body's speeds, 1.5 to 10 s in all; one it can't make is `bad_request` naming the pose and joint, before anything is sent | — | body | yes, 10 s |
 | | `hold_ms` | integer | 0 to 10000: how long each pose is held | 400 | | |
-| `lamp_play` | `name` | string, required | a recorded move's name: lowercase letters, digits, `-` and `_`, 40 at most; a lamp that doesn't route `play` yet refuses it, as every customer lamp does today (stable 11450) | — | body | yes, 10 s |
+| `lamp_play` | `name` | string, required | a move recorded in one of your pushed skills (`moves/NAME.json`): lowercase letters, digits, `-` and `_`, 40 at most; a lamp that doesn't route `play` yet refuses it, as every customer lamp does today (stable 11450) | — | body | yes, 10 s |
+| | `skill` | string | the pushed skill that has the move, when two have the name (the lamp refuses an ambiguous name, naming them) | none | body | yes, 10 s |
 | `lamp_joints` | `within_ms` | integer | 0 or more: how soon the joints get there (the body's caps pace each step). On stable 11450 all five go (stable 11048 and older: only `yaw` and `pitch`, the others refused), and with the body silent for 15 s both yaw and pitch must be named | 1000 | body | yes, 10 s, named in the request |
 | | `pitch` | number | degrees, −180 to 180; at least one of the five | none | | |
 | | `roll` | number | degrees, −180 to 180 | none | | |

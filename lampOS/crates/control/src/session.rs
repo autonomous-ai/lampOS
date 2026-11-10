@@ -301,6 +301,9 @@ pub struct Door {
     sounds: Option<crate::sounds::Sounds>,
     /// The computers' own notes, kept under the state folder's `notes`.
     notes: Option<crate::notes::Notes>,
+    /// The recorded moves of the computers' pushed skills (`crate::
+    /// pushed_moves`), kept beside the packages: with skill push on.
+    moves: Option<crate::pushed_moves::Moves>,
     /// Each computer's pairing generation, raised at its every pair,
     /// re-pair and revoke from one counter, so an install asked under one
     /// pairing knows when it's no longer the same (the same key gets the
@@ -412,6 +415,7 @@ impl Door {
             pushes: Pushes::default(),
             sounds: None,
             notes: None,
+            moves: None,
             revs: BTreeMap::new(),
             last_rev: 0,
             asking: BTreeSet::new(),
@@ -514,6 +518,9 @@ impl Door {
 
     /// Skill push on, its packages kept in `folder` for the manage helper.
     pub fn with_push_folder(mut self, folder: PathBuf) -> Self {
+        self.moves = Some(crate::pushed_moves::Moves::new(
+            folder.join(crate::pushed_moves::MOVES_FOLDER),
+        ));
         self.push_folder = Some(folder);
         self
     }
@@ -523,6 +530,22 @@ impl Door {
     pub fn with_notes_folder(mut self, folder: PathBuf) -> Self {
         self.notes = Some(crate::notes::Notes::new(folder));
         self
+    }
+
+    /// Where the kept moves are, and the package a push left for the
+    /// helper, while skill push is on: the install's answer reads the
+    /// package for its moves before the door deletes it.
+    pub fn moves_folder(&self) -> Option<PathBuf> {
+        self.push_folder
+            .as_ref()
+            .map(|folder| folder.join(crate::pushed_moves::MOVES_FOLDER))
+    }
+
+    /// The package a push left for the helper.
+    pub fn pushed_package(&self) -> Option<PathBuf> {
+        self.push_folder
+            .as_ref()
+            .map(|folder| folder.join(crate::push::PUSH_FOLDER).join("package.tar"))
     }
 
     /// The computers' own clips kept under `folder` (the state folder's
@@ -560,7 +583,9 @@ impl Door {
         std::mem::take(&mut self.helper_changes)
     }
 
-    fn rev_of(&self, client: &str) -> u64 {
+    /// The pairing generation of `client` now (0 if none): what an install
+    /// was asked under, to see whether it still stands.
+    pub fn rev_of(&self, client: &str) -> u64 {
         self.revs.get(client).copied().unwrap_or(0)
     }
 
@@ -776,6 +801,10 @@ impl Door {
             }
             if let Some(notes) = &mut self.notes {
                 notes.forget(client);
+            }
+            // Its recorded moves too: they were its own.
+            if let Some(moves) = &self.moves {
+                moves.forget(client);
             }
         }
         // To the file: now, or with the next save that succeeds (a retry,
@@ -1293,6 +1322,27 @@ impl Door {
             error.retry_ms = Some(retry_ms);
             return reply_refused(Some(re), error);
         }
+        // A recorded move is sent as the move it is: the same lease, rate,
+        // door pre-check and body check, and answer, as a `move`'s.
+        let op = match op {
+            Op::Play { name, skill } => {
+                let Some(moves) = &self.moves else {
+                    return refuse(ErrorCode::Refused, NO_MOVES.to_owned());
+                };
+                match moves.find(&client, &name, skill.as_deref()) {
+                    Ok(kept) => Op::Move {
+                        step_ms: u32::from(kept.step_ms),
+                        frames: kept
+                            .frames
+                            .iter()
+                            .map(|frame| frame.map(i32::from))
+                            .collect(),
+                    },
+                    Err(why) => return refuse(ErrorCode::Refused, why),
+                }
+            }
+            op => op,
+        };
         parts.asking(session.connection);
         match parts.reply(&client, re, &op, now_us) {
             Ok(reply) => {
@@ -1558,6 +1608,8 @@ pub const SOUNDS_OFF: &str = "this lamp keeps no computer's clips";
 
 /// Why a skill op is refused on a lamp where skill push is off.
 pub const PUSH_OFF: &str = "skill push is not on this lamp";
+/// A `play` where no moves are kept, as skill push is off.
+pub const NO_MOVES: &str = "recorded moves come with skill push, which is not on this lamp";
 
 /// The rates and caps `hello` tells, so a client keeps inside them, and
 /// this lamp's quiet hours (`"off"` when none). With the rates lifted
@@ -3114,7 +3166,7 @@ mod tests {
         assert_eq!(reply(&take)["lease"], "l_1");
         let play = door.handle(
             &mut session,
-            r#"{"id":6,"op":"play","name":"wave"}"#,
+            r#"{"id":6,"op":"gesture","name":"wave"}"#,
             &mut fake,
             3 * S,
             1,

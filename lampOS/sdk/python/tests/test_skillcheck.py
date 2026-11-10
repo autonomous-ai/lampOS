@@ -80,8 +80,14 @@ def test_a_script_is_refused(tmp_path):
     assert "run.py: a script; script skills are a later format" in check(folder).errors
 
 
+def plays(*names: str) -> str:
+    """Rules whose `[[do]]` play these moves: the lamp loads them with the
+    skill, so a move that fails refuses the skill."""
+    return 'version = "0.1.0"\n[permissions]\nlight = true\n' + "".join(f'[[do]]\nbody = {{ move = "{name}" }}\n' for name in names)
+
+
 def test_sounds_and_moves_are_held_to_the_lamps_bounds(tmp_path):
-    folder = skill(tmp_path / "noisy")
+    folder = skill(tmp_path / "noisy", rules=plays("sway"))
     sound(folder / "sounds" / "ok.wav", seconds=1.0)
     sound(folder / "sounds" / "long.wav", seconds=3.5)
     sound(folder / "sounds" / "stereo.wav", seconds=1.0, channels=2)
@@ -154,7 +160,7 @@ def test_nothing_in_a_folder_makes_the_check_raise(tmp_path):
 
 
 def test_an_unreadable_file_is_an_error_not_a_raise(tmp_path):
-    folder = skill(tmp_path / "locked")
+    folder = skill(tmp_path / "locked", rules=plays("locked"))
     (folder / "moves").mkdir()
     locked = folder / "moves" / "locked.json"
     locked.write_text(json.dumps(move("locked")))
@@ -176,7 +182,7 @@ def test_the_command_goes_on_past_a_folder_it_cant_read(tmp_path, capsys):
 
 
 def test_moves_are_held_as_the_body_holds_them(tmp_path):
-    folder = skill(tmp_path / "mover")
+    folder = skill(tmp_path / "mover", rules=plays("ok", "extra", "nameless", "nod", "fast", "short", "far", "rest"))
     (folder / "moves").mkdir()
     cases = {
         "ok": move("ok"),
@@ -200,6 +206,26 @@ def test_moves_are_held_as_the_body_holds_them(tmp_path):
     assert said("short") == ["moves/short.json: it lasts 500 ms, not 1500 to 10000"]
     assert any("farther than 200" in line for line in said("far"))
     assert said("rest") == ["moves/rest.json: it does not begin and end at nothing"]
+
+
+def test_a_recorded_move_the_skill_does_not_play_is_a_warning_never_stricter_than_the_lamp(tmp_path):
+    """The lamp installs a skill whose unplayed moves/ files fail the body's
+    check and leaves them out of `play`: the check says so, and goes on."""
+    folder = skill(tmp_path / "recorded")
+    (folder / "moves").mkdir()
+    (folder / "moves" / "ok.json").write_text(json.dumps(move("ok")))
+    (folder / "moves" / "far.json").write_text(json.dumps(move("far", frames=[[0] * 5, [300, 0, 0, 0, 0], [0] * 5, [0] * 5, [0] * 5])))
+    report = check(folder)
+    assert report.ok, report.errors
+    (said,) = [line for line in report.warnings if line.startswith("moves/far.json")]
+    assert "farther than" in said and "leaves it out" in said
+    assert not [line for line in report.warnings if line.startswith("moves/ok.json")]
+    # Played by the skill's own rules, the same file refuses the skill.
+    played = check(skill(tmp_path / "played", rules=plays("far")))
+    assert played.ok  # no file: the rule's move is missing is the lamp's load to say
+    (tmp_path / "played" / "moves").mkdir()
+    (tmp_path / "played" / "moves" / "far.json").write_text(json.dumps(move("far", frames=[[0] * 5, [300, 0, 0, 0, 0], [0] * 5, [0] * 5, [0] * 5])))
+    assert any(line.startswith("moves/far.json") and "farther than" in line for line in check(tmp_path / "played").errors)
 
 
 def test_a_script_without_a_suffix_is_refused(tmp_path):
@@ -238,7 +264,7 @@ def test_the_first_name_line_is_the_name_even_empty(tmp_path):
 
 
 def test_a_directory_named_as_a_move_is_not_a_file(tmp_path):
-    folder = skill(tmp_path / "dirmove")
+    folder = skill(tmp_path / "dirmove", rules=plays("x"))
     (folder / "moves" / "x.json").mkdir(parents=True)
     assert "moves/x.json: not a file" in check(folder).errors
 

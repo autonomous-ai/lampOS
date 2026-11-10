@@ -309,7 +309,7 @@ fn fields(op: &Op, said: impl Fn(&str) -> String) -> String {
         Op::TurnStart { prompt: None } => "no prompt".to_owned(),
         Op::ListenSet { on } => format!("on {on}"),
         Op::Gesture { name }
-        | Op::Play { name }
+        | Op::Play { name, .. }
         | Op::Sound { name }
         | Op::SoundRemove { name } => word(name),
         Op::SoundUpload {

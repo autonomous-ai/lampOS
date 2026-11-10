@@ -688,7 +688,7 @@
       "additionalProperties": false
     },
     "play": {
-      "description": "A recorded move from the client's installed package; needs a body lease held by this client.",
+      "description": "A recorded move of one of this computer's pushed skills (its moves/NAME.json, kept when skill.push installed the skill), sent as a move of the same frames is; needs a body lease held by this client. skill says which when two of its skills have the name; the lamp refuses an ambiguous name, naming them.",
       "type": "object",
       "properties": {
         "id": {
@@ -700,6 +700,11 @@
         "name": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+        },
+        "skill": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{1,64}$",
+          "description": "The pushed skill whose moves/ has the move, when two have the name."
         }
       },
       "required": [
@@ -1286,7 +1291,7 @@
     "reply": {
       "oneOf": [
         {
-          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now; sound.upload carries got for each part but the last, and sound for the last; sound.list carries sounds; sound.remove carries removed; notes.set carries key and bytes; notes.get carries key, found and, when found, value; notes.delete carries key and deleted; notes.list carries keys, count, total, bytes, keys_max and bytes_max; turn.end carries turn and started; listen.set carries mute; microphone.stream carries stream and, on, sample_rate, channels, format, block_ms and source.",
+          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill (and moves) for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now; sound.upload carries got for each part but the last, and sound for the last; sound.list carries sounds; sound.remove carries removed; notes.set carries key and bytes; notes.get carries key, found and, when found, value; notes.delete carries key and deleted; notes.list carries keys, count, total, bytes, keys_max and bytes_max; turn.end carries turn and started; listen.set carries mute; microphone.stream carries stream and, on, sample_rate, channels, format, block_ms and source.",
           "type": "object",
           "properties": {
             "re": {
@@ -1547,6 +1552,40 @@
             },
             "skill": {
               "type": "object"
+            },
+            "moves": {
+              "description": "With the last skill.push part's skill, on a lamp that has play: the moves of the package's moves/ that were kept for play, and the ones left out with why (the skill is installed either way).",
+              "type": "object",
+              "properties": {
+                "kept": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "left_out": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "why"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "kept",
+                "left_out"
+              ]
             },
             "skills": {
               "type": "array",

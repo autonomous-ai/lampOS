@@ -26,7 +26,7 @@ Everything below works there, except what this table marks. The full list, with 
 | `look` at `face` | next build (one turn toward the face in view) |
 | `look` at `name` | not in this release (the lamp has no sound direction) |
 | `joints` | all five joints: `roll`, `shoulder` and `elbow` as the body's pose, only while the lamp stands (11048 and older: `yaw` and `pitch` only) |
-| `play` | refused: "not routed yet: waits for client packages" |
+| `play` | from the next build: a move recorded in one of your pushed skills, by name ("Play a recorded move" in control.md); on the customer build refused: "not routed yet: waits for client packages" |
 | `camera.snapshot`, `camera.stream` | works, local network only (not the fast frame path) |
 | `skill.push`, `lamp skill push/list/remove` | works from 11091 on (the product unit passes `--manage-socket`), onto the developer's own lamp, with a yes at the lamp; refused on 10824 and older: "skill push is not on this lamp". No route to the Store from the SDK yet |
 | Signed skills (`keygen`, `pack --sign`, `install`) | not in this release |

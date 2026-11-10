@@ -2,7 +2,7 @@
 // refusals, as docs/control.md says them. No lamp needed.
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -903,10 +903,11 @@ test('off takes a handler off and unsubscribes the last', async () => {
 });
 
 test('the fake says done and lease changes to whoever they are for', async () => {
-  await withLamp({ autoDone: false }, async (lamp, fake) => {
+  await withLamp({ autoDone: false, grants: ['body', 'light', 'speak', 'hear'] }, async (lamp, fake) => {
     await lamp.withLease(['body'], async (lease) => {
-      const waiting = lamp.play('wave', { wait: true });
-      await until(() => fake.asked('play').length);
+      // A turn, whose `done` the test says.
+      const waiting = lamp.startTurn(undefined, { wait: true });
+      await until(() => fake.asked('turn.start').length);
       fake.leaseEvent(lease.id, 'suspended', 'conversation');
       await until(() => lease.state === 'suspended');
       fake.done(fake.requests.at(-1).id, 'cut_short', 'conversation');
@@ -1018,12 +1019,12 @@ test('a waiting gesture or move returns at the body\'s answer', async () => {
 });
 
 test('an action refused here takes no id, so the next waiting one keeps its own', async () => {
-  await withLamp({ autoDone: false, grants: ['body', 'light', 'speak'] }, async (lamp, fake) => {
+  await withLamp({ autoDone: false, grants: ['body', 'light', 'speak', 'hear'] }, async (lamp, fake) => {
     await lamp.withLease(['body'], async () => {
       const bogus = lamp.gesture('Bogus', { wait: true });
-      const wave = lamp.play('wave', { wait: true });
+      const wave = lamp.startTurn(undefined, { wait: true });
       await assert.rejects(bogus, (error) => error.code === 'bad_request');
-      await until(() => fake.asked('play').length);
+      await until(() => fake.asked('turn.start').length);
       fake.done(fake.requests.at(-1).id);
       assert.equal((await wave).how, 'finished');
     }, { forMs: 5000 });
@@ -1089,7 +1090,7 @@ test('a waiting say resolves to its done', async () => {
 
 test('only gesture, move and express end a wait at their reply on a lamp without motion_done', async () => {
   const { ENDS_AT_REPLY } = await import('../src/client.js');
-  assert.deepEqual([...ENDS_AT_REPLY].sort(), ['express', 'gesture', 'move']);
+  assert.deepEqual([...ENDS_AT_REPLY].sort(), ['express', 'gesture', 'move', 'play']);
 });
 
 test('a request after the lamp has gone is refused at once, never left waiting', async () => {
@@ -1564,6 +1565,85 @@ test('a version in a literal string packs as in a basic one', async () => {
   const { pack } = await import('../src/push.js');
   const pkg = pack(skillFolder('desk-lit', "version = '0.2.0'\n[permissions]\nlight = true\n"));
   assert.equal(pkg.version, '0.2.0');
+});
+
+// A recorded move: an 8 s lean of `yaw` counts and back, no step over half of it.
+function moveFile(dir, name, yaw = 100) {
+  const frames = [0, yaw / 2, yaw, yaw / 2, 0, yaw / 2, yaw, yaw / 2, 0].map((count) => [0, 0, count, 0, 0]);
+  writeFileSync(join(dir, 'moves', `${name}.json`), JSON.stringify({ name, step_ms: 1000, frames }));
+}
+
+test('a package whose moves fail the check still installs and the answer names them', async () => {
+  const { pack } = await import('../src/push.js');
+  await withLamp({ grants: ['light', 'skills'] }, async (lamp) => {
+    const dir = skillFolder('desk-bad');
+    moveFile(dir, 'ok');
+    moveFile(dir, 'far', 1400);
+    writeFileSync(join(dir, 'moves', 'other.json'), JSON.stringify({ name: 'not-other', step_ms: 1000, frames: [] }));
+    rmSync(join(dir, 'moves', 'wave.json'));
+    const skill = await lamp.pushSkill(dir);
+    assert.equal(skill.name, 'desk-bad');
+    assert.deepEqual(skill.moves.kept, ['ok']);
+    assert.deepEqual(skill.moves.left_out.map((left) => [left.name, left.why.includes('farther than'), left.why.includes('not-other')]), [['far', true, false], ['other', false, true]]);
+    assert.deepEqual((await lamp.skills()).map((listed) => listed.name), ['desk-bad']);
+    assert.ok(pack(dir).parts.length >= 1);
+  });
+});
+
+test('a waiting play ends at the answer or the done as a move does', async () => {
+  // `play` is sent as a `move`: the answer on a lamp that does not say
+  // `motionDone`, the body's `done` (told by the test) on one that does.
+  for (const motionDone of [false, true]) {
+    await withLamp({ grants: ['body', 'skills'], motionDone, autoDone: false }, async (lamp, fake) => {
+      const one = skillFolder(`desk-wave-${motionDone}`);
+      moveFile(one, 'wave');
+      await lamp.pushSkill(one);
+      await lamp.withLease(['body'], async () => {
+        const waiting = lamp.play('wave', { wait: true });
+        let ended = false;
+        waiting.then(() => { ended = true; }, () => { ended = true; });
+        if (!motionDone) {
+          assert.equal((await waiting).to, 'body');
+        } else {
+          await until(() => fake.asked('play').length === 1);
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          assert.equal(ended, false);
+          fake.done(fake.requests.at(-1).id);
+          assert.equal((await waiting).how, 'finished');
+        }
+      });
+    });
+  }
+});
+
+test('a recorded move of a pushed skill is played by name', async () => {
+  await withLamp({ grants: ['body', 'light', 'skills'] }, async (lamp, fake) => {
+    const one = skillFolder('desk-wave');
+    moveFile(one, 'wave');
+    moveFile(one, 'wiggle', 120);
+    const skill = await lamp.pushSkill(one);
+    assert.deepEqual(skill.moves, { kept: ['wave', 'wiggle'], left_out: [] });
+    assert.equal('moves' in (await lamp.skills())[0], false);
+    await assert.rejects(lamp.play('wave'), byCode.no_lease);
+    await lamp.withLease(['body'], async () => {
+      assert.equal((await lamp.play('wave')).to, 'body');
+      // A wait ends at the body's `done`, as `move`'s does where the lamp says `motionDone`.
+      assert.equal((await Promise.race([lamp.play('wave', { wait: true }), new Promise((_, no) => setTimeout(() => no(new Error('play wait never returned')), 2000))])).how, 'finished');
+      await assert.rejects(lamp.play('constructor'), (error) => error.why.startsWith('no move constructor'));
+      assert.deepEqual(fake.asked('play').at(0), { name: 'wave' });
+      await assert.rejects(lamp.play('nothing'), (error) => error.why === 'no move nothing in your pushed skills: skill.push one with moves/nothing.json');
+      const two = skillFolder('desk-greet');
+      moveFile(two, 'wave', 90);
+      await lamp.pushSkill(two);
+      await assert.rejects(lamp.play('wave'), (error) => error.why === 'the move wave is in more than one of your skills (desk-greet, desk-wave): say which with skill');
+      assert.equal((await lamp.play('wave', { skill: 'desk-greet' })).to, 'body');
+      assert.deepEqual(fake.asked('play').at(-1), { name: 'wave', skill: 'desk-greet' });
+      await assert.rejects(lamp.play('wave', { skill: 'gamma' }), (error) => error.why === 'no skill gamma of yours has recorded moves');
+      await assert.rejects(lamp.play('wiggle', { skill: 'desk-greet' }), (error) => error.why === 'no move wiggle in your skill desk-greet');
+      await lamp.removeSkill('desk-wave');
+      await assert.rejects(lamp.play('wiggle'), (error) => /no move wiggle in your pushed skills/.test(error.why));
+    }, { forMs: 5000 });
+  });
 });
 
 test('a skill is pushed in parts, listed and removed', async () => {

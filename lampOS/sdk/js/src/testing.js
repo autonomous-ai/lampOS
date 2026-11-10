@@ -176,6 +176,45 @@ function clipLoudnessRefusal(data, read) {
 // client uses too; they are exported from here as before.
 export { LAMP_FARTHEST, MOVE_FARTHEST, MOVE_FASTEST, MOVE_FRAMES_MIN, MOVE_LASTS_MS, MOVE_STEP_MS, moveWhy } from './moves.js';
 
+// The `moves/NAME.json` of a pushed package (ustar, as `pack` writes it), as lamp-control keeps them
+// (`pushed_moves::found_in`): each held to a move's check, the ones that fail left out with why, at most 64 by name.
+function pushedMoves(data, skill) {
+  const prefix = `${skill}/moves/`;
+  const files = [];
+  for (let at = 0; at + 512 <= data.length;) {
+    const name = data.subarray(at, at + 100).toString('utf8').replace(/\0.*$/s, '');
+    if (!name) break;
+    const pre = data.subarray(at + 345, at + 500).toString('utf8').replace(/\0.*$/s, '');
+    const size = parseInt(data.subarray(at + 124, at + 135).toString('ascii'), 8);
+    const full = pre ? `${pre}/${name}` : name;
+    if (data[at + 156] === 0x30 || data[at + 156] === 0) {
+      if (full.startsWith(prefix) && full.endsWith('.json') && !full.slice(prefix.length, -5).includes('/')) {
+        files.push([full.slice(prefix.length, -5), data.subarray(at + 512, at + 512 + size)]);
+      }
+    }
+    at += 512 + Math.ceil(size / 512) * 512;
+  }
+  files.sort(([a], [b]) => (a < b ? -1 : 1));
+  const moves = {};
+  const leftOut = [];
+  for (const [stem, bytes] of files) {
+    if (Object.keys(moves).length >= 64) { leftOut.push([stem, 'more than 64 moves: the first 64 by name are kept']); continue; }
+    if (bytes.length > 256 * 1024) { leftOut.push([stem, 'more than 262144 bytes']); continue; }
+    if (!/^[a-z][a-z0-9_-]{0,31}$/.test(stem)) { leftOut.push([stem, 'a name of a letter then letters, digits, _ and -, at most 32']); continue; }
+    let body;
+    try {
+      body = JSON.parse(bytes.toString('utf8'));
+      const keys = Object.keys(body ?? {}).sort().join();
+      if (typeof body !== 'object' || body === null || keys !== 'frames,name,step_ms') throw new Error('a move is exactly name, step_ms and frames');
+    } catch (error) { leftOut.push([stem, `not a move: ${error.message}`]); continue; }
+    if (body.name !== stem) { leftOut.push([stem, `the file is moves/${stem}.json but the move's name is ${JSON.stringify(body.name)}`]); continue; }
+    const why = moveWhy(body.step_ms, body.frames);
+    if (why !== null) { leftOut.push([stem, why]); continue; }
+    moves[stem] = { step_ms: body.step_ms, frames: body.frames };
+  }
+  return { moves, leftOut: leftOut.sort(([a], [b]) => (a < b ? -1 : 1)) };
+}
+
 // lamp-control's refusal of a computer's `move` (protocol.rs), in its words, as
 // `bad_request`: its own shape first, then the body's check; null for one it takes.
 export function moveRefusal(stepMs, frames, farthest = MOVE_FARTHEST) {
@@ -781,13 +820,19 @@ export class FakeLamp {
     const kept = this.pushed.get(request.name);
     if (kept && kept.client !== client) return this.refuse(ws, id, 'refused', "another computer's skill has that name");
     const skill = { name: manifest.name, version: manifest.version, sha256: sha, on: true, held: null };
+    const { moves, leftOut } = pushedMoves(data, manifest.name);
     // Listed as the helper lists it (lamp-skills `list_pushed_by`): no `client`, which only this fake keeps; `author` is
     // a signed skill's, never a pushed test folder's.
     const at = Math.floor(Date.now() / 1000) * 1000;
     this.pushed.set(request.name, {
       ...skill, pushed_at: new Date(at).toISOString().replace(/\.\d{3}Z$/, 'Z'), pushed_at_unix_ms: at, author: null, client,
+      // The moves of its `moves/` kept for `play` (lamp-control's `pushed_moves`): this fake's, never listed.
+      moves,
     });
-    return this.ok(ws, id, { skill: { ...skill, asks: [], shown: [] } });
+    return this.ok(ws, id, {
+      skill: { ...skill, asks: [], shown: [] },
+      moves: { kept: Object.keys(moves).sort(), left_out: leftOut.map(([name, why]) => ({ name, why })) },
+    });
   }
 
   ok(ws, re, fields = {}) { ws.send(JSON.stringify({ re, ok: true, ...fields })); }
@@ -1091,6 +1136,29 @@ export class FakeLamp {
         this.stopFollowing(ws);
         return this.lookDone(ws, id, yaw, pitch);
       }
+      case 'play': {
+        // As lamp-control: one of this computer's pushed skills' moves, sent as a `move` is (the body takes it; with
+        // motionDone a `done` follows).
+        const mine = [...this.pushed.entries()].filter(([, s]) => s.client === client).sort(([a], [b]) => (a < b ? -1 : 1));
+        let why = null;
+        if (request.skill !== undefined) {
+          const kept = mine.find(([n]) => n === request.skill);
+          if (!kept || !Object.keys(kept[1].moves ?? {}).length) why = `no skill ${request.skill} of yours has recorded moves`;
+          else if (!Object.hasOwn(kept[1].moves, request.name)) why = `no move ${request.name} in your skill ${request.skill}`;
+        } else {
+          const have = mine.filter(([, s]) => Object.hasOwn(s.moves ?? {}, request.name)).map(([n]) => n);
+          if (!have.length) why = `no move ${request.name} in your pushed skills: skill.push one with moves/${request.name}.json`;
+          else if (have.length > 1) why = `the move ${request.name} is in more than one of your skills (${have.join(', ')}): say which with skill`;
+        }
+        if (why) {
+          this.requests.pop();
+          return this.refuse(ws, id, 'refused', why);
+        }
+        this.ok(ws, id, { to: 'body' });
+        // Sent as a move: with motionDone its `done` follows.
+        if (this.motionDone && this.autoDone) this.done(id);
+        return undefined;
+      }
       case 'gesture':
       case 'move':
         // As lamp-control routes them: the body takes them; with motionDone
@@ -1102,7 +1170,7 @@ export class FakeLamp {
       case 'skill.push':
         return this.push(ws, client, id, request);
       case 'skill.list':
-        return this.ok(ws, id, { skills: [...this.pushed.values()].filter((s) => s.client === client).map(({ client: _, ...s }) => s) });
+        return this.ok(ws, id, { skills: [...this.pushed.values()].filter((s) => s.client === client).map(({ client: _, moves: __, ...s }) => s) });
       case 'skill.remove': {
         const kept = this.pushed.get(request.name);
         if (!kept || kept.client !== client) return this.refuse(ws, id, 'refused', "not one of this computer's pushed skills");

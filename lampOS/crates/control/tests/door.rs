@@ -1614,6 +1614,161 @@ async fn a_skill_is_pushed_in_parts_installed_by_the_helper_listed_removed_and_t
     );
 }
 
+/// A package as `lamp-skills pack` lays it out, tar of one skill's folder.
+fn tar_of(files: &[(&str, Vec<u8>)]) -> Vec<u8> {
+    let mut builder = tar::Builder::new(Vec::new());
+    for (path, bytes) in files {
+        let mut header = tar::Header::new_ustar();
+        header.set_entry_type(tar::EntryType::Regular);
+        header.set_size(bytes.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        builder.append_data(&mut header, path, &bytes[..]).unwrap();
+    }
+    builder.into_inner().unwrap()
+}
+
+/// A recorded move: an 8 s lean of `yaw` counts and back.
+fn lean(name: &str, yaw: i16) -> Vec<u8> {
+    let frames: Vec<[i16; 5]> = [0, yaw / 2, yaw, yaw / 2, 0, yaw / 2, yaw, yaw / 2, 0]
+        .iter()
+        .map(|yaw| [0, 0, *yaw, 0, 0])
+        .collect();
+    json!({"name": name, "step_ms": 1000, "frames": frames})
+        .to_string()
+        .into_bytes()
+}
+
+/// docs/control.md, "Play a recorded move", end to end: the install keeps
+/// the package's `moves/` (the answer names the kept and the left out),
+/// `play` sends one to the body as the `move` it is (the same lease and
+/// the same datagram), a removed skill's moves and a revoked computer's are
+/// gone, and a push again replaces them.
+#[tokio::test]
+async fn a_recorded_move_of_a_pushed_skill_is_played_as_a_move_and_goes_with_its_skill_and_pairing()
+{
+    let dir = std::env::temp_dir().join(format!(
+        "lamp-control-door-mood-for-play-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let mood = std::os::unix::net::UnixDatagram::bind(dir.join("mood.sock")).unwrap();
+    mood.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    let parts = lamp_control::parts::Lamp::new(
+        Some(dir.join("mood.sock")),
+        None,
+        None,
+        "boot".into(),
+        Arc::new(|_, _| {}),
+    );
+    let lamp = lamp_built("play", Box::new(parts), |door, dir| {
+        door.with_push_folder(dir.to_path_buf())
+    })
+    .await;
+    let _helper = manage_helper(&lamp.dir.join("manage.sock"), &lamp.dir, Duration::ZERO);
+    lamp.shared.set_manage_socket(lamp.dir.join("manage.sock"));
+    let mut socket = paired(&lamp, json!(["body", "skills"]), 44).await;
+    let package = tar_of(&[
+        ("desk-wave/skill.toml", b"kind = \"installable\"".to_vec()),
+        ("desk-wave/moves/wave.json", lean("wave", 100)),
+        ("desk-wave/moves/far.json", lean("far", 600)),
+    ]);
+    let sha256: String = {
+        use sha2::Digest as _;
+        sha2::Sha256::digest(&package)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect()
+    };
+    let push = |id: u64| {
+        json!({"id": id, "op": "skill.push", "name": "desk-wave", "sha256": sha256,
+            "size": package.len(), "part": 0, "parts": 1, "data": STANDARD.encode(&package)})
+    };
+    // Before any push: nothing to play, and no lease needed to be told so.
+    let none = send(&mut socket, json!({"id": 2, "op": "play", "name": "wave"})).await;
+    assert_eq!(none["error"]["code"], "no_lease", "{none}");
+    let installed = send(&mut socket, push(3)).await;
+    assert_eq!(installed["skill"]["name"], "desk-wave", "{installed}");
+    assert_eq!(installed["moves"]["kept"], json!(["wave"]), "{installed}");
+    assert_eq!(
+        installed["moves"]["left_out"][0]["name"], "far",
+        "{installed}"
+    );
+    assert!(
+        installed["moves"]["left_out"][0]["why"]
+            .as_str()
+            .unwrap()
+            .contains("farther than"),
+        "{installed}"
+    );
+    let take = send(
+        &mut socket,
+        json!({"id": 4, "op": "lease.take", "parts": ["body"], "for_ms": 30000}),
+    )
+    .await;
+    assert_eq!(take["lease"], "l_1", "{take}");
+    let unknown = send(
+        &mut socket,
+        json!({"id": 5, "op": "play", "name": "nothing"}),
+    )
+    .await;
+    assert_eq!(unknown["error"]["code"], "refused", "{unknown}");
+    assert!(
+        unknown["error"]["why"]
+            .as_str()
+            .unwrap()
+            .starts_with("no move nothing in your pushed skills"),
+        "{unknown}"
+    );
+    let played = send(&mut socket, json!({"id": 6, "op": "play", "name": "wave"})).await;
+    assert_eq!(played["to"], "body", "{played}");
+    let mut datagram = vec![0u8; 16 * 1024];
+    let len = mood.recv(&mut datagram).unwrap();
+    let sent: Value = serde_json::from_slice(&datagram[..len]).unwrap();
+    assert_eq!(sent["move"]["name"], "control");
+    assert_eq!(sent["move"]["step_ms"], 1000);
+    assert_eq!(sent["move"]["frames"][2], json!([0, 0, 100, 0, 0]));
+    // The kept file is the computer's, beside the packages, and the package
+    // itself is gone as before.
+    let client = std::fs::read_dir(lamp.dir.join("moves"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .file_name();
+    assert!(
+        lamp.dir
+            .join("moves")
+            .join(&client)
+            .join("desk-wave.json")
+            .exists()
+    );
+    assert!(!lamp.dir.join("push/package.tar").exists());
+    // The skill removed: its moves go too (past the motion rate's second).
+    tokio::time::sleep(Duration::from_millis(1_100)).await;
+    let removed = send(
+        &mut socket,
+        json!({"id": 7, "op": "skill.remove", "name": "desk-wave"}),
+    )
+    .await;
+    assert_eq!(removed["ok"], true, "{removed}");
+    assert!(
+        !lamp
+            .dir
+            .join("moves")
+            .join(&client)
+            .join("desk-wave.json")
+            .exists()
+    );
+    let gone = send(&mut socket, json!({"id": 8, "op": "play", "name": "wave"})).await;
+    assert_eq!(gone["error"]["code"], "refused", "{gone}");
+    // The pairing revoked: the computer's folder goes.
+    let revoked = admin(&lamp, json!({"revoke": client.to_str().unwrap()})).await;
+    assert_eq!(revoked["revoked"], true, "{revoked}");
+    assert!(!lamp.dir.join("moves").join(&client).exists());
+}
+
 /// Fourteen's P2 on #3910: a revoke while an install is with the helper.
 /// The revoke's `off_pushed_by` can be served before the install finishes,
 /// so the door sends it again once the install is answered: the last word
@@ -1653,6 +1808,63 @@ async fn a_revoke_during_an_install_turns_the_skill_off_after_it() {
     until_asked_times(&helper, &off, 2).await;
     let asked = helper.lock().unwrap().asked.clone();
     assert_eq!(asked, [install, off.clone(), off], "{asked:?}");
+}
+
+/// Nine's P2 on #6039: a revoke while an install is with the helper deletes
+/// the computer's folder of moves, and the install's answer must not write
+/// the moves back for a pairing that is gone.
+#[tokio::test]
+async fn a_revoke_during_an_install_leaves_no_moves_of_that_computer() {
+    let lamp = lamp_built(
+        "push-revoke-moves",
+        Box::new(session::Unrouted),
+        |door, dir| door.with_push_folder(dir.to_path_buf()),
+    )
+    .await;
+    let helper = manage_helper(
+        &lamp.dir.join("manage.sock"),
+        &lamp.dir,
+        Duration::from_millis(1_500),
+    );
+    lamp.shared.set_manage_socket(lamp.dir.join("manage.sock"));
+    let mut socket = paired(&lamp, json!(["body", "skills"]), 44).await;
+    let package = tar_of(&[
+        ("desk-wave/skill.toml", b"kind = \"installable\"".to_vec()),
+        ("desk-wave/moves/wave.json", lean("wave", 100)),
+    ]);
+    let sha256: String = {
+        use sha2::Digest as _;
+        sha2::Sha256::digest(&package)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect()
+    };
+    socket
+        .send(Message::text(
+            json!({"id": 3, "op": "skill.push", "name": "desk-wave", "sha256": sha256,
+                "size": package.len(), "part": 0, "parts": 1, "data": STANDARD.encode(&package)})
+            .to_string(),
+        ))
+        .await
+        .unwrap();
+    let install = json!({"install_pushed": sha256});
+    until_asked(&helper, &install).await;
+    let client = helper.lock().unwrap().kept.clone().unwrap().1["client"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(
+        admin(&lamp, json!({"revoke": client})).await["revoked"],
+        true
+    );
+    // The install's answer lands after the revoke: waited for through the
+    // second `off`, which the door sends once the install is answered.
+    let off = json!({"off_pushed_by": client});
+    until_asked_times(&helper, &off, 2).await;
+    assert!(
+        !lamp.dir.join("moves").join(&client).exists(),
+        "a revoked computer's moves were kept"
+    );
 }
 
 /// Fourteen's and Reviewer-two's P2 on #3910: revoked during an install,
