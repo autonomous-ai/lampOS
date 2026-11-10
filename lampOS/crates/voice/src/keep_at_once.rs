@@ -103,10 +103,10 @@ const ASKS_AT_THE_END: &[&str] = &["không", "chưa"];
 /// #5565: "I don't like tea" kept "Likes tea." must not be confirmed). An
 /// "n't" ends a word too ([`not_in`]).
 const NOT_WORDS: &[&str] = &[
-    "not", "no", "never", "nor", "neither", "none", "nothing", "nobody", "nowhere", "cannot",
-    "dont", "doesnt", "didnt", "cant", "wont", "isnt", "arent", "wasnt", "werent", "hasnt",
-    "havent", "hadnt", "shouldnt", "wouldnt", "couldnt", "mustnt", "không", "chẳng", "chả", "chưa",
-    "đừng",
+    "not", "no", "never", "nor", "neither", "none", "nothing", "nobody", "nowhere", "without",
+    "cannot", "dont", "doesnt", "didnt", "cant", "wont", "isnt", "arent", "wasnt", "werent",
+    "hasnt", "havent", "hadnt", "shouldnt", "wouldnt", "couldnt", "mustnt", "không", "chẳng",
+    "chả", "chưa", "đừng",
 ];
 
 /// Whether `said` asks a question anywhere in it, with or without a "?":
@@ -575,6 +575,33 @@ mod tests {
             "Remember that I do not like tea",
             &["Doesn't like tea."]
         ));
+    }
+
+    #[test]
+    fn without_and_no_longer_must_not_change_the_kept_fact() {
+        for (said, kept) in [
+            (
+                "Remember that I like tea with milk",
+                "Likes tea without milk.",
+            ),
+            (
+                "Remember that I like tea without milk",
+                "Likes tea with milk.",
+            ),
+            ("Remember that I like tea", "No longer likes tea."),
+            ("Remember that I no longer like tea", "Likes tea."),
+        ] {
+            assert!(!covers(said, &[kept]), "{said} / {kept}");
+        }
+        for (said, kept) in [
+            (
+                "Remember that I like tea without milk",
+                "Likes tea without milk.",
+            ),
+            ("Remember that I no longer like tea", "No longer likes tea."),
+        ] {
+            assert!(covers(said, &[kept]), "{said} / {kept}");
+        }
     }
 
     #[test]

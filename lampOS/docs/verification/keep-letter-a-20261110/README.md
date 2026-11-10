@@ -201,3 +201,76 @@ relabeled as testing this runtime. This is not ready or activated.
 ### First-use timing of the added-negation path
 
 A separate probe measures the new negation branch on its first call, rather than the A-to-B early-return path used by the mixed-case probe's first measurement. Both source epochs use “Remember that I like tea” / “Doesn't like tea.” The first result changes from true (incorrect acceptance) to false. First / median / p99 / maximum elapsed time across the first call and 1,000 repeated calls: before 305.315 / 147.211 / 271.467 / 419.461 us; after 306.088 / 189.378 / 289.616 / 414.235 us. Both meet the 1 ms coverage-call target in this sample. The native gate was also running on this host; no scheduler or device inference. Process startup is outside the measured boundary. The mixed 22-case sample is retained separately, not replaced. Source hashes/commands/logs are in /tmp/fourth-keep-letter-probe/negation-path-receipt.json and negation-path-{before,after}.{rs,log}. The after-source hash matches the current production prefix exactly.
+
+## Follow-up: absence expressed with without
+
+Reviewer-lead's second read of published `4dd0326ca` identified the remaining
+case “I like tea with milk” kept as “Likes tea without milk.” On the unpublished
+c290 carry `08e08517e9`, the exact production-prefix probe reproduced this:
+one mismatch among 28 cases, exit 1. Adding `without` to the existing negation
+vocabulary makes all 28 pass, exit 0. No new comparison pass, I/O, task or state
+is added. `No longer` already contains the recognized `no`; added, dropped
+and unchanged controls cover that phrase without another production rule.
+
+The probe uses the actual helpers described above and real linked libraries.
+The timed first call is this new with/without case, before other invocations:
+290.912 us before, 184.112 us after. Across 1,000 calls over the same 28 cases,
+the respective median/p99/maximum values are 112.133/230.565/639.910 us and
+111.760/197.386/368.130 us. Both samples meet the under-1 ms host-comparison
+target; no speedup, process-startup, Engine, model, storage or device latency
+is established. Logs and exact inputs remain in
+`/tmp/fourth-keep-letter-probe/without-{before,after}*`.
+
+- Before production-prefix SHA-256: `6976d7515e7365f8face365572fcacebef4415953461ebe8d231b88868a47dbe`.
+- After production-prefix SHA-256: `31926a6f8b23552ea3ab7d0c752321dece5b7723fa69221f24b1f7270f9d33b4`.
+- Actual helpers remain `03712f0d6227fde1f38961324c8226cd87ec2d0600e2037b6b39c86c063f5718`.
+
+One module regression and two Engine regressions cover changed forms taking
+exactly the switch-off continuation, and unchanged forms retaining the fixed
+one-round answer. On `08e08517e9` plus this six-file repair, Mac Rust 1.96.0,
+short TMPDIR, two build/test threads and no incremental/debug information:
+
+- `cargo +1.96.0 fmt --all --check`: passed, 23.076 s.
+- `cargo +1.96.0 clippy --offline -q --workspace --all-targets -- -D warnings`:
+  passed, 223.544 s.
+- `cargo +1.96.0 test --offline -q -p lamp-voice --lib keep_at_once:: -- --nocapture --test-threads=1`:
+  26 passed / zero failed or ignored, 5.05 s body / 250.430 s command.
+- `cargo +1.96.0 test --offline -q -p lamp-voice -- --test-threads=2`:
+  **failed**, 5,506 passed / seven failed / 18 ignored, 1,538.82 s body /
+  1,695.873 s command, exit 101. All guarded hashes stayed fixed.
+
+The full-library failures were:
+
+- `coordinator::tests::termination::sigterm_retains_failure_and_acknowledged_synthetic_diagnostics`:
+  signal child did not finish.
+- `ring_night::tests::the_worker_rests_on_the_asleep_face_only_while_expression_sleeps`:
+  asleep-frame assertion.
+- `ring_unplug::tests::actual_resting_and_speaking_frames_show_asleep_before_receipt`:
+  acknowledgement assertion.
+- `second_provider::net::chat::tests::a_kept_client_keeps_one_idle_connection_per_host`:
+  four connections instead of three.
+- `second_provider::net::chat::tests::a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it`:
+  three connections instead of two.
+- `second_provider::tests::chat_second_try::both_silent_the_slow_line_comes_at_its_own_time`:
+  three requests instead of two.
+- `second_provider::tests::chat_second_try::off_no_second_try_goes`:
+  two requests instead of one.
+
+Those five source files are unchanged from c290. One exact diagnostic per
+identity passed on the same source, using `--exact --nocapture --test-threads=1`.
+That does not establish the causes or turn the full run green. No full-library
+rerun followed. The separately unrun `--test it` target failed 276 passed /
+one failed: the light-call test's sorted middle was 53.318822 ms against 25 ms.
+The other integration targets passed two / six ignored, binaries/examples
+eleven, doc tests zero. `cargo +1.96.0 build --offline -q --workspace` passed
+in 164.626 s. The remaining controller returned 101 for the retained integration
+failure even though its final build passed. All six guarded source hashes
+stayed fixed; only this evidence note was then extended.
+
+Raw full/remaining logs and receipts are retained under
+`/tmp/fourth-keep-without-c290-*`. Changed-path controls and static checks pass,
+but this is not a green full-native gate, readiness or activation claim. Fresh
+published-head CI and delta reads are separate. The branch keeps the switch
+off; #5972's proposed activation has an independent HOLD because its train
+lacked even the earlier A-value and added-negation repairs. Mixed-clause and
+symbolic-value limitations remain and must be considered before activation.

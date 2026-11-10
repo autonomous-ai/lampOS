@@ -1312,7 +1312,9 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   "blood type A" and "I have a cat" kept as "Has a cat" remain fast.
   Added negation also takes round 2: "I like tea" kept as "Doesn't like
   tea" cannot receive the fixed acknowledgment. Equivalent contracted
-  negations remain fast. This is conservative lexical coverage, not a
+  negations remain fast. "Without" also counts as negation: changing "with
+  milk" to "without milk" takes round 2. "No longer" is covered by "no";
+  unchanged forms stay fast. This is conservative lexical coverage, not a
   check of which clause each negation belongs to. A line with a
   question word or shape in it, English or Vietnamese, with or without
   its "?" (`keep_at_once::asks_a_question`: "… in the drawer where are

@@ -998,6 +998,8 @@ order is kept. A written turn is the same from the chat on.
     Presence of negation must also agree in both directions: "I like tea"
     kept as "Doesn't like tea" goes to round 2. This uses the same folded
     negation marker, so "don't", "do not" and "doesn't" remain equivalent.
+    "Without" counts too, so adding or dropping it takes round 2; "no
+    longer" is covered by "no". Unchanged forms remain fast.
     It does not associate negation with individual clauses of a mixed fact.
     For standalone "a" in the requested payload, an additional conservative
     check requires one kept text with the same ordered normalized content,

@@ -570,3 +570,55 @@ fn an_equivalent_negation_stays_fast() {
     assert_eq!(went.asked.len(), 1, "{went:?}");
     assert_eq!(went.said(), vec![KEPT]);
 }
+
+/// A changed absence must take the same continuation as the disabled switch.
+#[test]
+fn without_and_no_longer_changes_go_to_round_two_like_off() {
+    for (said, text) in [
+        (
+            "Remember that I like tea with milk",
+            "Likes tea without milk.",
+        ),
+        (
+            "Remember that I like tea without milk",
+            "Likes tea with milk.",
+        ),
+        ("Remember that I like tea", "No longer likes tea."),
+        ("Remember that I no longer like tea", "Likes tea."),
+    ] {
+        let turn = |on| {
+            keep_turn(
+                on,
+                said,
+                keeping_text(text),
+                vec![words("Let me check that fact.")],
+                kept,
+            )
+        };
+        let off = turn(false);
+        let on = turn(true);
+        assert_eq!(off.asked.len(), 2);
+        assert_eq!(on, off, "{said} / {text}");
+    }
+}
+
+#[test]
+fn unchanged_without_and_no_longer_stay_fast() {
+    for (said, text) in [
+        (
+            "Remember that I like tea without milk",
+            "Likes tea without milk.",
+        ),
+        ("Remember that I no longer like tea", "No longer likes tea."),
+    ] {
+        let went = keep_turn(
+            true,
+            said,
+            keeping_text(text),
+            vec![words("The second round.")],
+            kept,
+        );
+        assert_eq!(went.asked.len(), 1, "{went:?}");
+        assert_eq!(went.said(), vec![KEPT]);
+    }
+}
