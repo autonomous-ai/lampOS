@@ -94,18 +94,25 @@ fn is_example(answer: &str) -> bool {
         || name(&given.card).is_some_and(|given| Some(given) == name(&example.card))
 }
 
-/// What the model is told it is, before the brief: the format, and a whole
-/// skill the lamp's check takes.
+/// What the model is told it is, before the brief: the format, a whole
+/// skill the lamp's check takes, and what a skill may use and read
+/// ([`services`]), with a made skill's reads as this process has them.
 fn system() -> String {
+    system_with(made_skill::reads_on())
+}
+
+/// [`system`], with a made skill's reads on or off.
+fn system_with(reads: bool) -> String {
     let (cannot, left_out) = (made_skill::CANNOT, made_skill::LEFT_OUT);
+    let services = services(reads);
     format!(
         "You write skills for a lamp. Answer exactly as the request says, with the two fenced \
          blocks and nothing else. Use only the keys and values the request names, written as \
          in this example, which the lamp's check takes:\n\n{EXAMPLE}\n\nThe example shows \
          the form only: never answer with it. A skill can't speak \
-         or keep time by itself: a reminder at a time or every so often is the lamp's own \
-         timer, not a skill. Make what the request asks with the light or the head, on the \
-         lamp's resting or someone being there. A skill can't hear what is said: a request \
+         (but to read a linked service aloud, as below) or keep time by itself: a reminder at a time or every so often is the lamp's own \
+         timer, not a skill. Make what the request asks with the light or the head, or a \
+         read as below, on the lamp's resting or someone being there. A skill can't hear what is said: a request \
          that needs words or a sound heard, or anything else a skill here can't sense or do, \
          is answered with one line and no blocks: {cannot} then one short sentence said to \
          the person, in plain words, why, ending with what to ask instead when there is one; \
@@ -113,7 +120,47 @@ fn system() -> String {
          me every hour to stand up'.\" Never stand something \
          else in for it, and add no time of day the request didn't name. When a part of the \
          request can't be done with these (dimming slowly, over a minute), make the rest and \
-         add one line after the blocks: {left_out} what was left out, in a few words."
+         add one line after the blocks: {left_out} what was left out, in a few words.\n\n\
+         {services}"
+    )
+}
+
+/// What the making model is told of the person's linked services (mail, a
+/// calendar, Slack, ...): the rules a made skill is held to, in plain
+/// words, for the model to judge any request by (the owner, 10 Nov:
+/// "quăng cho deepseek hết đi, đừng if else"; no Rust word lists decide
+/// it). Off, a skill uses none; on, it reads at most one, only reads it,
+/// and only one of [`made_skill::read_steps`]. What it can't make is
+/// answered with [`made_skill::CANNOT`], which the lamp tells as it is. It
+/// never names a place to link one: on lamp-9adf, 4 Nov, the model told
+/// the owner to link a calendar already linked (the first builder on
+/// #5288). The cap (`made_skill::capped`) still holds every made skill to
+/// these whatever the model answers.
+fn services(reads: bool) -> String {
+    let cannot = made_skill::CANNOT;
+    let ask_me = "You can ask me for it yourself any time.";
+    if !reads {
+        return format!(
+            "A skill can't use the person's mail, calendar or any other linked service yet, \
+             even one already linked: a request that needs one is answered with one line and \
+             no blocks: {cannot} Not possible yet: a skill can't use your mail, calendar or \
+             other services, even ones already linked. {ask_me} Never tell them to link one."
+        );
+    }
+    let steps = made_skill::read_steps().join("\n- ");
+    let unreadable = made_skill::unreadable_names().join(", ");
+    format!(
+        "A skill may read at most one of the person's linked services, and only read it: it \
+         never sends, writes, posts, books, schedules, deletes or changes anything in a \
+         service. A request to be read one of these is a skill with [permissions] only \
+         speak = true, services = {{ CODE = \"read\" }} and its topics; its trigger's during \
+         only for a time the request names; and exactly one [[do]] step, the one shown here \
+         for that service, filled in from the request, and no light or head step. The services a skill can read, each as name (CODE): step:\n- {steps}\n\
+         A request to send, write or change anything in a service, to read two or more \
+         services, or to read one not listed here ({unreadable}, or any other) is answered \
+         with one line and no blocks: {cannot} then one short sentence saying what a skill \
+         can do instead (read one linked service), ending \"{ask_me}\" Never tell them to \
+         link a service."
     )
 }
 
@@ -1045,6 +1092,43 @@ light = { dim = 1 }
         assert_eq!(served.join().unwrap(), 1);
         assert!(made_skill::entries(&keeping.directory).is_empty());
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The owner, 10 Nov ("quăng cho deepseek hết đi, đừng if else"): what
+    /// a skill may read or do is told to the model in plain words, and the
+    /// model, not a word list, answers what it can't with `cannot:`. With
+    /// reads on: one linked service at most, only read, only a listed one,
+    /// with each listed one's step; off: none at all. Neither names a place
+    /// to link one.
+    #[test]
+    fn the_system_prompt_carries_the_rules_of_a_read() {
+        let on = system_with(true);
+        for rule in [
+            "A skill may read at most one of the person's linked services, and only read it",
+            "never sends, writes, posts, books, schedules, deletes or changes anything",
+            "to read two or more services, or to read one not listed here",
+            "is answered with one line and no blocks: cannot: then one short sentence",
+            "You can ask me for it yourself any time.",
+            "Never tell them to link a service.",
+            "services = { CODE = \"read\" }",
+            "its trigger's during only for a time the request names",
+        ] {
+            assert!(on.contains(rule), "{rule}");
+        }
+        for step in made_skill::read_steps() {
+            assert!(on.contains(&format!("\n- {step}")), "{step}");
+        }
+        assert!(on.contains(made_skill::CALENDAR_READ) && on.contains(made_skill::DRIVE_READ));
+        assert!(on.contains("Notion") && on.contains("Slack"), "{on}");
+        let off = system_with(false);
+        assert!(off.contains(
+            "cannot: Not possible yet: a skill can't use your mail, calendar or other services"
+        ));
+        assert!(!off.contains("services = {") && !off.contains(made_skill::GMAIL_READ));
+        for prompt in [&on, &off] {
+            assert!(!prompt.contains("Connectors"), "{prompt}");
+            assert!(prompt.contains("cannot: then one short sentence said to the person"));
+        }
     }
 
     /// Second's HOLD on #5985: the model's `cannot:` reason may echo the

@@ -89,57 +89,11 @@ pub const BRIEF_HEAD: &str = "Write one lamp skill (lampOS lamp-skills)";
 /// What comes before the person's request in the brief.
 const REQUEST_MARK: &str = "Request: ";
 
-/// What a request for a skill that uses one of the person's services (mail,
-/// a calendar, Slack, ...) is told: a made skill never reaches a linked
-/// service yet, linked or not, but the person can ask the lamp itself. It
-/// names no place to link one: on lamp-9adf, 4 Nov, the model told the
-/// owner to link a calendar already linked (the first builder on #5288).
-/// Words to the person, as the app shows them as they are
-/// (`app_make::begin`'s `refused`); the voice tells the model to say them.
-pub const NOT_A_SERVICE: &str = "Not possible yet: a skill can't use your mail, calendar or \
-     other services, even ones already linked. You can ask me for it yourself any time.";
-/// What a request to make a skill that would write to a linked service is
-/// told with a made skill's reads on ([`READS_ENVIRONMENT`]): a skill reads
-/// one service and never writes ([`NOT_A_SERVICE`] isn't true there; the
-/// testers' sheet, 6 Nov, "a skill is limited with no reason").
-pub const NOT_A_WRITE: &str = "Not possible yet: a skill can read one linked service, but \
-     it can't send, write or change anything there. You can ask me for it yourself any time.";
-/// What a request naming two linked services is told with reads on.
-pub const ONE_SERVICE: &str = "Not possible yet: a skill can read only one linked service, \
-     not two or more. You can ask me for it yourself any time.";
-/// What a request is told with reads on when the service it names has
-/// nothing a made skill reads (Notion, read only through its own tools).
-pub const NOT_READABLE: &str = "Not possible yet: a skill can read one linked service, but \
-     not that one. You can ask me for it yourself any time.";
-/// Words that name a linked service ([`crate::services`]) in a request, as
-/// a whole word: mail and a calendar, and the services' own names.
-const SERVICE_WORDS: [&str; 17] = [
-    "mail",
-    "mails",
-    "email",
-    "emails",
-    "gmail",
-    "inbox",
-    "calendar",
-    "gdrive",
-    "notion",
-    "figma",
-    "github",
-    "asana",
-    "ahrefs",
-    "facebook",
-    "slack",
-    "hubspot",
-    "amplitude",
-];
-/// Services whose one word is also a plain one ("drive", "linear",
-/// "monday"): named only as these.
-const SERVICE_PHRASES: [&str; 3] = ["google drive", "linear app", "monday com"];
-
 /// The switch for a made skill that reads a linked service to its owner
 /// alone (#5288, the first builder's ruling there, 4 Nov 20:5x): here, in
 /// `lamp-skills`, its manage helper and `lamp-services`. `on` only; off,
-/// every request that names a service is [`NOT_A_SERVICE`], as before.
+/// the making model is told a skill can't use a service at all
+/// (`make_skill_local`'s system prompt) and the cap refuses one.
 pub const READS_ENVIRONMENT: &str = "LAMP_SKILL_READS";
 
 /// Whether a made skill may read a linked service in this process.
@@ -147,219 +101,12 @@ pub fn reads_on() -> bool {
     std::env::var(READS_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
-/// The service each of [`SERVICE_WORDS`] and [`SERVICE_PHRASES`] names, by
-/// its code in `lamp-services`' catalogue. A made skill may read any of
-/// them that has reads (`lamp_services::spoken::not_readable`).
-const SERVICE_CODES: [(&str, &str); 20] = [
-    ("mail", "gmail"),
-    ("mails", "gmail"),
-    ("email", "gmail"),
-    ("emails", "gmail"),
-    ("gmail", "gmail"),
-    ("inbox", "gmail"),
-    ("calendar", "google_calendar"),
-    ("gdrive", "google_drive"),
-    ("notion", "notion"),
-    ("figma", "figma"),
-    ("github", "github"),
-    ("asana", "asana"),
-    ("ahrefs", "ahrefs"),
-    ("facebook", "facebook"),
-    ("slack", "slack"),
-    ("hubspot", "hubspot"),
-    ("amplitude", "amplitude"),
-    ("google drive", "google_drive"),
-    ("linear app", "linear"),
-    ("monday com", "mondaydotcom"),
-];
+/// A calendar's step, given whole: its events of a day.
+pub const CALENDAR_READ: &str = "read = { service = \"google_calendar\", what = \"events\", \
+     day = \"today\" }, or day = \"tomorrow\" when tomorrow is asked";
 
-/// Words of a request that would write, send or change something: a made
-/// skill only reads (writes are not ruled yet).
-/// ("posts" is left out: a Page's posts are read.)
-const WRITE_WORDS: [&str; 21] = [
-    "send", "sends", "draft", "drafts", "reply", "replies", "write", "writes", "add", "adds",
-    "post", "create", "creates", "forward", "delete", "mark", "archive", "invite", "book",
-    "schedule", "put",
-];
-
-/// Write words that are also things read: "my schedule", "my latest
-/// Facebook post", "the book titles" (El's P3 on #5679).
-const ALSO_A_THING: [&str; 3] = ["schedule", "post", "book"];
-
-/// Words before one of [`ALSO_A_THING`] that make it the thing read,
-/// whatever follows: "my schedule on my calendar", "the latest post on
-/// Facebook" (El's P2 on #5696).
-const A_THING_AFTER: [&str; 6] = ["my", "the", "s", "latest", "last", "newest"];
-
-/// Words before one of [`ALSO_A_THING`] that make it the thing read only
-/// when the request asks to be read before it ("read me my Facebook post
-/// about the sale", "what's my calendar schedule today"), or at its end or
-/// before one of [`A_THING_BEFORE`] ("my latest Facebook post"); else it
-/// is a verb, "tomorrow book the room", "my calendar book the room",
-/// "facebook post that I'm out" (El's P3s on #5690 and #5696, and P2s on
-/// #5696).
-const MAYBE_A_THING_AFTER: [&str; 6] = ["tomorrow", "today", "day", "calendar", "facebook", "page"];
-
-/// Words after one of [`ALSO_A_THING`] that keep it the thing read after
-/// one of [`MAYBE_A_THING_AFTER`]. Not "for": "tomorrow book for me a
-/// table" writes.
-const A_THING_BEFORE: [&str; 2] = ["from", "of"];
-
-/// Words a request asks to be read with: with one of them, a thing said
-/// with "say" is what is read ("read me the last post saying sale", "the
-/// last post saying we are open, read it to me"), not a post to write
-/// ("latest post: say hi on Facebook"). With none, "my latest post saying
-/// sale on Facebook" can't be told from that write, so it is one.
-const ASKED_TO_READ: [&str; 6] = ["read", "reads", "tell", "what", "show", "check"];
-
-/// Words after one of [`ALSO_A_THING`] that make it a verb after one of
-/// [`MAYBE_A_THING_AFTER`] in a new clause, even with a read asked for
-/// earlier: "check my calendar and tomorrow schedule a meeting" (the
-/// first builder's P3 on #5696). Not "that": "read me the facebook post
-/// that I liked" reads.
-const AN_OBJECT: [&str; 6] = ["a", "an", "me", "it", "the", "my"];
-
-/// Words that start a new clause after the read asked for, so that an
-/// object after the word makes it a verb: "check my calendar and tomorrow
-/// schedule the meeting". With none, the object says which one is read:
-/// "read me my facebook post a week ago" (the first builder's HOLD on
-/// #5719).
-const A_NEW_CLAUSE: [&str; 3] = ["and", "then", "also"];
-
-/// Whether `words[at]`, one of [`ALSO_A_THING`], is the thing read.
-fn a_thing(words: &[&str], at: usize) -> bool {
-    let Some(before) = at.checked_sub(1).map(|before| words[before]) else {
-        return false;
-    };
-    let asked = |words: &[&str]| words.iter().any(|word| ASKED_TO_READ.contains(word));
-    // "let's post" splits into "let" "s": no "'s" (the first builder's P3
-    // on #5696).
-    let lets = before == "s" && at >= 2 && words[at - 2] == "let";
-    if A_THING_AFTER.contains(&before) && !lets {
-        let says = words[at + 1..]
-            .iter()
-            .any(|word| ["say", "saying"].contains(word));
-        !says || asked(words)
-    } else if MAYBE_A_THING_AFTER.contains(&before) {
-        let next = words.get(at + 1);
-        let read_at = words[..at]
-            .iter()
-            .rposition(|word| ASKED_TO_READ.contains(word));
-        let new_clause = read_at.is_none_or(|read_at| {
-            words[read_at + 1..at]
-                .iter()
-                .any(|word| A_NEW_CLAUSE.contains(word))
-        });
-        let verb = new_clause && next.is_some_and(|next| AN_OBJECT.contains(next));
-        !verb && (read_at.is_some() || next.is_none_or(|next| A_THING_BEFORE.contains(next)))
-    } else {
-        false
-    }
-}
-
-/// Whether "put" at `words[at]` writes: with a service named after it, or
-/// put "in", "on", "into" or "to" "my drive" (El's P3 on #5696: "put the
-/// count on the light from my drive" is the lamp's own).
-fn puts_to_a_service(words: &[&str], at: usize) -> bool {
-    let after = &words[at + 1..];
-    names_a_linked_service(&after.join(" "))
-        || after.windows(3).any(|three| {
-            ["in", "on", "into", "to"].contains(&three[0]) && three[1..] == ["my", "drive"]
-        })
-}
-
-/// Words that only ask for the skill itself, before "skill" at a request's
-/// start: "create a skill that reads my calendar" asks for a skill that
-/// reads, and its "create" is no write (on lamp-9adf on 4 Nov, 23:51, a
-/// calendar read skill asked for by voice was refused so).
-const ASKING_FOR_A_SKILL: [&str; 20] = [
-    "create", "make", "add", "build", "write", "set", "up", "me", "a", "an", "new", "please",
-    "lampy", "lamp", "can", "you", "could", "i", "want", "like",
-];
-
-/// `words` without the asking for the skill itself ("create me a new
-/// skill that ...", "add a skill to ..."): only when every word before
-/// "skill" is such asking, so a write said elsewhere still counts.
-fn asked_of_the_skill<'a>(words: &[&'a str]) -> Vec<&'a str> {
-    let Some(at) = words.iter().position(|word| *word == "skill") else {
-        return words.to_vec();
-    };
-    if !words[..at]
-        .iter()
-        .all(|word| ASKING_FOR_A_SKILL.contains(word))
-    {
-        return words.to_vec();
-    }
-    let rest = &words[at + 1..];
-    let skip = usize::from(
-        rest.first()
-            .is_some_and(|word| ["that", "which", "to"].contains(word)),
-    );
-    rest[skip..].to_vec()
-}
-
-/// What a request to be read a linked service asks for: the service's
-/// code, and for a calendar or mail the one step `lamp-skills` takes (a
-/// calendar's events of a day, tomorrow when it says so, else today; the
-/// latest mail). Any other service's step the model writes from the
-/// service's reads. Its limit, in the person's words, when it would write
-/// ([`NOT_A_WRITE`]), names two services ([`ONE_SERVICE`]), or names one
-/// with nothing to read or none the lamp knows ([`NOT_READABLE`]).
-fn read_of(request: &str) -> Result<(&'static str, Option<&'static str>), &'static str> {
-    let request = request.to_lowercase().replace("e-mail", "email");
-    let words: Vec<&str> = request
-        .split(|c: char| !c.is_alphanumeric())
-        .filter(|word| !word.is_empty())
-        .collect();
-    let words = asked_of_the_skill(&words);
-    let writes = words.iter().enumerate().any(|(at, word)| {
-        WRITE_WORDS.contains(word)
-            && !(ALSO_A_THING.contains(word) && a_thing(&words, at))
-            // "put" writes to a service only when one is named after it:
-            // "put the count on the light" is the lamp's own.
-            && (*word != "put" || puts_to_a_service(&words, at))
-    });
-    if writes {
-        return Err(NOT_A_WRITE);
-    }
-    let joined = format!(" {} ", words.join(" "));
-    let mut codes: Vec<&'static str> = SERVICE_CODES
-        .iter()
-        .filter(|(said, _)| {
-            if said.contains(' ') {
-                joined.contains(&format!(" {said} "))
-            } else {
-                words.contains(said)
-            }
-        })
-        .map(|(_, code)| *code)
-        .collect();
-    codes.sort_unstable();
-    codes.dedup();
-    let code = match codes.as_slice() {
-        [code] => code,
-        // Not reached from `brief_with`, which asks this only of a request
-        // that names a service; were it reached, no service is one with
-        // nothing to read.
-        [] => return Err(NOT_READABLE),
-        _ => return Err(ONE_SERVICE),
-    };
-    if lamp_services::spoken::not_readable(code).is_some() {
-        return Err(NOT_READABLE);
-    }
-    let step = match *code {
-        "google_calendar" if words.contains(&"tomorrow") => {
-            Some("read = { service = \"google_calendar\", what = \"events\", day = \"tomorrow\" }")
-        }
-        "google_calendar" => {
-            Some("read = { service = \"google_calendar\", what = \"events\", day = \"today\" }")
-        }
-        "gmail" => Some("read = { service = \"gmail\", what = \"recent\" }"),
-        "google_drive" => Some(DRIVE_READ),
-        _ => None,
-    };
-    Ok((code, step))
-}
+/// Mail's step, given whole: the latest mail.
+pub const GMAIL_READ: &str = "read = { service = \"gmail\", what = \"recent\" }";
 
 /// Drive's step, given whole: its files come newest first, and `query` is
 /// only words to search for. A lamp, 5 Nov: "read my latest Google Drive
@@ -373,19 +120,47 @@ fn read_of(request: &str) -> Result<(&'static str, Option<&'static str>), &'stat
 pub const DRIVE_READ: &str = "read = { service = \"google_drive\", what = \"files\" }, \
      no other key: files come newest first; query is search words";
 
-/// Whether a request names a linked service (any case; "e-mail" too), so
-/// a skill to make is never asked of the model for one.
-fn names_a_linked_service(request: &str) -> bool {
-    let request = request.to_lowercase().replace("e-mail", "email");
-    let words: Vec<&str> = request
-        .split(|c: char| !c.is_alphanumeric())
-        .filter(|word| !word.is_empty())
-        .collect();
-    let joined = format!(" {} ", words.join(" "));
-    words.iter().any(|word| SERVICE_WORDS.contains(word))
-        || SERVICE_PHRASES
-            .iter()
-            .any(|phrase| joined.contains(&format!(" {phrase} ")))
+/// Each linked service a made skill may read, as one line for the making
+/// model: its name, its code and the one step that reads it (a calendar's,
+/// mail's or Drive's given whole, any other's reads listed to choose from,
+/// never a whole text or a free-form read). From `lamp-services`' own
+/// catalogue, so a service with reads added there is offered here too.
+/// Which one a request asks for, and whether it asks for a read at all,
+/// is the model's to judge (the owner, 10 Nov: decisions go to the model,
+/// not word lists); the cap ([`capped`]) still holds the skill to one
+/// readable service, read only.
+pub fn read_steps() -> Vec<String> {
+    lamp_services::reads::WHATS
+        .iter()
+        .map(|(code, _)| *code)
+        .filter(|code| lamp_services::spoken::not_readable(code).is_none())
+        .map(|code| {
+            let step = match code {
+                "google_calendar" => CALENDAR_READ.to_owned(),
+                "gmail" => GMAIL_READ.to_owned(),
+                "google_drive" => DRIVE_READ.to_owned(),
+                _ => format!(
+                    "read = {{ service = \"{code}\", what = one of {}, its keys }}",
+                    lamp_services::spoken::whats(code).join("; ")
+                ),
+            };
+            format!("{} ({code}): {step}", service_name(code))
+        })
+        .collect()
+}
+
+/// The linked services a made skill can't read, by name, each once: the
+/// making model answers a request for one with `cannot:`.
+pub fn unreadable_names() -> Vec<&'static str> {
+    let mut names: Vec<&'static str> = Vec::new();
+    for service in lamp_services::catalog::SERVICES {
+        if lamp_services::spoken::not_readable(service.code).is_some()
+            && !names.contains(&service.name)
+        {
+            names.push(service.name);
+        }
+    }
+    names
 }
 
 /// The brief: the format of a skill a lamp can make, what it may use, and
@@ -397,12 +172,17 @@ pub fn brief(request: &str) -> Result<String, &'static str> {
 }
 
 /// [`brief`], with a made skill's reads on or off ([`READS_ENVIRONMENT`]).
-/// On, a request to be read one linked service with reads is briefed as a
-/// skill whose one step reads it ([`read_of`]): a calendar's, mail's or
-/// Drive's step given whole, any other service's reads listed for the model to choose
-/// from (`lamp_services::spoken::whats`, never a whole text). A request
-/// that would write, names two services or one with nothing to read is
-/// told that limit ([`read_of`]); with reads off, any is [`NOT_A_SERVICE`].
+/// One brief for every request: whether it asks for the light and the
+/// head, for a read of one linked service, or for something no made skill
+/// does is the making model's to judge (the owner, 10 Nov: decisions go to
+/// the model, not word lists), by the rules in its system prompt
+/// (`make_skill_local`), which answers what it can't make with
+/// [`CANNOT`]. On, the brief adds a few words pointing to a read ("as
+/// above": the system prompt, which says its form and each service's step,
+/// [`read_steps`]), so the longest brief stays within [`MOST_BRIEF_BYTES`].
+/// It no longer says "write no files": no maker has had tools to write
+/// with since the lamp's own model became the only one (3 Nov). Only an empty or too long
+/// request is refused here, before the model is asked.
 pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
     let request = request.split_whitespace().collect::<Vec<_>>().join(" ");
     if request.is_empty() {
@@ -411,35 +191,10 @@ pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
     if request.len() > MOST_REQUEST_BYTES {
         return Err("That is too long to ask for as one skill: say it more shortly.");
     }
-    if names_a_linked_service(&request) {
-        if !reads {
-            return Err(NOT_A_SERVICE);
-        }
-        let (service, step) = read_of(&request)?;
-        let step = match step {
-            Some(step) => step.to_owned(),
-            None => format!(
-                "read = {{ service = \"{service}\", what = one of {}, its keys }}",
-                lamp_services::spoken::whats(service).join("; ")
-            ),
-        };
-        return Ok(format!(
-            "{BRIEF_HEAD} for the request at the end. Reply with exactly two fenced blocks, \
-             ```skill.toml and ```SKILL.md, and nothing else; write no files. skill.toml: \
-             kind = \"installable\", version = \"1.0.0\", no name key; [permissions] with only \
-             speak = true, services = {{ {service} = \"read\" }} and topics only voice/state and \
-             room/presence; one [trigger] on voice/state (field \"state\", equals \"resting\") or \
-             room/presence (field \"someone\", equals true), with for; during = \
-             {{ from = \"HH:MM\", to = \"HH:MM\" }} only for a time asked for; \
-             [ask] policy = \"nudge\"; \
-             one [[do]] step: {step}. \
-             SKILL.md: front matter name (lowercase, hyphens) and description (one sentence: \
-             what it does, when). {REQUEST_MARK}{request}"
-        ));
-    }
+    let read = if reads { " Or one read, as above." } else { "" };
     Ok(format!(
         "{BRIEF_HEAD} for the request at the end. Reply with exactly two fenced blocks, \
-         ```skill.toml and ```SKILL.md, and nothing else; write no files. skill.toml: \
+         ```skill.toml and ```SKILL.md, and nothing else. skill.toml: \
          kind = \"installable\", version = \"1.0.0\", no name key; [permissions] \
          with only light = true and/or body = true, topics only voice/state and room/presence; \
          one [trigger] on \
@@ -447,8 +202,8 @@ pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
          equals true or false), with for, cooldown, rearm = \"ends\"; a time of day as the \
          trigger's during = {{ from = \"22:00\", to = \"22:30\" }}; \
          [ask] policy = \"nudge\"; [[do]] steps: light = {{ colour, level 1-5, for }} or \
-         {{ dim = 1 }}, body = {{ gesture = \"nod\" or \"curious\" }}. SKILL.md: front matter \
-         name (lowercase, hyphens) and description (one sentence: what it does, when). \
+         {{ dim = 1 }}, body = {{ gesture = \"nod\" or \"curious\" }}.{read} SKILL.md: front \
+         matter name (lowercase, hyphens) and description (one sentence: what it does, when). \
          {REQUEST_MARK}{request}"
     ))
 }
@@ -904,7 +659,7 @@ pub fn plainly(text: &str) -> Result<String, Refused> {
 /// (the first builder's ruling on #5288). Off, such a step is unsaid.
 pub fn plainly_with(text: &str, reads: bool) -> Result<String, Refused> {
     // Its lines go back to the model once, as the check's do; with reads
-    // on, they keep the brief's read step ([`PLAIN_OR_READ`]).
+    // on, they keep the service's read step ([`PLAIN_OR_READ`]).
     let unsaid = || {
         Refused(
             "it does something the lamp can't say plainly".into(),
@@ -1062,8 +817,9 @@ const PLAIN_ONLY: &str = "only kind, version, needs, permissions, one [trigger],
 /// app make of "Read me my latest email when I sit down at my desk." was
 /// refused twice: the repair, told only lights and gestures, took the
 /// mail read away.
-const PLAIN_OR_READ: &str = "; or, for a read of a linked service, only one [[do]] step: the \
-                             brief's read step exactly as the brief gives it, and nothing else";
+const PLAIN_OR_READ: &str = "; or, for a read of a linked service, only one [[do]] step: that \
+                             service's read step exactly as your instructions list it, and \
+                             nothing else";
 
 /// The model's [`LEFT_OUT`] words in a fixed frame, as its own note: no
 /// quotes, and one clause, so they can't read as another sentence of what
@@ -2482,295 +2238,99 @@ light = { dim = 1 }
         assert!(!is_brief("Write a poem about lamps"));
     }
 
-    /// A skill asked to use any linked service is never made: the person
-    /// is told a skill can't, that the lamp itself can, and where it is
-    /// linked; a word that only holds one, or a plain word that is also a
-    /// service's name, is still a skill.
+    /// The owner, 10 Nov: whether a request asks for a linked service, a
+    /// write or two services is the making model's to judge, never a word
+    /// list's here. Every request, with reads on or off, is briefed with
+    /// the request as it is said; with reads on the brief adds one line
+    /// pointing to a read, and the longest fits [`MOST_BRIEF_BYTES`] either way.
     #[test]
-    fn a_skill_for_a_linked_service_points_to_asking_the_lamp() {
+    fn every_request_is_briefed_and_the_model_judges_it() {
         for request in [
             "read my mail every morning",
             "Glow blue when I get an E-mail",
-            "check my Gmail inbox",
-            "nod when my calendar has a meeting",
+            "every evening at nine, read me tomorrow's calendar",
             "glow red when Slack has a message",
-            "open my Google Drive file",
-            "nod when a GitHub build fails",
-            "glow when my Notion page changes",
-        ] {
-            assert_eq!(brief(request), Err(NOT_A_SERVICE), "{request}");
-        }
-        // Not possible yet, linked or not: no place to link it is named.
-        assert!(NOT_A_SERVICE.contains("yet") && NOT_A_SERVICE.contains("already linked"));
-        assert!(!NOT_A_SERVICE.contains("Connectors"));
-        for request in [
-            "glow warm when the mailman comes",
+            "read me my Notion plans",
+            "send my calendar to the team",
+            "read my calendar and my mail",
+            "tomorrow book a meeting on my calendar",
+            "read me my latest Facebook post",
             "dim the light at 10 pm",
-            "nod every monday morning",
-            "glow when I drive home",
         ] {
-            assert!(brief(request).is_ok(), "{request}");
+            for reads in [true, false] {
+                let brief = brief_with(request, reads).unwrap();
+                assert!(is_brief(&brief) && request_of(&brief) == request, "{brief}");
+                assert_eq!(brief.contains(" Or one read, as above."), reads, "{brief}");
+            }
+        }
+        let request = "x".repeat(MOST_REQUEST_BYTES);
+        for reads in [true, false] {
+            let longest = brief_with(&request, reads).unwrap();
+            assert!(longest.len() <= MOST_BRIEF_BYTES, "{}", longest.len());
         }
     }
 
-    /// #5288: with a made skill's reads on, a request to be read a calendar
-    /// or mail is briefed with its one read step, within [`MOST_BRIEF_BYTES`]
-    /// bytes; a write, two services or one with nothing a skill reads are
-    /// told that limit (the testers' sheet, 6 Nov), and with the switch off
-    /// every one is [`NOT_A_SERVICE`], as before.
+    /// #5288: the making model is shown each readable service's one step,
+    /// from `lamp-services`' catalogue: a calendar's, mail's and Drive's
+    /// whole, any other's fixed reads (never a query, a path or a whole
+    /// text); a service with nothing a skill reads is only named, for its
+    /// `cannot:`.
     #[test]
-    fn with_reads_on_a_calendar_or_mail_read_is_briefed() {
-        let calendar = "every evening at nine, read me tomorrow's calendar";
-        let brief = brief_with(calendar, true).unwrap();
-        assert!(is_brief(&brief) && request_of(&brief) == calendar);
-        assert!(brief.contains(
-            "read = { service = \"google_calendar\", what = \"events\", day = \"tomorrow\" }"
-        ));
-        assert!(brief.contains("services = { google_calendar = \"read\" }"));
-        let mail = brief_with("every morning read me my mail", true).unwrap();
-        assert!(mail.contains("read = { service = \"gmail\", what = \"recent\" }"));
-        assert!(mail.contains("services = { gmail = \"read\" }"));
-        assert!(
-            brief_with("what is on my calendar, each morning", true)
-                .unwrap()
-                .contains("day = \"today\"")
-        );
-        // Every other linked service: its reads listed, never a whole text.
-        // Notion is read only through its MCP server's tools (#5308), which
-        // a made skill can't read yet.
+    fn the_read_steps_are_the_catalogues_readable_services() {
+        let steps = read_steps();
+        let step = |code: &str| {
+            steps
+                .iter()
+                .find(|line| line.contains(&format!("({code}):")))
+                .unwrap_or_else(|| panic!("{code}: {steps:?}"))
+                .clone()
+        };
         assert_eq!(
-            brief_with("each morning read me my Notion plans", true),
-            Err(NOT_READABLE)
+            step("google_calendar"),
+            format!("Google Calendar (google_calendar): {CALENDAR_READ}")
         );
-        let drive = brief_with("read me my Google Drive files at nine", true).unwrap();
-        assert!(drive.contains("services = { google_drive = \"read\" }"));
+        assert!(CALENDAR_READ.contains("day = \"today\" }, or day = \"tomorrow\""));
+        assert_eq!(step("gmail"), format!("Gmail (gmail): {GMAIL_READ}"));
+        assert_eq!(
+            step("google_drive"),
+            format!("Google Drive (google_drive): {DRIVE_READ}")
+        );
         // A lamp, 5 Nov: "read my latest Google Drive files" was made with
-        // query = "order by modifiedTime desc", which matched no file. Drive's
-        // step is given whole: newest first, query only search words.
-        assert!(
-            drive.contains(&format!("one [[do]] step: {DRIVE_READ}. SKILL.md")),
-            "{drive}"
-        );
+        // query = "order by modifiedTime desc", which matched no file.
+        // Drive's step is given whole: newest first, query only search words.
         assert!(
             DRIVE_READ.contains("what = \"files\" }, no other key")
                 && DRIVE_READ.contains("newest first")
                 && DRIVE_READ.contains("query is search words")
-                && !drive.contains("text {id}")
-                && !drive.contains("file {id}")
         );
         // On 10300 the note's "(newest first; …)" right after the braces
-        // came back as one more key in them, twice. The note now says a
-        // field's word nowhere a key could be read from it.
+        // came back as one more key in them, twice.
         assert!(!DRIVE_READ.contains('(') && !DRIVE_READ.contains("newest_first"));
-        let latest = brief_with("read my latest Google Drive files", true).unwrap();
-        assert!(latest.contains(DRIVE_READ), "{latest}");
         // Thirteen's P2 on #5303: fixed reads only, no query, path or call.
-        let github = brief_with("each morning read me my GitHub issues", true).unwrap();
-        assert!(github.contains("notifications; issues {repo}; pulls {repo}; repos, its keys"));
-        assert!(!github.contains("query") && !github.contains("graphql"));
-        // P3.3: the time of day is the request's. No time is shown: lamp-9adf,
-        // 5 Nov 01:00, "when I come back to my desk" was made with the shown
-        // 08:00 to 08:30.
-        for brief in [&brief, &mail, &github, &drive] {
-            assert!(brief.contains("only for a time asked for"), "{brief}");
+        let github = step("github");
+        assert!(
+            github.contains("notifications; issues {repo}; pulls {repo}; repos, its keys"),
+            "{github}"
+        );
+        for line in &steps {
             assert!(
-                !brief.contains("21:00") && !brief.contains("08:00"),
-                "{brief}"
+                !line.contains("graphql") && !line.contains("text {id}"),
+                "{line}"
             );
         }
-        // The testers' sheet, 6 Nov ("a skill is limited with no reason"):
-        // with reads on, "a skill can't use your mail" is false, so each is
-        // told its own limit: a read only, of one service that has one.
-        for (request, limit) in [
-            ("glow red when Slack has a message", NOT_READABLE),
-            ("read me my Ahrefs numbers", NOT_READABLE),
-            ("read me my HubSpot deals", NOT_READABLE),
-            ("every friday draft my weekly mail to the team", NOT_A_WRITE),
-            (
-                "when I say wrap up add tomorrow's first meeting to my calendar",
-                NOT_A_WRITE,
-            ),
-            ("send my calendar to the team", NOT_A_WRITE),
-            ("read my calendar and my mail", ONE_SERVICE),
-            ("read my Notion page and my GitHub issues", ONE_SERVICE),
-            ("post my Notion page to Slack", NOT_A_WRITE),
-            // Asking for the skill is no write, but a write after it still is.
-            (
-                "create a skill that adds a meeting to my calendar",
-                NOT_A_WRITE,
-            ),
-            ("write me a skill to send my mail", NOT_A_WRITE),
-            ("schedule a meeting on my calendar", NOT_A_WRITE),
-            // Heron's P3: a write before "skill" is never dropped with the ask.
-            (
-                "send my mail with a skill that reads my calendar",
-                NOT_A_WRITE,
-            ),
-        ] {
-            assert_eq!(brief_with(request, true), Err(limit), "{request}");
-        }
-        // Each says what a skill can do, and none that it can't use a
-        // service at all.
-        for limit in [NOT_A_WRITE, ONE_SERVICE, NOT_READABLE] {
-            assert!(limit.contains("a skill can read"), "{limit}");
-            assert!(!limit.contains("can't use"), "{limit}");
+        for code in ["notion", "slack", "ahrefs", "hubspot", "gmail-app"] {
             assert!(
-                limit.ends_with("You can ask me for it yourself any time."),
-                "{limit}"
+                !steps
+                    .iter()
+                    .any(|line| line.contains(&format!("({code}):"))),
+                "{code}"
             );
         }
-        // How people ask for one (lamp-9adf, 4 Nov 23:51): "create a skill
-        // that ..." and "my schedule" are no writes.
-        for request in [
-            "Create a skill that reads my calendar for tomorrow when I come back to my desk",
-            "Add a new skill to read me my mail each morning",
-            "Lampy, make me a skill: read my calendar schedule for tomorrow at my desk",
-            "when I sit down, read me tomorrow's schedule from my calendar",
-            // El's P3 on #5679: "post" and "book" said as the thing read, and
-            // "put" with no service after it, are no writes either.
-            "read me my latest Facebook post",
-            "read me the book titles in my Google Drive",
-            "read me my mail and put the count on the light",
-            // El's P2 on #5696: a word after the thing doesn't make it a
-            // verb after "my", "the", "latest", "last" or "newest".
-            "read me my schedule on my calendar",
-            "read me the schedule on my calendar",
-            "read me my latest post on Facebook",
-            "what's the latest post on Facebook",
-            "read me the newest post on my Facebook page",
-            "read the post on my page on Facebook",
-            "read me the last post to my Facebook page",
-            "read me the latest post that my Facebook page has",
-            "read the post it got on Facebook",
-            "read me the post a friend left on Facebook",
-            "read me the last post saying sale on Facebook",
-            "read my schedule from my calendar",
-            "read me tomorrow's schedule from my calendar",
-            "what's on my schedule today in my calendar",
-            "read me my calendar schedule for tomorrow",
-            "read me the files in my Google Drive and put the count on the light",
-            "read me my mail and put the count on the light from my drive",
-            // El's P2s on #5696's restate: a read asked for before the
-            // service and the thing, and "read it to me" after a saying.
-            "read me my Facebook post about the sale",
-            "read me my Facebook page post about the sale",
-            "what's my calendar schedule today",
-            "read me my calendar schedule at nine",
-            "read me the facebook post on my page",
-            "read me the latest facebook post on my page",
-            "read me tomorrow schedule on my calendar",
-            "read me today schedule on my calendar",
-            "the last post saying we are open on Facebook, read it to me",
-            "show me my latest post saying sale on Facebook",
-            "tell me if my last post says hi on Facebook",
-            // The first builder's P3s on #5696: "let's" and a read in an
-            // earlier clause leave these reads alone.
-            "let's read my schedule from my calendar",
-            "read me the facebook post that I liked",
-            "check my calendar and read me tomorrow schedule",
-            // The first builder's HOLD on #5719: an object with no new
-            // clause after the read says which one is read.
-            "read me the facebook post a friend shared",
-            "read me my facebook post a week ago",
-            "read me the latest facebook post an hour ago",
-            "show me my calendar schedule a week ahead",
-            "read me the facebook post it showed me",
-            "read me today and tomorrow schedule on my calendar",
-        ] {
-            assert!(brief_with(request, true).is_ok(), "{request}");
+        let unreadable = unreadable_names();
+        for name in ["Notion", "Slack", "Ahrefs", "HubSpot"] {
+            assert!(unreadable.contains(&name), "{name}: {unreadable:?}");
         }
-        // As verbs, they still write.
-        for request in [
-            "post my mail to Facebook",
-            "book a meeting on my calendar",
-            "put a meeting on my calendar",
-            "read my mail and post it on Facebook",
-            // El's P3 on #5690: a word that makes it the thing read, then
-            // what it writes.
-            "my calendar, book a meeting",
-            "my calendar schedule a meeting",
-            "tomorrow book a meeting on my calendar",
-            "today post a photo to Facebook",
-            "each day post a hello on Facebook",
-            "the calendar book me a dentist at nine",
-            "at the end of the day book a room on my calendar",
-            "facebook post that I'm out",
-            "on my Facebook page post that we are closed",
-            "latest post: say hi on Facebook",
-            "last post on facebook say we are open",
-            "newest post to facebook saying hi",
-            "read my mail then put it in my drive",
-            // El's P3s on #5696: any object after "tomorrow", "today",
-            // "day", "calendar", "facebook" or "page" and the verb.
-            "today post my photo to Facebook",
-            "today post this on Facebook",
-            "today post them to Facebook",
-            "today post something on Facebook",
-            "facebook post this",
-            "facebook post them",
-            "facebook post something nice",
-            "facebook post hello world",
-            "page post we are open today on Facebook",
-            "tomorrow book my flight on my calendar",
-            "tomorrow book us a table on my calendar",
-            "my calendar book us a table",
-            "my calendar book the room",
-            "tomorrow book the room on my calendar",
-            "my calendar book dinner",
-            "the calendar book in a meeting",
-            "the calendar schedule my week",
-            "my calendar schedule my week",
-            "my calendar schedule lunch with Sam",
-            "tomorrow schedule lunch on my calendar",
-            "calendar schedule dinner at seven",
-            "post my photo to Facebook",
-            "tomorrow post an update on Facebook",
-            "facebook post saying hi",
-            "read my mail and put the file in Google Drive",
-            // El's P3 on #5696's restate: "for" after the verb.
-            "facebook post for the shop saying we are open",
-            "tomorrow book for me a table on my calendar",
-            // With nothing asked to be read, a saying is a post to write.
-            "when I sit down, my latest post saying sale on Facebook",
-            "latest post saying hi on Facebook",
-            "the newest post: saying we are closed, on Facebook",
-            // The first builder's P3s on #5696: "let's" is no "'s", and
-            // an object after the verb writes even with a read asked for
-            // in an earlier clause.
-            "let's post a photo on Facebook",
-            "let's book a table on my calendar",
-            "let's schedule a meeting on my calendar",
-            "check my calendar and tomorrow schedule a meeting",
-            "read my mail and today post an update on Facebook",
-            "what's on my calendar, then tomorrow book me a room",
-            "check my calendar and tomorrow schedule the meeting",
-            "check facebook and today post my photo",
-        ] {
-            assert_eq!(brief_with(request, true), Err(NOT_A_WRITE), "{request}");
-        }
-        for request in [
-            calendar,
-            "every morning read me my mail",
-            "read me my Notion plans",
-        ] {
-            assert_eq!(brief_with(request, false), Err(NOT_A_SERVICE), "{request}");
-        }
-        for service in [
-            "calendar tomorrow",
-            "GitHub",
-            "Google Drive",
-            "Asana",
-            "Facebook",
-        ] {
-            let words = format!("read my {service} ");
-            let longest = format!("{words}{}", "x".repeat(MOST_REQUEST_BYTES - words.len()));
-            let brief = brief_with(&longest, true).unwrap();
-            assert!(
-                brief.len() <= MOST_BRIEF_BYTES,
-                "{service}: {}",
-                brief.len()
-            );
-        }
+        assert!(!unreadable.contains(&"Google Calendar"));
     }
 
     /// A made skill that reads (#5288).
@@ -3132,7 +2692,7 @@ body = { gesture = "nod" }
     }
 
     /// With reads on, a read refused as unsaid goes back with lines that
-    /// keep the brief's read step, so the repair doesn't take the read away
+    /// keep the service's read step, so the repair doesn't take the read away
     /// (lamp-9adf, 5 Nov 13:26: an app make of a mail read, refused twice).
     #[test]
     fn with_reads_on_the_repair_lines_keep_the_read_step() {
@@ -3148,7 +2708,7 @@ body = { gesture = "nod" }
         assert!(why.contains("can't say plainly"), "{why}");
         assert_eq!(lines, format!("{PLAIN_ONLY}{PLAIN_OR_READ}"));
         assert!(
-            lines.contains("the brief's read step exactly as the brief gives it"),
+            lines.contains("that service's read step exactly as your instructions list it"),
             "{lines}"
         );
         assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
