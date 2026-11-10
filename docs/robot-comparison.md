@@ -21,6 +21,7 @@ Skills install by capability: a robot's [`ROBOT.md`](../robots/lamp/ROBOT.md) de
 | [guard](../skills/guard/)<br>Guard the house | ✅ |  | ✅ |  |
 | [music](../skills/music/)<br>Play music | ✅ | ✅ | ✅ |  |
 | [music-suggestion](../skills/music-suggestion/)<br>Suggest a song | ✅ | ✅ | ✅ |  |
+| [radio-drama](../skills/radio-drama/)<br>Listen to a story | ✅ | ✅ | ✅ |  |
 | [emotion-detection](../skills/user-emotion-detection/)<br>Read your mood | ✅ | ✅ | ✅ | ○ |
 | [mood](../skills/mood/)<br>Track how you feel | ✅ | ✅ | ✅ | ○ |
 | [wellbeing](../skills/wellbeing/)<br>Posture and breaks | ✅ | ✅ | ✅ | ○ |

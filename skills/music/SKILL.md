@@ -1,6 +1,6 @@
 ---
 name: music
-description: Play and stop music from YouTube through the device's speaker on user request.
+description: Play and stop music from YouTube through the device's speaker on user request. NOT for stories, audio dramas or radio dramas (radio-drama skill).
 ---
 
 # Music

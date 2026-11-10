@@ -1,15 +1,13 @@
 # OS Server API — Tài Liệu
 
-Opening chỉ là một âm xác nhận ngắn: tiếng Anh "Uhm.", tiếng Việt "Ừm.",
-tiếng Nhật "うん。", tiếng Trung giản thể/phồn thể "嗯。". Lượt voice thông thường
-của agent chính gọi phát ngay trước khi chuyển lời người dùng; lượt delegate bỏ
-qua opening. Continuation chỉ dùng một âm ngắn (tiếng Anh "Hmm...", tiếng Việt
-"Ừm..."), chờ 3,5 giây từ lúc
-agent bắt đầu lượt (từ tool đầu tiên với lượt delegate). Khi tool kết thúc,
-lịch phát lại cộng thêm phần cooldown 2,5 giây còn lại. Timer này không làm
-trễ opening.
-Mỗi lượt có tối đa một continuation tự động; các tool sau đó không phát thêm.
-Đã xoá bộ câu opening và continuation cũ. Filler chờ tự động không chọn câu theo tool. Cue realtime/tool được gọi riêng không đổi.
+Opening (một âm ngắn, tiếng Anh "Hmm...") hiện đang tạm tắt trong
+`PlayOpeningFillerNow`. Continuation báo cho người dùng biết yêu cầu vẫn đang
+được xử lý — tiếng Việt "Đợi mình chút nhé." / "Mình vẫn đang làm nhé.", tiếng
+Anh "One moment." / "Still working on it.", theo đúng thứ tự đó — và chờ 3,5 giây im lặng từ lúc agent
+bắt đầu lượt, cho cả lượt thường lẫn lượt delegate từ realtime. Khi tool kết
+thúc, lịch phát lại cộng thêm phần cooldown 2,5 giây còn lại. Mỗi lượt có tối đa
+hai continuation tự động; các tool sau đó không phát thêm. Filler chờ tự động
+không chọn câu theo tool. Cue realtime/tool được gọi riêng không đổi.
 
 Với follow-up Automatic của lamp Standard và Pro, HAL có thể gửi metadata sensing tùy
 chọn `suppress_auto_fillers: true`. OS bỏ opening và continuation filler tự động

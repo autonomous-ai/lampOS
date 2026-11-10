@@ -105,9 +105,9 @@ func TestFillerRealtimeUsesDedicatedVietnamesePool(t *testing.T) {
 	}
 }
 
-func TestFillerContinuationUsesNaturalVietnameseThoughtSounds(t *testing.T) {
+func TestFillerContinuationTellsVietnameseUsersToWait(t *testing.T) {
 	got := FillerContinuation(LangVI)
-	want := map[string]bool{"Ừm...": true}
+	want := map[string]bool{"Đợi mình chút nhé.": true, "Mình vẫn đang làm nhé.": true}
 
 	if len(got) != len(want) {
 		t.Fatalf("FillerContinuation(%q) = %v, want %d phrases", LangVI, got, len(want))
