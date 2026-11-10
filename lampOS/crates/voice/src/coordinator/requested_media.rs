@@ -194,7 +194,6 @@ impl Reply {
                 "the confirmation failed",
             ),
             (!self.had_audio, "the confirmation was empty"),
-            (self.playback_gaps != 0, "the confirmation had a gap"),
             (
                 self.media.confirmation_retired_at_us.is_none(),
                 "the confirmation never retired",
@@ -203,9 +202,13 @@ impl Reply {
         .into_iter()
         .find_map(|(ended, why)| ended.then_some(why));
         if let Some(why) = ended {
-            // A failed, empty or gapped confirmation ends the offer, said once
-            // (#5764: it ended with nothing to say why). Dropping the ticket
-            // releases the grant without I/O on this loop.
+            // A failed, empty or unretired confirmation ends the offer, said
+            // once (#5764: it ended with nothing to say why). A gap does not:
+            // it is late words, not cut ones, and retirement means all of
+            // them played. On lamp-52e6 on 10 Nov (request 3) the wait sound
+            // played 1.5 s after the line, the confirmation 4.5 s after that,
+            // and the gap between them cancelled a real ask. Dropping the
+            // ticket releases the grant without I/O on this loop.
             eprintln!(
                 "lamp-voice: request {}: requested audio cancelled: {why}",
                 self.owner.turn()
@@ -241,7 +244,6 @@ impl Reply {
             && self.media.confirmation_retired_at_us.is_some()
             && matches!(self.cloud.outcome, Some(RequestOutcome::Complete))
             && self.had_audio
-            && self.playback_gaps == 0
             && let Some(ticket) = self.media.ticket.as_mut()
             && ticket.may_play(at_us)
         {
