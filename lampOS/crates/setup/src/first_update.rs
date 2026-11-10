@@ -91,23 +91,29 @@ pub fn wait(
     phase: &mut dyn FnMut(&str),
 ) -> Ended {
     let started = now();
-    let mut before = match updates.newest() {
-        Some(status) => status.last,
+    let first = match updates.newest() {
+        Some(status) => status,
         None => loop {
             if now().duration_since(started) >= HEARD_WITHIN {
                 return Ended::Unheard;
             }
             if let Some(status) = updates.next(LOOK) {
-                break status.last;
+                break status;
             }
         },
     };
+    let mut before = first.last;
     if let Err(error) = updates.ask() {
         return Ended::NotAsked(error.to_string());
     }
     let mut asked = now();
-    // Whether a round has said a phase since the last ask.
-    let mut began = false;
+    // Whether a round has said a phase since the last ask: one already
+    // running at the first look counts, so its end is followed even when
+    // it comes before another phase (Reviewer-two's P2 on #5667).
+    let mut began = first.now != "idle";
+    if began {
+        phase(&first.now);
+    }
     let mut unreachable_again = true;
     let ended = loop {
         let at = now();

@@ -564,7 +564,9 @@ marker (`crate::first_update`):
 2. Setup says `update/check` on the bus, as the app's Check for update does
    (#4153), and follows the round on `update/status`, each phase as
    `update_phase` (`checking`, `fetching`, `switching`, `watching`,
-   `restoring`). Nothing of the product runs yet (every part needs the
+   `restoring`). A round already running at setup's first look counts as
+   begun, so its end is the round setup waits for, even when it ends before
+   another phase is said (#5667). Nothing of the product runs yet (every part needs the
    marker), so the switch restarts no voice and no body, and the walk isn't
    under way, so the updater doesn't hold for it.
 3. A round that only switched the updater (`self-switched`, the climb of an
