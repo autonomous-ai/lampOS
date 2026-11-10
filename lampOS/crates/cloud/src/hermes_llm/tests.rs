@@ -1,0 +1,281 @@
+use super::*;
+use std::os::unix::fs::PermissionsExt;
+use tokio::sync::oneshot;
+
+const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+const KEY: &str = "relay-key-for-the-test";
+
+/// A stand-in relay on loopback: one request, kept whole, answered with
+/// `answer` sent in two pieces.
+async fn relay(answer: &'static str, kind: &'static str) -> (String, oneshot::Receiver<Vec<u8>>) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let (kept, seen) = oneshot::channel();
+    tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut bytes = Vec::new();
+        let mut chunk = [0u8; 4096];
+        let end = loop {
+            if let Some(end) = find_head_end(&bytes) {
+                break end;
+            }
+            let read = stream.read(&mut chunk).await.unwrap();
+            assert!(read > 0);
+            bytes.extend_from_slice(&chunk[..read]);
+        };
+        let head = String::from_utf8_lossy(&bytes[..end]).to_ascii_lowercase();
+        let length: usize = head
+            .lines()
+            .find_map(|line| line.strip_prefix("content-length:"))
+            .map(|value| value.trim().parse().unwrap())
+            .unwrap_or(0);
+        while bytes.len() < end + 4 + length {
+            let read = stream.read(&mut chunk).await.unwrap();
+            bytes.extend_from_slice(&chunk[..read]);
+        }
+        let _ = kept.send(bytes);
+        let (one, two) = answer.split_at(answer.len() / 2);
+        let head = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: {kind}\r\nTransfer-Encoding: chunked\r\n\r\n"
+        );
+        stream.write_all(head.as_bytes()).await.unwrap();
+        for piece in [one, two] {
+            let framed = format!("{:x}\r\n{piece}\r\n", piece.len());
+            stream.write_all(framed.as_bytes()).await.unwrap();
+            stream.flush().await.unwrap();
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        stream.write_all(b"0\r\n\r\n").await.unwrap();
+    });
+    (format!("http://{address}/api/v1/ai/v1/deepseek"), seen)
+}
+
+/// The forwarder on a free loopback port, to `base`.
+async fn forwarder(base: &str) -> SocketAddr {
+    let listener = Forwarder::bind(0).await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let forwarder = Arc::new(Forwarder::new(base, KEY, TOKEN).unwrap());
+    tokio::spawn(forwarder.serve(listener));
+    address
+}
+
+/// `raw` sent, and the answer's status, head and (de-chunked) body.
+async fn ask(address: SocketAddr, raw: &[u8]) -> (u16, String, Vec<u8>) {
+    let mut stream = TcpStream::connect(address).await.unwrap();
+    stream.write_all(raw).await.unwrap();
+    let mut bytes = Vec::new();
+    stream.read_to_end(&mut bytes).await.unwrap();
+    let end = find_head_end(&bytes).expect("an answer's head");
+    let head = String::from_utf8_lossy(&bytes[..end]).into_owned();
+    let status = head[9..12].parse().unwrap();
+    let mut body = bytes[end + 4..].to_vec();
+    if head
+        .to_ascii_lowercase()
+        .contains("transfer-encoding: chunked")
+    {
+        let mut plain = Vec::new();
+        let mut rest = &body[..];
+        loop {
+            let line = find_head_end_line(rest);
+            let size =
+                usize::from_str_radix(std::str::from_utf8(&rest[..line]).unwrap(), 16).unwrap();
+            rest = &rest[line + 2..];
+            if size == 0 {
+                break;
+            }
+            plain.extend_from_slice(&rest[..size]);
+            rest = &rest[size + 2..];
+        }
+        body = plain;
+    }
+    (status, head, body)
+}
+
+fn find_head_end_line(bytes: &[u8]) -> usize {
+    bytes
+        .windows(2)
+        .position(|window| window == b"\r\n")
+        .unwrap()
+}
+
+fn chat(token: Option<&str>, body: &str) -> Vec<u8> {
+    let bearer = token
+        .map(|token| format!("Authorization: Bearer {token}\r\n"))
+        .unwrap_or_default();
+    format!(
+        "POST {CHAT_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\n{bearer}\
+         Content-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+        body.len()
+    )
+    .into_bytes()
+}
+
+#[tokio::test]
+async fn it_listens_on_loopback_only_and_answers_only_loopback_peers() {
+    let listener = Forwarder::bind(0).await.unwrap();
+    assert!(listener.local_addr().unwrap().ip().is_loopback());
+    assert_eq!(
+        listener.local_addr().unwrap().ip(),
+        IpAddr::V4(Ipv4Addr::LOCALHOST)
+    );
+    assert!(admits("127.0.0.1:5000".parse().unwrap()));
+    assert!(admits("[::1]:5000".parse().unwrap()));
+    assert!(!admits("192.168.1.20:5000".parse().unwrap()));
+    assert!(!admits("0.0.0.0:5000".parse().unwrap()));
+}
+
+#[tokio::test]
+async fn a_chat_goes_to_the_relay_with_the_key_and_streams_back() {
+    let sse = "data: {\"choices\":[{\"delta\":{\"content\":\"rain\"}}]}\n\ndata: [DONE]\n\n";
+    let (base, seen) = relay(sse, "text/event-stream").await;
+    let address = forwarder(&base).await;
+    let body = r#"{"model":"deepseek-flash","stream":true,"messages":[]}"#;
+    let (status, head, answer) = ask(address, &chat(Some(TOKEN), body)).await;
+    assert_eq!(status, 200);
+    assert!(head.contains("Content-Type: text/event-stream"));
+    assert_eq!(String::from_utf8(answer).unwrap(), sse);
+    let upstream = String::from_utf8(seen.await.unwrap()).unwrap();
+    assert!(upstream.starts_with("POST /api/v1/ai/v1/deepseek/chat/completions HTTP/1.1\r\n"));
+    let lower = upstream.to_ascii_lowercase();
+    assert!(
+        lower.contains(&format!("authorization: bearer {KEY}")),
+        "the key added"
+    );
+    assert!(
+        !upstream.contains(TOKEN),
+        "the local token never leaves the lamp"
+    );
+    assert!(upstream.ends_with(body), "the body as sent");
+}
+
+#[tokio::test]
+async fn the_models_list_goes_to_the_relay() {
+    let (base, seen) = relay("{\"data\":[]}", "application/json").await;
+    let address = forwarder(&base).await;
+    let raw = format!("GET {MODELS_PATH} HTTP/1.1\r\nAuthorization: Bearer {TOKEN}\r\n\r\n");
+    let (status, _, answer) = ask(address, raw.as_bytes()).await;
+    assert_eq!((status, answer.as_slice()), (200, &b"{\"data\":[]}"[..]));
+    let upstream = String::from_utf8(seen.await.unwrap()).unwrap();
+    assert!(upstream.starts_with("GET /api/v1/ai/v1/deepseek/models HTTP/1.1\r\n"));
+}
+
+#[tokio::test]
+async fn no_token_or_a_wrong_one_is_refused_and_nothing_reaches_the_relay() {
+    let (base, mut seen) = relay("{}", "application/json").await;
+    let address = forwarder(&base).await;
+    let wrong = "f".repeat(64);
+    for token in [None, Some(wrong.as_str()), Some("short")] {
+        let (status, _, body) = ask(address, &chat(token, "{}")).await;
+        assert_eq!(status, 401, "{token:?}");
+        assert!(!String::from_utf8_lossy(&body).contains(KEY));
+    }
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert!(seen.try_recv().is_err(), "the relay was never asked");
+}
+
+#[tokio::test]
+async fn other_paths_and_methods_are_refused() {
+    let address = forwarder("http://127.0.0.1:9/none").await;
+    for (raw, want) in [
+        (
+            format!(
+                "POST /v1/deepseek/v1/tools/search HTTP/1.1\r\nAuthorization: Bearer {TOKEN}\r\nContent-Length: 2\r\n\r\n{{}}"
+            ),
+            404,
+        ),
+        (
+            format!(
+                "POST /v1/chat/completions HTTP/1.1\r\nAuthorization: Bearer {TOKEN}\r\nContent-Length: 2\r\n\r\n{{}}"
+            ),
+            404,
+        ),
+        (
+            format!("GET / HTTP/1.1\r\nAuthorization: Bearer {TOKEN}\r\n\r\n"),
+            404,
+        ),
+        (
+            format!("GET {CHAT_PATH} HTTP/1.1\r\nAuthorization: Bearer {TOKEN}\r\n\r\n"),
+            405,
+        ),
+        (
+            format!(
+                "POST {CHAT_PATH} HTTP/1.1\r\nAuthorization: Bearer {TOKEN}\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n"
+            ),
+            411,
+        ),
+    ] {
+        assert_eq!(ask(address, raw.as_bytes()).await.0, want, "{raw}");
+    }
+}
+
+#[tokio::test]
+async fn a_body_over_the_cap_is_refused_before_it_is_read() {
+    let address = forwarder("http://127.0.0.1:9/none").await;
+    let raw = format!(
+        "POST {CHAT_PATH} HTTP/1.1\r\nAuthorization: Bearer {TOKEN}\r\nContent-Length: {}\r\n\r\n",
+        MOST_BODY + 1
+    );
+    assert_eq!(ask(address, raw.as_bytes()).await.0, 413);
+}
+
+#[tokio::test]
+async fn an_unreachable_relay_is_a_502_naming_no_key() {
+    let address = forwarder("http://127.0.0.1:9/none").await;
+    let (status, _, body) = ask(address, &chat(Some(TOKEN), "{}")).await;
+    assert_eq!(status, 502);
+    assert!(!String::from_utf8_lossy(&body).contains(KEY));
+}
+
+#[test]
+fn starts_are_capped_per_minute() {
+    let mut started = Started::default();
+    let now = Instant::now();
+    for _ in 0..PER_MINUTE {
+        assert!(started.take(now));
+    }
+    assert!(!started.take(now));
+    assert!(started.take(now + Duration::from_secs(61)));
+}
+
+#[test]
+fn the_relay_is_the_voices_deepseek() {
+    assert_eq!(relay_base(None), COMPANY_DEEPSEEK);
+    let product = include_str!("../../../../deploy/product/settings/second.json");
+    assert_eq!(relay_base(Some(product)), COMPANY_DEEPSEEK);
+    assert_eq!(
+        relay_base(Some(
+            r#"{"deepseek_base_url":"https://near.invalid/deepseek/"}"#
+        )),
+        "https://near.invalid/deepseek"
+    );
+    assert_eq!(
+        relay_base(Some(r#"{"llm_base_url":"https://example.invalid/v1"}"#)),
+        COMPANY_DEEPSEEK,
+        "only the company relay carries the lamp's key"
+    );
+}
+
+#[test]
+fn the_token_is_made_once_private_and_kept() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = token(dir.path()).unwrap();
+    assert!(plain(&first) && first.len() == 64);
+    let mode = std::fs::metadata(dir.path().join(TOKEN_FILE))
+        .unwrap()
+        .permissions()
+        .mode();
+    assert_eq!(mode & 0o777, 0o600);
+    assert_eq!(token(dir.path()).unwrap(), first);
+    std::fs::write(dir.path().join(TOKEN_FILE), "bad\n").unwrap();
+    let remade = token(dir.path()).unwrap();
+    assert!(plain(&remade) && remade != first);
+}
+
+#[test]
+fn the_debug_line_hides_the_key_and_token() {
+    let forwarder = Forwarder::new(COMPANY_DEEPSEEK, KEY, TOKEN).unwrap();
+    let shown = format!("{forwarder:?}");
+    assert!(!shown.contains(KEY) && !shown.contains(TOKEN));
+    assert!(Forwarder::new(COMPANY_DEEPSEEK, "", TOKEN).is_err());
+    assert!(Forwarder::new(COMPANY_DEEPSEEK, KEY, "short").is_err());
+}

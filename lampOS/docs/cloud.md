@@ -2421,6 +2421,51 @@ app that asks anyway is told `developer access is off on this lamp`.
   (`LAMP_CLOUD_TLS`) closes the rest. Until it is on this is an accepted risk,
   and the pairing is never described as end to end.
 
+## Hermes' DeepSeek, forwarded on the lamp (#5978, `LAMP_HERMES_ON_LAMP`)
+
+Hermes on the lamp (#5978) asks the lamp's own DeepSeek, through the
+Autonomous relay, with the same key the voice uses, without that key ever
+being in a file Hermes (user `lampos`) can read. lamp-cloud already holds the
+key (its unit's `LoadCredential=key`), so it forwards Hermes' requests and
+adds the key itself (`lamp_cloud::hermes_llm`).
+
+- **Off** unless `LAMP_HERMES_ON_LAMP=on` in lamp-cloud's environment (the
+  product unit doesn't set it yet), and only while lamp-cloud runs
+  (`LAMP_CLOUD=on`).
+- **Where:** `127.0.0.1:7741`, loopback only, and a peer that isn't loopback
+  is never answered. 7741 is used by no other lampOS part and by neither of
+  Hermes' own ports (8642, 8645).
+- **What:** only `POST /v1/deepseek/chat/completions`, to
+  `<relay>/chat/completions`, and `GET /v1/deepseek/models`, to
+  `<relay>/models`, with the voice's key as the bearer. The answer is sent
+  back as it comes (chunked, so a streamed Server-Sent Events answer reaches
+  Hermes piece by piece), with the relay's status and `Content-Type`. Any
+  other path is 404, another method on those two 405, a chunked request
+  body 411.
+- **The relay:** `<relay>` is the voice's DeepSeek: `second.json`'s
+  `deepseek_base_url`, else the company relay's DeepSeek under its
+  `llm_base_url` (`…/api/v1/ai/v1/deepseek`, as `second_config.rs`'s
+  `relay_deepseek`), read from a `second` credential when the unit hands
+  one in. The product unit hands in none yet, so it is the product
+  `second.json`'s, `https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek`.
+- **The local token:** every request must carry
+  `Authorization: Bearer <token>`, or it is 401 and the relay is never
+  asked. The token is 32 random bytes in hex, made once into
+  `hermes-token` in lamp-cloud's state folder (`/var/lib/lampos-cloud`,
+  `lampos`'s, 0700; the file 0600) and kept across restarts; a reset that
+  empties the folder makes a new one. Hermes' `.env` holds only this token
+  (docs/tasks.md, "Hermes' settings on the lamp"), so other local users
+  can't use the forwarder, and nothing Hermes can read holds the relay's
+  key. The token is compared in constant time and never leaves the lamp.
+- **Bounds:** a request body at most 2 MiB (413 before it is read), its
+  head at most 16 KiB, read within 10 s and its body within 30 s; at most 4
+  requests at once and 60 started in any minute (429 past either); the relay
+  connected within 10 s, each read of its answer within 120 s and the whole
+  answer within 10 min. An unreachable relay is 502. One request per
+  connection.
+- **Logs:** one line when it starts listening, or why it couldn't (no state
+  folder, the port taken); never a body, the token or the key.
+
 ## Not yet known, for the backend (#1396)
 
 - Whether the backend's `connected` comes from MQTT, the ping, or both, and
