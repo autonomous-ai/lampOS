@@ -130,6 +130,36 @@ fn found_bus() -> Bus {
     Bus::new([2028, 2048, 1946, 2085, 1817], [(0, 4095); 5])
 }
 
+/// Why `lamp-body` would refuse an ancestor of its lock folder, the rule of
+/// `trusted_metadata` in crates/body/src/linux.rs, copied: any group or other
+/// write bit (a sticky `/tmp` and a root-owned folder are NOT exempt), and an
+/// owner that is neither root nor the user running it. (Its last rule, the lock
+/// folder's own mode 0700, is lamp-sim's own `private_dir`.)
+fn ancestor_trouble(mode: u32, owner: u32, uid: u32) -> Option<&'static str> {
+    if owner != 0 && owner != uid {
+        Some("owned by another user")
+    } else if mode & 0o022 != 0 {
+        Some("writable by group or others")
+    } else {
+        None
+    }
+}
+
+/// The first folder above (or at) `path` that `lamp-body` would refuse, and why.
+/// The body walks the literal path with no symlink followed (so a path with a
+/// link in it fails there whatever it points to); this walks the real path, so
+/// it never refuses a folder the body would take.
+fn writable_ancestor(path: &Path) -> Option<(PathBuf, u32, &'static str)> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let uid = rustix::process::geteuid().as_raw();
+    let full = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_owned());
+    full.ancestors().find_map(|folder| {
+        let metadata = std::fs::metadata(folder).ok()?;
+        let mode = metadata.permissions().mode() & 0o7777;
+        ancestor_trouble(mode, metadata.uid(), uid).map(|why| (folder.to_owned(), mode, why))
+    })
+}
+
 fn private_dir(dir: &Path) -> std::io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
     std::fs::create_dir_all(dir.join("locks"))?;
@@ -141,6 +171,15 @@ fn private_dir(dir: &Path) -> std::io::Result<()> {
 
 fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
     private_dir(dir)?;
+    // Say it here, not as five silent body restarts: the real lamp-body refuses
+    // a lock folder under a folder others can write to.
+    if let Some((folder, mode, why)) = writable_ancestor(dir) {
+        return Err(std::io::Error::other(format!(
+            "{} is {why} (mode {mode:o}): lamp-body refuses a lock folder under it. \
+             Make the lamp folder under a private parent, e.g. `mkdir -m 700 ~/.lampsim` and `lamp-sim run ~/.lampsim/b`",
+            folder.display()
+        )));
+    }
     let bin = option(args, "--bin-dir")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
@@ -468,13 +507,31 @@ fn body_command(bin: &Path, dir: &Path, bus_root: &Path) -> std::io::Result<Comm
 /// the last line it wrote.
 fn why_body_ended(dir: &Path) -> String {
     let text = std::fs::read_to_string(dir.join("body.log")).unwrap_or_default();
-    text.lines()
-        .rev()
-        .find_map(|line| {
-            let report: serde_json::Value = serde_json::from_str(line).ok()?;
-            Some(report["body"]["stop"].to_string())
-        })
-        .unwrap_or_else(|| "no exit report".to_owned())
+    why_in(&text)
+}
+
+/// The reason in a body log: the stop of the last exit report, else (a body that
+/// refused to start prints its reason as the report's other fields or as plain
+/// text) the last line of the log itself, cut short.
+fn why_in(text: &str) -> String {
+    let last = text.lines().rev().find(|line| !line.trim().is_empty());
+    let stop = last.and_then(|line| {
+        let report: serde_json::Value = serde_json::from_str(line).ok()?;
+        report["body"]["stop"].as_str().map(str::to_owned)
+    });
+    match (stop, last) {
+        (Some(stop), _) => stop,
+        (None, Some(line)) => {
+            let line = line.trim();
+            let cut: String = line.chars().take(400).collect();
+            if line.chars().count() > 400 {
+                format!("{cut}...")
+            } else {
+                cut
+            }
+        }
+        (None, None) => "no exit report".to_owned(),
+    }
 }
 
 /// A thread with a name, so that the lamp can say which one ended.
@@ -541,5 +598,67 @@ mod tests {
         assert_ne!(lamp_name(a), lamp_name(b));
         assert_eq!(lamp_name(a), lamp_name(a));
         assert!(lamp_name(a).starts_with("virtual-") && lamp_name(a).len() == 14);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn a_folder_others_can_write_to_is_named_as_the_lock_folders_trouble() {
+        let base = std::env::temp_dir().join(format!("lsm-anc-{}", std::process::id()));
+        let inner = base.join("a").join("b");
+        std::fs::create_dir_all(&inner).unwrap();
+        for folder in [&base, &base.join("a"), &inner] {
+            std::fs::set_permissions(folder, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        // Private all the way up to the temp folder itself (usually 1777): the
+        // first offender is above `base`, never `inner`.
+        let found = writable_ancestor(&inner);
+        assert!(
+            found
+                .as_ref()
+                .is_none_or(|(folder, _, _)| !folder.starts_with(&base)),
+            "{found:?}"
+        );
+        std::fs::set_permissions(base.join("a"), std::fs::Permissions::from_mode(0o775)).unwrap();
+        let (folder, mode, why) = writable_ancestor(&inner).unwrap();
+        assert_eq!(why, "writable by group or others");
+        assert_eq!(folder, std::fs::canonicalize(base.join("a")).unwrap());
+        assert_eq!(mode, 0o775);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// The same table as lamp-body's `lock_directory_policy_rejects_shared_or_untrusted_ancestors`.
+    #[test]
+    fn the_ancestor_rule_is_lamp_bodys() {
+        for mode in [0o777, 0o1777, 0o775, 0o702] {
+            assert!(ancestor_trouble(mode, 0, 1000).is_some(), "{mode:o}");
+        }
+        assert!(ancestor_trouble(0o755, 1001, 1000).is_some());
+        assert!(ancestor_trouble(0o755, 0, 1000).is_none());
+        assert!(ancestor_trouble(0o700, 1000, 1000).is_none());
+        // The final folder's mode is checked by lamp-body alone, on a folder lamp-sim made 0700.
+        assert!(ancestor_trouble(0o750, 1000, 1000).is_none());
+    }
+
+    #[test]
+    fn the_body_log_gives_the_stop_else_its_last_line() {
+        assert_eq!(why_in(""), "no exit report");
+        assert_eq!(
+            why_in("{\"body\":{\"stop\":\"a hand held it\"}}\n"),
+            "a hand held it"
+        );
+        // A body that refused to start: a report with no stop, or plain text.
+        let refused = "{\"error\":\"lock directory ancestor is group/world writable\"}\n";
+        assert_eq!(why_in(refused), refused.trim());
+        assert_eq!(
+            why_in("first\nlamp-body: bad flag\n\n"),
+            "lamp-body: bad flag"
+        );
+        let long = "x".repeat(500);
+        assert!(why_in(&long).ends_with("...") && why_in(&long).len() < 410);
     }
 }
