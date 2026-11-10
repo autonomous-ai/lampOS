@@ -247,6 +247,14 @@ mod tests {
             );
         }
         assert!(writes.contains("gmail-app: send_mail {to, cc, subject, text}"));
+        // A draft over the app password's link alone (the owner's 10 Nov),
+        // and drafts read back.
+        assert!(writes.contains(
+            "gmail: send_mail {to, cc, subject, text}, save_draft {to, cc, subject, text} (app password link only)"
+        ));
+        assert!(
+            reads.contains("gmail: recent {count}, search {query}, drafts {count}, message {id}")
+        );
         // The names the lamp can link, each once, and what to say of another.
         let connected = tools[0]["description"].as_str().unwrap();
         assert!(connected.contains("The lamp can link only: Gmail, Gmail with Google sign-in, Google Calendar, Google Drive, Figma, GitHub,"));

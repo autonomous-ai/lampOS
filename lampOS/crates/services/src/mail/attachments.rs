@@ -877,10 +877,11 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
 }
 
 /// A whole attachment read: login, EXAMINE of the mailbox the id names
-/// (`all41` All Mail, a bare `41` the inbox, as `message`), the mail with
-/// its structure, the part `pick` chooses unless the mail is a security one
-/// or the part a kind not read, logout. None when there is no such mail,
-/// All Mail no longer shown over IMAP among them.
+/// (`all41` All Mail, `draft12` Drafts, a bare `41` the inbox, as
+/// `message`), the mail with its structure, the part `pick` chooses unless
+/// the mail is a security one or the part a kind not read, logout. None
+/// when there is no such mail, All Mail no longer shown over IMAP among
+/// them. Only a draft keeps whom it is to, as `message`.
 pub async fn read_attachment<S: AsyncRead + AsyncWrite + Unpin>(
     stream: S,
     user: &str,
@@ -888,11 +889,11 @@ pub async fn read_attachment<S: AsyncRead + AsyncWrite + Unpin>(
     id: &str,
     pick: &Pick,
 ) -> Result<Option<MailItem>, Failure> {
-    let (in_all, uid) = super::imap_id(id).ok_or(Failure::Unreached)?;
+    let (folder, uid) = super::imap_id(id).ok_or(Failure::Unreached)?;
     let mut imap = Imap::new(stream);
     imap.greet().await?;
     imap.login(user, pass).await?;
-    if !imap.examine_named(in_all).await? {
+    if !imap.examine_named(folder).await? {
         imap.logout().await;
         return Ok(None);
     }
@@ -903,6 +904,9 @@ pub async fn read_attachment<S: AsyncRead + AsyncWrite + Unpin>(
         .next();
     if let Some(item) = &mut item {
         item.id = id.to_owned();
+        if folder != super::Folder::Drafts {
+            item.to.clear();
+        }
     }
     if let Some(item) = &mut item
         && !is_security_item(item)

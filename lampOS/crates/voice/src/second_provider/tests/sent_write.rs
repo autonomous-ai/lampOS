@@ -1773,6 +1773,9 @@ async fn forgotten_send_outcomes_keep_only_fixed_notes_and_the_right_repeat_guar
         (1, "asked", SEND_NOT_KNOWN_NOTE, Some(SEND_NOT_KNOWN)),
         (2, "unknown", SEND_NOT_KNOWN_NOTE, Some(SEND_NOT_KNOWN)),
         (3, "refused", SEND_REDACTED_REFUSED_NOTE, None),
+        // A saved draft (#5982): its success and its repeat guard are kept,
+        // and it is never called sent (Reviewer-two at `447e218c55`).
+        (4, "saved", SAVED_REDACTED_NOTE, Some(ALREADY_SENT)),
     ] {
         let origin = 110 + index * 2;
         let resumed = origin + 1;
@@ -1789,6 +1792,9 @@ async fn forgotten_send_outcomes_keep_only_fixed_notes_and_the_right_repeat_guar
         );
         let completed = match state {
             "sent" => Some(json!({"sent":true,"detail":"ledger-private-result-canary"})),
+            "saved" => {
+                Some(json!({"sent":false,"saved":true,"detail":"ledger-private-result-canary"}))
+            }
             "refused" => Some(json!({"error":"ledger-private-refusal-canary"})),
             _ => None,
         };

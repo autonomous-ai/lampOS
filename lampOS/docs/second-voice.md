@@ -4175,7 +4175,8 @@ after a take-over, but now for every turn:
   finds the send in turn, at most `services::DEADLINE` (20 s) from when
   the send began, and goes on from the send's call and result (once, even
   if a line before it already carried them), with the note "their
-  go-ahead already sent the write they asked for … do not call
+  go-ahead already sent the write they asked for (or, for a draft, saved
+  it) … do not call
   service_write again for it" (`SENT_WRITE_NOTE`); the journal says
   `request M: request N's K send tr(y|ies) began before a newer line cut its
   answer; the sent one and each try's own result go with its words` (the
