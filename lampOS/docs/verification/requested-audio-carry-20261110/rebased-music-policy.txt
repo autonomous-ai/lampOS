@@ -1,0 +1,277 @@
+
+running 4 tests
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 9 words, the last 0 ms after the line ended
+lamp-voice second: request 57: its answer is held back: a busy room
+lamp-voice second: request 57: a held line names reports: asked once
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 9 words, the last 0 ms after the line ended
+lamp-voice second: request 57: its answer is held back: a busy room
+lamp-voice second: request 57: a held line names reports: asked once
+lamp-voice second: request 57: reports_stop done though the answer was held (consent withdrawn), 0 ms after the line
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 9 words, the last 0 ms after the line ended
+lamp-voice second: request 57: its answer is held back: a busy room
+lamp-voice second: request 57: a held line names reports: asked once
+lamp-voice second: request 57: reports_stop done though the answer was held (consent withdrawn), 0 ms after the line
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 9 words, the last 0 ms after the line ended
+lamp-voice second: request 57: its answer is held back: a busy room
+lamp-voice second: request 57: a held line names reports: asked once
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 9 words, the last 0 ms after the line ended
+lamp-voice second: request 57: its answer is held back: a busy room
+lamp-voice second: request 57: a held line names reports: asked once
+lamp-voice second: request 57: reports_stop done though the answer was held (consent withdrawn), 0 ms after the line
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 9 words, the last 0 ms after the line ended
+lamp-voice second: request 57: its answer is held back: a busy room
+lamp-voice second: request 57: a held line names reports: asked once
+lamp-voice second: request 57: reports_stop done though the answer was held (consent withdrawn), 0 ms after the line
+.lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 16 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 1 ms
+lamp-voice second: request 57 chat round 1 called play_relaxing_music
+lamp-voice second: request 57: play_relaxing_music offered a recording for a line that did not ask to play; refused
+lamp-voice second: request 57 chat round 2 first event in 2 ms
+lamp-voice second: request 57 first piece to the voice 2 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 3 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 16 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called use_skill
+lamp-voice second: request 57: use_skill offered a recording for a line that did not ask to play; refused
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 2 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 8 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called play_relaxing_music
+lamp-voice second: request 57: play_relaxing_music offered a recording for a line that did not ask to play; refused
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 2 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 8 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called use_skill
+lamp-voice second: request 57: use_skill offered a recording for a line that did not ask to play; refused
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 2 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 7 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called play_relaxing_music
+lamp-voice second: request 57: play_relaxing_music offered a recording for a line that did not ask to play; refused
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 2 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 7 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called use_skill
+lamp-voice second: request 57: use_skill offered a recording for a line that did not ask to play; refused
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 1 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 7 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called play_relaxing_music
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 2 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 7 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called use_skill
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 1 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 12 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called play_relaxing_music
+lamp-voice second: request 57: play_relaxing_music offered a recording for a line that did not ask to play; refused
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 2 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 12 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called use_skill
+lamp-voice second: request 57: use_skill offered a recording for a line that did not ask to play; refused
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 2 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 9 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called play_relaxing_music
+lamp-voice second: request 57: play_relaxing_music offered a recording for a line that did not ask to play; refused
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 1 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 9 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called use_skill
+lamp-voice second: request 57: use_skill offered a recording for a line that did not ask to play; refused
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 1 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 6 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called play_relaxing_music
+lamp-voice second: request 57: play_relaxing_music offered a recording for a line that did not ask to play; refused
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 1 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 6 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called use_skill
+lamp-voice second: request 57: use_skill offered a recording for a line that did not ask to play; refused
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 1 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 6 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called play_relaxing_music
+lamp-voice second: request 57: play_relaxing_music offered a recording for a line that did not ask to play; refused
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 1 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 6 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called use_skill
+lamp-voice second: request 57: use_skill offered a recording for a line that did not ask to play; refused
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 2 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 6 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called play_relaxing_music
+lamp-voice second: request 57: play_relaxing_music offered a recording for a line that did not ask to play; refused
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 2 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 6 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called use_skill
+lamp-voice second: request 57: use_skill offered a recording for a line that did not ask to play; refused
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 2 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 6 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called play_relaxing_music
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 1 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 6 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called use_skill
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 1 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 6 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called play_relaxing_music
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 2 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 6 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called use_skill
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 2 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 6 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called play_relaxing_music
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 2 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 6 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called use_skill
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 2 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called play_relaxing_music
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 2 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called use_skill
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 1 ms after the words were heard
+.lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called play_relaxing_music
+lamp-voice second: request 57 asked for play_relaxing_music; waiting for the Policy's decision
+lamp-voice second: request 57 asked for play_relaxing_music; not done: the Policy judged the turn not for the lamp, and its name was not heard (0 ms)
+lamp-voice second: request 57: 0 words were let out before a held call; the turn ends here, and nothing more is said
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called use_skill
+lamp-voice second: request 57 asked for use_skill; waiting for the Policy's decision
+lamp-voice second: request 57 asked for use_skill; not done: the Policy judged the turn not for the lamp, and its name was not heard (0 ms)
+lamp-voice second: request 57: 0 words were let out before a held call; the turn ends here, and nothing more is said
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called play_relaxing_music
+lamp-voice second: request 57 asked for play_relaxing_music; waiting for the Policy's decision
+lamp-voice second: request 57 asked for play_relaxing_music; not done: the Policy judged the turn not for the lamp, and its name was not heard (120 ms)
+lamp-voice second: request 57: 0 words were let out before a held call; the turn ends here, and nothing more is said
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called use_skill
+lamp-voice second: request 57 asked for use_skill; waiting for the Policy's decision
+lamp-voice second: request 57 asked for use_skill; not done: the Policy judged the turn not for the lamp, and its name was not heard (120 ms)
+lamp-voice second: request 57: 0 words were let out before a held call; the turn ends here, and nothing more is said
+.lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called play_relaxing_music
+lamp-voice second: request 57 asked for play_relaxing_music; waiting for the Policy's decision
+lamp-voice second: request 57 asked for play_relaxing_music; run after 120 ms: the Policy took the turn as the lamp's
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 0 ms after the words were heard
+lamp-voice second: request 57: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 57 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 57 chat round 1 first event in 0 ms
+lamp-voice second: request 57 chat round 1 called use_skill
+lamp-voice second: request 57 asked for use_skill; waiting for the Policy's decision
+lamp-voice second: request 57 asked for use_skill; run after 120 ms: the Policy took the turn as the lamp's
+lamp-voice second: request 57 chat round 2 first event in 0 ms
+lamp-voice second: request 57 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 57 first answer audio 0 ms after the words were heard
+.
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 5524 filtered out; finished in 0.10s
+

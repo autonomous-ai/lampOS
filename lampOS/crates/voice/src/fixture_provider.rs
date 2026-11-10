@@ -747,6 +747,7 @@ impl FixtureProvider {
                         .ok_or_else(|| invalid("fixture output sequence exhausted"))?;
                     // Each fixed-size event is its own bounded provider packet.
                     ProviderOutput::Audio {
+                        spoken: true,
                         request,
                         sequence: self.output_sequence,
                         provider_event_at_us: now_us,

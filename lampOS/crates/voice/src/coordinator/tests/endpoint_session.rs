@@ -716,6 +716,7 @@ fn provider_peer(
             for packet in 0..packets as u64 {
                 sequence += 1;
                 outbox.push_back(ProviderOutput::Audio {
+                    spoken: true,
                     request,
                     sequence,
                     provider_event_at_us: monotonic_us(),

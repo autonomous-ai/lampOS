@@ -3295,6 +3295,7 @@ async fn play_fixed(
             );
         }
         ProviderOutput::Audio {
+            spoken: true,
             request,
             sequence: shared.sequence.fetch_add(1, Ordering::Relaxed) + 1,
             provider_event_at_us: monotonic_us(),
@@ -3735,6 +3736,7 @@ async fn say_resumed(shared: &Shared, request: u64, english: &'static str, rest:
                     );
                 }
                 let audio = ProviderOutput::Audio {
+                    spoken: true,
                     request,
                     sequence: shared.sequence.fetch_add(1, Ordering::Relaxed) + 1,
                     provider_event_at_us: monotonic_us(),
@@ -12996,6 +12998,7 @@ async fn cue(shared: &Shared, request: u64, clip: Vec<i16>) -> Result<(), Stop> 
     }
     for part in clip.chunks(PACKET_SAMPLES) {
         let audio = ProviderOutput::Audio {
+            spoken: false,
             request,
             sequence: shared.sequence.fetch_add(1, Ordering::Relaxed) + 1,
             provider_event_at_us: monotonic_us(),
@@ -15529,6 +15532,22 @@ async fn answer(
                                 && now >= offer.issued_us
                                 && now < offer.start_before_us
                         });
+                        // A recording plays only for a line that asks to
+                        // play (#5764): talk about music got one on
+                        // lamp-52e6 on 9 Nov, the skill's "only when …
+                        // explicitly asks" left to the model. Refused, and
+                        // the model told so, never its "next" confirmation.
+                        if answer.requested_audio.is_some()
+                            && !crate::requested_audio::asks_to_play(&heard_words)
+                        {
+                            eprintln!(
+                                "lamp-voice second: request {request}: {} offered a recording for a line that did not ask to play; refused",
+                                call.name
+                            );
+                            answer = crate::tools::ToolAnswer::plain(serde_json::json!({
+                                "error": crate::requested_audio::NOT_ASKED_TO_PLAY
+                            }));
+                        }
                         answer
                     }
                     _ => crate::tools::ToolAnswer::plain(
@@ -15978,6 +15997,7 @@ async fn answer(
                 played = true;
                 for part in samples.chunks(PACKET_SAMPLES) {
                     let audio = ProviderOutput::Audio {
+                        spoken: answering,
                         request,
                         sequence: shared.sequence.fetch_add(1, Ordering::Relaxed) + 1,
                         provider_event_at_us: monotonic_us(),
