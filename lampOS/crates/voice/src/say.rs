@@ -74,6 +74,11 @@
 //!   lamp, its speaker is busy or an answer is owed (never for the room's
 //!   speech nobody addresses to it), is refused paused or muted, and has no
 //!   quiet gap or one-in-30-s rarity. `spoken` means played whole, as a sound's.
+//!   lamp-control adds `by`, the asking computer's name (lamp-control's
+//!   alone, with exact `text` only), so that `voice/line` (#4209) can tell
+//!   whose words they were; every line the voice plays without the model,
+//!   an exact or a cached text, goes on `voice/line` as it begins, and a
+//!   reply when its words are whole.
 //! - **A paired computer's clip** (the local leader's 3 Nov, lamp-control's
 //!   `sound` of a clip it keeps): in place of the words, `clip` is the
 //!   absolute path of a WAV under lamp-control's clips folder
@@ -436,6 +441,17 @@ pub struct Request {
     /// place of a hello and the name only (#5207, Welcome back's day's
     /// first hello, "what's first today?").
     pub question: bool,
+    /// For `voice/line` (#4209): who asked, and what it was once rendered.
+    pub line: LineMeta,
+}
+
+/// What `voice/line` needs of a request that plays without the model.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct LineMeta {
+    /// The paired computer that asked it (an exact `text`'s `by`).
+    pub by: Option<String>,
+    /// Its words and where they came from, kept as they are rendered.
+    pub said: Option<(String, lamp_msgs::LineSource)>,
 }
 
 impl Request {
@@ -515,6 +531,10 @@ struct Wire {
     /// ([`TURN_SKILL`] only, alone).
     #[serde(default)]
     listen: Option<bool>,
+    /// The paired computer that asks an exact `text` (lamp-control's alone):
+    /// its name, so that the lamp can say whose words they were (#4209).
+    #[serde(default)]
+    by: Option<String>,
     /// A note to be told who is at the lamp (#2825): only with `note`.
     #[serde(default)]
     who: bool,
@@ -643,6 +663,7 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
             unplug_request: None,
             who: false,
             question: false,
+            line: Default::default(),
         });
     }
     let words = if let Some(clip) = wire.clip {
@@ -751,6 +772,17 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
         (false, true, Words::Text(_)) => return Err("cache is asked by root's helpers only".into()),
         (false, true, _) => return Err("cache goes only with text".into()),
     };
+    if let Some(by) = &wire.by {
+        if !matches!(words, Words::Exact(_)) {
+            return Err("by goes only with exact text".into());
+        }
+        if skill != TURN_SKILL {
+            return Err("by is lamp-control's alone".into());
+        }
+        if by.is_empty() || by.chars().count() > 64 || by.chars().any(char::is_control) {
+            return Err("by: a name of 1 to 64 characters, no control characters".into());
+        }
+    }
     let priority = wire.priority.unwrap_or(NORMAL_PRIORITY);
     if priority > 9 {
         return Err("priority is 0 to 9".into());
@@ -769,6 +801,10 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
         unplug_request: wire.unplug_request,
         who: wire.who,
         question: wire.question,
+        line: LineMeta {
+            by: wire.by,
+            said: None,
+        },
     })
 }
 
@@ -852,6 +888,7 @@ fn parse_turn(skill: String, turn: TurnWire, wire: Wire) -> Result<Request, Stri
         unplug_request: None,
         who: false,
         question: false,
+        line: Default::default(),
     })
 }
 
@@ -895,6 +932,7 @@ fn parse_listen(skill: String, on: bool, wire: &Wire) -> Result<Request, String>
         unplug_request: None,
         who: false,
         question: false,
+        line: Default::default(),
     })
 }
 
@@ -1025,9 +1063,34 @@ pub struct Ticket {
     question: bool,
     /// Its asker's cancel ([`CANCEL_LINE`]): the voice cuts the turn.
     cancel: Cancel,
+    /// For `voice/line` (#4209).
+    line: LineMeta,
 }
 
 impl Ticket {
+    /// The line this ticket plays, as `voice/line` tells it: an exact or
+    /// cached line taken to play. None for a clip, a sound or a model's
+    /// turn, whose words the voice does not hold.
+    pub fn spoken_line(&self) -> Option<lamp_msgs::SaidLine> {
+        use lamp_msgs::{LineBy, LineSource, SaidLine};
+        let (text, source) = self.line.said.clone()?;
+        let (by, app) = match source {
+            LineSource::Cached | LineSource::Recording | LineSource::Reply => (LineBy::Lamp, None),
+            LineSource::Exact if self.skill == TURN_SKILL => {
+                (LineBy::Computer, self.line.by.clone())
+            }
+            LineSource::Exact => (LineBy::Skill, Some(self.skill.clone())),
+        };
+        Some(SaidLine {
+            text,
+            by,
+            source,
+            app,
+            request: None,
+            cut: false,
+        })
+    }
+
     /// No bus I/O: a request-specific atomic deadline from the client worker.
     pub fn authority_valid(&self, now_us: u64) -> bool {
         self.guard.as_ref().is_none_or(|guard| guard.valid(now_us))
@@ -1085,6 +1148,7 @@ impl Ticket {
                 cancel: Default::default(),
                 who: false,
                 question: false,
+                line: Default::default(),
             },
             answered,
         )
@@ -1472,6 +1536,7 @@ impl Says {
                 unplug_request: None,
                 who: false,
                 question: false,
+                line: Default::default(),
             },
             answer,
             read_at_us: expires_at_us.saturating_sub(60_000_000),
@@ -1503,6 +1568,7 @@ impl Says {
                 unplug_request: None,
                 who: false,
                 question: false,
+                line: Default::default(),
             },
             answer,
             read_at_us: 0,
@@ -1534,6 +1600,25 @@ impl Says {
         Self::words_for_test(skill, Words::ExactSound(samples), NORMAL_PRIORITY)
     }
 
+    /// [`Self::exact_for_test`] with the words it was rendered from and who
+    /// asked it (`voice/line`).
+    #[cfg(test)]
+    pub(crate) fn exact_said_for_test(
+        skill: &str,
+        by: Option<&str>,
+        text: &str,
+        source: lamp_msgs::LineSource,
+        samples: Vec<i16>,
+    ) -> (Self, mpsc::Receiver<Answer>) {
+        let (mut says, answered) =
+            Self::words_for_test(skill, Words::ExactSound(samples), NORMAL_PRIORITY);
+        says.waiting[0].request.line = LineMeta {
+            by: by.map(str::to_owned),
+            said: Some((text.to_owned(), source)),
+        };
+        (says, answered)
+    }
+
     /// [`Self::note_for_test`] for any `words`.
     #[cfg(test)]
     pub(crate) fn words_for_test(
@@ -1555,6 +1640,7 @@ impl Says {
                 unplug_request: None,
                 who: false,
                 question: false,
+                line: Default::default(),
             },
             answer,
             read_at_us: 0,
@@ -1754,6 +1840,7 @@ impl Says {
                 cancel: waiting.cancel,
                 who: false,
                 question: false,
+                line: Default::default(),
             },
         ))
     }
@@ -1776,6 +1863,7 @@ impl Says {
                 cancel: waiting.cancel,
                 who: false,
                 question: false,
+                line: waiting.request.line,
             },
         ))
     }
@@ -1823,6 +1911,7 @@ impl Says {
                 cancel: waiting.cancel,
                 who: false,
                 question: false,
+                line: waiting.request.line,
             },
         ))
     }
@@ -1894,6 +1983,7 @@ impl Says {
                 cancel: waiting.cancel,
                 who,
                 question,
+                line: Default::default(),
             },
             quoted,
         ))
@@ -1928,6 +2018,7 @@ impl Says {
             cancel: waiting.cancel,
             who: false,
             question: false,
+            line: Default::default(),
         })
     }
 
@@ -1951,6 +2042,7 @@ impl Says {
             cancel: waiting.cancel,
             who: false,
             question: false,
+            line: Default::default(),
         })
     }
 
@@ -2105,9 +2197,11 @@ fn serve_client(
                     request.words = Words::Sound(recordings.samples(name)?);
                 }
                 Words::Cached(text) => {
+                    request.line.said = Some((text.clone(), lamp_msgs::LineSource::Cached));
                     request.words = Words::Sound(recordings.cached(text)?);
                 }
                 Words::Exact(text) => {
+                    request.line.said = Some((text.clone(), lamp_msgs::LineSource::Exact));
                     request.words = Words::ExactSound(recordings.rendered(text)?);
                 }
                 // A fixed line asked as text, the first stand's (#4710),
@@ -3707,6 +3801,7 @@ mod tests {
                     unplug_request: None,
                     who: false,
                     question: false,
+                    line: Default::default(),
                 },
                 answer,
                 read_at_us: expires_at_us.saturating_sub(60_000_000),
@@ -3793,6 +3888,7 @@ mod tests {
                 unplug_request: None,
                 who: false,
                 question: false,
+                line: Default::default(),
             }
         );
         let text =
@@ -4156,6 +4252,7 @@ mod tests {
                 unplug_request: None,
                 who: false,
                 question: false,
+                line: Default::default(),
             }
         );
         assert_eq!(
@@ -4894,6 +4991,103 @@ mod tests {
         ] {
             assert!(parse(line).is_err(), "{line}");
         }
+    }
+
+    /// #4209: lamp-control names the computer that asks an exact line, so
+    /// the lamp can say whose words they were: `by`, with control's exact
+    /// `text` only, a plain name.
+    #[test]
+    fn an_exact_text_may_name_the_computer_that_asked_it() {
+        let named = parse(
+            r#"{"skill":"control","text":"Build passed.","exact":true,"by":"desk-wave","expires_in_ms":30000}"#,
+        )
+        .unwrap();
+        assert_eq!(named.line.by.as_deref(), Some("desk-wave"));
+        let unnamed =
+            parse(r#"{"skill":"control","text":"Hi.","exact":true,"expires_in_ms":1}"#).unwrap();
+        assert_eq!(unnamed.line.by, None);
+        let long = "x".repeat(65);
+        for (line, why) in [
+            (
+                r#"{"skill":"control","text":"x","by":"a","expires_in_ms":1}"#.to_owned(),
+                "by goes only with exact text",
+            ),
+            (
+                r#"{"skill":"reminder","text":"x","exact":true,"by":"a","expires_in_ms":1}"#
+                    .to_owned(),
+                "by is lamp-control's alone",
+            ),
+            (
+                r#"{"skill":"control","text":"x","exact":true,"by":"","expires_in_ms":1}"#
+                    .to_owned(),
+                "by: a name of 1 to 64 characters, no control characters",
+            ),
+            (
+                format!(
+                    r#"{{"skill":"control","text":"x","exact":true,"by":"{long}","expires_in_ms":1}}"#
+                ),
+                "by: a name of 1 to 64 characters, no control characters",
+            ),
+            (
+                r#"{"skill":"control","text":"x","exact":true,"by":"a\nb","expires_in_ms":1}"#
+                    .to_owned(),
+                "by: a name of 1 to 64 characters, no control characters",
+            ),
+        ] {
+            assert_eq!(parse(&line).unwrap_err(), why, "{line}");
+        }
+    }
+
+    /// #4209: an exact or cached line taken to play says what it was and
+    /// who had it said, for `voice/line`.
+    #[test]
+    fn a_line_taken_to_play_says_what_it_was_and_who_had_it_said() {
+        use lamp_msgs::{LineBy, LineSource, SaidLine};
+        let said = |skill: &str, by: Option<&str>, text: &str, source| {
+            let (mut says, _answered) =
+                Says::exact_said_for_test(skill, by, text, source, vec![1; 8]);
+            let (_, ticket) = says.take_exact(0).unwrap();
+            ticket.spoken_line()
+        };
+        assert_eq!(
+            said(
+                "control",
+                Some("desk-wave"),
+                "Build passed.",
+                LineSource::Exact
+            ),
+            Some(SaidLine {
+                text: "Build passed.".into(),
+                by: LineBy::Computer,
+                source: LineSource::Exact,
+                app: Some("desk-wave".into()),
+                request: None,
+                cut: false,
+            })
+        );
+        // A computer that was not named: still a computer's.
+        assert_eq!(
+            said("control", None, "Hi.", LineSource::Exact).map(|line| (line.by, line.app)),
+            Some((LineBy::Computer, None))
+        );
+        // A skill's own exact words.
+        assert_eq!(
+            said("stand-up", None, "Stand up.", LineSource::Exact).map(|line| (line.by, line.app)),
+            Some((LineBy::Skill, Some("stand-up".into())))
+        );
+        // A cached phrase is the lamp's own.
+        assert_eq!(
+            said("shutdown", None, "Going to sleep now.", LineSource::Cached).map(|line| (
+                line.by,
+                line.source,
+                line.app
+            )),
+            Some((LineBy::Lamp, LineSource::Cached, None))
+        );
+        // A line with no words recorded (a clip, a sound) is none.
+        let (mut says, _answered) = Says::exact_for_test("control", vec![1; 8]);
+        let (_, ticket) = says.take_exact(0).unwrap();
+        assert_eq!(ticket.spoken_line(), None);
     }
 
     /// A paired computer's `exact` text (lamp-control's `say`): any caller
