@@ -805,7 +805,7 @@ impl Op {
                     step_ms: u16::try_from(*step_ms).unwrap_or(u16::MAX),
                     frames,
                 };
-                lamp_body::moves::check(&file)
+                lamp_body::moves::check_reach(&file, &lamp_body::moves::door_reach())
                     .map_err(|why| format!("frames: a move this body cannot play: {why}"))?;
             }
             // Any `within_ms`: the body's caps pace each step (the owner's

@@ -709,8 +709,14 @@ folded, may wait up to that long for its first motion to begin.
 `move`'s shape is checked here, and the body's move check
 (`crates/body/src/moves.rs`) judges the rest. The door doesn't know the lamp's
 reach, so its pre-check lets a base yaw through up to 250 counts, the most any
-lamp may be given; the body holds the move to its own reach and refuses one
-past it with the reach in its words.
+lamp may be given (with `LAMP_BODY_APP_REACH=on` in lamp-control's environment,
+on a dev lamp, every joint up to `moves::CEILING`: 1,300 counts for the head and
+the base, 1,000 for the arm); the body holds the move to its own reach and drops
+one past it with the reach in its words (`dropped: past this lamp's reach`; with the switch on but the servos' ranges
+unread, `dropped: this lamp's reach is not known`). The schema's `frame` allows
+1,300 counts either way, the most any lamp may take; the door and the body hold
+each joint to its own reach, and the SDK fakes to today's caps (200, 200, 250,
+350, 350) unless made with `app_reach`.
 
 ## Who wins
 

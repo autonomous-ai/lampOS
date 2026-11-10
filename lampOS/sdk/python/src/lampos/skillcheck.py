@@ -23,7 +23,7 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
-from .moves import MOVE_FARTHEST, MOVE_FASTEST, MOVE_LASTS_MS, MOVE_STEP_MS
+from .moves import MOVE_FASTEST, MOVE_LASTS_MS, MOVE_STEP_MS, SKILL_FARTHEST
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -258,9 +258,9 @@ def _move(path: Path, where: Path, report: Report) -> None:
     step = step_ms / 1_000
     for at, (before, after) in enumerate(zip(frames, frames[1:]), start=1):
         for joint in range(5):
-            if abs(after[joint]) > MOVE_FARTHEST[joint]:
+            if abs(after[joint]) > SKILL_FARTHEST[joint]:
                 report.errors.append(
-                    f"{where}: frame {at} takes joint {joint} {after[joint]} counts, farther than {MOVE_FARTHEST[joint]}"
+                    f"{where}: frame {at} takes joint {joint} {after[joint]} counts, farther than {SKILL_FARTHEST[joint]}"
                 )
                 return
             speed = abs(after[joint] - before[joint]) / step
