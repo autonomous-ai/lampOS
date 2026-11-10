@@ -3,10 +3,15 @@
 //! the voice's tools folder (`<run>/tools/`, lamp-voice only). Off unless
 //! `LAMP_SERVICES=on` (a drop-in on its unit, as in lamp-cloud's and the
 //! voice's) or `--enable`: off, it opens no socket and exits at once, so its
-//! unit stays inactive.
+//! unit stays inactive. `lamp-services --pdf-text` is the service's own
+//! child for one PDF's text (`mail::pdf`), never started by hand.
 use lamp_services::{
-    ENVIRONMENT, SKILL_READS_ENVIRONMENT, WRITE_ENVIRONMENT, mail::Gmail, net::Https, on,
-    refresh::Backend, serve, store, tools,
+    ENVIRONMENT, SKILL_READS_ENVIRONMENT, WRITE_ENVIRONMENT,
+    mail::{self, Gmail},
+    net::Https,
+    on,
+    refresh::Backend,
+    serve, store, tools,
 };
 use std::{
     fs, io,
@@ -37,6 +42,11 @@ fn bind(path: &Path) -> io::Result<UnixListener> {
 }
 
 fn main() -> ExitCode {
+    // A PDF attachment's parse, in a child of the service (`mail::pdf`):
+    // nothing else of the service is started.
+    if std::env::args().nth(1).as_deref() == Some(mail::pdf::CHILD_ARG) {
+        return mail::pdf::child();
+    }
     let mut enable = on(std::env::var(ENVIRONMENT).ok().as_deref());
     let mut store = PathBuf::from(store::DIR);
     let mut run = PathBuf::from("/run/lampos-services");

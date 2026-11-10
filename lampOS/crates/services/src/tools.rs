@@ -119,6 +119,8 @@ fn catalog_at(offset_minutes: Option<i32>) -> Value {
                     "what": string("What to read, as listed for the service."),
                     "query": string("Search words."),
                     "id": string("An id a list gave."),
+                    "name": string("For attachment: its name, as message listed it."),
+                    "index": {"type": "integer", "description": "For attachment: its place in message's list, from 1."},
                     "from": time_field("Start", 9, offset_minutes),
                     "to": time_field("End", 10, offset_minutes),
                     "count": {"type": "integer", "description": "How many, 1 to 10."},

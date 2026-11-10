@@ -156,7 +156,7 @@ switch, and the voice then declares no services' functions.
 
 | Part | Runs as | What it does here |
 |---|---|---|
-| `lamp-services` (`crates/services`, package and binary `lamp-services`) | root with no capability (`CapabilityBoundingSet=`), `Group=lampos`, `lamp-services.service`, network allowed, the system read-only but its two folders, the kernel, clock, hostname and control groups protected, no namespaces, realtime, set-id or write-and-execute memory, system calls held to `@system-service` less `@privileged` and `@resources` | Keeps the tokens; makes every call to a service; holds a prepared write for its "send" |
+| `lamp-services` (`crates/services`, package and binary `lamp-services`) | root with no capability (`CapabilityBoundingSet=`), `Group=lampos`, `lamp-services.service`, network allowed, the system read-only but its two folders, the kernel, clock, hostname and control groups protected, no namespaces, realtime, set-id or write-and-execute memory, system calls held to `@system-service` less `@privileged` and `@resources` (`setrlimit` and `prlimit64` back, for the PDF reader's memory cap) | Keeps the tokens; makes every call to a service; holds a prepared write for its "send" |
 | `lamp-cloud` (`crates/cloud/src/services.rs`) | `lampos` | Takes the app's kinds, fetches a link's data from the backend and hands it on; wipes on sign-out |
 | `lamp-voice` (`crates/voice/src/services.rs`) | root | Declares the three functions to the model and holds the send gate |
 
@@ -263,7 +263,7 @@ refresh goes to the lamp's backend, never to Google).
 
 | Code | Name | Hosts | Reads (`what`) | Writes (`action`) |
 |---|---|---|---|---|
-| `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (an app password); `gmail.googleapis.com` (a Google sign-in) | `recent {count}`, `search {query}`, `message {id}` | `send_mail {to, cc, subject, text}` |
+| `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (an app password); `gmail.googleapis.com` (a Google sign-in) | `recent {count}`, `search {query}`, `message {id}`, `attachment {id, name \| index}` | `send_mail {to, cc, subject, text}` |
 | `gmail-app` | Gmail with Google sign-in | `gmail.googleapis.com` | none: it only sends | `send_mail {to, cc, subject, text}` |
 | `google_calendar` | Google Calendar | `www.googleapis.com` | `events {from, to, calendar, count}` | `create_event {title, start, end, calendar, attendees, text}` |
 | `google_drive` | Google Drive | `www.googleapis.com` | `files {query, count}`, `file {id}`, `text {id}` | none |
@@ -395,7 +395,12 @@ heard line only, nothing kept.
   is still "Gmail has no such item". A list
   is at most 10 mails, newest first; nothing is marked read (a get changes
   no label). Each call is a web read (5 s to connect, 15 s each), 20 s for
-  the whole read; the tokens are scrubbed from the decoded text too.
+  the whole read. The tokens are scrubbed from every decoded field too
+  (`serve::scrub_mail`): sender, subject, date, text, and each
+  attachment's name, type and text, on a list, a mail's read and an
+  attachment's; over IMAP the app password likewise, as given and without
+  its spaces. A secret encoded in a header or an RFC 2047 file name is
+  decoded only past the raw answer's scrub, so it is scrubbed again there.
 - **Writes:** on a spoken "send", one `POST
   /gmail/v1/users/me/messages/send` (`users.messages.send`, the only route on
   its write list) with `{"raw": <base64url>}`: the same plain text message
@@ -460,6 +465,154 @@ account's identity and `gmail.send` only, no `gmail.readonly`.
   write gate holds.
 - **Refresh:** through the backend under its own code
   (`connector: "gmail-app"`), as Google Calendar's.
+
+**A mail's attachments** (`crates/services/src/mail/attachments.rs`), with
+either kind of `gmail` link:
+
+- **Named:** `message {id}` also gives `attachments`, at most 10
+  (`mail::ATTACHMENTS_MOST`): each one's `name`, `type` and `size` ("24
+  bytes", "51 KB", "1.2 MB"), and a `note` beside one the lamp doesn't
+  read (`mail::note`): "can't read this kind yet" (`mail::CANT_READ`) for
+  a kind, "this PDF is too large to read here (over 2 MB)" for a PDF over
+  2 MB as the mail gives it. A list's previews name none. An attached file is never taken for the mail's own
+  text: a part the list counts as a file (`Content-Disposition:
+  attachment`, or a name in its disposition's `filename` or its type's
+  `name`, `inline` or not; `attachments::is_file`) is skipped there.
+  Over IMAP they come from the same UID FETCH, with `BODYSTRUCTURE`; over
+  the API from the `format=full` answer's parts that carry a `filename`.
+- **Read:** `attachment {id, name | index}` reads one attachment's text: by
+  its name as `message` listed it (any case, or a part of it that names
+  one attachment only), by its place from 1, or, with neither, the mail's
+  only attachment. The answer is the mail's `id`, `from`, `subject` and
+  `date` and `attachment: {name, type, size, text}`, without the mail's own
+  text, quoted as every read. Text is at most 3,000 characters (`TEXT_MOST`)
+  before the quoted answer's own cut.
+- **Kinds read:** `text/plain`, `text/csv`, `text/tab-separated-values`,
+  `text/markdown` and `text/html` (its tags taken out as a body's are); a
+  part typed `application/octet-stream` by its ending (`.txt`, `.csv`,
+  `.tsv`, `.md`, `.log`, `.htm`, `.html`); and a PDF (`application/pdf`,
+  or `.pdf` by its ending), below. Everything else (an Office file, an
+  archive) is refused before any fetch: "the lamp can't read this kind
+  yet: it reads text, CSV, HTML and PDF attachments", in fixed words that
+  never say the sender's type back. No Office extractor is in the lamp's dependencies. An
+  image or a program is never read, whatever type it claims (`image/*`, or
+  an ending such as `.png`, `.exe`, `.sh`, `.js`, `.apk` on any of its
+  names, read whole): this is checked first (`attachments::never`), so
+  `run.exe` or `photo.png` typed `application/pdf` is no PDF and is
+  refused, while `notes.pdf` is read.
+- **Names:** shown at most 120 characters, but each name the part is given
+  (its disposition's `filename`, its type's `name`, RFC 2047 words, RFC
+  2231's `filename*` and its continued pieces `filename*0*`, `filename*1*`
+  or `filename*0`, joined, at most 32) is kept whole to 1,024 characters
+  (`attachments::NAME_CHECK_MOST`) for the security check alone, never
+  returned. A name longer than that, or sent in pieces with one missing or
+  more than 32, is never fetched: "can't check this file's name, so it
+  isn't read" (`attachments::NAME_UNCHECKED`), its `note` in the list too.
+  A quoted value is read with its escapes, a `;` inside the quotes its own
+  (`filename="notes; verification code.txt"` is that whole name); a header
+  whose quote is left open, or with text after a closing one, leaves the
+  name unchecked the same way (`attachments::header_params`). An RFC 2231
+  name, and each RFC 2047 word in a name, is read only in UTF-8 (US-ASCII
+  among it) or Latin-1, and only whole: in any other charset (UTF-16's `run.exe` would read
+  `r u n . e x e`), with bytes not its charset's own, or with a NUL or an
+  undecodable character in any name, it is unchecked too
+  (`attachments::name_in`); so is a name with an RFC 2047 word in another
+  charset (UTF-7's `run.exe` reads as plain ASCII) or malformed, its
+  payload too: a Q `=` without two hex digits after it, or B text that
+  isn't whole padded quartets (unpadded `cnVuLmV4ZQ` would read `run.ex`)
+  (`mail::decode_words_with`). A header value is decoded to its first
+  16 KiB (`mail::DECODE_MOST`), each word looked for within 512 bytes of
+  its `=?`, so the time is linear in the value; a longer name is
+  unchecked.
+- **A PDF** (`crates/services/src/mail/pdf.rs`): its text, read with
+  `pdf-extract` 0.12.1 on `lopdf` 0.42 (both MIT, pure Rust, from
+  crates.io, pinned in `Cargo.lock`; lopdf without its default features).
+  Bounds, all before or around the parse:
+  - at most 2 MB (`pdf::PDF_MOST`): one over 2 MB as the mail gives it is
+    refused before any fetch, and one that comes larger once decoded
+    before any parse, "this PDF is too large to read here (over 2 MB)";
+  - an encrypted PDF (`/Encrypt`) is not parsed: "can't read this PDF";
+  - the parse never runs in the service: its own binary is started again
+    as a child, `lamp-services --pdf-text` (`/proc/self/exe`, still the
+    running one after an update), the PDF on its standard input and its
+    text on its standard output, error output to nowhere (a panic's
+    message can quote the file), the panic hook silent and the parse
+    under `catch_unwind`. It is killed (SIGKILL) 2 s after its start
+    (`pdf::PARSE_WITHIN`), and one PDF is parsed at a time, another's turn
+    waited on at most 2 s too. A panic, a stack overflow (a form that
+    draws itself), a loop or a kill ends the child, never the service;
+    the read is then "can't read this PDF";
+  - memory, **the real bound**: on Linux the child's address space and
+    data (`RLIMIT_AS`, `RLIMIT_DATA`, soft and hard) are 128 MiB
+    (`pdf::CHILD_MEMORY_MOST`), set in the forked child before it runs the
+    binary (`pre_exec`, `prlimit64` calls, `pdf::limited`) and again
+    by the child first thing (`pdf::cap_memory`). A child whose limit
+    can't be set is never started, or exits before it reads anything. An
+    allocation past it fails in the child, which aborts: "can't read this
+    PDF", never a failure of the service. The unit's filter takes
+    `setrlimit prlimit64` back from `~@resources` for this
+    (`SystemCallFilter=setrlimit prlimit64`); with no capability a limit
+    is only ever lowered. On a developer's Mac there is no such limit;
+  - early refusals before the parse, in the child, none of them the bound:
+    the PDF's names are read as `lopdf` reads them (`/Fil#74er` is
+    `/Filter`), then it is "can't read this PDF" with a filter that the
+    count below doesn't bound (`LZWDecode`, `ASCII85Decode`), with a
+    `/Filter` array of more than one filter (each stage inflates the
+    last one's output), or with `/Columns` over 4,096, `/Colors` over 32
+    or `/BitsPerComponent` over 32 (`pdf::COLUMNS_MOST`, `COLORS_MOST`,
+    `BITS_MOST`: a predictor sizes two rows by them before any data). A
+    predictor within them still reads, as a cross-reference stream's own
+    (`/Predictor 12 /Columns 5`) does. Then every stream is inflated once
+    as `lopdf` would (zlib, else raw deflate) with a running total, a
+    `stream` keyword's spaces or tabs before its line end taken as
+    `lopdf` takes them, and past 16 MB in all (`pdf::INFLATED_MOST`) the
+    PDF is not read;
+  - text out: at most 3,000 characters (the layout stops past twice that,
+    a long PDF's later pages never laid out); a PDF with no text (a scan)
+    is "can't read this PDF".
+
+  A PDF fetched and not read is named in the answer's `attachments` with
+  its `note`, never read. Measured on a laptop (aarch64-darwin, release):
+  a one-page PDF read through the child in about 15 ms, first and repeat;
+  a child that never ends killed at 2.0 s. The lamp's own time is not
+  measured yet. Binary size: `lamp-services` release grows from 1.35 MB to
+  2.95 MB on that host (1.14 MB to 2.56 MB stripped), about 1.5 MB of it
+  `lopdf`'s, whose decryption can't be left out by a feature;
+  `pdf-extract` adds about 60 KB to it.
+- **Over IMAP:** the same login, read-only `EXAMINE` of the mailbox the id
+  names and UID FETCH as `message` (`all41` All Mail, found again by its
+  `LIST`; a bare `41` the inbox; an All Mail id with All Mail gone since
+  reads nothing; any other id is refused before connecting), then
+  `UID FETCH <uid> (UID BODY.PEEK[<section>]<0.1048576>)`: the part
+  alone, at most 1 MB (`net::BODY_MOST`), nothing marked read; its base64
+  or quoted-printable decoded, its charset read. A PDF's part is fetched
+  whole, at most 2,900,000 bytes (`mail::PDF_FETCH`: 2 MB in base64 with
+  its line breaks), the literal limit raised for that fetch alone.
+- **Over the API:** the mail with `format=full`, then `GET
+  /gmail/v1/users/me/messages/<id>/attachments/<attachmentId>`
+  (`users.messages.attachments.get`, on Gmail's read list, under
+  `gmail.readonly`); a part whose data came in the mail needs no second
+  call. The answer is read up to the 1 MB answer limit (a PDF's up to
+  `mail::PDF_FETCH`, that call's alone, `net::Call::most`); one cut there
+  is read from the start of its data. The tokens are scrubbed from the
+  text and from every attachment's name and type (`serve::scrub_mail`).
+  A mail whose `format=full` answer came cut reads no attachment ("this
+  mail is too long to read its attachments here").
+- **Security:** a security mail's attachment is never fetched, and the mail
+  is left out whole as any. One check (`mail::is_security_item`) reads the
+  sender, subject and text with every attachment's whole names (to 1,024
+  characters, not the shown 120) and type, before any part is chosen or
+  fetched over IMAP or the API: a mail whose file's name alone marks it
+  (`verification code.txt`, or 121 `a`s then ` verification code.txt`, or
+  that name sent as RFC 2231 pieces) has no byte of it fetched.
+  The same check runs again on what is returned, the attachment's text
+  among it, so a code in an attachment leaves the mail out too. What an attachment says is quoted data, never instructions.
+- **Refusals,** in words that hold nothing of the mail: "this mail has no
+  attachments", "this mail has N attachments: give the name or index of
+  one", "this mail has no one attachment by that name: read the mail with
+  message to see their names", "this mail has N attachments: index is 1 to
+  N", "this PDF is too large to read here (over 2 MB)", "the lamp can't
+  check this file's name, so it isn't read".
 
 ## MCP services
 
@@ -1024,7 +1177,7 @@ none of them can be read by a made skill yet ("... which a made skill can't
 read yet"), until each has a fixed read. Whether the service is linked is `lamp-services`'
 own answer at the run (`NOT_LINKED`), kept in the journal as "not read:
 ...". A read that gives one item's whole text is never a skill's
-(`spoken::WHOLE_TEXTS`): `gmail`'s `message`, `google_drive`'s `text`,
+(`spoken::WHOLE_TEXTS`): `gmail`'s `message` and `attachment`, `google_drive`'s `text`,
 and `figma`'s and `figma-api`'s `comments`. Nor is a
 free-form read, whose shape the asker writes and which could put any text
 where a title goes (`spoken::FREE_FORM`, Thirteen's P2 on #5303): a
