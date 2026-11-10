@@ -1,0 +1,26 @@
+
+> test
+> node --test check.test.mjs
+
+✔ GitHub headings include formatted text, duplicate suffixes and Unicode (8.854603ms)
+✔ explicit HTML anchors survive, but examples and comments do not (2.168469ms)
+✔ inline, reference, image and fragment links resolve with escaped destinations (13.437709ms)
+✔ missing file and wrong fragment are each reported and produce exit 1 (118.185401ms)
+✔ percent-encoded Unicode fragments and root-relative files resolve (2.191303ms)
+✔ network destinations are skipped and historical docs are not scanned (2.818336ms)
+✔ a sibling file or escaping symlink cannot conceal a standalone broken link (3.261238ms)
+✔ deleted docs directory or an empty scan fails rather than passing (2.390477ms)
+✔ HTML anchor values handle entities and quoted greater-than without fake attributes (0.509273ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 278.645447
+
+> check
+> node check.mjs ../../../lampOS
+
+192 docs, 1900 local links, 0 broken

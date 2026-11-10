@@ -62,8 +62,32 @@ maximum 1.725 us; cue-packet first/max 26.978 us, p95 1.281 us. The earlier
 broad invocation is retained separately. These are two packet kinds, not a
 before/after speedup comparison. Neither this timing nor authored retirement
 receipts prove acoustic or device latency. The existing first/repeated
-retirement-to-write host control remains in the requested-audio suite.
+retirement-to-write host control measured 538 us / 550 us against its
+250 ms target in the initial requested-audio suite.
 
 `LAMP_REQUESTED_AUDIO` stays off in the product. No activation, device action,
 live provider account or public playback claim. Original two-read, played-row,
 Store and default-on gates remain with their assigned owners.
+
+## Rebase provenance
+
+The final runtime repair is `4a03002e15ef293f4d73745e2fc75e3b2734f17b` on
+`b3e2d0903fb9a9a5fd34c41d84af761f9db3413c`. All five commits compare `=`
+against the initial carry. Documentation checks on this base pass: nine
+tests, 192 documents, 1900 local links, none broken. The rebased runtime gate completed successfully:
+
+- `cargo fmt --all --check`: passed.
+- `cargo clippy -q -p lamp-voice --all-targets -- -D warnings`: passed.
+- Requested-audio filter: 66 passed / one ignored manual diagnostic, 7.72 s.
+- Entire `music_policy` module: four passed, 0.10 s, including the expanded
+  direct/wrapped matrix and the existing boundary controls.
+- Exact serde and Live forwarding tests: one passed each.
+- Actual provider wait-cue control: one passed, 0.02 s.
+- Prepared first/repeated retirement-to-write host handoff: 579 us / 580 us,
+  both inside its 250 ms target. Acoustic onset remains unmeasured.
+
+All commands ran sequentially from `lampOS/`, with Cargo jobs 2 and the
+shared target directory. Follow-up evidence commits change only these
+verification files; the runtime tested is the hash above. Full ARM and
+Linux CI qualification follows publication; no local full-Voice pass is
+claimed for this carry.
