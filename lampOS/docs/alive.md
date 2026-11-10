@@ -345,6 +345,16 @@ Off unless `lamp-expression serve --head-touch`, and Controls runs with
   as the night's own sleep does: the same bow and breath. Never while
   onboarding is under way (#3747): the voice declines that hold, and its
   word that it is awake keeps Expression from folding.
+  The voice says so first, with `LAMP_SLEEP_LINE=on` (on in the product,
+  #6028): "Going to sleep. Tap my head to wake me." at the hold's 2 s, in
+  the owner's language, the breath in its place in the quiet hours
+  ([controls.md](controls.md)). The ring's asleep face is the voice's, in
+  its muted wait ([ring-choreography.md](ring-choreography.md), "The asleep
+  face"), not Expression's. Asleep, Expression's journal line "ignored
+  sleeping name (N): voice ownership, input readiness or freshness was
+  lost" is a name heard in the sleep that a voice event (a new session, a
+  lost input, a turn's end) left without its speech to count it: the sleep
+  is kept, only that name is let go (#6028).
 - **A tap**, or a hand kept a second, wakes it when asleep (#3747). Awake, a tap is "are you there?" (First,
   #711, 05:05). It looks up: the head lifts a little (`LOOK_UP`, pitch
   -0.035 rad), and toward a face the eyes saw in the last second, more for

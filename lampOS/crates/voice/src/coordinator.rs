@@ -2284,6 +2284,25 @@ fn may_hear(allowed: bool, slide: Option<crate::privacy::PrivacyState>) -> bool 
     allowed && slide != Some(crate::privacy::PrivacyState::Muted)
 }
 
+/// Whether a hand's hold falls in the lamp's quiet hours now
+/// (`lamp_local_time::quiet_hours`, 22:00 to 07:00 local, the one definition
+/// skills keep too), where it plays the breath, not the sleep line (#6028).
+/// A local time it cannot read is not quiet: the line is said.
+fn sleep_line_quiet_hours() -> bool {
+    #[cfg(test)]
+    {
+        TEST_QUIET_HOURS.with(std::cell::Cell::get)
+    }
+    #[cfg(not(test))]
+    {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_millis() as u64);
+        crate::local_time::system()
+            .is_some_and(|zone| lamp_local_time::quiet_hours(zone.minute_of_day(now_ms)))
+    }
+}
+
 /// The person's light a hand's sleep keeps on, from the bus if there is
 /// one (#1362): none means the asleep face. Read on Linux, where the ring is.
 #[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
@@ -5659,6 +5678,9 @@ thread_local! {
     /// `TEST_TASK_NEWS`.
     static TEST_SPEECH_CACHE: std::cell::RefCell<Option<std::sync::Arc<crate::say::tts_cache::TtsCache>>> =
         const { std::cell::RefCell::new(None) };
+    /// A loop test's quiet hours for the hold's sleep line (#6028), in
+    /// place of the lamp's local time.
+    static TEST_QUIET_HOURS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's say service (`LAMP_SAY=on`, #939), as `TEST_TASK_NEWS`.
     static TEST_SAYS: std::cell::RefCell<Option<crate::say::Says>> =
         const { std::cell::RefCell::new(None) };
@@ -13226,11 +13248,19 @@ fn conversation_with_gate_inner(
                     "boundary":"this decision, at Controls' hand time on the head; the first sample is head_sleep_breath_first_write"}),
             )?;
             if decided.is_ok() {
-                // The recorded line in the breath's place (#3748).
+                // The recorded line in the breath's place (#3748), but not in
+                // the quiet hours, where the breath and the asleep face alone
+                // show it (#6028).
+                let quiet = sleep_line_cache.is_some() && sleep_line_quiet_hours();
                 let sleep_line = sleep_line_cache
                     .as_ref()
+                    .filter(|_| !quiet)
                     .and_then(|cache| cache.sleep_line());
-                if sleep_line_cache.is_some() && sleep_line.is_none() {
+                if quiet {
+                    eprintln!(
+                        "lamp-voice: a hand's hold in the quiet hours: the breath plays, not the sleep line"
+                    );
+                } else if sleep_line_cache.is_some() && sleep_line.is_none() {
                     eprintln!(
                         "lamp-voice: the sleep line is not in the speech cache yet: a hand's hold plays the breath"
                     );
