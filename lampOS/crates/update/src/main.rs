@@ -889,7 +889,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     let hermes = {
         use lamp_update::{harness_install::product, hermes_install as hermes};
         let acts = config.apply && command == "serve";
-        // On by this build's default on a product lamp, as Harness's.
+        // Off by this build's default (PRODUCT_DEFAULT false); only LAMP_HERMES_ON_LAMP=on turns it on.
         let wanted = hermes::wanted(
             std::env::var(hermes::SWITCH).ok().as_deref(),
             acts && product::product_lamp(&config.root, &config.on(&config.units)),
