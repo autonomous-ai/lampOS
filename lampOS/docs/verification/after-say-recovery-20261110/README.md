@@ -88,3 +88,25 @@ These local results do not substitute for Linux/ARM CI or the played check.
 Maintained-document links: 192 docs, 1900 links, zero broken. The checker
 tests passed all nine cases. Historical verification directories are
 excluded from the outgoing-link scan.
+
+## Equal rebase onto the current integration base
+
+Both commits compare equal after rebase onto `c29008d21`, runtime head
+`ebea47ed7d0847713856118f39d17d1ce4d3ced5`. Skills, messages, bus and Cargo
+manifest/lock files are unchanged by the base advance; Voice changes are
+in person naming/worker prompt context, outside this Skills recovery path.
+The 675-test full gate above remains explicitly on the prior base.
+
+Current-base `cargo fmt --all --check` and
+`cargo clippy -q -p lamp-skills --all-targets -- -D warnings` passed.
+Actual integration controls, all serial except the single exact test:
+
+- `cargo test -q -p lamp-skills --test it cut -- --test-threads=1 --nocapture`: [four passed](current-cut.txt), 6.69 s, including show/dance replay and real-word/no-resume cancellation.
+- `cargo test -q -p lamp-skills --test it resumed_say -- --include-ignored --test-threads=1 --nocapture`: [seven passed](current-resumed.txt), 10.89 s, six regressions plus the explicit host timing diagnostic.
+- Exact `skills::words_heard_after_the_line_is_said_again_still_cancel`: [one passed](current-late-words.txt), 1.57 s.
+
+Current first/repeated invalid-state publication to observed cancellation:
+**18,020 us / 10,475 us**, same boundary and under the same 250 ms target.
+This is host evidence only. [Current docs](current-docs.txt): 192 documents,
+1900 links, zero broken. The evidence commit adds no runtime change.
+Fresh ARM/Linux CI and the two reads still qualify the published carry.
