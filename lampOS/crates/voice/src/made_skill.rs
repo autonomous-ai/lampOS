@@ -63,8 +63,9 @@ const FACES_TOPIC: &str = lamp_msgs::Faces::TOPIC;
 /// The eyes' word that the person at the desk stood up to leave.
 const STOOD_UP_TOPIC: &str = lamp_msgs::StoodUp::TOPIC;
 /// lamp-skills' own local clock, `lamp_skills::LOCAL_CLOCK_TOPIC` written
-/// out: this crate can't name it, lamp-skills depends on this one.
-const CLOCK_TOPIC: &str = "clock/local";
+/// out: this crate can't name it, lamp-skills depends on this one. Held
+/// equal to it by lamp-skills' own test (`tests/it/made.rs`).
+pub const CLOCK_TOPIC: &str = "clock/local";
 /// How long after a kept skill is marked to go on ([`goes_on`]) the manage
 /// helper still puts it on, by its own clock: the voice asks the helper
 /// right after marking it, so a kept SHA-256 is never put on later by any
@@ -661,10 +662,30 @@ pub fn say_text(say: &toml::Value) -> Option<String> {
         .then(|| text.to_owned())
 }
 
+/// The least `absent_for` of a made skill on a face coming into view
+/// (#6070, the Reviewer-lead's P2): a face lost for a frame and seen again
+/// is the same person still there, never someone new to greet (CLAUDE.md
+/// rule 8). [`paced`] sets it, `"1m"`, when it is missing or shorter,
+/// whether or not the skill speaks.
+pub const LEAST_FACE_ABSENT_SECS: u64 = 60;
+
+/// The least cooldown of a made skill on someone getting up (#6070): the
+/// eyes say a departure again each time the sitter's face is lost rising
+/// after being seen, so someone bobbing out of the picture and back would
+/// run it each time. [`paced`] sets it, `"1m"`, when it is missing or
+/// shorter; one that speaks has [`LEAST_SAY_COOLDOWN_SECS`].
+pub const LEAST_STOOD_UP_COOLDOWN_SECS: u64 = 60;
+
 /// A trigger's cooldown in seconds, when it is one [`duration`].
 fn cooldown_secs(trigger: &toml::Table) -> Option<u64> {
-    let (count, unit) = duration(trigger.get("cooldown")?.as_str()?)?;
-    // Too long to count is unreadable, so it is paced to an hour like one.
+    duration_secs(trigger, "cooldown")
+}
+
+/// A trigger's `key` (`cooldown`, `absent_for`) in seconds, when it is one
+/// [`duration`].
+fn duration_secs(trigger: &toml::Table, key: &str) -> Option<u64> {
+    let (count, unit) = duration(trigger.get(key)?.as_str()?)?;
+    // Too long to count is unreadable, so it is paced like a missing one.
     count.checked_mul(match unit {
         "second" => 1,
         "minute" => 60,
@@ -745,15 +766,21 @@ fn says_aloud(table: &toml::Table) -> bool {
         })
 }
 
-/// A made skill's `skill.toml` with the limits on speaking set rather than
-/// refused (#6062, the owner's rule: lifting a limit makes things simpler,
-/// never adds a refusal): a skill with a say step has a `cooldown` of at
-/// least an hour ([`LEAST_SAY_COOLDOWN_SECS`]), set to `"1h"` when missing,
-/// shorter or unreadable; one that speaks on the lamp's resting
+/// A made skill's `skill.toml` with its manners set rather than refused
+/// (#6062, #6066's rule (a), the owner's: lifting a limit makes things
+/// simpler, never adds a refusal): a skill with a say step has a `cooldown`
+/// of at least an hour ([`LEAST_SAY_COOLDOWN_SECS`]), set to `"1h"` when
+/// missing, shorter or unreadable; one that speaks on the lamp's resting
 /// (`voice/state`) runs only within [`SAY_HOURS`], its `during` set to them
-/// or to its part within them. Its `[trigger]` table's lines are changed in
-/// place, so what is checked, said plainly and packed is the same text.
-/// Anything else, or a skill that can't be read, is given back as it came.
+/// or to its part within them. Whether or not it speaks (#6070), one on a
+/// face coming into view runs `when = "appears"` (set when missing or
+/// `"present"`) after seeing none for at least a minute, its `absent_for`
+/// set to `"1m"` ([`LEAST_FACE_ABSENT_SECS`]) when missing, shorter or
+/// unreadable; one on someone getting up has a `cooldown` of at least a
+/// minute ([`LEAST_STOOD_UP_COOLDOWN_SECS`]). Its `[trigger]` table's lines
+/// are changed in place, so what is checked, said plainly and packed is the
+/// same text. Anything else, or a skill that can't be read, is given back
+/// as it came.
 pub fn paced(text: &str) -> String {
     let Ok(table) = toml::from_str::<toml::Table>(text) else {
         return text.to_owned();
@@ -761,14 +788,37 @@ pub fn paced(text: &str) -> String {
     let Some(trigger) = table.get("trigger").and_then(|trigger| trigger.as_table()) else {
         return text.to_owned();
     };
-    if !says_aloud(&table) {
-        return text.to_owned();
-    }
+    let topic = trigger.get("topic").and_then(|topic| topic.as_str());
+    let says = says_aloud(&table);
     let mut set: Vec<(&str, String)> = Vec::new();
-    if cooldown_secs(trigger).is_none_or(|secs| secs < LEAST_SAY_COOLDOWN_SECS) {
-        set.push(("cooldown", "cooldown = \"1h\"".to_owned()));
+    let least = if says {
+        Some((LEAST_SAY_COOLDOWN_SECS, "1h"))
+    } else if topic == Some(STOOD_UP_TOPIC) {
+        Some((LEAST_STOOD_UP_COOLDOWN_SECS, "1m"))
+    } else {
+        None
+    };
+    if let Some((least, line)) = least
+        && cooldown_secs(trigger).is_none_or(|secs| secs < least)
+    {
+        set.push(("cooldown", format!("cooldown = \"{line}\"")));
     }
-    if trigger.get("topic").and_then(|topic| topic.as_str()) == Some("voice/state")
+    // A face coming into view: a frame without one and the face again is
+    // still the one there, never a new arrival (#6070, CLAUDE.md rule 8).
+    // `lamp-skills` counts `absent_for` only with `when = "appears"`.
+    if topic == Some(FACES_TOPIC) {
+        if matches!(
+            trigger.get("when").map(toml::Value::as_str),
+            None | Some(Some("present"))
+        ) {
+            set.push(("when", "when = \"appears\"".to_owned()));
+        }
+        if duration_secs(trigger, "absent_for").is_none_or(|secs| secs < LEAST_FACE_ABSENT_SECS) {
+            set.push(("absent_for", "absent_for = \"1m\"".to_owned()));
+        }
+    }
+    if says
+        && topic == Some("voice/state")
         && let Some((from, to)) = day_window(trigger)
     {
         let line = format!(
@@ -4127,6 +4177,99 @@ light = { colour = "green", level = 3, for = "20s" }
             "body = { gesture = \"sleepy\" }",
             "Every day at 23:59, it droops sleepily, at most once every 12 hours.",
         );
+    }
+
+    /// #6070, the Reviewer-lead's P2, by #6066's rule (a): a made skill on a
+    /// face coming into view, a gesture or a light alone, runs only after
+    /// seeing none for a minute, set and never refused: missing or shorter
+    /// is set to `"1m"`, a longer one kept; `rearm` alone or `"present"`
+    /// becomes `when = "appears"`, which `absent_for` needs in lamp-skills.
+    /// One on someone getting up has a cooldown of a minute or more; one
+    /// that speaks keeps its hour.
+    #[test]
+    fn a_face_skill_waits_a_minute_away_and_a_getting_up_a_minute() {
+        let face = "topic = \"humans/faces/tracked\"\nwhen = \"appears\"\n";
+        let greeting = "body = { gesture = \"greeting\" }";
+        for (absent, kept) in [
+            ("", "1m"),
+            ("absent_for = \"10s\"\n", "1m"),
+            ("absent_for = \"59s\"\n", "1m"),
+            ("absent_for = \"soon\"\n", "1m"),
+            ("absent_for = \"18446744073709551615h\"\n", "1m"),
+            ("absent_for = \"60s\"\n", "60s"),
+            ("absent_for = \"5m\"\n", "5m"),
+        ] {
+            let text = made_with(&format!("{face}{absent}"), greeting);
+            let set = paced(&text);
+            let table: toml::Table = toml::from_str(&set).unwrap();
+            assert_eq!(
+                table["trigger"]["absent_for"].as_str(),
+                Some(kept),
+                "{absent}"
+            );
+            assert_eq!(table["trigger"]["when"].as_str(), Some("appears"));
+            // No cooldown is added: the minute away is its manners.
+            assert!(table["trigger"].get("cooldown").is_none(), "{set}");
+            capped_with(&set, false).unwrap();
+            assert_eq!(paced(&set), set, "paced once is paced");
+        }
+        assert_eq!(
+            plainly_with(&paced(&made_with(face, greeting)), false).unwrap(),
+            "When the lamp sees a face, after seeing none for a minute, it lifts its head and \
+             arm in a greeting."
+        );
+        // `rearm` alone, or `"present"` beside it: appears, so the minute
+        // counts.
+        for when in [
+            "rearm = \"ends\"\n",
+            "when = \"present\"\nrearm = \"ends\"\n",
+        ] {
+            let text = made_with(
+                &format!("topic = \"humans/faces/tracked\"\n{when}"),
+                greeting,
+            );
+            let table: toml::Table = toml::from_str(&paced(&text)).unwrap();
+            assert_eq!(table["trigger"]["when"].as_str(), Some("appears"), "{when}");
+            assert_eq!(
+                table["trigger"]["absent_for"].as_str(),
+                Some("1m"),
+                "{when}"
+            );
+            capped_with(&paced(&text), false).unwrap();
+        }
+        // A face skill that speaks gets both: the hour and the minute away.
+        let hello = made_with(face, "say = { text = \"Hello again!\" }")
+            .replace("body = true\n", "speak = true\n");
+        let table: toml::Table = toml::from_str(&paced(&hello)).unwrap();
+        assert_eq!(table["trigger"]["cooldown"].as_str(), Some("1h"));
+        assert_eq!(table["trigger"]["absent_for"].as_str(), Some("1m"));
+        // Someone getting up: a cooldown of a minute, a longer one kept.
+        let stood = "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n";
+        for (cooldown, kept) in [
+            ("", "1m"),
+            ("cooldown = \"20s\"\n", "1m"),
+            ("cooldown = \"10m\"\n", "10m"),
+        ] {
+            let text = made_with(
+                &format!("{stood}{cooldown}"),
+                "body = { gesture = \"headshake\" }",
+            );
+            let table: toml::Table = toml::from_str(&paced(&text)).unwrap();
+            assert_eq!(
+                table["trigger"]["cooldown"].as_str(),
+                Some(kept),
+                "{cooldown}"
+            );
+            assert!(table["trigger"].get("absent_for").is_none());
+            capped_with(&paced(&text), false).unwrap();
+        }
+        // Other triggers, silent, are given back as they came.
+        let clock = made_with(
+            "topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
+             during = { from = \"22:00\", to = \"22:01\" }\n",
+            "light = { dim = 1 }",
+        );
+        assert_eq!(paced(&clock), clock);
     }
 
     /// What lamp-skills would run otherwise than said, or that reads who

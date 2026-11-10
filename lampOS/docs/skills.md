@@ -2368,15 +2368,20 @@ gone ([switches.md](switches.md)). What happens:
          `when = "appears"` or `rearm = "ends"`, since faces come many
          times a second: "When the lamp sees a face, after seeing none",
          with `for` "When the lamp has seen a face for 3 seconds, …", with
-         `absent_for` "… after seeing none for 10 minutes". A face lost
-         for a moment and seen again is seen again: no `gap` is said or
-         kept;
+         `absent_for` "… after seeing none for 10 minutes". No `gap` is
+         said or kept; instead `paced` sets every one, spoken or not, to
+         `when = "appears"` and an `absent_for` of at least `"1m"`, a longer
+         one kept (#6070), so a face lost for a frame and seen again runs
+         nothing: "When the lamp sees a face, after seeing none for a
+         minute";
        - **someone getting up** (`room/stood_up`, which the eyes say once
          a departure of the person sitting at the desk, with
          `LAMP_ACTIVITY=on`), only as Watch you leave tests it,
          `field = "sitting_s"`, `above = 0`, with no `for` or
          `absent_for` (the message lasts 5 s): "When someone sitting at
-         the desk gets up";
+         the desk gets up". The eyes say it again each time the sitter's
+         face comes back and is lost rising, so `paced` sets its `cooldown`
+         to at least `"1m"` (#6070): "…, at most once a minute";
        - **a time each day** (`clock/local`, lamp-skills' own clock, as
          its daily triggers are written): `field = "known"`,
          `equals = true`, `rearm = "ends"` and a `during` of exactly one
