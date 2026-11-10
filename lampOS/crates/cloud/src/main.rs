@@ -160,6 +160,12 @@ fn main() -> ExitCode {
     let key = std::fs::read_to_string(credentials.join("key"))
         .map(|key| key.trim().to_owned())
         .unwrap_or_default();
+    // Hermes on the lamp (#5978): its DeepSeek through lamp-cloud's loopback
+    // forwarder, with this key; only with LAMP_HERMES_ON_LAMP=on. The voice's
+    // second.json, when the unit hands it in as `second`, names the relay.
+    let hermes_key = key.clone();
+    let hermes_second = std::fs::read_to_string(credentials.join("second")).ok();
+    let hermes_state = std::env::var_os("STATE_DIRECTORY").map(PathBuf::from);
     let build = std::fs::read_to_string(credentials.join("build"))
         .map(|state| lamp::build(&state))
         .unwrap_or_default();
@@ -421,7 +427,18 @@ fn main() -> ExitCode {
                 None => std::future::pending().await,
             }
         };
+        let mut said_hermes = |line: &str| say(line);
+        let forwarding = async move {
+            lamp_cloud::hermes_llm::run(
+                hermes_state.as_deref(),
+                hermes_second.as_deref(),
+                &hermes_key,
+                &mut said_hermes,
+            )
+            .await
+        };
         tokio::select! {
+            () = forwarding => {}
             () = alerting => {}
             () = wiping => {}
             () = pinging => {}
