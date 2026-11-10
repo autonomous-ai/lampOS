@@ -1674,19 +1674,25 @@ fn too_little_free_space_is_no_space_and_nothing_is_made() {
     assert_eq!(install(&lamp, &runs, 5).unwrap().install, "installed");
 }
 
-/// The product units do not turn the lamp's Hermes on: lamp-update's own
-/// unit alone decides (by its `PRODUCT_DEFAULT`, on, with the schedule),
-/// and neither lamp-cloud nor lamp-tasks sets the switch on here.
-/// lamp-tasks' `--engines-from-machines` and `--reply-named` come with the
-/// routing that uses them (#6094), not here.
+/// The product units turn the lamp's Hermes on for voice work (#5978, the
+/// first builder's (a), 11 Nov): lamp-tasks and lamp-cloud each set the
+/// switch, and lamp-tasks has `--engines-from-machines`, without which the
+/// lamp's own Hermes is never looked for. lamp-update's own unit still
+/// decides the install by its `PRODUCT_DEFAULT`, with the schedule; neither
+/// unit names Hermes's folder.
 #[test]
-fn the_product_units_do_not_turn_the_lamps_hermes_on() {
+fn the_product_units_turn_the_lamps_hermes_on_for_voice_work() {
     let tasks = include_str!("../../../../deploy/product/lamp-tasks.service");
     let cloud = include_str!("../../../../deploy/product/lamp-cloud.service");
     let switch = format!("Environment={SWITCH}=on");
     for (unit, text) in [("lamp-tasks", tasks), ("lamp-cloud", cloud)] {
-        assert!(!text.lines().any(|line| line == switch), "{unit}");
+        assert!(text.lines().any(|line| line == switch), "{unit}");
     }
+    let serve = tasks
+        .lines()
+        .find(|line| line.starts_with("ExecStart="))
+        .expect("lamp-tasks' ExecStart");
+    assert!(serve.contains(" --engines-from-machines "), "{serve}");
     assert!(!cloud.contains("lampos-hermes"));
     // The skills switch (#6128): named by no product unit at all, so it is
     // lamp-update's build default, on on a product lamp.

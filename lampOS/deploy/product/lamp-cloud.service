@@ -54,6 +54,9 @@ Environment=LAMP_OWNER_PLACE=on
 # A skill typed in the app (#2813, fourteen-P15): `can` names skills.make only while lamp-voice's maker
 # has a computer to hand it to (make_skill::watch, asked every 60 s).
 Environment=LAMP_APP_MAKE_SKILL=on
+# The lamp's own Hermes chats through lamp-cloud's loopback forwarder (127.0.0.1:7741) to the relay
+# (#5978, docs/cloud.md); it serves only once Hermes is installed and asks.
+Environment=LAMP_HERMES_ON_LAMP=on
 # Health and crash reports to the company (#2862, docs/cloud.md, "Health and crash reports"): only after
 # the person's yes at setup (share_reports) or from the app (reports.set). With no recorded yes, nothing
 # is sent; a reset wipes the choice.

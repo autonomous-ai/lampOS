@@ -1413,7 +1413,8 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
     hand-overs to a missing, a signed-out and an offline agent each refused
     at once with a plain line, and a good one unchanged.
 - **The lamp itself, with Hermes** (`LAMP_HERMES_ON_LAMP=on`, only with
-  `--engines-from-machines`; off unless set, #5978 part 3). Off, the
+  `--engines-from-machines`; off unless set, #5978 part 3; the product's
+  `lamp-tasks.service` sets both). Off, the
   machine Harness marks `current` (the lamp) is left out, as above.
   - **Kept as a target** only while its own engines look says `hermes` is
     `installed: true` (fresh, as above): with the switch the lamp's machine
