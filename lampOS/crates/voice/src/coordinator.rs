@@ -16778,7 +16778,7 @@ fn take_interrupted_reminder(reply: &mut Option<Reply>) -> Option<crate::reminde
         return None;
     }
     let mut receipt = current.reminder.take()?;
-    // Cut after most of it played: heard, so completed, not said again
+    // One reminder cut after most of it played: completed, not said again
     // (06c1, 5 Nov 17:04).
     if let Some(cut) = current.mostly_heard_at_cut()
         && receipt.heard_before_the_cut(cut.playback_sequence, current.handed)
