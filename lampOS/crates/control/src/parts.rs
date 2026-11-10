@@ -57,8 +57,11 @@
 //!   the lease the door holds for the computer (`crate::body_lease`); its
 //!   end comes later as a `done` event, with the angles the head reached.
 //!
-//! `look` at `face` and at `name` are not in this release, and refused as
-//! that. `joints`' `yaw` and `pitch` go as the holder's look, the same
+//! `look` at `face` goes the same way as `{"look":"face"}`: the body turns
+//! once toward the face the eyes last showed, by the gaze's measure, and
+//! answers `refused` (a `done` `dropped`) with "no face in view" when there
+//! is none. `look` at `name` is not in this release (the lamp has no sound
+//! direction), and refused as that. `joints`' `yaw` and `pitch` go as the holder's look, the same
 //! degrees from home; its `roll`, `shoulder` and `elbow` as the holder's
 //! pose, on the same socket. Not routed yet, each refused with what it waits for: `play`
 //! and `sound` (a client's package,
@@ -164,8 +167,10 @@ impl LightOut for lamp_bus::Publisher {
 /// `body/gesture`.
 pub const MOVE_NAME: &str = "control";
 
-/// `look` at `face` and at `name`: out of this release.
-pub const NOT_IN_THIS_RELEASE: &str = "not in this release: look at a face or a name";
+/// `look` at `name`: out of this release, the lamp having no direction of a
+/// voice.
+pub const NOT_IN_THIS_RELEASE: &str =
+    "not in this release: look at who said the lamp's name (the lamp has no sound direction)";
 
 /// The lamp's parts, as `lamp-control` reaches them.
 pub struct Lamp {
@@ -659,8 +664,10 @@ impl Lamp {
             }
             LookAt::Angles(Angles { yaw, pitch }) => json!({"yaw": yaw, "pitch": pitch}),
             LookAt::Target(LookTarget::Ahead) => json!("ahead"),
+            // One turn toward the face the eyes last showed, said by the body.
+            LookAt::Target(LookTarget::Face) => json!("face"),
             // Out of this release, said as that (the local leader, 29 Oct).
-            LookAt::Target(LookTarget::Face | LookTarget::Name) => {
+            LookAt::Target(LookTarget::Name) => {
                 return Err(Error::new(ErrorCode::Refused, NOT_IN_THIS_RELEASE));
             }
         };
@@ -2268,6 +2275,16 @@ mod tests {
         lamp.act("c_1", 11, &op(r#"{"id":11,"op":"look","at":"ahead"}"#), 0)
             .unwrap();
         assert_eq!(looked.try_recv().unwrap().line, r#"{"look":"ahead"}"#);
+        // A face: the body's own line, for it to turn once toward the face
+        // the eyes last showed (row 34); a name is out of this release.
+        lamp.act("c_1", 12, &op(r#"{"id":12,"op":"look","at":"face"}"#), 0)
+            .unwrap();
+        assert_eq!(looked.try_recv().unwrap().line, r#"{"look":"face"}"#);
+        let error = lamp
+            .act("c_1", 13, &op(r#"{"id":13,"op":"look","at":"name"}"#), 0)
+            .unwrap_err();
+        assert_eq!(error.why, NOT_IN_THIS_RELEASE);
+        assert!(looked.try_recv().is_err(), "nothing sent for a name");
     }
 
     /// `sound` is the lamp's own short hum: the voice's built-in cue on the
@@ -2498,7 +2515,6 @@ mod tests {
                 r#"{"id":1,"op":"look","at":"ahead"}"#,
                 "lease socket is not on",
             ),
-            (r#"{"id":1,"op":"look","at":"face"}"#, NOT_IN_THIS_RELEASE),
             (r#"{"id":1,"op":"look","at":"name"}"#, NOT_IN_THIS_RELEASE),
             (r#"{"id":1,"op":"play","name":"wave"}"#, "packages"),
         ] {

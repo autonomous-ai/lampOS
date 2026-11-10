@@ -391,8 +391,12 @@ test('the fake answers look as lamp-control does', async () => {
     const dones = [];
     lamp.on('done', (done) => dones.push(done));
     await lamp.withLease(['body'], async () => {
-      await assert.rejects(lamp.look('face'), (error) => error.code === 'refused' && error.why === 'not in this release: look at a face or a name');
-      await assert.rejects(lamp.look('name'), (error) => error.code === 'refused' && error.why === 'not in this release: look at a face or a name');
+      await assert.rejects(lamp.look('name'), (error) => error.code === 'refused' && error.why === "not in this release: look at who said the lamp's name (the lamp has no sound direction)");
+      // A face: taken, then dropped "no face in view" while the fake sees none.
+      assert.equal((await lamp.look('face')).to, 'body');
+      for (let i = 0; i < 50 && !dones.length; i += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+      assert.deepEqual([dones[0].how, dones[0].why], ['dropped', 'no face in view']);
+      dones.length = 0;
       assert.equal((await lamp.look({ yaw: -10, pitch: 5 })).to, 'body');
       for (let i = 0; i < 50 && !dones.length; i += 1) await new Promise((resolve) => setTimeout(resolve, 10));
     });
@@ -1028,7 +1032,7 @@ test('the fake checks the lease before the routing refusal', async () => {
 // words; face and name stay "not in this release".
 test('the fake takes look and yaw and pitch as a stable lamp does', async () => {
   const { JOINTS_WAIT, LAMP_CONTROL_REFUSES } = await import('../src/testing.js');
-  await withLamp({ grants: schema.grants, refuses: LAMP_CONTROL_REFUSES }, async (lamp) => {
+  await withLamp({ grants: schema.grants, refuses: LAMP_CONTROL_REFUSES, faceLook: false }, async (lamp) => {
     await lamp.withLease(['body'], async (lease) => {
       assert.equal((await lamp.look({ yaw: 5, pitch: 2 })).to, 'body');
       assert.equal((await lamp.joints(lease, 300, { yaw: -3, pitch: 1 })).to, 'body');
@@ -1036,6 +1040,21 @@ test('the fake takes look and yaw and pitch as a stable lamp does', async () => 
         await assert.rejects(lamp.joints(lease, 300, { yaw: 0, [joint]: 1 }), (error) => error.code === 'refused' && error.why === JOINTS_WAIT);
       }
       await assert.rejects(lamp.look('face'), (error) => error.code === 'refused' && error.why === 'not in this release: look at a face or a name');
+    });
+  });
+});
+
+// The next build (row 34): a look at a face is one turn toward the face the
+// body sees, its `done` saying where the head got to; none seen, dropped.
+test('the fake turns once toward a face in view and drops a look with none', async () => {
+  const fake = { face: { yaw: 12, pitch: -4 } };
+  await withLamp({ grants: ['body', 'look'], ...fake }, async (lamp) => {
+    const dones = [];
+    lamp.on('done', (done) => dones.push(done));
+    await lamp.withLease(['body'], async () => {
+      assert.equal((await lamp.look('face')).to, 'body');
+      for (let i = 0; i < 50 && !dones.length; i += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+      assert.deepEqual([dones[0].how, dones[0].yaw, dones[0].pitch], ['finished', 12, -4]);
     });
   });
 });
@@ -1673,7 +1692,7 @@ test('a waiting look ends a hand-follow when taken, not at its done', async () =
     fake.autoDone = true;
     // A refused look leaves a following alone.
     const again = await lamp.followHand().start();
-    await assert.rejects(lamp.look('face', { wait: true }), byCode.refused);
+    await assert.rejects(lamp.look('name', { wait: true }), byCode.refused);
     assert.ok(again.following);
     await again.stop();
     await lamp.withLease(['body'], async (lease) => {

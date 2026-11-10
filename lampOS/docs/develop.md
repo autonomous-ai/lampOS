@@ -22,7 +22,8 @@ is marked so. Everything below works there, except what this table marks. The fu
 | Pairing through the app | works; pass the lamp's address with `--host` (no lamp announces itself by mDNS yet) |
 | Events, states, `light`, `say`, `sound`, `volume`, `express`, `gesture`, `move` | works. A motion asked while the last one sent through lamp-control plays is refused `busy` with `retry_ms` on 10824; the next stable replaces it instead |
 | `look` at `ahead`, an angle or a `hand`, under a body lease | works; on a resting lamp a look may end `cut_short` just short of its target (fixed on lamp-voice, #5711, for the next stable) |
-| `look` at `face` or `name` | not in this release |
+| `look` at `face` | next build (one turn toward the face in view) |
+| `look` at `name` | not in this release (the lamp has no sound direction) |
 | `joints` | `yaw` and `pitch` only |
 | `play` | refused: "not routed yet: waits for client packages" |
 | `camera.snapshot`, `camera.stream` | works, local network only (not the fast frame path) |
