@@ -123,7 +123,9 @@ pub const SERVICES: &[Service] = &[
             (Get, "/drive/v3/files/*"),
             (Get, "/drive/v3/files/*/export"),
         ],
-        writes: &[],
+        // One new file in My Drive, uploaded whole (`writes::DRIVE_UPLOAD`):
+        // never an update, a copy, a share or a delete.
+        writes: &[(Post, "/upload/drive/v3/files")],
         mcp: None,
     },
     Service {
@@ -628,6 +630,32 @@ mod tests {
         ));
         assert!(!write_allowed("github", Post, "/user/repos"));
         assert!(!write_allowed("google_drive", Post, "/drive/v3/files"));
+        // Drive's one write is a new file's upload: never an update, a
+        // copy, a permission (a share), a delete or anything under it.
+        assert!(write_allowed(
+            "google_drive",
+            Post,
+            "/upload/drive/v3/files"
+        ));
+        for (method, path) in [
+            (Method::Patch, "/upload/drive/v3/files/abc"),
+            (Post, "/upload/drive/v3/files/abc"),
+            (Method::Patch, "/drive/v3/files/abc"),
+            (Post, "/drive/v3/files/abc/copy"),
+            (Post, "/drive/v3/files/abc/permissions"),
+            (Post, "/drive/v3/files/abc/comments"),
+            (Post, "/upload/drive/v2/files"),
+            (Post, "/upload/drive/v3/files/../files"),
+            (Get, "/upload/drive/v3/files"),
+        ] {
+            assert!(!write_allowed("google_drive", method, path), "{path}");
+        }
+        assert!(!ok("google_drive", Post, "/upload/drive/v3/files"));
+        assert!(!write_allowed(
+            "google_calendar",
+            Post,
+            "/upload/drive/v3/files"
+        ));
     }
 
     #[test]
