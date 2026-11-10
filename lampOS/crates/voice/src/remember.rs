@@ -5988,6 +5988,7 @@ fn replace_session(
     (name, person): (&str, Option<&str>),
     fresh: bool,
 ) -> (Option<String>, Option<String>) {
+    context.role_session = None;
     let previous_person = std::mem::replace(&mut context.session_person, person.map(str::to_owned));
     // The follow-up just asked about outlives an open for the same person
     // within its bound: the note's refresh after a refused forget opens the
@@ -6068,6 +6069,21 @@ fn take_opened(
     resumable: Option<(u64, u64)>,
     (replaces, fresh_tried): (bool, &Mutex<Option<Instant>>),
 ) -> (Option<String>, Option<String>) {
+    context.role_session = person.and_then(|person| {
+        let (snapshot, _) = opened.theirs.as_ref()?;
+        let session = snapshot["session"].as_str()?;
+        if snapshot["invalidated"] != false
+            || context.session.as_deref() != Some(session)
+            || context.session_person.as_deref() != Some(person)
+        {
+            return None;
+        }
+        Some((
+            person.to_owned(),
+            session.to_owned(),
+            snapshot["generation"].as_u64()?,
+        ))
+    });
     let mut resumed = None;
     if let Some((inhibits, lost)) = resumable
         && context.inhibits == inhibits
@@ -6635,6 +6651,8 @@ struct DaysContext {
     session: Option<String>,
     /// Whose snapshot the session also opened, beside the room's.
     session_person: Option<String>,
+    /// Only the adopted person's snapshot admits a role mutation.
+    role_session: Option<(String, String, u64)>,
     /// Times what the store keeps may have changed under a note being read:
     /// a forget or a rule's write sent, each stop of journalling (a forget,
     /// a rule forgotten, a limit) and each write whose answer was lost. A
@@ -7000,6 +7018,7 @@ impl DaysContext {
     /// guard is dropped (#2176).
     #[must_use = "the line is said after the context's guard is dropped"]
     fn inhibit(&mut self, why: Stopped) -> Option<String> {
+        self.role_session = None;
         self.journal_inhibited = true;
         self.changing();
         // Nothing is linked until a fresh session, which starts these anew:
@@ -10695,6 +10714,25 @@ impl DaysClient {
         self.rule_for_guarded(call, deadline, person, None)
     }
 
+    fn role_session_gone() -> Value {
+        json!({"role_changed":false,"error":"That role change could not be saved. Please ask again."})
+    }
+
+    /// The already adopted Memory token, not the provider's session counter.
+    fn role_session_for(
+        &self,
+        person: &str,
+        lease: Option<&crate::memory_scope::ScopeLease>,
+    ) -> Option<(String, u64)> {
+        lease?;
+        let context = self.context.lock().ok()?;
+        let (owner, session, generation) = context.role_session.as_ref()?;
+        (owner == person
+            && context.session.as_ref() == Some(session)
+            && context.session_person.as_deref() == Some(person))
+        .then(|| (session.clone(), *generation))
+    }
+
     /// A `set_role` or `end_role` (`LAMP_MEMORY_ROLE`), on the same gate as
     /// a keep: written only in the scope of the line's own known person, its
     /// lease still current, never a held or carried line. A role asked by
@@ -10739,7 +10777,10 @@ impl DaysClient {
                 return (role::unseen_ended_told(), true);
             };
             let role_revision = role::revision();
-            let line = json!({"op":"role_end","person":person});
+            let Some((session, generation)) = self.role_session_for(person, lease) else {
+                return (Self::role_session_gone(), true);
+            };
+            let line = json!({"op":"role_end_session","person":person,"session":session,"generation":generation});
             let answer = until
                 .checked_duration_since(Instant::now())
                 .and_then(|left| bounded_exchange_scoped(&self.socket, &line, left, lease));
@@ -10748,6 +10789,12 @@ impl DaysClient {
                     role::written(person, None, None);
                 }
                 return (gone(), false);
+            }
+            if answer
+                .as_ref()
+                .is_some_and(|answer| answer["error"] == "stale_session")
+            {
+                return (Self::role_session_gone(), true);
             }
             // Not written, the role comes back at the next open: it stays
             // held, and the model is told it did not end (#5545's P3).
@@ -10785,7 +10832,10 @@ impl DaysClient {
             return (role::unseen_told(&name), true);
         };
         let role_revision = role::revision();
-        let line = json!({"op":"role_set","person":person,"name":name});
+        let Some((session, generation)) = self.role_session_for(person, lease) else {
+            return (Self::role_session_gone(), true);
+        };
+        let line = json!({"op":"role_set_session","person":person,"session":session,"generation":generation,"name":name});
         let answer = until
             .checked_duration_since(Instant::now())
             .and_then(|left| bounded_exchange_scoped(&self.socket, &line, left, lease));
@@ -10802,6 +10852,7 @@ impl DaysClient {
                 }
                 (role::set_told(&name), true)
             }
+            Some(answer) if answer["error"] == "stale_session" => (Self::role_session_gone(), true),
             _ => (gone(), false),
         }
     }
@@ -26280,17 +26331,164 @@ mod tests {
                 let person = request["person"].is_string();
                 let scope = if person { PERSON_SCOPE } else { ROOM_SCOPE };
                 let mut answer = json!({"ok":true,"snapshot":{"session":session,"opened_unix_ms":NOW,
-                    "generation":2,"invalidated":false,"source_ids":[],
+                    "generation":if person { 2 } else { 1 },"invalidated":false,"source_ids":[],
                     "note":json!({"scope":scope,"untrusted":true,"facts":[]}).to_string()}});
                 if request["role"] == true {
                     answer["role"] = json!("Harry Potter");
                 }
                 answer
             }
-            Some("role_set") => json!({"ok":true}),
-            Some("role_end") => json!({"ok":true,"ended":true}),
+            Some("role_set_session") => json!({"ok":true}),
+            Some("role_end_session") => json!({"ok":true,"ended":true}),
             _ => json!({"ok":false}),
         }
+    }
+
+    #[test]
+    fn role_write_uses_only_the_adopted_person_snapshot() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let (socket, served) = memory("role-session-forward", 3, role_memory);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let person = person_id("Role Session Owner");
+        let owner = role_lease(
+            930,
+            crate::memory_scope::ScopeSnapshot::of("Role Session Owner"),
+        );
+        assert!(
+            client
+                .role_session_for(&person, Some(&owner.lease()))
+                .is_none()
+        );
+        // Real open/adopt path: room generation is never substituted for theirs.
+        let read = client.read_note_within(1, Some(&person), false, FIRST_READ, (true, false));
+        assert!(read.complete());
+        assert!(
+            client
+                .role_session_for(&person, Some(&owner.lease()))
+                .is_none(),
+            "a read not yet adopted authorizes nothing"
+        );
+        assert!(read.adopt().is_some());
+        let expected = format!("{}-1", client.prefix);
+        assert_eq!(
+            client.role_session_for(&person, Some(&owner.lease())),
+            Some((expected.clone(), 2))
+        );
+        assert!(
+            client
+                .role_session_for(&person_id("Other"), Some(&owner.lease()))
+                .is_none()
+        );
+        heard_now("Be yourself again");
+        let (answer, _) = client.role_for_guarded(
+            &call(role::END_ROLE, json!({})),
+            FIRST_READ,
+            Some(&person),
+            Some(&owner.lease()),
+        );
+        assert_eq!(answer, role::ended_told());
+        let seen = served.join().unwrap();
+        assert_eq!(seen.len(), 3, "no fresh open on the role action");
+        assert_eq!(
+            seen[2],
+            json!({"op":"role_end_session","person":person,"session":expected,"generation":2})
+        );
+        client.context.lock().unwrap().role_session = None;
+        let (answer, _) = client.role_for_guarded(
+            &call(role::END_ROLE, json!({})),
+            FIRST_READ,
+            Some(&person),
+            Some(&owner.lease()),
+        );
+        assert_eq!(answer, DaysClient::role_session_gone());
+        drop(client);
+        std::fs::remove_file(socket).unwrap();
+    }
+
+    #[test]
+    fn role_token_is_not_adopted_after_the_context_is_inhibited() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let (socket, served) = memory("role-inhibited-adopt", 2, role_memory);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let person = person_id("Role Inhibited Owner");
+        let owner = role_lease(
+            931,
+            crate::memory_scope::ScopeSnapshot::of("Role Inhibited Owner"),
+        );
+        let read = client.read_note_within(1, Some(&person), false, FIRST_READ, (true, false));
+        assert!(read.complete());
+        let _ = client.context.lock().unwrap().inhibit(Stopped::Forgotten);
+        assert!(read.adopt().is_none());
+        assert!(
+            client
+                .role_session_for(&person, Some(&owner.lease()))
+                .is_none()
+        );
+        assert_eq!(served.join().unwrap().len(), 2);
+        drop(client);
+        std::fs::remove_file(socket).unwrap();
+    }
+
+    #[test]
+    fn role_unknown_server_refusal_keeps_the_cached_role() {
+        let _one = crate::provider_worker::tests::one_thread();
+        role::set_on_for_test(true);
+        let name = "Role Older Server";
+        let person = person_id(name);
+        let owner = role_lease(932, crate::memory_scope::ScopeSnapshot::of(name));
+        for (operation, tool, words, args) in [
+            (
+                "role_set_session",
+                role::SET_ROLE,
+                "You are Sherlock now",
+                json!({"name":"Sherlock"}),
+            ),
+            (
+                "role_end_session",
+                role::END_ROLE,
+                "Be yourself again",
+                json!({}),
+            ),
+        ] {
+            role::hold(&person, Some("Harry Potter".into()));
+            let (socket, served) =
+                memory(operation, 1, |_| json!({"ok":false,"error":"unknown_op"}));
+            let client = DaysClient::new(socket.clone()).unwrap();
+            adopt_role_fixture(&client, &person);
+            heard_now(words);
+            let (told, _) = client.role_for_guarded(
+                &call(tool, args),
+                FIRST_READ,
+                Some(&person),
+                Some(&owner.lease()),
+            );
+            assert_ne!(told, role::set_told("Sherlock"));
+            assert_ne!(told, role::ended_told());
+            assert_eq!(role::cached(&person).as_deref(), Some("Harry Potter"));
+            let sent = served.join().unwrap();
+            assert_eq!(sent.len(), 1);
+            assert_eq!(sent[0]["op"], operation);
+            drop(client);
+            std::fs::remove_file(socket).unwrap();
+        }
+        role::forgot(Some(&person));
+        role::set_on_for_test(false);
+    }
+
+    fn adopt_role_fixture(client: &DaysClient, person: &str) {
+        let session = format!("{}-1", client.prefix);
+        let room = role_memory(&json!({"op":"session_open","session":session}))["snapshot"].clone();
+        let theirs = role_memory(&json!({"op":"session_open","session":session,"person":person}))["snapshot"].clone();
+        let mut opened = client.opened((room, vec![]), Some((theirs, vec![])));
+        let mut context = client.context.lock().unwrap();
+        replace_session(&mut context, &client.jobs, (&session, Some(person)), true);
+        let _ = take_opened(
+            &mut context,
+            &mut opened,
+            Some(person),
+            None,
+            (false, &client.fresh_tried),
+        );
     }
 
     fn role_lease(
@@ -26325,6 +26523,7 @@ mod tests {
         let client = DaysClient::new(socket.clone()).unwrap();
         let name = "Olivia Role Set";
         let person = person_id(name);
+        adopt_role_fixture(&client, &person);
         let olivia = role_lease(901, crate::memory_scope::ScopeSnapshot::of(name));
         let lease = olivia.lease();
         heard_now("You are Harry Potter now");
@@ -26357,8 +26556,8 @@ mod tests {
         assert_eq!(
             read,
             [
-                json!({"op":"role_set","person":person,"name":"Harry Potter"}),
-                json!({"op":"role_end","person":person}),
+                json!({"op":"role_set_session","person":person,"name":"Harry Potter","session":format!("{}-1", client.prefix),"generation":2}),
+                json!({"op":"role_end_session","person":person,"session":format!("{}-1", client.prefix),"generation":2}),
             ]
         );
         role::set_on_for_test(false);
@@ -26378,6 +26577,7 @@ mod tests {
         let client = DaysClient::new(socket.clone()).unwrap();
         let name = "Olivia Role One Face";
         let person = person_id(name);
+        adopt_role_fixture(&client, &person);
         role::hold(&person, Some("Sherlock".to_owned()));
         let lone = role_lease(905, crate::memory_scope::ScopeSnapshot::of(name));
         let lone_lease = lone.lease();
@@ -26406,7 +26606,9 @@ mod tests {
         assert_eq!(role::cached(&person).as_deref(), Some("Harry Potter"));
         assert_eq!(
             served.join().unwrap(),
-            [json!({"op":"role_set","person":person,"name":"Harry Potter"})]
+            [
+                json!({"op":"role_set_session","person":person,"name":"Harry Potter","session":format!("{}-1", client.prefix),"generation":2})
+            ]
         );
         role::forgot(Some(&person));
         role::set_on_for_test(false);
@@ -26597,6 +26799,7 @@ mod tests {
         // The only request served is the known guest's own end.
         let (socket, served) = memory("role-end-guest", 1, role_memory);
         let client = DaysClient::new(socket.clone()).unwrap();
+        adopt_role_fixture(&client, &guest);
         let room = role_lease(906, crate::memory_scope::ScopeSnapshot::room());
         let (told, _) = client.role_for_guarded(&end, FIRST_READ, None, Some(&room.lease()));
         assert_eq!(told, role::unseen_ended_told());
@@ -26610,7 +26813,9 @@ mod tests {
         assert_eq!(told, role::ended_told());
         assert_eq!(
             served.join().unwrap(),
-            [json!({"op":"role_end","person":guest})]
+            [
+                json!({"op":"role_end_session","person":guest,"session":format!("{}-1", client.prefix),"generation":2})
+            ]
         );
         assert_eq!(role::cached(&olivia).as_deref(), Some("Harry Potter"));
         drop(client);
@@ -26618,6 +26823,7 @@ mod tests {
         // Olivia's own end, not written: still held, and told it failed.
         let (socket, served) = memory("role-end-fail", 1, |_| json!({"ok":false}));
         let client = DaysClient::new(socket.clone()).unwrap();
+        adopt_role_fixture(&client, &olivia);
         let hers = role_lease(
             908,
             crate::memory_scope::ScopeSnapshot::of("Olivia Role End"),
@@ -26629,7 +26835,9 @@ mod tests {
         assert_eq!(role::cached(&olivia).as_deref(), Some("Harry Potter"));
         assert_eq!(
             served.join().unwrap(),
-            [json!({"op":"role_end","person":olivia})]
+            [
+                json!({"op":"role_end_session","person":olivia,"session":format!("{}-1", client.prefix),"generation":2})
+            ]
         );
         role::forgot(Some(&olivia));
         role::set_on_for_test(false);

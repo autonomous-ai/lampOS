@@ -15,7 +15,7 @@
 //!   [`NAME_BYTES`], letters, spaces, hyphens and apostrophes only, and no
 //!   word that makes a sentence or an instruction ([`CLAUSE_WORDS`]).
 //! - **Per face**: kept in the Days memory in the seen speaker's own scope
-//!   (`role_set`, `role_end`), the same gate as `remember`: the line's
+//!   (`role_set_session`, `role_end_session`), the same gate as `remember`: the line's
 //!   lease, its own known person, never a held, carried or room line. A
 //!   role asked by someone the lamp could not see lasts only for that
 //!   conversation, in its thread, and is never written.
