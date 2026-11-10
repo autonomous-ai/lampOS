@@ -18160,21 +18160,21 @@ async fn the_lamps_own_words_heard_back_are_held_or_taken_out_only_with_the_swit
 /// lamp-3e83, 10 Nov: the owner's "go ahead and send it" after the lamp's
 /// "Say 'go ahead and send it'" was held as the lamp's own echo, and the
 /// write never went. After a read-back ending "Say 'yes, send it' to send
-/// it.", the person's "Yes, send it." begun after the lamp's words reaches
-/// the model while the write waits, and the model's send with its send_id
-/// passes the gate; with no write waiting it is held as the echo as before.
+/// it.", the person's "Okay, yes, send it." begun after the lamp's words
+/// reaches the model while the write waits, and the model's send with its
+/// send_id passes the gate. A line of only the read-back's own words, "Yes,
+/// send it.", is held as the echo, write waiting or not, so the room
+/// returning it never sends (App Only's P1 on #6009).
 #[tokio::test(start_paused = true)]
 async fn a_yes_after_a_waiting_read_back_is_never_held_as_the_lamps_echo() {
     const READ_BACK: &str = "Send an email to Bob saying hi. Say 'yes, send it' to send it.";
-    for waits in [true, false] {
+    for (heard, waits, answered) in [
+        ("Okay, yes, send it.", true, true),
+        ("Yes, send it.", true, false),
+        ("Yes, send it.", false, false),
+    ] {
         let script = Arc::new(Script {
-            heard: Mutex::new(
-                [
-                    Ok("Email Bob hi.".to_owned()),
-                    Ok("Yes, send it.".to_owned()),
-                ]
-                .into(),
-            ),
+            heard: Mutex::new([Ok("Email Bob hi.".to_owned()), Ok(heard.to_owned())].into()),
             chats: Mutex::new(
                 [
                     vec![text(READ_BACK), Ok(ChatEvent::Done)],
@@ -18203,10 +18203,10 @@ async fn a_yes_after_a_waiting_read_back_is_never_held_as_the_lamps_echo() {
         let asked = script.asked.lock().unwrap().len();
         assert_eq!(
             asked,
-            if waits { 2 } else { 1 },
-            "waits {waits}: {labels:?}"
+            if answered { 2 } else { 1 },
+            "{heard} waits {waits}: {labels:?}"
         );
-        if waits {
+        if answered {
             assert!(labels.contains(&"said:Sent.".to_owned()), "{labels:?}");
             let mut pending = crate::services::pending_for_test_take();
             let send = lamp_gemini::ToolCall {
