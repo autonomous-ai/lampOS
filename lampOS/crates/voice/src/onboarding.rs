@@ -96,6 +96,17 @@ const START_QUIET_US: u64 = 3_000_000;
 const HOLD_US: u64 = 3_000_000;
 /// ... and is given up on after this long, with a word on what to do later.
 const SIT_GIVE_UP_US: u64 = 60_000_000;
+/// A walk not yet begun (#5931): no face this long after the voice's first
+/// tick, the lamp invites the person once ([`INVITE`]).
+const INVITE_AFTER_US: u64 = 20_000_000;
+/// A walk not yet begun (#5931): the head is held up, looking, this long
+/// from the voice's first tick, so a lamp folded at rest after a reset sees
+/// the person who set it up; then it rests as before and a call opens it.
+const RISE_US: u64 = 80_000_000;
+/// The walk's invite when nobody is in view as it begins (#5931, the lead's
+/// words), said once per voice start.
+pub(crate) const INVITE: &str = "(Say only this, nothing before or after it: \"Hi! I'm your lamp. \
+     Come sit in front of me, and we'll get to know each other.\")";
 /// One word on how to move the lamp, after this much quiet.
 const GUIDE_EVERY_US: u64 = 8_000_000;
 /// A step the model leads and never reports has failed after this long,
@@ -974,6 +985,10 @@ pub struct Onboarding {
     /// out by this tick, for the caller to bind to its turn
     /// ([`Self::bind_opener`]).
     opener_said: bool,
+    /// The first tick the walk waited, not yet begun, for a face (#5931).
+    waiting_since_us: Option<u64>,
+    /// The invite was said this voice start (#5931).
+    invited: bool,
     /// The turn that note is said in: the intro's `opened` is kept only
     /// when it is heard (the Reviewer-lead's P3 on #4095); any step's
     /// first note never said is asked again at once.
@@ -1326,6 +1341,8 @@ impl Onboarding {
             owed_after: None,
             closing: None,
             opener_said: false,
+            waiting_since_us: None,
+            invited: false,
             opener_turn: None,
             opener_asking: None,
             opener_unsaid: 0,
@@ -2545,6 +2562,17 @@ impl Onboarding {
             .is_some_and(|led| led.step == Step::WhereYouSit && led.asked_us.is_some())
     }
 
+    /// The walk has not begun and waits for a face (#5931): for [`RISE_US`]
+    /// from its first wait the lamp rises and looks, as for a call, so a
+    /// lamp folded after a reset sees the person who set it up.
+    pub fn rising(&self, now_us: u64) -> bool {
+        self.waiting_since_us
+            .is_some_and(|since| now_us.saturating_sub(since) < RISE_US)
+            && self.led.as_ref().is_some_and(|led| {
+                led.step == Step::WhereYouSit && led.asked_us.is_none() && !self.desired.opened
+            })
+    }
+
     /// A finished line the person said (#1722 row 10): the steps the model
     /// leads by talk end on what is heard too, so a model that forgets its
     /// `setup_step` call does not fail them; the call stays a second way
@@ -3162,6 +3190,14 @@ impl Onboarding {
             } else {
                 face.is_some()
             };
+            // #5931: a walk not yet begun waits from its first tick; with
+            // no face by [`INVITE_AFTER_US`] the lamp invites once.
+            let fresh = step == Step::WhereYouSit && !self.desired.opened;
+            let since = if fresh {
+                Some(*self.waiting_since_us.get_or_insert(now_us))
+            } else {
+                None
+            };
             if can_speak && there && quiet_us >= START_QUIET_US {
                 led.asked_us = Some(now_us);
                 led.guided_us = Some(now_us);
@@ -3184,6 +3220,18 @@ impl Onboarding {
                 let note = self.definition.note(step, opened).to_owned();
                 let intro = step == Step::WhereYouSit && !opened;
                 return Some(self.counted_note(step, note, intro));
+            }
+            if let Some(since) = since
+                && !self.invited
+                && face.is_none()
+                && can_speak
+                && quiet_us >= START_QUIET_US
+                && now_us.saturating_sub(since) >= INVITE_AFTER_US
+            {
+                self.invited = true;
+                self.records
+                    .push(json!({"kind":"onboarding_invite","at_us":now_us}));
+                return Some(INVITE.to_owned());
             }
             return None;
         };
@@ -7104,6 +7152,56 @@ mod tests {
         assert_eq!(room.outcome(Step::WhoYouAre), None);
         room.wait(2 * S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+    }
+
+    /// #5931 (lamp-52e6, 10 Nov 07:44): after a reset the lamp sat folded,
+    /// saw no face, and the walk waited for "Hey Lamp". Now it rises from
+    /// its first tick, and with nobody in view by 20 s it invites once.
+    #[test]
+    fn a_walk_with_nobody_in_view_rises_and_invites_once() {
+        let mut room = Room::new("invite");
+        let start = room.at;
+        assert!(room.wait(19 * S, None).is_empty());
+        assert!(room.walk.rising(room.at));
+        assert_eq!(room.wait(5 * S, None), [INVITE]);
+        assert_eq!(
+            room.walk
+                .records
+                .iter()
+                .filter(|record| record["kind"] == "onboarding_invite")
+                .count(),
+            1
+        );
+        // Never again this start; the head is held up to 80 s, then rests.
+        assert!(room.wait(50 * S, None).is_empty());
+        assert!(room.walk.rising(room.at));
+        room.wait(start + RISE_US - room.at, None);
+        assert!(!room.walk.rising(room.at));
+        assert!(room.wait(60 * S, None).is_empty());
+        // A face later opens the walk as before, with its intro.
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE))[0], SIT_NOTE);
+        assert!(!room.walk.rising(room.at));
+    }
+
+    /// #5931: a face in view before 20 s opens the walk as before, with no
+    /// invite, and the rise ends with the ask.
+    #[test]
+    fn a_face_before_the_invite_opens_the_walk_without_it() {
+        let mut room = Room::new("no-invite");
+        assert!(room.wait(10 * S, None).is_empty());
+        assert!(room.walk.rising(room.at));
+        assert_eq!(
+            room.wait(8 * S, Some(NEAR_MIDDLE))[..2],
+            [SIT_NOTE, SIT_DONE]
+        );
+        assert!(!room.walk.rising(room.at));
+        assert!(
+            !room
+                .walk
+                .records
+                .iter()
+                .any(|record| record["kind"] == "onboarding_invite")
+        );
     }
 
     /// #4080: the step words follow the offered order: a step with no
