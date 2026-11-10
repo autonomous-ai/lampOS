@@ -1,0 +1,47 @@
+"Lamp, I listened to some relaxing music on the train this morning, it was really nice.": expected=false, got=false
+"Lamp, what kind of music helps people relax?": expected=false, got=false
+"I love relaxing music.": expected=false, got=false
+"Lamp, don't play anything, I'm on a call.": expected=false, got=false
+"Can you not play music right now?": expected=false, got=false
+"My sister plays the piano every night.": expected=false, got=false
+"I want to know which songs calm a baby.": expected=false, got=false
+"Tôi đã nghe nhạc trên tàu sáng nay.": expected=false, got=false
+"Đừng mở nhạc nhé.": expected=false, got=false
+"Lamp, play some relaxing music. Actually, don't.": expected=false, got=false
+"Play some music; stop, never mind.": expected=false, got=false
+"Lamp, turn on the light.": expected=false, got=false
+"Lamp, play chess with me.": expected=false, got=false
+"Play something with me.": expected=false, got=false
+"Lamp, turn on the light so I can read my sheet music.": expected=false, got=false
+"Can you play chess while I listen to music?": expected=false, got=false
+"Play something like chess to relax.": expected=false, got=false
+"Play something with me to relax.": expected=false, got=false
+"Play the second game while I listen to music.": expected=false, got=false
+"Play another game to relax.": expected=false, got=false
+"Play the next something to relax.": expected=false, got=false
+"Lamp, play some music. Forget it.": expected=false, got=false
+"": expected=false, got=false
+"Lamp, can you play some relaxing music?": expected=true, got=true
+"Play some relaxing music.": expected=true, got=true
+"Hey lamp, please play something calm.": expected=true, got=true
+"Put on something relaxing, please.": expected=true, got=true
+"Could you please put some music on?": expected=true, got=true
+"I'd like to hear some relaxing music.": expected=true, got=true
+"I'm stressed. Play something quiet.": expected=true, got=true
+"Let's listen to some music.": expected=true, got=true
+"Please play a quiet recording.": expected=true, got=true
+"Now play the second recording.": expected=true, got=true
+"Play the first recording.": expected=true, got=true
+"Play the next recording.": expected=true, got=true
+"Play the previous recording.": expected=true, got=true
+"Play the last recording.": expected=true, got=true
+"Play another recording.": expected=true, got=true
+"Play a different recording.": expected=true, got=true
+"Lamp, mở nhạc thư giãn đi.": expected=true, got=true
+"Bật nhạc cho mình nhé.": expected=true, got=true
+"Lamp, play me something to relax.": expected=true, got=true
+"Lamp, can you play some relaxing music?": expected=true, got=true
+"Play something to help me sleep.": expected=true, got=true
+"Put on something calm.": expected=true, got=true
+"Could you put on something to help me unwind?": expected=true, got=true
+mismatches=0
