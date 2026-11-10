@@ -1044,7 +1044,7 @@ light = { dim = 1 }
             format!(
                 "{} Ask nothing about putting it on.",
                 made_skill::in_their_language(
-                    "I made evening dim, and it's on: when the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most once every 12 hours, using its light and whether it is talking. It starts on its own, at most 3 times a day, one an hour with the lamp's other nudges, never from 22:00 to 08:00, and rests till morning if ignored twice."
+                    "I made evening dim, and it's on: when the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most once every 12 hours, using its light and whether it is talking. It starts on its own, at most 3 times a day, one an hour with the lamp's other nudges, and rests till morning if ignored twice."
                 )
             )
         );
@@ -1240,7 +1240,7 @@ light = { dim = 1 }
             told["description"],
             "When the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at \
              most once every 12 hours. It starts on its own, at most 3 times a day, one an hour \
-             with the lamp's other nudges, never from 22:00 to 08:00, and rests till morning if ignored twice. The maker \
+             with the lamp's other nudges, and rests till morning if ignored twice. The maker \
              notes what it couldn't do: dimming slowly.",
             "{told}"
         );

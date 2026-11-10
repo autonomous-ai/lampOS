@@ -958,7 +958,8 @@ pub fn mannered(text: &str) -> String {
     let after_ignored = integer("after_ignored", table.get("rest"))
         .unwrap_or(MANNERS_RESTS_AFTER.into())
         .clamp(1, MANNERS_RESTS_AFTER_AT_MOST.into());
-    // The night stays quiet unless the skill runs only within the day.
+    // The night stays quiet unless the skill runs only within the day, or
+    // at a time the person asked for ([`within_day`]).
     let quiet = !trigger.get("during").is_some_and(within_day);
     // A grant no step uses is dropped (App Only's P2 on #6103): no step of
     // a made skill sends a message or takes the camera's picture, so
@@ -1036,15 +1037,26 @@ pub const MANNERS_RESTS_AFTER_AT_MOST: u32 = 3;
 /// [`MANNERS_QUIET`]'s other side.
 const DAY: (u32, u32) = (8 * 60, 22 * 60);
 
-/// Whether a trigger's `during` lies wholly within [`DAY`], never across
-/// midnight.
+/// The longest `during` read as a time the person asked for in their own
+/// words (the coordinator's ruling on #6103, 10 Nov): it runs as said,
+/// night or not, with no quiet hours over it ("dim the light at ten").
+const ASKED_TIME_MINUTES: u32 = 3 * 60;
+
+/// Whether a trigger's `during` runs as said, with no quiet hours: one that
+/// lies wholly within [`DAY`], or one of at most [`ASKED_TIME_MINUTES`]
+/// (across midnight too), a time the person asked for. A wider one, such
+/// as all day, keeps the night quiet.
 fn within_day(during: &toml::Value) -> bool {
     let at = |key: &str| {
         let (hours, minutes) = during.get(key)?.as_str()?.split_once(':')?;
         let (hours, minutes): (u32, u32) = (hours.parse().ok()?, minutes.parse().ok()?);
         (hours < 24 && minutes < 60).then_some(hours * 60 + minutes)
     };
-    matches!((at("from"), at("to")), (Some(from), Some(to)) if DAY.0 <= from && from < to && to <= DAY.1)
+    let (Some(from), Some(to)) = (at("from"), at("to")) else {
+        return false;
+    };
+    let long = (to + 24 * 60 - from) % (24 * 60);
+    (DAY.0 <= from && from < to && to <= DAY.1) || (long > 0 && long <= ASKED_TIME_MINUTES)
 }
 
 /// [`paced`]'s limits on speaking (#6062).
@@ -5191,7 +5203,8 @@ light = { colour = "green", level = 3, for = "20s" }
         assert!(plain.contains("never from 22:00 to 08:00"), "{plain}");
     }
 
-    /// Thirteen's P2 on #6103: the night stays quiet unless the trigger runs
+    /// Thirteen's P2 on #6103 and the coordinator's ruling: the night stays
+    /// quiet unless a time asked for (3 hours at most) or the trigger runs
     /// only within 08:00-22:00; an all-day window keeps it.
     #[test]
     fn the_night_stays_quiet_unless_its_window_is_within_the_day() {
@@ -5206,8 +5219,13 @@ light = { colour = "green", level = 3, for = "20s" }
                 .contains_key("quiet")
         };
         assert!(quiet("from = \"00:00\", to = \"23:59\""));
-        assert!(quiet("from = \"21:00\", to = \"23:00\""));
-        assert!(quiet("from = \"07:00\", to = \"09:00\""));
+        assert!(quiet("from = \"18:00\", to = \"23:30\""));
+        // A time asked for, 3 hours at most, runs as said (the ruling).
+        assert!(!quiet("from = \"22:00\", to = \"22:30\""));
+        assert!(!quiet("from = \"21:00\", to = \"23:00\""));
+        assert!(!quiet("from = \"23:30\", to = \"01:00\""));
+        assert!(quiet("from = \"22:00\", to = \"01:01\""));
+        assert!(!quiet("from = \"07:00\", to = \"09:00\""));
         assert!(quiet("from = \"20:00\", to = \"09:00\""));
         assert!(!quiet("from = \"08:00\", to = \"22:00\""));
         assert!(!quiet("from = \"12:00\", to = \"13:00\""));
@@ -5382,14 +5400,14 @@ light = { colour = "green", level = 3, for = "20s" }
             capped_with(&paced(&text), false).unwrap();
         }
         // Other triggers, silent, keep their own floors: only the manners
-        // are set, the night kept quiet around a time past 22:00.
+        // are set, and a time asked for runs as said, no quiet hours.
         let clock = made_with(
             "topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
              during = { from = \"22:00\", to = \"22:01\" }\n",
             "light = { dim = 1 }",
         );
         assert_eq!(say_paced(&clock), clock);
-        assert!(paced(&clock).contains("[quiet]"));
+        assert!(!paced(&clock).contains("[quiet]"));
     }
 
     /// What lamp-skills would run otherwise than said, or that reads who
