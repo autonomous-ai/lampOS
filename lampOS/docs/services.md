@@ -969,12 +969,14 @@ four product units set it since 5 Nov (`lamp-update`'s install test
 tools socket (`/run/lampos-services/tools/call.sock`, or
 `LAMP_SKILLS_SERVICES_SOCKET`): `lamp-services` tells it by its cgroup and
 takes only `service_read` from it ("The three parts and their sockets",
-above). What the service gives goes to no model: `lamp-skills` says it as
-exact text through the voice's say socket (never a model turn, held while
+above). What the service gives goes to no language model: `lamp-skills`
+says it as exact text through the voice's say socket (never a model turn, held while
 someone talks with the lamp, refused while it is paused or muted), so it
 stays quoted data and nothing can act on it, as `AFTER_READ` asks. The
 voice's own send gate is not in this path; the skill's gate below stands in
-for it.
+for it. The configured speech-synthesis provider may still receive the
+exact spoken text, including event titles, senders and subjects, to render
+it as audio; exact words do not imply local-only speech synthesis.
 
 **Which services.** Every service in the catalogue with a read of a
 fixed shape, and none that only sends (`lamp_services::spoken::not_readable`):
@@ -1065,6 +1067,11 @@ publishes, every 250 ms:
 
 All must hold steadily for 5 s. Until then the run waits, at most 60
 minutes, and then skips the day with nothing said ("skipped: <why>").
+A configured trigger window determines when a read becomes due, not a
+speech cutoff. A queued read may speak after that window, within the same
+one-hour wait from when it came due, provided its gate still opens; quiet
+hours and the checks before each line still apply.
+
 **One read at a time** (`service_read::Turns`, #5618): a read begins only
 with the lamp's one turn, which it holds from its gate's opening to its
 last line. The turn is free when no other skill's read holds it and a
@@ -1077,7 +1084,8 @@ starting a fresh hour. Without it, two skills' reads held at their gates
 together (Morning agenda and Morning mail behind a visitor) would say their
 lines in turn, one's between the other's. A
 read runs once a local day per skill (kept in `lamp-skills`' memory, so a
-restart forgets it). While its run waits for the gate, and after it came
+restart of `lamp-skills` forgets it and can allow another read that day).
+While its run waits for the gate, and after it came
 due until local midnight, the skill's trigger is not said triggered or asked
 of the Policy each time it holds: the chance is dropped with one journal
 line a hold, `<skill> not run: its read is still under way` or `... its read

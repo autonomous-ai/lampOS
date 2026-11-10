@@ -13,8 +13,12 @@ Skills, then Connectors.
 
 When it reads:
 
-- Once a day at most, and only in the morning window. It waits 20 minutes,
-  so it doesn't come straight after Morning agenda.
+- The morning window determines when the read becomes due, not when it
+  must finish speaking. It can wait beyond that window within the same
+  one-hour wait from when it became due; the gates below still apply.
+- Once per local day while lamp-skills keeps running. Restarting lamp-skills
+  clears that daily bookkeeping, so it may become due again that day.
+- It waits 20 minutes, so it doesn't come straight after Morning agenda.
 - Only when you are alone with the lamp, it knows your face as its
   owner's, and nobody has spoken for a minute.
   If that doesn't happen within an hour, it lets the day go and says
@@ -27,6 +31,10 @@ When it reads:
 It reads only senders and subjects, never a message's text. Security mail
 and one-time codes are left out: they are neither said nor counted. It
 keeps nothing of what it read; the journal keeps only counts.
+
+The lamp uses fixed words, without sending the read to a language model.
+Its configured speech provider may still receive the exact spoken text
+including senders and subjects to turn it into audio.
 
 An installable skill: its owner puts it on from the Skills Store and takes
 it off. Not in the product.
