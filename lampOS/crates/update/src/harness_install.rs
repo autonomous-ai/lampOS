@@ -112,7 +112,7 @@ pub const TEXT: &str = "\
 # lamp-update-harness: puts Harness on the lamp before its sign-in, with Harness's own installer, installed only
 # (lampOS/docs/install.md, \"Harness before the sign-in\", #5197). Written and started by a round of lamp-update
 # with LAMP_HARNESS_AT_ONBOARDING=on, whose own sandbox cannot write /usr/local/bin or Harness's home; never
-# enabled. Outside lampos.target, as lamp-update is. With LAMP_HERMES_ON_LAMP=on it puts the pinned Hermes there
+# enabled. Outside lampos.target, as lamp-update is. With Hermes on (LAMP_HERMES_ON_LAMP) it puts the pinned Hermes there
 # after Harness, as lampos, with its wrapper in /usr/local/bin and its namespace script in /usr/local/lib/lampos
 # (lampOS/docs/install.md, \"Hermes on the lamp\", #5978).
 [Unit]

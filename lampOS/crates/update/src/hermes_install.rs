@@ -1,8 +1,8 @@
 //! Hermes put on the lamp after Harness (#5978; docs/install.md, "Hermes on
-//! the lamp"): off on every lamp unless `LAMP_HERMES_ON_LAMP=on` in
-//! lamp-update's own unit ([`PRODUCT_DEFAULT`] is off: the product turns
-//! it on only once its lamp-c0a4 numbers are judged, the first builder,
-//! 10 Nov); `off` there keeps it off.
+//! the lamp"): on by default on a lamp installed as the product
+//! ([`PRODUCT_DEFAULT`] is on: the product owner's decision, 10 Nov);
+//! `LAMP_HERMES_ON_LAMP=off` in lamp-update's own unit turns it off, and
+//! any other lamp has it only with `on` there.
 //! It rides on Harness before the sign-in ([`crate::harness_install`]):
 //! with that off, Hermes is off as well.
 //!
@@ -22,12 +22,17 @@
 //! own PID namespace and `/proc`, so no lamp process, lamp-cloud's
 //! `/proc/<pid>/root` among them, is visible) and [`NS`], which shows
 //! Hermes, by an allow-list, only [`ALLOWED`] (its own folder, its work
-//! folder and the skills) over empty read-only tmpfs on each of
+//! folder and the skills) and [`SKILLS_SOCKET`] (lamp-skills' tools
+//! folder, read-only) over empty read-only tmpfs on each of
 //! [`OVERLAID`] (`/run`, `/var/lib`, `/etc/lampOS`), gives it its own
 //! [`PRIVATE`] (`/tmp`), binds `/dev/null` over the devices of [`DEVICES`],
 //! and then drops back to the caller's own ids in a nested user namespace,
 //! where those mounts are locked. Hermes is given only lamp-cloud's local
 //! forwarder token ([`TOKEN`], as [`TOKEN_ENV`]), never the relay key.
+//! Its reach into the lamp is the voice's model's: only through
+//! lamp-skills' socket (`lamp-tasks skill call NAME`), where lamp-skills
+//! applies its cooldowns, pause and policy, never a device or a service's
+//! files.
 //! Before anything is installed, the namespace is tried as `lampos`
 //! ([`userns_argv`]); a lamp where it does not work gets nothing,
 //! `no_userns`. No unit, no daemon,
@@ -83,11 +88,9 @@ use std::{
 /// The switch, in lamp-update's own unit: `on` exactly.
 pub const SWITCH: &str = "LAMP_HERMES_ON_LAMP";
 /// Whether a lamp installed as the product installs Hermes with [`SWITCH`]
-/// unset: off, until the lamp's Hermes numbers on lamp-c0a4 (RAM at rest
-/// and while running a task, CPU, the voice's first answer, free disk on
-/// 16 GB) are judged (the first builder, 10 Nov). Any other lamp with it
-/// unset is off too.
-pub const PRODUCT_DEFAULT: bool = false;
+/// unset: on, the product owner's decision (10 Nov); `off` turns it off.
+/// Any other lamp with it unset is off.
+pub const PRODUCT_DEFAULT: bool = true;
 
 /// Where the install is, in lamp-update's records (0600), next to
 /// Harness's [`harness_install::RECORD`]. lamp-update's own: not said on
@@ -147,15 +150,25 @@ pub const TOKEN_ENV: &str = "LAMP_HERMES_TOKEN";
 pub const WORK: &str = "/var/lib/lampos-tasks/harnesses/lamp-tasks";
 /// The lamp's skills, which Hermes reads in place: shown read-only.
 pub const SKILLS: &str = "/var/lib/lampOS/skills";
+/// lamp-skills' tools folder (`tools.json` and `call.sock`), the voice's
+/// `LAMP_SKILLS_DIR`: the one folder under `/run` [`NS`] shows Hermes,
+/// read-only (a unix socket still connects on a read-only mount), when it
+/// is there. `lamp-tasks skill call NAME` calls a skill through it, so
+/// Hermes reaches the lamp as the voice's model does: through lamp-skills,
+/// which applies its cooldowns, pause and policy.
+pub const SKILLS_SOCKET: &str = "/run/lampos-skills";
 /// All [`NS`] shows Hermes of what it lays [`OVERLAID`] over: its own
-/// folder, the work folder and the skills (read-only), plus the file
+/// folder, the work folder and the skills (read-only), plus
+/// [`SKILLS_SOCKET`] (read-only) and the file
 /// `/etc/resolv.conf` resolves to when that is under `/run` (read-only,
 /// so names still resolve). An allow-list: a lamp service's runtime or
 /// state folder is hidden unless named here, so a new service is hidden
 /// with no change (`no_lampos_service_folder_is_visible_to_hermes`).
+/// [`SKILLS_SOCKET`], under `/run`, is the one lamp service folder shown.
 pub const ALLOWED: [&str; 3] = [PLACE, WORK, SKILLS];
 /// What [`NS`] lays an empty read-only tmpfs over, with only [`ALLOWED`]
-/// put back: every lamp service's sockets and runtime files, systemd's
+/// and [`SKILLS_SOCKET`] put back: every other lamp service's sockets and
+/// runtime files, systemd's
 /// credentials (lamp-cloud's relay key), every state folder (lamp-cloud's,
 /// with [`TOKEN`], among them) and the lamp's own settings.
 pub const OVERLAID: [&str; 3] = ["/run", "/var/lib", "/etc/lampOS"];
@@ -207,8 +220,9 @@ pub const INSTALL_PATH: &str = "/usr/bin:/bin";
 pub const WRAPPER_TEXT: &str = r#"#!/bin/sh
 # lampOS: Hermes on the lamp (#5978; lampOS/docs/install.md, "Hermes on the lamp"). Written by lamp-update.
 # Hermes runs as its caller (lampos, Harness's user), in a user, mount and PID namespace with its own /proc, where it
-# sees only its own folder, its work folder and the skills, no lamp service's files or sockets, no camera, mic or
-# serial device and no lamp process; it is given only lamp-cloud's local forwarder token. It is never run any other way.
+# sees only its own folder, its work folder, the skills and lamp-skills' socket folder (it reaches the lamp only through
+# lamp-skills, as the voice does), no other lamp service's files or sockets, no camera, mic or serial device and no lamp
+# process; it is given only lamp-cloud's local forwarder token. It is never run any other way.
 T=$(cat /var/lib/lampos-cloud/hermes-token 2>/dev/null) && [ -n "$T" ] || {
   echo "hermes: no forwarder token at /var/lib/lampos-cloud/hermes-token; lamp-cloud makes it with LAMP_HERMES_ON_LAMP=on" >&2
   exit 1
@@ -223,11 +237,12 @@ exec /usr/bin/unshare --map-root-user --mount --pid --kill-child --mount-proc --
 /// it would hide the lamp's files from the whole lamp). An allow-list:
 /// 1. a private tmpfs on each of [`PRIVATE`]; on the new `/tmp`, what
 ///    stays visible is staged: [`ALLOWED`] bound there (the work folder
-///    and the skills only when there) and the file `/etc/resolv.conf`
-///    resolves to when it is under `/run`;
+///    and the skills only when there), [`SKILLS_SOCKET`] when there, and
+///    the file `/etc/resolv.conf` resolves to when it is under `/run`;
 /// 2. an empty tmpfs over each of [`OVERLAID`] (`/etc/lampOS` when there),
 ///    the mount points made in it and the staged mounts moved back; the
-///    skills and `resolv.conf` remounted read-only (with the flags they
+///    skills, [`SKILLS_SOCKET`] and `resolv.conf` remounted read-only (with
+///    the flags they
 ///    had, as a user namespace may only add flags), then each overlay;
 /// 3. `/dev/null` bound over each character device of [`DEVICES`];
 /// 4. back into the folder it was started in, now through the new mounts
@@ -240,13 +255,14 @@ exec /usr/bin/unshare --map-root-user --mount --pid --kill-child --mount-proc --
 pub const NS_TEXT: &str = r#"#!/bin/sh
 # lampOS: Hermes on the lamp, inside the namespace /usr/local/bin/hermes makes (#5978; lampOS/docs/install.md,
 # "Hermes on the lamp"). Written by lamp-update. Root here only: it shows Hermes only its own folder, its work folder,
-# the skills (read-only) and resolv.conf over empty read-only /run, /var/lib and /etc/lampOS, gives it its own /tmp,
-# hides the camera, mic and serial devices, then drops back to the caller's own ids in a nested user namespace,
-# where these mounts are locked. Any step failing ends it before Hermes runs.
+# the skills (read-only), lamp-skills' socket folder /run/lampos-skills (read-only: it reaches the lamp only through
+# lamp-skills, as the voice does) and resolv.conf over empty read-only /run, /var/lib and /etc/lampOS, gives it its
+# own /tmp, hides the camera, mic and serial devices, then drops back to the caller's own ids in a nested user
+# namespace, where these mounts are locked. Any step failing ends it before Hermes runs.
 read -r _ _ count < /proc/self/uid_map || exit 1
 [ "$count" != 4294967295 ] || { echo "hermes-ns: only inside the namespace /usr/local/bin/hermes makes" >&2; exit 1; }
 [ -n "${LAMP_NS_UID-}" ] && [ -n "${LAMP_NS_GID-}" ] || exit 1
-H=/var/lib/lampos-hermes W=/var/lib/lampos-tasks/harnesses/lamp-tasks K=/var/lib/lampOS/skills S=/tmp/.lampos-ns
+H=/var/lib/lampos-hermes W=/var/lib/lampos-tasks/harnesses/lamp-tasks K=/var/lib/lampOS/skills C=/run/lampos-skills S=/tmp/.lampos-ns
 D=$(pwd -P) || exit 1
 R=$(readlink -f /etc/resolv.conf) || R=
 case $R in /run/?*) [ -f "$R" ] || R= ;; *) R= ;; esac
@@ -255,10 +271,11 @@ ro() { O=$(findmnt -no VFS-OPTIONS -M "$1") || fail "no mount at $1"; O=${O#r[ow
 mount -t tmpfs -o size=256m,mode=1777,nosuid,nodev none /tmp || fail "no /tmp"
 mount -t tmpfs -o size=64m,mode=1777,nosuid,nodev none /var/tmp || fail "no /var/tmp"
 if [ -d /dev/shm ]; then mount -t tmpfs -o size=64m,mode=1777,nosuid,nodev none /dev/shm || fail "no /dev/shm"; fi
-mkdir -m 0700 "$S" "$S/h" "$S/w" "$S/k" || fail "no staging"
+mkdir -m 0700 "$S" "$S/h" "$S/w" "$S/k" "$S/c" || fail "no staging"
 mount --bind "$H" "$S/h" || fail "no $H"
 if [ -d "$W" ]; then mount --bind "$W" "$S/w" || fail "no $W"; else W=; fi
 if [ -d "$K" ]; then mount --bind "$K" "$S/k" || fail "no $K"; else K=; fi
+if [ -d "$C" ]; then mount --bind "$C" "$S/c" || fail "no $C"; else C=; fi
 if [ -n "$R" ]; then touch "$S/r" && mount --bind "$R" "$S/r" || fail "no $R"; fi
 mount -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec none /run || fail "/run not hidden"
 mount -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec none /var/lib || fail "/var/lib not hidden"
@@ -266,8 +283,9 @@ if [ -d /etc/lampOS ]; then mount -t tmpfs -o size=4k,mode=0555,nosuid,nodev,noe
 mkdir -p "$H" && mount --move "$S/h" "$H" || fail "$H not shown"
 if [ -n "$W" ]; then mkdir -p "$W" && mount --move "$S/w" "$W" || fail "$W not shown"; fi
 if [ -n "$K" ]; then mkdir -p "$K" && mount --move "$S/k" "$K" && ro "$K" || fail "$K not shown"; fi
+if [ -n "$C" ]; then mkdir -p "$C" && mount --move "$S/c" "$C" && ro "$C" || fail "$C not shown"; fi
 if [ -n "$R" ]; then mkdir -p "${R%/*}" && touch "$R" && mount --move "$S/r" "$R" && ro "$R" || fail "$R not shown"; fi
-rm -f "$S/r" && rmdir "$S/h" "$S/w" "$S/k" "$S" || fail "staging left"
+rm -f "$S/r" && rmdir "$S/h" "$S/w" "$S/k" "$S/c" "$S" || fail "staging left"
 mount -o remount,bind,ro,nosuid,nodev,noexec /run || fail "/run not read-only"
 mount -o remount,bind,ro,nosuid,nodev,noexec /var/lib || fail "/var/lib not read-only"
 if [ -d /etc/lampOS ]; then mount -o remount,bind,ro,nosuid,nodev,noexec /etc/lampOS || fail "/etc/lampOS not read-only"; fi
@@ -932,7 +950,7 @@ fn steps(
         }
     }
     say(&format!(
-        "Hermes {VERSION} ({}) installed for {USER} at {HERMES}; Harness runs it through {WRAPPER}, in a namespace that shows it only its own folder, its work folder and the skills; no service, nothing at boot",
+        "Hermes {VERSION} ({}) installed for {USER} at {HERMES}; Harness runs it through {WRAPPER}, in a namespace that shows it only its own folder, its work folder, the skills and lamp-skills' socket; no service, nothing at boot",
         kit.commit
     ));
     write(records, HermesInstall::installed(now_unix_ms()))

@@ -3276,10 +3276,11 @@ the round never waits for Harness's download. Its sandbox differs:
 namespace script), since Harness's home may not exist yet under
 `/var/lib`; network on; 3600 s since #5978 (1500 before). It runs
 `lamp-update harness-install`, which also installs the pinned Hermes
-after Harness, as `lampos`, with `LAMP_HERMES_ON_LAMP=on` in lamp-update's
-own unit (off unless set, on a product lamp too: its `PRODUCT_DEFAULT` is
-off until the lamp-c0a4 numbers are judged; install.md,
-"Hermes on the lamp"); a round with that switch on and Harness already
+after Harness, as `lampos`, unless `LAMP_HERMES_ON_LAMP=off` in
+lamp-update's own unit (on by default on a product lamp: its
+`PRODUCT_DEFAULT` is on, the product owner's decision, 10 Nov; another
+lamp needs `on`; install.md, "Hermes on the lamp"); a round with that
+switch on and Harness already
 there starts the same unit for Hermes. `check-units` compares it with its own text
 as "the updater's", and a round never takes it for a part's unit. Its
 record, `harness-install.json`, is said on `update/status` as `harness`.

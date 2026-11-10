@@ -63,8 +63,9 @@ harness-on puts Harness on a lamp lampOS is installed on: without Harness at
 harness-install run by lamp-update-harness.service, which a `serve` round starts with
         LAMP_HARNESS_AT_ONBOARDING=on while Harness is missing (#5197): harness-on's
         install alone, through the manifest the round pinned if it named one (its sha256
-        checked first), recorded for update/status; no Harness at boot, no daemon. With
-        LAMP_HERMES_ON_LAMP=on, Hermes after it, pinned, as lampos (#5978).
+        checked first), recorded for update/status; no Harness at boot, no daemon. Then
+        Hermes after it (on by default on a product lamp, LAMP_HERMES_ON_LAMP=off
+        turns it off), pinned, as lampos (#5978).
 back    lamp-update-back (installed as /usr/local/lib/lampos/lamp-update-back, started by
         lamp-update.service's failure and its timer): when lamp-update switched to its own
         new build (LAMP_UPDATE_SELF=on) and that build has not confirmed itself, and
@@ -890,7 +891,8 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     let hermes = {
         use lamp_update::{harness_install::product, hermes_install as hermes};
         let acts = config.apply && command == "serve";
-        // Off by this build's default (PRODUCT_DEFAULT false); only LAMP_HERMES_ON_LAMP=on turns it on.
+        // On by this build's default on a product lamp (PRODUCT_DEFAULT true, the product owner's
+        // decision, 10 Nov); LAMP_HERMES_ON_LAMP=off turns it off, and another lamp needs `on`.
         let wanted = hermes::wanted(
             std::env::var(hermes::SWITCH).ok().as_deref(),
             acts && product::product_lamp(&config.root, &config.on(&config.units)),
