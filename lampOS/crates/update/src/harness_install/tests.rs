@@ -1557,6 +1557,9 @@ fn versions_are_compared_as_dotted_numbers() {
         ("", "0.5.39", None),
         ("0.5.x", "0.5.39", None),
         ("0..1", "0.5.39", None),
+        ("0.6.10", "0.6.2", Some(false)),
+        ("0.5.98", "0.6.2", Some(true)),
+        ("0.6.2", "0.5.98", Some(false)),
     ] {
         assert_eq!(older(have, want), said, "{have} vs {want}");
     }
