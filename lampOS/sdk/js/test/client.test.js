@@ -1303,6 +1303,13 @@ test('a say is exact unless rephrase is asked', async () => {
   });
 });
 
+test('the fake camera gives the picture a test sets', () => withLamp({ grants: ['camera'] }, async (lamp, fake) => {
+  // An app that reads its picture (a brightness meter) needs a real image: `fake.picture` is what a snapshot
+  // and a stream's frames carry; the default is the smallest whole JPEG.
+  fake.picture = Buffer.from([0xff, 0xd8, 0x6d, 0x69, 0x6e, 0x65, 0xff, 0xd9]);
+  assert.deepEqual(await lamp.cameraSnapshot(), fake.picture);
+}));
+
 test('the camera stream asks up to 30 a second, and 31 is refused before sending', () => withLamp({ grants: ['light', 'camera'] }, async (lamp) => {
   const started = await lamp.cameraStream(true, 30);
   assert.equal(started.fps, 30);
