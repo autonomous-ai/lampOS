@@ -37,6 +37,10 @@ pub const WRITE_ENVIRONMENT: &str = "LAMP_SERVICES_WRITE";
 /// `lamp-skills.service` may call the tools' socket too, for `service_read`
 /// alone.
 pub const SKILL_READS_ENVIRONMENT: &str = "LAMP_SKILL_READS";
+/// The switch for changing and cancelling a Google Calendar event by its
+/// id (`update_event`, `delete_event`), read by this program: off unless
+/// `on`, and only with [`WRITE_ENVIRONMENT`] on too.
+pub const CALENDAR_EDITS_ENVIRONMENT: &str = "LAMP_CALENDAR_EDITS";
 
 /// Whether a switch is on, as `var` gives it.
 pub fn on(var: Option<&str>) -> bool {

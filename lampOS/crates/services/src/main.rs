@@ -6,7 +6,7 @@
 //! unit stays inactive. `lamp-services --pdf-text` is the service's own
 //! child for one PDF's text (`mail::pdf`), never started by hand.
 use lamp_services::{
-    ENVIRONMENT, SKILL_READS_ENVIRONMENT, WRITE_ENVIRONMENT,
+    CALENDAR_EDITS_ENVIRONMENT, ENVIRONMENT, SKILL_READS_ENVIRONMENT, WRITE_ENVIRONMENT,
     mail::{self, Gmail},
     net::Https,
     on,
@@ -98,10 +98,16 @@ fn main() -> ExitCode {
     if skill_writes {
         say("a made skill's writes on: lamp-skills may send each write the owner said yes to");
     }
+    // Changing and cancelling a calendar event by its id, a write too.
+    let calendar_edits = write_on && on(std::env::var(CALENDAR_EDITS_ENVIRONMENT).ok().as_deref());
+    if calendar_edits {
+        say("calendar edits on: an event changed or cancelled only on a spoken send");
+    }
     let services = Arc::new(
         serve::Services::new(store::Store(store), Https, Gmail, backend, write_on)
             .with_skill_reads(skill_reads)
-            .with_skill_writes(skill_writes),
+            .with_skill_writes(skill_writes)
+            .with_calendar_edits(calendar_edits),
     );
     let tools_dir = run.join("tools");
     let opened = (|| -> io::Result<(UnixListener, UnixListener)> {
@@ -109,7 +115,7 @@ fn main() -> ExitCode {
         fs::set_permissions(&tools_dir, fs::Permissions::from_mode(0o755))?;
         let admin = bind(&run.join("admin.sock"))?;
         let calls = bind(&tools_dir.join(tools::CALL_SOCKET))?;
-        tools::write(&tools_dir)?;
+        tools::write_for(&tools_dir, calendar_edits)?;
         Ok((admin, calls))
     })();
     let (admin, calls) = match opened {
