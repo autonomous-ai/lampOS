@@ -566,6 +566,20 @@ test('get answers the states asked', async () => {
   });
 });
 
+test('lamp.said needs the speech grant and comes with who had it said', async () => {
+  await withLamp({ grants: ['speech'] }, async (lamp, fake) => {
+    let told;
+    const said = new Promise((resolve) => { told = resolve; });
+    await lamp.on('lamp.said', (event) => told(event));
+    fake.emit('lamp.said', { text: 'It is a long', by: 'lamp', source: 'reply', cut: true });
+    const event = await said;
+    assert.deepEqual([event.text, event.by, event.source, event.cut], ['It is a long', 'lamp', 'reply', true]);
+  });
+  await withLamp({ grants: ['speak'] }, async (lamp) => {
+    await assert.rejects(lamp.on('lamp.said', () => {}), (error) => error.code === 'no_grant');
+  });
+});
+
 test('air and device need their grants, and air.changed comes on a new reading', async () => {
   await withLamp({ grants: ['air', 'device'] }, async (lamp, fake) => {
     assert.deepEqual(await lamp.air(), AIR);

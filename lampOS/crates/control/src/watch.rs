@@ -124,6 +124,27 @@ fn device_reading(payload: &Value) -> Value {
     Value::Object(reading)
 }
 
+/// What `voice/line` means for `lamp.said`: the line's words, who had it
+/// said and where it came from (never the `app`, which is a computer's id),
+/// and who may be told, or nothing.
+fn said_line(payload: &Value) -> Option<Out> {
+    let text = payload["text"]
+        .as_str()
+        .filter(|text| !text.trim().is_empty())?;
+    let (by, source) = (payload["by"].as_str()?, payload["source"].as_str()?);
+    let to = match (by, source) {
+        ("lamp", "cached") => SaidTo::Everyone,
+        ("lamp", "reply") if payload["scope"] == "owner" => SaidTo::Everyone,
+        ("computer", "exact") => SaidTo::Client(payload["app"].as_str()?.to_owned()),
+        _ => return None,
+    };
+    let mut fields = json!({"text": text, "by": by, "source": source});
+    if payload["cut"] == true {
+        fields["cut"] = json!(true);
+    }
+    Some(Out::Said { fields, to })
+}
+
 /// A reading with `known: true`, or `{"known": false}` without one.
 fn known(reading: Option<&(Value, u64)>) -> Value {
     match reading {
@@ -143,12 +164,24 @@ pub enum Out {
     Event(EventKind, Value),
     /// Words heard, finished: for phrase matching only, never sent.
     Heard(String),
+    /// A line the lamp said, for `lamp.said` to the computers holding
+    /// `speech` that `to` names (docs/control.md, "What the lamp says").
+    Said { fields: Value, to: SaidTo },
     /// Every lease (on a part, or all) suspended while someone talks.
     Suspend(Option<Part>, LeaseWhy),
     /// Talking ended: suspended leases held again.
     Resume,
     /// Every lease (on a part, or all) lost.
     Lose(Option<Part>, LeaseWhy),
+}
+
+/// Who a line the lamp said goes to.
+#[derive(Clone, Debug, PartialEq)]
+pub enum SaidTo {
+    /// Every computer holding `speech` and subscribed.
+    Everyone,
+    /// Only the computer (its id) that had the lamp say it.
+    Client(String),
 }
 
 /// A hand in the picture, as `humans/hands/tracked` says it: the palm's
@@ -330,6 +363,14 @@ impl Watch {
                 }
                 _ => Vec::new(),
             },
+            // What the lamp said, gated before it goes anywhere (privacy read
+            // of the `speech` design, Thirteen's P2-2): a fixed phrase to
+            // every computer; a computer's own exact line back to that
+            // computer alone; a reply only when the voice says it was said
+            // in the owner's own scope. A reply with no scope, another
+            // person's, and a skill's line are not sent: unknown is not
+            // sent.
+            "voice/line" => said_line(payload).into_iter().collect(),
             "ears/classes" => self.sounds(payload),
             "controls/gesture" => {
                 if payload["enabled"] == false {
@@ -1268,6 +1309,62 @@ mod tests {
         let mut shadow = pet(32, 3, false);
         shadow["enabled"] = json!(false);
         assert!(watch.take("controls/pet", &shadow, 9 * S).is_empty());
+    }
+
+    /// Thirteen's P2-2 on the `speech` design: a line the lamp said goes
+    /// only where the privacy read allows, and unknown is not sent.
+    #[test]
+    fn a_line_the_lamp_said_goes_only_where_it_may() {
+        let mut watch = Watch::new();
+        let mut said = |payload: Value| watch.take("voice/line", &payload, S);
+        // A fixed phrase: to everyone who reads what the lamp says.
+        assert_eq!(
+            said(json!({"text": "Going to sleep now.", "by": "lamp", "source": "cached"})),
+            [Out::Said {
+                fields: json!({"text": "Going to sleep now.", "by": "lamp", "source": "cached"}),
+                to: SaidTo::Everyone
+            }]
+        );
+        // A reply in the owner's own scope, cut: told as cut.
+        assert_eq!(
+            said(
+                json!({"text": "It is", "by": "lamp", "source": "reply", "scope": "owner", "cut": true, "request": 4})
+            ),
+            [Out::Said {
+                fields: json!({"text": "It is", "by": "lamp", "source": "reply", "cut": true}),
+                to: SaidTo::Everyone
+            }]
+        );
+        // A reply with no scope, or any other scope, is not sent.
+        assert!(said(json!({"text": "Four.", "by": "lamp", "source": "reply"})).is_empty());
+        assert!(
+            said(json!({"text": "Four.", "by": "lamp", "source": "reply", "scope": "room"}))
+                .is_empty()
+        );
+        assert!(
+            said(json!({"text": "Four.", "by": "lamp", "source": "reply", "scope": "other"}))
+                .is_empty()
+        );
+        // A computer's own line goes back to that computer alone, and its
+        // name (an id) is not in what is sent.
+        assert_eq!(
+            said(
+                json!({"text": "Build passed.", "by": "computer", "source": "exact", "app": "c_1"})
+            ),
+            [Out::Said {
+                fields: json!({"text": "Build passed.", "by": "computer", "source": "exact"}),
+                to: SaidTo::Client("c_1".into())
+            }]
+        );
+        // One that names nobody, a skill's line, a recording and an empty
+        // line are not sent.
+        assert!(said(json!({"text": "Hi.", "by": "computer", "source": "exact"})).is_empty());
+        assert!(
+            said(json!({"text": "Water.", "by": "skill", "source": "exact", "app": "reminder"}))
+                .is_empty()
+        );
+        assert!(said(json!({"text": "x", "by": "lamp", "source": "recording"})).is_empty());
+        assert!(said(json!({"text": " ", "by": "lamp", "source": "cached"})).is_empty());
     }
 
     #[test]

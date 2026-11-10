@@ -597,6 +597,64 @@ async fn the_bus_reaches_a_subscriber_as_events_phrases_only_and_lease_signals()
     );
 }
 
+/// What the lamp says goes to a computer only with the `speech` grant it
+/// asked for, a line meant for one computer goes to that computer alone, and
+/// the journal keeps the kind, never the words.
+#[tokio::test]
+async fn what_the_lamp_says_reaches_only_a_computer_holding_speech() {
+    use lamp_control::watch::{Out, SaidTo};
+    let lamp = lamp("said").await;
+    // Without the grant the subscription itself is refused.
+    let mut plain = paired(&lamp, json!(["look"]), 7).await;
+    let refused = send(
+        &mut plain,
+        json!({"id": 3, "op": "subscribe", "events": ["lamp.said"]}),
+    )
+    .await;
+    assert_eq!(refused["error"]["code"], "no_grant", "{refused}");
+    lamp.shared.move_clock_on(Duration::from_millis(1_100));
+    let mut reader = paired(&lamp, json!(["speech"]), 8).await;
+    let subscribed = send(
+        &mut reader,
+        json!({"id": 3, "op": "subscribe", "events": ["lamp.said"]}),
+    )
+    .await;
+    assert_eq!(subscribed["ok"], true, "{subscribed}");
+    let fields = json!({"text": "Going to sleep now.", "by": "lamp", "source": "cached"});
+    lamp.shared.deliver(vec![Out::Said {
+        fields: fields.clone(),
+        to: SaidTo::Everyone,
+    }]);
+    let said = next(&mut reader).await;
+    assert_eq!(said["ev"], "lamp.said");
+    assert_eq!(said["text"], "Going to sleep now.");
+    assert_eq!(
+        (said["by"].as_str(), said["source"].as_str()),
+        (Some("lamp"), Some("cached"))
+    );
+    assert!(said["at"].as_str().unwrap().ends_with('Z'), "{said}");
+    // A line meant for another computer is not this one's.
+    lamp.shared.deliver(vec![Out::Said {
+        fields: json!({"text": "Not yours.", "by": "computer", "source": "exact"}),
+        to: SaidTo::Client("c_other".into()),
+    }]);
+    // Its own is.
+    let listed = admin(&lamp, json!({"clients": true})).await;
+    let own = listed["clients"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "test laptop")
+        .map(|c| c["id"].as_str().unwrap().to_owned())
+        .unwrap_or_else(|| listed["clients"][1]["id"].as_str().unwrap().to_owned());
+    lamp.shared.deliver(vec![Out::Said {
+        fields: json!({"text": "Build passed.", "by": "computer", "source": "exact"}),
+        to: SaidTo::Client(own),
+    }]);
+    let mine = next(&mut reader).await;
+    assert_eq!(mine["text"], "Build passed.", "{mine}");
+}
+
 /// A look under a body lease that a conversation suspended is refused as
 /// the suspension it is, not as "take a lease on the body first": the SDK's
 /// `Lease.state` still read `held` for the moment before its event came
