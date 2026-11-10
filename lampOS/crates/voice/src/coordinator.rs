@@ -10708,6 +10708,7 @@ fn conversation_with_gate_inner(
                         &mut walk_told,
                         reply.as_ref(),
                         snapshot.microphone_generation(),
+                        onboarding.is_some(),
                     );
                     // A line begun in a computer's turn is a call, as a tap
                     // is: told to the worker's rule right after its Start.
@@ -10963,6 +10964,7 @@ fn conversation_with_gate_inner(
                                     &mut walk_told,
                                     reply.as_ref(),
                                     snapshot.microphone_generation(),
+                                    onboarding.is_some(),
                                 );
                                 if took_over {
                                     took_over_turn =
@@ -16395,7 +16397,12 @@ fn tell_walk(
     told: &mut Option<(u64, bool)>,
     reply: Option<&Reply>,
     privacy_generation: u64,
+    walk: bool,
 ) {
+    // A lamp with no walk at all (no onboarding) has nothing to tell.
+    if !walk {
+        return;
+    }
     // A local-only turn (#830) sends nothing.
     let Some(current) = reply.filter(|current| current.local_only.is_none()) else {
         return;
