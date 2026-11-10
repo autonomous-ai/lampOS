@@ -246,6 +246,10 @@ pub struct Watch {
     device: Option<(Value, u64)>,
     /// Where the body is, for `body.state`.
     body: BodyState,
+    /// The head pet last told as `touch` (its controls session and contact),
+    /// so one pet, said at most ten times a second while it lasts, is one
+    /// event.
+    pet_told: Option<(String, u64)>,
 }
 
 impl Watch {
@@ -348,6 +352,40 @@ impl Watch {
                 };
                 out.push(event);
                 out
+            }
+            // A hand on the head, as lamp-controls says it: each contact
+            // (`lamp_msgs/TouchEvent`) says `touch` when it begins, `stroke`
+            // while it slides and `tap` once it is let go quickly. Only a
+            // tap is told here (11091: nothing but a button's `controls/
+            // gesture` ever was, so no head tap reached a program); a pet
+            // is `controls/pet`'s.
+            "controls/touch" => {
+                if payload["enabled"] == true
+                    && payload["source"] == "head"
+                    && payload["gesture"] == "tap"
+                    && !payload["released_us"].is_null()
+                {
+                    vec![Out::Event(EventKind::Touch, json!({"kind": "tap"}))]
+                } else {
+                    Vec::new()
+                }
+            }
+            // A hand petting the head (`lamp_msgs/HeadPet`): said when it is
+            // told apart, again while it lasts and once more as it ends;
+            // the first of a contact is the event.
+            "controls/pet" => {
+                let (Some(session), Some(contact)) = (
+                    payload["session_id"].as_str(),
+                    payload["contact_id"].as_u64(),
+                ) else {
+                    return Vec::new();
+                };
+                let told = Some((session.to_owned(), contact));
+                if payload["enabled"] != true || payload["ended"] == true || self.pet_told == told {
+                    return Vec::new();
+                }
+                self.pet_told = told;
+                vec![Out::Event(EventKind::Touch, json!({"kind": "pet"}))]
             }
             // Every change is said by lamp-actions, the speaker's only
             // writer: told when it differs from the one before, so the first
@@ -927,6 +965,7 @@ mod tests {
             "name/heard",
             "room/stood_up",
             "controls/touch",
+            "controls/pet",
         ] {
             assert_eq!(Watch::kept_of(topic, &json!({})), None, "{topic}");
         }
@@ -1037,6 +1076,81 @@ mod tests {
                 )
                 .is_empty()
         );
+    }
+
+    /// What lamp-controls says on `controls/touch` for a head contact, as
+    /// lamp-75c9 (11091) published it while a person tapped and stroked
+    /// (Ten's touch check, 10 Nov 2026): the whole `lamp_msgs/TouchEvent`.
+    fn head_touch(gesture: &str, contact: u64, released: Option<u64>) -> Value {
+        json!({"active_mask": 0, "active_names": [], "began_us": 417374608818u64,
+            "contact_id": contact, "distance": 0.0, "enabled": true, "gesture": gesture,
+            "name": "head", "observed_us": 417374911590u64, "position": null,
+            "reader_session_id": "touch-gpio-584969-364420275115", "released_us": released,
+            "session_id": "b90b26cdeb027a54", "source": "head", "speed": 0.0,
+            "stamp": {"at_us": 417374911639u64, "clock_id": "b05003f2", "sequence": 47},
+            "toward_pad": null, "when_asleep": null, "when_quiet": "attend",
+            "when_speaking": "attend"})
+    }
+
+    #[test]
+    fn a_head_tap_on_controls_touch_is_a_touch_tap_and_a_contact_still_down_is_not() {
+        let mut watch = Watch::new();
+        let touching = head_touch("touch", 23, None);
+        assert!(watch.take("controls/touch", &touching, S).is_empty());
+        assert!(
+            watch
+                .take("controls/touch", &head_touch("stroke", 23, None), S)
+                .is_empty()
+        );
+        let out = watch.take(
+            "controls/touch",
+            &head_touch("tap", 24, Some(417374761802)),
+            S,
+        );
+        assert_eq!(kinds(&out), [EventKind::Touch]);
+        assert_eq!(out[0], Out::Event(EventKind::Touch, json!({"kind": "tap"})));
+        // A shadow (not enabled) reading and another's source say nothing.
+        let mut shadow = head_touch("tap", 25, Some(1));
+        shadow["enabled"] = json!(false);
+        assert!(watch.take("controls/touch", &shadow, 2 * S).is_empty());
+        let mut strip = head_touch("tap", 26, Some(1));
+        strip["source"] = json!("strip");
+        assert!(watch.take("controls/touch", &strip, 2 * S).is_empty());
+    }
+
+    #[test]
+    fn a_head_pet_on_controls_pet_is_one_touch_pet_for_the_whole_contact() {
+        let mut watch = Watch::new();
+        let pet = |contact: u64, swaps: u32, ended: bool| {
+            json!({"stamp": {"at_us": 1, "clock_id": "c", "sequence": 3}, "session_id": "s1",
+                "reader_session_id": "r", "enabled": true, "contact_id": contact,
+                "began_us": 1, "petted_us": 2, "observed_us": 3, "swaps": swaps,
+                "swaps_per_second": 4.0, "resting": false, "ended": ended})
+        };
+        let first = watch.take("controls/pet", &pet(30, 3, false), S);
+        assert_eq!(
+            first,
+            vec![Out::Event(EventKind::Touch, json!({"kind": "pet"}))]
+        );
+        // Told again while it lasts and at its end: not news.
+        assert!(
+            watch
+                .take("controls/pet", &pet(30, 5, false), 2 * S)
+                .is_empty()
+        );
+        assert!(
+            watch
+                .take("controls/pet", &pet(30, 5, true), 3 * S)
+                .is_empty()
+        );
+        // The next pet, its own contact, is.
+        assert_eq!(
+            kinds(&watch.take("controls/pet", &pet(31, 3, false), 6 * S)),
+            [EventKind::Touch]
+        );
+        let mut shadow = pet(32, 3, false);
+        shadow["enabled"] = json!(false);
+        assert!(watch.take("controls/pet", &shadow, 9 * S).is_empty());
     }
 
     #[test]

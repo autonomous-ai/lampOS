@@ -190,6 +190,16 @@ fn every_event_from_the_bus_validates_against_the_schema() {
         ("controls/gesture", json!({"gesture": "multi_tap"}), 21 * S),
         ("controls/gesture", json!({"gesture": "pet"}), 21 * S),
         ("controls/gesture", json!({"gesture": "long_press"}), 21 * S),
+        (
+            "controls/touch",
+            json!({"enabled": true, "source": "head", "gesture": "tap", "released_us": 1}),
+            21 * S,
+        ),
+        (
+            "controls/pet",
+            json!({"enabled": true, "session_id": "s", "contact_id": 5, "ended": false}),
+            21 * S,
+        ),
         ("voice/state", json!({"state": "listening"}), 22 * S),
         ("voice/state", json!({"state": "resting"}), 23 * S),
         ("lamp/pause", json!({"paused": true}), 24 * S),
