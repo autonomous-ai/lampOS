@@ -25,6 +25,13 @@ Environment=PATH=/usr/local/bin:/usr/bin:/bin
 # A home lamp keeps the Harness its build pinned: Harness's own self-update is held, and a newer
 # Harness comes only through a new pin in a build (#5229, #5379; docs/tasks.md).
 Environment=LAMP_HARNESS_HOLD_UPDATES=on
+# The lamp's own Hermes as a task target (#5978; lampOS/docs/install.md, "Hermes on the lamp"): lamp-update puts the
+# pinned Hermes there after Harness, with LAMP_HERMES_ON_LAMP on in its own unit (on by default on a product lamp).
+# lamp-tasks keeps the lamp a target only while Harness's look at the lamp says Hermes is installed, so a lamp
+# without it hands over as before. It needs --engines-from-machines below: without it the lamp's Hermes is never
+# looked for. --reply-named types work into a session the person names (#5535), with LAMP_TASKS_REPLY_NAMED in
+# lamp-voice.service.
+Environment=LAMP_HERMES_ON_LAMP=on
 RuntimeDirectory=lampos-tasks
 RuntimeDirectoryMode=0700
 StateDirectory=lampos-tasks
@@ -41,7 +48,7 @@ StateDirectoryMode=0700
 # #5198, docs/tasks.md). The socket is lampos's, so any unit run as lampos can connect to it; lamp-tasks
 # reads each caller from the kernel (SO_PEERCRED and its cgroup) and closes any that is not
 # lamp-cloud.service run as lampos (#5379).
-ExecStart=/opt/lampOS/tasks/current/lamp-tasks serve --enable --watch --progress --push-wait --close-told --harness-as-person --set-up-later --targets-from-machines claude --folder-missing --sign-in-by-code --app-socket /run/lampos-tasks/app.sock --dir /var/lib/lampos-tasks/store --socket /run/lampos-tasks/request.sock --voice-socket /run/lampos-tasks/voice.sock --targets /var/lib/lampos-tasks/targets.json --harness /usr/local/bin/harness
+ExecStart=/opt/lampOS/tasks/current/lamp-tasks serve --enable --watch --progress --push-wait --close-told --harness-as-person --set-up-later --targets-from-machines claude --engines-from-machines --reply-named --folder-missing --sign-in-by-code --app-socket /run/lampos-tasks/app.sock --dir /var/lib/lampos-tasks/store --socket /run/lampos-tasks/request.sock --voice-socket /run/lampos-tasks/voice.sock --targets /var/lib/lampos-tasks/targets.json --harness /usr/local/bin/harness
 Restart=on-failure
 RestartSec=5s
 StandardInput=null
