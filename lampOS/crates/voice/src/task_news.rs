@@ -1709,7 +1709,7 @@ pub(crate) fn unprompted(words: &str) -> String {
 /// work to is named in its news (a Hermes task was told as Claude Code's);
 /// Claude Code, the default target's, for a task naming no known engine.
 pub(crate) fn who(task: &Value) -> &'static str {
-    task["target"]["engine"]
+    engine_of(task)
         .as_str()
         .and_then(crate::agent_tasks::name_of)
         .unwrap_or("Claude Code")
@@ -1720,13 +1720,13 @@ pub(crate) fn who(task: &Value) -> &'static str {
 /// computer", as without it; for Devin Cloud, which works on no computer,
 /// "the Devin session in Harness".
 pub(crate) fn their_computer(task: &Value) -> String {
-    if task["target"]["engine"] == "devin-cloud" {
+    if engine_of(task) == "devin-cloud" {
         return "the Devin session in Harness".to_owned();
     }
     if on_the_lamp(task) {
         return "the lamp".to_owned();
     }
-    task["target_alias"]
+    alias_of(task)
         .as_str()
         .and_then(crate::agent_tasks::machine_name)
         .map_or_else(
@@ -1738,7 +1738,35 @@ pub(crate) fn their_computer(task: &Value) -> String {
 /// Whether the work was done on the lamp itself, by Hermes there
 /// (`lamp-tasks` with `LAMP_HERMES_ON_LAMP`, #5978).
 pub(crate) fn on_the_lamp(task: &Value) -> bool {
-    task["target_alias"] == crate::agent_tasks::LAMP_TARGET && task["target"]["engine"] == "hermes"
+    *alias_of(task) == crate::agent_tasks::LAMP_TARGET && *engine_of(task) == "hermes"
+}
+
+/// Where the task's work is, as a `get_task` answer names it: the machine
+/// its named session was found on (`task.dispatch.joined_on`, #5978) when
+/// the lamp's hand-over joined one on a computer, else its target's alias
+/// (`task.target_alias`, or `target_alias` as a shaped entry names it).
+fn alias_of(task: &Value) -> &Value {
+    let joined = &task["task"]["dispatch"]["joined_on"]["alias"];
+    if joined.is_string() {
+        return joined;
+    }
+    let alias = &task["task"]["target_alias"];
+    if alias.is_string() {
+        alias
+    } else {
+        &task["target_alias"]
+    }
+}
+
+/// The engine of the agent doing the work: the joined session's (#5978),
+/// else the launch target's.
+fn engine_of(task: &Value) -> &Value {
+    let joined = &task["task"]["dispatch"]["joined_on"]["engine"];
+    if joined.is_string() {
+        joined
+    } else {
+        &task["target"]["engine"]
+    }
 }
 
 /// What a note of work done on the lamp itself adds (#5978): the person
@@ -4784,6 +4812,17 @@ mod tests {
     fn work_done_on_the_lamp_is_told_as_done_here() {
         let done =
             json!({"state":"idle","answer":"A short poem about the rain.","truncated":false});
+        let fetched = |joined: Value| {
+            json!({"text":"Write a poem","target":{"engine":"hermes"},
+            "task":{"target_alias":"lamp","dispatch":{"joined_on":joined}}})
+        };
+        assert!(on_the_lamp(&fetched(Value::Null)));
+        assert_eq!(their_computer(&fetched(Value::Null)), "the lamp");
+        assert_eq!(who(&fetched(Value::Null)), "Hermes");
+        let elsewhere = fetched(json!({"alias":"office","machine_id":"m","engine":"codex"}));
+        assert!(!on_the_lamp(&elsewhere));
+        assert_eq!(their_computer(&elsewhere), "their computer");
+        assert_eq!(who(&elsewhere), "Codex");
         let on = |alias: &str, engine: &str| json!({"text":"Write a poem","target":{"engine":engine},"target_alias":alias});
         let lamp = note(&own(), &on("lamp", "hermes"), &done, 0).unwrap();
         assert!(lamp.contains("Hermes"), "{lamp}");

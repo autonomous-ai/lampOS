@@ -1345,34 +1345,79 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
     is looked at too. The target is `lamp`, engine Hermes only, folder
     `~/harnesses/lamp-tasks/lamp` under `lampos`'s home (the part makes it,
     0700, since Harness makes only a `~/harnesses/<name>` folder), with no
-    name. With it, at most 7 computers are kept, so the file keeps its 8; a
-    computer whose name makes `lamp` is `lamp-2`. With no computer, the
-    file holds the lamp alone instead of being removed. Hermes missing, not
-    looked at, or the switch off: left out, as before. Without
-    `--engines-from-machines` the part says once that the lamp is no target.
-  - **Computers first.** A `prepare` for a computer goes there as before
-    while any computer target is not known `offline`. Only when every
-    computer target is known offline, or there is none, does it go to
-    `lamp`, and the answer says `"target":"lamp"`. A `prepare` naming
-    `lamp` goes there.
+    name. With it, at most 7
+    computers are kept, so the file keeps its 8; a computer whose name
+    makes `lamp` is `lamp-2`. With no computer, the file holds the lamp
+    alone instead of being removed. Hermes missing, not looked at, or the
+    switch off: left out, as before. Without `--engines-from-machines` the
+    part says once that the lamp is no target.
+  - **Hermes' home.** Hermes keeps its settings in
+    `HERMES_HOME=/var/lib/lampos-hermes/.hermes`, outside `lampos`'s home,
+    apart from Harness' sign-in and lamp-cloud's credentials. Hermes saves
+    its shell environment there (`cache/scratch`), so nothing lamp-tasks
+    gives it carries a key: only the forwarder's local token. Which user
+    Hermes runs as is part 1's (install) and still being settled. At
+    start, with the switch on, the part (as `lampos`) writes Hermes'
+    settings there for the lamp's DeepSeek forwarder (port 7741) with the
+    token from `/var/lib/lampos-cloud/hermes-token`, and says one journal
+    line: written, unchanged, or "not written: no forwarder token yet",
+    when the token is missing (then nothing is written).
+  - **`HERMES_HOME` for Harness.** With the switch on, the env file the
+    part writes for Harness (`HARNESS_ENV_FILE`, as for the hold above)
+    names `HERMES_HOME` and `SHELL=/bin/sh`, and every Harness command the
+    part runs has both. `lampos`'s own shell is `/usr/sbin/nologin`, and
+    Harness reads an engine's launch environment through `SHELL` first:
+    without it `harness new` times out "Waiting to read the engine's
+    launch environment" (seen on a lamp).
+    The file is written with the hold off too, then without the hold's
+    lines: the launcher isn't pinned then, so only the Harness commands the
+    part runs, and the daemon they start, have `HERMES_HOME`. The hooks
+    block is kept as it is: Harness writes its hooks into Hermes'
+    `config.yaml` only while that file is owned by Harness's user
+    (`lampos`).
+  - **Which session, which machine.** A hand-over naming a session looks
+    for it as #5784 does (exact name, then a word-start prefix, then by its
+    work), on the lamp first, then on each computer target's machine. A
+    fit on the lamp wins a tie; one fit on a computer alone is replied into
+    there (`harness reply --machine <its id>`), the task's dispatch says
+    `joined_on` (alias, machine, engine; schema 6), and it is shown,
+    watched, closed and told as that machine's, like any computer task.
+    Two computers fitting and none on the lamp is `session_ambiguous`; a
+    computer that can't be read is left out rather than said not found.
+    A hand-over naming a machine looks there only.
+  - **New work goes to the lamp.** A new task naming nothing goes to the
+    lamp's Hermes; one naming their computer (`where` `"computer"`) or an
+    agent there goes to the computer, and a computer known `offline` is
+    refused `computer_offline`, never moved to the lamp quietly. The task
+    is followed on the lamp's machine id exactly like a computer task:
+    show, wait, watch, task news and the status and progress tool. Its
+    session shows in Harness Desktop like any other.
   - **The voice:** the `lamp` target is never one of the staff.
-    `start_agent_task` gets `where` (`"lamp"` only) while the tasks part
-    has it, for "on the lamp" or "do it yourself". The read-back says
-    "Hermes on the lamp", whether asked or told by the answer. Asked for
-    with no `lamp` target, it says that isn't set up and nothing goes to a
-    computer instead. A finished task's news adds that it was done here on
-    the lamp ("I did it here on the lamp"), and the rest is said to be on
-    the lamp.
+    `start_agent_task` gets `where` (`"lamp"`, `"computer"`) while the
+    tasks part has it; the description says long work is handed over, an
+    earlier session of theirs first (the lamp's first), else a new one on
+    the lamp unless they name their computer. The read-back and the yes
+    are as before (one yes for a named session too): "Hermes on the lamp".
+    Asked for with no `lamp` target, it says that isn't set up and nothing
+    goes to a computer instead. A finished task's news adds that it was
+    done here on the lamp ("I did it here on the lamp"); a session joined
+    on a computer is told as that computer's.
   - **Tests:** `readiness::tests::the_lamp_is_kept_only_where_hermes_is_known_installed`,
     `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
+    `runtime::tests::hermes_settings_are_written_at_start_only_with_a_token`,
+    `hold::tests::the_env_file_names_hermes_home_and_a_shell_with_or_without_the_hold`,
+    `engine::tests::a_session_joined_on_another_machine_is_followed_there`,
+    `tests/harness.rs`: `a_named_session_is_looked_for_on_the_lamp_first_then_the_computers`,
+    `the_session_machines_come_from_the_targets`,
     `tests/runtime.rs`: `the_lamp_is_a_target_with_hermes_only_when_on_and_installed_there`
-    (off, Hermes missing, installed; a computer online, asked for the lamp,
-    no computer online), the voice's
-    `agent_tasks::tests::work_goes_to_the_lamp_itself_only_when_asked_or_told_so`
+    (off, Hermes missing, installed; a computer offline refused; the answer
+    shown on the lamp's machine), the voice's
+    `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`
     and `task_news::tests::work_done_on_the_lamp_is_told_as_done_here`.
   - **Not yet shown on a lamp:** Hermes found by the lamp's Harness, a task
-    run there with no computer online, its done line, and the voice staying
-    responsive while it runs (#5978 part 4).
+    run there with DeepSeek, its done line, the hooks block after a
+    restart, the session in Harness Desktop, and the
+    voice staying responsive while it runs (#5978 part 4).
 
 Signing in a lamp with no screen is by a spoken code since Harness 0.4.23
 (openharness#1410; ["Signing in by a spoken code"](#signing-in-by-a-spoken-code---sign-in-by-code-1676)).
