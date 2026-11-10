@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-11-10 00:39 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1711, posted by the PM (Faye) since 4 Nov, are the live ones.
+Written by the first builder from the team's review page at 2026-11-10 12:42 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1711, posted by the PM (Faye) since 4 Nov, are the live ones.
 
-**Build 92.7% over 75 rows. Quality 68.8% over 17 rows.** For later (mood, and texting from the app): 46.8% over 4 rows, not in the build figure.
+**Build 92.8% over 75 rows. Quality 68.8% over 17 rows.** For later (mood, and texting from the app): 46.8% over 4 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -25,7 +25,7 @@ Written by the first builder from the team's review page at 2026-11-10 00:39 (+0
 | Speaks first when it should (the Policy) | 1.00 | #752 | second |  |
 | Each person’s memory kept apart | 1.00 | #764 | seventh |  |
 | Sleep, and waking on its name | 1.00 | #749 #714 | fourth, second |  |
-| Reminders, timers, memory across days | 0.95 | #748 #743 | — | 6 Nov 17:3x, down from 1.00: a store behind the delivery ledger says “Timer set” and never rings (#5498, seen on 52e6 after a test’s put-back); |
+| Reminders, timers, memory across days | 1.00 | #748 #743 | — | 10 Nov 12:3x, back up from 0.95: #5498’s fix (a stale oldest reminder no longer silences the rest) has been on stable since 10686, and #5879 (a plain reminders question always reads the real reminders, `list_reminders`) … |
 | Setup for a home, 5 s reset | 0.95 | #806 #1209 #2861 #3579 | first, el | 26 Oct 20:3x, up from 0.85: shown on lamp-52e6 with build 7071 (the lead’s agent, 20:10–20:28). |
 | A safe shutdown from the app and a long press | 1.00 | #3697 #3698 #3713 #3735 | fifth, mobile | 2 Nov 16:0x, up from 0.85, built: on in the product since #4909, stable in 9528 (16:0x). |
 | Touch strip and head pads | 0.95 | #711 #1362 #2445 #2460 #2857 | first, fifth | 27 Oct 15:1x: found on the tester’s 7071 lamps: a hand kept 3 s put the lamp to sleep unsaid, in onboarding’s touch and giving-way steps, and they reset it (#3747, #3749). |
