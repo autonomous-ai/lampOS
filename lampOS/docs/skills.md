@@ -2149,9 +2149,11 @@ gone ([switches.md](switches.md)). What happens:
    "A made skill's read"). Kept, a skill whose step reads a service not
    linked now (`services_connected`, asked once, at most 500 ms) is still
    kept, and the make tells it: by voice, `needs_link` in the make's
-   answer and one sentence said after the line that it's on, "Gmail isn't linked yet:
-   link it in the app, under Skills, then Connectors, and the skill will
-   start then."; from the app, `needs_link: [{"code", "name"}]` in
+   answer, and after the line that it's on the model is asked to tell the
+   person, in its own words and the conversation's language, that the
+   skill will start once that service is linked in the app, under Skills,
+   then Connectors (`made_skill::needs_link_ask`; the owner, 10 Nov:
+   never a fixed English sentence); from the app, `needs_link: [{"code", "name"}]` in
    `skills.made`. With `lamp-services` not answering, neither, and the
    make stands ([services.md](services.md), "Not linked when it is made").
 5. **Checked.** The card is marked `made: here` (`lamp-cloud`'s "Made on

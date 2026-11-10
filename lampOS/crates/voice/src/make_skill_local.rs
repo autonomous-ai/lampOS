@@ -462,14 +462,15 @@ fn ask(
 /// a made skill goes on with no spoken yes).
 ///
 /// `needs`: the linked services it reads that aren't linked now
-/// ([`made_skill::needs_link`]): told as `needs_link`, and their sentence
-/// said after the line.
+/// ([`made_skill::needs_link`]): told as `needs_link`, and the model asked
+/// to tell them after the line in its own words and the conversation's
+/// language ([`made_skill::needs_link_ask`]), never a fixed sentence.
 fn told(made: Result<Made, Refused>, on: Result<(), String>, needs: Option<&[Value]>) -> Value {
     match made {
         Ok(made) => {
             let link = needs
-                .and_then(made_skill::needs_link_said)
-                .map(|said| format!(" Then say exactly: \"{said}\""))
+                .and_then(made_skill::needs_link_ask)
+                .map(|ask| format!(" {ask}"))
                 .unwrap_or_default();
             let line = match &on {
                 Ok(()) => made_skill::on_line(&made),
@@ -1511,8 +1512,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     }
 
     /// Made by voice, a skill that reads Gmail not linked is told with
-    /// `needs_link` and the sentence where to link it, said after the line
-    /// that it's on; linked, or with `lamp-services` not telling,
+    /// `needs_link` and the model asked to tell, after the line that it's
+    /// on, in its own words and language, where to link it; linked, or with `lamp-services` not telling,
     /// neither, and the make stands. A skill that reads nothing never asks.
     #[test]
     fn a_made_skill_that_reads_a_service_not_linked_says_where_to_link_it() {
@@ -1537,19 +1538,22 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             "{answer}"
         );
         let next = answer["next"].as_str().unwrap();
-        let sentence = "Gmail isn't linked yet: link it in the app, under Skills, then \
-                        Connectors, and the skill will start then.";
+        // The owner, 10 Nov ("đồng bộ luôn"): the model tells it in its own
+        // words and the conversation's language; no fixed sentence is said.
+        let ask = made_skill::needs_link_ask(&needs.clone().unwrap()).unwrap();
         let (on, link) = (
             next.find("I made morning mail, and it's on: reads your latest mail at eight")
                 .expect(next),
-            next.find(sentence).expect(next),
+            next.find(&ask).expect(next),
         );
         assert!(on < link, "{next}");
+        assert!(!next.contains("isn't linked yet"), "{next}");
+        assert_eq!(next.matches("Say exactly").count(), 1, "{next}");
         for linked in [Some(vec!["gmail".to_owned()]), None] {
             let needs = made_skill::needs_link(&gmail.uses, || linked.clone());
             let answer = told(Ok(gmail.clone()), Ok(()), needs.as_deref());
             assert!(answer.get("needs_link").is_none(), "{answer}");
-            assert!(!answer["next"].as_str().unwrap().contains("isn't linked"));
+            assert!(!answer["next"].as_str().unwrap().contains("Connectors"));
             assert_eq!(answer["made"], "morning-mail");
         }
         let plain = made(None);
