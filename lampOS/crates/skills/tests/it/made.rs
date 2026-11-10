@@ -134,7 +134,7 @@ fn a_made_skill_that_does_more_than_it_declares_or_may_is_not_kept() {
         "light = { dim = 1 }\nbody = { gesture = \"curious\" }",
     );
     let refused = keep(&answer(&gesture, "evening-dim"), false, "s1:8:1", &keeping).unwrap_err();
-    assert_eq!(refused.0, "it doesn't pass the lamp's check");
+    assert_eq!(refused.0, lamp_voice::made_skill::NOT_PASSED);
     // The check's own lines come back for a repair (#2813 piece 2).
     assert!(refused.1.is_some_and(|lines| !lines.is_empty()));
     let speaking = TOML.replace("light = true\n", "light = true\nspeak = true\n");
