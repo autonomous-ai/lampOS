@@ -2785,6 +2785,12 @@ EXAMPLE_RUNS = {
     "desk_health.py": ([], "stuffy", ("say", ("light", {"colour": "orange", "level": 2, "pattern": "breathe"}))),
     "greet.py": ([], "arrived", (("gesture", {"name": "greeting"}),)),
     "notes.py": ([], None, (("notes.get", {"key": "runs"}), ("notes.set", {"key": "runs", "value": 1}), ("light", {"colour": "warm", "level": 1}))),
+    # A long stretch at the desk (SIT_AFTER_S below): one slow tilt, counted in the day's note.
+    "posture.py": ([], "arrived", (
+        "lease.take",
+        ("move", {"frames": poses_to_frames([{"roll": 3, "pitch": 1}, {"roll": -2}], hold_ms=600)}),
+        ("notes.set", {"value": 1}),
+    )),
     "phrase.py": ([], "phrase", (("light", {"colour": "warm", "level": 2, "pattern": "breathe"}), ("gesture", {"name": "nod"}))),
     "pomodoro.py": ([], None, (("light", {"colour": "warm", "level": 2}),)),
     "push_skill.py": (["../examples/hello-skill"], None, ("skill.push",)),
@@ -2841,7 +2847,7 @@ def test_every_example_runs_against_a_fake_lamp_and_sends_what_it_is_for(tmp_pat
             await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, keyring=Keyring(home))
             ran = await asyncio.create_subprocess_exec(
                 sys.executable, str(examples / name), *args, cwd=home if name in WRITES_FILES else examples.parent,
-                env={**os.environ, "LAMPOS_HOME": str(home), "PYTHONUNBUFFERED": "1", "DESK_STUFFY_AFTER_S": "1"},
+                env={**os.environ, "LAMPOS_HOME": str(home), "PYTHONUNBUFFERED": "1", "DESK_STUFFY_AFTER_S": "1", "SIT_AFTER_S": "1"},
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
             )
             said = asyncio.ensure_future(ran.communicate())
