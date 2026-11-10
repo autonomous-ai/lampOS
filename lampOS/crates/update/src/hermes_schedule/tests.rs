@@ -194,6 +194,24 @@ fn someone_heard_freezes_it_and_the_quiet_stretch_thaws_it() {
     assert_eq!(watch.look(12 * MIN + 100, Ok(()), &read("a")), Act::Nothing);
 }
 
+/// No lease read with the slide known in the install's first second is
+/// said once, so an install with no privacy watch is not silent about it;
+/// a lease read in time says nothing.
+#[test]
+fn an_install_with_no_privacy_lease_says_so_once() {
+    let mut unseen = Watch::default();
+    assert_eq!(unseen.look(5_000, Ok(()), &Lease::Gone), Act::Nothing);
+    assert_eq!(unseen.no_lease_line(5_000), None);
+    assert_eq!(unseen.no_lease_line(5_999), None);
+    let line = unseen.no_lease_line(6_000).expect("said after 1 s");
+    assert!(line.contains("no privacy watch"), "{line}");
+    assert_eq!(unseen.no_lease_line(9_000), None, "said once");
+    let mut seen = Watch::default();
+    assert_eq!(seen.no_lease_line(0), None);
+    assert_eq!(seen.look(100, Ok(()), &read("a")), Act::Nothing);
+    assert_eq!(seen.no_lease_line(2_000), None);
+}
+
 /// Frozen 30 min in all, over one freeze or several, stops it as
 /// `interrupted`: never frozen for good, and inside the one-shot's hour.
 #[test]
