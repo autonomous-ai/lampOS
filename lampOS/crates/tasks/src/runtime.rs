@@ -7,7 +7,7 @@ use crate::{
     follow::{CliWatch, Follows, WatchLane},
     harness::{
         AccountMachine, CLOSE_BUDGET, Cli, CliConfig, Closed, Ended, EngineKind, EngineRow, Launch,
-        LaunchOutcome, Listed, MOST_WAITED, Observation, SignIn, Target,
+        LaunchOutcome, Listed, MOST_WAITED, Observation, SessionMachines, SignIn, Target,
     },
     now::Now as TasksNow,
     progress::{Reads, Tracker},
@@ -210,14 +210,32 @@ pub struct SetUpLater {
     /// computer is known offline, or its engine not found there or known not
     /// signed in ([`crate::readiness`]). Off unless set.
     pub engines: bool,
-    /// `LAMP_HERMES_ON_LAMP=on` (#5978), only with `engines`: the home
-    /// (`lampos`'s, as Harness's on the lamp) the lamp's own folder
-    /// [`LAMP_PROJECT`] is made under. The lamp's own machine is looked at
-    /// too, and kept as the target [`LAMP_TARGET`], engine Hermes, while
-    /// its look says Hermes is installed. A `prepare` goes there only when
-    /// asked for it, or when no computer of the person's is there but known
-    /// offline ([`crate::engine::Engine::lamp_on`]). `None`: off, as before.
-    pub lamp: Option<PathBuf>,
+    /// `LAMP_HERMES_ON_LAMP=on` (#5978), only with `engines`: the lamp's
+    /// own machine is looked at too, and kept as the target
+    /// [`LAMP_TARGET`], engine Hermes, while its look says Hermes is
+    /// installed ([`LampSide`]). `None`: off, as before.
+    pub lamp: Option<LampSide>,
+}
+
+/// `LAMP_HERMES_ON_LAMP` (#5978): what lamp-tasks keeps for the lamp's own
+/// Hermes. `home` is `lampos`'s (Harness's) home, under which its work
+/// folder [`LAMP_PROJECT`] is made; `machines`
+/// the machines a named hand-over to the lamp looks among for its session,
+/// kept from the targets as they are read and given to Harness's adapter
+/// ([`crate::harness::SessionMachines`]).
+#[derive(Clone, Debug, Default)]
+pub struct LampSide {
+    pub home: PathBuf,
+    pub machines: Arc<Mutex<SessionMachines>>,
+}
+
+impl LampSide {
+    pub fn new(home: PathBuf) -> Self {
+        Self {
+            home,
+            machines: Default::default(),
+        }
+    }
 }
 
 /// `serve --targets-from-machines` asks Harness for the machines once in
@@ -233,7 +251,17 @@ pub const MACHINES_PROJECT: &str = "~/harnesses/lamp-tasks";
 /// target, with Hermes, and the folder it works in there. Never a
 /// computer's alias: a computer whose name makes `lamp` is `lamp-2`.
 pub const LAMP_TARGET: &str = "lamp";
+/// Hermes' own settings, `HERMES_HOME`, as Harness finds its sessions by
+/// it too (openharness `config/env.ts`, `engines/hermes/home.ts`): outside
+/// `lampos`'s home, apart from Harness's sign-in and lamp-cloud's
+/// credentials.
+pub const HERMES_HOME: &str = "/var/lib/lampos-hermes/.hermes";
+/// The lamp's own work folder, under `lampos`'s (Harness's) home, beside
+/// the computers' [`MACHINES_PROJECT`].
 pub const LAMP_PROJECT: &str = "~/harnesses/lamp-tasks/lamp";
+/// lamp-cloud's loopback forwarder for Hermes' DeepSeek
+/// (`lamp_cloud::hermes_llm::PORT`).
+pub const HERMES_FORWARDER_PORT: u16 = 7741;
 
 /// How often `serve --set-up-later` looks at the targets and the sign-in.
 pub const SET_UP_LOOK_EVERY: Duration = Duration::from_secs(60);
@@ -1063,6 +1091,12 @@ fn owner<C: Clock>(
         {
             targets_due = Instant::now() + later.every;
             look_at_targets(&mut engine, &later.targets, &mut targets_seen, found);
+            // The machines a named hand-over to the lamp looks among (#5978).
+            if let Some(side) = later.lamp.as_ref()
+                && let Ok(mut machines) = side.machines.lock()
+            {
+                *machines = SessionMachines::from_targets(engine.targets());
+            }
             look_at_names(&mut engine, &later.targets, &mut names_said);
             if engines_on {
                 look_at_engines(&mut engine, &later.targets, &mut engines_read_said);
@@ -1127,11 +1161,11 @@ fn owner<C: Clock>(
                                     known.listed(&listed, unix_ms());
                                     let mut chosen = known.choices(&listed, wanted, unix_ms());
                                     // The lamp itself, with Hermes (#5978).
-                                    if let Some(home) = later.lamp.as_deref()
+                                    if let Some(side) = later.lamp.as_ref()
                                         && let Some(lamp) =
                                             known.lamp_with_hermes(&listed, unix_ms())
                                     {
-                                        make_lamp_folder(home);
+                                        make_lamp_folder(&side.home);
                                         chosen.insert(lamp, EngineKind::Hermes);
                                     }
                                     chosen
@@ -1956,8 +1990,8 @@ fn from_machines(
     (targets, names)
 }
 
-/// The lamp's own work folder, [`LAMP_PROJECT`] under `home`, `lampos`'s,
-/// as Harness's on the lamp (#5978): made here, 0700, since Harness makes
+/// The lamp's own work folder, [`LAMP_PROJECT`] under `home`, `lampos`'s
+/// (#5978): made here when it is not there, 0700, since Harness makes
 /// only a `~/harnesses/<name>` folder. A failure is said; the hand-over
 /// then says the folder is missing.
 fn make_lamp_folder(home: &Path) {
@@ -1965,12 +1999,44 @@ fn make_lamp_folder(home: &Path) {
     if folder.is_dir() {
         return;
     }
-    if let Err(error) = fs::DirBuilder::new()
+    let made = fs::DirBuilder::new()
         .recursive(true)
         .mode(0o700)
-        .create(&folder)
-    {
+        .create(&folder);
+    if let Err(error) = made {
         eprintln!("tasks: the lamp's own work folder not made: {error}");
+    }
+}
+
+/// `LAMP_HERMES_ON_LAMP` (#5978): Hermes' settings written at the part's
+/// start ([`crate::hermes_config::write`]) under `hermes_home`, for
+/// lamp-cloud's forwarder, with its local token read from `token_path`.
+/// Run as `lampos`, Hermes' own user (`hermes_config`). One journal line, never the token: a missing token skips it.
+pub fn set_up_hermes(hermes_home: &Path, token_path: &Path) -> String {
+    let token = match fs::read_to_string(token_path) {
+        Ok(token) => token,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            return "tasks: Hermes' settings not written: no forwarder token yet".to_owned();
+        }
+        Err(error) => {
+            return format!("tasks: Hermes' settings not written: the token not read ({error})");
+        }
+    };
+    match crate::hermes_config::write(hermes_home, HERMES_FORWARDER_PORT, token.trim()) {
+        Ok(written) => format!(
+            "tasks: Hermes' settings for the lamp's DeepSeek: config {}, env {}",
+            if written.config_changed {
+                "written"
+            } else {
+                "unchanged"
+            },
+            if written.env_changed {
+                "written"
+            } else {
+                "unchanged"
+            }
+        ),
+        Err(error) => format!("tasks: Hermes' settings not written: {error}"),
     }
 }
 
@@ -2961,6 +3027,22 @@ pub fn serve<C: Clock>(
             executable.display()
         );
     }
+    // The lamp's own Hermes (#5978), only with the machines' engines looked
+    // at: its settings written now, and Harness told where its sessions are.
+    let lamp_side = config
+        .set_up_later
+        .as_ref()
+        .filter(|later| later.engines && later.from_machines.is_some())
+        .and_then(|later| later.lamp.clone());
+    if lamp_side.is_some() {
+        eprintln!(
+            "{}",
+            set_up_hermes(
+                Path::new(HERMES_HOME),
+                Path::new(crate::hermes_config::TOKEN_PATH)
+            )
+        );
+    }
     serve_with_adapter(config, clock, stop, move |session| {
         // Harness's launcher in its pinned shape with the update hold
         // (#5493), so a Harness command run by hand holds it too; a
@@ -2977,21 +3059,34 @@ pub fn serve<C: Clock>(
         let mut cli = CliConfig::new(executable);
         cli.cancel = Some(cancelled);
         switches.apply(&mut cli, &dir, from_machines);
-        // Harness held at the version installed (#5229), off unless set.
-        if crate::hold::on(std::env::var(crate::hold::SWITCH).ok().as_deref()) {
-            match crate::hold::hold(&mut cli.environment) {
+        // Harness held at the version installed (#5229), off unless set;
+        // and where the lamp's own Hermes keeps its sessions (#5978).
+        let held = crate::hold::on(std::env::var(crate::hold::SWITCH).ok().as_deref());
+        let hermes = lamp_side.as_ref().map(|_| Path::new(HERMES_HOME));
+        if held || hermes.is_some() {
+            match crate::hold::env_file(&mut cli.environment, held, hermes) {
                 Ok(path) => {
-                    eprintln!(
-                        "tasks: Harness's own updates held ({}=true, {}={})",
-                        crate::hold::DISABLE,
-                        crate::hold::ENV_FILE,
-                        path.display()
-                    );
-                    cli.health_after_start = true;
+                    if held {
+                        eprintln!(
+                            "tasks: Harness's own updates held ({}=true, {}={})",
+                            crate::hold::DISABLE,
+                            crate::hold::ENV_FILE,
+                            path.display()
+                        );
+                        cli.health_after_start = true;
+                    }
+                    if hermes.is_some() {
+                        eprintln!(
+                            "tasks: Harness finds the lamp's own Hermes by {}={HERMES_HOME}",
+                            crate::hold::HERMES_HOME
+                        );
+                    }
                 }
-                Err(why) => eprintln!("tasks: Harness's own updates not held: {why}"),
+                Err(why) if held => eprintln!("tasks: Harness's own updates not held: {why}"),
+                Err(why) => eprintln!("tasks: Harness not told of the lamp's own Hermes: {why}"),
             }
         }
+        cli.session_machines = lamp_side.as_ref().map(|side| side.machines.clone());
         Cli::new(cli, session.into()).map(|cli| Production::Cli(Box::new(cli)))
     })
 }
@@ -3028,9 +3123,6 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     )
     .map_err(io::Error::other)?;
     engine.close_told(config.close_told);
-    engine.lamp_on(config.set_up_later.as_ref().is_some_and(|later| {
-        later.lamp.is_some() && later.engines && later.from_machines.is_some()
-    }));
     if let Some(version) = config.targets_newer {
         engine.targets_newer(version);
     }
@@ -4317,6 +4409,48 @@ mod tests {
             read_targets(&path).unwrap().keys().collect::<Vec<_>>(),
             ["lamp"]
         );
+    }
+
+    /// #5978: Hermes' settings at the part's start: skipped with one line
+    /// while lamp-cloud has no token, written for the forwarder once it has,
+    /// Harness's hooks kept, and the token never in the line.
+    #[test]
+    fn hermes_settings_are_written_at_start_only_with_a_token() {
+        let dir = tempfile::tempdir().unwrap();
+        let hermes = dir.path().join(".hermes");
+        let token = dir.path().join("hermes-token");
+        let said = set_up_hermes(&hermes, &token);
+        assert_eq!(
+            said,
+            "tasks: Hermes' settings not written: no forwarder token yet"
+        );
+        assert!(!hermes.exists());
+        let secret = "0123456789abcdef".repeat(4);
+        fs::write(&token, format!("{secret}\n")).unwrap();
+        fs::create_dir_all(&hermes).unwrap();
+        fs::write(
+            hermes.join("config.yaml"),
+            "hooks:\n  on_session_start: harness\n",
+        )
+        .unwrap();
+        let said = set_up_hermes(&hermes, &token);
+        assert_eq!(
+            said,
+            "tasks: Hermes' settings for the lamp's DeepSeek: config written, env written"
+        );
+        assert!(!said.contains(&secret));
+        let config = fs::read_to_string(hermes.join("config.yaml")).unwrap();
+        assert!(
+            config.contains("hooks:\n  on_session_start: harness"),
+            "{config}"
+        );
+        assert!(config.contains("127.0.0.1:7741/v1/deepseek"), "{config}");
+        assert!(
+            fs::read_to_string(hermes.join(".env"))
+                .unwrap()
+                .contains(&secret)
+        );
+        assert!(set_up_hermes(&hermes, &token).ends_with("config unchanged, env unchanged"));
     }
 
     /// #1676: the part writes the targets file only where it is its own: none
