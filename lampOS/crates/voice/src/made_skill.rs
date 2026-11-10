@@ -2943,8 +2943,14 @@ pub const SEEN_WITH_THE_REPO: &str = "anyone who can see that repo can see it";
 /// (`lamp_skills::service_write`). None for a write the lamp can't send.
 fn write_plainly(step: &toml::Value) -> Option<String> {
     let step = step.as_table().filter(|step| step.len() == 1)?;
-    let content = write_content(step.get("write")?)?;
-    lamp_services::skill_writes::check(&content).ok()?;
+    write_said(&write_content(step.get("write")?)?)
+}
+
+/// A write's content (as [`writes_of`] keeps it) in the say-back's plain
+/// words: what the lamp must have said whole before its yes is taken
+/// (`crate::skill_write_yes`, App Only's P1 on #6142).
+pub fn write_said(content: &Value) -> Option<String> {
+    lamp_services::skill_writes::check(content).ok()?;
     let text = |key: &str| content.get(key).and_then(Value::as_str);
     let quoted = |key: &str| text(key).map(|text| format!("“{text}”"));
     let saying = quoted("text")
@@ -2956,9 +2962,9 @@ fn write_plainly(step: &toml::Value) -> Option<String> {
         (_, "send_mail") => {
             let mut said = format!(
                 "mails {} from your {name}",
-                and_list(&addresses_of(&content, "to"))
+                and_list(&addresses_of(content, "to"))
             );
-            let cc = addresses_of(&content, "cc");
+            let cc = addresses_of(content, "cc");
             if !cc.is_empty() {
                 said.push_str(&format!(", copying {}", and_list(&cc)));
             }
@@ -2975,7 +2981,7 @@ fn write_plainly(step: &toml::Value) -> Option<String> {
             if let (Some(start), Some(end)) = (text("start"), text("end")) {
                 said.push_str(&format!(" from {start} to {end}"));
             }
-            let guests = addresses_of(&content, "attendees");
+            let guests = addresses_of(content, "attendees");
             if !guests.is_empty() {
                 said.push_str(&format!(", inviting {}", and_list(&guests)));
             }
@@ -3852,6 +3858,11 @@ pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Ma
 pub struct Asked<'a> {
     pub request: &'a str,
     pub own: Vec<(String, String)>,
+    /// The line heard for a make by voice, the person's own words: a
+    /// write's words and recipients are held to it, never to the model's
+    /// `request` argument, which may carry a read's (App Only's P1 on
+    /// #6142). `None` for the app's typed ask, held to `request`.
+    pub heard: Option<&'a str>,
 }
 
 /// [`keep`], with the person's request: the times of day it named
@@ -3883,9 +3894,11 @@ pub fn keep_asked(
     // packed is the paced one.
     files.toml = paced_asked(&files.toml, asked);
     let (version, uses) = capped(&files.toml)?;
-    // A write's words and recipients are the request's own (#6066).
+    // A write's words and recipients are the request's own (#6066): the
+    // heard line's, for a make by voice.
     if !uses.writes.is_empty() {
-        write_from_request(&files.toml, request.request, &request.own)?;
+        let words = request.heard.unwrap_or(request.request);
+        write_from_request(&files.toml, words, &request.own)?;
     }
     // Said only once the check has passed: its lines, which name the
     // field, go to a repair before these do.

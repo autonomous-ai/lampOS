@@ -185,7 +185,7 @@ socket's group can't tell `lamp-cloud` from another `lampos` process:
   | `{"op":"remove","code":"gmail"}` | `{"ok":true}` |
   | `{"op":"wipe"}` | `{"ok":true}` |
   | `{"op":"list"}` | `{"ok":true,"connected":[{"code":"gmail","account":"a@b.c","expired":false}]}` |
-  | `{"op":"skill_write_approve","skill":"<name>","writes":[...]}`, the app's yes to a made skill's writes (with `LAMP_SKILL_WRITES=on`; "A made skill's write", below) | `{"ok":true,"result":{"approved":N,"public":["owner/name"]}}` |
+  | `{"op":"skill_write_approve","skill":"<name>","writes":[...],"sha256"?}`, the app's yes to a made skill's writes (with `LAMP_SKILL_WRITES=on`; `sha256`, optional, the package the yes was said to, refused unless it is the one installed; "A made skill's write", below) | `{"ok":true,"result":{"approved":N,"public":["owner/name"]}}` |
 
   A line with a field its op doesn't take, or a code the catalogue doesn't
   know, is refused without repeating it.
@@ -1914,8 +1914,12 @@ whole):
   the voice's memory for 120 s (`crate::skill_write_yes`). An agreement
   in any words, judged by the model, is a `make_skill` call with only
   the `approve_id` it was given, in a later heard request on the second
-  route. The voice then calls `skill_write_approve` itself
-  (`services::skill_write_approve`). Its answer's `public` repositories
+  route, once the lamp's own words in one answer, as played and uncut,
+  held the whole say-back of each write (else it is said again and the
+  wait goes on). The voice then calls `skill_write_approve` itself
+  (`services::skill_write_approve`), with the `sha256` of the package
+  said back: `lamp-services` refuses "the skill on the lamp is not the
+  one said back" when another is installed. Its answer's `public` repositories
   are said as "anyone can see" what it posts. While the yes is awaited, a
   line made only of the lamp's own words, begun over its voice or within
   the 1.5 s echo tail, is held even in the private room

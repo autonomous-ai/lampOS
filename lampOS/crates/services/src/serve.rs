@@ -162,7 +162,7 @@ pub fn parse_admin(line: &str) -> Result<Admin, String> {
         Some("remove") if only(&["op", "code"]) => Ok(Admin::Remove(code()?)),
         Some("wipe") if only(&["op"]) => Ok(Admin::Wipe),
         Some("list") if only(&["op"]) => Ok(Admin::List),
-        Some(skill_writes::APPROVE) if only(&["op", "skill", "writes"]) => {
+        Some(skill_writes::APPROVE) if only(&["op", "skill", "writes", "sha256"]) => {
             let mut args = value.clone();
             if let Some(args) = args.as_object_mut() {
                 args.remove("op");
@@ -581,8 +581,9 @@ impl<H: Http, M: Mail> Services<H, M> {
     /// The owner's yes to a made skill's writes (#6066), from the voice's
     /// yes path (the tools socket, its cgroup alone) or the app
     /// (`lamp-cloud`, the admin socket), never `lamp-skills`; who said yes
-    /// is not checked. `{"skill", "writes": [content, ...]}`, each content
-    /// exactly as its skill file has it. Each is checked and its service
+    /// is not checked. `{"skill", "writes": [content, ...], "sha256"?}`,
+    /// each content exactly as its skill file has it; `sha256`, when given,
+    /// the package the yes was said to, which must be the one installed. Each is checked and its service
     /// must be linked now; its hash is kept with the link it is approved
     /// under ([`skill_writes::link_of`]), replacing what the skill had.
     /// An empty list takes the skill's approvals away.
@@ -606,6 +607,18 @@ impl<H: Http, M: Mail> Services<H, M> {
             .ok_or("writes is a list of the skill's writes")?;
         let package = skill_writes::installed_package(&self.skills_dir, skill)
             .ok_or("the skill is not on the lamp as a package: nothing was approved")?;
+        // The package the yes was said to, when the asker names it: another
+        // package of the skill's name put on since (made again, updated) is
+        // never approved by it.
+        match args.get("sha256") {
+            None => {}
+            Some(said) if said.as_str() == Some(package.as_str()) => {}
+            Some(_) => {
+                return Err(
+                    "the skill on the lamp is not the one said back: nothing was approved".into(),
+                );
+            }
+        }
         let mut approved = Vec::new();
         // The repositories anyone can see, for the voice to say so.
         let mut public = Vec::new();
@@ -2556,6 +2569,40 @@ mod tests {
         // A field it doesn't take is refused whole.
         let extra = json!({"op":"skill_write_approve","skill":"x","writes":[],"code":"gmail"});
         assert_eq!(run(on.admin(&extra.to_string())).0["ok"], false);
+    }
+
+    /// A yes naming the package it was said to (`sha256`) approves only
+    /// that package: another put on under the skill's name since is refused.
+    #[test]
+    fn a_yes_naming_its_package_approves_only_that_package() {
+        let dir = tempfile::tempdir().unwrap();
+        put_on(dir.path(), "arrive-mail", "1");
+        let on = services(dir.path(), "{}", true).with_skill_writes(true);
+        run(on.admin(&app_password_gmail("me@home.test")));
+        let said_to =
+            skill_writes::installed_package(&dir.path().join("skills"), "arrive-mail").unwrap();
+        let yes = |sha256: &str| {
+            json!({"op":"call","name":"skill_write_approve","args":{
+                "skill":"arrive-mail","writes":[arrival_mail()],"sha256":sha256}})
+            .to_string()
+        };
+        // Made again under its name before the yes: refused, nothing kept.
+        put_on(dir.path(), "arrive-mail", "2");
+        let refused = run(on.tool(&yes(&said_to)));
+        assert_eq!(
+            refused["error"],
+            "the skill on the lamp is not the one said back: nothing was approved",
+            "{refused}"
+        );
+        let line = skill_write_line("arrive-mail", &arrival_mail());
+        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        // The package installed now: approved, and from the app's door too.
+        let now =
+            skill_writes::installed_package(&dir.path().join("skills"), "arrive-mail").unwrap();
+        assert_eq!(run(on.tool(&yes(&now)))["result"]["approved"], 1);
+        let admin = json!({"op":"skill_write_approve","skill":"arrive-mail",
+                           "writes":[arrival_mail()],"sha256":now});
+        assert_eq!(run(on.admin(&admin.to_string())).0["result"]["approved"], 1);
     }
 
     /// #6066: a made skill's write goes only as the owner approved it,
