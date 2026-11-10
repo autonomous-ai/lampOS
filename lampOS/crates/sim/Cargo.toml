@@ -20,6 +20,9 @@ lamp-ipc = { path = "../ipc" }
 lamp-msgs = { path = "../msgs" }
 serde.workspace = true
 serde_json.workspace = true
+# The eyes' own JPEG decoder and encoder: the warped camera picture.
+zune-jpeg = "=0.4.21"
+jpeg-encoder = "=0.7.1"
 rustix = { version = "=1.1.5", features = ["fs", "pty", "termios", "event", "process"] }
 
 [lints]
