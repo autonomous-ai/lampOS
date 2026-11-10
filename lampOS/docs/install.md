@@ -1232,9 +1232,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      never rewrites `lamp-update.service`, so a pin or switch written there
      would reach only a lamp installed after it. Instead the pinned Harness
      manifest itself is compiled into lamp-update (`product::MANIFEST`, from
-     `deploy/harness/cli-0.5.39.metadata.json`, a byte-for-byte copy of
+     `deploy/harness/cli-0.6.2.metadata.json`, a byte-for-byte copy of
      Harness's CDN manifest `https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/cli/metadata.json`
-     when it named 0.5.39). The signed manifest names lamp-update by its
+     when it named 0.6.2; 0.5.98 or newer is needed for Hermes on the lamp, openharness#3807, #5978). The signed manifest names lamp-update by its
      SHA-256, so the build's Ed25519 signature covers the pin (#3693's
      decision (a): a sha256 pin in our signed manifest is enough, as Harness
      signs nothing). Nothing is fetched or hosted for it: the one-shot checks
@@ -1249,7 +1249,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      never reads it again from its server.
      After the install, `harness
      version` is compared with the manifest's `cli.version` and journaled:
-     `Harness 0.5.39 is the pinned version`, or `Harness says version …, not
+     `Harness 0.6.2 is the pinned version`, or `Harness says version …, not
      the pinned …`. Another version, or none, is recorded `failed` with
      `version`, not `installed`, so the app can tell it apart. Harness is
      still there and lamp-tasks is still started again. While Harness is
@@ -1376,9 +1376,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
          (`UPGRADE_RETRY_AFTER`). If the copy cannot be put back and
          Harness is then missing, the next round installs it as on a lamp
          without it.
-       - **Shown only in tests**; the move from 0.5.39 to a newer pin on a
-         lamp, signed in and handing work over after, is a lamp row (#5957,
-         part 3).
+       - **Shown only in tests**; the move to a newer pin on a lamp, signed in and handing work over
+         after, was shown on lamp-c0a4 on 10 Nov (0.5.62 to 0.5.95, and 0.5.95
+         to 0.6.2 with #5978's row).
      - **Held there:** Harness's own self-update is held by lamp-tasks'
        `LAMP_HARNESS_HOLD_UPDATES` (tasks.md, "Harness held at its pinned
        version"). A Team account ignores it. With that switch on in
