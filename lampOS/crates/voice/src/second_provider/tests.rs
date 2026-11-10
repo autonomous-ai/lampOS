@@ -3232,6 +3232,73 @@ async fn a_walk_owned_onboarding_line_is_said_in_its_words_and_never_asked_of_th
     assert!(calls.lock().unwrap().is_empty());
 }
 
+/// #5999 (V2's trap on #6105): the walk's face question, now its own line,
+/// is said with no chat, yet still kept in the conversation as the lamp's
+/// words, the way the worker keeps a turn (its written note, then each
+/// output): the person's "Yes." after it runs the setup save on the name
+/// read back (`known_faces::face_agreed_name`, #6013's names window), and
+/// the model is told it was said.
+#[tokio::test(start_paused = true)]
+async fn the_walks_own_face_question_is_kept_as_said_and_its_yes_names_the_face() {
+    let _one = crate::provider_worker::tests::one_thread();
+    let kept = std::mem::take(
+        &mut *crate::thread::THREAD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()),
+    );
+    let now = Instant::now();
+    {
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        thread.person("My name is Walter.", true, now);
+        thread.lamp(1, "Walter, did I get that right?", now);
+        thread.person("Yes. That's my name.", true, now);
+        thread.lamp(2, "Yes, that's your name settled, then.", now);
+    }
+    let note = crate::onboarding::own_line(crate::onboarding::skill::FACE_ASK.to_owned());
+    let script = Arc::new(Script {
+        chats: Mutex::new([vec![text("Something else."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (mut engine, calls, _) = scripted(script.clone());
+    crate::thread::THREAD.lock().unwrap().written(3, &note);
+    engine.submit(written(3, &note));
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(10), engine.next())
+            .await
+            .expect("the turn ends");
+        super::worker::keep(&event, None);
+        if matches!(
+            event,
+            ProviderOutput::TurnComplete { .. } | ProviderOutput::TurnFailed { .. }
+        ) {
+            break;
+        }
+    }
+    assert!(script.asked.lock().unwrap().is_empty());
+    assert!(calls.lock().unwrap().is_empty());
+    let (said, history) = {
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        thread.person("Yes.", true, now);
+        let said = thread.names_window(crate::known_faces::SAID_EXCHANGES);
+        (
+            said,
+            format!("{:?}", thread.recent(now, Duration::from_secs(600), 10)),
+        )
+    };
+    *crate::thread::THREAD
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = kept;
+    assert_eq!(
+        crate::known_faces::face_agreed_name(&said).as_deref(),
+        Some("Walter"),
+        "{said:?}"
+    );
+    assert!(
+        history.contains("May I remember your face, so I know you next time?"),
+        "{history}"
+    );
+}
+
 /// #1712, the first builder at 16:04: a spoken line whose chat the route
 /// gave up, not begun within `BEGIN_WITHIN`, is no talk the lamp left
 /// alone. Two of them don't end the conversation, and the person's next
