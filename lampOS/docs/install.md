@@ -1487,8 +1487,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        (`/var/lib/lampOS/voice/onboarding/progress.json`, or the file the
        voice unit's `LAMP_ONBOARDING_FILE` names), within 6 h
        (`AFTER_WALK_LASTS`), for the first try since (a try recorded
-       `installing` or `failed` after it waits for the night); or the
-       quiet hour at night, 01:00 up to 05:00 local
+       `installing` or `failed` after it waits for the night); or, by
+       day, the first quiet stretch of a lamp that never tried (no
+       `installing` or `failed` record: one that just took the update with
+       Hermes on, so it is usable the same day; the first builder's day
+       window, 11 Nov on #6059), and a try after it waits for the night; or
+       the quiet hour at night, 01:00 up to 05:00 local
        (`NIGHT_FROM_MINUTE`, `NIGHT_TO_MINUTE`), in the lamp's zone
        (`/etc/localtime`, which setup points at the phone's zone, read by
        `lamp-local-time` as the other parts read it). A wall clock before

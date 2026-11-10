@@ -12,7 +12,8 @@
 //!    setup walk is under way; only in a quiet stretch, nobody heard and
 //!    the voice resting for [`QUIET_STRETCH`]; and then either right after
 //!    the setup walk ended (its first try since, within
-//!    [`AFTER_WALK_LASTS`]) or in the quiet hour at night
+//!    [`AFTER_WALK_LASTS`]), by day at the first quiet stretch of a lamp
+//!    that never tried (it just took the update), or in the quiet hour at night
 //!    ([`NIGHT_FROM_MINUTE`] to [`NIGHT_TO_MINUTE`], the lamp's own time).
 //!    Harness's own install is not held by it.
 //! 2. **While someone speaks** ([`Watch`]): the one-shot's cgroup is frozen
@@ -92,6 +93,11 @@ pub enum Window {
     AfterWalk,
     /// The quiet hour at night.
     Night,
+    /// By day, the first quiet stretch of a lamp that never tried: one
+    /// that took the update with Hermes on (the first builder's day
+    /// window, 11 Nov 01:15 on #6059), so it is usable the same day. A try
+    /// that failed or was stopped waits for the night.
+    AfterUpdate,
 }
 
 impl Window {
@@ -99,6 +105,7 @@ impl Window {
         match self {
             Self::AfterWalk => "the first quiet stretch after the setup walk",
             Self::Night => "the quiet hour at night",
+            Self::AfterUpdate => "the first quiet stretch after the update, by day",
         }
     }
 }
@@ -123,6 +130,9 @@ pub fn window(moment: &Moment) -> Result<Window, String> {
         && moment.tried_unix_ms.is_none_or(|tried| tried < ended)
     {
         return Ok(Window::AfterWalk);
+    }
+    if moment.tried_unix_ms.is_none() {
+        return Ok(Window::AfterUpdate);
     }
     match moment.local_minute.filter(|_| clock_set) {
         Some(minute) if (NIGHT_FROM_MINUTE..NIGHT_TO_MINUTE).contains(&minute) => Ok(Window::Night),
