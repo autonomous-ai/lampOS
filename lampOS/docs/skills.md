@@ -2162,11 +2162,18 @@ gone ([switches.md](switches.md)). What happens:
      `[budget]` always `wellbeing` with `per_hour` 1-2 (no other key), and
      `[rest] after_ignored` to 1-3 (0 or less is 1); `[quiet]` is always
      22:00-08:00, left out only when the trigger's `during` lies wholly
-     within 08:00-22:00 or is at most 3 hours long, a time the person asked
-     for in their own words, which runs as said, night or not (the
-     coordinator's ruling on #6103: "dim the light at ten", 22:00-22:30,
-     runs at 22:10; test `a_made_evening_dim_runs_at_ten_past_ten`); a
-     wider one, such as all day, keeps it. The
+     within 08:00-22:00, or runs at a time the request's own words name:
+     at most 3 hours, within a window `made_skill::asked_windows` reads
+     from the person's words ("from 22:00 to 22:30"; a single time, "at 10
+     pm", "at ten tonight", "lúc 10 giờ tối", is it and the hour after; a
+     bare "at ten" either morning or evening), passed by the maker
+     (`make_skill_local`) to `made_skill::keep_asked`. That runs as said,
+     night or not ("dim the light at ten tonight", 22:00-22:30, runs at
+     22:10; test `a_made_evening_dim_runs_at_ten_past_ten`). A window the
+     model chose alone (a request with no time), or a wider one such as all
+     day, keeps it (Thirteen's HOLD follow-up on #6103; tests
+     `the_night_stays_quiet_unless_its_window_is_within_the_day`,
+     `the_times_a_request_names_are_read_from_its_words`). The
      floors of #6062 and #6070 (`made_skill::say_paced`: a say's hour, a
      face's minute away, a getting up's minute, stuffy air's hour) apply
      too. A trigger on one person's face (a `name`, `known` or `who` key) is
@@ -2177,7 +2184,13 @@ gone ([switches.md](switches.md)). What happens:
      rests till morning if ignored twice." (`made_skill::manners_plainly`;
      one in a shape the lamp couldn't set is unsaid and repaired). A made
      skill installs into the lamp's skills folder, not the pushed folder,
-     so it may join the group. Tests:
+     so it may join the group. It is kept only with all four at these
+     values and no unused grant (`made_skill::manners_kept`, Thirteen's and
+     App Only's P2 on 355d255189): dotted keys (`quiet.from`,
+     `permissions.messages`) and multi-line text are set like any other,
+     and a shape the lamp can't set (an inline `permissions = { … }`) is
+     unsaid as "parts manners" and repaired, never kept unmannered. Tests:
+     `a_skill_is_never_kept_without_its_manners_whatever_its_shape`,
      `a_self_starting_made_skill_is_given_manners_not_refused`,
      `a_made_skills_manners_are_clamped_to_their_bounds`,
      `the_night_stays_quiet_unless_its_window_is_within_the_day`, and
