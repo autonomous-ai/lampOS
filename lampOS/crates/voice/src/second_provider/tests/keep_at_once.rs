@@ -533,3 +533,40 @@ fn an_ordinary_article_paraphrase_can_still_be_answered_at_once() {
     assert_eq!(went.asked.len(), 1, "{went:?}");
     assert_eq!(went.said(), vec![KEPT]);
 }
+
+/// A successful tool result cannot fast-confirm the opposite of the heard fact.
+#[test]
+fn an_added_negation_goes_to_round_two_like_off() {
+    for text in [
+        "Doesn't like tea.",
+        "Does not like tea.",
+        "Never likes tea.",
+    ] {
+        let turn = |on| {
+            keep_turn(
+                on,
+                "Remember that I like tea",
+                keeping_text(text),
+                vec![words("Let me check that fact.")],
+                kept,
+            )
+        };
+        let off = turn(false);
+        let on = turn(true);
+        assert_eq!(off.asked.len(), 2);
+        assert_eq!(on, off, "{text}");
+    }
+}
+
+#[test]
+fn an_equivalent_negation_stays_fast() {
+    let went = keep_turn(
+        true,
+        "Remember that I don't like tea",
+        keeping_text("Doesn't like tea."),
+        vec![words("The second round.")],
+        kept,
+    );
+    assert_eq!(went.asked.len(), 1, "{went:?}");
+    assert_eq!(went.said(), vec![KEPT]);
+}

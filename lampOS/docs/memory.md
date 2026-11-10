@@ -1310,7 +1310,10 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   "a": an incidental article cannot cover a changed letter value. Split,
   reordered or uncertain article paraphrases take round 2; unchanged
   "blood type A" and "I have a cat" kept as "Has a cat" remain fast.
-  This is conservative lexical coverage. A line with a
+  Added negation also takes round 2: "I like tea" kept as "Doesn't like
+  tea" cannot receive the fixed acknowledgment. Equivalent contracted
+  negations remain fast. This is conservative lexical coverage, not a
+  check of which clause each negation belongs to. A line with a
   question word or shape in it, English or Vietnamese, with or without
   its "?" (`keep_at_once::asks_a_question`: "… in the drawer where are
   they"), goes to round 2, as does a keep asked in words other than

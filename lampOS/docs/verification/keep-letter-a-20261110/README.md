@@ -139,3 +139,65 @@ cargo +1.96.0 build --offline -q --workspace
 The controller hashes both changed Rust
 files and all three behavior docs before and after each stage. The
 verification README is outside that source guard so results can be recorded.
+
+## Added-negation follow-up, 10 November
+
+Thirteen's HOLD 6758394575 found the converse of the earlier lost-negation
+case: "I like tea" kept as "Doesn't like tea" passed the one-way subset
+check. On local carry 07b3b689a (base 90d9948c4), an expanded standalone
+probe reproduced five added-negation failures in 22 cases, exit 1. The
+repair compares the presence of the marker emitted by `not_in` on both
+sides, after the same normalization. All 22 cases then passed, exit 0.
+The probe controller itself exits zero after writing its result; these
+exit codes are the tested binaries' codes, recorded in their JSON receipts.
+
+Measured over the same 1,000 coverage calls, first / median / p99 / maximum
+elapsed time was 185.498 / 110.612 / 163.656 / 619.432 us before, and
+280.102 / 114.107 / 222.789 / 570.515 us after. Both samples meet the 1 ms
+coverage-only target. No network, real memory-store or device measurement.
+Artifacts are `negation-before` and `negation-after` under the same scratch
+probe directory. New unit and actual Engine tests cover added negation
+falling through to round 2 and equivalent negation staying fast. Native
+results are recorded below; older passes and reads do not qualify this repair.
+
+This remains lexical coverage. Matching the presence of negation does not
+prove its scope in multiple clauses, nor repair the separately reported
+question-word and other value-token limitations. The product switch stays off.
+
+### Native follow-up and train 767 rebase
+
+On 07b3b689a plus the six-file repair / base 90d9948c4, formatting passed
+in 18.618 s, strict workspace/all-target Clippy in 212.207 s, and all 23
+focused keep-at-once module/Engine cases passed (zero failed or ignored,
+1.47 s body; 190.350 s command). Full Voice failed: 5,477 passed, two failed,
+16 ignored, 761.24 s body / 829.868 s command. Both failures were extra
+HTTP requests: `a_look_never_gets_a_second_try` counted two versus one, and
+`a_round_after_a_tool_never_gets_a_second_try` counted three versus two.
+The latter calls check_the_time, not remember. Their test/fixture source is
+unchanged by this repair; the origin of the extra requests is unproven.
+
+Each exact diagnostic passed once (3.582 and 2.246 s command). Remaining
+integration targets passed 279 cases / six ignored, binaries/examples eleven,
+and documentation tests zero cases. Workspace build passed in 222.786 s.
+Every guarded file hash stayed equal. The full suite was not rerun to obtain
+a green result; diagnostic passes do not erase its failure. Exact commands,
+logs and hashes: `/tmp/fourth-keep-negation-native-*` and
+`/tmp/fourth-keep-negation-remaining-*`.
+
+The carry then rebased to 138624c7996ea986c3260b1f2cf0ebaee3f5382f on
+train 767, b3e2d0903fb9a9a5fd34c41d84af761f9db3413c. Its one carried patch
+is range-diff equal and every addition/deletion in all six repair files was
+preserved. The first sandboxed rebase could not write the worktree index;
+no rebase started or source changed. The permitted retry completed.
+Current-base formatting passed in 19.371 s and strict workspace/all-target
+Clippy in 182.382 s. Focused Engine/module tests passed 23 / zero failed or
+ignored (2.00 s body; 213.898 s command). Integration passed 279 / six ignored
+(101.735 s command), and workspace build passed in 106.539 s. All six
+guarded file hashes remained identical throughout these gates. Commands,
+logs and hashes are in `/tmp/fourth-keep-negation-train767-receipt.json`. Fresh full ARM CI is required,
+under joining.md's unchanged timed-test rule; no older native or CI run is
+relabeled as testing this runtime. This is not ready or activated.
+
+### First-use timing of the added-negation path
+
+A separate probe measures the new negation branch on its first call, rather than the A-to-B early-return path used by the mixed-case probe's first measurement. Both source epochs use “Remember that I like tea” / “Doesn't like tea.” The first result changes from true (incorrect acceptance) to false. First / median / p99 / maximum elapsed time across the first call and 1,000 repeated calls: before 305.315 / 147.211 / 271.467 / 419.461 us; after 306.088 / 189.378 / 289.616 / 414.235 us. Both meet the 1 ms coverage-call target in this sample. The native gate was also running on this host; no scheduler or device inference. Process startup is outside the measured boundary. The mixed 22-case sample is retained separately, not replaced. Source hashes/commands/logs are in /tmp/fourth-keep-letter-probe/negation-path-receipt.json and negation-path-{before,after}.{rs,log}. The after-source hash matches the current production prefix exactly.

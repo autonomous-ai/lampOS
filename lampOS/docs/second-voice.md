@@ -995,6 +995,10 @@ order is kept. A written turn is the same from the chat on.
     and "not", so "I don't like tea" kept "Likes tea." goes to round 2 and
     kept "Doesn't like tea." stays fast; one letter alone is a word, so
     "blood type O" kept "type A" goes to round 2 (Thirteen's P3 on #5565).
+    Presence of negation must also agree in both directions: "I like tea"
+    kept as "Doesn't like tea" goes to round 2. This uses the same folded
+    negation marker, so "don't", "do not" and "doesn't" remain equivalent.
+    It does not associate negation with individual clauses of a mixed fact.
     For standalone "a" in the requested payload, an additional conservative
     check requires one kept text with the same ordered normalized content,
     retaining every "a". "Blood type A" kept as "Blood type B" therefore

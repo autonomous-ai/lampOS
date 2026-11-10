@@ -272,7 +272,9 @@ fn compared(words: &[String]) -> Vec<String> {
 /// one kept text with the same ordered content, retaining every "a": an
 /// incidental article cannot cover a requested letter value. Split or
 /// reordered such paraphrases defer; "i" remains an existing exclusion.
-/// This is conservative lexical coverage, not semantic equivalence.
+/// Adding or dropping negation also defers, including contracted spellings.
+/// This is conservative lexical coverage, not semantic equivalence: it does
+/// not associate a negation with individual clauses in mixed statements.
 pub fn covers(said: &str, kept: &[&str]) -> bool {
     let mut heard = crate::known_faces::lower_words(said);
     if let Some((at, len)) = (0..heard.len()).find_map(|at| {
@@ -330,6 +332,11 @@ pub fn covers(said: &str, kept: &[&str]) -> bool {
         .into_iter()
         .filter(|word| !nothing.contains(word))
         .collect();
+    // compared emits "not" for every spelling recognized by not_in. A
+    // one-way subset check alone would accept a newly negated kept fact.
+    if kept.iter().any(|word| word == "not") != content.iter().any(|word| word == "not") {
+        return false;
+    }
     !content.is_empty() && content.iter().all(|word| kept.contains(word))
 }
 
@@ -546,6 +553,27 @@ mod tests {
         assert!(!covers(
             "Remember that I like tea tell me about it",
             &["Likes tea."]
+        ));
+    }
+
+    #[test]
+    fn a_negation_added_to_the_kept_text_goes_to_round_2() {
+        for kept in [
+            "Doesn't like tea.",
+            "Does not like tea.",
+            "Doesnt like tea.",
+            "Never likes tea.",
+        ] {
+            assert!(!covers("Remember that I like tea", &[kept]), "{kept}");
+        }
+        assert!(!covers("Remember that I can swim", &["Cannot swim."]));
+        assert!(covers(
+            "Remember that I don't like tea",
+            &["Doesn't like tea."]
+        ));
+        assert!(covers(
+            "Remember that I do not like tea",
+            &["Doesn't like tea."]
         ));
     }
 
