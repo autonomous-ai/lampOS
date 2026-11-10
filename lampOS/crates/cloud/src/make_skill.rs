@@ -6,10 +6,10 @@
 //! page (`LAMP_SKILLS_PAGE=on`); lamp-voice checks the same switch in its
 //! own unit, so this is not the only gate.
 //!
-//! **Nothing from the app puts a skill on.** The lamp asks about the kept
-//! skill out loud, and only a spoken yes at the lamp puts it on (the lead's
-//! ruling on #1711, 20 Oct 08:37). The app shows what it will ask about:
-//! the name, what it does, what it may use and the SHA-256.
+//! **The app's MAKE IT is the ask** (#5977; the owner, 10 Nov): a kept skill
+//! goes on at once with no spoken yes, held to the cap and the check, and
+//! the lamp says what it made, what it does and what it uses. The app
+//! shows the same: the name, what it does, what it may use and the SHA-256.
 //!
 //! The owner's alone, as every kind here is: only the lamp's own account
 //! channel commands it (`online::commanded`).

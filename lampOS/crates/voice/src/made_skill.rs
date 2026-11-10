@@ -2213,10 +2213,33 @@ fn not_on(directory: &Path, sha256: &str, why: &str) {
     }
 }
 
-/// What the lamp says once a made skill is on: one short line, its name
-/// (the owner, 10 Nov: no "Shall I put it on the lamp?" any more).
+/// What the lamp says once a made skill is on (the owner, 10 Nov: no
+/// "Shall I put it on the lamp?" any more): its name, then what it does as
+/// its description says and what it uses, so the person hears what went on
+/// with no yes asked (App Only's P1 on #5985, the 11:47 ruling's
+/// read-back), and how to take it off.
 pub fn on_line(made: &Made) -> String {
-    format!("I made {}, and it's on.", spoken_name(&made.name))
+    let name = spoken_name(&made.name);
+    let does = made.description.trim().trim_end_matches(['.', '!', '?']);
+    let mut letters = does.chars();
+    let does: String = match (letters.next(), letters.clone().next()) {
+        // "Dims the light" said after a colon as "dims the light", never
+        // a word all in capitals ("LED").
+        (Some(first), second) if !second.is_some_and(char::is_uppercase) => {
+            first.to_lowercase().chain(letters).collect()
+        }
+        _ => does.to_owned(),
+    };
+    if does.is_empty() {
+        return format!("I made {name}, and it's on.");
+    }
+    let uses = made.uses.spoken();
+    let using = if uses == "nothing" {
+        String::new()
+    } else {
+        format!(", using {uses}")
+    };
+    format!("I made {name}, and it's on: {does}{using}. Say \"take it off\" to take it off.")
 }
 
 /// What the lamp says when a kept skill couldn't be put on: why, in the
@@ -3676,6 +3699,22 @@ body = { gesture = "nod" }
             package: PathBuf::new(),
         });
         assert_eq!(line, "I made evening dim, and it's on.");
+        // What it does and uses is said with it (App Only's P1 on #5985).
+        let line = on_line(&Made {
+            name: "evening-dim".into(),
+            version: "1.0.0".into(),
+            sha256: "a".repeat(64),
+            description: "Dims the light at 10 pm.".into(),
+            uses: Uses {
+                light: true,
+                ..Uses::default()
+            },
+            package: PathBuf::new(),
+        });
+        assert_eq!(
+            line,
+            "I made evening dim, and it's on: dims the light at 10 pm, using its light. Say \"take it off\" to take it off."
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 
