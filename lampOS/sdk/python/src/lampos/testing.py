@@ -509,6 +509,9 @@ class FakeLamp:
         self.pulses_dropped: list[tuple[str, dict]] = []
         self._pulsed: dict[str, float] = {}
         self.clock = time.monotonic
+        # The picture `camera.snapshot` and a stream's frames carry: the
+        # smallest whole JPEG unless a test sets a real one (`fake.picture = jpeg`).
+        self.picture: bytes = FAKE_JPEG
         # Pushed skills by name, and the one push in flight on the lamp.
         self.pushed: dict[str, dict] = {}
         self._pushing: dict | None = None
@@ -1320,12 +1323,12 @@ class FakeLamp:
                 await self.done(id_)
         elif op == "camera.snapshot":
             # A picture with no camera behind it: the smallest whole JPEG.
-            await self._ok(ws, id_, jpeg=base64.b64encode(FAKE_JPEG).decode(), bytes=len(FAKE_JPEG), age_ms=0)
+            await self._ok(ws, id_, jpeg=base64.b64encode(self.picture).decode(), bytes=len(self.picture), age_ms=0)
         elif op == "camera.stream":
             if request["on"]:
                 fps = request.get("fps", 2)
                 await self._ok(ws, id_, stream="on", fps=fps, fps_now=None)
-                frame = {"ev": "camera.frame", "jpeg": base64.b64encode(FAKE_JPEG).decode(), "bytes": len(FAKE_JPEG), "age_ms": 0, "fps_now": None}
+                frame = {"ev": "camera.frame", "jpeg": base64.b64encode(self.picture).decode(), "bytes": len(self.picture), "age_ms": 0, "fps_now": None}
                 await ws.send(json.dumps(frame))
             else:
                 await self._ok(ws, id_, stream="off")

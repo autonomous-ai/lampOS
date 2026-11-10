@@ -2036,6 +2036,25 @@ def test_lamp_skill_push_list_and_remove_run_as_the_js_clis_do(tmp_path):
     run(go())
 
 
+def test_the_fake_camera_gives_the_picture_a_test_sets(tmp_path):
+    """An app that reads its picture (a brightness meter) needs a real image: `fake.picture` is
+    what a snapshot and a stream's frames carry; the default is the smallest whole JPEG."""
+
+    async def go():
+        async with FakeLamp(grants=("camera",)) as fake:
+            fake.picture = b"\xff\xd8not-really-but-mine\xff\xd9"
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                assert await lamp.camera_snapshot() == fake.picture
+                frames = asyncio.Queue()
+                lamp.on("camera.frame", frames.put_nowait)
+                await lamp.camera_stream(fps=3)
+                frame = await asyncio.wait_for(frames.get(), 5)
+                assert base64.b64decode(frame["jpeg"]) == fake.picture
+
+    run(go())
+
+
 def test_the_camera_gives_a_picture_and_a_stream_with_the_camera_grant_only(tmp_path):
     async def go():
         from lampos.testing import FAKE_JPEG

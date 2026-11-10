@@ -400,6 +400,9 @@ export class FakeLamp {
     this.pulsesDropped = [];
     this.pulsed = new Map();
     this.clock = () => Date.now();
+    // The picture `camera.snapshot` and a stream's frames carry: the smallest whole JPEG
+    // unless a test sets a real one (`fake.picture = buffer`).
+    this.picture = FAKE_JPEG;
     // Each connection whose head follows the hand (`look` at `hand`) and its
     // lease, until its stop, another look, or the lease ends; and the last
     // hand said.
@@ -949,7 +952,7 @@ export class FakeLamp {
       }
       case 'camera.snapshot':
         // A picture with no camera behind it: the smallest whole JPEG.
-        return this.ok(ws, id, { jpeg: FAKE_JPEG.toString('base64'), bytes: FAKE_JPEG.length, age_ms: 0 });
+        return this.ok(ws, id, { jpeg: this.picture.toString('base64'), bytes: this.picture.length, age_ms: 0 });
       case 'camera.stream':
         // As lamp-control's check: 1 to 30 a second.
         if (request.fps !== undefined && !(Number.isInteger(request.fps) && request.fps >= 1 && request.fps <= 30)) {
@@ -957,7 +960,7 @@ export class FakeLamp {
         }
         if (!request.on) return this.ok(ws, id, { stream: 'off' });
         this.ok(ws, id, { stream: 'on', fps: request.fps ?? 2, fps_now: null });
-        ws.send(JSON.stringify({ ev: 'camera.frame', jpeg: FAKE_JPEG.toString('base64'), bytes: FAKE_JPEG.length, age_ms: 0, fps_now: null }));
+        ws.send(JSON.stringify({ ev: 'camera.frame', jpeg: this.picture.toString('base64'), bytes: this.picture.length, age_ms: 0, fps_now: null }));
         return undefined;
       case 'microphone.stream':
         // As lamp-control's microphone.rs: on again replaces it, off ends it
