@@ -55,6 +55,9 @@ pub struct Stimuli {
     sounds: Publisher,
     sound_on: Option<(String, Instant)>,
     sound_said: Option<Instant>,
+    touch: Publisher,
+    pet: Publisher,
+    touches: u64,
     air: Publisher,
     air_set: Option<AirState>,
     air_said: Option<Instant>,
@@ -74,6 +77,9 @@ impl Stimuli {
             )?,
             sound_on: None,
             sound_said: None,
+            touch: bus.publisher("controls/touch", Kind::Event, "controls")?,
+            pet: bus.publisher("controls/pet", Kind::Event, "controls")?,
+            touches: 0,
             air: bus.publisher_declared(AirState::TOPIC, &AirState::declaration(), "air")?,
             air_set: None,
             air_said: None,
@@ -92,6 +98,22 @@ impl Stimuli {
                 request: None,
             };
             self.heard.publish_json(now_us, &words)?;
+        }
+        if let Some(kind) = take(&self.dir.join("touch")) {
+            // A hand on the head, as controls says it: a tap is a quick
+            // contact let go; a pet is told once for its contact.
+            self.touches += 1;
+            if kind.trim() == "pet" {
+                self.pet.publish_json(
+                    now_us,
+                    &json!({"enabled": true, "session_id": "lamp-sim", "contact_id": self.touches, "ended": false}),
+                )?;
+            } else {
+                self.touch.publish_json(
+                    now_us,
+                    &json!({"enabled": true, "source": "head", "gesture": "tap", "contact_id": self.touches, "released_us": now_us}),
+                )?;
+            }
         }
         if let Some(class) = take(&self.dir.join("sound")) {
             let class = class.trim().to_owned();
