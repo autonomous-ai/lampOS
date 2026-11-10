@@ -99,7 +99,11 @@ sau:
      `a_made_evening_dim_runs_at_ten_past_ten`); `during` rộng hơn, như cả
      ngày, vẫn giữ nó. Các mức sàn của #6062 và #6070
      (`made_skill::say_paced`: một giờ cho câu nói, một phút vắng mặt cho
-     khuôn mặt, một phút cho việc đứng dậy) cũng áp dụng. Mỗi cái được nói
+     khuôn mặt, một phút cho việc đứng dậy, một giờ cho không khí ngột
+     ngạt) cũng áp dụng. Trigger theo khuôn mặt của một người cụ thể (khóa
+     `name`, `known` hay `who`) là "I can't do that yet: starting when it
+     sees one particular person": trigger của `lamp-skills` thấy một khuôn
+     mặt, không bao giờ biết là ai. Mỗi cái được nói
      lại đúng như đã đặt: "… It starts on its own, at most 3 times a day,
      one an hour with the lamp's other nudges, never from 22:00 to 08:00,
      and rests till morning if ignored twice."
