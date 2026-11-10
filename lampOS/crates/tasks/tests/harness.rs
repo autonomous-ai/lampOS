@@ -1163,7 +1163,7 @@ fn with_reply_named_a_named_session_is_typed_into_and_never_started_new() {
         (json!({"error":"NOT_IDLE","detail":"…"}), "reply_not_idle"),
         (
             json!({"error":"NOT_RUNNING","detail":"…"}),
-            "reply_not_running",
+            "session_closed",
         ),
         (
             json!({"ok":false,"name":"x","id":AGENT,"message":null,"state":"failed"}),
@@ -1237,6 +1237,39 @@ fn with_reply_named_a_named_session_is_typed_into_and_never_started_new() {
         assert_eq!(rig.cli().launch(&request), not_sent("invalid_session"));
         assert!(verbs(&rig).is_empty());
     }
+}
+
+/// #5535, the first builder's ruling on #5784's follow-up: a named session
+/// Harness says was closed or stopped (`harness reply`'s `NOT_RUNNING`) is
+/// not sent with its own reason, `session_closed`, so the lamp can say how
+/// to open it again, and nothing is routed or started new in its place.
+#[test]
+fn with_reply_named_a_closed_session_is_told_closed_and_nothing_new_starts() {
+    let mut rig = Rig::new();
+    rig.config.reply_named = true;
+    rig.config.route = true;
+    rig.config.engines_ready = true;
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"route":{"default":true},
+        "ps":step(json!({"you":null,"machine":"desk-pc","harnesses":[
+            ps_row(AGENT, "Docs-Update", "idle", Some("/w/site"))
+        ],"next":[]})),
+        "reply":{"stdout":format!("{}\n", json!({
+            "error":"NOT_RUNNING",
+            "detail":"was closed or stopped. Run harness resume, or start a new harness with the whole task.",
+            "code":"NOT_RUNNING",
+            "next":[]
+        })),"exit":5}
+    }));
+    let mut request = launch();
+    request.session = Some("docs update".into());
+    assert_eq!(bare(rig.cli().launch(&request)), not_sent("session_closed"));
+    let called: Vec<String> = rig
+        .calls()
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(called, ["machines", "ps", "reply"]);
 }
 
 /// A Devin Cloud agent's id, as Harness 0.4.27 gave one on 20 October.
