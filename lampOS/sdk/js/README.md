@@ -234,7 +234,19 @@ await lamp.closed();
   `seen: false` 1 s after the last), and `fake.emitHandTrack(track, {
   realtime })` says them. `lamp fake --hands` waves a hand for 3 s after
   each arrival and answers a look at it.
-- **In your tests:** `FakeLamp` from `lampos/testing` is the same fake lamp:
+- **In your tests:** `await fake.connect()` gives a `Lamp` already paired with
+  the fake (its own temporary keyring, closed and removed by `fake.stop()`), so
+  a test of your program needs no code, pin or `LAMPOS_HOME`:
+
+  ```js
+  const fake = await FakeLamp.start();
+  const lamp = await fake.connect();
+  await lamp.say('hello');
+  assert.deepEqual(fake.asked('say'), [{ text: 'hello' }]);
+  await fake.stop();
+  ```
+
+  `FakeLamp` from `lampos/testing` is the same fake lamp:
   `emit`, `refuseNext`, `done`, `leaseEvent`, `requests`, `received`. Its
   `light` keeps lamp-control's pattern levels (a `breathe` at level 1 is refused)
   and answers `{"to":"ring"}`. `pulsesDropped` lists a second pulse within a

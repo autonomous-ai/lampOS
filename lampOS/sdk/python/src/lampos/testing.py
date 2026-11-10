@@ -18,6 +18,7 @@ from __future__ import annotations
 import array
 import asyncio
 import base64
+import contextlib
 import datetime
 import hashlib
 import io
@@ -26,6 +27,7 @@ import json
 import math
 import os
 import random
+import shutil
 import ssl
 import sys
 import tempfile
@@ -547,6 +549,8 @@ class FakeLamp:
         self.audio_sequence = 0
         self._next_lease = 1
         self._server = None
+        self._connected: list = []
+        self._folders: list[str] = []
         self._validator = (
             jsonschema.Draft202012Validator({**schema.schema(), "oneOf": [{"$ref": "#/$defs/request"}]})
             if jsonschema
@@ -570,8 +574,39 @@ class FakeLamp:
         return self
 
     async def __aexit__(self, *_exc) -> None:
+        for lamp in self._connected:
+            # A test may have dropped or closed it already (a lease held on a dead
+            # socket): that must not mask the test's own result.
+            with contextlib.suppress(Exception):
+                await lamp.close()
+        self._connected.clear()
         self._server.close()
         await self._server.wait_closed()
+        for folder in self._folders:
+            shutil.rmtree(folder, ignore_errors=True)
+        self._folders.clear()
+
+    async def connect(self, *, name: str = "test app") -> Any:
+        """A `Lamp` paired with this fake and connected, for a test of your own
+        program: no code, pin or keyring to set up. Its keyring is a folder of its
+        own (removed on exit, your `LAMPOS_HOME` untouched), and it is closed when
+        the fake is. Call it again for a second computer.
+
+            async with FakeLamp() as fake:
+                lamp = await fake.connect()
+                await lamp.say("hello")
+                assert fake.asked("say") == [{"text": "hello"}]
+        """
+        from .client import Lamp
+        from .keys import Keyring
+
+        folder = tempfile.mkdtemp(prefix="lampos-fake-")
+        self._folders.append(folder)
+        ring = Keyring(folder)
+        await Lamp.pair(self.code, self.host, pin=self.pin, port=self.port, name=name, keyring=ring)
+        lamp = await Lamp.connect(keyring=ring)
+        self._connected.append(lamp)
+        return lamp
 
     # What a test asks of it.
 
