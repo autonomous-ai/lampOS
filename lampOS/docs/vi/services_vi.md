@@ -449,18 +449,22 @@ nó chỉ là danh tính của tài khoản và `gmail.send`, không có `gmail.
   với token của nó.
 - **Ghi:** `send_mail`, được đọc lại và gửi như của `gmail`, khi có câu
   "send" nói ra: một `POST /gmail/v1/users/me/messages/send` từ chính tài
-  khoản đó, không bao giờ qua SMTP. 401 hoặc 403: "not sent: Google refused
-  the Gmail sign-in".
-- **Khi cả hai được liên kết**, một lần gửi có thể đi qua một trong hai; một
-  lần đọc chỉ qua `gmail`. Mô tả của hàm đọc ghi `gmail-app: none, it only
-  sends: reads use gmail`. Khi `gmail` là mật khẩu ứng dụng, mọi lần đọc
-  đều ưu tiên nó (`serve.rs`, `read_args`, yêu cầu của chủ đèn ngày 10/11):
-  một lần đọc gọi tên `gmail`, `gmail-app` hay tên của một trong hai đều đi
-  qua IMAP bằng mật khẩu ứng dụng, và token của đăng nhập không bao giờ được
-  gửi cho nó. Chỉ khi không có mật khẩu ứng dụng nào được giữ thì lần đọc
-  mới dùng token của đăng nhập Google (một liên kết `gmail` tạo bằng đăng
-  nhập đó); khi ấy một lần đọc gọi tên `gmail-app` vẫn không đọc gì. Việc
-  ghi không đổi: mỗi lần ghi vẫn đi qua liên kết mà tên của nó dẫn đến.
+  khoản đó, không bao giờ qua SMTP; trừ khi `gmail` được liên kết bằng mật
+  khẩu ứng dụng (xem dưới). 401 hoặc 403: "not sent: Google refused the
+  Gmail sign-in".
+- **Khi cả hai được liên kết**, một lần đọc chỉ qua `gmail`. Mô tả của hàm
+  đọc ghi `gmail-app: none, it only sends: reads use gmail`. Một quy tắc áp
+  dụng cho mọi lần đọc và ghi Gmail: mật khẩu ứng dụng trước, token chỉ khi
+  không có nó (`serve.rs`, `gmail_args`, yêu cầu của chủ đèn ngày 10/11).
+  Khi `gmail` là mật khẩu ứng dụng, một lần đọc hay gửi gọi tên `gmail`,
+  `gmail-app` hay tên của một trong hai đều đi qua IMAP hoặc SMTP bằng mật
+  khẩu ứng dụng, và token của đăng nhập không bao giờ được gửi cho nó. Một
+  lần gửi được viết lại như thế cả khi được chuẩn bị (phần đọc lại ghi
+  "from" địa chỉ của mật khẩu ứng dụng) lẫn khi được xác nhận, nên hai bước
+  khớp nhau, dù mỗi bước dùng tên Gmail nào. Chỉ khi không có mật khẩu ứng
+  dụng nào được giữ thì một lệnh gọi Gmail mới dùng token của đăng nhập
+  Google: khi ấy lần gửi đi qua liên kết mà tên của nó dẫn đến, và một lần
+  đọc gọi tên `gmail-app` vẫn không đọc gì.
 - **Tên nào cũng đến được nó** (`serve.rs`, `linked_code`): một lệnh gọi tên
   `gmail` khi chỉ `gmail-app` được liên kết thì dùng liên kết `gmail-app`, và
   một lệnh gọi tên `gmail-app` khi chỉ `gmail` được liên kết thì dùng
