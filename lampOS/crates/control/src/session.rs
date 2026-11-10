@@ -805,6 +805,10 @@ impl Door {
             } => {
                 return match self.leases.take(&client, wanted, *for_ms, now_us) {
                     Ok(held) => ok(re, json!({"lease": held.lease, "for_ms": for_ms})),
+                    Err(Refusal::Busy { part, holder }) if holder == client => {
+                        let suspended = self.leases.has_suspended(&client, part, now_us);
+                        reply_refused(Some(re), own_busy(part, suspended))
+                    }
                     Err(refusal) => refused_by_lease(re, refusal),
                 };
             }
@@ -1028,6 +1032,13 @@ impl Door {
         } else if op.needs_lease() == Some(Part::Body)
             && !self.leases.holds(&client, Part::Body, now_us)
         {
+            // A lease a conversation suspended is still this client's: say
+            // so, so a program waits for the `held` event instead of taking
+            // a second lease (the lead's 4-lamp show, 10 Nov: `no_lease` on
+            // about 1 turn in 6 while `Lease.state` still read held).
+            if self.leases.has_suspended(&client, Part::Body, now_us) {
+                return reply_refused(Some(re), own_busy(Part::Body, true));
+            }
             return refuse(
                 ErrorCode::NoLease,
                 "take a lease on the body first".to_owned(),
@@ -1412,6 +1423,24 @@ fn reply_refused(re: Option<u64>, error: Error) -> Outcome {
     }
 }
 
+/// A take refused because this computer holds the part itself: by a lease
+/// a conversation suspended (it comes back when they stop), or by one it
+/// still has, not "another computer" (the lead's lamp run, 10 Nov).
+fn own_busy(part: Part, suspended: bool) -> Error {
+    let part = json!(part);
+    let part = part.as_str().unwrap_or_default();
+    Error::new(
+        ErrorCode::Busy,
+        if suspended {
+            format!(
+                "your lease on the {part} is suspended while someone talks to the lamp: it is yours again when they stop"
+            )
+        } else {
+            format!("you already hold the {part}: use the lease you have")
+        },
+    )
+}
+
 fn refused_by_lease(re: u64, refusal: Refusal) -> Outcome {
     let error = match refusal {
         Refusal::Busy { part, .. } => Error::new(
@@ -1440,6 +1469,20 @@ fn refused_by_lease(re: u64, refusal: Refusal) -> Outcome {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A computer refused its own body take says whose lease holds it
+    /// (the lead's lamp run, 10 Nov: "another computer" for its own).
+    #[test]
+    fn a_take_refused_by_its_own_lease_does_not_blame_another_computer() {
+        assert_eq!(
+            own_busy(Part::Body, true).why,
+            "your lease on the body is suspended while someone talks to the lamp: it is yours again when they stop"
+        );
+        assert_eq!(
+            own_busy(Part::Body, false).why,
+            "you already hold the body: use the lease you have"
+        );
+    }
     use base64::Engine as _;
     use base64::engine::general_purpose::STANDARD;
     use ring::signature::{Ed25519KeyPair, KeyPair as _};

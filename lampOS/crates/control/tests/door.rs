@@ -548,11 +548,60 @@ async fn the_bus_reaches_a_subscriber_as_events_phrases_only_and_lease_signals()
         next(&mut socket).await,
         json!({"ev": "lease", "lease": "l_1", "state": "suspended", "why": "conversation"})
     );
+    // Its own take meanwhile is told whose lease holds the part, not
+    // "another computer" (lamp run, 10 Nov 16:20).
+    let again = send(
+        &mut socket,
+        json!({"id": 5, "op": "lease.take", "parts": ["light"], "for_ms": 30000}),
+    )
+    .await;
+    assert_eq!(again["error"]["code"], "busy", "{again}");
+    assert_eq!(
+        again["error"]["why"],
+        "your lease on the light is suspended while someone talks to the lamp: it is yours again when they stop",
+        "{again}"
+    );
     lamp.shared.deliver(vec![Out::Resume]);
     assert_eq!(
         next(&mut socket).await,
         json!({"ev": "lease", "lease": "l_1", "state": "held"})
     );
+}
+
+/// A look under a body lease that a conversation suspended is refused as
+/// the suspension it is, not as "take a lease on the body first": the SDK's
+/// `Lease.state` still read `held` for the moment before its event came
+/// (the lead's 4-lamp show, 10 Nov 16:50: no_lease on about 1 turn in 6).
+#[tokio::test]
+async fn an_op_under_a_suspended_body_lease_says_suspended_not_no_lease() {
+    use lamp_control::protocol::LeaseWhy;
+    use lamp_control::watch::Out;
+    let lamp = lamp("suspended-look").await;
+    let mut socket = paired(&lamp, json!(["body", "look"]), 5).await;
+    let take = send(
+        &mut socket,
+        json!({"id": 3, "op": "lease.take", "parts": ["body"], "for_ms": 30000}),
+    )
+    .await;
+    assert_eq!(take["lease"], "l_1", "{take}");
+    lamp.shared
+        .deliver(vec![Out::Suspend(None, LeaseWhy::Conversation)]);
+    assert_eq!(
+        next(&mut socket).await,
+        json!({"ev": "lease", "lease": "l_1", "state": "suspended", "why": "conversation"})
+    );
+    let look = send(&mut socket, json!({"id": 4, "op": "look", "at": "ahead"})).await;
+    assert_eq!(look["error"]["code"], "busy", "{look}");
+    assert_eq!(
+        look["error"]["why"],
+        "your lease on the body is suspended while someone talks to the lamp: it is yours again when they stop",
+        "{look}"
+    );
+    // Never taken at all: still no_lease.
+    lamp.shared.move_clock_on(Duration::from_millis(1_100));
+    let mut other = paired(&lamp, json!(["body", "look"]), 6).await;
+    let none = send(&mut other, json!({"id": 3, "op": "look", "at": "ahead"})).await;
+    assert_eq!(none["error"]["code"], "no_lease", "{none}");
 }
 
 /// Part 6: while a computer holds `body`, the door holds the body's own
