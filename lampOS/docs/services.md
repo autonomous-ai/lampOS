@@ -1206,7 +1206,7 @@ list) refuses the
 skill. Its uses add "reading your <service>".
 
 **Not linked when it is made** (`made_skill::needs_link`, no switch: it
-only adds a field and a sentence). Once a made skill that reads a service
+only adds a field and an ask to the model). Once a made skill that reads a service
 is kept, `lamp-voice` asks `lamp-services` `services_connected` on the
 tools socket (`services::linked_codes`, at most 500 ms; a skill that reads
 nothing asks nothing). Either Gmail code counts as linked for the other,
@@ -1215,9 +1215,11 @@ it reads isn't in the list, the skill is still kept and asked about as
 before, and:
 
 - made by voice, the make's answer carries `needs_link`
-  (`[{"code", "name"}]`), and the lamp says one sentence before its ask:
-  "Gmail isn't linked yet: link it in the app, under Skills, then
-  Connectors, and the skill will start then.";
+  (`[{"code", "name"}]`), and after the line that it's on the model is
+  asked to tell the person, in its own words and the conversation's
+  language, that the skill will start once Gmail is linked in the app,
+  under Skills, then Connectors (`made_skill::needs_link_ask`; the owner,
+  10 Nov, "đồng bộ luôn": never a fixed English sentence said as it is);
 - made from the app, the ask keeps it, and `skills.made` tells it as
   `needs_link: [{"code": "gmail", "name": "Gmail"}]` ([cloud.md](cloud.md),
   "A skill typed in the app"), `[]` when nothing is missing.
