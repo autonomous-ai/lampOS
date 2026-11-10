@@ -935,11 +935,35 @@ impl OwnAsks {
         priority: u8,
         expires_in_ms: u64,
     ) -> mpsc::Receiver<Answer> {
+        self.ask(skill, "text", text, priority, expires_in_ms)
+    }
+
+    /// Ask for `note`, an instruction the model phrases in its own words
+    /// (a socket client's `note`), as [`Self::text`] asks for words.
+    pub fn note(
+        &self,
+        skill: &str,
+        note: &str,
+        priority: u8,
+        expires_in_ms: u64,
+    ) -> mpsc::Receiver<Answer> {
+        self.ask(skill, "note", note, priority, expires_in_ms)
+    }
+
+    /// [`Self::text`] or [`Self::note`], by `key`.
+    fn ask(
+        &self,
+        skill: &str,
+        key: &str,
+        words: &str,
+        priority: u8,
+        expires_in_ms: u64,
+    ) -> mpsc::Receiver<Answer> {
         let (answer, answered) = mpsc::channel();
         let read_at_us = lamp_ipc::monotonic_us();
         let line = json!({
             "skill": skill,
-            "text": text,
+            key: words,
             "priority": priority,
             "expires_in_ms": expires_in_ms,
         })
@@ -2836,6 +2860,30 @@ mod tests {
         bits_per_sample: 16,
         sample_format: hound::SampleFormat::Int,
     };
+
+    /// An own ask's note is a note the model phrases, as a socket client's
+    /// is; its text is words said as they are (#6032: a made skill's line
+    /// is told as a note, in the conversation's language).
+    #[test]
+    fn an_own_note_is_a_note_and_an_own_text_is_text() {
+        let (sent, taken) = mpsc::channel();
+        let asks = OwnAsks(sent);
+        let _answered = asks.note(
+            "app-make",
+            "Tell the person this: \"hi\"",
+            NORMAL_PRIORITY,
+            1_000,
+        );
+        assert_eq!(
+            taken.recv().unwrap().request.words,
+            Words::Note("Tell the person this: \"hi\"".into())
+        );
+        let _answered = asks.text("app-make", "hi", NORMAL_PRIORITY, 1_000);
+        assert_eq!(
+            taken.recv().unwrap().request.words,
+            Words::Text("hi".into())
+        );
+    }
 
     #[test]
     fn a_short_quiet_sound_is_read_and_a_long_loud_or_other_one_is_refused() {

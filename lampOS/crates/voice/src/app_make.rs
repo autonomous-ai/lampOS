@@ -561,17 +561,38 @@ pub fn write_here(
     }
 }
 
-/// `line`, said through the say service's own asks, as written, at a good
-/// moment within [`LINE_WAITS_MS`]; what became of it logged. Nothing
-/// waits on its answer: the skill is on, or not, already.
+/// `line`, said through the say service's own asks at a good moment
+/// within [`LINE_WAITS_MS`]: its content told as a note in the language of
+/// the conversation, the skill's and services' names as written
+/// ([`say_note`]; the owner, 10 Nov, "đồng bộ luôn"), never English words
+/// said as they are to a person who speaks another language. What became
+/// of it logged. Nothing waits on its answer: the skill is on, or not,
+/// already.
 pub fn say_line(asks: &crate::say::OwnAsks, line: &str) {
-    let answered = asks.text("app-make", line, crate::say::NORMAL_PRIORITY, LINE_WAITS_MS);
+    let answered = match say_note(line) {
+        Some(note) => asks.note(
+            "app-make",
+            &note,
+            crate::say::NORMAL_PRIORITY,
+            LINE_WAITS_MS,
+        ),
+        None => asks.text("app-make", line, crate::say::NORMAL_PRIORITY, LINE_WAITS_MS),
+    };
     while let Ok(answer) = answered.recv() {
         if let crate::say::Answer::Done(outcome) = answer {
             eprintln!("lamp-voice: an app's skill: its line: {outcome:?}");
             return;
         }
     }
+}
+
+/// The say service's note for a made skill's `line`
+/// ([`made_skill::in_their_language`]); none when it would pass the say
+/// service's bound ([`crate::say::MOST_WORDS_BYTES`]), and the line is
+/// then asked as written rather than refused unsaid.
+fn say_note(line: &str) -> Option<String> {
+    let note = made_skill::in_their_language(line);
+    (note.len() <= crate::say::MOST_WORDS_BYTES).then_some(note)
 }
 
 /// The lamp's own chat, as [`crate::make_skill_local::own_chat`] gives it.
@@ -1050,6 +1071,22 @@ mod tests {
         let words = "a skill that checks my calendar every evening";
         let brief = begin(dir.as_path(), words, "r1", NOW).unwrap();
         assert_eq!(made_skill::request_of(&brief), words);
+    }
+
+    /// The owner, 10 Nov ("đồng bộ luôn"): a made skill's line goes to the
+    /// say service as a note told in the conversation's language, names
+    /// kept; one past the say service's bound is asked as written rather
+    /// than refused unsaid.
+    #[test]
+    fn a_made_line_is_said_in_the_conversations_language() {
+        let line = "I made evening dim, and it's on: it dims the light at ten.";
+        let note = say_note(line).unwrap();
+        assert_eq!(note, made_skill::in_their_language(line));
+        assert!(
+            note.contains("in the language of the conversation"),
+            "{note}"
+        );
+        assert!(say_note(&"x".repeat(crate::say::MOST_WORDS_BYTES)).is_none());
     }
 
     /// One at a time, a request id each, the words within the voice's own
