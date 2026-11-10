@@ -1223,8 +1223,8 @@ pub fn own_words(note: &str) -> Option<&str> {
 /// Whether the walk is under way, as the coordinator last read it
 /// ([`Onboarding::under_way`]).
 #[cfg(not(test))]
-// Process ownership: serve writes this walk state; the second worker must receive it over
-// ProviderInput (#5995), never through a shared static.
+// Process ownership: serve and the second worker write their own process-local copies;
+// WalkUnderWay IPC updates the worker copy read by its reply formatter (#5995).
 static UNDER_WAY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 // Per test thread, so a test's walk never reaches another test's replies.
 #[cfg(test)]
