@@ -3286,7 +3286,7 @@ its window (`hermes_schedule::window`): not in the first round after
 lamp-update starts, not while the setup walk is under way, only after
 10 min with the voice resting and nobody heard, and then right after the
 walk ended or 01:00 to 05:00 local. While it runs, a thread of `serve`
-freezes the unit (`systemctl freeze`) as soon as the voice is not quiet,
+freezes the unit (its own `cgroup.freeze`; `systemctl freeze` is refused for a oneshot still activating) as soon as the voice is not quiet,
 thaws it after 10 quiet min, stops it after 30 min frozen in all
 (`interrupted`) and stops it at once when the voice's privacy lease is
 lost (`privacy_lost`); both are tried in the next open window. The unit
