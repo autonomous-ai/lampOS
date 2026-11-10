@@ -142,9 +142,12 @@ to" or "let's", with an ask: play, put on, put some or put something, turn
 on, start, hear, listen to, or Vietnamese "mở/bật/phát nhạc", "mở/bật/phát
 bài" or "cho tôi/mình/em nghe", and at or after the ask name a recording:
 music, a song, recording, sound, track, tune, playlist, melody, lullaby,
-"nhạc" or "bài", or "something" before relaxing, calm, quiet, soft,
-soothing, gentle, peaceful or chill. "Lamp, turn on the light." and "Lamp,
-play chess with me." do not ask. A line with "don't", "not", "never", "no",
+"nhạc" or "bài", or "something" with relaxing, calm, quiet, soft,
+soothing, gentle, peaceful, chill, relax, unwind or sleep within four words
+after it: "Lamp, play me something to relax." and "Play something to help me
+sleep." ask (on lamp-52e6 on 10 Nov the first was refused while "something"
+counted only right before a calm word). "Lamp, turn on the light.", "Lamp,
+play chess with me." and "Play something with me." do not ask. A line with "don't", "not", "never", "no",
 "stop", "cancel", "actually", "wait", "maybe", "đừng" or "thôi" anywhere,
 in any sentence, does not ask: "Lamp, play some relaxing music. Actually,
 don't." is refused. Otherwise Voice drops the offer and
