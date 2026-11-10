@@ -434,6 +434,8 @@ of each, and its kind and period as a declaration, are in
 | `camera/image` | Where the newest picture is, and when it was taken. The picture itself stays in a file | latched | Eyes | 2 to 4 a second |
 | `body/joint_states` | Each joint: where it is, how fast, how loaded (ROS's `JointState`) | latched | Body | 10 to 20 a second |
 | `humans/faces/tracked` | The faces in view: a passing id, where, and whether it is turned to the lamp | latched | Eyes | With each look |
+| `humans/hands/tracked` | A hand in view: where, how wide, open or not, and how sure; never the picture | stream | Eyes (when built), only while a hand is wanted | One a look while a hand is wanted and seen |
+| `humans/hands/wanted` | Whether anyone wants a hand looked for | latched | lamp-control | When a computer's look at a hand starts or ends |
 | `humans/familiar` | How familiar the remembered person at the lamp is, as a level, with no name | latched | Eyes, with `--visits on` (#1670) | At each recognition, every 2 s |
 | `humans/seems` | How the near face seems, as a kind and a confidence, for measuring; Mood reads its kind with `LAMP_MOOD_SEEMS=on` (#1671, mood.md); the second voice tells a known person's turn how they seem with `LAMP_SECOND_SEEMS=on` (second-voice.md) | latched | Eyes, with `--seems` or `--seems-blendshapes` (#1671) | At most every 2 s while a face is near |
 | `voice/heard`, `voice/said` | What was heard and what was said, as text | stream | Voice | With each thing said |
