@@ -385,3 +385,46 @@ fn a_lamp_that_never_tried_installs_at_its_first_quiet_stretch_by_day() {
         assert!(window(&closed).is_err(), "{closed:?}");
     }
 }
+
+/// c0a4, 11 Nov: the products stage, frozen 21 min while someone spoke, was
+/// taken for timed out the moment it thawed, as a stage's clock goes on
+/// while frozen. A Hermes stage gets the installer's own bound and the most
+/// it may be frozen; Harness's installer and other steps keep theirs; and
+/// the one-shot's hour still holds a stage with every freeze.
+#[test]
+fn a_hermes_stage_has_room_for_the_most_it_may_be_frozen() {
+    use crate::{
+        install::{HERMES_STAGE_WITHIN, INSTALLER_WITHIN, bound_of},
+        world::RESTART_WITHIN,
+    };
+    let argv = |words: &[&str]| {
+        words
+            .iter()
+            .map(|word| (*word).to_owned())
+            .collect::<Vec<_>>()
+    };
+    let stage = argv(&[
+        "runuser",
+        "-u",
+        "lampos",
+        "--",
+        "bash",
+        &format!("/var/tmp/x/{}", crate::hermes_install::INSTALLER_FILE),
+        "--stage",
+        "products",
+    ]);
+    assert_eq!(bound_of(&stage), HERMES_STAGE_WITHIN);
+    assert_eq!(HERMES_STAGE_WITHIN, INSTALLER_WITHIN + MOST_FROZEN);
+    assert!(HERMES_STAGE_WITHIN < Duration::from_secs(3600));
+    assert_eq!(
+        bound_of(&argv(&[
+            "sh",
+            &format!("/x/{}", crate::install::PINNED_INSTALLER)
+        ])),
+        INSTALLER_WITHIN
+    );
+    assert_eq!(
+        bound_of(&argv(&["systemctl", "restart", "x"])),
+        RESTART_WITHIN
+    );
+}

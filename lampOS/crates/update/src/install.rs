@@ -1196,17 +1196,39 @@ pub const VERSION_WITHIN: Duration = Duration::from_secs(30);
 /// be slow.
 pub const INSTALLER_WITHIN: Duration = Duration::from_secs(15 * 60);
 
+/// The longest one stage of Hermes's installer may take (#5978): the
+/// installer's own [`INSTALLER_WITHIN`] and the most the one-shot may be
+/// kept frozen while someone speaks
+/// ([`crate::hermes_schedule::MOST_FROZEN`]), as the clock goes on while it
+/// is frozen. On c0a4 (11 Nov) a products stage frozen 21 min was taken for
+/// timed out the moment it thawed.
+pub const HERMES_STAGE_WITHIN: Duration =
+    Duration::from_secs(INSTALLER_WITHIN.as_secs() + crate::hermes_schedule::MOST_FROZEN.as_secs());
+
 /// Every step through it gets [`RESTART_WITHIN`], but Harness's installer,
-/// which fetches, gets [`INSTALLER_WITHIN`].
+/// which fetches, gets [`INSTALLER_WITHIN`], and a stage of Hermes's,
+/// which may be frozen too, [`HERMES_STAGE_WITHIN`].
 pub fn output_of(argv: &[String]) -> Result<String, String> {
-    output_of_within(
-        argv,
-        if runs_installer(argv) {
-            INSTALLER_WITHIN
-        } else {
-            RESTART_WITHIN
-        },
-    )
+    output_of_within(argv, bound_of(argv))
+}
+
+/// How long [`output_of`] waits for `argv`.
+pub fn bound_of(argv: &[String]) -> Duration {
+    if runs_hermes_stage(argv) {
+        HERMES_STAGE_WITHIN
+    } else if runs_installer(argv) {
+        INSTALLER_WITHIN
+    } else {
+        RESTART_WITHIN
+    }
+}
+
+/// Whether `argv` runs one stage of Hermes's checked installer, `bash
+/// <dir>/`[`crate::hermes_install::INSTALLER_FILE`] `--stage …`.
+pub fn runs_hermes_stage(argv: &[String]) -> bool {
+    let hermes = format!("/{}", crate::hermes_install::INSTALLER_FILE);
+    argv.windows(2)
+        .any(|pair| pair[0] == "bash" && pair[1].ends_with(&hermes))
 }
 
 /// Whether `argv` runs Harness's installer: the CDN's piped to `sh`, or a
@@ -1214,11 +1236,7 @@ pub fn output_of(argv: &[String]) -> Result<String, String> {
 /// stage of Hermes's checked copy, `bash <dir>/`
 /// [`crate::hermes_install::INSTALLER_FILE`] `--stage …` (#5978).
 pub fn runs_installer(argv: &[String]) -> bool {
-    let hermes = format!("/{}", crate::hermes_install::INSTALLER_FILE);
-    if argv
-        .windows(2)
-        .any(|pair| pair[0] == "bash" && pair[1].ends_with(&hermes))
-    {
+    if runs_hermes_stage(argv) {
         return true;
     }
     match argv {

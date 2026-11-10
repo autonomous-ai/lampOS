@@ -1735,7 +1735,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      tools come through its package manager only as a build asks for them.
      `setup` and `gateway` need a person and are not run; `complete` writes
      only a marker. Each stage has the installer's 15-min bound
-     (`INSTALLER_WITHIN`); the unit's is an hour for Harness and Hermes
+     and the 30 min it may be kept frozen while someone speaks
+     (`HERMES_STAGE_WITHIN`, 45 min: a stage's clock goes on while frozen,
+     and on c0a4 a products stage frozen 21 min was taken for timed out
+     the moment it thawed); the unit's is an hour for Harness and Hermes
      together.
    - **Memory first:** before anything is moved or made, and before the
      disk is looked at, `MemAvailable` in `/proc/meminfo` must be at least
