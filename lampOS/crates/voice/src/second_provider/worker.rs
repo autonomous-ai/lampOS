@@ -2656,17 +2656,17 @@ pub fn serve(
                     // app is named from the next (Reviewer-three's P3 on
                     // #4476). The owner who_you_are kept is the other name
                     // they may go by, and a forget clears it at once.
-                    let owner = crate::person::by_default_owner(
-                        crate::person::now(),
-                        crate::known_faces::owner_now(),
-                    );
+                    let typed = crate::person::now();
+                    let from_setup = typed.is_some();
+                    let owner =
+                        crate::person::by_default_owner(typed, crate::known_faces::owner_now());
                     if let Some(line) = no_owner.line(owner.is_some()) {
                         eprintln!("{line}");
                     }
                     let (name, owners) = owner?;
-                    Some((name, owners, bus))
+                    Some((name, owners, bus, from_setup))
                 })
-                .map(|(name, owners, bus)| {
+                .map(|(name, owners, bus, from_setup)| {
                     let name = name.as_str();
                     let faces = bus
                         .as_ref()
@@ -2708,9 +2708,19 @@ pub fn serve(
                         }
                         None => {
                             // Said without the name, so a miss shows whether
-                            // the reply was told it (lamp-29e7, 29 Oct, #4118).
+                            // the reply was told it (lamp-29e7, 29 Oct, #4118),
+                            // and where it came from and why (B5186).
                             eprintln!(
-                                "lamp-voice second: the owner is named by default to this reply (LAMP_PERSON_NAME_BY_DEFAULT)"
+                                "lamp-voice second: the owner is named by default to this reply: {}, their name {} (LAMP_PERSON_NAME_BY_DEFAULT)",
+                                crate::person::named_by_default_because(
+                                    &owners,
+                                    known_now.as_deref()
+                                ),
+                                if from_setup {
+                                    "typed at setup"
+                                } else {
+                                    "kept with their face at who_you_are"
+                                }
                             );
                             format!("\n\n{}", crate::person::by_default(name))
                         }
@@ -5480,6 +5490,10 @@ pub(crate) fn known_name_told(on: bool, who: Option<&Path>, person: Option<&str>
     if person != Some(crate::known_faces::memory_person(&name).as_str()) {
         return String::new();
     }
+    // Where a told name came from, never the name (B5186).
+    eprintln!(
+        "lamp-voice second: the seen speaker's known face's name is told to this reply (LAMP_SECOND_FACE_NAME)"
+    );
     format!("\n\n{}", crate::known_faces::note(&name))
 }
 
