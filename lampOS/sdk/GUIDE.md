@@ -819,7 +819,7 @@ Last verified 10 Nov 2026, on a test lamp running a customer build: 10824 unless
 | A partner's brain installed on an edition lamp | planned | |
 | `play` a recorded move by name | in development | refused "not routed yet: waits for client packages"; send it as `move` |
 | Look at a face or a name | in development | refused "not in this release" today |
-| The faster camera stream | in development: built, behind `LAMP_EYES_FAST_STREAM`, off (9 Nov 2026) | measured on a test lamp on the customer build: the eyes' cost is nil, 13 to 16 frames a second reach the SDK at 640x480 or 1280x720; lamp-control's own CPU goes from about 2.5% to 3.4% of one core while streaming; it stays off until two privacy limits of the local socket are closed (switches.md) |
+| The faster camera stream | in development: built, behind `LAMP_EYES_FAST_STREAM`, off (9 Nov 2026) | measured on a test lamp on the customer build: the eyes' cost is nil, about 21 of the camera's 25 frames a second reach the SDK at 640x480 (10 Nov, with lamp-control's pace fix; 13 to 16 before it); lamp-control's own CPU goes from about 2.5% to 3.4% of one core while streaming; it stays off until two privacy limits of the local socket are closed (switches.md) |
 | The lamp announcing itself on the network | planned | then `--host` isn't needed |
 | The edition connector in the app (4 screens) | planned | |
 | The SDK in its own repository, the schema versioned there | planned | no date; package names stay `lampos` and `lamp-mcp` |
