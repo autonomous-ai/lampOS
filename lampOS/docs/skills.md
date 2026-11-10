@@ -2343,7 +2343,8 @@ to say aloud what it made; without either the app socket isn't started
    (`/run/lampos-app-make/make.sock` unset), opened to
    `LAMP_APP_MAKE_GROUP`, `lampos` unset, for `lamp-cloud` alone: the
    peer is read by `SO_PEERCRED`, and only `lamp-cloud.service` run as the
-   voice's own user is answered; any other caller is closed with no answer
+   `lampos` user is answered (`app_make::APP_CALLER_USER`; the voice runs
+   as root); any other caller is closed with no answer
    (`app_make::app_caller_may`; App Only's P2 on #5985: with no spoken yes,
    no other part in the group may put a skill on). One JSON line in, one
    out. A group not known starts nothing (`app_make::group_named`).
@@ -2482,7 +2483,8 @@ restart it is asked about again and the app is still told:
    skill typed in the app and made here: once the socket has answered
    `kept`, it is put on through the manage helper (`made_skill::put_on`),
    then said through the say service's own asks, at a good moment: "I
-   added NAME from a file, not from the Skills Store, and it's on."
+   added NAME from a file, not from the Skills Store, and it's on: WHAT IT
+   DOES, using WHAT IT USES. Say \"take it off\" to take it off."
    (`upload_skill::on_line`), or "I added a skill from a file but couldn't
    put it on: <why>." (`upload_skill::not_on_line`).
 7. **The manage helper holds it again** (`install_made`): a card that says
