@@ -1,3 +1,27 @@
+## 2026-11-10 — all three ARM gates green; ordinary-answer review finding
+
+- #5969 at 5dcb60eec: ARM 42765411943 passed 15,008 tests / 113 skipped
+  in 326.875 s; Linux and docs green. Two reads present, marked ready;
+  NEXT TRAIN 6760609455. No integration or device action by Third.
+- #5975 at f75e3da94: ARM 42764611606 passed 15,013 / 113 skipped
+  in 304.238 s, remaining stages and Linux/docs green. Second's read
+  clears the compound-object HOLD; Reviewer-lead's second read pending.
+  Still draft and requested audio OFF; original played/activation gates remain.
+- #5997 at 806b93e95: ARM 42765710152 passed 15,017 / 113 skipped
+  in 314.120 s, remaining stages and Linux/docs green. Second code and
+  Fourteen/El behavior reads pending; draft, original played check owed.
+  Historical failed runs remain recorded separately for all carries.
+- #5994 at 042474d4e: HOLD 6760583197, causal proof 6760694107.
+  After ordinary Yes, a no-tool answer about a plant kept outdoors is
+  wrongly replaced with the failed-memory line. Same normalized-text Engine
+  probe: parent parser passes all four ordinary descriptions; reviewed
+  parser fails, confirmed again after restoring it. Exact predicate probe
+  has zero mismatches before and three after. Four existing/authored tests
+  pass. Wrong-CWD and initial chunk-array fixture failures retained, not
+  counted as production results. Temporary edits removed; checkout clean.
+- #5993 docs read subsequently landed in nc-20, reported by the train bot.
+  Current main checkout stays clean; no device, deployment or activation.
+
 ## 2026-11-10 — three current carries published; music HOLD cleared
 
 - #5975 is published at f75e3da9456a3b07b7cf4ecdbb2c467a1536ae49,
