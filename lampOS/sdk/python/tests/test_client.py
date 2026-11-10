@@ -2676,6 +2676,7 @@ EXAMPLE_RUNS = {
     )),
     "follow.py": ([], "arrived", ("lease.take", ("look", {"at": "face"}))),
     "follow_hand.py": ([], "hand", ("lease.take", ("look", {"at": "hand"}))),
+    "heat_watch.py": ([], "hot", (("light", {"colour": "orange", "level": 2, "pattern": "pulse"}),)),
     "greet.py": ([], "arrived", (("gesture", {"name": "greeting"}),)),
     "phrase.py": ([], "phrase", (("light", {"colour": "warm", "level": 2, "pattern": "breathe"}), ("gesture", {"name": "nod"}))),
     "pomodoro.py": ([], None, (("light", {"colour": "warm", "level": 2}),)),
@@ -2719,6 +2720,7 @@ def test_every_example_runs_against_a_fake_lamp_and_sends_what_it_is_for(tmp_pat
         # track's last `seen: false` can land before the example waits for a
         # hand, and it waits on for one (Python 3.10 CI on #5864).
         "hand": lambda fake: fake.emit_hand_track(hand_track("wave", seconds=1.0), realtime=True),
+        "hot": lambda fake: fake.emit("body.state", joints={"yaw": {"deg": 0.0, "temp_c": 41}, "elbow": {"deg": 30.0, "temp_c": 66}}, lamp={"light": "off", "talking": False, "private": False}),
         "phrase": lambda fake: fake.emit("phrase.heard", phrase="good night lamp"),
         "tap": lambda fake: fake.emit("touch", kind="tap"),
     }
