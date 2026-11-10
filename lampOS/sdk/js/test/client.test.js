@@ -435,6 +435,21 @@ test('actions send the schema\'s fields and wait for done', async () => {
   });
 });
 
+test('a name that is no event says which event it meant', async () => {
+  await withLamp({}, async (lamp, fake) => {
+    // `lease.ended` is the event `lease` (state `lost`); `lease` and `done` come with no subscription.
+    assert.throws(() => lamp.on('lease.ended', () => {}), (error) => error.code === 'bad_request'
+      && error.message.includes("no event 'lease.ended'") && error.message.includes("lamp.on('lease', handler)")
+      && error.message.includes('lost'));
+    assert.throws(() => lamp.on('done.finished', () => {}), (error) => error.message.includes("lamp.on('done', handler)"));
+    assert.throws(() => lamp.on('camera.zoomed', () => {}), (error) => error.message.includes('person.arrived')
+      && error.message.includes("'lease' or 'done'") && error.message.includes('camera.frame')
+      && error.message.includes('microphone.audio'));
+    await assert.rejects(lamp.subscribe(['lease']), (error) => error.message.includes('without subscribing'));
+    assert.deepEqual(fake.received.filter((f) => f.op === 'subscribe'), []);
+  });
+});
+
 test('names outside the schema never leave this computer', async () => {
   await withLamp({}, async (lamp, fake) => {
     for (const call of [lamp.gesture('Nod'), lamp.gesture('../nod'), lamp.light('magenta', 3, 1000)]) {
