@@ -332,6 +332,23 @@ struct Owed {
     tag: Option<u64>,
 }
 
+/// How long a sight of a face is a face in view: the gaze's own
+/// (`gaze::LOST_US`).
+pub const FACE_IN_VIEW: Duration = Duration::from_secs(6);
+
+/// The newest face the eyes showed: where across the picture and down it
+/// (-1 left or top, 1 right or bottom, as `gaze::Sight`), when, and where the
+/// head looked when the picture was taken (yaw and pitch counts from the
+/// pose's own direction, the frame of a look's aim): the face is that far
+/// from where the head was then, wherever it has been since.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FaceSeen {
+    pub x: f32,
+    pub y: f32,
+    pub at: Instant,
+    pub head: [f32; 2],
+}
+
 /// The holder's look: where the head is asked to look, and the answer
 /// still owed for it.
 #[derive(Debug, Default)]
@@ -419,6 +436,68 @@ impl Looking {
             tag,
         });
         before
+    }
+
+    /// Whether a holder's look is `{"look":"face"}`, for [`Looking::ask_face`].
+    pub fn is_face(line: &[u8]) -> bool {
+        matches!(
+            serde_json::from_slice::<LookLine>(line),
+            Ok(LookLine { look: LookValue::Word(word), .. }) if word == "face"
+        )
+    }
+
+    /// A look at the face in view (`{"look":"face"}`): one turn toward it,
+    /// from where the head looked when the picture was taken, by the gaze's own measure of the
+    /// picture (`turn`: counts of yaw and of pitch that bring a face from the
+    /// right and the bottom edge to the middle). Sent on as the angles that
+    /// turn comes to, so everything a look is (the reach, `clamped`, the
+    /// `done`) is as for any look. Refused, and nothing aimed, when the body
+    /// is not held, the lamp's gaze is not measured, a look is still under
+    /// way (the picture was taken while the head moved), or no face was seen
+    /// in the last [`FACE_IN_VIEW`]. One glance: it never searches.
+    pub fn ask_face(
+        &mut self,
+        line: &[u8],
+        held: bool,
+        reach: Reach,
+        now: Instant,
+        face: Option<FaceSeen>,
+        turn: Option<[f32; 2]>,
+    ) -> Option<String> {
+        let tag = tag_of(line);
+        let refuse = |why: &str| Some(with_tag(refused(why), tag));
+        if !held {
+            return refuse("the body is not held");
+        }
+        let Some(turn) = turn else {
+            return refuse("this lamp's gaze is not measured, so it cannot look at a face");
+        };
+        if self.asked.is_some() {
+            return refuse("another look is still under way");
+        }
+        let Some(face) = face.filter(|face| {
+            face.x.is_finite()
+                && face.y.is_finite()
+                && now.saturating_duration_since(face.at) <= FACE_IN_VIEW
+        }) else {
+            return refuse("no face in view");
+        };
+        // From where the head looked when the picture was taken (not the last
+        // look's aim: the lamp's own life or gaze may have moved it before
+        // the lease), the picture's offset of the face in counts.
+        let counts = [
+            face.head[0] + turn[0] * face.x.clamp(-1.0, 1.0),
+            face.head[1] + turn[1] * face.y.clamp(-1.0, 1.0),
+        ];
+        let angles = serde_json::json!({
+            "yaw": counts[0] / COUNTS_PER_DEGREE,
+            "pitch": -counts[1] / COUNTS_PER_DEGREE,
+        });
+        let mut asked = serde_json::json!({ "look": angles });
+        if let Some(tag) = tag {
+            asked["tag"] = serde_json::json!(tag);
+        }
+        self.ask(asked.to_string().as_bytes(), held, reach, now)
     }
 
     /// Where the head is asked to look, as the body's `Asked::aim` takes it.
@@ -1922,5 +2001,129 @@ mod tests {
                 .get("tag")
                 .is_none()
         );
+    }
+
+    /// Row 34 (the guide): a look at the face in view is one turn toward it
+    /// by the gaze's measure, as any look; and refused, nothing aimed, when
+    /// there is no face to look at.
+    #[test]
+    fn a_look_at_a_face_turns_once_toward_it_and_never_searches() {
+        const TURN: [f32; 2] = [342.0, 200.0];
+        let now = Instant::now();
+        let seen = |x: f32, y: f32, ago_ms: u64| {
+            Some(FaceSeen {
+                x,
+                y,
+                at: now - Duration::from_millis(ago_ms),
+                head: [0.0; 2],
+            })
+        };
+        let face = br#"{"look":"face","tag":4}"#;
+        assert!(Looking::is_face(face));
+        assert!(!Looking::is_face(br#"{"look":"ahead"}"#));
+        assert!(!Looking::is_face(br#"{"look":{"yaw":1,"pitch":2}}"#));
+
+        // A face half across the picture to the right, a bit above the
+        // middle: 171 counts of yaw, 40 of pitch (head up), taken as the
+        // angles they come to, and the usual `done` follows.
+        let mut looking = Looking::default();
+        assert_eq!(
+            looking.ask_face(face, true, REACH, now, seen(0.5, -0.2, 100), Some(TURN)),
+            None
+        );
+        let aim = looking.aim().unwrap();
+        assert!((aim[0] - 171.0).abs() < 0.6, "{aim:?}");
+        assert!((aim[1] + 40.0).abs() < 0.6, "{aim:?}");
+        assert!(!looking.from_home());
+
+        // Not asked again while it is under way; the answer is tagged.
+        let said = value(
+            &looking
+                .ask_face(face, true, REACH, now, seen(0.5, -0.2, 100), Some(TURN))
+                .unwrap(),
+        );
+        assert_eq!(
+            (said["look"].clone(), said["tag"].clone()),
+            ("refused".into(), 4.into())
+        );
+        assert_eq!(said["why"], "another look is still under way");
+
+        // No face, a stale one, a body not held, a gaze not measured: refused
+        // with why, and nothing aimed or changed.
+        for (held, sight, turn, why) in [
+            (true, None, Some(TURN), "no face in view"),
+            (true, seen(0.0, 0.0, 6_001), Some(TURN), "no face in view"),
+            (true, seen(f32::NAN, 0.0, 10), Some(TURN), "no face in view"),
+            (
+                false,
+                seen(0.0, 0.0, 10),
+                Some(TURN),
+                "the body is not held",
+            ),
+            (
+                true,
+                seen(0.0, 0.0, 10),
+                None,
+                "this lamp's gaze is not measured, so it cannot look at a face",
+            ),
+        ] {
+            let mut looking = Looking::default();
+            let said = value(
+                &looking
+                    .ask_face(face, held, REACH, now, sight, turn)
+                    .unwrap(),
+            );
+            assert_eq!(said["look"], "refused", "{why}");
+            assert_eq!(said["why"], why);
+            assert_eq!(looking.aim(), None);
+        }
+
+        // From where the head looked when the picture was taken, not from
+        // home nor the last look's aim (the lead's P2): with the head 20
+        // degrees right of home when the lease was taken, a face at the
+        // middle of the picture keeps the head there, and one half across
+        // adds its half-picture to it.
+        let twenty = 20.0 * COUNTS_PER_DEGREE;
+        let from_there = |x: f32| {
+            Some(FaceSeen {
+                x,
+                y: 0.0,
+                at: now,
+                head: [twenty, 0.0],
+            })
+        };
+        let mut looking = Looking::default();
+        assert_eq!(
+            looking.ask_face(face, true, REACH, now, from_there(0.0), Some(TURN)),
+            None
+        );
+        let aim = looking.aim().unwrap();
+        assert!(
+            (aim[0] - twenty).abs() < 0.6,
+            "{aim:?}: stays 20 degrees right"
+        );
+        assert_eq!(looking.asked().unwrap().0[0].round(), 20.0);
+        let mut looking = Looking::default();
+        looking.ask_face(face, true, REACH, now, from_there(0.5), Some(TURN));
+        let aim = looking.aim().unwrap();
+        assert!((aim[0] - (twenty + 171.0)).abs() < 0.6, "{aim:?}");
+        // A look before it (another aim) changes nothing of where the picture
+        // was taken from.
+        let mut looking = Looking::default();
+        looking.ask(br#"{"look":{"yaw":-30,"pitch":0}}"#, true, REACH, now);
+        looking.asked = None; // answered
+        looking.ask_face(face, true, REACH, now, from_there(0.0), Some(TURN));
+        assert!((looking.aim().unwrap()[0] - twenty).abs() < 0.6);
+        let mut looking = Looking::default();
+        looking.ask_face(
+            face,
+            true,
+            REACH,
+            now,
+            seen(1.0, 0.0, 10),
+            Some([900.0, 200.0]),
+        );
+        assert_eq!(looking.aim().unwrap()[0], REACH.yaw);
+        assert!(looking.asked().unwrap().1, "clamped");
     }
 }

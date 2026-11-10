@@ -972,6 +972,13 @@ struct LeaseDoor {
     reach: lamp_body::lease::Reach,
     /// The holder's pose of the head's roll and the arm.
     posing: lamp_body::lease::Posing,
+    /// The newest face the eyes showed, for a look at it (kept while the
+    /// body is held too), and the gaze's measure of the picture (counts of
+    /// yaw and pitch from an edge to the middle); none until measured.
+    face: Option<lamp_body::lease::FaceSeen>,
+    picture: Option<[f32; 2]>,
+    /// Where the head looked at the last step, to tell when it is moving.
+    looked: Option<[f32; 2]>,
 }
 
 // Used by the Linux body and its Linux-only test.
@@ -1003,6 +1010,9 @@ impl LeaseDoor {
             lease: Default::default(),
             looking: Default::default(),
             posing: Default::default(),
+            face: None,
+            picture: None,
+            looked: None,
             limping: Default::default(),
             reach: lamp_body::lease::Reach {
                 yaw: 0.0,
@@ -1046,6 +1056,36 @@ impl LeaseDoor {
     /// Whether the holder has let the base go limp, while it holds the body.
     fn limp(&self, now: std::time::Instant) -> bool {
         self.lease.holds(now) && self.limping.on()
+    }
+
+    /// The eyes' newest word: a face seen is kept for a look at it, with
+    /// where the head looked when it was seen (`look`: yaw and pitch counts
+    /// from the pose's own direction, as the body applies them), nobody seen
+    /// clears it (it is not a face in view any more). A picture taken while
+    /// the head was moving (`look` changed since the last word) is not kept:
+    /// it shows the face from somewhere between.
+    fn sight(
+        &mut self,
+        seen: Option<lamp_body::gaze::Seen>,
+        look: [f32; 2],
+        now: std::time::Instant,
+    ) {
+        let still = self
+            .looked
+            .is_none_or(|before| (0..2).all(|axis| (look[axis] - before[axis]).abs() < 1.0));
+        self.looked = Some(look);
+        match seen {
+            Some(lamp_body::gaze::Seen { face: Some(sight) }) if still => {
+                self.face = Some(lamp_body::lease::FaceSeen {
+                    x: sight.x,
+                    y: sight.y,
+                    at: now,
+                    head: look,
+                });
+            }
+            Some(lamp_body::gaze::Seen { face: None }) => self.face = None,
+            _ => {}
+        }
     }
 
     fn aim(&self, now: std::time::Instant) -> Option<[f32; 2]> {
@@ -1100,6 +1140,24 @@ impl LeaseDoor {
                 let said = lamp_body::lease::Limping::look_refused(&line[..end]);
                 look_answered(&said);
                 out += &said;
+            } else if lamp_body::lease::Looking::is_face(&line[..end]) {
+                // A look at the face in view: one turn by the gaze's measure.
+                let held = self.lease.holds(now);
+                let answer = self.looking.ask_face(
+                    &line[..end],
+                    held,
+                    self.reach,
+                    now,
+                    self.face,
+                    self.picture,
+                );
+                if answer.is_none() {
+                    eprintln!("lamp-body: a holder's look at a face taken");
+                }
+                if let Some(said) = answer {
+                    look_answered(&said);
+                    out += &said;
+                }
             } else if lamp_body::lease::Looking::is_look(&line[..end]) {
                 let held = self.lease.holds(now);
                 let answer = self.looking.ask(&line[..end], held, self.reach, now);
@@ -1551,10 +1609,13 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 "lamp-body: the body may be held by lamp-control at {} (lampos {lampos:?})",
                 path.display()
             );
-            Some(LeaseDoor::bind(
-                path,
-                Box::new(move |caller| holder_may(caller, lampos)),
-            )?)
+            let mut door =
+                LeaseDoor::bind(path, Box::new(move |caller| holder_may(caller, lampos)))?;
+            door.picture = arguments
+                .gaze
+                .as_ref()
+                .map(|choice| choice.turn.map(f32::from));
+            Some(door)
         }
         None => None,
     };
@@ -1573,6 +1634,8 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     // The body's last step, for a holder's look to be there.
     let lease_seen = std::cell::Cell::new(None);
     let lease_aimed = std::cell::Cell::new(None);
+    // Where the head looks as the body applies it, to place a face seen.
+    let lease_looked = std::cell::Cell::new([0.0f32; 2]);
     let lease_posed = std::cell::Cell::new(None);
     let moves = moves_of(arguments.moves.as_deref());
     // `--hold-from` (#2668): a hand on the head from a test input, for
@@ -1961,6 +2024,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         // there, or stopped short, by where it was sent (lamp-75c9, 7 Nov).
         lease_seen.set(Some((glimpse.wanted, glimpse.positions)));
         lease_aimed.set(glimpse.look_aimed);
+        lease_looked.set(glimpse.look);
         lease_posed.set(Some(lamp_body::lease::PoseSeen {
             posed: match (glimpse.posed, glimpse.unposed) {
                 (Some(posed), None) => Ok(posed),
@@ -2479,6 +2543,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                         asleep: asleep.get(),
                     };
                     let now = std::time::Instant::now();
+                    door.sight(asked.seen, lease_looked.get(), now);
                     door.looking.applied(lease_aimed.get());
                     if door.turn(around, now, lease_seen.get(), lease_posed.get()) {
                         lamp_body::body::Asked {
@@ -3597,6 +3662,87 @@ mod tests {
 
     /// The door takes a holder's pose only while held, answers it once the
     /// arm is there, as the body kept it, and lets it go with the lease.
+    /// A look at a face over the real socket (row 34): one turn toward the
+    /// face the eyes last showed, by the gaze's measure; "no face in view"
+    /// before any is seen, and once the eyes say nobody is there.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_lease_door_looks_once_at_the_face_the_eyes_last_showed() {
+        use lamp_body::gaze::{Seen, Sight};
+        use lamp_body::lease::{Around, Reach};
+        use std::io::{BufRead, BufReader, Write};
+        use std::os::unix::net::UnixStream;
+        let directory = std::env::temp_dir().join(format!("lamp-body-face-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("lease.sock");
+        let mut door = LeaseDoor::bind(&path, Box::new(|caller| caller.is_some())).unwrap();
+        door.reach = Reach {
+            yaw: 480.0,
+            up: 150.0,
+            down: 15.0,
+        };
+        door.picture = Some([342.0, 200.0]);
+        let quiet = Around::default();
+        let now = std::time::Instant::now();
+        let mut holder = UnixStream::connect(&path).unwrap();
+        let mut heard = BufReader::new(holder.try_clone().unwrap());
+        let mut said = || {
+            let mut line = String::new();
+            heard.read_line(&mut line).unwrap();
+            line
+        };
+        // Held, but no face seen yet: refused, nothing aimed.
+        holder
+            .write_all(b"{\"hold\":{\"for_ms\":5000}}\n{\"look\":\"face\"}\n")
+            .unwrap();
+        assert!(door.turn(quiet, now, None, None));
+        assert_eq!(said(), "{\"lease\":\"held\",\"tags\":true}\n");
+        assert_eq!(
+            said(),
+            "{\"look\":\"refused\",\"why\":\"no face in view\"}\n"
+        );
+        assert_eq!(door.aim(now), None);
+        // A face half across to the right: one turn of 171 counts of yaw.
+        let face = |x| {
+            Some(Seen {
+                face: Some(Sight {
+                    x,
+                    y: 0.0,
+                    size: 0.2,
+                    turned: 0.0,
+                }),
+            })
+        };
+        door.sight(face(0.5), [0.0; 2], now);
+        holder.write_all(b"{\"look\":\"face\"}\n").unwrap();
+        assert!(door.turn(quiet, now, None, None));
+        let aim = door.aim(now).unwrap();
+        assert!((aim[0] - 171.0).abs() < 0.6 && aim[1] == 0.0, "{aim:?}");
+        // Nobody there any more, and the eyes say so: a later look is refused.
+        door.looking.end("test");
+        door.sight(Some(Seen { face: None }), [0.0; 2], now);
+        holder.write_all(b"{\"look\":\"face\"}\n").unwrap();
+        door.turn(quiet, now, None, None);
+        assert!(said().contains("no face in view"));
+        // The head 20 degrees right when the picture was taken (the lamp's
+        // own gaze put it there before the lease): a face in the middle keeps
+        // it there; a picture taken while the head moved is not kept.
+        let twenty = 20.0 * lamp_body::lease::COUNTS_PER_DEGREE;
+        door.looking.end("test");
+        door.sight(face(0.0), [twenty, 0.0], now);
+        door.sight(face(0.0), [twenty, 0.0], now);
+        holder.write_all(b"{\"look\":\"face\"}\n").unwrap();
+        door.turn(quiet, now, None, None);
+        let aim = door.aim(now).unwrap();
+        assert!((aim[0] - twenty).abs() < 0.6, "{aim:?}");
+        door.looking.end("test");
+        door.sight(Some(Seen { face: None }), [twenty, 0.0], now);
+        door.sight(face(0.0), [twenty + 50.0, 0.0], now);
+        assert_eq!(door.face, None, "taken while the head moved: not kept");
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
     #[cfg(target_os = "linux")]
     #[test]
     fn the_lease_door_poses_its_holders_arm_and_says_when_it_is_there() {

@@ -32,7 +32,7 @@ const EXAMPLE_RUNS = {
   'ci-light.js': [['pass'], null, [['light', { colour: 'green', level: 3, pattern: 'breathe' }]]],
   // Its three poses, eased as the SDK eases them.
   'curious.js': [[], null, ['lease.take', ['move', { frames: posesToFrames([{ pitch: 3 }, { pitch: 2, yaw: -3 }, { pitch: 2, yaw: 3 }], { holdMs: 400 }) }]]],
-  'follow.js': [[], 'arrived', ['lease.take', ['look', { at: 'face' }]], 'not now: refused: not in this release: look at a face or a name'],
+  'follow.js': [[], 'arrived', ['lease.take', ['look', { at: 'face' }]]],
   'follow-hand.js': [[], 'hand', ['lease.take', ['look', { at: 'hand' }]]],
   'greet.js': [[], 'arrived', [['gesture', { name: 'greeting' }]]],
   'phrase.js': [[], 'phrase', [['light', { colour: 'warm', level: 2, pattern: 'breathe' }], ['gesture', { name: 'nod' }]]],

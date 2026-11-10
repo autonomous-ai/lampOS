@@ -452,10 +452,18 @@ def test_the_fake_answers_look_as_lamp_control_does(tmp_path):
                 dones = []
                 lamp.on("done", dones.append)
                 async with lamp.lease("body", for_ms=5000):
-                    for at, why in [("face", "not in this release: look at a face or a name"), ("name", "not in this release: look at a face or a name")]:
-                        with pytest.raises(errors.BY_CODE["refused"]) as raised:
-                            await lamp.look(at)
-                        assert why in raised.value.why
+                    with pytest.raises(errors.BY_CODE["refused"]) as raised:
+                        await lamp.look("name")
+                    assert "the lamp has no sound direction" in raised.value.why
+                    # A face: taken, then dropped "no face in view" while the
+                    # fake sees none.
+                    assert (await lamp.look("face"))["to"] == "body"
+                    for _ in range(50):
+                        if dones:
+                            break
+                        await asyncio.sleep(0.01)
+                    assert (dones[0]["how"], dones[0]["why"]) == ("dropped", "no face in view")
+                    dones.clear()
                     assert (await lamp.look(yaw=-10, pitch=5))["to"] == "body"
                     for _ in range(50):
                         if dones:
@@ -533,7 +541,7 @@ def test_a_waiting_look_ends_a_hand_follow_when_taken_not_at_its_done(tmp_path):
                 # A refused look leaves a following alone.
                 again = await lamp.follow_hand().start()
                 with pytest.raises(errors.BY_CODE["refused"]):
-                    await lamp.look("face", wait=True)
+                    await lamp.look("name", wait=True)
                 assert again.following
                 await again.stop()
                 async with lamp.lease("body", for_ms=5000) as lease:
@@ -1601,7 +1609,7 @@ def test_the_fake_takes_look_and_yaw_and_pitch_as_a_stable_lamp_does(tmp_path):
         from lampos.testing import JOINTS_WAIT, LAMP_CONTROL_REFUSES
 
         async with FakeLamp(
-            grants=schema.grants(), refuses=LAMP_CONTROL_REFUSES
+            grants=schema.grants(), refuses=LAMP_CONTROL_REFUSES, face_look=False
         ) as fake:
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
@@ -2573,6 +2581,26 @@ def test_the_volume_needs_the_speak_grant(tmp_path):
     run(go())
 
 
+def test_the_fake_turns_once_toward_a_face_in_view(tmp_path):
+    # The next build (row 34): a look at a face is one turn toward the face
+    # the body sees, its `done` saying where the head got to.
+    async def go():
+        async with FakeLamp(grants=schema.grants(), face={"yaw": 12.0, "pitch": -4.0}) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                dones = []
+                lamp.on("done", dones.append)
+                async with lamp.lease("body", for_ms=5000):
+                    assert (await lamp.look("face"))["to"] == "body"
+                    for _ in range(50):
+                        if dones:
+                            break
+                        await asyncio.sleep(0.01)
+                    assert (dones[0]["how"], dones[0]["yaw"], dones[0]["pitch"]) == ("finished", 12.0, -4.0)
+
+    run(go())
+
+
 # Every example but the tour (which has its own test), run from sdk/python as
 # the README runs it, against a fake lamp that grants everything: its
 # arguments, the event it waits for (said once it has subscribed), the ops it exists to send
@@ -2595,7 +2623,7 @@ EXAMPLE_RUNS = {
         "lease.take",
         ("move", {"frames": poses_to_frames([{"pitch": 3}, {"pitch": 2, "yaw": -3}, {"pitch": 2, "yaw": 3}], hold_ms=400)}),
     )),
-    "follow.py": ([], "arrived", ("lease.take", ("look", {"at": "face"})), "not now: refused: not in this release: look at a face or a name"),
+    "follow.py": ([], "arrived", ("lease.take", ("look", {"at": "face"}))),
     "follow_hand.py": ([], "hand", ("lease.take", ("look", {"at": "hand"}))),
     "greet.py": ([], "arrived", (("gesture", {"name": "greeting"}),)),
     "phrase.py": ([], "phrase", (("light", {"colour": "warm", "level": 2, "pattern": "breathe"}), ("gesture", {"name": "nod"}))),

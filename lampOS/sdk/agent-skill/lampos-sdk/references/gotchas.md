@@ -35,7 +35,9 @@ And three more:
 - **`look` on a resting lamp may end `cut_short`**, "not there in time:
   something holds the head", with no hand on it. Treat a `cut_short` close
   to the target as arrived, ask again, or lift the head with a gesture
-  first. `look` at `face` and `name` are refused, "not in this release";
+  first. `look` at `name` is refused, "not in this release" (no sound
+  direction), and `face` is refused on 11091 and older, while on the next build
+  it turns once toward the face in view or ends `dropped` "no face in view";
   `ahead`, a yaw and pitch, and `hand` work.
 - **The camera** sends the eyes' newest frame, about 1 to 2 a second; the
   fast path (`fast: true`) is not on customer lamps.
