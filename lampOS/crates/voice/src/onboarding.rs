@@ -1120,6 +1120,9 @@ pub struct Onboarding {
     /// The owner's language (#4473 (b)): the walk hears and says its lines
     /// in it ([`in_language`]); none is English, as the walk always was.
     language: Option<crate::language::Language>,
+    /// The last note [`Self::tick`] handed out has no line in the owner's
+    /// language: [`Self::tick_line`] leaves it the model's to say in it.
+    untranslated: bool,
     /// How many faces the eyes saw at the last look ([`Self::face_now`]);
     /// `None` when none was read fresh. The face asked for once more waits
     /// for exactly one (Thirteen's P3 on #5328).
@@ -1447,6 +1450,7 @@ impl Onboarding {
             face_saved_unasked: false,
             face_saved_name: None,
             language: None,
+            untranslated: false,
             faces_in_view: None,
             looked: None,
             felt: None,
@@ -3112,9 +3116,10 @@ impl Onboarding {
     /// [`Self::tick`]'s note as the coordinator begins it: a fixed line
     /// ("Say only this: ...") is the walk's own line ([`own_line`]), said as
     /// written with no chat (#5999: the model reworded or refused the walk's
-    /// lines, and scene A's face question was not said word for word). An
-    /// "Ask exactly this" note tells the model how to take the answer, and
-    /// stays the model's.
+    /// lines, and scene A's face question was not said word for word), in
+    /// the owner's language. An "Ask exactly this" note tells the model how
+    /// to take the answer, and stays the model's; so does a fixed line with
+    /// no line in the owner's language.
     pub fn tick_line(
         &mut self,
         now_us: u64,
@@ -3124,8 +3129,14 @@ impl Onboarding {
         face: Option<Framing>,
         still: bool,
     ) -> Option<String> {
-        self.tick(now_us, quiet_us, can_speak, paused, face, still)
-            .map(own_line)
+        let note = self.tick(now_us, quiet_us, can_speak, paused, face, still)?;
+        // A line with none in the owner's language stays a note, for the
+        // model to say in it: never an own line in English.
+        Some(if self.untranslated {
+            note
+        } else {
+            own_line(note)
+        })
     }
 
     /// Call every loop. `quiet_us` is how long nothing has been said to the
@@ -3183,7 +3194,9 @@ impl Onboarding {
             self.owed_note.turn = None;
         }
         // Kept in English above; said in the owner's language (#4473 (b)).
-        Some(in_language::said(note, self.language))
+        let said = in_language::said(note.clone(), self.language);
+        self.untranslated = self.language.is_some() && said == note;
+        Some(said)
     }
 
     fn tick_led(
@@ -7441,6 +7454,69 @@ mod tests {
                 "May I remember your face, so I know you next time?".to_owned()
             )]
         );
+    }
+
+    /// A Vietnamese owner hears the walk's own lines in Vietnamese: a fixed
+    /// line is marked the walk's own only once said in the owner's language
+    /// (`in_language`). One with no line in that language stays a note for
+    /// the model to say in it, never an own line in English (the
+    /// Reviewer-lead's P3 on #5777: exact text is not translated).
+    #[test]
+    fn a_vietnamese_owner_hears_the_walks_own_lines_in_vietnamese() {
+        let mut room = Room::new("fixed-lines-own-vi");
+        room.walk.language = Some(crate::language::Language::Vietnamese);
+        room.walk.face_kept = true;
+        let walk = |room: &mut Room, for_us: u64| {
+            let mut lines = Vec::new();
+            let until = room.at + for_us;
+            while room.at < until {
+                room.walk.drain_storage_for_test(room.at);
+                let quiet = room.at - room.said;
+                if let Some(line) =
+                    room.walk
+                        .tick_line(room.at, quiet, true, false, Some(NEAR_MIDDLE), true)
+                {
+                    let (boot, turn) = (BootId::new([3; 16]).unwrap(), room.at + 1);
+                    if room.walk.bind_opener(boot, turn) {
+                        room.walk
+                            .invitation_finished(boot, turn, Delivery::Whole, room.at);
+                    }
+                    lines.push(line);
+                    room.said = room.at;
+                }
+                room.at += S / 4;
+            }
+            lines
+        };
+        let mut lines = walk(&mut room, 27 * S);
+        room.walk.heard("Mình tên là Walter.", room.at);
+        room.walk.lamp_said(room.at);
+        room.walk.lamp_words("Walter, đúng không?");
+        room.walk.heard("Vâng.", room.at);
+        room.walk.lamp_said(room.at);
+        room.walk.lamp_words("Được rồi, Walter.");
+        lines.extend(walk(&mut room, S));
+        let face_ask = in_language::said(
+            skill::FACE_ASK.to_owned(),
+            Some(crate::language::Language::Vietnamese),
+        );
+        assert_eq!(
+            lines.last().and_then(|line| own_words(line)),
+            fixed_words(&face_ask)
+        );
+        // No face kept: the name-only line, which has no Vietnamese line.
+        lines.extend(walk(&mut room, FACE_SAVE_WAIT_US + S));
+        let name_only = lines
+            .iter()
+            .find(|line| line.contains("Got your name."))
+            .expect("the name-only line");
+        assert_eq!(own_words(name_only), None, "{name_only}");
+        // Every own line is said in Vietnamese, none in English.
+        for line in &lines {
+            if let Some(words) = own_words(line) {
+                assert!(!words.is_ascii(), "{words}");
+            }
+        }
     }
 
     /// The walk's face question and its yes end the step once the face is

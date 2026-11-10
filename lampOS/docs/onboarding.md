@@ -368,11 +368,18 @@ lines, the walk's face question (`FACE_ASK`), the name-only line, the
 closing. Each is said in its words with no chat, as the sentence prompts
 above; its written note still stays in the conversation's history beside
 the lamp's words, so the face question's yes still runs the setup save
-(`Thread::names_window`). An "Ask exactly this" note (`who_you_are`'s ask
+(`Thread::names_window`): unlike a skill's exact line (#5777), it goes
+through the provider, whose words reach the thread as any answer's. It is
+marked once said in the owner's language (`in_language`); a fixed line with
+no line in that language (the name-only line and the longer closings in
+Vietnamese, for one) stays a note for the model to say in it, never an own
+line in English. An "Ask exactly this" note (`who_you_are`'s ask
 and its read-back, preferences, the room sounds and faces asks, the face
 question asked again) tells the model how to take the answer, so it stays
-the model's. Test:
-`onboarding::tests::the_walks_fixed_lines_go_out_as_its_own_lines`.
+the model's. Tests:
+`onboarding::tests::the_walks_fixed_lines_go_out_as_its_own_lines`,
+`onboarding::tests::a_vietnamese_owner_hears_the_walks_own_lines_in_vietnamese`,
+`second_provider::tests::the_walks_own_face_question_is_kept_as_said_and_its_yes_names_the_face`.
 
 **The walk's last words name a few things to try** (#5316, the first
 customers' stage 2 on #5296), with `LAMP_ONBOARDING_FIRST_TRIES=on` exactly
