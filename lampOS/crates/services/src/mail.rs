@@ -16,6 +16,9 @@
 //! make an app password, as Google Workspace's often can't) reads and
 //! sends through Gmail's REST API instead: the calls and their answers
 //! here, the requests made by `serve.rs` with the token.
+//!
+//! A mail's attachments are named when it is read whole, and the text of
+//! one of them read on its own ask: [`attachments`].
 use crate::{catalog, net, reads};
 use base64::{
     Engine,
@@ -35,8 +38,11 @@ pub const WITHIN: Duration = Duration::from_secs(20);
 pub const CONNECT_WITHIN: Duration = Duration::from_secs(5);
 /// The longest protocol line read.
 const LINE_MOST: usize = 65_536;
-/// The longest literal read, and all of one response's.
-const LITERAL_MOST: usize = 262_144;
+/// The longest literal read (an attachment's part, fetched at most
+/// [`attachments::ATTACHMENT_FETCH`]; a PDF's, at most
+/// [`attachments::PDF_FETCH`], raises it for that fetch alone), and all of
+/// one response's.
+const LITERAL_MOST: usize = net::BODY_MOST;
 const RESPONSE_MOST: usize = 2 << 20;
 /// The most mails one list returns.
 pub const LIST_MOST: usize = 10;
@@ -83,6 +89,8 @@ pub struct MailItem {
     pub subject: String,
     pub date: String,
     pub text: String,
+    /// Its attachments, when it was read whole ([`attachments`]).
+    pub attachments: Vec<Attachment>,
 }
 
 /// What is read.
@@ -122,7 +130,26 @@ pub trait Mail {
         pass: &str,
         out: &Outgoing,
     ) -> impl Future<Output = Result<(), Failure>>;
+    /// One mail by its id, its attachments named and the one `pick`
+    /// chooses read ([`attachments::chosen`]); none when there is no such
+    /// mail.
+    fn attachment(
+        &self,
+        user: &str,
+        pass: &str,
+        id: &str,
+        pick: &Pick,
+    ) -> impl Future<Output = Result<Option<MailItem>, Failure>>;
 }
+
+mod attachments;
+pub mod pdf;
+pub use attachments::{
+    ATTACHMENTS_MOST, Attachment, CANT_READ, PDF_FETCH, Pick, api_attachment_bytes,
+    api_attachment_url, api_inline_bytes, attachment_text, chosen, fetch_most, is_pdf, note,
+    read_attachment, read_into, readable,
+};
+pub use pdf::{PDF_CANT_READ, PDF_TOO_LARGE};
 
 // --- Security mails ---------------------------------------------------------
 
@@ -570,6 +597,24 @@ pub fn is_security_mail(from: &str, subject: &str, text: &str) -> bool {
     near_code || signs_in || has_login_link(&all)
 }
 
+/// Whether a mail is a security one ([`is_security_mail`]) by everything
+/// known of it: its sender, subject and text, and each attachment's name,
+/// type and any text read. Checked before an attachment is chosen or
+/// fetched, so a mail that its file's name alone marks (`verification
+/// code.txt`) has no byte of it fetched, and again on what is returned.
+pub fn is_security_item(item: &MailItem) -> bool {
+    let mut all = vec![item.text.as_str()];
+    for attachment in &item.attachments {
+        // Its whole names (to 1,024 characters each), not the shown one
+        // cut to 120: a marker past the cut still counts.
+        all.push(&attachment.name);
+        all.push(&attachment.whole_name);
+        all.push(&attachment.kind);
+        all.extend(attachment.text.as_deref());
+    }
+    is_security_mail(&item.from, &item.subject, &all.join("\n"))
+}
+
 // --- MIME -------------------------------------------------------------------
 
 /// A message's header fields, unfolded, in order.
@@ -658,30 +703,91 @@ fn base64_lenient(bytes: &[u8]) -> Vec<u8> {
     STANDARD.decode(&clean[..whole]).unwrap_or_default()
 }
 
+/// Whether a B word's text is base64 as written: whole quartets, padded,
+/// nothing [`base64_lenient`] would cut or skip.
+fn base64_exact(bytes: &[u8]) -> bool {
+    let clean: Vec<u8> = bytes
+        .iter()
+        .copied()
+        .filter(|b| !b.is_ascii_whitespace())
+        .collect();
+    clean.len().is_multiple_of(4) && STANDARD.decode(&clean).is_ok()
+}
+
+/// Whether a Q word's text has every `=` followed by two hex digits.
+fn quoted_exact(bytes: &[u8]) -> bool {
+    bytes.iter().enumerate().all(|(i, &b)| {
+        b != b'='
+            || bytes
+                .get(i + 1..i + 3)
+                .is_some_and(|hex| hex.iter().all(u8::is_ascii_hexdigit))
+    })
+}
+
+/// The most of a header value [`decode_words_with`] reads; the rest is
+/// left out, and the value counted as not read whole.
+pub const DECODE_MOST: usize = 16 * 1024;
+
+/// The most bytes one encoded word may take from its `=?` to its `?=`
+/// (RFC 2047 says 75; mailers write longer ones).
+const WORD_MOST: usize = 512;
+
+/// `at` or the nearest char boundary below it, within `text`.
+fn char_floor(text: &str, at: usize) -> usize {
+    let mut at = at.min(text.len());
+    while !text.is_char_boundary(at) {
+        at -= 1;
+    }
+    at
+}
+
 /// RFC 2047's encoded words (`=?charset?B|Q?text?=`) decoded; the space
 /// between two of them dropped.
 pub fn decode_words(value: &str) -> String {
+    decode_words_with(value, |bytes, charset| Some(charset_text(bytes, charset))).0
+}
+
+/// [`decode_words`] with `text` reading each word's bytes in its charset;
+/// and whether every word was read (none malformed, none `text` refused).
+/// A word whose payload is malformed (`=ZZ`, a cut-off quartet) is still
+/// decoded as [`decode_words`] does, but isn't counted as read.
+pub fn decode_words_with(
+    value: &str,
+    text: impl Fn(&[u8], &str) -> Option<String>,
+) -> (String, bool) {
+    // El's P1 on #5826: a value cut to `DECODE_MOST` first, and each word
+    // looked for within `WORD_MOST` of its `=?`, so a value that keeps
+    // opening words and never closes one costs linear time, not quadratic.
+    let cut = char_floor(value, DECODE_MOST);
     let mut out = String::new();
-    let mut rest = value;
+    let mut rest = &value[..cut];
     let mut last_was_word = false;
+    let mut whole = cut == value.len();
     while let Some(start) = rest.find("=?") {
         let (before, after) = rest.split_at(start);
         let decoded = (|| {
-            let inner = &after[2..];
+            let inner = &after[2..char_floor(after, WORD_MOST)];
             let (charset, inner) = inner.split_once('?')?;
             let (encoding, inner) = inner.split_once('?')?;
             let end = inner.find("?=")?;
-            let text = &inner[..end];
-            let bytes = match encoding {
-                "B" | "b" => base64_lenient(text.as_bytes()),
-                "Q" | "q" => quoted_printable(text.replace('_', " ").as_bytes()),
+            let encoded = &inner[..end];
+            let (bytes, exact) = match encoding {
+                "B" | "b" => (
+                    base64_lenient(encoded.as_bytes()),
+                    base64_exact(encoded.as_bytes()),
+                ),
+                "Q" | "q" => (
+                    quoted_printable(encoded.replace('_', " ").as_bytes()),
+                    quoted_exact(encoded.as_bytes()),
+                ),
                 _ => return None,
             };
             let used = 2 + charset.len() + 1 + encoding.len() + 1 + end + 2;
-            Some((charset_text(&bytes, charset), used))
+            Some((text(&bytes, charset), used, exact))
         })();
         match decoded {
-            Some((text, used)) => {
+            Some((Some(text), used, exact)) => {
+                whole &= exact;
                 if !(last_was_word && before.trim().is_empty()) {
                     out.push_str(before);
                 }
@@ -689,7 +795,15 @@ pub fn decode_words(value: &str) -> String {
                 rest = &after[used..];
                 last_was_word = true;
             }
+            Some((None, used, _)) => {
+                whole = false;
+                out.push_str(before);
+                out.push_str(&after[..used]);
+                rest = &after[used..];
+                last_was_word = false;
+            }
             None => {
+                whole = false;
                 out.push_str(before);
                 out.push_str("=?");
                 rest = &after[2..];
@@ -698,7 +812,7 @@ pub fn decode_words(value: &str) -> String {
         }
     }
     out.push_str(rest);
-    out
+    (out, whole)
 }
 
 /// A header parameter (`boundary`, `charset`), unquoted.
@@ -811,6 +925,11 @@ fn part_text(headers: &Headers, body: &[u8], depth: u8) -> Option<(bool, String)
             .or_else(|| texts.first())
             .cloned();
     }
+    // A file the attachment list names, `inline` or not, is never the
+    // mail's own text ([`attachments::is_file`]).
+    if depth > 0 && attachments::is_file(headers) {
+        return None;
+    }
     let decoded = match headers
         .get("content-transfer-encoding")
         .map(|value| value.trim().to_ascii_lowercase())
@@ -877,15 +996,19 @@ struct Response {
 pub struct Imap<S> {
     io: BufReader<S>,
     tag: u32,
+    /// The longest literal taken now: [`LITERAL_MOST`], or a whole PDF's
+    /// part while it is fetched ([`attachments::PDF_FETCH`]).
+    literal_most: usize,
 }
 
 /// Before a UID from All Mail in a mail's id over IMAP (`all41`); a bare
 /// UID (`41`) is the inbox's. A UID names a mail only within its mailbox,
-/// so the id carries which one, and `message` opens that one again.
+/// so the id carries which one, and `message` and `attachment` open that
+/// one again.
 pub const ALL_MAIL_ID: &str = "all";
 
 /// A mail's id over IMAP: whether its UID is All Mail's, and the UID.
-fn imap_id(id: &str) -> Option<(bool, u32)> {
+pub(crate) fn imap_id(id: &str) -> Option<(bool, u32)> {
     let (in_all, uid) = match id.strip_prefix(ALL_MAIL_ID) {
         Some(uid) => (true, uid),
         None => (false, id),
@@ -1009,6 +1132,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
         Imap {
             io: BufReader::new(stream),
             tag: 0,
+            literal_most: LITERAL_MOST,
         }
     }
 
@@ -1023,7 +1147,9 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
             match literal_size(&line) {
                 Some(size) => {
                     total += size;
-                    if size > LITERAL_MOST || total > RESPONSE_MOST {
+                    if size > self.literal_most
+                        || total > RESPONSE_MOST.max(self.literal_most + LINE_MOST)
+                    {
                         return Err(Failure::Unreached);
                     }
                     let label = line[..line.rfind('{').unwrap_or(0)].to_owned();
@@ -1137,6 +1263,21 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
         }
     }
 
+    /// EXAMINE of the mailbox a mail's id names: All Mail for `in_all`,
+    /// else the inbox. False, nothing opened, when All Mail is no longer
+    /// shown over IMAP (no such mail here).
+    pub async fn examine_named(&mut self, in_all: bool) -> Result<bool, Failure> {
+        let mailbox = if in_all {
+            self.all_mail().await?
+        } else {
+            Some("INBOX".to_owned())
+        };
+        match mailbox {
+            Some(mailbox) => self.examine(&mailbox).await.map(|()| true),
+            None => Ok(false),
+        }
+    }
+
     /// UID SEARCH: every UID found, oldest first. `words` are Gmail's own
     /// search (`X-GM-RAW`); none is every mail.
     pub async fn search(&mut self, words: Option<&str>) -> Result<Vec<u32>, Failure> {
@@ -1182,10 +1323,13 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
             .map(u32::to_string)
             .collect::<Vec<_>>()
             .join(",");
+        // A whole mail's fetch names its attachments too.
+        let whole = text_most >= MESSAGE_FETCH;
+        let structure = if whole { " BODYSTRUCTURE" } else { "" };
         let fetched = self
             .run(
                 &format!(
-                    "UID FETCH {set} (UID BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE CONTENT-TYPE CONTENT-TRANSFER-ENCODING)] BODY.PEEK[TEXT]<0.{text_most}>)"
+                    "UID FETCH {set} (UID BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE CONTENT-TYPE CONTENT-TRANSFER-ENCODING)] BODY.PEEK[TEXT]<0.{text_most}>{structure})"
                 ),
                 None,
             )
@@ -1223,6 +1367,11 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
                         subject: field("subject"),
                         date: field("date"),
                         text: body_text(&head, body, keep),
+                        attachments: if whole {
+                            attachments::imap_attachments(response)
+                        } else {
+                            Vec::new()
+                        },
                     },
                 ))
             })
@@ -1271,22 +1420,15 @@ pub async fn read_mail<S: AsyncRead + AsyncWrite + Unpin>(
         }
         MailAsk::Message(id) => {
             let (in_all, uid) = imap_id(id).ok_or(Failure::Unreached)?;
-            let mailbox = if in_all {
-                imap.all_mail().await?
-            } else {
-                Some("INBOX".to_owned())
-            };
-            match mailbox {
-                Some(mailbox) => {
-                    imap.examine(&mailbox).await?;
-                    let mut items = imap.fetch(&[uid], MESSAGE_FETCH, TEXT_MOST).await?;
-                    for item in &mut items {
-                        item.id.clone_from(id);
-                    }
-                    items
+            if imap.examine_named(in_all).await? {
+                let mut items = imap.fetch(&[uid], MESSAGE_FETCH, TEXT_MOST).await?;
+                for item in &mut items {
+                    item.id.clone_from(id);
                 }
+                items
+            } else {
                 // All Mail no longer shown over IMAP: no such mail here.
-                None => Vec::new(),
+                Vec::new()
             }
         }
     };
@@ -1624,9 +1766,15 @@ fn api_part_text(part: &Value, depth: u8) -> Option<(bool, String)> {
             .or_else(|| texts.first())
             .cloned();
     }
+    let headers = api_headers(part);
+    // A file the attachment list names, `inline` or not, is never the
+    // mail's own text ([`attachments::is_file`]).
+    let named = !part["filename"].as_str().unwrap_or("").is_empty();
+    if depth > 0 && (named || attachments::is_file(&headers)) {
+        return None;
+    }
     let data = part["body"]["data"].as_str()?;
     let bytes = URL_SAFE_NO_PAD.decode(data.trim_end_matches('=')).ok()?;
-    let headers = api_headers(part);
     let charset = param(headers.get("content-type").unwrap_or(""), "charset").unwrap_or_default();
     let text = charset_text(&bytes, &charset);
     match kind.as_str() {
@@ -1660,6 +1808,11 @@ pub fn api_item(text: &str, whole: bool) -> Option<MailItem> {
         subject: field("subject"),
         date: field("date"),
         text,
+        attachments: if whole {
+            attachments::api_attachments(payload)
+        } else {
+            Vec::new()
+        },
     })
 }
 
@@ -1710,6 +1863,20 @@ impl Mail for Gmail {
     async fn read(&self, user: &str, pass: &str, ask: &MailAsk) -> Result<Vec<MailItem>, Failure> {
         tokio::time::timeout(WITHIN, async {
             read_mail(connect(IMAP_HOST, IMAP_PORT).await?, user, pass, ask).await
+        })
+        .await
+        .map_err(|_| Failure::Unreached)?
+    }
+
+    async fn attachment(
+        &self,
+        user: &str,
+        pass: &str,
+        id: &str,
+        pick: &Pick,
+    ) -> Result<Option<MailItem>, Failure> {
+        tokio::time::timeout(WITHIN, async {
+            read_attachment(connect(IMAP_HOST, IMAP_PORT).await?, user, pass, id, pick).await
         })
         .await
         .map_err(|_| Failure::Unreached)?
@@ -1891,6 +2058,29 @@ mod tests {
             ),
         ] {
             assert!(!is_security_mail(from, subject, text), "{subject} {text}");
+        }
+    }
+
+    /// A mail its attachment's name alone marks: neutral sender, subject
+    /// and text, the file `verification code.txt`.
+    #[test]
+    fn a_security_item_counts_its_attachments_names() {
+        let item = |name: &str| MailItem {
+            from: "Ann <ann@x.test>".into(),
+            subject: "Notes".into(),
+            text: "See attached".into(),
+            attachments: vec![Attachment {
+                name: name.into(),
+                kind: "text/plain".into(),
+                ..Attachment::default()
+            }],
+            ..MailItem::default()
+        };
+        for name in ["verification code.txt", "Your sign-in code 482913.txt"] {
+            assert!(is_security_item(&item(name)), "{name}");
+        }
+        for name in ["notes.txt", "sales.csv"] {
+            assert!(!is_security_item(&item(name)), "{name}");
         }
     }
 

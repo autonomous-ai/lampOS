@@ -2,7 +2,7 @@
 //! to the model: trimmed, and wrapped as quoted data from the service,
 //! never as instructions, under the voice's 4 KB answer cap.
 use crate::catalog::{self, FACEBOOK_VERSION, Method};
-use crate::mail::{self, MailAsk, MailItem};
+use crate::mail::{self, MailAsk, MailItem, Pick};
 use crate::store::Entry;
 use serde_json::{Map, Value, json};
 use std::ops::RangeInclusive;
@@ -36,6 +36,8 @@ pub enum Plan {
     /// Gmail: over IMAP with an app password, its REST API with a Google
     /// sign-in.
     Mail(MailAsk),
+    /// One of a Gmail mail's attachments, by the mail's id: its text.
+    Attachment(String, Pick),
 }
 
 fn text<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
@@ -231,7 +233,10 @@ fn graphql(base: &str, query: &str, variables: Option<&Value>) -> Result<Plan, S
 
 /// What each service reads, by `what`, for the tools' description.
 pub const WHATS: &[(&str, &str)] = &[
-    ("gmail", "recent {count}, search {query}, message {id}"),
+    (
+        "gmail",
+        "recent {count}, search {query}, message {id}, attachment {id, name|index} (text/CSV/HTML/PDF)",
+    ),
     ("gmail-app", "none, it only sends: reads use gmail"),
     // No `calendars`: the link holds only `calendar.events`, and Google
     // lists calendars only with a calendar or calendarlist scope (#5385).
@@ -292,6 +297,32 @@ pub fn plan(code: &str, args: &Value, entry: &Entry, now: i64) -> Result<Plan, S
                     return Err("a mail's id is the one a list gave".into());
                 }
                 MailAsk::Message(id.to_owned())
+            }
+            // One attachment's text, by the mail's id and its name or
+            // place in the list `message` gave; none named, its only one.
+            "attachment" => {
+                let id = needed(args, "id", what)?;
+                let fits = if entry.oauth() {
+                    mail::api_id_ok(id)
+                } else {
+                    mail::imap_id_ok(id)
+                };
+                if !fits {
+                    return Err("a mail's id is the one a list gave".into());
+                }
+                let pick = match (text(args, "name"), args.get("index")) {
+                    (Some(_), _) => Pick::Name(words(args, "name", what)?.to_owned()),
+                    (None, Some(index)) => Pick::Index(
+                        // A model may give the number as text.
+                        index
+                            .as_u64()
+                            .or_else(|| index.as_str()?.trim().parse().ok())
+                            .and_then(|index| usize::try_from(index).ok())
+                            .ok_or("index is an attachment's place, from 1")?,
+                    ),
+                    (None, None) => Pick::Only,
+                };
+                return Ok(Plan::Attachment(id.to_owned(), pick));
             }
             _ => return Err(unknown(code)),
         }));
@@ -551,17 +582,63 @@ pub fn items(body: &str) -> Vec<Value> {
 
 /// A mail as it is quoted; a security mail only as "a security mail, left
 /// out", nothing of it kept.
+///
+/// A mail read whole names its attachments (name, type, size, and
+/// [`mail::note`] beside one the lamp doesn't read: a kind it can't, a PDF
+/// too large, or one fetched and not read); a mail whose
+/// attachment was read gives that attachment and its text in place of the
+/// mail's own. The names, types and the attachment's text are read for
+/// security text with the mail's ([`mail::is_security_item`], the same
+/// check made before any attachment is fetched).
 pub fn mail_item(item: &MailItem) -> Value {
-    if mail::is_security_mail(&item.from, &item.subject, &item.text) {
+    if mail::is_security_item(item) {
         return json!(mail::SECURITY_LEFT_OUT);
     }
-    json!({
+    let about = |attachment: &mail::Attachment| {
+        let mut about = json!({
+            "name": attachment.name,
+            "type": attachment.kind,
+            "size": size_words(attachment.size),
+        });
+        if let Some(note) = mail::note(attachment) {
+            about["note"] = json!(note);
+        }
+        about
+    };
+    let mut quoted = json!({
         "id": item.id,
         "from": item.from,
         "subject": item.subject,
         "date": item.date,
-        "text": item.text,
-    })
+    });
+    match item.attachments.iter().find(|one| one.text.is_some()) {
+        Some(read) => {
+            let mut attachment = about(read);
+            attachment["text"] = json!(read.text);
+            quoted["attachment"] = attachment;
+        }
+        None => {
+            quoted["text"] = json!(item.text);
+            if !item.attachments.is_empty() {
+                quoted["attachments"] = item
+                    .attachments
+                    .iter()
+                    .take(mail::ATTACHMENTS_MOST)
+                    .map(about)
+                    .collect();
+            }
+        }
+    }
+    quoted
+}
+
+/// A size as said: bytes, KB or MB.
+fn size_words(bytes: usize) -> String {
+    match bytes {
+        0..1_024 => format!("{bytes} bytes"),
+        1_024..1_048_576 => format!("{} KB", bytes.div_ceil(1_024)),
+        _ => format!("{:.1} MB", bytes as f64 / 1_048_576.0),
+    }
 }
 
 /// The words every quoted result carries.
@@ -979,7 +1056,7 @@ mod tests {
     fn http(plan: Plan) -> (Method, String, Option<Value>) {
         match plan {
             Plan::Http { method, url, body } => (method, url, body),
-            Plan::Mail(_) => panic!("mail"),
+            Plan::Mail(_) | Plan::Attachment(..) => panic!("mail"),
         }
     }
 
@@ -1159,8 +1236,10 @@ mod tests {
             ("+41", false),
             ("all+41", false),
         ] {
-            let planned = plan("gmail", &json!({"what":"message","id":id}), &entry(), 0);
-            assert_eq!(planned.is_ok(), fits, "{id}");
+            for what in ["message", "attachment"] {
+                let planned = plan("gmail", &json!({"what":what,"id":id}), &entry(), 0);
+                assert_eq!(planned.is_ok(), fits, "{what} {id}");
+            }
         }
     }
 
@@ -1368,6 +1447,7 @@ mod tests {
             subject: "Your sign-in code".into(),
             date: "d".into(),
             text: "Use 482913 to sign in".into(),
+            ..MailItem::default()
         };
         let quoted = quoted("Gmail", vec![mail_item(&code)]);
         let text = quoted.to_string();
@@ -1381,6 +1461,7 @@ mod tests {
             subject: "Dinner".into(),
             date: "d".into(),
             text: "At 7".into(),
+            ..MailItem::default()
         };
         assert_eq!(mail_item(&plain)["subject"], "Dinner");
         assert_eq!(rfc3339(1_793_664_000), "2026-11-03T00:00:00Z");
@@ -1564,6 +1645,7 @@ mod tests {
                 subject: subject.into(),
                 date: "Tue, 03 Nov 2026 10:15:30 +0700".into(),
                 text: text.into(),
+                ..MailItem::default()
             })
         };
         let mails = quoted(

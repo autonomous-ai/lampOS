@@ -54,9 +54,10 @@ pub const SPOKEN: &[(&str, Option<&str>, Spoken)] = &[
 pub const FREE_FORM: &[&str] = &["query", "get", "call"];
 
 /// Reads that give an item's whole text, never a made skill's: a mail, a
-/// Drive file's text, Figma's comments.
+/// mail's attachment, a Drive file's text, Figma's comments.
 pub const WHOLE_TEXTS: &[(&str, &str)] = &[
     ("gmail", "message"),
+    ("gmail", "attachment"),
     ("google_drive", "text"),
     ("figma", "comments"),
     ("figma-api", "comments"),
@@ -458,6 +459,8 @@ mod tests {
             ("slack", "call", "can't read yet"),
             ("hubspot", "tools", "can't read yet"),
             ("gmail", "message", "whole text"),
+            // Thirteen's HOLD on #5826: an attachment's text is a whole text.
+            ("gmail", "attachment", "whole text"),
             ("notion", "search", "can't read yet"),
             ("google_drive", "nothing", "reads files, file"),
             ("gmail-app", "recent", "only sends"),

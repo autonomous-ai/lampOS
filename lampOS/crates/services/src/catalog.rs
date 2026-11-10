@@ -77,6 +77,8 @@ pub const SERVICES: &[Service] = &[
             (Get, "/gmail/v1/users/me/profile"),
             (Get, "/gmail/v1/users/me/messages"),
             (Get, "/gmail/v1/users/me/messages/*"),
+            // One attachment's data (`users.messages.attachments.get`).
+            (Get, "/gmail/v1/users/me/messages/*/attachments/*"),
         ],
         writes: &[(Post, "/gmail/v1/users/me/messages/send")],
         mcp: None,
@@ -579,6 +581,22 @@ mod tests {
         ));
         assert!(!ok("gmail", Post, "/gmail/v1/users/me/messages/send"));
         assert!(!ok("gmail", Get, "/gmail/v1/users/me/settings/filters"));
+        // An attachment's data; never deeper, never a write.
+        assert!(ok(
+            "gmail",
+            Get,
+            "/gmail/v1/users/me/messages/18c2/attachments/ANGj-x_1"
+        ));
+        assert!(!ok(
+            "gmail",
+            Get,
+            "/gmail/v1/users/me/messages/18c2/attachments/a/b"
+        ));
+        assert!(!ok(
+            "gmail",
+            Post,
+            "/gmail/v1/users/me/messages/18c2/attachments/a"
+        ));
         assert!(write_allowed(
             "gmail",
             Post,

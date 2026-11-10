@@ -25,14 +25,23 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
 webpki-roots = "1"
-# `net`: an asker's peer, by SO_PEERCRED; `fs`: whether standard input is one.
-rustix = { version = "=1.1.5", features = ["fs", "net"] }
+# `net`: an asker's peer, by SO_PEERCRED; `fs`: whether standard input is one;
+# `process`: the PDF reader child's memory limit (`setrlimit`, `mail::pdf`).
+rustix = { version = "=1.1.5", features = ["fs", "net", "process"] }
 # SMTP's AUTH and a message's body; IMAP's base64 parts.
 base64 = "=0.22.1"
 # A pending write's random id, from the ring the TLS already builds.
 ring = "0.17"
 # A security text read composed (NFC): Vietnamese with combining accents.
 unicode-normalization = "=0.1.25"
+# A PDF attachment's text (MIT, pure Rust, on lopdf without its defaults:
+# no chrono, no rayon), parsed only in a child process killed at 2 s and,
+# on Linux, held to 128 MiB by RLIMIT_AS and RLIMIT_DATA (`mail::pdf`). Most of its size is lopdf's (its decryption is not
+# optional); pdf-extract adds about 60 KB to it, for words spaced as laid out.
+pdf-extract = "=0.12.1"
+# A PDF's streams inflated once with a running count before lopdf, which
+# inflates them without bound, sees them: the version lopdf itself uses.
+flate2 = "=1.1.11"
 # The lamp's own UTC offset, for the Calendar time fields' example.
 lamp-local-time = { path = "../local-time" }
 

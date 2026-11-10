@@ -159,7 +159,7 @@ kế tiếp, và khi đó giọng nói không khai báo hàm nào của dịch v
 
 | Phần | Chạy dưới quyền | Việc nó làm ở đây |
 |---|---|---|
-| `lamp-services` (`crates/services`, package và binary `lamp-services`) | root không có capability nào (`CapabilityBoundingSet=`), `Group=lampos`, `lamp-services.service`, được phép dùng mạng, hệ thống chỉ-đọc trừ hai thư mục của nó, kernel, đồng hồ, hostname và control group được bảo vệ, không namespace, realtime, set-id hay bộ nhớ vừa ghi vừa chạy, system call giới hạn ở `@system-service` trừ `@privileged` và `@resources` | Giữ các token; thực hiện mọi lệnh gọi đến một dịch vụ; giữ một lần ghi đã chuẩn bị chờ "send" của nó |
+| `lamp-services` (`crates/services`, package và binary `lamp-services`) | root không có capability nào (`CapabilityBoundingSet=`), `Group=lampos`, `lamp-services.service`, được phép dùng mạng, hệ thống chỉ-đọc trừ hai thư mục của nó, kernel, đồng hồ, hostname và control group được bảo vệ, không namespace, realtime, set-id hay bộ nhớ vừa ghi vừa chạy, system call giới hạn ở `@system-service` trừ `@privileged` và `@resources` (trả lại `setrlimit` và `prlimit64`, cho giới hạn bộ nhớ của bộ đọc PDF) | Giữ các token; thực hiện mọi lệnh gọi đến một dịch vụ; giữ một lần ghi đã chuẩn bị chờ "send" của nó |
 | `lamp-cloud` (`crates/cloud/src/services.rs`) | `lampos` | Nhận các kind của ứng dụng, lấy dữ liệu của một liên kết từ backend và chuyển tiếp; xoá khi đăng xuất |
 | `lamp-voice` (`crates/voice/src/services.rs`) | root | Khai báo ba hàm cho mô hình và giữ cổng gửi |
 
@@ -271,7 +271,7 @@ backend của đèn, không bao giờ đến Google).
 
 | Code | Tên | Host | Đọc (`what`) | Ghi (`action`) |
 |---|---|---|---|---|
-| `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (mật khẩu ứng dụng); `gmail.googleapis.com` (đăng nhập Google) | `recent {count}`, `search {query}`, `message {id}` | `send_mail {to, cc, subject, text}` |
+| `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (mật khẩu ứng dụng); `gmail.googleapis.com` (đăng nhập Google) | `recent {count}`, `search {query}`, `message {id}`, `attachment {id, name \| index}` | `send_mail {to, cc, subject, text}` |
 | `gmail-app` | Gmail with Google sign-in | `gmail.googleapis.com` | không có: nó chỉ gửi | `send_mail {to, cc, subject, text}` |
 | `google_calendar` | Google Calendar | `www.googleapis.com` | `events {from, to, calendar, count}` | `create_event {title, start, end, calendar, attendees, text}` |
 | `google_drive` | Google Drive | `www.googleapis.com` | `files {query, count}`, `file {id}`, `text {id}` | không có |
@@ -410,8 +410,13 @@ giữ gì.
   hỏi theo id vẫn là "Gmail has no such item". Một danh sách tối đa 10 thư,
   mới nhất trước; không gì bị đánh
   dấu đã đọc (một lần lấy không đổi nhãn nào). Mỗi lệnh gọi là một lần đọc
-  web (5 s để kết nối, 15 s mỗi lệnh), 20 s cho cả lần đọc; các token cũng
-  được xoá khỏi nội dung đã giải mã.
+  web (5 s để kết nối, 15 s mỗi lệnh), 20 s cho cả lần đọc. Các token cũng
+  được xoá khỏi mọi trường đã giải mã (`serve::scrub_mail`): người gửi, tiêu
+  đề, ngày, nội dung, và tên, kiểu, nội dung của mỗi tệp đính kèm, ở một
+  danh sách, lần đọc một thư và lần đọc một tệp đính kèm; qua IMAP mật khẩu
+  ứng dụng cũng vậy, như đã nhập và khi bỏ dấu cách. Một bí mật được mã hoá
+  trong một header hay một tên tệp RFC 2047 chỉ được giải mã sau lần xoá trên
+  câu trả lời thô, nên nó được xoá lại ở đó.
 - **Ghi:** khi có câu "send" nói ra, một `POST
   /gmail/v1/users/me/messages/send` (`users.messages.send`, route duy nhất
   trong danh sách ghi của nó) với `{"raw": <base64url>}`: cùng thư văn bản
@@ -480,6 +485,164 @@ nó chỉ là danh tính của tài khoản và `gmail.send`, không có `gmail.
   ghi vẫn giữ nguyên.
 - **Làm mới:** qua backend dưới mã riêng của nó (`connector: "gmail-app"`),
   như của Google Calendar.
+
+**Tệp đính kèm của một thư** (`crates/services/src/mail/attachments.rs`),
+với cả hai loại liên kết `gmail`:
+
+- **Được nêu tên:** `message {id}` còn đưa ra `attachments`, tối đa 10
+  (`mail::ATTACHMENTS_MOST`): `name`, `type` và `size` của mỗi tệp ("24
+  bytes", "51 KB", "1.2 MB"), và một `note` bên cạnh tệp mà đèn không đọc
+  (`mail::note`): "can't read this kind yet" (`mail::CANT_READ`) cho một
+  loại, "this PDF is too large to read here (over 2 MB)" cho một PDF quá
+  2 MB theo kích thước thư đưa. Bản xem trước của một danh sách không nêu
+  tệp nào. Một tệp đính kèm không bao giờ bị
+  coi là nội dung riêng của thư: một phần mà danh sách tính là tệp
+  (`Content-Disposition: attachment`, hoặc có tên trong `filename` của
+  disposition hay `name` của kiểu, `inline` hay không;
+  `attachments::is_file`) bị bỏ qua ở đó. Qua IMAP chúng đến từ cùng lệnh UID FETCH,
+  kèm `BODYSTRUCTURE`; qua API từ các phần có `filename` trong câu trả lời
+  `format=full`.
+- **Đọc:** `attachment {id, name | index}` đọc nội dung chữ của một tệp
+  đính kèm: theo tên như `message` đã liệt kê (không phân biệt hoa thường,
+  hoặc một phần của tên chỉ khớp đúng một tệp), theo vị trí tính từ 1, hoặc,
+  khi không có cả hai, tệp đính kèm duy nhất của thư. Câu trả lời là `id`,
+  `from`, `subject` và `date` của thư cùng `attachment: {name, type, size,
+  text}`, không kèm nội dung riêng của thư, được trích dẫn như mọi lần đọc.
+  Nội dung tối đa 3,000 ký tự (`TEXT_MOST`) trước khi câu trả lời trích dẫn
+  tự cắt.
+- **Các loại được đọc:** `text/plain`, `text/csv`,
+  `text/tab-separated-values`, `text/markdown` và `text/html` (bỏ thẻ như
+  với nội dung thư); một phần kiểu `application/octet-stream` theo đuôi tệp
+  (`.txt`, `.csv`, `.tsv`, `.md`, `.log`, `.htm`, `.html`); và PDF
+  (`application/pdf`, hoặc đuôi `.pdf`), ở dưới. Mọi loại khác (tệp Office,
+  tệp nén) bị từ chối trước khi lấy: "the lamp can't read this kind yet: it
+  reads text, CSV, HTML and PDF attachments", bằng chữ cố định, không bao
+  giờ nhắc lại kiểu tệp người gửi khai. Không
+  có bộ trích Office nào trong các phụ thuộc của đèn. Một ảnh hay một chương
+  trình không bao giờ được đọc, dù nó khai kiểu gì (`image/*`, hoặc đuôi như
+  `.png`, `.exe`, `.sh`, `.js`, `.apk` ở bất kỳ tên nào của nó, đọc trọn):
+  điều này được kiểm tra trước tiên (`attachments::never`), nên `run.exe`
+  hay `photo.png` khai kiểu `application/pdf` không phải PDF và bị từ chối,
+  còn `notes.pdf` vẫn được đọc.
+- **Tên:** hiển thị tối đa 120 ký tự, nhưng mỗi tên mà phần đó được đặt
+  (`filename` của disposition, `name` của kiểu, từ RFC 2047, `filename*`
+  của RFC 2231 và các mảnh nối tiếp `filename*0*`, `filename*1*` hoặc
+  `filename*0`, được nối lại, tối đa 32 mảnh) được giữ trọn đến 1,024 ký tự
+  (`attachments::NAME_CHECK_MOST`) chỉ cho phép kiểm tra bảo mật, không bao
+  giờ được trả về. Một tên dài hơn thế, hoặc gửi thành mảnh mà thiếu một
+  mảnh hay quá 32 mảnh, không bao giờ được lấy: "can't check this file's
+  name, so it isn't read" (`attachments::NAME_UNCHECKED`), cũng là `note`
+  của nó trong danh sách. Một giá trị trong ngoặc kép được đọc cùng các ký
+  tự thoát, dấu `;` bên trong ngoặc là của chính nó
+  (`filename="notes; verification code.txt"` là trọn tên đó); một header có
+  ngoặc kép bị bỏ ngỏ, hoặc có chữ sau ngoặc đóng, cũng để tên ở trạng thái
+  chưa kiểm tra như vậy (`attachments::header_params`). Một tên RFC 2231,
+  và từng từ RFC 2047 trong một tên, chỉ được đọc ở UTF-8 (gồm cả US-ASCII) hoặc Latin-1, và chỉ khi đọc
+  trọn: ở bảng mã khác (`run.exe` bằng UTF-16 sẽ thành `r u n . e x e`),
+  với byte không thuộc bảng mã của nó, hoặc khi một tên bất kỳ có ký tự
+  NUL hay ký tự không giải mã được, tên đó cũng ở trạng thái chưa kiểm tra
+  (`attachments::name_in`); một tên có từ RFC 2047 ở bảng mã khác
+  (`run.exe` bằng UTF-7 đọc ra thành ASCII thường) hoặc bị hỏng cũng vậy,
+  kể cả phần dữ liệu: một dấu `=` trong Q không có hai chữ số hex theo sau,
+  hay chữ B không phải các nhóm bốn ký tự đủ và có đệm (`cnVuLmV4ZQ` không
+  đệm sẽ đọc thành `run.ex`) (`mail::decode_words_with`). Một giá trị
+  header chỉ được giải mã tới 16 KiB đầu (`mail::DECODE_MOST`), mỗi từ chỉ
+  được tìm trong 512 byte kể từ `=?` của nó, nên thời gian tăng tuyến tính
+  theo độ dài; một tên dài hơn thì ở trạng thái chưa kiểm tra.
+- **PDF** (`crates/services/src/mail/pdf.rs`): nội dung chữ của nó, đọc bằng
+  `pdf-extract` 0.12.1 trên `lopdf` 0.42 (cả hai MIT, thuần Rust, từ
+  crates.io, ghim trong `Cargo.lock`; lopdf không có tính năng mặc định).
+  Các giới hạn, đều trước hoặc quanh lúc phân tích:
+  - tối đa 2 MB (`pdf::PDF_MOST`): một PDF quá 2 MB theo kích thước thư đưa
+    bị từ chối trước khi lấy, và một PDF lớn hơn sau khi giải mã bị từ chối
+    trước khi phân tích, "this PDF is too large to read here (over 2 MB)";
+  - một PDF được mã hoá (`/Encrypt`) không được phân tích: "can't read this
+    PDF";
+  - việc phân tích không bao giờ chạy trong dịch vụ: chính binary của nó
+    được chạy lại thành một tiến trình con, `lamp-services --pdf-text`
+    (`/proc/self/exe`, vẫn là bản đang chạy sau một lần cập nhật), PDF vào
+    đầu vào chuẩn và nội dung ra đầu ra chuẩn, đầu ra lỗi bỏ đi (thông điệp
+    panic có thể trích tệp), panic hook im lặng và việc phân tích nằm trong
+    `catch_unwind`. Nó bị giết (SIGKILL) 2 s sau khi bắt đầu
+    (`pdf::PARSE_WITHIN`), và mỗi lúc chỉ phân tích một PDF, lượt của PDF
+    khác cũng chỉ được chờ tối đa 2 s. Một panic, tràn ngăn xếp (một form tự
+    vẽ chính nó), một vòng lặp hay một lần giết chỉ kết thúc tiến trình con,
+    không bao giờ là dịch vụ; khi đó lần đọc là "can't read this PDF";
+  - bộ nhớ, **giới hạn thật**: trên Linux, không gian địa chỉ và vùng dữ
+    liệu của tiến trình con (`RLIMIT_AS`, `RLIMIT_DATA`, cả soft lẫn hard)
+    là 128 MiB (`pdf::CHILD_MEMORY_MOST`), đặt trong tiến trình con đã fork
+    trước khi nó chạy binary (`pre_exec`, các lệnh `prlimit64`,
+    `pdf::limited`) và đặt lại bởi chính tiến trình con ngay đầu tiên
+    (`pdf::cap_memory`). Một tiến trình con không đặt được giới hạn thì
+    không bao giờ được chạy, hoặc thoát trước khi đọc gì. Một lần cấp phát
+    vượt giới hạn thất bại trong tiến trình con, nó abort: "can't read this
+    PDF", không bao giờ là lỗi của dịch vụ. Bộ lọc của unit trả lại
+    `setrlimit prlimit64` từ `~@resources` cho việc này
+    (`SystemCallFilter=setrlimit prlimit64`); không có capability nào thì
+    một giới hạn chỉ có thể bị hạ xuống. Trên máy Mac của nhà phát triển
+    không có giới hạn này;
+  - các lần từ chối sớm trước khi phân tích, trong tiến trình con, không cái
+    nào là giới hạn thật: tên trong PDF được đọc như `lopdf` đọc
+    (`/Fil#74er` là `/Filter`), rồi PDF là "can't read this PDF" khi có một
+    bộ lọc mà phép đếm dưới đây không giới hạn được (`LZWDecode`,
+    `ASCII85Decode`), khi có một mảng `/Filter` nhiều hơn một bộ lọc (mỗi
+    tầng giải nén đầu ra của tầng trước), hoặc khi `/Columns` quá 4,096,
+    `/Colors` quá 32 hay `/BitsPerComponent` quá 32 (`pdf::COLUMNS_MOST`,
+    `COLORS_MOST`, `BITS_MOST`: một predictor cấp phát hai hàng theo các số
+    đó trước khi có dữ liệu). Một predictor trong các giới hạn đó vẫn được
+    đọc, như của một cross-reference stream (`/Predictor 12 /Columns 5`).
+    Sau đó mỗi stream được giải nén một lần như `lopdf` sẽ làm (zlib, nếu
+    không thì raw deflate) với tổng cộng dồn, khoảng trắng hay tab giữa từ
+    khoá `stream` và cuối dòng được tính như `lopdf` tính, và quá 16 MB tổng
+    (`pdf::INFLATED_MOST`) thì PDF không được đọc;
+  - nội dung ra: tối đa 3,000 ký tự (việc dàn trang dừng khi quá gấp đôi số
+    đó, các trang sau của một PDF dài không bao giờ được dàn); một PDF không
+    có chữ (bản scan) là "can't read this PDF".
+
+  Một PDF đã lấy mà không đọc được nêu trong `attachments` của câu trả lời
+  kèm `note`, không bao giờ được đọc. Đo trên một laptop (aarch64-darwin,
+  release): một PDF một trang đọc qua tiến trình con trong khoảng 15 ms, lần
+  đầu và lần lặp; một tiến trình con không bao giờ kết thúc bị giết ở 2.0 s.
+  Thời gian trên đèn chưa được đo. Kích thước binary: `lamp-services` release
+  tăng từ 1.35 MB lên 2.95 MB trên máy đó (1.14 MB lên 2.56 MB khi strip),
+  khoảng 1.5 MB là của `lopdf`, mà phần giải mã của nó không bỏ được bằng
+  feature; `pdf-extract` thêm khoảng 60 KB.
+- **Qua IMAP:** cùng lần đăng nhập, `EXAMINE` chỉ-đọc hộp thư mà id chỉ tới
+  và UID FETCH như `message` (`all41` là All Mail, tìm lại bằng `LIST`; `41`
+  trơn là hộp thư đến; id All Mail khi All Mail đã không còn thì không gì
+  được đọc; id nào khác bị từ chối trước khi kết nối), rồi
+  `UID FETCH <uid> (UID BODY.PEEK[<section>]<0.1048576>)`: chỉ phần đó, tối
+  đa 1 MB (`net::BODY_MOST`), không đánh dấu đã đọc; giải mã base64 hoặc
+  quoted-printable, đọc theo charset của nó. Phần của một PDF được lấy trọn,
+  tối đa 2,900,000 byte (`mail::PDF_FETCH`: 2 MB ở base64 kèm ngắt dòng),
+  giới hạn literal chỉ được nâng cho riêng lần lấy đó.
+- **Qua API:** thư với `format=full`, rồi `GET
+  /gmail/v1/users/me/messages/<id>/attachments/<attachmentId>`
+  (`users.messages.attachments.get`, nằm trong danh sách đọc của Gmail, với
+  `gmail.readonly`); một phần có dữ liệu ngay trong thư không cần lần gọi
+  thứ hai. Câu trả lời được đọc đến giới hạn 1 MB (của một PDF đến
+  `mail::PDF_FETCH`, chỉ riêng lần gọi đó, `net::Call::most`); câu trả lời
+  bị cắt ở đó được đọc từ đầu dữ liệu của nó. Các token được xoá khỏi nội
+  dung và khỏi tên và kiểu của mọi tệp đính kèm (`serve::scrub_mail`). Một thư
+  mà câu trả lời `format=full` bị cắt thì không đọc tệp đính kèm nào ("this
+  mail is too long to read its attachments here").
+- **Bảo mật:** tệp đính kèm của một thư bảo mật không bao giờ được lấy, và
+  thư bị bỏ ra nguyên vẹn như mọi thư bảo mật. Một phép kiểm tra
+  (`mail::is_security_item`) đọc người gửi, tiêu đề và nội dung cùng các tên
+  trọn vẹn (đến 1,024 ký tự, không phải 120 ký tự hiển thị) và kiểu của mọi
+  tệp đính kèm, trước khi chọn hay lấy bất kỳ phần nào qua IMAP hoặc API:
+  một thư mà chỉ riêng tên tệp đã đánh dấu (`verification code.txt`, hoặc
+  121 chữ `a` rồi ` verification code.txt`, hoặc tên đó gửi thành các mảnh
+  RFC 2231) không có byte nào của tệp bị lấy. Cùng phép kiểm tra chạy lại
+  trên những gì được trả về, gồm cả nội dung tệp đính kèm, nên một mã trong
+  tệp đính kèm cũng làm thư bị bỏ ra. Những gì tệp đính kèm nói là dữ liệu trích dẫn,
+  không bao giờ là chỉ dẫn.
+- **Từ chối,** bằng lời không chứa gì của thư: "this mail has no
+  attachments", "this mail has N attachments: give the name or index of
+  one", "this mail has no one attachment by that name: read the mail with
+  message to see their names", "this mail has N attachments: index is 1 to
+  N", "this PDF is too large to read here (over 2 MB)", "the lamp can't
+  check this file's name, so it isn't read".
 
 ## Dịch vụ MCP
 
@@ -1091,7 +1254,7 @@ dịch vụ nào trong số đó được kỹ năng tự tạo đọc ("... whi
 can't read yet"), cho đến khi mỗi dịch vụ có một việc đọc cố định. Dịch vụ có được liên kết hay không là câu trả lời của
 chính `lamp-services` lúc chạy (`NOT_LINKED`), ghi vào journal là "not read:
 ...". Một lần đọc trả về toàn văn của một mục không bao giờ là của kỹ năng
-(`spoken::WHOLE_TEXTS`): `message` của `gmail`, `text` của `google_drive`,
+(`spoken::WHOLE_TEXTS`): `message` và `attachment` của `gmail`, `text` của `google_drive`,
 và `comments` của `figma` và `figma-api`. Một việc đọc
 dạng tự do cũng không, vì người hỏi viết hình dạng của nó và nó có thể đặt
 bất kỳ văn bản nào vào chỗ của tiêu đề (`spoken::FREE_FORM`, P2 của Thirteen
