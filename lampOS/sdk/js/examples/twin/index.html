@@ -28,6 +28,12 @@
   details label { display: grid; grid-template-columns: 70px 1fr 60px; gap: 6px; align-items: center; margin: 4px 0; font-size: 12px; }
   details input[type=number] { width: 100%; }
   #ring { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 6px; border: 1px solid var(--line); }
+  .load { height: 4px; background: var(--line); border-radius: 2px; margin: 4px 0 2px; overflow: hidden; }
+  .load > i { display: block; height: 100%; width: 0; background: var(--accent, #e0902f); transition: width .15s; }
+  .load.high > i { background: #d9534f; }
+  #speaking { display: none; margin-left: 8px; padding: 0 7px; border-radius: 9px; background: var(--accent, #e0902f); color: #111; font-size: 11px; animation: speak .8s ease-in-out infinite alternate; }
+  #speaking.on { display: inline-block; }
+  @keyframes speak { from { opacity: .45; } to { opacity: 1; } }
   #log { font-size: 12px; color: var(--soft); margin-top: 12px; white-space: pre-wrap; }
   @media (max-width: 720px) { body { grid-template-columns: 1fr; grid-template-rows: 55vh auto; height: auto; } aside { border-left: 0; border-top: 1px solid var(--line); } }
 </style>
@@ -42,7 +48,7 @@
 <div id="view"><div id="status">loading the lamp…</div></div>
 <aside>
   <h1>Lamp twin</h1>
-  <p class="sub"><span id="ring"></span><span id="lampline">waiting for body.state</span></p>
+  <p class="sub"><span id="ring"></span><span id="lampline">waiting for body.state</span><span id="speaking">speaking</span></p>
   <div id="joints"></div>
   <details>
     <summary>Calibrate (zero and direction)</summary>
@@ -170,6 +176,7 @@ for (const name of model.chain) {
   row.className = 'joint';
   row.innerHTML = `<header><b>${name}</b><span class="now">–</span></header>
     <input type="range" min="-180" max="180" step="0.5" value="0" aria-label="${name}">
+    <div class="load" title="load the body reads on this joint"><i></i></div>
     <div class="facts">servo ${joint.servo} · ${joint.bus}</div>`;
   const slider = row.querySelector('input');
   let dragging = false;
@@ -184,7 +191,7 @@ for (const name of model.chain) {
     send({ type: 'drag', joint: name, deg: Number(slider.value) });
   });
   slider.addEventListener('change', () => send({ type: 'drag', joint: name, deg: Number(slider.value) }));
-  rows[name] = { row, slider, now: row.querySelector('.now'), facts: row.querySelector('.facts'), dragging: () => dragging };
+  rows[name] = { row, slider, now: row.querySelector('.now'), facts: row.querySelector('.facts'), load: row.querySelector('.load'), dragging: () => dragging };
   panel.append(row);
 }
 
@@ -228,6 +235,10 @@ function connect() {
       const goal = typeof joint.goal_deg === 'number' ? ` · goal ${joint.goal_deg.toFixed(1)}°` : '';
       const load = joint.load === undefined ? '' : ` · load ${Math.round(joint.load * 100)}%`;
       row.facts.textContent = `${joint.counts} counts${goal}${load}${temp}`;
+      // The body's own load reading, as it says it (0 to 1); the twin adds no physics of its own.
+      const share = typeof joint.load === 'number' ? Math.max(0, Math.min(1, joint.load)) : 0;
+      row.load.firstElementChild.style.width = `${Math.round(share * 100)}%`;
+      row.load.classList.toggle('high', share >= 0.8);
     }
     const light = lamp.light ?? {};
     const on = light.on === true && TINTS[light.colour];
@@ -243,6 +254,7 @@ function connect() {
     glow.color.copy(tint);
     glow.intensity = share * 2;
     document.getElementById('ring').style.background = `#${disc.material.color.getHexString()}`;
+    document.getElementById('speaking').classList.toggle('on', lamp.talking === true);
     document.getElementById('lampline').textContent = `light ${on ? `${light.colour}, ${light.level} of 5` : 'off'}${lamp.talking ? ' · talking' : ''}${lamp.private ? ' · private' : ''}`;
   };
 }
