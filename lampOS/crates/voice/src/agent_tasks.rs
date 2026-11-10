@@ -882,14 +882,17 @@ fn declared_on(place: &Place, staff: &[Member], lamp: bool) -> Vec<Tool> {
                      own, and not if they said no or something else. In the same breath, \
                      before you call it, say in a few natural words that you are giving it \
                      to whoever will do it (\"Okay, giving that to {default}.\"), and nothing \
-                     more until it answers.{}",
+                     more until it answers. With nothing prepared in this talk, call \
+                     start_agent_task first, never this.{}",
                     if place.correct { NOT_A_YES } else { "" }
                 )
             } else {
                 format!(
                     "Start the task you prepared with start_agent_task. Call it only right \
                      after the person has said yes to the task you read back; never on your \
-                     own, and not if they said no or something else.{}",
+                     own, and not if they said no or something else. With nothing prepared in this talk, \
+                     call start_agent_task first. Never say the work is given or started \
+                     unless this call answered that it is.{}",
                     if place.correct { NOT_A_YES } else { "" }
                 )
             },
@@ -971,8 +974,11 @@ fn on_the_lamp_description(place: &Place, staff: &[Member]) -> String {
          their agents to do something. Never for what you can answer in a few words, a story or \
          joke told aloud, or what your own functions do (your light, reminders, the time, the \
          weather). A session they name (\"the book program one\") gets `session`, never a recall, \
-         and `where` only if they name a machine (computer, Mac, laptop, PC). Don't ask for \
-         details or who first. {} You can do this: \
+         and `where` only if they name a machine (computer, Mac, laptop, PC). New work with no machine or agent named goes to \
+         Hermes here on the lamp: leave out `where` and `who`, even for code or a website. \
+         More work on a task already done or handed over (\"in the sea poem, add a line\") is a \
+         new call with `session`, made now, before you say it back: never answer it in words alone. \
+         Don't ask for details or who first. {} You can do this: \
          never say you cannot open files or work on their computer; if they ask you to start an \
          agent without saying what for, ask in a few words and call this with their answer.",
         computer(place),
