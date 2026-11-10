@@ -11,7 +11,7 @@ use lamp_services::{
     net::Https,
     on,
     refresh::Backend,
-    serve, store, tools,
+    serve, skill_writes, store, tools,
 };
 use std::{
     fs, io,
@@ -93,9 +93,15 @@ fn main() -> ExitCode {
     if skill_reads {
         say("a made skill's reads on: lamp-skills may read, never write");
     }
+    // A made skill's approved write (#6066): lamp-skills may send it.
+    let skill_writes = on(std::env::var(skill_writes::ENVIRONMENT).ok().as_deref());
+    if skill_writes {
+        say("a made skill's writes on: lamp-skills may send each write the owner said yes to");
+    }
     let services = Arc::new(
         serve::Services::new(store::Store(store), Https, Gmail, backend, write_on)
-            .with_skill_reads(skill_reads),
+            .with_skill_reads(skill_reads)
+            .with_skill_writes(skill_writes),
     );
     let tools_dir = run.join("tools");
     let opened = (|| -> io::Result<(UnixListener, UnixListener)> {
