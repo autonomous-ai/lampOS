@@ -523,7 +523,7 @@ is more than half a degree from what was asked; stopped farther short, it is
 `cut_short` after 5 s, saying how many counts short. Read the angles from the
 `done`, not from what you asked.
 
-A lamp has no rate limits, except two guards: refused actions, 20 a second (past it the connection closes), and changes of the phrases a connection listens for, 6 a minute. Hello's `limits` says `"rates": "off"` with those two as `refused` and `phrases`. `say`, `sound` and `turn.start` are still refused in quiet hours where this lamp sets them (off by default).
+A lamp has no rate limits, except two guards: refused actions, 20 a second (past it the connection closes), and changes of the phrases a connection listens for, 6 a minute. Hello's `limits` says `"rates": "off"` with those two as `refused` and `phrases`. `say`, `sound` and `turn.start` are still refused in quiet hours where this lamp sets them (off by default). A loop that sends a refused call again at once (a light while the lamp is private, a note while it is paused) hits the first guard: 20 refusals a second close the connection. On a refusal, wait for the event that mends it (`lamp.changed`) or for your next turn of the loop, not for the next tick of the clock.
 
 **Refusals** raise `lampos.errors.BY_CODE[code]`, a `LampError` with `code`,
 `why` (the lamp's own words), for `rate` `retry_ms`, and `what_to_do`, the
