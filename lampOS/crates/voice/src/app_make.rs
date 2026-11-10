@@ -510,7 +510,10 @@ pub fn make_here_with(
             // voice's are, so the backend never counts the app's makes
             // (`crate::made_counts`).
             crate::made_counts::refused(&keeping.directory, made_skill::Maker::App);
-            not_kept(&keeping.directory, &from, &why)
+            not_kept(&keeping.directory, &from, &why);
+            // Said aloud too, the plain reason and what to try (the owner,
+            // 10 Nov: "when making fails I hear no reason from the lamp").
+            say(&made_skill::not_made_line(&why));
         }
     }
 }
@@ -557,6 +560,7 @@ pub fn write_here(
         Err(made_skill::Refused(why, _)) => {
             eprintln!("lamp-voice: a written skill: not kept: {why}");
             not_kept(&keeping.directory, &from, &why);
+            say(&made_skill::not_made_line(&why));
         }
     }
 }
@@ -567,31 +571,72 @@ pub fn write_here(
 /// ([`say_note`]; the owner, 10 Nov, "đồng bộ luôn"), never English words
 /// said as they are to a person who speaks another language. What became
 /// of it logged. Nothing waits on its answer: the skill is on, or not,
-/// already.
+/// already. Dropped once begun (on lamp-74ff, 10 Nov 17:40, talk cut a made
+/// skill's line, `user_interrupted`, and it was never said), it is asked
+/// once more, said at the next good moment within what is left of
+/// [`LINE_WAITS_MS`].
 pub fn say_line(asks: &crate::say::OwnAsks, line: &str) {
-    let answered = match say_note(line) {
-        Some(note) => asks.note(
-            "app-make",
-            &note,
-            crate::say::NORMAL_PRIORITY,
-            LINE_WAITS_MS,
-        ),
-        None => asks.text("app-make", line, crate::say::NORMAL_PRIORITY, LINE_WAITS_MS),
+    said(line, |words, note, within_ms| {
+        let priority = crate::say::NORMAL_PRIORITY;
+        if note {
+            asks.note("app-make", words, priority, within_ms)
+        } else {
+            asks.text("app-make", words, priority, within_ms)
+        }
+    });
+}
+
+/// [`say_line`]'s asks, through `ask` (the words, whether they are a note,
+/// and how long the ask may wait): the last outcome, none when the voice
+/// went away.
+fn said(
+    line: &str,
+    mut ask: impl FnMut(&str, bool, u64) -> std::sync::mpsc::Receiver<crate::say::Answer>,
+) -> Option<crate::say::Outcome> {
+    let began = std::time::Instant::now();
+    let (words, note) = match say_note(line) {
+        Some(note) => (note, true),
+        None => (line.to_owned(), false),
     };
-    while let Ok(answer) = answered.recv() {
-        if let crate::say::Answer::Done(outcome) = answer {
-            eprintln!("lamp-voice: an app's skill: its line: {outcome:?}");
-            return;
+    let mut outcome = None;
+    for asked in 1..=2 {
+        let elapsed = u64::try_from(began.elapsed().as_millis()).unwrap_or(u64::MAX);
+        let within_ms = LINE_WAITS_MS.saturating_sub(elapsed);
+        if within_ms == 0 {
+            break;
+        }
+        let answered = ask(&words, note, within_ms);
+        outcome = loop {
+            match answered.recv() {
+                Ok(crate::say::Answer::Done(outcome)) => break Some(outcome),
+                Ok(_) => continue,
+                Err(_) => break None,
+            }
+        };
+        eprintln!("lamp-voice: an app's skill: its line: {outcome:?}");
+        match &outcome {
+            Some(crate::say::Outcome::Dropped(_)) if asked == 1 => {
+                eprintln!("lamp-voice: an app's skill: its line dropped; asked once more");
+            }
+            Some(crate::say::Outcome::Spoken) => return outcome,
+            _ => break,
         }
     }
+    eprintln!("lamp-voice: an app's skill: its line wasn't said");
+    outcome
 }
 
 /// The say service's note for a made skill's `line`
-/// ([`made_skill::in_their_language`]); none when it would pass the say
-/// service's bound ([`crate::say::MOST_WORDS_BYTES`]), and the line is
-/// then asked as written rather than refused unsaid.
+/// ([`made_skill::in_their_language`], or for a skill not made
+/// [`made_skill::not_made_in_their_language`]); none when it would pass
+/// the say service's bound ([`crate::say::MOST_WORDS_BYTES`]), and the
+/// line is then asked as written rather than refused unsaid.
 fn say_note(line: &str) -> Option<String> {
-    let note = made_skill::in_their_language(line);
+    let note = if line.starts_with(made_skill::NOT_MADE_HEAD) {
+        made_skill::not_made_in_their_language(line)
+    } else {
+        made_skill::in_their_language(line)
+    };
     (note.len() <= crate::say::MOST_WORDS_BYTES).then_some(note)
 }
 
@@ -1089,6 +1134,50 @@ mod tests {
         assert!(say_note(&"x".repeat(crate::say::MOST_WORDS_BYTES)).is_none());
     }
 
+    /// lamp-74ff, 10 Nov 17:40: talk cut a made skill's line
+    /// (`user_interrupted`) and it was never said. Dropped, it is asked once
+    /// more, within what is left of the wait; dropped again, it is let go.
+    /// A not-made line is a note of its own: nothing to do, why and what to
+    /// try.
+    #[test]
+    fn a_dropped_line_is_asked_once_more() {
+        use crate::say::{Answer, Outcome};
+        let answering = |outcomes: Vec<Outcome>| {
+            let mut outcomes = outcomes.into_iter();
+            let mut asked = Vec::new();
+            let last = said("I made x, and it's on.", |words, note, within_ms| {
+                asked.push((words.to_owned(), note, within_ms));
+                let (answer, answered) = std::sync::mpsc::channel();
+                let _ = answer.send(Answer::Begun(1));
+                let _ = answer.send(Answer::Done(outcomes.next().unwrap()));
+                answered
+            });
+            (last, asked)
+        };
+        let (last, asked) = answering(vec![
+            Outcome::Dropped("user_interrupted".into()),
+            Outcome::Spoken,
+        ]);
+        assert_eq!(last, Some(Outcome::Spoken));
+        assert_eq!(asked.len(), 2);
+        assert!(asked.iter().all(|(words, note, within_ms)| {
+            *note
+                && words == &made_skill::in_their_language("I made x, and it's on.")
+                && *within_ms <= LINE_WAITS_MS
+        }));
+        let (last, asked) = answering(vec![Outcome::Spoken]);
+        assert_eq!((last, asked.len()), (Some(Outcome::Spoken), 1));
+        let dropped = Outcome::Dropped("user_interrupted".into());
+        let (last, asked) = answering(vec![dropped.clone(), dropped.clone()]);
+        assert_eq!((last, asked.len()), (Some(dropped), 2));
+        let (last, asked) = answering(vec![Outcome::Expired]);
+        assert_eq!((last, asked.len()), (Some(Outcome::Expired), 1));
+        let line = made_skill::not_made_line(made_skill::UNSAID);
+        let note = say_note(&line).unwrap();
+        assert_eq!(note, made_skill::not_made_in_their_language(&line));
+        assert!(note.contains("call no tool"), "{note}");
+    }
+
     /// One at a time, a request id each, the words within the voice's own
     /// bound; an old ask still "making" lets another start.
     #[test]
@@ -1368,13 +1457,17 @@ mod tests {
         let at = now_unix_ms();
         let brief = begin(&keeping.directory, "make me a skill that glows", "r1", at).unwrap();
         let (url, served) = service(vec![(200, "Sure! Here is a skill.".into())]);
+        let mut said = Vec::new();
         make_here(&keeping, &brief, "r1", at, chat_at(url), |line| {
-            panic!("nothing is said: {line}")
+            said.push(line.to_owned())
         });
         assert_eq!(served.join().unwrap(), 1);
         let told = status(&keeping.directory, Some("r1"), at);
         assert_eq!(told["state"], "not_kept", "{told}");
-        assert!(told["why"].is_string(), "{told}");
+        let why = told["why"].as_str().unwrap();
+        // Said aloud too (the owner, 10 Nov: "when making fails I hear no
+        // reason from the lamp"): the same plain reason.
+        assert_eq!(said, [made_skill::not_made_line(why)]);
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -1396,8 +1489,9 @@ mod tests {
         let reason = "A skill can't keep time by itself. Ask me for a reminder instead, like \
                       'remind me every hour to stand up'.";
         let (url, served) = service(vec![(200, format!("cannot: {reason}"))]);
+        let mut said = Vec::new();
         make_here(&keeping, &brief, "r1", at, chat_at(url), |line| {
-            panic!("nothing is said: {line}")
+            said.push(line.to_owned())
         });
         assert_eq!(served.join().unwrap(), 1);
         let told = status(&keeping.directory, Some("r1"), at);
@@ -1406,6 +1500,7 @@ mod tests {
             (Some("not_kept"), Some(reason)),
             "{told}"
         );
+        assert_eq!(said, [format!("I couldn't make that: {reason}")]);
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -1606,9 +1701,14 @@ mod tests {
             at + 3_000,
         )
         .unwrap();
+        let mut said = Vec::new();
         write_here(&keeping, &taken, "w2", at + 3_000, &installed, |line| {
-            panic!("nothing is said: {line}")
+            said.push(line.to_owned())
         });
+        assert_eq!(
+            said,
+            ["I couldn't make that: a skill called taken is already on the lamp or kept."]
+        );
         let told = status(&keeping.directory, Some("w2"), at + 3_000);
         assert_eq!(told["state"], "not_kept", "{told}");
         assert!(
