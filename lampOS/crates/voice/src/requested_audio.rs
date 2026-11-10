@@ -197,9 +197,33 @@ fn audio_object(mut words: &[String]) -> bool {
             break;
         }
     }
-    words
-        .first()
-        .is_some_and(|word| AUDIO.contains(&word.as_str()))
+    let Some(noun) = words.first().filter(|word| AUDIO.contains(&word.as_str())) else {
+        return false;
+    };
+    let mut rest = &words[1..];
+    // The noun must end the object: "music trivia" is a game, not
+    // requested music. Accept only bounded known request endings.
+    if matches!(noun.as_str(), "nhac" | "bai") {
+        if starts_with_words(rest, &["thu", "gian"]) {
+            rest = &rest[2..];
+        }
+        if rest.first().is_some_and(|word| word == "cho")
+            && rest
+                .get(1)
+                .is_some_and(|word| matches!(word.as_str(), "toi" | "minh" | "em"))
+        {
+            rest = &rest[2..];
+        }
+        rest.len() <= 3
+            && rest
+                .iter()
+                .all(|word| matches!(word.as_str(), "di" | "nhe" | "nha"))
+    } else {
+        rest.len() <= 3
+            && rest
+                .iter()
+                .all(|word| matches!(word.as_str(), "please" | "now" | "on"))
+    }
 }
 
 /// Whether `said`, the line that led to a requested-audio call, plainly asks
@@ -391,6 +415,11 @@ mod tests {
             "Play the second game while I listen to music.",
             "Play another game to relax.",
             "Play the next something to relax.",
+            "Play music trivia with me.",
+            "Play a music quiz.",
+            "Play the next music game.",
+            "Play music trivia now.",
+            "Play recording games with me.",
             "Lamp, play some music. Forget it.",
             "",
         ] {
@@ -413,6 +442,8 @@ mod tests {
             "Play the last recording.",
             "Play another recording.",
             "Play a different recording.",
+            "Please play a quiet recording now.",
+            "Play music, please.",
             "Lamp, mở nhạc thư giãn đi.",
             "Bật nhạc cho mình nhé.",
             // #5802: lamp-52e6 on 10 Nov, clips relax and relax2.

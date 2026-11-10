@@ -401,6 +401,13 @@ async fn talk_about_music_gets_no_recording_and_the_model_is_told_so() {
         ("Play a different recording.", true),
         ("Play the second game while I listen to music.", false),
         ("Play another game to relax.", false),
+        ("Play music trivia with me.", false),
+        ("Play a music quiz.", false),
+        ("Play the next music game.", false),
+        ("Play music trivia now.", false),
+        ("Play recording games with me.", false),
+        ("Please play a quiet recording now.", true),
+        ("Play music, please.", true),
         ("Lamp, mở nhạc thư giãn đi.", true),
         ("Bật nhạc cho mình nhé.", true),
     ] {
