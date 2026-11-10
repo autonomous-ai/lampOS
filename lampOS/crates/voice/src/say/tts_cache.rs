@@ -30,9 +30,10 @@ use std::{
 pub const DIR: &str = "/var/lib/lampOS/voice/tts-cache";
 /// At most this many lines are kept; past it the oldest go first, never the
 /// owner's current lines (#4883, [`TtsCache::make_room`]). Only the lamp's
-/// own fixed lines come here: [`WARM`] and 18 lines in the owner's language
-/// (#4473 (c)), with room for a change of voice or language.
-pub const MOST_FILES: usize = 48;
+/// own fixed lines come here: [`WARM`] and the fixed lines in the owner's
+/// language (#4473 (c), 45 since #5999's skill lines), with room for a change
+/// of voice or language and the lines asked since.
+pub const MOST_FILES: usize = 64;
 /// The longest line kept: 20 s at the speaker's rate.
 pub const MOST_FRAMES: u32 = SOUND_RATE * 20;
 /// The longest one rendering may take.
@@ -536,8 +537,8 @@ mod tests {
             let (cache, calls) = counted(&dir, "Rachel");
             let cache = cache.speaking(Some(language));
             let lines = cache.warm_lines();
-            assert_eq!(lines.len(), 37 + WARM.len(), "{language:?}");
-            assert_eq!(&lines[37..], WARM);
+            assert_eq!(lines.len(), 46 + WARM.len(), "{language:?}");
+            assert_eq!(&lines[46..], WARM);
             let words = language.fixed(lamp_msgs::SLEEP_LINE).unwrap();
             assert_eq!(lines[1], words);
             assert_ne!(cache.key(words), cache.key(lamp_msgs::SLEEP_LINE));
@@ -573,7 +574,7 @@ mod tests {
         let (off, _) = counted(&dir, "Rachel");
         let off = off.speaking(Some(Language::Vietnamese));
         assert!(!off.warm_lines().contains(&"Dạ?"));
-        assert_eq!(off.warm_lines().len(), 37 + WARM.len());
+        assert_eq!(off.warm_lines().len(), 46 + WARM.len());
         let (vietnamese, calls) = counted(&dir, "Rachel");
         let vietnamese = vietnamese
             .speaking(Some(Language::Vietnamese))

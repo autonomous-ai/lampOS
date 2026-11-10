@@ -5418,6 +5418,9 @@ fn made_here(skills: &[lamp_skills::Skill], dir: &Path) -> HashSet<String> {
 /// (`made`, #6062) asks with `made`: the voice takes only its exact text,
 /// framed as quoted and untrusted, with no functions and no memory, so its
 /// words never run as an instruction; its note is refused there.
+/// A step's own words (`text`) go as the voice's exact words (#5999, as
+/// #5777's unplug lines): said as written, never a chat turn the model may
+/// decline or reword.
 fn say_ask(call: &Call, who: bool, made: bool) -> Option<serde_json::Value> {
     let (mut ask, note) = match call {
         Call::Say(note) => (
@@ -5431,6 +5434,10 @@ fn say_ask(call: &Call, who: bool, made: bool) -> Option<serde_json::Value> {
         ask["made"] = json!(true);
     } else if who && note {
         ask["who"] = json!(true);
+    }
+    // A made skill's text goes `made` alone, never exact (#6062).
+    if !made && !note {
+        ask["exact"] = json!(true);
     }
     Some(ask)
 }
