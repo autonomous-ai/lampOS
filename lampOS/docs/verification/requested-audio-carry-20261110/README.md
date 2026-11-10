@@ -126,3 +126,24 @@ calls; unrelated-object negatives remain refused.
 These focused local results do not replace the failed ARM run or establish a
 new full-suite pass. No device or acoustic latency verification was performed
 for this selector follow-up.
+
+## Compound requested objects
+
+Second's HOLD on `0aa71fb62` showed that “Play music trivia with me”
+authorized recording in both direct and wrapped Engine calls. The noun
+prefix alone was insufficient. The follow-up requires a complete bounded
+object ending: English please/now/on endings, or the existing Vietnamese
+relaxation/recipient/politeness forms. It does not maintain a list of game
+names. Unrecognized trailing phrases are conservatively refused.
+
+The same 53-case exact-source probe has [five mismatches before](compound-before.txt)
+and [zero after](compound-after.txt). Five compound-object negatives and
+two polite-ending positives were added to the classifier and actual Engine
+matrix. All previous 46 probe controls remain. Native follow-up on the train-768 base: 33 music tests passed (0.92 s),
+66 requested-audio tests passed / one ignored (7.16 s), formatting passed.
+Strict all-target Clippy first failed writing its incremental cache with
+ENOSPC; [the failure](compound-clippy-enospc.txt) is retained. After removing
+two completed clean Third worktrees and unlocked old incremental caches,
+the same Clippy command passed (empty output, exit 0). No source changes
+were made between these lint attempts. Native tests are retained in
+[the music log](compound-music.txt) and [requested-audio log](compound-requested.txt).
