@@ -103,15 +103,16 @@ stream`, `microphone.stream`, privacy rules) run on them unchanged.
   process, which is one code path for all OSes) and does what eyes does at the edge: writes
   the newest JPEG to the file `camera/image` points at, publishes `camera/image` (2-4/s) and
   feeds `--frames-socket`. lamp-control already refuses it while private. Pictures with
-  people: local only, never committed. The camera is off unless `--camera=always` is given:
-  then it stays open for the lamp's whole life, as the eyes' does (the host's camera light stays
-  on), and each picture still goes to a computer only while the ring shows its mark. Opening it
-  only while a computer's camera mark is on the ring (closed 10 s after the last), so that the
-  host's camera light means someone is looking, needs one change in lamp-control's own `camera.rs`
-  (its owner, eighth, reads it): it read the sight file before it asked the ring for the mark, so a
-  closed camera could never be asked to open. That change is `--camera-opens-on-demand`, off by
-  default so real lamps behave as before, in its own PR (#6095); the sim's on-demand `--camera`
-  comes after it.
+  people: local only, never committed. The camera is off unless `--camera=always` or `--camera`
+  is given. `--camera=always` keeps it open for the lamp's whole life, as the eyes' is (the host's
+  camera light stays on). `--camera` opens it only while a computer's camera mark is on the ring
+  (closed about 10 to 11.5 s after the last: a mark counts for 1.5 s after it was drawn, then the
+  camera's own 10 s hold), so the host's camera light means someone is looking. That needed one
+  change in lamp-control's own `camera.rs`: it read the sight file before it asked the ring for the
+  mark, so a closed camera could never be asked to open. The change is
+  `--camera-opens-on-demand` (#6095), off by default so real lamps behave as before; lamp-sim
+  passes it with `--camera`. Each picture still goes to a computer only while the ring shows the
+  camera's mark.
 - Mic: capture host mic, resample to 16 kHz mono S16, 20 ms blocks (320 samples), publish
   `mic1/audio` as the ears do (`json+pcm`, 50/s). `microphone.stream` and `hear` then work.
   Needs the OS mic permission on macOS (one prompt); say so in the README.

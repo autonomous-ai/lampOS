@@ -26,7 +26,7 @@ a lock folder under `/tmp`), and short: Unix socket paths hold 103 bytes.
 |---|---|
 | `--bin-dir BIN` | where `lamp-body` and `lamp-control` are (default: beside `lamp-sim`) |
 | `--listen ADDR` | the door's address (default `127.0.0.1:7731`) |
-| `--camera=always` | the host camera (ffmpeg) is open for the lamp's whole life, as the eyes' is; the host camera light stays on. Opening it only while a computer's camera mark is on the ring needs lamp-control's `--camera-opens-on-demand` (docs/control.md, "The camera"), which comes as its own change, then `--camera` |
+| `--camera=always` | the host camera (ffmpeg) is open for the lamp's whole life, as the eyes' is; the host camera light stays on. `--camera` opens it only while a computer's camera mark is on the ring (a mark seen in the last 1.5 s counts) and keeps it open 10 s after that, so it closes about 10 to 11.5 s after the mark is let go (lamp-sim passes lamp-control's `--camera-opens-on-demand`, docs/control.md "The camera"): the host camera light means someone is looking; snapshots and streams wait up to 3 s for the first frame |
 | `--microphone` | the host microphone (ffmpeg) feeds `mic1/audio`; it stays open for the lamp's life, so a macOS microphone indicator stays on; a computer still hears it only through `microphone.stream` and the ring's mark |
 
 Camera and microphone are off unless asked for. `LAMP_SIM_CAMERA` and
