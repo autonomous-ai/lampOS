@@ -89,6 +89,7 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `level` | integer | 1 to 5 | 3 | | |
 | | `for_ms` | integer | milliseconds; more than 30000 lights 30000 | 10000 | | |
 | | `pattern` | string | `breathe`, `candle` or `pulse` | none: steady | | |
+| | `keep_for_s` | number | seconds, 1 to 600: keeps the light on past 30 seconds, this server asking the lamp again until then; another light or `lamp_stop` ends it sooner | none | | |
 | `lamp_ring` | `pixels` | list of strings | one `#rrggbb` per pixel, from pixel 0 around the ring, the lamp's count of them (`ring_pixels` in the answer). Exactly one of `pixels` or `rgb` | none | light | no |
 | | `rgb` | string | one `#rrggbb` for the whole ring | none | | |
 | | `brightness` | integer | 0 to 100 of the given colours, under the ring's own ceiling | 100 | | |
@@ -121,7 +122,7 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 **An argument a tool doesn't take is refused**, never read past. Each
 tool's schema says `"additionalProperties": false`, and a call such as
 `lamp_light(colour="warm", for_s=5)` comes back as the tool's error:
-`bad_request: lamp_light takes no for_s; it takes colour, for_ms, level, pattern`.
+`bad_request: lamp_light takes no for_s; it takes colour, for_ms, keep_for_s, level, pattern`.
 Before, it lit the default 10 s. A call missing an argument the tool
 needs is refused the same way, `bad_request: lamp_light needs colour`, never
 in the validator's words. `serverInfo.version` is lamp-mcp's own.
