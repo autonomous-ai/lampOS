@@ -386,8 +386,9 @@ It needs no lamp. It gives:
 - `measured`: what is still the CAD's. The origins are, and each joint's
   `zero_deg` and `sign`, the joint's `deg` in `body.state` (from its home) at the CAD's rest
   pose, are too, until measured on a lamp. Shoulder and elbow have one measure so far: sign -1
-  and lamp-75c9's stand angle as zero (from its numbers and the render, not yet from a photo);
-  a lamp's own stand angle differs by a few degrees.
+  and lamp-75c9's stand angle as zero (from its numbers and the render; a photo of lamp-75c9 standing at rest agrees with the zero, the sign is still from the render);
+  a lamp's own stand angle differs by a few degrees. The twin uses a calibration saved in the browser
+  (`twin-cal` in the page's local storage) over the model's: clear the page's site data to see the measured zero.
 
 `hardware` (`import { hardware } from 'lampos'`) is the lamp's parts as data ([lamp.hardware.json](../../docs/lamp.hardware.json), [hardware.md](../../docs/hardware.md)): the board, servos, camera, microphones, speaker, light, touch, buttons, air sensor and power, each with where its facts come from.
 
