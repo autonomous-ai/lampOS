@@ -9,6 +9,7 @@ pub enum Method {
     Get,
     Post,
     Patch,
+    Delete,
 }
 
 impl Method {
@@ -17,6 +18,7 @@ impl Method {
             Self::Get => "GET",
             Self::Post => "POST",
             Self::Patch => "PATCH",
+            Self::Delete => "DELETE",
         }
     }
 }
@@ -46,7 +48,7 @@ pub struct Service {
     pub mcp: Option<&'static str>,
 }
 
-use Method::{Get, Post};
+use Method::{Delete, Get, Patch, Post};
 
 /// Figma's reads, under either of its codes.
 const FIGMA_READS: &[(Method, &str)] = &[
@@ -108,7 +110,13 @@ pub const SERVICES: &[Service] = &[
             (Get, "/calendar/v3/calendars/*/events"),
             (Get, "/calendar/v3/calendars/*/events/*"),
         ],
-        writes: &[(Post, "/calendar/v3/calendars/*/events")],
+        // Changing and cancelling one event by its id with
+        // `LAMP_CALENDAR_EDITS` (`writes::prepare_edit`).
+        writes: &[
+            (Post, "/calendar/v3/calendars/*/events"),
+            (Patch, "/calendar/v3/calendars/*/events/*"),
+            (Delete, "/calendar/v3/calendars/*/events/*"),
+        ],
         mcp: None,
     },
     Service {

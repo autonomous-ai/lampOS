@@ -164,6 +164,7 @@ impl Http for Https {
             Method::Get => reqwest::Method::GET,
             Method::Post => reqwest::Method::POST,
             Method::Patch => reqwest::Method::PATCH,
+            Method::Delete => reqwest::Method::DELETE,
         };
         let mut request = client.request(method, &call.url);
         for (name, value) in &call.headers {

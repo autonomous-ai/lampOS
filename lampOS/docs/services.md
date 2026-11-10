@@ -114,6 +114,7 @@ connected apps.
 |---|---|---|
 | `LAMP_SERVICES=on` | `lamp-cloud` (with `LAMP_CLOUD=on`), `lamp-voice` and `lamp-services` | `lamp-cloud` answers the app's `connector.*` and `services.list` with V1's "not on this lamp: <kind>" and puts nothing in `can`; the voice declares none of the three functions and routes none; `lamp-services` opens no socket and exits |
 | `LAMP_SERVICES_WRITE=on` (on in the product's `lamp-services.service`) | `lamp-services` | `service_write` answers "writing to services is off on this lamp", and nothing is prepared or sent; reads are as before |
+| `LAMP_CALENDAR_EDITS=on` (off in the product until its lamp check) | `lamp-services`, with `LAMP_SERVICES_WRITE=on` | `service_write`'s `update_event` and `delete_event` answer "changing or cancelling a calendar event is off on this lamp" before anything is read, held or sent, and `tools.json` lists only `create_event` for Google Calendar ("Changing or cancelling a calendar event", below) |
 | `LAMP_SERVICES_TOLD=on` (#5523) | `lamp-voice`'s two routes, with `LAMP_SERVICES=on` | The owner's line is told nothing of what is linked: the model knows only the three functions and asks `services_connected` when it thinks to ("The voice is told what is linked", below) |
 | `LAMP_SKILL_WRITES=on` (#6066; off in every product unit) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) | A made skill writes to no service: a skill with a `write` step or a `"write"` permission does not load, and `lamp-services` refuses `skill_write` and `skill_write_approve` ("A made skill's write", below) |
 | `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and the making model is told to answer a request for a skill naming a service with `cannot:` ("A made skill's read", below) |
@@ -1070,7 +1071,7 @@ written `…/` here:
 | Service | Action | Any of |
 |---|---|---|
 | `gmail`, `gmail-app` | `send_mail` | `…/gmail.send`, `…/gmail.compose`, `…/gmail.modify`, `https://mail.google.com/` |
-| `google_calendar` | `create_event` | `…/calendar`, `…/calendar.events`, `…/calendar.events.owned` |
+| `google_calendar` | `create_event`, `update_event`, `delete_event` | `…/calendar`, `…/calendar.events`, `…/calendar.events.owned` |
 
 `writes::scope_allows` splits each `scopes` item on whitespace (a list kept
 as one spaced string reads alike) and matches each scope as a full URL,
@@ -1080,8 +1081,8 @@ helper once #5825 lands. Only Google's links record their scopes in this
 form, so no other service is in the table. With
 none of them, the call fails with "<Service> is linked without permission to
 <what>: link it again in the app (Skills, then Connectors) and allow it."
-(`serve::NO_PERMISSION`, after the colon), `<what>` being "send mail" or "add
-calendar events": nothing is held, nothing is called. An app password, a
+(`serve::NO_PERMISSION`, after the colon), `<what>` being "send mail", "add
+calendar events", "change calendar events" or "delete calendar events": nothing is held, nothing is called. An app password, a
 personal key (`pat`) or a link recording no scopes is not checked, as
 before.
 
@@ -1090,6 +1091,51 @@ in Google's words (`ACCESS_TOKEN_SCOPE_INSUFFICIENT` or
 `insufficientPermissions`, `writes::scope_refused`), is told the same words
 after "not sent: " (for a service not in the table, `<what>` is "make this
 change"). Any other 401 or 403 keeps its words.
+
+### Changing or cancelling a calendar event (`LAMP_CALENDAR_EDITS`)
+
+Off unless `LAMP_CALENDAR_EDITS=on` and `LAMP_SERVICES_WRITE=on` in
+`lamp-services` (off in the product until its lamp check). On, Google
+Calendar's actions in `tools.json` add `update_event {event_id, title, start,
+end, text, calendar}` and `delete_event {event_id, calendar}`
+(`writes::CALENDAR_EDITS`), and `service_write` takes an `event_id`: the id a
+calendar read or a create gave (a confirmed `create_event` now answers
+`{"sent": true, "service", "event_id"}`). The write's description lists
+Google Calendar as `create_event, update_event, delete_event: see event_id`
+(`writes::CALENDAR_ACTIONS_SHORT`), and `event_id`'s own description gives
+each of the three with its fields: the write's description has no room for
+them within the 1,024 bytes its link takes.
+
+- **Scope.** Google's `events.patch` and `events.delete` take the same
+  scopes as `events.insert`, so the app's Calendar link, which holds
+  `calendar.events`, allows both with no new consent (table above). A link
+  without one is refused before anything is asked of Google, as a create is.
+- **Read back from the event as it is now.** Without `send_id`, the lamp
+  first reads that one event (`GET /calendar/v3/calendars/<calendar>/events/<id>`,
+  on Calendar's read list), and reads back its title and time now, what
+  changes and who is told: "Change the event "Hamburger party" on your Google
+  Calendar (primary), now from … to …: move it to … to …. Its guests, …, are
+  told by email. Seen by whoever your calendar is shared with." or "Delete
+  the event "Hamburger party", now from … to …, from your Google Calendar
+  (primary). … The lamp can't bring it back." The event's own text is the
+  service's data, kept to one line of at most 200 characters.
+- **Then sent as any write**: held 120 s, sent once on `"said":"send"`, with
+  the voice's same gate (the owner seen saying it, the read-back said in
+  full, "send" the very next line). The send is one
+  `PATCH …/events/<id>?sendUpdates=all` carrying only what changes
+  (`summary`, `start` and `end` together, `description`), or one
+  `DELETE …/events/<id>?sendUpdates=all` with no body; both are on
+  Calendar's write list (`catalog.rs`) and nothing else is.
+- **Bounds.** `event_id` and `calendar` are ids in a path (no `/`, `\`,
+  `?`, `#`, at most 256 bytes); a move gives both its start and end, each
+  with the lamp's own UTC offset; an `update_event` needs at least one
+  change.
+- **Gone in Google.** When the event was deleted, or changed so, in Google
+  itself, its read or its send gets a 404 or 410, or the event reads as
+  `"status":"cancelled"`. Each answers `writes::EVENT_GONE`: "That event is
+  no longer on the Google Calendar: it was deleted or changed there, and
+  nothing was changed. Say it's no longer there, and offer to create it
+  again with create_event." (after "not sent: " on a send). Nothing is held.
 
 The model is told of `service_write`, first in its description
 (`WRITE_RULE`, then the rule every services function has, below):

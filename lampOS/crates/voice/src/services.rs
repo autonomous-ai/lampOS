@@ -3330,6 +3330,96 @@ mod tests {
         assert_eq!(pending, None);
     }
 
+    /// lamp-3e83, 10 Nov: a calendar event's change and its cancel are
+    /// writes like any other: prepared only for the owner seen saying it,
+    /// kept with their read-back, and sent only on a "send" as the next
+    /// line after that read-back was said in full, never otherwise.
+    #[test]
+    fn a_calendar_edit_is_read_back_and_confirmed_as_any_write() {
+        for (action, read_back) in [
+            (
+                "update_event",
+                "Change the event \"Hamburger party\" on your Google Calendar (primary): move it to 8 PM to 9 PM.",
+            ),
+            (
+                "delete_event",
+                "Delete the event \"Hamburger party\" from your Google Calendar (primary). The lamp can't bring it back.",
+            ),
+        ] {
+            let now = Instant::now();
+            let prepare = call(
+                WRITE,
+                json!({"service":"google_calendar","action":action,"event_id":"ev1","said":"send"}),
+            );
+            let off_camera = Turn {
+                seen_owner: false,
+                ..heard("cancel the party", 9)
+            };
+            let mut pending = None;
+            let refused = gate(&mut pending, &prepare, 10, &off_camera, now).expect_err(action);
+            assert_eq!(refused["error"], NOT_SEEN_SAYING, "{action}");
+            // Passed to the service with no "said" of the model's.
+            let passed = gate(
+                &mut pending,
+                &prepare,
+                10,
+                &heard("cancel the party", 9),
+                now,
+            )
+            .expect(action);
+            assert_eq!(passed.args.get("said"), None, "{action}");
+            // Kept with its read-back, and told to say it in full.
+            let mut told = json!({"read_back": read_back, "send_id": "s1", "sent": false});
+            answered(&mut pending, &passed, 10, &mut told, now, "ann");
+            assert_eq!(told["next"], READ_BACK_NEXT, "{action}");
+            assert_eq!(pending.as_ref().unwrap().service, "google_calendar");
+            let kept = pending.clone();
+            let send = call(
+                WRITE,
+                json!({"service":"google_calendar","send_id":"s1","said":"send"}),
+            );
+            // The read-back not said in full: refused, and forgotten.
+            said_in(&mut pending, 10, "Shall I do it?", now);
+            began_in(&mut pending, now + Duration::from_secs(12));
+            let refused = gate(
+                &mut pending,
+                &send,
+                11,
+                &heard("go ahead and send it", 10),
+                at(now),
+            )
+            .expect_err(action);
+            assert_eq!(refused["error"], NOT_READ_BACK, "{action}");
+            assert_eq!(pending, None);
+            // Said in full, a send in its own request is no send.
+            let mut pending = kept.clone();
+            said_in(&mut pending, 10, read_back, now);
+            let refused = gate(
+                &mut pending,
+                &send,
+                10,
+                &heard("go ahead and send it", 9),
+                now,
+            )
+            .expect_err(action);
+            assert_eq!(refused["error"], CANCELLED, "{action}");
+            // Said in full, and "send" the very next line: sent.
+            let mut pending = kept;
+            said_in(&mut pending, 10, read_back, now);
+            began_in(&mut pending, now + Duration::from_secs(12));
+            let sent = gate(
+                &mut pending,
+                &send,
+                11,
+                &heard("go ahead and send it", 10),
+                at(now),
+            )
+            .expect(action);
+            assert_eq!(sent.args["said"], "send", "{action}");
+            assert_eq!(sent.args["send_id"], "s1", "{action}");
+        }
+    }
+
     #[test]
     fn a_write_is_prepared_only_when_the_owner_is_seen_saying_it() {
         let now = Instant::now();
