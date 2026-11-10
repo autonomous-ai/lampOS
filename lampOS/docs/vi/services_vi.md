@@ -790,7 +790,12 @@ by service: …" của nó được nói trên tham số `action`.
   đọc lại mà không gọi hàm, và câu "send" sau đó không thấy gì; luật riêng
   của hàm giờ nói không bao giờ được nói một phần đọc lại mà không lệnh gọi
   nào trong cùng lượt đưa ra.
-- **Một câu huỷ trơn là của đèn, không để mô hình chọn** (#5958). Trên
+- **Một câu huỷ trơn là của đèn, không để mô hình chọn** (#5958). Chỉ khi
+  nó là câu trả lời mà phần đọc lại đã hỏi (`answers_the_read_back`, P2 của
+  Thirteen và HOLD của Reviewer-two trên #5967): đúng câu ngay sau phần đọc
+  lại, phần đọc lại không bị cắt, đèn không trả lời gì ở giữa, và do chính
+  người đã yêu cầu nói khi biết người nói là ai; mọi câu "Cancel that." khác
+  là của mô hình. Trên
   lamp-9adf ngày 10/11, câu "Lamp, cancel that." sau phần đọc lại được trả
   lời "Cancel what exactly? I have several things set", không có lệnh gọi
   nào: mô hình cân nó với các nhắc việc của đèn. Giờ, khi một lệnh ghi của
