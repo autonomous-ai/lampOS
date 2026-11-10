@@ -532,6 +532,32 @@ impl Shared {
                     // The kind alone: never the phrase, nor what was said.
                     self.journal_events(&heard, &serde_json::json!("phrase.heard"), now);
                 }
+                Out::Said { fields, to } => {
+                    let mut event = fields;
+                    event["ev"] = serde_json::json!("lamp.said");
+                    event["at"] = Value::String(at.clone());
+                    let mut sent = Vec::new();
+                    for open in self.open.lock().expect("open").values() {
+                        let Some(client) = &open.client else {
+                            continue;
+                        };
+                        let mine = match &to {
+                            crate::watch::SaidTo::Everyone => true,
+                            crate::watch::SaidTo::Client(id) => id == client,
+                        };
+                        if !mine
+                            || !open.grants.contains(&Grant::Speech)
+                            || !open.events.contains(&EventKind::LampSaid)
+                        {
+                            continue;
+                        }
+                        if open.outbox.send(event.clone()).is_ok() {
+                            sent.push(client.clone());
+                        }
+                    }
+                    // The kind alone: never what was said.
+                    self.journal_events(&sent, &event["ev"], now);
+                }
                 Out::Suspend(part, why) => {
                     let changes = self
                         .door
@@ -1357,12 +1383,13 @@ fn wall_ms() -> u64 {
 
 /// The bus topics the door reads, each subscribed on its own thread, every
 /// message handed to `watch` and what it means delivered.
-pub const TOPICS: [&str; 23] = [
+pub const TOPICS: [&str; 24] = [
     "humans/faces/tracked",
     "humans/hands/tracked",
     "room/stood_up",
     "name/heard",
     "voice/heard",
+    "voice/line",
     "ears/classes",
     "controls/gesture",
     "body/hand",

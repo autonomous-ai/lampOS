@@ -813,6 +813,38 @@ def test_get_answers_the_states_asked(tmp_path):
 
 
 
+def test_lamp_said_needs_the_speech_grant_and_comes_with_who_had_it_said(tmp_path):
+    """Every line the lamp says out loud, as `lamp.said` (the `speech` grant):
+    its text, who had it said, where it came from, and `cut` when it was cut
+    short. The debug log never shows the text."""
+
+    async def go():
+        async with FakeLamp(grants=("speech",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                said: asyncio.Queue = asyncio.Queue()
+                await lamp.on("lamp.said", said.put_nowait)
+                await fake.emit("lamp.said", text="It is a long", by="lamp", source="reply", cut=True)
+                event = await said.get()
+                assert (event["text"], event["by"], event["source"], event["cut"]) == ("It is a long", "lamp", "reply", True)
+        async with FakeLamp(grants=("speak",)) as fake:
+            ring = await paired(fake, tmp_path / "other")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(LampError, match="no_grant"):
+                    await lamp.on("lamp.said", lambda event: None)
+
+    run(go())
+
+
+def test_the_debug_log_never_shows_what_the_lamp_said(monkeypatch, capsys):
+    from lampos import debug
+
+    monkeypatch.setenv("LAMPOS_LOG", "debug")
+    debug.frame("<-", {"ev": "lamp.said", "text": "Your mail says the code is 4821", "by": "lamp", "source": "reply", "cut": True})
+    err = capsys.readouterr().err
+    assert "4821" not in err and "by" in err, err
+
+
 def test_air_and_device_need_their_grants_and_air_changed_comes_on_a_new_reading(tmp_path):
     from lampos.testing import AIR, DEVICE
 
