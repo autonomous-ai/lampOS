@@ -545,7 +545,7 @@ impl<H: Http, M: Mail> Services<H, M> {
         entry: &Entry,
         method: Method,
         url: String,
-        body: Option<Value>,
+        body: Option<Body>,
         write: bool,
     ) -> Result<String, String> {
         let reply = self
@@ -589,11 +589,8 @@ impl<H: Http, M: Mail> Services<H, M> {
             401 | 403 if service.code == "gmail-app" => {
                 return Err(Failure::SignInRefused.words().into());
             }
-            401 | 403 => {
-                return Err(format!(
-                    "{name} refused the lamp's link: it may need linking again in the app"
-                ));
-            }
+            403 => return Err(forbidden(name, &reply.body)),
+            401 => return Err(relink(name)),
             404 => return Err(format!("{name} has no such item")),
             429 => return Err(format!("{name} is busy: try again in a while")),
             _ => return Err(format!("{name} answered with an error")),
@@ -612,7 +609,7 @@ impl<H: Http, M: Mail> Services<H, M> {
         entry: &Entry,
         method: Method,
         url: String,
-        body: Option<Value>,
+        body: Option<Body>,
         write: bool,
     ) -> Result<net::Reply, String> {
         let call = Self::token_call(service, entry, method, url, body, write)?;
@@ -627,7 +624,7 @@ impl<H: Http, M: Mail> Services<H, M> {
         entry: &Entry,
         method: Method,
         url: String,
-        body: Option<Value>,
+        body: Option<Body>,
         write: bool,
     ) -> Result<Call, String> {
         // Gmail's app password goes over IMAP and SMTP only, never to its
@@ -642,13 +639,23 @@ impl<H: Http, M: Mail> Services<H, M> {
                 ("accept".into(), "application/json".into()),
                 ("user-agent".into(), "lampOS-services".into()),
             ],
-            body: body.map(|body| body.to_string().into_bytes()),
+            body: None,
             most: net::BODY_MOST,
         };
+        let content_type = match body {
+            None => None,
+            Some(Body::Json(body)) => {
+                call.body = Some(body.to_string().into_bytes());
+                Some("application/json".to_owned())
+            }
+            Some(Body::Typed { content_type, text }) => {
+                call.body = Some(text.into_bytes());
+                Some(content_type)
+            }
+        };
         net::guard(service.code, &call, write)?;
-        if call.body.is_some() {
-            call.headers
-                .push(("content-type".into(), "application/json".into()));
+        if let Some(content_type) = content_type {
+            call.headers.push(("content-type".into(), content_type));
         }
         if service.code == "github" {
             call.headers[0].1 = "application/vnd.github+json".into();
@@ -923,7 +930,9 @@ impl<H: Http, M: Mail> Services<H, M> {
                 Ok(reads::quoted(service.name, vec![reads::mail_item(&item)]))
             }
             Plan::Http { method, url, body } => {
-                let text = self.call(service, &entry, method, url, body, false).await?;
+                let text = self
+                    .call(service, &entry, method, url, body.map(Body::Json), false)
+                    .await?;
                 Ok(reads::quoted(service.name, reads::items(&text)))
             }
         }
@@ -965,11 +974,12 @@ impl<H: Http, M: Mail> Services<H, M> {
             if let Some(what) = writes::scope_missing(service.code, args, &entry) {
                 return Err(no_permission(service, what));
             }
-            let pending = if service.mcp.is_some() {
+            let mut pending = if service.mcp.is_some() {
                 self.mcp_prepare(service, &entry, args).await?
             } else {
                 writes::prepare(service.code, args, &entry)?
             };
+            pending.link = writes::link_of(&entry);
             let read_back = pending.read_back.clone();
             let next = if matches!(pending.action, Action::Draft(_)) {
                 "Nothing is saved yet. Read read_back to the person in full; save the draft only if their next words say save or send."
@@ -1018,6 +1028,16 @@ impl<H: Http, M: Mail> Services<H, M> {
                 )
             });
         }
+        // Sent only with the link it was read back for: the very entry this
+        // send uses is compared, so a link replaced at any moment since, the
+        // same account's included (a new refresh token), sends nothing
+        // (Reviewer-three's P1 on #5825).
+        if writes::link_of(&entry) != pending.link {
+            return Err(LINK_CHANGED.into());
+        }
+        // What a write made, when its service says: a new Drive file's name
+        // and link.
+        let mut made = None;
         let mut answer = json!({"sent": true, "service": service.name});
         match pending.action {
             // `gmail-app` is a Google sign-in only: never over SMTP.
@@ -1029,9 +1049,16 @@ impl<H: Http, M: Mail> Services<H, M> {
                     &writes::random_id(),
                 );
                 let url = mail::api_send_url()?;
-                self.call(service, &entry, Method::Post, url, Some(body), true)
-                    .await
-                    .map_err(|why| format!("not sent: {why}"))?;
+                self.call(
+                    service,
+                    &entry,
+                    Method::Post,
+                    url,
+                    Some(Body::Json(body)),
+                    true,
+                )
+                .await
+                .map_err(|why| format!("not sent: {why}"))?;
             }
             Action::Mail(out) => {
                 self.mail
@@ -1054,9 +1081,30 @@ impl<H: Http, M: Mail> Services<H, M> {
                 answer = json!({"sent": false, "saved": true, "service": service.name});
             }
             Action::Http { method, url, body } => {
-                self.call(service, &entry, method, url, Some(body), true)
+                self.call(service, &entry, method, url, Some(Body::Json(body)), true)
                     .await
                     .map_err(|why| format!("not sent: {why}"))?;
+            }
+            Action::Upload {
+                url,
+                content_type,
+                body,
+            } => {
+                let answer = self
+                    .call(
+                        service,
+                        &entry,
+                        Method::Post,
+                        url,
+                        Some(Body::Typed {
+                            content_type,
+                            text: body,
+                        }),
+                        true,
+                    )
+                    .await
+                    .map_err(|why| format!("not made: {why}"))?;
+                made = Some(writes::made(&answer));
             }
             Action::Mcp { tool, arguments } => {
                 let endpoint = Endpoint::new(service, &entry)?;
@@ -1079,8 +1127,63 @@ impl<H: Http, M: Mail> Services<H, M> {
                 service.code
             );
         }
+        if let Some(made) = made {
+            answer["made"] = made;
+        }
         Ok(answer)
     }
+}
+
+/// What a send is told when its service was linked again, to this or
+/// another account, after its read-back.
+pub const LINK_CHANGED: &str =
+    "nothing was sent: the service was linked again since the read-back, so ask for it again";
+
+/// A refused link, in the lamp's words.
+fn relink(name: &str) -> String {
+    format!("{name} refused the lamp's link: it may need linking again in the app")
+}
+
+/// A 403 in the lamp's own words, by the reason Google's error gives
+/// (`error.errors[].reason`, or `error.details[].reason` and
+/// `error.status` in its newer form): a full account, a busy service or
+/// the account's own policy each said as such, and anything else (a scope
+/// or sign-in refused, no reason given) as a link to make again. Only a
+/// reason's name is matched: nothing of the answer is passed on.
+fn forbidden(name: &str, body: &[u8]) -> String {
+    let answer: Value = serde_json::from_slice(body).unwrap_or_default();
+    let error = &answer["error"];
+    let reasons: Vec<&str> = ["errors", "details"]
+        .iter()
+        .filter_map(|list| error[list].as_array())
+        .flatten()
+        .filter_map(|item| item["reason"].as_str())
+        .chain(error["status"].as_str())
+        .collect();
+    let any = |names: &[&str]| reasons.iter().any(|reason| names.contains(reason));
+    if any(&["storageQuotaExceeded", "teamDriveFileLimitExceeded"]) {
+        format!("{name} is full: the account has no storage left for a new file")
+    } else if any(&[
+        "userRateLimitExceeded",
+        "rateLimitExceeded",
+        "dailyLimitExceeded",
+        "quotaExceeded",
+        "RATE_LIMIT_EXCEEDED",
+        "RESOURCE_EXHAUSTED",
+    ]) {
+        format!("{name} is busy: try again in a while")
+    } else if any(&["domainPolicy"]) {
+        format!("{name}'s account doesn't allow this: its organisation's policy refuses it")
+    } else {
+        relink(name)
+    }
+}
+
+/// A request's body: JSON, or text in its own content type (a Drive
+/// upload's `multipart/related`).
+enum Body {
+    Json(Value),
+    Typed { content_type: String, text: String },
 }
 
 /// The tool `tool` in a service's list.
@@ -1197,18 +1300,20 @@ mod tests {
     use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
     use std::sync::Mutex;
 
-    /// A service that answers 200 with `body` and keeps every call.
+    /// A service that answers `status` (200 when 0) with `body` and keeps
+    /// every call.
     #[derive(Default)]
     struct FakeHttp {
         calls: Mutex<Vec<Call>>,
         body: String,
+        status: u16,
     }
 
     impl Http for FakeHttp {
         async fn send(&self, call: Call) -> Result<Reply, String> {
             self.calls.lock().unwrap().push(call);
             Ok(Reply {
-                status: 200,
+                status: if self.status == 0 { 200 } else { self.status },
                 body: self.body.clone().into_bytes(),
                 ..Reply::default()
             })
@@ -2045,6 +2150,230 @@ mod tests {
         assert!(on.desk.waiting());
         run(on.admin(r#"{"op":"remove","code":"gmail"}"#));
         assert!(!on.desk.waiting());
+    }
+
+    /// The product's Drive link, as the backend sends it: `drive.file` and
+    /// the account's identity.
+    fn drive_line(token: &str) -> String {
+        set_line(
+            "google_drive",
+            json!({"auth_type":"oauth","access_token":token,
+                   "scopes":["https://www.googleapis.com/auth/drive.file","openid",
+                             "https://www.googleapis.com/auth/userinfo.email",
+                             "https://www.googleapis.com/auth/userinfo.profile"]}),
+        )
+    }
+
+    /// A Drive link with no scope that makes files is refused at the first
+    /// call, with nothing held or called (Thirteen's P2 on #5825).
+    #[test]
+    fn a_read_only_drive_link_is_told_to_link_again_before_any_read_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let on = services(dir.path(), "{}", true);
+        run(on.admin(&set_line(
+            "google_drive",
+            json!({"auth_type":"oauth","access_token":"planted-drive-ro",
+                   "scopes":["https://www.googleapis.com/auth/drive.readonly"]}),
+        )));
+        let ask = json!({"op":"call","name":"service_write","args":{"service":"google_drive","action":"create_doc","title":"Trip plan","text":"Day 1: Hue."}}).to_string();
+        assert_eq!(
+            run(on.tool(&ask)),
+            json!({"ok": false, "error": writes::DRIVE_NO_WRITE_SCOPE})
+        );
+        assert!(!on.desk.waiting());
+        assert!(on.http.calls.lock().unwrap().is_empty());
+    }
+
+    /// A failed upload is not made: `ok:false`, no `made`, its reason in
+    /// the lamp's words by Google's own (a full Drive, a busy one, a
+    /// scope refused, said as the missing permission #5844 tells), and the
+    /// write gone after (Thirteen's P3s on #5825).
+    #[test]
+    fn a_refused_drive_upload_is_not_made_and_says_why() {
+        let refused = |reason: &str| {
+            json!({"error":{"code":403,"message":"planted message","errors":[{"domain":"x","reason":reason}]}}).to_string()
+        };
+        for (body, why) in [
+            (
+                refused("storageQuotaExceeded"),
+                "not made: Google Drive is full: the account has no storage left for a new file",
+            ),
+            (
+                refused("userRateLimitExceeded"),
+                "not made: Google Drive is busy: try again in a while",
+            ),
+            (
+                json!({"error":{"code":403,"status":"PERMISSION_DENIED","details":[{"reason":"ACCESS_TOKEN_SCOPE_INSUFFICIENT"}]}}).to_string(),
+                "not made: Google Drive is linked without permission to make this change: link it again in the app (Skills, then Connectors) and allow it.",
+            ),
+            (
+                refused("insufficientPermissions"),
+                "not made: Google Drive is linked without permission to make this change: link it again in the app (Skills, then Connectors) and allow it.",
+            ),
+            (
+                "not json".to_owned(),
+                "not made: Google Drive refused the lamp's link: it may need linking again in the app",
+            ),
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let mut on = services(dir.path(), &body, true);
+            on.http.status = 403;
+            run(on.admin(&drive_line("planted-drive-403")));
+            let ask = json!({"op":"call","name":"service_write","args":{"service":"google_drive","action":"create_doc","title":"Trip plan","text":"Day 1: Hue."}}).to_string();
+            let held = run(on.tool(&ask));
+            let id = held["result"]["send_id"].as_str().unwrap().to_owned();
+            let send = json!({"op":"call","name":"service_write","args":{"service":"google_drive","send_id":id,"said":"send"}}).to_string();
+            let answer = run(on.tool(&send));
+            assert_eq!(answer, json!({"ok": false, "error": why}), "{body}");
+            assert!(answer.get("result").is_none());
+            assert!(!answer.to_string().contains("planted message"));
+            assert_eq!(on.http.calls.lock().unwrap().len(), 1);
+            // Not held for another try: asking again is a new write.
+            assert_eq!(run(on.tool(&send))["ok"], false);
+            assert_eq!(on.http.calls.lock().unwrap().len(), 1);
+        }
+    }
+
+    /// A write read back for one account is never sent with another linked
+    /// in its place before the "send": a Drive file prepared with A and
+    /// confirmed after B's `set` makes nothing and says why (the account
+    /// bind's words, Reviewer-two on #5982); a mail alike; and the same
+    /// account linked again with another refresh token makes nothing either
+    /// (Reviewer-three's P1 on #5825). The same account set again (a new
+    /// access token, the same refresh token) still sends.
+    #[test]
+    fn a_write_is_never_sent_with_a_link_that_replaced_its_own() {
+        let drive = |access: &str, refresh: &str, email: &str| {
+            set_line(
+                "google_drive",
+                json!({"auth_type":"oauth","access_token":access,"refresh_token":refresh,
+                       "user_email":email,"refresh":true,
+                       "scopes":["https://www.googleapis.com/auth/drive.file"]}),
+            )
+        };
+        let ask = json!({"op":"call","name":"service_write","args":{"service":"google_drive","action":"create_doc","title":"Private","text":"Only mine."}}).to_string();
+        let prepared = |on: &Services<FakeHttp, FakeMail>| {
+            let held = run(on.tool(&ask));
+            let id = held["result"]["send_id"].as_str().unwrap().to_owned();
+            json!({"op":"call","name":"service_write","args":{"service":"google_drive","send_id":id,"said":"send"}}).to_string()
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let on = services(dir.path(), r#"{"name":"Private"}"#, true);
+        assert_eq!(
+            run(on.admin(&drive("planted-a", "r-a", "a@home.test"))).0["ok"],
+            true
+        );
+        let send = prepared(&on);
+        assert_eq!(
+            run(on.admin(&drive("planted-b", "r-b", "b@home.test"))).0["ok"],
+            true
+        );
+        assert_eq!(
+            run(on.tool(&send)),
+            json!({"ok": false, "error": "not sent: the Google Drive link changed; nothing was sent"})
+        );
+        assert!(on.http.calls.lock().unwrap().is_empty(), "uploaded");
+        // Not held: the same id again finds nothing.
+        assert_eq!(run(on.tool(&send))["ok"], false);
+        assert!(on.http.calls.lock().unwrap().is_empty());
+        // B linked again with another refresh token: the link changed.
+        let send = prepared(&on);
+        run(on.admin(&drive("planted-b1", "r-b1", "b@home.test")));
+        assert_eq!(
+            run(on.tool(&send)),
+            json!({"ok": false, "error": LINK_CHANGED})
+        );
+        assert!(on.http.calls.lock().unwrap().is_empty(), "uploaded");
+        run(on.admin(&drive("planted-b", "r-b", "b@home.test")));
+        // B's own write, and B set again with a new access token, sends.
+        let send = prepared(&on);
+        run(on.admin(&drive("planted-b2", "r-b", "b@home.test")));
+        assert_eq!(run(on.tool(&send))["result"]["sent"], true);
+        let calls = on.http.calls.lock().unwrap().clone();
+        assert_eq!(calls.len(), 1);
+        assert!(
+            calls[0]
+                .headers
+                .contains(&("authorization".into(), "Bearer planted-b2".into()))
+        );
+
+        // A mail, by app password: another account set in between.
+        let gmail = |email: &str| {
+            set_line(
+                "gmail",
+                json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":email}}),
+            )
+        };
+        run(on.admin(&gmail("a@home.test")));
+        let held = run(on.tool(r#"{"op":"call","name":"service_write","args":{"service":"gmail","action":"send_mail","to":["mom@home.test"],"subject":"Dinner","text":"Home by 7"}}"#));
+        let id = held["result"]["send_id"].as_str().unwrap().to_owned();
+        run(on.admin(&gmail("b@home.test")));
+        let send = json!({"op":"call","name":"service_write","args":{"service":"gmail","send_id":id,"said":"send"}}).to_string();
+        assert_eq!(
+            run(on.tool(&send)),
+            json!({"ok": false, "error": "not sent: the Gmail link changed; nothing was sent"})
+        );
+        assert!(on.mail.sent.lock().unwrap().is_empty());
+    }
+
+    /// A new Drive file (#5385): read back whole with nothing called, then
+    /// one upload on the spoken send, with its multipart type, and the
+    /// answer's name and link; never from a made skill.
+    #[test]
+    fn a_drive_file_is_made_once_on_send_and_named_with_its_link() {
+        let dir = tempfile::tempdir().unwrap();
+        let on = services(
+            dir.path(),
+            r#"{"id":"1a","name":"Trip plan","webViewLink":"https://docs.google.com/document/d/1a/edit"}"#,
+            true,
+        );
+        run(on.admin(&drive_line("planted-drive-5385")));
+        let ask = json!({"op":"call","name":"service_write","args":{"service":"google_drive","action":"create_doc","title":"Trip plan","text":"Day 1: Hue."}}).to_string();
+        assert_eq!(
+            run(on.skill_tool(&ask)),
+            json!({"ok": false, "error": SKILL_READS_ONLY})
+        );
+        assert!(!on.desk.waiting());
+        let answer = run(on.tool(&ask));
+        let read_back = answer["result"]["read_back"].as_str().unwrap();
+        assert!(
+            read_back.contains("Google Doc named \"Trip plan\"")
+                && read_back.contains("\"Day 1: Hue.\""),
+            "{read_back}"
+        );
+        assert_eq!(answer["result"]["sent"], false);
+        assert!(on.http.calls.lock().unwrap().is_empty(), "made before send");
+        let id = answer["result"]["send_id"].as_str().unwrap().to_owned();
+        let send = json!({"op":"call","name":"service_write","args":{"service":"google_drive","send_id":id,"said":"send"}}).to_string();
+        let made = run(on.tool(&send));
+        assert_eq!(
+            made["result"],
+            json!({"sent": true, "service": "Google Drive", "made": {"name": "Trip plan", "link": "https://docs.google.com/document/d/1a/edit"}})
+        );
+        let calls = on.http.calls.lock().unwrap().clone();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].method, Method::Post);
+        assert_eq!(calls[0].url, writes::DRIVE_UPLOAD);
+        let header = |name: &str| {
+            calls[0]
+                .headers
+                .iter()
+                .find(|(given, _)| given == name)
+                .map(|(_, value)| value.clone())
+                .unwrap()
+        };
+        let content_type = header("content-type");
+        let boundary = content_type
+            .strip_prefix("multipart/related; boundary=")
+            .unwrap();
+        let body = String::from_utf8(calls[0].body.clone().unwrap()).unwrap();
+        assert!(body.starts_with(&format!("--{boundary}\r\n")), "{body}");
+        assert!(body.ends_with(&format!("\r\n--{boundary}--\r\n")));
+        assert!(body.contains("application/vnd.google-apps.document"));
+        assert_eq!(header("authorization"), "Bearer planted-drive-5385");
+        // Made once.
+        assert_eq!(run(on.tool(&send))["ok"], false);
+        assert_eq!(on.http.calls.lock().unwrap().len(), 1);
     }
 
     /// Gmail's REST API for a Google sign-in: a profile, an inbox of two

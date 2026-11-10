@@ -211,6 +211,13 @@ pub const NOT_SENT_NEXT: &str = "Say only that it was not sent, in the conversat
 /// What the model is told to say when the service did not save a draft.
 pub const NOT_SAVED_NEXT: &str =
     "Say only that the draft was not saved, in the conversation's language.";
+/// What the model is told when the service gave its own reason a write
+/// failed (a Drive link to make again, a full Drive): said, so the person
+/// learns what to do rather than hear "not sent" after every try.
+pub const NOT_SENT_WHY_NEXT: &str = "Say that it was not sent or made, and why, in a few words from error, in the conversation's language.";
+/// What the model is told when a write made a file (Google Drive's
+/// `made`): its name, never its link aloud.
+pub const MADE_NEXT: &str = "Say only that the file was made in their Google Drive, with its name from made, in the conversation's language. Never read out its link.";
 /// How long after the read-back could have finished playing ([`send_by`]) its
 /// "send" may come: the very next line, said soon.
 pub const SEND_WITHIN: Duration = Duration::from_secs(30);
@@ -1433,12 +1440,16 @@ pub fn answered(
             .get("error")
             .and_then(Value::as_str)
             .is_some_and(|error| error.starts_with("not saved"));
-        let next = if sent {
+        let next = if sent && told.get("made").is_some_and(Value::is_object) {
+            MADE_NEXT
+        } else if sent {
             SENT_NEXT
         } else if saved {
             SAVED_NEXT
         } else if draft_failed {
             NOT_SAVED_NEXT
+        } else if told.get("error").is_some_and(Value::is_string) {
+            NOT_SENT_WHY_NEXT
         } else {
             NOT_SENT_NEXT
         };
@@ -2407,6 +2418,36 @@ mod tests {
             fits.parameters.unwrap()["properties"]["action"]["description"],
             "What to do."
         );
+    }
+
+    /// lamp-services' own `tools.json`: the write's whole "action, by
+    /// service:" list reaches the model, Drive's new doc, sheet and file
+    /// (#5385) with it, within the link's bounds.
+    #[test]
+    fn every_write_action_reaches_the_model_from_the_services_own_catalogue() {
+        let dir = std::env::temp_dir().join(format!("lamp-services-acts-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        lamp_services::tools::write(&dir).unwrap();
+        let write = tools(&dir)
+            .into_iter()
+            .find(|tool| tool.name == WRITE)
+            .unwrap();
+        let parameters = write.parameters.clone().unwrap();
+        let told = format!(
+            "{} {}",
+            write.description, parameters["properties"]["action"]["description"]
+        );
+        for (code, actions) in lamp_services::writes::ACTIONS {
+            assert!(told.contains(&format!("{code}: {actions}")), "{code}");
+        }
+        assert!(told.contains(
+            "google_drive: create_doc or create_file {title, text}, create_sheet {title, rows}"
+        ));
+        assert!(write.description.len() <= MOST_DESCRIPTION_BYTES);
+        assert!(parameters.to_string().len() <= MOST_PARAMETERS_BYTES);
+        assert!(parameters["properties"]["rows"].is_object());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -3727,6 +3768,31 @@ mod tests {
     #[test]
     fn a_read_back_is_kept_and_a_send_and_a_read_are_told_what_to_say() {
         let now = Instant::now();
+        // The longest read-back lamp-services prepares
+        // (`READ_BACK_JSON_MOST`), as it answers, still reaches the model
+        // with the voice's words to say it (Reviewer-three's P2 on #5825).
+        let longest: String = "word "
+            .repeat(lamp_services::writes::READ_BACK_JSON_MOST)
+            .chars()
+            .take(lamp_services::writes::READ_BACK_JSON_MOST - 2)
+            .collect();
+        let mut told = json!({"read_back": longest, "send_id": "a".repeat(32), "sent": false,
+            "next": "Nothing is sent yet. Read read_back to the person in full; send only if their next words say send."});
+        assert_eq!(
+            json!(longest).to_string().len(),
+            lamp_services::writes::READ_BACK_JSON_MOST
+        );
+        assert!(
+            json!({"ok": true, "result": told}).to_string().len()
+                < lamp_services::reads::ANSWER_MOST
+        );
+        let write = call(
+            WRITE,
+            json!({"service":"google_drive","action":"create_sheet"}),
+        );
+        answered(&mut None, &write, 7, &mut told, now, "ann");
+        assert_eq!(told["next"], READ_BACK_NEXT);
+        assert!(crate::tools::sendable(&told), "{}", told.to_string().len());
         let mut pending = None;
         let write = call(WRITE, json!({"service":"gmail","action":"send"}));
         let mut told = json!({"read_back":"To Ann: hello","send_id":"s9"});
@@ -3752,6 +3818,17 @@ mod tests {
         let mut told = json!({"sent":false,"cancelled":true});
         answered(&mut pending, &send("s9"), 8, &mut told, now, "ann");
         assert_eq!(told["next"], NOT_SENT_NEXT);
+        // A failed send keeps the service's reason and is told to say it
+        // (a Drive link to make again, #5825); a made file says its name.
+        let relink =
+            "not made: Google Drive refused the lamp's link: it may need linking again in the app";
+        let mut told = json!({"error": relink});
+        answered(&mut pending, &send("s9"), 8, &mut told, now, "ann");
+        assert_eq!(told, json!({"error": relink, "next": NOT_SENT_WHY_NEXT}));
+        let mut told = json!({"sent":true,"service":"Google Drive","made":{"name":"Trip plan"}});
+        answered(&mut pending, &send("s9"), 8, &mut told, now, "ann");
+        assert_eq!(told["next"], MADE_NEXT);
+        assert!(MADE_NEXT.contains("its name") && MADE_NEXT.contains("Never read out its link"));
         let mut told = json!({"items":[]});
         answered(
             &mut pending,

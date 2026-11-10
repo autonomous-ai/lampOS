@@ -154,6 +154,7 @@ fn catalog_at(offset_minutes: Option<i32>) -> Value {
                     "subject": string("A mail's subject."),
                     "title": string("A title or name."),
                     "text": string("The whole text, as the person said it."),
+                    "rows": {"type": "array", "items": {"type": "array", "items": {"type": "string"}}, "description": "A new sheet's rows, each a list of cells."},
                     "repo": string("owner/name."),
                     "number": {"type": "integer", "description": "An issue's number."},
                     "id": string("A page's or file's id."),
@@ -255,6 +256,14 @@ mod tests {
         assert!(
             reads.contains("gmail: recent {count}, search {query}, drafts {count}, message {id}")
         );
+        // Drive makes a new doc, sheet or text file (#5385), a sheet from rows.
+        assert!(writes.contains(
+            "google_drive: create_doc or create_file {title, text}, create_sheet {title, rows}"
+        ));
+        let rows = &tools[2]["parameters"]["properties"]["rows"];
+        assert_eq!(rows["type"], "array");
+        assert_eq!(rows["items"]["type"], "array");
+        assert!(tools[1]["parameters"]["properties"]["rows"].is_null());
         // The names the lamp can link, each once, and what to say of another.
         let connected = tools[0]["description"].as_str().unwrap();
         assert!(connected.contains("The lamp can link only: Gmail, Gmail with Google sign-in, Google Calendar, Google Drive, Figma, GitHub,"));

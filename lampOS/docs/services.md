@@ -267,7 +267,7 @@ refresh goes to the lamp's backend, never to Google).
 | `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (an app password); `gmail.googleapis.com` (a Google sign-in) | `recent {count}`, `search {query}`, `drafts {count}` (an app password only), `message {id}`, `attachment {id, name \| index}` | `send_mail {to, cc, subject, text}`, `save_draft {to, cc, subject, text}` (an app password only) |
 | `gmail-app` | Gmail with Google sign-in | `gmail.googleapis.com` | none: it only sends | `send_mail {to, cc, subject, text}` |
 | `google_calendar` | Google Calendar | `www.googleapis.com` | `events {from, to, calendar, count}` | `create_event {title, start, end, calendar, attendees, text}` |
-| `google_drive` | Google Drive | `www.googleapis.com` | `files {query, count}`, `file {id}`, `text {id}` | none |
+| `google_drive` | Google Drive | `www.googleapis.com` | `files {query, count}`, `file {id}`, `text {id}` | `create_doc {title, text}`, `create_sheet {title, rows}`, `create_file {title, text}`: one new file in My Drive |
 | `figma`, `figma-api` | Figma | `api.figma.com` | `me`, `file {id}`, `comments {id}` | `comment {id, text}` |
 | `github` | GitHub | `api.github.com` | `query {graphql, variables}`, `notifications`, `issues {repo}`, `pulls {repo}`, `repos` | `create_issue {repo, title, text}`, `comment {repo, number, text}` |
 | `linear` | Linear | `api.linear.app` | `query {graphql, variables}`, `my_issues` | `create_issue {team_id, title, text}` |
@@ -731,9 +731,18 @@ an offset such as `+07:00`: Calendar refuses one without, so it is refused
 before the read-back, `reads::calendar_time`). A request is HTTPS
 only, to the service's own hosts, no redirect followed, 5 s to connect, 15 s
 in all, and at most 1 MiB of the answer read. An error status is said
-plainly: 401 or 403 "<Service> refused the lamp's link: it may need linking
+plainly: 401 "<Service> refused the lamp's link: it may need linking
 again in the app" (a write's 401 or 403 that says its scopes are too few is
-told what to do instead: "Scopes a write needs", under Writes), 404 "has no such item", 429 "is busy: try again in a
+told what to do instead: "Scopes a write needs", under Writes); 403 by the reason Google's error names (`serve::forbidden`,
+`error.errors[].reason`, `error.details[].reason` or `error.status`, only the
+name matched, nothing of the answer passed on): `storageQuotaExceeded` (or
+`teamDriveFileLimitExceeded`) "<Service> is full: the account has no
+storage left for a new file", `userRateLimitExceeded`, `rateLimitExceeded`,
+`dailyLimitExceeded`, `quotaExceeded`, `RATE_LIMIT_EXCEEDED` or
+`RESOURCE_EXHAUSTED` "is busy: try again in a while", `domainPolicy`
+"<Service>'s account doesn't allow this: its organisation's policy
+refuses it", any other (a scope or sign-in refused, no reason) the
+link words as a 401; 404 "has no such item", 429 "is busy: try again in a
 while", else "answered with an error". The token and the refresh token are
 scrubbed from any answer (each spelling, plain or URL-encoded).
 
@@ -937,7 +946,8 @@ Off unless `LAMP_SERVICES_WRITE=on`. Two phases (`writes.rs`):
    Facebook can see it."; a calendar event with attendees "each gets an
    invitation by email". The `send_id` is 16 random bytes in hex.
 2. **The same `send_id` with `"said":"send"`** sends exactly that write,
-   once: `{"sent": true, "service"}`. The waiting write is taken whatever
+   once: `{"sent": true, "service"}` (a new Drive file's also with
+   `"made": {"name", "link"}`, below). The waiting write is taken whatever
    follows: `said` other than "send" answers `{"sent": false, "cancelled":
    true}`; a wrong, used or late id, "nothing is waiting to be sent: it was
    cancelled, already sent or over two minutes old"; an id of another
@@ -946,14 +956,102 @@ Off unless `LAMP_SERVICES_WRITE=on`. Two phases (`writes.rs`):
    replaced by another account's since, nothing goes, "not sent: the
    <Service> link changed; nothing was sent" ("not saved: the Gmail link
    changed; nothing was saved" for a draft); the same account linked again
-   still goes (Reviewer-two on #5982). The journal says only "a confirmed
-   write to <code> was sent".
+   still goes (Reviewer-two on #5982), unless its link itself changed
+   (below). The journal says only "a confirmed write to <code> was sent".
 
 One write waits at a time (a new one replaces it), for 120 s. Bounds: a text
 at most 3,000 characters (line breaks kept), a subject or title one line of
 at most 200, at most 20 recipients or attendees, each a plain
-`local@domain.tld`. Google Drive and Ahrefs have no write ("the lamp only
-reads …").
+`local@domain.tld`. Ahrefs has no write ("the lamp only reads …").
+
+**The whole read-back is bounded too** (`writes::READ_BACK_JSON_MOST`,
+3,584 bytes as quoted, escaped JSON, for every write, an MCP tool's
+too): with the prepare's `send_id`, `sent` and the voice's words to say it,
+what the model gets stays within its 4,096-byte tool answer. A write within
+every cap above whose read-back is longer (50 rows of 10 blank cells, each
+said "blank"; a text of quotes or of non-Latin letters, which take more
+bytes) is refused before anything is held: `writes::READ_BACK_TOO_LONG`,
+"that is too long to read back in one go, so nothing was prepared: ask
+for a shorter text or a smaller sheet, or make it in parts".
+
+**A send goes only with the link it was read back for**
+(Reviewer-three's P1 on #5825): the prepare keeps `writes::link_of` of
+the linked entry (a hash of its code, kind, client, account, extras,
+static key and refresh token, or its access token when it has none), and
+the send compares it with the very entry it is about to use, after the
+account bind above. A `set` of another account in between (Drive B over
+Drive A, another Gmail) is refused by that bind ("not sent: the <Service>
+link changed; nothing was sent"); the same account linked again with
+another refresh token sends nothing either: `{"ok": false, "error":
+"nothing was sent: the service was linked again since the read-back, so
+ask for it again"}` (`serve::LINK_CHANGED`). Either way the write is gone.
+The same account set again or refreshed (a new access token, the same
+refresh token) still sends; a rotated refresh token reads as another link,
+which only cancels.
+
+**Google Drive makes a new file** (#5385, the first builder's yes on
+9 Nov): `create_doc {title, text}` a Google Doc, `create_sheet {title,
+rows}` a Google Sheet, `create_file {title, text}` a plain text file (its
+name gets `.txt` unless it ends so). Each is one new file in My Drive, by
+one call, the only one on Drive's write list: `POST
+https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink`
+(`writes::DRIVE_UPLOAD`; the list is the path `/upload/drive/v3/files`),
+a `multipart/related` body with a random `lamp-<hex>` boundary: the
+metadata `{"mimeType", "name"}` (`application/vnd.google-apps.document`,
+`application/vnd.google-apps.spreadsheet` or `text/plain`; no parent),
+then the content as `text/plain` (a Doc, a text file) or `text/csv` (a
+Sheet), which Drive converts. Nothing edits, copies, moves, shares,
+deletes or overwrites a file: those calls are on no list, and an action
+other than the three is refused with Drive's list. The read-back says
+the kind, the name and the whole content, for example "Make a new Google
+Doc named "Trip plan" in your Google Drive, saying: "Day 1: Hue.". Only
+you can see it, unless your Drive shares new files."; a sheet says each
+row, its cells split by "; then " (`writes::CELL_BREAK`, so a cell
+holding a comma is still heard as one), an empty cell "blank": "Make a
+new Google Sheet named "Groceries" in your Google Drive, with 2 rows.
+Row 1: Item; then Note; then Count. Row 2: Milk; then 2%, cold; then 2.
+…", and a sheet with no rows "…, empty.". The title is one line of at most
+200 characters and a text at most 3,000, as a mail's; a sheet at most 50
+rows of 10 cells, 3,000 characters in all, each cell text, a number,
+true or false (the rows a list of lists, or that list as JSON text), and
+no cell a formula: one beginning with `=`, `+`, `-` or `@` (after its
+spaces are trimmed), which a CSV import may evaluate, is refused, but a
+plain signed number such as `-5`, `+3.2` or `-1.5e-7` (`digits[.digits]
+[e[+|-]digits]` after the sign, nothing else) is kept, since a sheet reads
+it only as a number. The CSV quotes a
+cell with a comma, a quote or a line break and doubles its quotes. Made
+on the spoken send only, as every write: the answer is `{"sent": true,
+"service": "Google Drive", "made": {"name", "link"}}`, the link only when
+it is Google's own (`https://docs.google.com/…` or
+`https://drive.google.com/…`, `writes::made`), else left out. A failed
+upload is `{"ok": false, "error": "not made: …"}` with no `made`, its
+reason as the 403s above (a link to make again, a full Drive, a busy
+one). The same
+gate as a mail holds: the owner only, seen saying it, on the second
+route, never from a made skill (`service_read` alone), a scheduled run,
+a page or a mail.
+
+**Drive's scope:** the product's Drive link (the backend's Google sign-in)
+holds `https://www.googleapis.com/auth/drive.file`, `openid`,
+`userinfo.email` and `userinfo.profile`, never `drive.readonly` (Backend2,
+9 Nov 16:06). So the lamp makes files under that `drive.file` link, and
+it sees, reads and finds only the files it made or the owner picked for
+it, not the rest of their Drive. A write is prepared only when the link's
+`scopes` hold `https://www.googleapis.com/auth/drive` or
+`https://www.googleapis.com/auth/drive.file` (`writes::drive_may_write`,
+each scope taken whole); otherwise, and when a link records no scopes at
+all (one set before scopes were kept, or by hand), the first call is
+refused before any read-back, nothing held or called:
+`writes::DRIVE_NO_WRITE_SCOPE`, "This Google Drive link can't make files.
+To let the lamp make one, link Google Drive again in the app: Skills, then
+Connectors." No scopes is refused because such a link may be read-only,
+and the person would dictate the whole file to hear only a failure;
+linking again through the app records the scopes.
+
+**A timeout after Drive saved:** the upload has 15 s, inside the voice's
+20 s. If Drive made the file but its answer came too late, the lamp says
+it was not made, and asking again makes a second file with the same
+name: the person can delete the extra one in Drive.
 
 **Scopes a write needs** (`writes::SCOPES`). The check applies only to an
 OAuth link that records its scopes: a sign-in (an access token, `auth_type`
@@ -1238,15 +1336,21 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   counted: every other check above is unchanged.
 - **After a send** the model is told one fixed line: "Say only that it was
   sent, in the conversation's language." when the service answered
-  `sent: true`; "Say only that it was saved as a draft in their Gmail
-  Drafts, not sent, in the conversation's language." (`SAVED_NEXT`) when it
-  answered `saved: true`, so the lamp says "Saved as a draft.", never
-  "sent"; "Say only that the draft was not saved, in the conversation's
-  language." (`NOT_SAVED_NEXT`) for an error beginning "not saved"; else
-  "Say only that it was not sent, in the conversation's language." A saved
-  draft is a done write as a sent one is (`services::went`): its receipt is
-  never undone nor let go first, and a cut turn's note says the go-ahead
-  "already sent the write they asked for (or, for a draft, saved it)".
+  `sent: true`; "Say only that the file was made in their Google Drive,
+  with its name from made, in the conversation's language. Never read out
+  its link." (`MADE_NEXT`) when it also gave `made`; "Say only that it was
+  saved as a draft in their Gmail Drafts, not sent, in the conversation's
+  language." (`SAVED_NEXT`) when it answered `saved: true`, so the lamp says
+  "Saved as a draft.", never "sent"; "Say only that the draft was not saved,
+  in the conversation's language." (`NOT_SAVED_NEXT`) for an error beginning
+  "not saved"; "Say that it was not sent or made, and why, in a few words
+  from error, in the conversation's language." (`NOT_SENT_WHY_NEXT`) when the
+  service gave its own reason otherwise (`error`: a Drive link to make
+  again, a full Drive), so the person learns what to do; else "Say only that
+  it was not sent, in the conversation's language." A saved draft is a done
+  write as a sent one is (`services::went`): its receipt is never undone
+  nor let go first, and a cut turn's note says the go-ahead "already sent
+  the write they asked for (or, for a draft, saved it)".
 - **A send cut while awaited is never answered as nothing done** (#5853,
   lamp-9adf, 9 Nov). On the second route a send's call runs to its answer
   even when a newer line cuts the turn, and the line that answers those
@@ -1770,6 +1874,12 @@ still refused (`OWNER_ONLY`).
   `lamp-skills`' start, so a later rename or a forget-everything leaves the
   old name until a restart, which fails closed: the eyes' known file no
   longer shows that name, so the read stops at "not the owner". Writes from a made skill are not built.
+- **A new Drive file is built, not yet run on a lamp** (#5385): it is
+  made under the product's `drive.file` link (a link without a scope that
+  makes files, or with none recorded, is told to link again before any
+  read-back); a sheet's empty upload and Drive's conversion of each part
+  are as Google documents them, not yet seen; the lamp says the new file's
+  name after the send, never its link aloud, which the answer carries.
 - **Scheduled reads** of a service (a morning mail summary) are left out
   until they have a design of their own: a request not heard live reaches
   no service.
@@ -1829,7 +1939,19 @@ its renewal under its own code; security mails listed and read with each link sa
 line, a cut text with every code shape masked, an IMAP text cut at its fetch
 told cut) and still left out whole for a made skill; answers quoted
 and under the voice's cap; a write refused when off, read back in full and
-sent once within two minutes; a send or an event the link's listed scopes
+sent once within two minutes; a new Drive Doc, Sheet or text file read
+back whole (kind, name, every word or cell), its multipart body (the
+boundary, both types, the CSV quoting commas, quotes and line breaks),
+its bounds (title, text, 50 rows of 10 cells, no cell beginning with `=`,
+`+`, `-` or `@` but a plain signed number), a link without `drive` or
+`drive.file` (or with no scopes) refused before any read-back, every other
+Drive action refused, the write list taking `POST /upload/drive/v3/files`
+alone, made once on send with its multipart type and answered with its
+name and Google's own link only, a refused upload `ok:false` with no
+`made` and its 403 reason (full, busy, link), a read-back over 3,584 JSON bytes refused (50 rows of 10 blank cells), no send with a link set in its place since the read-back (a Drive or a mail), never from a made skill (and in
+`-p lamp-voice`, every write action of `tools.json` reaching the model
+within the link's bounds, and a failed send told to say why, a made file
+its name); a send or an event the link's listed scopes
 don't allow refused in plain words with nothing held or called, one they
 allow read back, a send Google refuses for its scopes told the same and any
 other 403 its own words, a link with no scopes listed (an app password, a
