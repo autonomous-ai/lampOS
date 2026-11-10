@@ -2334,6 +2334,27 @@ fn the_product_keeps_tastes_first_marks_maybes_and_leaves_newer_first_off() {
     );
 }
 
+/// A line that only asks to keep something, kept plainly, is answered at once
+/// with no second chat round (`LAMP_KEEP_ANSWERS_AT_ONCE`, C59, #5919): the
+/// memory owner's call to turn memory switches on, after its lamp check on
+/// lamp-06c1 on 10 Nov (median keep turn 2807 → 2056 ms, 6 of 6 kept). It
+/// acts only on the second route, set beside it.
+#[test]
+fn the_product_answers_a_plain_keep_at_once() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_KEEP_ANSWERS_AT_ONCE=on",
+        "Environment=LAMP_VOICE_ROUTE=second",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// A delivery ledger fenced ahead of its store is re-fenced at the voice's
 /// start in the product (#5560, its played row on lamp-52e6 on 8 Nov), so a
 /// lamp whose store was put back rings its new timers again.

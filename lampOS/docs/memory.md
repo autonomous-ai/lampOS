@@ -1298,7 +1298,7 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   `held_forget::a_keep_the_next_round_doubts_is_taken_back_until_their_yes`,
   `held_forget::a_doubted_keep_stays_without_the_eyes`.
 - **A plain keep is answered at once** (`LAMP_KEEP_ANSWERS_AT_ONCE=on`,
-  the second route; off unless set, C59). A spoken line that only asks to
+  the second route; on in the product, off unless set, C59, #5919). A spoken line that only asks to
   keep something ("Remember that my dentist is on Tuesday."), whose first
   chat round called `remember` alone with no words, is answered "Okay,
   I'll remember that." as soon as the memory answered a plain keep
@@ -1310,7 +1310,9 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   they"), goes to round 2, as does a keep asked in words other than
   English. In the owner's language the line is said from its clip rendered
   ahead, with no second chat round: on lamp-06c1 on 5 Nov that round was
-  most of a keep turn's extra 2.1 s, the memory 39 ms. A keep that
+  most of a keep turn's extra 2.1 s, the memory 39 ms; on lamp-06c1 on
+  10 Nov the median keep turn went from 2807 ms off to 2056 ms on, 6 of 6
+  kept. A keep that
   failed, kept nothing, was
   held, doubted or told with a note goes to round 2 as before, which says
   what happened: it is never said kept. The scope and seen-speaker gates

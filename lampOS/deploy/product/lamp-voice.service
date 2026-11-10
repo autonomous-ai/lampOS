@@ -205,6 +205,10 @@ Environment=LAMP_SECOND_SAID_ONCE=on
 # English only (#2135, #4700): on lamp-4ace on 31 Oct (d06603109f) off and on alternating, timers and reminders 2.06-2.20 s
 # against 2.95-3.27 s, a real light change 1.82-1.89 s, nothing said twice (the first builder on #4710, 17:35).
 Environment=LAMP_SECOND_SAY_WITH_CALL=on
+# A line that only asks to keep something, kept plainly, is answered "Okay, I'll remember that." at once with no second
+# chat round (C59, #5919): on lamp-06c1 on 10 Nov the median keep turn went from 2807 to 2056 ms, 6 of 6 kept. A keep
+# that failed, was held, doubted or told with a note still goes to round 2, which says what happened. Second route only.
+Environment=LAMP_KEEP_ANSWERS_AT_ONCE=on
 # An earlier turn that ran a light or volume step is told to the model as the call, then its words, so an ask
 # is not learned as words alone (#5018): on lamp-9adf at 9730, 10 of 10 device lines called, 0 talk-only (4 of 14 off).
 Environment=LAMP_HISTORY_KEEPS_CALLS=on
