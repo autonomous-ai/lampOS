@@ -611,6 +611,23 @@ async function withPaired(options, body) {
   } finally { await fake.stop(); }
 }
 
+test('a lease whose connection closed is lost, not held', async () => {
+  // The lamp ends a computer's leases when its last connection closes and
+  // tells nobody: `state` must not go on saying `held` (the lead's 4-lamp
+  // show, 10 Nov: held, then no_lease on the next look).
+  await withPaired({ grants: ['body'] }, async (fake, keyring) => {
+    const lamp = await Lamp.connect(undefined, { keyring });
+    const lease = await lamp.lease('body').take();
+    assert.equal(lease.held, true);
+    fake.restart();
+    await until(() => lease.state !== 'held');
+    assert.equal(lease.state, 'lost');
+    assert.equal(lease.lostWhy, 'the connection closed');
+    assert.equal(lease.held, false);
+    await lamp.close();
+  });
+});
+
 test('keepConnected carries a program across the lamp\'s restart', async () => {
   await withPaired({ grants: ['body', 'look'] }, async (fake, keyring) => {
     const arrivals = [];
