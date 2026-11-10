@@ -4993,8 +4993,31 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
         Call::Ends => "its trigger ended".into(),
         Call::ServiceRead(_) => "read: made by its own run, behind its gate".into(),
         Call::ServiceWrite(_) => "write: made by its own run, as the owner said yes".into(),
+        Call::Remind(remind) => {
+            // One set at a time, all skills: the list read for the same
+            // words and the set it allows are never split by another's.
+            let mut tally = REMINDS
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let said = lamp_skills::remind::set(
+                &sockets.actions,
+                &sockets.may.skill,
+                &sockets.may.permissions,
+                remind,
+                &mut tally,
+                clock::now_us(),
+            );
+            if said.contains(": refused, ") {
+                eprintln!("lamp-skills: skill:{}: {said}", sockets.may.skill);
+            }
+            said
+        }
     }
 }
+
+/// Each skill's reminders set within the last day
+/// ([`lamp_skills::remind::MOST_A_DAY`]). Kept while the program runs.
+static REMINDS: Mutex<lamp_skills::remind::Tally> = Mutex::new(lamp_skills::remind::Tally::new());
 
 /// The stand a person asked for (#4135): one `body/stand_asked`, kept by
 /// the bus, published only with the body's own switch on here too.

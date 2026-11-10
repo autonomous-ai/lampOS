@@ -27,6 +27,7 @@ pub mod knowledge;
 pub mod known;
 pub mod limits;
 pub mod package;
+pub mod remind;
 pub mod requested_audio;
 pub mod routine;
 pub mod service_read;
@@ -775,6 +776,9 @@ struct StepFile {
     /// A fixed write to one of the owner's linked services, sent only as
     /// the owner said yes to it ([`service_write`], #6066).
     write: Option<service_write::WriteFile>,
+    /// A timer or reminder set in the schedule, its words the skill's own
+    /// ([`remind`], #6066).
+    remind: Option<remind::RemindFile>,
 }
 
 /// `propose = { ... }`: what an add-on suggests, as its folder writes it.
@@ -1260,8 +1264,8 @@ pub struct Permissions {
     #[serde(default)]
     pub topics: Vec<String>,
     /// The actions part's functions it may call by name, beyond the
-    /// light's own, which `light` gives. No step names one yet: this is
-    /// the list such a step will be held to.
+    /// light's own, which `light` gives: a `remind` step's `set_reminder`
+    /// or `set_timer` ([`remind`], #6066).
     #[serde(default)]
     pub actions: Vec<String>,
     /// It may speak: a note or the voice's own words (`say`), or a sound.
@@ -1429,6 +1433,8 @@ impl Permissions {
                     )
                 });
             }
+            // Its function, which [permissions] actions must list.
+            Call::Remind(remind) => return self.refuses_action(remind.action()),
             Call::PrepareUnplug => unreachable!("handled above"),
             Call::AfterSay | Call::Ends => return None,
         };
@@ -2598,6 +2604,9 @@ pub enum Call {
     /// owner said yes to it ([`service_write`], #6066). Its skill's only
     /// step.
     ServiceWrite(Box<service_write::WriteStep>),
+    /// A timer or reminder set in the schedule through the actions part's
+    /// `set_timer` or `set_reminder` ([`remind`], #6066).
+    Remind(remind::Remind),
 }
 
 /// A say written as a table: `{ text = "..." }` or `{ note = "..." }`, with
@@ -2836,6 +2845,7 @@ impl Call {
             Self::Ends => ("ends", json!({})),
             Self::ServiceRead(read) => ("read", read.named()),
             Self::ServiceWrite(write) => ("write", write.named()),
+            Self::Remind(remind) => ("remind", remind.named()),
         }
     }
 }
@@ -4036,6 +4046,7 @@ fn manifest(
                 && step.show.is_none()
                 && step.stand.is_none()
                 && step.propose.is_none()
+                && step.remind.is_none()
                 && step.on.is_none()
                 && step.after.is_none()
                 && step.if_choice.is_none()
@@ -4073,9 +4084,10 @@ fn manifest(
             && step.show.is_none()
             && step.stand.is_none()
             && step.propose.is_none()
+            && step.remind.is_none()
         {
             return Err(
-                "a [[do]] step names body, light, say, sound, cue, rest, requested_audio, look, show, stand, propose or read"
+                "a [[do]] step names body, light, say, sound, cue, rest, requested_audio, look, show, stand, propose, remind or read"
                     .into(),
             );
         }
@@ -4117,6 +4129,7 @@ fn manifest(
                     || step.rest.is_some()
                     || step.requested_audio.is_some()
                     || step.look.is_some()
+                    || step.remind.is_some()
                 {
                     return Err(
                         "a step for some choices only makes body, light, show or stand".into(),
@@ -4397,6 +4410,17 @@ fn manifest(
                 return Err("requested audio definition changed while loading".into());
             }
             steps.push(Step::Call(Call::RequestedAudio(asset)));
+        }
+        if let Some(remind) = step.remind {
+            // A person who asks for a reminder asks the voice, which sets it
+            // and says its time back: a skill's is set by its trigger.
+            if file.tool.is_some() {
+                return Err(
+                    "remind, in a skill with a tool: a person asks the voice for a reminder, which sets it and says its time back; a skill's remind is set when its trigger starts it"
+                        .into(),
+                );
+            }
+            steps.push(Step::Call(Call::Remind(remind.step()?)));
         }
         ons.resize(steps.len(), on);
     }
