@@ -346,6 +346,26 @@ class Following:
         await self.stop()
 
 
+class Notes:
+    """This computer's notes on the lamp: `await lamp.notes.set("mood",
+    {"calm": True})`, `get`, `delete`, `list` (see `Lamp.notes_set`)."""
+
+    def __init__(self, lamp: "Lamp") -> None:
+        self._lamp = lamp
+
+    async def set(self, key: str, value: Any) -> dict:
+        return await self._lamp.notes_set(key, value)
+
+    async def get(self, key: str, default: Any = None) -> Any:
+        return await self._lamp.notes_get(key, default)
+
+    async def delete(self, key: str) -> bool:
+        return await self._lamp.notes_delete(key)
+
+    async def list(self, prefix: str = "") -> dict:
+        return await self._lamp.notes_list(prefix)
+
+
 class Lamp:
     """A connection to one paired lamp."""
 
@@ -946,6 +966,40 @@ class Lamp:
     async def remove_sound(self, name: str) -> dict:
         """Delete one of this computer's clips from the lamp."""
         return await self.request("sound.remove", name=name)
+
+    # Notes (the `notes` grant, docs/control.md "Notes"): this computer's own
+    # small key/value memory on the lamp. It outlives the program and the
+    # lamp's restart, belongs to this computer alone, and goes when the owner
+    # lets it go.
+
+    @property
+    def notes(self) -> "Notes":
+        """`lamp.notes.get/set/delete/list`: this computer's own notes."""
+        return Notes(self)
+
+    async def notes_set(self, key: str, value: Any) -> dict:
+        """Keep `value` (any JSON, at most 16384 bytes serialized) under
+        `key` (up to 64 of letters, digits and `. _ : -`): `{"key", "bytes"}`.
+        A computer keeps 256 keys and 256 KiB at most (`limits["notes"]`)."""
+        reply = await self.request("notes.set", key=key, value=value)
+        return {"key": reply["key"], "bytes": reply["bytes"]}
+
+    async def notes_get(self, key: str, default: Any = None) -> Any:
+        """The value under `key`, or `default` when none is kept (a stored
+        `None` is returned as `None`)."""
+        reply = await self.request("notes.get", key=key)
+        return reply["value"] if reply.get("found") else default
+
+    async def notes_delete(self, key: str) -> bool:
+        """Drop `key`; whether it was kept."""
+        return bool((await self.request("notes.delete", key=key)).get("deleted"))
+
+    async def notes_list(self, prefix: str = "") -> dict:
+        """This computer's keys that start with `prefix`, sorted:
+        `keys` (each `{"key", "bytes"}`), `count`, `total`, `bytes`,
+        `keys_max` and `bytes_max`."""
+        reply = await self.request("notes.list", prefix=prefix) if prefix else await self.request("notes.list")
+        return {k: v for k, v in reply.items() if k not in ("re", "ok")}
 
     # Turns and listening (docs/control.md): the person wins over each.
 

@@ -1192,6 +1192,59 @@ function wav(seconds, level = 1_000) {
   return data;
 }
 
+test('notes are set, read, listed and deleted as this computer\'s own', async () => {
+  await withLamp({ grants: ['notes'] }, async (lamp, fake) => {
+    assert.equal(lamp.limits.notes.keys_max, 256);
+    assert.equal(await lamp.notes.get('mood'), undefined);
+    assert.equal(await lamp.notes.get('mood', 'calm'), 'calm');
+    assert.deepEqual(await lamp.notes.set('mood', { calm: [1, 2, 3] }), { key: 'mood', bytes: 16 });
+    assert.deepEqual(await lamp.notes.get('mood'), { calm: [1, 2, 3] });
+    // A stored null is found, not a missing key.
+    await lamp.notes.set('nothing', null);
+    assert.equal(await lamp.notes.get('nothing', 'missing'), null);
+    await lamp.notes.set('mode', 7);
+    const listed = await lamp.notes.list('mo');
+    assert.deepEqual(listed.keys, [{ key: 'mode', bytes: 1 }, { key: 'mood', bytes: 16 }]);
+    assert.deepEqual([listed.count, listed.total, listed.keys_max, listed.bytes_max], [2, 3, 256, 262_144]);
+    assert.equal((await lamp.notes.list()).count, 3);
+    assert.equal(await lamp.notes.delete('mood'), true);
+    assert.equal(await lamp.notes.delete('mood'), false);
+    assert.deepEqual(fake.asked('notes.delete'), [{ key: 'mood' }, { key: 'mood' }]);
+    // The same calls by their op names, as every op has one.
+    assert.equal(await lamp.notesGet('mode'), 7);
+    assert.equal((await lamp.notesList('m')).count, 1);
+  });
+});
+
+test('notes are held to the lamp\'s bounds and belong to one computer', async () => {
+  await withLamp({ grants: ['notes'] }, async (lamp, fake, keyring) => {
+    for (const bad of ['a b', '', 'k'.repeat(65)]) {
+      await assert.rejects(lamp.notes.set(bad, 1), (error) => error.code === 'bad_request', bad);
+    }
+    await assert.rejects(lamp.notes.list('a/b'), (error) => error.code === 'bad_request');
+    const big = 'x'.repeat(16_384 - 2);
+    assert.equal((await lamp.notes.set('big', big)).bytes, 16_384);
+    await assert.rejects(lamp.notes.set('big', `${big}x`), /16384/);
+    assert.equal(await lamp.notes.get('big'), big);
+    await lamp.notes.delete('big');
+    for (let at = 0; at < 256; at++) await lamp.notes.set(`k${String(at).padStart(4, '0')}`, at);
+    await assert.rejects(lamp.notes.set('one-more', 1), /full/);
+    await lamp.notes.set('k0000', 'replaced');
+    const client = keyring.pairing().client;
+    assert.deepEqual([...fake.notes.keys()], [client]);
+    fake.revoke(client);
+    assert.equal(fake.notes.get(client)?.size ?? 0, 0);
+  });
+});
+
+test('notes need their grant', async () => {
+  await withLamp({ grants: ['speak'] }, async (lamp) => {
+    for (const call of [() => lamp.notes.get('k'), () => lamp.notes.set('k', 1), () => lamp.notes.delete('k'), () => lamp.notes.list()]) {
+      await assert.rejects(call(), (error) => error.code === 'no_grant');
+    }
+  });
+});
+
 test('a clip is uploaded in parts, played, listed and removed', async () => {
   await withLamp({ grants: ['speak'] }, async (lamp, fake) => {
     // 2 s, about 96 KB: three parts of 36 KiB.

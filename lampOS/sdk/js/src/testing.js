@@ -100,6 +100,14 @@ export const LIMITS = Object.freeze({
     clips_max: 64,
     store_max_bytes: 20_000_000,
   },
+  notes: {
+    key_max_bytes: 64,
+    value_max_bytes: 16_384,
+    keys_max: 256,
+    bytes_max: 262_144,
+    writes: [{ most: 30, within_ms: 60_000 }],
+    reads: [{ most: 120, within_ms: 60_000 }],
+  },
   ring: { pixels: 32 },
   quiet_hours: 'off',
 });
@@ -319,6 +327,9 @@ export class FakeLamp {
     // its loudness check.
     this.clips = new Map();
     this.uploads = new Map();
+    // Each computer's notes (`notes.set`) as lamp-control's notes.rs keeps them: its keys and values, held to the same
+    // caps, and gone with a `revoke`.
+    this.notes = new Map();
     // Pushed skills by name, and the one push in flight on the lamp.
     this.pushed = new Map();
     this.pushing = null;
@@ -693,6 +704,7 @@ export class FakeLamp {
     if (op === 'lease.take') return (request.parts ?? []).map((p) => ({ body: 'body', light: 'light', voice: 'speak' })[p]);
     const speak = ['say', 'sound', 'sound.upload', 'sound.list', 'sound.remove', 'turn.end', 'volume'];
     if (op.startsWith('skill.')) return ['skills'];
+    if (op.startsWith('notes.')) return ['notes'];
     if (speak.includes(op)) return ['speak'];
     // A turn speaks and hears what is said to the lamp.
     return {
@@ -701,6 +713,45 @@ export class FakeLamp {
       'microphone.stream': ['microphone'],
       'turn.start': ['speak', 'hear'], 'listen.set': ['hear'],
     }[op] ?? [];
+  }
+
+  // The owner lets `client` go, as lamp-control's revoke: its key, its clips and its notes are gone.
+  revoke(client) {
+    this.clients.delete(client);
+    this.clips.delete(client);
+    this.notes.delete(client);
+  }
+
+  // One `notes.*` op, as lamp-control's notes.rs answers it: this computer's own keys only, the value at most 16384
+  // bytes serialized, 256 keys and 262144 bytes of keys and values in all.
+  notesOp(ws, client, request) {
+    const { id, op } = request;
+    const room = this.notes.get(client) ?? new Map();
+    // As notes.rs: a key is 1 to 64 bytes of letters, digits and `. _ : -`; a prefix up to 64 of them.
+    const bad = op === 'notes.list' ? !/^[A-Za-z0-9._:-]{0,64}$/.test(request.prefix ?? '') : !/^[A-Za-z0-9._:-]{1,64}$/.test(request.key);
+    if (bad) return this.refuse(ws, id, 'bad_request', `${op === 'notes.list' ? 'prefix' : 'key'}: up to 64 bytes of letters, digits and . _ : -`);
+    const size = (value) => Buffer.byteLength(JSON.stringify(value));
+    const held = (keys) => [...keys].reduce((sum, [k, v]) => sum + Buffer.byteLength(k) + size(v), 0);
+    if (op === 'notes.set') {
+      const bytes = size(request.value);
+      if (bytes > 16_384) return this.refuse(ws, id, 'bad_request', `value: ${bytes} bytes, over the 16384 one note may take`);
+      const after = new Map(room).set(request.key, request.value);
+      if (after.size > 256 || held(after) > 262_144) {
+        return this.refuse(ws, id, 'refused', `this computer's notes are full: it keeps 256 keys at most and 262144 bytes in all (now ${room.size} keys, ${held(room)} bytes)`);
+      }
+      this.notes.set(client, after);
+      return this.ok(ws, id, { key: request.key, bytes });
+    }
+    if (op === 'notes.get') {
+      return room.has(request.key)
+        ? this.ok(ws, id, { key: request.key, found: true, value: room.get(request.key) })
+        : this.ok(ws, id, { key: request.key, found: false });
+    }
+    if (op === 'notes.delete') return this.ok(ws, id, { key: request.key, deleted: room.delete(request.key) });
+    const prefix = request.prefix ?? '';
+    const keys = [...room].filter(([k]) => k.startsWith(prefix)).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([key, value]) => ({ key, bytes: size(value) }));
+    return this.ok(ws, id, { keys, count: keys.length, total: room.size, bytes: held(room), keys_max: 256, bytes_max: 262_144 });
   }
 
   clipsOf(client) {
@@ -904,6 +955,11 @@ export class FakeLamp {
         this.pushed.delete(request.name);
         return this.ok(ws, id);
       }
+      case 'notes.set':
+      case 'notes.get':
+      case 'notes.delete':
+      case 'notes.list':
+        return this.notesOp(ws, client, request);
       case 'sound.upload':
         return this.upload(ws, client, request);
       case 'sound.list':

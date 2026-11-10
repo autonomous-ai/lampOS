@@ -2088,6 +2088,80 @@ def _wav(seconds: float, level: int = 1_000) -> bytes:
     return out.getvalue()
 
 
+def test_notes_are_set_read_listed_and_deleted_as_this_computers_own(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("notes",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                assert lamp.limits["notes"]["keys_max"] == 256
+                assert await lamp.notes.get("mood") is None
+                assert await lamp.notes.get("mood", default="calm") == "calm"
+                assert await lamp.notes.set("mood", {"calm": [1, 2, 3]}) == {"key": "mood", "bytes": 16}
+                assert await lamp.notes.get("mood") == {"calm": [1, 2, 3]}
+                # A stored null is found, not a missing key.
+                await lamp.notes.set("nothing", None)
+                assert await lamp.notes.get("nothing", default="missing") is None
+                await lamp.notes.set("mode", 7)
+                listed = await lamp.notes.list("mo")
+                assert listed["keys"] == [{"key": "mode", "bytes": 1}, {"key": "mood", "bytes": 16}]
+                assert (listed["count"], listed["total"]) == (2, 3)
+                assert listed["keys_max"] == 256 and listed["bytes_max"] == 262_144
+                assert (await lamp.notes.list())["count"] == 3
+                assert await lamp.notes.delete("mood") is True
+                assert await lamp.notes.delete("mood") is False
+                assert fake.asked("notes.delete") == [{"key": "mood"}, {"key": "mood"}]
+                # The same calls by their op names, as every op has one.
+                assert await lamp.notes_get("mode") == 7
+                assert (await lamp.notes_list("m"))["count"] == 1
+
+    run(go())
+
+
+def test_notes_are_held_to_the_lamps_bounds_and_belong_to_one_computer(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("notes",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["bad_request"]):
+                    await lamp.notes.set("a b", 1)
+                with pytest.raises(errors.BY_CODE["bad_request"]):
+                    await lamp.notes.set("", 1)
+                with pytest.raises(errors.BY_CODE["bad_request"]):
+                    await lamp.notes.get("k" * 65)
+                with pytest.raises(errors.BY_CODE["bad_request"]):
+                    await lamp.notes.list("a/b")
+                big = "x" * (16_384 - 2)
+                assert (await lamp.notes.set("big", big))["bytes"] == 16_384
+                with pytest.raises(errors.BY_CODE["bad_request"], match="16384"):
+                    await lamp.notes.set("big", big + "x")
+                assert await lamp.notes.get("big") == big
+                await lamp.notes.delete("big")
+                for at in range(256):
+                    await lamp.notes.set(f"k{at:04}", at)
+                with pytest.raises(errors.BY_CODE["refused"], match="full"):
+                    await lamp.notes.set("one-more", 1)
+                await lamp.notes.set("k0000", "replaced")
+                client = ring.pairing().client
+                # Another computer's notes are its own: the fake keeps them apart.
+                assert set(fake.notes) == {client}
+                fake.revoke(client)
+                assert fake.notes.get(client) in (None, {})
+
+    run(go())
+
+
+def test_notes_need_their_grant(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("speak",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                for call in (lamp.notes.get("k"), lamp.notes.set("k", 1), lamp.notes.delete("k"), lamp.notes.list()):
+                    with pytest.raises(errors.BY_CODE["no_grant"]):
+                        await call
+
+    run(go())
+
+
 def test_a_clip_is_uploaded_in_parts_played_listed_and_removed(tmp_path):
     async def go():
         async with FakeLamp(grants=("speak",)) as fake:

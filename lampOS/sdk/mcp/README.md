@@ -87,6 +87,11 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `path` | string, required | a WAV file on this computer: 16-bit mono PCM at 24 kHz, up to 30 s, no sample past −12 dBFS and no 10 ms past −30 dBFS RMS. Each computer keeps up to 64 clips and 20 MB on the lamp; revoking it deletes them | — | | |
 | `lamp_sounds` | none | | | | speak | no |
 | `lamp_remove_sound` | `name` | string, required | one of this computer's clips | — | speak | no |
+| `lamp_notes_set` | `key` | string, required | the note's key: 1 to 64 bytes of letters, digits and `. _ : -`; replaces a note of the same key | — | notes | no |
+| | `value` | any JSON, required | at most 16384 bytes serialized. Each computer keeps up to 256 keys and 256 KiB on the lamp, only its own, across restarts; revoking it deletes them. Answers `{key, bytes}` | — | | |
+| `lamp_notes_get` | `key` | string, required | one of this computer's own notes. Answers `{found, value}` | — | notes | no |
+| `lamp_notes_delete` | `key` | string, required | drops one of this computer's notes. Answers `{deleted}` | — | notes | no |
+| `lamp_notes_list` | `prefix` | string | this computer's keys that start with it, sorted; all when empty. Answers `{keys, count, total, bytes, keys_max, bytes_max}` | empty | notes | no |
 | `lamp_volume` | `to` | integer | 0 to 100 of what the lamp allows; 0 is muted. Exactly one of `to`, `step` or `mute`. The person's own volume, the same they set by voice or in the app; it returns the level it left, `{level, muted}` | none | speak | no |
 | | `step` | string | `up` or `down`: the lamp's own step, within its floor and ceiling | none | | |
 | | `mute` | boolean | `true` mutes; `false` brings it back to where it was | none | | |

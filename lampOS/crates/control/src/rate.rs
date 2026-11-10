@@ -28,6 +28,11 @@ pub enum Class {
     /// A `skill.push`, counted once at its first part: one each 10 s and
     /// 20 an hour.
     Push,
+    /// A `notes.set` or `notes.delete`, each a write to the lamp's disk: 30
+    /// a minute.
+    NotesWrite,
+    /// A `notes.get` or `notes.list`: 120 a minute.
+    NotesRead,
     /// A `skill.list` or `skill.remove`, each a request to root's manage
     /// helper: 6 a minute (Reviewer-two's P2 on #3910).
     Manage,
@@ -49,6 +54,8 @@ impl Class {
             // A turn speaks, or opens the lamp to be spoken to: a say's.
             Op::Say { .. } | Op::Sound { .. } | Op::TurnStart { .. } => Some(Self::Say),
             Op::Express { .. } => Some(Self::Express),
+            Op::NotesSet { .. } | Op::NotesDelete { .. } => Some(Self::NotesWrite),
+            Op::NotesGet { .. } | Op::NotesList { .. } => Some(Self::NotesRead),
             _ => None,
         }
     }
@@ -65,6 +72,8 @@ impl Class {
             Self::Phrases => &[(6, 60 * S)],
             Self::Push => &[(1, 10 * S), (20, 3_600 * S)],
             Self::Manage => &[(6, 60 * S)],
+            Self::NotesWrite => &[(30, 60 * S)],
+            Self::NotesRead => &[(120, 60 * S)],
             Self::Refused => &[(20, S)],
         }
     }
@@ -80,6 +89,8 @@ impl Class {
             Self::Phrases => "phrases: 6 changes a minute",
             Self::Push => "skill.push: 1 each 10 s and 20 an hour",
             Self::Manage => "skill.list and skill.remove: 6 a minute",
+            Self::NotesWrite => "notes.set and notes.delete: 30 a minute",
+            Self::NotesRead => "notes.get and notes.list: 120 a minute",
             Self::Refused => "refused actions: 20 a second",
         }
     }
@@ -225,6 +236,8 @@ mod tests {
             Class::Express,
             Class::Push,
             Class::Manage,
+            Class::NotesWrite,
+            Class::NotesRead,
         ] {
             for n in 0..1_000 {
                 assert_eq!(rates.take("c_1", class, n), Ok(()), "{class:?} {n}");
@@ -281,6 +294,20 @@ mod tests {
             Class::of(&op(r#"{"id":1,"op":"express","feeling":"glad"}"#)),
             Some(Class::Express)
         );
+        for frame in [
+            r#"{"id":1,"op":"notes.set","key":"k","value":1}"#,
+            r#"{"id":1,"op":"notes.delete","key":"k"}"#,
+        ] {
+            assert_eq!(Class::of(&op(frame)), Some(Class::NotesWrite), "{frame}");
+        }
+        for frame in [
+            r#"{"id":1,"op":"notes.get","key":"k"}"#,
+            r#"{"id":1,"op":"notes.list"}"#,
+        ] {
+            assert_eq!(Class::of(&op(frame)), Some(Class::NotesRead), "{frame}");
+        }
+        assert_eq!(Class::NotesWrite.windows(), [(30, 60_000_000)]);
+        assert_eq!(Class::NotesRead.windows(), [(120, 60_000_000)]);
         assert_eq!(Class::of(&op(r#"{"id":1,"op":"stop"}"#)), None);
         assert_eq!(
             Class::of(&op(r#"{"id":1,"op":"get","state":["lamp"]}"#)),

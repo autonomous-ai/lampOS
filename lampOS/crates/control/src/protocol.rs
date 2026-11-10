@@ -108,6 +108,10 @@ pub enum Grant {
     /// The microphone's sound as it is heard, never while the lamp is
     /// private.
     Microphone,
+    /// Its own small notes kept on the lamp (`notes.set`, `notes.get`,
+    /// `notes.delete`, `notes.list`): only its own, gone with its revoke
+    /// (docs/control.md, "Notes").
+    Notes,
 }
 
 impl Grant {
@@ -131,6 +135,9 @@ impl Grant {
             Self::Camera => "can see what the lamp's camera sees, never while it is private",
             Self::Microphone => {
                 "can hear what the lamp's microphone hears, never while it is private"
+            }
+            Self::Notes => {
+                "can keep small notes of its own on the lamp, which stay until it is let go"
             }
         }
     }
@@ -423,6 +430,21 @@ pub enum Op {
     /// One of the computer's own clips, deleted.
     #[serde(rename = "sound.remove")]
     SoundRemove { name: String },
+    /// A note of the client's own kept under a key: any JSON, small.
+    #[serde(rename = "notes.set")]
+    NotesSet { key: String, value: Value },
+    /// One of the client's own notes.
+    #[serde(rename = "notes.get")]
+    NotesGet { key: String },
+    /// One of the client's own notes dropped.
+    #[serde(rename = "notes.delete")]
+    NotesDelete { key: String },
+    /// The client's own keys, those that start with `prefix`.
+    #[serde(rename = "notes.list")]
+    NotesList {
+        #[serde(default)]
+        prefix: String,
+    },
     /// Opens a conversation turn as a tap on the head does: the person's
     /// next line is answered as spoken to the lamp. With `prompt`, the lamp
     /// says it first (docs/control.md, "Turns and listening").
@@ -539,6 +561,10 @@ impl Op {
             }
             Self::CameraSnapshot {} | Self::CameraStream { .. } => vec![Grant::Camera],
             Self::MicrophoneStream { .. } => vec![Grant::Microphone],
+            Self::NotesSet { .. }
+            | Self::NotesGet { .. }
+            | Self::NotesDelete { .. }
+            | Self::NotesList { .. } => vec![Grant::Notes],
         };
         needs.sort();
         needs.dedup();
@@ -868,7 +894,11 @@ impl Op {
             | Self::SkillList {}
             | Self::SoundList {}
             | Self::CameraSnapshot {}
-            | Self::MicrophoneStream { .. } => {}
+            | Self::MicrophoneStream { .. }
+            | Self::NotesSet { .. }
+            | Self::NotesGet { .. }
+            | Self::NotesDelete { .. }
+            | Self::NotesList { .. } => {}
             Self::Volume { to, step, mute } => {
                 let asked = usize::from(to.is_some())
                     + usize::from(step.is_some())
@@ -1449,6 +1479,7 @@ mod tests {
             Grant::Device,
             Grant::Camera,
             Grant::Microphone,
+            Grant::Notes,
         ]
         .into_iter()
         .map(|grant| (json!(grant), grant.shown()))
@@ -1484,6 +1515,10 @@ mod tests {
                 (
                     json!("microphone"),
                     "can hear what the lamp's microphone hears, never while it is private"
+                ),
+                (
+                    json!("notes"),
+                    "can keep small notes of its own on the lamp, which stay until it is let go"
                 ),
             ]
         );
@@ -1538,6 +1573,16 @@ mod tests {
         );
         assert_eq!(needs(r#"{"id":1,"op":"look","at":"ahead"}"#), [Grant::Body]);
         assert_eq!(needs(r#"{"id":1,"op":"say","text":"Hi."}"#), [Grant::Speak]);
+        for frame in [
+            r#"{"id":1,"op":"notes.set","key":"k","value":{"a":[1]}}"#,
+            r#"{"id":1,"op":"notes.get","key":"k"}"#,
+            r#"{"id":1,"op":"notes.delete","key":"k"}"#,
+            r#"{"id":1,"op":"notes.list"}"#,
+            r#"{"id":1,"op":"notes.list","prefix":"a."}"#,
+        ] {
+            assert_eq!(needs(frame), [Grant::Notes], "{frame}");
+            assert_eq!(op(frame).needs_lease(), None, "{frame}");
+        }
         assert_eq!(
             needs(
                 r#"{"id":1,"op":"subscribe","events":["person.arrived","sound.heard","touch","phrase.heard"],"phrases":["lights please"]}"#

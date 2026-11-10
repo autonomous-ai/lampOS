@@ -22,6 +22,7 @@ pub mod feelings;
 pub mod journal;
 pub mod lease;
 pub mod microphone;
+pub mod notes;
 pub mod pairing;
 pub mod parts;
 pub mod protocol;

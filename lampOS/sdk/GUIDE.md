@@ -87,7 +87,9 @@ The owner's steps in our app, today:
    - `skills`: can put skills on the lamp that run on their own;
    - `air`: can read the air sensor: particles, carbon dioxide and humidity, which
      can show when someone is in the room;
-   - `device`: can read the lamp's processor, memory, disk and temperature.
+   - `device`: can read the lamp's processor, memory, disk and temperature;
+   - `notes`: can keep small notes of its own on the lamp, which stay until it
+     is let go.
 4. **Check it is the right lamp.** The lamp says the first 8 characters of its
    security pin aloud, and the app shows the same 8 for the owner to confirm
    they match. Only then does the app show a one-time code (8 digits, 5
@@ -262,8 +264,16 @@ or at `stop`. The ring then shows the person's own light again.
 | `lamp.sound(name)` | `lamp.sound(name)` | `lamp_sound(name)` | Op `sound` with a clip's name: plays it as a word-for-word `say` is, once the person isn't talking | `speak` | no 30 s rarity for clips; refused in quiet hours where set | `{to: "voice"}`, then `done` `finished` | `refused` "no clip named … on this lamp for this computer: sound.upload it first" | works today (9 Nov 2026) |
 | `lamp.sounds()` | `lamp.sounds()` | `lamp_sounds()` | Op `sound.list`: this computer's clips, never another's | `speak` | — | `[{name, bytes, ms}, ...]` | `refused` "this lamp keeps no computer's clips" | works today (9 Nov 2026) |
 | `lamp.remove_sound(name)` | `lamp.removeSound(name)` | `lamp_remove_sound(name)` | Op `sound.remove`: deletes one of this computer's clips | `speak` | — | `{removed: name}` | `refused` "no clip named … on this lamp for this computer" | works today (9 Nov 2026) |
+| `lamp.notes.set(key, value)` | `lamp.notes.set(key, value)` | `lamp_notes_set(key, value)` | Op `notes.set` (also `lamp.notes_set`, `lamp.notesSet`): keeps `value` (any JSON, at most 16384 bytes serialized) under `key` (1 to 64 bytes of letters, digits and `. _ : -`), over one of the same key. A computer keeps 256 keys and 256 KiB of keys and values in all (`limits.notes`) | `notes` | 30 writes a minute (set and delete) | `{key, bytes}` | `bad_request` for a key that is not 1 to 64 of those; `bad_request` "value: N bytes, over the 16384 one note may take"; `refused` "this computer's notes are full …"; `busy` while its last note is still being kept; `rate`; nothing is partly kept | works today (10 Nov 2026) |
+| `lamp.notes.get(key, default)` | `lamp.notes.get(key, fallback)` | `lamp_notes_get(key)` | Op `notes.get` (also `lamp.notes_get`, `lamp.notesGet`): this computer's own note, never another's | `notes` | 120 reads a minute (get and list) | the value; `default` when none is kept (the op's `{key, found: false}`) | `bad_request` for a bad key; `rate` | works today (10 Nov 2026) |
+| `lamp.notes.delete(key)` | `lamp.notes.delete(key)` | `lamp_notes_delete(key)` | Op `notes.delete` (also `lamp.notes_delete`, `lamp.notesDelete`): drops one of this computer's notes | `notes` | counted with the writes | `true` when it was kept, else `false` | `bad_request` for a bad key; `rate` | works today (10 Nov 2026) |
+| `lamp.notes.list(prefix)` | `lamp.notes.list(prefix)` | `lamp_notes_list(prefix)` | Op `notes.list` (also `lamp.notes_list`, `lamp.notesList`): this computer's keys that start with `prefix` (all when empty), sorted | `notes` | counted with the reads | `{keys: [{key, bytes}], count, total, bytes, keys_max, bytes_max}` | `bad_request` for a prefix that is not up to 64 of those characters; `rate` | works today (10 Nov 2026) |
 
-A revoke deletes all of a computer's clips.
+A revoke deletes all of a computer's clips and all of its notes. Notes belong to
+the computer that wrote them (the lamp knows it by its pairing, never by a field of the
+request), survive its program's and the lamp's restarts, and are kept on the lamp
+as one file for each computer. The journal says counts and sizes, never a key or
+a value; the SDKs' debug log redacts them.
 
 ### Body
 
@@ -437,6 +447,7 @@ grant it needs. With every grant: 27 tools. With `light` alone: 6
 | Follow a hand | `lamp_follow_hand`, `lamp_follow_stop` | body and look |
 | Light | `lamp_light`, `lamp_ring` | light |
 | Voice and sound | `lamp_say`, `lamp_sound`, `lamp_upload_sound`, `lamp_sounds`, `lamp_remove_sound`, `lamp_volume`, `lamp_end_turn` | speak |
+| Notes | `lamp_notes_set`, `lamp_notes_get`, `lamp_notes_delete`, `lamp_notes_list` | notes |
 | Turns | `lamp_start_turn` | speak and hear |
 | Listening | `lamp_set_listening` | hear |
 | Camera | `lamp_camera_snapshot` (one picture; a stream is for a program, not a tool) | camera |
@@ -699,7 +710,9 @@ You don't need this to use the SDKs; it's for anyone writing their own client or
     "limits":{"hold_max_ms":30000,"lease_max_ms":600000,"phrases":[{"most":6,"within_ms":60000}],"quiet_hours":"off",
     "rates":"off","refused":[{"most":20,"within_ms":1000}],"ring":{"pixels":32},"say_max_bytes":900,
     "sounds":{"clip_max_bytes":1444140,"clip_max_ms":30000,"clips_max":64,"part_max_chars":49152,"parts_max":64,
-    "rate_hz":24000,"store_max_bytes":20000000}}}
+    "rate_hz":24000,"store_max_bytes":20000000},
+    "notes":{"key_max_bytes":64,"value_max_bytes":16384,"keys_max":256,"bytes_max":262144,
+    "writes":[{"most":30,"within_ms":60000}],"reads":[{"most":120,"within_ms":60000}]}}}
 
 -> {"id":1,"op":"subscribe","events":["phrase.heard"],"phrases":["good night lamp"]}
 <- {"re":1,"ok":true,"events":["phrase.heard"]}

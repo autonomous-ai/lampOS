@@ -200,6 +200,8 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     if say.is_some() {
         door = door.with_sound_folder(clips.clone());
     }
+    // A computer's own notes: always kept, in the state folder's `notes`.
+    door = door.with_notes_folder(state.join(lamp_control::notes::NOTES_FOLDER));
     let actions = option(arguments, "--actions-socket").map(PathBuf::from);
     let bus = match option(arguments, "--bus-root") {
         Some(root) => Some(lamp_bus::Bus::new(root).map_err(|e| format!("bus: {e}"))?),
