@@ -2286,3 +2286,166 @@ fn four_overdue_reminders_as_the_microphones_open_mid_talk_are_one_line_at_a_pau
     }
     assert!(note.contains("once, in one short natural line"), "{note}");
 }
+
+/// Single-reminder mostly-heard completion remains the existing policy.
+/// That aggregate threshold cannot prove that the final item in a joined
+/// announcement was heard: its entire audio can fit in the remaining 15%.
+/// Synthetic PCM pins this state transition, not acoustic/model fidelity.
+#[test]
+fn a_cut_joined_reminder_does_not_complete_its_unplayed_tail() {
+    let _clock = crate::scenario_clock::Scope::enter(std::time::Duration::from_secs(24)).unwrap();
+    for (joined, earlier_retirement) in [(false, false), (true, false), (true, true)] {
+        let mut fixture = RoundtripFixture::of_reminders();
+        if joined {
+            fixture.set_more(&["Rest."]);
+        }
+        fixture.advance_wall(30 * 60_000);
+        let offer = fixture.offer();
+        assert!(offer.late && offer.late_line());
+        assert_eq!(offer.also.len(), usize::from(joined));
+        if joined {
+            assert_eq!(offer.also_texts(), ["Rest."]);
+        }
+        let final_token = offer
+            .also
+            .last()
+            .map(|item| item.token.clone())
+            .unwrap_or_else(|| offer.token.clone());
+
+        // Same active Reply and complete-provider state as `cut_reminder`
+        // in coordinator.rs, but the receipt here belongs to a real offered
+        // item, so its settlement reaches the actual consumer and ledger.
+        let (_owner, mut current, _) = active_reply();
+        let mut receipt = fixture
+            .parent()
+            .admitted(offer.clone(), current.owner, 1, 1);
+        receipt.audio();
+        if earlier_retirement {
+            // A previous PCM generation is retired, but the whole reply
+            // still has an unplayed tail. Preserve the uncertain path.
+            receipt.retired(1, 1, 240);
+        }
+        current.reminder = Some(receipt);
+        current.handed = 27_200; // 85% of 32,000 samples.
+        current.pcm = vec![7; 4_800].into(); // Final 15% has not been handed out.
+        current.cloud.outcome = Some(RequestOutcome::Complete);
+        let mut reply = Some(current);
+        let mut interrupted = take_interrupted_reminder(&mut reply).unwrap();
+        // As in `cut_reminder`, model the caller's successful owner fence.
+        interrupted.interrupted_after_owner_fenced(Some(2));
+        drop(interrupted);
+        assert_eq!(fixture.settle_parent(), 1);
+        assert_eq!(fixture.received().len(), 1);
+
+        let final_view = fixture.view(&final_token);
+        if joined {
+            assert!(
+                final_view.completion.is_none(),
+                "the unplayed final joined item was durably completed by an aggregate 85% cut: {:?}",
+                fixture.received()
+            );
+            assert!(
+                !matches!(fixture.received()[0], ToWorker::Complete { .. }),
+                "a partial joined line has no per-item proof of completion"
+            );
+            if earlier_retirement {
+                assert!(matches!(
+                    fixture.received()[0],
+                    ToWorker::Abandon {
+                        no_audio: false,
+                        ..
+                    }
+                ));
+            } else {
+                assert!(matches!(
+                    fixture.received()[0],
+                    ToWorker::Retire {
+                        heard_some: true,
+                        ..
+                    }
+                ));
+            }
+        } else {
+            assert!(
+                final_view.completion.is_some(),
+                "control: the existing single-reminder mostly-heard policy still applies"
+            );
+            assert!(matches!(fixture.received()[0], ToWorker::Complete { .. }));
+        }
+    }
+}
+
+/// A joined line still completes every item when the real speaker retires
+/// all its audio and the provider succeeds; only partial-cut completion is gated.
+#[test]
+fn a_joined_reminder_played_whole_completes_every_item() {
+    let clock = crate::scenario_clock::Scope::enter(Duration::from_secs(24)).unwrap();
+    clock.set_pump(|_| Ok(())).unwrap();
+    let mut fixture = RoundtripFixture::of_reminders();
+    fixture.set_more(&["Rest."]);
+    fixture.advance_wall(30 * 60_000);
+    let offer = fixture.offer();
+    assert_eq!(offer.also.len(), 1);
+    let mut test = Test::new();
+    let current = test.reply.as_mut().unwrap();
+    current.reminder = Some(fixture.parent().admitted(
+        offer.clone(),
+        current.owner,
+        test.snapshot.microphone_generation(),
+        1,
+    ));
+    let first = test.generation(17);
+    test.accept(&first, 240);
+    test.retire(&first);
+    assert!(!test.finish_if_settled());
+    let last = test.generation(23);
+    test.provider_complete();
+    test.accept(&last, 240);
+    assert!(!test.finish_if_settled());
+    test.retire(&last);
+    assert!(test.finish_if_settled());
+    assert_eq!(fixture.settle_parent(), 1);
+    assert!(matches!(fixture.received()[0], ToWorker::Complete { .. }));
+    for token in std::iter::once(&offer.token).chain(offer.also.iter().map(|item| &item.token)) {
+        assert!(fixture.view(token).completion.is_some());
+    }
+}
+
+/// Host timing of the receipt decision only; excludes allocation, IPC,
+/// playback, cancellation and ledger settlement. Run manually, never as a
+/// machine-dependent pass/fail latency gate in the normal suite.
+#[test]
+#[ignore = "manual host receipt-decision latency diagnostic"]
+fn joined_reminder_cut_receipt_latency() {
+    let _clock = crate::scenario_clock::Scope::enter(Duration::from_secs(24)).unwrap();
+    for joined in [false, true] {
+        let mut fixture = RoundtripFixture::of_reminders();
+        if joined {
+            fixture.set_more(&["Rest."]);
+        }
+        fixture.advance_wall(30 * 60_000);
+        let offer = fixture.offer();
+        let (_owner, current, _) = active_reply();
+        let mut samples = Vec::new();
+        for _ in 0..256 {
+            let mut receipt = fixture
+                .parent()
+                .admitted(offer.clone(), current.owner, 1, 1);
+            receipt.audio();
+            let began = std::time::Instant::now();
+            let completed = std::hint::black_box(receipt.heard_before_the_cut(1, 27_200));
+            samples.push(began.elapsed());
+            assert_eq!(completed, !joined);
+        }
+        let first = samples[0];
+        samples.sort();
+        let p95 = samples[(samples.len() * 95).div_ceil(100) - 1];
+        eprintln!(
+            "receipt decision joined={joined}: first={:.3} us, p95={:.3} us, max={:.3} us, n={}",
+            first.as_secs_f64() * 1e6,
+            p95.as_secs_f64() * 1e6,
+            samples.last().unwrap().as_secs_f64() * 1e6,
+            samples.len(),
+        );
+    }
+}

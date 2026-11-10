@@ -358,6 +358,8 @@ pub(crate) enum FromWorker {
 
 struct Progress {
     token: PreparedToken,
+    /// Aggregate partial playback cannot prove every item in a joined line.
+    joined: bool,
     owner: TurnOwner,
     privacy: u64,
     session: u64,
@@ -498,11 +500,14 @@ impl Receipt {
     /// generation that ended it, rather than retired to be said again
     /// (06c1, 5 Nov 17:04: "Time to drink some water." was cut by a
     /// wordless cut-in after 4 of its 5 words and said again 10 s later).
-    /// Only a live, qualified receipt with audio and no settlement yet;
-    /// whether it was completed.
+    /// Only a live, qualified receipt for one item, with audio and no
+    /// settlement yet; whether it was completed. A joined line has no
+    /// per-item audio boundaries, so its unplayed tail may contain a whole
+    /// reminder. Its partial cut keeps the existing retry-or-held handling.
     pub fn heard_before_the_cut(&mut self, playback_sequence: u64, frames: u64) -> bool {
         let mut state = self.0.borrow_mut();
-        if !state.live
+        if state.joined
+            || !state.live
             || !state.qualified
             || !state.had_audio
             || state.settlement.is_some()
@@ -571,6 +576,7 @@ impl Probe {
 #[cfg(test)]
 pub(crate) fn receipt_for_test(owner: TurnOwner, privacy: u64, session: u64) -> (Receipt, Probe) {
     let state = Rc::new(RefCell::new(Progress {
+        joined: false,
         token: PreparedToken {
             key: lamp_schedule::delivery::DeliveryKey {
                 store_id: "0123456789abcdef0123456789abcdef".into(),
@@ -872,6 +878,7 @@ impl Reminders {
         session: u64,
     ) -> Receipt {
         let state = Rc::new(RefCell::new(Progress {
+            joined: !offer.also.is_empty(),
             token: offer.token,
             owner,
             privacy,
