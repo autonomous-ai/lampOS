@@ -5414,7 +5414,7 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   it, with the person's face alone in view, hears their reminders and may
   cancel or snooze them ([schedule.md](schedule.md), [switches.md](switches.md)).
 - **A one-face line is read as its person's; its forgets need the mouth**
-  (`LAMP_PERSON_SCOPE_ONE_FACE_READS=on`, off everywhere, #5522; with
+  (`LAMP_PERSON_SCOPE_ONE_FACE_READS=on`, on in the product since 10 Nov, #5522; with
   `LAMP_PERSON_SCOPE_ONE_FACE` acted on, `Engine::reading_by_one_face`). A
   line the one-face rule takes is not narrowed at admission
   (`ScopeLease::read_by_one_face`): its chat is told their context, recall

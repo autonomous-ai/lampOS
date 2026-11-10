@@ -703,7 +703,7 @@ eight, and none when more match), never all; nothing is read back to that
 voice.
 
 **Reads, too, with their own switch; forgets need the mouth**
-(`LAMP_PERSON_SCOPE_ONE_FACE_READS=on`, off everywhere, #5522; the memory
+(`LAMP_PERSON_SCOPE_ONE_FACE_READS=on`, on in the product since 10 Nov, #5522; the memory
 owner's 16:43 "apply it" on #5385, read by the PM as saving and recall, not
 forgetting, and the memory owner's 16:49: "tạm thời chưa cho xóa nếu ko
 detect đc mở miệng", for now no forgetting unless the mouth is seen
