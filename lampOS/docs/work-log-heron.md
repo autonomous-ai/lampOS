@@ -654,3 +654,15 @@ Ready for lamp-voice: no (a read and a lamp result; no code)
   `LAMP_UNTIED_GOING_ON` is not set on 11308. Stays heron's (#4450
   issuecomment-6761445939). Kit P3: `night.py`'s bus taps want
   `/usr/local/bin/lamp-bus`, which this product lamp doesn't have.
+- 14:44: the first builder closed #5524 (done by #5577) and gave heron
+  #5991's privacy read (TWO READS, with Reviewer-two) and the `held` pass.
+- 14:4x: #5991 is P2, not READ-OK. With `LAMP_SAME_VOICE_FOR=services`, no
+  conversation rule reads a print, so the one-face rule's "no other voice
+  heard" never fails, and READS gives the person's memory to any off-camera
+  voice. fc4b's journal on 11308 showed 0 "another voice" lines. On 11308
+  `CARRIED_MEMORY` was inactive; #6004 (in 11333) makes it act with no
+  print. Thirteen moved #6004 to HOLD at 14:52 on this.
+- 14:50–14:55: #4450 after2 with `held` by drop-in on 11333 (the lamp
+  switched at 14:26), twice: d08 held 2/2; d07 answered 2/2, let out by
+  `held` on one shared word ("time"). Drop-in out, restart 14:55:13, lamp as
+  found. #4450 stays heron's (issuecomment-6762092969).
