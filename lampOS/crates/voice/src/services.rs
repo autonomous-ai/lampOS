@@ -639,18 +639,6 @@ pub fn answer_awaited(words: &str) -> bool {
         })
 }
 
-/// Whether a write waits now for the answer its read-back asked for
-/// ([`answers_the_read_back`]): a line begun after the lamp's words is then
-/// the person's answer, never held as the lamp's own echo for repeating the
-/// read-back's "Say 'yes, send it'" (lamp-3e83, 10 Nov).
-pub fn write_waits() -> bool {
-    kept::pending(|pending| {
-        pending
-            .as_ref()
-            .is_some_and(|kept| answers_the_read_back(kept, Instant::now()))
-    })
-}
-
 /// Whether a line now is the reply the waiting write `kept` asked for
 /// (Thirteen's P2 on #5967): the very next line after its read-back, uncut,
 /// nothing the lamp answered between, within [`PENDING_FOR`].

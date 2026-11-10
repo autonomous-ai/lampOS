@@ -11288,7 +11288,6 @@ fn own_echo_of(
             began_us,
             over_the_lamps_voice: marks.over_the_lamps_voice,
             called: marks.called.load(Ordering::Acquire),
-            write_waits: crate::services::write_waits(),
         },
         answer
             .as_ref()

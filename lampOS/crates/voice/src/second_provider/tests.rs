@@ -18157,21 +18157,20 @@ async fn the_lamps_own_words_heard_back_are_held_or_taken_out_only_with_the_swit
     }
 }
 
-/// lamp-3e83, 10 Nov: the owner's "go ahead and send it" after the lamp's
-/// "Say 'go ahead and send it'" was held as the lamp's own echo, and the
-/// write never went. After a read-back ending "Say 'yes, send it' to send
-/// it.", the person's "Okay, yes, send it." begun after the lamp's words
-/// reaches the model while the write waits, and the model's send with its
-/// send_id passes the gate. A line of only the read-back's own words, "Yes,
-/// send it.", is held as the echo, write waiting or not, so the room
-/// returning it never sends (App Only's P1 on #6009).
+/// A waiting read-back's own "yes, send it" returned by the room never
+/// reaches the model as agreement (App Only's and Thirteen's P1s on #6009):
+/// alone within the tail it is held; after an ASR filler ("Um, yes, send
+/// it.") or a person's own word ("Okay, yes, send it.") its run is taken out,
+/// so the model gets only "Um," or "Okay," and decides from that. The
+/// model's send with its send_id then passes the gate, as any agreement.
 #[tokio::test(start_paused = true)]
-async fn a_yes_after_a_waiting_read_back_is_never_held_as_the_lamps_echo() {
+async fn the_lamps_own_send_phrase_heard_back_never_agrees_for_the_person() {
     const READ_BACK: &str = "Send an email to Bob saying hi. Say 'yes, send it' to send it.";
-    for (heard, waits, answered) in [
-        ("Okay, yes, send it.", true, true),
-        ("Yes, send it.", true, false),
-        ("Yes, send it.", false, false),
+    for (heard, waits, sent) in [
+        ("Okay, yes, send it.", true, Some("Okay,")),
+        ("Um, yes, send it.", true, Some("Um,")),
+        ("Yes, send it.", true, None),
+        ("Yes, send it.", false, None),
     ] {
         let script = Arc::new(Script {
             heard: Mutex::new([Ok("Email Bob hi.".to_owned()), Ok(heard.to_owned())].into()),
@@ -18203,10 +18202,17 @@ async fn a_yes_after_a_waiting_read_back_is_never_held_as_the_lamps_echo() {
         let asked = script.asked.lock().unwrap().len();
         assert_eq!(
             asked,
-            if answered { 2 } else { 1 },
+            if sent.is_some() { 2 } else { 1 },
             "{heard} waits {waits}: {labels:?}"
         );
-        if answered {
+        if let Some(sent) = sent {
+            let last = format!("{:?}", script.asked.lock().unwrap()[1].last());
+            assert!(
+                last.contains(sent) && !last.to_lowercase().contains("send it"),
+                "{heard}: {last}"
+            );
+        }
+        if sent == Some("Okay,") {
             assert!(labels.contains(&"said:Sent.".to_owned()), "{labels:?}");
             let mut pending = crate::services::pending_for_test_take();
             let send = lamp_gemini::ToolCall {
