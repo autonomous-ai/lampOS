@@ -29,10 +29,12 @@ client's config (`claude mcp add lamp -- lamp-mcp --home ~/.config/lampos`), or
 `python -m lamp_mcp` from the venv's python when the client can't find `lamp-mcp`
 on its PATH. An unpaired start says in one stderr line which folder it looked in.
 
-**On a customer lamp (stable 10824)** five things are missing: skill push,
-joints past yaw and pitch and `play`, limp and pose, mDNS (pair with
-`--host`), and local event times (`at` is UTC). Read
-[references/gotchas.md](references/gotchas.md#on-a-customer-lamp-today-stable-10824)
+**On a customer lamp (stable 11450)** five things are missing: `play` and a
+look at a face or name, a motion's end (`wait=True` returns when the lamp takes
+it), limp and pose, mDNS (pair with `--host`), and local event times (`at` is
+UTC). Skill push, `joints` for `roll`, `shoulder` and `elbow` (while the lamp
+stands) and a head tap as a `touch` event are in 11450. Read
+[references/gotchas.md](references/gotchas.md#on-a-customer-lamp-today-stable-11450)
 before promising any of them.
 
 ## Start without a lamp
@@ -135,7 +137,7 @@ elsewhere:
 - **A new motion cuts the one playing short:** a gesture, move or
   feeling's move asked while another plays replaces it, eased out from where
   the body is. While the person is using the lamp, the body drops the new
-  one ("the person is using the lamp"). Stable 10824 and older refuse it
+  one ("the person is using the lamp"). Stable 10824 and older refused it
   `busy` with `retry_ms` instead: wait and ask again.
 - **Quiet hours:** a lamp setting (`limits.quiet_hours`, `off` by default,
   or a `{from, to}` window the lamp sets). `say` and `sound` are refused `quiet_hours` then; the

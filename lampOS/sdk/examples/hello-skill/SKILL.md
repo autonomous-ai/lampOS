@@ -9,9 +9,10 @@ The smallest skill a computer can push to its own lamp with the lampos SDK:
 one short spoken hello when the person asks for it. It asks only for `speak`,
 so the pairing needs the `skills` grant and the `speak` grant.
 
-Skill push is not yet on customer lamps (stable 10824): there every skill op
-is refused, "skill push is not on this lamp". Try it against the fake lamp
-(`lamp fake`, with its own `LAMPOS_HOME`) instead.
+Skill push works on customer lamps from stable 11091 on (11450 today), with a
+yes at the lamp; on 11048 and older every skill op is refused, "skill push is
+not on this lamp". You can also try it against the fake lamp (`lamp fake`,
+with its own `LAMPOS_HOME`).
 
 Try it, then take it off:
 
