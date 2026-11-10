@@ -13292,7 +13292,7 @@ async fn answer(
     let cancelled =
         (heard && own.is_none() && scope.as_ref().is_none_or(|scope| scope.is_current()))
             .then(|| {
-                let owner = crate::services::owner_of(scope.as_ref());
+                let owner = crate::services::speaker_of(scope.as_ref());
                 crate::services::cancel_waiting(request, &said, owner.as_deref(), Instant::now())
             })
             .flatten();

@@ -5158,6 +5158,74 @@ async fn a_plain_cancel_of_a_waiting_write_is_said_by_the_lamp_with_no_chat() {
     assert!(!labels.contains(&"own_words:1".to_owned()), "{labels:?}");
 }
 
+/// Reviewer-two's HOLD on #5967 at `a0e82daeaf`: outside the private room
+/// a known other's "Lamp, cancel that." right after the
+/// owner's read-back is the model's, through the actual Engine and its
+/// scope lease: no fixed words, and the owner's write still waits. A known
+/// other is never taken for an unknown speaker.
+#[tokio::test]
+async fn a_known_others_cancel_of_the_owners_write_is_the_models() {
+    use crate::memory_scope::{FaceCache, GAP, ScopeLease};
+    crate::person::set_private_room_for_test(Some(false));
+    let other = crate::remember::person_id("Bob");
+    for heard in ["Lamp, cancel that."] {
+        let path = std::env::temp_dir().join(format!(
+            "fourteen-known-other-{}-{}",
+            std::process::id(),
+            heard.len()
+        ));
+        std::fs::write(&path, "Bob").unwrap();
+        let cache = Arc::new(FaceCache::holding_gaps(Some(GAP)));
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(heard.to_owned())].into()),
+            chats: Mutex::new([vec![text("Sure."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let runner: ScopedToolRunner =
+            Arc::new(|_, _, _, _, _: ScopeLease| Box::pin(async { json!({"ok":true}) }));
+        let mut engine = engine.with_memory_scope(
+            lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            None,
+        );
+        engine.memory_camera(true, 1);
+        let seen = crate::known_faces::FaceObservation::read(&path).unwrap();
+        cache.replace_seen(cache.begin_refresh(), Some(seen), Some(1));
+        let now = Instant::now();
+        let mut kept = crate::services::Pending {
+            began_clear: true,
+            service: "gmail".to_owned(),
+            ..crate::services::Pending::new("id", 0, now, "Send a mail.", "ann")
+        };
+        kept.spoken = "Send a mail. Say send it.".to_owned();
+        kept.spoken_from = Some(now - Duration::from_secs(4));
+        kept.spoken_at = Some(now - Duration::from_secs(3));
+        crate::services::pending_for_test(Some(kept));
+        engine.submit(start(1));
+        let lease = engine.memory_lease().unwrap();
+        assert_eq!(lease.scope().unwrap().person(), Some(other.as_str()));
+        assert_eq!(
+            crate::services::owner_of(Some(&lease)),
+            None,
+            "not the owner"
+        );
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        assert_eq!(script.asked.lock().unwrap().len(), 1, "{heard}: {labels:?}");
+        assert!(!labels.contains(&"own_words:1".to_owned()), "{labels:?}");
+        assert!(
+            crate::services::pending_for_test_is_some(),
+            "{heard}: the owner's write still waits"
+        );
+        crate::services::pending_for_test(None);
+        std::fs::remove_file(&path).unwrap();
+    }
+    crate::person::set_private_room_for_test(None);
+}
+
 /// The Live route's case of 17 October on this route: "Yes. Please start
 /// it." to the lamp's "Shall I start it?" ended after "Yes." as a short
 /// sound heard as "bien". Checked, with the lamp having just asked, it is
