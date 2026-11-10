@@ -120,6 +120,7 @@ lamp says so.
 | `system.info`'s `onboarding_done_at` | when the lamp's setup walk ended, in Unix ms (#5812): the voice's `onboarding/pending` heartbeat's `done_at_unix_ms`, said whenever it is known, so an app that missed `onboarding.done` opens Skills on its page's open if it hasn't for that `at`. No field while unknown: a walk not ended, a lamp set up before it was dated, or the voice not running ("Setup done, told to the app" below) |
 | `system.info`'s `onboarding_done_supported` | `true` while `LAMP_APP_ONBOARDING_DONE=on` (with a state folder): this lamp will send `onboarding.done`, so the app may wait for it (Mobile's ask on #5824). No field otherwise: an older lamp, or the switch off, never sends it, so the app doesn't wait ("Setup done, told to the app" below) |
 | `system.info`'s `onboarding_step_supported` | `true` with the same switch: this lamp sends `onboarding.step` as each walk step ends (#5979). No field otherwise ("Each setup step, told to the app" below) |
+| `system.info`'s `onboarding_page_supported` | `true` with the same switch: this lamp takes `onboarding.page` and sends `onboarding.page_done` (#6076). No field otherwise, so the app keeps its Next ("The app's onboarding pages, done on the lamp" below) |
 | `system.info`'s `account` | `signed_out` while this lamp's login is no longer accepted (`LAMP_SIGNED_OUT=on`, "Signed out" below). No field otherwise, read as before: an older lamp, the switch off, and a lamp signed in all say none |
 | `system.info`'s `reset` | whether the reset button's 5 s hold takes this lamp back into setup (#2937): `hold` when `/etc/lampOS/controls/controls-pins.json` names a `reset` line (a product lamp), `none` when not (a lamp moved from V1, whose pins never carry one: its way back is the hotspot, [setup.md](setup.md)). No field when the pins can't be read; the app reads a missing field as before, the hold. The app keeps the last one it heard, for a lamp it can't ask |
 | `volume.get`, `volume.set` (`{"volume": 0..100}`) | through `lamp-actions`' socket (`volume_level`, `volume_to`, `actions.md`), its only writer: `{"volume", "raw", "max_volume"}`, a set read back |
@@ -2245,6 +2246,39 @@ Tests: `online::tests::each_walk_step_is_told_once_beside_the_walks_end`,
 `without_the_switch_no_walk_step_is_told`, `onboarding_step::tests`,
 `answer::tests::the_kinds_this_lamp_has_are_answered_by_its_parts`, and
 `app_contract.rs`'s `system.info` row.
+
+## The app's onboarding pages, done on the lamp (#6076, `onboarding.page`)
+
+After the walk, the app's pages (Try first skill, Add a skill, Create your
+skill) go on by themselves, and the lamp says each one done. Behind
+`onboarding.done`'s switch, `LAMP_APP_ONBOARDING_DONE=on` with a state folder;
+`system.info` says `onboarding_page_supported: true` then.
+
+- **The app tells the page.** `onboarding.page` `{"page": "try" | "add" |
+  "create" | null, "added"?: [name], "walk_id"?}`, answered `{}`; `null`
+  closes it; any other page is refused. One page open at a time.
+- **try.** Done by the first Try line run after the page opened: the light
+  turned on or to another colour (`light/state`; `how: "turn_blue"` for
+  blue, else `"light"`), or a `dance` run done (`skills/events`, a run not
+  made doesn't count; `how: "dance"`). A light already blue as the page
+  opened isn't seen to turn blue; the dance still counts.
+- **add.** The pick comes as the page is left: done at once, its line
+  "I'll remind you to sip water." for `sip-of-water` alone, else "Got it.
+  Those are on now."
+- **create.** Never done here: the app follows `skills.made` (#5985).
+- **The line.** "That's your first skill." for Try. Handed to the voice's say
+  socket (`LAMP_SAY_SOCKET`, else `/run/lampos-say/say.sock`) as a note,
+  skill `onboarding-app`, let go after 30 s: said in the person's language,
+  only once nobody is talking and no other line is playing (the say
+  service's gates), never waited for here.
+- **The push.** One unasked `data` reply on `fd_channel`, kind
+  `onboarding.page_done`, data `{"page", "how"?, "walk_id"?}`, once per page
+  opened, on the tick while connected, best effort as `onboarding.step` is.
+  The journal says `onboarding.page_done: handed to the client` or `not
+  handed to the client, not tried again`. The app goes on about 1 s after it.
+
+Tests: `onboarding_page::tests`,
+`answer::tests::the_kinds_this_lamp_has_are_answered_by_its_parts`.
 
 ## The two yeses from the app (#5500, `consent.get`, `consent.set`)
 

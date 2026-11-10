@@ -657,6 +657,18 @@ async fn session(
                                 say.line(&steps.tried(&ended, took));
                             }
                         }
+                        // The app's onboarding page done (#6076): only while
+                        // connected, with the same switch, once a page.
+                        if connected
+                            && onboarding_done.is_some()
+                            && let Some(done) = lamp.onboarding_page_done()
+                        {
+                            let event = me
+                                .data(&now(), crate::onboarding_page::DONE_KIND, &Ok(Some(done)))
+                                .to_string();
+                            let took = handed.publish(&client, account.fd_channel.as_str(), event, None);
+                            say.line(&format!("{}: {}", crate::onboarding_page::DONE_KIND, if took { "handed to the client" } else { "not handed to the client, not tried again" }));
+                        }
                         // The walk's end (#5812): only while connected, and
                         // kept until the broker's ack.
                         if connected
