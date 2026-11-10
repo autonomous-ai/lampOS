@@ -83,7 +83,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `phrase.heard` | `phrase`: one the client registered | `voice/heard`, matched on the lamp: the client is told which phrase, **never what was said** | `hear` |
 | `name.heard` | `score` (the listener's, 0–1 to a hundredth; left out when the bus gives none). A sound like the name can pass the lamp's own bar (0.9): lamp-75c9 woke at 0.941 on no words on 9 Nov, while real calls scored 0.90 to 1.00, so a program acting on its own sets its own bar | `name/heard` | `hear` |
 | `sound.heard` | `class` (`knock`, `music`, …), `score` | `ears/classes` | `sound` |
-| `touch` | `kind` (`tap`, `pet`, `hold`), `where` | `controls/touch`, `controls/gesture`, `body/hand` | none |
+| `touch` | `kind` (`tap`, `pet`, `hold`), `where` | `controls/touch` (a head contact let go quickly is a `tap`), `controls/pet` (one `pet` for a contact), `controls/gesture` (a button's or the base's tap), `body/hand`. A head `hold` is not produced yet | none |
 | `button` | `press` (`press`, `long_press`) | `controls/gesture` | none |
 | `time` | the client's own schedule | the lamp's clock and zone | none |
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `quiet_hours` (planned, not produced yet), `lease` | `voice/state`, `lamp/pause`, privacy, `voice/mute`, the leases | none |

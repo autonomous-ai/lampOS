@@ -1319,7 +1319,7 @@ fn wall_ms() -> u64 {
 
 /// The bus topics the door reads, each subscribed on its own thread, every
 /// message handed to `watch` and what it means delivered.
-pub const TOPICS: [&str; 22] = [
+pub const TOPICS: [&str; 23] = [
     "humans/faces/tracked",
     "humans/hands/tracked",
     "room/stood_up",
@@ -1336,6 +1336,7 @@ pub const TOPICS: [&str; 22] = [
     "light/drawn",
     "mood/state",
     "controls/touch",
+    "controls/pet",
     "air/state",
     "board/state",
     "speaker/volume",
