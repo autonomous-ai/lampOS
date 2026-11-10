@@ -225,9 +225,11 @@ monotonic counter. A caller must not reuse a closed session name as a new
 incarnation without a generation change: closing alone deletes the row, and
 reopening the same name otherwise represents the same token identity.
 
-An app forget invalidates storage immediately in its transaction. Voice's
-external-forget notification is checked every 500 ms off the turn path: its
-cached role may remain visible until that notification is handled. This is not
+An app forget invalidates storage immediately in its transaction. With
+conversation summaries enabled, Voice checks external-forget notifications
+every 500 ms off the turn path; its cached role may remain visible until that
+notification is handled. With summaries disabled, this notification path does
+not run, so this interval does not bound cache visibility. This is not
 an atomic cross-process speech cutoff; stale role writes are refused regardless
 of that notification delay.
 

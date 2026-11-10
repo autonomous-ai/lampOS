@@ -1044,8 +1044,10 @@ role. Voice never opens a new session to authorize an old role action. Updated
 Memory refuses legacy unfenced operations; updated Voice sends only the new
 operations, which older Memory rejects. An older Voice and older Memory pair
 still has the previous unfenced behavior.
-External forget notifications are polled every 500 ms off the turn path; the
-cached role can remain visible until the notification is handled. The storage
+External forget notifications are polled every 500 ms off the turn path when
+conversation summaries are enabled; the cached role can remain visible until
+the notification is handled. With summaries disabled this notification path
+does not run, so the interval does not bound cache visibility. The storage
 fence does not promise an atomic cross-process speech cutoff.
 
 An older memory refuses them.

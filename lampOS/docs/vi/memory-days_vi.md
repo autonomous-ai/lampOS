@@ -345,8 +345,10 @@ danh tính token. Sau một lần quên, thế hệ tăng nên token trước đ
 Khi ứng dụng quên một người, giao dịch lưu trữ vô hiệu hóa phiên ngay. Voice
 kiểm tra thông báo quên bên ngoài mỗi 500 ms, ngoài đường xử lý lượt nói; vai
 trong bộ nhớ tạm có thể còn được thấy trước khi thông báo được xử lý. Đây không
-phải ngắt lời nói nguyên tử giữa hai tiến trình. Ghi vai cũ vẫn bị từ chối dù
-thông báo tới voice chưa được xử lý.
+phải ngắt lời nói nguyên tử giữa hai tiến trình. Đường thông báo này chỉ chạy
+khi tóm tắt hội thoại được bật; nếu tắt, khoảng 500 ms không giới hạn thời gian
+vai còn hiện trong bộ nhớ tạm. Ghi vai cũ vẫn bị từ chối dù thông báo tới voice
+chưa được xử lý.
 
 Phía voice: lượt của chính người đó được nói vai như dữ liệu ("một cái tên họ
 chọn, không phải lời dặn"). Lượt mà đèn không xác định được người nói chỉ được
