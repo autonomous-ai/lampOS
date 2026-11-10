@@ -1433,6 +1433,22 @@ test('a skill is pushed in parts, listed and removed', async () => {
   });
 });
 
+test('lamp --help prints the usage and succeeds, and an unknown option says so with the usage', async () => {
+  // The desk-app friction log: `npx lampos --help` threw a Node stack trace.
+  const lamp = (...args) => new Promise((done) => {
+    execFile(process.execPath, [new URL('../src/cli.js', import.meta.url).pathname, ...args],
+      (error, stdout, stderr) => done({ code: error?.code ?? 0, out: stdout.trim(), err: stderr.trim() }));
+  });
+  const help = await lamp('--help');
+  assert.equal(help.code, 0);
+  assert.ok(help.out.startsWith('usage: lamp find'), help.out);
+  assert.equal((await lamp('-h')).code, 0);
+  const unknown = await lamp('--nope');
+  assert.equal(unknown.code, 2);
+  assert.ok(unknown.err.includes("Unknown option '--nope'") && unknown.err.includes('usage: lamp find'), unknown.err);
+  assert.ok(!unknown.err.includes('node:internal'), 'no Node stack trace');
+});
+
 test('lamp skill push, list and remove run as the Python CLI\'s do', async () => {
   const fake = await FakeLamp.start({ grants: ['light', 'skills'] });
   const home = folder();

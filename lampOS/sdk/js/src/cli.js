@@ -11,10 +11,26 @@ import { find } from './discovery.js';
 import { PORT } from './schema.js';
 import { fake } from './fake.js';
 
-const { values, positionals } = parseArgs({
+const USAGE = 'usage: lamp find | lamp pair CODE --pin PIN [--host HOST] [--name NAME] | lamp hello [LAMP_ID] | lamp fake [--every S] [--cycles N] [--everything] [--hands] | lamp skill push FOLDER | list | remove NAME [LAMP_ID]';
+
+// `--help` and `-h` print the usage and succeed, as the Python `lamp --help` does,
+// and an option this CLI does not know says so with the usage, not a Node stack trace.
+if (process.argv.slice(2).some((arg) => arg === '--help' || arg === '-h')) {
+  console.log(USAGE);
+  process.exit(0);
+}
+
+let parsed;
+try {
+  parsed = parseArgs({
   allowPositionals: true,
   options: { host: { type: 'string' }, port: { type: 'string' }, name: { type: 'string' }, pin: { type: 'string' }, every: { type: 'string' }, cycles: { type: 'string' }, everything: { type: 'boolean' }, hands: { type: 'boolean' } },
-});
+  });
+} catch (error) {
+  console.error(`lamp: ${error.message.split('.')[0]}\n${USAGE}`);
+  process.exit(2);
+}
+const { values, positionals } = parsed;
 const [command, arg, third, fourth] = positionals;
 
 async function main() {
@@ -65,7 +81,7 @@ async function main() {
     console.log(`${lamp.info.id}: grants ${lamp.grants.join(', ')}`);
     await lamp.close();
   } else {
-    console.error('usage: lamp find | lamp pair CODE --pin PIN [--host HOST] [--name NAME] | lamp hello [LAMP_ID] | lamp fake [--every S] [--cycles N] [--everything] [--hands] | lamp skill push FOLDER | list | remove NAME [LAMP_ID]');
+    console.error(USAGE);
     return 2;
   }
   return 0;
