@@ -275,7 +275,7 @@ backend của đèn, không bao giờ đến Google).
 | `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (mật khẩu ứng dụng); `gmail.googleapis.com` (đăng nhập Google) | `recent {count}`, `search {query}`, `drafts {count}` (chỉ mật khẩu ứng dụng), `message {id}`, `attachment {id, name \| index}` | `send_mail {to, cc, subject, text}`, `save_draft {to, cc, subject, text}` (chỉ mật khẩu ứng dụng) |
 | `gmail-app` | Gmail with Google sign-in | `gmail.googleapis.com` | không có: nó chỉ gửi | `send_mail {to, cc, subject, text}` |
 | `google_calendar` | Google Calendar | `www.googleapis.com` | `events {from, to, calendar, count}` | `create_event {title, start, end, calendar, attendees, text}` |
-| `google_drive` | Google Drive | `www.googleapis.com` | `files {query, count}`, `file {id}`, `text {id}` | không có |
+| `google_drive` | Google Drive | `www.googleapis.com` | `files {query, count}`, `file {id}`, `text {id}` | `create_doc {title, text}`, `create_sheet {title, rows}`, `create_file {title, text}`: một tệp mới trong My Drive |
 | `figma`, `figma-api` | Figma | `api.figma.com` | `me`, `file {id}`, `comments {id}` | `comment {id, text}` |
 | `github` | GitHub | `api.github.com` | `query {graphql, variables}`, `notifications`, `issues {repo}`, `pulls {repo}`, `repos` | `create_issue {repo, title, text}`, `comment {repo, number, text}` |
 | `linear` | Linear | `api.linear.app` | `query {graphql, variables}`, `my_issues` | `create_issue {team_id, title, text}` |
@@ -765,9 +765,18 @@ giờ (`Z` hoặc độ lệch như `+07:00`: Calendar từ chối thời điể
 bị từ chối trước khi đọc lại, `reads::calendar_time`). Một yêu cầu
 chỉ qua HTTPS, đến các host của chính dịch vụ, không theo chuyển hướng, 5 s để
 kết nối, tổng cộng 15 s, và đọc tối đa 1 MiB câu trả lời. Một mã lỗi được nói
-rõ ràng: 401 hoặc 403 "<Service> refused the lamp's link: it may need linking
+rõ ràng: 401 "<Service> refused the lamp's link: it may need linking
 again in the app" (401 hoặc 403 của một lần ghi nói scope của nó không đủ thì
-được nói cách làm: "Scope một lần ghi cần", trong phần Ghi), 404 "has no such item", 429 "is busy: try again in a
+được nói cách làm: "Scope một lần ghi cần", trong phần Ghi); 403 theo lý do mà lỗi của Google nêu (`serve::forbidden`,
+`error.errors[].reason`, `error.details[].reason` hoặc `error.status`, chỉ so
+tên, không truyền đi gì của câu trả lời): `storageQuotaExceeded` (hoặc
+`teamDriveFileLimitExceeded`) "<Service> is full: the account has no
+storage left for a new file", `userRateLimitExceeded`, `rateLimitExceeded`,
+`dailyLimitExceeded`, `quotaExceeded`, `RATE_LIMIT_EXCEEDED` hoặc
+`RESOURCE_EXHAUSTED` "is busy: try again in a while", `domainPolicy`
+"<Service>'s account doesn't allow this: its organisation's policy
+refuses it", mọi lý do khác (scope hay đăng nhập bị từ chối, không có lý do)
+là câu liên kết lại như 401; 404 "has no such item", 429 "is busy: try again in a
 while", còn lại "answered with an error". Token và refresh token được xoá khỏi
 mọi câu trả lời (mọi cách viết, thuần hay mã hoá URL).
 
@@ -984,7 +993,8 @@ Tắt trừ khi `LAMP_SERVICES_WRITE=on`. Hai pha (`writes.rs`):
    on Facebook can see it."; một sự kiện lịch có người tham dự thì "each gets
    an invitation by email". `send_id` là 16 byte ngẫu nhiên dạng hex.
 2. **Cùng `send_id` đó với `"said":"send"`** gửi đúng lần ghi đó, một lần:
-   `{"sent": true, "service"}`. Lần ghi đang chờ bị lấy đi dù điều gì xảy ra
+   `{"sent": true, "service"}` (một tệp Drive mới thì có thêm `"made":
+   {"name", "link"}`, xem dưới). Lần ghi đang chờ bị lấy đi dù điều gì xảy ra
    tiếp: `said` khác "send" thì trả lời `{"sent": false, "cancelled":
    true}`; một id sai, đã dùng hoặc quá hạn thì "nothing is waiting to be
    sent: it was cancelled, already sent or over two minutes old"; một id của
@@ -993,14 +1003,100 @@ Tắt trừ khi `LAMP_SERVICES_WRITE=on`. Hai pha (`writes.rs`):
    liên kết bị thay bằng liên kết của tài khoản khác, không gì đi cả, "not
    sent: the <Service> link changed; nothing was sent" ("not saved: the
    Gmail link changed; nothing was saved" với một bản nháp); cùng tài khoản
-   được liên kết lại thì vẫn đi (Reviewer-two trên #5982). Journal chỉ ghi
+   được liên kết lại thì vẫn đi (Reviewer-two trên #5982), trừ khi chính
+   liên kết của nó đã đổi (xem dưới). Journal chỉ ghi
    "a confirmed write to <code> was sent".
 
 Mỗi lúc chỉ một lần ghi chờ (lần mới thay lần cũ), trong 120 s. Giới hạn: một
 văn bản tối đa 3,000 ký tự (giữ dấu xuống dòng), một tiêu đề thư hay tiêu đề
 là một dòng tối đa 200, tối đa 20 người nhận hoặc người tham dự, mỗi người là
-một `local@domain.tld` thuần. Google Drive và Ahrefs không có ghi ("the lamp
-only reads …").
+một `local@domain.tld` thuần. Ahrefs không có ghi ("the lamp only reads …").
+
+**Toàn bộ phần đọc lại cũng có giới hạn** (`writes::READ_BACK_JSON_MOST`,
+3,584 byte dạng JSON đã đặt trong ngoặc và escape, cho mọi lần ghi, cả tool
+MCP): cùng `send_id`, `sent` của lần chuẩn bị và lời của giọng nói bảo nói
+nó, những gì model nhận vẫn nằm trong câu trả lời tool 4,096 byte của nó.
+Một lần ghi trong mọi giới hạn trên nhưng phần đọc lại dài hơn (50 hàng 10 ô
+trống, mỗi ô nói "blank"; một văn bản toàn dấu ngoặc kép hay chữ ngoài bảng
+Latin, tốn nhiều byte hơn) bị từ chối trước khi giữ gì:
+`writes::READ_BACK_TOO_LONG`, "that is too long to read back in one go, so
+nothing was prepared: ask for a shorter text or a smaller sheet, or make it
+in parts".
+
+**Một lần gửi chỉ đi với đúng liên kết đã được đọc lại** (P1 của
+Reviewer-three trên #5825): lần chuẩn bị giữ `writes::link_of` của mục đã
+liên kết (một hash của mã, loại, client, tài khoản, phần thêm, khoá tĩnh và
+refresh token, hoặc access token khi không có), và lần gửi so nó với chính
+mục sắp dùng, sau phép gắn tài khoản ở trên. Một lệnh `set` cho tài khoản
+khác xen giữa (Drive B thay Drive A, một Gmail khác) bị phép gắn đó từ chối
+("not sent: the <Service> link changed; nothing was sent"); cùng tài khoản
+được liên kết lại với một refresh token khác cũng không gửi gì: `{"ok":
+false, "error": "nothing was sent: the service was linked again since the
+read-back, so ask for it again"}` (`serve::LINK_CHANGED`). Dù cách nào lần
+ghi cũng bị bỏ. Cùng tài khoản được đặt lại hay
+làm mới (access token mới, cùng refresh token) vẫn gửi; một refresh token
+được xoay vòng được coi là liên kết khác, chỉ làm huỷ.
+
+**Google Drive tạo một tệp mới** (#5385, first builder đồng ý ngày 9/11):
+`create_doc {title, text}` một Google Doc, `create_sheet {title, rows}` một
+Google Sheet, `create_file {title, text}` một tệp văn bản thuần (tên được
+thêm `.txt` trừ khi đã kết thúc như vậy). Mỗi lần là một tệp mới trong My
+Drive, bằng một lệnh gọi, lệnh duy nhất trong danh sách ghi của Drive: `POST
+https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink`
+(`writes::DRIVE_UPLOAD`; danh sách là đường dẫn `/upload/drive/v3/files`),
+một thân `multipart/related` với boundary ngẫu nhiên `lamp-<hex>`: metadata
+`{"mimeType", "name"}` (`application/vnd.google-apps.document`,
+`application/vnd.google-apps.spreadsheet` hoặc `text/plain`; không có thư mục
+cha), rồi nội dung dạng `text/plain` (Doc, tệp văn bản) hoặc `text/csv`
+(Sheet), mà Drive chuyển đổi. Không gì sửa, sao chép, di chuyển, chia sẻ, xoá
+hay ghi đè một tệp: các lệnh đó không nằm trong danh sách nào, và một action
+khác ba action trên bị từ chối kèm danh sách của Drive. Phần đọc lại nói loại,
+tên và toàn bộ nội dung, ví dụ "Make a new Google Doc named "Trip plan" in
+your Google Drive, saying: "Day 1: Hue.". Only you can see it, unless your
+Drive shares new files."; một sheet nói từng hàng, các ô cách nhau bằng
+"; then " (`writes::CELL_BREAK`, để một ô có dấu phẩy vẫn được nghe là một
+ô), ô trống là "blank": "Make a new Google Sheet named "Groceries" in your
+Google Drive, with 2 rows. Row 1: Item; then Note; then Count. Row 2: Milk;
+then 2%, cold; then 2. …", và một sheet không có hàng "…, empty.".
+Tiêu đề là một dòng tối đa 200 ký tự và văn bản tối đa 3,000, như của thư;
+một sheet tối đa 50 hàng 10 ô, tổng cộng 3,000 ký tự, mỗi ô là văn bản, số,
+true hoặc false (rows là danh sách các danh sách, hoặc danh sách đó dạng văn
+bản JSON), và không ô nào là công thức: ô bắt đầu bằng `=`, `+`, `-` hoặc `@`
+(sau khi cắt khoảng trắng), mà việc nhập CSV có thể tính, bị từ chối, nhưng
+một số có dấu thuần như `-5`, `+3.2` hay `-1.5e-7` (`digits[.digits]
+[e[+|-]digits]` sau dấu, không gì khác) được giữ, vì sheet chỉ đọc nó là một
+số. CSV
+đặt trong ngoặc kép một ô có dấu phẩy, dấu ngoặc kép hoặc xuống dòng và nhân
+đôi dấu ngoặc kép của nó. Chỉ tạo khi có câu "send" nói ra, như mọi lần ghi:
+câu trả lời là `{"sent": true, "service": "Google Drive", "made": {"name",
+"link"}}`, link chỉ khi là của chính Google (`https://docs.google.com/…` hoặc
+`https://drive.google.com/…`, `writes::made`), ngược lại thì bỏ đi. Một lần
+tải lên thất bại là `{"ok": false, "error": "not made: …"}`, không có `made`,
+lý do theo các mã 403 ở trên (liên kết lại, Drive đầy, Drive bận). Cùng cổng
+như thư: chỉ chủ đèn, được thấy đang nói, trên route thứ hai, không bao giờ từ
+một kỹ năng tự tạo (chỉ `service_read`), một lần chạy theo lịch, một trang hay
+một thư.
+
+**Scope của Drive:** liên kết Drive của sản phẩm (đăng nhập Google qua
+backend) giữ `https://www.googleapis.com/auth/drive.file`, `openid`,
+`userinfo.email` và `userinfo.profile`, không bao giờ `drive.readonly`
+(Backend2, 16:06 ngày 9/11). Nên đèn tạo tệp dưới liên kết `drive.file` đó,
+và chỉ thấy, đọc và tìm được các tệp nó đã tạo hoặc chủ đèn đã chọn cho nó,
+không phải phần còn lại của Drive. Một lần ghi chỉ được chuẩn bị khi `scopes`
+của liên kết có `https://www.googleapis.com/auth/drive` hoặc
+`https://www.googleapis.com/auth/drive.file` (`writes::drive_may_write`, mỗi
+scope được so nguyên vẹn); nếu không, và khi liên kết không ghi scope nào
+(đặt trước khi scope được lưu, hoặc đặt tay), lệnh gọi đầu tiên bị từ chối
+trước mọi phần đọc lại, không giữ hay gọi gì: `writes::DRIVE_NO_WRITE_SCOPE`,
+"This Google Drive link can't make files. To let the lamp make one, link
+Google Drive again in the app: Skills, then Connectors." Không có scope thì
+bị từ chối vì liên kết đó có thể chỉ đọc, và người dùng sẽ đọc cả tệp chỉ để
+nghe một lỗi; liên kết lại qua app sẽ ghi các scope.
+
+**Hết thời gian sau khi Drive đã lưu:** lần tải lên có 15 s, trong 20 s của
+giọng nói. Nếu Drive đã tạo tệp nhưng câu trả lời đến quá muộn, đèn nói tệp
+chưa được tạo, và hỏi lại sẽ tạo tệp thứ hai cùng tên: người dùng có thể xoá
+tệp thừa trong Drive.
 
 **Scope một lần ghi cần** (`writes::SCOPES`). Kiểm tra này chỉ áp dụng cho
 một liên kết OAuth có ghi lại scope: một lần đăng nhập (có access token,
@@ -1286,16 +1382,22 @@ nên danh sách "action, by service: …" của nó được nói trên tham s�
   khác ở trên giữ nguyên.
 - **Sau một lần gửi** mô hình được báo một câu cố định: "Say only that it was
   sent, in the conversation's language." khi dịch vụ trả lời `sent: true`;
-  "Say only that it was saved as a draft in their Gmail Drafts, not sent, in
-  the conversation's language." (`SAVED_NEXT`) khi nó trả lời `saved: true`,
-  nên đèn nói "Saved as a draft.", không bao giờ nói "sent"; "Say only that
-  the draft was not saved, in the conversation's language."
-  (`NOT_SAVED_NEXT`) với một lỗi bắt đầu bằng "not saved"; nếu không thì
-  "Say only that it was not sent, in the conversation's language." (nói
-  bằng ngôn ngữ của cuộc trò chuyện). Một bản nháp đã lưu là một lệnh ghi
-  đã xong như một lần đã gửi (`services::went`): biên nhận của nó không bao
-  giờ bị huỷ hay bị bỏ trước, và ghi chú của một lượt bị cắt nói lời đồng ý
-  "already sent the write they asked for (or, for a draft, saved it)".
+  "Say only that the file was made in their Google Drive, with its name from
+  made, in the conversation's language. Never read out its link."
+  (`MADE_NEXT`) khi nó cũng trả `made`; "Say only that it was saved as a
+  draft in their Gmail Drafts, not sent, in the conversation's language."
+  (`SAVED_NEXT`) khi nó trả lời `saved: true`, nên đèn nói "Saved as a
+  draft.", không bao giờ nói "sent"; "Say only that the draft was not saved,
+  in the conversation's language." (`NOT_SAVED_NEXT`) với một lỗi bắt đầu
+  bằng "not saved"; "Say that it was not sent or made, and why, in a few
+  words from error, in the conversation's language." (`NOT_SENT_WHY_NEXT`)
+  khi dịch vụ đưa lý do riêng khác của nó (`error`: liên kết Drive cần làm
+  lại, Drive đầy), để người dùng biết phải làm gì; nếu không thì "Say only
+  that it was not sent, in the conversation's language." (nói bằng ngôn ngữ
+  của cuộc trò chuyện). Một bản nháp đã lưu là một lệnh ghi đã xong như một
+  lần đã gửi (`services::went`): biên nhận của nó không bao giờ bị huỷ hay
+  bị bỏ trước, và ghi chú của một lượt bị cắt nói lời đồng ý "already sent
+  the write they asked for (or, for a draft, saved it)".
 - **Một lần gửi bị cắt khi còn đang chờ không bao giờ được trả lời như thể
   chưa làm gì** (#5853, lamp-9adf, 9/11). Trên tuyến thứ hai, lệnh gọi của
   một lần gửi vẫn chạy đến khi có câu trả lời dù một câu mới hơn cắt lượt,
@@ -1817,6 +1919,12 @@ không phải của chủ đèn vẫn bị từ chối (`OWNER_ONLY`).
   sau đó để lại tên cũ cho đến lần khởi động lại, và điều đó đóng an toàn:
   tệp known của mắt không còn hiện tên đó, nên việc đọc dừng ở "not the
   owner". Việc ghi từ một kỹ năng tự tạo chưa được xây.
+- **Tạo tệp Drive mới đã xây, chưa chạy trên đèn** (#5385): tệp được tạo
+  dưới liên kết `drive.file` của sản phẩm (một liên kết không có scope tạo
+  tệp, hoặc không ghi scope nào, được bảo liên kết lại trước mọi phần đọc
+  lại); việc tải lên một sheet trống và việc Drive chuyển đổi từng phần là
+  như Google mô tả, chưa được thấy; sau khi gửi đèn nói tên tệp mới, không
+  bao giờ đọc to link, mà câu trả lời mang theo.
 - **Đọc dịch vụ theo lịch** (một bản tóm tắt thư buổi sáng) được bỏ ra cho
   đến khi có thiết kế riêng: một yêu cầu không được nghe trực tiếp không chạm
   đến dịch vụ nào.
@@ -1882,7 +1990,18 @@ số trần, một nội dung bị cắt có mọi dạng mã được che, mộ
 cắt ở lần fetch được báo là bị cắt) và vẫn bị bỏ trọn với một kỹ năng tự
 tạo; câu trả lời được trích dẫn và dưới mức trần của giọng nói; một lần ghi
 bị từ chối khi tắt, được đọc lại đầy đủ và gửi một lần trong hai phút; một
-lần gửi hay một sự kiện mà scope được liệt kê của liên kết không cho phép bị
+Google Doc, Sheet hay tệp văn bản Drive mới được đọc lại trọn (loại, tên, mọi
+chữ hay ô), thân multipart của nó (boundary, cả hai kiểu, CSV đặt trong ngoặc
+kép dấu phẩy, dấu ngoặc kép và xuống dòng), giới hạn của nó (tiêu đề, văn
+bản, 50 hàng 10 ô, không ô nào bắt đầu bằng `=`, `+`, `-` hay `@` trừ một số
+có dấu thuần), một liên kết không có `drive` hay `drive.file` (hoặc không có
+scope) bị từ chối trước mọi phần đọc lại, mọi action Drive khác bị từ chối, danh
+sách ghi chỉ nhận `POST /upload/drive/v3/files`, tạo một lần khi gửi với kiểu
+multipart và trả lời bằng tên và chỉ link của chính Google, một lần tải lên bị
+từ chối là `ok:false` không có `made` kèm lý do 403 (đầy, bận, liên kết), một phần đọc lại quá 3,584 byte JSON bị từ chối (50 hàng 10 ô trống), không gửi với một liên kết được đặt thay kể từ lần đọc lại (Drive hay thư), không
+bao giờ từ một kỹ năng tự tạo (và trong `-p lamp-voice`, mọi action ghi của
+`tools.json` đến được model trong giới hạn của liên kết, một lần gửi thất bại
+được bảo nói lý do, một tệp đã tạo nói tên của nó); một lần gửi hay một sự kiện mà scope được liệt kê của liên kết không cho phép bị
 từ chối bằng lời rõ ràng, không gì được giữ hay gọi, một lần được cho phép
 được đọc lại, một lần gửi Google từ chối vì scope được nói cùng lời đó và mọi
 403 khác giữ lời riêng, một liên kết không liệt kê scope (mật khẩu ứng dụng,
