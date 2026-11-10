@@ -1619,10 +1619,14 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      folder still installs Harness), `ProtectSystem=full` (so `/var` is
      writable for Hermes's folder), `TimeoutStartSec=3600`, for Harness's
      install as well. `/etc` is not writable. It runs at `Nice=10`,
-     `IOSchedulingClass=idle` and `CPUWeight=20`, as lamp-update does: on
-     lamp-c0a4 on 10 Nov a Hermes install at the default priority stalled
-     lamp-controls' loop 93 ms past the privacy reading's 50 ms, and the
-     voice kept the microphones closed until it was restarted.
+     `IOSchedulingClass=idle` and `CPUWeight=20`, as lamp-update does, and
+     is capped: `CPUQuota=150%`, writes 8 MB/s and 200 IOPS, reads 16 MB/s
+     and 400 IOPS on `/var/lib`'s card. On lamp-c0a4 on 10 Nov a Hermes
+     install at the default priority stalled lamp-controls' loop 93 ms past
+     the privacy reading's 50 ms, and the voice kept the microphones closed
+     until it was restarted. The lower priority alone did not stop it: the
+     card's scheduler is `none`, so the idle I/O class has no effect, and the
+     install's 2.4 GB of writes (the Python packages above all) took the card.
    - **Taken out:** a failed install takes the wrapper and the namespace
      script out, the wrapper first, so `lampos` finds no `hermes`. With the
      switch off, a reached round that finds either writes the ask with
