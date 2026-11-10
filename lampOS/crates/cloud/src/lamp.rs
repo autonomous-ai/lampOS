@@ -776,6 +776,14 @@ impl Lamp for Real {
         crate::onboarding_done::kept_in()
     }
 
+    fn onboarding_steps(&self) -> Option<(u64, Vec<lamp_msgs::OnboardingStepEnded>)> {
+        let pending = self
+            .latest(lamp_msgs::OnboardingPending::TOPIC)?
+            .parse::<lamp_msgs::OnboardingPending>()
+            .ok()?;
+        Some((pending.walk_id?, pending.steps_ended))
+    }
+
     fn make_skill(&self) -> Option<PathBuf> {
         self.make_skill.clone()
     }
