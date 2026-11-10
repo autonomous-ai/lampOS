@@ -145,6 +145,21 @@ lamp's door on 127.0.0.1, default 7731), `--twin-port N` (default 8737), `--came
 start (the lamp makes a new certificate then); to drive the lamp from your own program too, run it
 with `LAMPOS_HOME=DIR/sdk`. Linux for now (the real `lamp-body` runs only there).
 
+### The examples against a running lamp
+
+`conformance/examples.js` runs the SDK's examples as programs against the paired lamp and checks
+what the lamp shows: `ci-light.js pass` leaves the light green, `pomodoro.js` warm, and `greet.js`
+moves the body when someone arrives, `phrase.js` warms the light when its phrase is heard, `air.js` turns it orange on stuffy air. Each must print no error. The fake lamp's own test
+(`test/examples.test.js`) checks what an example asked; a real lamp cannot be asked that.
+
+```sh
+node conformance/examples.js --sim ~/.lampsim/b --lamp-sim target/debug/lamp-sim   # the virtual desktop lamp
+```
+
+`--sim DIR` is the virtual lamp's folder: the examples that wait for the room get it from `lamp-sim people|hear|hand|air`
+(someone arriving, a heard phrase, a hand, the air), and are skipped without it. What is left (a camera, a skill
+folder, a look at a face) is in `NOT_YET` with what each waits for.
+
 ## Pair with a real lamp
 
 Run the command as `npx --no-install lampos …` (or from `node_modules/.bin`),

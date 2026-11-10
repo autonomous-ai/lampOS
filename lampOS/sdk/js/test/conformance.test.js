@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readdirSync } from 'node:fs';
 import { differences } from '../conformance/conformance.js';
+import { NOT_YET, RUNS } from '../conformance/examples.js';
 
 const row = (name, result, fields = []) => ({ name, result, fields, ms: 1 });
 
@@ -19,4 +21,11 @@ test('conformance: a step listed as expected is not counted', () => {
   const left = [row('look under a lease', 'ok', ['how', 'why'])];
   const right = [row('look under a lease', 'ok', ['clamped', 'how', 'pitch', 'yaw'])];
   assert.deepEqual(differences(left, right), []);
+});
+
+test('conformance: every example has a row against a running lamp, or says what it waits for', () => {
+  const have = new Set([...RUNS.map((r) => r.name), ...Object.keys(NOT_YET)]);
+  const present = readdirSync(new URL('../examples/', import.meta.url)).filter((f) => f.endsWith('.js'));
+  assert.deepEqual(present.filter((f) => !have.has(f)), []);
+  assert.deepEqual([...have].filter((f) => !present.includes(f)), []);
 });
