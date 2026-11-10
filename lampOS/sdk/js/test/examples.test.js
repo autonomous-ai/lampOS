@@ -34,6 +34,7 @@ const EXAMPLE_RUNS = {
   'curious.js': [[], null, ['lease.take', ['move', { frames: posesToFrames([{ pitch: 3 }, { pitch: 2, yaw: -3 }, { pitch: 2, yaw: 3 }], { holdMs: 400 }) }]]],
   'follow.js': [[], 'arrived', ['lease.take', ['look', { at: 'face' }]], 'not now: refused: not in this release: look at a face or a name'],
   'follow-hand.js': [[], 'hand', ['lease.take', ['look', { at: 'hand' }]]],
+  'heat-watch.js': [[], 'hot', [['light', { colour: 'orange', level: 2, pattern: 'pulse' }]]],
   'greet.js': [[], 'arrived', [['gesture', { name: 'greeting' }]]],
   'phrase.js': [[], 'phrase', [['light', { colour: 'warm', level: 2, pattern: 'breathe' }], ['gesture', { name: 'nod' }]]],
   'pomodoro.js': [[], null, [['light', { colour: 'warm', level: 2 }]]],
@@ -68,6 +69,7 @@ test('every example runs against a fake lamp and sends what it is for', async ()
     arrived: (fake) => fake.emit('person.arrived', { count: 1, near: 0.3 }),
     // In real time, as the lamp tells it: the example looks every 0.2 s.
     hand: (fake) => fake.emitHandTrack(handTrack('wave', { seconds: 1 }), { realtime: true }),
+    hot: (fake) => fake.emit('body.state', { joints: { yaw: { deg: 0, temp_c: 41 }, elbow: { deg: 30, temp_c: 66 } }, lamp: { light: 'off', talking: false, private: false } }),
     phrase: (fake) => fake.emit('phrase.heard', { phrase: 'good night lamp' }),
     tap: (fake) => fake.emit('touch', { kind: 'tap' }),
   };
