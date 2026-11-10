@@ -6,7 +6,7 @@ use lamp_msgs::{
     HealthItem, JointState, Level, RoomPresence, Speech, VoiceState,
 };
 use lamp_peek::{
-    monitor::{Conn, Monitor},
+    monitor::{Conn, Monitor, Redeemed, SESSION_LASTS},
     page,
     serve::{self, Peek},
     units::UnitRow,
@@ -1273,4 +1273,52 @@ fn monitor_mode_a_code_opens_once_and_its_cookie_dies_with_a_restart() {
     peek.kill().unwrap();
     peek.wait().unwrap();
     fs::remove_dir_all(root).unwrap();
+}
+
+/// An open stream ends when its session does (the 12 hours), not only new
+/// requests (reviewer-two's HOLD on #5943): the session is opened on a clock
+/// set back to just before its end, so the end comes within the test.
+#[test]
+fn monitor_mode_an_open_stream_ends_with_its_session() {
+    let monitor = monitor_names();
+    let opened = Instant::now() - SESSION_LASTS + Duration::from_millis(1500);
+    let session = {
+        let mut gate = monitor.gate();
+        let code = gate.issue(opened).unwrap();
+        match gate.redeem(&code, opened).unwrap() {
+            Redeemed::Session(session) => session,
+            other => panic!("{other:?}"),
+        }
+    };
+    let rig = Rig::monitor(
+        "mon-end",
+        monitor,
+        conn("192.168.1.20:50000", "192.168.1.5:80"),
+    );
+    let with = format!("Cookie: peek_session={session}\r\n");
+    let mut stream = TcpStream::connect(("127.0.0.1", rig.port)).unwrap();
+    stream.set_read_timeout(Some(WAIT)).unwrap();
+    write!(
+        stream,
+        "GET /events HTTP/1.1\r\nHost: lamp-test.local\r\nConnection: close\r\n{with}\r\n"
+    )
+    .unwrap();
+    let mut reader = BufReader::new(stream);
+    let (mut text, mut line, started) = (String::new(), String::new(), Instant::now());
+    loop {
+        line.clear();
+        match reader.read_line(&mut line) {
+            Ok(0) => break,
+            Ok(_) => text.push_str(&line),
+            Err(error) => panic!("the stream outlived its session: {error}"),
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "the stream outlived its session"
+        );
+    }
+    assert!(text.starts_with("HTTP/1.1 200"), "{text}");
+    assert!(text.contains("event: camera"), "{text}");
+    let (status, _, body) = rig.ask_as("lamp-test.local", "GET", "/bus", &with, "");
+    assert_eq!(status, 401, "{body}");
 }
