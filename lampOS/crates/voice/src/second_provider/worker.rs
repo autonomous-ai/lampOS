@@ -9901,9 +9901,11 @@ impl Heeding {
             attention.name_heard_scored(at_us, score);
         }
         attention.heard(heard);
-        // A read-back asks for its "send", however its last sentence reads
-        // (`services::send_awaited`).
-        let lamp_asked = signs.lamp_asked || crate::services::send_awaited(heard);
+        // A read-back asks for its "send", or its cancel (#5958), however
+        // its last sentence reads (`services::send_awaited`).
+        let lamp_asked = signs.lamp_asked
+            || crate::services::send_awaited(heard)
+            || crate::services::cancel_awaited(heard);
         attention.lamp_asked(lamp_asked);
         let busy = signs.room == crate::room_told::Room::Busy;
         attention.set_near(signs.near);

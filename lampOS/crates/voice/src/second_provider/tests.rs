@@ -5124,6 +5124,40 @@ async fn a_checked_sound_is_answered_only_as_the_send_a_waiting_write_asked_for(
     assert_eq!(sound_turn(true, true, "Send.").await.1, 0);
 }
 
+/// #5958: on lamp-9adf on 10 Nov, "Lamp, cancel that." after a read-back
+/// was answered "Cancel what exactly?", with no call, and a bare "Cancel."
+/// was held as a short sound. While a write waits, a plain cancel forgets it
+/// and the lamp says so in its own words, the chat never asked; with none
+/// waiting, the line is the model's as before.
+#[tokio::test]
+async fn a_plain_cancel_of_a_waiting_write_is_said_by_the_lamp_with_no_chat() {
+    let waiting = || crate::services::Pending {
+        began_clear: true,
+        service: "gmail".to_owned(),
+        ..crate::services::Pending::new("id", 8, std::time::Instant::now(), "Send a mail.", "ann")
+    };
+    for (marked, heard) in [(true, "Cancel."), (false, "Lamp, cancel that.")] {
+        crate::services::pending_for_test(Some(waiting()));
+        let (labels, asked) = sound_turn(true, marked, heard).await;
+        assert_eq!(asked, 0, "{heard}: {labels:?}");
+        assert!(
+            labels.contains(&format!("said:{}", crate::services::CANCELLED_SAID)),
+            "{heard}: {labels:?}"
+        );
+        assert!(labels.contains(&"own_words:1".to_owned()), "{labels:?}");
+        assert!(
+            labels.iter().any(|label| label.starts_with("audio:")),
+            "{labels:?}"
+        );
+        assert!(crate::services::send_state(0).is_none());
+        crate::services::pending_for_test(None);
+    }
+    // No write waiting: the model's, as before.
+    let (labels, asked) = sound_turn(true, false, "Lamp, cancel that.").await;
+    assert_eq!(asked, 1, "{labels:?}");
+    assert!(!labels.contains(&"own_words:1".to_owned()), "{labels:?}");
+}
+
 /// The Live route's case of 17 October on this route: "Yes. Please start
 /// it." to the lamp's "Shall I start it?" ended after "Yes." as a short
 /// sound heard as "bien". Checked, with the lamp having just asked, it is
