@@ -409,6 +409,9 @@ fn made_and_journaled(
 ) -> (Result<Made, Refused>, String) {
     let began = std::time::Instant::now();
     let chat = Arc::new(chat);
+    // The times of day the person's own words name: only a window within
+    // one runs at night without quiet hours (Thirteen's HOLD on #6103).
+    let asked = made_skill::asked_windows(request);
     // Whether the last answer was the model's own `cannot:`: its reason is
     // never journaled ([`kept_line`]).
     let models_cannot = std::cell::Cell::new(false);
@@ -424,7 +427,7 @@ fn made_and_journaled(
                     Some(EXAMPLE_GIVEN_BACK.into()),
                 ))
             }
-            Ok(text) => made_skill::keep(&text, false, from, keeping),
+            Ok(text) => made_skill::keep_asked(&text, false, from, keeping, &asked),
             Err(why) => {
                 eprintln!("lamp-voice: a skill made here: the model didn't answer: {why}");
                 Err(Refused("the lamp's model didn't answer".into(), None))

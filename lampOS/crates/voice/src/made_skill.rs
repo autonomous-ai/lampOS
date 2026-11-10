@@ -911,7 +911,13 @@ fn says_aloud(table: &toml::Table) -> bool {
 /// as it came. Then every skill that starts itself is given the runtime's
 /// manners ([`mannered`], #6066 (a)): both the floors and the manners apply.
 pub fn paced(text: &str) -> String {
-    mannered(&say_paced(text))
+    paced_asked(text, &[])
+}
+
+/// [`paced`], with the times the request named ([`asked_windows`]): a
+/// `during` within one runs as said, with no quiet hours.
+pub fn paced_asked(text: &str, asked: &[(u32, u32)]) -> String {
+    mannered_asked(&say_paced(text), asked)
 }
 
 /// The manners a made skill that starts itself is given by the lamp, never
@@ -938,6 +944,11 @@ pub const MANNERS_RESTS_AFTER: u32 = 2;
 /// Added as lines, so what is checked, said and packed is one text; a skill
 /// that can't be read, or doesn't start itself, is given back as it came.
 pub fn mannered(text: &str) -> String {
+    mannered_asked(text, &[])
+}
+
+/// [`mannered`], with the times the request named ([`keeps_quiet`]).
+pub fn mannered_asked(text: &str, asked: &[(u32, u32)]) -> String {
     let Ok(table) = toml::from_str::<toml::Table>(text) else {
         return text.to_owned();
     };
@@ -967,15 +978,27 @@ pub fn mannered(text: &str) -> String {
         .clamp(1, MANNERS_RESTS_AFTER_AT_MOST.into());
     // The night stays quiet unless the skill runs only within the day, or
     // at a time the person asked for ([`within_day`]).
-    let quiet = !trigger.get("during").is_some_and(within_day);
+    let quiet = keeps_quiet(trigger, asked);
     // A grant no step uses is dropped (App Only's P2 on #6103): no step of
     // a made skill sends a message or takes the camera's picture, so
     // neither is kept, and the say-back names only what a step does.
     let unused = ["messages", "camera", "look"];
     let mut kept = Vec::new();
     let mut part: Option<String> = None;
+    // Inside a multi-line string a line is text, never a header or a key
+    // (Thirteen's shape 3 on #6103: a description line `[rest]`).
+    let mut in_text = false;
     for line in text.lines() {
         let trimmed = line.trim();
+        let quotes = line.matches("\"\"\"").count() + line.matches("'''").count();
+        if in_text {
+            in_text = quotes % 2 == 0;
+            let manner = matches!(part.as_deref(), Some("quiet" | "budget" | "rest"));
+            if !manner {
+                kept.push(line);
+            }
+            continue;
+        }
         if trimmed.starts_with('[') {
             part = Some(
                 trimmed
@@ -987,12 +1010,23 @@ pub fn mannered(text: &str) -> String {
         let key = trimmed
             .split_once('=')
             .map(|(key, _)| key.trim().trim_matches('"'));
-        let dropped = match (part.as_deref(), key) {
-            (Some("quiet" | "budget" | "rest"), _) => true,
-            (None, Some("most_a_day" | "quiet" | "budget" | "rest")) => true,
-            (Some("permissions"), Some(key)) => unused.contains(&key),
+        // A dotted key (`quiet.from`, `permissions.messages`), by its parts
+        // (Thirteen's shape 2).
+        let (head, rest) = match key {
+            Some(key) => match key.split_once('.') {
+                Some((head, rest)) => (Some(head.trim().trim_matches('"')), Some(rest.trim())),
+                None => (Some(key), None),
+            },
+            None => (None, None),
+        };
+        let dropped = match (part.as_deref(), head, rest) {
+            (Some("quiet" | "budget" | "rest"), _, _) => true,
+            (None, Some("most_a_day" | "quiet" | "budget" | "rest"), _) => true,
+            (None, Some("permissions"), Some(grant)) => unused.contains(&grant.trim_matches('"')),
+            (Some("permissions"), Some(key), _) => unused.contains(&key),
             _ => false,
         };
+        in_text = quotes % 2 == 1;
         if !dropped {
             kept.push(line);
         }
@@ -1033,6 +1067,89 @@ pub fn mannered(text: &str) -> String {
     }
 }
 
+/// Whether a made skill carries the lamp's manners as [`mannered`] sets
+/// them (Thirteen's and App Only's P2 on #6103, option 2): one that starts
+/// itself (a `[trigger]`, no `tool`) has all four at the lamp's values,
+/// `most_a_day` 1 to 6, `[budget]` the nudges' group with 1 or 2 an hour,
+/// `[rest]` after 1 to 3, and `[quiet]` 22:00-08:00 unless its time runs as
+/// said ([`within_day`]), and no grant no step uses (`messages`, `camera`,
+/// `look`). Whatever shape the model wrote, inline or dotted, the table is
+/// what is read. Anything else is true.
+fn manners_kept(table: &toml::Table, asked: &[(u32, u32)]) -> bool {
+    let Some(trigger) = table.get("trigger").and_then(toml::Value::as_table) else {
+        return true;
+    };
+    if table.contains_key("tool") {
+        return true;
+    }
+    let only = |part: &str, keys: &[&str]| {
+        table
+            .get(part)
+            .and_then(toml::Value::as_table)
+            .is_some_and(|part| part.keys().all(|key| keys.contains(&key.as_str())))
+    };
+    let integer = |part: &str, key: &str| {
+        table
+            .get(part)
+            .and_then(|part| part.get(key))
+            .and_then(toml::Value::as_integer)
+    };
+    let text = |part: &str, key: &str| {
+        table
+            .get(part)
+            .and_then(|part| part.get(key))
+            .and_then(toml::Value::as_str)
+    };
+    let in_range = |value: Option<i64>, most: u32| {
+        value.is_some_and(|value| (1..=i64::from(most)).contains(&value))
+    };
+    let night = only("quiet", &["from", "to"])
+        && text("quiet", "from") == Some(MANNERS_QUIET.0)
+        && text("quiet", "to") == Some(MANNERS_QUIET.1);
+    let quiet_kept = match keeps_quiet(trigger, asked) {
+        false => !table.contains_key("quiet") || night,
+        true => night,
+    };
+    let granted = table
+        .get("permissions")
+        .and_then(toml::Value::as_table)
+        .is_some_and(|granted| {
+            ["messages", "camera", "look"]
+                .iter()
+                .any(|key| granted.contains_key(*key))
+        });
+    in_range(
+        table.get("most_a_day").and_then(toml::Value::as_integer),
+        MANNERS_MOST_A_DAY_AT_MOST,
+    ) && only("budget", &["group", "per_hour"])
+        && text("budget", "group") == Some(MANNERS_GROUP)
+        && in_range(integer("budget", "per_hour"), MANNERS_PER_HOUR_AT_MOST)
+        && only("rest", &["after_ignored"])
+        && in_range(
+            integer("rest", "after_ignored"),
+            MANNERS_RESTS_AFTER_AT_MOST,
+        )
+        && quiet_kept
+        && !granted
+}
+
+/// What [`keep`] says of a paced skill: [`plainly`], once its manners are
+/// as the lamp sets them ([`manners_kept`]); a skill the lamp couldn't
+/// set them on is never kept unmannered, but unsaid ("parts manners"), so
+/// the repair writes it plainly.
+fn said_mannered(text: &str, asked: &[(u32, u32)]) -> Result<String, Refused> {
+    let table: toml::Table = toml::from_str(text).map_err(unreadable)?;
+    if !manners_kept(&table, asked) {
+        let unsaid = Unsaid::of("parts manners".to_owned());
+        eprintln!(
+            "lamp-voice: a made skill can't be said plainly: {}",
+            unsaid.part
+        );
+        return Err(Refused(UNSAID.into(), Some(unsaid.repair(reads_on()))));
+    }
+    plainly(text)
+}
+
 /// The most runs a day a made skill may ask for (Thirteen's bound on #6103).
 pub const MANNERS_MOST_A_DAY_AT_MOST: u32 = 6;
 /// The most runs an hour its group may give it.
@@ -1044,26 +1161,170 @@ pub const MANNERS_RESTS_AFTER_AT_MOST: u32 = 3;
 /// [`MANNERS_QUIET`]'s other side.
 const DAY: (u32, u32) = (8 * 60, 22 * 60);
 
-/// The longest `during` read as a time the person asked for in their own
-/// words (the coordinator's ruling on #6103, 10 Nov): it runs as said,
-/// night or not, with no quiet hours over it ("dim the light at ten").
+/// The longest `during` that runs at the night's hours with no quiet hours
+/// over it: a time asked for in the person's own words ([`asked_windows`],
+/// "dim the light at ten tonight"), at most 3 hours long. A window the
+/// model chose alone, or a wider one, keeps the night quiet (Thirteen's
+/// HOLD follow-up on #6103, 21:51).
 const ASKED_TIME_MINUTES: u32 = 3 * 60;
 
-/// Whether a trigger's `during` runs as said, with no quiet hours: one that
-/// lies wholly within [`DAY`], or one of at most [`ASKED_TIME_MINUTES`]
-/// (across midnight too), a time the person asked for. A wider one, such
-/// as all day, keeps the night quiet.
-fn within_day(during: &toml::Value) -> bool {
+/// How long after a single time the person named a window may run: "at
+/// ten" is 22:00 to 23:00.
+const ASKED_AT_MINUTES: u32 = 60;
+
+/// Minutes in a day.
+const DAY_MINUTES: u32 = 24 * 60;
+
+/// A trigger's `during`, as minutes of the day, from and to.
+fn during_minutes(during: &toml::Value) -> Option<(u32, u32)> {
     let at = |key: &str| {
         let (hours, minutes) = during.get(key)?.as_str()?.split_once(':')?;
         let (hours, minutes): (u32, u32) = (hours.parse().ok()?, minutes.parse().ok()?);
         (hours < 24 && minutes < 60).then_some(hours * 60 + minutes)
     };
-    let (Some(from), Some(to)) = (at("from"), at("to")) else {
+    Some((at("from")?, at("to")?))
+}
+
+/// Whether a trigger's `during` lies wholly within [`DAY`], never across
+/// midnight: it needs no quiet hours.
+fn within_day(during: &toml::Value) -> bool {
+    matches!(during_minutes(during), Some((from, to)) if DAY.0 <= from && from < to && to <= DAY.1)
+}
+
+/// Whether a trigger's `during` runs at a time the person asked for in
+/// their own words: at most [`ASKED_TIME_MINUTES`] long and wholly within
+/// one of `asked` ([`asked_windows`]), across midnight too.
+fn runs_as_asked(during: &toml::Value, asked: &[(u32, u32)]) -> bool {
+    let Some((from, to)) = during_minutes(during) else {
         return false;
     };
-    let long = (to + 24 * 60 - from) % (24 * 60);
-    (DAY.0 <= from && from < to && to <= DAY.1) || (long > 0 && long <= ASKED_TIME_MINUTES)
+    let after = |at: u32, start: u32| (at + DAY_MINUTES - start) % DAY_MINUTES;
+    let long = after(to, from);
+    long > 0
+        && long <= ASKED_TIME_MINUTES
+        && asked.iter().any(|&(start, end)| {
+            let (at_from, at_to, window) =
+                (after(from, start), after(to, start), after(end, start));
+            at_from < at_to && at_to <= window
+        })
+}
+
+/// Whether a made skill keeps the night quiet: unless its `during` lies
+/// within the day, or runs at a time the person asked for.
+fn keeps_quiet(trigger: &toml::Table, asked: &[(u32, u32)]) -> bool {
+    !trigger
+        .get("during")
+        .is_some_and(|during| within_day(during) || runs_as_asked(during, asked))
+}
+
+/// The times of day a request names in the person's own words, as windows
+/// of minutes (Thirteen's HOLD follow-up on #6103): "from 22:00 to 22:30"
+/// is that window; a single time, "at 10 pm", "at ten tonight", "lúc 10 giờ
+/// tối", is it and the hour after ([`ASKED_AT_MINUTES`]). A bare hour with
+/// no morning or evening, "at ten", is either. Only these let a made
+/// skill's `during` run at night without quiet hours ([`mannered`]).
+pub fn asked_windows(request: &str) -> Vec<(u32, u32)> {
+    const WORDS: [&str; 12] = [
+        "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven",
+        "twelve",
+    ];
+    const LATER: [&str; 10] = [
+        "pm",
+        "p.m.",
+        "p.m",
+        "tonight",
+        "evening",
+        "night",
+        "tối",
+        "đêm",
+        "chiều",
+        "afternoon",
+    ];
+    const EARLIER: [&str; 5] = ["am", "a.m.", "a.m", "morning", "sáng"];
+    let lower = request.to_lowercase();
+    let tokens: Vec<&str> = lower
+        .split(|c: char| c.is_whitespace() || ",;!?()".contains(c))
+        .filter(|token| !token.is_empty())
+        .collect();
+    // Each time named, with where it was, as the minutes it may be.
+    let mut times: Vec<(usize, Vec<u32>)> = Vec::new();
+    for (at, token) in tokens.iter().enumerate() {
+        let token = token.trim_end_matches('.');
+        // "22:00", "10:30pm", "10pm", "10h", "ten".
+        let (digits, suffix) = token.split_at(
+            token
+                .find(|c: char| !(c.is_ascii_digit() || c == ':'))
+                .unwrap_or(token.len()),
+        );
+        let (hour, minute) = match digits.split_once(':') {
+            Some((hour, minute)) => (hour.parse::<u32>().ok(), minute.parse::<u32>().ok()),
+            None => (digits.parse::<u32>().ok(), Some(0)),
+        };
+        let (hour, minute, suffix) = match (hour, minute) {
+            (Some(hour), Some(minute)) if !digits.is_empty() => (hour, minute, suffix),
+            _ => match WORDS.iter().position(|word| *word == token) {
+                Some(index) => (index as u32 + 1, 0, ""),
+                None => continue,
+            },
+        };
+        if hour > 23 || minute > 59 || !matches!(suffix, "" | "pm" | "am" | "h" | "giờ") {
+            continue;
+        }
+        let near: Vec<&str> = std::iter::once(suffix)
+            .chain(tokens.iter().skip(at + 1).take(3).copied())
+            .collect();
+        let later = near.iter().any(|word| LATER.contains(word));
+        let earlier = near.iter().any(|word| EARLIER.contains(word));
+        let clock = digits.contains(':') || hour > 12;
+        let hours: Vec<u32> = match (clock, later, earlier) {
+            (true, _, _) if hour > 12 || !later => vec![hour],
+            (_, true, _) => vec![if hour < 12 { hour + 12 } else { hour }],
+            (_, _, true) => vec![if hour == 12 { 0 } else { hour }],
+            // A bare hour, said as a time ("at ten"): morning or evening.
+            _ if at > 0
+                && ["at", "lúc", "from", "to", "until", "till", "đến"]
+                    .contains(&tokens[at - 1]) =>
+            {
+                vec![hour % 12, hour % 12 + 12]
+            }
+            _ => continue,
+        };
+        times.push((
+            at,
+            hours.into_iter().map(|hour| hour * 60 + minute).collect(),
+        ));
+    }
+    let mut windows = Vec::new();
+    let mut used = vec![false; times.len()];
+    for index in 0..times.len() {
+        if used[index] {
+            continue;
+        }
+        let (at, starts) = &times[index];
+        // "from A to B": the next time named within a few words.
+        let until = times.get(index + 1).filter(|(next, _)| {
+            next - at <= 4
+                && tokens[at + 1..*next]
+                    .iter()
+                    .any(|word| ["to", "until", "till", "đến", "-"].contains(word))
+        });
+        match until {
+            Some((_, ends)) => {
+                used[index + 1] = true;
+                for &start in starts {
+                    for &end in ends {
+                        windows.push((start, end));
+                    }
+                }
+            }
+            None => {
+                for &start in starts {
+                    windows.push((start, (start + ASKED_AT_MINUTES) % DAY_MINUTES));
+                }
+            }
+        }
+    }
+    windows
 }
 
 /// [`paced`]'s limits on speaking (#6062).
@@ -3066,6 +3327,19 @@ pub struct Made {
 /// answer made as `from` (`local:…`) is kept once: asked again,
 /// the kept one is given back.
 pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Made, Refused> {
+    keep_asked(answer, cut, from, keeping, &[])
+}
+
+/// [`keep`], with the times of day the person's request named
+/// ([`asked_windows`]): a `during` within one runs as said, at night too,
+/// with no quiet hours; any other keeps the night quiet.
+pub fn keep_asked(
+    answer: &str,
+    cut: bool,
+    from: &str,
+    keeping: &Keeping,
+    asked: &[(u32, u32)],
+) -> Result<Made, Refused> {
     let unkept = |why: io::Error| {
         eprintln!("lamp-voice: a made skill was not kept: {why}");
         Refused::new("the lamp couldn't keep it")
@@ -3081,11 +3355,11 @@ pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Ma
     let mut files = files(answer)?;
     // A say's pace set, never refused (#6062): the text checked, said and
     // packed is the paced one.
-    files.toml = paced(&files.toml);
+    files.toml = paced_asked(&files.toml, asked);
     let (version, uses) = capped(&files.toml)?;
     // Said only once the check has passed: its lines, which name the
     // field, go to a repair before these do.
-    let said = plainly(&files.toml).map(|does| match &files.left_out {
+    let said = said_mannered(&files.toml, asked).map(|does| match &files.left_out {
         Some(what) => format!("{does} {}", left_out(what)),
         None => does,
     });
@@ -4995,6 +5269,100 @@ light = { colour = "green", level = 3, for = "20s" }
 
     /// A made skill with `trigger` and one `step`, reading presence and the
     /// clock, its light and its body.
+    /// Thirteen's and App Only's P2 on 355d255189: a self-starting skill
+    /// the lamp couldn't set its manners on is never kept unmannered. An
+    /// inline `permissions` with `messages`, dotted `quiet.*` keys and a
+    /// description line `[rest]` each come out mannered, or unsaid for a
+    /// repair; none is said with a send.
+    #[test]
+    fn a_skill_is_never_kept_without_its_manners_whatever_its_shape() {
+        let pet = "topic = \"controls/pet\"\nfield = \"ended\"\nequals = false\nrearm = \"ends\"\n";
+        let nod = made_with(pet, "body = { gesture = \"nod\" }");
+        let version = "version = \"1.0.0\"\n";
+        let inline = nod
+            .replace(
+                "[permissions]\nlight = true\nbody = true\n",
+                "permissions = { light = true, body = true, messages = true, topics = [] }\n",
+            )
+            .replace(
+                "topics = [\"humans/faces/tracked\", \"room/stood_up\", \"clock/local\"]\n",
+                "",
+            );
+        let shapes = [
+            ("inline permissions", inline),
+            (
+                "dotted quiet",
+                nod.replace(
+                    version,
+                    &format!("{version}quiet.from = \"03:00\"\nquiet.to = \"03:01\"\n"),
+                ),
+            ),
+            (
+                "dotted grant",
+                nod.replace(
+                    "[permissions]\nlight = true\nbody = true\ntopics = [\"humans/faces/tracked\", \
+                     \"room/stood_up\", \"clock/local\"]\n",
+                    "permissions.light = true\npermissions.body = true\n\
+                     permissions.messages = true\n",
+                ),
+            ),
+            (
+                "a description line [rest]",
+                nod.replace(
+                    version,
+                    &format!(
+                        "{version}description = \"\"\"Nods.\n[rest]\nafter_ignored = 9\n\"\"\"\n"
+                    ),
+                ),
+            ),
+        ];
+        for (shape, text) in shapes {
+            let table: toml::Table =
+                toml::from_str(&text).unwrap_or_else(|error| panic!("{shape}: {error}"));
+            if shape == "dotted grant" {
+                assert_eq!(table["permissions"]["messages"].as_bool(), Some(true));
+            }
+            let paced = paced(&text);
+            let set: toml::Table = toml::from_str(&paced).unwrap();
+            // Only the inline table is left to the repair: the lamp sets
+            // the manners on the others.
+            assert_eq!(
+                manners_kept(&set, &[]),
+                shape != "inline permissions",
+                "{shape}: {paced}"
+            );
+            match said_mannered(&paced, &[]) {
+                Ok(said) => {
+                    assert!(manners_kept(&set, &[]), "{shape}: {paced}");
+                    assert!(!said.contains("send a message"), "{shape}: {said}");
+                    assert!(
+                        said.contains("never from 22:00 to 08:00"),
+                        "{shape}: {said}"
+                    );
+                }
+                // Unsaid for a repair: its manners, or a part plainly
+                // can't say (a description).
+                Err(Refused(why, Some(lines))) => {
+                    assert_eq!(why, UNSAID, "{shape}");
+                    let part = match shape {
+                        "inline permissions" => "parts manners",
+                        "a description line [rest]" => "parts description",
+                        _ => panic!("{shape}: {lines}"),
+                    };
+                    assert!(lines.contains(part), "{shape}: {lines}");
+                }
+                other => panic!("{shape}: {other:?}"),
+            }
+        }
+        // Unpaced, a self-starting skill has none: never said, repaired.
+        assert!(matches!(
+            said_mannered(&nod, &[]),
+            Err(Refused(why, Some(_))) if why == UNSAID
+        ));
+        // The evening dim, a time asked for, needs no quiet hours.
+        assert!(said_mannered(&paced(TOML), &[]).is_ok());
+    }
+
     fn made_with(trigger: &str, step: &str) -> String {
         format!(
             "kind = \"installable\"\nversion = \"1.0.0\"\n\n[permissions]\nlight = true\n\
@@ -5274,32 +5642,85 @@ light = { colour = "green", level = 3, for = "20s" }
         );
     }
 
-    /// Thirteen's P2 on #6103 and the coordinator's ruling: the night stays
-    /// quiet unless a time asked for (3 hours at most) or the trigger runs
-    /// only within 08:00-22:00; an all-day window keeps it.
+    /// Thirteen's P2 on #6103 and his 21:51 follow-up: the night stays quiet
+    /// unless the trigger runs only within 08:00-22:00, or at a time the
+    /// request's own words name (3 hours at most, within it). A window the
+    /// model chose alone, or an all-day one, keeps it.
     #[test]
     fn the_night_stays_quiet_unless_its_window_is_within_the_day() {
         let pet = "topic = \"controls/pet\"\nfield = \"ended\"\nequals = false\nrearm = \"ends\"\n";
-        let quiet = |during: &str| {
-            let text = paced(&made_with(
-                &format!("{pet}during = {{ {during} }}\n"),
-                "body = { gesture = \"nod\" }",
-            ));
-            toml::from_str::<toml::Table>(&text)
-                .unwrap()
-                .contains_key("quiet")
+        let quiet = |request: &str, during: &str| {
+            let text = paced_asked(
+                &made_with(
+                    &format!("{pet}during = {{ {during} }}\n"),
+                    "body = { gesture = \"nod\" }",
+                ),
+                &asked_windows(request),
+            );
+            let table: toml::Table = toml::from_str(&text).unwrap();
+            assert!(manners_kept(&table, &asked_windows(request)), "{text}");
+            table.contains_key("quiet")
         };
-        assert!(quiet("from = \"00:00\", to = \"23:59\""));
-        assert!(quiet("from = \"18:00\", to = \"23:30\""));
-        // A time asked for, 3 hours at most, runs as said (the ruling).
-        assert!(!quiet("from = \"22:00\", to = \"22:30\""));
-        assert!(!quiet("from = \"21:00\", to = \"23:00\""));
-        assert!(!quiet("from = \"23:30\", to = \"01:00\""));
-        assert!(quiet("from = \"22:00\", to = \"01:01\""));
-        assert!(!quiet("from = \"07:00\", to = \"09:00\""));
-        assert!(quiet("from = \"20:00\", to = \"09:00\""));
-        assert!(!quiet("from = \"08:00\", to = \"22:00\""));
-        assert!(!quiet("from = \"12:00\", to = \"13:00\""));
+        let no_time = "make a skill that nods when someone pats its head";
+        // Within the day, asked or not: no quiet hours.
+        assert!(!quiet(no_time, "from = \"08:00\", to = \"22:00\""));
+        assert!(!quiet(no_time, "from = \"12:00\", to = \"13:00\""));
+        // A night window the model chose alone keeps them.
+        assert!(quiet(no_time, "from = \"01:00\", to = \"03:00\""));
+        assert!(quiet(no_time, "from = \"22:00\", to = \"22:30\""));
+        assert!(quiet(no_time, "from = \"00:00\", to = \"23:59\""));
+        assert!(quiet(no_time, "from = \"07:00\", to = \"09:00\""));
+        // A time the person named runs as said.
+        for request in [
+            "dim the light at ten tonight",
+            "dim the light at 10 pm",
+            "dim the light at 22:00",
+            "dim the light from 22:00 to 22:30",
+            "giảm đèn lúc 10 giờ tối",
+            "dim the light at ten",
+        ] {
+            assert!(
+                !quiet(request, "from = \"22:00\", to = \"22:30\""),
+                "{request}"
+            );
+            // Not at another hour of the night, nor wider than asked.
+            assert!(
+                quiet(request, "from = \"01:00\", to = \"03:00\""),
+                "{request}"
+            );
+            assert!(
+                quiet(request, "from = \"00:00\", to = \"23:59\""),
+                "{request}"
+            );
+        }
+        assert!(!quiet(
+            "nod from 23:30 to 01:00",
+            "from = \"23:30\", to = \"01:00\""
+        ));
+        assert!(quiet(
+            "nod from 22:00 to 01:01",
+            "from = \"22:00\", to = \"01:01\""
+        ));
+        assert!(quiet("dim at 10 am", "from = \"22:00\", to = \"22:30\""));
+    }
+
+    /// The times a request names, as windows of minutes ([`asked_windows`]).
+    #[test]
+    fn the_times_a_request_names_are_read_from_its_words() {
+        let ten_pm = (22 * 60, 23 * 60);
+        assert_eq!(asked_windows("dim the light at 10 pm"), [ten_pm]);
+        assert_eq!(asked_windows("dim the light at 10pm"), [ten_pm]);
+        assert_eq!(asked_windows("dim the light at ten tonight"), [ten_pm]);
+        assert_eq!(asked_windows("giảm đèn lúc 10 giờ tối"), [ten_pm]);
+        assert_eq!(asked_windows("at 22:00 dim it"), [ten_pm]);
+        assert_eq!(
+            asked_windows("from 22:00 to 22:30"),
+            [(22 * 60, 22 * 60 + 30)]
+        );
+        assert_eq!(asked_windows("at ten"), [(10 * 60, 11 * 60), ten_pm]);
+        assert_eq!(asked_windows("at 7 am"), [(7 * 60, 8 * 60)]);
+        assert!(asked_windows("make a skill that nods when someone pats its head").is_empty());
+        assert!(asked_windows("glow when two people come").is_empty());
     }
 
     /// A skill added from a file keeps the cap from before #6066 (App
@@ -5471,14 +5892,14 @@ light = { colour = "green", level = 3, for = "20s" }
             capped_with(&paced(&text), false).unwrap();
         }
         // Other triggers, silent, keep their own floors: only the manners
-        // are set, and a time asked for runs as said, no quiet hours.
+        // are set, the night kept quiet: no request named the time.
         let clock = made_with(
             "topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
              during = { from = \"22:00\", to = \"22:01\" }\n",
             "light = { dim = 1 }",
         );
         assert_eq!(say_paced(&clock), clock);
-        assert!(!paced(&clock).contains("[quiet]"));
+        assert!(paced(&clock).contains("[quiet]"));
     }
 
     /// What lamp-skills would run otherwise than said, or that reads who

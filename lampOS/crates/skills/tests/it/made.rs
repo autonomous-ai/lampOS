@@ -3,7 +3,9 @@
 //! is packed and kept in a 0700 folder with its SHA-256, at most five;
 //! what does more than it declares, or more than a made skill may, is not.
 use lamp_skills::package::{self, asked as asked_helper, install_made, install_made_at};
-use lamp_voice::made_skill::{GOES_ON_WITHIN, KEPT_MOST, Keeping, Made, goes_on, keep};
+use lamp_voice::made_skill::{
+    GOES_ON_WITHIN, KEPT_MOST, Keeping, Made, asked_windows, goes_on, keep, keep_asked,
+};
 use sha2::{Digest, Sha256};
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
@@ -90,7 +92,7 @@ fn a_skill_made_by_voice_is_checked_packed_and_kept() {
         made.description,
         "When the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most \
          once every 12 hours. It starts on its own, at most 3 times a day, one an hour with the \
-         lamp's other nudges, and rests till morning if ignored twice."
+         lamp's other nudges, never from 22:00 to 08:00, and rests till morning if ignored twice."
     );
     assert_eq!(made.uses.spoken(), "its light and whether it is talking");
     let bytes = fs::read(&made.package).unwrap();
@@ -762,7 +764,8 @@ fn a_face_a_getting_up_and_a_clock_made_skill_are_packed_and_kept() {
         assert_eq!(made.name, name);
         // Each starts on its own, with the nudges' manners (#6066 (a)); a
         // time asked for (the clock's minute) runs as said, no quiet hours.
-        let night = if name == "night-droop" {
+        // No request named the time: the night kept quiet.
+        let night = if name.is_empty() {
             ""
         } else {
             "never from 22:00 to 08:00, "
@@ -780,11 +783,12 @@ fn a_face_a_getting_up_and_a_clock_made_skill_are_packed_and_kept() {
     assert_eq!(tars(&keeping.directory).len(), 3);
 }
 
-/// The coordinator's ruling on #6103: a time the person names (a `during`
-/// of at most 3 hours) runs as said, night or not, with no quiet hours. The
-/// evening dim, 22:00-22:30, made, put on and run by the real engine at
-/// 22:10, dims; the same skill all day (00:00-23:59) keeps the night quiet
-/// and does nothing at 22:10.
+/// A time the request's own words name runs as said, night or not, with no
+/// quiet hours (Thirteen's HOLD follow-up on #6103): "dim the light at ten
+/// tonight", made as 22:00-22:30, put on and run by the real engine at
+/// 22:10, dims. The same window with no time in the request, the model's
+/// choice alone, keeps the night quiet and does nothing at 22:10, as does
+/// an all-day one.
 #[test]
 fn a_made_evening_dim_runs_at_ten_past_ten() {
     const S: u64 = 1_000_000;
@@ -794,12 +798,13 @@ fn a_made_evening_dim_runs_at_ten_past_ten() {
     let keeping = keeping(dir.path());
     let skills = dir.path().join("skills");
     fs::create_dir_all(&skills).unwrap();
-    let runs_at_ten_past = |toml: &str, name: &str| {
-        let made = keep(
+    let runs_at_ten_past = |toml: &str, name: &str, request: &str| {
+        let made = keep_asked(
             &answer(toml, name),
             false,
             &format!("s1:{name}:1"),
             &keeping,
+            &asked_windows(request),
         )
         .unwrap();
         let now = now_ms();
@@ -834,15 +839,22 @@ fn a_made_evening_dim_runs_at_ten_past_ten() {
         }
         (ran, installed, made.description)
     };
-    let (ran, installed, said) = runs_at_ten_past(TOML, "evening-dim");
+    let tonight = "dim the light at ten tonight";
+    let (ran, installed, said) = runs_at_ten_past(TOML, "evening-dim", tonight);
     assert!(!installed.contains("[quiet]"), "{installed}");
     assert!(!said.contains("never from"), "{said}");
     assert!(ran, "{installed}");
+    // No time in the request: the model's window alone keeps the quiet.
+    let (ran, installed, said) =
+        runs_at_ten_past(TOML, "unasked-dim", "make a skill that dims the light");
+    assert!(installed.contains("[quiet]"), "{installed}");
+    assert!(said.contains("never from 22:00 to 08:00"), "{said}");
+    assert!(!ran, "{installed}");
     let all_day = TOML.replace(
         "from = \"22:00\", to = \"22:30\"",
         "from = \"00:00\", to = \"23:59\"",
     );
-    let (ran, installed, said) = runs_at_ten_past(&all_day, "all-day-dim");
+    let (ran, installed, said) = runs_at_ten_past(&all_day, "all-day-dim", tonight);
     assert!(installed.contains("[quiet]"), "{installed}");
     assert!(said.contains("never from 22:00 to 08:00"), "{said}");
     assert!(!ran, "{installed}");
