@@ -138,6 +138,12 @@ struct Counts {
     daemon_starts: AtomicUsize,
     /// How many daemon starts still fail, `start_failed` (lamp-75c9, 21 Oct).
     daemon_fails: AtomicUsize,
+    /// Whether the adapter says its daemon is to be started again (its env
+    /// file changed while it ran, #5978), and how many times it was.
+    restart_wanted: AtomicBool,
+    daemon_restarts: AtomicUsize,
+    /// Each launch's machine and engine, as it was asked of Harness.
+    launched_on: Mutex<Vec<(String, EngineKind)>>,
     /// Each launch and daemon start, in the order they ran, and a launch
     /// held on the job lane while set (the reviewer-lead's P2 on #2309).
     order: Mutex<Vec<&'static str>>,
@@ -286,7 +292,12 @@ impl Adapter for Script {
     fn engines_lane(&self) -> Option<Arc<dyn EnginesLane>> {
         Some(Arc::new(ScriptEngines(self.counts.clone())))
     }
-    fn launch(&self, _: &Launch) -> LaunchOutcome {
+    fn launch(&self, launch: &Launch) -> LaunchOutcome {
+        self.counts
+            .launched_on
+            .lock()
+            .unwrap()
+            .push((launch.target.machine_id.clone(), launch.target.engine));
         self.counts.launches.fetch_add(1, Ordering::SeqCst);
         self.counts.order.lock().unwrap().push("launch");
         while self.counts.hold_launch.load(Ordering::SeqCst) && !self.stop.load(Ordering::Acquire) {
@@ -344,6 +355,14 @@ impl Adapter for Script {
         {
             return Err("start_failed".into());
         }
+        Ok(())
+    }
+    fn restart_wanted(&self) -> bool {
+        self.counts.restart_wanted.load(Ordering::SeqCst)
+    }
+    fn restart_daemon(&self) -> Result<(), String> {
+        self.counts.daemon_restarts.fetch_add(1, Ordering::SeqCst);
+        self.counts.order.lock().unwrap().push("restart");
         Ok(())
     }
     fn sign_in_starter(&self) -> Option<lamp_tasks::sign_in::Starter> {
@@ -2236,6 +2255,43 @@ fn the_lamp_is_a_target_with_hermes_only_when_on_and_installed_there() {
     assert_eq!(*s.counts.shown_on.lock().unwrap(), ["a".repeat(32)]);
 }
 
+/// #5978, the owner's rule: a fresh lamp after an update with no computer
+/// paired works on its own Hermes, the lamp being one device. Harness's
+/// machines list only the lamp, its engines say Hermes is installed: the
+/// targets are exactly `lamp` with Hermes, no error for having no
+/// computer, and a hand-over to `lamp` (what the voice prepares with no
+/// `where` and no `who`) is started with `harness new` on the lamp's own
+/// machine.
+#[test]
+fn a_lamp_with_no_computer_hands_work_to_its_own_hermes() {
+    let home = tempfile::tempdir().unwrap();
+    let (mut s, path) = engines_running(true);
+    s.config.set_up_later.as_mut().unwrap().lamp = Some(LampSide::new(home.path().to_owned()));
+    s.counts.machines.lock().unwrap().truncate(1);
+    s.counts
+        .engines
+        .lock()
+        .unwrap()
+        .insert("a".repeat(32), Ok(vec![row("hermes", Some(true), None)]));
+    s.start();
+    targets_until(&s, json!([{"alias":"lamp","engine":"hermes"}]));
+    let written: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    let targets = written["targets"].as_object().unwrap();
+    assert_eq!(targets.len(), 1, "{written}");
+    assert_eq!(targets["lamp"]["engine"], "hermes");
+    assert_eq!(targets["lamp"]["machine_id"], "a".repeat(32));
+    // The voice's call with no `where` and no `who` prepares for `lamp`.
+    let prepared = prepared_for(&s, "lamp", |answer| answer["ok"] == true);
+    let id = prepared["id"].clone();
+    let confirm = json!({"op":"confirm","guard":s.guard(),"id":id,"prepared_digest":prepared["prepared_digest"],"session_id":s.status()["summary"]["session_id"]});
+    assert_eq!(s.trusted(confirm)["ok"], true);
+    s.wait(&id, |v| v["task"]["dispatch"]["state"] == "accepted");
+    assert_eq!(
+        *s.counts.launched_on.lock().unwrap(),
+        [("a".repeat(32), EngineKind::Hermes)]
+    );
+}
+
 /// #5199: an engine not found on that computer (`installed` null with
 /// `installable` true) is refused early, and the targets say so; unknown
 /// proceeds.
@@ -2565,6 +2621,46 @@ fn a_part_started_signed_in_starts_harnesss_daemon_once() {
     assert_eq!(started(true, false), 1, "signed in at the start");
     assert_eq!(started(true, true), 0, "signed out at the start");
     assert_eq!(started(false, false), 0, "no sign-in by code");
+}
+
+/// #5978, lamp-c0a4 on 10 Nov: Harness's daemon reads its env file only at
+/// its start, so when lamp-tasks wrote it with other words while the
+/// daemon ran, the daemon is started again once, before a hand-over; never
+/// while a task is busy (watched): then it waits. An adapter that doesn't
+/// ask for it is never restarted.
+#[test]
+fn a_changed_env_file_restarts_harnesss_daemon_once_and_never_while_a_task_is_busy() {
+    // Asked, no task: once, however long the part runs.
+    let mut s = Running::new(false);
+    s.stop();
+    s.counts.restart_wanted.store(true, Ordering::SeqCst);
+    s.start();
+    let start = Instant::now();
+    while s.counts.daemon_restarts.load(Ordering::SeqCst) == 0 {
+        assert!(start.elapsed() < Duration::from_secs(5), "never restarted");
+        thread::sleep(Duration::from_millis(5));
+    }
+    let prepared = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    s.wait(&prepared["id"], |v| {
+        !v["task"]["dispatch"]["finished"].is_null()
+    });
+    thread::sleep(Duration::from_millis(200));
+    assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 1);
+    assert_eq!(*s.counts.order.lock().unwrap(), ["restart", "launch"]);
+    // The part started again with that task still busy: no restart.
+    s.stop();
+    s.start();
+    thread::sleep(Duration::from_millis(300));
+    assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 1);
+    // Not asked: never.
+    let s = Running::new(false);
+    let prepared = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    s.wait(&prepared["id"], |v| {
+        !v["task"]["dispatch"]["finished"].is_null()
+    });
+    assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 0);
 }
 
 /// openharness#1463, the reviewer-lead's P2 on #2309: a hand-over waiting

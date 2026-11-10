@@ -158,8 +158,22 @@ short command-line program for keeping a reading list". Two that fit are
 meant may be the stopped one (the Reviewer-lead's P2 on #5784 at
 71bf964baa). Harness fills `asks` (the last two
 prompts) and `about` (the last recaps) only for a live session with a
-finished turn, within 3 s, for the first 40 rows; a stopped row, or one
-with no turn ended yet, is found by its name or folder alone. A session
+finished turn, within 3 s, for the first 40 rows, and never for a stopped
+one (openharness cli `commands.ts` 602-605, as the Harness team means
+it). So with `--close-told`, which closes a session once its done line
+is told, a follow-up by its work ("in the moon poem, add a line about
+the stars") would never find it (lamp-c0a4, 10 Nov). When no row fits by
+name, folder or work and the words name some work, the newest stopped
+rows of that machine (at most 4, `MOST_STOPPED_READ`, by `lastActive`;
+failed or offline ones are not read) are read one by one with `harness
+show --machine <id> <agent> --json` (its last turn only: `ask`, `answer`,
+`tools`, commands.ts 746-790), each within what is left of the launch
+bound less 2 s, and their last `ask` is matched by work the same way.
+One that fits is that stopped session; two are `session_ambiguous`; a
+show that fails or can't be read is passed over. A live row that fits by
+its work is taken without reading the stopped ones, so a stopped one
+that also holds the words is not weighed against it. A row with no turn
+ended yet is found by its name or folder alone. A session
 the lamp started keeps the `lamp-<hex>` it was given with `--name`, which
 Harness never replaces with the agent's title. `harness route` was tried for this
 and not used: on lamp-c0a4 on 9 Nov it took 6.6–18.6 s a call and called
@@ -176,22 +190,31 @@ refusal), and nothing is started new in any case:
   characters. Task news says it at once, so a wrong join is heard (the
   Reviewer-lead's P2 on #5784 at 71bf964baa). A routed join keeps none.
 - **Not sent, with why:** `session_not_found`; `session_ambiguous` (two or
-  more live ones fit, or, found by its work, a live one and a stopped one;
-  never guessed); `session_stopped` (only a stopped
-  one fits); `session_busy` (working, asking the person something, or
+  more live ones fit, or, found by its work, a live one and a stopped one,
+  or two stopped ones by their last asks; never guessed);
+  `session_stopped` (only a stopped one fits, `LAMP_TASKS_RESUME_CLOSED`
+  off; two stopped ones by their name too); `session_busy` (working, asking the person something, or
   still starting); `session_closed` (the reply's `NOT_RUNNING`: Harness
   says it was closed or stopped; nothing is started on its own, the first
   builder's ruling on #5784's follow-up; with `LAMP_TASKS_RESUME_CLOSED`
   it is reopened first, below); the reply's other refusals
   (`reply_off`, `reply_not_idle`, `reply_failed`); `sessions_failed` or
   `sessions_<code>` when the list can't be read, `sessions_timeout` too
-  when it leaves the reply under 1 s of the launch bound (`REPLY_FLOOR`).
+  when it leaves the reply under 1 s of the launch bound (`REPLY_FLOOR`),
+  and `sessions_offline` when nothing fits while a computer was left out
+  as offline (below).
 - **Closed, reopened** (`LAMP_TASKS_RESUME_CLOSED=on` in lamp-tasks' own
   unit, off unless set). It needs Harness CLI 0.5.98 or newer, the first
   released CLI that lists `resume` in `harness --help` (openharness#3606,
   PR #3808); the switch can be on once the lamp's pin reaches it (#5957).
-  A reply that says `NOT_RUNNING` is followed by `harness resume --machine
-  <id> <agent> --json` once, inside the same launch bound. Before the first
+  One stopped session that fits, by its name or folder or by its last
+  ask (above), is reopened with `harness resume --machine <id> <agent>
+  --json` before any reply (Harness CLI 0.6.2 `commands.ts` 983: the same
+  id, name and folder, `hermes --resume <sessionId>` for Hermes), and a
+  reply that says `NOT_RUNNING` is followed by it once, both inside the
+  same launch bound. Then `harness reply` types the words as into an idle
+  one, which needs the person's `programs-reply` switch (else
+  `REPLY_OFF`, exit 5, `reply_off`). Before the first
   resume of a start, lamp-tasks asks whether the installed CLI has it
   (`harness --help` lists `resume`, or else `harness resume --help` exits
   0) and keeps the answer for the rest of the run (a look that can't
@@ -215,9 +238,13 @@ refusal), and nothing is started new in any case:
   `session_closed`. Never resumed twice in one hand-over (a second
   `NOT_RUNNING` is `session_closed`), never started new; under 1 s left
   before the resume or the reply is `sessions_timeout`, nothing typed.
-  Off, a closed session is `session_closed` as above. Tests:
+  Off, a closed session is `session_closed` as above, and a stopped one
+  that fits `session_stopped`, nothing typed. Tests:
   `tests/harness.rs`
   `with_resume_closed_a_closed_named_session_is_reopened_once_and_typed_into`,
+  `a_stopped_session_is_found_by_its_last_ask_and_reopened_with_the_switch`,
+  `words_that_name_no_work_read_no_stopped_session`,
+  `with_resume_closed_a_stopped_session_found_by_name_is_reopened`,
   `with_resume_closed_a_resume_that_leaves_no_time_types_nothing`,
   `with_resume_closed_an_older_harness_without_resume_is_told_closed`;
   `task_news::tests::a_reopened_named_session_is_said_reopened_and_an_unconfirmed_one_closed`.
@@ -1460,6 +1487,23 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
     Harness reads an engine's launch environment through `SHELL` first:
     without it `harness new` times out "Waiting to read the engine's
     launch environment" (seen on a lamp).
+    Harness's daemon reads the file only when it starts: on lamp-c0a4 on
+    10 Nov it was written with `SHELL` and `HERMES_HOME` while harnessd
+    ran, and `harness new hermes` waited on "Waiting to read the engine's
+    launch environment" until harnessd was restarted by hand. So when
+    lamp-tasks' write gives the file other words (or it was not there)
+    and a daemon answers on Harness's port (`/api/health`), lamp-tasks
+    starts it again once with `harness start --restart` (Harness CLI
+    0.6.2: stops the daemon running for this data folder and starts it
+    over), on its job lane as the daemon start after a sign-in is
+    (openharness#1463), before the next hand-over; never while a task is
+    busy (watched), then it waits until none is. One journal line says it
+    (`Harness's daemon started again: its env file changed while it ran`,
+    or `not started again: <code>`). Tests:
+    `hold::tests::the_env_file_is_said_changed_only_when_its_words_change`,
+    `tests/runtime.rs`
+    `a_changed_env_file_restarts_harnesss_daemon_once_and_never_while_a_task_is_busy`,
+    `tests/harness.rs` `the_daemon_is_started_again_with_harness_start_restart`.
     The file is written with the hold off too, then without the hold's
     lines: the launcher isn't pinned then, so only the Harness commands the
     part runs, and the daemon they start, have `HERMES_HOME`. The hooks
@@ -1468,14 +1512,26 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
     (`lampos`).
   - **Which session, which machine.** A hand-over naming a session looks
     for it as #5784 does (exact name, then a word-start prefix, then by its
-    work), on the lamp first, then on each computer target's machine. A
-    fit on the lamp wins a tie; one fit on a computer alone is replied into
+    work, then by a stopped session's last ask), on the lamp first, then
+    on each computer target's machine. A fit on the lamp is the answer,
+    and the computers' lists are then not read at all; one fit on a
+    computer alone is replied into
     there (`harness reply --machine <its id>`), the task's dispatch says
     `joined_on` (alias, machine, engine; schema 6), and it is shown,
     watched, closed and told as that machine's, like any computer task.
     Two computers fitting and none on the lamp is `session_ambiguous`; a
     computer that can't be read is left out rather than said not found.
-    A hand-over naming a machine looks there only.
+    A computer the last `harness machines` look said is `offline` is not
+    listed at all (kept by lamp-tasks from that look, no call of its own):
+    nothing could be typed there, and its list only answers DISCONNECTED.
+    A hand-over naming a machine looks there only. Latency: on lamp-c0a4
+    on 10 Nov the lookup took 15.2 s, reading every machine in turn,
+    including two offline computers that each answered DISCONNECTED after
+    about 2.2 s and the person's Mac, whose list takes about 4 s. Now a
+    session on the lamp costs the lamp's own list (and, found by its last
+    ask, up to 4 `harness show` reads and a `harness resume`); the
+    computers' 8.4 s or so are gone. A session only on the Mac costs the
+    lamp's list plus the Mac's (about 4 s), the offline ones' 4.4 s gone.
   - **New work goes to the lamp.** A new task naming nothing goes to the
     lamp's Hermes, and so does one naming Hermes or the lamp as `who`;
     one naming their computer (`where` `"computer"`) or an agent there
@@ -1511,8 +1567,16 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
     `hold::tests::the_env_file_names_hermes_home_and_a_shell_with_or_without_the_hold`,
     `engine::tests::a_session_joined_on_another_machine_is_followed_there`,
     `tests/harness.rs`: `a_named_session_is_looked_for_on_the_lamp_first_then_the_computers`,
+    `a_computer_said_offline_is_not_listed_for_a_named_session`,
+    `a_lamp_with_no_computer_finds_and_reopens_its_closed_session`,
     `the_session_machines_come_from_the_targets`,
-    `tests/runtime.rs`: `the_lamp_is_a_target_with_hermes_only_when_on_and_installed_there`
+    `tests/runtime.rs`: `a_lamp_with_no_computer_hands_work_to_its_own_hermes`
+    (the owner's rule: a fresh lamp with no computer paired is one device,
+    and its targets are only `lamp` with Hermes, a hand-over to it started
+    on the lamp's machine; the lamp's work folder is made whichever look,
+    the machines' or an engines look coming back, finds Hermes there first),
+    the voice's `agent_tasks::tests::a_lamp_with_no_computer_still_hands_work_to_its_own_hermes`,
+    `the_lamp_is_a_target_with_hermes_only_when_on_and_installed_there`
     (off, Hermes missing, installed; a computer offline refused; the answer
     shown on the lamp's machine), the voice's
     `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`
