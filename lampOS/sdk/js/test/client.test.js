@@ -1734,14 +1734,13 @@ test('a look or joints waits for the body\'s done and says when a conversation d
       assert.deepEqual([aimed.how, aimed.yaw, aimed.pitch], ['finished', -4, 2]);
       // Without `wait`, only the door's answer, as before.
       assert.equal((await lamp.joints(lease, 300, { yaw: 1 })).to, 'body');
-      // A conversation suspends the lease: the door still takes the look, and
-      // the body's `done` says it was dropped.
+      // A conversation suspends the lease: the door refuses a body op as the
+      // suspension it is (session.rs), not as "take a lease first" nor
+      // "another computer".
       fake.leaseEvent(lease.id, 'suspended', 'conversation');
       await until(() => lease.state === 'suspended');
-      let dropped = await lamp.joints(lease, 300, { yaw: -13 }, { wait: true });
-      assert.deepEqual([dropped.how, dropped.why], ['dropped', 'the body is not held']);
-      dropped = await lamp.look({ yaw: 3, pitch: 1 }, { wait: true });
-      assert.deepEqual([dropped.how, dropped.why], ['dropped', 'the body is not held']);
+      await assert.rejects(lamp.joints(lease, 300, { yaw: -13 }, { wait: true }), (error) => error.code === 'busy' && /suspended while someone talks/.test(error.why));
+      await assert.rejects(lamp.look({ yaw: 3, pitch: 1 }, { wait: true }), (error) => error.code === 'busy' && /your lease on the body is suspended/.test(error.why));
       fake.leaseEvent(lease.id, 'held');
       await until(() => lease.state === 'held');
       assert.equal((await lamp.look('ahead', { wait: true })).how, 'finished');
@@ -1749,6 +1748,22 @@ test('a look or joints waits for the body\'s done and says when a conversation d
       await assert.rejects(lamp.look('hand', { wait: true }), /followHand/);
     }, { forMs: 5000 });
     assert.deepEqual(fake.asked('joints')[0], { lease: 'l_1', targets: { pitch: 2, yaw: -4 }, within_ms: 300 });
+  });
+});
+
+// The race the door cannot see: a look taken, then the conversation suspends
+// the lease before the body answers: the body's `done` says it was dropped.
+test('a look taken just before a conversation is dropped by the body in its done', async () => {
+  await withLamp({ grants: ['body', 'look'], autoDone: false }, async (lamp, fake) => {
+    const until = async (ready) => { while (!ready()) await new Promise((r) => setTimeout(r, 10)); };
+    await lamp.withLease(['body'], async (lease) => {
+      const waiting = lamp.look({ yaw: 3, pitch: 1 }, { wait: true });
+      await until(() => fake.asked('look').length > 0);
+      fake.leaseEvent(lease.id, 'suspended', 'conversation');
+      fake.done(fake.requests.at(-1).id, 'dropped', 'the body is not held');
+      const dropped = await waiting;
+      assert.deepEqual([dropped.how, dropped.why], ['dropped', 'the body is not held']);
+    }, { forMs: 5000 });
   });
 });
 
