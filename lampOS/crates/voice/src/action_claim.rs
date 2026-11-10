@@ -1742,6 +1742,86 @@ pub(crate) mod tests {
         }
     }
 
+    /// Whether any prefix of `reply`, cut at each char as it streams, or
+    /// the whole of it, is judged a worded claim.
+    fn ever_a_claim(reply: &str) -> bool {
+        reply
+            .char_indices()
+            .map(|(at, _)| &reply[..at])
+            .any(|so_far| matches!(claim_as(so_far, false, true), Some(Some(_))))
+            || matches!(claim_as(reply, false, true), Some(Some(_)))
+            || matches!(claim_as(reply, true, true), Some(Some(_)))
+    }
+
+    /// Fourth's HOLD on #5910: a clock's ':' or '.' is inside its time,
+    /// never the sentence's end, and a comma defers the judgement to the
+    /// sentence's real end, so talk or a question there is no claim, as
+    /// it is streamed and whole.
+    #[test]
+    fn a_kept_light_closes_at_the_sentences_end_not_inside_a_clock() {
+        let mut claimed = Vec::new();
+        for reply in [
+            "Keeping it on until 10:30 would waste power.",
+            "Keeping it on until ten, would that help?",
+            "Keeping it on until 10.30 would waste power.",
+            "Leaving it on until 10:30, is that okay?",
+            "Keeping the light on until 10:30 pm, right?",
+            "It'll stay on until 10.30, would that help?",
+            "The light is on until 10.30, isn't it?",
+            "Your light'll stay on for 1.5 hours, right?",
+            "Okay, louder, right?",
+        ] {
+            if ever_a_claim(reply) {
+                claimed.push(reply);
+            }
+        }
+        assert!(claimed.is_empty(), "claimed: {claimed:?}");
+        for (reply, kind) in [
+            ("Keeping it on until 10:30.", Claim::LightKept),
+            ("Keeping it on until 10:30 pm.", Claim::LightKept),
+            ("Keeping it on until 10.30.", Claim::LightKept),
+            ("Keeping it on until ten, as you asked.", Claim::LightKept),
+            ("It'll stay on until 10:30.", Claim::LightKept),
+            ("The light is on until 10.30, as asked.", Claim::LightKept),
+            ("Setting a timer for 10:30 am.", Claim::Schedule),
+            ("Setting a reminder for 6:30.", Claim::Schedule),
+        ] {
+            assert_eq!(claim_as(reply, true, true), Some(Some(kind)), "{reply:?}");
+        }
+        // Streamed, a clock's mark waits for what follows it.
+        for reply in ["Keeping it on until 10:", "Keeping it on until 10:3"] {
+            assert_eq!(claim_as(reply, false, true), None, "{reply:?}");
+        }
+    }
+
+    /// The kept-light controls stay no claim at every streamed prefix too.
+    #[test]
+    fn a_kept_lights_controls_are_no_claim_as_they_stream() {
+        let mut claimed = Vec::new();
+        for reply in [
+            "I left a light on for you.",
+            "I'll leave it on for you.",
+            "Turning it off and on again usually helps.",
+            "It stays on until you say otherwise.",
+            "It'll stay on until you're back.",
+            "The light is on until you turn it off.",
+            "Your light will be on when you get home.",
+            "Keeping it on until ten would waste power.",
+            "Leaving it on for 10 hours wastes power.",
+            "Keeping the light on is easy.",
+            "I'll keep it on until ten?",
+            "The light will stay on until ten?",
+            "It'll stay on until ten?",
+            "It's on until ten.",
+            "My light is blue now.",
+        ] {
+            if ever_a_claim(reply) {
+                claimed.push(reply);
+            }
+        }
+        assert!(claimed.is_empty(), "claimed: {claimed:?}");
+    }
+
     #[test]
     fn the_light_kept_stands_beside_a_light_call_a_set_or_a_kept_rule() {
         for name in [
