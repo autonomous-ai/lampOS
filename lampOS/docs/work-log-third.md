@@ -1,3 +1,33 @@
+## 2026-11-10 — music selector regression repaired; reminder second read
+
+- #5975 ARM 42757338768 exposed a real classifier regression: “Now play
+  the second recording” was refused. It stopped at 12,931 passed / one
+  failed, 113 skipped; Linux lint/docs passed separately. No retry-only
+  explanation. Raw failure is retained in the carry evidence.
+- Published selector repair 0aa71fb62 on train 768 (75da83b34). Prior six
+  commits compare equal over the rebase. One bounded selector precedes
+  the audio noun; unrelated games and retractions remain refused. Same
+  46 classifier cases: seven failures before, zero after. Current fmt,
+  strict Voice Clippy, 33 music tests and 66 requested-audio tests (one
+  ignored) pass; docs 192/1900/zero broken. Fresh ARM 42761649338 is
+  running. READ ASK 6759741407 continues Second/Reviewer-lead's reads.
+- #5969 current head 31933971d is an equal-patch rebase onto train 768.
+  Local fmt, strict Clippy and 177 serial reminder tests pass (three
+  ignored). Initial stale dependency failure is retained; forced source
+  recompilation required no content change. Twelve's second READ-OK is
+  6759676824, carrying its earlier 6759391913; the earlier read arrived
+  before my follow-up but was missed. Reviewer-lead's same-patch read
+  remains. New ARM 42760836833 is running; Linux/docs pass.
+- Independent reads completed: #5974 at 0a35aaba2 (seven guide tests,
+  P3 body-loop wording); #5938 at 6de2c7099 (50 focused tests, P3 camera
+  prompt/log wording). The latter does not replace the default decision.
+- Claimed stalled #5902 in 6759432481 / Queue 6759448906. Fifth's patch
+  rebased equal onto train 768 in third/after-say-recovery-carry-1110.
+  Six process/bus regressions for resumed state loss, timeout and invalid
+  heard data are running fail-first before production changes. Reviewed
+  V1's bounded speech wait and cancellation baseline. No device action,
+  switch activation or deployment; original product and played gates stay.
+
 ## 2026-11-10 — requested-music carry published; reminder ARM green
 
 - Draft #5975 published at 4ebf8927dea2e01493043994cfda95f2b5976fad,
