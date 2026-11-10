@@ -175,6 +175,46 @@ export function moveRefusal(stepMs, frames) {
   return why === null ? null : `frames: a move this body cannot play: ${why}`;
 }
 
+// lamp-control's `light` limits (protocol.rs, msgs' arbitration.rs): a ring
+// light's fade, how long it is held, the ring's pixels, the colour levels.
+export const LIGHT_FADE_MS = Object.freeze([1_000, 60_000]);
+export const LIGHT_FOR_MS = Object.freeze([1, 30_000]);
+export const LIGHT_LEVELS = Object.freeze([1, 5]);
+export const RING_PIXELS = 32;
+const hexRgb = (text) => typeof text === 'string' && /^#[0-9a-fA-F]{6}$/.test(text);
+
+// lamp-control's refusal of a computer's `light` (protocol.rs), in its words, as
+// `bad_request`, in its order; null for one it takes. Only for a light it parses
+// (whole numbers where it wants them): anything else is the schema's to refuse.
+export function lightRefusal(request) {
+  for (const field of ['level', 'brightness', 'fade_ms', 'for_ms']) {
+    const value = request[field];
+    if (value !== undefined && value !== null && !Number.isInteger(value)) return null;
+  }
+  const given = (value) => value !== undefined && value !== null;
+  const { colour, rgb, pixels } = request;
+  if ([colour, rgb, pixels].filter(given).length !== 1) return 'one of colour, rgb or pixels';
+  if (given(colour)) {
+    if (!schema.colours.includes(colour)) return `colour: one of ${schema.colours.join(', ')}`;
+    const level = request.level;
+    if (!given(level) || level < LIGHT_LEVELS[0] || level > LIGHT_LEVELS[1]) return `level: from ${LIGHT_LEVELS[0]} to ${LIGHT_LEVELS[1]}, with colour`;
+    if (given(request.brightness)) return 'brightness goes with rgb or pixels; colour has level';
+  } else {
+    if (given(request.level) || given(request.pattern)) return 'level and pattern go with colour';
+    if (given(request.brightness) && (request.brightness < 0 || request.brightness > 100)) return 'brightness: from 0 to 100';
+  }
+  if (given(rgb) && !hexRgb(rgb)) return 'rgb: #rrggbb';
+  if (given(pixels)) {
+    if (!Array.isArray(pixels) || pixels.length !== RING_PIXELS) return `pixels: ${RING_PIXELS} of them, one per pixel of the ring`;
+    if (!pixels.every(hexRgb)) return 'pixels: each #rrggbb';
+  }
+  const fade = request.fade_ms;
+  if (given(fade) && (fade < LIGHT_FADE_MS[0] || fade > LIGHT_FADE_MS[1])) return `fade_ms: from ${LIGHT_FADE_MS[0]} to ${LIGHT_FADE_MS[1]}`;
+  const forMs = request.for_ms;
+  if (given(forMs) && (forMs < LIGHT_FOR_MS[0] || forMs > LIGHT_FOR_MS[1])) return `for_ms: from ${LIGHT_FOR_MS[0]} to ${LIGHT_FOR_MS[1]}`;
+  return null;
+}
+
 // How a synthetic hand moves (`handTrack`): across the picture and back
 // (`wave`), round in a circle, left to right once, or held still.
 export const HAND_PATHS = Object.freeze(['wave', 'circle', 'across', 'still']);
@@ -596,6 +636,11 @@ export class FakeLamp {
           return this.refuse(ws, id, 'bad_request', 'frames: each frame is five whole counts');
         }
         const refusal = moveRefusal(request.step_ms, request.frames);
+        if (refusal) return this.refuse(ws, id, 'bad_request', refusal);
+      }
+      // As lamp-control's protocol.rs for a light: its own limits, in its words.
+      if (request.op === 'light') {
+        const refusal = lightRefusal(request);
         if (refusal) return this.refuse(ws, id, 'bad_request', refusal);
       }
       if (request.op === 'pair') return this.pair(ws, request, nonce);
