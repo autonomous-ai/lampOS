@@ -465,6 +465,92 @@ fn a_device_change_claimed_in_other_words_twice_with_no_call_says_it_was_not_don
     }
 }
 
+/// GO-159 (lamp-52e6, 11091): the kept light's claim the worded runs
+/// missed, said as "it", "will stay" or "keeping" ("I'll keep it on until
+/// ten."), twice with no call: said as the plain line that it wasn't done,
+/// as "I've kept the light on until ten." is.
+#[test]
+fn a_kept_light_said_as_it_or_will_stay_twice_with_no_call_says_it_was_not_done() {
+    let heard = "Hey Lamp, keep the light on until ten.";
+    for claim in crate::action_claim::tests::KEPT_SHAPES {
+        let went = worded(heard, saying(claim), vec![saying(claim)]);
+        assert_eq!(
+            went.said,
+            said(&[crate::action_claim::NOT_DONE_LINE]),
+            "{claim}"
+        );
+        assert_eq!((went.asked, went.ran.len()), (2, 0), "{claim}");
+        assert!(told_claim(&went), "{claim}: {:?}", went.notes);
+    }
+}
+
+/// Fourth's HOLD on #5910: talk or a question about keeping the light on,
+/// with a clock or a comma inside ("Keeping it on until ten, would that
+/// help?"), is said as it is with no call; "Keeping it on until 10:30." is
+/// held and said not done.
+#[test]
+fn a_kept_light_with_a_clock_or_a_comma_is_judged_at_its_sentences_end() {
+    let heard = "Hey Lamp, keep the light on until ten.";
+    for answer in [
+        "Keeping it on until 10:30 would waste power.",
+        "Keeping it on until ten, would that help?",
+    ] {
+        let on = worded(heard, saying(answer), vec![]);
+        assert_eq!((on.asked, on.ran.len()), (1, 0), "{answer}");
+        assert!(!told_claim(&on), "{answer}: {:?}", on.notes);
+        assert_eq!(on, claimed(true, heard, saying(answer), vec![]), "{answer}");
+    }
+    let claim = "Keeping it on until 10:30.";
+    let went = worded(heard, saying(claim), vec![saying(claim)]);
+    assert_eq!(went.said, said(&[crate::action_claim::NOT_DONE_LINE]));
+    assert_eq!((went.asked, went.ran.len()), (2, 0));
+    assert!(told_claim(&went), "{:?}", went.notes);
+}
+
+/// A help request can be phrased without a question opener. Its explanation
+/// must survive the actual held-speech path without a retry or not-done line,
+/// including when the stream pauses immediately after the duration.
+#[test]
+fn explanations_and_questions_are_said_without_an_action_retry() {
+    let heard = "Explain how the light behaves after a tap.";
+    assert!(!crate::action_claim::asked_as_a_question(heard));
+    for (opening, ending) in [
+        ("It stays on for ten minutes", " after a tap."),
+        ("The light is on for five seconds", " when you tap it."),
+        (
+            "Your light will be on for two hours",
+            " each evening on the schedule you set.",
+        ),
+        ("It'll stay on until 10.", "30, would that help?"),
+        ("The light is on until 10.", "30, isn't it?"),
+        ("Your light'll stay on for 1.", "5 hours, right?"),
+        ("Okay, louder,", " right?"),
+    ] {
+        let words = format!("{opening}{ending}");
+        for streamed in [false, true] {
+            let events = || {
+                if streamed {
+                    vec![text(opening), text(ending), Ok(ChatEvent::Done)]
+                } else {
+                    saying(&words)
+                }
+            };
+            let run =
+                |enabled| turn_with(true, enabled, true, heard, events(), vec![saying(&words)]);
+            let went = run(true);
+            assert_eq!(went, run(false), "{words}, streamed={streamed}");
+            let spoken: String = went
+                .said
+                .iter()
+                .map(|part| part.strip_prefix("said:").unwrap())
+                .collect();
+            assert_eq!(spoken, words, "{words}");
+            assert_eq!((went.asked, went.ran.len()), (1, 0), "{words}");
+            assert!(!told_claim(&went), "{words}: {:?}", went.notes);
+        }
+    }
+}
+
 /// A turn that made its call is untouched by the worded claims, byte for
 /// byte: the words beside the call, and after it. A limit said ("for one
 /// minute") is one the call carried.
