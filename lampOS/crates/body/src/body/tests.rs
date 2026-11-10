@@ -6600,6 +6600,55 @@ fn a_head_moved_and_held_or_pressed_past_its_bound_stays_held_while_the_hand_doe
     ran(false);
 }
 
+/// #5196, lamp-06c1: a head whose pitch reads 130 at its own rest, moved 40
+/// counts by a hand that then lets go and leaves it there, nothing on it
+/// after. Its own weight there is over `STALL_LOAD`, and away from where its
+/// hold began that alone renewed the hold on every step: held, and said a
+/// hand on `body/hand`, until lamp-body was restarted. Those readings are a
+/// hand holding it still too, so a push is never said without end: held
+/// still for `HAND_STILL_STEPS` it is let go within its ease.
+#[test]
+fn a_head_moved_by_a_hand_then_left_at_its_own_load_over_100_is_let_go() {
+    let ms = Duration::from_millis;
+    for limp in [false, true] {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(40));
+        lamp.hand = Some((ms(1_500), ms(4_000), PITCH, f32::from(HOME[0]) - 40.0));
+        lamp.strains = vec![
+            (ms(1_500), ms(2_000), PITCH, 300),
+            (ms(0), ms(40_000), PITCH, 130),
+        ];
+        let news = || Some((Mood::Resting, 0));
+        let mut seen = Vec::new();
+        let report = run(
+            &mut lamp,
+            &mut clock,
+            Limits {
+                limp,
+                ..giving_way(GiveWay::Return)
+            },
+            None,
+            news,
+            |glimpse| seen.push(*glimpse),
+        );
+        assert_eq!(report.stop, Stop::Cancelled, "limp {limp}: {report:?}");
+        assert!(report.eased[0] >= 1, "limp {limp}: {report:?}");
+        assert!(
+            seen.iter()
+                .any(|g| g.hand && (ms(1_500)..ms(4_000)).contains(&clock_of(g))),
+            "limp {limp}: the hand was never said"
+        );
+        // Still from two seconds: twenty seconds held still, its ease of two
+        // and a second more, and it is no longer said, nor held.
+        let late: Vec<_> = seen.iter().filter(|g| clock_of(g) >= ms(25_000)).collect();
+        assert!(!late.is_empty());
+        assert!(
+            late.iter().all(|g| !g.hand),
+            "limp {limp}: still said a hand at {:?}",
+            late.iter().rev().find(|g| g.hand).map(|g| clock_of(g))
+        );
+    }
+}
+
 /// A hand that takes the head past its reach leaves it at the edge of it.
 #[test]
 fn told_to_stay_a_head_pushed_past_its_reach_is_kept_at_the_edge() {

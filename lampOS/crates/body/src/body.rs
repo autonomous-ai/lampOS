@@ -134,6 +134,14 @@ const CONTACT_STEPS: u8 = 3;
 const HAND_STEPS: u16 = 50;
 use crate::HAND_MOVED;
 const LIMP_LAG: u16 = 11;
+/// A joint held where it gave way that has not moved more than `HAND_MOVED`
+/// for this many steps (twenty seconds) is no longer renewed as in a hand:
+/// its hold runs out and it is let go, and a hand truly still on it gives
+/// way again. Its readings alone never end such a hold: lamp-06c1's head,
+/// moved 40 counts and left there, read its own weight of 130 over
+/// `STALL_LOAD`, the same as a hand holding it still, and was said a hand
+/// on `body/hand` until lamp-body was restarted (#5196).
+const HAND_STILL_STEPS: u16 = 1_000;
 /// With `--give-way`, a joint whose goal is more than `STALL_SLACK` counts
 /// from where it is, whose load is over `STALL_LOAD` and which moves no
 /// more than `STALL_SLACK` counts for `STALL_STEPS` steps is told to stop
@@ -5327,6 +5335,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // Steps left that a head or base joint the stall rule just gave way
     // under is said as a hand ([`STALL_HAND_STEPS`]).
     let mut stalled_hand = [0u16; 3];
+    // Where each held joint last moved more than `HAND_MOVED`, and steps
+    // held since ([`HAND_STILL_STEPS`]).
+    let mut held_still = [(0u16, 0u16); 3];
     // What each joint read on its last step neither held, a hand nor over
     // its bound: its own weight.
     let mut rest_load = [0u16; 3];
@@ -7500,6 +7511,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         for (index, joint) in COMMANDED.iter().enumerate() {
             let is = samples[joint.index()];
             report.peak_load[index] = report.peak_load[index].max(is.load);
+            if !held[index] {
+                held_still[index] = (is.position, 0);
+            }
             let (strained, astray) = if gesture_cooling > 0 {
                 (
                     limits.load[index].max(GESTURE_LOAD),
@@ -7640,6 +7654,14 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 // renews; 06c1's head pushed at 300 from its rest of 130
                 // reads its weight again.
                 let still = is.position.abs_diff(held_from[index]) <= HAND_MOVED;
+                held_still[index] = match held_still[index] {
+                    (at, steps) if at.abs_diff(is.position) <= HAND_MOVED => {
+                        (at, steps.saturating_add(1))
+                    }
+                    _ => (is.position, 0),
+                };
+                // Held still this long: not renewed, so it is let go.
+                let worn = held_still[index].1 >= HAND_STILL_STEPS;
                 let bound = if still && !(over_full[index] && pressing) {
                     strained
                 } else {
@@ -7649,10 +7671,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 // quiet read among them (a servo whose goal is where it is
                 // reads little) is not the hand gone, and a joint sent home
                 // with the hand still on it pushes into it and jerks.
-                if is.load > bound || is.position.abs_diff(written[index]) > HAND_MOVED {
+                if !worn && (is.load > bound || is.position.abs_diff(written[index]) > HAND_MOVED) {
                     easing[index] = easing[index].max(HAND_STEPS);
                 }
-                if let Some(moved) = in_hand_after(
+                if worn {
+                    in_hand[index] = 0;
+                } else if let Some(moved) = in_hand_after(
                     &mut in_hand[index],
                     is,
                     bound,
