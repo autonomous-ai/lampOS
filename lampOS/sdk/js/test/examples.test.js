@@ -36,6 +36,7 @@ const EXAMPLE_RUNS = {
   'follow-hand.js': [[], 'hand', ['lease.take', ['look', { at: 'hand' }]]],
   'heat-watch.js': [[], 'hot', [['light', { colour: 'orange', level: 2, pattern: 'pulse' }]]],
   'greet.js': [[], 'arrived', [['gesture', { name: 'greeting' }]]],
+  'notes.js': [[], null, [['notes.get', { key: 'runs' }], ['notes.set', { key: 'runs', value: 1 }], ['light', { colour: 'warm', level: 1 }]]],
   'phrase.js': [[], 'phrase', [['light', { colour: 'warm', level: 2, pattern: 'breathe' }], ['gesture', { name: 'nod' }]]],
   'pomodoro.js': [[], null, [['light', { colour: 'warm', level: 2 }]]],
   'push-skill.js': [['../examples/hello-skill'], null, ['skill.push']],
