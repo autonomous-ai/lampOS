@@ -2813,13 +2813,17 @@ def test_fake_connect_gives_a_connected_lamp_with_its_own_keyring_and_cleans_up(
     async def scenario():
         async with FakeLamp() as fake:
             lamp = await fake.connect()
+            third = await fake.connect()
             other = await fake.connect(name="second computer")
+            names = [client["name"] for client in fake.clients.values()]
+            assert names == ["test app 1", "test app 2", "second computer"], names
+            await third.close()
             reply = await lamp.say("hello")
             assert fake.asked("say") == [{"text": "hello"}]
             assert reply["ok"] and other is not lamp
             await other.close()  # the test closed one itself: the fake's exit must not trip on it
             folders = list(fake._folders)
-            assert len(folders) == 2 and all(Path(folder).is_dir() for folder in folders)
+            assert len(folders) == 3 and all(Path(folder).is_dir() for folder in folders)
         return lamp, folders
 
     lamp, folders = run(scenario())
@@ -2827,3 +2831,20 @@ def test_fake_connect_gives_a_connected_lamp_with_its_own_keyring_and_cleans_up(
     assert not (tmp_path / "home").exists()  # LAMPOS_HOME was never written
     with pytest.raises(LampError):
         run(lamp.say("after the fake is gone"))
+
+
+def test_a_fake_lamp_with_grants_all_takes_every_grant_the_protocol_names_and_the_default_stays_narrow():
+    async def scenario():
+        async with FakeLamp() as narrow:
+            lamp = await narrow.connect()
+            with pytest.raises(errors.NoGrantError):
+                await lamp.on("phrase.heard", lambda event: None, phrases=["good night lamp"])
+        async with FakeLamp(grants="all") as wide:
+            lamp = await wide.connect()
+            await lamp.on("phrase.heard", lambda event: None, phrases=["good night lamp"])
+            return wide.grants
+
+    assert run(scenario()) == list(schema.grants())
+    for slip in ("hear", "All", ""):
+        with pytest.raises(ValueError):
+            FakeLamp(grants=slip)
